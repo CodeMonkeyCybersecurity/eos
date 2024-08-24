@@ -19,7 +19,7 @@ fi
 
 # Handle the 'list' argument to list all scripts in the scripts/ directory
 if [ "$1" == "list" ]; then
-    echo "sudo run <example.sh>"
+    echo "Run any of the scripts below by running: sudo run <example.sh>"
     for script in ./scripts/*.sh; do
         basename "$script"
     done
