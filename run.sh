@@ -24,11 +24,18 @@ if [ "$1" == "list" ]; then
     exit 0
 fi
 
-script_path="$1"
+script_name="$1"
+
+# Prepend the 'scripts/' directory if the script_name doesn't contain a path
+if [[ "$script_name" != */* ]]; then
+    script_path="./scripts/$script_name"
+else
+    script_path="$script_name"
+fi
 
 # Check if the script exists
 if [ ! -f "$script_path" ]; then
-    echo "Error: Script '$script_path' not found."
+    echo "Error: Script '$script_name' not found."
     exit 1
 fi
 
