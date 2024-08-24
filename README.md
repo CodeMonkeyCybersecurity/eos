@@ -1,6 +1,4 @@
 # MonQ-fabric
- scripting and automation
-
 To help make ubuntu server administration easier for those of us who weren't born in a bash shell.
 
 ## For example
