@@ -1,5 +1,4 @@
 #!/bin/bash
-# borg_backup.sh
 
 # Prompt the user for BORG_REPO, BORG_PASSPHRASE, and retention policies
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
@@ -83,6 +82,13 @@ echo "Configuration has been saved to $CONFIG_FILE"
 # Export the variables so they can be used in the backup script
 export BORG_REPO
 export BORG_PASSPHRASE
+
+# Add BorgBackup operations to crontab
+(crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_DAILY%%:*} * * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_WEEKLY%%:*} * * ${BACKUP_TIME_WEEKLY%% *} ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_MONTHLY%%:*} ${BACKUP_TIME_MONTHLY%% *} * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
+
+echo "BorgBackup operations have been added to crontab."
 
 # Log file for backup operation
 LOGFILE=~/borgbackup/backup.log
