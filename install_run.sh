@@ -26,21 +26,15 @@ confirm_directory() {
     fi
 }
 
-# Function to create the 'run' script
-create_run_script() {
-    cat <<EOL > /usr/local/bin/run
-#!/bin/bash
-# Navigate to MonQ-fabric directory and execute the script
-cd "$1" || exit 1
-chmod +x "\$1"
-./"\$1"
-EOL
+# Function to create the 'run' command using the run.sh from the repository
+create_run_command() {
+    cp "$1/run.sh" /usr/local/bin/run
     chmod +x /usr/local/bin/run
-    echo "'run' command has been successfully created and hardcoded with the MonQ-fabric location."
+    echo "'run' command has been successfully created from run.sh and installed in /usr/local/bin."
 }
 
 # Main script execution
-echo "This script will install the 'run' command for root."
+echo "This script will install the 'run' command for the current user: $(get_username) and for root."
 
 read -p "Do you want to continue? (y/n): " confirm
 if [[ "$confirm" =~ ^[Yy]$ ]]; then
@@ -54,7 +48,7 @@ if [[ "$confirm" =~ ^[Yy]$ ]]; then
     fi
 
     confirm_directory
-    create_run_script "$current_dir"
+    create_run_command "$current_dir"
 
     echo "'run' command has been installed and can be executed from any directory."
 else
