@@ -15,11 +15,13 @@ check_run_exists() {
     fi
 }
 
-# Function to find MonQ-fabric repository
-find_monq_fabric() {
-    read -p "Enter the path where 'MonQ-fabric' repository is cloned: " monq_fabric_path
-    if [ ! -d "$monq_fabric_path" ]; then
-        echo "Error: Directory '$monq_fabric_path' does not exist. Please try again."
+# Function to confirm the current directory is correct
+confirm_directory() {
+    current_dir=$(pwd)
+    echo "Current directory is: $current_dir"
+    read -p "Is this the correct directory where 'MonQ-fabric' is cloned? (y/n): " confirm_dir
+    if [[ ! "$confirm_dir" =~ ^[Yy]$ ]]; then
+        echo "Please navigate to the correct directory and run the script again."
         exit 1
     fi
 }
@@ -51,8 +53,8 @@ if [[ "$confirm" =~ ^[Yy]$ ]]; then
         fi
     fi
 
-    find_monq_fabric
-    create_run_script "$monq_fabric_path"
+    confirm_directory
+    create_run_script "$current_dir"
 
     echo "'run' command has been installed and can be executed from any directory."
 else
