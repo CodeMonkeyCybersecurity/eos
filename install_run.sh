@@ -40,7 +40,7 @@ EOL
 }
 
 # Main script execution
-echo "This script will install the 'run' command for the current user: $(get_username) and for root."
+echo "This script will install the 'run' command for root."
 
 read -p "Do you want to continue? (y/n): " confirm
 if [[ "$confirm" =~ ^[Yy]$ ]]; then
