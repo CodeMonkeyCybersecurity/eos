@@ -12,7 +12,7 @@ echo "user:supersecretpassword" | sudo chpasswd
 sudo usermod -aG sudo user
 ```
 
-Into something the rest of us can use:
+Into something a human can understand:
 ``` bash
 Enter the new username:
 Enter the password:
