@@ -22,16 +22,41 @@ Should this user have sudo privileges?:
 Start in your main user directory
 
 ``` bash
+cd ~
+```
+
+Clone this repository
+``` bash
 git clone https://github.com/chickenj0/MonQ-fabric.git
+```
+
+Enter the directory you've just made
+``` bash
 cd MonQ-fabric
 ```
+
 Find the available scripts
 ``` bash
 ls -lah
 ```
 
-Chose the script you want and execute it. In the example above:
+Install the 'run' command
 ``` bash
-chmod +x add_user.sh
-./add_user.sh
+sudo chmod +x install_run.sh
+sudo ./install_run.sh
+
+
+Use the 'run' command. For the example above (adding a new user), it would look like
+``` bash
+run add_user.sh
+```
+
+Or, to create a new ssh key
+```bash
+run create_ssh_key.sh
+```
+
+Or, to check what else you can do with the 'run' command, simply type:
+```bash
+run
 ```
