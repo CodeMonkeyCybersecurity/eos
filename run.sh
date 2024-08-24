@@ -19,8 +19,10 @@ fi
 
 # Handle the 'list' argument to list all scripts in the scripts/ directory
 if [ "$1" == "list" ]; then
-    echo "Available scripts in the scripts/ directory:"
-    ls -1 ./scripts/*.sh
+    echo "sudo run <example.sh>"
+    for script in ./scripts/*.sh; do
+        basename "$script"
+    done
     exit 0
 fi
 
