@@ -37,19 +37,19 @@ validate_time() {
 }
 
 # Ensure the scripts are executable and exist
-if [ ! -x "./scripts/check_ssh_credentials.sh" ]; then
+if [ ! -x "./scripts/check_ssh_credentials" ]; then
     error_exit "Missing or non-executable check_ssh_credentials.sh script."
 fi
 
-if [ ! -x "./scripts/check_repo_path.sh" ]; then
+if [ ! -x "./scripts/check_repo_path" ]; then
     error_exit "Missing or non-executable check_repo_path.sh script."
 fi
 
 # Check SSH credentials
-./scripts/check_ssh_credentials.sh || error_exit "SSH credentials check failed."
+./scripts/check_ssh_credentials || error_exit "SSH credentials check failed."
 
 # Check Borg repository path
-./scripts/check_repo_path.sh || error_exit "Repository path check failed."
+./scripts/check_repo_path || error_exit "Repository path check failed."
 
 # Prompt the user for BORG_REPO path
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
@@ -88,7 +88,7 @@ IMPORTANT_DIRS=${IMPORTANT_DIRS:-/etc /home /root /var}
 IMPORTANT_DIRS=$(echo "$IMPORTANT_DIRS" | tr ',' ' ')
 
 read -p "Enter any known issues or considerations (optional): " KNOWN_ISSUES
-read -p "Enter contact information (e.g., Henry, henry@codemonkey.net.au): " CONTACT_INFO
+read -p "Enter contact information (e.g., First Last, your@email.net.au): " CONTACT_INFO
 
 # Create a configuration file in markdown format
 CONFIG_FILE=~/borgbackup/borg_configs.md
