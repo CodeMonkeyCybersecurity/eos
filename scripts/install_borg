@@ -1,22 +1,48 @@
 #!/bin/bash
 
+# Ensure the borgbackup directory exists
+mkdir -p ~/borgbackup
+
+# Function to check Borg repository connection and initialize if necessary
+check_and_create_repo() {
+    echo "Checking connection to the Borg repository..."
+    borg list "$BORG_REPO" > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        echo "Unable to connect to the repository or repository not initialized. Attempting to create the repository..."
+        borg init --encryption=repokey "$BORG_REPO"
+        if [ $? -eq 0 ]; then
+            echo "Repository successfully created at $BORG_REPO."
+        else
+            error_exit "Failed to create the repository at $BORG_REPO. Exiting."
+        fi
+    else
+        echo "Connection to the Borg repository verified successfully."
+    fi
+}
+
 # Prompt the user for BORG_REPO, BORG_PASSPHRASE, and retention policies
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
 read -sp "Enter the BORG_PASSPHRASE (hidden input): " BORG_PASSPHRASE
 echo
-read -p "Enter the number of daily backups to keep: " KEEP_DAILY
-read -p "Enter the number of weekly backups to keep: " KEEP_WEEKLY
-read -p "Enter the number of monthly backups to keep: " KEEP_MONTHLY
+read -p "Enter the number of daily backups to keep: 7: " KEEP_DAILY
+read -p "Enter the number of weekly backups to keep: 4: " KEEP_WEEKLY
+read -p "Enter the number of monthly backups to keep: 12: " KEEP_MONTHLY
+
+# Check the connection to the Borg repository and initialize if necessary
+check_and_create_repo
 
 # Ask for additional configuration details
-read -p "Enter the daily backup time (e.g., 02:00 AM): " BACKUP_TIME_DAILY
-read -p "Enter the weekly backup day and time (e.g., Sunday at 03:00 AM): " BACKUP_TIME_WEEKLY
-read -p "Enter the monthly backup day and time (e.g., 1st of every month at 04:00 AM): " BACKUP_TIME_MONTHLY
+read -p "Enter the daily backup time (in 24-hour format, e.g., 02:00): " BACKUP_TIME_DAILY
+read -p "Enter the weekly backup day and time (e.g., Sun 03:00 in 24-hour format): " BACKUP_TIME_WEEKLY
+read -p "Enter the monthly backup day and time (e.g., 1st 04:00 in 24-hour format): " BACKUP_TIME_MONTHLY
 
 read -p "Enter the hostname of the environment (e.g., $(hostname)): " HOSTNAME
 OS_INFO=$(lsb_release -d | cut -f2)
-read -p "Enter the important directories to backup (default: /etc, /home, /root, /var): " IMPORTANT_DIRS
+read -p "Enter the important directories to backup (default: /etc /home /root /var): " IMPORTANT_DIRS
 IMPORTANT_DIRS=${IMPORTANT_DIRS:-/etc /home /root /var}
+
+# Handle multiple directories with commas
+IMPORTANT_DIRS=$(echo "$IMPORTANT_DIRS" | tr ',' ' ')
 
 read -p "Enter any known issues or considerations (optional): " KNOWN_ISSUES
 read -p "Enter contact information (e.g., Henry, henry@codemonkey.net.au): " CONTACT_INFO
@@ -89,86 +115,3 @@ export BORG_PASSPHRASE
 (crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_MONTHLY%%:*} ${BACKUP_TIME_MONTHLY%% *} * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
 
 echo "BorgBackup operations have been added to crontab."
-
-# Log file for backup operation
-LOGFILE=~/borgbackup/backup.log
-
-# Function to log information
-info() {
-    printf "\n%s %s\n" "$(date)" "$*" | tee -a "$LOGFILE"
-}
-
-# Function to log and handle errors
-error() {
-    printf "\n%s %s\n" "$(date)" "$*" | tee -a "$LOGFILE" >&2
-    exit 1
-}
-
-# Trap signals and log them
-trap 'error "Backup interrupted"' INT TERM
-
-# Backup function
-backup() {
-    info "Starting backup"
-    borg create                         \
-        --verbose                       \
-        --filter AME                    \
-        --list                          \
-        --stats                         \
-        --show-rc                       \
-        --compression lz4               \
-        --exclude-caches                \
-        --exclude 'home/*/.cache/*'     \
-        --exclude 'var/tmp/*'           \
-                                        \
-        ::'{hostname}-{now}'            \
-        ${IMPORTANT_DIRS}
-    return $?
-}
-
-# Pruning function
-prune() {
-    info "Pruning repository"
-    borg prune                          \
-        --list                          \
-        --glob-archives '{hostname}-*'  \
-        --show-rc                       \
-        --keep-daily    ${KEEP_DAILY}   \
-        --keep-weekly   ${KEEP_WEEKLY}  \
-        --keep-monthly  ${KEEP_MONTHLY}
-    return $?
-}
-
-# Compacting function
-compact() {
-    info "Compacting repository"
-    borg compact
-    return $?
-}
-
-# Main backup process
-backup_exit=0
-prune_exit=0
-compact_exit=0
-
-backup
-backup_exit=$?
-
-prune
-prune_exit=$?
-
-compact
-compact_exit=$?
-
-# Determine global exit status
-if [ ${global_exit} -eq 0 ]; then
-    info "Backup, Prune, and Compact finished successfully"
-    sed -i "s/Last Successful Backup:.*/Last Successful Backup: $(date)/" ${CONFIG_FILE}
-elif [ ${global_exit} -eq 1 ]; then
-    info "Backup, Prune, and/or Compact finished with warnings"
-else
-    error "Backup, Prune, and/or Compact finished with errors"
-    sed -i "s/Last Failure:.*/Last Failure: $(date)/" ${CONFIG_FILE}
-fi
-
-exit ${global_exit}
