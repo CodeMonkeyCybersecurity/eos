@@ -4,7 +4,7 @@
 INSTALL_DIR="/usr/local/bin"
 
 # Define the name of the script
-SCRIPT_NAME="run"
+SCRIPT_NAME="run.sh"
 
 # Full path to the script
 SCRIPT_PATH="$INSTALL_DIR/$SCRIPT_NAME"
