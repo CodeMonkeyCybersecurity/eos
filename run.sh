@@ -1,20 +1,15 @@
 #!/bin/bash
 # run.sh
 
-# Get the absolute path to the scripts directory
-# Assuming 'run.sh' is located in the MonQ-fabric directory
-# and scripts are in a 'scripts' subdirectory
-script_dir="$(realpath "$(dirname "$0")/scripts")"
-
 # If no argument is provided, display the usage message
 if [ -z "$1" ]; then
-    echo "Usage: sudo run <script_name_or_path>"
+    echo "Usage: sudo run <script_path>"
     echo ""
     echo "To see what else you can do with 'run', simply type:"
     echo "sudo run"
     echo ""
     echo "This command allows you to:"
-    echo "- Execute any script by providing its name or path."
+    echo "- Execute any script by providing its path."
     echo "- The script will be made executable and then run."
     echo ""
     echo "You can also list available scripts in the scripts/ directory:"
@@ -24,25 +19,25 @@ fi
 
 # Handle the 'list' argument to list all scripts in the scripts/ directory
 if [ "$1" == "list" ]; then
-    echo "Run any of the scripts below by running: sudo run <script_name>"
-    for script in "$script_dir"/*.sh; do
-        basename "$script" .sh
+    echo "Run any of the scripts below by running: sudo run <example.sh>"
+    for script in ./scripts/*.sh; do
+        basename "$script"
     done
     exit 0
 fi
 
 script_name="$1"
 
-# If the script_name doesn't contain a path, prepend the 'scripts/' directory
+# Prepend the 'scripts/' directory if the script_name doesn't contain a path
 if [[ "$script_name" != */* ]]; then
-    script_path="$script_dir/$script_name.sh"
+    script_path="./scripts/$script_name"
 else
     script_path="$script_name"
 fi
 
 # Check if the script exists
 if [ ! -f "$script_path" ]; then
-    echo "Error: Script '$script_name' not found in '$script_dir'."
+    echo "Error: Script '$script_name' not found."
     exit 1
 fi
 
