@@ -3,6 +3,12 @@
 # Ensure the borgbackup directory exists
 mkdir -p ~/borgbackup
 
+# Function to log and handle errors
+error_exit() {
+    echo "$1" 1>&2
+    exit 1
+}
+
 # Function to check Borg repository connection
 check_repo_connection() {
     echo "Checking connection to the Borg repository..."
@@ -97,7 +103,7 @@ ${KNOWN_ISSUES:-None}
 - **Last Failure**: N/A
 
 ## Commands and Execution Notes
-- **Backup Command**: \`borg create --verbose --filter AME --list --compression lz4 --exclude-caches --exclude 'home/*/.cache/*' --exclude 'var/tmp/*' ::'{hostname}-{now}' ${IMPORTANT_DIRS}\`
+- **Backup Command**: \`borg create --verbose --filter AME --list --compression lz4 --exclude-caches --exclude 'home/*/.cache/*' --exclude 'var/tmp/*' "$BORG_REPO::'{hostname}-{now}'" ${IMPORTANT_DIRS}\`
 - **Execution Notes**: Ensure that all dependencies are installed before running the script.
 EOF
 
@@ -107,9 +113,19 @@ echo "Configuration has been saved to $CONFIG_FILE"
 export BORG_REPO
 export BORG_PASSPHRASE
 
+# Convert backup times to crontab format (24-hour)
+convert_time_to_24hr_format() {
+    time_input="$1"
+    date -d "$time_input" +'%H:%M'
+}
+
+daily_time=$(convert_time_to_24hr_format "$BACKUP_TIME_DAILY")
+weekly_time=$(convert_time_to_24hr_format "$BACKUP_TIME_WEEKLY")
+monthly_time=$(convert_time_to_24hr_format "$BACKUP_TIME_MONTHLY")
+
 # Add BorgBackup operations to crontab
-(crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_DAILY%%:*} * * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
-(crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_WEEKLY%%:*} * * ${BACKUP_TIME_WEEKLY%% *} ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
-(crontab -l 2>/dev/null; echo "0 ${BACKUP_TIME_MONTHLY%%:*} ${BACKUP_TIME_MONTHLY%% *} * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 ${daily_time%%:*} * * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 ${weekly_time%%:*} * * ${weekly_time%% *} ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 ${monthly_time%%:*} ${monthly_time%% *} * * ~/borgbackup/backup_script.sh > ~/borgbackup/backup.log 2>&1") | crontab -
 
 echo "BorgBackup operations have been added to crontab."
