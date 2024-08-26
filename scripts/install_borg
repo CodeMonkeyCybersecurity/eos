@@ -20,6 +20,16 @@ check_repo_connection() {
     fi
 }
 
+# Example of integrating the checks into install_borg.sh
+
+# Check SSH credentials first
+./check_ssh_credentials.sh
+
+# Check repository path
+./check_repo_path.sh
+
+# If both checks pass, continue with the rest of the installation
+
 # Prompt the user for BORG_REPO path
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
 
