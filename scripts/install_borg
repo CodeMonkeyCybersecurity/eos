@@ -36,20 +36,20 @@ validate_time() {
     fi
 }
 
-# Ensure the scripts are executable
-if [ ! -x "./scripts/check_ssh_credentials" ]; then
-    error_exit "Missing or non-executable check_ssh_credentials script."
+# Ensure the scripts are executable and exist
+if [ ! -x "./scripts/check_ssh_credentials.sh" ]; then
+    error_exit "Missing or non-executable check_ssh_credentials.sh script."
 fi
 
-if [ ! -x "./scripts/check_repo_path" ]; then
-    error_exit "Missing or non-executable check_repo_path script."
+if [ ! -x "./scripts/check_repo_path.sh" ]; then
+    error_exit "Missing or non-executable check_repo_path.sh script."
 fi
 
 # Check SSH credentials
-./scripts/check_ssh_credentials || error_exit "SSH credentials check failed."
+./scripts/check_ssh_credentials.sh || error_exit "SSH credentials check failed."
 
 # Check Borg repository path
-./scripts/check_repo_path || error_exit "Repository path check failed."
+./scripts/check_repo_path.sh || error_exit "Repository path check failed."
 
 # Prompt the user for BORG_REPO path
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
