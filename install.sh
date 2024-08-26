@@ -10,7 +10,7 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 # Directory where the scripts are located
-SOURCE_DIR="$(pwd)/scripts"  # Change this if your scripts are in a different directory
+SOURCE_DIR="$(pwd)"  # Change this if your scripts are in a different directory
 
 # Ensure the source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -21,8 +21,8 @@ fi
 # Move all scripts recursively from the source directory to the target directory
 echo "Moving scripts from $SOURCE_DIR to $TARGET_DIR"
 
-# Find all .sh files in the source directory and move them to the target directory
-find "$SOURCE_DIR" -type f -name "*.sh" -exec sudo mv {} "$TARGET_DIR/" \;
+# Copy all contents of the source directory to the target directory
+sudo cp -R "$SOURCE_DIR/"* "$TARGET_DIR/"
 
 # Make all moved scripts executable
 echo "Making scripts executable"
@@ -31,8 +31,8 @@ sudo chmod -R +x "$TARGET_DIR"/
 # Provide feedback
 echo "Installation complete."
 
-
-
+# ASCII art
+cat << "EOF"
 
        #                 ____---------_____
        #               / ___/-----------___ \
@@ -56,3 +56,4 @@ echo "Installation complete."
        #                \___\_, |_.__/\___|_|
        #                    |__/
 
+EOF
