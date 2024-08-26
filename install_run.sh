@@ -33,6 +33,19 @@ create_run_command() {
     echo "'run' command has been successfully created from run.sh and installed in /usr/local/bin."
 }
 
+# Function to ensure all scripts in the scripts/ directory are executable
+make_scripts_executable() {
+    script_dir="$1/scripts"
+    if [ -d "$script_dir" ]; then
+        echo "Making all scripts in $script_dir executable..."
+        chmod +x "$script_dir"/*
+        echo "All scripts in $script_dir are now executable."
+    else
+        echo "Error: scripts directory not found at $script_dir."
+        exit 1
+    fi
+}
+
 # Main script execution
 echo "This script will install the 'run' command for the current user: $(get_username) and for root."
 
@@ -48,6 +61,7 @@ if [[ "$confirm" =~ ^[Yy]$ ]]; then
     fi
 
     confirm_directory
+    make_scripts_executable "$current_dir"
     create_run_command "$current_dir"
 
     echo "'run' command has been installed and can be executed from any directory."
