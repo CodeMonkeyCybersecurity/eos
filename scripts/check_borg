@@ -1,0 +1,121 @@
+#!/bin/bash
+
+# Function to log and handle errors
+error_exit() {
+    echo "$1" 1>&2
+    exit 1
+}
+
+# Function to check BorgBackup logs
+check_logs() {
+    if [ -f ~/borgbackup/backup.log ]; then
+        echo "Displaying BorgBackup logs:"
+        cat ~/borgbackup/backup.log
+    else
+        echo "Log file not found."
+    fi
+}
+
+# Function to verify backup archives
+verify_archives() {
+    if [ -z "$BORG_REPO" ]; then
+        error_exit "BORG_REPO is not set. Exiting."
+    fi
+    echo "Listing archives in the repository:"
+    borg list "$BORG_REPO"
+}
+
+# Function to test restore
+test_restore() {
+    if [ -z "$BORG_REPO" ]; then
+        error_exit "BORG_REPO is not set. Exiting."
+    fi
+    read -p "Enter the archive name to restore: " archive_name
+    read -p "Enter the destination directory: " dest_dir
+    echo "Restoring archive $archive_name to $dest_dir"
+    borg extract "$BORG_REPO::$archive_name" "$dest_dir"
+    echo "Restore operation completed."
+}
+
+# Function to check crontab entries
+check_crontab() {
+    echo "Current crontab entries for the user:"
+    crontab -l
+}
+
+# Function to review borg_configs.md
+review_configs() {
+    if [ -f ~/borgbackup/borg_configs.md ]; then
+        echo "Displaying borg_configs.md:"
+        cat ~/borgbackup/borg_configs.md
+    else
+        echo "borg_configs.md file not found."
+    fi
+}
+
+# Function to check the repository size
+monitor_size() {
+    if [ -z "$BORG_REPO" ]; then
+        error_exit "BORG_REPO is not set. Exiting."
+    fi
+    echo "Calculating the size of the repository:"
+    du -sh "$BORG_REPO"
+}
+
+# Function to set up notifications
+setup_notifications() {
+    read -p "Enter your email address for notifications: " email
+    if [ -z "$email" ]; then
+        error_exit "No email provided. Exiting."
+    fi
+    echo "Setting up notifications for backup failures..."
+    echo "To configure notifications, please ensure that your system can send emails (e.g., via sendmail or Postfix)."
+    # Add mail sending logic to the backup script
+    echo "if [ \${global_exit} -ne 0 ]; then" >> ~/borgbackup/backup_script.sh
+    echo "    echo 'BorgBackup failed on \$(hostname)' | mail -s 'BorgBackup Failure' $email" >> ~/borgbackup/backup_script.sh
+    echo "fi" >> ~/borgbackup/backup_script.sh
+    echo "Notification setup completed."
+}
+
+# Function to prompt for installation type
+prompt_check_type() {
+    echo "What would you like to check?"
+    echo "1. Check BorgBackup logs"
+    echo "2. Verify backup archives"
+    echo "3. Test restore"
+    echo "4. Check crontab entries"
+    echo "5. Review borg_config.md"
+    echo "6. Check the repository size"
+    echo "7. Set up notifications"
+    read -p "Please enter your choice (1 - 7): " choice
+
+    case $choice in
+        1)
+            check_logs
+            ;;
+        2)
+            verify_archives
+            ;;
+        3)
+            test_restore
+            ;;
+        4)
+            check_crontab
+            ;;
+        5)
+            review_configs
+            ;;
+        6)
+            monitor_size
+            ;;
+        7)
+            setup_notifications
+            ;;
+        *)
+            error_exit "Invalid choice. Exiting."
+            ;;
+    esac
+}
+
+# Run the prompt
+prompt_check_type
