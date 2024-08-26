@@ -12,8 +12,6 @@ if [ -f "$1" ]; then
   script_path="./$1"
 elif [ -f "/usr/local/bin/fabric/$1" ]; then
   script_path="/usr/local/bin/fabric/$1"
-elif [ -f "$(realpath "$1")" ]; then
-  script_path=$(realpath "$1")
 else
   echo "Error: Script '$1' not found."
   exit 1
