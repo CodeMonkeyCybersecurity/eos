@@ -1,0 +1,41 @@
+
+
+# Function to prompt for installation type
+prompt_check_type() {
+    echo "What would you like to check?"
+    echo "1. Check BorgBackup logs"
+    echo "2. Verify backup archives"
+    echo "3. Test restore"
+    echo "4. Check crontab entries"
+    echo "5. Review borg_config.md"
+    echo "6. Check the repository size"
+    echo "7. Set up notifications"
+    read -p "Please enter your choice (1 - 7): " choice
+
+    case $choice in
+        1)
+            check_logs
+            ;;
+        2)
+            verify_archives
+            ;;
+        3)
+            test_restore
+            ;;
+        4)  
+            check_crontab
+            ;;
+        5)
+            review_configs
+            ;;
+        6)
+            monitor_size
+            ;;
+        7)
+            setup_notifications
+            ;;
+        *)
+            error_exit "Invalid choice. Exiting."
+            ;;
+    esac
+}
