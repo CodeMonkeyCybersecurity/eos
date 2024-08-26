@@ -1,17 +1,28 @@
+
 # Update the list of packages
-sudo apt update
+sudo apt-get update
 
-# Install prerequisites
-sudo apt install -y wget apt-transport-https software-properties-common
+# Install pre-requisite packages.
+sudo apt-get install -y wget apt-transport-https software-properties-common
 
-# Import the Microsoft GPG key
-wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
+# Get the version of Ubuntu
+source /etc/os-release
 
-# Register the Microsoft repository
+# Download the Microsoft repository keys
+wget -q https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb
+
+# Register the Microsoft repository keys
 sudo dpkg -i packages-microsoft-prod.deb
 
-# Update package lists again
-sudo apt update
+# Delete the Microsoft repository keys file
+rm packages-microsoft-prod.deb
 
+# Update the list of packages after we added packages.microsoft.com
+sudo apt-get update
+
+###################################
 # Install PowerShell
-sudo apt install -y powershell
+sudo apt-get install -y powershell
+
+# Start PowerShell
+pwsh
