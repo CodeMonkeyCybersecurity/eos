@@ -42,6 +42,14 @@ check_or_initialize_repo() {
         # Prompt to initialize the repository
         read -p "Do you want to initialize a new Borg repository at this path? (y/n): " init_choice
         if [ "$init_choice" == "y" ]; then
+            # Ensure the directory exists and is writable
+            ssh "$user@$host" "mkdir -p $repo_dir && chmod 700 $repo_dir"
+            if [ $? -ne 0 ]; then
+                echo "Error: Failed to create or set permissions for the directory $repo_dir on the remote server."
+                exit 1
+            fi
+
+            # Initialize the Borg repository
             ssh "$user@$host" "borg init --encryption=repokey $repo_dir"
             if [ $? -eq 0 ]; then
                 echo "Borg repository initialized successfully at $repo_path."
