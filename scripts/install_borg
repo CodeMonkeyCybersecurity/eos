@@ -161,16 +161,14 @@ compact
 compact_exit=$?
 
 # Determine global exit status
-global_exit=$(( backup_exit > prune_exit ? backup_exit : prune_exit ))
-global_exit=$(( compact_exit > global_exit ? compact_exit : global_exit ))
-
-# Log final status
 if [ ${global_exit} -eq 0 ]; then
     info "Backup, Prune, and Compact finished successfully"
+    sed -i "s/Last Successful Backup:.*/Last Successful Backup: $(date)/" ${CONFIG_FILE}
 elif [ ${global_exit} -eq 1 ]; then
     info "Backup, Prune, and/or Compact finished with warnings"
 else
     error "Backup, Prune, and/or Compact finished with errors"
+    sed -i "s/Last Failure:.*/Last Failure: $(date)/" ${CONFIG_FILE}
 fi
 
 exit ${global_exit}
