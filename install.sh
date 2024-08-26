@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define the directory where you want to place the 'run' script
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="/usr/local/bin/fabric"
 
 # Define the name of the script
 SCRIPT_NAME="run"
