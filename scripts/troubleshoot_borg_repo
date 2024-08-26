@@ -46,6 +46,7 @@ check_or_initialize_repo() {
             ssh "$user@$host" "mkdir -p $repo_dir && chmod 700 $repo_dir"
             if [ $? -ne 0 ]; then
                 echo "Error: Failed to create or set permissions for the directory $repo_dir on the remote server."
+                echo "You will likely need to create this yourself manually, then try this again."
                 exit 1
             fi
 
