@@ -1,0 +1,10 @@
+Package: fabric
+Version: 1.0.0
+Section: base
+Priority: optional
+Architecture: all
+Maintainer: Henry Oliver <henry@codemonkey.net.au>
+Description: A versatile script runner
+ This package provides the 'run' command, which allows you to execute scripts
+ with ease. To help make ubuntu server administration easier for those of us who weren't born in a bash shell.
+
