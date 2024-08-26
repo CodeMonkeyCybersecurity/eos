@@ -5,8 +5,8 @@ check_ssh_connection() {
     local ssh_path=$1
 
     # Extract username and host from the SSH path
-    local user=$(echo "$ssh_path" | awk -F '[@:]' '{print $2}')
-    local host=$(echo "$ssh_path" | awk -F '[@:]' '{print $3}')
+    local user=$(echo "$ssh_path" | awk -F '[@:]' '{print $1}')
+    local host=$(echo "$ssh_path" | awk -F '[@:]' '{print $2}')
 
     echo "Checking SSH connection to $user@$host..."
     
@@ -51,17 +51,14 @@ ensure_ssh_prefix() {
     echo "$path"
 }
 
-# Modify the troubleshoot_borg_repo script to include this function:
+# Function to troubleshoot Borg repository
 troubleshoot_borg_repo() {
     read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
     BORG_REPO=$(ensure_ssh_prefix "$BORG_REPO")
 
-    # The rest of your script follows...
-}
-
     # Extract SSH path from BORG_REPO for SSH check
     SSH_PATH=$(echo "$BORG_REPO" | awk -F '://' '{print $2}')
-    
+
     # Check SSH connection
     check_ssh_connection "$SSH_PATH"
 
