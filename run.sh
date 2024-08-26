@@ -23,8 +23,11 @@ fi
 # Handle the 'list' argument to list all scripts in the script_dir directory
 if [ "$1" == "list" ]; then
     echo "Run any of the scripts below by running: sudo run <example>"
+    # List all files in the directory, filtering out directories
     for script in "$script_dir"/*; do
-        basename "$script"
+        if [ -f "$script" ]; then
+            basename "$script"
+        fi
     done
     exit 0
 fi
