@@ -3,33 +3,31 @@
 # Ensure the borgbackup directory exists
 mkdir -p ~/borgbackup
 
-# Function to check Borg repository connection and initialize if necessary
-check_and_create_repo() {
+# Function to check Borg repository connection
+check_repo_connection() {
     echo "Checking connection to the Borg repository..."
     borg list "$BORG_REPO" > /dev/null 2>&1
     if [ $? -ne 0 ]; then
-        echo "Unable to connect to the repository or repository not initialized. Attempting to create the repository..."
-        borg init --encryption=repokey "$BORG_REPO"
-        if [ $? -eq 0 ]; then
-            echo "Repository successfully created at $BORG_REPO."
-        else
-            error_exit "Failed to create the repository at $BORG_REPO. Exiting."
-        fi
+        error_exit "Unable to connect to the repository at $BORG_REPO. Please check the repository path or your SSH credentials."
     else
         echo "Connection to the Borg repository verified successfully."
     fi
 }
 
-# Prompt the user for BORG_REPO, BORG_PASSPHRASE, and retention policies
+# Prompt the user for BORG_REPO path
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
+
+# Check the connection to the Borg repository
+check_repo_connection
+
+# If the connection is successful, proceed to ask for the passphrase
 read -sp "Enter the BORG_PASSPHRASE (hidden input): " BORG_PASSPHRASE
 echo
-read -p "Enter the number of daily backups to keep: 7: " KEEP_DAILY
-read -p "Enter the number of weekly backups to keep: 4: " KEEP_WEEKLY
-read -p "Enter the number of monthly backups to keep: 12: " KEEP_MONTHLY
 
-# Check the connection to the Borg repository and initialize if necessary
-check_and_create_repo
+# Continue with the rest of the script
+read -p "Enter the number of daily backups to keep: " KEEP_DAILY
+read -p "Enter the number of weekly backups to keep: " KEEP_WEEKLY
+read -p "Enter the number of monthly backups to keep: " KEEP_MONTHLY
 
 # Ask for additional configuration details
 read -p "Enter the daily backup time (in 24-hour format, e.g., 02:00): " BACKUP_TIME_DAILY
