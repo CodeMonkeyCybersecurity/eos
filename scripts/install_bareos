@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Function to display a message and exit with an error code
+function error_exit {
+    echo "$1" 1>&2
+    exit 1
+}
+
+# Function to install Bareos Director
+install_director() {
+    echo "Installing Bareos Director..."
+    apt-get install -y bareos bareos-database-postgresql || error_exit "Failed to install Bareos Director."
+    
+    # Set up PostgreSQL database for Bareos Director
+    echo "Configuring PostgreSQL for Bareos..."
+    sudo -u postgres createuser bareos || error_exit "Failed to create Bareos PostgreSQL user."
+    sudo -u postgres createdb -O bareos bareos || error_exit "Failed to create Bareos PostgreSQL database."
+    sudo -u postgres psql -c "ALTER USER bareos WITH PASSWORD 'bareos';" || error_exit "Failed to set password for Bareos PostgreSQL user."
+
+    # Enable and start Bareos Director services
+    echo "Enabling and starting Bareos Director services..."
+    systemctl enable bareos-dir || error_exit "Failed to enable Bareos Director service."
+    systemctl enable bareos-sd || error_exit "Failed to enable Bareos Storage Daemon service."
+    systemctl start bareos-dir || error_exit "Failed to start Bareos Director service."
+    systemctl start bareos-sd || error_exit "Failed to start Bareos Storage Daemon service."
+}
+
+# Function to install Bareos Client (File Daemon)
+install_client() {
+    echo "Installing Bareos Client (File Daemon)..."
+    apt-get install -y bareos-filedaemon || error_exit "Failed to install Bareos File Daemon."
+
+    # Enable and start Bareos File Daemon service
+    echo "Enabling and starting Bareos File Daemon service..."
+    systemctl enable bareos-fd || error_exit "Failed to enable Bareos File Daemon service."
+    systemctl start bareos-fd || error_exit "Failed to start Bareos File Daemon service."
+}
+
+# Function to prompt for installation type
+prompt_installation_type() {
+    echo "What would you like to install?"
+    echo "1. Bareos Director"
+    echo "2. Bareos Client (File Daemon)"
+    echo "3. Both"
+    read -p "Please enter your choice (1/2/3): " choice
+
+    case $choice in
+        1)
+            install_director
+            ;;
+        2)
+            install_client
+            ;;
+        3)
+            install_director
+            install_client
+            ;;
+        *)
+            error_exit "Invalid choice. Exiting."
+            ;;
+    esac
+}
+
+# Check if the script is run as root
+if [[ $EUID -ne 0 ]]; then
+   error_exit "This script must be run as root."
+fi
+
+# Update package lists
+echo "Updating package lists..."
+apt-get update || error_exit "Failed to update package lists."
+
+# Install necessary prerequisites
+echo "Installing prerequisites..."
+apt-get install -y wget gnupg2 lsb-release || error_exit "Failed to install prerequisites."
+
+# Add the Bareos repository
+echo "Adding Bareos repository..."
+wget -q https://download.bareos.org/bareos/release/latest/Debian_$(lsb_release -cs)/Release.key -O- | apt-key add - || error_exit "Failed to add Bareos repository key."
+echo "deb http://download.bareos.org/bareos/release/latest/Debian_$(lsb_release -cs)/ /" > /etc/apt/sources.list.d/bareos.list || error_exit "Failed to add Bareos repository."
+
+# Update package lists again
+echo "Updating package lists..."
+apt-get update || error_exit "Failed to update package lists after adding Bareos repository."
+
+# Prompt user for installation type
+prompt_installation_type
+
+# Provide feedback to the user
+echo "Bareos installation and configuration complete."
