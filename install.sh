@@ -9,35 +9,18 @@ if [ ! -d "$TARGET_DIR" ]; then
   sudo mkdir -p "$TARGET_DIR"
 fi
 
-# Install each script into the target directory
-install_script() {
-  script_name="$1"
-  source_path="$2"
-
-  # Check if the script exists
-  if [ ! -f "$source_path/$script_name" ]; then
-    echo "Error: Script '$script_name' not found in '$source_path'"
-    return 1
-  fi
-
-  # Copy the script to the target directory
-  echo "Installing '$script_name' to '$TARGET_DIR'"
-  sudo cp "$source_path/$script_name" "$TARGET_DIR/"
-
-  # Make the script executable
-  sudo chmod +x "$TARGET_DIR/$script_name"
-}
-
-# List of scripts to install
-scripts=("script1.sh" "script2.sh" "install_borg.sh")
-
 # Directory where the scripts are located
-source_dir="$(pwd)"  # Assuming scripts are in the current directory
+SOURCE_DIR="$(pwd)/scripts"  # Change this if your scripts are in a different directory
 
-# Install each script
-for script in "${scripts[@]}"; do
-  install_script "$script" "$source_dir"
-done
+# Move all scripts recursively from the source directory to the target directory
+echo "Moving scripts from $SOURCE_DIR to $TARGET_DIR"
+
+# Find all files in the source directory and move them to the target directory
+find "$SOURCE_DIR" -type f -name "*.sh" -exec sudo mv {} "$TARGET_DIR/" \;
+
+# Make all moved scripts executable
+echo "Making scripts executable"
+sudo chmod +x "$TARGET_DIR"/*.sh
 
 # Provide feedback
-echo "Installation complete. All scripts are now available in $TARGET_DIR"
+echo "Installation complete."
