@@ -1,41 +1,47 @@
 #!/bin/bash
+# run.sh
 
-# Function to list all scripts in the /usr/local/bin/fabric directory
-list_scripts() {
-    echo "Available scripts in /usr/local/bin/fabric:"
-    if [ -d "/usr/local/bin/fabric" ]; then
-        scripts=$(ls /usr/local/bin/fabric 2>/dev/null)
-        if [ -z "$scripts" ]; then
-            echo "No scripts found in /usr/local/bin/fabric."
-        else
-            echo "$scripts"
-        fi
-    else
-        echo "Directory /usr/local/bin/fabric does not exist."
-    fi
-}
+# Define the directory where the scripts are located
+script_dir="/usr/local/bin/fabric"
 
-# Check if the script argument is provided
+# If no argument is provided, display the usage message
 if [ -z "$1" ]; then
-  echo "Error: No script name provided."
-  echo "Usage: run <script.sh>"
-  exit 1
+    echo "Usage: sudo run <script_name_or_path>"
+    echo ""
+    echo "To see what else you can do with 'run', simply type:"
+    echo "sudo run"
+    echo ""
+    echo "This command allows you to:"
+    echo "- Execute any script by providing its name or path."
+    echo "- The script will be made executable and then run."
+    echo ""
+    echo "You can also list available scripts in the '$script_dir' directory:"
+    echo "sudo run list"
+    exit 1
 fi
 
-# Check if the user wants to list available scripts
+# Handle the 'list' argument to list all scripts in the script_dir directory
 if [ "$1" == "list" ]; then
-    list_scripts
+    echo "Run any of the scripts below by running: sudo run <example>"
+    for script in "$script_dir"/*; do
+        basename "$script"
+    done
     exit 0
 fi
 
-# Search in the current directory, /usr/local/bin/fabric, and by absolute path
-if [ -f "$1" ]; then
-  script_path="./$1"
-elif [ -f "/usr/local/bin/fabric/$1" ]; then
-  script_path="/usr/local/bin/fabric/$1"
+script_name="$1"
+
+# If the script_name doesn't contain a path, prepend the script_dir directory
+if [[ "$script_name" != */* ]]; then
+    script_path="$script_dir/$script_name"
 else
-  echo "Error: Script '$1' not found."
-  exit 1
+    script_path="$script_name"
+fi
+
+# Check if the script exists
+if [ ! -f "$script_path" ]; then
+    echo "Error: Script '$script_name' not found in '$script_dir'."
+    exit 1
 fi
 
 # Make the script executable
