@@ -10,7 +10,7 @@ if [ ! -d "$TARGET_DIR" ]; then
 fi
 
 # Directory where the scripts are located
-SOURCE_DIR="$(pwd)scripts"  # Change this if your scripts are in a different directory
+SOURCE_DIR="$(pwd)/scripts"  # Change this if your scripts are in a different directory
 
 # Ensure the source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
