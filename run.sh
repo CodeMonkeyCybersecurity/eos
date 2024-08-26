@@ -24,9 +24,7 @@ fi
 if [ "$1" == "list" ]; then
     echo "Run any of the scripts below by running: sudo run <example>"
     # List all files in the directory, filtering out directories
-    for script in "$script_dir"/*; do
-        if [ -f "$script" ]; then
-            basename "$script"
+    ls -lah /usr/local/bin/fabric
         fi
     done
     exit 0
