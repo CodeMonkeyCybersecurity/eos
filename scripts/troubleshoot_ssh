@@ -3,6 +3,11 @@
 # Function to check SSH connection
 check_ssh_connection() {
     local ssh_path=$1
+
+    # Remove any single quotes from the SSH path
+    ssh_path=$(echo "$ssh_path" | sed "s/'//g")
+
+    # Extract username and host from the SSH path
     local user=$(echo "$ssh_path" | awk -F '[@:]' '{print $1}')
     local host=$(echo "$ssh_path" | awk -F '[@:]' '{print $2}')
 
@@ -46,6 +51,10 @@ check_ssh_key_permissions() {
 # Function to check if SSH service is running on the remote server
 check_ssh_service() {
     local ssh_path=$1
+
+    # Remove any single quotes from the SSH path
+    ssh_path=$(echo "$ssh_path" | sed "s/'//g")
+
     local user=$(echo "$ssh_path" | awk -F '[@:]' '{print $1}')
     local host=$(echo "$ssh_path" | awk -F '[@:]' '{print $2}')
 
