@@ -20,7 +20,7 @@ find "$SOURCE_DIR" -type f -name "*.sh" -exec sudo mv {} "$TARGET_DIR/" \;
 
 # Make all moved scripts executable
 echo "Making scripts executable"
-sudo chmod +x "$TARGET_DIR"/*.sh
+sudo chmod -R +x "$TARGET_DIR"/
 
 # Provide feedback
 echo "Installation complete."
