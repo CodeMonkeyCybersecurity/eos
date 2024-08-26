@@ -42,7 +42,7 @@ fi
 
 # Move the script to the target directory
 echo "Moving '$SCRIPT_NAME' to $INSTALL_DIR..."
-sudo mv "$SCRIPT_NAME" "$INSTALL_DIR"
+sudo cp "$SCRIPT_NAME" "$INSTALL_DIR"
 
 # Make the script executable
 echo "Making '$SCRIPT_NAME' executable..."
