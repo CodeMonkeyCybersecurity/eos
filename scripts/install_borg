@@ -20,21 +20,45 @@ check_repo_connection() {
     fi
 }
 
-# Example of integrating the checks into install_borg.sh
+# Function to ensure the SSH path is correctly formatted
+ensure_ssh_prefix() {
+    local path=$1
+    if [[ "$path" != ssh://* ]]; then
+        path="ssh://$path"
+    fi
+    echo "$path"
+}
 
-# Check SSH credentials first
-./check_ssh_credentials.sh
+# Function to validate time input
+validate_time() {
+    if ! date -d "$1" "+%H:%M" &> /dev/null; then
+        error_exit "Invalid time format: $1"
+    fi
+}
 
-# Check repository path
-./check_repo_path.sh
+# Ensure the scripts are executable
+if [ ! -x "./scripts/check_ssh_credentials" ]; then
+    error_exit "Missing or non-executable check_ssh_credentials script."
+fi
 
-# If both checks pass, continue with the rest of the installation
+if [ ! -x "./scripts/check_repo_path" ]; then
+    error_exit "Missing or non-executable check_repo_path script."
+fi
+
+# Check SSH credentials
+./scripts/check_ssh_credentials || error_exit "SSH credentials check failed."
+
+# Check Borg repository path
+./scripts/check_repo_path || error_exit "Repository path check failed."
 
 # Prompt the user for BORG_REPO path
 read -p "Enter the BORG_REPO path (e.g., /mnt/borg-repo or ssh://username@host:/path/to/repo): " BORG_REPO
 
+# Ensure the correct SSH format
+BORG_REPO=$(ensure_ssh_prefix "$BORG_REPO")
+
 # Check the connection to the Borg repository
-check_repo_connection
+check_repo_connection "$BORG_REPO"
 
 # If the connection is successful, proceed to ask for the passphrase
 read -sp "Enter the BORG_PASSPHRASE (hidden input): " BORG_PASSPHRASE
@@ -45,10 +69,15 @@ read -p "Enter the number of daily backups to keep: " KEEP_DAILY
 read -p "Enter the number of weekly backups to keep: " KEEP_WEEKLY
 read -p "Enter the number of monthly backups to keep: " KEEP_MONTHLY
 
-# Ask for additional configuration details
+# Validate time inputs
 read -p "Enter the daily backup time (in 24-hour format, e.g., 02:00): " BACKUP_TIME_DAILY
+validate_time "$BACKUP_TIME_DAILY"
+
 read -p "Enter the weekly backup day and time (e.g., Sun 03:00 in 24-hour format): " BACKUP_TIME_WEEKLY
+validate_time "$BACKUP_TIME_WEEKLY"
+
 read -p "Enter the monthly backup day and time (e.g., 1st 04:00 in 24-hour format): " BACKUP_TIME_MONTHLY
+validate_time "$BACKUP_TIME_MONTHLY"
 
 read -p "Enter the hostname of the environment (e.g., $(hostname)): " HOSTNAME
 OS_INFO=$(lsb_release -d | cut -f2)
