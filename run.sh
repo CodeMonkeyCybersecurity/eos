@@ -1,8 +1,10 @@
 #!/bin/bash
 # run.sh
 
-# Get the directory where this script is located
-script_dir="$(dirname "$(realpath "$0")")/../scripts"
+# Get the absolute path to the scripts directory
+# Assuming 'run.sh' is located in the MonQ-fabric directory
+# and scripts are in a 'scripts' subdirectory
+script_dir="$(realpath "$(dirname "$0")/scripts")"
 
 # If no argument is provided, display the usage message
 if [ -z "$1" ]; then
@@ -22,7 +24,7 @@ fi
 
 # Handle the 'list' argument to list all scripts in the scripts/ directory
 if [ "$1" == "list" ]; then
-    echo "Run any of the scripts below by running: sudo run <example>"
+    echo "Run any of the scripts below by running: sudo run <script_name>"
     for script in "$script_dir"/*.sh; do
         basename "$script" .sh
     done
