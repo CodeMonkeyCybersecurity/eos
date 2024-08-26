@@ -2,7 +2,7 @@
 # run.sh
 
 # Get the directory where this script is located
-script_dir="$(dirname "$(realpath "$0")")/scripts"
+script_dir="$(dirname "$(realpath "$0")")/../scripts"
 
 # If no argument is provided, display the usage message
 if [ -z "$1" ]; then
