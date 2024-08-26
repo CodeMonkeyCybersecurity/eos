@@ -14,7 +14,7 @@ check_ssh_connection() {
     fi
 
     # Attempt to SSH into the host
-    ssh -o BatchMode=yes -o ConnectTimeout=5 "$user@$host" 'exit' > /dev/null 2>&1
+    ssh -i "$SSH_KEY_PATH" -o BatchMode=yes -o ConnectTimeout=5 "$user@$host" 'exit' > /dev/null 2>&1
 
     if [ $? -ne 0 ]; then
         echo "Error: Unable to connect via SSH to $host as $user. Please verify your SSH credentials."
@@ -50,7 +50,7 @@ check_ssh_service() {
     local host=$(echo "$ssh_path" | awk -F '[@:]' '{print $2}')
 
     echo "Checking if SSH service is running on $host..."
-    ssh -o BatchMode=yes -o ConnectTimeout=5 "$user@$host" 'systemctl is-active ssh' > /dev/null 2>&1
+    ssh -i "$SSH_KEY_PATH" -o BatchMode=yes -o ConnectTimeout=5 "$user@$host" 'systemctl is-active ssh' > /dev/null 2>&1
 
     if [ $? -ne 0 ]; then
         echo "Error: SSH service is not running on $host or you don't have permission to check the service status."
@@ -60,13 +60,38 @@ check_ssh_service() {
     fi
 }
 
+# Function to list available SSH keys and prompt the user to select one
+select_ssh_key() {
+    echo "Available SSH keys in ~/.ssh/:"
+    ssh_keys=($(ls ~/.ssh/*.pub | sed 's/.pub$//'))
+    
+    if [ ${#ssh_keys[@]} -eq 0 ]; then
+        echo "No SSH keys found in ~/.ssh/. Please generate or add an SSH key."
+        exit 1
+    fi
+
+    for i in "${!ssh_keys[@]}"; do
+        echo "$((i+1)). ${ssh_keys[$i]}"
+    done
+
+    read -p "Select an SSH key by number: " key_choice
+
+    if [[ $key_choice -gt 0 && $key_choice -le ${#ssh_keys[@]} ]]; then
+        SSH_KEY_PATH="${ssh_keys[$((key_choice-1))]}"
+        echo "Selected SSH key: $SSH_KEY_PATH"
+    else
+        echo "Invalid choice. Exiting."
+        exit 1
+    fi
+}
+
 # Function to troubleshoot SSH connectivity
 troubleshoot_ssh() {
     # Prompt for SSH path
     read -p "Enter the SSH path (e.g., username@host): " SSH_PATH
 
-    # Prompt for SSH key location
-    read -p "Enter the SSH key path (e.g., ~/.ssh/id_rsa): " SSH_KEY_PATH
+    # Automatically detect and select SSH key
+    select_ssh_key
 
     # Check SSH key permissions
     check_ssh_key_permissions "$SSH_KEY_PATH"
