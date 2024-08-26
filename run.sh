@@ -4,7 +4,12 @@
 list_scripts() {
     echo "Available scripts in /usr/local/bin/fabric:"
     if [ -d "/usr/local/bin/fabric" ]; then
-        ls /usr/local/bin/fabric
+        scripts=$(ls /usr/local/bin/fabric 2>/dev/null)
+        if [ -z "$scripts" ]; then
+            echo "No scripts found in /usr/local/bin/fabric."
+        else
+            echo "$scripts"
+        fi
     else
         echo "Directory /usr/local/bin/fabric does not exist."
     fi
