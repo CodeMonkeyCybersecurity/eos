@@ -45,7 +45,7 @@ def create_borg_backup(repo_path, backup_name, source_paths, exclude_patterns=No
                 cmd += ['--exclude', pattern]
 
         env = os.environ.copy()
-	env['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = 'YES'
+        env['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = 'YES'
 
         result = subprocess.run(
             cmd,
