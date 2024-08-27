@@ -2,6 +2,11 @@
 
 sudo apt-get update
 sudo apt-get install python3-pip
+sudo apt install python3.12-venv
+python3 -m venv ~/myenv
+source ~/myenv/bin/activate
+pip install --upgrade requests urllib3 docker docker-compose
+python install_traefik.py
 
 # Function to check if Docker is installed
 check_docker() {
