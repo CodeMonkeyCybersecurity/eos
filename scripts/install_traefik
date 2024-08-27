@@ -1,5 +1,8 @@
 #!/bin/bash
 
+sudo apt-get update
+sudo apt-get install python3-pip
+
 # Function to check if Docker is installed
 check_docker() {
   if ! [ -x "$(command -v docker)" ]; then
