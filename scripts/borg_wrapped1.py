@@ -53,7 +53,7 @@ def create_borg_backup(repo_path, backup_name, source_paths, exclude_patterns=No
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env/env
+            env=env
         )
         logging.info("Backup created successfully.")
         return result.stdout
