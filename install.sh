@@ -30,15 +30,15 @@ add_to_path() {
     fi
 }
 
-# Check if the script already exists in the target directory
-if [ -f "$SCRIPT_PATH" ]; then
-    echo "The script '$SCRIPT_NAME' already exists in $INSTALL_DIR."
-    read -p "Do you want to overwrite it? (y/n): " OVERWRITE
-    if [ "$OVERWRITE" != "y" ]; then
-        echo "Installation aborted."
-        exit 1
-    fi
+# Perform a clean installation by removing the old directory if it exists
+if [ -d "$INSTALL_DIR" ]; then
+    echo "Removing existing installation at $INSTALL_DIR..."
+    sudo rm -rf "$INSTALL_DIR"
 fi
+
+# Recreate the directory for a fresh installation
+echo "Creating target directory: $INSTALL_DIR"
+sudo mkdir -p "$INSTALL_DIR"
 
 # Move the script to the target directory
 echo "Moving '$SCRIPT_NAME' to $INSTALL_DIR..."
@@ -53,18 +53,6 @@ add_to_path
 
 echo "'$SCRIPT_NAME' has been installed successfully and is available in your PATH."
 
-# Optionally verify by running the command
-echo "You can now use the '$SCRIPT_NAME' command from any directory."
-
-# Define the target directory
-TARGET_DIR="/usr/local/bin/fabric"
-
-# Create the target directory if it doesn't exist
-if [ ! -d "$TARGET_DIR" ]; then
-  echo "Creating target directory: $TARGET_DIR"
-  sudo mkdir -p "$TARGET_DIR"
-fi
-
 # Directory where the scripts are located
 SOURCE_DIR="$(pwd)/scripts"  # Change this if your scripts are in a different directory
 
@@ -75,14 +63,14 @@ if [ ! -d "$SOURCE_DIR" ]; then
 fi
 
 # Move all scripts recursively from the source directory to the target directory
-echo "Moving scripts from $SOURCE_DIR to $TARGET_DIR"
+echo "Moving scripts from $SOURCE_DIR to $INSTALL_DIR"
 
 # Copy all contents of the source directory to the target directory
-sudo cp -R "$SOURCE_DIR/"* "$TARGET_DIR/"
+sudo cp -R "$SOURCE_DIR/"* "$INSTALL_DIR/"
 
 # Make all moved scripts executable
 echo "Making scripts executable"
-sudo chmod -R +x "$TARGET_DIR"/
+sudo chmod -R +x "$INSTALL_DIR"/
 
 # Provide feedback
 echo "Installation complete."
