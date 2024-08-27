@@ -30,11 +30,20 @@ def test_reverse_proxy(url, expected_status=200, expected_text=None):
         return False
 
 def main():
-    # List of URLs to test with expected status codes and text.
+    # Prompt user for inputs
+    url = input("Enter the URL of the reverse proxy to test: ")
+    expected_status = input("Enter the expected HTTP status code (default is 200): ")
+    expected_text = input("Enter a substring of the expected text in the response body (optional): ")
+
+    # Use default status code if the user input is empty
+    if not expected_status:
+        expected_status = 200
+    else:
+        expected_status = int(expected_status)
+
+    # Create a single test case based on user input
     tests = [
-        {"url": "http://your-reverse-proxy-domain.com", "expected_status": 200, "expected_text": "Welcome to my website"},
-        {"url": "http://your-reverse-proxy-domain.com/another-service", "expected_status": 200, "expected_text": "Another Service"},
-        # Add more test cases as needed
+        {"url": url, "expected_status": expected_status, "expected_text": expected_text or None}
     ]
     
     all_tests_passed = True
