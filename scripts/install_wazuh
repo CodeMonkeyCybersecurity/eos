@@ -22,8 +22,9 @@ if ! command -v docker-compose &> /dev/null; then
 fi
 
 # Set Wazuh Docker Compose repository URL
-REPO_URL="https://raw.githubusercontent.com/wazuh/wazuh-docker/main/single-node/docker-compose.yml"
-DOCKER_COMPOSE_FILE="docker-compose.yml"
+git clone https://github.com/wazuh/wazuh-docker.git -b v4.8.2
+cd wazuh-docker 
+cd single-node
 
 # Download the Wazuh Docker Compose file
 log "Downloading Wazuh Docker Compose file..."
