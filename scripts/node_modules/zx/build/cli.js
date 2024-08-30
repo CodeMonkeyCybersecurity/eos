@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+"use strict";
+import { require } from './deno.js'
+const {
+  argv,
+  getVersion,
+  importPath,
+  injectGlobalRequire,
+  isMain,
+  main,
+  printUsage,
+  runScript,
+  scriptFromHttp,
+  scriptFromStdin,
+  transformMarkdown,
+  writeAndImport
+} = require('./cli.cjs')
+export {
+  argv,
+  getVersion,
+  importPath,
+  injectGlobalRequire,
+  isMain,
+  main,
+  printUsage,
+  runScript,
+  scriptFromHttp,
+  scriptFromStdin,
+  transformMarkdown,
+  writeAndImport
+}
+

@@ -1,0 +1,1 @@
+cmd_Release/drivelist.node := ln -f "Release/obj.target/drivelist.node" "Release/drivelist.node" 2>/dev/null || (rm -rf "Release/drivelist.node" && cp -af "Release/obj.target/drivelist.node" "Release/drivelist.node")
