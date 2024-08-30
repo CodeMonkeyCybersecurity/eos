@@ -50,6 +50,8 @@ sudo chmod -R +x "$SCRIPT_PATH"
 
 # Add the directory to PATH if necessary
 add_to_path
+export PATH="$PATH:/usr/local/bin/fabric"
+source ~/.bashrc 
 
 echo "'$SCRIPT_NAME' has been installed successfully and is available in your PATH."
 
