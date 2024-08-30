@@ -2,10 +2,6 @@
 # run.sh - A versatile script runner
 
 # Check if the script is run as root
-if [ "$(id -u)" -ne 0 ]; then
-    echo "You must run this as root."
-    exit 1
-fi
 
 # Default script directory
 script_dir="${RUN_SCRIPT_DIR:-/usr/local/bin/fabric}"
