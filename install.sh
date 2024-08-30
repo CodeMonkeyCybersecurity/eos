@@ -13,16 +13,16 @@ SCRIPT_PATH="$INSTALL_DIR/$SCRIPT_NAME"
 add_to_path() {
     SHELL_RC=""
     if [ -f "$HOME/.bashrc" ]; then
-        SHELL_RC="$HOME/.bashrc"
+        SHELL_RC="root/.bashrc"
     elif [ -f "$HOME/.zshrc" ]; then
-        SHELL_RC="$HOME/.zshrc"
+        SHELL_RC="root/.zshrc"
     else
         echo "Neither .bashrc nor .zshrc found. Please add $INSTALL_DIR to your PATH manually."
         exit 1
     fi
 
     if ! grep -q "$INSTALL_DIR" "$SHELL_RC"; then
-        echo "export PATH="\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
+        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
         echo "$INSTALL_DIR has been added to your PATH in $SHELL_RC"
         source "$SHELL_RC"
     else
@@ -42,16 +42,19 @@ sudo mkdir -p "$INSTALL_DIR"
 
 # Move the script to the target directory
 echo "Moving '$SCRIPT_NAME' to $INSTALL_DIR..."
-sudo cp "$SCRIPT_NAME" "$INSTALL_DIR"
+if [ -f "$SCRIPT_NAME" ]; then
+    sudo cp "$SCRIPT_NAME" "$INSTALL_DIR"
+else
+    echo "Error: Script '$SCRIPT_NAME' not found in the current directory."
+    exit 1
+fi
 
 # Make the script executable
 echo "Making '$SCRIPT_NAME' executable..."
-sudo chmod -R +x "$SCRIPT_PATH"
+sudo chmod +x "$SCRIPT_PATH"
 
 # Add the directory to PATH if necessary
 add_to_path
-export PATH="$PATH:/usr/local/bin/fabric"
-source ~/.bashrc 
 
 echo "'$SCRIPT_NAME' has been installed successfully and is available in your PATH."
 
@@ -72,16 +75,9 @@ sudo cp -R "$SOURCE_DIR/"* "$INSTALL_DIR/"
 
 # Make all moved scripts executable
 echo "Making scripts executable"
-sudo chmod -R +x "$INSTALL_DIR"/
+sudo chmod -R +x "$INSTALL_DIR/"
 
-# Add to PATH if not already added
-if [[ ":$PATH:" != *":/usr/local/bin/fabric:"* ]]; then
-    echo "export PATH=\"\$PATH:/usr/local/bin/fabric\"" >> ~/.bashrc
-    echo "Added /usr/local/bin/fabric to PATH in ~/.bashrc"
-fi
-
-source ~/.bashrc
-echo "installation complete."
+echo "Installation complete."
 echo "Current PATH: $PATH"
 
 # ASCII art
