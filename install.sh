@@ -46,7 +46,7 @@ sudo cp "$SCRIPT_NAME" "$INSTALL_DIR"
 
 # Make the script executable
 echo "Making '$SCRIPT_NAME' executable..."
-sudo chmod +x "$SCRIPT_PATH"
+sudo chmod -R +x "$SCRIPT_PATH"
 
 # Add the directory to PATH if necessary
 add_to_path
