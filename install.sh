@@ -22,7 +22,7 @@ add_to_path() {
     fi
 
     if ! grep -q "$INSTALL_DIR" "$SHELL_RC"; then
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
+        echo "export PATH="\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
         echo "$INSTALL_DIR has been added to your PATH in $SHELL_RC"
         source "$SHELL_RC"
     else
