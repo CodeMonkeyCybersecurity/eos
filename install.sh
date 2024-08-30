@@ -74,14 +74,18 @@ sudo cp -R "$SOURCE_DIR/"* "$INSTALL_DIR/"
 echo "Making scripts executable"
 sudo chmod -R +x "$INSTALL_DIR"/
 
-# Provide feedback
-echo "Installation complete."
-export PATH="$PATH:/usr/local/bin/fabric"
+# Add to PATH if not already added
+if [[ ":$PATH:" != *":/usr/local/bin/fabric:"* ]]; then
+    echo "export PATH=\"\$PATH:/usr/local/bin/fabric\"" >> ~/.bashrc
+    echo "Added /usr/local/bin/fabric to PATH in ~/.bashrc"
+fi
+
 source ~/.bashrc
-echo $PATH
+echo "installation complete."
+echo "Current PATH: $PATH"
 
 # ASCII art
-cat << "EOF
+cat << "EOF"
 #     ___         _       __  __          _
 #    / __|___  __| |___  |  \/  |___ _ _ | |_____ _  _
 #   | (__/ _ \/ _` / -_) | |\/| / _ \ ' \| / / -_) || |
