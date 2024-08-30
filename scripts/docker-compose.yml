@@ -1,0 +1,34 @@
+
+version: '3'
+
+services:
+
+  db:
+    image: postgres:12
+    restart: unless-stopped
+    volumes:
+      - ./volumes/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: mmuser
+      POSTGRES_PASSWORD: mmuser_password
+      POSTGRES_DB: mattermost
+    networks:
+      - mattermost-network
+
+  app:
+    image: mattermost/mattermost-team-edition:latest
+    restart: unless-stopped
+    ports:
+      - "8010:8065"
+    volumes:
+      - ./volumes/app/mattermost:/mattermost/data
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: postgres://mmuser:mmuser_password@db:5432/mattermost?sslmode=disable
+    networks:
+      - mattermost-network
+    depends_on:
+      - db
+
+networks:
+  mattermost-network:
