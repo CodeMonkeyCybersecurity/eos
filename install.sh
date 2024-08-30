@@ -76,6 +76,9 @@ sudo chmod -R +x "$INSTALL_DIR"/
 
 # Provide feedback
 echo "Installation complete."
+export PATH="$PATH:/usr/local/bin/fabric"
+source ~/.bashrc
+echo $PATH
 
 # ASCII art
 cat << "EOF"                 
