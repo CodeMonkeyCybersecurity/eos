@@ -13,9 +13,9 @@ SCRIPT_PATH="$INSTALL_DIR/$SCRIPT_NAME"
 add_to_path() {
     SHELL_RC=""
     if [ -f "$HOME/.bashrc" ]; then
-        SHELL_RC="root/.bashrc"
+        SHELL_RC="$HOME/.bashrc"
     elif [ -f "$HOME/.zshrc" ]; then
-        SHELL_RC="root/.zshrc"
+        SHELL_RC="$HOME/.zshrc"
     else
         echo "Neither .bashrc nor .zshrc found. Please add $INSTALL_DIR to your PATH manually."
         exit 1
