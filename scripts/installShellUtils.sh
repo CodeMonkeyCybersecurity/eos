@@ -1,6 +1,7 @@
 #!/bin/bash
 
 sudo apt update && sudo apt dist-upgrade -y && sudo apt autoremove && sudo apt autoclean \
+sudo systemctl daemon-reload \
 
 sudo apt install -y \
 gh tree ncdu zfsutils-linux \
@@ -22,3 +23,5 @@ npm install -g zx && \
 sudo snap install powershell  --classic && \
 
 sudo snap refresh
+
+sudo apt update && sudo systemctl daemon-reload
