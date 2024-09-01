@@ -1,9 +1,18 @@
 #!/bin/bash
 
-sudo apt install gh tree ncdu zfs* prometheus zx git fzf python3-fabric
+sudo apt update && sudo apt dist-upgrade -y && sudo apt autoremove && sudo apt autoclean
 
-sudo snap install powershell
+sudo apt install gh tree ncdu zfsutils-linux \
+prometheus \
+zx \
+git \
+fzf \
+python3-fabric \
+ansible \
+nginx \
+prettier \
+borgbackup
 
-gh auth login
+sudo snap install powershell 
 
-gh repo clone chickenj0/fabric
+sudo snap refresh
