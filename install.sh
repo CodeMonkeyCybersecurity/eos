@@ -59,7 +59,7 @@ add_to_path
 echo "'$SCRIPT_NAME' has been installed successfully and is available in your PATH."
 
 # Directory where the scripts are located
-SOURCE_DIR="$(pwd)/scripts"  # Change this if your scripts are in a different directory
+SOURCE_DIR="$(pwd)/scripts/*"  # Change this if your scripts are in a different directory
 
 # Ensure the source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -76,6 +76,9 @@ sudo cp -R "$SOURCE_DIR/"* "$INSTALL_DIR/"
 # Make all moved scripts executable
 echo "Making scripts executable"
 sudo chmod -R +x "$INSTALL_DIR/"
+
+echo "Making /etc/fabric to store any local logs and configs"
+sudo mkdir -p /etc/fabric
 
 echo "Installation complete."
 echo "Current PATH: $PATH"
