@@ -2,6 +2,8 @@
 
 # Define the directory where you want to place the 'run' script
 INSTALL_DIR="/usr/local/bin/fabric"
+FABRIC_CONFIGS="/etc/fabric"
+FABRIC_LOGS="/var/log/fabric"
 
 # Define the name of the script
 SCRIPT_NAME="run"
@@ -37,8 +39,8 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 
 # Recreate the directory for a fresh installation
-echo "Creating target directory: $INSTALL_DIR"
-sudo mkdir -p "$INSTALL_DIR"
+echo "Creating target directories: $INSTALL_DIR $FABRIC_CONFIGS $FABRIC_LOGS"
+sudo mkdir -p "$INSTALL_DIR" "$FABRIC_CONFIGS" "$FABRIC_LOGS"
 
 # Move the script to the target directory
 echo "Moving '$SCRIPT_NAME' to $INSTALL_DIR..."
@@ -76,9 +78,6 @@ sudo cp -R "$SOURCE_DIR/"* "$INSTALL_DIR/"
 # Make all moved scripts executable
 echo "Making scripts executable"
 sudo chmod -R +x "$INSTALL_DIR/"
-
-echo "Making /etc/fabric to store any local logs and configs"
-sudo mkdir -p /etc/fabric
 
 echo "Installation complete."
 echo "Current PATH: $PATH"
