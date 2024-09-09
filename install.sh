@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # Define the directory where you want to place the 'run' script
-INSTALL_DIR="/usr/local/bin/fabric"
-FABRIC_CONFIGS="/etc/fabric"
-FABRIC_LOGS="/var/log/fabric"
+INSTALL_DIR="/usr/local/bin/eos"
+EOS_CONFIGS="/etc/eos"
+EOS_LOGS="/var/log/eos"
 
 # Define the name of the script
 SCRIPT_NAME="run"
@@ -39,8 +39,8 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 
 # Recreate the directory for a fresh installation
-echo "Creating target directories: $INSTALL_DIR $FABRIC_CONFIGS $FABRIC_LOGS"
-sudo mkdir -p "$INSTALL_DIR" "$FABRIC_CONFIGS" "$FABRIC_LOGS"
+echo "Creating target directories: $INSTALL_DIR $EOS_CONFIGS $EOS_LOGS"
+sudo mkdir -p "$INSTALL_DIR" "$EOS_CONFIGS" "$EOS_LOGS"
 
 # Move the script to the target directory
 echo "Moving '$SCRIPT_NAME' to $INSTALL_DIR..."
