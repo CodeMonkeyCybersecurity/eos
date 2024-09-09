@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Function to generate the output file name and create the file
 output_file () {
     # Generate the current date, time, and machine name
     timestamp=$(date +"%Y-%m-%d_%H-%M-%S")
@@ -9,15 +10,22 @@ output_file () {
     # Construct the output file name
     output_file="${timestamp}_${user}_${machine_name}_ubuntuconfigs.md"
     
+    # Ensure the directory exists
+    sudo mkdir -p /etc/eos
+    
     # Create the output file (touch to ensure it exists)
-    sudo touch "/var/log/${output_file}"
-    echo "/var/log/${output_file}"  # Return the path of the output file
+    sudo touch "/etc/eos/${output_file}"
+    
+    # Return the path of the output file
+    echo "/etc/eos/${output_file}"
 }
 
+# Function to gather Ubuntu configurations and write them to the output file
 ubuntu_configs () {
     # Capture output file path
     output_file_path="$1"
     
+    # Gather system information and write it to the output file
     {
         echo "==hardware=="
         sudo lshw -short
