@@ -4,7 +4,7 @@
 # Check if the script is run as root
 
 # Default script directory
-script_dir="${RUN_SCRIPT_DIR:-/usr/local/bin/fabric}"
+script_dir="${RUN_SCRIPT_DIR:-/usr/local/bin/eos}"
 
 # Log file for recording actions (optional)
 log_file="/var/log/run_script.log"
