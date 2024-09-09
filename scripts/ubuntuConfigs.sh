@@ -51,7 +51,8 @@ ubuntu_configs () {
         
         echo "==networking=="
         sudo ip addr
-        ss -tuln
+        sudo ss -tuln
+        sudo curl ifconfig.me
         
         echo "==services=="
         sudo service --status-all
