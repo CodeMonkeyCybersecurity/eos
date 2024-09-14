@@ -28,6 +28,7 @@ check_success "Docker installation"
 # Add user to the Docker group
 sudo groupadd docker || true  # Ignore if the group already exists
 sudo usermod -aG docker $USER
+newgrp docker
 echo "Please log out and back in for group changes to take effect."
 
 # Enable Docker service
