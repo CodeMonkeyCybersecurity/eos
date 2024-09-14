@@ -9,7 +9,7 @@ def run_command(command, input_needed=False):
             os.system(command)  # Using os.system for interactive terminal commands
         else:
             result = subprocess.run(command, shell=True, check=True)
-        return result
+            return result
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while running the command: {e}")
         exit(1)
