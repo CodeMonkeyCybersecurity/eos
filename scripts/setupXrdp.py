@@ -5,12 +5,16 @@ def run_command(command, input_needed=False):
     """Run a shell command and handle user inputs if needed."""
     try:
         if input_needed:
-            result = subprocess.run(command, shell=True, text=True, input=input_needed)
+            user_input = input("Input required for command '{}': ".format(command))  # Prompt user for input
+            result = subprocess.run(command, shell=True, text=True, input=user_input)
         else:
             result = subprocess.run(command, shell=True, check=True)
         return result
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while running the command: {e}")
+        exit(1)
+    except TypeError as e:
+        print(f"TypeError occurred: {e}")
         exit(1)
 
 def install_desktop_environment():
