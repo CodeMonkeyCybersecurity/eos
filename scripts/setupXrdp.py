@@ -8,20 +8,22 @@ def run_command(command, input_needed=False):
             print(f"Running interactive command: '{command}'. Please follow the instructions in the terminal.")
             os.system(command)  # Using os.system for interactive terminal commands
         else:
-            result = subprocess.run(command, shell=True, check=True)
+            result = subprocess.run(command, shell=True, check=True, text=True)
             return result
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while running the command: {e}")
+        input("Press Enter to exit.")
         exit(1)
     except TypeError as e:
         print(f"TypeError occurred: {e}")
+        input("Press Enter to exit.")
         exit(1)
 
 def check_service_status(service_name):
     """Check the status of a service and handle errors gracefully."""
     try:
         print(f"Checking {service_name} status...")
-        result = subprocess.run(f"sudo systemctl status {service_name}", shell=True, check=True)
+        result = subprocess.run(f"sudo systemctl status {service_name}", shell=True, check=True, text=True)
         return result
     except subprocess.CalledProcessError as e:
         print(f"An error occurred while checking the status of {service_name}: {e}")
