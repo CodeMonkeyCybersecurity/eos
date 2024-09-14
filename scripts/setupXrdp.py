@@ -17,6 +17,16 @@ def run_command(command, input_needed=False):
         print(f"TypeError occurred: {e}")
         exit(1)
 
+def check_service_status(service_name):
+    """Check the status of a service and handle errors gracefully."""
+    try:
+        print(f"Checking {service_name} status...")
+        result = subprocess.run(f"sudo systemctl status {service_name}", shell=True, check=True)
+        return result
+    except subprocess.CalledProcessError as e:
+        print(f"An error occurred while checking the status of {service_name}: {e}")
+        return None
+
 def install_desktop_environment():
     """Install Xfce desktop environment and required packages."""
     print("Updating package lists...")
@@ -27,7 +37,7 @@ def install_desktop_environment():
     
     print("Selecting display manager (gdm3 recommended)...")
     # Use os.system for interactive terminal commands
-    run_command('sudo dpkg-reconfigure lightdm', input_needed=True)
+    run_command('sudo dpkg-reconfigure gdm3', input_needed=True)
 
 def install_xrdp():
     """Install xrdp on Ubuntu and start the service."""
@@ -40,8 +50,8 @@ def install_xrdp():
     print("Enabling xrdp service to start on boot...")
     run_command('sudo systemctl enable xrdp')
     
-    print("Checking xrdp status...")
-    run_command('sudo systemctl status xrdp')
+    # Check xrdp service status using the enhanced function
+    check_service_status('xrdp')
 
 def configure_xrdp():
     """Configure xrdp and allow the RDP port in the firewall."""
