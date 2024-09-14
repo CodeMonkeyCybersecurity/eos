@@ -5,7 +5,7 @@ sudo systemctl daemon-reload \
 
 sudo apt install -y \
 nfs-kernel-server nfs-common \
-gh tree ncdu zfsutils-linux \
+gh tree ncdu ceph ceph-deploy btrfs-progs \
 hub \
 nmap \
 htop iftop iotop nload glances\
