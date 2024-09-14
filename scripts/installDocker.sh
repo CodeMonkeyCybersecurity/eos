@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit on any error
+set -e
+
 # Function to check if the last command was successful
 check_success() {
   if [ $? -ne 0 ]; then
@@ -15,13 +18,28 @@ if [[ $confirm != "y" ]]; then
   exit 0
 fi
 
-sudo curl -sSL https://get.docker.com/ | sh
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+check_success "Downloading Docker installation script"
 
+sudo sh get-docker.sh
+check_success "Docker installation"
+
+# Add user to the Docker group
+sudo groupadd docker || true  # Ignore if the group already exists
+sudo usermod -aG docker $USER
+echo "Please log out and back in for group changes to take effect."
+
+# Enable Docker service
 sudo systemctl start docker
+check_success "Starting Docker"
+
 sudo systemctl enable docker
+check_success "Enabling Docker to start on boot"
 
-sudo curl -L "https://github.com/docker/compose/releases/download/v2.12.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+# Run a test Docker container
+docker run hello-world
+check_success "Running Docker hello-world test"
 
-sudo chmod +x /usr/local/bin/docker-compose
-
-sudo docker-compose --version
+# Clean up
+rm -f get-docker.sh
