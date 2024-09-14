@@ -5,8 +5,8 @@ def run_command(command, input_needed=False):
     """Run a shell command and handle user inputs if needed."""
     try:
         if input_needed:
-            user_input = input("Input required for command '{}': ".format(command))  # Prompt user for input
-            result = subprocess.run(command, shell=True, text=True, input=user_input)
+            print(f"Running interactive command: '{command}'. Please follow the instructions in the terminal.")
+            os.system(command)  # Using os.system for interactive terminal commands
         else:
             result = subprocess.run(command, shell=True, check=True)
         return result
@@ -26,7 +26,7 @@ def install_desktop_environment():
     run_command('sudo apt install xfce4 xfce4-goodies -y')
     
     print("Selecting display manager (gdm3 recommended)...")
-    # Prompting the user to choose the display manager interactively
+    # Use os.system for interactive terminal commands
     run_command('sudo dpkg-reconfigure lightdm', input_needed=True)
 
 def install_xrdp():
