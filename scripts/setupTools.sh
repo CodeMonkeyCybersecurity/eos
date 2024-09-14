@@ -4,6 +4,7 @@ sudo apt update && sudo apt dist-upgrade -y && sudo apt autoremove && sudo apt a
 sudo systemctl daemon-reload \
 
 sudo apt install -y \
+nfs-kernel-server nfs-common \
 gh tree ncdu zfsutils-linux \
 hub \
 nmap \
