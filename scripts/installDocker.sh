@@ -31,11 +31,13 @@ sudo usermod -aG docker $USER
 echo "Please log out and back in for group changes to take effect."
 
 # Enable Docker service
-sudo systemctl start docker
-check_success "Starting Docker"
+sudo systemctl enable docker.service
+sudo systemctl start docker.service
+check_success "Starting and enabling Docker to start on boot"
 
-sudo systemctl enable docker
-check_success "Enabling Docker to start on boot"
+sudo systemctl enable containerd.service
+sudo systemctl start containerd.service
+check_success "Starting and enabling containerd.service to start on boot"
 
 # Run a test Docker container
 docker run hello-world
