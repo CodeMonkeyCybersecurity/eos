@@ -178,6 +178,7 @@ def main():
     parser.add_argument('--check-yaml', help="Check the YAML configuration", action='store_true')
     parser.add_argument('--check-repo', help="Check the Borg repository", action='store_true')
     parser.add_argument('--dryrun', help="Run a dry run of the backup", action='store_true')
+    parser.add_argument('--backup', help="Run a full backup", action='store_true') 
     parser.add_argument('--list', help="List all archives in the repository", action='store_true')
     parser.add_argument('--restore', help="Restore a specific archive", type=str)
     parser.add_argument('--test-restore', help="Test restore a specific archive", type=str)
@@ -213,6 +214,11 @@ def main():
     if args.dryrun:
         logging.info("Running a dry run of the backup.")
         run_borg_backup(config, dryrun=True)
+        return
+        
+    if args.backup:  # Run full backup when --backup is passed
+        logging.info("Running the full Borg backup.")
+        run_borg_backup(config)
         return
 
     if args.list:
