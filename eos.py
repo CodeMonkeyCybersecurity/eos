@@ -4,14 +4,14 @@ import shutil
 import subprocess
 from datetime import datetime
 
-# Default directories for installation and execution
+# Directories for installation and scripts
 EOS_DIR = "/usr/local/bin/eos"
 EOS_SCRIPTS_DIR = os.path.join(EOS_DIR, "scripts")
 EOS_CONFIGS = "/etc/eos"
 EOS_LOGS = "/var/log/eos"
 BACKUP_DIR = "/usr/local/bin/eos_backup"
 SCRIPT_NAME = "eos.py"
-SOURCE_DIR = os.path.join(os.getcwd(), "scripts")  # Your scripts directory in the current working directory
+SOURCE_DIR = os.path.join(os.getcwd(), "scripts")  # Your scripts directory in /Eos/scripts
 LOG_FILE = "/var/log/eos_install.log"
 
 
