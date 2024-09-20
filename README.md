@@ -39,14 +39,14 @@ cd Eos
 
 4. Install the 'run' command
 ``` bash
-sudo chmod +x install_run.sh
-sudo ./install_run.sh
+sudo python3 eos.py
 ```
 
 ## How to use 
-In the 'For Example' section above, we added a new user. We did this by using the command 'run', and then selecting the script we want to use by typing it out. The script to add a new user is called 'add_user.sh', so:
+In the 'For Example' section above, we added a new user. The script to add a new user is called 'addUser.sh', so:
 ``` bash
-sudo run addUser.sh
+user@hostname:~/Eos/scripts$ sudo chmod +x addUser.sh
+user@hostname:~/Eos/scripts$ sudo ./addUser.sh
 ```
 
 The script to create a new SSH key is called 'create_ssh_key.sh'. So, to create a new SSH key, we simply: 
@@ -54,7 +54,8 @@ The script to create a new SSH key is called 'create_ssh_key.sh'. So, to create 
 sudo run createSshKey.sh
 ```
 
-To see what else you can do with 'run', simply type:
+If the script ends in .py, for example configureBorg.py, type:
 ```bash
-run
+sudo python3 configureBorg.py
 ```
+and press enter
