@@ -144,6 +144,36 @@ def test_restore_borg_archive(config, archive_name):
     except subprocess.CalledProcessError as e:
         logging.error(f"Test restore failed: {e.stderr}")
 
+def print_help():
+    """Print available flags and their descriptions."""
+    help_message = """
+Available Flags:
+--check-yaml       : Check the YAML configuration for missing values
+--check-repo       : Check the Borg repository health
+--dryrun           : Perform a dry-run of the backup without making changes
+--list             : List all Borg archives in the repository
+--restore          : Restore a specific archive (requires --target-dir)
+--test-restore     : Test restore a specific archive without extracting
+--target-dir       : Specify the target directory for restoring archives
+--help             : Show this help message and quit
+"""
+    print(help_message)
+
+def interactive_prompt():
+    """Interactive prompt if no flags are provided."""
+    print("No argument provided. Would you like to run --help? [y/n]")
+    choice = input().lower()
+
+    if choice == 'y':
+        print_help()
+        retry = input("Would you like to retry with a valid argument? [y/n]: ").lower()
+        if retry == 'y':
+            print("Please re-run the script with a valid argument.")
+        else:
+            print("Exiting...")
+    else:
+        print("Exiting...")
+
 def main():
     parser = argparse.ArgumentParser(description="Borg Backup Wrapper")
     parser.add_argument('--check-yaml', help="Check the YAML configuration", action='store_true')
@@ -153,8 +183,19 @@ def main():
     parser.add_argument('--restore', help="Restore a specific archive", type=str)
     parser.add_argument('--test-restore', help="Test restore a specific archive", type=str)
     parser.add_argument('--target-dir', help="Specify the target directory for the restore", type=str)
+    parser.add_argument('--help', help="Show this help message", action='store_true')
 
     args = parser.parse_args()
+
+    # If no arguments are passed, prompt the user for help or exit
+    if not any(vars(args).values()):
+        interactive_prompt()
+        return
+
+    # Show help if requested
+    if args.help:
+        print_help()
+        return
 
     # Load the YAML configuration
     config = load_config()
