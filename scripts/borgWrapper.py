@@ -37,6 +37,36 @@ def write_borg_config(repo_path, encryption):
     else:
         logging.error("Failed to ensure config directory, skipping config file creation.")
 
+def load_borg_config():
+    """Load Borg repository configuration from the config file."""
+    if os.path.exists(CONFIG_FILE):
+        try:
+            with open(CONFIG_FILE, 'r') as config_file:
+                config = {}
+                for line in config_file:
+                    key, value = line.strip().split('=')
+                    config[key] = value
+                logging.info("Loaded Borg configuration.")
+                return config
+        except Exception as e:
+            logging.error(f"Failed to load Borg config: {e}")
+            return None
+    else:
+        logging.error("Configuration file does not exist.")
+        return None
+
+def check_or_ask_for_defaults():
+    """Check if default configs exist or prompt user to input defaults."""
+    config = load_borg_config()
+    if config:
+        print(f"Default configuration:\nREPO_PATH={config.get('REPO_PATH')}\nENCRYPTION={config.get('ENCRYPTION')}")
+        return config
+    else:
+        # Ask for default values if config does not exist
+        repo_path = input("Enter default repository path: ")
+        encryption = input("Enter default encryption type (default is 'none'): ") or 'none'
+        write_borg_config(repo_path, encryption)
+        return {"REPO_PATH": repo_path, "ENCRYPTION": encryption}
 
 def init_borg_repo(repo_path, encryption='none'):
     """Initialize a new Borg repository."""
@@ -162,16 +192,22 @@ def main():
     parser.add_argument('--list', help="List archives in a repository", action='store_true')
     parser.add_argument('--restore', help="Restore a backup", action='store_true')
     parser.add_argument('--check', help="Check the consistency of a Borg repository", action='store_true')
+    parser.add_argument('--configs', help="Check or set default configuration", action='store_true')
 
     args = parser.parse_args()
 
-    if args.init:
-        repo_path = input("Enter the repository path: ")
-        encryption = input("Enter encryption type (default is 'none'): ") or 'none'
+    if args.configs:
+        check_or_ask_for_defaults()
+
+    elif args.init:
+        config = check_or_ask_for_defaults()
+        repo_path = config['REPO_PATH']
+        encryption = config['ENCRYPTION']
         print(init_borg_repo(repo_path, encryption))
 
     elif args.backup:
-        repo_path = input("Enter the repository path: ")
+        config = check_or_ask_for_defaults()
+        repo_path = config['REPO_PATH']
         backup_name = input("Enter the name for the backup archive: ")
         source_paths = input("Enter the source paths to include, separated by spaces: ").split()
         exclude_patterns = input("Enter exclude patterns (optional), separated by spaces: ").split() or None
