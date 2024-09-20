@@ -80,14 +80,13 @@ def move_scripts():
             os.chmod(os.path.join(INSTALL_DIR, file), 0o755)
     log_action("All scripts moved and made executable.")
 
-
 def add_to_path(directory):
     """Adds a directory to the user's PATH by updating the shell configuration file."""
     shell_rc = None
     bashrc = os.path.expanduser("~/.bashrc")
     zshrc = os.path.expanduser("~/.zshrc")
 
-    # Determine which shell config file to use
+    # Determine which shell config file to use for the current user
     if os.path.isfile(bashrc):
         shell_rc = bashrc
     elif os.path.isfile(zshrc):
@@ -103,7 +102,7 @@ def add_to_path(directory):
             print(f"The directory '{directory}' is already in the PATH.")
             return
 
-    # Append the directory to the PATH in the shell config file
+    # Append the directory to the PATH in the user's shell config file
     with open(shell_rc, 'a') as f:
         f.write(f'\nexport PATH="$PATH:{directory}"\n')
 
