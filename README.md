@@ -1,6 +1,4 @@
 # Eos
-In ancient Greek mythology and religion, Eos is the goddess and personification of the dawn. chickenj0/Eos isn't quite as cool as that, but it may help you get started with ubuntu server.
-
 Eos aims to help make ubuntu server administration easier for those of us who weren't born in a bash shell.
 
 ## For example
