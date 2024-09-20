@@ -80,30 +80,37 @@ def move_scripts():
             os.chmod(os.path.join(INSTALL_DIR, file), 0o755)
     log_action("All scripts moved and made executable.")
 
-def create_alias():
-    """Creates an alias for the eos command."""
+def add_to_path(directory):
+    """Adds a directory to the user's PATH by updating the shell configuration file."""
     shell_rc = None
     bashrc = os.path.expanduser("~/.bashrc")
     zshrc = os.path.expanduser("~/.zshrc")
 
+    # Determine which shell config file to use
     if os.path.isfile(bashrc):
         shell_rc = bashrc
     elif os.path.isfile(zshrc):
         shell_rc = zshrc
     else:
-        print("Error: Could not find .bashrc or .zshrc to create alias.")
-        log_action("Error: Could not find shell config to create alias.")
+        print("Error: Could not find .bashrc or .zshrc to update.")
         return
 
-    alias_command = f"alias eos='python3 {INSTALL_DIR}/eos.py'"
-    
-    # Add alias to shell config
+    # Check if the directory is already in the PATH
+    with open(shell_rc, 'r') as f:
+        content = f.read()
+        if directory in content:
+            print(f"The directory '{directory}' is already in the PATH.")
+            return
+
+    # Append the directory to the PATH in the shell config file
     with open(shell_rc, 'a') as f:
-        f.write(f"\n{alias_command}\n")
-    
-    print(f"Alias 'eos' added to {shell_rc}. You can now run 'eos' from any directory.")
-    log_action(f"Alias 'eos' added to {shell_rc}")
+        f.write(f'\nexport PATH="$PATH:{directory}"\n')
+
+    print(f"Added '{directory}' to the PATH in {shell_rc}.")
+
+    # Source the shell configuration file to apply the changes immediately
     subprocess.run(['source', shell_rc], shell=True)
+    print(f"Sourced {shell_rc}. The changes should now be active.")
 
 # -------- SCRIPT RUNNER FUNCTIONS -------- #
 def show_help():
@@ -163,6 +170,7 @@ def main():
         clean_install()
         install_fresh()
         move_scripts()
+        add_to_path("Added to $PATH")
         log_action("Installation complete.")
         print("Installation complete. Check /var/log/eos/install.log for details.")
         sys.exit(0)
