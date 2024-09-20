@@ -80,36 +80,6 @@ def move_scripts():
             os.chmod(os.path.join(INSTALL_DIR, file), 0o755)
     log_action("All scripts moved and made executable.")
 
-def add_to_path(directory):
-    """Adds a directory to the user's PATH by updating the shell configuration file."""
-    shell_rc = None
-    bashrc = os.path.expanduser("~/.bashrc")
-    zshrc = os.path.expanduser("~/.zshrc")
-
-    # Determine which shell config file to use for the current user
-    if os.path.isfile(bashrc):
-        shell_rc = bashrc
-    elif os.path.isfile(zshrc):
-        shell_rc = zshrc
-    else:
-        print("Error: Could not find .bashrc or .zshrc to update.")
-        return
-
-    # Check if the directory is already in the PATH
-    with open(shell_rc, 'r') as f:
-        content = f.read()
-        if directory in content:
-            print(f"The directory '{directory}' is already in the PATH.")
-            return
-
-    # Append the directory to the PATH in the user's shell config file
-    with open(shell_rc, 'a') as f:
-        f.write(f'\nexport PATH="$PATH:{directory}"\n')
-
-    print(f"Added '{directory}' to the PATH in {shell_rc}.")
-    print(f"Please run 'source {shell_rc}' or restart your terminal for the changes to take effect.")
-
-
 # -------- SCRIPT RUNNER FUNCTIONS -------- #
 def show_help():
     """Displays help information."""
@@ -168,9 +138,10 @@ def main():
         clean_install()
         install_fresh()
         move_scripts()
-        add_to_path(INSTALL_DIR)
         log_action("Installation complete.")
         print("Installation complete. Check /var/log/eos/install.log for details.")
+        print("To get started, you need to run 'export PATH="$PATH:/usr/local/bin/eos"'")
+        print("Then, 'source ~/.bashrc'")
         sys.exit(0)
 
     # If not "install" mode, it's the "run" mode for executing scripts
