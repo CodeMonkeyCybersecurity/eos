@@ -80,6 +80,7 @@ def move_scripts():
             os.chmod(os.path.join(INSTALL_DIR, file), 0o755)
     log_action("All scripts moved and made executable.")
 
+
 def add_to_path(directory):
     """Adds a directory to the user's PATH by updating the shell configuration file."""
     shell_rc = None
@@ -107,10 +108,8 @@ def add_to_path(directory):
         f.write(f'\nexport PATH="$PATH:{directory}"\n')
 
     print(f"Added '{directory}' to the PATH in {shell_rc}.")
+    print(f"Please run 'source {shell_rc}' or restart your terminal for the changes to take effect.")
 
-    # Source the shell configuration file to apply the changes immediately
-    subprocess.run(['source', shell_rc], shell=True)
-    print(f"Sourced {shell_rc}. The changes should now be active.")
 
 # -------- SCRIPT RUNNER FUNCTIONS -------- #
 def show_help():
@@ -170,7 +169,7 @@ def main():
         clean_install()
         install_fresh()
         move_scripts()
-        add_to_path("Added to $PATH")
+        add_to_path(INSTALL_DIR)
         log_action("Installation complete.")
         print("Installation complete. Check /var/log/eos/install.log for details.")
         sys.exit(0)
