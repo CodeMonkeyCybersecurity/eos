@@ -36,7 +36,7 @@ git clone https://github.com/chickenj0/Eos.git
 ``` bash
 cd Eos
 ```
-
+4. Then 
 ``` bash
 sudo python3 eos.py
 cd ~/Eos/scripts
