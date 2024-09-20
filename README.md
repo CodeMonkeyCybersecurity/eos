@@ -61,3 +61,8 @@ If the script ends in .py, for example configureBorg.py, type:
 sudo python3 configureBorg.py
 ```
 and press enter
+
+To find out what other scripts are available:
+```bash
+user@hostname:~/Eos/scripts$ ls
+```
