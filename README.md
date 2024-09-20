@@ -37,10 +37,12 @@ git clone https://github.com/chickenj0/Eos.git
 cd Eos
 ```
 
-4. Install the 'run' command
 ``` bash
 sudo python3 eos.py
+cd ~/Eos/scripts
 ```
+
+
 
 ## How to use 
 In the 'For Example' section above, we added a new user. The script to add a new user is called 'addUser.sh', so:
