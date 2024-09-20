@@ -67,8 +67,12 @@ def run_borg_backup(config, dryrun=False):
     env = os.environ.copy()
     env['BORG_PASSPHRASE'] = passphrase
 
+    # Generate a unique archive name using the current timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    archive_name = f"{repo}::{{hostname}}-{timestamp}"
+    
     # Build the borg create command
-    borg_create_cmd = ['borg', 'create', f'{repo}::{{hostname}}-{{now}}'] + paths + [
+    borg_create_cmd = ['borg', 'create', archive_name] + paths + [
         '--verbose',
         '--filter', config['backup']['filter'],
         '--list',
