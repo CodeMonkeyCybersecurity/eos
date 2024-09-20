@@ -3,6 +3,8 @@ import os
 import subprocess
 import argparse
 import logging
+from datetime import datetime  # Make sure to import datetime
+import socket  # Used to get the hostname
 
 CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
@@ -29,7 +31,7 @@ def check_yaml(config):
     required_values = {
         'borg.repo': config.get('borg', {}).get('repo'),
         'borg.passphrase': config.get('borg', {}).get('passphrase'),
-        'backup.encryption': config.get('borg', {}).get('encryption'),
+        'borg.encryption': config.get('borg', {}).get('encryption'),
         'backup.paths_to_backup': config.get('backup', {}).get('paths_to_backup')
     }
 
@@ -67,9 +69,10 @@ def run_borg_backup(config, dryrun=False):
     env = os.environ.copy()
     env['BORG_PASSPHRASE'] = passphrase
 
-    # Generate a unique archive name using the current timestamp
+    # Generate a unique archive name using the hostname and current timestamp
+    hostname = socket.gethostname()  # Get the actual hostname of the machine
     timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-    archive_name = f"{repo}::{{hostname}}-{timestamp}"
+    archive_name = f"{repo}::{hostname}-{timestamp}"
     
     # Build the borg create command
     borg_create_cmd = ['borg', 'create', archive_name] + paths + [
