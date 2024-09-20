@@ -1,95 +1,144 @@
-#!/bin/bash
+import os
+import shutil
+import subprocess
+from datetime import datetime
 
-# Define the directory where you want to place the 'run' script
-INSTALL_DIR="/usr/local/bin/eos"
-EOS_CONFIGS="/etc/eos"
-EOS_LOGS="/var/log/eos"
+INSTALL_DIR = "/usr/local/bin/eos"
+EOS_CONFIGS = "/etc/eos"
+EOS_LOGS = "/var/log/eos"
+BACKUP_DIR = "/usr/local/bin/eos_backup"
+SCRIPT_NAME = "run"
+SCRIPT_PATH = os.path.join(INSTALL_DIR, SCRIPT_NAME)
+SOURCE_DIR = os.path.join(os.getcwd(), "scripts")
+LOG_FILE = "/var/log/eos/install.log"
 
-# Define the name of the script
-SCRIPT_NAME="run"
 
-# Full path to the script
-SCRIPT_PATH="$INSTALL_DIR/$SCRIPT_NAME"
+def log_message(message):
+    """Logs a message to the install log file."""
+    # Ensure the EOS_LOGS directory exists before writing
+    os.makedirs(EOS_LOGS, exist_ok=True)
+    with open(LOG_FILE, 'a') as f:
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        f.write(f"{timestamp} - {message}\n")
 
-# Function to add the directory to PATH in .bashrc or .zshrc
-add_to_path() {
-    SHELL_RC=""
-    if [ -f "$HOME/.bashrc" ]; then
-        SHELL_RC="$HOME/.bashrc"
-    elif [ -f "$HOME/.zshrc" ]; then
-        SHELL_RC="$HOME/.zshrc"
-    else
-        echo "Neither .bashrc nor .zshrc found. Please add $INSTALL_DIR to your PATH manually."
-        exit 1
-    fi
 
-    if ! grep -q "$INSTALL_DIR" "$SHELL_RC"; then
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_RC"
-        echo "$INSTALL_DIR has been added to your PATH in $SHELL_RC"
-        source "$SHELL_RC"
-    else
-        echo "$INSTALL_DIR is already in your PATH."
-    fi
-}
+def add_to_path():
+    """Add the INSTALL_DIR to the PATH in the user's shell configuration."""
+    shell_rc = None
+    bashrc = os.path.expanduser("~/.bashrc")
+    zshrc = os.path.expanduser("~/.zshrc")
 
-# Perform a clean installation by removing the old directory if it exists
-if [ -d "$INSTALL_DIR" ]; then
-    echo "Removing existing installation at $INSTALL_DIR..."
-    sudo rm -rf "$INSTALL_DIR"
-fi
+    if os.path.isfile(bashrc):
+        shell_rc = bashrc
+    elif os.path.isfile(zshrc):
+        shell_rc = zshrc
+    else:
+        log_message("Neither .bashrc nor .zshrc found. Exiting.")
+        print(f"Neither .bashrc nor .zshrc found. Please add {INSTALL_DIR} to your PATH manually.")
+        exit(1)
 
-# Recreate the directory for a fresh installation
-echo "Creating target directories: $INSTALL_DIR $EOS_CONFIGS $EOS_LOGS"
-sudo mkdir -p "$INSTALL_DIR" "$EOS_CONFIGS" "$EOS_LOGS"
+    with open(shell_rc, 'r+') as f:
+        content = f.read()
+        if INSTALL_DIR not in content:
+            f.write(f'\nexport PATH="$PATH:{INSTALL_DIR}"\n')
+            log_message(f"{INSTALL_DIR} added to PATH in {shell_rc}")
+            print(f"{INSTALL_DIR} has been added to your PATH in {shell_rc}.")
+            subprocess.run(['source', shell_rc], shell=True)
+        else:
+            log_message(f"{INSTALL_DIR} already in PATH.")
+            print(f"{INSTALL_DIR} is already in your PATH.")
 
-# Move the script to the target directory
-echo "Moving '$SCRIPT_NAME' to $INSTALL_DIR..."
-if [ -f "$SCRIPT_NAME" ]; then
-    sudo cp "$SCRIPT_NAME" "$INSTALL_DIR"
-else
-    echo "Error: Script '$SCRIPT_NAME' not found in the current directory."
-    exit 1
-fi
 
-# Make the script executable
-echo "Making '$SCRIPT_NAME' executable..."
-sudo chmod +x "$SCRIPT_PATH"
+def check_dependencies():
+    """Check if required commands are available."""
+    commands = ["sudo", "cp", "mkdir", "chmod", "rm"]
+    for cmd in commands:
+        if not shutil.which(cmd):
+            log_message(f"Error: {cmd} is not installed.")
+            print(f"Error: {cmd} is not installed. Please install it and try again.")
+            exit(1)
 
-# Add the directory to PATH if necessary
-add_to_path
 
-echo "'$SCRIPT_NAME' has been installed successfully and is available in your PATH."
+def backup_existing_install():
+    """Backup existing installation if it exists."""
+    if os.path.exists(INSTALL_DIR):
+        print(f"Existing installation found. Backing up to {BACKUP_DIR}.")
+        log_message(f"Backing up existing installation to {BACKUP_DIR}.")
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        backup_path = os.path.join(BACKUP_DIR, datetime.now().strftime('%Y%m%d%H%M%S'))
+        shutil.move(INSTALL_DIR, backup_path)
 
-# Directory where the scripts are located
-SOURCE_DIR="$(pwd)/scripts/"  # Change this if your scripts are in a different directory
 
-# Ensure the source directory exists
-if [ ! -d "$SOURCE_DIR" ]; then
-  echo "Error: Source directory $SOURCE_DIR does not exist."
-  exit 1
-fi
+def clean_install():
+    """Remove the existing installation if confirmed by the user."""
+    if os.path.exists(INSTALL_DIR):
+        answer = input(f"Do you want to remove the existing installation at {INSTALL_DIR}? [y/n]: ").strip().lower()
+        if answer == 'y':
+            log_message(f"Removing existing installation at {INSTALL_DIR}")
+            shutil.rmtree(INSTALL_DIR)
+        else:
+            print("Installation aborted.")
+            log_message("Installation aborted by user.")
+            exit(0)
 
-# Move all scripts recursively from the source directory to the target directory
-echo "Moving scripts from $SOURCE_DIR to $INSTALL_DIR"
 
-# Copy all contents of the source directory to the target directory
-sudo cp -R "$SOURCE_DIR/"* "$INSTALL_DIR/"
+def install_fresh():
+    """Create fresh target directories."""
+    print(f"Creating target directories: {INSTALL_DIR}, {EOS_CONFIGS}, {EOS_LOGS}")
+    log_message(f"Creating directories: {INSTALL_DIR}, {EOS_CONFIGS}, {EOS_LOGS}")
+    os.makedirs(INSTALL_DIR, exist_ok=True)
+    os.makedirs(EOS_CONFIGS, exist_ok=True)
+    os.makedirs(EOS_LOGS, exist_ok=True)
 
-# Make all moved scripts executable
-echo "Making scripts executable"
-sudo chmod -R +x "$INSTALL_DIR/"
 
-echo "Installation complete."
-echo "Current PATH: $PATH"
+def move_script():
+    """Move the main script to the target directory."""
+    if os.path.isfile(SCRIPT_NAME):
+        shutil.copy(SCRIPT_NAME, INSTALL_DIR)
+        log_message(f"Moving {SCRIPT_NAME} to {INSTALL_DIR}")
+    else:
+        print(f"Error: Script {SCRIPT_NAME} not found in the current directory.")
+        log_message(f"Error: Script {SCRIPT_NAME} not found.")
+        exit(1)
 
-# ASCII art
-cat << "EOF"
-#     ___         _       __  __          _
-#    / __|___  __| |___  |  \/  |___ _ _ | |_____ _  _
-#   | (__/ _ \/ _` / -_) | |\/| / _ \ ' \| / / -_) || |
-#    \___\___/\__,_\___| |_|  |_\___/_||_|_\_\___|\_, |
-#                  / __|  _| |__  ___ _ _         |__/
-#                 | (_| || | '_ \/ -_) '_|
-#                  \___\_, |_.__/\___|_|
-#                      |__/
-EOF
+
+def make_executable():
+    """Make the script executable."""
+    os.chmod(SCRIPT_PATH, 0o755)
+    log_message(f"Making {SCRIPT_NAME} executable.")
+
+
+def move_additional_scripts():
+    """Move all additional scripts to the target directory."""
+    if not os.path.isdir(SOURCE_DIR):
+        log_message(f"Error: Source directory {SOURCE_DIR} does not exist.")
+        print(f"Error: Source directory {SOURCE_DIR} does not exist.")
+        exit(1)
+
+    print(f"Moving scripts from {SOURCE_DIR} to {INSTALL_DIR}")
+    log_message(f"Moving scripts from {SOURCE_DIR} to {INSTALL_DIR}")
+    for file in os.listdir(SOURCE_DIR):
+        file_path = os.path.join(SOURCE_DIR, file)
+        if os.path.isfile(file_path):
+            shutil.copy(file_path, INSTALL_DIR)
+            os.chmod(os.path.join(INSTALL_DIR, file), 0o755)
+    log_message("All scripts moved and made executable.")
+
+
+def main():
+    """Main installation process."""
+    log_message("Starting installation process.")
+    check_dependencies()
+    backup_existing_install()
+    clean_install()
+    install_fresh()
+    move_script()
+    make_executable()
+    move_additional_scripts()
+    add_to_path()
+    log_message("Installation complete.")
+    print("Installation complete. Check /var/log/eos/install.log for details.")
+
+
+if __name__ == "__main__":
+    main()
