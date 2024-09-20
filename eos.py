@@ -9,7 +9,7 @@ INSTALL_DIR = "/usr/local/bin/eos"
 EOS_CONFIGS = "/etc/eos"
 EOS_LOGS = "/var/log/eos"
 BACKUP_DIR = "/usr/local/bin/eos_backup"
-SCRIPT_NAME = "run"
+SCRIPT_NAME = "eos"
 SOURCE_DIR = os.path.join(os.getcwd(), "scripts")
 LOG_FILE = "/var/log/run_script.log"
 
