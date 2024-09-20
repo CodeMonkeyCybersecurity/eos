@@ -51,7 +51,7 @@ user@hostname:~/Eos/scripts$ sudo chmod +x addUser.sh
 user@hostname:~/Eos/scripts$ sudo ./addUser.sh
 ```
 
-The script to create a new SSH key is called 'create_ssh_key.sh'. So, to create a new SSH key, we simply: 
+The script to create a new SSH key is called 'createSshKey.sh'. So, to create a new SSH key, we simply: 
 ```bash
 sudo run createSshKey.sh
 ```
