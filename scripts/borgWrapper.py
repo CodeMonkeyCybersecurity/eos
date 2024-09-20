@@ -6,9 +6,37 @@ import argparse
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+CONFIG_DIR = "/etc/eos/borg"
+CONFIG_FILE = os.path.join(CONFIG_DIR, "config")
+
 def is_remote_path(path):
     """Check if the path is a remote SSH path."""
     return ':' in path and '@' in path
+
+def ensure_config_directory():
+    """Ensure that the config directory exists."""
+    if not os.path.exists(CONFIG_DIR):
+        try:
+            os.makedirs(CONFIG_DIR)
+            logging.info(f"Created configuration directory at {CONFIG_DIR}")
+        except Exception as e:
+            logging.error(f"Failed to create config directory: {e}")
+            return False
+    return True
+
+def write_borg_config(repo_path, encryption):
+    """Write the Borg repository configuration to a file."""
+    if ensure_config_directory():
+        try:
+            with open(CONFIG_FILE, 'w') as config_file:
+                config_file.write(f"REPO_PATH={repo_path}\n")
+                config_file.write(f"ENCRYPTION={encryption}\n")
+            logging.info(f"Borg configuration written to {CONFIG_FILE}")
+        except Exception as e:
+            logging.error(f"Failed to write Borg config: {e}")
+    else:
+        logging.error("Failed to ensure config directory, skipping config file creation.")
+
 
 def init_borg_repo(repo_path, encryption='none'):
     """Initialize a new Borg repository."""
@@ -24,6 +52,8 @@ def init_borg_repo(repo_path, encryption='none'):
             text=True
         )
         logging.info("Borg repository initialized successfully.")
+        write_borg_config(repo_path, encryption)
+        
         return result.stdout
     except subprocess.CalledProcessError as e:
         logging.error("Failed to initialize Borg repository.")
