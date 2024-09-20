@@ -163,6 +163,7 @@ def main():
         print(check_borg_repo(repo_path))
     else:
         print("Invalid action. Please choose a valid option.")
+        print("Try 'python3 borgWrapper.py --help'")
 
 if __name__ == "__main__":
     main()
