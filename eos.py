@@ -140,8 +140,8 @@ def main():
         move_scripts()
         log_action("Installation complete.")
         print("Installation complete. Check /var/log/eos/install.log for details.")
-        print("To get started, you need to run 'export PATH="$PATH:/usr/local/bin/eos"'")
-        print("Then, 'source ~/.bashrc'")
+        printf("To get started, you need to run 'export PATH="$PATH:/usr/local/bin/eos"'")
+        printf("Then, 'source ~/.bashrc'")
         sys.exit(0)
 
     # If not "install" mode, it's the "run" mode for executing scripts
