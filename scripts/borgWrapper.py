@@ -29,7 +29,7 @@ def check_yaml(config):
     required_values = {
         'borg.repo': config.get('borg', {}).get('repo'),
         'borg.passphrase': config.get('borg', {}).get('passphrase'),
-        'backup.encryption': config.get('backup', {}).get('encryption'),
+        'backup.encryption': config.get('borg', {}).get('encryption'),
         'backup.paths_to_backup': config.get('backup', {}).get('paths_to_backup')
     }
 
