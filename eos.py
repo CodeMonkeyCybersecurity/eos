@@ -4,7 +4,7 @@ import shutil
 import subprocess
 from datetime import datetime
 
-# Default directories for installation
+# Default directories for installation and execution
 EOS_DIR = "/usr/local/bin/eos"
 EOS_SCRIPTS_DIR = os.path.join(EOS_DIR, "scripts")
 EOS_CONFIGS = "/etc/eos"
@@ -97,6 +97,34 @@ def move_other_scripts():
     log_action("All scripts moved and made executable.")
 
 
+# -------- SCRIPT EXECUTION FUNCTIONS -------- #
+def list_scripts(script_dir):
+    """Lists all scripts in the script directory."""
+    print(f"Available scripts in '{script_dir}':")
+    for script in os.listdir(script_dir):
+        script_path = os.path.join(script_dir, script)
+        if os.path.isfile(script_path):
+            print(os.path.basename(script_path))
+
+
+def execute_script(script_name):
+    """Executes a script from the EOS scripts directory."""
+    script_path = os.path.join(EOS_SCRIPTS_DIR, script_name)
+
+    # Check if the script exists
+    if not os.path.isfile(script_path):
+        print(f"Error: Script '{script_name}' not found in '{EOS_SCRIPTS_DIR}'.")
+        sys.exit(1)
+
+    # Make the script executable if it isn't already
+    if not os.access(script_path, os.X_OK):
+        os.chmod(script_path, 0o755)
+
+    # Execute the script
+    print(f"Executing script: {script_name}")
+    subprocess.run([script_path], check=True)
+
+
 # -------- MAIN FUNCTION -------- #
 def main():
     # Check if the script is running in "install" mode
@@ -112,8 +140,19 @@ def main():
         print("Installation complete. Check /var/log/eos_install.log for details.")
         sys.exit(0)
 
-    # If not "install" mode, show help
-    print("Error: Invalid mode. Use 'install' to run the installation.")
+    # Handle 'list' command to list available scripts
+    if len(sys.argv) > 1 and sys.argv[1] == "list":
+        list_scripts(EOS_SCRIPTS_DIR)
+        sys.exit(0)
+
+    # Handle execution of a script
+    if len(sys.argv) > 1:
+        script_name = sys.argv[1]
+        execute_script(script_name)
+        sys.exit(0)
+
+    # If no valid option provided, show help
+    print("Error: No script name provided. Use 'eos list' to see available scripts or 'install' to install.")
     sys.exit(1)
 
 
