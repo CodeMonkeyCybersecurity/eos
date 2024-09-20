@@ -11,7 +11,10 @@ EOS_CONFIGS = "/etc/eos"
 EOS_LOGS = "/var/log/eos"
 BACKUP_DIR = "/usr/local/bin/eos_backup"
 SCRIPT_NAME = "eos.py"
-SOURCE_DIR = os.path.join(os.getcwd(), "scripts")  # Your scripts directory in /Eos/scripts
+
+# Define the source directories as absolute paths from the user's home directory
+SOURCE_EOS_DIR = os.path.expanduser("~/Eos")  # The directory where eos.py is located
+SOURCE_SCRIPTS_DIR = os.path.join(SOURCE_EOS_DIR, "scripts")  # The directory containing the scripts
 LOG_FILE = "/var/log/eos_install.log"
 
 
@@ -68,9 +71,9 @@ def install_fresh():
 
 def move_eos_script():
     """Move the eos.py script to the target directory."""
-    eos_script_path = os.path.join(os.getcwd(), SCRIPT_NAME)  # Assume eos.py is in the current directory
+    eos_script_path = os.path.join(SOURCE_EOS_DIR, SCRIPT_NAME)  # eos.py should be in ~/Eos/
     if not os.path.isfile(eos_script_path):
-        print(f"Error: '{SCRIPT_NAME}' not found in the current directory.")
+        print(f"Error: '{SCRIPT_NAME}' not found in {SOURCE_EOS_DIR}.")
         sys.exit(1)
 
     print(f"Moving '{SCRIPT_NAME}' to {EOS_DIR}")
@@ -82,15 +85,15 @@ def move_eos_script():
 
 def move_other_scripts():
     """Move the other scripts to the target scripts directory."""
-    if not os.path.isdir(SOURCE_DIR):
-        log_action(f"Error: Source directory {SOURCE_DIR} does not exist.")
-        print(f"Error: Source directory {SOURCE_DIR} does not exist.")
+    if not os.path.isdir(SOURCE_SCRIPTS_DIR):
+        log_action(f"Error: Source directory {SOURCE_SCRIPTS_DIR} does not exist.")
+        print(f"Error: Source directory {SOURCE_SCRIPTS_DIR} does not exist.")
         sys.exit(1)
 
-    print(f"Moving scripts from {SOURCE_DIR} to {EOS_SCRIPTS_DIR}")
-    log_action(f"Moving scripts from {SOURCE_DIR} to {EOS_SCRIPTS_DIR}")
-    for file in os.listdir(SOURCE_DIR):
-        file_path = os.path.join(SOURCE_DIR, file)
+    print(f"Moving scripts from {SOURCE_SCRIPTS_DIR} to {EOS_SCRIPTS_DIR}")
+    log_action(f"Moving scripts from {SOURCE_SCRIPTS_DIR} to {EOS_SCRIPTS_DIR}")
+    for file in os.listdir(SOURCE_SCRIPTS_DIR):
+        file_path = os.path.join(SOURCE_SCRIPTS_DIR, file)
         if os.path.isfile(file_path):
             shutil.copy(file_path, EOS_SCRIPTS_DIR)
             os.chmod(os.path.join(EOS_SCRIPTS_DIR, file), 0o755)
@@ -134,8 +137,8 @@ def main():
         backup_existing_install()
         clean_install()
         install_fresh()
-        move_eos_script()  # Move eos.py to /usr/local/bin/eos
-        move_other_scripts()  # Move other scripts to /usr/local/bin/eos/scripts
+        move_eos_script()  # Move eos.py from ~/Eos/ to /usr/local/bin/eos
+        move_other_scripts()  # Move other scripts from ~/Eos/scripts to /usr/local/bin/eos/scripts
         log_action("Installation complete.")
         print("Installation complete. Check /var/log/eos_install.log for details.")
         sys.exit(0)
