@@ -80,6 +80,30 @@ def move_scripts():
             os.chmod(os.path.join(INSTALL_DIR, file), 0o755)
     log_action("All scripts moved and made executable.")
 
+def create_alias():
+    """Creates an alias for the eos command."""
+    shell_rc = None
+    bashrc = os.path.expanduser("~/.bashrc")
+    zshrc = os.path.expanduser("~/.zshrc")
+
+    if os.path.isfile(bashrc):
+        shell_rc = bashrc
+    elif os.path.isfile(zshrc):
+        shell_rc = zshrc
+    else:
+        print("Error: Could not find .bashrc or .zshrc to create alias.")
+        log_action("Error: Could not find shell config to create alias.")
+        return
+
+    alias_command = f"alias eos='python3 {INSTALL_DIR}/eos.py'"
+    
+    # Add alias to shell config
+    with open(shell_rc, 'a') as f:
+        f.write(f"\n{alias_command}\n")
+    
+    print(f"Alias 'eos' added to {shell_rc}. You can now run 'eos' from any directory.")
+    log_action(f"Alias 'eos' added to {shell_rc}")
+    subprocess.run(['source', shell_rc], shell=True)
 
 # -------- SCRIPT RUNNER FUNCTIONS -------- #
 def show_help():
