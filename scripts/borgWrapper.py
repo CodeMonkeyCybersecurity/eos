@@ -1,235 +1,96 @@
-import subprocess
+import yaml
 import os
+import subprocess
 import logging
-import argparse
+
+CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-CONFIG_DIR = "/etc/eos/borg"
-CONFIG_FILE = os.path.join(CONFIG_DIR, "config")
+def load_config():
+    """Load configuration from YAML file."""
+    if os.path.exists(CONFIG_PATH):
+        with open(CONFIG_PATH, 'r') as file:
+            try:
+                config = yaml.safe_load(file)
+                return config
+            except yaml.YAMLError as e:
+                logging.error(f"Error loading configuration file: {e}")
+                return None
+    else:
+        logging.error(f"Configuration file not found. Please run 'sudo python3 configureBorg.py --create'")
+        return None
 
-def is_remote_path(path):
-    """Check if the path is a remote SSH path."""
-    return ':' in path and '@' in path
+def check_config_values(config):
+    """Check if all required configuration values are set correctly."""
+    required_values = {
+        'borg.repo': config.get('borg', {}).get('repo'),
+        'borg.passphrase': config.get('borg', {}).get('passphrase'),
+        'backup.encryption': config.get('backup', {}).get('encryption'),
+        'backup.paths_to_backup': config.get('backup', {}).get('paths_to_backup')
+    }
 
-def ensure_config_directory():
-    """Ensure that the config directory exists."""
-    if not os.path.exists(CONFIG_DIR):
-        try:
-            os.makedirs(CONFIG_DIR)
-            logging.info(f"Created configuration directory at {CONFIG_DIR}")
-        except Exception as e:
-            logging.error(f"Failed to create config directory: {e}")
+    for key, value in required_values.items():
+        if not value:
+            logging.error(f"Configuration issue: '{key}' is not set or is invalid.")
             return False
     return True
 
-def write_borg_config(repo_path, encryption):
-    """Write the Borg repository configuration to a file."""
-    if ensure_config_directory():
-        try:
-            with open(CONFIG_FILE, 'w') as config_file:
-                config_file.write(f"REPO_PATH={repo_path}\n")
-                config_file.write(f"ENCRYPTION={encryption}\n")
-            logging.info(f"Borg configuration written to {CONFIG_FILE}")
-        except Exception as e:
-            logging.error(f"Failed to write Borg config: {e}")
-    else:
-        logging.error("Failed to ensure config directory, skipping config file creation.")
+def run_borg_backup(config):
+    """Run the Borg backup using the configuration values."""
+    repo = config['borg']['repo']
+    passphrase = config['borg']['passphrase']
+    paths = config['backup']['paths_to_backup']
+    encryption = config['backup']['encryption']
 
-def load_borg_config():
-    """Load Borg repository configuration from the config file."""
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, 'r') as config_file:
-                config = {}
-                for line in config_file:
-                    key, value = line.strip().split('=')
-                    config[key] = value
-                logging.info("Loaded Borg configuration.")
-                return config
-        except Exception as e:
-            logging.error(f"Failed to load Borg config: {e}")
-            return None
-    else:
-        logging.error("Configuration file does not exist.")
-        return None
+    # Set the environment variable for passphrase
+    env = os.environ.copy()
+    env['BORG_PASSPHRASE'] = passphrase
 
-def check_or_ask_for_defaults():
-    """Check if default configs exist or prompt user to input defaults."""
-    config = load_borg_config()
-    if config:
-        print(f"Default configuration:\nREPO_PATH={config.get('REPO_PATH')}\nENCRYPTION={config.get('ENCRYPTION')}")
-        return config
-    else:
-        # Ask for default values if config does not exist
-        repo_path = input("Enter default repository path: ")
-        encryption = input("Enter default encryption type (default is 'none'): ") or 'none'
-        write_borg_config(repo_path, encryption)
-        return {"REPO_PATH": repo_path, "ENCRYPTION": encryption}
+    # Build the borg create command
+    borg_create_cmd = [
+        'borg', 'create', f'{repo}::{{hostname}}-{{now}}'
+    ] + paths + [
+        '--verbose',
+        '--filter', config['backup']['filter'],
+        '--list',
+        '--stats',
+        '--show-rc',
+        '--compression', config['backup']['compression'],
+        '--exclude-caches'
+    ]
 
-def init_borg_repo(repo_path, encryption='none'):
-    """Initialize a new Borg repository."""
-    if not is_remote_path(repo_path) and not os.path.exists(os.path.dirname(repo_path)):
-        return f"Error: The directory {os.path.dirname(repo_path)} does not exist."
+    # Add any exclude patterns from config
+    for pattern in config['backup'].get('exclude_patterns', []):
+        borg_create_cmd += ['--exclude', pattern]
 
     try:
+        # Run the borg create command
         result = subprocess.run(
-            ['borg', 'init', '--encryption', encryption, repo_path],
+            borg_create_cmd,
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            env=env,
             text=True
         )
-        logging.info("Borg repository initialized successfully.")
-        write_borg_config(repo_path, encryption)
-        
-        return result.stdout
+        logging.info(result.stdout)
     except subprocess.CalledProcessError as e:
-        logging.error("Failed to initialize Borg repository.")
-        return f"Error initializing repository: {e.stderr}"
-
-def create_borg_backup(repo_path, backup_name, source_paths, exclude_patterns=None):
-    """Create a backup with Borg."""
-    if not is_remote_path(repo_path) and not os.path.exists(repo_path):
-        return f"Error: The repository path {repo_path} does not exist."
-
-    for path in source_paths:
-        if not os.path.exists(path):
-            return f"Error: The source path {path} does not exist."
-
-    try:
-        cmd = ['borg', 'create', f'{repo_path}::{backup_name}'] + source_paths
-        if exclude_patterns:
-            for pattern in exclude_patterns:
-                cmd += ['--exclude', pattern]
-
-        env = os.environ.copy()
-        env['BORG_UNKNOWN_UNENCRYPTED_REPO_ACCESS_IS_OK'] = 'YES'
-
-        result = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            env=env
-        )
-        logging.info("Backup created successfully.")
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        logging.error("Failed to create Borg backup.")
-        return f"Error creating backup: {e.stderr}"
-
-def list_borg_archives(repo_path):
-    """List all archives in a Borg repository."""
-    if not is_remote_path(repo_path) and not os.path.exists(repo_path):
-        return f"Error: The repository path {repo_path} does not exist."
-
-    try:
-        result = subprocess.run(
-            ['borg', 'list', repo_path],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        logging.info("Listed archives successfully.")
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        logging.error("Failed to list Borg archives.")
-        return f"Error listing archives: {e.stderr}"
-
-def restore_borg_backup(repo_path, archive_name, target_path, restore_paths=None):
-    """Restore a Borg backup."""
-    if not is_remote_path(repo_path) and not os.path.exists(repo_path):
-        return f"Error: The repository path {repo_path} does not exist."
-
-    if not os.path.exists(target_path):
-        return f"Error: The target path {target_path} does not exist."
-
-    try:
-        cmd = ['borg', 'extract', f'{repo_path}::{archive_name}', '--destination', target_path]
-        if restore_paths:
-            cmd += restore_paths
-
-        result = subprocess.run(
-            cmd,
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        logging.info("Backup restored successfully.")
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        logging.error("Failed to restore Borg backup.")
-        return f"Error restoring backup: {e.stderr}"
-
-def check_borg_repo(repo_path):
-    """Check the consistency of a Borg repository."""
-    if not is_remote_path(repo_path) and not os.path.exists(repo_path):
-        return f"Error: The repository path {repo_path} does not exist."
-
-    try:
-        result = subprocess.run(
-            ['borg', 'check', repo_path],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        logging.info("Borg repository checked successfully.")
-        return result.stdout
-    except subprocess.CalledProcessError as e:
-        logging.error("Failed to check Borg repository.")
-        return f"Error checking repository: {e.stderr}"
+        logging.error(f"Borg backup failed: {e.stderr}")
 
 def main():
-    parser = argparse.ArgumentParser(description="BorgBackup Python Wrapper")
-    parser.add_argument('--init', help="Initialize a new Borg repository", action='store_true')
-    parser.add_argument('--backup', help="Create a new backup", action='store_true')
-    parser.add_argument('--list', help="List archives in a repository", action='store_true')
-    parser.add_argument('--restore', help="Restore a backup", action='store_true')
-    parser.add_argument('--check', help="Check the consistency of a Borg repository", action='store_true')
-    parser.add_argument('--configs', help="Check or set default configuration", action='store_true')
+    # Load the configuration
+    config = load_config()
+    if not config:
+        return  # Exit if config is not loaded
 
-    args = parser.parse_args()
-
-    if args.configs:
-        check_or_ask_for_defaults()
-
-    elif args.init:
-        config = check_or_ask_for_defaults()
-        repo_path = config['REPO_PATH']
-        encryption = config['ENCRYPTION']
-        print(init_borg_repo(repo_path, encryption))
-
-    elif args.backup:
-        config = check_or_ask_for_defaults()
-        repo_path = config['REPO_PATH']
-        backup_name = input("Enter the name for the backup archive: ")
-        source_paths = input("Enter the source paths to include, separated by spaces: ").split()
-        exclude_patterns = input("Enter exclude patterns (optional), separated by spaces: ").split() or None
-        print(create_borg_backup(repo_path, backup_name, source_paths, exclude_patterns))
-
-    elif args.list:
-        repo_path = input("Enter the repository path: ")
-        print(list_borg_archives(repo_path))
-
-    elif args.restore:
-        repo_path = input("Enter the repository path: ")
-        archive_name = input("Enter the archive name to restore: ")
-        target_path = input("Enter the target path for restoration: ")
-        restore_paths = input("Enter specific paths to restore (optional), separated by spaces: ").split() or None
-        print(restore_borg_backup(repo_path, archive_name, target_path, restore_paths))
-
-    elif args.check:
-        repo_path = input("Enter the repository path: ")
-        print(check_borg_repo(repo_path))
+    # Check if all required configuration values are set
+    if check_config_values(config):
+        logging.info("All configuration values are correct. Proceeding with the backup.")
+        run_borg_backup(config)
     else:
-        print("Invalid action. Please choose a valid option.")
-        print("Try 'python3 borgWrapper.py --help'")
+        logging.error("One or more configuration values are missing or incorrect. Backup aborted.")
 
 if __name__ == "__main__":
     main()
