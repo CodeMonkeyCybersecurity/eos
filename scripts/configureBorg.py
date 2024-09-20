@@ -9,7 +9,7 @@ DEFAULT_CONFIG = {
     'borg': {
         'repo': '',
         'passphrase': '',
-        'encryption': 'repokey'
+        'encryption': 'repokey'  # Default encryption method added
     },
     'backup': {
         'verbose': True,
@@ -71,7 +71,7 @@ def edit_variable(config, variable, value):
     elif variable == 'passphrase':
         config['borg']['passphrase'] = value
     elif variable == 'encryption':
-        config['borg']['encryption'] = value
+        config['borg']['encryption'] = value or 'repokey'  # Set default encryption to 'repokey' if not provided
     elif variable == 'filter':
         config['backup']['filter'] = value
     elif variable == 'compression':
@@ -81,7 +81,7 @@ def edit_variable(config, variable, value):
         return False
     return True
 
-def prompt_for_variable():
+def prompt_for_variable(config):
     """Prompt the user for which variable to edit."""
     print("Which variable would you like to edit?")
     print("1: repo")
@@ -92,14 +92,18 @@ def prompt_for_variable():
     choice = input("Enter the number of the variable to edit: ")
 
     variables = {
-        '1': 'repo',
-        '2': 'passphrase',
-        '3': 'encryption',
-        '4': 'filter',
-        '5': 'compression'
+        '1': ('repo', config['borg']['repo']),
+        '2': ('passphrase', config['borg']['passphrase']),
+        '3': ('encryption', config['borg'].get('encryption', 'repokey')),  # Default to 'repokey'
+        '4': ('filter', config['backup']['filter']),
+        '5': ('compression', config['backup']['compression'])
     }
 
-    return variables.get(choice, None)
+    variable, default_value = variables.get(choice, (None, None))
+    if variable:
+        value = input(f"Enter new value for {variable} (default: {default_value}): ") or default_value
+        return variable, value
+    return None, None
 
 def main():
     parser = argparse.ArgumentParser(description="Borg YAML Configuration Editor")
@@ -119,9 +123,8 @@ def main():
 
     # If no specific flag is provided, prompt the user for input
     if args.edit and not any([args.repo, args.passphrase, args.encryption, args.filter, args.compression]):
-        variable = prompt_for_variable()
+        variable, value = prompt_for_variable(config)
         if variable:
-            value = input(f"Enter new value for {variable}: ")
             if edit_variable(config, variable, value):
                 update_config(config)
         else:
