@@ -155,7 +155,6 @@ Available Flags:
 --restore          : Restore a specific archive (requires --target-dir)
 --test-restore     : Test restore a specific archive without extracting
 --target-dir       : Specify the target directory for restoring archives
---help             : Show this help message and quit
 """
     print(help_message)
 
@@ -175,7 +174,7 @@ def interactive_prompt():
         print("Exiting...")
 
 def main():
-    parser = argparse.ArgumentParser(description="Borg Backup Wrapper")
+    parser = argparse.ArgumentParser(description="Borg Backup Wrapper", add_help=True)  # Use default argparse help
     parser.add_argument('--check-yaml', help="Check the YAML configuration", action='store_true')
     parser.add_argument('--check-repo', help="Check the Borg repository", action='store_true')
     parser.add_argument('--dryrun', help="Run a dry run of the backup", action='store_true')
@@ -183,18 +182,12 @@ def main():
     parser.add_argument('--restore', help="Restore a specific archive", type=str)
     parser.add_argument('--test-restore', help="Test restore a specific archive", type=str)
     parser.add_argument('--target-dir', help="Specify the target directory for the restore", type=str)
-    parser.add_argument('--help', help="Show this help message", action='store_true')
 
     args = parser.parse_args()
 
     # If no arguments are passed, prompt the user for help or exit
     if not any(vars(args).values()):
         interactive_prompt()
-        return
-
-    # Show help if requested
-    if args.help:
-        print_help()
         return
 
     # Load the YAML configuration
