@@ -113,4 +113,64 @@ def load_config():
         return None
 
 def update_config(new_data):
-    """Update the YAML configuration​⬤
+    """Update the YAML configuration file with new data."""
+    with open(CONFIG_PATH, 'w') as file:
+        yaml.dump(new_data, file)
+        print("Configuration updated.")
+
+def print_defaults():
+    """Print the default configuration."""
+    print("Default configuration values:")
+    print(yaml.dump(DEFAULT_CONFIG, default_flow_style=False))
+
+def read_config():
+    """Read and print the current configuration."""
+    config = load_config()
+    if config:
+        print("Current configuration:")
+        print(yaml.dump(config, default_flow_style=False))
+
+def edit_config():
+    """Edit the configuration, specifically the repo, passphrase, and reinitialize with repokey encryption."""
+    config = load_config()
+    if config:
+        repo = input(f"Enter new Borg repository path (current: {config['borg']['repo']}): ") or config['borg']['repo']
+        passphrase = input(f"Enter new Borg passphrase (current: {config['borg']['passphrase']}): ") or config['borg']['passphrase']
+        
+        config['borg']['repo'] = repo
+        config['borg']['passphrase'] = passphrase
+        
+        update_config(config)
+        
+        # Reinitialize the repo with encryption
+        init_repo_with_encryption(repo, passphrase)
+
+def main():
+    parser = argparse.ArgumentParser(description="Borg YAML Configuration Wrapper with Encryption")
+    parser.add_argument('--create', help="Create the YAML configuration file and initialize with encryption", action='store_true')
+    parser.add_argument('--read', help="Read the current configuration", action='store_true')
+    parser.add_argument('--edit', help="Edit the Borg repository and passphrase and reinitialize with encryption", action='store_true')
+    parser.add_argument('--see-defaults', help="See the default configuration values", action='store_true')
+    
+    args = parser.parse_args()
+
+    if args.create:
+        if not os.path.exists(CONFIG_PATH):
+            create_default_config()
+        else:
+            print(f"Configuration file already exists at {CONFIG_PATH}")
+    
+    elif args.read:
+        read_config()
+    
+    elif args.edit:
+        edit_config()
+    
+    elif args.see_defaults:
+        print_defaults()
+
+    else:
+        print("No valid flag provided. Use --help for more information.")
+
+if __name__ == "__main__":
+    main()
