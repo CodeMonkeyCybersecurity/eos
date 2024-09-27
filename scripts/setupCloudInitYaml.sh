@@ -3,7 +3,7 @@
 # Get system details
 HOSTNAME=$(hostname)
 USER=$(whoami)
-SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
+SSH_KEY=$(cat ~/.ssh/id_ed25519.pub)
 
 # Get list of installed packages
 INSTALLED_PACKAGES=$(dpkg --get-selections | awk '/install/ {print $1}' | xargs)
