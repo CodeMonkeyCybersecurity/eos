@@ -11,7 +11,7 @@ sudo usermod -aG sudo user
 
 Into something a human can understand:
 ``` bash
-sudo run addUser.sh
+sudo ./addUser.sh
 ```
 The terminal will then ask you to:
 ```bash
@@ -45,21 +45,33 @@ cd ~/Eos/scripts
 ## How to use scripts ending in .sh
 These scripts are bash shell scripts
 In the 'For Example' section above, we added a new user. The script to add a new user is called 'addUser.sh', so:
+
+Start in the main scripts directory
 ``` bash
+user@hostname:~$ cd ~/Eos/scripts
+```
+
+Make sure the script you want to run is executable:
+```bash
 user@hostname:~/Eos/scripts$ sudo chmod +x addUser.sh
+```
+
+Then execute it:
+```bash
 user@hostname:~/Eos/scripts$ sudo ./addUser.sh
 ```
 
 The script to create a new SSH key is called 'createSshKey.sh'. So, to create a new SSH key, we simply: 
 ```bash
-sudo run createSshKey.sh
+user@hostname:~/Eos/scripts$ sudo ./createSshKey.sh
 ```
 
 ## How to use scripts ending in .py
 These scripts are written in python. Python is almost always installed by default in Ubuntu distributions.
 If the script ends in .py, for example configureBorg.py, type:
 ```bash
-sudo python3 configureBorg.py
+user@hostname:~$ cd ~/Eos/scripts
+user@hostname:~/Eos/scripts$ sudo python3 configureBorg.py
 ```
 and press enter
 
@@ -71,17 +83,18 @@ If the script ends in .mjs, for example 'installKube.mjs':
 
 Install zx globally using node package manager (npm)
 ```bash
-sudo npm install -g zx
+user@hostname:~$ cd ~/Eos/scripts
+user@hostname:~/Eos/scripts$ sudo npm install -g zx
 ```
 
 Make sure the script you want to run is executable. For this example we are using 'installKube.mjs', so:
 ```bash
-sudo chmod +x installKube.mjs
+user@hostname:~/Eos/scripts$ sudo chmod +x installKube.mjs
 ```
 
 To run the script:
 ```bash
-sudo zx installKube.mjs
+user@hostname:~/Eos/scripts$ sudo zx installKube.mjs
 ```
 
 Replace 'installKube.mjs' with whichever .mjs script you want to run.
