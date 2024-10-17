@@ -71,17 +71,17 @@ If the script ends in .mjs, for example 'installKube.mjs':
 
 Install zx globally using node package manager (npm)
 ```bash
-npm install -g zx # 
+sudo npm install -g zx # 
 ```
 
 Make sure the script you want to run is executable. For this example we are using 'installKube.mjs', so:
 ```bash
-chmod +x installKube.mjs
+sudo chmod +x installKube.mjs
 ```
 
 To run the script:
 ```bash
-zx installKube.mjs
+sudo zx installKube.mjs
 ```
 
 Replace 'installKube.mjs' with whichever .mjs script you want to run.
