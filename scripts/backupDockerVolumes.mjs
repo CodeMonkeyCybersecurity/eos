@@ -1,8 +1,5 @@
 #!/usr/bin/env zx
 
-import { $ } from 'zx';
-import os from 'os';
-
 const homeDir = os.homedir();
 const backupDir = `${homeDir}/docker_volume_backups`;
 
