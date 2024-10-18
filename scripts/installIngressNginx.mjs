@@ -9,8 +9,3 @@ async function installHelm() {
 installHelm().catch(err => {
     console.error('Error during installation:', err);
 });
-
-
-
- \
- 
