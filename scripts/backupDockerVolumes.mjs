@@ -1,16 +1,25 @@
 #!/usr/bin/env zx
 
+import { $ } from 'zx';
+import os from 'os';
+
+const homeDir = os.homedir();
+const backupDir = `${homeDir}/docker_volume_backups`;
+
 // Create the backup directory if it doesn't exist
-const backupDir = '~/docker_volume_backups';
 await $`mkdir -p ${backupDir}`;
 
-// List all Docker volumes
-const volumes = await $`docker volume ls -q`;
+// Get the list of Docker volumes
+const { stdout } = await $`docker volume ls -q`;
+const volumes = stdout.trim().split('\n');
 
-// Loop through each volume and back it up
-for (const volume of volumes.stdout.split('\n').filter(Boolean)) {
-    console.log(`Backing up volume: ${volume}`);
-    await $`docker run --rm -v ${volume}:/volume -v ${backupDir}:/backup alpine sh -c "cd /volume && tar czf /backup/${volume}.tar.gz ."`;
+for (const volume of volumes) {
+  console.log(`Backing up volume: ${volume}`);
+  try {
+    await $`docker run --rm -v ${volume}:/volume -v ${backupDir}:/backup alpine sh -c "cd /volume && tar czf /backup/${volume}.tar.gz ."`
+  } catch (error) {
+    console.error(`Failed to back up volume: ${volume}`);
+    console.error(error);
+  }
 }
-
 console.log('Backup completed successfully!');
