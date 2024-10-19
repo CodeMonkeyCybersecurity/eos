@@ -133,12 +133,6 @@ async function checkBorgBackupDockerInstallationInContainer() {
   }
 }
 
-// Function to create all backup directories
-async function createBackupDirectories() {
-  const dirsToCreate = Object.values(backupConfig);
-  await Promise.all(dirsToCreate.map(dir => $`mkdir -p ${dir}`));
-}
-
 // Function to initialize Borg repository
 async function initializeBorgRepo() {
   const repoExists = await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg list ${repoDir} || true`;
