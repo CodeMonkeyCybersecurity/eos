@@ -43,16 +43,29 @@ function askQuestion(query) {
   }));
 }
 
-// Function to check if the Borg container exists
+// Function to check if the Borg container exists and create it if not
 async function checkBorgBackupDockerContainerExistence() {
   const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
   const containers = containerList.trim().split('\n');
 
+  // Check if the container already exists
   if (!containers.includes(DOCKER_CONTAINER_NAME)) {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" does not exist. Creating it...`);
-    await $`docker run -d --restart unless-stopped --name borgBackupDocker \
-  -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
-  alpine sh -c "while true; do sleep 30; done"`; // Create an Alpine container that runs indefinitely
+
+    try {
+      // Stop and remove any existing container with the same name (if left over from a failed run)
+      await $`docker stop ${DOCKER_CONTAINER_NAME} || true`;
+      await $`docker rm ${DOCKER_CONTAINER_NAME} || true`;
+
+      // Create the container
+      await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} \
+        -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
+        alpine sh -c "while true; do sleep 30; done"`;
+      console.log(`Container "${DOCKER_CONTAINER_NAME}" created successfully.`);
+    } catch (error) {
+      console.error(`Failed to create container "${DOCKER_CONTAINER_NAME}".`);
+      handleError(error);
+    }
   } else {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" already exists.`);
   }
