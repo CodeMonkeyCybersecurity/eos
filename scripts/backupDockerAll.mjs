@@ -18,7 +18,7 @@ const backupConfig = {
   envVars: `${homeDir}/dockerBackups/EnvVars`,
   bindMounts: `${homeDir}/dockerBackups/BindMounts`,
   swarm: `${homeDir}/dockerBackups/Swarm`,
-  repoDir: `${homeDir}/dockerBackups/borg_repo`,
+  repoDir: `/borg_repo`, // Inside the Docker container, repo is mounted here
 };
 
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
@@ -86,7 +86,7 @@ async function createBackupDirectories() {
 async function initializeBorgRepo() {
   const repoExists = await $`docker exec ${DOCKER_CONTAINER_NAME} borg list ${backupConfig.repoDir} || true`;
   if (!repoExists.stdout) {
-    await $`docker exec ${DOCKER_CONTAINER_NAME} borg init --encryption=repokey ${backupConfig.repoDir}`;
+    await $`docker exec ${DOCKER_CONTAINER_NAME} borg init --encryption=repokey /borg_repo`;
   }
 }
 
@@ -98,7 +98,7 @@ async function backupVolumes() {
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
     try {
-      await $`docker exec -it ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /var/lib/docker/volumes/${volume}/_data`;
+      await $`docker exec -it ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} /var/lib/docker/volumes/${volume}/_data`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
       handleError(error);
@@ -126,7 +126,7 @@ async function backupBindMounts() {
     const bindMountName = bindMount.replace(/[\/\\]/g, '_');
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
-      await $`docker exec -v ${bindMount}:/bind ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} /bind`;
+      await $`docker exec -v ${bindMount}:/bind ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${bindMountName}_${TIMESTAMP} /bind`;
     } catch (error) {
       console.error(`Failed to back up bind mount: ${bindMount}`);
       handleError(error);
@@ -145,7 +145,7 @@ async function backupContainers() {
 
     console.log(`Backing up container: ${sanitizedContainerName}`);
     try {
-      await $`docker export ${containerId} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedContainerName}_${TIMESTAMP} -`;
+      await $`docker export ${containerId} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedContainerName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up container: ${sanitizedContainerName}`);
       handleError(error);
@@ -162,7 +162,7 @@ async function backupImages() {
     const sanitizedImageName = image.replace(/[\/:]/g, '_');
     console.log(`Backing up image: ${image}`);
     try {
-      await $`docker save ${image} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedImageName}_${TIMESTAMP} -`;
+      await $`docker save ${image} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedImageName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up image: ${image}`);
       handleError(error);
@@ -181,7 +181,7 @@ async function backupNetworks() {
 
     console.log(`Backing up network: ${networkName}`);
     try {
-      await $`docker network inspect ${networkId} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedNetworkName}_${TIMESTAMP} -`;
+      await $`docker network inspect ${networkId} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedNetworkName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up network: ${networkName}`);
       handleError(error);
@@ -202,7 +202,7 @@ async function backupEnvVars() {
     try {
       const { stdout: envVars } = await $`docker inspect --format='{{range .Config.Env}}{{.}} {{end}}' ${containerId}`;
       const envVarsArray = envVars.split(' ').filter(Boolean);
-      await $`echo ${JSON.stringify(envVarsArray, null, 2)} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedContainerName}_env_vars_${TIMESTAMP} -`;
+      await $`echo ${JSON.stringify(envVarsArray, null, 2)} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedContainerName}_env_vars_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
       handleError(error);
@@ -215,7 +215,7 @@ async function cleanupOldBackups() {
   const daysToKeep = 30;
   console.log(`Cleaning up old backups... Keeping backups for the last ${daysToKeep} days.`);
   try {
-    await $`docker exec ${DOCKER_CONTAINER_NAME} borg prune --keep-daily=${daysToKeep} --keep-weekly=4 --keep-monthly=6 ${backupConfig.repoDir}`;
+    await $`docker exec ${DOCKER_CONTAINER_NAME} borg prune --keep-daily=${daysToKeep} --keep-weekly=4 --keep-monthly=6 /borg_repo`;
     console.log('Cleanup completed successfully.');
   } catch (error) {
     console.error('Failed to clean up old backups.');
