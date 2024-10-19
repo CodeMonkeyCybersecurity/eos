@@ -21,6 +21,7 @@ const backupConfig = {
   repoDir: `${homeDir}/dockerBackups/borg_repo`,
 };
 
+console.log(`Processing timestamp: ${TIMESTAMP}`);
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 
 // Centralized error handling function
@@ -128,6 +129,7 @@ async function backupBindMounts() {
   }
 
   for (const bindMount of bindMounts) {
+    console.log(`Processing bindMount: ${bindMount}`);
     const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace forward and backward slashes with an underscore
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
@@ -148,6 +150,7 @@ async function backupContainers() {
     const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
     
     // Check if containerName is a string, fix: handle TypeError
+    console.log(`Processing containerName: ${containerName}`);
     const sanitizedContainerName = typeof containerName === 'string' ? containerName.replace(/^\//, '') : ''; // Remove leading slash
 
     console.log(`Backing up container: ${sanitizedContainerName}`);
@@ -166,6 +169,7 @@ async function backupImages() {
 
   for (const image of images) {
     const sanitizedImageName = image.replace(/[\/:]/g, '_'); // Replace slashes and colons for a valid filename
+    console.log(`Processing sanitizedImageName: ${sanitizedImageName}`);
     console.log(`Backing up image: ${image}`);
     try {
       await $`docker save ${image} | gzip > ${backupConfig.images}/${sanitizedImageName}_${TIMESTAMP}.tar.gz`;
@@ -184,6 +188,7 @@ async function backupNetworks() {
     // Get network name and inspect
     const { stdout: networkName } = await $`docker network inspect ${networkId} --format '{{.Name}}'`;
     const sanitizedNetworkName = networkName.replace(/[\/:]/g, '_'); // Replace slashes and colons for a valid filename
+    console.log(`Processing sanitizedNetworkName: ${sanitizedNetworkName}`);
 
     console.log(`Backing up network: ${networkName}`);
     try {
@@ -202,9 +207,8 @@ async function backupEnvVars() {
 
   for (const containerId of containerIds) {
     const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
-    const sanitizedContainerName = containerName.replace(/
-
-^\//, ''); // Remove leading slash
+    console.log(`Processing containerName: ${containerName}`);
+    const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
 
     console.log(`Backing up environment variables for container: ${sanitizedContainerName}`);
     try {
