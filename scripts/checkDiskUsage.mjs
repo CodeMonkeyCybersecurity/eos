@@ -13,4 +13,5 @@ const used = rootLine[2];  // Third column is "Used"
 const available = rootLine[3];  // Fourth column is "Available"
 
 // Output the result
-echo(`Used: ${used}, Available: ${available}`);
+echo(`Total Disk Usage: ${used}`);
+echo(`Total Disk Available: ${available}`);
