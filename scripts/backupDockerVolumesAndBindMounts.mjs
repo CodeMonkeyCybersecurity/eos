@@ -1,56 +1,87 @@
 #!/usr/bin/env zx
 
-const os = require('os'); // Make sure to require the 'os' module
+const os = require('os');
+const path = require('path');
+
 const homeDir = os.homedir();
-const backupDir = `${homeDir}/docker_volume_backups`;
-const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
-const BACKUP_FILE = `${backupDir}/wazuh_backup_${TIMESTAMP}.tar.gz`;
+const backupConfig = {
+  baseDir: `${homeDir}/dockerBackups`,
+  volumes: `${homeDir}/dockerBackups/Volumes`,
+  containers: `${homeDir}/dockerBackups/Containers`,
+  images: `${homeDir}/dockerBackups/Images`,
+  networks: `${homeDir}/dockerBackups/Networks`,
+  envVars: `${homeDir}/dockerBackups/EnvVars`,
+  bindMounts: `${homeDir}/dockerBackups/BindMounts`,
+  swarm: `${homeDir}/dockerBackups/Swarm`,
+  repoDir: `${homeDir}/dockerBackups/borg_repo`,
+};
 
-// Create the backup directory if it doesn't exist
-await $`mkdir -p ${backupDir}`;
+const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0];
 
-// Get list of all containers
-const { stdout: containersStdout } = await $`docker ps -q`;
-const containerIds = containersStdout.trim().split('\n').filter(id => id);
+// Function to create directories
+async function createDirectories(dirs) {
+  await Promise.all(dirs.map(dir => $`mkdir -p ${dir}`));
+}
 
-const bindMounts = new Set();
+// Function to initialize Borg repository
+async function initializeBorgRepo() {
+  const repoExists = await $`borg list ${backupConfig.repoDir} || true`;
+  if (!repoExists.stdout) {
+    await $`borg init --encryption=repokey ${backupConfig.repoDir}`;
+  }
+}
 
-for (const containerId of containerIds) {
-  const { stdout: mountsStdout } = await $`docker inspect ${containerId} --format='{{json .Mounts}}'`;
-  const mounts = JSON.parse(mountsStdout);
+// Function to back up Docker volumes
+async function backupVolumes() {
+  const { stdout: volumesStdout } = await $`docker volume ls -q`;
+  const volumes = volumesStdout.trim().split('\n').filter(volume => volume);
 
-  for (const mount of mounts) {
-    if (mount.Type === 'bind') {
-      bindMounts.add(mount.Source);
+  for (const volume of volumes) {
+    console.log(`Backing up volume: ${volume}`);
+    try {
+      await $`docker run --rm -v ${volume}:/volume alpine sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume"`;
+    } catch (error) {
+      console.error(`Failed to back up volume: ${volume}`);
+      console.error(error);
     }
   }
 }
 
-// Back up Docker volumes
-const { stdout: volumesStdout } = await $`docker volume ls -q`;
-const volumes = volumesStdout.trim().split('\n').filter(volume => volume);
-
-for (const volume of volumes) {
-  console.log(`Backing up volume: ${volume}`);
-  try {
-    await $`docker run --rm -v ${volume}:/volume -v ${backupDir}:/backup alpine sh -c "cd /volume && tar czf /backup/${volume}.tar.gz ."`
-  } catch (error) {
-    console.error(`Failed to back up volume: ${volume}`);
-    console.error(error);
+// Function to back up bind mounts
+async function backupBindMounts(bindMounts) {
+  for (const bindMount of bindMounts) {
+    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
+    console.log(`Backing up bind mount: ${bindMount}`);
+    try {
+      await $`borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} ${bindMount}`;
+    } catch (error) {
+      console.error(`Failed to back up bind mount: ${bindMount}`);
+      console.error(error);
+    }
   }
 }
 
-// Back up bind mounts
-for (const bindMount of bindMounts) {
-  const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
-  console.log(`Backing up bind mount: ${bindMount}`);
-  try {
-    // Use tar only for directories or handle files separately
-    await $`tar czf ${backupDir}/bind_${bindMountName}.tar.gz -C ${bindMount} .`;
-  } catch (error) {
-    console.error(`Failed to back up bind mount: ${bindMount}`);
-    console.error(error);
-  }
-}
+// Main script execution
+(async () => {
+  await createDirectories(Object.values(backupConfig));
+  await initializeBorgRepo();
 
-console.log('Backup completed successfully!');
+  const { stdout: containersStdout } = await $`docker ps -q`;
+  const containerIds = containersStdout.trim().split('\n').filter(id => id);
+
+  const bindMounts = new Set();
+  for (const containerId of containerIds) {
+    const { stdout: mountsStdout } = await $`docker inspect ${containerId} --format='{{json .Mounts}}'`;
+    const mounts = JSON.parse(mountsStdout);
+    for (const mount of mounts) {
+      if (mount.Type === 'bind') {
+        bindMounts.add(mount.Source);
+      }
+    }
+  }
+
+  await backupVolumes();
+  await backupBindMounts(Array.from(bindMounts));
+
+  console.log('Backup completed successfully!');
+})();
