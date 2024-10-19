@@ -1,8 +1,6 @@
 #!/usr/bin/env zx
 
-const os = require('os');
 const backupDir = `/opt/backups/dockerBackups/docker_dockerfiles_backups`;  // Adjust this path as needed
-const baseDir = `${os.homedir()}`;  // Your home directory
 
 // Function to check if the script is run with sudo/root
 function checkRootUser() {
@@ -17,24 +15,31 @@ async function main() {
   // Check if the script is run as root
   checkRootUser();
 
-  await $`mkdir -p ${backupDir}`;  // Create the backup directory
+  try {
+    // Create the backup directory if it doesn't exist
+    await $`mkdir -p ${backupDir}`;
 
-  // Automatically find all directories under the home directory containing Dockerfiles
-  const dockerFiles = await $`find ${baseDir} -name 'Dockerfile'`;
-  const dirs = await $`find ${baseDir} -name '.'`;
+    // Automatically find all Dockerfiles under /home and /root
+    console.log('Searching for Dockerfiles under /home and /root');
+    const { stdout: dockerFiles } = await $`find /home /root -name 'Dockerfile'`;
 
-  for (const file of dockerFiles.stdout.split('\n').filter(Boolean)) {
-    console.log(`Backing up Dockerfile: ${file}`);
-    await $`cp ${file} ${backupDir}/`;
+    for (const file of dockerFiles.split('\n').filter(Boolean)) {
+      console.log(`Backing up Dockerfile: ${file}`);
+      await $`cp ${file} ${backupDir}/`;
+    }
+
+    // Optionally back up the context (files in the same directory as the Dockerfile)
+    console.log('Backing up Dockerfile build contexts');
+    const { stdout: dirs } = await $`find /home /root -name '.'`;
+    for (const dir of dirs.split('\n').filter(Boolean)) {
+      console.log(`Backing up build context for: ${dir}`);
+      await $`cp -r ${dir}/* ${backupDir}/`;
+    }
+
+    console.log('Dockerfile and build context backup completed successfully!');
+  } catch (error) {
+    console.error(`Error during backup: ${error.message}`);
   }
-
-  // Optionally back up the context (e.g., all files in the directory containing the Dockerfile)
-  for (const dir of dirs.stdout.split('\n').filter(Boolean)) {
-    console.log(`Backing up build context for: ${dir}`);
-    await $`cp -r ${dir}/* ${backupDir}/`;
-  }
-
-  console.log('Dockerfile and build context backup completed successfully!');
 }
 
 // Call the main function
