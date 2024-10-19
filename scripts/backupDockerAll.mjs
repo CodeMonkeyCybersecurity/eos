@@ -157,6 +157,11 @@ async function backupVolumes() {
   const { stdout: volumesStdout } = await $`docker volume ls -q`;
   const volumes = volumesStdout.trim().split('\n').filter(volume => volume);
 
+  // Use already defined variables
+  const localBackupDirBase = backupConfig.baseDir; // Local backup directory path from backupConfig
+  const borgRepo = backupConfig.repoDir; // Borg repository path from backupConfig
+  const timestamp = TIMESTAMP; // Reuse the previously defined timestamp
+
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
 
@@ -169,21 +174,22 @@ async function backupVolumes() {
       if (mountpoint) {
         console.log(`Mount point for ${volume}: ${mountpoint}`);
 
-        // Get and display the permissions for the mount point
-        //const { stdout: permissionsStdout } = await $`stat -c "%A %U %G" ${mountpoint}`;
-        //console.log(`Permissions for ${mountpoint}: ${permissionsStdout.trim()}`);
+        // Define the local directory for this volume's backup
+        const localBackupDir = `${localBackupDirBase}/${volume}`;
 
-        // Set permissions for the mount point
-      //  console.log(`Setting permissions for ${mountpoint}...`);
-        //await $`sudo chown -R root:root ${mountpoint}`;
-        //await $`sudo chmod -R 755 ${mountpoint}`;
-        //console.log(`Permissions set for ${mountpoint}`);
-        
-        // Perform the backup inside the Borg container
+        // Step 1: Copy the volume to a local directory using docker cp
+        console.log(`Copying volume ${volume} to ${localBackupDir}`);
+        await $`docker cp ${volume}:/ ${localBackupDir}`;
+
+        // Step 2: Run Borg to back up the local directory
+        console.log(`Running Borg to back up ${localBackupDir}`);
         await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
-          borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
-      //} else {
-        //console.error(`Mount point not found for volume: ${volume}`);
+          borg create --stats --progress ${borgRepo}::${volume}_${timestamp} ${localBackupDir}`;
+          
+        console.log(`Backup for volume ${volume} completed.`);
+        
+      } else {
+        console.error(`Mount point not found for volume: ${volume}`);
       }
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
