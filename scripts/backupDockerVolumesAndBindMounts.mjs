@@ -1,9 +1,8 @@
 #!/usr/bin/env zx
 
 const os = require('os');
-const path = require('path');
-
 const homeDir = os.homedir();
+
 const backupConfig = {
   baseDir: `${homeDir}/dockerBackups`,
   volumes: `${homeDir}/dockerBackups/Volumes`,
@@ -16,11 +15,12 @@ const backupConfig = {
   repoDir: `${homeDir}/dockerBackups/borg_repo`,
 };
 
-const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0];
+const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 
-// Function to create directories
-async function createDirectories(dirs) {
-  await Promise.all(dirs.map(dir => $`mkdir -p ${dir}`));
+// Function to create all backup directories
+async function createBackupDirectories() {
+  const dirsToCreate = Object.values(backupConfig);
+  await Promise.all(dirsToCreate.map(dir => $`mkdir -p ${dir}`));
 }
 
 // Function to initialize Borg repository
@@ -48,24 +48,7 @@ async function backupVolumes() {
 }
 
 // Function to back up bind mounts
-async function backupBindMounts(bindMounts) {
-  for (const bindMount of bindMounts) {
-    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
-    console.log(`Backing up bind mount: ${bindMount}`);
-    try {
-      await $`borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} ${bindMount}`;
-    } catch (error) {
-      console.error(`Failed to back up bind mount: ${bindMount}`);
-      console.error(error);
-    }
-  }
-}
-
-// Main script execution
-(async () => {
-  await createDirectories(Object.values(backupConfig));
-  await initializeBorgRepo();
-
+async function backupBindMounts() {
   const { stdout: containersStdout } = await $`docker ps -q`;
   const containerIds = containersStdout.trim().split('\n').filter(id => id);
 
@@ -80,8 +63,24 @@ async function backupBindMounts(bindMounts) {
     }
   }
 
-  await backupVolumes();
-  await backupBindMounts(Array.from(bindMounts));
+  for (const bindMount of bindMounts) {
+    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
+    console.log(`Backing up bind mount: ${bindMount}`);
+    try {
+      await $`borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} ${bindMount}`;
+    } catch (error) {
+      console.error(`Failed to back up bind mount: ${bindMount}`);
+      console.error(error);
+    }
+  }
+}
+
+// Main script execution
+(async () => {
+  await createBackupDirectories(); // Create all backup directories
+  await initializeBorgRepo(); // Initialize the Borg repository
+  await backupVolumes(); // Back up Docker volumes
+  await backupBindMounts(); // Back up bind mounts
 
   console.log('Backup completed successfully!');
 })();
