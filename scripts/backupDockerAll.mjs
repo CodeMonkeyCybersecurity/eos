@@ -54,14 +54,20 @@ async function setPassphrase() {
   process.env.BORG_PASSPHRASE = passphrase; // Set it in the environment for the script duration
 }
 
-// Function to create the backup directory
-async function createBackupDirectory() {
+// Function to create all backup directories
+async function createBackupDirectories() {
   try {
-    console.log(`Creating backup directory at ${baseDir}...`);
-    await $`sudo mkdir -p ${baseDir}`;
-    console.log('Backup directory created successfully.');
+    console.log('Creating backup directories...');
+    
+    // Loop through each directory path in the backupConfig object
+    for (const dir of Object.values(backupConfig)) {
+      console.log(`Creating directory at ${dir}...`);
+      await $`sudo mkdir -p ${dir}`; // Create the directory
+    }
+    
+    console.log('All backup directories created successfully.');
   } catch (error) {
-    console.error('Failed to create backup directory.');
+    console.error('Failed to create one or more backup directories.');
     handleError(error);
   }
 }
