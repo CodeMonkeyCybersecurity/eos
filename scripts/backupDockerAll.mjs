@@ -138,8 +138,20 @@ async function backupVolumes() {
 
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
+
     try {
-      await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} /data`;
+      // Get the mount point of the volume
+      const { stdout: mountpointStdout } = await $`docker volume inspect --format '{{.Mountpoint}}' ${volume}`;
+      const mountpoint = mountpointStdout.trim();
+
+      // Check if the mount point exists before backing it up
+      if (mountpoint) {
+        console.log(`Backing up volume from path: ${mountpoint}`);
+
+        await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
+      } else {
+        console.error(`Mount point not found for volume: ${volume}`);
+      }
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
       handleError(error);
