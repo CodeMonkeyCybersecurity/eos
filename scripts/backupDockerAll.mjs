@@ -280,6 +280,8 @@ async function cleanupOldBackups() {
 // Main script execution
 (async () => {
   await setPassphrase(); // Ensure the passphrase is set
+  await ensurePermissions()
+  await checkContainerExistence()
   await checkBorgBackupDockerInstallationInContainer(); // Check if Borg is installed in the Docker container
   await createBackupDirectories(); // Create all backup directories before trying to initialize the Borg repository
   await initializeBorgRepo(); // Initialize the Borg repository
