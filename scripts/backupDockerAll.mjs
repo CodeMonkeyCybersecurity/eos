@@ -74,7 +74,7 @@ async function backupVolumes() {
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
     try {
-      await $`docker run --rm -v ${volume}:/volume alpine sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume"`;
+      await $`docker run -v ${volume}:/volume alpine sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume"`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
       console.error(error);
