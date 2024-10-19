@@ -66,8 +66,8 @@ async function createBackupDirectory() {
 async function ensurePermissions() {
   try {
     console.log('Ensuring permissions on backup directory...');
-    await $`sudo chown -R ${USER}:${USER} ${homeDir}/dockerBackups/borg_repo`;
-    await $`sudo chmod -R 775 ${homeDir}/dockerBackups/borg_repo`;
+    await $`sudo chown -R ${USER}:${USER} ${baseDir}/borg_repo`;
+    await $`sudo chmod -R 775 ${baseDir}/borg_repo`;
     console.log('Permissions set successfully.');
   } catch (error) {
     console.error('Failed to set permissions.');
