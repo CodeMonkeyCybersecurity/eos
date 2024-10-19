@@ -16,10 +16,8 @@ async function checkRootUser() {
 // Define your Docker container name or ID
 const DOCKER_CONTAINER_NAME = 'borgbackupdocker'; // Default container name
 const USER = process.env.USER; // Get the current user
-const backupConfig = {
-  baseDir: `/opt/backups/dockerBackups`,
-  repoDir: `/borg_repo`, // Inside the Docker container, repo is mounted here
-};
+const baseDir = '/opt/backups/dockerBackups'; // Define baseDir correctly as a string
+const repoDir = `${baseDir}/borg_repo`; // Inside the Docker container, repo is mounted here
 
 // Function to create timestamp
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
