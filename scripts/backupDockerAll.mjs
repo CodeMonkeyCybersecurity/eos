@@ -21,7 +21,7 @@ const backupConfig = {
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 
 // Function to check if the Borg container exists
-async function checkContainerExistence() {
+async function checkBorgBackupDockerContainerExistence() {
   const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
   const containers = containerList.trim().split('\n');
 
@@ -34,7 +34,7 @@ async function checkContainerExistence() {
 }
 
 // Function to check if Borg is installed in the Docker container
-async function checkBorgInstallationInContainer() {
+async function checkBorgBackupDockerInstallationInContainer() {
   try {
     await $`docker exec ${DOCKER_CONTAINER_NAME} borg --version`;
   } catch (error) {
@@ -191,7 +191,8 @@ async function backupEnvVars() {
 
 // Main script execution
 (async () => {
-  await checkBorgInstallationInContainer(); // Check if Borg is installed in the Docker container
+  await checkBorgBackupDockerContainerExistence(); // Check if the Borg container exists, creates it if not
+  await checkBorgBackupDockerInstallationInContainer(); // Check if Borg is installed in the Docker container
   await createBackupDirectories(); // Create all backup directories
   await initializeBorgRepo(); // Initialize the Borg repository
   await backupVolumes(); // Back up Docker volumes
