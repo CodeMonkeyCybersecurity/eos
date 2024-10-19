@@ -3,6 +3,9 @@
 const os = require('os');
 const homeDir = os.homedir();
 
+// Define your Docker container name or ID
+const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID
+
 const backupConfig = {
   baseDir: `${homeDir}/dockerBackups`,
   volumes: `${homeDir}/dockerBackups/Volumes`,
@@ -16,6 +19,23 @@ const backupConfig = {
 };
 
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
+
+// Function to check if Borg is installed in the Docker container
+async function checkBorgInstallationInContainer() {
+  try {
+    await $`docker exec ${DOCKER_CONTAINER_NAME} borg --version`;
+  } catch (error) {
+    console.error('Borg is not installed in the container. Attempting to install it...');
+    const installChoice = await $`read -p "Would you like to install Borg in the container? [y/N]: " choice; echo $choice`;
+    if (installChoice.trim().toLowerCase() === 'y') {
+      console.log('Installing Borg in the Docker container...');
+      await $`docker exec ${DOCKER_CONTAINER_NAME} sh -c "apt update && apt install -y borgbackup"`; // For Debian/Ubuntu containers
+    } else {
+      console.error('Borg is required for this backup script. Exiting...');
+      process.exit(1); // Exit the script if the user chooses not to install
+    }
+  }
+}
 
 // Function to create all backup directories
 async function createBackupDirectories() {
