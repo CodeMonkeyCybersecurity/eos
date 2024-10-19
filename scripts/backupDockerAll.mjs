@@ -3,7 +3,6 @@
 const os = require('os');
 const fs = require('fs'); // Import filesystem module
 const path = require('path');
-const homeDir = os.homedir();
 const readline = require('readline'); // Use require instead of import
 
 // Function to check if the script is run with sudo/root
@@ -14,24 +13,15 @@ async function checkRootUser() {
   }
 }
 
-// Call the checkRootUser function at the start
-await checkRootUser();
-
 // Define your Docker container name or ID
 const DOCKER_CONTAINER_NAME = 'borgbackupdocker'; // Default container name
 const USER = process.env.USER; // Get the current user
 const backupConfig = {
-  baseDir: `${homeDir}/dockerBackups`,
-  volumes: `${homeDir}/dockerBackups/Volumes`,
-  containers: `${homeDir}/dockerBackups/Containers`,
-  images: `${homeDir}/dockerBackups/Images`,
-  networks: `${homeDir}/dockerBackups/Networks`,
-  envVars: `${homeDir}/dockerBackups/EnvVars`,
-  bindMounts: `${homeDir}/dockerBackups/BindMounts`,
-  swarm: `${homeDir}/dockerBackups/Swarm`,
+  baseDir: `/opt/backups/dockerBackups`,
   repoDir: `/borg_repo`, // Inside the Docker container, repo is mounted here
 };
 
+// Function to create timestamp
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 console.log(`Processing timestamp: ${TIMESTAMP}`);
 
@@ -58,6 +48,18 @@ function askQuestion(query) {
 async function setPassphrase() {
   const passphrase = await askQuestion('Enter  passphrase: ');
   process.env.BORG_PASSPHRASE = passphrase; // Set it in the environment for the script duration
+}
+
+// Function to create the backup directory
+async function createBackupDirectory() {
+  try {
+    console.log(`Creating backup directory at ${backupConfig.baseDir}...`);
+    await $`sudo mkdir -p ${backupConfig.baseDir}`;
+    console.log('Backup directory created successfully.');
+  } catch (error) {
+    console.error('Failed to create backup directory.');
+    handleError(error);
+  }
 }
 
 // Function to ensure correct permissions on the backup directory
@@ -285,7 +287,9 @@ async function cleanupOldBackups() {
 
 // Main script execution
 (async () => {
+  await checkRootUser(); // Call the checkRootUser function at the start
   await setPassphrase(); // Ensure the passphrase is set
+  await createBackupDirectory() // Create backup directory
   await ensurePermissions()
   await checkContainerExistence()
   await checkBorgBackupDockerInstallationInContainer(); // Check if Borg is installed in the Docker container
