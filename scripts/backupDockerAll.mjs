@@ -178,12 +178,12 @@ async function backupEnvVars() {
 
     console.log(`Backing up environment variables for container: ${sanitizedContainerName}`);
     try {
-      // Retrieve environment variables
       const { stdout: envVars } = await $`docker inspect --format='{{range .Config.Env}}{{.}} {{end}}' ${containerId}`;
       const envVarsArray = envVars.split(' ').filter(Boolean); // Split and filter empty values
 
-      // Save to a JSON file
-      await $`echo ${JSON.stringify(envVarsArray)} > ${backupConfig.envVars}/${sanitizedContainerName}_env_vars.json`;
+      const jsonFilePath = path.join(backupConfig.envVars, `${sanitizedContainerName}_env_vars.json`);
+      await fs.promises.mkdir(backupConfig.envVars, { recursive: true }); // Ensure directory exists
+      await fs.promises.writeFile(jsonFilePath, JSON.stringify(envVarsArray, null, 2));
     } catch (error) {
       console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
       console.error(`Error: ${error.stderr || error.message}`);
@@ -222,7 +222,6 @@ async function cleanupOldBackups() {
   await backupNetworks(); // Back up networks
   await backupEnvVars(); // Back up EnvVars
   await cleanupOldBackups(); // Cleanup old backups
-
 
   console.log('Backup completed successfully!');
 })();
