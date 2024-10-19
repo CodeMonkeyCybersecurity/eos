@@ -76,7 +76,7 @@ async function ensurePermissions() {
 // Function to check if the Borg container exists and create it if not
 async function checkContainerExistence() {
   const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
-  const containers = containerList.trim().split('\n');
+  const containers = containerList.trim() ? containerList.trim().split('\n') : [];
 
   if (!containers.includes(DOCKER_CONTAINER_NAME)) {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" does not exist. Creating it...`);
@@ -90,7 +90,7 @@ async function checkContainerExistence() {
 
       // Ensure the container is running correctly
       const { stdout: runningContainers } = await $`docker ps --format "{{.Names}}"`;
-      if (!runningContainers.includes(DOCKER_CONTAINER_NAME)) {
+      if (!runningContainers.trim().split('\n').includes(DOCKER_CONTAINER_NAME)) {
         console.error(`Failed to start container "${DOCKER_CONTAINER_NAME}" correctly.`);
         process.exit(1); // Exit the process if it failed
       }
