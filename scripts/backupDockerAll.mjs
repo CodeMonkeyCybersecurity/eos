@@ -1,10 +1,12 @@
 #!/usr/bin/env zx
 
 const os = require('os');
+const fs = require('fs'); // Import filesystem module
+const path = require('path'); // Import path module
 const homeDir = os.homedir();
 
 // Define your Docker container name or ID
-const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID
+const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID, we usse this as a default and strongly recommend not changing it because we reference it in other backup scripts. Of course, if you are sure you know what you are doing then don't let us stop you. 
 
 const backupConfig = {
   baseDir: `${homeDir}/dockerBackups`,
@@ -189,6 +191,24 @@ async function backupEnvVars() {
   }
 }
 
+// Cleanup function to remove old backups
+async function cleanupOldBackups() {
+  const daysToKeep = 30; // Number of days to keep backups
+  const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000).toISOString();
+
+  console.log('Cleaning up old backups...');
+  const backupFiles = await fs.promises.readdir(backupConfig.baseDir);
+
+  for (const file of backupFiles) {
+    const filePath = path.join(backupConfig.baseDir, file);
+    const stats = await fs.promises.stat(filePath);
+    if (stats.mtime < new Date(cutoffDate)) {
+      console.log(`Removing old backup: ${file}`);
+      await fs.promises.unlink(filePath);
+    }
+  }
+}
+
 // Main script execution
 (async () => {
   await checkBorgBackupDockerContainerExistence(); // Check if the Borg container exists, creates it if not
@@ -201,6 +221,8 @@ async function backupEnvVars() {
   await backupImages(); // Back up images
   await backupNetworks(); // Back up networks
   await backupEnvVars(); // Back up EnvVars
+  await cleanupOldBackups(); // Cleanup old backups
+
 
   console.log('Backup completed successfully!');
 })();
