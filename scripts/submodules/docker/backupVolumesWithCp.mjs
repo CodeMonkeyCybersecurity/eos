@@ -1,8 +1,6 @@
 #!/usr/bin/env zx
 
-const os = require('os');
-const homeDir = os.homedir();
-const backupDir = `${homeDir}/docker_volume_backups`;  // Adjust this path as needed
+const backupDir = `/opt/backups/dockerBackups`;  // Adjust this path as needed
 
 // Create the backup directory if it doesn't exist
 await $`mkdir -p ${backupDir}`;
