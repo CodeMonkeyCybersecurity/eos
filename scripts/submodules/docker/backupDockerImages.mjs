@@ -1,6 +1,6 @@
 #!/usr/bin/env zx
 
-const backupDir = `/opt/backups/dockerBackups`;  // Adjust this path as needed
+const backupDir = `/opt/backups/dockerBackups/images`;  // Adjust this path as needed
 
 // Function to check if the script is run with sudo/root
 function checkRootUser() {
