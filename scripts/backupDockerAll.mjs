@@ -154,50 +154,37 @@ async function initializeBorgRepo() {
   }
 }
 
-// Function to back up Docker volumes
+// Function to back up Docker volumes using docker cp
 async function backupVolumes() {
   const { stdout } = await $`docker volume ls -q`;
   const volumes = stdout.trim().split('\n');
 
   // Use already defined variables
   const localBackupDirBase = backupConfig.baseDir; // Local backup directory path from backupConfig
-  const borgRepo = backupConfig.repoDir; // Borg repository path from backupConfig
   const timestamp = TIMESTAMP; // Reuse the previously defined timestamp
 
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
 
     try {
-      // Get the mount point of the volume
-      const { stdout: mountpointStdout } = await $`docker volume inspect --format '{{.Mountpoint}}' ${volume}`;
-      const mountpoint = mountpointStdout.trim();
-
       // Define the local backup directory for this volume
       const volumeBackupDir = `${localBackupDirBase}/${volume}_${timestamp}`;
       
       // Step 1: Copy the volume to a local directory using docker cp
-      // Mount the Docker volume in a temporary Alpine container and copy the contents using cp
       console.log(`Creating backup for volume ${volume} at ${volumeBackupDir}`);
       await $`mkdir -p ${volumeBackupDir}`;
-      await $`docker run --rm -v ${volume}:/volume -v ${volumeBackupDir}:/backup alpine sh -c "cp -r /volume/. /backup/"`;
-
-      console.log(`Local backup for volume ${volume} completed.`);
-
-      // Step 2: Run Borg to back up the local directory
-      console.log(`Running Borg to back up ${volumeBackupDir}`);
-      await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
-        borg create --stats --progress ${borgRepo}::${volume}_${timestamp} ${volumeBackupDir}`;
-
-      console.log(`Borg backup for volume ${volume} completed.`);
-
+      
+      // Use docker cp to copy the volume's contents to the local backup directory
+      await $`docker cp ${volume}:/ ${volumeBackupDir}/`;
+      
+      console.log(`Backup for volume ${volume} completed.`);
+      
     } catch (error) {
-      console.error(`Failed to back up volume: ${volume}`);
+      console.error(`Failed to copy volume: ${volume}`);
       console.error(error);
     }
   }
 }
-
-console.log('Backup process completed successfully!');
 
 // Function to back up bind mounts
 async function backupBindMounts() {
