@@ -7,7 +7,7 @@ const homeDir = os.homedir();
 import readline from 'readline';
 
 // Define your Docker container name or ID
-const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID, we usse this as a default and strongly recommend not changing it because we reference it in other backup scripts. Of course, if you are sure you know what you are doing then don't let us stop you. 
+const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID, we use this as a default and strongly recommend not changing it because we reference it in other backup scripts. Of course, if you are sure you know what you are doing then don't let us stop you. 
 
 const backupConfig = {
   baseDir: `${homeDir}/dockerBackups`,
@@ -64,13 +64,17 @@ async function checkBorgBackupDockerInstallationInContainer() {
   } catch (error) {
     console.error('Borg is not installed in the container. Attempting to install it...');
 
-    // Use zx's prompt function to ask for user input
+    // Use readline to ask for user input (updated from prompt function)
     const installChoice = await askQuestion('Would you like to install Borg in the container? [y/N]: ');
 
     // Check user input
     if (installChoice.trim().toLowerCase() === 'y') {
       console.log('Installing Borg in the Docker container...');
+
+      // Check if the container is Alpine-based or use appropriate installation method
       await $`docker exec ${DOCKER_CONTAINER_NAME} sh -c "apk add --no-cache borgbackup"`; // For Alpine containers
+      // For Ubuntu/Debian-based containers, use the following instead:
+      // await $`docker exec ${DOCKER_CONTAINER_NAME} sh -c "apt update && apt install -y borgbackup"`;
     } else {
       console.error('Borg is required for this backup script. Exiting...');
       process.exit(1); // Exit the script if the user chooses not to install
@@ -141,8 +145,10 @@ async function backupContainers() {
   const containerIds = containersStdout.trim().split('\n').filter(id => id);
 
   for (const containerId of containerIds) {
-    const containerName = await $`docker inspect --format='{{.Name}}' ${containerId}`;
-    const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
+    const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
+    
+    // Check if containerName is a string, fix: handle TypeError
+    const sanitizedContainerName = typeof containerName === 'string' ? containerName.replace(/^\//, '') : ''; // Remove leading slash
 
     console.log(`Backing up container: ${sanitizedContainerName}`);
     try {
@@ -196,7 +202,9 @@ async function backupEnvVars() {
 
   for (const containerId of containerIds) {
     const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
-    const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
+    const sanitizedContainerName = containerName.replace(/
+
+^\//, ''); // Remove leading slash
 
     console.log(`Backing up environment variables for container: ${sanitizedContainerName}`);
     try {
