@@ -136,8 +136,9 @@ async function checkBorgBackupDockerInstallationInContainer() {
 // Function to initialize Borg repository
 async function initializeBorgRepo() {
   try {
-    const repoExists = await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg list /borg_repo || true`;
-    
+    console.log('Checking if Borg repository exists at /borg_repo...');
+    const repoExists = await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg info /borg_repo || true`;
+
     if (repoExists.stdout.includes('Repository')) {
       console.log('A repository already exists at /borg_repo. Skipping initialization.');
     } else {
@@ -147,7 +148,7 @@ async function initializeBorgRepo() {
     }
   } catch (error) {
     console.error('Failed to initialize Borg repository.');
-    handleError(error);
+    handleError(error, 'Error initializing Borg repository.');
   }
 }
 
