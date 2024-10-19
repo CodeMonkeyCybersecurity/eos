@@ -3,12 +3,15 @@
 const backupDir = `/opt/backups/dockerBackups`;  // Adjust this path as needed
 
 // Function to check if the script is run with sudo/root
-async function checkRootUser() {
+function checkRootUser() {
   if (process.getuid && process.getuid() !== 0) {
     console.error("This script must be run with sudo or as root.");
     process.exit(1); // Exit if not run as root
   }
 }
+
+// Check if the script is run as root
+checkRootUser();
 
 // Create the backup directory if it doesn't exist
 await $`mkdir -p ${backupDir}`;
