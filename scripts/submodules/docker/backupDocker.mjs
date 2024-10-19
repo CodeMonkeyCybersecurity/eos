@@ -3,7 +3,7 @@
 const path = require('path');
 
 // Define the directory where your sub-scripts are located
-const scriptsDir = path.join(__dirname, 'submodules/docker');
+const scriptsDir = path.join(__dirname);
 
 // List of scripts to execute
 const scripts = [
