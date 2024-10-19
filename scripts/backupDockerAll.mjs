@@ -177,10 +177,12 @@ async function backupBindMounts() {
   }
 
   for (const bindMount of bindMounts) {
-    const bindMountName = bindMount.replace(/[\/\\]/g, '_');
+    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Sanitize bind mount name
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
-      await $`docker run --rm -v ${bindMount}:/bind -v /home/henry/dockerBackups/borg_repo:/borg_repo ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${bindMountName}_${TIMESTAMP} /bind`;
+      await $`docker run --rm -v ${bindMount}:/bind -v ${backupConfig.baseDir}/borg_repo:${backupConfig.repoDir} \
+        -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
+        borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} /bind`;
     } catch (error) {
       console.error(`Failed to back up bind mount: ${bindMount}`);
       handleError(error);
