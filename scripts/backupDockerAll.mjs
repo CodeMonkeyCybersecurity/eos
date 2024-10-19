@@ -293,11 +293,10 @@ async function cleanupOldBackups() {
 (async () => {
   await checkRootUser(); // Call the checkRootUser function at the start
   await setPassphrase(); // Ensure the passphrase is set
-  await createBackupDirectory() // Create backup directory
+  await createBackupDirectories(); // Create all backup directories before trying to initialize the Borg repository
   await ensurePermissions()
   await checkContainerExistence()
   await checkBorgBackupDockerInstallationInContainer(); // Check if Borg is installed in the Docker container
-  await createBackupDirectories(); // Create all backup directories before trying to initialize the Borg repository
   await initializeBorgRepo(); // Initialize the Borg repository
   await backupVolumes(); // Back up Docker volumes
   await backupBindMounts(); // Back up bind mounts
