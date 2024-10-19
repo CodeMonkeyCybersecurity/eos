@@ -105,9 +105,11 @@ async function backupVolumes() {
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
     try {
-      await $`docker run -v ${volume}:/volume alpine sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume"`;
+      // Use borgBackupDocker to back up the volume
+      await $`docker exec -v ${volume}:/volume ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
+      handleError(error);
     }
   }
 }
@@ -129,6 +131,19 @@ async function backupBindMounts() {
   }
 
   for (const bindMount of bindMounts) {
+    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
+    console.log(`Backing up bind mount: ${bindMount}`);
+    try {
+      // Use borgBackupDocker to back up the bind mount
+      await $`docker exec -v ${bindMount}:/bind ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} /bind`;
+    } catch (error) {
+      console.error(`Failed to back up bind mount: ${bindMount}`);
+      handleError(error);
+    }
+  }
+}
+
+  for (const bindMount of bindMounts) {
     console.log(`Processing bindMount: ${bindMount}`);
     const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace forward and backward slashes with an underscore
     console.log(`Backing up bind mount: ${bindMount}`);
@@ -148,16 +163,15 @@ async function backupContainers() {
 
   for (const containerId of containerIds) {
     const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
-    
-    // Check if containerName is a string, fix: handle TypeError
-    console.log(`Processing containerName: ${containerName}`);
-    const sanitizedContainerName = typeof containerName === 'string' ? containerName.replace(/^\//, '') : ''; // Remove leading slash
+    const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
 
     console.log(`Backing up container: ${sanitizedContainerName}`);
     try {
-      await $`docker export ${containerId} | gzip > ${backupConfig.containers}/${sanitizedContainerName}_${TIMESTAMP}.tar.gz`;
+      // Use borgBackupDocker to handle container exports and compress them using Borg
+      await $`docker export ${containerId} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedContainerName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up container: ${sanitizedContainerName}`);
+      handleError(error);
     }
   }
 }
@@ -169,12 +183,13 @@ async function backupImages() {
 
   for (const image of images) {
     const sanitizedImageName = image.replace(/[\/:]/g, '_'); // Replace slashes and colons for a valid filename
-    console.log(`Processing sanitizedImageName: ${sanitizedImageName}`);
     console.log(`Backing up image: ${image}`);
     try {
-      await $`docker save ${image} | gzip > ${backupConfig.images}/${sanitizedImageName}_${TIMESTAMP}.tar.gz`;
+      // Use borgBackupDocker to handle image exports and compress them using Borg
+      await $`docker save ${image} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedImageName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up image: ${image}`);
+      handleError(error);
     }
   }
 }
@@ -185,17 +200,16 @@ async function backupNetworks() {
   const networkIds = networksStdout.trim().split('\n').filter(id => id);
 
   for (const networkId of networkIds) {
-    // Get network name and inspect
     const { stdout: networkName } = await $`docker network inspect ${networkId} --format '{{.Name}}'`;
     const sanitizedNetworkName = networkName.replace(/[\/:]/g, '_'); // Replace slashes and colons for a valid filename
-    console.log(`Processing sanitizedNetworkName: ${sanitizedNetworkName}`);
 
     console.log(`Backing up network: ${networkName}`);
     try {
-      // Save the network configuration as JSON
-      await $`docker network inspect ${networkId} > ${backupConfig.networks}/${sanitizedNetworkName}.json`;
+      // Use borgBackupDocker to save the network configuration inside the backup repository
+      await $`docker network inspect ${networkId} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedNetworkName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up network: ${networkName}`);
+      handleError(error);
     }
   }
 }
@@ -207,7 +221,6 @@ async function backupEnvVars() {
 
   for (const containerId of containerIds) {
     const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
-    console.log(`Processing containerName: ${containerName}`);
     const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
 
     console.log(`Backing up environment variables for container: ${sanitizedContainerName}`);
@@ -215,11 +228,11 @@ async function backupEnvVars() {
       const { stdout: envVars } = await $`docker inspect --format='{{range .Config.Env}}{{.}} {{end}}' ${containerId}`;
       const envVarsArray = envVars.split(' ').filter(Boolean); // Split and filter empty values
 
-      const jsonFilePath = path.join(backupConfig.envVars, `${sanitizedContainerName}_env_vars.json`);
-      await fs.promises.mkdir(backupConfig.envVars, { recursive: true }); // Ensure directory exists
-      await fs.promises.writeFile(jsonFilePath, JSON.stringify(envVarsArray, null, 2));
+      // Save environment variables inside borgBackupDocker
+      await $`echo ${JSON.stringify(envVarsArray, null, 2)} | docker exec -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${sanitizedContainerName}_env_vars_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
+      handleError(error);
     }
   }
 }
@@ -227,18 +240,16 @@ async function backupEnvVars() {
 // Cleanup function to remove old backups
 async function cleanupOldBackups() {
   const daysToKeep = 30; // Number of days to keep backups
-  const cutoffDate = new Date(Date.now() - daysToKeep * 24 * 60 * 60 * 1000).toISOString();
+  console.log(`Cleaning up old backups... Keeping backups for the last ${daysToKeep} days.`);
 
-  console.log('Cleaning up old backups...');
-  const backupFiles = await fs.promises.readdir(backupConfig.baseDir);
-
-  for (const file of backupFiles) {
-    const filePath = path.join(backupConfig.baseDir, file);
-    const stats = await fs.promises.stat(filePath);
-    if (stats.mtime < new Date(cutoffDate)) {
-      console.log(`Removing old backup: ${file}`);
-      await fs.promises.unlink(filePath);
-    }
+  try {
+    // Use borg prune to automatically clean up old backups inside the borgBackupDocker container
+    await $`docker exec ${DOCKER_CONTAINER_NAME} borg prune --keep-daily=${daysToKeep} --keep-weekly=4 --keep-monthly=6 ${backupConfig.repoDir}`;
+    
+    console.log('Cleanup completed successfully.');
+  } catch (error) {
+    console.error('Failed to clean up old backups.');
+    handleError(error);
   }
 }
 
