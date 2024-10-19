@@ -18,5 +18,9 @@ const sizes = stdout.trim().split('\n');
 // Calculate the total disk usage in GB
 let total = sizes.reduce((sum, size) => sum + convertToGB(size), 0);
 
+// Calculate space needed for safe backup (10x)
+let safesize = total * 10;
+
 // Print the total Docker disk usage
 echo(`Total Docker Disk Usage: ${total.toFixed(2)} GB`);
+echo(`Total space required for safe Docker backup: ${safesize.toFixed(2)} GB`);
