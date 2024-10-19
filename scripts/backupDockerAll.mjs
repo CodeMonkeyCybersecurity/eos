@@ -118,14 +118,14 @@ async function checkContainerExistence() {
 // Function to check if Borg is installed in the Docker container
 async function checkBorgBackupDockerInstallationInContainer() {
   try {
-    await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg --version`;
+    await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg --version`;
     console.log('Borg is already installed in the container.');
   } catch (error) {
     console.error('Borg is not installed in the container. Attempting to install it...');
     const installChoice = await askQuestion('Would you like to install Borg in the container? [y/N]: ');
     if (installChoice.trim().toLowerCase() === 'y') {
       console.log('Installing Borg in the Docker container...');
-      await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} sh -c "apk add --no-cache borgbackup"`; // For Alpine containers
+      await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} sh -c "apk add --no-cache borgbackup"`; // For Alpine containers
     } else {
       console.error('Borg is required for this backup script. Exiting...');
       process.exit(1);
@@ -137,13 +137,13 @@ async function checkBorgBackupDockerInstallationInContainer() {
 async function initializeBorgRepo() {
   try {
     console.log('Checking if Borg repository exists at /borg_repo...');
-    const repoExists = await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg info /borg_repo || true`;
+    const repoExists = await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg info /borg_repo || true`;
 
     if (repoExists.stdout.includes('Repository')) {
       console.log('A repository already exists at /borg_repo. Skipping initialization.');
     } else {
       console.log('Initializing new Borg repository at /borg_repo...');
-      await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg init --encryption=repokey /borg_repo`;
+      await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg init --encryption=repokey /borg_repo`;
       console.log('Repository initialized successfully.');
     }
   } catch (error) {
@@ -180,7 +180,7 @@ async function backupVolumes() {
         console.log(`Permissions set for ${mountpoint}`);
         
         // Perform the backup inside the Borg container
-        await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
+        await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
       } else {
         console.error(`Mount point not found for volume: ${volume}`);
       }
@@ -232,7 +232,7 @@ async function backupContainers() {
 
     console.log(`Backing up container: ${sanitizedContainerName}`);
     try {
-      await $`docker export ${containerId} | docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedContainerName}_${TIMESTAMP} -`;
+      await $`docker export ${containerId} | docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedContainerName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up container: ${sanitizedContainerName}`);
       handleError(error);
@@ -249,7 +249,7 @@ async function backupImages() {
     const sanitizedImageName = image.replace(/[\/:]/g, '_');
     console.log(`Backing up image: ${image}`);
     try {
-      await $`docker save ${image} | docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedImageName}_${TIMESTAMP} -`;
+      await $`docker save ${image} | docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedImageName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up image: ${image}`);
       handleError(error);
@@ -268,7 +268,7 @@ async function backupNetworks() {
 
     console.log(`Backing up network: ${networkName}`);
     try {
-      await $`docker network inspect ${networkId} | docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedNetworkName}_${TIMESTAMP} -`;
+      await $`docker network inspect ${networkId} | docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedNetworkName}_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up network: ${networkName}`);
       handleError(error);
@@ -289,7 +289,7 @@ async function backupEnvVars() {
     try {
       const { stdout: envVars } = await $`docker inspect --format='{{range .Config.Env}}{{.}} {{end}}' ${containerId}`;
       const envVarsArray = envVars.split(' ').filter(Boolean);
-      await $`echo ${JSON.stringify(envVarsArray, null, 2)} | docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedContainerName}_env_vars_${TIMESTAMP} -`;
+      await $`echo ${JSON.stringify(envVarsArray, null, 2)} | docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -i ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${sanitizedContainerName}_env_vars_${TIMESTAMP} -`;
     } catch (error) {
       console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
       handleError(error);
@@ -302,7 +302,7 @@ async function cleanupOldBackups() {
   const daysToKeep = 30;
   console.log(`Cleaning up old backups... Keeping backups for the last ${daysToKeep} days.`);
   try {
-    await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg prune --keep-daily=${daysToKeep} --keep-weekly=4 --keep-monthly=6 /borg_repo`;
+    await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg prune --keep-daily=${daysToKeep} --keep-weekly=4 --keep-monthly=6 /borg_repo`;
     console.log('Cleanup completed successfully.');
   } catch (error) {
     console.error('Failed to clean up old backups.');
