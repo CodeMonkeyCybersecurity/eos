@@ -3,7 +3,6 @@
 const os = require('os');
 const fs = require('fs'); // Import filesystem module
 const path = require('path'); // Import path module
-const { prompt } = require('zx');
 const homeDir = os.homedir();
 
 // Define your Docker container name or ID
