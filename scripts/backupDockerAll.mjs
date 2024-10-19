@@ -178,6 +178,7 @@ async function backupEnvVars() {
 
 // Main script execution
 (async () => {
+  await checkBorgInstallationInContainer(); // Check if Borg is installed in the Docker container
   await createBackupDirectories(); // Create all backup directories
   await initializeBorgRepo(); // Initialize the Borg repository
   await backupVolumes(); // Back up Docker volumes
