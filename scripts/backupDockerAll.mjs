@@ -4,6 +4,7 @@ const os = require('os');
 const fs = require('fs'); // Import filesystem module
 const path = require('path'); // Import path module
 const homeDir = os.homedir();
+const { prompt } = require('zx');
 
 // Define your Docker container name or ID
 const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID, we usse this as a default and strongly recommend not changing it because we reference it in other backup scripts. Of course, if you are sure you know what you are doing then don't let us stop you. 
