@@ -45,7 +45,8 @@ for (const bindMount of bindMounts) {
   const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
   console.log(`Backing up bind mount: ${bindMount}`);
   try {
-    await $`sudo tar czf ${backupDir}/bind_${bindMountName}.tar.gz -C ${bindMount} .`;
+    // Use tar only for directories or handle files separately
+    await $`tar czf ${backupDir}/bind_${bindMountName}.tar.gz -C ${bindMount} .`;
   } catch (error) {
     console.error(`Failed to back up bind mount: ${bindMount}`);
     console.error(error);
