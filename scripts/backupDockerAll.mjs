@@ -4,6 +4,7 @@ const os = require('os');
 const fs = require('fs'); // Import filesystem module
 const path = require('path'); // Import path module
 const homeDir = os.homedir();
+import readline from 'readline';
 
 // Define your Docker container name or ID
 const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Replace with your actual container name or ID, we usse this as a default and strongly recommend not changing it because we reference it in other backup scripts. Of course, if you are sure you know what you are doing then don't let us stop you. 
@@ -26,6 +27,19 @@ const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0];
 function handleError(error, contextMessage = '') {
   console.error(contextMessage);
   console.error(`Error: ${error.stderr || error.message}`);
+}
+
+// Function to ask user for input
+function askQuestion(query) {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  
+  return new Promise(resolve => rl.question(query, answer => {
+    rl.close();
+    resolve(answer);
+  }));
 }
 
 // Function to check if the Borg container exists
@@ -51,7 +65,7 @@ async function checkBorgBackupDockerInstallationInContainer() {
     console.error('Borg is not installed in the container. Attempting to install it...');
 
     // Use zx's prompt function to ask for user input
-    const installChoice = await prompt('Would you like to install Borg in the container? [y/N]: ');
+    const installChoice = await askQuestion('Would you like to install Borg in the container? [y/N]: ');
 
     // Check user input
     if (installChoice.trim().toLowerCase() === 'y') {
