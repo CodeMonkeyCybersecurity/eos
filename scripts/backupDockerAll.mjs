@@ -22,6 +22,12 @@ const backupConfig = {
 
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 
+// Centralized error handling function
+function handleError(error, contextMessage = '') {
+  console.error(contextMessage);
+  console.error(`Error: ${error.stderr || error.message}`);
+}
+
 // Function to check if the Borg container exists
 async function checkBorgBackupDockerContainerExistence() {
   const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
