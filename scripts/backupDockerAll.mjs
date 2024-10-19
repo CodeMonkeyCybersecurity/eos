@@ -171,39 +171,31 @@ async function backupVolumes() {
       const mountpoint = mountpointStdout.trim();
 
       // Define the local backup directory for this volume
-      const volumeBackupDir = `${backupDir}/${volume}_${timestamp}`;
+      const volumeBackupDir = `${localBackupDirBase}/${volume}_${timestamp}`;
       
-        // Step 1: Copy the volume to a local directory using docker cp
-        // Mount the Docker volume in a temporary Alpine container and copy the contents using cp
-        console.log(`Creating backup for volume ${volume} at ${volumeBackupDir}`);
-        await $`mkdir -p ${volumeBackupDir}`;
-        await $`docker run --rm -v ${volume}:/volume -v ${volumeBackupDir}:/backup alpine sh -c "cp -r /volume/. /backup/"`;
+      // Step 1: Copy the volume to a local directory using docker cp
+      // Mount the Docker volume in a temporary Alpine container and copy the contents using cp
+      console.log(`Creating backup for volume ${volume} at ${volumeBackupDir}`);
+      await $`mkdir -p ${volumeBackupDir}`;
+      await $`docker run --rm -v ${volume}:/volume -v ${volumeBackupDir}:/backup alpine sh -c "cp -r /volume/. /backup/"`;
 
-    console.log(`Backup for volume ${volume} completed.`);
-  } catch (error) {
-    console.error(`Failed to back up volume: ${volume}`);
-    console.error(error);
-  }
-}
+      console.log(`Local backup for volume ${volume} completed.`);
 
-console.log('Backup completed successfully!');
-      
-        // Step 2: Run Borg to back up the local directory
-        console.log(`Running Borg to back up ${localBackupDir}`);
-        await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
-          borg create --stats --progress ${borgRepo}::${volume}_${timestamp} ${localBackupDir}`;
-          
-        console.log(`Backup for volume ${volume} completed.`);
-        
-      } else {
-        console.error(`Mount point not found for volume: ${volume}`);
-      }
+      // Step 2: Run Borg to back up the local directory
+      console.log(`Running Borg to back up ${volumeBackupDir}`);
+      await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
+        borg create --stats --progress ${borgRepo}::${volume}_${timestamp} ${volumeBackupDir}`;
+
+      console.log(`Borg backup for volume ${volume} completed.`);
+
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
-      handleError(error); // Ensure error handling for failed backups
+      console.error(error);
     }
   }
 }
+
+console.log('Backup process completed successfully!');
 
 // Function to back up bind mounts
 async function backupBindMounts() {
