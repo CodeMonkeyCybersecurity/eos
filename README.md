@@ -84,6 +84,7 @@ If the script ends in .mjs, for example 'installKube.mjs':
 Install zx globally using node package manager (npm)
 ```bash
 user@hostname:~$ cd ~/Eos/scripts
+user@hostname:~/Eos/scripts$ sudo apt install npm #If npm isn't already installed, or you don't know whether it is installed or not
 user@hostname:~/Eos/scripts$ sudo npm install -g zx
 ```
 
