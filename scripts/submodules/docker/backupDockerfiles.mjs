@@ -17,7 +17,7 @@ async function main() {
   // Check if the script is run as root
   checkRootUser();
 
-  await $`mkdir -p ${backupDir}/docker_dockerfiles_backups`;
+  await $`mkdir -p ${backupDir}`;  // Create the backup directory
 
   // Automatically find all directories under the home directory containing Dockerfiles
   const dockerFiles = await $`find ${baseDir} -name 'Dockerfile'`;
