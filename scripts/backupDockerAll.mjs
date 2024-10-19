@@ -18,7 +18,7 @@ async function checkRootUser() {
 await checkRootUser();
 
 // Define your Docker container name or ID
-const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Default container name
+const DOCKER_CONTAINER_NAME = 'borgbackupdocker'; // Default container name
 const USER = process.env.USER; // Get the current user
 const backupConfig = {
   baseDir: `${homeDir}/dockerBackups`,
