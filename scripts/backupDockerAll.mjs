@@ -21,8 +21,8 @@ const backupConfig = {
   repoDir: `${homeDir}/dockerBackups/borg_repo`,
 };
 
-console.log(`Processing timestamp: ${TIMESTAMP}`);
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
+console.log(`Processing timestamp: ${TIMESTAMP}`);
 
 // Centralized error handling function
 function handleError(error, contextMessage = '') {
