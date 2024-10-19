@@ -19,6 +19,12 @@ const USER = process.env.USER; // Get the current user
 const baseDir = '/opt/backups/dockerBackups'; // Define baseDir correctly as a string
 const repoDir = `${baseDir}/borg_repo`; // Inside the Docker container, repo is mounted here
 
+// Define backupConfig object
+const backupConfig = {
+  baseDir,
+  repoDir,
+};
+
 // Function to create timestamp
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 console.log(`Processing timestamp: ${TIMESTAMP}`);
@@ -51,8 +57,8 @@ async function setPassphrase() {
 // Function to create the backup directory
 async function createBackupDirectory() {
   try {
-    console.log(`Creating backup directory at ${backupConfig.baseDir}...`);
-    await $`sudo mkdir -p ${backupConfig.baseDir}`;
+    console.log(`Creating backup directory at ${baseDir}...`);
+    await $`sudo mkdir -p ${baseDir}`;
     console.log('Backup directory created successfully.');
   } catch (error) {
     console.error('Failed to create backup directory.');
@@ -83,7 +89,7 @@ async function checkContainerExistence() {
 
     try {
       await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} \
-        -v ${backupConfig.baseDir}/borg_repo:/borg_repo:rw \
+        -v ${baseDir}/borg_repo:/borg_repo:rw \
         -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} \
         alpine sh -c "while true; do sleep 30; done"`;
       console.log(`Container "${DOCKER_CONTAINER_NAME}" created successfully.`);
@@ -129,7 +135,7 @@ async function createBackupDirectories() {
 
 // Function to initialize Borg repository
 async function initializeBorgRepo() {
-  const repoExists = await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg list ${backupConfig.repoDir} || true`;
+  const repoExists = await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg list ${repoDir} || true`;
   if (!repoExists.stdout) {
     await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg init --encryption=repokey /borg_repo`;
   }
@@ -184,9 +190,9 @@ async function backupBindMounts() {
     const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Sanitize bind mount name
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
-      await $`docker run --rm -v ${bindMount}:/bind -v ${backupConfig.baseDir}/borg_repo:${backupConfig.repoDir} \
+      await $`docker run --rm -v ${bindMount}:/bind -v ${baseDir}/borg_repo:${repoDir} \
         -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
-        borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} /bind`;
+        borg create --stats --progress ${repoDir}::${bindMountName}_${TIMESTAMP} /bind`;
     } catch (error) {
       console.error(`Failed to back up bind mount: ${bindMount}`);
       handleError(error);
