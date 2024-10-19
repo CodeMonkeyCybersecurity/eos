@@ -50,7 +50,9 @@ async function checkBorgBackupDockerContainerExistence() {
 
   if (!containers.includes(DOCKER_CONTAINER_NAME)) {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" does not exist. Creating it...`);
-    await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} alpine sh -c "while true; do sleep 30; done"`; // Create an Alpine container that runs indefinitely
+    await $`docker run -d --restart unless-stopped --name borgBackupDocker \
+  -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
+  alpine sh -c "while true; do sleep 30; done"`; // Create an Alpine container that runs indefinitely
   } else {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" already exists.`);
   }
