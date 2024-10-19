@@ -83,7 +83,6 @@ async function backupVolumes() {
       await $`docker run -v ${volume}:/volume alpine sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume"`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
-      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -130,7 +129,6 @@ async function backupContainers() {
       await $`docker export ${containerId} | gzip > ${backupConfig.containers}/${sanitizedContainerName}_${TIMESTAMP}.tar.gz`;
     } catch (error) {
       console.error(`Failed to back up container: ${sanitizedContainerName}`);
-      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -147,7 +145,6 @@ async function backupImages() {
       await $`docker save ${image} | gzip > ${backupConfig.images}/${sanitizedImageName}_${TIMESTAMP}.tar.gz`;
     } catch (error) {
       console.error(`Failed to back up image: ${image}`);
-      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -168,7 +165,6 @@ async function backupNetworks() {
       await $`docker network inspect ${networkId} > ${backupConfig.networks}/${sanitizedNetworkName}.json`;
     } catch (error) {
       console.error(`Failed to back up network: ${networkName}`);
-      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -192,7 +188,6 @@ async function backupEnvVars() {
       await fs.promises.writeFile(jsonFilePath, JSON.stringify(envVarsArray, null, 2));
     } catch (error) {
       console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
-      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
