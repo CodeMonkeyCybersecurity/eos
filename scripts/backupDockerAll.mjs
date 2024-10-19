@@ -223,17 +223,17 @@ async function cleanupOldBackups() {
 
 // Main script execution
 (async () => {
-  await checkBorgBackupDockerContainerExistence();
-  await checkBorgBackupDockerInstallationInContainer();
-  await createBackupDirectories();
-  await initializeBorgRepo();
-  await backupVolumes();
-  await backupBindMounts();
-  await backupContainers();
-  await backupImages();
-  await backupNetworks();
-  await backupEnvVars();
-  await cleanupOldBackups();
+  await checkBorgBackupDockerContainerExistence(); // Check if the Borg container exists, creates it if not
+  await checkBorgBackupDockerInstallationInContainer(); // Check if Borg is installed in the Docker container
+  await createBackupDirectories(); // Create all backup directories before trying to initialize the Borg repository
+  await initializeBorgRepo(); // Initialize the Borg repository
+  await backupVolumes(); // Back up Docker volumes
+  await backupBindMounts(); // Back up bind mounts
+  await backupContainers(); // Back up containers
+  await backupImages(); // Back up images
+  await backupNetworks(); // Back up networks
+  await backupEnvVars(); // Back up EnvVars
+  await cleanupOldBackups(); // Cleanup old backups
 
   console.log('Backup completed successfully!');
 })();
