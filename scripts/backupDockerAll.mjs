@@ -6,6 +6,17 @@ const path = require('path');
 const homeDir = os.homedir();
 const readline = require('readline'); // Use require instead of import
 
+// Function to check if the script is run with sudo/root
+async function checkRootUser() {
+  if (process.getuid && process.getuid() !== 0) {
+    console.error("This script must be run with sudo or as root.");
+    process.exit(1); // Exit if not run as root
+  }
+}
+
+// Call the checkRootUser function at the start
+await checkRootUser();
+
 // Define your Docker container name or ID
 const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Default container name
 const USER = process.env.USER; // Get the current user
