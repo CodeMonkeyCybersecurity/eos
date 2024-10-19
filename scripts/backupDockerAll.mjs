@@ -105,8 +105,8 @@ async function backupVolumes() {
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
     try {
-      // Use borgBackupDocker to back up the volume
-      await $`docker exec -v ${volume}:/volume ${DOCKER_CONTAINER_NAME} borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume`;
+      // Mount the volume inside the borgBackupDocker container and run Borg from there
+      await $`docker exec -it ${DOCKER_CONTAINER_NAME} sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /var/lib/docker/volumes/${volume}/_data"`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
       handleError(error);
