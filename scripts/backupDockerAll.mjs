@@ -60,16 +60,13 @@ async function checkBorgBackupDockerContainerExistence() {
   const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
   const containers = containerList.trim().split('\n');
 
-  // Check if the container already exists
   if (!containers.includes(DOCKER_CONTAINER_NAME)) {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" does not exist. Creating it...`);
 
     try {
-      // Stop and remove any existing container with the same name (if left over from a failed run)
       await $`docker stop ${DOCKER_CONTAINER_NAME} || true`;
       await $`docker rm ${DOCKER_CONTAINER_NAME} || true`;
 
-      // Create the container
       await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} \
         -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
         -u $(id -u):$(id -g) \
