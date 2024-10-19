@@ -148,13 +148,14 @@ async function backupVolumes() {
       if (mountpoint) {
         console.log(`Backing up volume from path: ${mountpoint}`);
 
+        // Perform the backup inside the Borg container
         await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
       } else {
         console.error(`Mount point not found for volume: ${volume}`);
       }
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
-      handleError(error);
+      handleError(error); // Ensure error handling for failed backups
     }
   }
 }
