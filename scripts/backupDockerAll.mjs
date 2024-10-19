@@ -170,19 +170,20 @@ async function backupVolumes() {
         console.log(`Mount point for ${volume}: ${mountpoint}`);
 
         // Get and display the permissions for the mount point
-        const { stdout: permissionsStdout } = await $`stat -c "%A %U %G" ${mountpoint}`;
-        console.log(`Permissions for ${mountpoint}: ${permissionsStdout.trim()}`);
+        //const { stdout: permissionsStdout } = await $`stat -c "%A %U %G" ${mountpoint}`;
+        //console.log(`Permissions for ${mountpoint}: ${permissionsStdout.trim()}`);
 
         // Set permissions for the mount point
-        console.log(`Setting permissions for ${mountpoint}...`);
-        await $`sudo chown -R root:root ${mountpoint}`;
-        await $`sudo chmod -R 755 ${mountpoint}`;
-        console.log(`Permissions set for ${mountpoint}`);
+      //  console.log(`Setting permissions for ${mountpoint}...`);
+        //await $`sudo chown -R root:root ${mountpoint}`;
+        //await $`sudo chmod -R 755 ${mountpoint}`;
+        //console.log(`Permissions set for ${mountpoint}`);
         
         // Perform the backup inside the Borg container
-        await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
-      } else {
-        console.error(`Mount point not found for volume: ${volume}`);
+        await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
+          borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
+      //} else {
+        //console.error(`Mount point not found for volume: ${volume}`);
       }
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
