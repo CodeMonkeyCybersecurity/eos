@@ -77,7 +77,7 @@ async function backupVolumes() {
       await $`docker run -v ${volume}:/volume alpine sh -c "borg create --stats --progress ${backupConfig.repoDir}::${volume}_${TIMESTAMP} /volume"`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
-      console.error(error);
+      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -105,7 +105,7 @@ async function backupBindMounts() {
       await $`borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} ${bindMount}`;
     } catch (error) {
       console.error(`Failed to back up bind mount: ${bindMount}`);
-      console.error(error);
+      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -124,7 +124,7 @@ async function backupContainers() {
       await $`docker export ${containerId} | gzip > ${backupConfig.containers}/${sanitizedContainerName}_${TIMESTAMP}.tar.gz`;
     } catch (error) {
       console.error(`Failed to back up container: ${sanitizedContainerName}`);
-      console.error(error);
+      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -141,7 +141,7 @@ async function backupImages() {
       await $`docker save ${image} | gzip > ${backupConfig.images}/${sanitizedImageName}_${TIMESTAMP}.tar.gz`;
     } catch (error) {
       console.error(`Failed to back up image: ${image}`);
-      console.error(error);
+      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -162,7 +162,7 @@ async function backupNetworks() {
       await $`docker network inspect ${networkId} > ${backupConfig.networks}/${sanitizedNetworkName}.json`;
     } catch (error) {
       console.error(`Failed to back up network: ${networkName}`);
-      console.error(error);
+      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
@@ -186,7 +186,7 @@ async function backupEnvVars() {
       await $`echo ${JSON.stringify(envVarsArray)} > ${backupConfig.envVars}/${sanitizedContainerName}_env_vars.json`;
     } catch (error) {
       console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
-      console.error(error);
+      console.error(`Error: ${error.stderr || error.message}`);
     }
   }
 }
