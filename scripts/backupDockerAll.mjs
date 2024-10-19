@@ -29,7 +29,7 @@ async function checkBorgInstallationInContainer() {
     const installChoice = await $`read -p "Would you like to install Borg in the container? [y/N]: " choice; echo $choice`;
     if (installChoice.trim().toLowerCase() === 'y') {
       console.log('Installing Borg in the Docker container...');
-      await $`docker exec ${DOCKER_CONTAINER_NAME} sh -c "apt update && apt install -y borgbackup"`; // For Debian/Ubuntu containers
+      await $`docker exec ${DOCKER_CONTAINER_NAME} sh -c "apk add --no-cache borgbackup"`; // For Alpine containers
     } else {
       console.error('Borg is required for this backup script. Exiting...');
       process.exit(1); // Exit the script if the user chooses not to install
