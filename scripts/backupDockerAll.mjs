@@ -87,6 +87,7 @@ async function checkBorgBackupDockerContainerExistence() {
 
       await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} \
         -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
+        -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} \
         alpine sh -c "while true; do sleep 30; done"`;
       console.log(`Container "${DOCKER_CONTAINER_NAME}" created successfully.`);
     } catch (error) {
@@ -138,7 +139,7 @@ async function backupVolumes() {
   for (const volume of volumes) {
     console.log(`Backing up volume: ${volume}`);
     try {
-      await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${TIMESTAMP} /data`;
+      await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} /data`;
     } catch (error) {
       console.error(`Failed to back up volume: ${volume}`);
       handleError(error);
@@ -166,7 +167,7 @@ async function backupBindMounts() {
     const bindMountName = bindMount.replace(/[\/\\]/g, '_');
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
-      await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} -v ${bindMount}:/bind ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${bindMountName}_${TIMESTAMP} /bind`;
+      await $`docker run --rm -v ${bindMount}:/bind -v /home/henry/dockerBackups/borg_repo:/borg_repo borgBackupDocker borg create --stats --progress /borg_repo::${bindMountName}_${TIMESTAMP} /bind`;
     } catch (error) {
       console.error(`Failed to back up bind mount: ${bindMount}`);
       handleError(error);
