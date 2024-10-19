@@ -20,6 +20,19 @@ const backupConfig = {
 
 const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
 
+// Function to check if the Borg container exists
+async function checkContainerExistence() {
+  const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
+  const containers = containerList.trim().split('\n');
+
+  if (!containers.includes(DOCKER_CONTAINER_NAME)) {
+    console.log(`Container "${DOCKER_CONTAINER_NAME}" does not exist. Creating it...`);
+    await $`docker run -d --name ${DOCKER_CONTAINER_NAME} alpine sh -c "while true; do sleep 30; done"`; // Create an Alpine container that runs indefinitely
+  } else {
+    console.log(`Container "${DOCKER_CONTAINER_NAME}" already exists.`);
+  }
+}
+
 // Function to check if Borg is installed in the Docker container
 async function checkBorgInstallationInContainer() {
   try {
