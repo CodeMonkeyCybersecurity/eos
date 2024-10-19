@@ -128,7 +128,7 @@ async function backupBindMounts() {
   }
 
   for (const bindMount of bindMounts) {
-    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace slashes for a valid filename
+    const bindMountName = bindMount.replace(/[\/\\]/g, '_'); // Replace forward and backward slashes with an underscore
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
       await $`borg create --stats --progress ${backupConfig.repoDir}::${bindMountName}_${TIMESTAMP} ${bindMount}`;
