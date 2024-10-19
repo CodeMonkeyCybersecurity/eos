@@ -72,6 +72,7 @@ async function checkBorgBackupDockerContainerExistence() {
       // Create the container
       await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} \
         -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
+        -u $(id -u):$(id -g) \
         alpine sh -c "while true; do sleep 30; done"`;
       console.log(`Container "${DOCKER_CONTAINER_NAME}" created successfully.`);
     } catch (error) {
