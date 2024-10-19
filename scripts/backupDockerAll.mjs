@@ -154,8 +154,8 @@ async function initializeBorgRepo() {
 
 // Function to back up Docker volumes
 async function backupVolumes() {
-  const { stdout: volumesStdout } = await $`docker volume ls -q`;
-  const volumes = volumesStdout.trim().split('\n').filter(volume => volume);
+  const { stdout } = await $`docker volume ls -q`;
+  const volumes = stdout.trim().split('\n');
 
   // Use already defined variables
   const localBackupDirBase = backupConfig.baseDir; // Local backup directory path from backupConfig
@@ -170,17 +170,24 @@ async function backupVolumes() {
       const { stdout: mountpointStdout } = await $`docker volume inspect --format '{{.Mountpoint}}' ${volume}`;
       const mountpoint = mountpointStdout.trim();
 
-      // Check if the mount point exists before modifying it
-      if (mountpoint) {
-        console.log(`Mount point for ${volume}: ${mountpoint}`);
-
-        // Define the local directory for this volume's backup
-        const localBackupDir = `${localBackupDirBase}/${volume}`;
-
+      // Define the local backup directory for this volume
+      const volumeBackupDir = `${backupDir}/${volume}_${timestamp}`;
+      
         // Step 1: Copy the volume to a local directory using docker cp
-        console.log(`Copying volume ${volume} to ${localBackupDir}`);
-        await $`docker cp ${volume}:/ ${localBackupDir}`;
+        // Mount the Docker volume in a temporary Alpine container and copy the contents using cp
+        console.log(`Creating backup for volume ${volume} at ${volumeBackupDir}`);
+        await $`mkdir -p ${volumeBackupDir}`;
+        await $`docker run --rm -v ${volume}:/volume -v ${volumeBackupDir}:/backup alpine sh -c "cp -r /volume/. /backup/"`;
 
+    console.log(`Backup for volume ${volume} completed.`);
+  } catch (error) {
+    console.error(`Failed to back up volume: ${volume}`);
+    console.error(error);
+  }
+}
+
+console.log('Backup completed successfully!');
+      
         // Step 2: Run Borg to back up the local directory
         console.log(`Running Borg to back up ${localBackupDir}`);
         await $`docker exec -u root -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} \
