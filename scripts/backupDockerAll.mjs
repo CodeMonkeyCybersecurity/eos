@@ -75,12 +75,97 @@ async function backupBindMounts() {
   }
 }
 
+// Function to back up Docker containers
+async function backupContainers() {
+  const { stdout: containersStdout } = await $`docker ps -q`;
+  const containerIds = containersStdout.trim().split('\n').filter(id => id);
+
+  for (const containerId of containerIds) {
+    const containerName = await $`docker inspect --format='{{.Name}}' ${containerId}`;
+    const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
+
+    console.log(`Backing up container: ${sanitizedContainerName}`);
+    try {
+      await $`docker export ${containerId} | gzip > ${backupConfig.containers}/${sanitizedContainerName}_${TIMESTAMP}.tar.gz`;
+    } catch (error) {
+      console.error(`Failed to back up container: ${sanitizedContainerName}`);
+      console.error(error);
+    }
+  }
+}
+
+// Function to back up Docker images
+async function backupImages() {
+  const { stdout: imagesStdout } = await $`docker images --format "{{.Repository}}:{{.Tag}}"`;
+  const images = imagesStdout.trim().split('\n').filter(image => image);
+
+  for (const image of images) {
+    const sanitizedImageName = image.replace(/[\/:]/g, '_'); // Replace slashes and colons for a valid filename
+    console.log(`Backing up image: ${image}`);
+    try {
+      await $`docker save ${image} | gzip > ${backupConfig.images}/${sanitizedImageName}_${TIMESTAMP}.tar.gz`;
+    } catch (error) {
+      console.error(`Failed to back up image: ${image}`);
+      console.error(error);
+    }
+  }
+}
+
+// Function to back up Docker networks
+async function backupNetworks() {
+  const { stdout: networksStdout } = await $`docker network ls -q`;
+  const networkIds = networksStdout.trim().split('\n').filter(id => id);
+
+  for (const networkId of networkIds) {
+    // Get network name and inspect
+    const { stdout: networkName } = await $`docker network inspect ${networkId} --format '{{.Name}}'`;
+    const sanitizedNetworkName = networkName.replace(/[\/:]/g, '_'); // Replace slashes and colons for a valid filename
+
+    console.log(`Backing up network: ${networkName}`);
+    try {
+      // Save the network configuration as JSON
+      await $`docker network inspect ${networkId} > ${backupConfig.networks}/${sanitizedNetworkName}.json`;
+    } catch (error) {
+      console.error(`Failed to back up network: ${networkName}`);
+      console.error(error);
+    }
+  }
+}
+
+// Function to back up environment variables from Docker containers
+async function backupEnvVars() {
+  const { stdout: containersStdout } = await $`docker ps -q`;
+  const containerIds = containersStdout.trim().split('\n').filter(id => id);
+
+  for (const containerId of containerIds) {
+    const { stdout: containerName } = await $`docker inspect --format='{{.Name}}' ${containerId}`;
+    const sanitizedContainerName = containerName.replace(/^\//, ''); // Remove leading slash
+
+    console.log(`Backing up environment variables for container: ${sanitizedContainerName}`);
+    try {
+      // Retrieve environment variables
+      const { stdout: envVars } = await $`docker inspect --format='{{range .Config.Env}}{{.}} {{end}}' ${containerId}`;
+      const envVarsArray = envVars.split(' ').filter(Boolean); // Split and filter empty values
+
+      // Save to a JSON file
+      await $`echo ${JSON.stringify(envVarsArray)} > ${backupConfig.envVars}/${sanitizedContainerName}_env_vars.json`;
+    } catch (error) {
+      console.error(`Failed to back up environment variables for container: ${sanitizedContainerName}`);
+      console.error(error);
+    }
+  }
+}
+
 // Main script execution
 (async () => {
   await createBackupDirectories(); // Create all backup directories
   await initializeBorgRepo(); // Initialize the Borg repository
   await backupVolumes(); // Back up Docker volumes
   await backupBindMounts(); // Back up bind mounts
+  await backupContainers(); // Back up containers
+  await backupImages(); // Back up images
+  await backupNetworks(); // Back up networks
+  await backupEnvVars(); // Back up EnvVars
 
   console.log('Backup completed successfully!');
 })();
