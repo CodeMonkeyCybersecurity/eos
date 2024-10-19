@@ -82,14 +82,18 @@ async function checkContainerExistence() {
     console.log(`Container "${DOCKER_CONTAINER_NAME}" does not exist. Creating it...`);
 
     try {
-      await $`docker stop ${DOCKER_CONTAINER_NAME} || true`;
-      await $`docker rm ${DOCKER_CONTAINER_NAME} || true`;
-
       await $`docker run -d --restart unless-stopped --name ${DOCKER_CONTAINER_NAME} \
-        -v /home/henry/dockerBackups/borg_repo:/borg_repo:rw \
+        -v ${backupConfig.baseDir}/borg_repo:/borg_repo:rw \
         -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} \
         alpine sh -c "while true; do sleep 30; done"`;
       console.log(`Container "${DOCKER_CONTAINER_NAME}" created successfully.`);
+
+      // Ensure the container is running correctly
+      const { stdout: runningContainers } = await $`docker ps --format "{{.Names}}"`;
+      if (!runningContainers.includes(DOCKER_CONTAINER_NAME)) {
+        console.error(`Failed to start container "${DOCKER_CONTAINER_NAME}" correctly.`);
+        process.exit(1); // Exit the process if it failed
+      }
     } catch (error) {
       console.error(`Failed to create container "${DOCKER_CONTAINER_NAME}".`);
       handleError(error);
