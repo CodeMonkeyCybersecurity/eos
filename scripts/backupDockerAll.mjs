@@ -50,8 +50,10 @@ function askQuestion(query) {
 
 // Function to set your  passphrase
 async function setPassphrase() {
-  const passphrase = await askQuestion('Enter  passphrase: ');
-  process.env.BORG_PASSPHRASE = passphrase; // Set it in the environment for the script duration
+  if (!process.env.BORG_PASSPHRASE) {
+    const passphrase = await askQuestion('Enter passphrase: ');
+    process.env.BORG_PASSPHRASE = passphrase; // Set it in the environment for the script duration
+  }
 }
 
 // Function to create all backup directories
@@ -62,7 +64,7 @@ async function createBackupDirectories() {
     // Loop through each directory path in the backupConfig object
     for (const dir of Object.values(backupConfig)) {
       console.log(`Creating directory at ${dir}...`);
-      await $`sudo mkdir -p ${dir}`; // Create the directory
+      await $`mkdir -p ${dir}`; // Create the directory
     }
     
     console.log('All backup directories created successfully.');
@@ -76,8 +78,8 @@ async function createBackupDirectories() {
 async function ensurePermissions() {
   try {
     console.log('Ensuring permissions on backup directory...');
-    await $`sudo chown -R ${USER}:${USER} ${baseDir}/borg_repo`;
-    await $`sudo chmod -R 775 ${baseDir}/borg_repo`;
+    await $`chown -R ${USER}:${USER} ${baseDir}/borg_repo`;
+    await $`chmod -R 775 ${baseDir}/borg_repo`;
     console.log('Permissions set successfully.');
   } catch (error) {
     console.error('Failed to set permissions.');
