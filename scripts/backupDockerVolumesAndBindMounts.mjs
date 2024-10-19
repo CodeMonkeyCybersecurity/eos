@@ -1,7 +1,10 @@
 #!/usr/bin/env zx
 
+const os = require('os'); // Make sure to require the 'os' module
 const homeDir = os.homedir();
 const backupDir = `${homeDir}/docker_volume_backups`;
+const TIMESTAMP = new Date().toISOString().replace(/[-:.T]/g, '').split('.')[0]; // Format: YYYYMMDD_HHMMSS
+const BACKUP_FILE = `${backupDir}/wazuh_backup_${TIMESTAMP}.tar.gz`;
 
 // Create the backup directory if it doesn't exist
 await $`mkdir -p ${backupDir}`;
@@ -23,9 +26,9 @@ for (const containerId of containerIds) {
   }
 }
 
-// Back up Docker volumes as before
-const { stdout } = await $`docker volume ls -q`;
-const volumes = stdout.trim().split('\n').filter(volume => volume);
+// Back up Docker volumes
+const { stdout: volumesStdout } = await $`docker volume ls -q`;
+const volumes = volumesStdout.trim().split('\n').filter(volume => volume);
 
 for (const volume of volumes) {
   console.log(`Backing up volume: ${volume}`);
