@@ -74,7 +74,7 @@ async function ensurePermissions() {
 }
 
 // Function to check if the Borg container exists and create it if not
-async function checkBorgBackupDockerContainerExistence() {
+async function checkContainerExistence() {
   const { stdout: containerList } = await $`docker ps -a --format "{{.Names}}"`;
   const containers = containerList.trim().split('\n');
 
@@ -179,7 +179,7 @@ async function backupBindMounts() {
     const bindMountName = bindMount.replace(/[\/\\]/g, '_');
     console.log(`Backing up bind mount: ${bindMount}`);
     try {
-      await $`docker run --rm -v ${bindMount}:/bind -v /home/henry/dockerBackups/borg_repo:/borg_repo borgBackupDocker borg create --stats --progress /borg_repo::${bindMountName}_${TIMESTAMP} /bind`;
+      await $`docker run --rm -v ${bindMount}:/bind -v /home/henry/dockerBackups/borg_repo:/borg_repo ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${bindMountName}_${TIMESTAMP} /bind`;
     } catch (error) {
       console.error(`Failed to back up bind mount: ${bindMount}`);
       handleError(error);
