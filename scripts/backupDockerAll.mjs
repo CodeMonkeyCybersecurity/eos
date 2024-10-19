@@ -2,13 +2,12 @@
 
 const os = require('os');
 const fs = require('fs'); // Import filesystem module
-const path = require('path'); // Import path module
 const homeDir = os.homedir();
 const readline = require('readline'); // Use require instead of import
 
 // Define your Docker container name or ID
 const DOCKER_CONTAINER_NAME = 'borgBackupDocker'; // Default container name
-
+const USER = process.env.USER; // Get the current user
 const backupConfig = {
   baseDir: `${homeDir}/dockerBackups`,
   volumes: `${homeDir}/dockerBackups/Volumes`,
@@ -41,6 +40,19 @@ function askQuestion(query) {
     rl.close();
     resolve(answer);
   }));
+}
+
+// Function to ensure correct permissions on the backup directory
+async function ensurePermissions() {
+  try {
+    console.log('Ensuring permissions on backup directory...');
+    await $`sudo chown -R ${USER}:${USER} ${homeDir}/dockerBackups/borg_repo`;
+    await $`sudo chmod -R 775 ${homeDir}/dockerBackups/borg_repo`;
+    console.log('Permissions set successfully.');
+  } catch (error) {
+    console.error('Failed to set permissions.');
+    handleError(error);
+  }
 }
 
 // Function to check if the Borg container exists and create it if not
