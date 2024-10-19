@@ -2,6 +2,7 @@
 
 const os = require('os');
 const fs = require('fs'); // Import filesystem module
+const path = require('path');
 const homeDir = os.homedir();
 const readline = require('readline'); // Use require instead of import
 
