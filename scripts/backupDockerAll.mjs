@@ -47,7 +47,10 @@ async function checkBorgBackupDockerInstallationInContainer() {
     await $`docker exec ${DOCKER_CONTAINER_NAME} borg --version`;
   } catch (error) {
     console.error('Borg is not installed in the container. Attempting to install it...');
-    const installChoice = await $`read -p "Would you like to install Borg in the container? [y/N]: " choice; echo $choice`;
+
+    // Use zx's prompt function to ask for user input
+    const installChoice = await prompt('Would you like to install Borg in the container? [y/N]: ');
+    
     if (installChoice.trim().toLowerCase() === 'y') {
       console.log('Installing Borg in the Docker container...');
       await $`docker exec ${DOCKER_CONTAINER_NAME} sh -c "apk add --no-cache borgbackup"`; // For Alpine containers
