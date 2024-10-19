@@ -165,10 +165,20 @@ async function backupVolumes() {
       const { stdout: mountpointStdout } = await $`docker volume inspect --format '{{.Mountpoint}}' ${volume}`;
       const mountpoint = mountpointStdout.trim();
 
-      // Check if the mount point exists before backing it up
+      // Check if the mount point exists before modifying it
       if (mountpoint) {
-        console.log(`Backing up volume from path: ${mountpoint}`);
+        console.log(`Mount point for ${volume}: ${mountpoint}`);
 
+        // Get and display the permissions for the mount point
+        const { stdout: permissionsStdout } = await $`stat -c "%A %U %G" ${mountpoint}`;
+        console.log(`Permissions for ${mountpoint}: ${permissionsStdout.trim()}`);
+
+        // Set permissions for the mount point
+        console.log(`Setting permissions for ${mountpoint}...`);
+        await $`sudo chown -R root:root ${mountpoint}`;
+        await $`sudo chmod -R 755 ${mountpoint}`;
+        console.log(`Permissions set for ${mountpoint}`);
+        
         // Perform the backup inside the Borg container
         await $`docker exec -e BORG_PASSPHRASE=${process.env.BORG_PASSPHRASE} ${DOCKER_CONTAINER_NAME} borg create --stats --progress /borg_repo::${volume}_${TIMESTAMP} ${mountpoint}`;
       } else {
