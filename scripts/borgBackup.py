@@ -46,10 +46,8 @@ def run_borg_backup(config, dryrun=False):
         logging.info(result.stdout)
     except subprocess.CalledProcessError as e:
         logging.error(f"Borg backup failed: {e.stderr}")
-        if "not a valid repository" in e.stderr.lower():
-            prompt_for_repository_menu()
 
-# Add prompt for repository menu in case of issues
+# Prompt user to go to repository menu
 def prompt_for_repository_menu():
     """Prompt the user if they want to go to the repository options menu."""
     while True:
@@ -62,7 +60,6 @@ def prompt_for_repository_menu():
         else:
             print("Invalid input. Please type 'y' for Yes or 'n' for No.")
 
-# Function to display and handle repository options
 def repository_options_menu():
     """Handle the repository options menu."""
     while True:
@@ -95,15 +92,128 @@ def repository_options_menu():
         else:
             print("Invalid option. Please try again.")
 
-# Add function to handle the new "Run backup now" option
-def run_backup_now():
-    """Run backup immediately with the current configuration."""
-    config = load_config()
-    if config:
-        run_borg_backup(config)
-    else:
-        print("No configuration found. Please create one first.")
+# Check the repository
+def check_repo(config):
+    """Check repository health with 'borg check'."""
+    repo = config['borg']['repo']
+    passphrase = config['borg']['passphrase']
 
+    env = os.environ.copy()
+    env['BORG_PASSPHRASE'] = passphrase
+
+    try:
+        result = subprocess.run(['borg', 'check', repo], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
+        logging.info(result.stdout)
+        print("Repository check passed.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Repository check failed: {e.stderr}")
+
+# Clear the screen
+def clear_screen():
+    """Clear the terminal screen."""
+    os.system('clear')
+
+# Load the YAML configuration
+def create_yaml_config():
+    """Create the YAML config file at /etc/eos/borg_config.yaml."""
+    config = {
+        'borg': {
+            'repo': input("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): "),
+            'passphrase': input("Enter the Borg passphrase: "),
+            'encryption': input("Enter the encryption type (e.g., repokey, none): ")
+        },
+        'backup': {
+            'paths_to_backup': input("Enter the directories to back up (comma-separated): ").split(','),
+            'exclude_patterns': input("Enter exclude patterns (comma-separated): ").split(','),
+            'compression': input("Enter the compression method (e.g., lz4, zstd): ")
+        }
+    }
+
+    # Save to YAML
+    try:
+        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+        with open(CONFIG_PATH, 'w') as file:
+            yaml.safe_dump(config, file)
+        logging.info(f"Configuration saved to {CONFIG_PATH}.")
+    except OSError as e:
+        logging.error(f"Failed to write the configuration file: {e}")
+
+def load_config():
+    """Load configuration from YAML file."""
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r') as file:
+                config = yaml.safe_load(file)
+                logging.info("Configuration loaded successfully.")
+                return config
+        except yaml.YAMLError as e:
+            logging.error(f"Error loading configuration file: {e}")
+            return None
+    else:
+        logging.error(f"Configuration file not found.")
+        return None
+
+# Save the YAML configuration
+def save_config(config):
+    """Save the modified YAML config file."""
+    try:
+        with open(CONFIG_PATH, 'w') as file:
+            yaml.safe_dump(config, file)
+        logging.info(f"Configuration updated and saved to {CONFIG_PATH}.")
+    except OSError as e:
+        logging.error(f"Failed to write the configuration file: {e}")
+
+# Edit YAML menu
+def edit_yaml_menu(config):
+    """Display YAML editing options."""
+    while True:
+        print("\nEditting existing YAML file. What would you like to edit?")
+        print("(0) Compression method (eg. lz4, zstd. Default is zstd)")
+        print("(1) Enter the encryption type (e.g., repokey, none)")
+        print("(2) Borg repository path (e.g., user@backup-server:/path/to/repo. You must make sure this exists and is available prior to running a backup)")
+        print("(3) Enter the directories to back up (comma-separated, default is: /etc,/var,/home,/mnt,/root,/opt)")
+        print("(4) Enter exclude patterns (comma-separated, default is: home/*/.cache/*,var/tmp/*)")
+        print("(5) Prune settings (comma-separated in format d,w,m,y. Default is 30,0,0,0)")
+        print("(6) Edit with nano")
+        print("(7) Return to main Menu")
+        print("(E) (E)xit")
+        
+        choice = input("Select an option: ").upper()
+
+        if choice == '0':
+            config['backup']['compression'] = input("Enter the compression method (e.g., lz4, zstd, default is zstd): ")
+            save_config(config)
+        elif choice == '1':
+            config['borg']['encryption'] = input("Enter the encryption type (e.g., repokey, none): ")
+            save_config(config)
+        elif choice == '2':
+            config['borg']['repo'] = input("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): ")
+            save_config(config)
+        elif choice == '3':
+            config['backup']['paths_to_backup'] = input("Enter the directories to back up (comma-separated, default is /etc,/var,/home,/mnt,/root,/opt): ").split(',')
+            save_config(config)
+        elif choice == '4':
+            config['backup']['exclude_patterns'] = input("Enter exclude patterns (comma-separated, default is home/*/.cache/*,var/tmp/*): ").split(',')
+            save_config(config)
+        elif choice == '5':
+            prune_settings = input("Enter prune settings (comma-separated in format d,w,m,y. Default is 30,0,0,0): ").split(',')
+            config['backup']['prune'] = {
+                'daily': prune_settings[0],
+                'weekly': prune_settings[1],
+                'monthly': prune_settings[2],
+                'yearly': prune_settings[3]
+            }
+            save_config(config)
+        elif choice == '6':
+            os.system(f"nano {CONFIG_PATH}")  # Open the YAML file with nano for manual editing
+        elif choice == '7':
+            break  # Return to the main menu
+        elif choice == 'E':
+            exit_program()
+        else:
+            print("Invalid option. Please try again.")
+
+# Display main menu
 def display_menu():
     """Display the main menu."""
     print("Welcome to Code Monkey Cybersecurity's borgBackup.py.")
@@ -119,6 +229,57 @@ def display_menu():
     print("(N) Run backup (N)ow")  # New option to run backup immediately
     print("(E) (E)xit")
 
+# Display submenu
+def display_submenu():
+    """Display the submenu for the selected section."""
+    print("\n(0) Run backup with current configuration")
+    print("(1) Print out current configuration")
+    print("(2) Create new configuration")
+    print("(3) Edit existing configuration")
+    print("(4) Perform a dry run with current configuration")
+    print("(5) Delete current configuration")
+    print("(6) Replace current configuration")
+    print("(7) Return to main Menu")
+    print("(E) (E)xit")
+
+# Handle submenu option
+def handle_submenu_option(option):
+    """Handle user options from the submenu."""
+    config = load_config()
+
+    if option == '0' and config:
+        run_borg_backup(config)
+    elif option == '1':
+        print("Current configuration:")
+        print(config)
+    elif option == '2':
+        create_yaml_config()
+    elif option == '3' and config:
+        edit_yaml_menu(config)  # Go to YAML edit menu
+    elif option == '4' and config:
+        run_borg_backup(config, dryrun=True)
+    elif option == '5' and config:
+        try:
+            os.remove(CONFIG_PATH)
+            print("Configuration deleted.")
+        except OSError as e:
+            print(f"Error deleting configuration: {e}")
+    elif option == '6':
+        create_yaml_config()
+    elif option == '7':
+        return
+    elif option == 'E':
+        exit_program()
+    else:
+        print("Invalid option or no configuration available. Please choose a valid option.")
+
+# Exit the script
+def exit_program():
+    """Exit the script."""
+    print("Exiting the program. Goodbye!")
+    exit()
+
+# Main program loop
 def main():
     while True:
         clear_screen()
@@ -129,20 +290,17 @@ def main():
             continue  # Show the menu again
         elif choice == 'H':
             print("Help: This is a Borg Backup tool for managing backups and repositories.")
-        elif choice == 'Y':
-            display_submenu()
-        elif choice == 'O':
-            repository_options_menu()
-        elif choice == 'B':
-            display_submenu()
-        elif choice == 'R':
-            display_submenu()
-        elif choice == 'D':
-            display_submenu()
-        elif choice == 'A':
-            display_submenu()
-        elif choice == 'N':  # Run backup now option
-            run_backup_now()  # Run the backup immediately with the current configuration
+        elif choice == 'N':  # Run backup immediately
+            config = load_config()
+            if config:
+                run_borg_backup(config)
+        elif choice in ['Y', 'O', 'B', 'R', 'D', 'A']:
+            while True:
+                display_submenu()
+                submenu_choice = input("Select an option: ").upper()
+                if submenu_choice == '7':
+                    break  # Return to the main menu
+                handle_submenu_option(submenu_choice)
         elif choice == 'E':
             exit_program()
         else:
