@@ -334,6 +334,53 @@ def edit_yaml_menu(config):
         else:
             print("Invalid option. Please try again.")
 
+import subprocess
+
+def add_borg_to_crontab(config):
+    """Add Borg backup to crontab."""
+    # Prompt user for the backup schedule
+    print("Enter the time for the Borg backup (24-hour format):")
+    minute = input("Minute (0-59): ")
+    hour = input("Hour (0-23): ")
+    day_of_month = input("Day of month (1-31, * for every day): ")
+    month = input("Month (1-12, * for every month): ")
+    day_of_week = input("Day of week (0-6, Sunday is 0 or 7, * for every day): ")
+
+    # Ensure that user has entered values correctly
+    cron_time = f"{minute} {hour} {day_of_month} {month} {day_of_week}"
+
+    # Command to run Borg backup using the current configuration
+    borg_backup_command = f"borg create {config['borg']['repo']}::{socket.gethostname()}-{datetime.now().strftime('%Y-%m-%dT%H:%M:%S')} {' '.join(config['backup']['paths_to_backup'])} --compression {config['backup'].get('compression', 'zstd')} --exclude-caches"
+
+    # Construct the crontab entry
+    cron_entry = f"{cron_time} {borg_backup_command} >> /var/log/eos_borg_backup.log 2>&1"
+
+    # Check if the crontab entry already exists
+    try:
+        result = subprocess.run(['crontab', '-l'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode == 0:
+            current_crontab = result.stdout
+        else:
+            current_crontab = ""
+    except subprocess.CalledProcessError as e:
+        print(f"Error: Could not retrieve current crontab. {e}")
+        return
+
+    # Append the new cron entry if not already present
+    if cron_entry not in current_crontab:
+        new_crontab = current_crontab + f"\n{cron_entry}\n"
+        try:
+            # Update the crontab
+            process = subprocess.run(['crontab', '-'], input=new_crontab, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if process.returncode == 0:
+                print("Borg backup schedule added to crontab successfully.")
+            else:
+                print(f"Error: Failed to update crontab. {process.stderr}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Could not update crontab. {e}")
+    else:
+        print("This backup configuration already exists in crontab.")
+
 # Display main menu
 def display_menu():
     """Display the main menu."""
@@ -347,7 +394,8 @@ def display_menu():
     print("(R) Go to (R)estore options")
     print("(D) Go to (D)ebugging options")
     print("(A) Go to (A)rchive options")
-    print("(N) Run backup (N)ow")  # New option to run backup immediately
+    print("(N) Run backup (N)ow")
+    print("(C) Add backup to crontab")
     print("(E) (E)xit")
     logging.info("Displaying main menu")
 
@@ -402,13 +450,20 @@ def exit_program():
     print("Exiting the program. Goodbye!")
     exit()
 
+#main function
 def main():
     while True:
         clear_screen()
         display_menu()
         choice = input("Select an option: ").upper()
 
-        if choice == 'M':
+        if choice == 'C':
+            config = load_config()
+            if config:
+                add_borg_to_crontab(config)
+            else:
+                print("Error: No valid configuration found.")
+        elif choice == 'M':
             print("Showing the main menu...")
             logging.info("Showing the main menu.")
             continue  # Show the menu again
