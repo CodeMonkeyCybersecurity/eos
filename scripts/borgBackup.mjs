@@ -14,10 +14,10 @@ try {
     console.error(`Error: Required package '${missingPackage}' is not installed.`);
     console.log(`To resolve this issue, you have two options:`);
     
-    console.log(`1. Install the missing package locally (recommended++):`);
-    console.log(`\nsudo npm install ${missingPackage}\n`);
+    console.log(`1. Install the missing package locally (recommended):`);
+    console.log(`\nnpm install ${missingPackage}\n`);
     
-    console.log(`2. Or install it glocally:`);
+    console.log(`2. Or install it globally:`);
     console.log(`\nsudo npm install -g ${missingPackage}\n`);
 
     console.log(`If you installed the package globally and still encounter issues, check if it is in your $PATH by running:`);
@@ -25,13 +25,12 @@ try {
     
     console.log(`If it's not there, you can add the global npm bin directory to your PATH by appending this line to your ~/.bashrc or ~/.zshrc file (depending on your shell):`);
     console.log(`\nexport PATH=$PATH:$(npm bin -g)\n`);
-    console.log(`export PATH=$PATH:/usr/local/lib/node_modules`);
 
     console.log(`After adding this, reload your shell with the following command:`);
     console.log(`\nsource ~/.bashrc  # or ~/.zshrc if you're using Zsh\n`);
 
-    console.log(`You can also verify that Node.js can access the global'${missingPackage}' by running: `);
-    console.log(`node -e "require('js-yaml')"`);
+    console.log(`You can also verify that Node.js can access the global '${missingPackage}' package by running:`);
+    console.log(`node -e "require('${missingPackage}')"`);
 
     process.exit(1);
   } else {
