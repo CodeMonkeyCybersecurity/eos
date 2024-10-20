@@ -3,9 +3,11 @@
 // Try to load required packages and handle missing module errors gracefully
 let yaml;
 let argparse;
+let luxon;
 try {
   yaml = await import('js-yaml');
   argparse = await import('argparse');
+  luxon = await import('luxon');
 } catch (error) {
   if (error.code === 'ERR_MODULE_NOT_FOUND') {
     const missingPackage = error.message.match(/'([^']+)'/)[1];
@@ -28,7 +30,6 @@ if (process.getuid && process.getuid() !== 0) {
 // Rest of your script here...
 import { promises as fs } from 'fs';
 import { hostname } from 'os';
-import { DateTime } from 'luxon';
 
 // Path to the YAML configuration file
 const CONFIG_PATH = '/etc/eos/borg_config.yaml';
@@ -85,7 +86,7 @@ async function runBorgBackup(config, dryrun = false) {
   const { repo, passphrase } = config.borg;
   const paths = config.backup.paths_to_backup;
   const compression = config.backup.compression || 'lz4';
-  const archiveName = `${repo}::${hostname()}-${DateTime.now().toFormat('yyyy-MM-ddTHH:mm:ss')}`;
+  const archiveName = `${repo}::${hostname()}-${luxon.DateTime.now().toFormat('yyyy-MM-ddTHH:mm:ss')}`;
 
   process.env.BORG_PASSPHRASE = passphrase;
 
