@@ -205,17 +205,26 @@ def clear_screen():
 
 # Load the YAML configuration
 def create_yaml_config():
-    """Create the YAML config file at /etc/eos/borg_config.yaml."""
+    """Create the YAML config file at /etc/eos/borg_config.yaml with default values."""
+    # Default values for the configuration
+    default_repo = "henry@ubuntu-backups:/mnt/cybermonkey"
+    default_passphrase = "Linseed7)Twine33Phoney57Barracuda4)Province0"
+    default_encryption = "repokey"
+    default_paths_to_backup = "/var,/etc,/home,/root,/opt,/mnt"
+    default_exclude_patterns = "home/*/.cache/*,var/tmp/*"
+    default_compression = "zstd"
+
+    # Prompt the user for inputs, with default values suggested
     config = {
         'borg': {
-            'repo': input("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): "),
-            'passphrase': input("Enter the Borg passphrase: "),
-            'encryption': input("Enter the encryption type (e.g., repokey, none): ")
+            'repo': input(f"Enter the Borg repository path (default: {default_repo}): ") or default_repo,
+            'passphrase': input(f"Enter the Borg passphrase (default: {default_passphrase}): ") or default_passphrase,
+            'encryption': input(f"Enter the encryption type (e.g., repokey, none, default: {default_encryption}): ") or default_encryption
         },
         'backup': {
-            'paths_to_backup': input("Enter the directories to back up (comma-separated): ").split(','),
-            'exclude_patterns': input("Enter exclude patterns (comma-separated): ").split(','),
-            'compression': input("Enter the compression method (e.g., lz4, zstd): ")
+            'paths_to_backup': input(f"Enter the directories to back up (comma-separated, default: {default_paths_to_backup}): ") or default_paths_to_backup.split(','),
+            'exclude_patterns': input(f"Enter exclude patterns (comma-separated, default: {default_exclude_patterns}): ") or default_exclude_patterns.split(','),
+            'compression': input(f"Enter the compression method (e.g., lz4, zstd, default: {default_compression}): ") or default_compression
         }
     }
 
