@@ -12,15 +12,29 @@ try {
   if (error.code === 'ERR_MODULE_NOT_FOUND') {
     const missingPackage = error.message.match(/'([^']+)'/)[1];
     console.error(`Error: Required package '${missingPackage}' is not installed.`);
-    console.log(`To resolve this issue, run the following command to install the missing package:`);
+    console.log(`To resolve this issue, you have two options:`);
+    
+    console.log(`1. Install the missing package globally:`);
     console.log(`\nnpm install -g ${missingPackage}\n`);
+    
+    console.log(`2. Or install it locally in your project directory:`);
+    console.log(`\nnpm install ${missingPackage}\n`);
+
+    console.log(`If you installed the package globally and still encounter issues, check if it is in your $PATH by running:`);
+    console.log(`\necho $PATH\n`);
+    
+    console.log(`If it's not there, you can add the global npm bin directory to your PATH by appending this line to your ~/.bashrc or ~/.zshrc file (depending on your shell):`);
+    console.log(`\nexport PATH=$PATH:$(npm bin -g)\n`);
+
+    console.log(`After adding this, reload your shell with the following command:`);
+    console.log(`\nsource ~/.bashrc  # or ~/.zshrc if you're using Zsh\n`);
+
     process.exit(1);
   } else {
     console.error(`An unexpected error occurred: ${error.message}`);
     process.exit(1);
   }
 }
-
 // Check if the script is being run with sudo
 if (process.getuid && process.getuid() !== 0) {
   console.error('Error: This script must be run with sudo privileges. Please rerun the script with "sudo".');
