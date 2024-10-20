@@ -1,50 +1,51 @@
 #!/usr/bin/env zx
 
-// Try to load required packages and handle missing module errors gracefully
+// Load required packages dynamically
 let yaml;
-let argparse;
 let luxon;
-try {
-  yaml = await import('js-yaml');
-  argparse = await import('argparse');
-  luxon = await import('luxon');
-} catch (error) {
-  if (error.code === 'ERR_MODULE_NOT_FOUND') {
-    const missingPackage = error.message.match(/'([^']+)'/)[1];
-    console.error(`Error: Required package '${missingPackage}' is not installed.`);
-    console.log(`To resolve this issue, you have two options:`);
-    
-    console.log(`1. Install the missing package locally (recommended):`);
-    console.log(`\nnpm install ${missingPackage}\n`);
-    
-    console.log(`2. Or install it globally:`);
-    console.log(`\nsudo npm install -g ${missingPackage}\n`);
+async function loadPackages() {
+  try {
+    yaml = await import('js-yaml');
+    luxon = await import('luxon');
+  } catch (error) {
+    if (error.code === 'ERR_MODULE_NOT_FOUND') {
+      const missingPackage = error.message.match(/'([^']+)'/)[1];
+      console.error(`Error: Required package '${missingPackage}' is not installed.`);
+      console.log(`To resolve this issue, you have two options:`);
+      
+      console.log(`1. Install the missing package locally (recommended):`);
+      console.log(`\nnpm install ${missingPackage}\n`);
+      
+      console.log(`2. Or install it globally:`);
+      console.log(`\nsudo npm install -g ${missingPackage}\n`);
 
-    console.log(`If you installed the package globally and still encounter issues, check if it is in your $PATH by running:`);
-    console.log(`\necho $PATH\n`);
-    
-    console.log(`If it's not there, you can add the global npm bin directory to your PATH by appending this line to your ~/.bashrc or ~/.zshrc file (depending on your shell):`);
-    console.log(`\nexport PATH=$PATH:$(npm bin -g)\n`);
+      console.log(`If you installed the package globally and still encounter issues, check if it is in your $PATH by running:`);
+      console.log(`\necho $PATH\n`);
+      
+      console.log(`If it's not there, you can add the global npm bin directory to your PATH by appending this line to your ~/.bashrc or ~/.zshrc file (depending on your shell):`);
+      console.log(`\nexport PATH=$PATH:$(npm bin -g)\n`);
 
-    console.log(`After adding this, reload your shell with the following command:`);
-    console.log(`\nsource ~/.bashrc  # or ~/.zshrc if you're using Zsh\n`);
+      console.log(`After adding this, reload your shell with the following command:`);
+      console.log(`\nsource ~/.bashrc  # or ~/.zshrc if you're using Zsh\n`);
 
-    console.log(`You can also verify that Node.js can access the global '${missingPackage}' package by running:`);
-    console.log(`node -e "require('${missingPackage}')"`);
+      console.log(`You can also verify that Node.js can access the global '${missingPackage}' package by running:`);
+      console.log(`node -e "require('${missingPackage}')"`);
 
-    process.exit(1);
-  } else {
-    console.error(`An unexpected error occurred: ${error.message}`);
-    process.exit(1);
+      process.exit(1);
+    } else {
+      console.error(`An unexpected error occurred: ${error.message}`);
+      process.exit(1);
+    }
   }
 }
+
 // Check if the script is being run with sudo
 if (process.getuid && process.getuid() !== 0) {
   console.error('Error: This script must be run with sudo privileges. Please rerun the script with "sudo".');
   process.exit(1);
 }
 
-// Rest of your script here...
+// Import necessary Node.js modules
 import { promises as fs } from 'fs';
 import { hostname } from 'os';
 
@@ -54,10 +55,9 @@ const CONFIG_PATH = '/etc/eos/borg_config.yaml';
 // Load the configuration file
 async function loadConfig() {
   try {
-    if (await fs.stat(CONFIG_PATH)) {
-      const content = await fs.readFile(CONFIG_PATH, 'utf8');
-      return yaml.load(content);
-    }
+    await fs.access(CONFIG_PATH);  // Check if the file is accessible
+    const content = await fs.readFile(CONFIG_PATH, 'utf8');
+    return yaml.load(content);
   } catch (error) {
     console.error(`Error loading configuration: ${error.message}`);
     return null;
@@ -144,34 +144,14 @@ async function listBorgArchives(config) {
   }
 }
 
-// Restore a Borg archive
-async function restoreBorgArchive(config, archiveName, targetDir) {
-  const { repo, passphrase } = config.borg;
-  process.env.BORG_PASSPHRASE = passphrase;
-
-  try {
-    await $`borg extract ${repo}::${archiveName} --target ${targetDir}`;
-    console.log(`Restored archive '${archiveName}' to '${targetDir}'`);
-  } catch (error) {
-    console.error(`Restoring archive failed: ${error.stderr}`);
-  }
-}
-
-// Test restore a Borg archive
-async function testRestoreBorgArchive(config, archiveName) {
-  const { repo, passphrase } = config.borg;
-  process.env.BORG_PASSPHRASE = passphrase;
-
-  try {
-    await $`borg extract --dry-run ${repo}::${archiveName}`;
-    console.log(`Test restore of archive '${archiveName}' succeeded.`);
-  } catch (error) {
-    console.error(`Test restore failed: ${error.stderr}`);
-  }
-}
-
-// Main function to handle the argument parsing and actions
+// Main function to handle argument parsing and actions
 async function main() {
+  await loadPackages();  // Load required packages
+  
+  // Dynamically import argparse
+  const argparse = await import('argparse');
+
+  // Set up argument parsing
   const parser = new argparse.ArgumentParser({
     description: 'Borg Backup Wrapper',
   });
@@ -205,14 +185,6 @@ async function main() {
     await runBorgBackup(config);
   } else if (args.list) {
     await listBorgArchives(config);
-  } else if (args.restore) {
-    if (!args.target_dir) {
-      console.error('You must specify a --target-dir to restore an archive.');
-    } else {
-      await restoreBorgArchive(config, args.restore, args.target_dir);
-    }
-  } else if (args.test_restore) {
-    await testRestoreBorgArchive(config, args.test_restore);
   } else {
     console.log('No valid action specified. Use --help for available options.');
   }
