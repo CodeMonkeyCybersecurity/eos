@@ -9,7 +9,7 @@ CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
 # Set up logging to output to both a file and the console
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  #  DEBUG for verbose logging
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("/var/log/eos.log"),  # Change this to the desired log file path
