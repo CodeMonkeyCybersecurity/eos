@@ -10,6 +10,43 @@ CONFIG_PATH = "/etc/eos/borg_config.yaml"
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Function to run Borg backup
+def run_borg_backup(config, dryrun=False):
+    """Run the Borg backup using the configuration values."""
+    repo = config['borg']['repo']
+    passphrase = config['borg']['passphrase']
+    paths = config['backup']['paths_to_backup']
+    compression = config['backup'].get('compression', 'zstd')  # Default to 'zstd' if not specified
+
+    env = os.environ.copy()
+    env['BORG_PASSPHRASE'] = passphrase
+
+    hostname = socket.gethostname()  # Get the actual hostname of the machine
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    archive_name = f"{repo}::{hostname}-{timestamp}"
+
+    borg_create_cmd = ['borg', 'create', archive_name] + paths + [
+        '--verbose',
+        '--compression', compression,
+        '--list',
+        '--stats',
+        '--show-rc',
+        '--exclude-caches'
+    ]
+
+    # Add any exclude patterns from config
+    for pattern in config['backup'].get('exclude_patterns', []):
+        borg_create_cmd += ['--exclude', pattern]
+
+    if dryrun:
+        borg_create_cmd.append('--dry-run')
+
+    try:
+        result = subprocess.run(borg_create_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
+        logging.info(result.stdout)
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Borg backup failed: {e.stderr}")
+
 def clear_screen():
     """Clear the terminal screen."""
     os.system('clear')
