@@ -9,7 +9,7 @@ CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
 # Set up logging to output to both a file and the console
 logging.basicConfig(
-    level=logging.DEBUG,  #  DEBUG for verbose logging
+    level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.FileHandler("/var/log/eos.log"),  # Change this to the desired log file path
@@ -300,9 +300,12 @@ def main():
         elif choice == 'H':
             print("Help: This is a Borg Backup tool for managing backups and repositories.")
         elif choice == 'N':  # Run backup immediately
-            config = load_config()
+            config = load_config()  # Ensure config is loaded
             if config:
-                run_borg_backup(config)
+                logging.info("Running backup immediately with current configuration.")
+                run_borg_backup(config)  # Ensure this runs
+            else:
+                logging.error("No valid configuration found. Unable to run backup.")
         elif choice in ['Y', 'O', 'B', 'R', 'D', 'A']:
             while True:
                 display_submenu()
