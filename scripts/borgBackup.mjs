@@ -25,9 +25,13 @@ try {
     
     console.log(`If it's not there, you can add the global npm bin directory to your PATH by appending this line to your ~/.bashrc or ~/.zshrc file (depending on your shell):`);
     console.log(`\nexport PATH=$PATH:$(npm bin -g)\n`);
+    console.log(`export PATH=$PATH:/usr/local/lib/node_modules`);
 
     console.log(`After adding this, reload your shell with the following command:`);
     console.log(`\nsource ~/.bashrc  # or ~/.zshrc if you're using Zsh\n`);
+
+    console.log(`You can also verify that Node.js can access the global'${missingPackage}' by running: `);
+    console.log(`node -e "require('js-yaml')"`);
 
     process.exit(1);
   } else {
