@@ -59,10 +59,13 @@ except Exception as e:
     logging.error(f"Failed to set BORG_RSH: {e}")
     print(f"Error: Could not set BORG_RSH. {e}")
 
-#run_borg_backup
 def run_borg_backup(config, dryrun=False):
     """Run the Borg backup using the configuration values."""
     try:
+        # Start status update
+        print("Starting Borg backup...")
+        logging.info("Starting Borg backup.")
+
         # Extract relevant config details
         repo = config['borg']['repo']
         passphrase = config['borg']['passphrase']
@@ -96,12 +99,19 @@ def run_borg_backup(config, dryrun=False):
         if dryrun:
             borg_create_cmd.append('--dry-run')
 
+        # Status update before running the command
+        print("Running Borg backup command...")
+        logging.info("Running Borg backup command.")
+        
         # Run the Borg create command
         result = subprocess.run(borg_create_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
+        
+        # Success update
         logging.info(result.stdout)  # Log the output of the command
-        print(result.stdout)  # Print the result to console
+        print(f"Borg backup completed successfully!\n{result.stdout}")  # Print the result to console
 
     except subprocess.CalledProcessError as e:
+        # Failure update
         logging.error(f"Borg backup failed: {e.stderr}")
         print(f"Error: Borg backup failed. {e.stderr}")
         prompt_for_repository_menu()  # Prompt for repository fix if backup fails
@@ -120,6 +130,7 @@ def prompt_for_repository_menu():
             print("Invalid input. Please type 'y' for Yes or 'n' for No.")
 
 
+# Modify the repository_options_menu function to show success/failure
 def repository_options_menu():
     """Handle the repository options menu."""
     while True:
@@ -142,14 +153,23 @@ def repository_options_menu():
             if config:
                 config['borg']['repo'] = input("Enter the new repository path (e.g., user@backup-server:/path/to/repo): ")
                 save_config(config)
+                print("Repository path updated successfully.")  # Indicate success
         elif choice == '3':
             config = load_config()
             if config:
-                check_repo(config)
-        elif choice == '4':  # New option to create a repository
+                success = check_repo(config)
+                if success:
+                    print("Repository health check completed successfully.")  # Indicate success
+                else:
+                    print("Repository health check failed.")  # Indicate failure
+        elif choice == '4':  # Create a new repository
             config = load_config()
             if config:
-                create_borg_repository(config)
+                success = create_borg_repository(config)
+                if success:
+                    print("New repository created successfully.")  # Indicate success
+                else:
+                    print("Failed to create the repository.")  # Indicate failure
         elif choice == 'M':
             break
         elif choice == 'E':
@@ -169,11 +189,14 @@ def check_repo(config):
     try:
         result = subprocess.run(['borg', 'check', repo], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
         logging.info(result.stdout)
-        print("Repository check passed.")
+        print(f"Repository check passed for {repo}.")  # Success message
+        return True  # Indicate success
     except subprocess.CalledProcessError as e:
         logging.error(f"Repository check failed: {e.stderr}")
+        print(f"Error: Repository check failed for {repo}. {e.stderr}")  # Failure message
+        return False  # Indicate failure
 
-# create a repository
+# Create a repository
 def create_borg_repository(config):
     """Initialize a new Borg repository."""
     try:
@@ -192,11 +215,12 @@ def create_borg_repository(config):
         result = subprocess.run(borg_init_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
 
         logging.info(f"Repository {repo} created successfully.")
-        print(result.stdout)
-        
+        print(f"Repository {repo} created successfully.")  # Success message
+        return True  # Indicate success
     except subprocess.CalledProcessError as e:
         logging.error(f"Failed to create Borg repository: {e.stderr}")
-        print(f"Error: Failed to create repository. {e.stderr}")
+        print(f"Error: Failed to create repository {repo}. {e.stderr}")  # Failure message
+        return False  # Indicate failure
 
 # Clear the screen
 def clear_screen():
@@ -222,8 +246,8 @@ def create_yaml_config():
             'encryption': input(f"Enter the encryption type (e.g., repokey, none, default: {default_encryption}): ") or default_encryption
         },
         'backup': {
-            'paths_to_backup': input(f"Enter the directories to back up (comma-separated, default: {default_paths_to_backup}): ") or default_paths_to_backup.split(','),
-            'exclude_patterns': input(f"Enter exclude patterns (comma-separated, default: {default_exclude_patterns}): ") or default_exclude_patterns.split(','),
+            'paths_to_backup': input(f"Enter the directories to back up (comma-separated, default: {default_paths_to_backup}): ") or default_paths_to_backup,
+            'exclude_patterns': input(f"Enter exclude patterns (comma-separated, default: {default_exclude_patterns}): ") or default_exclude_patterns,
             'compression': input(f"Enter the compression method (e.g., lz4, zstd, default: {default_compression}): ") or default_compression
         }
     }
@@ -266,7 +290,7 @@ def save_config(config):
 def edit_yaml_menu(config):
     """Display YAML editing options."""
     while True:
-        print("\nEditting existing YAML file. What would you like to edit?")
+        print("\nEditing existing YAML file. What would you like to edit?")
         print("(0) Compression method (eg. lz4, zstd. Default is zstd)")
         print("(1) Enter the encryption type (e.g., repokey, none)")
         print("(2) Borg repository path (e.g., user@backup-server:/path/to/repo. You must make sure this exists and is available prior to running a backup)")
@@ -289,10 +313,8 @@ def edit_yaml_menu(config):
             config['borg']['repo'] = input("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): ")
             save_config(config)
         elif choice == '3':
-            config['backup']['paths_to_backup'] = input("Enter the directories to back up (comma-separated, default is /etc,/var,/home,/mnt,/root,/opt): ").split(',')
-            save_config(config)
-        elif choice == '4':
-            config['backup']['exclude_patterns'] = input("Enter exclude patterns (comma-separated, default is home/*/.cache/*,var/tmp/*): ").split(',')
+            config['backup']['paths_to_backup'] = (input(f"Enter the directories to back up (comma-separated, default: /etc,/var,/home,/mnt,/root,/opt): ") or "/etc,/var,/home,/mnt,/root,/opt").split(',')
+            config['backup']['exclude_patterns'] = (input(f"Enter exclude patterns (comma-separated, default: home/*/.cache/*,var/tmp/*): ") or "home/*/.cache/*,var/tmp/*").split(',')
             save_config(config)
         elif choice == '5':
             prune_settings = input("Enter prune settings (comma-separated in format d,w,m,y. Default is 30,0,0,0): ").split(',')
@@ -380,7 +402,6 @@ def exit_program():
     print("Exiting the program. Goodbye!")
     exit()
 
-# Main program loop
 def main():
     while True:
         clear_screen()
@@ -388,17 +409,23 @@ def main():
         choice = input("Select an option: ").upper()
 
         if choice == 'M':
+            print("Showing the main menu...")
+            logging.info("Showing the main menu.")
             continue  # Show the menu again
         elif choice == 'H':
             print("Help: This is a Borg Backup tool for managing backups and repositories.")
         elif choice == 'N':  # Run backup immediately
+            print("Validating configuration for backup...")
             config = load_config()  # Ensure config is loaded
             if config:
-                logging.info("Running backup immediately with current configuration.")
-                run_borg_backup(config)  # Ensure this runs
+                logging.info("Configuration validated successfully.")
+                print("Running backup now...")
+                run_borg_backup(config)  # Run the backup
             else:
                 logging.error("No valid configuration found. Unable to run backup.")
+                print("Error: No valid configuration found.")
         elif choice == 'O':  # Repository options menu
+            print("Opening repository options menu...")
             repository_options_menu()  # Correctly call repository options menu
         elif choice in ['Y', 'B', 'R', 'D', 'A']:
             while True:
@@ -409,6 +436,7 @@ def main():
                 else:
                     handle_submenu_option(submenu_choice)
         elif choice == 'E':
+            print("Exiting program...")
             exit_program()
         else:
             print("Invalid choice. Please try again.")
