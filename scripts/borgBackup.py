@@ -47,6 +47,65 @@ def run_borg_backup(config, dryrun=False):
     except subprocess.CalledProcessError as e:
         logging.error(f"Borg backup failed: {e.stderr}")
 
+def prompt_for_repository_menu():
+    """Prompt the user if they want to go to the repository options menu."""
+    while True:
+        user_input = input("The repository is invalid. Would you like to go to the repository options to fix it? (y/N): ").lower()
+        if user_input == 'y':
+            repository_options_menu()
+            break
+        elif user_input == 'n' or user_input == '':
+            break
+        else:
+            print("Invalid input. Please type 'y' for Yes or 'n' for No.")
+
+def repository_options_menu():
+    """Handle the repository options menu."""
+    while True:
+        print("\nRepository Options:")
+        print("(1) View current repository path")
+        print("(2) Change repository path")
+        print("(3) Check repository health")
+        print("(4) Return to main menu")
+        print("(E) Exit")
+
+        choice = input("Select an option: ").upper()
+
+        if choice == '1':
+            config = load_config()
+            if config:
+                print(f"Current repository: {config['borg']['repo']}")
+        elif choice == '2':
+            config = load_config()
+            if config:
+                config['borg']['repo'] = input("Enter the new repository path (e.g., user@backup-server:/path/to/repo): ")
+                save_config(config)
+        elif choice == '3':
+            config = load_config()
+            if config:
+                check_repo(config)
+        elif choice == '4':
+            break
+        elif choice == 'E':
+            exit_program()
+        else:
+            print("Invalid option. Please try again.")
+
+def check_repo(config):
+    """Check repository health with 'borg check'."""
+    repo = config['borg']['repo']
+    passphrase = config['borg']['passphrase']
+
+    env = os.environ.copy()
+    env['BORG_PASSPHRASE'] = passphrase
+
+    try:
+        result = subprocess.run(['borg', 'check', repo], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
+        logging.info(result.stdout)
+        print("Repository check passed.")
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Repository check failed: {e.stderr}")
+
 def clear_screen():
     """Clear the terminal screen."""
     os.system('clear')
