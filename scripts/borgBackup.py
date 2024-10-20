@@ -8,13 +8,16 @@ import socket  # Used to get the hostname
 CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
 # Set up logging to output to both a file and the console
+file_handler = logging.FileHandler("/var/log/eos.log")
+file_handler.setLevel(logging.DEBUG)  # Log all levels to the log file
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.ERROR)  # Only log errors or higher to the console
+
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.DEBUG,  # Overall log level
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler("/var/log/eos.log"),  # Change this to the desired log file path
-        logging.StreamHandler()  # This will continue printing logs to the console
-    ]
+    handlers=[file_handler, console_handler]
 )
 
 def run_borg_backup(config, dryrun=False):
