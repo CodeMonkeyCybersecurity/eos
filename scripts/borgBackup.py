@@ -88,7 +88,7 @@ def repository_options_menu():
         print("(2) Change repository path")
         print("(3) Check repository health")
         print("(4) Create a new repository")  # Add option to create new repository
-        print("(5) Return to main menu")
+        print("(M) Return to main menu")
         print("(E) Exit")
 
         choice = input("Select an option: ").upper()
@@ -110,7 +110,7 @@ def repository_options_menu():
             config = load_config()
             if config:
                 create_borg_repository(config)
-        elif choice == '5':
+        elif choice == 'M':
             break
         elif choice == 'E':
             exit_program()
