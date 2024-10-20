@@ -1,7 +1,6 @@
 import yaml
 import os
 import subprocess
-import argparse
 import logging
 from datetime import datetime
 import socket  # Used to get the hostname
@@ -10,6 +9,10 @@ CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def clear_screen():
+    """Clear the terminal screen."""
+    os.system('clear')
 
 def create_yaml_config():
     """Create the YAML config file at /etc/eos/borg_config.yaml."""
@@ -36,57 +39,19 @@ def create_yaml_config():
         logging.error(f"Failed to write the configuration file: {e}")
 
 def load_config():
-    """Load configuration from YAML file, and loop to create or correct it if necessary."""
-    while True:
-        if os.path.exists(CONFIG_PATH):
-            try:
-                with open(CONFIG_PATH, 'r') as file:
-                    config = yaml.safe_load(file)
-                    if config and check_yaml(config):
-                        logging.info("Configuration loaded successfully.")
-                        return config
-                    else:
-                        logging.error("Configuration file is invalid. Please provide correct values.")
-                        create_yaml_config()  # Loop back to create or correct the config
-            except yaml.YAMLError as e:
-                logging.error(f"Error loading configuration file: {e}")
-                create_yaml_config()  # Loop back to create the config
-        else:
-            logging.error(f"Configuration file not found. Creating a new configuration...")
-            create_yaml_config()  # Create the config file
-            continue  # Loop again to reload
-
-def check_yaml(config):
-    """Check if YAML config has valid values."""
-    required_values = {
-        'borg.repo': config.get('borg', {}).get('repo'),
-        'borg.passphrase': config.get('borg', {}).get('passphrase'),
-        'borg.encryption': config.get('borg', {}).get('encryption'),
-        'backup.paths_to_backup': config.get('backup', {}).get('paths_to_backup')
-    }
-
-    for key, value in required_values.items():
-        if not value:
-            logging.error(f"Configuration issue: '{key}' is not set or is invalid.")
-            return False
-    logging.info("All required configuration values are set.")
-    return True
-
-def check_repo(config):
-    """Check repository health with 'borg check'."""
-    repo = config['borg']['repo']
-    passphrase = config['borg']['passphrase']
-
-    env = os.environ.copy()
-    env['BORG_PASSPHRASE'] = passphrase
-
-    try:
-        result = subprocess.run(['borg', 'check', repo], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
-        logging.info(result.stdout)
-        return True
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Repository check failed: {e.stderr}")
-        return False
+    """Load configuration from YAML file."""
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, 'r') as file:
+                config = yaml.safe_load(file)
+                logging.info("Configuration loaded successfully.")
+                return config
+        except yaml.YAMLError as e:
+            logging.error(f"Error loading configuration file: {e}")
+            return None
+    else:
+        logging.error(f"Configuration file not found.")
+        return None
 
 def run_borg_backup(config, dryrun=False):
     """Run the Borg backup using the configuration values."""
@@ -111,9 +76,6 @@ def run_borg_backup(config, dryrun=False):
         '--exclude-caches'
     ]
 
-    for pattern in config['backup'].get('exclude_patterns', []):
-        borg_create_cmd += ['--exclude', pattern]
-
     if dryrun:
         borg_create_cmd.append('--dry-run')
 
@@ -122,110 +84,90 @@ def run_borg_backup(config, dryrun=False):
         logging.info(result.stdout)
     except subprocess.CalledProcessError as e:
         logging.error(f"Borg backup failed: {e.stderr}")
+
+def display_menu():
+    """Display the main menu."""
+    print("Welcome to Code Monkey Cybersecurity's borgBackup.py.")
+    print("What would you like to do? Type the letter of the option you want and press enter:")
+    print("(M) Show this (M)enu")
+    print("(H) Show (H)elp")
+    print("(Y) Go to (Y)AML options")
+    print("(O) Go to repository (O)ptions")
+    print("(B) Go to (B)ackup options")
+    print("(R) Go to (R)estore options")
+    print("(D) Go to (D)ebugging options")
+    print("(A) Go to (A)rchive options")
+    print("(E) (E)xit")
+    
+def display_submenu():
+    """Display the submenu for the selected section."""
+    print("\n(0) Run backup with current configuration")
+    print("(1) Print out current configuration")
+    print("(2) Create new configuration")
+    print("(3) Edit existing configuration")
+    print("(4) Perform a dry run with current configuration")
+    print("(5) Delete current configuration")
+    print("(6) Replace current configuration")
+    print("(7) Return to main Menu")
+    print("(E) (E)xit")
+
+def handle_submenu_option(option):
+    """Handle user options from the submenu."""
+    config = load_config()
+    
+    if option == '0' and config:
+        run_borg_backup(config)
+    elif option == '1':
+        print("Current configuration:")
+        print(config)
+    elif option == '2':
+        create_yaml_config()
+    elif option == '3' and config:
+        print("Editing configuration (manual changes may be required).")
+        create_yaml_config()  # Simplified editing process for now
+    elif option == '4' and config:
+        run_borg_backup(config, dryrun=True)
+    elif option == '5' and config:
+        try:
+            os.remove(CONFIG_PATH)
+            print("Configuration deleted.")
+        except OSError as e:
+            print(f"Error deleting configuration: {e}")
+    elif option == '6':
+        create_yaml_config()
+    elif option == '7':
         return
+    elif option == 'E':
+        exit_program()
+    else:
+        print("Invalid option or no configuration available. Please choose a valid option.")
 
-def list_borg_archives(config):
-    """List all archives in the Borg repository."""
-    repo = config['borg']['repo']
-    passphrase = config['borg']['passphrase']
-
-    env = os.environ.copy()
-    env['BORG_PASSPHRASE'] = passphrase
-
-    try:
-        result = subprocess.run(['borg', 'list', repo], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
-        logging.info(result.stdout)
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Listing archives failed: {e.stderr}")
-
-def restore_borg_archive(config, archive_name, target_dir):
-    """Restore a Borg archive to a specified directory."""
-    repo = config['borg']['repo']
-    passphrase = config['borg']['passphrase']
-
-    env = os.environ.copy()
-    env['BORG_PASSPHRASE'] = passphrase
-
-    borg_restore_cmd = ['borg', 'extract', f'{repo}::{archive_name}', '--target', target_dir]
-
-    try:
-        result = subprocess.run(borg_restore_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
-        logging.info(f"Restored archive '{archive_name}' to '{target_dir}'")
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Restoring archive failed: {e.stderr}")
-
-def test_restore_borg_archive(config, archive_name):
-    """Perform a test restore without actually extracting the files."""
-    repo = config['borg']['repo']
-    passphrase = config['borg']['passphrase']
-
-    env = os.environ.copy()
-    env['BORG_PASSPHRASE'] = passphrase
-
-    borg_test_restore_cmd = ['borg', 'extract', '--dry-run', f'{repo}::{archive_name}']
-
-    try:
-        result = subprocess.run(borg_test_restore_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
-        logging.info(f"Test restore of archive '{archive_name}' succeeded.")
-    except subprocess.CalledProcessError as e:
-        logging.error(f"Test restore failed: {e.stderr}")
+def exit_program():
+    """Exit the script."""
+    print("Exiting the program. Goodbye!")
+    exit()
 
 def main():
-    parser = argparse.ArgumentParser(description="Borg Backup Wrapper", add_help=True)
-    parser.add_argument('--create-yaml', help="Create the Borg YAML configuration file", action='store_true')
-    parser.add_argument('--check-yaml', help="Check the YAML configuration", action='store_true')
-    parser.add_argument('--check-repo', help="Check the Borg repository", action='store_true')
-    parser.add_argument('--dryrun', help="Run a dry run of the backup", action='store_true')
-    parser.add_argument('--backup', help="Run a full backup", action='store_true')
-    parser.add_argument('--list', help="List all archives in the repository", action='store_true')
-    parser.add_argument('--restore', help="Restore a specific archive", type=str)
-    parser.add_argument('--test-restore', help="Test restore a specific archive", type=str)
-    parser.add_argument('--target-dir', help="Specify the target directory for the restore", type=str)
+    while True:
+        clear_screen()
+        display_menu()
+        choice = input("Select an option: ").upper()
 
-    args = parser.parse_args()
-
-    if args.create_yaml:
-        create_yaml_config()
-        return
-
-    if not any(vars(args).values()):
-        parser.print_help()
-        return
-
-    config = load_config()
-    if not config:
-        return  # Exit if the config file is not found or invalid
-
-    if args.check_yaml:
-        check_yaml(config)
-        return
-
-    if args.check_repo:
-        check_repo(config)
-        return
-
-    if args.dryrun:
-        run_borg_backup(config, dryrun=True)
-        return
-
-    if args.backup:
-        run_borg_backup(config)
-        return
-
-    if args.list:
-        list_borg_archives(config)
-        return
-
-    if args.restore:
-        if not args.target_dir:
-            logging.error("Target directory must be specified for restoration.")
+        if choice == 'M':
+            continue  # Show the menu again
+        elif choice == 'H':
+            print("Help: This is a Borg Backup tool for managing backups and repositories.")
+        elif choice in ['Y', 'O', 'B', 'R', 'D', 'A']:
+            while True:
+                display_submenu()
+                submenu_choice = input("Select an option: ").upper()
+                if submenu_choice == '7':
+                    break  # Return to the main menu
+                handle_submenu_option(submenu_choice)
+        elif choice == 'E':
+            exit_program()
         else:
-            restore_borg_archive(config, args.restore, args.target_dir)
-        return
-
-    if args.test_restore:
-        test_restore_borg_archive(config, args.test_restore)
-        return
+            print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     main()
