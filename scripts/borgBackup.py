@@ -76,6 +76,7 @@ def prompt_for_repository_menu():
         else:
             print("Invalid input. Please type 'y' for Yes or 'n' for No.")
 
+
 def repository_options_menu():
     """Handle the repository options menu."""
     while True:
@@ -314,7 +315,7 @@ def handle_submenu_option(option):
             print(f"Error deleting configuration: {e}")
     elif option == '6':
         create_yaml_config()
-    elif option == '7':
+    elif option == 'M':
         return
     elif option == 'E':
         exit_program()
@@ -345,13 +346,16 @@ def main():
                 run_borg_backup(config)  # Ensure this runs
             else:
                 logging.error("No valid configuration found. Unable to run backup.")
-        elif choice in ['Y', 'O', 'B', 'R', 'D', 'A']:
+        elif choice == 'O':  # Repository options menu
+            repository_options_menu()  # Correctly call repository options menu
+        elif choice in ['Y', 'B', 'R', 'D', 'A']:
             while True:
                 display_submenu()
                 submenu_choice = input("Select an option: ").upper()
-                if submenu_choice == '7':
+                if submenu_choice == 'M':
                     break  # Return to the main menu
-                handle_submenu_option(submenu_choice)
+                else:
+                    handle_submenu_option(submenu_choice)
         elif choice == 'E':
             exit_program()
         else:
