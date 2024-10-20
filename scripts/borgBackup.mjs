@@ -14,11 +14,11 @@ try {
     console.error(`Error: Required package '${missingPackage}' is not installed.`);
     console.log(`To resolve this issue, you have two options:`);
     
-    console.log(`1. Install the missing package globally:`);
-    console.log(`\nnpm install -g ${missingPackage}\n`);
+    console.log(`1. Install the missing package locally (recommended++):`);
+    console.log(`\nsudo npm install ${missingPackage}\n`);
     
-    console.log(`2. Or install it locally in your project directory:`);
-    console.log(`\nnpm install ${missingPackage}\n`);
+    console.log(`2. Or install it glocally:`);
+    console.log(`\nsudo npm install -g ${missingPackage}\n`);
 
     console.log(`If you installed the package globally and still encounter issues, check if it is in your $PATH by running:`);
     console.log(`\necho $PATH\n`);
