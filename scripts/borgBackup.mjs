@@ -1,9 +1,33 @@
 #!/usr/bin/env zx
 
+// Try to load required packages and handle missing module errors gracefully
+let yaml;
+let argparse;
+try {
+  yaml = await import('js-yaml');
+  argparse = await import('argparse');
+} catch (error) {
+  if (error.code === 'ERR_MODULE_NOT_FOUND') {
+    const missingPackage = error.message.match(/'([^']+)'/)[1];
+    console.error(`Error: Required package '${missingPackage}' is not installed.`);
+    console.log(`To resolve this issue, run the following command to install the missing package:`);
+    console.log(`\nnpm install -g ${missingPackage}\n`);
+    process.exit(1);
+  } else {
+    console.error(`An unexpected error occurred: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+// Check if the script is being run with sudo
+if (process.getuid && process.getuid() !== 0) {
+  console.error('Error: This script must be run with sudo privileges. Please rerun the script with "sudo".');
+  process.exit(1);
+}
+
+// Rest of your script here...
 import { promises as fs } from 'fs';
-import yaml from 'js-yaml';
 import { hostname } from 'os';
-import { ArgumentParser } from 'argparse';
 import { DateTime } from 'luxon';
 
 // Path to the YAML configuration file
@@ -130,7 +154,7 @@ async function testRestoreBorgArchive(config, archiveName) {
 
 // Main function to handle the argument parsing and actions
 async function main() {
-  const parser = new ArgumentParser({
+  const parser = new argparse.ArgumentParser({
     description: 'Borg Backup Wrapper',
   });
 
