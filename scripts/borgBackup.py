@@ -6,10 +6,38 @@ import logging
 from datetime import datetime
 import socket  # Used to get the hostname
 
-CONFIG_PATH = "/etc/eos/borgBackupConfig.yaml"
+CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+def create_yaml_config():
+    """Create the YAML config file at /etc/eos/borg_config.yaml."""
+    if os.path.exists(CONFIG_PATH):
+        logging.error(f"Configuration file already exists at {CONFIG_PATH}.")
+        return
+    
+    config = {
+        'borg': {
+            'repo': input("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): "),
+            'passphrase': input("Enter the Borg passphrase: "),
+            'encryption': input("Enter the encryption type (e.g., repokey, none): ")
+        },
+        'backup': {
+            'paths_to_backup': input("Enter the directories to back up (comma-separated): ").split(','),
+            'exclude_patterns': input("Enter exclude patterns (comma-separated): ").split(','),
+            'compression': input("Enter the compression method (e.g., lz4, zstd): ")
+        }
+    }
+
+    # Save to YAML
+    try:
+        os.makedirs(os.path.dirname(CONFIG_PATH), exist_ok=True)
+        with open(CONFIG_PATH, 'w') as file:
+            yaml.safe_dump(config, file)
+        logging.info(f"Configuration saved to {CONFIG_PATH}.")
+    except OSError as e:
+        logging.error(f"Failed to write the configuration file: {e}")
 
 def load_config():
     """Load configuration from YAML file."""
@@ -27,7 +55,7 @@ def load_config():
             logging.error(f"Error loading configuration file: {e}")
             return None
     else:
-        logging.error(f"Configuration file not found. Please run 'sudo python3 configureBorg.py --create'.")
+        logging.error(f"Configuration file not found. Please run 'sudo python3 configureBorg.py --create-yaml'.")
         return None
 
 def check_yaml(config):
@@ -38,6 +66,7 @@ def check_yaml(config):
         'borg.encryption': config.get('borg', {}).get('encryption'),
         'backup.paths_to_backup': config.get('backup', {}).get('paths_to_backup')
     }
+
     for key, value in required_values.items():
         if not value:
             logging.error(f"Configuration issue: '{key}' is not set or is invalid.")
@@ -145,6 +174,7 @@ def test_restore_borg_archive(config, archive_name):
 
 def main():
     parser = argparse.ArgumentParser(description="Borg Backup Wrapper", add_help=True)
+    parser.add_argument('--create-yaml', help="Create the Borg YAML configuration file", action='store_true')
     parser.add_argument('--check-yaml', help="Check the YAML configuration", action='store_true')
     parser.add_argument('--check-repo', help="Check the Borg repository", action='store_true')
     parser.add_argument('--dryrun', help="Run a dry run of the backup", action='store_true')
@@ -155,6 +185,10 @@ def main():
     parser.add_argument('--target-dir', help="Specify the target directory for the restore", type=str)
 
     args = parser.parse_args()
+
+    if args.create_yaml:
+        create_yaml_config()
+        return
 
     if not any(vars(args).values()):
         parser.print_help()
