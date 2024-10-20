@@ -20,6 +20,9 @@ logging.basicConfig(
     handlers=[file_handler, console_handler]
 )
 
+# 	Specify a Temporary Directory for Borg:
+os.environ["TMPDIR"] = "/home/henry/tmp"
+
 # Error handling for setting the BORG_RSH environment variable
 try:
     ssh_key_path = os.path.expanduser("~/.ssh/id_ed25519")
