@@ -13,10 +13,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def create_yaml_config():
     """Create the YAML config file at /etc/eos/borg_config.yaml."""
-    if os.path.exists(CONFIG_PATH):
-        logging.error(f"Configuration file already exists at {CONFIG_PATH}.")
-        return
-    
     config = {
         'borg': {
             'repo': input("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): "),
@@ -40,23 +36,25 @@ def create_yaml_config():
         logging.error(f"Failed to write the configuration file: {e}")
 
 def load_config():
-    """Load configuration from YAML file."""
-    if os.path.exists(CONFIG_PATH):
-        try:
-            with open(CONFIG_PATH, 'r') as file:
-                config = yaml.safe_load(file)
-                if config:
-                    logging.info("Configuration loaded successfully.")
-                    return config
-                else:
-                    logging.error("Configuration file is empty or invalid.")
-                    return None
-        except yaml.YAMLError as e:
-            logging.error(f"Error loading configuration file: {e}")
-            return None
-    else:
-        logging.error(f"Configuration file not found. Please run 'sudo python3 configureBorg.py --create-yaml'.")
-        return None
+    """Load configuration from YAML file, and loop to create or correct it if necessary."""
+    while True:
+        if os.path.exists(CONFIG_PATH):
+            try:
+                with open(CONFIG_PATH, 'r') as file:
+                    config = yaml.safe_load(file)
+                    if config and check_yaml(config):
+                        logging.info("Configuration loaded successfully.")
+                        return config
+                    else:
+                        logging.error("Configuration file is invalid. Please provide correct values.")
+                        create_yaml_config()  # Loop back to create or correct the config
+            except yaml.YAMLError as e:
+                logging.error(f"Error loading configuration file: {e}")
+                create_yaml_config()  # Loop back to create the config
+        else:
+            logging.error(f"Configuration file not found. Creating a new configuration...")
+            create_yaml_config()  # Create the config file
+            continue  # Loop again to reload
 
 def check_yaml(config):
     """Check if YAML config has valid values."""
@@ -196,13 +194,10 @@ def main():
 
     config = load_config()
     if not config:
-        return  # Exit if the config file is not found
+        return  # Exit if the config file is not found or invalid
 
     if args.check_yaml:
-        if check_yaml(config):
-            logging.info("YAML configuration is valid.")
-        else:
-            logging.error("YAML configuration has issues.")
+        check_yaml(config)
         return
 
     if args.check_repo:
