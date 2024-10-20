@@ -7,8 +7,15 @@ import socket  # Used to get the hostname
 
 CONFIG_PATH = "/etc/eos/borg_config.yaml"
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# Set up logging to output to both a file and the console
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("/var/log/eos.log"),  # Change this to the desired log file path
+        logging.StreamHandler()  # This will continue printing logs to the console
+    ]
+)
 
 # Function to run Borg backup
 def run_borg_backup(config, dryrun=False):
@@ -228,6 +235,7 @@ def display_menu():
     print("(A) Go to (A)rchive options")
     print("(N) Run backup (N)ow")  # New option to run backup immediately
     print("(E) (E)xit")
+    logging.info("Displaying main menu")
 
 # Display submenu
 def display_submenu():
@@ -241,6 +249,7 @@ def display_submenu():
     print("(6) Replace current configuration")
     print("(7) Return to main Menu")
     print("(E) (E)xit")
+    logging.info("Displaying main submenu")
 
 # Handle submenu option
 def handle_submenu_option(option):
