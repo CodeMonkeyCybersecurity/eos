@@ -2,152 +2,178 @@
 
 import { promises as fs } from 'fs';
 import yaml from 'js-yaml';
-import readline from 'readline';
 import { hostname } from 'os';
+import { ArgumentParser } from 'argparse';
+import { DateTime } from 'luxon';
 
-// Set the config file path
-const configFilePath = '/etc/eos/borg.yaml';
+// Path to the YAML configuration file
+const CONFIG_PATH = '/etc/eos/borg_config.yaml';
 
-// Function to read user input from terminal
-async function promptUser(question) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  
-  return new Promise((resolve) => {
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-// Function to load YAML config file
+// Load the configuration file
 async function loadConfig() {
   try {
-    const file = await fs.readFile(configFilePath, 'utf8');
-    return yaml.load(file);
+    if (await fs.stat(CONFIG_PATH)) {
+      const content = await fs.readFile(CONFIG_PATH, 'utf8');
+      return yaml.load(content);
+    }
   } catch (error) {
-    return null; // Return null if the file doesn't exist
+    console.error(`Error loading configuration: ${error.message}`);
+    return null;
   }
 }
 
-// Function to save YAML config file, ensuring the directory exists
-async function saveConfig(config) {
-  try {
-    // Ensure the /etc/eos directory exists
-    await fs.mkdir('/etc/eos', { recursive: true });
+// Check if required values are set in the YAML config
+function checkYamlConfig(config) {
+  const requiredValues = {
+    'borg.repo': config?.borg?.repo,
+    'borg.passphrase': config?.borg?.passphrase,
+    'borg.encryption': config?.borg?.encryption,
+    'backup.paths_to_backup': config?.backup?.paths_to_backup,
+  };
 
-    const yamlContent = yaml.dump(config);
-    await fs.writeFile(configFilePath, yamlContent, 'utf8');
-    console.log(`Configuration saved to ${configFilePath}`);
-  } catch (error) {
-    console.error("Error saving configuration:", error);
-    process.exit(1);
+  for (const [key, value] of Object.entries(requiredValues)) {
+    if (!value) {
+      console.error(`Configuration issue: '${key}' is not set.`);
+      return false;
+    }
   }
+  console.info('All required configuration values are set.');
+  return true;
 }
 
-// Function to check and create configuration if missing
-async function createOrUpdateConfig() {
-  let config = await loadConfig();
-
-  if (!config) {
-    console.log('No configuration file found. Creating a new one...');
-    config = {};
-  }
-
-  // Ask for repository path
-  if (!config.borg || !config.borg.repo) {
-    config.borg = config.borg || {};
-    config.borg.repo = await promptUser("Enter the Borg repository path (e.g., user@backup-server:/path/to/repo): ");
-  }
-
-  // Ask for passphrase
-  if (!config.borg.passphrase) {
-    config.borg.passphrase = await promptUser("Enter the Borg passphrase: ");
-  }
-
-  // Ask for paths to back up
-  if (!config.backup || !config.backup.paths_to_backup) {
-    config.backup = config.backup || {};
-    config.backup.paths_to_backup = (await promptUser("Enter the directories to back up (comma-separated): ")).split(',');
-  }
-
-  // Ask for exclude patterns
-  if (!config.backup.exclude_patterns) {
-    config.backup.exclude_patterns = (await promptUser("Enter exclude patterns (comma-separated, e.g., /home/*/.cache/*): ")).split(',');
-  }
-
-  // Save the configuration
-  await saveConfig(config);
-
-  return config;
-}
-
-// Function to run Borg backup
-async function runBackup(config) {
-  const backupDirs = config.backup.paths_to_backup.join(' ');
-  const repo = config.borg.repo;
-  const passphrase = config.borg.passphrase;
-  const archiveName = `${hostname()}-${Date.now()}`;
-  const excludePatterns = config.backup.exclude_patterns;
-
-  if (!passphrase) {
-    console.error("Passphrase is not set.");
-    process.exit(1);
-  }
-
-  // Set the Borg passphrase environment variable
+// Check the health of the Borg repository
+async function checkRepo(config) {
+  const { repo, passphrase } = config.borg;
   process.env.BORG_PASSPHRASE = passphrase;
 
   try {
-    const borgBackupCmd = [
-      'borg',
-      'create',
-      '--verbose',
-      '--stats',
-      '--compression', 'lz4',
-      `${repo}::${archiveName}`,
-      backupDirs,
-      ...excludePatterns.map(pattern => `--exclude ${pattern}`)
-    ].join(' ');
-
-    console.log(`Running Borg backup: ${borgBackupCmd}`);
-    await $`${borgBackupCmd}`;
-    console.log("Backup completed successfully.");
+    await $`borg check ${repo}`;
+    console.log('Repository check passed.');
+    return true;
   } catch (error) {
-    console.error("Error during backup:", error);
-    process.exit(1);
+    console.error(`Repository check failed: ${error.stderr}`);
+    return false;
   }
 }
 
-// Function to prune old backups
-async function pruneArchives(config) {
+// Run the Borg backup
+async function runBorgBackup(config, dryrun = false) {
+  const { repo, passphrase } = config.borg;
+  const paths = config.backup.paths_to_backup;
+  const compression = config.backup.compression || 'lz4';
+  const archiveName = `${repo}::${hostname()}-${DateTime.now().toFormat('yyyy-MM-ddTHH:mm:ss')}`;
+
+  process.env.BORG_PASSPHRASE = passphrase;
+
+  const borgCreateCmd = [
+    'borg', 'create', archiveName,
+    ...paths,
+    '--verbose', '--filter', config.backup.filter, '--list',
+    '--stats', '--show-rc', '--compression', compression, '--exclude-caches',
+  ];
+
+  // Add any exclude patterns from config
+  config.backup.exclude_patterns?.forEach(pattern => {
+    borgCreateCmd.push('--exclude', pattern);
+  });
+
+  // Add dry-run if applicable
+  if (dryrun) {
+    borgCreateCmd.push('--dry-run');
+  }
+
   try {
-    const borgPruneCmd = [
-      'borg',
-      'prune',
-      '--keep-daily', '30',
-      '--glob-archives', "'{hostname}-*'",
-      '--verbose',
-      '--stats'
-    ].join(' ');
-
-    console.log(`Pruning old backups: ${borgPruneCmd}`);
-    await $`${borgPruneCmd}`;
-    console.log("Prune completed successfully.");
+    await $`${borgCreateCmd}`;
+    console.log('Backup completed successfully.');
   } catch (error) {
-    console.error("Error during prune:", error);
-    process.exit(1);
+    console.error(`Backup failed: ${error.stderr}`);
   }
 }
 
-// Main function to run backup and prune operations
+// List all Borg archives
+async function listBorgArchives(config) {
+  const { repo, passphrase } = config.borg;
+  process.env.BORG_PASSPHRASE = passphrase;
+
+  try {
+    await $`borg list ${repo}`;
+  } catch (error) {
+    console.error(`Listing archives failed: ${error.stderr}`);
+  }
+}
+
+// Restore a Borg archive
+async function restoreBorgArchive(config, archiveName, targetDir) {
+  const { repo, passphrase } = config.borg;
+  process.env.BORG_PASSPHRASE = passphrase;
+
+  try {
+    await $`borg extract ${repo}::${archiveName} --target ${targetDir}`;
+    console.log(`Restored archive '${archiveName}' to '${targetDir}'`);
+  } catch (error) {
+    console.error(`Restoring archive failed: ${error.stderr}`);
+  }
+}
+
+// Test restore a Borg archive
+async function testRestoreBorgArchive(config, archiveName) {
+  const { repo, passphrase } = config.borg;
+  process.env.BORG_PASSPHRASE = passphrase;
+
+  try {
+    await $`borg extract --dry-run ${repo}::${archiveName}`;
+    console.log(`Test restore of archive '${archiveName}' succeeded.`);
+  } catch (error) {
+    console.error(`Test restore failed: ${error.stderr}`);
+  }
+}
+
+// Main function to handle the argument parsing and actions
 async function main() {
-  const config = await createOrUpdateConfig();
-  await runBackup(config);
-  await pruneArchives(config);
+  const parser = new ArgumentParser({
+    description: 'Borg Backup Wrapper',
+  });
+
+  parser.add_argument('--check-yaml', { help: 'Check the YAML configuration', action: 'store_true' });
+  parser.add_argument('--check-repo', { help: 'Check the Borg repository', action: 'store_true' });
+  parser.add_argument('--dryrun', { help: 'Run a dry run of the backup', action: 'store_true' });
+  parser.add_argument('--backup', { help: 'Run a full backup', action: 'store_true' });
+  parser.add_argument('--list', { help: 'List all archives in the repository', action: 'store_true' });
+  parser.add_argument('--restore', { help: 'Restore a specific archive', type: 'string' });
+  parser.add_argument('--test-restore', { help: 'Test restore a specific archive', type: 'string' });
+  parser.add_argument('--target-dir', { help: 'Specify the target directory for the restore', type: 'string' });
+
+  const args = parser.parse_args();
+
+  // Load the YAML configuration
+  const config = await loadConfig();
+  if (!config) {
+    console.error('No valid configuration found.');
+    return;
+  }
+
+  // Handle each argument
+  if (args.check_yaml) {
+    checkYamlConfig(config);
+  } else if (args.check_repo) {
+    await checkRepo(config);
+  } else if (args.dryrun) {
+    await runBorgBackup(config, true);
+  } else if (args.backup) {
+    await runBorgBackup(config);
+  } else if (args.list) {
+    await listBorgArchives(config);
+  } else if (args.restore) {
+    if (!args.target_dir) {
+      console.error('You must specify a --target-dir to restore an archive.');
+    } else {
+      await restoreBorgArchive(config, args.restore, args.target_dir);
+    }
+  } else if (args.test_restore) {
+    await testRestoreBorgArchive(config, args.test_restore);
+  } else {
+    console.log('No valid action specified. Use --help for available options.');
+  }
 }
 
 main().catch(err => {
