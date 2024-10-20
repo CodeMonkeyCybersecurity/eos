@@ -83,7 +83,8 @@ def repository_options_menu():
         print("(1) View current repository path")
         print("(2) Change repository path")
         print("(3) Check repository health")
-        print("(4) Return to main menu")
+        print("(4) Create a new repository")  # Add option to create new repository
+        print("(5) Return to main menu")
         print("(E) Exit")
 
         choice = input("Select an option: ").upper()
@@ -101,7 +102,11 @@ def repository_options_menu():
             config = load_config()
             if config:
                 check_repo(config)
-        elif choice == '4':
+        elif choice == '4':  # New option to create a repository
+            config = load_config()
+            if config:
+                create_borg_repository(config)
+        elif choice == '5':
             break
         elif choice == 'E':
             exit_program()
@@ -123,6 +128,31 @@ def check_repo(config):
         print("Repository check passed.")
     except subprocess.CalledProcessError as e:
         logging.error(f"Repository check failed: {e.stderr}")
+
+# create a repository
+def create_borg_repository(config):
+    """Initialize a new Borg repository."""
+    try:
+        repo = config['borg']['repo']
+        passphrase = config['borg']['passphrase']
+        
+        # Set up environment for Borg init
+        env = os.environ.copy()
+        env['BORG_PASSPHRASE'] = passphrase
+        
+        # Initialize the repository with encryption if set
+        encryption_type = config['borg'].get('encryption', 'repokey')
+
+        # Run Borg init command
+        borg_init_cmd = ['borg', 'init', '--encryption', encryption_type, repo]
+        result = subprocess.run(borg_init_cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True)
+
+        logging.info(f"Repository {repo} created successfully.")
+        print(result.stdout)
+        
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Failed to create Borg repository: {e.stderr}")
+        print(f"Error: Failed to create repository. {e.stderr}")
 
 # Clear the screen
 def clear_screen():
