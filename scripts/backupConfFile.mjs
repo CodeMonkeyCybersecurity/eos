@@ -1,4 +1,4 @@
-#!/usr/local/bin/zx
+#!/usr/bin/env zx
 
 import { $ } from 'zx'
 import path from 'path'
