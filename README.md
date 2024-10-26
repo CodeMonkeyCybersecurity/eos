@@ -21,27 +21,6 @@ Confirm password:
 Should this user have sudo privileges?:
 ```
 
-## How to install 
-1. Start in your main user directory
-``` bash
-cd ~
-```
-
-2. Clone this repository
-``` bash
-git clone https://github.com/chickenj0/Eos.git
-```
-
-3. Enter the directory you've just made
-``` bash
-cd Eos
-```
-4. Then 
-``` bash
-sudo python3 eos.py
-cd ~/Eos/scripts
-```
-
 ## How to use scripts ending in .sh
 These scripts are bash shell scripts
 In the 'For Example' section above, we added a new user. The script to add a new user is called 'addUser.sh', so:
