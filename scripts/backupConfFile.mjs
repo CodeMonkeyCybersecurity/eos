@@ -3,8 +3,11 @@
 import { $ } from 'zx'
 import path from 'path'
 
+// Logging
+console.log("Arguments provided:", process.argv) // Argument Debugging: console.log("Arguments provided:", process.argv) will show the list of arguments passed to the script when it runs.
+
 // Check if <file_to_backup> is specified as an argument
-if (process.argv.length < 3) {
+if (process.argv.length < 3 || !process.argv[2]) { //Additional Check: The condition if (process.argv.length < 3 || !process.argv[2]) ensures the script exits if <file_to_backup> is missing.
   console.error("Usage: zx backupConfFile.mjs <file_to_backup>")
   process.exit(1)
 }
