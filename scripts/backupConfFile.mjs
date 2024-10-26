@@ -1,4 +1,5 @@
-// backupConfFile.mjs
+#!/usr/local/bin/zx
+
 import { $ } from 'zx'
 import path from 'path'
 
