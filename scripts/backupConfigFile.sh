@@ -2,7 +2,7 @@
 
 # Prompt for new username
 read -p "Enter the file to back backed up: " fileName
-backupName = "$fileName.backup.$(date +"%A_%Y-%m-%d_%H%M%S")"
+backupName= \"$fileName.backup.$(date +"%A_%Y-%m-%d_%H%M%S")"
 read -p "Trying to create backup of $fileName now: $backupName"
 
 # Check if the fileName is not empty
