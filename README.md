@@ -1,6 +1,17 @@
 # Eos
 Eos aims to help make ubuntu server administration easier for those of us who weren't born in a bash shell.
 
+We use all the tools here on a daily basis. Because of this, you can be assured they are actively used and maintained. You should also be aware, therefore, that because they are being actively updated and adjusted, they should be considered 'current best effort' and not a perfect product.
+
+## Run getStarted.sh
+This is done typing: 
+``` bash
+user@hostname:~$ cd ~/Eos
+user@hostname:~$ sudo ./getStarted.sh
+```
+While not 100% necessary, this adds some helpful open source shell utilities and the necessary packages needed to run the scripts in Eos without further bother. So, not strictly necessary, but highly recommended.
+
+
 ## For example
 Turns:
 ``` bash
