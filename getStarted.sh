@@ -59,7 +59,7 @@ function setupUfw() {
         sudo ufw default deny incoming
         sudo ufw default allow outgoing
 
-        services=("ssh" "http" "https" "sftp")
+        services=("ssh" "http" "https")
 
         for service in "${services[@]}"; do 
           read -p "Do you want to allow $service? (y/n): " service_choice
