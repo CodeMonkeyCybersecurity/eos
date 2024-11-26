@@ -96,9 +96,11 @@ To find out what other scripts are available:
 user@hostname:~/Eos/scripts$ ls
 ```
 
-**Complaints, compliments, confusion and other communications:** git@cybermonkey.net.au
+## Complaints, compliments, confusion and other communications:
 
+Secure email: [git@cybermonkey.net.au](mailto:git@cybermonkey.net.au)  
 
+Website: [cybermonkey.net.au](https://cybermonkey.net.au)
 
 ```
      ___         _       __  __          _
@@ -110,4 +112,3 @@ user@hostname:~/Eos/scripts$ ls
                   \___\_, |_.__/\___|_|
                       |__/
 ```
-
