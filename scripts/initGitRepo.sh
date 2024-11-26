@@ -45,28 +45,35 @@ echo "All files added to the staging area."
 # Step 5: Commit the changes
 print_header "Committing Files"
 read -p "Enter a commit message [Default: 'Initial commit']: " commit_message
-commit_message=${commit_message:-"Initial commit: Add landing page for Code Monkey Cybersecurity"}
+commit_message=${commit_message:-"Initial commit"}
 git commit -m "$commit_message"
 echo "Files committed with message: '$commit_message'"
 
-# Step 6: Set up a remote repository (Optional)
-read -p "Do you want to set up a remote repository? (y/n): " setup_remote
-if [[ "$setup_remote" == "y" || "$setup_remote" == "Y" ]]; then
-    read -p "Enter your Git remote repository URL (e.g., https://github.com/username/repo.git): " remote_url
-    git remote add origin "$remote_url"
-    git branch -M main
-    git push -u origin main
-    echo "Remote repository set up and changes pushed."
-else
-    echo "Skipping remote repository setup."
+# Step 6: Check if GitHub CLI is installed
+if ! command -v gh &>/dev/null; then
+    echo "Error: GitHub CLI (gh) is not installed. Please install it and try again."
+    exit 1
 fi
 
-# Step 7: Verify the repository
+# Step 7: Authenticate with GitHub if not already logged in
+if ! gh auth status &>/dev/null; then
+    echo "You are not logged into GitHub. Starting authentication..."
+    gh auth login
+fi
+
+# Step 8: Set up the remote repository
+print_header "Setting Up Remote Repository"
+read -p "Enter your Git remote repository URL (e.g., https://github.com/username/repo.git): " remote_url
+git remote add origin "$remote_url"
+git branch -M main
+git push -u origin main
+echo "Remote repository set up and changes pushed."
+
+# Step 9: Verify Repository Status and History
 print_header "Repository Status and History"
 git status
-echo
 git log --oneline
-echo "Git repository is ready to use."
 
 # Final message
 echo "Your Git repository setup in '$repo_dir' is complete!"
+echo "Finis"
