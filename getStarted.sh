@@ -79,7 +79,7 @@ function setupUfw() {
     fi
 
     echo "Configuring UFW..."
-    sufw default deny incoming
+    ufw default deny incoming
     ufw default allow outgoing
 
     services=("ssh" "http" "https")
