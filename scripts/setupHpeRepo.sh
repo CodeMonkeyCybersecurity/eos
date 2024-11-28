@@ -37,6 +37,10 @@ cat <<EOF > "$REPO_FILE"
 deb [signed-by=/etc/apt/trusted.gpg.d/hpePublicKey2048_key2.gpg] https://downloads.linux.hpe.com/SDR/repo/mcp $DIST/current non-free
 EOF
 
+#confirm keys added correctly
+echo "listing gpg.d keys to confirm they're added correctly..."
+ls -l /etc/apt/trusted.gpg.d/
+
 # Update the package index
 echo "Updating package index..."
 apt update
