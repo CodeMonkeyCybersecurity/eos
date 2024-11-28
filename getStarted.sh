@@ -31,7 +31,7 @@ apt update && apt dist-upgrade -y && apt autoremove -y && apt autoclean -y
 checkCommand "System update and cleanup"
 
 echo "Installing required packages..."
-apt install -y --fix-missing\
+apt install -y --fix-missing \
 nfs-kernel-server nfs-common \
 mailutils lm-sensors \
 gh tree ncdu ssh nmap wireguard \
