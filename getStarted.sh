@@ -36,7 +36,7 @@ nfs-kernel-server nfs-common \
 mailutils lm-sensors \
 gh tree ncdu ssh nmap wireguard \
 htop iftop iotop nload glances \
-prometheus zx git fzf python3-pip \
+prometheus git fzf python3-pip \
 nginx borgbackup etckeeper ufw
 checkCommand "Package installation"
 
