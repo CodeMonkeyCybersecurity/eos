@@ -41,15 +41,21 @@ nginx borgbackup etckeeper ufw
 checkCommand "Package installation"
 
 # Install npm function
-function installNpm() {
+function installNpmZx() {
     if yesNoPrompt "Do you want to install zx for scripting?"; then
-        echo "Proceeding with npm installation..."
-        apt install -y npm && npm install -g zx
-        checkCommand "npm and zx installation"
+        echo "Proceeding with zx installation..."
+        if ! command -v npm &>/dev/null; then
+            echo "npm not found. Installing npm..."
+            sudo apt install -y npm
+            checkCommand "npm installation"
+        fi
+        sudo npm install -g zx
+        checkCommand "zx installation"
     else
         echo "Installation of zx canceled."
     fi
 }
+
 
 # Install PowerShell function
 function installPwsh() {
@@ -114,7 +120,7 @@ function installTailscale() {
 }
 
 # Run functions
-installNpm
+installNpmZx
 installPwsh
 setupUfw
 installTailscale
