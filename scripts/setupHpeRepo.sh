@@ -3,6 +3,8 @@
 # Variables
 REPO_FILE="/etc/apt/sources.list.d/mcp.list"
 KEYRING_DIR="/etc/apt/trusted.gpg.d"
+DIST=$(lsb_release -sc)
+REPO_URL="https://downloads.linux.hpe.com/SDR/repo/mcp"
 HPE_KEYS=(
     "https://downloads.linux.hpe.com/SDR/hpPublicKey2048_key1.pub"
     "https://downloads.linux.hpe.com/SDR/hpePublicKey2048_key1.pub"
@@ -32,7 +34,7 @@ done
 # Add the MCP repository
 echo "Adding the MCP repository..."
 cat <<EOF > "$REPO_FILE"
-deb [signed-by=/etc/apt/trusted.gpg.d/hpePublicKey2048_key2.gpg] https://downloads.linux.hpe.com/SDR/repo/mcp jammy/current non-free
+deb [signed-by=/etc/apt/trusted.gpg.d/hpePublicKey2048_key2.gpg] https://downloads.linux.hpe.com/SDR/repo/mcp $DIST/current non-free
 EOF
 
 # Update the package index
@@ -40,4 +42,4 @@ echo "Updating package index..."
 apt update
 
 # Done
-echo "HPE repository and keys added successfully."
+echo "HPE MCP repository and keys added successfully."
