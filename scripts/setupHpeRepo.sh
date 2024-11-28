@@ -34,16 +34,45 @@ done
 # Add the MCP repository
 echo "Adding the MCP repository..."
 cat <<EOF > "$REPO_FILE"
-deb [signed-by=/etc/apt/trusted.gpg.d/hpePublicKey2048_key2.gpg] https://downloads.linux.hpe.com/SDR/repo/mcp $DIST/current non-free
+deb [signed-by=/etc/apt/trusted.gpg.d/hpePublicKey2048_key2.gpg] $REPO_URL $DIST/current non-free
 EOF
 
 #confirm keys added correctly
 echo "listing gpg.d keys to confirm they're added correctly..."
-ls -l /etc/apt/trusted.gpg.d/
+ls "$KEYRING_DIR"
 
 # Update the package index
 echo "Updating package index..."
-apt update
+if ! apt update; then
+    echo "Failed to update package index. Exiting."
+    exit 1
+fi
 
-# Done
-echo "HPE MCP repository and keys added successfully."
+# Array of HPE packages
+HPE_PACKAGES=(
+    "hp-health"         # HPE System Health Application and Command line Utilities (Gen9 and earlier)
+    "hponcfg"           # HPE RILOE II/iLO online configuration utility
+    "amsd"              # HPE Agentless Management Service (Gen10 and newer)
+    "hp-ams"            # HPE Agentless Management Service (Gen9 and earlier)
+    "hp-snmp-agents"    # Insight Management SNMP Agents for HPE ProLiant Systems (Gen9 and earlier)
+    "hpsmh"             # HPE System Management Homepage (Gen9 and earlier)
+    "hp-smh-templates"  # HPE System Management Homepage Templates (Gen9 and earlier)
+    "ssacli"            # HPE Command Line Smart Storage Administration Utility
+    "ssaducli"          # HPE Command Line Smart Storage Administration Diagnostics
+    "ssa"               # HPE Array Smart Storage Administration Service
+    "storcli"           # MegaRAID command line interface
+)
+
+
+# Install each package in the array
+echo "Installing HPE packages..."
+for PACKAGE in "${HPE_PACKAGES[@]}"; do
+    echo "Installing $PACKAGE..."
+    if ! apt install -y "$PACKAGE"; then
+        echo "Failed to install $PACKAGE. Continuing with the next package."
+    fi
+done
+
+echo "All packages installed successfully."
+
+echo "Finis"
