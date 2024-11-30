@@ -50,6 +50,7 @@ setup_modsecurity() {
 
 # Compile ModSecurity Nginx connector
 compile_nginx_connector() {
+    mkdir -p /usr/local/src/nginx/
     echo "[Info] Compiling ModSecurity Nginx connector..."
     sudo git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/ || error_exit "Failed to clone ModSecurity Nginx connector."
     cd /usr/local/src/nginx/ || error_exit "Failed to navigate to Nginx source directory."
