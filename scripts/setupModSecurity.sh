@@ -15,11 +15,13 @@ command_exists() {
 install_dependencies() {
     echo "[Info] Installing required packages..."
     sudo apt update || error_exit "Failed to update package list."
+    sudo apt-add-repository -ss
     sudo apt install -y nginx dpkg-dev gcc make build-essential \
         autoconf automake libtool libcurl4-openssl-dev \
         liblua5.3-dev libpcre2-dev libfuzzy-dev ssdeep gettext \
         pkg-config libpcre3 libpcre3-dev libxml2 libxml2-dev \
         libcurl4 libgeoip-dev libyajl-dev doxygen \
+        software-properties-common \
         git software-properties-common wget || error_exit "Failed to install dependencies."
 }
 
