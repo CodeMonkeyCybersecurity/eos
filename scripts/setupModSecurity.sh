@@ -23,7 +23,7 @@ install_nginx() {
 download_source() {
     echo "get username..." 
     read -p "Which user would you like to administer nginx?: " INPUT_USER || error_exit "read -p "Which user would you like to administer nginx?: " INPUT_USER failed"
-    chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R || error_exit "chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R failed"
+    chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R || error_exit "chown '$INPUT_USER:$INPUT_USER' /usr/local/src/ -R failed"
     mkdir -p /usr/local/src/nginx || exit_error "failed to mkdir: /usr/local/src/nginx"
     cd /usr/local/src/nginx/ || exit_error "failed to cd into the Nginx source directory."
     echo "Download Nginx source package: "
@@ -74,11 +74,86 @@ compile_nginx_connector() {
 load_connector_module() {
     echo "[Info] Configuring Nginx..."
     echo "Load the ModSecurity v3 Nginx Connector Module..."
-    #sudo mkdir -p /etc/nginx/modsec || error_exit "Failed to create ModSecurity configuration directory."
-    sudo cp /usr/local/src/ModSecurity/modsecurity.conf-recommended /etc/nginx/modsec/modsecurity.conf || error_exit "Failed to copy ModSecurity configuration."
-    sudo cp /usr/local/src/ModSecurity/unicode.mapping /etc/nginx/modsec/ || error_exit "Failed to copy unicode mapping file."
-    sudo sed -i 's/SecRuleEngine DetectionOnly/SecRuleEngine On/' /etc/nginx/modsec/modsecurity.conf || error_exit "Failed to enable SecRuleEngine."
-    echo "Include /etc/nginx/modsec/modsecurity.conf;" | sudo tee -a /etc/nginx/modsec/main.conf >/dev/null
+    # Define the Nginx configuration file path
+    NGINX_CONF="/etc/nginx/nginx.conf"
+    MODULE_LINE="load_module modules/ngx_http_modsecurity_module.so;"
+    MODSEC_LINES=(
+        "modsecurity on;"
+        "modsecurity_rules_file /etc/nginx/modsec/main.conf;"
+    )
+    # Backup the existing Nginx configuration file
+    if [[ -f "$NGINX_CONF" ]]; then
+        cp "$NGINX_CONF" "${NGINX_CONF}.bak"
+        echo "Backup of $NGINX_CONF created at ${NGINX_CONF}.bak"
+    else
+        echo "Nginx configuration file not found at $NGINX_CONF. Exiting."
+        exit 1
+    fi
+    # Check if the module line already exists
+    if grep -q "^$MODULE_LINE" "$NGINX_CONF"; then
+        echo "The module line is already present in the configuration file. No changes made."
+    else
+        # Insert the line at the beginning of the file
+        sed -i "1s|^|$MODULE_LINE\n|" "$NGINX_CONF"
+        echo "Added '$MODULE_LINE' to the beginning of $NGINX_CONF."
+    fi
+    # Add ModSecurity lines to the http { ... } section
+    if grep -q "http {" "$NGINX_CONF"; then
+        for LINE in "${MODSEC_LINES[@]}"; do
+            if ! grep -q "^$LINE" "$NGINX_CONF"; then
+                sed -i "/http {/a \    $LINE" "$NGINX_CONF"
+                echo "Added '$LINE' to the http { ... } section."
+            else
+                echo "'$LINE' is already present in the http { ... } section. No changes made."
+            fi
+        done
+    else
+        echo "No http { ... } section found in $NGINX_CONF. Please check the configuration file."
+        exit 1
+    fi
+    MODSEC_ETC_DIR="/etc/nginx/modsec"
+    mkdir -p $MODSEC_ETC_DIR || error_exit "Failed to create ModSecurity configuration directory."
+    MODSEC_LOCAL_DIR="/usr/local/src/ModSecurity"
+    cp $MODSEC_LOCAL_DIR/modsecurity.conf-recommended $MODSEC_ETC_DIR/modsecurity.conf || error_exit "Failed to copy ModSecurity configuration."
+    cp $MODSEC_LOCAL_DIR/unicode.mapping $MODSEC_ETC_DIR || error_exit "Failed to copy unicode mapping file."
+    MODSEC_CONF="/etc/nginx/modsec/modsecurity.conf" 
+    cp "$MODSEC_CONF" "${MODSEC_CONF}.bak" || error_exit "Failed to create modsec_conf.bak"
+    echo "Backup of $MODSEC_CONF saved at ${MODSEC_CONF}.bak"
+    sed -i 's/^SecAuditLogParts ABIJDEFHZ/SecAuditLogParts ABCEFHJKZ/' "$MODSEC_CONF" || error_exit "Failed to change default logging configs in $MODSEC_CONF"
+    echo "SecAuditLogParts updated."
+    echo "disabling body inspection"
+    sed -i 's/^SecResponseBodyAccess On/SecAuditLogParts Off/' "$MODSEC_CONF" || error_exit "SecResponseBodyAccess failed to be turned off"
+    MODSEC_MAIN="$MODSEC_ETC_DIR/main.conf"
+    echo "Include $MODSEC_CONF;" | sudo tee -a $MODSEC_MAIN >/dev/null
+    sudo nginx -t || error_exit "Nginx configuration test failed."
+    sudo systemctl restart nginx || error_exit "Failed to restart Nginx."
+}
+    
+# Download and enable OWASP CRS
+setup_owasp_crs() {
+    echo "[Info] Setting up OWASP Core Rule Set..."
+    echo "Navigate in your browser to 'https://github.com/coreruleset/coreruleset/releases' and find out what the latest release it (eg. 4.9.0)"
+    read -p "Enter the latest release: " LATEST_RELEASE
+    wget https://github.com/coreruleset/coreruleset/archive/v$LATEST_RELEASE.tar.gz || error_exit "Failed to download OWASP CRS."
+    tar xvf v$LATEST_RELEASE.tar.gz || error_exit "Failed to extract OWASP CRS."
+    CORERULESET_LATEST="coreruleset-$LATEST_RELEASE"
+    sudo mv $CORERULESET_LATEST $MODSEC_ETC_DIR || error_exit "Failed to move OWASP CRS."
+    CORERULESET="$MODSEC_ETC_DIR/$CORERULESET_LATEST"
+    CRS_CONF="$CORERULESET-$LATEST_RELEASE/crs-setup.conf"
+    sudo mv $CRS_CONF.example $CRS_CONF || error_exit "Failed to rename CRS configuration."
+    # Add CRS includes to main.conf
+echo -e "Include $CRS_CONF\nInclude $CORERULESET/rules/*.conf" >> $MODSEC_MAIN
+    MODSEC_MAIN
+}
+
+    
+
+
+
+
+    
+    
+    
     echo "Include /etc/nginx/modsec/coreruleset-3.3.4/crs-setup.conf;" | sudo tee -a /etc/nginx/modsec/main.conf >/dev/null
     echo "Include /etc/nginx/modsec/coreruleset-3.3.4/rules/*.conf;" | sudo tee -a /etc/nginx/modsec/main.conf >/dev/null
     echo "load_module modules/ngx_http_modsecurity_module.so;" | sudo tee -a /etc/nginx/nginx.conf >/dev/null
@@ -86,52 +161,6 @@ load_connector_module() {
     sudo systemctl restart nginx || error_exit "Failed to restart Nginx."
 }
 
-echo "Edit the main Nginx configuration file..."
-# todo Add the following line at the beginning of the file.
-
-#load_module modules/ngx_http_modsecurity_module.so;
-#Also, add the following two lines in the http {...} section, so ModSecurity will be enabled for all Nginx virtual hosts.
-
-#modsecurity on;
-#modsecurity_rules_file /etc/nginx/modsec/main.conf;
-
-echo "create the /etc/nginx/modsec/ directory to store ModSecurity configuration..."
-mkdir /etc/nginx/modsec/
-
-echo "Then copy the ModSecurity configuration file..."
-cp /usr/local/src/ModSecurity/modsecurity.conf-recommended /etc/nginx/modsec/modsecurity.conf
-
-echo "Edit the file..."
-nano /etc/nginx/modsec/modsecurity.conf
-
-# TODO Find the following line.
-
-#SecRuleEngine DetectionOnly
-#This config tells ModSecurity to log HTTP transactions, but takes no action when an attack is detected. Change it to the following, so ModSecurity will detect and block web attacks.
-#SecRuleEngine On
-#Then find the following line (line 224), which tells ModSecurity what information should be included in the audit log.
-
-#SecAuditLogParts ABIJDEFHZ
-#However, the default setting is wrong. You will know why later when I explain how to understand ModSecurity logs. The setting should be changed to the following.
-
-#SecAuditLogParts ABCEFHJKZ
-
-#If you have a coding website, you might want to disable response body inspection, otherwise, you might get 403 forbidden errors just by loading a web page with lots of code content.
-
-#SecResponseBodyAccess Off
-
-echo "create the /etc/nginx/modsec/main.conf file..."
-nano /etc/nginx/modsec/main.conf
-echo Include /etc/nginx/modsec/modsecurity.conf >> /etc/nginx/modsec/main.conf
-
-echo "We also need to copy the Unicode mapping file."
-cp /usr/local/src/ModSecurity/unicode.mapping /etc/nginx/modsec/
-
-echo "test Nginx configuration..."
-nginx -t
-
-echo "If the test is successful, restart Nginx..."
-systemctl restart nginx
 
 
 
@@ -139,14 +168,8 @@ systemctl restart nginx
 
 
 
-# Download and enable OWASP CRS
-setup_owasp_crs() {
-    echo "[Info] Setting up OWASP Core Rule Set..."
-    wget https://github.com/coreruleset/coreruleset/archive/v3.3.4.tar.gz || error_exit "Failed to download OWASP CRS."
-    tar xvf v3.3.4.tar.gz || error_exit "Failed to extract OWASP CRS."
-    sudo mv coreruleset-3.3.4 /etc/nginx/modsec/ || error_exit "Failed to move OWASP CRS."
-    sudo mv /etc/nginx/modsec/coreruleset-3.3.4/crs-setup.conf.example /etc/nginx/modsec/coreruleset-3.3.4/crs-setup.conf || error_exit "Failed to rename CRS configuration."
-}
+
+
 
 # Main function
 main() {
