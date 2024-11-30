@@ -19,6 +19,7 @@ install_nginx() {
     apt install software-properties-common || error_exit "sudo apt install software-properties-common  failed"
     apt-add-repository -ss || error_exit "sudo apt-add-repository -ss failed"
     apt update || error_exit "sudo apt update failed"
+}
 
 download_source() {
     echo "get username..." 
@@ -55,7 +56,7 @@ install_libmodsecurity() {
     make || error_exit "make failed"
     echo "After the make command finished without errors, install the binary..."
     make install || error_exit "make install failed"
-
+}
 
 # Compile ModSecurity Nginx connector
 compile_nginx_connector() {
@@ -125,8 +126,11 @@ load_connector_module() {
     sed -i 's/^SecResponseBodyAccess On/SecAuditLogParts Off/' "$MODSEC_CONF" || error_exit "SecResponseBodyAccess failed to be turned off"
     MODSEC_MAIN="$MODSEC_ETC_DIR/main.conf"
     echo "Include $MODSEC_CONF;" | sudo tee -a $MODSEC_MAIN >/dev/null
-    sudo nginx -t || error_exit "Nginx configuration test failed."
-    sudo systemctl restart nginx || error_exit "Failed to restart Nginx."
+    # Define the NGINX configuration test command with error handling
+    NGINX_T='sudo nginx -t || { echo "Nginx configuration test failed." >&2; exit 1; }'
+    NGINX_RESTART='sudo systemctl restart nginx || { echo "Failed to restart Nginx." >&2; exit 1; }'
+    NGINX_T_AND_RESTART="$NGINX_T && $NGINX_RESTART"
+    eval "$NGINX_T_AND_RESTART"
 }
     
 # Download and enable OWASP CRS
@@ -142,34 +146,9 @@ setup_owasp_crs() {
     CRS_CONF="$CORERULESET-$LATEST_RELEASE/crs-setup.conf"
     sudo mv $CRS_CONF.example $CRS_CONF || error_exit "Failed to rename CRS configuration."
     # Add CRS includes to main.conf
-echo -e "Include $CRS_CONF\nInclude $CORERULESET/rules/*.conf" >> $MODSEC_MAIN
-    MODSEC_MAIN
+    echo -e "Include $CRS_CONF\nInclude $CORERULESET/rules/*.conf" >> $MODSEC_MAIN
+    eval "$NGINX_T_AND_RESTART"
 }
-
-    
-
-
-
-
-    
-    
-    
-    echo "Include /etc/nginx/modsec/coreruleset-3.3.4/crs-setup.conf;" | sudo tee -a /etc/nginx/modsec/main.conf >/dev/null
-    echo "Include /etc/nginx/modsec/coreruleset-3.3.4/rules/*.conf;" | sudo tee -a /etc/nginx/modsec/main.conf >/dev/null
-    echo "load_module modules/ngx_http_modsecurity_module.so;" | sudo tee -a /etc/nginx/nginx.conf >/dev/null
-    sudo nginx -t || error_exit "Nginx configuration test failed."
-    sudo systemctl restart nginx || error_exit "Failed to restart Nginx."
-}
-
-
-
-
-
-
-
-
-
-
 
 # Main function
 main() {
