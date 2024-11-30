@@ -12,14 +12,17 @@ check_sudo() {
 # Ensure the script is run as root
 check_sudo
 
+# Get the original directory (where the script is run from)
+ORIGINAL_DIR=$(pwd)
+
 # Create the target directory
 mkdir -p /usr/local/bin/eos/scripts
 
-# Move contents of ~/Eos to the appropriate location
-mv ~/Eos/* /usr/local/bin/eos/
+# Move contents of the original directory to /usr/local/bin/eos
+mv "$ORIGINAL_DIR"/* /usr/local/bin/eos/
 
 # Make the files executable
 chmod +x /usr/local/bin/eos
-chmod +x /usr/local/bin/eos/scripts/*.sh
+chmod +x /usr/local/bin/eos/scripts/*.sh || echo "No scripts found in /usr/local/bin/eos/scripts/"
 
 echo -e "\e[32m✔ Installation complete.\e[0m"
