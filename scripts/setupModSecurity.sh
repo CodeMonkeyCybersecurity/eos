@@ -23,10 +23,10 @@ install_nginx() {
 
 download_source() {
     echo "get username..." 
-    read -p "Which user would you like to administer nginx?: " INPUT_USER || error_exit "read -p "Which user would you like to administer nginx?: " INPUT_USER failed"
+    read -p "Which user would you like to administer nginx?: " INPUT_USER || error_exit "Failed to set user"
     chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R || error_exit "chown '$INPUT_USER:$INPUT_USER' /usr/local/src/ -R failed"
-    mkdir -p /usr/local/src/nginx || exit_error "failed to mkdir: /usr/local/src/nginx"
-    cd /usr/local/src/nginx/ || exit_error "failed to cd into the Nginx source directory."
+    mkdir -p /usr/local/src/nginx || error_exit "failed to mkdir: /usr/local/src/nginx"
+    cd /usr/local/src/nginx/ || error_exit "failed to cd into the Nginx source directory."
     echo "Download Nginx source package: "
     apt install dpkg-dev 
     apt source nginx 
@@ -42,6 +42,7 @@ install_libmodsecurity() {
     git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/ || error_exit "Failed to clone ModSecurity."
     cd /usr/local/src/ModSecurity/ || error_exit "Failed to navigate to ModSecurity directory."
     echo "Install build dependencies..."
+    apt update
     apt install gcc make build-essential autoconf \
     automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev \
     libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev \
@@ -123,14 +124,12 @@ load_connector_module() {
     sed -i 's/^SecAuditLogParts ABIJDEFHZ/SecAuditLogParts ABCEFHJKZ/' "$MODSEC_CONF" || error_exit "Failed to change default logging configs in $MODSEC_CONF"
     echo "SecAuditLogParts updated."
     echo "disabling body inspection"
-    sed -i 's/^SecResponseBodyAccess On/SecAuditLogParts Off/' "$MODSEC_CONF" || error_exit "SecResponseBodyAccess failed to be turned off"
+    sed -i 's/^SecResponseBodyAccess On/SecResponseBodyAccess Off/' "$MODSEC_CONF" || error_exit "SecResponseBodyAccess failed to be turned off"
     MODSEC_MAIN="$MODSEC_ETC_DIR/main.conf"
     echo "Include $MODSEC_CONF;" | sudo tee -a $MODSEC_MAIN >/dev/null
     # Define the NGINX configuration test command with error handling
-    NGINX_T='sudo nginx -t || { echo "Nginx configuration test failed." >&2; exit 1; }'
-    NGINX_RESTART='sudo systemctl restart nginx || { echo "Failed to restart Nginx." >&2; exit 1; }'
-    NGINX_T_AND_RESTART="$NGINX_T && $NGINX_RESTART"
-    eval "$NGINX_T_AND_RESTART"
+    sudo nginx -t || { echo "Nginx configuration test failed." >&2; exit 1; }
+    sudo systemctl restart nginx || { echo "Failed to restart Nginx." >&2; exit 1; }
 }
     
 # Download and enable OWASP CRS
@@ -140,14 +139,13 @@ setup_owasp_crs() {
     read -p "Enter the latest release: " LATEST_RELEASE
     wget https://github.com/coreruleset/coreruleset/archive/v$LATEST_RELEASE.tar.gz || error_exit "Failed to download OWASP CRS."
     tar xvf v$LATEST_RELEASE.tar.gz || error_exit "Failed to extract OWASP CRS."
-    CORERULESET_LATEST="coreruleset-$LATEST_RELEASE"
-    sudo mv $CORERULESET_LATEST $MODSEC_ETC_DIR || error_exit "Failed to move OWASP CRS."
-    CORERULESET="$MODSEC_ETC_DIR/$CORERULESET_LATEST"
-    CRS_CONF="$CORERULESET-$LATEST_RELEASE/crs-setup.conf"
+    sudo mv "coreruleset-$LATEST_RELEASE/" $MODSEC_ETC_DIR || error_exit "Failed to move OWASP CRS."
+    CRS_CONF="coreruleset-$LATEST_RELEASE/crs-setup.conf"
     sudo mv $CRS_CONF.example $CRS_CONF || error_exit "Failed to rename CRS configuration."
     # Add CRS includes to main.conf
     echo -e "Include $CRS_CONF\nInclude $CORERULESET/rules/*.conf" >> $MODSEC_MAIN
-    eval "$NGINX_T_AND_RESTART"
+    sudo nginx -t || { echo "Nginx configuration test failed." >&2; exit 1; }
+    sudo systemctl restart nginx || { echo "Failed to restart Nginx." >&2; exit 1; }
 }
 
 # Main function
