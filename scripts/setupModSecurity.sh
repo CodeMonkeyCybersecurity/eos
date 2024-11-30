@@ -14,6 +14,7 @@ command_exists() {
 }
 
 install_nginx() {
+    apt update
     apt install nginx || error_exit "Failed to install nginx."
     nginx -V || error_exit "Failed to verify nginx version."
     apt install software-properties-common || error_exit "sudo apt install software-properties-common  failed"
