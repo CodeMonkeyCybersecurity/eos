@@ -5,7 +5,7 @@ check_sudo() {
     echo -e "\e[31m✘ This script must be run as root. Please use sudo.\e[0m"
     exit 1
   else
-    echo -e "\e[32m✔ Running as root.\e[0m"
+    echo -e "Running as root."
   fi
 }
 
