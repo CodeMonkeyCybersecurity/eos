@@ -15,8 +15,11 @@ check_sudo() {
 # Ensure the script is run as root
 check_sudo
 
+# Erase previous install
+rm -rf /usr/local/bin/eos
+
 # Create the target directory
-mkdir -p /usr/local/bin/eos/scripts
+mkdir -p /usr/local/bin/eos
 
 # Move contents of the original directory to /usr/local/bin/eos
 mv "$ORIGINAL_DIR"/* /usr/local/bin/eos/
