@@ -22,7 +22,7 @@ rm -rf /usr/local/bin/eos
 mkdir -p /usr/local/bin/eos
 
 # Move contents of the original directory to /usr/local/bin/eos
-mv "$ORIGINAL_DIR"/* /usr/local/bin/eos/
+cp "$ORIGINAL_DIR"/* /usr/local/bin/eos/
 
 # Make the files executable
 chmod +x /usr/local/bin/eos
