@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Get the original directory (where the script is run from)
+ORIGINAL_DIR=$(pwd)
 check_sudo() {
   if [[ $EUID -ne 0 ]]; then
     echo -e "\e[31m✘ This script must be run as root. Please use sudo.\e[0m"
@@ -11,9 +13,6 @@ check_sudo() {
 
 # Ensure the script is run as root
 check_sudo
-
-# Get the original directory (where the script is run from)
-ORIGINAL_DIR=$(pwd)
 
 # Create the target directory
 mkdir -p /usr/local/bin/eos/scripts
