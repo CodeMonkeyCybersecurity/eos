@@ -6,49 +6,129 @@ error_exit() {
     exit 1
 }
 
+../checkSudo.sh || error_exit "Failed to verify sudo privileges."
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Update and install dependencies
-install_dependencies() {
-    echo "[Info] Installing required packages..."
-    sudo apt update || error_exit "Failed to update package list."
-    sudo apt-add-repository -ss
-    sudo apt install -y nginx dpkg-dev gcc make build-essential \
-        autoconf automake libtool libcurl4-openssl-dev \
-        liblua5.3-dev libpcre2-dev libfuzzy-dev ssdeep gettext \
-        pkg-config libpcre3 libpcre3-dev libxml2 libxml2-dev \
-        libcurl4 libgeoip-dev libyajl-dev doxygen \
-        software-properties-common \
-        git software-properties-common wget || error_exit "Failed to install dependencies."
-}
+apt install nginx || error_exit "Failed to install nginx."
 
-# Install Nginx
-install_nginx() {
-    echo "[Info] Installing Nginx..."
-    sudo apt install -y nginx || error_exit "Failed to install Nginx."
-}
+nginx -V || error_exit "Failed to verify nginx version."
 
-# Check Nginx version
-check_nginx_version() {
-    echo "[Info] Checking Nginx compatibility..."
-    nginx -V 2>&1 | grep -- "--with-compat" || error_exit "Nginx is not compiled with '--with-compat'. Please install a compatible version."
-}
+apt install software-properties-common || error_exit "sudo apt install software-properties-common  failed"
+apt-add-repository -ss || error_exit "sudo apt-add-repository -ss failed"
+apt update || error_exit "sudo apt update failed"
 
-# Download and compile ModSecurity
-setup_modsecurity() {
-    echo "[Info] Setting up ModSecurity..."
-    sudo git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/ || error_exit "Failed to clone ModSecurity."
-    cd /usr/local/src/ModSecurity/ || error_exit "Failed to navigate to ModSecurity directory."
-    sudo git submodule init || error_exit "Failed to initialize submodules."
-    sudo git submodule update || error_exit "Failed to update submodules."
-    sudo ./build.sh || error_exit "Failed to build ModSecurity."
-    sudo ./configure || error_exit "Failed to configure ModSecurity."
-    sudo make -j$(nproc) || error_exit "Failed to compile ModSecurity."
-    sudo make install || error_exit "Failed to install ModSecurity."
-}
+echo "get username..." 
+read -p "Which user would you like to administer nginx?: " INPUT_USER || error_exit "read -p "Which user would you like to administer nginx?: " INPUT_USER failed"
+chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R || error_exit "chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R failed"
+
+mkdir -p /usr/local/src/nginx
+cd /usr/local/src/nginx/
+
+echo "Download Nginx source package:"
+apt install dpkg-dev 
+apt source nginx 
+
+echo "list the downloaded source files..."
+ls
+
+echo "To compile libmodsecurity, first clone the source code from Github..."
+apt install git || error_exit "Failed to install git"
+git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/ || error_exit "Failed to clone ModSecurity."
+cd /usr/local/src/ModSecurity/ || error_exit "Failed to navigate to ModSecurity directory."
+
+echo "Install build dependencies..."
+apt install gcc make build-essential autoconf \
+automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev \
+libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev \
+libxml2 libxml2-dev libcurl4 libgeoip-dev libyajl-dev doxygen 
+
+echo "Install required submodules..."
+git submodule init || error_exit "Failed to initialize submodules."
+git submodule update || error_exit "Failed to update submodules."
+
+echo "Configure the build environment..."
+./build.sh 
+./configure
+make 
+
+echo "After the make command finished without errors, install the binary..."
+make install
+
+echo "Download and Compile ModSecurity v3 Nginx Connector Source Code..."
+git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/
+
+echo "note the version of nginx which has been installed. You will need to input it in the next step..."
+ls -lah /usr/local/src/nginx/
+
+read -p "Enter nginx version number (eg. 1.24.0): " VERSION_NUMBER
+cd /usr/local/src/nginx/nginx-$VERSION_NUMBER/
+
+echo "Install build dependencies for Nginx..."
+apt build-dep nginx
+apt install uuid-dev
+
+echo "configure the environment ..."
+./configure --with-compat --with-openssl=/usr/include/openssl/ --add-dynamic-module=/usr/local/src/ModSecurity-nginx
+
+echo "Build the ModSecurity Nginx Connector module..."
+make modules
+
+echo "Copy 'objs/ngx_http_modsecurity_module.so' it to the '/usr/share/nginx/modules/' directory."
+cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/
+
+echo "Load the ModSecurity v3 Nginx Connector Module..."
+echo "Edit the main Nginx configuration file..."
+# todo Add the following line at the beginning of the file.
+
+#load_module modules/ngx_http_modsecurity_module.so;
+#Also, add the following two lines in the http {...} section, so ModSecurity will be enabled for all Nginx virtual hosts.
+
+#modsecurity on;
+#modsecurity_rules_file /etc/nginx/modsec/main.conf;
+
+echo "create the /etc/nginx/modsec/ directory to store ModSecurity configuration..."
+mkdir /etc/nginx/modsec/
+
+echo "Then copy the ModSecurity configuration file..."
+cp /usr/local/src/ModSecurity/modsecurity.conf-recommended /etc/nginx/modsec/modsecurity.conf
+
+echo "Edit the file..."
+nano /etc/nginx/modsec/modsecurity.conf
+
+# TODO Find the following line.
+
+#SecRuleEngine DetectionOnly
+#This config tells ModSecurity to log HTTP transactions, but takes no action when an attack is detected. Change it to the following, so ModSecurity will detect and block web attacks.
+#SecRuleEngine On
+#Then find the following line (line 224), which tells ModSecurity what information should be included in the audit log.
+
+#SecAuditLogParts ABIJDEFHZ
+#However, the default setting is wrong. You will know why later when I explain how to understand ModSecurity logs. The setting should be changed to the following.
+
+#SecAuditLogParts ABCEFHJKZ
+
+#If you have a coding website, you might want to disable response body inspection, otherwise, you might get 403 forbidden errors just by loading a web page with lots of code content.
+
+#SecResponseBodyAccess Off
+
+echo "create the /etc/nginx/modsec/main.conf file..."
+nano /etc/nginx/modsec/main.conf
+echo Include /etc/nginx/modsec/modsecurity.conf >> /etc/nginx/modsec/main.conf
+
+echo "We also need to copy the Unicode mapping file."
+cp /usr/local/src/ModSecurity/unicode.mapping /etc/nginx/modsec/
+
+echo "test Nginx configuration..."
+nginx -t
+
+echo "If the test is successful, restart Nginx..."
+systemctl restart nginx
+
+
 
 # Compile ModSecurity Nginx connector
 compile_nginx_connector() {
