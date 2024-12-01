@@ -120,12 +120,13 @@ def load_connector_module():
     run_command("systemctl restart nginx", "Failed to restart Nginx.")
     
 # Download and enable OWASP CRS
-setup_owasp_crs() {
+def setup_owasp_crs():
+    modsec_main = "/etc/nginx/modsec/main.conf"
+    modsec_etc_dir = "/etc/nginx/modsec"
     echo "[Info] Setting up OWASP Core Rule Set..."
-    echo "Navigate in your browser to 'https://github.com/coreruleset/coreruleset/releases' and find out what the latest release it (eg. 4.9.0)"
-    read -p "Enter the latest release: " LATEST_RELEASE
-    wget https://github.com/coreruleset/coreruleset/archive/v$LATEST_RELEASE.tar.gz || error_exit "Failed to download OWASP CRS."
-    tar xvf v$LATEST_RELEASE.tar.gz || error_exit "Failed to extract OWASP CRS."
+    print("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
+    latest_release = input("Enter the latest release: ")
+    run_command(f"wget https://github.com/coreruleset/coreruleset/archive/v{latest_release}.tar.gz", "Failed to download OWASP CRS.")    tar xvf v$LATEST_RELEASE.tar.gz || error_exit "Failed to extract OWASP CRS."
     sudo mv "coreruleset-$LATEST_RELEASE/" $MODSEC_ETC_DIR || error_exit "Failed to move OWASP CRS."
     CRS_CONF="coreruleset-$LATEST_RELEASE/crs-setup.conf"
     sudo mv $CRS_CONF.example $CRS_CONF || error_exit "Failed to rename CRS configuration."
@@ -136,7 +137,7 @@ setup_owasp_crs() {
 }
 
 # Main function
-main() {
+def main():
     install_nginx
     download_source
     install_libmodsecurity
@@ -144,8 +145,8 @@ main() {
     load_connector_module
     setup_owasp_crs
     echo "[Success] ModSecurity with Nginx has been successfully set up."
-}
 
-main
+if __name__ == "__main__":
+    main()
 
 # credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions!
