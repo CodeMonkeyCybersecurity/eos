@@ -136,8 +136,7 @@ def download_source():
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
     version_number = get_valid_version("Enter nginx version number (e.g., 1.24.0): ")
     logging.info("Nginx source files downloaded successfully.")
-    return version_number
-
+    
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
     run_command("apt install -y git", "Failed to install git.")
