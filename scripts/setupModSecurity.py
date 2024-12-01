@@ -205,6 +205,7 @@ def compile_nginx_connector(version_number):
         run_command("./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx",
                     "Failed to configure Nginx for ModSecurity.")
         run_command("make modules", "Failed to build ModSecurity Nginx module.")
+        run_command("mkdir -p /usr/share/nginx/modules")
         run_command("cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/",
                     "Failed to copy ModSecurity module.")
         logging.info("ModSecurity Nginx module compiled and installed successfully.")
