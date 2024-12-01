@@ -216,7 +216,6 @@ def compile_nginx_connector(version_number):
             "Failed to configure Nginx for ModSecurity."
         )
         run_command("make modules", "Failed to build ModSecurity Nginx module.")
-        run_command("mkdir -p /usr/share/nginx/modules", "Failed to create /usr/share/nginx/modules")
         run_command(
             "cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/",
             "Failed to copy ModSecurity module."
