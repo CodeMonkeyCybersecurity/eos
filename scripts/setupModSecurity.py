@@ -67,25 +67,48 @@ def run_command(command, error_message):
 
 def enable_deb_src():
     """Ensure that deb-src entries are enabled in sources.list."""
-    sources_file = "/etc/apt/sources.list"
+    sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
     try:
+        logging.info("Checking if 'deb-src' is enabled in sources.list...")
+
+        # Read the current sources.list content
         with open(sources_file, "r") as file:
             lines = file.readlines()
 
         updated_lines = []
+        updated = False
         for line in lines:
             if line.strip().startswith("# deb-src"):
                 updated_lines.append(line.lstrip("# "))  # Uncomment deb-src lines
+                updated = True
+            elif line.strip().startswith("deb-src"):
+                updated_lines.append(line)  # Keep existing deb-src entries
             else:
-                updated_lines.append(line)
+                updated_lines.append(line)  # Keep other lines unchanged
 
-        with open(sources_file, "w") as file:
-            file.writelines(updated_lines)
+        # Add default deb-src entries if none are found
+        if not any(line.strip().startswith("deb-src") for line in updated_lines):
+            logging.info("No 'deb-src' entries found. Adding default entries...")
+            updated_lines.append("\n")
+            updated_lines.append("deb-src http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse\n")
+            updated_lines.append("deb-src http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse\n")
+            updated_lines.append("deb-src http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse\n")
+            updated_lines.append("deb-src http://archive.ubuntu.com/ubuntu/ noble-backports main restricted universe multiverse\n")
+            updated = True
 
-        logging.info("deb-src entries enabled in sources.list. Updating package lists...")
-        run_command("apt update", "Failed to update package lists after enabling deb-src.")
+        # Write back the updated sources.list if changes were made
+        if updated:
+            logging.info("Updating sources.list to enable 'deb-src' entries...")
+            with open(sources_file, "w") as file:
+                file.writelines(updated_lines)
+            logging.info("'deb-src' entries enabled successfully. Updating package lists...")
+            subprocess.run("apt update", shell=True, check=True)
+        else:
+            logging.info("'deb-src' entries are already enabled. No changes needed.")
+
     except Exception as e:
-        error_exit(f"Failed to enable deb-src entries: {e}")
+        logging.error(f"Failed to enable 'deb-src' entries: {e}")
+        raise
 
 def install_nginx():
     """Install and configure Nginx on the system."""
