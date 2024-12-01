@@ -135,7 +135,8 @@ def download_source():
     print("Listing downloaded source files:")
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
     version_number = get_valid_version("Enter nginx version number (e.g., 1.24.0): ")
-    logging.info("Nginx source files downloaded successfully.")
+    logging.info("Nginx source files downloaded successfully.") 
+    return version_number
     
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
@@ -236,10 +237,16 @@ def load_connector_module():
             print(f"Added '{module_line}' to {nginx_conf}.")
     
     # Ensure ModSecurity directives are present in the `http` block
-    modsec_etc_dir = "/etc/nginx/modsec"
-    os.makedirs(modsec_etc_dir, exist_ok=True)
-    shutil.copy("/usr/local/src/ModSecurity/modsecurity.conf-recommended", f"{modsec_etc_dir}/modsecurity.conf")
-    shutil.copy("/usr/local/src/ModSecurity/unicode.mapping", modsec_etc_dir)
+    with open(nginx_conf, "r") as file:
+        content = file.read()
+
+    if "include /etc/nginx/modsec/main.conf;" not in content:
+        # Insert the include directive into the http block
+        content = re.sub(r'(http\s*{)', r'\1\n    include /etc/nginx/modsec/main.conf;', content, flags=re.MULTILINE)
+
+        with open(nginx_conf, "w") as file:
+            file.write(content)
+        print("Included ModSecurity configuration in nginx.conf.")
 
     # Update ModSecurity configuration
     modsec_conf = f"{modsec_etc_dir}/modsecurity.conf"
