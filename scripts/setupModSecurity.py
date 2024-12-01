@@ -46,8 +46,8 @@ def get_valid_version(prompt):
         print("[Error] Invalid version format. Expected X.Y.Z (e.g., 4.9.0). Please try again.")
         
 def command_exists(command):
-    result = subprocess.run(["command", "-v", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return result.returncode == 0
+    """Check if a command exists in the system's PATH."""
+    return shutil.which(command) is not None
 
 def check_dependencies():
     required_commands = ["apt", "nginx", "wget", "git"]
