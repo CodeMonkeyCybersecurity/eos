@@ -80,6 +80,7 @@ def add_official_deb_src():
         "URIs: http://security.ubuntu.com/ubuntu/",
         "Suites: noble-security",
         "Components: main restricted universe multiverse",
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"
     ]
     try:
         if not os.path.exists(sources_file):
