@@ -4,6 +4,7 @@ import subprocess
 import os
 import sys
 import shutil
+import re
 
 print("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
@@ -14,7 +15,28 @@ def error_exit(message):
 def check_sudo():
     if os.geteuid() != 0:
         error_exit("This script must be run as root or with sudo privileges.")
- 
+
+def get_valid_user(prompt):
+    while True:
+        user_input = input(prompt).strip()
+        if not user_input:
+            print("[Error] Input cannot be empty. Please try again.")
+        elif not user_input.isalnum():
+            print("[Error] Usernames can only contain letters and numbers. Please try again.")
+        else:
+            return user_input
+
+def get_valid_version(prompt):
+    version_pattern = r'^\d+\.\d+\.\d+$'  # Example: 1.24.0
+    while True:
+        user_input = input(prompt).strip()
+        if re.match(version_pattern, user_input):
+            return user_input
+        print("[Error] Invalid version format. Expected X.Y.Z (e.g., 4.9.0). Please try again.")
+def command_exists(command):
+    result = subprocess.run(["command", "-v", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return result.returncode == 0
+
 def check_dependencies():
     required_commands = ["apt", "nginx", "wget", "git"]
     for cmd in required_commands:
@@ -22,9 +44,9 @@ def check_dependencies():
             error_exit(f"This script requires '{cmd}', but it is not installed or not in PATH. Please install it using 'sudo apt install {cmd}'.")
     
 def run_command(command, error_message):
-    result = subprocess.run(command, shell=True)
+    result = subprocess.run(command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
-        error_exit(error_message)
+        error_exit(f"{error_message}\nCommand output: {result.stderr}")
 
 def install_nginx():
     """Install and configure Nginx on the system."""
@@ -37,9 +59,7 @@ def install_nginx():
 
 def download_source():
     """Downloading and configuring Nginx source files"""
-    input_user = input("Which user would you like to administer nginx?: ")
-    if not input_user:
-        error_exit("User input is required.")
+    input_user = get_valid_user("Which user would you like to administer nginx?: ")
     
     run_command(f"chown {input_user}:{input_user} /usr/local/src/ -R", f"Failed to change ownership of /usr/local/src/ to {input_user}.")
     os.makedirs("/usr/local/src/nginx", exist_ok=True)
@@ -134,8 +154,8 @@ def setup_owasp_crs():
     modsec_etc_dir = "/etc/nginx/modsec"
     print("[Info] Setting up OWASP Core Rule Set...")
     print("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
-    latest_release = input("Enter the latest release: ")
-    
+    latest_release = get_valid_version("Enter the latest release (e.g., 4.9.0): ")
+
     run_command(f"wget https://github.com/coreruleset/coreruleset/archive/v{latest_release}.tar.gz", "Failed to download OWASP CRS.")
     run_command(f"tar xvf v{latest_release}.tar.gz", "Failed to extract OWASP CRS.")
 
