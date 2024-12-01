@@ -67,7 +67,7 @@ def run_command(command, error_message):
 
 def add_official_deb_src():
     """
-    Add official Ubuntu deb-src entries to the sources file if deb-src is not supported by the current mirror.
+    Add official Ubuntu deb-src entries to a .sources file.
     """
     sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
     official_deb_src = [
