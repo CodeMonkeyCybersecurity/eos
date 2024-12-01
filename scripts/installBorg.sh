@@ -19,3 +19,4 @@ if ! sudo apt install -y borgbackup; then
 fi
 
 echo "BorgBackup installation completed successfully."
+echo "run 'gh repo clone CodeMonkeyCybersecurity/Persephone' for more advanced Borg Backup handling."
