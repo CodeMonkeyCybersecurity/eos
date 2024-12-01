@@ -154,15 +154,33 @@ def install_libmodsecurity():
 
 # Compile ModSecurity Nginx connector
 def compile_nginx_connector(version_number):
-    """Compiling ModSecurity Nginx connector..."""
-    run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/", "Failed to clone ModSecurity Nginx connector.")
-    os.makedirs(f"/usr/local/src/nginx/nginx-{version_number}/", exist_ok=True)
-    os.chdir(f"/usr/local/src/nginx/nginx-{version_number}/")
-    run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
-    run_command(f"./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx", "Failed to configure Nginx for ModSecurity.")
-    run_command("make modules", "Failed to build ModSecurity Nginx module.")
-    run_command("cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/", "Failed to copy ModSecurity module.")
-    
+    """Compile ModSecurity Nginx connector."""
+    try:
+        # Clone ModSecurity Nginx connector
+        run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/",
+                    "Failed to clone ModSecurity Nginx connector.")
+
+        # Change to Nginx source directory
+        nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
+        os.makedirs(nginx_src_dir, exist_ok=True)
+        os.chdir(nginx_src_dir)
+
+        # Install build dependencies and configure Nginx
+        run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
+        run_command("./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx",
+                    "Failed to configure Nginx for ModSecurity.")
+
+        # Build and copy the module
+        run_command("make modules", "Failed to build ModSecurity Nginx module.")
+        os.makedirs("/usr/share/nginx/modules/", exist_ok=True)
+        run_command("cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/",
+                    "Failed to copy ModSecurity module.")
+
+        logging.info("ModSecurity Nginx module compiled and installed successfully.")
+    except Exception as e:
+        logging.error(f"Failed to compile ModSecurity Nginx connector: {e}")
+        raise
+
 # Configure Nginx for ModSecurity
 def load_connector_module():
     """Configuring Nginx for ModSecurity..."""
