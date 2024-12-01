@@ -156,9 +156,19 @@ def install_libmodsecurity():
 def compile_nginx_connector(version_number):
     """Compile ModSecurity Nginx connector."""
     try:
-        # Clone ModSecurity Nginx connector
-        run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/",
-                    "Failed to clone ModSecurity Nginx connector.")
+        # Check if the ModSecurity directory already exists
+        modsec_dir = "/usr/local/src/ModSecurity-nginx/"
+        if os.path.exists(modsec_dir):
+            logging.info(f"Directory '{modsec_dir}' already exists.")
+            choice = input(f"The directory '{modsec_dir}' already exists. Do you want to continue without cloning? (y/n): ").strip().lower()
+            if choice != 'y':
+                logging.info("Exiting as per user request.")
+                return
+
+        else:
+            # Clone ModSecurity Nginx connector
+            run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/",
+                        "Failed to clone ModSecurity Nginx connector.")
 
         # Change to Nginx source directory
         nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
