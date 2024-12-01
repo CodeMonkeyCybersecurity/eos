@@ -204,13 +204,16 @@ def load_connector_module():
     else:
         error_exit(f"Nginx configuration file not found at {nginx_conf}.")
 
-    # Add the module line if not already present
-    with open(nginx_conf, "r+") as file:
-        content = file.read()
-        if module_line not in content:
-            file.seek(0, 0)
-            file.write(f"{module_line}\n{content}")
-            print(f"Added '{module_line}' to the beginning of {nginx_conf}.")
+    # Add the module line outside any blocks
+    with open(nginx_conf, "r") as file:
+        content = file.readlines()
+
+    if module_line not in content:
+        with open(nginx_conf, "w") as file:
+            # Write the `load_module` line first, followed by the original content
+            file.write(module_line + "\n")
+            file.writelines(content)
+            print(f"Added '{module_line}' to {nginx_conf}.")
     
     # Ensure ModSecurity directives are present in the `http` block
     modsec_etc_dir = "/etc/nginx/modsec"
