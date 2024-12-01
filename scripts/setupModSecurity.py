@@ -5,16 +5,27 @@ import os
 import sys
 import shutil
 import re
+import logging
 
 print("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
+logging.basicConfig(
+    level=logging.INFO,  # Set default log level to INFO
+    format="%(asctime)s [%(levelname)s] %(message)s",  # Format: timestamp, log level, and message
+    handlers=[
+        logging.StreamHandler(),  # Log to console
+        logging.FileHandler("script.log", mode="a"),  # Log to file
+    ]
+)
+
 def error_exit(message):
-    print(f"[Error] {message}", file=sys.stderr)
+    logging.error(message)
     sys.exit(1)
 
 def check_sudo():
     if os.geteuid() != 0:
-        error_exit("This script must be run as root or with sudo privileges.")
+        error_exit("This script must be run as root or with sudo privileges.")        
+    logging.info("Sudo privileges verified.")
 
 def get_valid_user(prompt):
     while True:
@@ -33,20 +44,25 @@ def get_valid_version(prompt):
         if re.match(version_pattern, user_input):
             return user_input
         print("[Error] Invalid version format. Expected X.Y.Z (e.g., 4.9.0). Please try again.")
+        
 def command_exists(command):
     result = subprocess.run(["command", "-v", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return result.returncode == 0
 
 def check_dependencies():
     required_commands = ["apt", "nginx", "wget", "git"]
-    for cmd in required_commands:
-        if not command_exists(cmd):
-            error_exit(f"This script requires '{cmd}', but it is not installed or not in PATH. Please install it using 'sudo apt install {cmd}'.")
-    
+    missing_commands = [cmd for cmd in required_commands if not command_exists(cmd)]
+    if missing_commands:
+        error_exit(f"The following commands are required but not installed: {', '.join(missing_commands)}.\n"
+                   f"Please install them using 'sudo apt install {' '.join(missing_commands)}'.")
+
 def run_command(command, error_message):
+    logging.debug(f"Running command: {command}")
     result = subprocess.run(command, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
-        error_exit(f"{error_message}\nCommand output: {result.stderr}")
+        logging.error(f"Command failed with error: {result.stderr}")
+        error_exit(f"{error_message}\nCommand output:\n{result.stdout}\n{result.stderr}")
+    logging.debug(f"Command succeeded with output: {result.stdout}")
 
 def install_nginx():
     """Install and configure Nginx on the system."""
@@ -59,6 +75,8 @@ def install_nginx():
 
 def download_source():
     """Downloading and configuring Nginx source files"""
+    logging.info("Starting to download Nginx source files...")
+
     input_user = get_valid_user("Which user would you like to administer nginx?: ")
     
     run_command(f"chown {input_user}:{input_user} /usr/local/src/ -R", f"Failed to change ownership of /usr/local/src/ to {input_user}.")
@@ -73,8 +91,9 @@ def download_source():
     run_command("apt source nginx", "Failed to download nginx source.")
     print("Listing downloaded source files:")
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
-    version_number = input("Enter nginx version number (e.g., 1.24.0): ")
+    version_number = get_valid_version("Enter nginx version number (e.g., 1.24.0): ")
     return version_number
+    logging.info("Nginx source files downloaded successfully.")
 
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
@@ -182,6 +201,7 @@ def setup_owasp_crs():
 
 # Main function
 def main():
+    logging.info("Starting the script...")
     check_sudo()
     check_dependencies()
     install_nginx()
@@ -190,7 +210,7 @@ def main():
     compile_nginx_connector(version_number)
     load_connector_module()
     setup_owasp_crs()
-    print("[Success] ModSecurity with Nginx has been successfully set up.")
+    logging.info("[Success] ModSecurity with Nginx has been successfully set up.")
 
 if __name__ == "__main__":
     main()
