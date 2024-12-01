@@ -67,7 +67,7 @@ def run_command(command, error_message):
 
 def add_official_deb_src():
     """
-    Add official Ubuntu deb-src entries to a .sources file.
+    Add official Ubuntu deb-src entries to a .sources file, ensuring no duplicates.
     """
     sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
     official_deb_src = [
@@ -86,15 +86,27 @@ def add_official_deb_src():
         if not os.path.exists(sources_file):
             raise FileNotFoundError(f"{sources_file} does not exist.")
 
+        # Read existing content
+        with open(sources_file, "r") as file:
+            existing_content = file.read()
+
+        # Check if any of the lines in official_deb_src already exist
+        if any(entry in existing_content for entry in official_deb_src):
+            logging.info("Official deb-src entries already exist. Skipping addition.")
+            return
+
+        # Append entries if they don't exist
         with open(sources_file, "a") as file:
             logging.info("Adding official deb-src entries to sources.list.")
             file.write("\n" + "\n".join(official_deb_src) + "\n")
         logging.info("Official deb-src entries added successfully.")
+
+        # Update package list
         subprocess.run("apt update", shell=True, check=True)
     except Exception as e:
         logging.error(f"Failed to add official deb-src entries: {e}")
         raise
-
+        
 def install_nginx():
     """Install and configure Nginx on the system."""
     run_command("apt update", "Failed to update package list.")
