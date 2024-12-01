@@ -139,8 +139,29 @@ def download_source():
     
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
-    run_command("apt install -y git", "Failed to install git.")
-    run_command("git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/", "Failed to clone ModSecurity.")
+    modsec_dir = "/usr/local/src/ModSecurity"
+
+    if os.path.exists(modsec_dir):
+        logging.warning(f"Directory '{modsec_dir}' already exists.")
+        try:
+            choice = input(f"The directory '{modsec_dir}' already exists. Do you want to overwrite it? (y/n): ").strip().lower()
+            if choice == 'y':
+                shutil.rmtree(modsec_dir)
+                logging.info(f"Removed existing directory: {modsec_dir}")
+            elif choice == 'n':
+                logging.info("Skipping cloning ModSecurity.")
+                return
+            else:
+                logging.info("Exiting as per user request.")
+                sys.exit(0)
+        except Exception as e:
+            error_exit(f"Error handling directory '{modsec_dir}': {e}")
+
+    run_command(
+        "git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/",
+        "Failed to clone ModSecurity."
+    )
+    logging.info("ModSecurity cloned successfully.")
     os.chdir("/usr/local/src/ModSecurity")
     run_command("apt update", "Failed to update package list.")
     run_command("apt install -y gcc make build-essential autoconf automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev libxml2 libxml2-dev libcurl4 libgeoip-dev libyajl-dev doxygen uuid-dev", "Failed to install dependencies.")
