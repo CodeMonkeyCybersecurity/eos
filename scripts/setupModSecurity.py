@@ -193,7 +193,7 @@ def install_libmodsecurity():
 # Compile ModSecurity Nginx connector
 def compile_nginx_connector(version_number):
     """Compile ModSecurity Nginx connector."""
-    modsec_nginx_dir = "/usr/local/src/ModSecurity-nginx/"
+    modsec_nginx_dir = "/usr/local/src/ModSecurity-nginx"
     nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
     nginx_modules_dir = "/usr/share/nginx/modules/"
 
@@ -208,17 +208,18 @@ def compile_nginx_connector(version_number):
             f"git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git {modsec_nginx_dir}",
             "Failed to clone ModSecurity Nginx connector."
         )
+        run_command(cd )
 
         # Compile and copy the module
         os.chdir(nginx_src_dir)
         run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
         run_command(
-            f"./configure --with-compat --add-dynamic-module={modsec_nginx_dir}",
+            f"./configure --with-compat --with-openssl=/usr/include/openssl/ --add-dynamic-module={modsec_nginx_dir}",
             "Failed to configure Nginx for ModSecurity."
         )
         run_command("make modules", "Failed to build ModSecurity Nginx module.")
         run_command(
-            "cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/",
+            "cp objs/ngx_http_modsecurity_module.so {nginx_modules_dir}",
             "Failed to copy ModSecurity module."
         )
         logging.info("ModSecurity Nginx module compiled and installed successfully.")
@@ -233,7 +234,8 @@ def load_connector_module():
     nginx_conf = "/etc/nginx/nginx.conf"
     module_line = "load_module modules/ngx_http_modsecurity_module.so;"
     modsec_etc_dir = "/etc/nginx/modsec"
-    
+
+    # TODO Also, add the following two lines in the http {...} section, so ModSecurity will be enabled for all Nginx virtual hosts. FROM HERE ONWARDS
     # Backup Nginx configuration
     if os.path.exists(nginx_conf):
         shutil.copy(nginx_conf, f"{nginx_conf}.bak")
