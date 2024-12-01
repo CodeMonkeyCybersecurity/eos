@@ -65,6 +65,28 @@ def run_command(command, error_message):
         error_exit(f"{error_message}")
     logging.debug("Command succeeded.")
 
+def enable_deb_src():
+    """Ensure that deb-src entries are enabled in sources.list."""
+    sources_file = "/etc/apt/sources.list"
+    try:
+        with open(sources_file, "r") as file:
+            lines = file.readlines()
+
+        updated_lines = []
+        for line in lines:
+            if line.strip().startswith("# deb-src"):
+                updated_lines.append(line.lstrip("# "))  # Uncomment deb-src lines
+            else:
+                updated_lines.append(line)
+
+        with open(sources_file, "w") as file:
+            file.writelines(updated_lines)
+
+        logging.info("deb-src entries enabled in sources.list. Updating package lists...")
+        run_command("apt update", "Failed to update package lists after enabling deb-src.")
+    except Exception as e:
+        error_exit(f"Failed to enable deb-src entries: {e}")
+
 def install_nginx():
     """Install and configure Nginx on the system."""
     run_command("apt update", "Failed to update package list.")
@@ -205,6 +227,7 @@ def main():
     logging.info("Starting the script...")
     check_sudo()
     check_dependencies()
+    enable_deb_src()
     install_nginx()
     version_number = download_source()
     install_libmodsecurity()
