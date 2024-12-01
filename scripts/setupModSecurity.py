@@ -135,8 +135,8 @@ def download_source():
     print("Listing downloaded source files:")
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
     version_number = get_valid_version("Enter nginx version number (e.g., 1.24.0): ")
-    return version_number
     logging.info("Nginx source files downloaded successfully.")
+    return version_number
 
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
@@ -246,29 +246,51 @@ def setup_owasp_crs():
     print("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
     latest_release = get_valid_version("Enter the latest release (e.g., 4.9.0): ")
 
-    run_command(f"wget https://github.com/coreruleset/coreruleset/archive/v{latest_release}.tar.gz", "Failed to download OWASP CRS.")
-    run_command(f"tar xvf v{latest_release}.tar.gz", "Failed to extract OWASP CRS.")
-
+    archive_file = f"v{latest_release}.tar.gz"
     extracted_dir = f"coreruleset-{latest_release}"
-    if not os.path.exists(extracted_dir):
-        error_exit(f"Extracted directory {extracted_dir} not found.")
-    
-    if os.path.exists(os.path.join(modsec_etc_dir, extracted_dir)):
-        shutil.rmtree(os.path.join(modsec_etc_dir, extracted_dir))
-    shutil.move(extracted_dir, modsec_etc_dir)    
-    crs_conf = os.path.join(modsec_etc_dir, "crs-setup.conf")
-    if os.path.exists(f"{crs_conf}.example"):
-        shutil.move(f"{crs_conf}.example", crs_conf)
-    else:
-        error_exit(f"Failed to find {crs_conf}.example for renaming.")
-    
-    with open(modsec_main, "a") as file:
-        file.write(f"Include {crs_conf}\n")
-        file.write(f"Include {os.path.join(modsec_etc_dir, 'rules', '*.conf')}\n")
 
-    run_command("nginx -t", "Nginx configuration test failed.")
-    run_command("systemctl restart nginx", "Failed to restart Nginx.")
+    try:
+        # Download the OWASP CRS archive
+        run_command(f"wget https://github.com/coreruleset/coreruleset/archive/v{latest_release}.tar.gz", "Failed to download OWASP CRS.")
+        
+        # Extract the archive
+        run_command(f"tar xvf {archive_file}", "Failed to extract OWASP CRS.")
+        
+        # Verify the extracted directory exists
+        if not os.path.exists(extracted_dir):
+            error_exit(f"Extracted directory {extracted_dir} not found.")
 
+        # Move the extracted directory to the desired location
+        if os.path.exists(os.path.join(modsec_etc_dir, extracted_dir)):
+            shutil.rmtree(os.path.join(modsec_etc_dir, extracted_dir))
+        shutil.move(extracted_dir, modsec_etc_dir)
+
+        # Rename the configuration file
+        crs_conf = os.path.join(modsec_etc_dir, "crs-setup.conf")
+        if os.path.exists(f"{crs_conf}.example"):
+            shutil.move(f"{crs_conf}.example", crs_conf)
+        else:
+            error_exit(f"Failed to find {crs_conf}.example for renaming.")
+        
+        # Include CRS rules in the main configuration
+        with open(modsec_main, "a") as file:
+            file.write(f"Include {crs_conf}\n")
+            file.write(f"Include {os.path.join(modsec_etc_dir, 'rules', '*.conf')}\n")
+
+        # Clean up the downloaded archive
+        if os.path.exists(archive_file):
+            os.remove(archive_file)
+            print(f"Temporary file {archive_file} has been removed.")
+        
+        # Test and restart Nginx
+        run_command("nginx -t", "Nginx configuration test failed.")
+        run_command("systemctl restart nginx", "Failed to restart Nginx.")
+
+        logging.info("OWASP CRS setup completed successfully.")
+    
+    except Exception as e:
+        logging.error(f"Failed to set up OWASP CRS: {e}")
+        raise
 
 # Main function
 def main():
