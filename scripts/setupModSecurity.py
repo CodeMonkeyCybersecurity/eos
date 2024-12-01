@@ -108,37 +108,44 @@ def add_official_deb_src():
         raise
 
 def check_and_create_directory(dir_path):
-    if os.path.isdir(dir_path):
+    """Ensure that the specified path is a directory. If it exists, handle according to user choice."""
+    if os.path.islink(dir_path):
+        os.unlink(dir_path)
+        print(f"Removed symlink at '{dir_path}'.")
+
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        print(f"Directory '{dir_path}' has been created.")
+    elif os.path.isdir(dir_path):
         print(f"Directory '{dir_path}' already exists.")
         print("Options:")
         print("1. Skip and continue (default)")
         print("2. Overwrite the existing directory")
         print("3. Exit the script")
 
-        choice = input("Please enter your choice [1/2/3]: ").strip()
-        if choice == '':
-            choice = '1'
+        choice = input("Please enter your choice [1/2/3]: ").strip() or '1'
+
         if choice == '1':
             print("Continuing with the existing directory.")
         elif choice == '2':
-            if os.path.islink(dir_path) or os.path.exists(dir_path):
-                # Remove the symlink or existing directory
-                os.unlink(dir_path) if os.path.islink(dir_path) else shutil.rmtree(dir_path)
-            os.makedirs(dir_path)
-            print(f"Directory '{dir_path}' has been overwritten.")
+            try:
+                shutil.rmtree(dir_path)
+                os.makedirs(dir_path)
+                print(f"Directory '{dir_path}' has been overwritten.")
+            except Exception as e:
+                print(f"Failed to overwrite directory '{dir_path}': {e}")
+                sys.exit(1)
         elif choice == '3':
             print("Exiting script.")
-            sys.exit()
+            sys.exit(0)
         else:
             print("Invalid choice. Continuing with the existing directory.")
-    elif os.path.exists(dir_path):
+    else:
+        # Path exists but is not a directory
         print(f"A file with the name '{dir_path}' exists.")
         print("Cannot proceed as a file exists with the same name as the desired directory.")
-        sys.exit()
-    else:
-        os.makedirs(dir_path)
-        print(f"Directory '{dir_path}' has been created.")
-
+        sys.exit(1)
+        
 def install_nginx():
     """Install and configure Nginx on the system."""
     run_command("apt update", "Failed to update package list.")
@@ -208,7 +215,6 @@ def compile_nginx_connector(version_number):
             f"git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git {modsec_nginx_dir}",
             "Failed to clone ModSecurity Nginx connector."
         )
-        run_command(cd )
 
         # Compile and copy the module
         os.chdir(nginx_src_dir)
@@ -219,7 +225,7 @@ def compile_nginx_connector(version_number):
         )
         run_command("make modules", "Failed to build ModSecurity Nginx module.")
         run_command(
-            "cp objs/ngx_http_modsecurity_module.so {nginx_modules_dir}",
+            f"cp objs/ngx_http_modsecurity_module.so {nginx_modules_dir}",
             "Failed to copy ModSecurity module."
         )
         logging.info("ModSecurity Nginx module compiled and installed successfully.")
