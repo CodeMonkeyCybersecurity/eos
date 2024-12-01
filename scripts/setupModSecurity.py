@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import subprocess
 import os
 import sys
@@ -41,7 +43,10 @@ def download_source():
     
     run_command(f"chown {input_user}:{input_user} /usr/local/src/ -R", f"Failed to change ownership of /usr/local/src/ to {input_user}.")
     os.makedirs("/usr/local/src/nginx", exist_ok=True)
-    os.chdir("/usr/local/src/nginx")
+    try:
+        os.chdir("/usr/local/src/nginx")
+    except FileNotFoundError:
+        error_exit("Failed to change directory to /usr/local/src/nginx.")
     
     print("Downloading Nginx source package...")
     run_command("apt install -y dpkg-dev", "Failed to install dpkg-dev.")
@@ -55,6 +60,7 @@ def install_libmodsecurity():
     """Installing libmodsecurity..."""
     run_command("apt install -y git", "Failed to install git.")
     run_command("git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/", "Failed to clone ModSecurity.")
+    os.makedirs("/usr/local/src/ModSecurity", exist_ok=True)
     os.chdir("/usr/local/src/ModSecurity")
     run_command("apt update", "Failed to update package list.")
     run_command("apt install -y gcc make build-essential autoconf automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev libxml2 libxml2-dev libcurl4 libgeoip-dev libyajl-dev doxygen uuid-dev", "Failed to install dependencies.")
@@ -69,6 +75,7 @@ def install_libmodsecurity():
 def compile_nginx_connector(version_number):
     """Compiling ModSecurity Nginx connector..."""
     run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/", "Failed to clone ModSecurity Nginx connector.")
+    os.makedirs("/usr/local/src/nginx/nginx-{version_number}/, exist_ok=True")
     os.chdir(f"/usr/local/src/nginx/nginx-{version_number}/")
     run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
     run_command(f"./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx", "Failed to configure Nginx for ModSecurity.")
@@ -154,15 +161,13 @@ def setup_owasp_crs():
 
 # Main function
 def main():
-    install_nginx
-    download_source
-    install_libmodsecurity
-    compile_nginx_connector
-    load_connector_module
-    setup_owasp_crs
-    echo "[Success] ModSecurity with Nginx has been successfully set up."
+    install_nginx()
+    version_number = download_source()
+    install_libmodsecurity()
+    compile_nginx_connector(version_number)
+    load_connector_module()
+    setup_owasp_crs()
+    print("[Success] ModSecurity with Nginx has been successfully set up.")
 
 if __name__ == "__main__":
     main()
-
-printf("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
