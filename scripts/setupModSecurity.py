@@ -118,7 +118,6 @@ def load_connector_module():
     # Test Nginx configuration and restart
     run_command("nginx -t", "Nginx configuration test failed.")
     run_command("systemctl restart nginx", "Failed to restart Nginx.")
-}
     
 # Download and enable OWASP CRS
 setup_owasp_crs() {
