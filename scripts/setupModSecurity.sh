@@ -7,14 +7,18 @@ def error_exit(message):
     print(f"[Error] {message}", file=sys.stderr)
     sys.exit(1)
 
-../checkSudo.sh || error_exit "Failed to verify sudo privileges."
-
+def check_sudo():
+    """Check if the script is running with sudo privileges."""
+    if os.geteuid() != 0:
+        print("[Error] This script must be run as root or with sudo privileges.", file=sys.stderr)
+        sys.exit(1)
+check_sudo()
+ 
 # Function to check if a command exists
 def command_exists(command):
     result = subprocess.run(["command", "-v", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     return result.returncode == 0
-
-
+    
 def run_command(command, error_message):
     result = subprocess.run(command, shell=True)
     if result.returncode != 0:
@@ -59,7 +63,6 @@ def install_libmodsecurity():
     run_command("make", "Failed to compile ModSecurity.")
     run_command("make install", "Failed to install ModSecurity.")
 
-
 # Compile ModSecurity Nginx connector
 def compile_nginx_connector(version_number):
     print("Compiling ModSecurity Nginx connector...")
@@ -69,68 +72,52 @@ def compile_nginx_connector(version_number):
     run_command(f"./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx", "Failed to configure Nginx for ModSecurity.")
     run_command("make modules", "Failed to build ModSecurity Nginx module.")
     run_command("cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/", "Failed to copy ModSecurity module.")
-
-
-
-
+    
 # Configure Nginx for ModSecurity
-load_connector_module() {
-    echo "[Info] Configuring Nginx..."
-    echo "Load the ModSecurity v3 Nginx Connector Module..."
-    # Define the Nginx configuration file path
-    NGINX_CONF="/etc/nginx/nginx.conf"
-    MODULE_LINE="load_module modules/ngx_http_modsecurity_module.so;"
-    MODSEC_LINES=(
-        "modsecurity on;"
-        "modsecurity_rules_file /etc/nginx/modsec/main.conf;"
-    )
-    # Backup the existing Nginx configuration file
-    if [[ -f "$NGINX_CONF" ]]; then
-        cp "$NGINX_CONF" "${NGINX_CONF}.bak"
-        echo "Backup of $NGINX_CONF created at ${NGINX_CONF}.bak"
-    else
-        echo "Nginx configuration file not found at $NGINX_CONF. Exiting."
-        exit 1
-    fi
-    # Check if the module line already exists
-    if grep -q "^$MODULE_LINE" "$NGINX_CONF"; then
-        echo "The module line is already present in the configuration file. No changes made."
-    else
-        # Insert the line at the beginning of the file
-        sed -i "1s|^|$MODULE_LINE\n|" "$NGINX_CONF"
-        echo "Added '$MODULE_LINE' to the beginning of $NGINX_CONF."
-    fi
-    # Add ModSecurity lines to the http { ... } section
-    if grep -q "http {" "$NGINX_CONF"; then
-        for LINE in "${MODSEC_LINES[@]}"; do
-            if ! grep -q "^$LINE" "$NGINX_CONF"; then
-                sed -i "/http {/a \    $LINE" "$NGINX_CONF"
-                echo "Added '$LINE' to the http { ... } section."
-            else
-                echo "'$LINE' is already present in the http { ... } section. No changes made."
-            fi
-        done
-    else
-        echo "No http { ... } section found in $NGINX_CONF. Please check the configuration file."
-        exit 1
-    fi
-    MODSEC_ETC_DIR="/etc/nginx/modsec"
-    mkdir -p $MODSEC_ETC_DIR || error_exit "Failed to create ModSecurity configuration directory."
-    MODSEC_LOCAL_DIR="/usr/local/src/ModSecurity"
-    cp $MODSEC_LOCAL_DIR/modsecurity.conf-recommended $MODSEC_ETC_DIR/modsecurity.conf || error_exit "Failed to copy ModSecurity configuration."
-    cp $MODSEC_LOCAL_DIR/unicode.mapping $MODSEC_ETC_DIR || error_exit "Failed to copy unicode mapping file."
-    MODSEC_CONF="/etc/nginx/modsec/modsecurity.conf" 
-    cp "$MODSEC_CONF" "${MODSEC_CONF}.bak" || error_exit "Failed to create modsec_conf.bak"
-    echo "Backup of $MODSEC_CONF saved at ${MODSEC_CONF}.bak"
-    sed -i 's/^SecAuditLogParts ABIJDEFHZ/SecAuditLogParts ABCEFHJKZ/' "$MODSEC_CONF" || error_exit "Failed to change default logging configs in $MODSEC_CONF"
-    echo "SecAuditLogParts updated."
-    echo "disabling body inspection"
-    sed -i 's/^SecResponseBodyAccess On/SecResponseBodyAccess Off/' "$MODSEC_CONF" || error_exit "SecResponseBodyAccess failed to be turned off"
-    MODSEC_MAIN="$MODSEC_ETC_DIR/main.conf"
-    echo "Include $MODSEC_CONF;" | sudo tee -a $MODSEC_MAIN >/dev/null
-    # Define the NGINX configuration test command with error handling
-    sudo nginx -t || { echo "Nginx configuration test failed." >&2; exit 1; }
-    sudo systemctl restart nginx || { echo "Failed to restart Nginx." >&2; exit 1; }
+def load_connector_module():
+    print("Configuring Nginx for ModSecurity...")
+    nginx_conf = "/etc/nginx/nginx.conf"
+    module_line = "load_module modules/ngx_http_modsecurity_module.so;"
+    
+    # Backup Nginx configuration
+    if os.path.exists(nginx_conf):
+        shutil.copy(nginx_conf, f"{nginx_conf}.bak")
+        print(f"Backup of {nginx_conf} created at {nginx_conf}.bak")
+    else:
+        error_exit(f"Nginx configuration file not found at {nginx_conf}.")
+
+    # Add the module line if not already present
+    with open(nginx_conf, "r+") as file:
+        content = file.read()
+        if module_line not in content:
+            file.seek(0, 0)
+            file.write(f"{module_line}\n{content}")
+            print(f"Added '{module_line}' to the beginning of {nginx_conf}.")
+    
+    # Ensure ModSecurity directives are present in the `http` block
+    modsec_etc_dir = "/etc/nginx/modsec"
+    os.makedirs(modsec_etc_dir, exist_ok=True)
+    shutil.copy("/usr/local/src/ModSecurity/modsecurity.conf-recommended", f"{modsec_etc_dir}/modsecurity.conf")
+    shutil.copy("/usr/local/src/ModSecurity/unicode.mapping", modsec_etc_dir)
+
+    # Update ModSecurity configuration
+    modsec_conf = f"{modsec_etc_dir}/modsecurity.conf"
+    shutil.copy(modsec_conf, f"{modsec_conf}.bak")
+    print(f"Backup of {modsec_conf} saved at {modsec_conf}.bak")
+    with open(modsec_conf, "r") as file:
+        config_lines = file.readlines()
+    with open(modsec_conf, "w") as file:
+        for line in config_lines:
+            if "SecAuditLogParts" in line:
+                line = line.replace("ABIJDEFHZ", "ABCEFHJKZ")
+            if "SecResponseBodyAccess On" in line:
+                line = line.replace("SecResponseBodyAccess On", "SecResponseBodyAccess Off")
+            file.write(line)
+    print("ModSecurity configuration updated.")
+
+    # Test Nginx configuration and restart
+    run_command("nginx -t", "Nginx configuration test failed.")
+    run_command("systemctl restart nginx", "Failed to restart Nginx.")
 }
     
 # Download and enable OWASP CRS
