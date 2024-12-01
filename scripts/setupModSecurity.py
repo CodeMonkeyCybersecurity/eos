@@ -108,35 +108,36 @@ def add_official_deb_src():
         raise
 
 def check_and_create_directory(dir_path):
-    if not os.path.exists(dir_path):
+    if os.path.isdir(dir_path):
+        print(f"Directory '{dir_path}' already exists.")
+        print("Options:")
+        print("1. Skip and continue (default)")
+        print("2. Overwrite the existing directory")
+        print("3. Exit the script")
+
+        choice = input("Please enter your choice [1/2/3]: ").strip()
+        if choice == '':
+            choice = '1'
+        if choice == '1':
+            print("Continuing with the existing directory.")
+        elif choice == '2':
+            if os.path.islink(dir_path) or os.path.exists(dir_path):
+                # Remove the symlink or existing directory
+                os.unlink(dir_path) if os.path.islink(dir_path) else shutil.rmtree(dir_path)
+            os.makedirs(dir_path)
+            print(f"Directory '{dir_path}' has been overwritten.")
+        elif choice == '3':
+            print("Exiting script.")
+            sys.exit()
+        else:
+            print("Invalid choice. Continuing with the existing directory.")
+    elif os.path.exists(dir_path):
+        print(f"A file with the name '{dir_path}' exists.")
+        print("Cannot proceed as a file exists with the same name as the desired directory.")
+        sys.exit()
+    else:
         os.makedirs(dir_path)
         print(f"Directory '{dir_path}' has been created.")
-    else:
-        if os.path.isdir(dir_path):
-            print(f"Directory '{dir_path}' already exists.")
-            print("Options:")
-            print("1. Skip and continue (default)")
-            print("2. Overwrite the existing directory")
-            print("3. Exit the script")
-
-            choice = input("Please enter your choice [1/2/3]: ").strip()
-            if choice == '':
-                choice = '1'
-            if choice == '1':
-                print("Continuing with the existing directory.")
-            elif choice == '2':
-                shutil.rmtree(dir_path)
-                os.makedirs(dir_path)
-                print(f"Directory '{dir_path}' has been overwritten.")
-            elif choice == '3':
-                print("Exiting script.")
-                sys.exit()
-            else:
-                print("Invalid choice. Continuing with the existing directory.")
-        else:
-            print(f"A file with the name '{dir_path}' exists.")
-            print("Cannot proceed as a file exists with the same name as the desired directory.")
-            sys.exit()
 
 def install_nginx():
     """Install and configure Nginx on the system."""
