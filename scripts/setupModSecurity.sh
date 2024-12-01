@@ -1,76 +1,76 @@
-#!/bin/bash
+import subprocess
+import os
+import sys
+import shutil
 
-# Function for error handling
-error_exit() {
-    echo "[Error] $1" >&2
-    exit 1
-}
+def error_exit(message):
+    print(f"[Error] {message}", file=sys.stderr)
+    sys.exit(1)
 
 ../checkSudo.sh || error_exit "Failed to verify sudo privileges."
 
 # Function to check if a command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
+def command_exists(command):
+    result = subprocess.run(["command", "-v", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    return result.returncode == 0
 
-install_nginx() {
-    apt update
-    apt install nginx || error_exit "Failed to install nginx."
-    nginx -V || error_exit "Failed to verify nginx version."
-    apt install software-properties-common || error_exit "sudo apt install software-properties-common  failed"
-    apt-add-repository -ss || error_exit "sudo apt-add-repository -ss failed"
-    apt update || error_exit "sudo apt update failed"
-}
 
-download_source() {
-    echo "get username..." 
-    read -p "Which user would you like to administer nginx?: " INPUT_USER || error_exit "Failed to set user"
-    chown "$INPUT_USER:$INPUT_USER" /usr/local/src/ -R || error_exit "chown '$INPUT_USER:$INPUT_USER' /usr/local/src/ -R failed"
-    mkdir -p /usr/local/src/nginx || error_exit "failed to mkdir: /usr/local/src/nginx"
-    cd /usr/local/src/nginx/ || error_exit "failed to cd into the Nginx source directory."
-    echo "Download Nginx source package: "
-    apt install dpkg-dev 
-    apt source nginx 
-    echo "list the downloaded source files..."
-    echo "note the version of nginx which has been installed. You will need to input it in the next step..."
-    ls -lah /usr/local/src/nginx/
-    read -p "Enter nginx version number (eg. 1.24.0): " VERSION_NUMBER
-}
+def run_command(command, error_message):
+    result = subprocess.run(command, shell=True)
+    if result.returncode != 0:
+        error_exit(error_message)
 
-install_libmodsecurity() {
-    echo "To compile libmodsecurity, first clone the source code from Github..."
-    apt install git || error_exit "Failed to install git"
-    git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/ || error_exit "Failed to clone ModSecurity."
-    cd /usr/local/src/ModSecurity/ || error_exit "Failed to navigate to ModSecurity directory."
-    echo "Install build dependencies..."
-    apt update
-    apt install gcc make build-essential autoconf \
-    automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev \
-    libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev \
-    libxml2 libxml2-dev libcurl4 libgeoip-dev libyajl-dev doxygen \
-    uuid-dev || error_exit "Failed to install all dependencies."
-    echo "Install required submodules..."
-    git submodule init || error_exit "Failed to initialize submodules."
-    git submodule update || error_exit "Failed to update submodules."
-    echo "Configure the build environment..."
-    ./build.sh || error_exit "./build.sh failed"
-    ./configure || error_exit "./configure failed"
-    make || error_exit "make failed"
-    echo "After the make command finished without errors, install the binary..."
-    make install || error_exit "make install failed"
-}
+def install_nginx():
+    run_command("apt update", "Failed to update package list.")
+    run_command("apt install -y nginx", "Failed to install nginx.")
+    run_command("nginx -V", "Failed to verify nginx version.")
+    run_command("apt install -y software-properties-common", "Failed to install software-properties-common.")
+    run_command("apt-add-repository -ss", "Failed to add repository.")
+    run_command("apt update", "Failed to update package list after adding repository.")
+
+def download_source():
+    input_user = input("Which user would you like to administer nginx?: ")
+    if not input_user:
+        error_exit("User input is required.")
+    
+    run_command(f"chown {input_user}:{input_user} /usr/local/src/ -R", f"Failed to change ownership of /usr/local/src/ to {input_user}.")
+    os.makedirs("/usr/local/src/nginx", exist_ok=True)
+    os.chdir("/usr/local/src/nginx")
+    
+    print("Downloading Nginx source package...")
+    run_command("apt install -y dpkg-dev", "Failed to install dpkg-dev.")
+    run_command("apt source nginx", "Failed to download nginx source.")
+    print("Listing downloaded source files:")
+    subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
+    version_number = input("Enter nginx version number (e.g., 1.24.0): ")
+    return version_number
+
+def install_libmodsecurity():
+    print("Installing libmodsecurity...")
+    run_command("apt install -y git", "Failed to install git.")
+    run_command("git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/", "Failed to clone ModSecurity.")
+    os.chdir("/usr/local/src/ModSecurity")
+    run_command("apt update", "Failed to update package list.")
+    run_command("apt install -y gcc make build-essential autoconf automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev libxml2 libxml2-dev libcurl4 libgeoip-dev libyajl-dev doxygen uuid-dev", "Failed to install dependencies.")
+    run_command("git submodule init", "Failed to initialize submodules.")
+    run_command("git submodule update", "Failed to update submodules.")
+    run_command("./build.sh", "Failed to build ModSecurity.")
+    run_command("./configure", "Failed to configure ModSecurity.")
+    run_command("make", "Failed to compile ModSecurity.")
+    run_command("make install", "Failed to install ModSecurity.")
+
 
 # Compile ModSecurity Nginx connector
-compile_nginx_connector() {
-    echo "[Info] Compiling ModSecurity Nginx connector..."
-    echo "Download and Compile ModSecurity v3 Nginx Connector Source Code..."
-    git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/ || error_exit "Failed to clone ModSecurity Nginx connector."
-    cd /usr/local/src/nginx/nginx-$VERSION_NUMBER/ || error_exit "Failed to navigate to Nginx source directory."
-    apt build-dep nginx || error_exit "Install build dependencies for Nginx failed."
-    ./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx || error_exit "Failed to configure Nginx for ModSecurity."
-    make modules || error_exit "Failed to build ModSecurity Nginx module."
-    cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/ || error_exit "Failed to copy ModSecurity module."
-}
+def compile_nginx_connector(version_number):
+    print("Compiling ModSecurity Nginx connector...")
+    run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/", "Failed to clone ModSecurity Nginx connector.")
+    os.chdir(f"/usr/local/src/nginx/nginx-{version_number}/")
+    run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
+    run_command(f"./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx", "Failed to configure Nginx for ModSecurity.")
+    run_command("make modules", "Failed to build ModSecurity Nginx module.")
+    run_command("cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/", "Failed to copy ModSecurity module.")
+
+
 
 
 # Configure Nginx for ModSecurity
