@@ -55,14 +55,15 @@ def check_dependencies():
     if missing_commands:
         error_exit(f"The following commands are required but not installed: {', '.join(missing_commands)}.\n"
                    f"Please install them using 'sudo apt install {' '.join(missing_commands)}'.")
-
+    
 def run_command(command, error_message):
     logging.debug(f"Running command: {command}")
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    # Run the command interactively
+    result = subprocess.run(command, shell=True)
     if result.returncode != 0:
-        logging.error(f"Command failed with error: {result.stderr}")
-        error_exit(f"{error_message}\nCommand output:\n{result.stdout}\n{result.stderr}")
-    logging.debug(f"Command succeeded with output: {result.stdout}")
+        logging.error(f"Command failed.")
+        error_exit(f"{error_message}")
+    logging.debug("Command succeeded.")
 
 def install_nginx():
     """Install and configure Nginx on the system."""
