@@ -10,7 +10,7 @@ import logging
 print("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
 logging.basicConfig(
-    level=logging.INFO,  # Set default log level to INFO
+    level=logging.DEBUG,  # Set default log level to INFO
     format="%(asctime)s [%(levelname)s] %(message)s",  # Format: timestamp, log level, and message
     handlers=[
         logging.StreamHandler(),  # Log to console
