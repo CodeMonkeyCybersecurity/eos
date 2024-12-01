@@ -14,12 +14,12 @@ def error_exit(message):
 def check_sudo():
     if os.geteuid() != 0:
         error_exit("This script must be run as root or with sudo privileges.")
-check_sudo()
  
-# Function to check if a command exists
-def command_exists(command):
-    result = subprocess.run(["command", "-v", command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    return result.returncode == 0
+def check_dependencies():
+    required_commands = ["apt", "nginx", "wget", "git"]
+    for cmd in required_commands:
+        if not command_exists(cmd):
+            error_exit(f"This script requires '{cmd}', but it is not installed or not in PATH. Please install it using 'sudo apt install {cmd}'.")
     
 def run_command(command, error_message):
     result = subprocess.run(command, shell=True)
@@ -60,7 +60,6 @@ def install_libmodsecurity():
     """Installing libmodsecurity..."""
     run_command("apt install -y git", "Failed to install git.")
     run_command("git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/", "Failed to clone ModSecurity.")
-    os.makedirs("/usr/local/src/ModSecurity", exist_ok=True)
     os.chdir("/usr/local/src/ModSecurity")
     run_command("apt update", "Failed to update package list.")
     run_command("apt install -y gcc make build-essential autoconf automake libtool libcurl4-openssl-dev liblua5.3-dev libpcre2-dev libfuzzy-dev ssdeep gettext pkg-config libpcre3 libpcre3-dev libxml2 libxml2-dev libcurl4 libgeoip-dev libyajl-dev doxygen uuid-dev", "Failed to install dependencies.")
@@ -75,7 +74,7 @@ def install_libmodsecurity():
 def compile_nginx_connector(version_number):
     """Compiling ModSecurity Nginx connector..."""
     run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/", "Failed to clone ModSecurity Nginx connector.")
-    os.makedirs("/usr/local/src/nginx/nginx-{version_number}/, exist_ok=True")
+    os.makedirs(f"/usr/local/src/nginx/nginx-{version_number}/", exist_ok=True)
     os.chdir(f"/usr/local/src/nginx/nginx-{version_number}/")
     run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
     run_command(f"./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx", "Failed to configure Nginx for ModSecurity.")
@@ -144,7 +143,9 @@ def setup_owasp_crs():
     if not os.path.exists(extracted_dir):
         error_exit(f"Extracted directory {extracted_dir} not found.")
     
-    shutil.move(extracted_dir, modsec_etc_dir)
+    if os.path.exists(os.path.join(modsec_etc_dir, extracted_dir)):
+        shutil.rmtree(os.path.join(modsec_etc_dir, extracted_dir))
+    shutil.move(extracted_dir, modsec_etc_dir)    
     crs_conf = os.path.join(modsec_etc_dir, "crs-setup.conf")
     if os.path.exists(f"{crs_conf}.example"):
         shutil.move(f"{crs_conf}.example", crs_conf)
@@ -161,6 +162,8 @@ def setup_owasp_crs():
 
 # Main function
 def main():
+    check_sudo()
+    check_dependencies()
     install_nginx()
     version_number = download_source()
     install_libmodsecurity()
