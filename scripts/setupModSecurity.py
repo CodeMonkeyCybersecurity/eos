@@ -3,15 +3,15 @@ import os
 import sys
 import shutil
 
+print("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
+
 def error_exit(message):
     print(f"[Error] {message}", file=sys.stderr)
     sys.exit(1)
 
 def check_sudo():
-    """Check if the script is running with sudo privileges."""
     if os.geteuid() != 0:
-        print("[Error] This script must be run as root or with sudo privileges.", file=sys.stderr)
-        sys.exit(1)
+        error_exit("This script must be run as root or with sudo privileges.")
 check_sudo()
  
 # Function to check if a command exists
@@ -25,6 +25,7 @@ def run_command(command, error_message):
         error_exit(error_message)
 
 def install_nginx():
+    """Install and configure Nginx on the system."""
     run_command("apt update", "Failed to update package list.")
     run_command("apt install -y nginx", "Failed to install nginx.")
     run_command("nginx -V", "Failed to verify nginx version.")
@@ -33,6 +34,7 @@ def install_nginx():
     run_command("apt update", "Failed to update package list after adding repository.")
 
 def download_source():
+    """Downloading and configuring Nginx source files"""
     input_user = input("Which user would you like to administer nginx?: ")
     if not input_user:
         error_exit("User input is required.")
@@ -50,7 +52,7 @@ def download_source():
     return version_number
 
 def install_libmodsecurity():
-    print("Installing libmodsecurity...")
+    """Installing libmodsecurity..."""
     run_command("apt install -y git", "Failed to install git.")
     run_command("git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/", "Failed to clone ModSecurity.")
     os.chdir("/usr/local/src/ModSecurity")
@@ -65,7 +67,7 @@ def install_libmodsecurity():
 
 # Compile ModSecurity Nginx connector
 def compile_nginx_connector(version_number):
-    print("Compiling ModSecurity Nginx connector...")
+    """Compiling ModSecurity Nginx connector..."""
     run_command("git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/", "Failed to clone ModSecurity Nginx connector.")
     os.chdir(f"/usr/local/src/nginx/nginx-{version_number}/")
     run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
@@ -75,7 +77,7 @@ def compile_nginx_connector(version_number):
     
 # Configure Nginx for ModSecurity
 def load_connector_module():
-    print("Configuring Nginx for ModSecurity...")
+    """Configuring Nginx for ModSecurity..."""
     nginx_conf = "/etc/nginx/nginx.conf"
     module_line = "load_module modules/ngx_http_modsecurity_module.so;"
     
@@ -121,20 +123,34 @@ def load_connector_module():
     
 # Download and enable OWASP CRS
 def setup_owasp_crs():
+    """Download and enable OWASP CRS"""
     modsec_main = "/etc/nginx/modsec/main.conf"
     modsec_etc_dir = "/etc/nginx/modsec"
-    echo "[Info] Setting up OWASP Core Rule Set..."
+    print("[Info] Setting up OWASP Core Rule Set...")
     print("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
     latest_release = input("Enter the latest release: ")
-    run_command(f"wget https://github.com/coreruleset/coreruleset/archive/v{latest_release}.tar.gz", "Failed to download OWASP CRS.")    tar xvf v$LATEST_RELEASE.tar.gz || error_exit "Failed to extract OWASP CRS."
-    sudo mv "coreruleset-$LATEST_RELEASE/" $MODSEC_ETC_DIR || error_exit "Failed to move OWASP CRS."
-    CRS_CONF="coreruleset-$LATEST_RELEASE/crs-setup.conf"
-    sudo mv $CRS_CONF.example $CRS_CONF || error_exit "Failed to rename CRS configuration."
-    # Add CRS includes to main.conf
-    echo -e "Include $CRS_CONF\nInclude $CORERULESET/rules/*.conf" >> $MODSEC_MAIN
-    sudo nginx -t || { echo "Nginx configuration test failed." >&2; exit 1; }
-    sudo systemctl restart nginx || { echo "Failed to restart Nginx." >&2; exit 1; }
-}
+    
+    run_command(f"wget https://github.com/coreruleset/coreruleset/archive/v{latest_release}.tar.gz", "Failed to download OWASP CRS.")
+    run_command(f"tar xvf v{latest_release}.tar.gz", "Failed to extract OWASP CRS.")
+
+    extracted_dir = f"coreruleset-{latest_release}"
+    if not os.path.exists(extracted_dir):
+        error_exit(f"Extracted directory {extracted_dir} not found.")
+    
+    shutil.move(extracted_dir, modsec_etc_dir)
+    crs_conf = os.path.join(modsec_etc_dir, "crs-setup.conf")
+    if os.path.exists(f"{crs_conf}.example"):
+        shutil.move(f"{crs_conf}.example", crs_conf)
+    else:
+        error_exit(f"Failed to find {crs_conf}.example for renaming.")
+    
+    with open(modsec_main, "a") as file:
+        file.write(f"Include {crs_conf}\n")
+        file.write(f"Include {os.path.join(modsec_etc_dir, 'rules', '*.conf')}\n")
+
+    run_command("nginx -t", "Nginx configuration test failed.")
+    run_command("systemctl restart nginx", "Failed to restart Nginx.")
+
 
 # Main function
 def main():
@@ -149,4 +165,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions!
+printf("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
