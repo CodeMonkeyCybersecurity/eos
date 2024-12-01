@@ -65,49 +65,33 @@ def run_command(command, error_message):
         error_exit(f"{error_message}")
     logging.debug("Command succeeded.")
 
-def enable_deb_src():
-    """Ensure that deb-src entries are enabled in sources.list."""
+def add_official_deb_src():
+    """
+    Add official Ubuntu deb-src entries to the sources file if deb-src is not supported by the current mirror.
+    """
     sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
+    official_deb_src = [
+        "Types: deb-src",
+        "URIs: http://archive.ubuntu.com/ubuntu/",
+        "Suites: noble noble-updates noble-backports",
+        "Components: main restricted universe multiverse",
+        "",
+        "Types: deb-src",
+        "URIs: http://security.ubuntu.com/ubuntu/",
+        "Suites: noble-security",
+        "Components: main restricted universe multiverse",
+    ]
     try:
-        logging.info("Checking if 'deb-src' is enabled in sources.list...")
+        if not os.path.exists(sources_file):
+            raise FileNotFoundError(f"{sources_file} does not exist.")
 
-        # Read the current sources.list content
-        with open(sources_file, "r") as file:
-            lines = file.readlines()
-
-        updated_lines = []
-        updated = False
-        for line in lines:
-            if line.strip().startswith("# deb-src"):
-                updated_lines.append(line.lstrip("# "))  # Uncomment deb-src lines
-                updated = True
-            elif line.strip().startswith("deb-src"):
-                updated_lines.append(line)  # Keep existing deb-src entries
-            else:
-                updated_lines.append(line)  # Keep other lines unchanged
-
-        # Add default deb-src entries if none are found
-        if not any(line.strip().startswith("deb-src") for line in updated_lines):
-            logging.info("No 'deb-src' entries found. Adding default entries...")
-            updated_lines.append("\n")
-            updated_lines.append("deb-src http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse\n")
-            updated_lines.append("deb-src http://archive.ubuntu.com/ubuntu/ noble-updates main restricted universe multiverse\n")
-            updated_lines.append("deb-src http://security.ubuntu.com/ubuntu/ noble-security main restricted universe multiverse\n")
-            updated_lines.append("deb-src http://archive.ubuntu.com/ubuntu/ noble-backports main restricted universe multiverse\n")
-            updated = True
-
-        # Write back the updated sources.list if changes were made
-        if updated:
-            logging.info("Updating sources.list to enable 'deb-src' entries...")
-            with open(sources_file, "w") as file:
-                file.writelines(updated_lines)
-            logging.info("'deb-src' entries enabled successfully. Updating package lists...")
-            subprocess.run("apt update", shell=True, check=True)
-        else:
-            logging.info("'deb-src' entries are already enabled. No changes needed.")
-
+        with open(sources_file, "a") as file:
+            logging.info("Adding official deb-src entries to sources.list.")
+            file.write("\n" + "\n".join(official_deb_src) + "\n")
+        logging.info("Official deb-src entries added successfully.")
+        subprocess.run("apt update", shell=True, check=True)
     except Exception as e:
-        logging.error(f"Failed to enable 'deb-src' entries: {e}")
+        logging.error(f"Failed to add official deb-src entries: {e}")
         raise
 
 def install_nginx():
@@ -250,7 +234,7 @@ def main():
     logging.info("Starting the script...")
     check_sudo()
     check_dependencies()
-    enable_deb_src()
+    add_official_deb_src()
     install_nginx()
     version_number = download_source()
     install_libmodsecurity()
