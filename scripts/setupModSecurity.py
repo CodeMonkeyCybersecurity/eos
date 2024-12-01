@@ -106,7 +106,38 @@ def add_official_deb_src():
     except Exception as e:
         logging.error(f"Failed to add official deb-src entries: {e}")
         raise
-        
+
+def check_and_create_directory(dir_path):
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        print(f"Directory '{dir_path}' has been created.")
+    else:
+        if os.path.isdir(dir_path):
+            print(f"Directory '{dir_path}' already exists.")
+            print("Options:")
+            print("1. Skip and continue (default)")
+            print("2. Overwrite the existing directory")
+            print("3. Exit the script")
+
+            choice = input("Please enter your choice [1/2/3]: ").strip()
+            if choice == '':
+                choice = '1'
+            if choice == '1':
+                print("Continuing with the existing directory.")
+            elif choice == '2':
+                shutil.rmtree(dir_path)
+                os.makedirs(dir_path)
+                print(f"Directory '{dir_path}' has been overwritten.")
+            elif choice == '3':
+                print("Exiting script.")
+                sys.exit()
+            else:
+                print("Invalid choice. Continuing with the existing directory.")
+        else:
+            print(f"A file with the name '{dir_path}' exists.")
+            print("Cannot proceed as a file exists with the same name as the desired directory.")
+            sys.exit()
+
 def install_nginx():
     """Install and configure Nginx on the system."""
     run_command("apt update", "Failed to update package list.")
@@ -141,22 +172,7 @@ def download_source():
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
     modsec_dir = "/usr/local/src/ModSecurity"
-
-    if os.path.exists(modsec_dir):
-        logging.warning(f"Directory '{modsec_dir}' already exists.")
-        try:
-            choice = input(f"The directory '{modsec_dir}' already exists. Do you want to overwrite it? (y/n): ").strip().lower()
-            if choice == 'y':
-                shutil.rmtree(modsec_dir)
-                logging.info(f"Removed existing directory: {modsec_dir}")
-            elif choice == 'n':
-                logging.info("Skipping cloning ModSecurity.")
-                return
-            else:
-                logging.info("Exiting as per user request.")
-                sys.exit(0)
-        except Exception as e:
-            error_exit(f"Error handling directory '{modsec_dir}': {e}")
+    check_and_create_directory(modsec_dir)
 
     run_command(
         "git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/",
@@ -177,38 +193,36 @@ def install_libmodsecurity():
 def compile_nginx_connector(version_number):
     """Compile ModSecurity Nginx connector."""
     modsec_nginx_dir = "/usr/local/src/ModSecurity-nginx/"
+    nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
+    nginx_modules_dir = "/usr/share/nginx/modules/"
+
     try:
-        # Handle existing directory
-        if os.path.exists(modsec_nginx_dir):
-            choice = input(f"The directory '{modsec_nginx_dir}' already exists. Do you want to overwrite it? (y/n): ").strip().lower()
-            if choice == 'y':
-                shutil.rmtree(modsec_nginx_dir)
-                logging.info(f"Removed existing directory: {modsec_nginx_dir}")
-            elif choice == 'n':
-                logging.info("Skipping cloning ModSecurity Nginx connector.")
-                return
-            else:
-                logging.info("Invalid input. Exiting.")
-                sys.exit(0)
+        # Prepare directories
+        check_and_create_directory(modsec_nginx_dir)
+        check_and_create_directory(nginx_modules_dir)
+        os.makedirs(nginx_src_dir, exist_ok=True)
 
         # Clone the repository
         run_command(
-            "git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git /usr/local/src/ModSecurity-nginx/",
+            f"git clone --depth 1 https://github.com/SpiderLabs/ModSecurity-nginx.git {modsec_nginx_dir}",
             "Failed to clone ModSecurity Nginx connector."
         )
 
         # Compile and copy the module
-        nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
-        os.makedirs(nginx_src_dir, exist_ok=True)
         os.chdir(nginx_src_dir)
         run_command("apt build-dep nginx -y", "Failed to install build dependencies for Nginx.")
-        run_command("./configure --with-compat --add-dynamic-module=/usr/local/src/ModSecurity-nginx",
-                    "Failed to configure Nginx for ModSecurity.")
+        run_command(
+            f"./configure --with-compat --add-dynamic-module={modsec_nginx_dir}",
+            "Failed to configure Nginx for ModSecurity."
+        )
         run_command("make modules", "Failed to build ModSecurity Nginx module.")
         run_command("mkdir -p /usr/share/nginx/modules", "Failed to create /usr/share/nginx/modules")
-        run_command("cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/",
-                    "Failed to copy ModSecurity module.")
+        run_command(
+            "cp objs/ngx_http_modsecurity_module.so /usr/share/nginx/modules/",
+            "Failed to copy ModSecurity module."
+        )
         logging.info("ModSecurity Nginx module compiled and installed successfully.")
+
     except Exception as e:
         logging.error(f"Failed to compile ModSecurity Nginx connector: {e}")
         raise
