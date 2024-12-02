@@ -111,7 +111,6 @@ def add_official_deb_src():
         logging.error(f"Failed to add official deb-src entries: {e}")
         raise
 
-
 def get_latest_crs_version():
     """Fetch the latest CRS version from GitHub releases."""
     try:
@@ -133,11 +132,11 @@ def check_and_create_directory(dir_path):
         os.makedirs(dir_path)
         logging.info(f"Directory '{dir_path}' has been created.")
     elif os.path.isdir(dir_path):
-        logging.info(f"Directory '{dir_path}' already exists.")
-        logging.info("Options:")
-        logging.info("1. Skip and continue (default)")
-        logging.info("2. Overwrite the existing directory")
-        logging.info("3. Exit the script")
+        print(f"Directory '{dir_path}' already exists.")
+        print("Options:")
+        print("1. Skip and continue (default)")
+        print("2. Overwrite the existing directory")
+        print("3. Exit the script")
 
         choice = input("Please enter your choice [1/2/3]: ").strip() or '1'
 
