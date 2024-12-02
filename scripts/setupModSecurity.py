@@ -6,6 +6,8 @@ import sys
 import shutil
 import re
 import logging
+import requests
+import pwd
 
 logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
@@ -52,7 +54,7 @@ def command_exists(command):
     return shutil.which(command) is not None
 
 def check_dependencies():
-    required_commands = ["apt", "nginx", "wget", "git"]
+    required_commands = ["apt", "wget", "git"]
     missing_commands = [cmd for cmd in required_commands if not command_exists(cmd)]
     if missing_commands:
         error_exit(f"The following commands are required but not installed: {', '.join(missing_commands)}.\n"
@@ -109,6 +111,18 @@ def add_official_deb_src():
         logging.error(f"Failed to add official deb-src entries: {e}")
         raise
 
+
+def get_latest_crs_version():
+    """Fetch the latest CRS version from GitHub releases."""
+    try:
+        response = requests.get("https://api.github.com/repos/coreruleset/coreruleset/releases/latest")
+        data = response.json()
+        latest_version = data['tag_name'].lstrip('v')
+        return latest_version
+    except Exception as e:
+        logging.error(f"Failed to fetch latest CRS version: {e}")
+        return None
+
 def check_and_create_directory(dir_path):
     """Ensure that the specified path is a directory. If it exists, handle according to user choice."""
     if os.path.islink(dir_path):
@@ -161,9 +175,22 @@ def download_source():
     """Downloading and configuring Nginx source files"""
     logging.info("Starting to download Nginx source files...")
 
-    input_user = get_valid_user("Which user would you like to administer nginx?: ")
+    # Detect the current user or default to 'root'
+    try:
+        if os.geteuid() == 0 and 'SUDO_USER' in os.environ:
+            input_user = os.environ['SUDO_USER']
+        else:
+            input_user = pwd.getpwuid(os.geteuid()).pw_name
+    except Exception as e:
+        logging.error(f"Failed to detect the current user: {e}")
+        input_user = 'root'
+
+    logging.info(f"Detected user: {input_user}")
     
-    run_command(f"chown {input_user}:{input_user} /usr/local/src/ -R", f"Failed to change ownership of /usr/local/src/ to {input_user}.")
+    # Proceed without user input
+    if input_user != 'root':
+        run_command(f"chown {input_user}:{input_user} /usr/local/src/ -R", f"Failed to change ownership of /usr/local/src/ to {input_user}.")
+    
     os.makedirs("/usr/local/src/nginx", exist_ok=True)
     try:
         os.chdir("/usr/local/src/nginx")
@@ -176,6 +203,12 @@ def download_source():
     logging.info("Listing downloaded source files:")
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
     logging.info("Nginx source files downloaded successfully.") 
+
+    # Get the Nginx version number
+    version_number = get_nginx_version("/usr/local/src/nginx/")
+    if not version_number:
+        error_exit("Failed to determine Nginx version.")
+    logging.info(f"Nginx version {version_number} detected.")
     return version_number
     
 def install_libmodsecurity():
@@ -198,15 +231,10 @@ def install_libmodsecurity():
     run_command("make", "Failed to compile ModSecurity.")
     run_command("make install", "Failed to install ModSecurity.")
 
-# Compile ModSecurity Nginx connector
 def compile_nginx_connector(version_number):
     """Compile ModSecurity Nginx connector."""
     nginx_source_parent_dir = '/usr/local/src/nginx/'
-    version_number = get_nginx_version(nginx_source_parent_dir)
-    if not version_number:
-        logging.error("Could not determine Nginx version from source directory.")
-        raise ValueError("Nginx version not found.")
-    logging.info(f"Detected Nginx version: {version_number}")    
+    logging.info(f"Using Nginx version: {version_number}") 
     
     modsec_nginx_dir = "/usr/local/src/ModSecurity-nginx"
     nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
@@ -306,8 +334,11 @@ def setup_owasp_crs():
     modsec_main = "/etc/nginx/modsec/main.conf"
     modsec_etc_dir = "/etc/nginx/modsec"
     logging.info("[Info] Setting up OWASP Core Rule Set...")
-    logging.info("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
-    latest_release = get_valid_version("Enter the latest release (e.g., 4.9.0): ")
+    latest_release = get_latest_crs_version()
+    if not latest_release:
+        error_exit("Failed to determine the latest OWASP CRS version.")
+
+    logging.info(f"Latest OWASP CRS version detected: {latest_release}")
 
     archive_file = f"v{latest_release}.tar.gz"
     extracted_dir = f"coreruleset-{latest_release}"
