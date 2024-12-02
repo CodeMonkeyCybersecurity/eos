@@ -216,7 +216,6 @@ def compile_nginx_connector(version_number):
         # Prepare directories
         check_and_create_directory(modsec_nginx_dir)
         check_and_create_directory(nginx_modules_dir)
-        os.makedirs(nginx_src_dir, exist_ok=True)
 
         # Clone the repository
         run_command(
@@ -232,8 +231,10 @@ def compile_nginx_connector(version_number):
             "Failed to configure Nginx for ModSecurity."
         )
         run_command("make modules", "Failed to build ModSecurity Nginx module.")
+
+        ngx_module_path = os.path.join(nginx_src_dir, 'objs', 'ngx_http_modsecurity_module.so')
         run_command(
-            f"cp objs/ngx_http_modsecurity_module.so {nginx_modules_dir}",
+            f"cp {ngx_module_path} {nginx_modules_dir}",
             "Failed to copy ModSecurity module."
         )
         logging.info("ModSecurity Nginx module compiled and installed successfully.")
