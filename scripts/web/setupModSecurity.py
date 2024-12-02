@@ -19,15 +19,14 @@ logging.basicConfig(
         logging.FileHandler("script.log", mode="a"),  # Log to file
     ]
 )
-
-def error_exit(message):
-    logging.error(message)
-    sys.exit(1)
-
 def check_sudo():
     if os.geteuid() != 0:
         error_exit("This script must be run as root or with sudo privileges.")        
     logging.info("Sudo privileges verified.")
+    
+def error_exit(message):
+    logging.error(message)
+    sys.exit(1)
 
 def get_valid_user(prompt):
     while True:
@@ -38,6 +37,34 @@ def get_valid_user(prompt):
             logging.error("[Error] Usernames can only contain letters and numbers. Please try again.")
         else:
             return user_input
+
+def get_ubuntu_codename():
+    """Get the Ubuntu codename (e.g., focal, jammy)."""
+    try:
+        result = subprocess.run(['lsb_release', '-sc'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode != 0:
+            error_exit("Failed to get Ubuntu codename.")
+        codename = result.stdout.strip()
+        logging.info(f"Ubuntu codename detected: {codename}")
+        return codename
+    except Exception as e:
+        logging.error(f"Failed to get Ubuntu codename: {e}")
+        error_exit("Failed to get Ubuntu codename.")
+
+def prepare_deb_src_entries(ubuntu_codename):
+    entries = [
+        "Types: deb-src",
+        "URIs: http://archive.ubuntu.com/ubuntu/",
+        f"Suites: {ubuntu_codename} {ubuntu_codename}-updates {ubuntu_codename}-backports",
+        "Components: main restricted universe multiverse",
+        "",
+        "Types: deb-src",
+        "URIs: http://security.ubuntu.com/ubuntu/",
+        f"Suites: {ubuntu_codename}-security",
+        "Components: main restricted universe multiverse",
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"
+    ]
+    return "\n".join(entries)
 
 def get_nginx_version(nginx_source_dir):
     """Automatically get the Nginx version from the source directory name."""
@@ -71,44 +98,41 @@ def run_command(command, error_message):
 
 def add_official_deb_src():
     """
-    Add official Ubuntu deb-src entries to a .sources file, ensuring no duplicates.
+    Add official Ubuntu deb-src entries to /etc/apt/sources.list.d/ubuntu.sources, ensuring no duplicates.
     """
+    ubuntu_codename = get_ubuntu_codename()
     sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
-    official_deb_src = [
-        "Types: deb-src",
-        "URIs: http://archive.ubuntu.com/ubuntu/",
-        "Suites: noble noble-updates noble-backports",
-        "Components: main restricted universe multiverse",
-        "",
-        "Types: deb-src",
-        "URIs: http://security.ubuntu.com/ubuntu/",
-        "Suites: noble-security",
-        "Components: main restricted universe multiverse",
-        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"
-    ]
+    deb_src_content = prepare_deb_src_entries(ubuntu_codename)
+
     try:
-        if not os.path.exists(sources_file):
-            raise FileNotFoundError(f"{sources_file} does not exist.")
+        # Read existing content if the file exists
+        if os.path.exists(sources_file):
+            with open(sources_file, "r") as file:
+                existing_content = file.read()
+        else:
+            existing_content = ""
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(sources_file), exist_ok=True)
+            logging.info(f"Created directory {os.path.dirname(sources_file)} for sources file.")
 
-        # Read existing content
-        with open(sources_file, "r") as file:
-            existing_content = file.read()
-
-        # Check if any of the lines in official_deb_src already exist
-        if any(entry in existing_content for entry in official_deb_src):
-            logging.info("Official deb-src entries already exist. Skipping addition.")
+        # Check if the deb-src entries are already present
+        if deb_src_content in existing_content:
+            logging.info("deb-src entries already exist in ubuntu.sources. Skipping addition.")
             return
 
-        # Append entries if they don't exist
+        # Append deb-src entries to the file
         with open(sources_file, "a") as file:
-            logging.info("Adding official deb-src entries to sources.list.")
-            file.write("\n" + "\n".join(official_deb_src) + "\n")
-        logging.info("Official deb-src entries added successfully.")
+            logging.info("Adding deb-src entries to ubuntu.sources.")
+            # Add a separator if the file is not empty
+            if existing_content.strip():
+                file.write("\n\n")
+            file.write(deb_src_content + "\n")
+        logging.info("deb-src entries added successfully.")
 
         # Update package list
-        subprocess.run("apt update", shell=True, check=True)
+        run_command("apt update", "Failed to update package list.")
     except Exception as e:
-        logging.error(f"Failed to add official deb-src entries: {e}")
+        logging.error(f"Failed to add deb-src entries: {e}")
         raise
 
 def get_latest_crs_version():
