@@ -175,7 +175,6 @@ def download_source():
     run_command("apt source nginx", "Failed to download nginx source.")
     logging.info("Listing downloaded source files:")
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
-    version_number = get_valid_version("Enter nginx version number (e.g., 1.24.0): ")
     logging.info("Nginx source files downloaded successfully.") 
     return version_number
     
