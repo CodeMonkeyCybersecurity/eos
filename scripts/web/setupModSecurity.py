@@ -331,7 +331,7 @@ def load_connector_module():
     check_and_create_directory(modsec_etc_dir)
 
     # Copy default ModSecurity configuration file
-    modsec_conf_src = "/usr/local/modsecurity/etc/modsecurity.conf-recommended"
+    modsec_conf_src_rec = "/usr/local/src/ModSecurity/modsecurity.conf-recommended"
     modsec_conf_dst = os.path.join(modsec_etc_dir, "modsecurity.conf")
     if not os.path.exists(modsec_conf_dst):
         if os.path.exists(modsec_conf_src):
