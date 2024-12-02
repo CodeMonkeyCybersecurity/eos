@@ -7,7 +7,7 @@ import shutil
 import re
 import logging
 
-print("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
+logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
 logging.basicConfig(
     level=logging.DEBUG,  # Set default log level to INFO
@@ -31,9 +31,9 @@ def get_valid_user(prompt):
     while True:
         user_input = input(prompt).strip()
         if not user_input:
-            print("[Error] Input cannot be empty. Please try again.")
+            logging.error("[Error] Input cannot be empty. Please try again.")
         elif not user_input.isalnum():
-            print("[Error] Usernames can only contain letters and numbers. Please try again.")
+            logging.error("[Error] Usernames can only contain letters and numbers. Please try again.")
         else:
             return user_input
 
@@ -43,7 +43,7 @@ def get_valid_version(prompt):
         user_input = input(prompt).strip()
         if re.match(version_pattern, user_input):
             return user_input
-        print("[Error] Invalid version format. Expected X.Y.Z (e.g., 4.9.0). Please try again.")
+        logging.error("[Error] Invalid version format. Expected X.Y.Z (e.g., 4.9.0). Please try again.")
         
 def command_exists(command):
     """Check if a command exists in the system's PATH."""
@@ -111,39 +111,39 @@ def check_and_create_directory(dir_path):
     """Ensure that the specified path is a directory. If it exists, handle according to user choice."""
     if os.path.islink(dir_path):
         os.unlink(dir_path)
-        print(f"Removed symlink at '{dir_path}'.")
+        logging.info(f"Removed symlink at '{dir_path}'.")
 
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
-        print(f"Directory '{dir_path}' has been created.")
+        logging.info(f"Directory '{dir_path}' has been created.")
     elif os.path.isdir(dir_path):
-        print(f"Directory '{dir_path}' already exists.")
-        print("Options:")
-        print("1. Skip and continue (default)")
-        print("2. Overwrite the existing directory")
-        print("3. Exit the script")
+        logging.info(f"Directory '{dir_path}' already exists.")
+        logging.info("Options:")
+        logging.info("1. Skip and continue (default)")
+        logging.info("2. Overwrite the existing directory")
+        logging.info("3. Exit the script")
 
         choice = input("Please enter your choice [1/2/3]: ").strip() or '1'
 
         if choice == '1':
-            print("Continuing with the existing directory.")
+            logging.info("Continuing with the existing directory.")
         elif choice == '2':
             try:
                 shutil.rmtree(dir_path)
                 os.makedirs(dir_path)
-                print(f"Directory '{dir_path}' has been overwritten.")
+                logging.info(f"Directory '{dir_path}' has been overwritten.")
             except Exception as e:
-                print(f"Failed to overwrite directory '{dir_path}': {e}")
+                logging.error(f"Failed to overwrite directory '{dir_path}': {e}")
                 sys.exit(1)
         elif choice == '3':
-            print("Exiting script.")
+            logging.info("Exiting script.")
             sys.exit(0)
         else:
-            print("Invalid choice. Continuing with the existing directory.")
+            logging.warning("Invalid choice. Continuing with the existing directory.")
     else:
         # Path exists but is not a directory
-        print(f"A file with the name '{dir_path}' exists.")
-        print("Cannot proceed as a file exists with the same name as the desired directory.")
+        logging.error(f"A file with the name '{dir_path}' exists.")
+        logging.error("Cannot proceed as a file exists with the same name as the desired directory.")
         sys.exit(1)
         
 def install_nginx():
@@ -168,10 +168,10 @@ def download_source():
     except FileNotFoundError:
         error_exit("Failed to change directory to /usr/local/src/nginx.")
     
-    print("Downloading Nginx source package...")
+    logging.info("Downloading Nginx source package...")
     run_command("apt install -y dpkg-dev", "Failed to install dpkg-dev.")
     run_command("apt source nginx", "Failed to download nginx source.")
-    print("Listing downloaded source files:")
+    logging.info("Listing downloaded source files:")
     subprocess.run(["ls", "-lah", "/usr/local/src/nginx/"])
     version_number = get_valid_version("Enter nginx version number (e.g., 1.24.0): ")
     logging.info("Nginx source files downloaded successfully.") 
@@ -245,7 +245,7 @@ def load_connector_module():
     # Backup Nginx configuration
     if os.path.exists(nginx_conf):
         shutil.copy(nginx_conf, f"{nginx_conf}.bak")
-        print(f"Backup of {nginx_conf} created at {nginx_conf}.bak")
+        logging.info(f"Backup of {nginx_conf} created at {nginx_conf}.bak")
     else:
         error_exit(f"Nginx configuration file not found at {nginx_conf}.")
 
@@ -258,7 +258,7 @@ def load_connector_module():
             # Write the `load_module` line first, followed by the original content
             file.write(module_line + "\n")
             file.writelines(content)
-            print(f"Added '{module_line}' to {nginx_conf}.")
+            logging.info(f"Added '{module_line}' to {nginx_conf}.")
     
     # Ensure ModSecurity directives are present in the `http` block
     with open(nginx_conf, "r") as file:
@@ -270,12 +270,12 @@ def load_connector_module():
 
         with open(nginx_conf, "w") as file:
             file.write(content)
-        print("Included ModSecurity configuration in nginx.conf.")
+        logging.info("Included ModSecurity configuration in nginx.conf.")
 
     # Update ModSecurity configuration
     modsec_conf = f"{modsec_etc_dir}/modsecurity.conf"
     shutil.copy(modsec_conf, f"{modsec_conf}.bak")
-    print(f"Backup of {modsec_conf} saved at {modsec_conf}.bak")
+    logging.info(f"Backup of {modsec_conf} saved at {modsec_conf}.bak")
     with open(modsec_conf, "r") as file:
         config_lines = file.readlines()
     with open(modsec_conf, "w") as file:
@@ -285,7 +285,7 @@ def load_connector_module():
             if "SecResponseBodyAccess On" in line:
                 line = line.replace("SecResponseBodyAccess On", "SecResponseBodyAccess Off")
             file.write(line)
-    print("ModSecurity configuration updated.")
+    logging.info("ModSecurity configuration updated.")
 
     # Test Nginx configuration and restart
     run_command("nginx -t", "Nginx configuration test failed.")
@@ -296,8 +296,8 @@ def setup_owasp_crs():
     """Download and enable OWASP CRS"""
     modsec_main = "/etc/nginx/modsec/main.conf"
     modsec_etc_dir = "/etc/nginx/modsec"
-    print("[Info] Setting up OWASP Core Rule Set...")
-    print("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
+    logging.info("[Info] Setting up OWASP Core Rule Set...")
+    logging.info("Navigate to 'https://github.com/coreruleset/coreruleset/releases' in your browser and find the latest release (e.g., 4.9.0).")
     latest_release = get_valid_version("Enter the latest release (e.g., 4.9.0): ")
 
     archive_file = f"v{latest_release}.tar.gz"
@@ -334,7 +334,7 @@ def setup_owasp_crs():
         # Clean up the downloaded archive
         if os.path.exists(archive_file):
             os.remove(archive_file)
-            print(f"Temporary file {archive_file} has been removed.")
+            logging.info(f"Temporary file {archive_file} has been removed.")
         
         # Test and restart Nginx
         run_command("nginx -t", "Nginx configuration test failed.")
