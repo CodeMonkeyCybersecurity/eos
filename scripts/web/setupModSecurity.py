@@ -334,11 +334,11 @@ def load_connector_module():
     modsec_conf_src_rec = "/usr/local/src/ModSecurity/modsecurity.conf-recommended"
     modsec_conf_dst = os.path.join(modsec_etc_dir, "modsecurity.conf")
     if not os.path.exists(modsec_conf_dst):
-        if os.path.exists(modsec_conf_src):
-            shutil.copy(modsec_conf_src, modsec_conf_dst)
+        if os.path.exists(modsec_conf_src_rec):
+            shutil.copy(modsec_conf_src_rec, modsec_conf_dst)
             logging.info(f"Copied ModSecurity configuration to {modsec_conf_dst}")
         else:
-            error_exit(f"ModSecurity configuration file not found at {modsec_conf_src}.")
+            error_exit(f"ModSecurity configuration file not found at {modsec_conf_src_rec}.")
     else:
         logging.info(f"ModSecurity configuration already exists at {modsec_conf_dst}, skipping copy.")
 
