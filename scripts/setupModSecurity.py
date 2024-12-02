@@ -37,14 +37,16 @@ def get_valid_user(prompt):
         else:
             return user_input
 
-def get_valid_version(prompt):
-    version_pattern = r'^\d+\.\d+\.\d+$'  # Example: 1.24.0
-    while True:
-        user_input = input(prompt).strip()
-        if re.match(version_pattern, user_input):
-            return user_input
-        logging.error("[Error] Invalid version format. Expected X.Y.Z (e.g., 4.9.0). Please try again.")
-        
+def get_nginx_version(nginx_source_dir):
+    """Automatically get the Nginx version from the source directory name."""
+    dirs = os.listdir(nginx_source_dir)
+    version_pattern = re.compile(r'nginx-(\d+\.\d+\.\d+)')
+    for dir_name in dirs:
+        match = version_pattern.match(dir_name)
+        if match:
+            return match.group(1)
+    return None
+
 def command_exists(command):
     """Check if a command exists in the system's PATH."""
     return shutil.which(command) is not None
@@ -200,6 +202,13 @@ def install_libmodsecurity():
 # Compile ModSecurity Nginx connector
 def compile_nginx_connector(version_number):
     """Compile ModSecurity Nginx connector."""
+    nginx_source_parent_dir = '/usr/local/src/nginx/'
+    version_number = get_nginx_version(nginx_source_parent_dir)
+    if not version_number:
+        logging.error("Could not determine Nginx version from source directory.")
+        raise ValueError("Nginx version not found.")
+    logging.info(f"Detected Nginx version: {version_number}")    
+    
     modsec_nginx_dir = "/usr/local/src/ModSecurity-nginx"
     nginx_src_dir = f"/usr/local/src/nginx/nginx-{version_number}/"
     nginx_modules_dir = "/usr/share/nginx/modules/"
