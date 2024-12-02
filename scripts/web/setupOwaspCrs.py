@@ -1,3 +1,68 @@
+#!/usr/bin/env python3
+
+import subprocess
+import os
+import sys
+import shutil
+import re
+import logging
+import requests
+import pwd
+
+def check_sudo():
+    if os.geteuid() != 0:
+        error_exit("This script must be run as root or with sudo privileges.")        
+    logging.info("Sudo privileges verified.")
+
+logging.basicConfig(
+    level=logging.DEBUG,  # Set default log level to INFO
+    format="%(asctime)s [%(levelname)s] %(message)s",  # Format: timestamp, log level, and message
+    handlers=[
+        logging.StreamHandler(),  # Log to console
+        logging.FileHandler("script.log", mode="a"),  # Log to file
+    ]
+)
+
+def check_and_create_directory(dir_path):
+    """Ensure that the specified path is a directory. If it exists, handle according to user choice."""
+    if os.path.islink(dir_path):
+        os.unlink(dir_path)
+        logging.info(f"Removed symlink at '{dir_path}'.")
+
+    if not os.path.exists(dir_path):
+        os.makedirs(dir_path)
+        logging.info(f"Directory '{dir_path}' has been created.")
+    elif os.path.isdir(dir_path):
+        print(f"Directory '{dir_path}' already exists.")
+        print("Options:")
+        print("1. Skip and continue (default)")
+        print("2. Overwrite the existing directory")
+        print("3. Exit the script")
+
+        choice = input("Please enter your choice [1/2/3]: ").strip() or '1'
+
+        if choice == '1':
+            logging.info("Continuing with the existing directory.")
+        elif choice == '2':
+            try:
+                shutil.rmtree(dir_path)
+                os.makedirs(dir_path)
+                logging.info(f"Directory '{dir_path}' has been overwritten.")
+            except Exception as e:
+                logging.error(f"Failed to overwrite directory '{dir_path}': {e}")
+                sys.exit(1)
+        elif choice == '3':
+            logging.info("Exiting script.")
+            sys.exit(0)
+        else:
+            logging.warning("Invalid choice. Continuing with the existing directory.")
+    else:
+        # Path exists but is not a directory
+        logging.error(f"A file with the name '{dir_path}' exists.")
+        logging.error("Cannot proceed as a file exists with the same name as the desired directory.")
+        sys.exit(1)
+
+
 # Download and enable OWASP CRS
 def setup_owasp_crs():
     """Download and enable OWASP CRS"""
@@ -55,3 +120,14 @@ def setup_owasp_crs():
     except Exception as e:
         logging.error(f"Failed to set up OWASP CRS: {e}")
         raise
+
+# Main function
+def main():
+    logging.info("Starting the script...")
+    check_sudo()
+    setup_owasp_crs()
+    setup_owasp_crs()
+    print("[Success]ModSecurity with the OWASP Core Rule Set (CRS) has been set up.")
+
+if __name__ == "__main__":
+    main()
