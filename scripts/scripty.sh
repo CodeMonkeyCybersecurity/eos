@@ -19,7 +19,7 @@ rotate_log_file() {
 
 # Start the script command with logging to the initial file
 echo "Starting logging to $CURRENT_FILE"
-script -q /dev/null | tee -a "$CURRENT_FILE" | while IFS= read -r line; do
+script | tee -a "$CURRENT_FILE" | while IFS= read -r line; do
     echo "$line" | tee -a "$CURRENT_FILE" > /dev/null
     rotate_log_file
 done
