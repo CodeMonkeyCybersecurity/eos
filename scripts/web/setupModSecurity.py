@@ -10,7 +10,14 @@ import requests
 import pwd
 import datetime
 
+CONFIG_FILE = '/etc/CodeMonkeyCyber/Persephone/borgConfig.yaml'
+LOG_DIR = '/var/log/CodeMonkeyCyber'
+LOG_FILE = f'{LOG_DIR}/Persephone.log'
+
 logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
+
+# Ensure log directory exists
+os.makedirs(LOG_DIR, exist_ok=True)
 
 logging.basicConfig(
     level=logging.DEBUG,  # Set default log level to INFO
@@ -20,6 +27,7 @@ logging.basicConfig(
         logging.FileHandler("script.log", mode="a"),  # Log to file
     ]
 )
+
 def check_sudo():
     if os.geteuid() != 0:
         error_exit("This script must be run as root or with sudo privileges.")        
