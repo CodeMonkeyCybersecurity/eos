@@ -96,6 +96,16 @@ user@hostname:~/Eos/scripts$ sudo zx installKube.mjs
 
 Replace 'installKube.mjs' with whichever .mjs script you want to run.
 
+NOTE: .mjs is slowly going to be phased out in this repo in favour of using python3 whenever possible and bash.sh scripts where python3 is too cumbersome. This is for the sake of simplicity and uniformity.
+
+## What directories and files will be used
+
+CONFIG_FILE = '/etc/CodeMonkeyCyber/Eos/borgConfig.yaml'
+LOG_DIR = '/var/log/CodeMonkeyCyber'
+LOG_FILE = f'{LOG_DIR}/Eos.log'
+SUBMODULES_SOURCE = './submodules'
+SUBMODULES_DEST = '/usr/local/bin/Eos'
+
 ## What other scripts are available?
 To find out what other scripts are available:
 ```bash
