@@ -9,6 +9,7 @@ import logging
 import requests
 import pwd
 import datetime
+import distro
 
 logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
@@ -39,33 +40,9 @@ def get_valid_user(prompt):
         else:
             return user_input
 
-def get_ubuntu_codename():
-    """Get the Ubuntu codename (e.g., focal, jammy)."""
-    try:
-        result = subprocess.run(['lsb_release', '-sc'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if result.returncode != 0:
-            error_exit("Failed to get Ubuntu codename.")
-        codename = result.stdout.strip()
-        logging.info(f"Ubuntu codename detected: {codename}")
-        return codename
-    except Exception as e:
-        logging.error(f"Failed to get Ubuntu codename: {e}")
-        error_exit("Failed to get Ubuntu codename.")
 
-def prepare_deb_src_entries(ubuntu_codename):
-    entries = [
-        "Types: deb-src",
-        "URIs: http://archive.ubuntu.com/ubuntu/",
-        f"Suites: {ubuntu_codename} {ubuntu_codename}-updates {ubuntu_codename}-backports",
-        "Components: main restricted universe multiverse",
-        "",
-        "Types: deb-src",
-        "URIs: http://security.ubuntu.com/ubuntu/",
-        f"Suites: {ubuntu_codename}-security",
-        "Components: main restricted universe multiverse",
-        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"
-    ]
-    return "\n".join(entries)
+def get_ubuntu_codename():
+    return distro.codename()
 
 def get_nginx_version(nginx_source_dir):
     """Automatically get the Nginx version from the source directory name."""
@@ -102,6 +79,7 @@ def add_official_deb_src():
     Add official Ubuntu deb-src entries to /etc/apt/sources.list.d/ubuntu.sources.
     """
     sources_file = '/etc/apt/sources.list.d/ubuntu.sources'
+    ubuntu_codename = get_ubuntu_codename()
 
     # Check if the sources file exists
     if os.path.exists(sources_file):
@@ -126,18 +104,20 @@ def add_official_deb_src():
         print(f"{sources_file} does not exist. Proceeding to create a new one.")
 
     # Contents to write to the new sources file
-    new_contents = """Types: deb deb-src
-URIs: http://au.archive.ubuntu.com/ubuntu/
-Suites: noble noble-updates noble-backports
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-Types: deb deb-src
-URIs: http://security.ubuntu.com/ubuntu/
-Suites: noble-security
-Components: main restricted universe multiverse
-Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-"""
+    entries = [
+        "Types: deb-src",
+        "URIs: http://archive.ubuntu.com/ubuntu/",
+        f"Suites: {ubuntu_codename} {ubuntu_codename}-updates {ubuntu_codename}-backports",
+        "Components: main restricted universe multiverse",
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg",
+        " ",
+        "Types: deb-src",
+        "URIs: http://security.ubuntu.com/ubuntu/",
+        f"Suites: {ubuntu_codename}-security",
+        "Components: main restricted universe multiverse",
+        "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"
+    ]
+    return "\n".join(entries)
 
     try:
         # Write the new contents to the sources file
