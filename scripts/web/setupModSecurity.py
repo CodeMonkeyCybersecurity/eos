@@ -98,41 +98,44 @@ def run_command(command, error_message):
 
 def add_official_deb_src():
     """
-    Add official Ubuntu deb-src entries to /etc/apt/sources.list.d/ubuntu.sources, ensuring no duplicates.
+    Add official Ubuntu deb-src entries to /etc/apt/sources.list.d/ubuntu.sources.
+    This function is idempotent: it ensures the file contains the correct entries without duplicates or conflicts.
     """
     ubuntu_codename = get_ubuntu_codename()
     sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
-    deb_src_content = prepare_deb_src_entries(ubuntu_codename)
+    deb_src_content = prepare_deb_src_entries(ubuntu_codename).strip()
 
     try:
+       # Ensure the directory exists
+        os.makedirs(os.path.dirname(sources_file), exist_ok=True)
+        
         # Read existing content if the file exists
         if os.path.exists(sources_file):
             with open(sources_file, "r") as file:
-                existing_content = file.read()
+                existing_content = file.read().strip()
         else:
             existing_content = ""
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(sources_file), exist_ok=True)
-            logging.info(f"Created directory {os.path.dirname(sources_file)} for sources file.")
+            
+        # Normalize the content by ensuring only the desired entries remain
+        if existing_content:
+            # Remove duplicate or conflicting entries
+            existing_lines = set(existing_content.splitlines())
+            new_lines = set(deb_src_content.splitlines())
+            merged_lines = sorted(existing_lines.union(new_lines))
+        else:
+            merged_lines = deb_src_content.splitlines()
 
-        # Check if the deb-src entries are already present
-        if deb_src_content in existing_content:
-            logging.info("deb-src entries already exist in ubuntu.sources. Skipping addition.")
-            return
+        # Write the updated content back to the file
+        with open(sources_file, "w") as file:
+            logging.info("Updating ubuntu.sources with deb-src entries.")
+            file.write("\n".join(merged_lines) + "\n")
 
-        # Append deb-src entries to the file
-        with open(sources_file, "a") as file:
-            logging.info("Adding deb-src entries to ubuntu.sources.")
-            # Add a separator if the file is not empty
-            if existing_content.strip():
-                file.write("\n\n")
-            file.write(deb_src_content + "\n")
-        logging.info("deb-src entries added successfully.")
+        logging.info("deb-src entries updated successfully.")
 
         # Update package list
         run_command("apt update", "Failed to update package list.")
     except Exception as e:
-        logging.error(f"Failed to add deb-src entries: {e}")
+        logging.error(f"Failed to ensure deb-src entries: {e}")
         raise
 
 def get_latest_crs_version():
