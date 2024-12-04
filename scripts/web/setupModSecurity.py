@@ -311,7 +311,7 @@ def download_source():
 def install_libmodsecurity():
     """Installing libmodsecurity..."""
     modsec_dir = "/usr/local/src/ModSecurity"
-    check_and_create_directory(modsec_dir)
+    check_and_create_path(modsec_dir)
 
     run_command(
         "git clone --depth 1 -b v3/master --single-branch https://github.com/SpiderLabs/ModSecurity /usr/local/src/ModSecurity/",
@@ -339,8 +339,8 @@ def compile_nginx_connector(version_number):
 
     try:
         # Prepare directories
-        check_and_create_directory(modsec_nginx_dir)
-        check_and_create_directory(nginx_modules_dir)
+        check_and_create_path(modsec_nginx_dir)
+        check_and_create_path(nginx_modules_dir)
 
         # Clone the repository
         run_command(
@@ -426,7 +426,7 @@ def load_connector_module():
         file.write(content)
 
     # Ensure ModSecurity directory exists
-    check_and_create_directory(modsec_etc_dir)
+    check_and_create_path(modsec_etc_dir)
 
     # Copy default ModSecurity configuration file
     modsec_conf_src_rec = "/usr/local/src/ModSecurity/modsecurity.conf-recommended"
