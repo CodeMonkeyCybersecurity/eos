@@ -10,11 +10,6 @@ import requests
 import pwd
 import datetime
 
-try:
-    import distro
-except ImportError:
-    distro = None  # We'll handle installation if needed
-
 logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
 logging.basicConfig(
@@ -43,26 +38,13 @@ def get_valid_user(prompt):
             logging.error("[Error] Usernames can only contain letters and numbers. Please try again.")
         else:
             return user_input
-            
-def install_distro():
-    try:
-        print("'distro' module not found. Installing it now...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "distro"])
-        global distro
-        import distro  # Try importing again after installation
-        print("'distro' module installed successfully.")
-    except Exception as e:
-        print(f"Failed to install 'distro' module: {e}")
-        distro = None  # Ensure distro is set to None if installation fails
 
 def get_ubuntu_codename():
-    if not distro:
-        install_distro()
-    if distro:
-        return distro.codename()
-    else:
-        # Fallback method or exit
-        print("Cannot determine Ubuntu codename without 'distro' module.")
+    try:
+        codename = subprocess.check_output(['lsb_release', '-sc']).decode().strip()
+        return codename
+    except Exception as e:
+        print(f"Error determining Ubuntu codename: {e}")
         return None
 
 def get_nginx_version(nginx_source_dir):
