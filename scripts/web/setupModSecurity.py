@@ -10,9 +10,9 @@ import requests
 import pwd
 import datetime
 
-CONFIG_FILE = '/etc/CodeMonkeyCyber/Persephone/borgConfig.yaml'
+CONFIG_FILE = '/etc/CodeMonkeyCyber/Eos/setupModSecurity.yaml'
 LOG_DIR = '/var/log/CodeMonkeyCyber'
-LOG_FILE = f'{LOG_DIR}/Persephone.log'
+LOG_FILE = f'{LOG_DIR}/setupModSecurity.log'
 
 logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
