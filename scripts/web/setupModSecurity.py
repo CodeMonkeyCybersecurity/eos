@@ -10,7 +10,6 @@ import requests
 import pwd
 import datetime
 
-CONFIG_FILE = '/etc/CodeMonkeyCyber/Eos/setupModSecurity.yaml'
 LOG_DIR = '/var/log/CodeMonkeyCyber'
 LOG_FILE = f'{LOG_DIR}/setupModSecurity.log'
 
