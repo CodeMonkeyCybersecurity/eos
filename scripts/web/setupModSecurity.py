@@ -8,6 +8,7 @@ import re
 import logging
 import requests
 import pwd
+import datetime
 
 logging.info("Credit that to https://www.linuxbabe.com/security/modsecurity-nginx-debian-ubuntu for the amazing instructions which this script is based on")
 
@@ -99,44 +100,62 @@ def run_command(command, error_message):
 def add_official_deb_src():
     """
     Add official Ubuntu deb-src entries to /etc/apt/sources.list.d/ubuntu.sources.
-    This function is idempotent: it ensures the file contains the correct entries without duplicates or conflicts.
     """
-    ubuntu_codename = get_ubuntu_codename()
-    sources_file = "/etc/apt/sources.list.d/ubuntu.sources"
-    deb_src_content = prepare_deb_src_entries(ubuntu_codename).strip()
+    sources_file = '/etc/apt/sources.list.d/ubuntu.sources'
+
+    # Check if the sources file exists
+    if os.path.exists(sources_file):
+        # Create backup filename with timestamp
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+        backup_file = f'/etc/apt/sources.list.d/ubuntu.sources_{timestamp}.bak'
+        try:
+            # Backup the current sources file
+            shutil.copy2(sources_file, backup_file)
+            print(f"Backed up {sources_file} to {backup_file}")
+        except Exception as e:
+            print(f"Error backing up file: {e}")
+            return
+        try:
+            # Delete the current sources file
+            os.remove(sources_file)
+            print(f"Deleted {sources_file}")
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+            return
+    else:
+        print(f"{sources_file} does not exist. Proceeding to create a new one.")
+
+    # Contents to write to the new sources file
+    new_contents = """Types: deb deb-src
+URIs: http://au.archive.ubuntu.com/ubuntu/
+Suites: noble noble-updates noble-backports
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb deb-src
+URIs: http://security.ubuntu.com/ubuntu/
+Suites: noble-security
+Components: main restricted universe multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+"""
 
     try:
-       # Ensure the directory exists
-        os.makedirs(os.path.dirname(sources_file), exist_ok=True)
-        
-        # Read existing content if the file exists
-        if os.path.exists(sources_file):
-            with open(sources_file, "r") as file:
-                existing_content = file.read().strip()
-        else:
-            existing_content = ""
-            
-        # Normalize the content by ensuring only the desired entries remain
-        if existing_content:
-            # Remove duplicate or conflicting entries
-            existing_lines = set(existing_content.splitlines())
-            new_lines = set(deb_src_content.splitlines())
-            merged_lines = sorted(existing_lines.union(new_lines))
-        else:
-            merged_lines = deb_src_content.splitlines()
-
-        # Write the updated content back to the file
-        with open(sources_file, "w") as file:
-            logging.info("Updating ubuntu.sources with deb-src entries.")
-            file.write("\n".join(merged_lines) + "\n")
-
-        logging.info("deb-src entries updated successfully.")
-
-        # Update package list
-        run_command("apt update", "Failed to update package list.")
+        # Write the new contents to the sources file
+        with open(sources_file, 'w') as f:
+            f.write(new_contents)
+        print(f"Created new {sources_file} with specified contents.")
     except Exception as e:
-        logging.error(f"Failed to ensure deb-src entries: {e}")
-        raise
+        print(f"Error writing to file: {e}")
+        return
+
+    # Run apt update
+    try:
+        print("Running 'apt update'...")
+        subprocess.run(['apt', 'update'], check=True)
+        print("apt update completed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running 'apt update': {e}")
+        return
 
 def get_latest_crs_version():
     """Fetch the latest CRS version from GitHub releases."""
