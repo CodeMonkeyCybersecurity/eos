@@ -102,6 +102,10 @@ def add_official_deb_src():
     sources_file = '/etc/apt/sources.list.d/ubuntu.sources'
     ubuntu_codename = get_ubuntu_codename()
 
+    if not ubuntu_codename:
+        logging.error(f"Unable to determine Ubuntu codename.")
+        return
+
     # Check if the sources file exists
     if os.path.exists(sources_file):
         # Create backup filename with timestamp
@@ -110,19 +114,19 @@ def add_official_deb_src():
         try:
             # Backup the current sources file
             shutil.copy2(sources_file, backup_file)
-            print(f"Backed up {sources_file} to {backup_file}")
+            logging.info(f"Backed up {sources_file} to {backup_file}")
         except Exception as e:
-            print(f"Error backing up file: {e}")
+            logging.info(f"Error backing up file: {e}")
             return
         try:
             # Delete the current sources file
             os.remove(sources_file)
-            print(f"Deleted {sources_file}")
+            logging.info(f"Deleted {sources_file}")
         except Exception as e:
-            print(f"Error deleting file: {e}")
+            logging.error(f"Error deleting file: {e}")
             return
     else:
-        print(f"{sources_file} does not exist. Proceeding to create a new one.")
+        logging.info(f"{sources_file} does not exist. Proceeding to create a new one.")
 
     # Contents to write to the new sources file
     entries = [
@@ -138,22 +142,21 @@ def add_official_deb_src():
         "Components: main restricted universe multiverse",
         "Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg"
     ]
-    return "\n".join(entries)
 
     try:
         # Write the new contents to the sources file
         with open(sources_file, 'w') as f:
-            f.write(new_contents)
-        print(f"Created new {sources_file} with specified contents.")
+            f.write("\n".join(entries))
+            logging.info(f"New sources written to {sources_file}")
     except Exception as e:
-        print(f"Error writing to file: {e}")
+        logging.error(f"Error writing to file: {e}")
         return
 
     # Run apt update
     try:
-        print("Running 'apt update'...")
+        logging.info("Running 'apt update'...")
         subprocess.run(['apt', 'update'], check=True)
-        print("apt update completed successfully.")
+        logging.debug("apt update completed successfully.")
     except subprocess.CalledProcessError as e:
         print(f"Error running 'apt update': {e}")
         return
