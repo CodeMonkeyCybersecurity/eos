@@ -1,20 +1,19 @@
-import shutil
-import os
+import subprocess
 
-def remove_directory(path):
+def remove_directory_with_shell(path):
     """
-    Recursively and forcefully delete a directory and its contents.
+    Use the shell command `rm -rf` to delete a directory and its contents.
 
     :param path: Path to the directory to be deleted.
     """
-    if os.path.exists(path):
-        try:
-            shutil.rmtree(path)
-            print(f"Successfully deleted: {path}")
-        except Exception as e:
-            print(f"Error while deleting {path}: {e}")
-    else:
-        print(f"Path does not exist: {path}")
+    try:
+        # Execute the command `rm -rf` using subprocess
+        subprocess.run(['rm', '-rf', path], check=True)
+        print(f"Successfully deleted: {path}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error occurred while deleting {path}: {e}")
+    except Exception as e:
+        print(f"Unexpected error: {e}")
 
 # Usage
-remove_directory("<path>")
+remove_directory_with_shell("<path>")
