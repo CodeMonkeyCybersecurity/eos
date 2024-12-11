@@ -1,0 +1,106 @@
+Script started on Tue Dec  3 20:31:52 2024
+/Users/henry/.zshrc:17: command not found: script "$(date +"%Y-%m-%d %H:%M") mnemosyne.txt"
+[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry/Eos/scripts/mnemosyne_logs[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro mnemosyne_logs % [K[?2004hsscripty[?2004l
+zsh: command not found: scripty
+[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry/Eos/scripts/mnemosyne_logs[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro mnemosyne_logs % [K[?2004hscripty       scriptyexit   eit brew updategrade[12Dsource ~/.zshrc[15Dvi scripty.[2C  [?2004l
+[?1006;1000h[?1002h[?1049h[22;0;0t[>4;2m[?1h=[?2004h[?1004h[1;41r[?12h[?12l[22;2t[22;1t[27m[23m[29m[m[H[2J[?25l[41;1H"scripty.sh" [New][2;1H▽[6n[2;1H  [3;1HPzz\[0%m[6n[3;1H           [1;1H[>c]10;?]11;?[2;1H[94m~                                                                           [3;1H~                                                                           [4;1H~                                                                           [5;1H~                                                                           [6;1H~                                                                           [7;1H~                                                                           [8;1H~                                                                           [9;1H~                                                                           [10;1H~                                                                           [11;1H~                                                                           [12;1H~                                                                           [13;1H~                                                                           [14;1H~                                                                           [15;1H~                                                                           [16;1H~                                                                           [17;1H~                                                                           [18;1H~                                                                           [19;1H~                                                                           [20;1H~                                                                           [21;1H~                                                                           [22;1H~                                                                           [23;1H~                                                                           [24;1H~                                                                           [25;1H~                                                                           [26;1H~                                                                           [27;1H~                                                                           [28;1H~                                                                           [29;1H~                                                                           [30;1H~                                                                           [31;1H~                                                                           [32;1H~                                                                           [33;1H~                                                                           [34;1H~                                                                           [35;1H~                                                                           [36;1H~                                                                           [37;1H~                                                                           [38;1H~                                                                           [39;1H~                                                                           [40;1H~                                                                           [m[41;59H0,0-1[9CAll[1;1H[?25h[?4m[27m[23m[29m[m[H[2J[?25l[2;1H[94m~                                                                           [3;1H~                                                                           [4;1H~                                                                           [5;1H~                                                                           [6;1H~                                                                           [7;1H~                                                                           [8;1H~                                                                           [9;1H~                                                                           [10;1H~                                                                           [11;1H~                                                                           [12;1H~                                                                           [13;1H~                                                                           [14;1H~                                                                           [15;1H~                                                                           [16;1H~                                                                           [17;1H~                                                                           [18;1H~                                                                           [19;1H~                                                                           [20;1H~                                                                           [21;1H~                                                                           [22;1H~                                                                           [23;1H~                                                                           [24;1H~                                                                           [25;1H~                                                                           [26;1H~                                                                           [27;1H~                                                                           [28;1H~                                                                           [29;1H~                                                                           [30;1H~                                                                           [31;1H~                                                                           [32;1H~                                                                           [33;1H~                                                                           [34;1H~                                                                           [35;1H~                                                                           [36;1H~                                                                           [37;1H~                                                                           [38;1H~                                                                           [39;1H~                                                                           [40;1H~                                                                           [m[41;59H0,0-1[9CAll"scripty.sh" [New][1;1H[?25h[?25l[41;49H^X[1;1H[41;49H  [1;1H[?25h[?25l[41;49H:[1;1H[41;1H[K[41;1H:[?25hwq![?25l[?1006;1000l[?1002l[?2004l[>4;m"scripty.sh" [New] 0L, 0B written[23;2t[23;1t
+[?1004l[?2004l[?1l>[?1049l[23;0;0t[?25h[>4;m[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry/Eos/scripts/mnemosyne_logs[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro mnemosyne_logs % [K[?2004hvi scripty.sh[13Dscripty      exit   eit brew updategrade[12Dsource ~/.zshrc[15Dvi scripty.[2C  [13Dsource ~/.z[2Crc[15Dvi scripty.[2C  [13Dsource ~/.z[2Crc[15Dvi scripty.[2C  [13Dcat ~/.zshrc [12Dvi scripty.sh[13Dsource ~/.z[2Crc[15Dvi scripty.[2C  [13Dsource ~/.z[2Crc[15Dbrew upgrade   [12Dsource ~/.zshrc[8D~/.zshrc [9D~/.zshrc [9D~/.zshrc [9D~/.zshrc [9D~/.zshrc [9Ds~/.zshrc [9D~/.zshrc [9Ds~/.zshrc[8Dsu~/.zshrc[8Dd~/.zshrc[8Do~/.zshrc[8D ~/.zshrc[8Dv~/.zshrc[8Di~/.zshrc[8D ~/.zshrc[8D[?2004l
+Password:
+[?1006;1000h[?1002h[?1049h[22;0;0t[>4;2m[?1h=[?2004h[?1004h[1;41r[?12h[?12l[22;2t[22;1t[27m[23m[29m[m[H[2J[?25l[41;1H"~/.zshrc" 18L, 498B[2;1H▽[6n[2;1H  [3;1HPzz\[0%m[6n[3;1H           [1;1H[>c]10;?]11;?[2;1H[34m# >>> conda initialize >>>[m[2;27H[K[3;1H[34m# !! Contents within this block are managed by 'conda init' !![m[3;63H[K[4;1H__conda_setup=[31m"[m[35m$([m[31m'/opt/anaconda3/bin/conda' 'shell.zsh' 'hook' [m[38;5;130m2>[m[31m /dev/null[m[35m))[m[5;1H[31m"[m
+[38;5;130mif[m [ [35m$?[m -eq [31m0[m ]; [38;5;130mthen
+[m    [38;5;130meval[m [31m"[m[35m$__conda_setup[m[31m"[m
+[38;5;130melse
+[m    [38;5;130mif[m [ -f [31m"/opt/anaconda3/etc/profile.d/conda.sh"[m ]; [38;5;130mthen[10;8H .[m [31m"/opt/anaconda3/etc/profile.d/conda.sh"[m
+    [38;5;130melse[12;9Hexport[m PATH=[31m"/opt/anaconda3/bin:[m[35m$PATH[m[31m"[m
+    [38;5;130mfi
+fi
+unset[m __conda_setup
+[34m# <<< conda initialize <<<[m
+
+[31m'script "$(date +"%Y-%m-%d %H:%M") mnemosyne.txt"'[m
+
+[94m~                                                                           [21;1H~                                                                           [22;1H~                                                                           [23;1H~                                                                           [24;1H~                                                                           [25;1H~                                                                           [26;1H~                                                                           [27;1H~                                                                           [28;1H~                                                                           [29;1H~                                                                           [30;1H~                                                                           [31;1H~                                                                           [32;1H~                                                                           [33;1H~                                                                           [34;1H~                                                                           [35;1H~                                                                           [36;1H~                                                                           [37;1H~                                                                           [38;1H~                                                                           [39;1H~                                                                           [40;1H~                                                                           [m[41;59H1,0-1[9CAll[1;1H[?25h[?4m[27m[23m[29m[m[H[2J[?25l[2;1H[96m# >>> conda initialize >>>
+# !! Contents within this block are managed by 'conda init' !![m
+__conda_setup=[95m"[m[38;5;81m$([m[95m'/opt/anaconda3/bin/conda' 'shell.zsh' 'hook' [m[93m2>[m[95m /dev/null[m[38;5;81m))[m[5;1H[95m"[m
+[93mif[m [ [38;5;81m$?[m -eq [95m0[m ]; [93mthen
+[m    [93meval[m [95m"[m[38;5;81m$__conda_setup[m[95m"[m
+[93melse
+[m    [93mif[m [ -f [95m"/opt/anaconda3/etc/profile.d/conda.sh"[m ]; [93mthen[10;8H .[m [95m"/opt/anaconda3/etc/profile.d/conda.sh"[m
+    [93melse[12;9Hexport[m PATH=[95m"/opt/anaconda3/bin:[m[38;5;81m$PATH[m[95m"[m
+    [93mfi
+fi
+unset[m __conda_setup
+[96m# <<< conda initialize <<<[m
+
+[95m'script "$(date +"%Y-%m-%d %H:%M") mnemosyne.txt"'[m
+
+[94m~                                                                           [21;1H~                                                                           [22;1H~                                                                           [23;1H~                                                                           [24;1H~                                                                           [25;1H~                                                                           [26;1H~                                                                           [27;1H~                                                                           [28;1H~                                                                           [29;1H~                                                                           [30;1H~                                                                           [31;1H~                                                                           [32;1H~                                                                           [33;1H~                                                                           [34;1H~                                                                           [35;1H~                                                                           [36;1H~                                                                           [37;1H~                                                                           [38;1H~                                                                           [39;1H~                                                                           [40;1H~                                                                           [m[41;59H1,0-1[9CAll"~/.zshrc" 18L, 498B[1;1H[?25h[?25l[41;49H~@k[1;1H[41;49H   [2;1H[41;59H2,1  [2;1H[?25h[?25l[41;49H~@k[2;1H[41;49H   [3;1H[41;59H3[3;1H[?25h[?25l[41;49H~@k[3;1H[41;49H   [4;1H[41;59H4[4;1H[?25h[?25l[41;49H~@k[4;1H[41;49H   [6;1H[41;59H5[6;1H[?25h[?25l[41;49H~@k[6;1H[41;49H   [7;1H[41;59H6[7;1H[?25h[?25l[41;49H~@k[7;1H[41;49H   [8;1H[41;59H7[8;1H[?25h[?25l[41;49H~@k[8;1H[41;49H   [9;1H[41;59H8[9;1H[?25h[?25l[41;49H~@k[9;1H[41;49H   [10;1H[41;59H9[10;1H[?25h[?25l[41;49H~@k[10;1H[41;49H   [11;1H[41;59H10,1[11;1H[?25h[?25l[41;49H~@k[11;1H[41;49H   [12;1H[41;60H1[12;1H[?25h[?25l[41;49H~@k[12;1H[41;49H   [13;1H[41;60H2[13;1H[?25h[?25l[41;49H~@k[13;1H[41;49H   [14;1H[41;60H3[14;1H[?25h[?25l[41;49H~@k[14;1H[41;49H   [15;1H[41;60H4[15;1H[?25h[?25l[41;49H~@k[15;1H[41;49H   [16;1H[41;60H5[16;1H[?25h[?25l[41;49H~@k[16;1H[41;49H   [17;1H[41;60H6,0-1[17;1H[?25h[?25l[41;49H~@k[17;1H[41;49H   [18;1H[41;60H7,1  [18;1H[?25h[?25l[41;49Hd[18;1H[?25h[?25l[41;50Hd[18;1H[41;49H  [18;1H[18;40r[40;1H
+[1;41r[40;1H[94m~                                                                           [m[41;1H[K[41;59H17,0-1[8CAll[18;1H[?25h[?25l[41;49Hd[18;1H[?25h[?25l[41;50Hd[18;1H[41;49H  [17;1H
+[94m~                                                                           [m[41;60H6[17;1H[?25h[?25l[41;49Hd[17;1H[?25h[?25l[41;50Hd[17;1H[41;49H  [16;1H
+[94m~                                                                           [m[41;60H5,1  [16;1H[?25h[?25l[41;49H:[16;1H[41;49H[K[41;1H:[?25hwq![?25l[?1006;1000l[?1002l[?2004l[>4;m"~/.zshrc" 15L, 445B written[23;2t[23;1t
+[?1004l[?2004l[?1l>[?1049l[23;0;0t[?25h[>4;m[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry/Eos/scripts/mnemosyne_logs[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro mnemosyne_logs % [K[?2004hssource ~/.zshe rc[?2004l
+[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry/Eos/scripts/mnemosyne_logs[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro mnemosyne_logs % [K[?2004hccd ~[?2004l
+[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro ~ % [K[?2004hlls -lah[?2004l
+total 259360
+drwxr-x---+  61 henry  staff   1.9K  3 Dec 20:32 .
+drwxr-xr-x    5 root   admin   160B 20 Nov 16:50 ..
+-r--------    1 henry  staff     7B 16 Nov 21:17 .CFUserTextEncoding
+-rw-r--r--@   1 henry  staff    12K  1 Dec 17:46 .DS_Store
+drwx------+  10 henry  staff   320B 28 Nov 12:21 .Trash
+drwxr-xr-x    4 henry  staff   128B 31 Jul 15:09 .anaconda
+-rw-------@   1 henry  staff    10K  9 Oct 21:58 .bash_history
+-rw-r--r--    1 root   staff   447B 31 Jul 15:08 .bash_profile
+-rw-r--r--@   1 henry  staff   200B 10 Sep 22:18 .bashrc
+drwx------@   2 henry  staff    64B  2 Aug 20:23 .cache
+drwxr-xr-x@   4 henry  staff   128B 17 Nov 08:42 .conda
+-rw-r--r--@   1 henry  staff    23B 31 Jul 15:09 .condarc
+drwxr-xr-x@   9 henry  staff   288B 26 Nov 21:09 .config
+drwxr-xr-x    3 henry  staff    96B 31 Jul 15:09 .continuum
+drwx------    3 henry  staff    96B 30 Oct 17:34 .cups
+drwxr-xr-x@  14 henry  staff   448B 20 Nov 18:52 .docker
+-rw-r--r--@   1 henry  staff   335B 21 Sep 15:01 .gitconfig
+drwxr-xr-x@   3 henry  staff    96B 19 Oct 20:27 .gk
+drwxr-xr-x@  11 henry  staff   352B 19 Sep 20:02 .ipfs
+drwxr-xr-x@   3 henry  staff    96B 19 Aug 20:15 .ipython
+drwxr-xr-x    4 henry  staff   128B 17 Oct 23:02 .kube
+drwxr-xr-x@   4 henry  staff   128B 26 Aug 19:12 .local
+drwxr-xr-x   18 henry  staff   576B 17 Oct 23:01 .minikube
+drwxr-xr-x@   5 henry  staff   160B 19 Oct 20:29 .npm
+-rw-------    1 henry  staff     7B 31 Jul 16:21 .python_history
+drwxr-xr-x@   6 henry  staff   192B 19 Oct 20:22 .rest-client
+drwx------    8 henry  staff   256B 30 Nov 20:07 .ssh
+-rw-r--r--    1 root   staff   281B 31 Jul 15:08 .tcshrc
+drwxr-xr-x@   4 henry  staff   128B  8 Aug 15:21 .thumbnails
+drwxr-xr-x@   3 henry  staff    96B  9 Sep 11:49 .vim
+-rw-------    1 root   staff   8.4K  3 Dec 20:32 .viminfo
+drwxr-xr-x@   5 henry  staff   160B 31 Jul 14:22 .vscode
+drwxr-xr-x@   4 henry  staff   128B 12 Aug 12:04 .vscode-oss
+-rw-r--r--    1 henry  staff   165B 12 Oct 12:56 .wget-hsts
+-rw-r--r--@   1 henry  staff   635B 31 Jul 15:08 .xonshrc
+-rw-r--r--@   1 henry  staff    43B 31 Jul 14:14 .zprofile
+-rw-------    1 henry  staff    20K  3 Dec 20:28 .zsh_history
+drwx------  156 henry  staff   4.9K  3 Dec 20:29 .zsh_sessions
+-rw-r--r--    1 henry  staff   445B  3 Dec 20:32 .zshrc
+-rw-r--r--    1 henry  staff   681K 28 Nov 09:37 2024-11-28 09:00 mnemosyne.txt
+-rw-r--r--    1 henry  staff   289K 28 Nov 10:44 2024-11-28 09:39 mnemosyne.txt
+drwxr-xr-x@   7 henry  staff   224B  7 Sep 10:20 Applications
+drwxr-xr-x@   6 henry  staff   192B 30 Nov 19:39 Applications (Parallels)
+drwx------@  19 henry  staff   608B 30 Nov 23:41 Desktop
+drwx------@ 263 henry  staff   8.2K 28 Nov 13:48 Documents
+drwxr--r--@  66 henry  staff   2.1K  1 Dec 22:50 Downloads
+drwxr-xr-x   13 henry  staff   416B  3 Dec 18:52 Eos
+drwx------@  99 henry  staff   3.1K 23 Sep 20:25 Library
+drwx------@  12 henry  staff   384B 22 Sep 13:42 Movies
+drwx------@ 725 henry  staff    23K  6 Aug 12:30 Music
+drwx------@   5 henry  staff   160B 16 Nov 21:36 Parallels
+drwx------@  23 henry  staff   736B 17 Oct 17:07 Pictures
+drwxr-xr-x+   4 henry  staff   128B 31 Jul 13:41 Public
+-rw-r--r--@   1 root   staff    13K 19 Oct 20:12 borgbackupdocker.mjs
+drwxr-xr-x    6 henry  staff   192B 26 Oct 18:05 debugging configs
+drwxr-xr-x    7 henry  staff   224B 21 Oct 21:35 kube
+-rw-r--r--    1 henry  staff    99M 17 Oct 22:55 minikube
+drwxr-xr-x    2 henry  staff    64B  3 Dec 20:29 mnemosyne_logs
+drwxr-xr-x    7 henry  staff   224B 12 Oct 13:21 nebula
+-rw-r--r--    1 henry  staff    27M 10 Sep 02:20 nebula-darwin.zip
+-rw-r--r--    1 henry  staff    84B 16 Nov 22:38 package-lock.json
+[1m[7m%[27m[1m[0m                                                                            ]7;file://Henrys-MacBook-Pro.local/Users/henry[0m[27m[24m[J(base) henry@Henrys-MacBook-Pro ~ % [K[?2004h
