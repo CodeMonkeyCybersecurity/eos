@@ -35,10 +35,9 @@ spec:
             configMapKeyRef:
               name: mongodb-configmap
               key: database_url
-
 ---
 apiVersion: v1
-kind: Service
+kind: Service 
 metadata:
   name: mongo-express-service
 spec:
