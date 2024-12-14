@@ -96,13 +96,18 @@ NOTE: .mjs is slowly going to be phased out in this repo in favour of using pyth
 ## What directories and files will be used
 
 CONFIG_FILE = '/etc/CodeMonkeyCyber/Eos/borgConfig.yaml'
+
 LOG_DIR = '/var/log/CodeMonkeyCyber'
+
 LOG_FILE = f'{LOG_DIR}/Eos.log'
+
 SUBMODULES_SOURCE = './submodules'
+
 SUBMODULES_DEST = '/usr/local/bin/Eos'
 
 ## What other scripts are available?
 To find out what other scripts are available:
+
 ```bash
 user@hostname:~/Eos/scripts$ ls
 ```
