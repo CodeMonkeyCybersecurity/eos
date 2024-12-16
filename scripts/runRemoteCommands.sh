@@ -25,10 +25,13 @@ if [ ${#ENDPOINTS[@]} -eq 0 ]; then
     exit 1
 fi
 
+read -s -p "Enter sudo password: " SUDO_PASS
+echo
+
 # Run the command on each endpoint
 for ENDPOINT in "${ENDPOINTS[@]}"; do
     echo "Running command on $ENDPOINT..."
-    ssh "${SSH_USER}@${ENDPOINT}" "$COMMAND"
+    ssh "${SSH_USER}@${ENDPOINT}" "echo $SUDO_PASS | sudo -S $COMMAND"
 done
 
 # Wait for all background processes to complete
