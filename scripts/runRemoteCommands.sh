@@ -1,4 +1,5 @@
 #!/bin/bash
+# runRemoteCommands.sh
 
 # Prompt user for endpoints if not provided via command-line options
 if [ -z "$1" ]; then
@@ -27,7 +28,7 @@ fi
 # Run the command on each endpoint
 for ENDPOINT in "${ENDPOINTS[@]}"; do
     echo "Running command on $ENDPOINT..."
-    ssh "${SSH_USER}@${ENDPOINT}" "$COMMAND" &
+    ssh "${SSH_USER}@${ENDPOINT}" "$COMMAND" &&
 done
 
 # Wait for all background processes to complete
