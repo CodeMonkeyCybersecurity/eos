@@ -34,7 +34,7 @@ spec:
           valueFrom: 
             configMapKeyRef:
               name: mongo-config
-              key: mongo_url
+              key: mongo-url
 ---
 apiVersion: v1
 kind: Service
