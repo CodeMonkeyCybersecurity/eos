@@ -1,44 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mongodb-depl
+  name: mongo-deployment
   labels:
-    app: mongodb
+    app: mongo
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: mongodb
+      app: mongo
   template:
     metadata:
       labels:
-       app: mongodb
+        app: mongo
     spec:
       containers:
       - name: mongodb
-        image: mongo
+        image: mongo:5.0
         ports:
         - containerPort: 27017
-        env: 
-        - name: MONGO_INITDB_ROOT_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: mongodb-secret
-              key: mongo-root-username
-        - name: MONGO_INITDB_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mongodb-secret
-              key: mongo-root-password
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongodb-service
+  name: mongo-service
 spec:
   selector:
-    app: mongodb
+    app.kubernetes.io/name: MyApp
   ports:
     - protocol: TCP
       port: 27017
-      targetPort: 27017
+      targetPort: 27017 # Needs to be the same as containerPort
