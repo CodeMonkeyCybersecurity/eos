@@ -67,8 +67,19 @@ function deployIngress() {
     fi
 }
 
+function startKube() {
+    if yesNoPrompt "Do you want start minikube?"; then
+        minikube start
+    else 
+        echo "minikube not started"
+    fi
+}
+
 deployTestService
 deployLoadBalance
 deployIngress
+startKube
 
 echo "finis"
+
+set +x
