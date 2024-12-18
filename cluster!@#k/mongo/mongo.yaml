@@ -25,7 +25,6 @@ spec:
             secretKeyRef:
               name: mongo-secret
               key: mongo-user
-        env:
         - name: MONGO_INITDB_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
