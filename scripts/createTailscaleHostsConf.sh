@@ -6,7 +6,7 @@ set -xe
 source ../variables.conf
 # Define output file
 # Generate Tailscale hosts YAML
-echo "Generating Tailscale hosts YAML file..."
+echo "Generating Tailscale hosts .conf file..."
 tailscale status --json | jq -r '.Peer[] | "- hostname: \(.HostName)\n  ip: \(.TailAddr)"' | grep -v "$(hostname)" > "$TAILSCALE_HOSTS_YAML"
 ls -lah "$TAILSCALE_HOSTS_CONF"
 cat "$TAILSCALE_HOSTS_CONF"
