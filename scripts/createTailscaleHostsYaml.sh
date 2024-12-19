@@ -9,5 +9,6 @@ TAILSCALE_HOSTS_YAML="/opt/cyberMonkey/tailscaleHosts.yaml"
 echo "Generating Tailscale hosts YAML file..."
 tailscale status --json | jq -r '.Peer[] | "- hostname: \(.HostName)\n  ip: \(.TailAddr)"' | grep -v "$(hostname)" > "$TAILSCALE_HOSTS_YAML"
 ls -lah "$TAILSCALE_HOSTS_YAML"
+cat "$TAILSCALE_HOSTS_YAML"
 set +x
 echo "finis"
