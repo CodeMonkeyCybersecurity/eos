@@ -1,5 +1,7 @@
 #!/bin/bash
 
+../utils/checkSudo.sh
+
 # Prompt user for endpoints if not provided via command-line options
 if [ -z "$1" ]; then
     read -p "Enter the computers you want to copy your ssh key to (comma-separated, e.g., endpoint1,endpoint2,endpoint3): " ENDPOINTS_INPUT
