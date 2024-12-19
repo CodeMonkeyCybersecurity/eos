@@ -168,3 +168,6 @@ cython_debug/
 *.deb
 *.conf
 *mnemosyne.txt
+
+# MacOS
+.DS_Store
