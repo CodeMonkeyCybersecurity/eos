@@ -18,6 +18,7 @@ remote_path="/opt/dmesgs"
 scp_retrieve_file() {
     # Execute the SCP command to recursively copy the directory
     scp -r "$remote_user@$remote_host:$remote_path" "$local_path"
+    ls -lah "$local_path"
 
     # Check if the command succeeded
     if [ $? -eq 0 ]; then
