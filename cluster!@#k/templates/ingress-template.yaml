@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: minimal-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec: # routing rules
+  ingressClassName: nginx-example
+  rules:
+  - host: myapp.com # public facing DNS name. needs to be valid domain name 
+    http: # can configure https using this. this is actially internal 
+      paths: # everything after domain name eg. myapp.com/mypath
+      - path: /testpath
+        pathType: Prefix
+        backend:
+          service:
+            name: test
+            port:
+              number: 80 # needs to be same as target port of internal services
+
+              # instead of LoadBalancer, default type is ClusterIP
+              # no nodePort in internal service
+
+# https://kubernetes.io/docs/concepts/services-networking/ingress/
