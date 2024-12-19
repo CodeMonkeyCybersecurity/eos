@@ -1,5 +1,5 @@
 #!/bin/bash
-# /scripts/createHostsYaml.sh
+# /scripts/createHostsConf.sh
 set -xe
 ../utils/checkSudo.sh
 ../utils/cyberMonkeyDir.sh
