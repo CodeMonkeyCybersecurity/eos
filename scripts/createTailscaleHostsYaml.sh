@@ -8,8 +8,6 @@ set -xe
 
 TAILSCALE_HOSTS_YAML="$CYBERMONKEY_DIR/tailscaleHosts.yaml"
 
-mkdir -p
-
 tailscale status --json | jq -r '.Peer[] | "- hostname: \(.HostName)\n  ip: \(.TailAddr)"' | grep -v "$(hostname)" > "$TAILSCALE_HOSTS_YAML"
 
 set +x
