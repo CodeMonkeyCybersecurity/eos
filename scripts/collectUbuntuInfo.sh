@@ -1,6 +1,10 @@
 #!/bin/bash
 # TODO: DO NOT USE STILL IN DEVELOPMENT
 
+set -xe
+
+../utils/checkSudo.sh
+
 ps aux
 users
 ls -lah /tmp
@@ -10,7 +14,8 @@ df -h
 lsblk
 cat .bash_history
 cat /etc/crontab
-sudo dmesg
+dmesg
 ip a
-sudo crontab -l
 crontab -l
+
+set +x
