@@ -2,7 +2,7 @@
 
 set -xe
 
-../submodules/checkSudo.sh
+../utils/checkSudo.sh
 
 mkdir -p /opt/dmesgs
 
