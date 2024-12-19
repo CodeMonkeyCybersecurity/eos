@@ -17,12 +17,7 @@ read -p "Enter the username you want to manage these with: " USER
     done
     echo "\""
 } > "$CONF_FILE"
-
 echo ".conf file created at $CONF_FILE with the following content:"
 cat "$CONF_FILE"
-
 set +x
-
 echo "finis"
-
-
