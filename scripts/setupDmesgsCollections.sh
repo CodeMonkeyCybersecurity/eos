@@ -1,9 +1,9 @@
 #!/bin/bash
-# setupDmesgsCollections.sh 
+# setupDmesgsCollections.sh
 
 set -xe
 
-../checkSudo.sh
+../utils/checkSudo.sh
 
 # Set local path for retrieved files
 local_path="/opt/dmesgs/collections"
