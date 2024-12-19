@@ -4,7 +4,7 @@
 set -xe
 
 ../utils/checkSudo.sh
-CYBERMONKEY_DIR=$("../utils/cyberMonkeyDir.sh") || { echo "cyberMonkeyDir.sh failed"; exit 1; }
+../utils/cyberMonkeyDir.sh
 
 # Define output file
 TAILSCALE_HOSTS_YAML="$CYBERMONKEY_DIR/tailscaleHosts.yaml"
