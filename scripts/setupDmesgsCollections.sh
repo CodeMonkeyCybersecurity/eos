@@ -6,13 +6,13 @@ set -xe
 ../utils/checkSudo.sh
 
 # Set local path for retrieved files
-local_path="/opt/dmesgs/collections"
+local_path="/opt/cyberMonkey/dmesgs/collections"
 mkdir -p "$local_path"
 
 # Prompt for user input
 read -p "Enter the address of the remote computer (hostname or IP): " remote_host
 read -p "Enter the username of the remote computer: " remote_user
-remote_path="/opt/dmesgs"
+remote_path="/opt/cyberMonkey/dmesgs"
 
 # Function to retrieve a file using SCP
 scp_retrieve_file() {
