@@ -4,11 +4,13 @@ set -xe
 
 ../utils/checkSudo.sh
 
-mkdir -p /opt/dmesgs
+DMESGS_DIR="/opt/cyberMonkey/dmesgs"
 
-dmesg > "/opt/dmesgs/$(date +"%Y-%m-%d_%H-%M")_dmesg.txt"
+mkdir -p "$DMESGS_DIR"
 
-ls -lah /opt/dmesgs
+dmesg > "$DMESGS_DIR/$(date +"%Y-%m-%d_%H-%M")_dmesg.txt"
+
+ls -lah "$DMESGS_DIR"
 
 set +x
 
