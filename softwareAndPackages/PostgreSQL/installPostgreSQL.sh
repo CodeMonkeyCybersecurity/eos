@@ -9,4 +9,8 @@ echo ""
 source "$UTILITIES_DIR/apt.sh"
 source "$UTILITIES_DIR/start.sh" || { echo "Failed to source start.sh"; exit 1; }
 apt install -y postgresql || { echo "Failed to install PostgreSQL"; exit 1; }
+postgresql --version
+systemctl enable postgresql
+systemctl start postgresql
+systemctl status postgresql
 source "$UTILITIES_DIR/stop.sh" || { echo "Failed to source stop.sh"; exit 1; }
