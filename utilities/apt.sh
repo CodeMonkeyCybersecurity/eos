@@ -1,6 +1,6 @@
 #!/bin/bash
 # /utilities/apt.sh
-source checkSudo.sh
+source "$UTILITIES_DIR/checkSudo.sh"
 echo -e "Before you do this, it's a good idea to update apt.\n"
 echo "Please choose an option from the list below:"
 # Define the list of options
