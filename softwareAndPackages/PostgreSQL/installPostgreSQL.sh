@@ -42,4 +42,6 @@ psql -U postgres -c "\du"
 psql -U postgres -c "SELECT usename, client_addr, application_name FROM pg_stat_activity;"
 
 systemctl restart postgresql
+
 source "$UTILITIES_DIR/stop.sh" || { echo "Failed to source stop.sh"; exit 1; }
+echo "PostgreSQL installation and configuration complete."
