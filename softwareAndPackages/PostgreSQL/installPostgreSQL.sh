@@ -28,14 +28,14 @@ sudo cp $PSQL_CONFIG_DIR/postgresql.conf $PSQL_CONFIG_DIR/postgresql.conf.bak
 echo "Set Up a Superuser Password"
 read -n 1 -s -r -p "Press any key to continue..."
 echo ""
-sudo -u postgres psql
+sudo -u postgres psql <<EOF
 \password postgres
+EOF
 
 # TODO figure this out
 # Automate configuration edits
 #sed -i "s/peer/scram-sha-256/" "$PSQL_CONFIG_DIR/pg_hba.conf"
 #sed -i "s/md5/scram-sha-256/" "$PSQL_CONFIG_DIR/pg_hba.conf"
-psql -U postgres
 psql -U postgres -c "SHOW listen_addresses;"
 psql -U postgres -c "SHOW ssl;"
 psql -U postgres -c "\du"
