@@ -4,7 +4,8 @@ sudo -u postgres psql -d "colours_db"<<EOF
 CREATE TABLE IF NOT EXISTS open_colour (
     id SERIAL PRIMARY KEY,
     colour_name VARCHAR(50) NOT NULL,
-    hex_value CHAR(7) NOT NULL
+    hex_value CHAR(7) NOT NULL,
+    rgb_value VARCHAR(15) NOT NULL
 );
 
 INSERT INTO open_colour (colour_name, hex_value, rgb_value) VALUES

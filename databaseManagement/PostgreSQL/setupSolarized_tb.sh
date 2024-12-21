@@ -4,7 +4,8 @@ sudo -u postgres psql -d "colours_db"<<EOF
 CREATE TABLE IF NOT EXISTS solarized (
     id SERIAL PRIMARY KEY,
     colour_name VARCHAR(50) NOT NULL,
-    hex_value CHAR(7) NOT NULL
+    hex_value CHAR(7) NOT NULL,
+    rgb_value VARCHAR(15) NOT NULL
 );
 
 INSERT INTO solarized (colour_name, hex_value, rgb_value) VALUES
@@ -23,6 +24,6 @@ INSERT INTO solarized (colour_name, hex_value, rgb_value) VALUES
 ('Violet', '#6c71c4', '108,113,196'),
 ('Blue', '#268bd2', '38,139,210'),
 ('Cyan', '#2aa198', '42,161,152'),
-('Green', '#859900', '133,153,0');
+('Green', '#859900', '133,153,0')
 ON CONFLICT (colour_name) DO NOTHING;
 EOF
