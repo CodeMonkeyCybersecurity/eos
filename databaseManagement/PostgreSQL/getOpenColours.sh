@@ -1,6 +1,5 @@
 #!/bin/bash
 # Define the target database
-set -xe
 DATABASE="colours_db"
 # fetch data from the database
 COLORS=$(
@@ -23,4 +22,3 @@ while IFS="|" read -r colour_name hex_value rgb_value; do
     echo -e "\e[38;2;${r};${g};${b}mThis is $colour_name. Hex: $hex_value. RGB: $rgb_value\e[0m"
 done <<< "$COLORS"
 echo "All colours displayed. Exiting."
-set +x
