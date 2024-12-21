@@ -49,7 +49,7 @@ func init() {
 	dbPassword := os.Getenv("DB_PASSWORD")
 	if dbPassword == "" {
 		log.Fatal("Database password not set. Please set the DB_PASSWORD environment variable.")
-	}	dbName := "eos_db"
+	}	dbName := "eosdb"
 	// Connection string
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		dbHost, dbPort, dbUser, dbPassword, dbName)
