@@ -1,13 +1,13 @@
 #!/bin/bash
 
-sudo -u postgres psql <<EOF
-CREATE TABLE open_colors (
+sudo -u postgres psql -d "colours_db"<<EOF
+CREATE TABLE IF NOT EXISTS open_colour (
     id SERIAL PRIMARY KEY,
-    color_name VARCHAR(50) NOT NULL,
+    colour_name VARCHAR(50) NOT NULL,
     hex_value CHAR(7) NOT NULL
 );
 
-INSERT INTO open_colors (color_name, hex_value) VALUES
+INSERT INTO open_colour (colour_name, hex_value) VALUES
 ('White', '#ffffff'),
 ('Black', '#000000'),
 ('Gray 0', '#f8f9fa'),
@@ -140,4 +140,5 @@ INSERT INTO open_colors (color_name, hex_value) VALUES
 ('Orange 7', '#f76707'),
 ('Orange 8', '#e8590c'),
 ('Orange 9', '#d9480f');
+ON CONFLICT (colour_name) DO NOTHING;
 EOF
