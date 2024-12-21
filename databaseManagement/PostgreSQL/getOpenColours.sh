@@ -1,7 +1,7 @@
 #!/bin/bash
 # Define the target database
 DATABASE="colours_db"
-etch data from the database
+fetch data from the database
 COLORS=$(sudo -u postgres psql -d "$DATABASE" -t -c "SELECT colour_name, hex_value, rgb_value FROM open_colours;")
 # Loop through each color
 echo "$COLORS" | while IFS="|" read -r colour_name hex_value rgb_value; do
