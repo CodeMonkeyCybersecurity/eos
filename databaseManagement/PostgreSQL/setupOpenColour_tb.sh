@@ -111,5 +111,4 @@ INSERT INTO open_colour (colour_name, hex_value, rgb_value) VALUES
 ('Green 7', '#37b24d', '55,178,77'),
 ('Green 8', '#2f9e44', '47,158,68'),
 ('Green 9', '#2b8a3e', '43,138,62');
-ON CONFLICT (colour_name) DO NOTHING;
 EOF

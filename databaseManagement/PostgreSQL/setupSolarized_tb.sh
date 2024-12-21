@@ -25,5 +25,4 @@ INSERT INTO solarized (colour_name, hex_value, rgb_value) VALUES
 ('Blue', '#268bd2', '38,139,210'),
 ('Cyan', '#2aa198', '42,161,152'),
 ('Green', '#859900', '133,153,0')
-ON CONFLICT (colour_name) DO NOTHING;
 EOF
