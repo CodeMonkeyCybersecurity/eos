@@ -2,7 +2,7 @@
 # Define the target database
 DATABASE="colours_db"
 fetch data from the database
-COLORS=$(sudo -u postgres psql -d "$DATABASE" -t -c "SELECT colour_name, hex_value, rgb_value FROM open_colours;")
+COLORS=$(sudo -u postgres psql -d "$DATABASE" -t -c "SELECT colour_name, hex_value, rgb_value FROM open_colour;")
 # Loop through each color
 echo "$COLORS" | while IFS="|" read -r colour_name hex_value rgb_value; do
     # Trim spaces
