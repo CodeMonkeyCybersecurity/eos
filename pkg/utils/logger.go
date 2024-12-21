@@ -91,6 +91,13 @@ func (l *Logger) logToDatabase(level LogLevel, message string) error {
 	if l.db == nil {
 		return fmt.Errorf("database connection is nil")
 	}
+
+	// Check if the database connection is alive
+	if err := l.db.Ping(); err != nil {
+		l.logger.Printf("[ERROR] Database connection lost: %v", err)
+		return err
+	}
+
 	query := `INSERT INTO logs (timestamp, level, message) VALUES ($1, $2, $3)`
 	_, err := l.db.Exec(query, time.Now(), level, message)
 	return err
