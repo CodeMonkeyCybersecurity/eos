@@ -32,9 +32,12 @@ var getCmd = &cobra.Command{
 			getHardware()
 		case "basic":
 			getBasic()
+		case "privileges":
+			getPrivileges()
 		default:
 			fmt.Printf("Error: Unsupported resource '%s'.\n", object)
 			os.Exit(1)
+
 		}
 	},
 }
@@ -102,8 +105,8 @@ func getBasic() {
 	fmt.Println("  Swap usage:             ", getSwapUsage())
 	fmt.Println("  Processes:              ", getProcessCount())
 	fmt.Println("  Users logged in:        ", getLoggedInUsers())
-	fmt.Println("  IPv4 address for ens18: ", getIPAddress("ens18", false))
-	fmt.Println("  IPv6 address for ens18: ", getIPAddress("ens18", true))
+	fmt.Println("  IPv4 address:           ", getIPAddress("ens18", false))
+	fmt.Println("  IPv6 address:           ", getIPAddress("ens18", true))
 }
 
 // Helper functions
