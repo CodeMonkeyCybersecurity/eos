@@ -1,5 +1,6 @@
 #!/bin/bash
 # Define the target database
+set -xe
 DATABASE="colours_db"
 # Fetch data from the database
 COLORS=$(sudo -u postgres psql -d "$DATABASE" -t -c "SELECT colour_name, hex_value, rgb_value FROM solarized;")
@@ -17,3 +18,4 @@ echo "$COLORS" | while IFS="|" read -r colour_name hex_value rgb_value; do
     echo -e "\e[38;2;${r};${g};${b}mThis is $colour_name. Hex: $hex_value. RGB: $rgb_value\e[0m"
 done
 echo "All colours displayed. Exiting."
+set +x
