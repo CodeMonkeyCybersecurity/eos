@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS configurations (
     value TEXT NOT NULL
 );
 EOF
-    then
+    if
         echo -e "${RED}Error: Failed to create schema.${RESET}"
         exit 1
     fi
