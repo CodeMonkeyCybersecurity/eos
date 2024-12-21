@@ -1,4 +1,9 @@
 #!/bin/bash
+# List all databases to confirm the changes
+echo "Listing all databases..."
+sudo -u postgres psql <<EOF
+\l
+EOF
 read -p "What is the old database name (the one you want to change)?: " OLD_DB_NAME
 read -p "What is the new database name (what do you want to change it to)?: " NEW_DB_NAME
 # Check for empty inputs
