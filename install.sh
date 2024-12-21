@@ -78,7 +78,7 @@ function setup_database() {
     echo -e "${GREEN}Database '$DB_NAME' is ready.${RESET}"
 
     # Create required tables
-    psql -U $DB_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME <<EOF
+    if ! psql -U $DB_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME <<EOF
 CREATE TABLE IF NOT EXISTS logs (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS configurations (
     value TEXT NOT NULL
 );
 EOF
-    if
+    then
         echo -e "${RED}Error: Failed to create schema.${RESET}"
         exit 1
     fi
