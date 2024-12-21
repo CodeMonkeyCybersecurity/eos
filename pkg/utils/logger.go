@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -15,6 +18,28 @@ type Logger struct {
 	logger      *log.Logger
 	terminalMin LogLevel
 	colorize    bool // Enable or disable colorization
+}
+
+var (
+	globalLogger *Logger
+	once         sync.Once
+)
+
+// InitializeLogger sets up the global logger instance
+func InitializeLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colorize bool) error {
+	var err error
+	once.Do(func() {
+		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colorize)
+	})
+	return err
+}
+
+// GetLogger returns the global logger instance
+func GetLogger() *Logger {
+	if globalLogger == nil {
+		log.Fatalf("Logger not initialized. Call InitializeLogger first.")
+	}
+	return globalLogger
 }
 
 // NewLogger initializes a new Logger with file and database logging
@@ -74,6 +99,22 @@ const resetColor = "\033[0m"
 
 // applyColor applies ANSI color codes to the message if colorization is enabled
 func (l *Logger) applyColor(level LogLevel, message string) string {
+	// Retrieve metadata
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	hostname, _ := os.Hostname()
+	pid := strconv.Itoa(os.Getpid())
+
+	// Retrieve the current user
+	user := "unknown"
+	if u, err := exec.Command("whoami").Output(); err == nil {
+		user = string(u)
+		user = user[:len(user)-1] // Remove the trailing newline
+	}
+
+	// Format the message with metadata
+	formattedMessage := fmt.Sprintf("[%s] [%s] [PID:%s] %s", timestamp, hostname, pid, message)
+
+	// Add color if enabled
 	if l.colorize {
 		return fmt.Sprintf("%s[%s] %s%s", colorMap[level], level, message, resetColor)
 	}
