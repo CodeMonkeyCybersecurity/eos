@@ -116,9 +116,9 @@ func (l *Logger) applyColor(level LogLevel, message string) string {
 
 	// Add color if enabled
 	if l.colorize {
-		return fmt.Sprintf("%s[%s] %s%s", colorMap[level], level, message, resetColor)
+		return fmt.Sprintf("%s[%s] %s%s", colorMap[level], level, formattedMessage, resetColor)
 	}
-	return fmt.Sprintf("[%s] %s", level, message)
+	return fmt.Sprintf("[%s] %s", level, formattedMessage)
 }
 
 // logToFile logs a message to the file with optional colorization
