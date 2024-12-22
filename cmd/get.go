@@ -35,7 +35,7 @@ var getCmd = &cobra.Command{
 		case "privileges":
 			getPrivileges()
 		default:
-			fmt.Printf("Error: Unsupported resource '%s'.\n", object)
+			fmt.Println("Error: Unsupported resource. Use `eos get [processes|users|hardware|basic|privileges]`.")
 			os.Exit(1)
 
 		}
@@ -94,6 +94,9 @@ func getHardware() {
 	if err != nil {
 		fmt.Printf("Error fetching hardware details: %v\n", err)
 		return
+	}
+	if os.Geteuid() != 0 {
+		fmt.Println("Warning: Some details may be unavailable without root privileges.")
 	}
 	fmt.Println(output.String())
 }
@@ -189,27 +192,29 @@ func getIPAddress(ifaceName string, isIPv6 bool) string {
 	if ifaceName == "" {
 		return "No active interfaces found"
 	}
-
+	// Get interface by name
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
-		return "N/A"
+		return fmt.Sprintf("Error: Interface %s not found", ifaceName)
 	}
+	// Get IP addresses for the interface
 	addrs, err := iface.Addrs()
 	if err != nil {
-		return "N/A"
+		return fmt.Sprintf("Error retrieving addresses for %s", ifaceName)
 	}
+	// Filter for IPv4 or IPv6 addresses
 	for _, addr := range addrs {
 		ipNet, ok := addr.(*net.IPNet)
 		if !ok {
 			continue
 		}
-		if isIPv6 && ipNet.IP.To4() == nil {
+		if isIPv6 && ipNet.IP.To4() == nil { // IPv6
 			return ipNet.IP.String()
-		} else if !isIPv6 && ipNet.IP.To4() != nil {
+		} else if !isIPv6 && ipNet.IP.To4() != nil { // IPv4
 			return ipNet.IP.String()
 		}
 	}
-	return "N/A"
+	return "No suitable IP address found"
 }
 
 func parseMemValue(line string) uint64 {
@@ -219,4 +224,8 @@ func parseMemValue(line string) uint64 {
 	}
 	value, _ := strconv.ParseUint(fields[1], 10, 64)
 	return value * 1024 // kB to Bytes
+}
+
+func getPrivileges() {
+	fmt.Println("Fetching privileges is not implemented yet.")
 }
