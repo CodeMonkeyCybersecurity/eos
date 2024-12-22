@@ -23,7 +23,8 @@ sudo -u eos_user psql -d eos_db -c "\dt"   # List tables in the eos_db
 echo "Press Enter to continue..."
 read -r
 
-sudo -u eos_user psql -d eos_db -c "SELECT * FROM logs;"
+# verify that eos_user has the required privileges
+sudo -u eos_user psql -d "$DB_NAME" -c "\z"
 echo "Press Enter to continue..."
 read -r
 
