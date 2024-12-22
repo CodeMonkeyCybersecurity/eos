@@ -89,23 +89,23 @@ function create_eos_system_user() {
 }
 create_eos_system_user
 
-
-
 function setup_ssh_key() {
     echo -e "${GREEN}Setting up SSH key-based authentication...${RESET}"
 
-    SSH_KEY="$HOME/.ssh/id_ed25519"
-    SSH_PUB_KEY="$HOME/.ssh/id_ed25519.pub"
+    SSH_KEY_DIR="/home/$SYSTEM_USER/.ssh"
+    SSH_KEY_FILE="$SSH_KEY_DIR/id_ed25519"
 
-    # Check if key already exists
-    if [ -f "$SSH_KEY" ]; then
-        echo -e "${GREEN}An SSH key already exists at $SSH_KEY.${RESET}"
-    else
-        echo -e "${GREEN}Generating a new SSH key pair...${RESET}"
-        ssh-keygen -N "" -f "$SSH_KEY"
-        echo -e "${GREEN}SSH key generated at $SSH_KEY.${RESET}"
-    fi
-}
+    sudo -u "$SYSTEM_USER" bash <<EOF
+mkdir -p "$SSH_KEY_DIR"
+chmod 700 "$SSH_KEY_DIR"
+if [ ! -f "$SSH_KEY_FILE" ]; then
+    ssh-keygen -t ed25519 -f "$SSH_KEY_FILE" -N ""
+    chmod 600 "$SSH_KEY_FILE"
+    chmod 644 "$SSH_KEY_FILE.pub"
+else
+    echo "SSH key already exists at $SSH_KEY_FILE"
+fi
+EOF
 
 # Add a new PostgreSQL user for the Eos app
 function create_eos_db_user() {
