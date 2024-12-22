@@ -72,6 +72,28 @@ DB_HOST="localhost"
 DB_PORT="5432"
 PSQL_VERSION="16"
 
+# Path to default.yaml
+CONFIG_DIR="./config"
+DEFAULT_YAML="${CONFIG_DIR}/default.yaml"
+
+# Ensure the config directory exists
+if [ ! -d "$CONFIG_DIR" ]; then
+  echo "Error: Config directory $CONFIG_DIR does not exist."
+  exit 1
+fi
+
+# Write variables to default.yaml
+cat > "$DEFAULT_YAML" <<EOL
+database:
+  name: "$DB_NAME"
+  user: "$DB_USER"
+  host: "$DB_HOST"
+  port: "$DB_PORT"
+  version: "$PSQL_VERSION"
+EOL
+
+echo "Updated $DEFAULT_YAML with configuration variables."
+
 # Create a new system user for Eos with sudo permission limitation
 function create_eos_system_user() {
     echo -e "${GREEN}Creating system user ${SYSTEM_USER}...${RESET}"

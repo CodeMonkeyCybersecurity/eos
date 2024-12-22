@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	_ "github.com/lib/pq"
 )
 
 // Logger provides methods for logging to both a file and a PostgreSQL database
