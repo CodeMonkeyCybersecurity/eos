@@ -125,6 +125,25 @@ function modify_pg_hba_conf() {
     sudo chmod 640 "$PG_HBA_CONF" # Restore restricted access
 }
 modify_pg_hba_conf
+
+# Add a new PostgreSQL user for the Eos app
+function create_eos_db_user() {
+    echo -e "${GREEN}Creating ${DB_USER} in PostgreSQL...${RESET}"
+
+    # Check if the user already exists
+    if psql -U ${DB_USER} -tc "SELECT 1 FROM pg_roles WHERE rolname = ${DB_USER}" | grep -q 1; then
+        echo -e "${GREEN}${DB_USER} already exists.${RESET}"
+    else
+        # Create the user
+        if ! psql -U ${DB_USER} -c "CREATE ROLE ${SYSTEM_USER};"; then
+            echo -e "${RED}Error: Failed to create ${DB_USER}.${RESET}"
+            exit 1
+        fi
+        echo -e "${GREEN}${DB_USER} created successfully.${RESET}"
+    fi
+}
+create_eos_db_user
+
 # Configure peer authentication for eos_user
 function configure_peer_authentication() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
@@ -167,23 +186,6 @@ function install_go_driver() {
 }
 install_go_driver
 
-# Add a new PostgreSQL user for the Eos app
-function create_eos_db_user() {
-    echo -e "${GREEN}Creating ${DB_USER} in PostgreSQL...${RESET}"
-
-    # Check if the user already exists
-    if psql -U ${DB_USER} -tc "SELECT 1 FROM pg_roles WHERE rolname = ${DB_USER}" | grep -q 1; then
-        echo -e "${GREEN}${DB_USER} already exists.${RESET}"
-    else
-        # Create the user
-        if ! psql -U ${DB_USER} -c "CREATE ROLE ${SYSTEM_USER};"; then
-            echo -e "${RED}Error: Failed to create ${DB_USER}.${RESET}"
-            exit 1
-        fi
-        echo -e "${GREEN}${DB_USER} created successfully.${RESET}"
-    fi
-}
-create_eos_db_user
 # Step 3: Setup PostgreSQL Database peer authentication
 function setup_eos_db() {
     # Create the 'eos_db' database if it doesn't exist
