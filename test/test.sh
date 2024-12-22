@@ -23,6 +23,10 @@ sudo -u eos_user psql -d eos_db -c "\dt"   # List tables in the eos_db
 echo "Press Enter to continue..."
 read -r
 
+sudo -u eos_user psql -d eos_db -c "SELECT * FROM logs;"
+echo "Press Enter to continue..."
+read -r
+
 # List the contents of the cyberMonkey log directory
 sudo ls -lah /var/log/cyberMonkey/
 echo "Press Enter to continue..."
