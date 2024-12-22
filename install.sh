@@ -10,7 +10,7 @@ checkSudo() {
     fi
 }
 # Code to execute when the script is run directly
-
+checkSudo
 set -ex  # Exit immediately if a command exits with a non-zero status
 
 function export_script_variables() {
@@ -31,11 +31,10 @@ function export_script_variables() {
     chmod 600 script_vars.env
     echo "Done. You can 'source $output_file' to re-import these variables."
 }
-
+export_script_variables
 TIMESTAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 USER_HOSTNAME_STAMP="$(hostname)_$(whoami)"
 STAMP="${TIMESTAMP}_${USER_HOSTNAME_STAMP}"
-
 mkdir -p "${CYBERMONKEY_LOG_DIR:-/var/log/cyberMonkey}"
 EOS_LOG_FILE="${CYBERMONKEY_LOG_DIR}/eos.log"
 # Redirect all output (stdout and stderr) to the log file
@@ -91,14 +90,14 @@ function create_eos_system_user() {
         echo -e "${GREEN}${SYSTEM_USER} is already in the sudoers file.${RESET}"
     fi
 }
-
+create_eos_system_user
 # Function to execute commands as eos_user
 function run_as_eos_system_user() {
     local command="$1"
     echo -e "\033[32m✔ Running as ${SYSTEM_USER}: $command\033[0m"
     sudo -u ${SYSTEM_USER} bash -c "$command"
 }
-
+run_as_eos_system_user
 function setup_ssh_key() {
     echo -e "${GREEN}Setting up SSH key-based authentication...${RESET}"
 
@@ -114,7 +113,7 @@ function setup_ssh_key() {
         echo -e "${GREEN}SSH key generated at $SSH_KEY.${RESET}"
     fi
 }
-
+setup_ssh_key
 # Temporarily change permissions for pg_hba.conf to allow script modification
 function modify_pg_hba_conf() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
@@ -122,13 +121,10 @@ function modify_pg_hba_conf() {
     echo -e "${GREEN}Updating permissions for pg_hba.conf...${RESET}"
     sudo chmod 644 "$PG_HBA_CONF" # Allow read and write access to others during script execution
 
-    # Call function to configure peer authentication
-    configure_peer_authentication
-
     echo -e "${GREEN}Reverting permissions for pg_hba.conf...${RESET}"
     sudo chmod 640 "$PG_HBA_CONF" # Restore restricted access
 }
-
+modify_pg_hba_conf
 # Configure peer authentication for eos_user
 function configure_peer_authentication() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
@@ -145,7 +141,7 @@ function configure_peer_authentication() {
     echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
     sudo systemctl restart postgresql
 }
-
+configure_peer_authentication
 # Step 1: Check prerequisites
 function check_prerequisites() {
     echo -e "${GREEN}Checking prerequisites...${RESET}"
@@ -162,14 +158,14 @@ function check_prerequisites() {
         exit 1
     fi
 }
-
+check_prerequisites
 # Step 2: Install Go PostgreSQL Driver
 function install_go_driver() {
     echo -e "${GREEN}Installing Go PostgreSQL driver...${RESET}"
     go get github.com/lib/pq
     echo -e "${GREEN}Go PostgreSQL driver installed successfully.${RESET}"
 }
-
+install_go_driver
 # Add a new PostgreSQL user for the Eos app
 function create_eos_db_user() {
     echo -e "${GREEN}Creating ${DB_USER} in PostgreSQL...${RESET}"
@@ -186,7 +182,7 @@ function create_eos_db_user() {
         echo -e "${GREEN}${DB_USER} created successfully.${RESET}"
     fi
 }
-
+create_eos_db_user
 # Step 3: Setup PostgreSQL Database peer authentication
 function setup_eos_db() {
     # Create the 'eos_db' database if it doesn't exist
@@ -229,21 +225,10 @@ EOF
     fi
     echo -e "${GREEN}Database validation successful.${RESET}"
 }
+setup_eos_db
 
 # Step 4: Run Setup
 function main() {
-    checkSudo
-    export_script_variables
-    create_eos_system_user
-    run_as_eos_system_user
-    setup_ssh_key
-    modify_pg_hba_conf
-    configure_peer_authentication
-    check_prerequisites
-    install_go_driver
-    create_eos_db_user
-    setup_eos_db
-    
     echo -e "${GREEN}Setup complete! You can now use eos with `eos [command] [focus] [--modifier]`.${RESET}"
 }
 
