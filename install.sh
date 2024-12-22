@@ -166,16 +166,17 @@ function install_go_driver() {
     echo -e "${GREEN}Go PostgreSQL driver installed successfully.${RESET}"
 }
 install_go_driver
+
 # Add a new PostgreSQL user for the Eos app
 function create_eos_db_user() {
     echo -e "${GREEN}Creating ${DB_USER} in PostgreSQL...${RESET}"
 
     # Check if the user already exists
-    if psql -U postgres -tc "SELECT 1 FROM pg_roles WHERE rolname = ${DB_USER}" | grep -q 1; then
+    if psql -U ${DB_USER} -tc "SELECT 1 FROM pg_roles WHERE rolname = ${DB_USER}" | grep -q 1; then
         echo -e "${GREEN}${DB_USER} already exists.${RESET}"
     else
         # Create the user
-        if ! psql -U postgres -c "CREATE ROLE ${SYSTEM_USER} WITH LOGIN CREATEDB PASSWORD 'eos_password';"; then
+        if ! psql -U ${DB_USER} -c "CREATE ROLE ${SYSTEM_USER} WITH LOGIN CREATEDB PASSWORD 'eos_password';"; then
             echo -e "${RED}Error: Failed to create ${DB_USER}.${RESET}"
             exit 1
         fi
@@ -186,9 +187,9 @@ create_eos_db_user
 # Step 3: Setup PostgreSQL Database peer authentication
 function setup_eos_db() {
     # Create the 'eos_db' database if it doesn't exist
-    if ! psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'eos_db'" | grep -q 1; then
+    if ! psql -U ${DB_USER} -tc "SELECT 1 FROM pg_database WHERE datname = 'eos_db'" | grep -q 1; then
         echo -e "${GREEN}Creating database 'eos_db' owned by ${DB_USER}...${RESET}"
-        psql -U postgres -c "CREATE DATABASE eos_db OWNER ${SYSTEM_USER};"
+        psql -U ${DB_USER} -c "CREATE DATABASE eos_db OWNER ${SYSTEM_USER};"
     else
         echo -e "${GREEN}Database 'eos_db' already exists.${RESET}"
     fi
