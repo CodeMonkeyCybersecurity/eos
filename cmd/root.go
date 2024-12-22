@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/user"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/spf13/cobra"
@@ -25,6 +26,7 @@ func cmd() {
     if currentUser.Username != "eos_user" {
         log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
     }
+}
 
 // A helper to fetch environment variables with a default fallback
 func getEnv(key, fallback string) string {
