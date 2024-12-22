@@ -91,13 +91,9 @@ function create_eos_system_user() {
     fi
 }
 create_eos_system_user
-# Function to execute commands as eos_user
-function run_as_eos_system_user() {
-    local command="$1"
-    echo -e "\033[32m✔ Running as ${SYSTEM_USER}: $command\033[0m"
-    sudo -u ${SYSTEM_USER} bash -c "$command"
-}
-run_as_eos_system_user
+
+
+
 function setup_ssh_key() {
     echo -e "${GREEN}Setting up SSH key-based authentication...${RESET}"
 
@@ -113,7 +109,7 @@ function setup_ssh_key() {
         echo -e "${GREEN}SSH key generated at $SSH_KEY.${RESET}"
     fi
 }
-setup_ssh_key
+
 # Temporarily change permissions for pg_hba.conf to allow script modification
 function modify_pg_hba_conf() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
@@ -124,7 +120,7 @@ function modify_pg_hba_conf() {
     echo -e "${GREEN}Reverting permissions for pg_hba.conf...${RESET}"
     sudo chmod 640 "$PG_HBA_CONF" # Restore restricted access
 }
-modify_pg_hba_conf
+
 
 # Add a new PostgreSQL user for the Eos app
 function create_eos_db_user() {
@@ -142,7 +138,6 @@ function create_eos_db_user() {
         echo -e "${GREEN}${DB_USER} created successfully.${RESET}"
     fi
 }
-create_eos_db_user
 
 # Configure peer authentication for eos_user
 function configure_peer_authentication() {
@@ -160,7 +155,7 @@ function configure_peer_authentication() {
     echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
     sudo systemctl restart postgresql
 }
-configure_peer_authentication
+
 # Step 1: Check prerequisites
 function check_prerequisites() {
     echo -e "${GREEN}Checking prerequisites...${RESET}"
@@ -177,14 +172,13 @@ function check_prerequisites() {
         exit 1
     fi
 }
-check_prerequisites
+
 # Step 2: Install Go PostgreSQL Driver
 function install_go_driver() {
     echo -e "${GREEN}Installing Go PostgreSQL driver...${RESET}"
     go get github.com/lib/pq
     echo -e "${GREEN}Go PostgreSQL driver installed successfully.${RESET}"
 }
-install_go_driver
 
 # Step 3: Setup PostgreSQL Database peer authentication
 function setup_eos_db() {
@@ -228,7 +222,16 @@ EOF
     fi
     echo -e "${GREEN}Database validation successful.${RESET}"
 }
+
+sudo -u ${SYSTEM_USER} bash -c "
+setup_ssh_key
+modify_pg_hba_conf
+create_eos_db_user
+configure_peer_authentication
+check_prerequisites
+install_go_driver
 setup_eos_db
+"
 
 # Step 4: Run Setup
 function main() {
