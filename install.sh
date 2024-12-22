@@ -117,6 +117,23 @@ function install_go_driver() {
     echo -e "${GREEN}Go PostgreSQL driver installed successfully.${RESET}"
 }
 
+# Add a new PostgreSQL user for the Eos app
+function create_eos_user() {
+    echo -e "${GREEN}Creating 'eos_user' in PostgreSQL...${RESET}"
+
+    # Check if the user already exists
+    if psql -U postgres -tc "SELECT 1 FROM pg_roles WHERE rolname = 'eos_user'" | grep -q 1; then
+        echo -e "${GREEN}'eos_user' already exists.${RESET}"
+    else
+        # Create the user
+        if ! psql -U postgres -c "CREATE ROLE eos_user WITH LOGIN CREATEDB PASSWORD 'eos_password';"; then
+            echo -e "${RED}Error: Failed to create 'eos_user'.${RESET}"
+            exit 1
+        fi
+        echo -e "${GREEN}'eos_user' created successfully.${RESET}"
+    fi
+}
+
 # Step 3: Setup PostgreSQL Database peer authentication
 function ensure_peer_authentication() {
     echo -e "${GREEN}Ensuring peer authentication is configured...${RESET}"
@@ -135,20 +152,40 @@ function ensure_peer_authentication() {
 function setup_database() {
     echo -e "${GREEN}Setting up PostgreSQL database...${RESET}"
 
-    # Check if the peer authentication entry already exists
-    if grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
-        echo -e "${GREEN}Peer authentication is already configured.${RESET}"
-    else
-        echo -e "${GREEN}Adding peer authentication to pg_hba.conf...${RESET}"
+    # Define the pg_hba.conf path and peer authentication entry for 'eos_user'
+    PG_HBA_CONF="/etc/postgresql/14/main/pg_hba.conf" # Adjust for your PostgreSQL version
+    PEER_AUTH_ENTRY="local   all             eos_user                                peer"
+
+    # Check and add peer authentication if missing
+    if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
+        echo -e "${GREEN}Adding peer authentication for 'eos_user' to pg_hba.conf...${RESET}"
         echo "$PEER_AUTH_ENTRY" | sudo tee -a "$PG_HBA_CONF" > /dev/null
+    else
+        echo -e "${GREEN}Peer authentication for 'eos_user' is already configured.${RESET}"
     fi
 
     # Restart PostgreSQL to apply changes
     echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
-    if ! sudo systemctl restart postgresql; then
-        echo -e "${RED}Error: Failed to restart PostgreSQL. Please check your configuration.${RESET}"
-        exit 1
+    sudo systemctl restart postgresql
+
+    # Create 'eos_user' if it doesn't exist
+    if ! psql -U postgres -tc "SELECT 1 FROM pg_roles WHERE rolname = 'eos_user'" | grep -q 1; then
+        echo -e "${GREEN}Creating PostgreSQL user 'eos_user'...${RESET}"
+        psql -U postgres -c "CREATE ROLE eos_user WITH LOGIN CREATEDB;"
+    else
+        echo -e "${GREEN}PostgreSQL user 'eos_user' already exists.${RESET}"
     fi
+
+    # Create the 'eos_db' database if it doesn't exist
+    if ! psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'eos_db'" | grep -q 1; then
+        echo -e "${GREEN}Creating database 'eos_db' owned by 'eos_user'...${RESET}"
+        psql -U postgres -c "CREATE DATABASE eos_db OWNER eos_user;"
+    else
+        echo -e "${GREEN}Database 'eos_db' already exists.${RESET}"
+    fi
+
+    echo -e "${GREEN}PostgreSQL database and user setup complete.${RESET}"
+}
 
     echo -e "${GREEN}Peer authentication configured successfully.${RESET}"
 }
@@ -198,6 +235,7 @@ function main() {
     setup_ssh_key
     ensure_peer_authentication
     install_go_driver
+    create_eos_user
     setup_database
     export_script_variables
     echo -e "${GREEN}Setup complete! You can now use eos with `eos [command] [focus] [--modifier]`.${RESET}"
