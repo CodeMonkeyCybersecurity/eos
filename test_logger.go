@@ -9,8 +9,8 @@ import (
 
 func main() {
 	// Paths for configuration and log files
-	configPath := filepath.Join("..", "..", "config", "default.yaml") // Adjust path as needed
-	logFilePath := "/tmp/test_logger.log"
+	configPath := filepath.Join("config", "default.yaml")
+	logFilePath := "/var/log/cyberMonkey/test_logger.log"
 
 	// Initialize the logger
 	err := utils.InitializeLogger(configPath, logFilePath, utils.DebugLevel, true)

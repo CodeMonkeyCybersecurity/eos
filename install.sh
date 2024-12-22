@@ -90,7 +90,10 @@ database:
   host: "$DB_HOST"
   port: "$DB_PORT"
   version: "$PSQL_VERSION"
-EOL
+
+logs:
+  directory: "$CYBERMONKEY_LOG_DIR"
+  file: "$EOS_LOG_FILE"
 
 echo "Updated $DEFAULT_YAML with configuration variables."
 
