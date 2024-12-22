@@ -10,10 +10,38 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"path/filepath"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/spf13/cobra"
 )
+
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "eos",
+	Short: "Eos CLI for managing local and remote environments",
+	Long: `Eos is a command-line application for managing processes, users,
+hardware, backups, and more.`,
+Run: func(cmd *cobra.Command, args []string) {
+	configPath := filepath.Join(".", "config", "default.yaml")
+	logFilePath := "/tmp/eos.log"
+
+	// Initialize the logger
+	err := utils.InitializeLogger(configPath, logFilePath, utils.InfoLevel, true)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
+	logger := utils.GetLogger()
+	logger.Info("Eos CLI started successfully.")
+},
+)
+
+func Execute() {
+if err := rootCmd.Execute(); err != nil {
+	log.Fatalf("Command execution failed: %v", err)
+}
+}
 
 func cmd() {
 	currentUser, err := user.Current()
@@ -35,17 +63,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
-	Use:   "eos",
-	Short: "Eos CLI for managing local and remote environments",
-	Long: `Eos is a command-line application for managing processes, users,
-hardware, backups, and more.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Default action when no subcommand is provided
-		fmt.Println("Eos CLI: Use 'eos --help' to see available commands.")
-	},
-}
+
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {

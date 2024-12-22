@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"eos/config"
+
 	_ "github.com/lib/pq"
 )
 
@@ -28,12 +30,38 @@ var (
 )
 
 // InitializeLogger sets up the global logger instance
-func InitializeLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colorize bool) error {
-	var err error
+func InitializeLogger(configPath string, logFilePath string, terminalMin LogLevel, colorize bool) error {
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Build connection string from the loaded configuration
+	connStr := fmt.Sprintf(
+		"host=%s port=%s user=%s dbname=%s sslmode=disable",
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.User,
+		cfg.Database.Name,
+	)
+
+	// Open the database connection
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Ensure the connection is alive
+	if err := db.Ping(); err != nil {
+		return fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	// Initialize the logger
+	var initErr error
 	once.Do(func() {
-		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colorize)
+		globalLogger, initErr = NewLogger(db, logFilePath, terminalMin, colorize)
 	})
-	return err
+	return initErr
 }
 
 // GetLogger returns the global logger instance
