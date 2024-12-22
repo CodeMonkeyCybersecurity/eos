@@ -208,12 +208,11 @@ EOF
 
 function main() {
     setup_ssh_key
-    modify_pg_hba_conf
     create_eos_db_user
     configure_peer_authentication
     check_prerequisites
     install_go_driver
     setup_eos_db
-    echo -e \"${GREEN}Setup complete! Use 'eos' as needed.${RESET}\"
+    echo -e "${GREEN}Setup complete! Use 'eos' as needed.${RESET}"
 }
 main
