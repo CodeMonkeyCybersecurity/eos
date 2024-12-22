@@ -69,11 +69,6 @@ func init() {
 	connStr := fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=%s",
 		dbHost, dbPort, dbUser, dbName, dbSSLMode)
 
-	// Initialize the global logger
-	err = utils.InitializeLogger(db, "/var/log/cyberMonkey/eos.log", utils.InfoLevel, true)
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
 	// Connect to PostgreSQL
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
@@ -84,6 +79,12 @@ func init() {
 	// Check database health
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping the database: %v", err)
+	}
+
+	// Initialize the global logger
+	err = utils.InitializeLogger(db, "/var/log/cyberMonkey/eos.log", utils.InfoLevel, true)
+	if err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
 	// Add subcommands
