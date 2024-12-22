@@ -14,31 +14,6 @@ checkSudo
 
 set -ex  # Exit immediately if a command exits with a non-zero status
 
-# Create a new system user for Eos with sudo permission limitation
-function create_system_user() {
-    echo -e "${GREEN}Creating system user 'eos_user'...${RESET}"
-
-    # Check if the user already exists
-    if id "eos_user" &>/dev/null; then
-        echo -e "${GREEN}System user 'eos_user' already exists.${RESET}"
-    else
-        # Create the user with no login shell and no password
-        sudo useradd -m -s /usr/sbin/nologin eos_user
-        echo -e "${GREEN}System user 'eos_user' created successfully.${RESET}"
-    fi
-
-    # Add the user to the sudoers file with limitations
-    SUDOERS_FILE="/etc/sudoers.d/eos_user"
-    if [ ! -f "$SUDOERS_FILE" ]; then
-        echo -e "${GREEN}Adding 'eos_user' to the sudoers file with limitations...${RESET}"
-        echo "ALL ALL=(eos_user) NOPASSWD: /usr/local/bin/eos" | sudo tee "$SUDOERS_FILE" > /dev/null
-        sudo chmod 440 "$SUDOERS_FILE"
-        echo -e "${GREEN}'eos_user' added to the sudoers file with limited permissions.${RESET}"
-    else
-        echo -e "${GREEN}'eos_user' is already in the sudoers file.${RESET}"
-    fi
-}
-
 function export_script_variables() {
     local output_file="script_vars.env"
     echo "Exporting script variables to $output_file..."
@@ -117,6 +92,62 @@ DB_USER="eos_user"
 DB_HOST="localhost"
 DB_PORT="5432"
 PSQL_VERSION="16"
+
+# Create a new system user for Eos with sudo permission limitation
+function create_system_user() {
+    echo -e "${GREEN}Creating system user 'eos_user'...${RESET}"
+
+    # Check if the user already exists
+    if id "eos_user" &>/dev/null; then
+        echo -e "${GREEN}System user 'eos_user' already exists.${RESET}"
+    else
+        # Create the user with no login shell and no password
+        sudo useradd -m -s /usr/sbin/nologin eos_user
+        echo -e "${GREEN}System user 'eos_user' created successfully.${RESET}"
+    fi
+
+    # Add the user to the sudoers file with limitations
+    SUDOERS_FILE="/etc/sudoers.d/eos_user"
+    if [ ! -f "$SUDOERS_FILE" ]; then
+        echo -e "${GREEN}Adding 'eos_user' to the sudoers file with limitations...${RESET}"
+        echo "ALL ALL=(eos_user) NOPASSWD: /usr/local/bin/eos" | sudo tee "$SUDOERS_FILE" > /dev/null
+        sudo chmod 440 "$SUDOERS_FILE"
+        echo -e "${GREEN}'eos_user' added to the sudoers file with limited permissions.${RESET}"
+    else
+        echo -e "${GREEN}'eos_user' is already in the sudoers file.${RESET}"
+    fi
+}
+
+# Temporarily change permissions for pg_hba.conf to allow script modification
+function modify_pg_hba_conf() {
+    local PG_HBA_CONF="/etc/postgresql/16/main/pg_hba.conf"
+
+    echo -e "${GREEN}Updating permissions for pg_hba.conf...${RESET}"
+    sudo chmod 644 "$PG_HBA_CONF" # Allow read and write access to others during script execution
+
+    # Call function to configure peer authentication
+    configure_peer_authentication
+
+    echo -e "${GREEN}Reverting permissions for pg_hba.conf...${RESET}"
+    sudo chmod 640 "$PG_HBA_CONF" # Restore restricted access
+}
+
+# Configure peer authentication for eos_user
+function configure_peer_authentication() {
+    local PG_HBA_CONF="/etc/postgresql/16/main/pg_hba.conf"
+    local PEER_AUTH_ENTRY="local   all             eos_user                                peer"
+
+    if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
+        echo -e "${GREEN}Adding peer authentication for 'eos_user' to pg_hba.conf...${RESET}"
+        echo "$PEER_AUTH_ENTRY" | sudo tee -a "$PG_HBA_CONF" > /dev/null
+        echo -e "${GREEN}Peer authentication entry added.${RESET}"
+    else
+        echo -e "${GREEN}Peer authentication for 'eos_user' is already configured.${RESET}"
+    fi
+
+    echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
+    sudo systemctl restart postgresql
+}
 
 # Step 1: Check prerequisites
 function check_prerequisites() {
