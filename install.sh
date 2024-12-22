@@ -200,18 +200,6 @@ function setup_eos_db() {
     echo -e "${GREEN}PostgreSQL database and user setup complete.${RESET}"
 }
 
-    echo -e "${GREEN}Peer authentication configured successfully.${RESET}"
-}
-
-    # Create database if it doesn't exist
-    if ! psql -U $DB_USER -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
-        if ! psql -U $DB_USER -c "CREATE DATABASE $DB_NAME"; then
-            echo -e "${RED}Error: Failed to create the database.${RESET}"
-            exit 1
-        fi
-    fi
-    echo -e "${GREEN}Database '$DB_NAME' is ready.${RESET}"
-
     # Create required tables
     if ! psql -U $DB_USER -h $DB_HOST -p $DB_PORT -d $DB_NAME <<EOF
 CREATE TABLE IF NOT EXISTS logs (
