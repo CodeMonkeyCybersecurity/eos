@@ -76,7 +76,7 @@ function create_eos_system_user() {
         echo -e "${GREEN}System user ${SYSTEM_USER} already exists.${RESET}"
     else
         # Create the user with no login shell and no password
-        sudo useradd -m -s /usr/sbin/nologin ${SYSTEM_USER}
+        sudo useradd -m -s /usr/sbin/nologin -p '!' ${SYSTEM_USER}
         echo -e "${GREEN}System user ${SYSTEM_USER} created successfully.${RESET}"
     fi
 
