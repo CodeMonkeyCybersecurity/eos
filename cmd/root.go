@@ -13,19 +13,18 @@ import (
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 func cmd() {
-    currentUser, err := user.Current()
-    if err != nil {
-        log.Fatalf("Failed to determine current user: %v", err)
-    }
+	currentUser, err := user.Current()
+	if err != nil {
+		log.Fatalf("Failed to determine current user: %v", err)
+	}
 
-    // Enforce that Eos must be run as 'eos_user'
-    if currentUser.Username != "eos_user" {
-        log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
-    }
+	// Enforce that Eos must be run as 'eos_user'
+	if currentUser.Username != "eos_user" {
+		log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
+	}
 }
 
 // A helper to fetch environment variables with a default fallback
@@ -58,9 +57,7 @@ func Execute() {
 var cfgFile string
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	// define your flags and configuration settings.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.eos.yaml)")
 	// Database connection details
 	dbHost := getEnv("DB_HOST", "localhost")
@@ -69,7 +66,7 @@ func init() {
 	dbName := getEnv("DB_NAME", "eos_db")
 	// Connection string
 	dbSSLMode := getEnv("DB_SSLMODE", "disable") // Default to disable if using eos in a local environment only
-	connStr := fmt.Sprintf("host=%s port=%s user=%s dbname=%s" sslmode=%s",
+	connStr := fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=%s",
 		dbHost, dbPort, dbUser, dbName, dbSSLMode)
 
 	// Initialize the global logger
@@ -80,11 +77,13 @@ func init() {
 	// Connect to PostgreSQL
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		utils.GetLogger().Fatal(fmt.Sprintf("Failed to connect to PostgreSQL: %v", err))
+		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
+	}
+	defer db.Close()
+
 	// Check database health
 	if err := db.Ping(); err != nil {
-		utils.GetLogger().Fatal(fmt.Sprintf("Failed to connect to database: %v", err))
-	defer db.Close()
+		log.Fatalf("Failed to ping the database: %v", err)
 	}
 
 	// Add subcommands
