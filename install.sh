@@ -144,7 +144,9 @@ function configure_peer_authentication() {
     sudo chmod 644 "$PG_HBA_CONF"
     # Possibly update peer auth here
     sudo chmod 640 "$PG_HBA_CONF"
-    local PEER_AUTH_ENTRY="local   all             ${SYSTEM_USER}                                peer"
+    local PEER_AUTH_ENTRY="local   ${DB_NAME}     ${SYSTEM_USER}                                peer
+    local   all     ${SYSTEM_USER}                                reject"
+
 
     if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
         echo -e "${GREEN}Adding peer authentication for ${SYSTEM_USER} to pg_hba.conf...${RESET}"

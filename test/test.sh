@@ -24,7 +24,7 @@ echo "Press Enter to continue..."
 read -r
 
 # verify that eos_user has the required privileges
-sudo -u eos_user psql -d "$DB_NAME" -c "\z"
+sudo -u eos_user psql -d eos_db -c "\z"
 echo "Press Enter to continue..."
 read -r
 
