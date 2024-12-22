@@ -50,7 +50,7 @@ RESET="\033[0m"
 exec > >(tee -a "$EOS_LOG_FILE") 2>&1
 
 # Log script start with timestamp
-echo -e "${RED} Script started at $STAMP ${RESET}"
+echo -e "${RED} === Script started at $STAMP === ${RESET}"
 
 # Variables for binary download
 SYSTEM_USER="eos_user"
