@@ -107,34 +107,36 @@ function setup_ssh_key() {
     fi
 }
 
-# Temporarily change permissions for pg_hba.conf to allow script modification
-function modify_pg_hba_conf() {
-    local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
-    echo -e "${GREEN}Updating permissions for $PG_HBA_CONF...${RESET}"
-    sudo chmod 644 "$PG_HBA_CONF"
-    # Possibly update peer auth here
-    sudo chmod 640 "$PG_HBA_CONF"
-}
-
-
 # Add a new PostgreSQL user for the Eos app
 function create_eos_db_user() {
     echo -e "${GREEN}Creating $DB_USER in PostgreSQL...${RESET}"
     # **IMPORTANT**: any psql command as $DB_USER must be run as the system user too
-    if sudo -u "$SYSTEM_USER" psql -tc "SELECT 1 FROM pg_roles WHERE rolname = '$DB_USER'" | grep -q 1; then
-        echo -e "${GREEN}$DB_USER already exists.${RESET}"
+    sudo -u "$DB_USER" psql <<EOF
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT FROM pg_catalog.pg_roles WHERE rolname = 'eos_user'
+    ) THEN
+        CREATE ROLE eos_user WITH LOGIN;
+    END IF;
+END
+$$;
+EOF
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Successfully created or ensured existence of eos_user.${RESET}"
     else
-        if ! sudo -u "$SYSTEM_USER" psql -c "CREATE ROLE $DB_USER WITH LOGIN CREATEDB;"; then
-            echo -e "${RED}Error: Failed to create $DB_USER.${RESET}"
-            exit 1
-        fi
-        echo -e "${GREEN}$DB_USER created successfully.${RESET}"
+        echo -e "${RED}Error: Failed to create or check eos_user.${RESET}"
+        exit 1
     fi
 }
 
 # Configure peer authentication for eos_user
 function configure_peer_authentication() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
+    echo -e "${GREEN}Updating permissions for $PG_HBA_CONF...${RESET}"
+    sudo chmod 644 "$PG_HBA_CONF"
+    # Possibly update peer auth here
+    sudo chmod 640 "$PG_HBA_CONF"
     local PEER_AUTH_ENTRY="local   all             ${SYSTEM_USER}                                peer"
 
     if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
@@ -171,18 +173,22 @@ function install_go_driver() {
 
 # Step 3: Setup PostgreSQL Database peer authentication
 function setup_eos_db() {
-    # Create eos_db if missing
-    if ! sudo -u "$SYSTEM_USER" psql -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" | grep -q 1; then
-        echo -e "${GREEN}Creating database '$DB_NAME' owned by $DB_USER...${RESET}"
-        sudo -u "$SYSTEM_USER" psql -c "CREATE DATABASE $DB_NAME OWNER $DB_USER;"
-    else
-        echo -e "${GREEN}Database '$DB_NAME' already exists.${RESET}"
-    fi
+    sudo -u "$DB_USER" psql <<EOF
+DO \$\$
+BEGIN
+    IF NOT EXISTS (
+        SELECT FROM pg_database WHERE datname = 'eos_db'
+    ) THEN
+        CREATE DATABASE eos_db OWNER eos_user;
+    END IF;
+END
+\$\$;
+EOF
 
     echo -e "${GREEN}PostgreSQL database setup complete.${RESET}"
 
     # Create required tables
-    if ! sudo -u "$SYSTEM_USER" psql -d "$DB_NAME" <<EOF
+    sudo -u "$DB_USER" psql -d eos_db <<EOF
 CREATE TABLE IF NOT EXISTS logs (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -196,40 +202,18 @@ CREATE TABLE IF NOT EXISTS configurations (
     value TEXT NOT NULL
 );
 EOF
-    then
-        echo -e "${RED}Error: Failed to create schema.${RESET}"
-        exit 1
-    fi
+
     echo -e "${GREEN}Schema setup complete.${RESET}"
-
-    # Validate database setup
-    echo -e "${GREEN}Validating database setup...${RESET}"
-    if ! sudo -u "$SYSTEM_USER" psql -d "$DB_NAME" -c "\dt"; then
-        echo -e "${RED}Database validation failed. Please check your setup.${RESET}"
-        exit 1
-    fi
-    echo -e "${GREEN}Database validation successful.${RESET}"
-}
-
-# 6. Run each step as eos_user (or as needed)
-sudo -u ${SYSTEM_USER} bash -c "
-    set -ex
-    # Only run the steps that strictly require eos_user privileges here.
-    # Some steps (like checking Go or installing a driver) may not strictly need eos_user.
-
-    # If certain steps require root, call them outside this block.
-"
-
-# 7. Or just call them as root where appropriate:
-setup_ssh_key
-modify_pg_hba_conf
-create_eos_db_user
-configure_peer_authentication
-check_prerequisites
-install_go_driver
-setup_eos_db
+} 
 
 function main() {
+    setup_ssh_key
+    modify_pg_hba_conf
+    create_eos_db_user
+    configure_peer_authentication
+    check_prerequisites
+    install_go_driver
+    setup_eos_db
     echo -e \"${GREEN}Setup complete! Use 'eos' as needed.${RESET}\"
 }
 main
