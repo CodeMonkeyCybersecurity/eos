@@ -12,8 +12,7 @@ checkSudo() {
 # Code to execute when the script is run directly
 checkSudo
 
-set -e  # Exit immediately if a command exits with a non-zero status
-set -u  # Treat unset variables as an error
+set -ex  # Exit immediately if a command exits with a non-zero status
 
 function export_script_variables() {
     local output_file="script_vars.env"
