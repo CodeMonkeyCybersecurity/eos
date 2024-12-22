@@ -70,7 +70,7 @@ func init() {
 		dbHost, dbPort, dbUser, dbName, dbSSLMode)
 
 	// Connect to PostgreSQL
-	db, err := sql.Open("postgres", connStr)
+	db, err := sql.Open(dbUser, connStr)
 	if err != nil {
 		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
 	}
