@@ -188,6 +188,11 @@ EOF
 
     echo -e "${GREEN}PostgreSQL database setup complete.${RESET}"
 
+    # Grant privileges to eos_user on the public schema
+    sudo -u postgres psql -d "$DB_NAME" <<EOF
+    GRANT ALL ON SCHEMA public TO ${DB_USER};
+EOF
+
     # Create required tables
     sudo -u "$DB_USER" psql -d "$DB_NAME" <<EOF
 CREATE TABLE IF NOT EXISTS logs (
@@ -204,8 +209,13 @@ CREATE TABLE IF NOT EXISTS configurations (
 );
 EOF
 
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Error: Failed to create tables in eos_db.${RESET}"
+        exit 1
+    fi
+
     echo -e "${GREEN}Schema setup complete.${RESET}"
-} 
+}
 
 function main() {
     check_prerequisites
