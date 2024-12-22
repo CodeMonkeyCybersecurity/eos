@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"log"
 
-	"your_project_path/pkg/utils" // Replace with the actual path to your utils package
+	"eos/pkg/utils" // Replace with the actual path to your utils package
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
