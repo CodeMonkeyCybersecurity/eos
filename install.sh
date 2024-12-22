@@ -113,7 +113,7 @@ function create_eos_db_user() {
     echo -e "${GREEN}Creating $DB_USER in PostgreSQL...${RESET}"
     # **IMPORTANT**: any psql command as $DB_USER must be run as the system user too
     sudo -u postgres psql <<EOF
-DO $$
+DO \$\$
 BEGIN
     IF NOT EXISTS (
         SELECT FROM pg_catalog.pg_roles WHERE rolname = '${DB_USER}'
@@ -121,7 +121,7 @@ BEGIN
         CREATE ROLE ${DB_USER} WITH LOGIN;
     END IF;
 END
-$$;
+\$\$;
 EOF
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}Successfully created or ensured existence of eos_user.${RESET}"
