@@ -32,13 +32,18 @@ function export_script_variables() {
     echo "Done. You can 'source $output_file' to re-import these variables."
 }
 export_script_variables
+
+# Set up timestamps and log file paths
 TIMESTAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 USER_HOSTNAME_STAMP="$(hostname)_$(whoami)"
 STAMP="${TIMESTAMP}_${USER_HOSTNAME_STAMP}"
-mkdir -p "${CYBERMONKEY_LOG_DIR:-/var/log/cyberMonkey}"
+CYBERMONKEY_LOG_DIR="${CYBERMONKEY_LOG_DIR:-/var/log/cyberMonkey}"
+mkdir -p "$CYBERMONKEY_LOG_DIR"
 EOS_LOG_FILE="${CYBERMONKEY_LOG_DIR}/eos.log"
+
 # Redirect all output (stdout and stderr) to the log file
 exec > >(tee -a "$EOS_LOG_FILE") 2>&1
+
 # Log script start with timestamp
 echo "\033[31m=== Script started at $STAMP ===\033[0m"
 
@@ -47,6 +52,7 @@ GREEN="\033[0;32m"
 RED="\033[0;31m"
 RESET="\033[0m"
 
+# Variables for binary download
 SYSTEM_USER="eos_user"
 EOS_VERSION="v1.0.0"
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
