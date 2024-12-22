@@ -52,7 +52,7 @@ func init() {
 	// Database connection details
 	dbHost := getEnv("DB_HOST", "localhost")
 	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "postgres")
+	dbUser := getEnv("DB_USER", "eos_user")
 	dbName := getEnv("DB_NAME", "eos_db")
 	// Connection string
 	dbSSLMode := getEnv("DB_SSLMODE", "disable") // Default to disable if using eos in a local environment only

@@ -88,7 +88,7 @@ setup_ssh_key() {
 
 # Configuration Variables
 DB_NAME="eos_db"
-DB_USER="postgres"
+DB_USER="eos_user"
 DB_HOST="localhost"
 DB_PORT="5432"
 PSQL_VERSION="16"
