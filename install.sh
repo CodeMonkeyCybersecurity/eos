@@ -106,6 +106,7 @@ else
     echo "SSH key already exists at $SSH_KEY_FILE"
 fi
 EOF
+}
 
 # Add a new PostgreSQL user for the Eos app
 function create_eos_db_user() {
@@ -207,12 +208,14 @@ EOF
 } 
 
 function main() {
+    check_prerequisites
     setup_ssh_key
+    create_eos_system_user
     create_eos_db_user
     configure_peer_authentication
-    check_prerequisites
     install_go_driver
     setup_eos_db
     echo -e "${GREEN}Setup complete! Use 'eos' as needed.${RESET}"
 }
 main
+set +x
