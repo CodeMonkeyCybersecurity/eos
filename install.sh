@@ -120,7 +120,7 @@ function create_system_user() {
 
 # Temporarily change permissions for pg_hba.conf to allow script modification
 function modify_pg_hba_conf() {
-    local PG_HBA_CONF="/etc/postgresql/16/main/pg_hba.conf"
+    local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
 
     echo -e "${GREEN}Updating permissions for pg_hba.conf...${RESET}"
     sudo chmod 644 "$PG_HBA_CONF" # Allow read and write access to others during script execution
@@ -134,7 +134,7 @@ function modify_pg_hba_conf() {
 
 # Configure peer authentication for eos_user
 function configure_peer_authentication() {
-    local PG_HBA_CONF="/etc/postgresql/16/main/pg_hba.conf"
+    local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
     local PEER_AUTH_ENTRY="local   all             eos_user                                peer"
 
     if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
