@@ -1,31 +1,24 @@
 package main
 
 import (
-	"database/sql"
 	"log"
+	"path/filepath"
 
-	"eos/pkg/utils" // Replace with the actual path to your utils package
-
-	_ "github.com/lib/pq" // PostgreSQL driver
+	"eos/pkg/utils"
 )
 
 func main() {
-	// PostgreSQL connection details
-	connStr := "host=localhost port=5432 user=eos_user dbname=eos_db sslmode=disable"
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("Failed to connect to the database: %v", err)
-	}
-	defer db.Close()
+	// Paths for configuration and log files
+	configPath := filepath.Join("..", "..", "config", "default.yaml") // Adjust path as needed
+	logFilePath := "/tmp/test_logger.log"
 
 	// Initialize the logger
-	logFilePath := "/tmp/test_logger.log"
-	err = utils.InitializeLogger(db, logFilePath, utils.InfoLevel, true)
+	err := utils.InitializeLogger(configPath, logFilePath, utils.DebugLevel, true)
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
-	// Retrieve the logger instance
+	// Get the global logger instance
 	logger := utils.GetLogger()
 
 	// Test logging different levels
@@ -34,7 +27,4 @@ func main() {
 	logger.Warn("This is a WARN message")
 	logger.Error("This is an ERROR message")
 	logger.Critical("This is a CRITICAL message")
-	logger.Fatal("This is a FATAL message") // This will terminate the application
-
-	log.Println("Test completed.")
 }

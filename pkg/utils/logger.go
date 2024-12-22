@@ -38,7 +38,7 @@ func InitializeLogger(configPath string, logFilePath string, terminalMin LogLeve
 
 	// Build connection string from the loaded configuration
 	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s dbname=%s sslmode=disable",
+		"host=%s port=%s user=%s dbname=%s",
 		cfg.Database.Host,
 		cfg.Database.Port,
 		cfg.Database.User,
