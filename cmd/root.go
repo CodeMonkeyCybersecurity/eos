@@ -29,10 +29,10 @@ hardware, backups, and more.`,
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-    if err := rootCmd.Execute(); err != nil {
-        utils.GetLogger().Error(fmt.Sprintf("Command execution failed: %v", err))
-        os.Exit(1)
-    }
+	if err := rootCmd.Execute(); err != nil {
+		utils.GetLogger().Error(fmt.Sprintf("Command execution failed: %v", err))
+		os.Exit(1)
+	}
 }
 
 var cfgFile string
@@ -49,7 +49,8 @@ func init() {
 	dbPassword := os.Getenv("DB_PASSWORD")
 	if dbPassword == "" {
 		log.Fatal("Database password not set. Please set the DB_PASSWORD environment variable.")
-	}	dbName := "eosdb"
+	}
+	dbName := "eosdb"
 	// Connection string
 	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		dbHost, dbPort, dbUser, dbPassword, dbName)
