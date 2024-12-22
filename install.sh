@@ -197,6 +197,7 @@ EOF
     # Grant privileges to eos_user on the public schema
     sudo -u postgres psql -d "$DB_NAME" <<EOF
     GRANT ALL ON SCHEMA public TO ${DB_USER};
+    GRANT ALL PRIVILEGES ON TABLE logs TO ${DB_USER};
 EOF
 
     # Create required tables
