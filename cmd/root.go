@@ -12,7 +12,16 @@ import (
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
+
+// A helper to fetch environment variables with a default fallback
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -26,8 +35,6 @@ hardware, backups, and more.`,
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		utils.GetLogger().Error(fmt.Sprintf("Command execution failed: %v", err))
@@ -43,32 +50,30 @@ func init() {
 	// will be global for your application.
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.eos.yaml)")
 	// Database connection details
-	dbHost := "localhost"
-	dbPort := "5432"
-	dbUser := "postgres"
-	dbPassword := os.Getenv("DB_PASSWORD")
-	if dbPassword == "" {
-		log.Fatal("Database password not set. Please set the DB_PASSWORD environment variable.")
-	}
-	dbName := "eosdb"
+	dbHost := getEnv("DB_HOST", "localhost")
+	dbPort := getEnv("DB_PORT", "5432")
+	dbUser := getEnv("DB_USER", "postgres")
+	dbName := getEnv("DB_NAME", "eos_db")
 	// Connection string
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPassword, dbName)
+	dbSSLMode := getEnv("DB_SSLMODE", "disable") // Default to disable if using eos in a local environment only
+	connStr := fmt.Sprintf("host=%s port=%s user=%s dbname=%s" sslmode=%s",
+		dbHost, dbPort, dbUser, dbName, dbSSLMode)
 
-	// Connect to PostgreSQL
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
-	}
-	// Check database health
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to connect to the database: %v", err)
-	}
 	// Initialize the global logger
-	err = utils.InitializeLogger(db, "/var/log/eos.log", utils.InfoLevel, true)
+	err = utils.InitializeLogger(db, "/var/log/cyberMonkey/eos.log", utils.InfoLevel, true)
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
+	// Connect to PostgreSQL
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		utils.GetLogger().Fatal(fmt.Sprintf("Failed to connect to PostgreSQL: %v", err))
+	// Check database health
+	if err := db.Ping(); err != nil {
+		utils.GetLogger().Fatal(fmt.Sprintf("Failed to connect to database: %v", err))
+	defer db.Close()
+	}
+
 	// Add subcommands
 	rootCmd.AddCommand(getCmd)
 	rootCmd.AddCommand(setCmd)
