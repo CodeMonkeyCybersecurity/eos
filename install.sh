@@ -10,7 +10,6 @@ checkSudo() {
     fi
 }
 # Code to execute when the script is run directly
-checkSudo
 
 set -ex  # Exit immediately if a command exits with a non-zero status
 
@@ -49,19 +48,10 @@ GREEN="\033[0;32m"
 RED="\033[0;31m"
 RESET="\033[0m"
 
+SYSTEM_USER="eos_user"
 EOS_VERSION="v1.0.0"
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
-
-# Adjust ARCH for compatibility
-if [ "$ARCH" == "x86_64" ]; then
-  ARCH="amd64"
-elif [ "$ARCH" == "arm"* ]; then
-  ARCH="arm64"
-else
-    echo -e "${RED}Unsupported architecture: $ARCH${RESET}"
-    exit 1
-fi
 
 # Download binary
 echo -e "${GREEN}Downloading Eos binary...${RESET}"
@@ -70,7 +60,46 @@ chmod +x eos
 sudo mv eos /usr/local/bin/
 echo -e "${GREEN}Eos binary installed successfully.${RESET}"
 
-setup_ssh_key() {
+# Configuration Variables
+DB_NAME="eos_db"
+DB_USER="$SYSTEM_USER"
+DB_HOST="localhost"
+DB_PORT="5432"
+PSQL_VERSION="16"
+
+# Create a new system user for Eos with sudo permission limitation
+function create_eos_system_user() {
+    echo -e "${GREEN}Creating system user ${SYSTEM_USER}...${RESET}"
+
+    # Check if the user already exists
+    if id "$SYSTEM_USER" &>/dev/null; then
+        echo -e "${GREEN}System user ${SYSTEM_USER} already exists.${RESET}"
+    else
+        # Create the user with no login shell and no password
+        sudo useradd -m -s /usr/sbin/nologin ${SYSTEM_USER}
+        echo -e "${GREEN}System user ${SYSTEM_USER} created successfully.${RESET}"
+    fi
+
+    # Add the user to the sudoers file with limitations
+    SUDOERS_FILE="/etc/sudoers.d/${SYSTEM_USER}"
+    if [ ! -f "$SUDOERS_FILE" ]; then
+        echo -e "${GREEN}Adding ${SYSTEM_USER} to the sudoers file with limitations...${RESET}"
+        echo "ALL ALL=(${SYSTEM_USER}) NOPASSWD: /usr/local/bin/eos" | sudo tee "$SUDOERS_FILE" > /dev/null
+        sudo chmod 440 "$SUDOERS_FILE"
+        echo -e "${GREEN}${SYSTEM_USER} added to the sudoers file with limited permissions.${RESET}"
+    else
+        echo -e "${GREEN}${SYSTEM_USER} is already in the sudoers file.${RESET}"
+    fi
+}
+
+# Function to execute commands as eos_user
+function run_as_eos_system_user() {
+    local command="$1"
+    echo -e "\033[32m✔ Running as ${SYSTEM_USER}: $command\033[0m"
+    sudo -u ${SYSTEM_USER} bash -c "$command"
+}
+
+function setup_ssh_key() {
     echo -e "${GREEN}Setting up SSH key-based authentication...${RESET}"
 
     SSH_KEY="$HOME/.ssh/id_ed25519"
@@ -83,38 +112,6 @@ setup_ssh_key() {
         echo -e "${GREEN}Generating a new SSH key pair...${RESET}"
         ssh-keygen -N "" -f "$SSH_KEY"
         echo -e "${GREEN}SSH key generated at $SSH_KEY.${RESET}"
-    fi
-}
-
-# Configuration Variables
-DB_NAME="eos_db"
-DB_USER="eos_user"
-DB_HOST="localhost"
-DB_PORT="5432"
-PSQL_VERSION="16"
-
-# Create a new system user for Eos with sudo permission limitation
-function create_system_user() {
-    echo -e "${GREEN}Creating system user 'eos_user'...${RESET}"
-
-    # Check if the user already exists
-    if id "eos_user" &>/dev/null; then
-        echo -e "${GREEN}System user 'eos_user' already exists.${RESET}"
-    else
-        # Create the user with no login shell and no password
-        sudo useradd -m -s /usr/sbin/nologin eos_user
-        echo -e "${GREEN}System user 'eos_user' created successfully.${RESET}"
-    fi
-
-    # Add the user to the sudoers file with limitations
-    SUDOERS_FILE="/etc/sudoers.d/eos_user"
-    if [ ! -f "$SUDOERS_FILE" ]; then
-        echo -e "${GREEN}Adding 'eos_user' to the sudoers file with limitations...${RESET}"
-        echo "ALL ALL=(eos_user) NOPASSWD: /usr/local/bin/eos" | sudo tee "$SUDOERS_FILE" > /dev/null
-        sudo chmod 440 "$SUDOERS_FILE"
-        echo -e "${GREEN}'eos_user' added to the sudoers file with limited permissions.${RESET}"
-    else
-        echo -e "${GREEN}'eos_user' is already in the sudoers file.${RESET}"
     fi
 }
 
@@ -135,14 +132,14 @@ function modify_pg_hba_conf() {
 # Configure peer authentication for eos_user
 function configure_peer_authentication() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
-    local PEER_AUTH_ENTRY="local   all             eos_user                                peer"
+    local PEER_AUTH_ENTRY="local   all             ${SYSTEM_USER}                                peer"
 
     if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
-        echo -e "${GREEN}Adding peer authentication for 'eos_user' to pg_hba.conf...${RESET}"
+        echo -e "${GREEN}Adding peer authentication for ${SYSTEM_USER} to pg_hba.conf...${RESET}"
         echo "$PEER_AUTH_ENTRY" | sudo tee -a "$PG_HBA_CONF" > /dev/null
         echo -e "${GREEN}Peer authentication entry added.${RESET}"
     else
-        echo -e "${GREEN}Peer authentication for 'eos_user' is already configured.${RESET}"
+        echo -e "${GREEN}Peer authentication for ${SYSTEM_USER} is already configured.${RESET}"
     fi
 
     echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
@@ -174,68 +171,28 @@ function install_go_driver() {
 }
 
 # Add a new PostgreSQL user for the Eos app
-function create_eos_user() {
-    echo -e "${GREEN}Creating 'eos_user' in PostgreSQL...${RESET}"
+function create_eos_db_user() {
+    echo -e "${GREEN}Creating ${DB_USER} in PostgreSQL...${RESET}"
 
     # Check if the user already exists
-    if psql -U postgres -tc "SELECT 1 FROM pg_roles WHERE rolname = 'eos_user'" | grep -q 1; then
-        echo -e "${GREEN}'eos_user' already exists.${RESET}"
+    if psql -U postgres -tc "SELECT 1 FROM pg_roles WHERE rolname = ${DB_USER}" | grep -q 1; then
+        echo -e "${GREEN}${DB_USER} already exists.${RESET}"
     else
         # Create the user
-        if ! psql -U postgres -c "CREATE ROLE eos_user WITH LOGIN CREATEDB PASSWORD 'eos_password';"; then
-            echo -e "${RED}Error: Failed to create 'eos_user'.${RESET}"
+        if ! psql -U postgres -c "CREATE ROLE ${SYSTEM_USER} WITH LOGIN CREATEDB PASSWORD 'eos_password';"; then
+            echo -e "${RED}Error: Failed to create ${DB_USER}.${RESET}"
             exit 1
         fi
-        echo -e "${GREEN}'eos_user' created successfully.${RESET}"
+        echo -e "${GREEN}${DB_USER} created successfully.${RESET}"
     fi
 }
 
 # Step 3: Setup PostgreSQL Database peer authentication
-function ensure_peer_authentication() {
-    echo -e "${GREEN}Ensuring peer authentication is configured...${RESET}"
-
-    # Path to pg_hba.conf (adjust for your PostgreSQL version and installation)
-    PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
-    PEER_AUTH_ENTRY="local   all             postgres                                peer"
-
-    # Check if pg_hba.conf exists
-    if [ ! -f "$PG_HBA_CONF" ]; then
-        echo -e "${RED}Error: pg_hba.conf not found at $PG_HBA_CONF.${RESET}"
-        exit 1
-    fi
-
-# Step 3: Setup PostgreSQL Database
-function setup_database() {
-    echo -e "${GREEN}Setting up PostgreSQL database...${RESET}"
-
-    # Define the pg_hba.conf path and peer authentication entry for 'eos_user'
-    PG_HBA_CONF="/etc/postgresql/14/main/pg_hba.conf" # Adjust for your PostgreSQL version
-    PEER_AUTH_ENTRY="local   all             eos_user                                peer"
-
-    # Check and add peer authentication if missing
-    if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
-        echo -e "${GREEN}Adding peer authentication for 'eos_user' to pg_hba.conf...${RESET}"
-        echo "$PEER_AUTH_ENTRY" | sudo tee -a "$PG_HBA_CONF" > /dev/null
-    else
-        echo -e "${GREEN}Peer authentication for 'eos_user' is already configured.${RESET}"
-    fi
-
-    # Restart PostgreSQL to apply changes
-    echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
-    sudo systemctl restart postgresql
-
-    # Create 'eos_user' if it doesn't exist
-    if ! psql -U postgres -tc "SELECT 1 FROM pg_roles WHERE rolname = 'eos_user'" | grep -q 1; then
-        echo -e "${GREEN}Creating PostgreSQL user 'eos_user'...${RESET}"
-        psql -U postgres -c "CREATE ROLE eos_user WITH LOGIN CREATEDB;"
-    else
-        echo -e "${GREEN}PostgreSQL user 'eos_user' already exists.${RESET}"
-    fi
-
+function setup_eos_db() {
     # Create the 'eos_db' database if it doesn't exist
     if ! psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'eos_db'" | grep -q 1; then
-        echo -e "${GREEN}Creating database 'eos_db' owned by 'eos_user'...${RESET}"
-        psql -U postgres -c "CREATE DATABASE eos_db OWNER eos_user;"
+        echo -e "${GREEN}Creating database 'eos_db' owned by ${DB_USER}...${RESET}"
+        psql -U postgres -c "CREATE DATABASE eos_db OWNER ${SYSTEM_USER};"
     else
         echo -e "${GREEN}Database 'eos_db' already exists.${RESET}"
     fi
@@ -287,13 +244,18 @@ EOF
 
 # Step 4: Run Setup
 function main() {
-    check_prerequisites
-    setup_ssh_key
-    ensure_peer_authentication
-    install_go_driver
-    create_eos_user
-    setup_database
+    checkSudo
     export_script_variables
+    create_eos_system_user
+    run_as_eos_system_user
+    setup_ssh_key
+    modify_pg_hba_conf
+    configure_peer_authentication
+    check_prerequisites
+    install_go_driver
+    create_eos_db_user
+    setup_eos_db
+    
     echo -e "${GREEN}Setup complete! You can now use eos with `eos [command] [focus] [--modifier]`.${RESET}"
 }
 
