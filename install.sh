@@ -174,22 +174,22 @@ function install_go_driver() {
 
 # Step 3: Setup PostgreSQL Database peer authentication
 function setup_eos_db() {
-    sudo -u "$DB_USER" psql <<EOF
-DO \$\$
-BEGIN
-    IF NOT EXISTS (
-        SELECT FROM pg_database WHERE datname = 'eos_db'
-    ) THEN
-        CREATE DATABASE eos_db OWNER eos_user;
-    END IF;
-END
-\$\$;
+    sudo -u postgres psql <<EOF
+    DO \$\$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT FROM pg_database WHERE datname = '${DB_NAME}'
+        ) THEN
+            CREATE DATABASE ${DB_NAME} OWNER ${DB_USER};
+        END IF;
+    END
+    \$\$;
 EOF
 
     echo -e "${GREEN}PostgreSQL database setup complete.${RESET}"
 
     # Create required tables
-    sudo -u "$DB_USER" psql -d eos_db <<EOF
+    sudo -u "$DB_USER" psql -d "$DB_NAME" <<EOF
 CREATE TABLE IF NOT EXISTS logs (
     id SERIAL PRIMARY KEY,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
