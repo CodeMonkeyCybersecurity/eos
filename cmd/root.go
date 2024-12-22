@@ -15,6 +15,17 @@ import (
 	"github.com/spf13/viper"
 )
 
+func cmd() {
+    currentUser, err := user.Current()
+    if err != nil {
+        log.Fatalf("Failed to determine current user: %v", err)
+    }
+
+    // Enforce that Eos must be run as 'eos_user'
+    if currentUser.Username != "eos_user" {
+        log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
+    }
+
 // A helper to fetch environment variables with a default fallback
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {

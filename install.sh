@@ -14,6 +14,31 @@ checkSudo
 
 set -ex  # Exit immediately if a command exits with a non-zero status
 
+# Create a new system user for Eos with sudo permission limitation
+function create_system_user() {
+    echo -e "${GREEN}Creating system user 'eos_user'...${RESET}"
+
+    # Check if the user already exists
+    if id "eos_user" &>/dev/null; then
+        echo -e "${GREEN}System user 'eos_user' already exists.${RESET}"
+    else
+        # Create the user with no login shell and no password
+        sudo useradd -m -s /usr/sbin/nologin eos_user
+        echo -e "${GREEN}System user 'eos_user' created successfully.${RESET}"
+    fi
+
+    # Add the user to the sudoers file with limitations
+    SUDOERS_FILE="/etc/sudoers.d/eos_user"
+    if [ ! -f "$SUDOERS_FILE" ]; then
+        echo -e "${GREEN}Adding 'eos_user' to the sudoers file with limitations...${RESET}"
+        echo "ALL ALL=(eos_user) NOPASSWD: /usr/local/bin/eos" | sudo tee "$SUDOERS_FILE" > /dev/null
+        sudo chmod 440 "$SUDOERS_FILE"
+        echo -e "${GREEN}'eos_user' added to the sudoers file with limited permissions.${RESET}"
+    else
+        echo -e "${GREEN}'eos_user' is already in the sudoers file.${RESET}"
+    fi
+}
+
 function export_script_variables() {
     local output_file="script_vars.env"
     echo "Exporting script variables to $output_file..."
