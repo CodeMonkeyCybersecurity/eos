@@ -41,16 +41,16 @@ CYBERMONKEY_LOG_DIR="${CYBERMONKEY_LOG_DIR:-/var/log/cyberMonkey}"
 mkdir -p "$CYBERMONKEY_LOG_DIR"
 EOS_LOG_FILE="${CYBERMONKEY_LOG_DIR}/eos.log"
 
-# Redirect all output (stdout and stderr) to the log file
-exec > >(tee -a "$EOS_LOG_FILE") 2>&1
-
-# Log script start with timestamp
-echo "\033[31m=== Script started at $STAMP ===\033[0m"
-
 # Colors for pretty output
 GREEN="\033[0;32m"
 RED="\033[0;31m"
 RESET="\033[0m"
+
+# Redirect all output (stdout and stderr) to the log file
+exec > >(tee -a "$EOS_LOG_FILE") 2>&1
+
+# Log script start with timestamp
+echo "${RED} Script started at $STAMP ${RESET}"
 
 # Variables for binary download
 SYSTEM_USER="eos_user"
