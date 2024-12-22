@@ -176,7 +176,7 @@ function create_eos_db_user() {
         echo -e "${GREEN}${DB_USER} already exists.${RESET}"
     else
         # Create the user
-        if ! psql -U ${DB_USER} -c "CREATE ROLE ${SYSTEM_USER} WITH LOGIN CREATEDB PASSWORD 'eos_password';"; then
+        if ! psql -U ${DB_USER} -c "CREATE ROLE ${SYSTEM_USER};"; then
             echo -e "${RED}Error: Failed to create ${DB_USER}.${RESET}"
             exit 1
         fi
