@@ -11,7 +11,7 @@ import (
 // Config represents the structure of the YAML configuration file
 type Config struct {
 	Database struct {
-		User string `yaml:"name"`
+		Name string `yaml:"name"`
 		User string `yaml:"user"`
 		Host string `yaml:"host"`
 		Port string `yaml:"port"`
