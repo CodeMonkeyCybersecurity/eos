@@ -106,8 +106,8 @@ func init() {
 	}
 
 	// Add subcommands
-	rootCmd.AddCommand(getCmd)
-	rootCmd.AddCommand(setCmd)
-	rootCmd.AddCommand(goCmd)
+	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(readCmd)
+	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(deleteCmd)
 }

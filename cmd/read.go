@@ -1,4 +1,4 @@
-// get.go
+// read.go
 package cmd
 
 import (
@@ -15,27 +15,27 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// getCmd represents the "get" subcommand
-var getCmd = &cobra.Command{
-	Use:   "get",
+// readCmd represents the "read" subcommand
+var readCmd = &cobra.Command{
+	Use:   "read",
 	Short: "Retrieve information about resources (processes, users, backups, etc.)",
-	Long:  `Use eos get to retrieve detailed information about system resources, such as processes, users, hardware, backups, etc.`,
+	Long:  `Use eos read to retrieve detailed information about system resources, such as processes, users, hardware, backups, etc.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		object := args[0]
 		switch object {
 		case "processes":
-			getProcesses()
+			readProcesses()
 		case "users":
-			getUsers()
+			readUsers()
 		case "hardware":
-			getHardware()
+			readHardware()
 		case "basic":
-			getBasic()
+			readBasic()
 		case "privileges":
-			getPrivileges()
+			readPrivileges()
 		default:
-			fmt.Println("Error: Unsupported resource. Use `eos get [processes|users|hardware|basic|privileges]`.")
+			fmt.Println("Error: Unsupported resource. Use `eos read [processes|users|hardware|basic|privileges]`.")
 			os.Exit(1)
 
 		}
@@ -44,11 +44,11 @@ var getCmd = &cobra.Command{
 
 // Initialize subcommand
 func init() {
-	rootCmd.AddCommand(getCmd)
+	rootCmd.AddCommand(readCmd)
 }
 
 // Example function for fetching processes
-func getProcesses() {
+func readProcesses() {
 	fmt.Println("Fetching processes...")
 	cmd := exec.Command("ps", "-e", "-o", "pid,comm")
 	var output bytes.Buffer
@@ -63,7 +63,7 @@ func getProcesses() {
 }
 
 // Example function for fetching users
-func getUsers() {
+func readUsers() {
 	fmt.Println("Fetching users...")
 	content, err := ioutil.ReadFile("/etc/passwd")
 	if err != nil {
@@ -85,7 +85,7 @@ func getUsers() {
 }
 
 // Example function for fetching hardware details
-func getHardware() {
+func readHardware() {
 	fmt.Println("Fetching hardware details...")
 	cmd := exec.Command("lscpu")
 	var output bytes.Buffer
@@ -101,19 +101,19 @@ func getHardware() {
 	fmt.Println(output.String())
 }
 
-func getBasic() {
-	fmt.Println("  System load:            ", getSystemLoad())
-	fmt.Println("  Usage of /:             ", getDiskUsage("/"))
-	fmt.Println("  Memory usage:           ", getMemoryUsage())
-	fmt.Println("  Swap usage:             ", getSwapUsage())
-	fmt.Println("  Processes:              ", getProcessCount())
-	fmt.Println("  Users logged in:        ", getLoggedInUsers())
-	fmt.Println("  IPv4 address:           ", getIPAddress("ens18", false))
-	fmt.Println("  IPv6 address:           ", getIPAddress("ens18", true))
+func readBasic() {
+	fmt.Println("  System load:            ", readSystemLoad())
+	fmt.Println("  Usage of /:             ", readDiskUsage("/"))
+	fmt.Println("  Memory usage:           ", readMemoryUsage())
+	fmt.Println("  Swap usage:             ", readSwapUsage())
+	fmt.Println("  Processes:              ", readProcessCount())
+	fmt.Println("  Users logged in:        ", readLoggedInUsers())
+	fmt.Println("  IPv4 address:           ", readIPAddress("ens18", false))
+	fmt.Println("  IPv6 address:           ", readIPAddress("ens18", true))
 }
 
 // Helper functions
-func getSystemLoad() string {
+func readSystemLoad() string {
 	output, err := ioutil.ReadFile("/proc/loadavg")
 	if err != nil {
 		return "N/A"
@@ -121,7 +121,7 @@ func getSystemLoad() string {
 	return strings.Fields(string(output))[0]
 }
 
-func getDiskUsage(path string) string {
+func readDiskUsage(path string) string {
 	var stat syscall.Statfs_t
 	err := syscall.Statfs(path, &stat)
 	if err != nil {
@@ -133,7 +133,7 @@ func getDiskUsage(path string) string {
 	return fmt.Sprintf("%.1f%% of %.2fGB", percent, float64(total)/(1024*1024*1024))
 }
 
-func getMemoryUsage() string {
+func readMemoryUsage() string {
 	memInfo, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
 		return "N/A"
@@ -146,7 +146,7 @@ func getMemoryUsage() string {
 	return fmt.Sprintf("%.1f%%", percent)
 }
 
-func getSwapUsage() string {
+func readSwapUsage() string {
 	memInfo, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
 		return "N/A"
@@ -159,7 +159,7 @@ func getSwapUsage() string {
 	return fmt.Sprintf("%.1f%%", percent)
 }
 
-func getProcessCount() string {
+func readProcessCount() string {
 	output, err := exec.Command("sh", "-c", "ps -e | wc -l").Output()
 	if err != nil {
 		return "N/A"
@@ -168,7 +168,7 @@ func getProcessCount() string {
 	return strconv.Itoa(count)
 }
 
-func getLoggedInUsers() string {
+func readLoggedInUsers() string {
 	output, err := exec.Command("who").Output()
 	if err != nil {
 		return "N/A"
@@ -176,7 +176,7 @@ func getLoggedInUsers() string {
 	return strconv.Itoa(len(strings.Split(strings.TrimSpace(string(output)), "\n")))
 }
 
-func getIPAddress(ifaceName string, isIPv6 bool) string {
+func readIPAddress(ifaceName string, isIPv6 bool) string {
 	if ifaceName == "" {
 		ifaces, err := net.Interfaces()
 		if err != nil {
@@ -192,12 +192,12 @@ func getIPAddress(ifaceName string, isIPv6 bool) string {
 	if ifaceName == "" {
 		return "No active interfaces found"
 	}
-	// Get interface by name
+	// read interface by name
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
 		return fmt.Sprintf("Error: Interface %s not found", ifaceName)
 	}
-	// Get IP addresses for the interface
+	// read IP addresses for the interface
 	addrs, err := iface.Addrs()
 	if err != nil {
 		return fmt.Sprintf("Error retrieving addresses for %s", ifaceName)
@@ -226,6 +226,6 @@ func parseMemValue(line string) uint64 {
 	return value * 1024 // kB to Bytes
 }
 
-func getPrivileges() {
+func readPrivileges() {
 	fmt.Println("Fetching privileges is not implemented yet.")
 }
