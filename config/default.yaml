@@ -5,3 +5,4 @@ database:
   port: "5432"
   version: "16"
   socketDir: "/var/run/postgresql"
+  tables: ["configuration", "logs"]
