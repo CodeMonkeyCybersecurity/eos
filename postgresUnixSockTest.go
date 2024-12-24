@@ -18,7 +18,7 @@ type Config struct {
 		Host      string `yaml:"host"`
 		Port      string `yaml:"port"`
 		Version   string `yaml:"version"`
-		socketDir string `yaml: "/var/run/postgresql"`
+		socketDir string `yaml:"/var/run/postgresql"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
