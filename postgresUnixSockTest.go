@@ -8,7 +8,6 @@ import (
 
 	_ "github.com/lib/pq"
 	"gopkg.in/yaml.v3"
-
 )
 
 type Config struct {
@@ -54,8 +53,7 @@ func main() {
 	fmt.Printf("Database Tables: %s\n", config.Database.Tables)
 	fmt.Printf("Log Level: %s\n", config.Logging.Level)
 	fmt.Printf("Log File: %s\n", config.Logging.File)
-}
-
+	}
 
 	// Connection string
 	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", config.Database.SocketDir, config.Database.Name, config.Database.User, config.Database.Port,
