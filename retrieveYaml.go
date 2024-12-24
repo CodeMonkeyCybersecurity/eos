@@ -24,7 +24,7 @@ type Config struct {
 
 func main() {
 	// Specify the path to your YAML file
-	yamlFilePath := "config.yaml"
+	yamlFilePath := "eos/config/default.yaml"
 
 	// Read the YAML file
 	file, err := os.ReadFile(yamlFilePath)
