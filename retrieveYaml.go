@@ -16,7 +16,7 @@ type Config struct {
 		Host      string `yaml:"host"`
 		Port      string `yaml:"port"`
 		Version   string `yaml:"version"`
-		socketDir string `yaml:"socketDir"`
+		SocketDir string `yaml:"socketDir"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
