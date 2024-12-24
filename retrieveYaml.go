@@ -11,10 +11,9 @@ import (
 // Config represents the structure of the YAML configuration file
 type Config struct {
 	Database struct {
-		User     string `yaml:"user"`
-		Password string `yaml:"password"`
-		Host     string `yaml:"host"`
-		Port     string `yaml:"port"`
+		User string `yaml:"user"`
+		Host string `yaml:"host"`
+		Port string `yaml:"port"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
@@ -40,8 +39,10 @@ func main() {
 	}
 
 	// Access and print values from the parsed config
+	fmt.Printf("Database Name: %s\n", config.Database.Name)
 	fmt.Printf("Database User: %s\n", config.Database.User)
 	fmt.Printf("Database Host: %s\n", config.Database.Host)
+	fmt.Printf("Database Port: %s\n", config.Database.Port)
 	fmt.Printf("Log Level: %s\n", config.Logging.Level)
 	fmt.Printf("Log File: %s\n", config.Logging.File)
 }
