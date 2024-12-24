@@ -14,7 +14,7 @@ type Config struct {
 		User     string `yaml:"user"`
 		Password string `yaml:"password"`
 		Host     string `yaml:"host"`
-		Port     int    `yaml:port`
+		Port     string `yaml:"port"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
