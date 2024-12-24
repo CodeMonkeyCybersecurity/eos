@@ -5,4 +5,9 @@ database:
   port: "5432"
   version: "16"
   socketDir: "/var/run/postgresql"
-  tables: ["configuration", "logs"]
+  tables:
+    - "configuration"
+    - "logs"
+logging:
+  level: "INFO"
+  file: "/var/log/app.log"

@@ -13,12 +13,13 @@ import (
 
 type Config struct {
 	Database struct {
-		Name      string `yaml:"name"`
-		User      string `yaml:"user"`
-		Host      string `yaml:"host"`
-		Port      string `yaml:"port"`
-		Version   string `yaml:"version"`
-		socketDir string `yaml:"socketDir"`
+		Name      string   `yaml:"name"`
+		User      string   `yaml:"user"`
+		Host      string   `yaml:"host"`
+		Port      string   `yaml:"port"`
+		Version   string   `yaml:"version"`
+		SocketDir string   `yaml:"socketDir"`
+		Tables    []string `yaml:"tables"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
@@ -49,13 +50,16 @@ func main() {
 	fmt.Printf("Database Host: %s\n", config.Database.Host)
 	fmt.Printf("Database Port: %s\n", config.Database.Port)
 	fmt.Printf("Database Version: %s\n", config.Database.Version)
-	fmt.Printf("Database socketDir: %s\n", config.Database.socketDir)
+	fmt.Printf("Database SocketDir: %s\n", config.Database.SocketDir)
+	fmt.Printf("Database Tables: %s\n", config.Database.Tables)
 	fmt.Printf("Log Level: %s\n", config.Logging.Level)
 	fmt.Printf("Log File: %s\n", config.Logging.File)
 }
 
+
 	// Connection string
-	connStr := fmt.Sprintf("host=%s dbname=%s user=%s sslmode=disable", socketDir, database, user)
+	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", config.Database.SocketDir, config.Database.Name, config.Database.User, config.Database.Port,
+	)
 
 	// Open a connection
 	db, err := sql.Open("postgres", connStr)
