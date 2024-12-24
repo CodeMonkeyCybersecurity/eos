@@ -11,11 +11,12 @@ import (
 // Config represents the structure of the YAML configuration file
 type Config struct {
 	Database struct {
-		Name    string `yaml:"name"`
-		User    string `yaml:"user"`
-		Host    string `yaml:"host"`
-		Port    string `yaml:"port"`
-		Version string `yaml:"version"`
+		Name      string `yaml:"name"`
+		User      string `yaml:"user"`
+		Host      string `yaml:"host"`
+		Port      string `yaml:"port"`
+		Version   string `yaml:"version"`
+		socketDir string `yaml: "/var/run/postgresql"`
 	} `yaml:"database"`
 	Logging struct {
 		Level string `yaml:"level"`
@@ -46,6 +47,7 @@ func main() {
 	fmt.Printf("Database Host: %s\n", config.Database.Host)
 	fmt.Printf("Database Port: %s\n", config.Database.Port)
 	fmt.Printf("Database Version: %s\n", config.Database.Version)
+	fmt.Printf("Database Version: %s\n", config.Database.socketDir)
 	fmt.Printf("Log Level: %s\n", config.Logging.Level)
 	fmt.Printf("Log File: %s\n", config.Logging.File)
 }
