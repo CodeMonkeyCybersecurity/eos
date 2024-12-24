@@ -14,12 +14,12 @@ logging:
   file: "/var/log/app.log"
 
 logLevel:
-	DebugLevel: "DEBUG"
-	InfoLevel : "INFO"
-	WarnLevel : "WARN"
-	ErrorLevel: "ERROR"
-	CriticalLevel: "CRITICAL"
-	FatalLevel: "FATAL"
+  DebugLevel: "DEBUG"
+  InfoLevel : "INFO"
+  WarnLevel : "WARN"
+  ErrorLevel: "ERROR"
+  CriticalLevel: "CRITICAL"
+  FatalLevel: "FATAL"
 
 logPriority:
   DebugLevel: "0"
