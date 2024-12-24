@@ -24,6 +24,22 @@ type Logger struct {
 	colorize    bool // Enable or disable colorization
 }
 
+type Config struct {
+	Database struct {
+		Name      string   `yaml:"name"`
+		User      string   `yaml:"user"`
+		Host      string   `yaml:"host"`
+		Port      string   `yaml:"port"`
+		Version   string   `yaml:"version"`
+		SocketDir string   `yaml:"socketDir"`
+		Tables    []string `yaml:"tables"`
+	} `yaml:"database"`
+	Logging struct {
+		Level string `yaml:"level"`
+		File  string `yaml:"file"`
+	} `yaml:"logging"`
+}
+
 var (
 	globalLogger *Logger
 	once         sync.Once

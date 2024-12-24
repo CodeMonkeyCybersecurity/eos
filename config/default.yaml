@@ -8,6 +8,23 @@ database:
   tables:
     - "configuration"
     - "logs"
+
 logging:
   level: "INFO"
   file: "/var/log/app.log"
+
+logPriority:
+  DebugLevel: "0"
+  InfoLevel: "1"
+  WarnLevel: "2"
+  ErrorLevel: "3"
+  CriticalLevel: "4"
+  FatalLevel: "5"
+
+colourMap:
+  DebugLevel: "\033[0;36m" # Cyan
+  InfoLevel: "\033[0;32m"  # Green
+  WarnLevel: "\033[0;33m"  # Yellow
+  ErrorLevel: "\033[0;31m" # Red
+  CriticalLevel: "\033[0;35m" # Magenta
+  FatalLevel: "\033[1;31m" # Bright Red
