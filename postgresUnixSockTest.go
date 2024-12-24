@@ -43,21 +43,8 @@ func main() {
 		log.Fatalf("Error parsing YAML file: %v\n", err)
 	}
 
-	// Access and print values from the parsed config
-	fmt.Printf("Database Name: %s\n", config.Database.Name)
-	fmt.Printf("Database User: %s\n", config.Database.User)
-	fmt.Printf("Database Host: %s\n", config.Database.Host)
-	fmt.Printf("Database Port: %s\n", config.Database.Port)
-	fmt.Printf("Database Version: %s\n", config.Database.Version)
-	fmt.Printf("Database SocketDir: %s\n", config.Database.SocketDir)
-	fmt.Printf("Database Tables: %s\n", config.Database.Tables)
-	fmt.Printf("Log Level: %s\n", config.Logging.Level)
-	fmt.Printf("Log File: %s\n", config.Logging.File)
-	}
-
 	// Connection string
-	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", config.Database.SocketDir, config.Database.Name, config.Database.User, config.Database.Port,
-	)
+	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", config.Database.SocketDir, config.Database.Name, config.Database.User, config.Database.Port)
 
 	// Open a connection
 	db, err := sql.Open("postgres", connStr)
