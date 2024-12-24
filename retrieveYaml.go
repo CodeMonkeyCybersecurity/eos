@@ -47,7 +47,7 @@ func main() {
 	fmt.Printf("Database Host: %s\n", config.Database.Host)
 	fmt.Printf("Database Port: %s\n", config.Database.Port)
 	fmt.Printf("Database Version: %s\n", config.Database.Version)
-	fmt.Printf("Database Version: %s\n", config.Database.socketDir)
+	fmt.Printf("Database sockerDir: %s\n", config.Database.socketDir)
 	fmt.Printf("Log Level: %s\n", config.Logging.Level)
 	fmt.Printf("Log File: %s\n", config.Logging.File)
 }
