@@ -8,21 +8,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Config represents the structure of the YAML configuration file
-type Config struct {
-	Database struct {
-		Name      string   `yaml:"name"`
-		User      string   `yaml:"user"`
-		Host      string   `yaml:"host"`
-		Port      string   `yaml:"port"`
-		Version   string   `yaml:"version"`
-		SocketDir string   `yaml:"socketDir"`
-		Tables    []string `yaml:"tables"`
-	} `yaml:"database"`
-	Logging struct {
-		Level string `yaml:"level"`
-		File  string `yaml:"file"`
-	} `yaml:"logging"`
+// Recursive function to process and print nested YAML structures
+func processMap(data map[string]interface{}, indent string) {
+	for key, value := range data {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			// If the value is a nested map, call processMap recursively
+			fmt.Printf("%s%s:\n", indent, key)
+			processMap(v, indent+"  ")
+		case []interface{}:
+			// If the value is a slice, process each element
+			fmt.Printf("%s%s:\n", indent, key)
+			for _, item := range v {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					processMap(itemMap, indent+"  ")
+				} else {
+					fmt.Printf("%s  - %v\n", indent, item)
+				}
+			}
+		default:
+			// Print scalar values
+			fmt.Printf("%s%s: %v\n", indent, key, v)
+		}
+	}
 }
 
 func main() {
@@ -30,26 +38,19 @@ func main() {
 	yamlFilePath := "config/default.yaml"
 
 	// Read the YAML file
-	file, err := os.ReadFile(yamlFilePath)
+	content, err := os.ReadFile(yamlFilePath)
 	if err != nil {
 		log.Fatalf("Error reading YAML file: %v\n", err)
 	}
 
-	// Parse the YAML content into the Config struct
-	var config Config
-	err = yaml.Unmarshal(file, &config)
+	// Parse the YAML content into a generic map
+	var data map[string]interface{}
+	err = yaml.Unmarshal(content, &data)
 	if err != nil {
 		log.Fatalf("Error parsing YAML file: %v\n", err)
 	}
 
-	// Access and print values from the parsed config
-	fmt.Printf("Database Name: %s\n", config.Database.Name)
-	fmt.Printf("Database User: %s\n", config.Database.User)
-	fmt.Printf("Database Host: %s\n", config.Database.Host)
-	fmt.Printf("Database Port: %s\n", config.Database.Port)
-	fmt.Printf("Database Version: %s\n", config.Database.Version)
-	fmt.Printf("Database SockerDir: %s\n", config.Database.SocketDir)
-	fmt.Printf("Database Tables: %s\n", config.Database.Tables)
-	fmt.Printf("Log Level: %s\n", config.Logging.Level)
-	fmt.Printf("Log File: %s\n", config.Logging.File)
+	// Process and print all values
+	fmt.Println("YAML Content:")
+	processMap(data, "")
 }
