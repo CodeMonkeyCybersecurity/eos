@@ -34,14 +34,15 @@ Run: func(cmd *cobra.Command, args []string) {
 
 	logger := utils.GetLogger()
 	logger.Info("Eos CLI started successfully.")
-},
+	},
 )
 
 func Execute() {
 if err := rootCmd.Execute(); err != nil {
 	log.Fatalf("Command execution failed: %v", err)
+	}
 }
-}
+
 
 func cmd() {
 	currentUser, err := user.Current()
@@ -54,16 +55,6 @@ func cmd() {
 		log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
 	}
 }
-
-// A helper to fetch environment variables with a default fallback
-func getEnv(key, fallback string) string {
-	if value, ok := os.LookupEnv(key); ok {
-		return value
-	}
-	return fallback
-}
-
-
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -105,6 +96,110 @@ func init() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
+// Create
+var createCmd = &cobra.Command{
+	Use:   "read [target]",
+	Short: "Read information",
+	Long:  `Reads information about processes, users, etc.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 1 {
+			log.Fatalf("Please specify what to read, e.g., 'processes'")
+		}
+		target := args[0]
+		fmt.Printf("Reading %s...\n", target)
+		// Add your logic here
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(readCmd)
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Read
+var readCmd = &cobra.Command{
+	Use:   "read [target]",
+	Short: "Read information",
+	Long:  `Reads information about processes, users, etc.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 1 {
+			log.Fatalf("Please specify what to read, e.g., 'processes'")
+		}
+		target := args[0]
+		fmt.Printf("Reading %s...\n", target)
+		// Add your logic here
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(readCmd)
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Update
+var updateCmd = &cobra.Command{
+	Use:   "read [target]",
+	Short: "Read information",
+	Long:  `Reads information about processes, users, etc.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 1 {
+			log.Fatalf("Please specify what to read, e.g., 'processes'")
+		}
+		target := args[0]
+		fmt.Printf("Reading %s...\n", target)
+		// Add your logic here
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(readCmd)
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Delete
+var deleteCmd = &cobra.Command{
+	Use:   "read [target]",
+	Short: "Read information",
+	Long:  `Reads information about processes, users, etc.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 1 {
+			log.Fatalf("Please specify what to read, e.g., 'processes'")
+		}
+		target := args[0]
+		fmt.Printf("Reading %s...\n", target)
+		// Add your logic here
+	},
+}
+
+func init() {
+	rootCmd.AddCommand(readCmd)
+}
+
+func Execute() {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+	
 	// Add subcommands
 	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(readCmd)
