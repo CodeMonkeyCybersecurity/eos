@@ -43,7 +43,6 @@ if err := rootCmd.Execute(); err != nil {
 	}
 }
 
-
 func cmd() {
 	currentUser, err := user.Current()
 	if err != nil {
