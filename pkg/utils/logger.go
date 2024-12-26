@@ -17,8 +17,52 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// Config represents the structure of the YAML configuration
+type Config struct {
+	Database struct {
+		Name      string   `yaml:"name"`
+		User      string   `yaml:"user"`
+		Host      string   `yaml:"host"`
+		Port      string   `yaml:"port"`
+		Version   string   `yaml:"version"`
+		SocketDir string   `yaml:"socketDir"`
+		Tables    []string `yaml:"tables"`
+	} `yaml:"database"`
+	Logging struct {
+		Level string `yaml:"level"`
+		File  string `yaml:"file"`
+	} `yaml:"logging"`
+	LogLevel map[LogLevel]struct {
+		LogPriority string `yaml:"logPriority"`
+		ColourMap   string `yaml:"colourMap"`
+	} `yaml:"logLevel"`
+	Reset struct {
+		Colour string `yaml:"colour"`
+	} `yaml:"reset"`
+}
+
 // LogLevel defines the severity levels for logging
 type LogLevel string
+
+// load the yaml file and populate the config struct
+func LoadConfig(filePath string) (*Config, error) {
+	// Open the YAML file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open config file: %w", err)
+	}
+	defer file.Close()
+
+	// Parse the YAML file
+	var cfg Config
+	decoder := yaml.NewDecoder(file)
+	if err := decoder.Decode(&cfg); err != nil {
+		return nil, fmt.Errorf("failed to decode config file: %w", err)
+	}
+
+	return &cfg, nil
+}
+
 
 const (
 	Debug    LogLevel = "Debug"
@@ -37,53 +81,43 @@ type Logger struct {
 	colourize    bool // Enable or disable colourization
 }
 
-type Config struct {
-	Database struct {
-		Name      string   `yaml:"name"`
-		User      string   `yaml:"user"`
-		Host      string   `yaml:"host"`
-		Port      string   `yaml:"port"`
-		Version   string   `yaml:"version"`
-		SocketDir string   `yaml:"socketDir"`
-		Tables    []string `yaml:"tables"`
-	} `yaml:"database"`
-	Logging struct {
-		Level string `yaml:"level"`
-		File  string `yaml:"file"`
-	} `yaml:"logging"`
-	Reset struct {
-		Reset    string `yaml:"Reset"`	
-	} `yaml:"reset"`
-}
-
 var (
 	globalLogger *Logger
 	once         sync.Once
 )
 
-var logPriority = map[LogLevel]int{
-    "Debug":    0,
-    "Info":     1,
-    "Warn":     2,
-    "Error":    3,
-    "Critical": 4,
-    "Fatal":    5,
-}
+// Update the global logPriority and colourMap variables based on the YAML file:
+var (
+	logPriority = make(map[LogLevel]int)
+	colourMap   = make(map[LogLevel]string)
+)
 
-// InitializeLogger sets up the global logger instance
-func InitializeLogger(configPath string, logFilePath string, terminalMin LogLevel, colourize bool) error {
-	cfg, err := config.LoadConfig(configPath)
+func InitializeLoggerFromConfig(configPath string) error {
+	cfg, err := LoadConfig(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return err
 	}
 
-	// Database
+	// Populate logPriority and colourMap
+	for level, properties := range cfg.LogLevel {
+		priority, err := strconv.Atoi(properties.LogPriority)
+		if err != nil {
+			return fmt.Errorf("invalid log priority for level %s: %w", level, err)
+		}
+		logPriority[level] = priority
+		colourMap[level] = properties.ColourMap
+	}
+
+	return nil
+}
+
+// Database
 	// Connection string
-	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", config.Database.SocketDir, config.Database.Name, config.Database.User, config.Database.Port)
+	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", cfg.Database.SocketDir, cfg.Database.Name, cfg.Database.User, cfg.Database.Port)
 	// Open a connection
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		log.Fatalf("Failed to open a connection: %v", err)
+		return fmt.Errorf("Failed to open a database connection: %v", err)
 	}
 	// Initialize the logger
 	once.Do(func() {
