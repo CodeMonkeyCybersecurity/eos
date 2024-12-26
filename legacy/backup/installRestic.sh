@@ -11,6 +11,9 @@ sudo restic -r sftp:henry@backup:/srv/restic-repos/$(hostname) init
 # backup 
 sudo restic -r sftp:henry@backup:/srv/restic-repos/$(hostname) --verbose backup /root /home /var /etc /srv /usr /opt
 
-# TODO: compression
+read -p "What is your restic repo password?: " RESTIC_PASS
 
-# TODO: encryption 
+echo "$RESTIC_PASS" | sudo tee /root/.restic-password > /dev/null
+sudo chmod 600 /root/.restic-password
+
+restic -r sftp:henry@backup:/srv/restic-repos/$(hostname) --password-file /root/.restic-password --verbose backup /root /home /var /etc /srv /usr /opt
