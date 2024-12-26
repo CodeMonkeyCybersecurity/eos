@@ -1,3 +1,5 @@
+// config/default.yaml
+
 database:
   name: "eos_db"
   user: "eos_user"
