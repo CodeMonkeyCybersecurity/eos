@@ -79,6 +79,7 @@ type Logger struct {
 	logger      *log.Logger
 	terminalMin LogLevel
 	colourize    bool // Enable or disable colourization
+	resetColour string // Dynamically set reset color
 }
 
 var (
@@ -121,7 +122,7 @@ func InitializeLoggerFromConfig(configPath string) error {
 	}
 	// Initialize the logger
 	once.Do(func() {
-		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colourize)
+		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colourize, cfg.Reset.Colour)
 	})
 	if err != nil {
 		return err
@@ -136,7 +137,7 @@ func GetLogger() *Logger {
 }
 
 // NewLogger initializes a new Logger with file and database logging
-func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colourize bool) (*Logger, error) {
+func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colourize bool, resetColour string) (*Logger, error) {
 	// Open log file
 	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -152,11 +153,9 @@ func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colourize b
 		logger:      fileLogger,
 		terminalMin: terminalMin,
 		colourize:    colourize,
+		resetColour: resetColour, // Store the reset color
 	}, nil
 }
-
-// resetcolour resets the terminal colour
-const resetColour = "\033[0m"
 
 // applyColour applies ANSI colour codes to the message if colourization is enabled
 func (l *Logger) applyColour(level LogLevel, message string) string {
@@ -177,7 +176,7 @@ func (l *Logger) applyColour(level LogLevel, message string) string {
 
 	// Add colour if enabled
 	if l.colourize {
-		return fmt.Sprintf("%s[%s] %s%s", colourMap[level], level, formattedMessage)
+		return fmt.Sprintf("%s[%s] %s%s", colourMap[level], level, formattedMessage, l.resetColour)
 	}
 	return fmt.Sprintf("[%s] %s", level, formattedMessage)
 }
