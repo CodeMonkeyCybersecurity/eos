@@ -11,28 +11,27 @@ database:
 
 logging:
   level: "INFO"
-  file: "/var/log/app.log"
+  file: "/var/log/cyberMonkey/eos.log"
 
 logLevel:
-  DebugLevel: "DEBUG"
-  InfoLevel : "INFO"
-  WarnLevel : "WARN"
-  ErrorLevel: "ERROR"
-  CriticalLevel: "CRITICAL"
-  FatalLevel: "FATAL"
+  Debug:
+    - logPriority: "0"
+    - colourMap: "\033[0;36m"
+  Info:
+    - logPriority: "1"
+    - colourMap: "\033[0;32m" 
+  Warn:
+    - logPriority: "2"
+    - colourMap: "\033[0;33m"
+  Error:
+    - logPriority: "3"
+    - colourMap: "\033[0;31m"
+  Critical:
+    - logPriority: "4"
+    - colourMap: "\033[0;35m"
+  Fatal:
+    - logPriority: "5"
+    - colourMap: "\033[1;31m"
 
-logPriority:
-  DebugLevel: "0"
-  InfoLevel: "1"
-  WarnLevel: "2"
-  ErrorLevel: "3"
-  CriticalLevel: "4"
-  FatalLevel: "5"
-
-colourMap:
-  DebugLevel: "\033[0;36m" # Cyan
-  InfoLevel: "\033[0;32m"  # Green
-  WarnLevel: "\033[0;33m"  # Yellow
-  ErrorLevel: "\033[0;31m" # Red
-  CriticalLevel: "\033[0;35m" # Magenta
-  FatalLevel: "\033[1;31m" # Bright Red
+reset:
+  colour: "\033[0m"

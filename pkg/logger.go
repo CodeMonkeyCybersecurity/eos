@@ -10,9 +10,11 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"pkg/readYaml.go"
 
 	"eos/config"
 
+	"gopkg.in/yaml.v3"
 	_ "github.com/lib/pq"
 )
 
@@ -38,6 +40,17 @@ type Config struct {
 		Level string `yaml:"level"`
 		File  string `yaml:"file"`
 	} `yaml:"logging"`
+	LogLevel struct {
+		Debug    []string `yaml:"Debug"`
+		Info     []string `yaml:"Info"`
+		Warn     []string `yaml:"Warn"`
+		Error    []string `yaml:"Error"`
+		Critical []string `yaml:"Critical"`
+		Fatal    []string `yaml:"Fatal"`
+	} `yaml:"logLevel"`
+	Reset struct {
+		Reset    string `yaml:"Reset"`	
+	} `yaml:"reset"`
 }
 
 var (
@@ -45,39 +58,36 @@ var (
 	once         sync.Once
 )
 
+var logPriority = map[LogLevel]int{
+    "Debug":    0,
+    "Info":     1,
+    "Warn":     2,
+    "Error":    3,
+    "Critical": 4,
+    "Fatal":    5,
+}
+
 // InitializeLogger sets up the global logger instance
 func InitializeLogger(configPath string, logFilePath string, terminalMin LogLevel, colorize bool) error {
+	yamlFilePath := "config/default.yaml"
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Build connection string from the loaded configuration
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s dbname=%s",
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.User,
-		cfg.Database.Name,
-	)
-
-	// Open the database connection
+	// Database
+	// Connection string
+	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", config.Database.SocketDir, config.Database.Name, config.Database.User, config.Database.Port)
+	// Open a connection
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		log.Fatalf("Failed to open a connection: %v", err)
 	}
-
-	// Ensure the connection is alive
-	if err := db.Ping(); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
-	}
-
 	// Initialize the logger
-	var initErr error
 	once.Do(func() {
 		globalLogger, initErr = NewLogger(db, logFilePath, terminalMin, colorize)
 	})
-	return initErr
+	return err
 }
 
 // GetLogger returns the global logger instance
@@ -111,37 +121,8 @@ func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colorize bo
 // LogLevel represents different logging levels
 type LogLevel string
 
-const (
-	DebugLevel    LogLevel = "DEBUG"
-	InfoLevel     LogLevel = "INFO"
-	WarnLevel     LogLevel = "WARN"
-	ErrorLevel    LogLevel = "ERROR"
-	CriticalLevel LogLevel = "CRITICAL"
-	FatalLevel    LogLevel = "FATAL"
-)
-
-// logPriority maps log levels to their priority
-var logPriority = map[LogLevel]int{
-	DebugLevel:    0,
-	InfoLevel:     1,
-	WarnLevel:     2,
-	ErrorLevel:    3,
-	CriticalLevel: 4,
-	FatalLevel:    5,
-}
-
-// colorMap maps log levels to ANSI color codes
-var colorMap = map[LogLevel]string{
-	DebugLevel:    "\033[0;36m", // Cyan
-	InfoLevel:     "\033[0;32m", // Green
-	WarnLevel:     "\033[0;33m", // Yellow
-	ErrorLevel:    "\033[0;31m", // Red
-	CriticalLevel: "\033[0;35m", // Magenta
-	FatalLevel:    "\033[1;31m", // Bright Red
-}
-
 // resetColor resets the terminal color
-const resetColor = "\033[0m"
+const resetColour = "\033[0m"
 
 // applyColor applies ANSI color codes to the message if colorization is enabled
 func (l *Logger) applyColor(level LogLevel, message string) string {
@@ -162,7 +143,7 @@ func (l *Logger) applyColor(level LogLevel, message string) string {
 
 	// Add color if enabled
 	if l.colorize {
-		return fmt.Sprintf("%s[%s] %s%s", colorMap[level], level, formattedMessage, resetColor)
+		return fmt.Sprintf("%s[%s] %s%s", colorMap[level], level, formattedMessage)
 	}
 	return fmt.Sprintf("[%s] %s", level, formattedMessage)
 }
@@ -172,18 +153,6 @@ func (l *Logger) logToFile(level LogLevel, message string) {
 	coloredMessage := l.applyColor(level, message)
 	l.logger.Println(coloredMessage)
 }
-
-// logToDatabase logs a message to the PostgreSQL database
-func (l *Logger) logToDatabase(level LogLevel, message string) error {
-	if l.db == nil {
-		return fmt.Errorf("database connection is nil")
-	}
-
-	// Check if the database connection is alive
-	if err := l.db.Ping(); err != nil {
-		l.logger.Printf("[ERROR] Database connection lost: %v", err)
-		return err
-	}
 
 	query := `INSERT INTO logs (timestamp, level, message) VALUES ($1, $2, $3)`
 	_, err := l.db.Exec(query, time.Now(), level, message)
@@ -205,7 +174,7 @@ func (l *Logger) Log(level LogLevel, message string) {
 	// Log to terminal if the level meets the minimum requirement
 	if l.shouldLogToTerminal(level) {
 		color := colorMap[level]
-		fmt.Printf("%s[%s] %s%s\n", color, level, message, resetColor)
+		fmt.Printf("%s[%s] %s%s\n", color, level, message)
 	}
 }
 
@@ -239,3 +208,13 @@ func (l *Logger) Fatal(message string) {
 	l.Log(FatalLevel, message)
 	os.Exit(1)
 }
+
+
+
+	// Insert log entry into the 'logs' table
+	// insertQuery := "INSERT INTO logs (timestamp, level, message) VALUES ($1, $2, $3)"
+	// _, err = db.Exec(insertQuery, time.Now(), config.Logging.Level, "Test log entry")
+	// if err != nil {
+	// 	log.Fatalf("Failed to insert log entry: %v", err)
+	// }
+
