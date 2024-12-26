@@ -106,7 +106,7 @@ func InitializeLogger(configPath, logFilePath string, terminalMin LogLevel, colo
 	}
 
 	// Database connection string
-	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", cfg.Database.SocketDir, cfg.Database.Name, cfg.Database.User, cfg.Database.Port)
+	connStr := fmt.Sprintf("host=%s dbname=%s user=%s sslmode=disable", cfg.Database.SocketDir, cfg.Database.Name, cfg.Database.User)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return fmt.Errorf("Failed to open a database connection: %v", err)
