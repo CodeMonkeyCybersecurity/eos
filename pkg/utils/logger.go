@@ -22,7 +22,7 @@ type Logger struct {
 	db          *sql.DB
 	logger      *log.Logger
 	terminalMin LogLevel
-	colorize    bool // Enable or disable colorization
+	colourize    bool // Enable or disable colourization
 }
 
 type Config struct {
@@ -67,7 +67,7 @@ var logPriority = map[LogLevel]int{
 }
 
 // InitializeLogger sets up the global logger instance
-func InitializeLogger(configPath string, logFilePath string, terminalMin LogLevel, colorize bool) error {
+func InitializeLogger(configPath string, logFilePath string, terminalMin LogLevel, colourize bool) error {
 	yamlFilePath := "config/default.yaml"
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
@@ -84,7 +84,7 @@ func InitializeLogger(configPath string, logFilePath string, terminalMin LogLeve
 	}
 	// Initialize the logger
 	once.Do(func() {
-		globalLogger, initErr = NewLogger(db, logFilePath, terminalMin, colorize)
+		globalLogger, initErr = NewLogger(db, logFilePath, terminalMin, colourize)
 	})
 	return err
 }
@@ -98,7 +98,7 @@ func GetLogger() *Logger {
 }
 
 // NewLogger initializes a new Logger with file and database logging
-func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colorize bool) (*Logger, error) {
+func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colourize bool) (*Logger, error) {
 	// Open log file
 	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -113,18 +113,18 @@ func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colorize bo
 		db:          db,
 		logger:      fileLogger,
 		terminalMin: terminalMin,
-		colorize:    colorize,
+		colourize:    colourize,
 	}, nil
 }
 
 // LogLevel represents different logging levels
 type LogLevel string
 
-// resetColor resets the terminal color
+// resetcolour resets the terminal colour
 const resetColour = "\033[0m"
 
-// applyColor applies ANSI color codes to the message if colorization is enabled
-func (l *Logger) applyColor(level LogLevel, message string) string {
+// applyColour applies ANSI colour codes to the message if colourization is enabled
+func (l *Logger) applyColour(level LogLevel, message string) string {
 	// Retrieve metadata
 	timestamp := time.Now().Format("2006-01-02 15:04:05")
 	hostname, _ := os.Hostname()
@@ -140,17 +140,17 @@ func (l *Logger) applyColor(level LogLevel, message string) string {
 	// Format the message with metadata
 	formattedMessage := fmt.Sprintf("[%s] [%s] [PID:%s] %s", timestamp, hostname, pid, message)
 
-	// Add color if enabled
-	if l.colorize {
-		return fmt.Sprintf("%s[%s] %s%s", colorMap[level], level, formattedMessage)
+	// Add colour if enabled
+	if l.colourize {
+		return fmt.Sprintf("%s[%s] %s%s", colourMap[level], level, formattedMessage)
 	}
 	return fmt.Sprintf("[%s] %s", level, formattedMessage)
 }
 
-// logToFile logs a message to the file with optional colorization
+// logToFile logs a message to the file with optional colourization
 func (l *Logger) logToFile(level LogLevel, message string) {
-	coloredMessage := l.applyColor(level, message)
-	l.logger.Println(coloredMessage)
+	colouredMessage := l.applyColour(level, message)
+	l.logger.Println(colouredMessage)
 }
 
 // logToDatabase logs a message to the database
@@ -174,39 +174,39 @@ func (l *Logger) Log(level LogLevel, message string) {
 	}
 	// Log to terminal if the level meets the minimum requirement
 	if l.shouldLogToTerminal(level) {
-		color := colorMap[level]
-		fmt.Printf("%s[%s] %s%s\n", color, level, message)
+		colour := colourMap[level]
+		fmt.Printf("%s[%s] %s%s\n", colour, level, message)
 	}
 }
 
 // Debug logs a debug message
 func (l *Logger) Debug(message string) {
-	l.Log(DebugLevel, message)
+	l.Log(Debug, message)
 }
 
 // Info logs an informational message
 func (l *Logger) Info(message string) {
-	l.Log(InfoLevel, message)
+	l.Log(Info, message)
 }
 
 // Warn logs a warning message
 func (l *Logger) Warn(message string) {
-	l.Log(WarnLevel, message)
+	l.Log(Warn, message)
 }
 
 // Error logs an error message
 func (l *Logger) Error(message string) {
-	l.Log(ErrorLevel, message)
+	l.Log(Error, message)
 }
 
 // Critical logs a critical message
 func (l *Logger) Critical(message string) {
-	l.Log(CriticalLevel, message)
+	l.Log(Critical, message)
 }
 
 // Fatal logs a fatal message and exits the application
 func (l *Logger) Fatal(message string) {
-	l.Log(FatalLevel, message)
+	l.Log(Fatal, message)
 	os.Exit(1)
 }
 
