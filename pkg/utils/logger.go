@@ -72,7 +72,6 @@ var logPriority = map[LogLevel]int{
 
 // InitializeLogger sets up the global logger instance
 func InitializeLogger(configPath string, logFilePath string, terminalMin LogLevel, colourize bool) error {
-	yamlFilePath := "config/default.yaml"
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
