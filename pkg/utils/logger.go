@@ -93,41 +93,68 @@ var (
 	colourMap   = make(map[LogLevel]string)
 )
 
-func InitializeLoggerFromConfig(configPath string) error {
+// InitializeLogger sets up the global logger instance
+func InitializeLogger(configPath, logFilePath string, terminalMin LogLevel, colourize bool) error {
+	// Load configuration
 	cfg, err := LoadConfig(configPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+		
+	// Initialize logPriority and colourMap
+	if err := InitializeLoggerFromConfig(configPath); err != nil {
+		return fmt.Errorf("Failed to initialize logger config: %w, err)
 	}
 
-	// Populate logPriority and colourMap
-	for level, properties := range cfg.LogLevel {
-		priority, err := strconv.Atoi(properties.LogPriority)
-		if err != nil {
-			return fmt.Errorf("invalid log priority for level %s: %w", level, err)
-		}
-		logPriority[level] = priority
-		colourMap[level] = properties.ColourMap
+	// Database connection string
+	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", cfg.Database.SocketDir, cfg.Database.Name, cfg.Database.User, cfg.Database.Port)
+	db, err := sql.Open("postgres", connStr)
+	if err != nil {
+		return fmt.Errorf("Failed to open a database connection: %v", err)
+	}
+
+	// Fallback for reset colour
+	resetColour := cfg.Reset.Colour
+	if resetColour == "" {
+		resetColour = "\033[0m"
+	}
+
+	// Initialize the logger
+	var initErr error
+	once.Do(func() {
+		globalLogger, initErr = NewLogger(db, logFilePath, terminalMin, colourize, resetColour)
+	})
+	if initErr != nil {
+		return initErr
 	}
 
 	return nil
 }
 
-// Database
-	// Connection string
-	connStr := fmt.Sprintf("host=%s dbname=%s user=%s port=%s sslmode=disable", cfg.Database.SocketDir, cfg.Database.Name, cfg.Database.User, cfg.Database.Port)
-	// Open a connection
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return fmt.Errorf("Failed to open a database connection: %v", err)
-	}
-	// Initialize the logger
-	once.Do(func() {
-		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colourize, cfg.Reset.Colour)
-	})
-	if err != nil {
-		return err
-}
+// applyColour applies ANSI colour codes to the message if colourization is enabled
+func (l *Logger) applyColour(level LogLevel, message string) string {
+	// Retrieve metadata
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	hostname, _ := os.Hostname()
+	pid := strconv.Itoa(os.Getpid())
 
+	// Retrieve the current user
+	user := "unknown"
+	if u, err := exec.Command("whoami").Output(); err == nil {
+		user = string(u)
+		user = user[:len(user)-1] // Remove the trailing newline
+	}
+
+	// Format the message with metadata
+	formattedMessage := fmt.Sprintf("[%s] [%s] [PID:%s] %s", timestamp, hostname, pid, message)
+
+	// Add colour if enabled
+	if l.colourize {
+		return fmt.Sprintf("%s[%s] %s%s", colourMap[level], level, formattedMessage, l.resetColour)
+	}
+	return fmt.Sprintf("[%s] %s", level, formattedMessage)
+}
+				  
 // GetLogger returns the global logger instance
 func GetLogger() *Logger {
 	if globalLogger == nil {
@@ -155,30 +182,6 @@ func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colourize b
 		colourize:    colourize,
 		resetColour: resetColour, // Store the reset color
 	}, nil
-}
-
-// applyColour applies ANSI colour codes to the message if colourization is enabled
-func (l *Logger) applyColour(level LogLevel, message string) string {
-	// Retrieve metadata
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	hostname, _ := os.Hostname()
-	pid := strconv.Itoa(os.Getpid())
-
-	// Retrieve the current user
-	user := "unknown"
-	if u, err := exec.Command("whoami").Output(); err == nil {
-		user = string(u)
-		user = user[:len(user)-1] // Remove the trailing newline
-	}
-
-	// Format the message with metadata
-	formattedMessage := fmt.Sprintf("[%s] [%s] [PID:%s] %s", timestamp, hostname, pid, message)
-
-	// Add colour if enabled
-	if l.colourize {
-		return fmt.Sprintf("%s[%s] %s%s", colourMap[level], level, formattedMessage, l.resetColour)
-	}
-	return fmt.Sprintf("[%s] %s", level, formattedMessage)
 }
 
 // logToFile logs a message to the file with optional colourization
