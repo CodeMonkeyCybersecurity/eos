@@ -153,6 +153,8 @@ func (l *Logger) logToFile(level LogLevel, message string) {
 	l.logger.Println(coloredMessage)
 }
 
+// logToDatabase logs a message to the database
+func (l *Logger) logToDatabase(level LogLevel, message string) error {
 	query := `INSERT INTO logs (timestamp, level, message) VALUES ($1, $2, $3)`
 	_, err := l.db.Exec(query, time.Now(), level, message)
 	return err
