@@ -17,6 +17,18 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// LogLevel defines the severity levels for logging
+type LogLevel string
+
+const (
+	Debug    LogLevel = "Debug"
+	Info     LogLevel = "Info"
+	Warn     LogLevel = "Warn"
+	Error    LogLevel = "Error"
+	Critical LogLevel = "Critical"
+	Fatal    LogLevel = "Fatal"
+)
+
 // Logger provides methods for logging to both a file and a PostgreSQL database
 type Logger struct {
 	db          *sql.DB
@@ -39,14 +51,6 @@ type Config struct {
 		Level string `yaml:"level"`
 		File  string `yaml:"file"`
 	} `yaml:"logging"`
-	LogLevel struct {
-		Debug    []string `yaml:"Debug"`
-		Info     []string `yaml:"Info"`
-		Warn     []string `yaml:"Warn"`
-		Error    []string `yaml:"Error"`
-		Critical []string `yaml:"Critical"`
-		Fatal    []string `yaml:"Fatal"`
-	} `yaml:"logLevel"`
 	Reset struct {
 		Reset    string `yaml:"Reset"`	
 	} `yaml:"reset"`
@@ -116,9 +120,6 @@ func NewLogger(db *sql.DB, logFilePath string, terminalMin LogLevel, colourize b
 		colourize:    colourize,
 	}, nil
 }
-
-// LogLevel represents different logging levels
-type LogLevel string
 
 // resetcolour resets the terminal colour
 const resetColour = "\033[0m"
