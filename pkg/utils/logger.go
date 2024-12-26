@@ -123,7 +123,8 @@ func InitializeLoggerFromConfig(configPath string) error {
 	once.Do(func() {
 		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colourize)
 	})
-	return err
+	if err != nil {
+		return err
 }
 
 // GetLogger returns the global logger instance
