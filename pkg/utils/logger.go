@@ -88,7 +88,7 @@ func InitializeLogger(configPath string, logFilePath string, terminalMin LogLeve
 	}
 	// Initialize the logger
 	once.Do(func() {
-		globalLogger, initErr = NewLogger(db, logFilePath, terminalMin, colourize)
+		globalLogger, err = NewLogger(db, logFilePath, terminalMin, colourize)
 	})
 	return err
 }
