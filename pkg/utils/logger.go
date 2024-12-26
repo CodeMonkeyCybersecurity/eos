@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"pkg/utils/readYaml.go"
+	"pkg/utils"
 
 	"eos/config"
 
