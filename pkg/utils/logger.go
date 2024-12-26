@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	"pkg/utils"
 
 	"eos/config"
 
