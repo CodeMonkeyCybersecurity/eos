@@ -63,7 +63,6 @@ func LoadConfig(filePath string) (*Config, error) {
 	return &cfg, nil
 }
 
-
 const (
 	Debug    LogLevel = "Debug"
 	Info     LogLevel = "Info"
@@ -247,9 +246,8 @@ func (l *Logger) Fatal(message string) {
 	os.Exit(1)
 }
 
-
-
-	// Insert log entry into the 'logs' table
+	// TODO
+	//  Insert log entry into the 'logs' table
 	// insertQuery := "INSERT INTO logs (timestamp, level, message) VALUES ($1, $2, $3)"
 	// _, err = db.Exec(insertQuery, time.Now(), config.Logging.Level, "Test log entry")
 	// if err != nil {
