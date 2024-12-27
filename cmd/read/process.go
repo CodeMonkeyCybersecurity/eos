@@ -1,3 +1,4 @@
+// cmd/read/process
 package read
 
 import (
@@ -9,7 +10,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"eos/pkg/logger"
+
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 const hertz = 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
@@ -21,14 +25,18 @@ var readProcessCmd = &cobra.Command{
 	Long: `This command retrieves detailed information about all running processes on the system
 by reading the /proc directory and outputs it in a table format.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Reading process...")
+		log := logger.GetLogger()
+		log.Info("Executing read process command", zap.Strings("args", args))
+
+		// Retrieve process details
 		process, err := getProcessDetails()
 		if err != nil {
-			fmt.Printf("Error reading process: %v\n", err)
+			log.Error("Failed to retrieve process details", zap.Error(err))
 			return
 		}
 
-		// Print the table
+		// Log success and print the process table
+		log.Info("Successfully retrieved process details", zap.Int("processCount", len(process)))
 		printProcessTable(process)
 	},
 }
