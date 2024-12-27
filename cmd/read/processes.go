@@ -7,7 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"logs"
+	"log"
 	"os/exec"
 	"text/tabwriter"
 	"time"
