@@ -18,14 +18,14 @@ func DefaultConfig() zap.Config {
 		OutputPaths:      []string{"stdout", "/var/log/cyberMonkey/eos.log"}, // Log to console and file
 		ErrorOutputPaths: []string{"stderr"},                                 // Log errors to stderr
 		//EncoderConfig: zap.EncoderConfig{
-			TimeKey:    "time",
-			LevelKey:   "level",
-			MessageKey: "msg",
-			CallerKey:  "caller",
-			//EncodeLevel:  zap.LowercaseLevelEncoder, // e.g., "info"
-			//EncodeTime:   zap.ISO8601TimeEncoder,    // e.g., "2024-12-27T15:04:05Z"
-			//EncodeCaller: zap.ShortCallerEncoder,    // e.g., "file:line"
-		},
+		//TimeKey:    "time",
+		//LevelKey:   "level",
+		//MessageKey: "msg",
+		//CallerKey:  "caller",
+		//EncodeLevel:  zap.LowercaseLevelEncoder, // e.g., "info"
+		//EncodeTime:   zap.ISO8601TimeEncoder,    // e.g., "2024-12-27T15:04:05Z"
+		//EncodeCaller: zap.ShortCallerEncoder,    // e.g., "file:line"
+		//},
 	}
 }
 
