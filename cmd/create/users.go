@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// createUserCmd represents the command for creating a single user
-var createUserCmd = &cobra.Command{
+// createUsersCmd represents the command for creating a single user
+var createUsersCmd = &cobra.Command{
 	Use:   "user",
 	Short: "Create a new user",
 	Long:  `Create a new user account interactively in the system.`,
@@ -98,5 +98,5 @@ func CreateUser() {
 
 func init() {
 	// Register the create user command with the create command
-	CreateCmd.AddCommand(createUserCmd)
+	CreateCmd.AddCommand(createUsersCmd)
 }
