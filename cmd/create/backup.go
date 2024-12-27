@@ -65,7 +65,7 @@ then creates a backup of specified directories.`,
 
 // ensureResticInstalled ensures Restic is installed on the system
 func ensureResticInstalled() error {
-	cmd := exec.Command("sudo", "apt-get", "install", "-y", "restic")
+	cmd := exec.Command("apt", "install", "-y", "restic")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
