@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// createUsersCmd represents the command for creating a single user
+// createUserCmd represents the command for creating a single user
 var CreateUserCmd = &cobra.Command{
 	Use:   "user",
 	Short: "Create a new user",
