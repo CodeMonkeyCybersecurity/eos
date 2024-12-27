@@ -5,8 +5,6 @@ Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
 package read
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
