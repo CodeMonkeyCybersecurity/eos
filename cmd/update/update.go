@@ -1,24 +1,48 @@
-/*
-Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
-*/
-// cmd/update.go
 package update
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
-// UpdateCmd is the base command for update operations
+// UpdateCmd is the root command for update operations
 var UpdateCmd = &cobra.Command{
 	Use:   "update",
-	Short: "Update resources",
-	Long:  `Use this command to update various resources such as processes, users, or storage.`,
+	Short: "Update resources (e.g., processes, users, storage)",
+	Long:  `The update command allows you to modify existing resources such as processes, users, or storage.`,
 }
 
-// init initializes the update subcommands
+// init registers subcommands for the update command
 func init() {
-	// Register subcommands here
 	UpdateCmd.AddCommand(updateProcessesCmd)
 	UpdateCmd.AddCommand(updateUsersCmd)
 	UpdateCmd.AddCommand(updateStorageCmd)
+}
+
+var updateProcessesCmd = &cobra.Command{
+	Use:   "processes",
+	Short: "Update a process",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Updating a process...")
+		// Add your logic here
+	},
+}
+
+var updateUsersCmd = &cobra.Command{
+	Use:   "users",
+	Short: "Update a user",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Updating a user...")
+		// Add your logic here
+	},
+}
+
+var updateStorageCmd = &cobra.Command{
+	Use:   "storage",
+	Short: "Update storage",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Updating storage...")
+		// Add your logic here
+	},
 }
