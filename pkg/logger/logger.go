@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var log *zap.Logger
@@ -20,7 +19,7 @@ func DefaultConfig() zap.Config {
 		Encoding:         "json",                                             // JSON log format
 		OutputPaths:      []string{"stdout", "/var/log/cyberMonkey/eos.log"}, // Log to console and file
 		ErrorOutputPaths: []string{"stderr"},                                 // Log errors to stderr
-		EncoderConfig:    zapcore.NewDevelopmentEncoderConfig(),              // Use pre-configured development encoder
+		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),                  // Use pre-configured development encoder
 
 	}
 }
