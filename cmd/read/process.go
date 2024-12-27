@@ -62,7 +62,7 @@ func getProcessDetails() ([]ProcessInfo, error) {
 			if _, err := strconv.Atoi(pid); err == nil {
 				process, err := extractProcessDetails(pid, uptime)
 				if err == nil {
-					processes = append(process, processes)
+					processes = append(processes, process)
 				}
 			}
 		}
@@ -78,7 +78,8 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	statPath := fmt.Sprintf("%s/stat", procDir)
 	statContent, err := ioutil.ReadFile(statPath)
 	if err != nil {
-		return ProcessInfo{}, err
+		fmt.Printf("Skipping PID %s: %v\n", pid, err)
+		continue
 	}
 	fields := strings.Fields(string(statContent))
 
