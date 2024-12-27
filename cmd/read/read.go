@@ -17,7 +17,7 @@ var ReadCmd = &cobra.Command{
 
 // init registers subcommands for the read command
 func init() {
-	ReadCmd.AddCommand(readProcessesCmd)
+	ReadCmd.AddCommand(readProcessCmd)
 	ReadCmd.AddCommand(readUsersCmd)
 	ReadCmd.AddCommand(readStorageCmd)
 }

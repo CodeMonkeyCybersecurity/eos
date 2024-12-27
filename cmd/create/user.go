@@ -13,17 +13,17 @@ import (
 )
 
 // createUsersCmd represents the command for creating a single user
-var createUsersCmd = &cobra.Command{
-	Use:   "users",
+var CreateUserCmd = &cobra.Command{
+	Use:   "user",
 	Short: "Create a new user",
 	Long:  `Create a new user account interactively in the system.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		CreateUsers() // Call the interactive function
+		CreateUser() // Call the interactive function
 	},
 }
 
 // CreateUser handles the creation of a new user interactively
-func CreateUsers() {
+func CreateUser() {
 	// Handle interrupt signals (Ctrl+C)
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
@@ -109,5 +109,5 @@ func CreateUsers() {
 
 func init() {
 	// Register the create user command with the create command
-	CreateCmd.AddCommand(createUsersCmd)
+	CreateCmd.AddCommand(createUserCmd)
 }

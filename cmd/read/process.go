@@ -15,45 +15,45 @@ import (
 const hertz = 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
 
 // readProcessesCmd represents the command to read processes
-var readProcessesCmd = &cobra.Command{
-	Use:   "processes",
+var readProcessCmd = &cobra.Command{
+	Use:   "process",
 	Short: "Retrieve detailed information about running processes",
 	Long: `This command retrieves detailed information about all running processes on the system
 by reading the /proc directory and outputs it in a table format.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Reading processes...")
-		processes, err := getProcessesDetails()
+		fmt.Println("Reading process...")
+		process, err := getProcessDetails()
 		if err != nil {
-			fmt.Printf("Error reading processes: %v\n", err)
+			fmt.Printf("Error reading process: %v\n", err)
 			return
 		}
 
 		// Print the table
-		printProcessTable(processes)
+		printProcessTable(process)
 	},
 }
 
 // ProcessInfo holds details about a process
 type ProcessInfo struct {
-	PID         string
-	Comm        string
-	State       string
-	Name        string
-	User        string
-	CPUPercent  string
-	MemPercent  string
-	RunTime     string
+	PID        string
+	Comm       string
+	State      string
+	Name       string
+	User       string
+	CPUPercent string
+	MemPercent string
+	RunTime    string
 }
 
 // getProcessesDetails retrieves process information
-func getProcessesDetails() ([]ProcessInfo, error) {
+func getProcessDetails() ([]ProcessInfo, error) {
 	procDir := "/proc"
 	files, err := ioutil.ReadDir(procDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read /proc directory: %w", err)
 	}
 
-	var processes []ProcessInfo
+	var process []ProcessInfo
 	uptime := getSystemUptime()
 
 	for _, file := range files {
@@ -62,12 +62,12 @@ func getProcessesDetails() ([]ProcessInfo, error) {
 			if _, err := strconv.Atoi(pid); err == nil {
 				process, err := extractProcessDetails(pid, uptime)
 				if err == nil {
-					processes = append(processes, process)
+					process = append(process, process)
 				}
 			}
 		}
 	}
-	return processes, nil
+	return process, nil
 }
 
 // extractProcessDetails extracts details about a specific process
@@ -83,7 +83,7 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	fields := strings.Fields(string(statContent))
 
 	comm := strings.Trim(fields[1], "()") // Command name without parentheses
-	state := fields[2]    // State
+	state := fields[2]                    // State
 	startTime, _ := strconv.ParseFloat(fields[21], 64)
 
 	// Calculate runtime
@@ -91,7 +91,7 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 
 	// Get process name
 	processName := comm
-	
+
 	// Read /proc/[PID]/status to get user info
 	statusPath := fmt.Sprintf("%s/status", procDir)
 	statusContent, err := ioutil.ReadFile(statusPath)
@@ -198,11 +198,11 @@ func getSystemUptime() float64 {
 }
 
 // printProcessTable prints the process information in a table format
-func printProcessTable(processes []ProcessInfo) {
+func printProcessTable(process []ProcessInfo) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.Debug)
 	fmt.Fprintln(w, "PID\tComm\tState\tName\tUser\tCPU%\tMemory%\tRunning Time")
 	fmt.Fprintln(w, "----\t----\t----\t----\t----\t----\t----\t----")
-	for _, proc := range processes {
+	for _, proc := range process {
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			proc.PID, proc.Comm, proc.State, proc.Name, proc.User, proc.CPUPercent, proc.MemPercent, proc.RunTime)
 	}
@@ -210,5 +210,5 @@ func printProcessTable(processes []ProcessInfo) {
 }
 
 func init() {
-	ReadCmd.AddCommand(readProcessesCmd)
+	ReadCmd.AddCommand(readProcessCmd)
 }

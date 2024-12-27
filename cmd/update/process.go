@@ -1,4 +1,4 @@
-// cmd/update/processes.go
+// cmd/update/process.go
 package update
 
 import (
@@ -7,11 +7,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// updateProcessesCmd handles updating processes
-var updateProcessesCmd = &cobra.Command{
-	Use:   "processes",
-	Short: "Update processes",
-	Long:  `Use this command to update details about running processes.`,
+// updateProcessCmd handles updating process
+var updateProcessCmd = &cobra.Command{
+	Use:   "process",
+	Short: "Update process",
+	Long:  `Use this command to update details about running process.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
 			fmt.Println("Please specify the process to update.")
@@ -24,5 +24,5 @@ var updateProcessesCmd = &cobra.Command{
 }
 
 func init() {
-	UpdateCmd.AddCommand(updateProcessesCmd)
+	UpdateCmd.AddCommand(updateProcessCmd)
 }

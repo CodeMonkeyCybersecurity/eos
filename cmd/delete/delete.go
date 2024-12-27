@@ -17,7 +17,7 @@ var DeleteCmd = &cobra.Command{
 
 // init registers subcommands for the delete command
 func init() {
-	DeleteCmd.AddCommand(deleteProcessesCmd)
+	DeleteCmd.AddCommand(deleteProcessCmd)
 	DeleteCmd.AddCommand(deleteUsersCmd)
 	DeleteCmd.AddCommand(deleteStorageCmd)
 }

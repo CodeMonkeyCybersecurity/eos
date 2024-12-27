@@ -17,7 +17,7 @@ var UpdateCmd = &cobra.Command{
 
 // init registers subcommands for the update command
 func init() {
-	UpdateCmd.AddCommand(updateProcessesCmd)
+	UpdateCmd.AddCommand(updateProcessCmd)
 	UpdateCmd.AddCommand(updateUsersCmd)
 	UpdateCmd.AddCommand(updateStorageCmd)
 	UpdateCmd.AddCommand(hostnameCmd)

@@ -17,8 +17,8 @@ var CreateCmd = &cobra.Command{
 
 // init registers subcommands for the create command
 func init() {
-	CreateCmd.AddCommand(createProcessesCmd)
-	CreateCmd.AddCommand(createUsersCmd)
+	CreateCmd.AddCommand(createProcessCmd)
+	CreateCmd.AddCommand(createUserCmd)
 	CreateCmd.AddCommand(createStorageCmd)
 	CreateCmd.AddCommand(createBackupCmd)
 }
