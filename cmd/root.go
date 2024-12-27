@@ -35,12 +35,12 @@ Run: func(cmd *cobra.Command, args []string) {
 	logger := utils.GetLogger()
 	logger.Info("Eos CLI started successfully.")
 	},
-)
+}
 
 func Execute() {
 if err := rootCmd.Execute(); err != nil {
 	log.Fatalf("Command execution failed: %v", err)
-}
+	}
 }
 
 func cmd() {
