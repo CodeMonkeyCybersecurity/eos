@@ -11,8 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"eos/config"
-
 	"gopkg.in/yaml.v3"
 	_ "github.com/lib/pq"
 )
@@ -91,6 +89,25 @@ var (
 	logPriority = make(map[LogLevel]int)
 	colourMap   = make(map[LogLevel]string)
 )
+
+func InitializeLoggerFromConfig(configPath string) error {
+    cfg, err := LoadConfig(configPath)
+    if err != nil {
+        return fmt.Errorf("failed to load config for logger: %w", err)
+    }
+
+    // Populate logPriority and colourMap
+    for level, properties := range cfg.LogLevel {
+        priority, err := strconv.Atoi(properties.LogPriority)
+        if err != nil {
+            return fmt.Errorf("invalid log priority for level %s: %w", level, err)
+        }
+        logPriority[LogLevel(level)] = priority
+        colourMap[LogLevel(level)] = properties.ColourMap
+    }
+
+    return nil
+}
 
 // InitializeLogger sets up the global logger instance
 func InitializeLogger(configPath, logFilePath string, terminalMin LogLevel, colourize bool) error {
