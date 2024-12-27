@@ -37,12 +37,6 @@ Run: func(cmd *cobra.Command, args []string) {
 	},
 }
 
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		log.Fatalf("Command execution failed: %v", err)
-	}
-}
-
 func cmd() {
 	currentUser, err := user.Current()
 	if err != nil {
@@ -61,13 +55,6 @@ func getEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		utils.GetLogger().Error(fmt.Sprintf("Command execution failed: %v", err))
-		os.Exit(1)
-	}
 }
 
 var cfgFile string
@@ -103,99 +90,71 @@ func init() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
-	
-func Execute() {
-if err := rootCmd.Execute(); err != nil {
-	log.Fatalf("Command execution failed: %v", err)
-	}
-}
-
-func cmd() {
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Fatalf("Failed to determine current user: %v", err)
-	}
-
-	// Enforce that Eos must be run as 'eos_user'
-	if currentUser.Username != "eos_user" {
-		log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
-	}
-}
-
-func Execute() {
-	if err := rootCmd.Execute(); err != nil {
-		utils.GetLogger().Error(fmt.Sprintf("Command execution failed: %v", err))
-		os.Exit(1)
-	}
-}
-
 var cfgFile string
 
 func init() {
 
-// Create
-var createCmd = &cobra.Command{
-	Use:   " [target]",
-	Short: "Creates new items",
-	Long:  `Creates information about processes, users, etc.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
-			log.Fatalf("Please specify what to create, e.g., 'processes'")
-		}
-		target := args[0]
-		fmt.Printf("Creating %s...\n", target)
-		// Add your logic here
-	},
-}
-
-// Read
-var readCmd = &cobra.Command{
-	Use:   "read [target]",
-	Short: "Read information",
-	Long:  `Reads information about processes, users, etc.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
-			log.Fatalf("Please specify what to read, e.g., 'processes'")
-		}
-		target := args[0]
-		fmt.Printf("Reading %s...\n", target)
-		// Add your logic here
-	},
-}
-
-// Update
-var updateCmd = &cobra.Command{
-	Use:   "update [target]",
-	Short: "Updates information",
-	Long:  `Updates processes, users, etc.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
-			log.Fatalf("Please specify what to update, e.g., 'processes'")
-		}
-		target := args[0]
-		fmt.Printf("Updating %s...\n", target)
-		// Add your logic here
-	},
-}
-
-
-// Delete
-var deleteCmd = &cobra.Command{
-	Use:   "delete [target]",
-	Short: "Delete information",
-	Long:  `Delete information about processes, users, etc.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) < 1 {
-			log.Fatalf("Please specify what to delete, e.g., 'processes'")
-		}
-		target := args[0]
-		fmt.Printf("Delete %s...\n", target)
-		// Add your logic here
-	},
-}
+	// Create
+	var createCmd = &cobra.Command{
+		Use:   " [target]",
+		Short: "Creates new items",
+		Long:  `Creates information about processes, users, etc.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				log.Fatalf("Please specify what to create, e.g., 'processes'")
+			}
+			target := args[0]
+			fmt.Printf("Creating %s...\n", target)
+			// Add your logic here
+		},
+	}
 	
-// Initialize CLI
-func init() {
+	// Read
+	var readCmd = &cobra.Command{
+		Use:   "read [target]",
+		Short: "Read information",
+		Long:  `Reads information about processes, users, etc.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				log.Fatalf("Please specify what to read, e.g., 'processes'")
+			}
+			target := args[0]
+			fmt.Printf("Reading %s...\n", target)
+			// Add your logic here
+		},
+	}
+	
+	// Update
+	var updateCmd = &cobra.Command{
+		Use:   "update [target]",
+		Short: "Updates information",
+		Long:  `Updates processes, users, etc.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				log.Fatalf("Please specify what to update, e.g., 'processes'")
+			}
+			target := args[0]
+			fmt.Printf("Updating %s...\n", target)
+			// Add your logic here
+		},
+	}
+	
+	
+	// Delete
+	var deleteCmd = &cobra.Command{
+		Use:   "delete [target]",
+		Short: "Delete information",
+		Long:  `Delete information about processes, users, etc.`,
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				log.Fatalf("Please specify what to delete, e.g., 'processes'")
+			}
+			target := args[0]
+			fmt.Printf("Delete %s...\n", target)
+			// Add your logic here
+		},
+	}
+
 	rootCmd.AddCommand(createCmd)
 	rootCmd.AddCommand(readCmd)
 	rootCmd.AddCommand(updateCmd)
