@@ -3,9 +3,7 @@ package read
 
 import (
 	"fmt"
-	"log"
 	"os/exec"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -15,7 +13,7 @@ var readStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Retrieve information about storage devices and filesystem usage",
 	Long: `The read storage command displays detailed information about block devices 
-and the usage of mounted filesystems, combining the functionality of lsblk and df -h.`,	Run: func(cmd *cobra.Command, args []string) {
+and the usage of mounted filesystems, combining the functionality of lsblk and df -h.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Reading storage information...")
 
