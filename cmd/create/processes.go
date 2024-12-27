@@ -10,7 +10,7 @@ import (
 
 // createProcessesCmd represents the create command for processes
 var createProcessesCmd = &cobra.Command{
-	Use:   "processes",
+	Use:   "eos create processes",
 	Short: "Create new processes",
 	Long:  `This command allows you to create new processes in the system.`,
 	Run: func(cmd *cobra.Command, args []string) {

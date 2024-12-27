@@ -5,6 +5,7 @@ package create
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/spf13/cobra"
 )
@@ -16,12 +17,17 @@ var createBackupCmd = &cobra.Command{
 	Long: `This command allows you to create a new backup for specified resources.
     Use this to ensure your data is securely stored.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("createBackup called")
+		if len(args) < 1 {
+			log.Fatalf("Please provide details to create a backup.")
+		}
+		backupDetails := args[0]
+		fmt.Printf("Creating backup: %s...\n", backupDetails)
+		// Add your logic to create a backup
 	},
 }
 
 func init() {
-	createCmd.AddCommand(createBackupCmd)
+	CreateCmd.AddCommand(createBackupCmd)
 
 	// Here you will define your flags and configuration settings.
 
