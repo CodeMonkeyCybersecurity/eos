@@ -29,7 +29,6 @@ by reading the /proc directory.`,
 	},
 }
 
-// getRunningProcesses retrieves the list of running processes from the /proc directory
 func getRunningProcesses() ([]string, error) {
 	procDir := "/proc"
 	files, err := ioutil.ReadDir(procDir)
