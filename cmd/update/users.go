@@ -24,5 +24,5 @@ var updateUsersCmd = &cobra.Command{
 }
 
 func init() {
-	CreateCmd.AddCommand(updateUsersCmd)
+	UpdateCmd.AddCommand(updateUsersCmd)
 }

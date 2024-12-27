@@ -24,5 +24,5 @@ var updateProcessesCmd = &cobra.Command{
 }
 
 func init() {
-	CreateCmd.AddCommand(updateProcessesCmd)
+	UpdateCmd.AddCommand(updateProcessesCmd)
 }
