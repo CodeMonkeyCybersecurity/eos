@@ -9,6 +9,7 @@ import (
 	"eos/cmd/read"
 	"eos/cmd/update"
 	"eos/pkg/logger"
+	"eos/pkg/utils"
 
 	"os"
 	"os/user"
@@ -28,6 +29,11 @@ var rootCmd = &cobra.Command{
 hardware, backups, and more.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info("Eos CLI started successfully.")
+
+		if !utils.CheckSudo() {
+			log.Error("Sudo privileges are required to create a backup.")
+			return
+		}
 
 		// Example: Process the config path
 		configPath := filepath.Join(".", "config", "default.yaml")
