@@ -84,7 +84,7 @@ func ensureResticInstalled() error {
 
 // generateSSHKeys generates SSH keys for accessing the backup server
 func generateSSHKeys() error {
-	cmd := exec.Command("ssh-keygen", "-q", "-N", "", "-f", "/root/.ssh/id_rsa")
+	cmd := exec.Command("ssh-keygen", "-q", "-N", "", "-f", "/eos_user/.ssh/id_rsa")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -92,7 +92,7 @@ func generateSSHKeys() error {
 
 // copySSHKeys copies the generated SSH keys to the backup server
 func copySSHKeys() error {
-	cmd := exec.Command("ssh-copy-id", "henry@backup")
+	cmd := exec.Command("ssh-copy-id", "eos_user@backup")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -114,9 +114,9 @@ func performResticBackup() error {
 
 	cmd := exec.Command(
 		"restic", "-r", repoPath,
-		"--password-file=/root/.restic-password",
+		"--password-file=/eos_user/.restic-password",
 		"--verbose", "backup",
-		"/root", "/home", "/var", "/etc", "/srv", "/usr", "/opt",
+		"/home", "/var", "/etc", "/srv", "/usr", "/opt",
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -137,7 +137,7 @@ func getResticPassword() string {
 		os.Exit(1)
 	}
 
-	file := "/root/.restic-password"
+	file := "/eos_user/.restic-password"
 	err = os.WriteFile(file, []byte(password), 0600)
 	if err != nil {
 		log.Error("Failed to write password file", zap.Error(err))
