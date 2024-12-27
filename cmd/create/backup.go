@@ -148,10 +148,10 @@ func getResticPassword() string {
 
 // hostname retrieves the current hostname
 func hostname() string {
-	log := logger.GetLogger()
+	log := logger.GetLogger() // Retrieve the logger instance
 	name, err := os.Hostname()
 	if err != nil {
-		log.GetLogger().Warn("Failed to retrieve hostname, using 'unknown'", zap.Error(err))
+		log.Warn("Failed to retrieve hostname, using 'unknown'", zap.Error(err))
 		return "unknown"
 	}
 	return name
