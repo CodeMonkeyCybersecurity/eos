@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -46,7 +47,8 @@ func getRunningProcesses() ([]string, error) {
 				commPath := fmt.Sprintf("%s/%s/comm", procDir, pid)
 				comm, err := ioutil.ReadFile(commPath)
 				if err == nil {
-					processes = append(processes, fmt.Sprintf("%s: %s", pid, string(comm)))
+					processName := strings.TrimSpace(string(comm))
+					processes = append(processes, fmt.Sprintf("%s: %s", pid, processName))
 				} else {
 					processes = append(processes, pid) // Fallback to just PID
 				}
