@@ -17,13 +17,9 @@ var CreateCmd = &cobra.Command{
 	Short: "Create resources (e.g., processes, users, storage)",
 	Long:  `The create command allows you to create various resources such as processes, users, or storage.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Log the default behavior
 		log := logger.GetLogger()
-		if len(args) == 0 {
-			log.Warn("No subcommand specified for 'create'. Use a subcommand like 'process' or 'user'.")
-			return
-		}
-		log.Info("Create command invoked without a specific subcommand", zap.Strings("args", args))
+		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+		_ = cmd.Help() // Display help if no subcommand is provided
 	},
 }
 
