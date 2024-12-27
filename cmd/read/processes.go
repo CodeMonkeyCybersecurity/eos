@@ -7,11 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"log"
-	"os/exec"
 	"text/tabwriter"
-	"time"
-
+	
 	"github.com/spf13/cobra"
 )
 
