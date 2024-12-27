@@ -17,7 +17,7 @@ func DefaultConfig() zap.Config {
 		Encoding:         "json",                                             // JSON log format
 		OutputPaths:      []string{"stdout", "/var/log/cyberMonkey/eos.log"}, // Log to console and file
 		ErrorOutputPaths: []string{"stderr"},                                 // Log errors to stderr
-		EncoderConfig: zap.EncoderConfig{
+		//EncoderConfig: zap.EncoderConfig{
 			TimeKey:    "time",
 			LevelKey:   "level",
 			MessageKey: "msg",
