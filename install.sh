@@ -268,4 +268,10 @@ function main() {
     echo -e "${GREEN}Setup complete! Use 'eos' as needed.${RESET}"
 }
 main
+
+sudo usermod -aG adm eos_user # Add eos_user to the adm group (commonly used for log access):
+sudo chgrp -R adm /var/log/cyberMonkey # Change the group ownership of the directory:
+sudo chmod -R 775 /var/log/cyberMonkey # 	Adjust the permissions to allow group write access:
+ls -ld /var/log/cyberMonkey # Verify the permissions:
+
 set +x
