@@ -60,37 +60,6 @@ func getEnv(key, fallback string) string {
 var cfgFile string
 
 func init() {
-	// define your flags and configuration settings.
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.eos.yaml)")
-	// Database connection details
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "eos_user")
-	dbName := getEnv("DB_NAME", "eos_db")
-	// Connection string
-	dbSSLMode := getEnv("DB_SSLMODE", "disable") // Default to disable if using eos in a local environment only
-	connStr := fmt.Sprintf("host=%s port=%s user=%s dbname=%s sslmode=%s",
-		dbHost, dbPort, dbUser, dbName, dbSSLMode)
-
-	// Connect to PostgreSQL
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		log.Fatalf("Failed to connect to PostgreSQL: %v", err)
-	}
-	defer db.Close()
-
-	// Check database health
-	if err := db.Ping(); err != nil {
-		log.Fatalf("Failed to ping the database: %v", err)
-	}
-
-	// Initialize the global logger
-	err = utils.InitializeLogger(db, "/var/log/cyberMonkey/eos.log", utils.InfoLevel, true)
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
-
-func init() {
 
 	// Create
 	var createCmd = &cobra.Command{
