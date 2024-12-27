@@ -18,12 +18,12 @@ var createUsersCmd = &cobra.Command{
 	Short: "Create a new user",
 	Long:  `Create a new user account interactively in the system.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		CreateUser() // Call the interactive function
+		CreateUsers() // Call the interactive function
 	},
 }
 
 // CreateUser handles the creation of a new user interactively
-func CreateUser() {
+func CreateUsers() {
 	// Handle interrupt signals (Ctrl+C)
 	signalChan := make(chan os.Signal, 1)
 	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
@@ -32,11 +32,11 @@ func CreateUser() {
 		fmt.Println("\nOperation canceled. Exiting...")
 		os.Exit(1)
 	}()
-	
+
 	// Ensure the script is run as root
 	if os.Getenv("SUDO_USER") == "" && os.Geteuid() != 0 {
-	    fmt.Println("Please run as root or with sudo")
-	    return
+		fmt.Println("Please run as root or with sudo")
+		return
 	}
 
 	reader := bufio.NewReader(os.Stdin)
