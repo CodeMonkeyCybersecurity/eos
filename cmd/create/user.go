@@ -13,7 +13,7 @@ import (
 )
 
 // createUserCmd represents the command for creating a single user
-var CreateUserCmd = &cobra.Command{
+var createUserCmd = &cobra.Command{
 	Use:   "user",
 	Short: "Create a new user",
 	Long:  `Create a new user account interactively in the system.`,
