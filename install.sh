@@ -62,7 +62,7 @@ ARCH="$(uname -m)"
 echo -e "${GREEN}Downloading Eos binary...${RESET}"
 curl -L -o eos "https://github.com/CodeMonkeyCybersecurity/eos/releases/download/$EOS_VERSION/eos-$OS-$ARCH"
 chmod +x eos
-sudo mv eos /usr/local/bin/
+mv eos /usr/local/bin/
 echo -e "${GREEN}Eos binary installed successfully.${RESET}"
 
 # Configuration Variables
@@ -94,7 +94,7 @@ database:
 logs:
   directory: "$CYBERMONKEY_LOG_DIR"
   file: "$EOS_LOG_FILE"
-
+EOL
 echo "Updated $DEFAULT_YAML with configuration variables."
 
 # Create a new system user for Eos with sudo permission limitation
@@ -105,20 +105,20 @@ function create_eos_system_user() {
         echo -e "${GREEN}System user ${SYSTEM_USER} already exists.${RESET}"
     else
         # Create the user with a default shell and no password
-        sudo useradd -m -s /usr/sbin/nologin ${SYSTEM_USER}
+        useradd -m -s /usr/sbin/nologin ${SYSTEM_USER}
         echo -e "${GREEN}System user ${SYSTEM_USER} created successfully.${RESET}"
 
         # Prompt for the password
         echo -e "${GREEN}Please set a password for ${SYSTEM_USER}:${RESET}"
-        sudo passwd ${SYSTEM_USER}
+        passwd ${SYSTEM_USER}
     fi
 
     # Add user to sudoers if needed
     SUDOERS_FILE="/etc/sudoers.d/${SYSTEM_USER}"
     if [ ! -f "$SUDOERS_FILE" ]; then
         echo -e "${GREEN}Adding ${SYSTEM_USER} to the sudoers file with limitations...${RESET}"
-        echo "ALL ALL=(${SYSTEM_USER}) NOPASSWD: /usr/local/bin/eos" | sudo tee "$SUDOERS_FILE" > /dev/null
-        sudo chmod 440 "$SUDOERS_FILE"
+        echo "ALL ALL=(${SYSTEM_USER}) NOPASSWD: /usr/local/bin/eos" | tee "$SUDOERS_FILE" > /dev/null
+        chmod 440 "$SUDOERS_FILE"
         echo -e "${GREEN}${SYSTEM_USER} added to the sudoers file with limited permissions.${RESET}"
     else
         echo -e "${GREEN}${SYSTEM_USER} is already in the sudoers file.${RESET}"
@@ -172,23 +172,23 @@ EOF
 function configure_peer_authentication() {
     local PG_HBA_CONF="/etc/postgresql/${PSQL_VERSION}/main/pg_hba.conf"
     echo -e "${GREEN}Updating permissions for $PG_HBA_CONF...${RESET}"
-    sudo chmod 644 "$PG_HBA_CONF"
+    chmod 644 "$PG_HBA_CONF"
     # Possibly update peer auth here
-    sudo chmod 640 "$PG_HBA_CONF"
+    chmod 640 "$PG_HBA_CONF"
     local PEER_AUTH_ENTRY="local   ${DB_NAME}     ${SYSTEM_USER}                                peer
     local   all     ${SYSTEM_USER}                                reject"
 
 
     if ! grep -qF "$PEER_AUTH_ENTRY" "$PG_HBA_CONF"; then
         echo -e "${GREEN}Adding peer authentication for ${SYSTEM_USER} to pg_hba.conf...${RESET}"
-        echo "$PEER_AUTH_ENTRY" | sudo tee -a "$PG_HBA_CONF" > /dev/null
+        echo "$PEER_AUTH_ENTRY" | tee -a "$PG_HBA_CONF" > /dev/null
         echo -e "${GREEN}Peer authentication entry added.${RESET}"
     else
         echo -e "${GREEN}Peer authentication for ${SYSTEM_USER} is already configured.${RESET}"
     fi
 
     echo -e "${GREEN}Restarting PostgreSQL to apply changes...${RESET}"
-    sudo systemctl restart postgresql
+    systemctl restart postgresql
 }
 
 function check_prerequisites() {
@@ -275,7 +275,7 @@ function main() {
 }
 main
 
-sudo chown -R eos_user:eos_user /var/log/cyberMonkey # Change the ownership of the /var/log/cyberMonkey directory to eos_user. This will allow eos_user to write to the directory and manage the log files.
+chown -R eos_user:eos_user /var/log/cyberMonkey # Change the ownership of the /var/log/cyberMonkey directory to eos_user. This will allow eos_user to write to the directory and manage the log files.
 ls -ld /var/log/cyberMonkey # Verify the ownership:
 
 set +x
