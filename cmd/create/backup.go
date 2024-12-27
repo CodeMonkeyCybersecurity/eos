@@ -12,7 +12,7 @@ import (
 
 // createBackupCmd represents the createBackup command
 var createBackupCmd = &cobra.Command{
-	Use:   "eos create backup",
+	Use:   "backup",
 	Short: "Create a new backup",
 	Long: `This command allows you to create a new backup for specified resources.
     Use this to ensure your data is securely stored.`,
