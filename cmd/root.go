@@ -63,7 +63,7 @@ func init() {
 	// Create
 	var createCmd = &cobra.Command{
 		Use:   "create [target]",
-		Short: "Create new resources (e.g., processes, users, backups)",v
+		Short: "Create new resources (e.g., processes, users, backups)",
 		Long:  The create command allows you to create new resources in the system,
 such as processes, users, or backups.`,
 		Run: func(cmd *cobra.Command, args []string) {
