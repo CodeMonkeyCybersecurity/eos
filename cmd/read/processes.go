@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const hertz := 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
+const hertz = 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
 
 // readProcessesCmd represents the command to read processes
 var readProcessesCmd = &cobra.Command{
