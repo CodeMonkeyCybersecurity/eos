@@ -62,9 +62,10 @@ func init() {
 
 	// Create
 	var createCmd = &cobra.Command{
-		Use:   " [target]",
-		Short: "Creates new items",
-		Long:  `Creates information about processes, users, etc.`,
+		Use:   "create [target]",
+		Short: "Create new resources (e.g., processes, users, backups)",v
+		Long:  The create command allows you to create new resources in the system,
+such as processes, users, or backups.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				log.Fatalf("Please specify what to create, e.g., 'processes'")
@@ -78,8 +79,9 @@ func init() {
 	// Read
 	var readCmd = &cobra.Command{
 		Use:   "read [target]",
-		Short: "Read information",
-		Long:  `Reads information about processes, users, etc.`,
+		Short: "Retrieve information about resources",
+		Long:  `The read command retrieves information about various resources,
+such as processes, users, backups, and more.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				log.Fatalf("Please specify what to read, e.g., 'processes'")
@@ -93,8 +95,9 @@ func init() {
 	// Update
 	var updateCmd = &cobra.Command{
 		Use:   "update [target]",
-		Short: "Updates information",
-		Long:  `Updates processes, users, etc.`,
+		Short: "Update existing resources",
+		Long:  `The update command modifies existing resources, such as processes,
+users, or backups, based on the provided parameters.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				log.Fatalf("Please specify what to update, e.g., 'processes'")
@@ -108,8 +111,9 @@ func init() {
 	// Delete
 	var deleteCmd = &cobra.Command{
 		Use:   "delete [target]",
-		Short: "Delete information",
-		Long:  `Delete information about processes, users, etc.`,
+		Short: "Remove resources from the system",
+		Long:  `The delete command allows you to remove resources, such as processes,
+users, or backups, from the system.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
 				log.Fatalf("Please specify what to delete, e.g., 'processes'")
