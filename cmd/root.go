@@ -26,7 +26,7 @@ Run: func(cmd *cobra.Command, args []string) {
 	logFilePath := "/tmp/eos.log"
 
 	// Initialize the logger
-	err := utils.InitializeLogger(configPath, logFilePath, utils.InfoLevel, true)
+	err := utils.InitializeLogger(configPath, logFilePath, utils.Info, true)
 	if err != nil {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
