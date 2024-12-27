@@ -23,10 +23,9 @@ by reading the /proc directory.`,
 			return
 		}
 
-		fmt.Println("Current running processes:")
-		for _, process := range processes {
-			fmt.Println(process)
-		}
+		// Print processes in a single line, separated by commas
+		fmt.Print("Current running processes: ")
+		fmt.Println(strings.Join(processes, ", "))
 	},
 }
 
