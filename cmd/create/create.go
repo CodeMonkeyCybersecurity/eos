@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
+*/
 // cmd/create/create.go
 package create
 
