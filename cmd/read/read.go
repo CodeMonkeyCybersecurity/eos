@@ -23,30 +23,3 @@ func init() {
 	ReadCmd.AddCommand(readUsersCmd)
 	ReadCmd.AddCommand(readStorageCmd)
 }
-
-var readProcessesCmd = &cobra.Command{
-	Use:   "processes",
-	Short: "Read a process",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Reading a process...")
-		// Add your logic here
-	},
-}
-
-var readUsersCmd = &cobra.Command{
-	Use:   "users",
-	Short: "Read a user",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Reading a user...")
-		// Add your logic here
-	},
-}
-
-var readStorageCmd = &cobra.Command{
-	Use:   "storage",
-	Short: "Read storage",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Reading storage...")
-		// Add your logic here
-	},
-}
