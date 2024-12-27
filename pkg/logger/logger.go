@@ -19,15 +19,8 @@ func DefaultConfig() zap.Config {
 		Encoding:         "json",                                             // JSON log format
 		OutputPaths:      []string{"stdout", "/var/log/cyberMonkey/eos.log"}, // Log to console and file
 		ErrorOutputPaths: []string{"stderr"},                                 // Log errors to stderr
-		//EncoderConfig: zap.EncoderConfig{
-		//TimeKey:    "time",
-		//LevelKey:   "level",
-		//MessageKey: "msg",
-		//CallerKey:  "caller",
-		//EncodeLevel:  zap.LowercaseLevelEncoder, // e.g., "info"
-		//EncodeTime:   zap.ISO8601TimeEncoder,    // e.g., "2024-12-27T15:04:05Z"
-		//EncodeCaller: zap.ShortCallerEncoder,    // e.g., "file:line"
-		//},
+		EncoderConfig:    zapcore.NewDevelopmentEncoderConfig(),              // Use pre-configured development encoder
+
 	}
 }
 
@@ -144,7 +137,7 @@ func LogCommandExecution(cmdName string, args []string) {
 func Sync() {
 	if log != nil {
 		err := log.Sync()
-		if err != nil && err.Error() != "sync /dev/stdout: invalid argument" {
+		if err != nil && err.Error() != "sync /dev/stdout: invalid argument" { // failed to sync logger kept getting logged for no reason and its sometthing to do with the stout function itself , no this code, so i just said ignore it
 			log.Error("Failed to sync logger", zap.Error(err))
 		}
 	}
