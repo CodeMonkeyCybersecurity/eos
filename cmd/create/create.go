@@ -20,27 +20,3 @@ func init() {
 	CreateCmd.AddCommand(createUsersCmd)
 	CreateCmd.AddCommand(createStorageCmd)
 }
-
-var createProcessesCmd = &cobra.Command{
-	Use:   "processes",
-	Short: "Create a new process",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Creating a new process...")
-	},
-}
-
-var createUsersCmd = &cobra.Command{
-	Use:   "users",
-	Short: "Create a new user",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Creating a new user...")
-	},
-}
-
-var createStorageCmd = &cobra.Command{
-	Use:   "storage",
-	Short: "Create new storage",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Creating new storage...")
-	},
-}
