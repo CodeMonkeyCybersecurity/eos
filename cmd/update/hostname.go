@@ -9,6 +9,15 @@ import (
 	"strings"
 )
 
+var hostnameCmd = &cobra.Command{
+	Use:   "hostname",
+	Short: "Update the system hostname",
+	Long:  `Update the system hostname by modifying /etc/hostname and /etc/hosts.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		UpdateHostname()
+	},
+}
+
 // UpdateHostname updates the system hostname
 func UpdateHostname() {
 	// Get the current hostname
