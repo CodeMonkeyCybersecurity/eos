@@ -69,7 +69,7 @@ func ensureResticInstalled() error {
 
 	// Ensure the script is run with sudo
 	if os.Getenv("SUDO_USER") == "" {
-		log.Error("Restic installation requires sudo permissions", zap.Error(err))
+		log.Error("Restic installation requires sudo permissions")
 		return fmt.Errorf("need sudo permissions: run `sudo apt install restic`")
 	}
 	// Check for Restic installation
@@ -143,11 +143,12 @@ func getResticPassword() string {
 		log.Error("Failed to write password file", zap.Error(err))
 		os.Exit(1)
 	}
-	return password, nil
+	return password
 }
 
 // hostname retrieves the current hostname
 func hostname() string {
+	log := logger.GetLogger()
 	name, err := os.Hostname()
 	if err != nil {
 		log.GetLogger().Warn("Failed to retrieve hostname, using 'unknown'", zap.Error(err))
