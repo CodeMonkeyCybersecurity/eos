@@ -4,7 +4,6 @@ Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
 package cmd
 
 import (
-	"database/sql"
 	"eos/pkg/utils"
 	"fmt"
 	"log"
