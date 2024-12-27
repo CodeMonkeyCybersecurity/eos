@@ -38,8 +38,8 @@ Run: func(cmd *cobra.Command, args []string) {
 }
 
 func Execute() {
-if err := rootCmd.Execute(); err != nil {
-	log.Fatalf("Command execution failed: %v", err)
+	if err := rootCmd.Execute(); err != nil {
+		log.Fatalf("Command execution failed: %v", err)
 	}
 }
 
