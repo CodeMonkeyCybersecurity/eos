@@ -8,10 +8,11 @@ import (
 	"strconv"
 	"strings"
 	"text/tabwriter"
-	"time"
 
 	"github.com/spf13/cobra"
 )
+
+const hertz := 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
 
 // readProcessesCmd represents the command to read processes
 var readProcessesCmd = &cobra.Command{
@@ -86,7 +87,6 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	startTime, _ := strconv.ParseFloat(fields[21], 64)
 
 	// Calculate runtime
-	hertz := 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
 	runTime := fmt.Sprintf("%.2f seconds", uptime-(startTime/hertz))
 
 	// Get process name
