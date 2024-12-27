@@ -17,4 +17,5 @@ func init() {
 	CreateCmd.AddCommand(createProcessesCmd)
 	CreateCmd.AddCommand(createUsersCmd)
 	CreateCmd.AddCommand(createStorageCmd)
+	CreateCmd.AddCommand(createBackupCmd)
 }
