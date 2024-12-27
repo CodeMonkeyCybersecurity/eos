@@ -19,30 +19,3 @@ func init() {
 	UpdateCmd.AddCommand(updateUsersCmd)
 	UpdateCmd.AddCommand(updateStorageCmd)
 }
-
-var updateProcessesCmd = &cobra.Command{
-	Use:   "processes",
-	Short: "Update a process",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Updating a process...")
-		// Add your logic here
-	},
-}
-
-var updateUsersCmd = &cobra.Command{
-	Use:   "users",
-	Short: "Update a user",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Updating a user...")
-		// Add your logic here
-	},
-}
-
-var updateStorageCmd = &cobra.Command{
-	Use:   "storage",
-	Short: "Update storage",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Updating storage...")
-		// Add your logic here
-	},
-}
