@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var log *zap.Logger
