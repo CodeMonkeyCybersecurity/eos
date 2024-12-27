@@ -21,7 +21,7 @@ var createBackupCmd = &cobra.Command{
 }
 
 func init() {
-	create.AddCommand(createBackupCmd)
+	createCmd.AddCommand(createBackupCmd)
 
 	// Here you will define your flags and configuration settings.
 
