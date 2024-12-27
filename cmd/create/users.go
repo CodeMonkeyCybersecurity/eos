@@ -23,9 +23,9 @@ var createUsersCmd = &cobra.Command{
 // CreateUser handles the creation of a new user interactively
 func CreateUser() {
 	// Ensure the script is run as root
-	if os.Geteuid() != 0 {
-		fmt.Println("Please run as root")
-		return
+	if os.Getenv("SUDO_USER") == "" && os.Geteuid() != 0 {
+	    fmt.Println("Please run as root or with sudo")
+	    return
 	}
 
 	reader := bufio.NewReader(os.Stdin)
