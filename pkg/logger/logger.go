@@ -144,7 +144,7 @@ func LogCommandExecution(cmdName string, args []string) {
 func Sync() {
 	if log != nil {
 		err := log.Sync()
-		if err != nil {
+		if err != nil && err.Error() != "sync /dev/stdout: invalid argument" {
 			log.Error("Failed to sync logger", zap.Error(err))
 		}
 	}
