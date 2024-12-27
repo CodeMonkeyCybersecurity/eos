@@ -65,10 +65,21 @@ then creates a backup of specified directories.`,
 
 // ensureResticInstalled ensures Restic is installed on the system
 func ensureResticInstalled() error {
-	cmd := exec.Command("apt", "install", "-y", "restic")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	log := logger.GetLogger()
+
+	// Ensure the script is run with sudo
+	if os.Getenv("SUDO_USER") == "" {
+		log.Error("Restic installation requires sudo permissions", zap.Error(err))
+		return fmt.Errorf("need sudo permissions: run `sudo apt install restic`")
+	}
+	// Check for Restic installation
+	_, err := exec.LookPath("restic")
+	if err != nil {
+		log.Error("Restic is not installed", zap.Error(err))
+		return fmt.Errorf("Restic is not installed: run `sudo apt install restic`")
+	}
+	log.Info("Restic is installed and ready to use")
+	return nil
 }
 
 // generateSSHKeys generates SSH keys for accessing the backup server
@@ -116,18 +127,32 @@ func performResticBackup() error {
 
 // getResticPassword retrieves and stores the Restic repository password
 func getResticPassword() string {
-	fmt.Print("What is your restic repo password?: ")
+	log := logger.GetLogger()
+
 	var password string
-	fmt.Scanln(&password)
+	fmt.Print("Enter your Restic repository password: ")
+	_, err := fmt.Scanln(&password)
+	if err != nil {
+		log.Error("Failed to retrieve password, exiting", zap.Error(err))
+		os.Exit(1)
+	}
 
 	file := "/root/.restic-password"
-	_ = os.WriteFile(file, []byte(password), 0600)
-	return password
+	err = os.WriteFile(file, []byte(password), 0600)
+	if err != nil {
+		log.Error("Failed to write password file", zap.Error(err))
+		os.Exit(1)
+	}
+	return password, nil
 }
 
 // hostname retrieves the current hostname
 func hostname() string {
-	name, _ := os.Hostname()
+	name, err := os.Hostname()
+	if err != nil {
+		log.GetLogger().Warn("Failed to retrieve hostname, using 'unknown'", zap.Error(err))
+		return "unknown"
+	}
 	return name
 }
 
