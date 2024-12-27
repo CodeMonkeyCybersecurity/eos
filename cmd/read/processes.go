@@ -20,7 +20,7 @@ var readProcessesCmd = &cobra.Command{
 by reading the /proc directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Reading processes...")
-		processes, err := getProcessesDetails()
+		processes, err := getProcessDetails()
 		if err != nil {
 			fmt.Printf("Error reading processes: %v\n", err)
 			return
