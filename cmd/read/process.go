@@ -62,12 +62,12 @@ func getProcessDetails() ([]ProcessInfo, error) {
 			if _, err := strconv.Atoi(pid); err == nil {
 				process, err := extractProcessDetails(pid, uptime)
 				if err == nil {
-					processes = append(process, newProcess)
+					processes = append(process, processes)
 				}
 			}
 		}
 	}
-	return process, nil
+	return processes, nil
 }
 
 // extractProcessDetails extracts details about a specific process
