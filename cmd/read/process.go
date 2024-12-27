@@ -56,14 +56,14 @@ type ProcessInfo struct {
 // getProcessesDetails retrieves process information
 func getProcessDetails() ([]ProcessInfo, error) {
 	log := logger.GetLogger()
-    log.Info("Reading processes from /proc directory")
+	log.Info("Reading processes from /proc directory")
 
 	procDir := "/proc"
 	files, err := ioutil.ReadDir(procDir)
 	if err != nil {
-        log.Error("Failed to read /proc directory", zap.Error(err))
-        return nil, fmt.Errorf("failed to read /proc directory: %w", err)
-    }
+		log.Error("Failed to read /proc directory", zap.Error(err))
+		return nil, fmt.Errorf("failed to read /proc directory: %w", err)
+	}
 
 	var processes []ProcessInfo
 	uptime := getSystemUptime()
@@ -73,18 +73,18 @@ func getProcessDetails() ([]ProcessInfo, error) {
 			pid := file.Name()
 			if _, err := strconv.Atoi(pid); err == nil {
 				process, err := extractProcessDetails(pid, uptime)
-                if err != nil {
-                    log.Debug("Skipping process", zap.String("pid", pid), zap.Error(err))
-                    continue
-                }					
-				processes = append(processes, process)
+				if err != nil {
+					log.Debug("Skipping process", zap.String("pid", pid), zap.Error(err))
+					continue
 				}
+				processes = append(processes, process)
+
 			}
 		}
 	}
 
-    log.Info("Completed reading processes", zap.Int("processCount", len(processes)))
-    return processes, nil
+	log.Info("Completed reading processes", zap.Int("processCount", len(processes)))
+	return processes, nil
 }
 
 // extractProcessDetails extracts details about a specific process
@@ -173,10 +173,10 @@ func getCPUPercent(pid string) (string, error) {
 
 	totalCPU := uptime * hertz // Total CPU time
 	processCPU := (utime + stime) / totalCPU * 100.0
-    cpuPercent := fmt.Sprintf("%.2f", processCPU)
+	cpuPercent := fmt.Sprintf("%.2f", processCPU)
 
-    log.Info("Calculated CPU usage", zap.String("pid", pid), zap.String("cpuPercent", cpuPercent))
-    return cpuPercent, nil
+	log.Info("Calculated CPU usage", zap.String("pid", pid), zap.String("cpuPercent", cpuPercent))
+	return cpuPercent, nil
 }
 
 func getMemoryPercent(pid string) (string, error) {
@@ -220,14 +220,14 @@ func getMemoryPercent(pid string) (string, error) {
 		log.Warn("Total memory is zero or undefined; returning 0% for memory usage", zap.String("pid", pid))
 		return "0.0", nil
 	}
-	
-    memPercent := "0.0"
-    if totalMem > 0 {
-        memPercent = fmt.Sprintf("%.2f", (memUsage/totalMem)*100.0)
-    }
 
-    log.Info("Calculated memory usage", zap.String("pid", pid), zap.String("memPercent", memPercent))
-    return memPercent, nil
+	memPercent := "0.0"
+	if totalMem > 0 {
+		memPercent = fmt.Sprintf("%.2f", (memUsage/totalMem)*100.0)
+	}
+
+	log.Info("Calculated memory usage", zap.String("pid", pid), zap.String("memPercent", memPercent))
+	return memPercent, nil
 }
 
 // getSystemUptime retrieves the system uptime
