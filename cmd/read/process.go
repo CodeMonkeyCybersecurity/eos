@@ -55,11 +55,15 @@ type ProcessInfo struct {
 
 // getProcessesDetails retrieves process information
 func getProcessDetails() ([]ProcessInfo, error) {
+	log := logger.GetLogger()
+    log.Info("Reading processes from /proc directory")
+
 	procDir := "/proc"
 	files, err := ioutil.ReadDir(procDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read /proc directory: %w", err)
-	}
+        log.Error("Failed to read /proc directory", zap.Error(err))
+        return nil, fmt.Errorf("failed to read /proc directory: %w", err)
+    }
 
 	var processes []ProcessInfo
 	uptime := getSystemUptime()
@@ -69,28 +73,36 @@ func getProcessDetails() ([]ProcessInfo, error) {
 			pid := file.Name()
 			if _, err := strconv.Atoi(pid); err == nil {
 				process, err := extractProcessDetails(pid, uptime)
-				if err == nil {
-					processes = append(processes, process)
+                if err != nil {
+                    log.Debug("Skipping process", zap.String("pid", pid), zap.Error(err))
+                    continue
+                }					
+				processes = append(processes, process)
 				}
 			}
 		}
 	}
-	return processes, nil
+
+    log.Info("Completed reading processes", zap.Int("processCount", len(processes)))
+    return processes, nil
 }
 
 // extractProcessDetails extracts details about a specific process
 func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
+	log := logger.GetLogger()
+	log.Info("Extracting process details", zap.String("pid", pid))
+
 	procDir := fmt.Sprintf("/proc/%s", pid)
 
 	// Read /proc/[PID]/stat
 	statPath := fmt.Sprintf("%s/stat", procDir)
 	statContent, err := ioutil.ReadFile(statPath)
 	if err != nil {
-		fmt.Printf("Skipping PID %s: %v\n", pid, err)
+		log.Warn("Unable to read stat file for process", zap.String("pid", pid), zap.Error(err))
 		return ProcessInfo{}, err
 	}
-	fields := strings.Fields(string(statContent))
 
+	fields := strings.Fields(string(statContent))
 	comm := strings.Trim(fields[1], "()") // Command name without parentheses
 	state := fields[2]                    // State
 	startTime, _ := strconv.ParseFloat(fields[21], 64)
@@ -115,12 +127,15 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 				break
 			}
 		}
+	} else {
+		log.Warn("Unable to read status file", zap.String("pid", pid), zap.Error(err))
 	}
 
 	// Get CPU and memory usage
 	cpuPercent, _ := getCPUPercent(pid)
 	memPercent, _ := getMemoryPercent(pid)
 
+	log.Info("Successfully extracted process details", zap.String("pid", pid), zap.String("user", userName))
 	return ProcessInfo{
 		PID:        pid,
 		Comm:       comm,
@@ -134,10 +149,13 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 }
 
 func getCPUPercent(pid string) (string, error) {
+	log := logger.GetLogger()
+
 	statPath := fmt.Sprintf("/proc/%s/stat", pid)
 	data, err := ioutil.ReadFile(statPath)
 	if err != nil {
-		return "Err", nil // Return 0.0 if process is not accessible
+		log.Warn("Unable to read stat file for CPU usage", zap.String("pid", pid), zap.Error(err))
+		return "Err", nil // Return "Err" if process is not accessible
 	}
 
 	fields := strings.Fields(string(data))
@@ -147,20 +165,27 @@ func getCPUPercent(pid string) (string, error) {
 	// Get system uptime and total CPU time
 	uptimeData, err := ioutil.ReadFile("/proc/uptime")
 	if err != nil {
-		return "Err", nil
+		log.Warn("Unable to read uptime file for CPU calculation; using fallback", zap.Error(err))
+		return "0.0", nil
 	}
 	uptimeFields := strings.Fields(string(uptimeData))
 	uptime, _ := strconv.ParseFloat(uptimeFields[0], 64)
 
 	totalCPU := uptime * hertz // Total CPU time
 	processCPU := (utime + stime) / totalCPU * 100.0
-	return fmt.Sprintf("%.2f", processCPU), nil
+    cpuPercent := fmt.Sprintf("%.2f", processCPU)
+
+    log.Info("Calculated CPU usage", zap.String("pid", pid), zap.String("cpuPercent", cpuPercent))
+    return cpuPercent, nil
 }
 
 func getMemoryPercent(pid string) (string, error) {
+	log := logger.GetLogger()
+
 	statusPath := fmt.Sprintf("/proc/%s/status", pid)
 	data, err := ioutil.ReadFile(statusPath)
 	if err != nil {
+		log.Warn("Unable to read status file for memory usage", zap.String("pid", pid), zap.Error(err))
 		return "Err", nil // Return 0.0 if process is not accessible
 	}
 
@@ -176,6 +201,7 @@ func getMemoryPercent(pid string) (string, error) {
 
 	memInfo, err := ioutil.ReadFile("/proc/meminfo")
 	if err != nil {
+		log.Warn("Unable to read /proc/meminfo for memory calculation", zap.Error(err))
 		return "Err", nil
 	}
 
@@ -189,17 +215,29 @@ func getMemoryPercent(pid string) (string, error) {
 		}
 	}
 
-	if totalMem > 0 {
-		return fmt.Sprintf("%.2f", (memUsage/totalMem)*100.0), nil
+	// Add the block to handle zero or undefined total memory
+	if totalMem <= 0 {
+		log.Warn("Total memory is zero or undefined; returning 0% for memory usage", zap.String("pid", pid))
+		return "0.0", nil
 	}
-	return "0.0", nil
+	
+    memPercent := "0.0"
+    if totalMem > 0 {
+        memPercent = fmt.Sprintf("%.2f", (memUsage/totalMem)*100.0)
+    }
+
+    log.Info("Calculated memory usage", zap.String("pid", pid), zap.String("memPercent", memPercent))
+    return memPercent, nil
 }
 
 // getSystemUptime retrieves the system uptime
 func getSystemUptime() float64 {
+	log := logger.GetLogger()
+
 	uptimeFile := "/proc/uptime"
 	content, err := ioutil.ReadFile(uptimeFile)
 	if err != nil {
+		log.Warn("Unable to read uptime file", zap.Error(err))
 		return 0.0
 	}
 	uptime, _ := strconv.ParseFloat(strings.Fields(string(content))[0], 64)
