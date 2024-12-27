@@ -1,3 +1,4 @@
+// cmd/update/update.go
 package update
 
 import (
@@ -16,4 +17,5 @@ func init() {
 	UpdateCmd.AddCommand(updateProcessesCmd)
 	UpdateCmd.AddCommand(updateUsersCmd)
 	UpdateCmd.AddCommand(updateStorageCmd)
+	UpdateCmd.AddCommand(hostnameCmd)
 }
