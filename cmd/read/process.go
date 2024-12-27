@@ -53,7 +53,7 @@ func getProcessDetails() ([]ProcessInfo, error) {
 		return nil, fmt.Errorf("failed to read /proc directory: %w", err)
 	}
 
-	var process []ProcessInfo
+	var processes []ProcessInfo
 	uptime := getSystemUptime()
 
 	for _, file := range files {
@@ -62,7 +62,7 @@ func getProcessDetails() ([]ProcessInfo, error) {
 			if _, err := strconv.Atoi(pid); err == nil {
 				process, err := extractProcessDetails(pid, uptime)
 				if err == nil {
-					process = append(process, process)
+					processes = append(process, newProcess)
 				}
 			}
 		}
