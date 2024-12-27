@@ -124,10 +124,10 @@ users, or backups, from the system.`,
 		},
 	}
 
-	rootCmd.AddCommand(createCmd)
-	rootCmd.AddCommand(readCmd)
-	rootCmd.AddCommand(updateCmd)
-	rootCmd.AddCommand(deleteCmd)
+	rootCmd.AddCommand(create.createCmd)
+	rootCmd.AddCommand(read.readCmd)
+	rootCmd.AddCommand(update.updateCmd)
+	rootCmd.AddCommand(delete.deleteCmd)
 }
 
 // Execute starts the CLI
