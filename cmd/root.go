@@ -8,16 +8,17 @@ import (
 	"eos/cmd/delete"
 	"eos/cmd/read"
 	"eos/cmd/update"
-	"eos/pkg/utils"
-	"fmt"
-	"log"
+	"eos/pkg/logger"
+
 	"os"
 	"os/user"
 	"path/filepath"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
+
+var log *zap.Logger // Global logger instance
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -26,29 +27,23 @@ var rootCmd = &cobra.Command{
 	Long: `Eos is a command-line application for managing processes, users,
 hardware, backups, and more.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		log.Info("Eos CLI started successfully.")
+
+		// Example: Process the config path
 		configPath := filepath.Join(".", "config", "default.yaml")
-		logFilePath := "/tmp/eos.log"
-
-		// Initialize the logger
-		err := utils.InitializeLogger(configPath, logFilePath, utils.Info, true)
-		if err != nil {
-			log.Fatalf("Failed to initialize logger: %v", err)
-		}
-
-		logger := utils.GetLogger()
-		logger.Info("Eos CLI started successfully.")
+		log.Info("Loaded configuration", zap.String("path", configPath))
 	},
 }
 
-func cmd() {
+func enforceUser() {
 	currentUser, err := user.Current()
 	if err != nil {
-		log.Fatalf("Failed to determine current user: %v", err)
+		log.Fatal("Failed to determine current user", zap.Error(err))
 	}
 
 	// Enforce that Eos must be run as 'eos_user'
 	if currentUser.Username != "eos_user" {
-		log.Fatalf("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
+		log.Fatal("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
 	}
 }
 
@@ -62,8 +57,19 @@ func init() {
 
 // Execute starts the CLI
 func Execute() {
+	// Initialize the logger once globally
+	logger.Initialize()
+	defer logger.Sync()
+
+	// Assign the logger instance globally for reuse
+	log = logger.GetLogger()
+
+	// Enforce user check
+	enforceUser()
+
+	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		log.Error("CLI execution error", zap.Error(err))
 		os.Exit(1)
 	}
 }
