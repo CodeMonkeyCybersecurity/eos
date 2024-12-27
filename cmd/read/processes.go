@@ -93,7 +93,7 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	processName := comm
 	
 	// Read /proc/[PID]/status to get user info
-	statusPath := fmt.Sprintf("%s/comm", procDir)
+	statusPath := fmt.Sprintf("%s/status", procDir)
 	statusContent, err := ioutil.ReadFile(statusPath)
 	userName := "unknown"
 	if err == nil {
@@ -143,7 +143,7 @@ func getCPUPercent(pid string) (string, error) {
 	uptimeFields := strings.Fields(string(uptimeData))
 	uptime, _ := strconv.ParseFloat(uptimeFields[0], 64)
 
-	totalCPU := uptime * float64(os.Getpagesize()) // Total CPU time
+	totalCPU := uptime * hertz // Total CPU time
 	processCPU := (utime + stime) / totalCPU * 100.0
 	return fmt.Sprintf("%.2f", processCPU), nil
 }
