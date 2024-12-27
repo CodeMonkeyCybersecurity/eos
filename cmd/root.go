@@ -90,8 +90,6 @@ func init() {
 		log.Fatalf("Failed to initialize logger: %v", err)
 	}
 
-var cfgFile string
-
 func init() {
 
 	// Create
@@ -138,7 +136,6 @@ func init() {
 			// Add your logic here
 		},
 	}
-	
 	
 	// Delete
 	var deleteCmd = &cobra.Command{
