@@ -1,4 +1,7 @@
 // cmd/update/update.go
+/*
+Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
+*/
 package update
 
 import (
