@@ -98,13 +98,19 @@ logs:
 echo "Updated $DEFAULT_YAML with configuration variables."
 
 # Create a new system user for Eos with sudo permission limitation
+# Create a new system user for Eos with sudo permission limitation
 function create_eos_system_user() {
     echo -e "${GREEN}Creating system user ${SYSTEM_USER}...${RESET}"
     if id "$SYSTEM_USER" &>/dev/null; then
         echo -e "${GREEN}System user ${SYSTEM_USER} already exists.${RESET}"
     else
-        sudo useradd -m -s /usr/sbin/nologin -p '!' ${SYSTEM_USER}
+        # Create the user with a default shell and no password
+        sudo useradd -m -s /usr/sbin/nologin ${SYSTEM_USER}
         echo -e "${GREEN}System user ${SYSTEM_USER} created successfully.${RESET}"
+
+        # Prompt for the password
+        echo -e "${GREEN}Please set a password for ${SYSTEM_USER}:${RESET}"
+        sudo passwd ${SYSTEM_USER}
     fi
 
     # Add user to sudoers if needed
