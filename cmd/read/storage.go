@@ -11,7 +11,7 @@ import (
 // readStorageCmd represents the create command for storage
 var readStorageCmd = &cobra.Command{
 	Use:   "read",
-	Short: "Read new storage resources",
+	Short: "Read storage resources",
 	Long:  `This command allows you to read storage resources in the system.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
