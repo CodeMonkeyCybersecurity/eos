@@ -81,24 +81,19 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	}
 	fields := strings.Fields(string(statContent))
 
-	comm := fields[1]     // Command name
+	comm := strings.Trim(fields[1], "()") // Command name without parentheses
 	state := fields[2]    // State
 	startTime, _ := strconv.ParseFloat(fields[21], 64)
 
 	// Calculate runtime
-	hertz := float64(os.Getpagesize()) / 1024.0
+	hertz := 100.0 // Typically, this is 100 ticks per second; adjust for your system if necessary
 	runTime := fmt.Sprintf("%.2f seconds", uptime-(startTime/hertz))
 
-	// Read /proc/[PID]/comm
-	commPath := fmt.Sprintf("%s/comm", procDir)
-	commContent, err := ioutil.ReadFile(commPath)
-	processName := "unknown"
-	if err == nil {
-		processName = strings.TrimSpace(string(commContent))
-	}
-
+	// Get process name
+	processName := comm
+	
 	// Read /proc/[PID]/status to get user info
-	statusPath := fmt.Sprintf("%s/status", procDir)
+	statusPath := fmt.Sprintf("%s/comm", procDir)
 	statusContent, err := ioutil.ReadFile(statusPath)
 	userName := "unknown"
 	if err == nil {
@@ -113,9 +108,9 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 		}
 	}
 
-	// Placeholder for CPU and Memory (implement further logic if needed)
-	cpuPercent := "0.0"
-	memPercent := "0.0"
+	// Get CPU and memory usage
+	cpuPercent, _ := getCPUPercent(pid)
+	memPercent, _ := getMemoryPercent(pid)
 
 	return ProcessInfo{
 		PID:        pid,
@@ -127,6 +122,68 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 		MemPercent: memPercent,
 		RunTime:    runTime,
 	}, nil
+}
+
+func getCPUPercent(pid string) (string, error) {
+	statPath := fmt.Sprintf("/proc/%s/stat", pid)
+	data, err := ioutil.ReadFile(statPath)
+	if err != nil {
+		return "Err", nil // Return 0.0 if process is not accessible
+	}
+
+	fields := strings.Fields(string(data))
+	utime, _ := strconv.ParseFloat(fields[13], 64) // Field 13
+	stime, _ := strconv.ParseFloat(fields[14], 64) // Field 14
+
+	// Get system uptime and total CPU time
+	uptimeData, err := ioutil.ReadFile("/proc/uptime")
+	if err != nil {
+		return "Err", nil
+	}
+	uptimeFields := strings.Fields(string(uptimeData))
+	uptime, _ := strconv.ParseFloat(uptimeFields[0], 64)
+
+	totalCPU := uptime * float64(os.Getpagesize()) // Total CPU time
+	processCPU := (utime + stime) / totalCPU * 100.0
+	return fmt.Sprintf("%.2f", processCPU), nil
+}
+
+func getMemoryPercent(pid string) (string, error) {
+	statusPath := fmt.Sprintf("/proc/%s/status", pid)
+	data, err := ioutil.ReadFile(statusPath)
+	if err != nil {
+		return "Err", nil // Return 0.0 if process is not accessible
+	}
+
+	var memUsage float64
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "VmRSS:") {
+			fields := strings.Fields(line)
+			memUsage, _ = strconv.ParseFloat(fields[1], 64) // VmRSS in kB
+			break
+		}
+	}
+
+	memInfo, err := ioutil.ReadFile("/proc/meminfo")
+	if err != nil {
+		return "Err", nil
+	}
+
+	totalMem := 0.0
+	memLines := strings.Split(string(memInfo), "\n")
+	for _, line := range memLines {
+		if strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			totalMem, _ = strconv.ParseFloat(fields[1], 64) // MemTotal in kB
+			break
+		}
+	}
+
+	if totalMem > 0 {
+		return fmt.Sprintf("%.2f", (memUsage/totalMem)*100.0), nil
+	}
+	return "0.0", nil
 }
 
 // getSystemUptime retrieves the system uptime
