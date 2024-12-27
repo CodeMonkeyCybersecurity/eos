@@ -42,8 +42,16 @@ func getRunningProcesses() ([]string, error) {
 	for _, file := range files {
 		if file.IsDir() {
 			// Check if the directory name is numeric (process ID)
-			if _, err := strconv.Atoi(file.Name()); err == nil {
-				processes = append(processes, file.Name())
+			pid := file.Name()
+			if _, err := strconv.Atoi(pid); err == nil {
+				// Get process name from /proc/[PID]/comm
+				commPath := fmt.Sprintf("%s/%s/comm", procDir, pid)
+				comm, err := ioutil.ReadFile(commPath)
+				if err == nil {
+					processes = append(processes, fmt.Sprintf("%s: %s", pid, string(comm)))
+				} else {
+					processes = append(processes, pid) // Fallback to just PID
+				}
 			}
 		}
 	}
