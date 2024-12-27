@@ -52,16 +52,18 @@ func cmd() {
 	}
 }
 
+// Register all subcommands in the init function
+func init() {
+	rootCmd.AddCommand(create.CreateCmd)
+	rootCmd.AddCommand(read.ReadCmd)
+	rootCmd.AddCommand(update.UpdateCmd)
+	rootCmd.AddCommand(delete.DeleteCmd)
+}
+
 // Execute starts the CLI
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-	rootCmd.AddCommand(create.createCmd)
-	rootCmd.AddCommand(read.readCmd)
-	rootCmd.AddCommand(update.updateCmd)
-	rootCmd.AddCommand(delete.deleteCmd)
 }
