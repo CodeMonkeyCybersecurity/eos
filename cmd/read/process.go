@@ -79,7 +79,7 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	statContent, err := ioutil.ReadFile(statPath)
 	if err != nil {
 		fmt.Printf("Skipping PID %s: %v\n", pid, err)
-		continue
+		return ProcessInfo{}, err
 	}
 	fields := strings.Fields(string(statContent))
 
