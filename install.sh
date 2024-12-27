@@ -269,9 +269,7 @@ function main() {
 }
 main
 
-sudo usermod -aG adm eos_user # Add eos_user to the adm group (commonly used for log access):
-sudo chgrp -R adm /var/log/cyberMonkey # Change the group ownership of the directory:
-sudo chmod -R 775 /var/log/cyberMonkey # 	Adjust the permissions to allow group write access:
-ls -ld /var/log/cyberMonkey # Verify the permissions:
+sudo chown -R eos_user:eos_user /var/log/cyberMonkey # Change the ownership of the /var/log/cyberMonkey directory to eos_user. This will allow eos_user to write to the directory and manage the log files.
+ls -ld /var/log/cyberMonkey # Verify the ownership:
 
 set +x
