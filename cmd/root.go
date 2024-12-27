@@ -21,18 +21,18 @@ var rootCmd = &cobra.Command{
 	Short: "Eos CLI for managing local and remote environments",
 	Long: `Eos is a command-line application for managing processes, users,
 hardware, backups, and more.`,
-Run: func(cmd *cobra.Command, args []string) {
-	configPath := filepath.Join(".", "config", "default.yaml")
-	logFilePath := "/tmp/eos.log"
+	Run: func(cmd *cobra.Command, args []string) {
+		configPath := filepath.Join(".", "config", "default.yaml")
+		logFilePath := "/tmp/eos.log"
 
-	// Initialize the logger
-	err := utils.InitializeLogger(configPath, logFilePath, utils.Info, true)
-	if err != nil {
-		log.Fatalf("Failed to initialize logger: %v", err)
-	}
+		// Initialize the logger
+		err := utils.InitializeLogger(configPath, logFilePath, utils.Info, true)
+		if err != nil {
+			log.Fatalf("Failed to initialize logger: %v", err)
+		}
 
-	logger := utils.GetLogger()
-	logger.Info("Eos CLI started successfully.")
+		logger := utils.GetLogger()
+		logger.Info("Eos CLI started successfully.")
 	},
 }
 
@@ -64,7 +64,7 @@ func init() {
 	var createCmd = &cobra.Command{
 		Use:   "create [target]",
 		Short: "Create new resources (e.g., processes, users, backups)",
-		Long:  `The create command allows you to create new resources in the system,
+		Long: `The create command allows you to create new resources in the system,
 such as processes, users, or backups.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
@@ -75,12 +75,12 @@ such as processes, users, or backups.`,
 			// Add your logic here
 		},
 	}
-	
+
 	// Read
 	var readCmd = &cobra.Command{
 		Use:   "read [target]",
 		Short: "Retrieve information about resources",
-		Long:  `The read command retrieves information about various resources,
+		Long: `The read command retrieves information about various resources,
 such as processes, users, backups, and more.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
@@ -91,12 +91,12 @@ such as processes, users, backups, and more.`,
 			// Add your logic here
 		},
 	}
-	
+
 	// Update
 	var updateCmd = &cobra.Command{
 		Use:   "update [target]",
 		Short: "Update existing resources",
-		Long:  `The update command modifies existing resources, such as processes,
+		Long: `The update command modifies existing resources, such as processes,
 users, or backups, based on the provided parameters.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
@@ -107,12 +107,12 @@ users, or backups, based on the provided parameters.`,
 			// Add your logic here
 		},
 	}
-	
+
 	// Delete
 	var deleteCmd = &cobra.Command{
 		Use:   "delete [target]",
 		Short: "Remove resources from the system",
-		Long:  `The delete command allows you to remove resources, such as processes,
+		Long: `The delete command allows you to remove resources, such as processes,
 users, or backups, from the system.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if len(args) < 1 {
