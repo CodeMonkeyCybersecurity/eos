@@ -102,7 +102,7 @@ func InitializeLogger(configPath, logFilePath string, terminalMin LogLevel, colo
 		
 	// Initialize logPriority and colourMap
 	if err := InitializeLoggerFromConfig(configPath); err != nil {
-		return fmt.Errorf("Failed to initialize logger config: %w, err)
+		return fmt.Errorf("Failed to initialize logger config: %w", err)
 	}
 
 	// Database connection string
@@ -245,12 +245,3 @@ func (l *Logger) Fatal(message string) {
 	l.Log(Fatal, message)
 	os.Exit(1)
 }
-
-	// TODO
-	//  Insert log entry into the 'logs' table
-	// insertQuery := "INSERT INTO logs (timestamp, level, message) VALUES ($1, $2, $3)"
-	// _, err = db.Exec(insertQuery, time.Now(), config.Logging.Level, "Test log entry")
-	// if err != nil {
-	// 	log.Fatalf("Failed to insert log entry: %v", err)
-	// }
-
