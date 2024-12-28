@@ -291,4 +291,6 @@ chown -R :"$SYSTEM_GROUP" "$CYBERMONKEY_LOG_DIR" # Change the ownership of the /
 ls -ld "$CYBERMONKEY_LOG_DIR" # Verify the ownership:
 ls -ld "$INSTALLER_DIR"
 
+reboot
+
 set +x
