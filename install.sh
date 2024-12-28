@@ -54,9 +54,20 @@ echo -e "${RED} === Script started at $STAMP === ${RESET}"
 
 # Variables for binary download
 SYSTEM_USER="eos_user"
+SYSTEM_GROUP="eos_group"
 EOS_VERSION="v1.0.0"
 OS="$(uname | tr '[:upper:]' '[:lower:]')"
 ARCH="$(uname -m)"
+INSTALLER_DIR="/opt/eos"
+
+groupadd "$SYSTEM_GROUP"
+read -p "What is your main user account?: " MAIN_USER
+usermod -aG "$SYSTEM_GROUP" "$MAIN_USER"
+usermod -aG "$SYSTEM_GROUP" "$SYSTEM_USER"
+chown -R :"$SYSTEM_GROUP" "$INSTALLER_DIR"
+chmod -R 774 "$INSTALLER_DIR"
+chmod g+s "$INSTALLER_DIR"
+
 
 # Download binary
 echo -e "${GREEN}Downloading Eos binary...${RESET}"
@@ -275,7 +286,9 @@ function main() {
 }
 main
 
-chown -R eos_user:eos_user /var/log/cyberMonkey # Change the ownership of the /var/log/cyberMonkey directory to eos_user. This will allow eos_user to write to the directory and manage the log files.
-ls -ld /var/log/cyberMonkey # Verify the ownership:
+chown -R :"$SYSTEM_GROUP" "$INSTALLER_DIR"
+chown -R :"$SYSTEM_GROUP" "$CYBERMONKEY_LOG_DIR" # Change the ownership of the /var/log/cyberMonkey directory to eos_user. This will allow eos_user to write to the directory and manage the log files.
+ls -ld "$CYBERMONKEY_LOG_DIR" # Verify the ownership:
+ls -ld "$INSTALLER_DIR"
 
 set +x
