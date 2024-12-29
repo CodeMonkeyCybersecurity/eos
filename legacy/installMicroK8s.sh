@@ -6,16 +6,13 @@ sudo ufw allow 25000:25010/tcp && sudo ufw reload
 sudo snap install microk8s --classic
 sudo usermod -a -G microk8s $USER
 sudo chown -R henry ~/.kube
-mkdir -p ~/.kube
-chmod 0700 ~/.kube
 newgrp microk8s
 
 sudo microk8s status --wait-ready
 
-sudo microk8s enable dashboard
-sudo microk8s enable dns
-sudo microk8s enable registry
-sudo microk8s enable istio
+
+sudo microk8s enable dashboard dns  registry  istio rook-ceph
+
 sudo microk8s enable ingress
 
 
@@ -35,3 +32,9 @@ sudo microceph disk list
 sudo microk8s enable rook-ceph
 sudo microk8s connect-external-ceph
 
+
+
+
+
+-----------------------
+microk8s kubectl describe secret -n kube-system microk8s-dashboard-token

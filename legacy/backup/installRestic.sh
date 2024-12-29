@@ -1,5 +1,5 @@
 # install restic
-sudo apt-get install restic
+sudo apt install restic -y
 
 # ssh
 sudo ssh-keygen
@@ -20,4 +20,3 @@ echo "$RESTIC_REPO" | sudo tee /root/.restic-repo > /dev/null
 sudo chmod 600 /root/.restic-repo
 
 sudo restic --repository-file /root/.restic-repo --password-file /root/.restic-password --verbose backup /root /home /var /etc /srv /usr /opt
-
