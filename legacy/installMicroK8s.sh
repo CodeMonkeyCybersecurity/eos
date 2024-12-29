@@ -18,21 +18,12 @@ sudo microk8s enable registry
 sudo microk8s enable istio
 sudo microk8s enable ingress
 
+
 sudo microk8s kubectl get all --all-namespaces
 
 sudo microk8s dashboard-proxy
 
 exit # to allow for permissions chagens above to take effect
-
-
-----------
-# https://snapcraft.io/install/microceph/ubuntu
-sudo snap install microceph
- sudo snap refresh --hold microceph
- sudo microceph cluster bootstrap
- sudo microceph disk add loop,4G,3
- sudo ceph status
- kubectl apply -f https://raw.githubusercontent.com/ceph/ceph-csi/devel/examples/kubernetes/cephfs/driver.yaml
 
 
 -------------
