@@ -1,4 +1,4 @@
-¸Z# Eos
+# Eos
 Eos aims to help make ubuntu server administration easier for those of us who weren't born in a bash shell.
 
 We use all the tools here on a daily basis. Because of this, you can be assured they are actively used and maintained. You should also be aware, therefore, that because they are being actively updated and adjusted, they should be considered 'current best effort' and not a perfect product.
