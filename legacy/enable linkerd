@@ -1,0 +1,12 @@
+enable linkerd
+
+ microk8s enable community
+
+ git config --global --add safe.directory /snap/microk8s/current/addons/community/.git
+
+ microk8s enable community
+
+microk8s enable linkerd:proxy-auto-inject
+
+curl -sL https://run.linkerd.io/install | sh
+export PATH=$PATH:$HOME/.linkerd2/bin
