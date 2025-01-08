@@ -4,12 +4,11 @@ sudo usermod -a -G microk8s $USER
 mkdir -p ~/.kube
 chmod 0700 ~/.kube
 newgrp microk8s
+
+
 microk8s status --wait-ready
-
 microk8s kubectl get nodes
-
 microk8s kubectl get services
-
 alias kubectl='microk8s kubectl'
 
 microk8s kubectl create deployment nginx --image=nginx
