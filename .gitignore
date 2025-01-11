@@ -21,8 +21,12 @@
 go.work
 go.work.sum
 
-# env file
-.env
+# Other
+*.pem
+*.key
+*.env
 
 # MacOS
 .DS_Store
+desktop.ini
+
