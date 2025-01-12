@@ -54,7 +54,7 @@ pwd
 echo "verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node"
 
 # Change the permissions in the /opt/wazuh-docker directory otherwise this won't work
-sudo chown -R $USER: /opt/wazuh-docker && sudo chmod u+rxw /opt/wazuh-docker
+sudo chown -R $USER: /opt/wazuh-docker && sudo chmod -R u+rxw /opt/wazuh-docker
 ```
 
 ### Generate self-signed certificates for each cluster node.
