@@ -108,13 +108,13 @@ Make sure your tailscale network is up on your computer, your backend server, an
 sudo ufw status
 
 # for ssh
-sudo ufw allow from <your tailscale IP> to any port 22 # recommended
+sudo ufw allow from <your tailscale IP> to any port 22 proto tcp # recommended
 
 # for web server 
-sudo ufw allow from <reverse proxy tailscale IP> to any port 80,443 # recommended
+sudo ufw allow from <reverse proxy tailscale IP> to any port 80,443 proto tcp # recommended
 
 # for wazuh
-sudo ufw allow from <reverse proxy tailscale IP> to any port 1514,1515,5601,55000,9200 # recommended
+sudo ufw allow from <reverse proxy tailscale IP> to any port 1514,1515,5601,55000,9200 proto tcp # recommended
 
 # reload the firewall
 sudo ufw reload
@@ -139,13 +139,14 @@ sudo ufw enable
 sudo ufw status
 
 # for ssh
-sudo ufw allow 22
+sudo ufw allow ssh
 
 # for web server 
-sudo ufw allow 80,443
+sudo ufw allow http
+sudo ufw alllow https
 
 # for wazuh
-sudo ufw allow 1514,1515,5601,55000,9200
+sudo ufw allow from any to any port 1514,1515,5601,55000,9200 proto tcp
 
 # reload the firewall
 sudo ufw reload
