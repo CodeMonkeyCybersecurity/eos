@@ -94,7 +94,7 @@ services:
 
 Create the desired certificates:
 ```
-docker-compose -f generate-indexer-certs.yml run --rm generator
+docker compose -f generate-indexer-certs.yml run --rm generator
 ```
 
 ### Exposing the correct ports on the backed 
