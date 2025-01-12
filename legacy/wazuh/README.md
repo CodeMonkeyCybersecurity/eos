@@ -53,8 +53,14 @@ cd wazuh-docker/single-node
 pwd
 echo "verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node"
 
-# Change the permissions in the /opt/wazuh-docker directory otherwise this won't work
+# If that is all good, exit out of being root user
+exit
+
+# Change the permissions in the /opt/wazuh-docker directory to be yours (assuming you will be the one administering the wazuh install)
 sudo chown -R $USER: /opt/wazuh-docker && sudo chmod -R u+rxw /opt/wazuh-docker
+
+# Verify this with
+ls -lah 
 ```
 
 ### Generate self-signed certificates for each cluster node.
