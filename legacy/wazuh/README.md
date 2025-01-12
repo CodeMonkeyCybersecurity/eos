@@ -68,7 +68,7 @@ sudo chown -R $USER: /opt/wazuh-docker &&
 sudo chmod -R 774 /opt/wazuh-docker
 
 # Verify this with
-ls -lah 
+ls -lah /opt/wazuh-docker
 ```
 
 ### Generate self-signed certificates for each cluster node.
@@ -84,6 +84,7 @@ environment:
 
 To do this, go to:
 ```
+cd /opt/wazuh-docker/single-node
 nano generate-indexer-certs.yml
 ```
 Paste this at the bottom of the file
