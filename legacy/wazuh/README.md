@@ -23,7 +23,7 @@ Instructions for the post-install steps for docker are from here https://docs.do
 sudo groupadd docker
 
 # Add your user to the docker group.
-usermod -aG docker $USER
+sudo usermod -aG docker $USER
 
 #You can also run the following command to activate the changes to groups:
 newgrp docker
