@@ -38,10 +38,9 @@ docker run hello-world
 Up to date instructions are available at https://documentation.wazuh.com/current/deployment-options/docker/index.html
 
 ### Navigate to a good install directory and clone the repository
+You will need your 
 ```
-su
-umask
-# 0022 <- Verify it is 0022
+sudo -i
 cd /opt
 git clone https://github.com/wazuh/wazuh-docker.git -b v4.10.0
 cd wazuh-docker/single-node
