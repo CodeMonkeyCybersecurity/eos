@@ -48,8 +48,13 @@ Then clone the repo into a good directory to install it:
 cd /opt
 git clone https://github.com/wazuh/wazuh-docker.git -b v4.10.0
 cd wazuh-docker/single-node
-pwd
+
 # verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node
+pwd
+echo "verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node"
+
+# Change the permissions in the /opt/wazuh-docker directory otherwise this won't work
+sudo chown -R $USER: /opt/wazuh-docker && sudo chmod u+rxw /opt/wazuh-docker
 ```
 
 ### Generate self-signed certificates for each cluster node.
