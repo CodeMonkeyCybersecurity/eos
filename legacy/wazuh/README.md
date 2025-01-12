@@ -103,6 +103,8 @@ docker compose -f generate-indexer-certs.yml run --rm generator
 Make sure your tailscale network is up on your computer, your backend server, and your reverse proxy.
 
 #### To allow the appropriate firewall rules (recommended approach):
+To read about ufw firewall rules, go here https://help.ubuntu.com/community/UFW
+
 ```
 # check current status
 sudo ufw status
