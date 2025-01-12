@@ -1,8 +1,9 @@
 # Expanding an `ubuntu--vg-ubuntu--lv` logical volume
 To expand the `ubuntu--vg-ubuntu--lv` logical volume to use the full xxxGB of space available on the volume group, follow these steps:
 
-## 1. Check the current size of the logical volume (LV):
+## 1. Check the current size of the logical volume (LV), the space available, and the disk format:
 ```
+lsblk
 df -h
 sudo lvdisplay
 ```
