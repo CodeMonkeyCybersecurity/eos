@@ -216,7 +216,17 @@ cd $HOME/wazuh-docker/single-node
 docker compose up -d
 ```
 
-### Securing it
+### Verify your install 
+Check the docker containers are running
+```
+docker ps
+```
+
+Access wazuh instance locally via browser: `https://<backend tailscale IP>:5601`
+
+You should see your Wazuh login page available here.
+
+### Securing your install
 #### The oldest vulnerability in the world is default credentials, so make sure you change them
 Please see the Wazuh documentation at: https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html for changing default passwords etc.
 
@@ -226,6 +236,11 @@ sudo apt update
 sudo apt install fail2ban
 ```
 
+### Establishing reverse proxy
+**This should only be done after you are comfortable with the security of your install**
+Once you expose your install via reverse proxy it is exposed to the internet.
+The internet is a wild place AND IF YOU DONT SECURE IT PROPERLY YOU ARE POTENTIALLY INVITING THE WHOLE INTERNET INTO YOUR LOCAL LAN. NOT A GOOD IDEA.
 
+If you are comfortable with the security of your install, proceed to enabling the reverse proxy by going to our reverse proxy repo https://github.com/CodeMonkeyCybersecurity/hecate
 
 
