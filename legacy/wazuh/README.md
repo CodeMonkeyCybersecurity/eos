@@ -27,8 +27,10 @@ sudo usermod -aG docker $USER
 
 #You can also run the following command to activate the changes to groups:
 newgrp docker
+```
 
-# Verify that you can run docker commands without sudo.
+Verify that you can run docker commands without sudo.
+```
 docker run hello-world 
 ```
 
