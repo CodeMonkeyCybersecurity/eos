@@ -52,12 +52,20 @@ cd wazuh-docker/single-node
 # verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node
 pwd
 echo "verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node"
+```
 
-# If that is all good, exit out of being root user
+If that is all good, exit out of being root user
+```
 exit
+```
 
-# Change the permissions in the /opt/wazuh-docker directory to be yours (assuming you will be the one administering the wazuh install)
-sudo chown -R $USER: /opt/wazuh-docker && sudo chmod -R 774 /opt/wazuh-docker
+Change the permissions in the /opt/wazuh-docker directory to be yours (assuming you will be the one administering the wazuh install)
+```
+# Change to you owning it 
+sudo chown -R $USER: /opt/wazuh-docker &&
+
+# change fo it to be rwx for you, wrx for your group, and only readable to everyone else
+sudo chmod -R 774 /opt/wazuh-docker
 
 # Verify this with
 ls -lah 
