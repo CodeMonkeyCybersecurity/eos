@@ -57,7 +57,7 @@ echo "verify the present working direcotry (pwd) is /opt/wazuh-docker/single-nod
 exit
 
 # Change the permissions in the /opt/wazuh-docker directory to be yours (assuming you will be the one administering the wazuh install)
-sudo chown -R $USER: /opt/wazuh-docker && sudo chmod -R u+rxw /opt/wazuh-docker
+sudo chown -R $USER: /opt/wazuh-docker && sudo chmod -R 774 /opt/wazuh-docker
 
 # Verify this with
 ls -lah 
