@@ -56,11 +56,25 @@ pwd
 
 We have created a Docker image to automate certificate generation using the Wazuh certs gen tool.
 
-If your system uses a proxy, add the following to the generate-indexer-certs.yml file. If not, skip this particular step:
+If your system uses a proxy, add the following to the generate-indexer-certs.yml file.
+
 ```
 environment:
   - HTTP_PROXY=YOUR_PROXY_ADDRESS_OR_DNS
 ```
+
+To do this, go to:
+```
+nano generate-indexer-certs.yml
+```
+Paste this at the bottom of the file
+```
+...
+environment:
+  - HTTP_PROXY=domain.com
+```
+**Make sure your indentation is correct**
+**You can check your yaml syntax at: `https://www.yamllint.com/`**
 
 The complete example looks like:
 ```
