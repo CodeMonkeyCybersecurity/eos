@@ -69,9 +69,8 @@ nano generate-indexer-certs.yml
 ```
 Paste this at the bottom of the file
 ```
-...
-environment:
-  - HTTP_PROXY=domain.com
+    environment:
+      - HTTP_PROXY=wazuh.domain.com
 ```
 **Make sure your indentation is correct**
 **You can check your yaml syntax at: `https://www.yamllint.com/`**
