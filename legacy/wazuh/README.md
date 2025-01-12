@@ -65,7 +65,7 @@ environment:
 
 To do this, go to:
 ```
-cd /opt/wazuh-docker/single-node
+cd $HOME/wazuh-docker/single-node
 nano generate-indexer-certs.yml
 ```
 Paste this at the bottom of the file
@@ -169,7 +169,7 @@ I also recommend adjusting the `docker-compose.yml` file to expose the desktop v
 
 To do this, open up docker-compose.yml:
 ```
-cd /opt/wazuh-docker/single-node
+cd $HOME/wazuh-docker/single-node
 nano docker-compose.yml
 ```
 
@@ -212,7 +212,7 @@ And change it to
 ### Start up wazuh in docker
 Start it up 
 ```
-cd /opt/wazuh-docker/single-node
+cd $HOME/wazuh-docker/single-node
 docker compose up -d
 ```
 
