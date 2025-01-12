@@ -135,6 +135,7 @@ sudo ufw enable
 
 #### Less likely to run into issues, but also less secure
 ```
+# check current status
 sudo ufw status
 
 # for ssh
