@@ -37,39 +37,20 @@ docker run hello-world
 ## For a single node deployment 
 Up to date instructions are available at https://documentation.wazuh.com/current/deployment-options/docker/index.html
 
-### Navigate to a good install directory and clone the repository
-You will need change to root user 
+### Navigate to your home directory and clone the repository
+Clone the repo into a good directory to install it:
 ```
-sudo -i
-```
-
-Then clone the repo into a good directory to install it:
-```
-cd /opt
+cd $HOME
 git clone https://github.com/wazuh/wazuh-docker.git -b v4.10.0
-cd wazuh-docker/single-node
+cd $HOME/wazuh-docker/single-node
 
-# verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node
+# verify the present working direcotry (pwd) is cd $HOME/wazuh-docker/single-node
 pwd
-echo "verify the present working direcotry (pwd) is /opt/wazuh-docker/single-node"
+echo "verify the present working direcotry (pwd) is cd $HOME/wazuh-docker/single-node"
 ```
 
-If that is all good, exit out of being root user
-```
-exit
-```
+This install location assumes you will be the one administering the wazuh install.
 
-Change the permissions in the /opt/wazuh-docker directory to be yours (assuming you will be the one administering the wazuh install)
-```
-# Change to you owning it 
-sudo chown -R $USER: /opt/wazuh-docker &&
-
-# change fo it to be rwx for you, wrx for your group, and only readable to everyone else
-sudo chmod -R 774 /opt/wazuh-docker
-
-# Verify this with
-ls -lah /opt/wazuh-docker
-```
 
 ### Generate self-signed certificates for each cluster node.
 
@@ -114,24 +95,69 @@ services:
 
 Create the desired certificates:
 ```
+cd $HOME/wazuh-docker/single-node
 docker compose -f generate-indexer-certs.yml run --rm generator
 ```
 
 ### Exposing the correct ports on the backed 
 Make sure your tailscale network is up on your computer, your backend server, and your reverse proxy.
 
-To allow the appropriate firewall rules:
+#### To allow the appropriate firewall rules (recommended approach):
+```
+# check current status
+sudo ufw status
+
+# for ssh
+sudo ufw allow from <your tailscale IP> to any port 22 # recommended
+
+# for web server 
+sudo ufw allow from <reverse proxy tailscale IP> to any port 80,443 # recommended
+
+# for wazuh
+sudo ufw allow from <reverse proxy tailscale IP> to any port 1514,1515,5601,55000,9200 # recommended
+
+# reload the firewall
+sudo ufw reload
+
+# check current status
+sudo ufw status
+```
+
+check that has all worked
+```
+sudo ufw status
+```
+
+If it has, enable the ufw 
+```
+sudo ufw enable
+```
+
+#### Less likely to run into issues, but also less secure
 ```
 sudo ufw status
 
 # for ssh
-sudo ufw allow from <your tailscale IP> to any port 22
+sudo ufw allow 22
 
 # for web server 
-sudo ufw allow from <reverse proxy tailscale IP> to any port 80,443
+sudo ufw allow 80,443
 
 # for wazuh
-sudo ufw allow from <reverse proxy tailscale IP> to any port 1514,1515,5601,55000,9200
+sudo ufw allow 1514,1515,5601,55000,9200
+
+# reload the firewall
+sudo ufw reload
+```
+
+check that has all worked
+```
+sudo ufw status
+```
+
+If it has, enable the ufw 
+```
+sudo ufw enable
 ```
 
 ### Adjusting the default `docker-compose.yml`
