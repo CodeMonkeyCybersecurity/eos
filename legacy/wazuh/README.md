@@ -73,7 +73,8 @@ Paste this at the bottom of the file
       - HTTP_PROXY=wazuh.domain.com
 ```
 **Make sure your indentation is correct**
-**You can check your yaml syntax at: `https://www.yamllint.com/`**
+
+You can check your yaml syntax at: `https://www.yamllint.com/`
 
 The complete example looks like:
 ```
