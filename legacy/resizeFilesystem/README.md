@@ -3,7 +3,7 @@ To expand the `ubuntu--vg-ubuntu--lv` logical volume to use the full xxxGB of sp
 
 ## 1. Check the current size of the logical volume (LV):
 ```
-df -h /
+df -h
 sudo lvdisplay
 ```
 
