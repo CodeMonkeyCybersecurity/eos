@@ -33,8 +33,8 @@ Check that the logical volume and filesystem have been resized successfully:
 df -h /
 sudo lvdisplay
 ```
-Notes:
-	•	Replace /dev/ubuntu-vg/ubuntu-lv with the correct logical volume path if it differs in your setup.
-	•	The above commands do not require unmounting the filesystem, as you’re resizing the root filesystem while it’s in use.
 
-Let me know if you encounter any issues!
+Notes:
+* Replace /dev/ubuntu-vg/ubuntu-lv with the correct logical volume path if it differs in your setup.
+* The above commands do not require unmounting the filesystem, as you’re resizing the root filesystem while it’s in use.
+
