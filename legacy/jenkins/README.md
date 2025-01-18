@@ -1,7 +1,9 @@
 # Installing Jenkins
 
+## If you haven't already, [install docker](https://github.com/CodeMonkeyCybersecurity/eos/tree/main/legacy/docker)
+
 ## Take a [docker-compose](https://github.com/jenkinsci/docker/blob/master/README.md) image
-For example, from 
+For example: 
 ```
 services:
   jenkins:
@@ -16,4 +18,25 @@ volumes:
   jenkins_home:
 ```
 
+## Create a directory to install it locally 
+```
+mkdir -p $HOME/opt/jenkins
+nano $HOME/jenkins/docker-compose.yaml
+```
 
+Paste the docker compose configuration given above, then save and exit
+
+## start up Jenkins 
+```
+cd /$HOME/jenkins
+docker compose up -d
+```
+
+## verify it's installed properly
+Check the docker image
+```
+docker ps
+```
+
+Then try to access it via the brower 
+``` <hostname>:9080 ```
