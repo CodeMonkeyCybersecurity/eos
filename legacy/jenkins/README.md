@@ -20,7 +20,7 @@ volumes:
 
 ## Create a directory to install it locally 
 ```
-mkdir -p $HOME/opt/jenkins
+mkdir -p $HOME/jenkins
 nano $HOME/jenkins/docker-compose.yaml
 ```
 
