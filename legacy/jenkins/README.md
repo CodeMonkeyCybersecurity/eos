@@ -28,7 +28,7 @@ Paste the docker compose configuration given above, then save and exit
 
 ## start up Jenkins 
 ```
-cd /$HOME/jenkins
+cd $HOME/jenkins
 docker compose up -d
 ```
 
