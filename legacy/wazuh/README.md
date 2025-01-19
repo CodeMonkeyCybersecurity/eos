@@ -1,42 +1,18 @@
 # Installing Wazuh on a local backend in a docker container
-This is how to install Wazuh in a docker container in a way that, once a remote reverse proxy is set up, will be accessible from the internet 
+This is how to install Wazuh in a docker container in a way that, once a remote reverse proxy is set up, will be accessible from the internet. If you are wanting to expose Wazuh to the internet, these instructions need to be read alongside the [hecate reverse proxy instructions](https://github.com/CodeMonkeyCybersecurity/hecate.git).
+
+Up to date instructions for all of this are available [on Wazuh's website](https://documentation.wazuh.com/current/deployment-options/docker/index.html).
 
 ## Make sure docker is installed
-**If docker is already installed, you can skip these instructions**
+**If docker is not installed, you can follow [these](https://github.com/CodeMonkeyCybersecurity/eos/tree/main/legacy/docker) instructions**
 
-* Increase max_map_count on your Docker host
+### Docker modification
+* Prior to installing Wazuh, you need to increase max_map_count on your Docker host
 ```
 sysctl -w vm.max_map_count=262144
 ```
 
-* I like installing docker via snap
-```
-sudo snap install docker
-```
-
-* You then need to complete the post install instructions for docker:
-Instructions for the post-install steps for docker are from here https://docs.docker.com/engine/install/linux-postinstall/
-
-```
-# To create the docker group and add your user:
-# Create the docker group.
-sudo groupadd docker
-
-# Add your user to the docker group.
-sudo usermod -aG docker $USER
-
-#You can also run the following command to activate the changes to groups:
-newgrp docker
-```
-
-Verify that you can run docker commands without sudo.
-```
-docker run hello-world 
-```
-
 ## For a single node deployment 
-Up to date instructions are available at https://documentation.wazuh.com/current/deployment-options/docker/index.html
-
 ### Navigate to your home directory and clone the repository
 Clone the repo into a good directory to install it:
 ```
@@ -49,14 +25,16 @@ pwd
 echo "verify the present working direcotry (pwd) is cd $HOME/wazuh-docker/single-node"
 ```
 
-This install location assumes you will be the one administering the wazuh install.
+This install location assumes you will be the one administering the wazuh install because it is being installed in your home directory.
 
 
 ### Generate self-signed certificates for each cluster node.
 
 We have created a Docker image to automate certificate generation using the Wazuh certs gen tool.
 
-If your system uses a proxy, add the following to the generate-indexer-certs.yml file.
+If your system uses a proxy (such as [hecate](https://github.com/CodeMonkeyCybersecurity/hecate.git)) , add the following to the generate-indexer-certs.yml file.
+
+As a reminder, if you are using Wazuh alongside other web applications, you need to install wazuh on a subdomain. For example, if your main domain is `domain.com`, wazuh will need to be on a subdomain such as `wazuh.domain.com`. If you want to install it in a location like domain.com/wazuh, you need to rewite a whole bunch of javascript. [Hecate](https://github.com/CodeMonkeyCybersecurity/hecate.git) provides a template for installing Wazuh fairly painlessly.
 
 ```
 environment:
@@ -73,9 +51,8 @@ Paste this at the bottom of the file
     environment:
       - HTTP_PROXY=wazuh.domain.com
 ```
-**Make sure your indentation is correct**
 
-You can check your yaml syntax at: `https://www.yamllint.com/`
+You can check your yaml syntax [here](https://www.yamllint.com/).
 
 The complete example looks like:
 ```
@@ -90,7 +67,7 @@ services:
       - ./config/wazuh_indexer_ssl_certs/:/certificates/
       - ./config/certs.yml:/config/certs.yml
     environment:
-      - HTTP_PROXY=domain.com
+      - HTTP_PROXY=wazuh.domain.com
 ```
 
 Create the desired certificates:
@@ -175,6 +152,7 @@ nano docker-compose.yml
 
 Navigate to this section
 ```
+...
   wazuh.dashboard:
     image: wazuh/wazuh-dashboard:4.10.0
     hostname: wazuh.dashboard
@@ -189,10 +167,12 @@ Navigate to this section
       - DASHBOARD_PASSWORD=kibanaserver
       - API_USERNAME=wazuh-wui
       - API_PASSWORD=MyS3cr37P450r.*-
+...
 ```
 
 And change it to 
 ```
+...
   wazuh.dashboard:
     image: wazuh/wazuh-dashboard:4.10.0
     hostname: wazuh.dashboard
@@ -207,6 +187,7 @@ And change it to
       - DASHBOARD_PASSWORD=kibanaserver
       - API_USERNAME=wazuh-wui
       - API_PASSWORD=MyS3cr37P450r.*-
+...
 ```
 
 ### Start up wazuh in docker
@@ -222,13 +203,14 @@ Check the docker containers are running
 docker ps
 ```
 
+### Access via the browser
 Access wazuh instance locally via browser: `https://<backend tailscale IP>:5601`
 
 You should see your Wazuh login page available here.
 
 ### Securing your install
 #### The oldest vulnerability in the world is default credentials, so make sure you change them
-Please see the Wazuh documentation at: https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html for changing default passwords etc.
+Please see the Wazuh documentation [here](https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html) for changing default passwords etc.
 
 #### Install fail2ban
 ```
@@ -241,6 +223,10 @@ sudo apt install fail2ban
 Once you expose your install via reverse proxy it is exposed to the internet.
 The internet is a wild place AND IF YOU DONT SECURE IT PROPERLY YOU ARE POTENTIALLY INVITING THE WHOLE INTERNET INTO YOUR LOCAL LAN. NOT A GOOD IDEA.
 
-If you are comfortable with the security of your install, proceed to enabling the reverse proxy by going to our reverse proxy repo https://github.com/CodeMonkeyCybersecurity/hecate
+If you are comfortable with the security of your install, proceed to enabling the reverse proxy by going to our reverse proxy repo, [Hecate](https://github.com/CodeMonkeyCybersecurity/hecate).
+
+If you are going to do this, please make sure to change the default passwords *before* eposing it to the internet. For how to do this, please see [post install steps](https://github.com/CodeMonkeyCybersecurity/eos/edit/main/legacy/wazuh/postInstallSteps.md).
+
+
 
 
