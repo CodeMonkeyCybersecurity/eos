@@ -228,5 +228,14 @@ If you are comfortable with the security of your install, proceed to enabling th
 If you are going to do this, please make sure to change the default passwords *before* eposing it to the internet. For how to do this, please see [post install steps](https://github.com/CodeMonkeyCybersecurity/eos/edit/main/legacy/wazuh/postInstallSteps.md).
 
 
+### Exposed ports
+By default, the stack exposes the following ports:
 
-
+| Port | Protocol   |       
+| ------| ----------- |
+1514    | Wazuh TCP |
+1515    | Wazuh TCP |
+514     | Wazuh UDP |
+55000   | Wazuh API |
+9200    | Wazuh indexer HTTPS |
+443     | Wazuh dashboard HTTPS |
