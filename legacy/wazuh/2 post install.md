@@ -289,7 +289,9 @@ hosts:
 ```
 
 Open the `docker-compose.yml` file. Change all occurrences of the old password with the new one.
-```nano docker-compose.yml```
+```
+nano docker-compose.yml
+```
 
 ```
 ...
