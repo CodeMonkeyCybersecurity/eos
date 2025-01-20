@@ -323,10 +323,9 @@ services:
 ```
 
 Recreate the Wazuh containers:
-
 ```
-docker-compose down
-docker-compose up -d
+docker compose down
+docker compose up -d
 ```
 
 ### Note 
