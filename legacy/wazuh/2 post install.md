@@ -6,7 +6,7 @@ Thank you to Wazuh for these [instructions](https://documentation.wazuh.com/curr
 
 There are three default users whose passwords we need to change:
 * Wazuh indexer users `admin` and `kibanaserver`
-* Wazuh API user `wazuh-wui`
+* Wazuh API user ``wazuh-wui` `
 
 Again, thank you to Wazuh for the effort they put into their [documentation](https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html).
 
@@ -120,7 +120,7 @@ services:
       - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
       - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
       - SSL_KEY=/etc/ssl/filebeat.key
-      - API_USERNAME=wazuh-wui
+      - API_USERNAME=`wazuh-wui` 
       - API_PASSWORD=MyS3cr37P450r.*-
   ...
   wazuh.indexer:
@@ -253,10 +253,13 @@ Before exitting the Wazuh indexer container.
 
 
 ### Wazuh API users
-The wazuh-wui user is the user to connect with the Wazuh API by default. Follow these steps to change the password.
+The `wazuh-wui` user is the user to connect with the Wazuh API by default. Follow these steps to change the password.
 
 Note The password for Wazuh API users must be between 8 and 64 characters long. It must contain at least one uppercase and one lowercase letter, a number, and a symbol.
 Open the file config/wazuh_dashboard/wazuh.yml and modify the value of password parameter.
+```
+nano config/wazuh_dashboard/wazuh.yml
+```
 
 ```
 ...
@@ -286,7 +289,7 @@ services:
       - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
       - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
       - SSL_KEY=/etc/ssl/filebeat.key
-      - API_USERNAME=wazuh-wui
+      - API_USERNAME=`wazuh-wui` 
       - API_PASSWORD=MyS3cr37P450r.*-
   ...
   wazuh.dashboard:
@@ -297,7 +300,7 @@ services:
       - WAZUH_API_URL=https://wazuh.manager
       - DASHBOARD_USERNAME=kibanaserver
       - DASHBOARD_PASSWORD=kibanaserver
-      - API_USERNAME=wazuh-wui
+      - API_USERNAME=`wazuh-wui` 
       - API_PASSWORD=MyS3cr37P450r.*-
   ...
 ```
