@@ -19,7 +19,7 @@ cd $HOME/wazuh-docker/multi-node
 #### Set a new hash
 Stop the deployment stack if it’s running:
 ```
-docker-compose down
+docker compose down
 ```
 
 ** Wazuh advises not to use the $ or & characters in your new password. These characters can cause errors during deployment. **  (see below)
@@ -264,7 +264,6 @@ Before exitting the Wazuh indexer container.
 exit
 ```
 
-
 ### Wazuh API users
 The last default credentials we need to change are the default API credentials
 
@@ -273,6 +272,7 @@ The `wazuh-wui` user is the user to connect with the Wazuh API by default. Follo
 Note The password for Wazuh API users must be between 8 and 64 characters long. It must contain at least one uppercase and one lowercase letter, a number, and a symbol.
 Open the file config/wazuh_dashboard/wazuh.yml and modify the value of password parameter.
 ```
+cd $HOME/wazuh-docker/multi-node
 nano config/wazuh_dashboard/wazuh.yml
 ```
 
@@ -283,7 +283,7 @@ hosts:
       url: "https://wazuh.manager"
       port: 55000
       username: wazuh-wui
-      password: "MyS3cr37P450r.*-"
+      password: "MyS3cr37P450r.*-" # Replace this
       run_as: false
 ...
 ```
@@ -299,24 +299,24 @@ services:
     environment:
       - INDEXER_URL=https://wazuh.indexer:9200
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecretPassword
+      - INDEXER_PASSWORD=ThisWillBeThePlainTextPasswordYouSetEarlier
       - FILEBEAT_SSL_VERIFICATION_MODE=full
       - SSL_CERTIFICATE_AUTHORITIES=/etc/ssl/root-ca.pem
       - SSL_CERTIFICATE=/etc/ssl/filebeat.pem
       - SSL_KEY=/etc/ssl/filebeat.key
       - API_USERNAME=`wazuh-wui` 
-      - API_PASSWORD=MyS3cr37P450r.*-
+      - API_PASSWORD=MyS3cr37P450r.*- # Replace this
   ...
   wazuh.dashboard:
     ...
     environment:
       - INDEXER_USERNAME=admin
-      - INDEXER_PASSWORD=SecretPassword
+      - INDEXER_PASSWORD=ThisWillBeThePlainTextPasswordYouSetEarlier
       - WAZUH_API_URL=https://wazuh.manager
       - DASHBOARD_USERNAME=kibanaserver
-      - DASHBOARD_PASSWORD=kibanaserver
+      - DASHBOARD_PASSWORD=ThisIsTheOtherPasswordYouSetEarlier
       - API_USERNAME=`wazuh-wui` 
-      - API_PASSWORD=MyS3cr37P450r.*-
+      - API_PASSWORD=MyS3cr37P450r.*- # Replace this
   ...
 ```
 
