@@ -30,6 +30,7 @@ To do this, you will need the current version number in this format `<x.y.z>`. A
 ```
 docker ps
 ```
+
 Produces something like:
 ```
 ...
@@ -53,7 +54,7 @@ read -p "What is the current version number (in format x.y.z)?: " WAZUH_VERS
 docker run --rm -ti wazuh/wazuh-indexer:${WAZUH_VERS} bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh
 ```
 #### Copy the generated hash
-
+You will need to paste it into the next step.
 
 ##### Password complexity issues 
 A side note:
@@ -82,10 +83,6 @@ nano config/wazuh_indexer/internal_users.yml
 ```
 
 * `admin` user
-```
-nano docker-compose.yml
-```
-
 ```
 ...
 admin:
@@ -150,7 +147,7 @@ Run docker ps and note the name of the first Wazuh indexer container. For exampl
 
 Run `docker exec -it <WAZUH_INDEXER_CONTAINER_NAME> bash` to enter the container. For example:
 ```
-docker exec -it single-node-wazuh.indexer-1 bash
+docker exec -it multi-node-wazuh1.indexer-1 bash
 ```
 
 Set the following variables:
@@ -171,11 +168,15 @@ bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh
 ```
 
 Exit the Wazuh indexer container.
-```exit```
+```
+exit
+```
 
 You should now see your normal shell, something like:
 ```
+...
 user@hostname:~$
+...
 ```
 
 Now, login with the new credentials on the Wazuh dashboard. Verify they work before moving on.
@@ -197,7 +198,8 @@ Copy the generated hash.
 
 * `kibanaserver` user
 ```
-nano docker-compose.yml
+cd $HOME/wazuh-docker/multi-node
+nano config/wazuh_indexer/internal_users.yml
 ```
 
 ```
@@ -210,6 +212,11 @@ kibanaserver:
 ```
 
 #### Set the new password
+```
+cd $HOME/wazuh-docker/multi-node
+nano docker-compose.yml
+```
+
 ```
 ...
 services:
@@ -233,7 +240,9 @@ docker compose up -d
 ```
 
 Because we're repeating the exact same steps as before, we 
-```docker exec -it single-node-wazuh.indexer-1 bash```
+```
+docker exec -it multi-node-wazuh1.indexer-1 bash
+```
 
 We set these again:
 ```
@@ -244,17 +253,21 @@ CERT=$INSTALLATION_DIR/certs/admin.pem
 export JAVA_HOME=/usr/share/wazuh-indexer/jdk
 ```
 
-Wait for the Wazuh indexer to initialize properly again for its two-five mins. Then:
+Wait for the Wazuh indexer to initialize properly again for its two-five mins. Then again in the docker container:
 ```
 HOST=$(grep node.name $INSTALLATION_DIR/opensearch.yml | awk '{printf $2}')
 bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -cd /usr/share/wazuh-indexer/opensearch-security/ -nhnv -cacert  $CACERT -cert $CERT -key $KEY -p 9200 -icl -h $HOST
 ```
 
 Before exitting the Wazuh indexer container.
-```exit```
+```
+exit
+```
 
 
 ### Wazuh API users
+The last default credentials we need to change are the default API credentials
+
 The `wazuh-wui` user is the user to connect with the Wazuh API by default. Follow these steps to change the password.
 
 Note The password for Wazuh API users must be between 8 and 64 characters long. It must contain at least one uppercase and one lowercase letter, a number, and a symbol.
