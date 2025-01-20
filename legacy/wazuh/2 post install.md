@@ -328,5 +328,12 @@ docker compose down
 docker compose up -d
 ```
 
+Check everything still works 
+```
+docker ps
+```
+
+And log in via the browser and check everything is still working
+
 ### Note 
 Docker doesn’t reload the configuration dynamically. You need to restart the stack after changing the configuration of a component.
