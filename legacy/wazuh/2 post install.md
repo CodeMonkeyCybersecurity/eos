@@ -149,7 +149,9 @@ docker compose up -d
 Run docker ps and note the name of the first Wazuh indexer container. For example, `multi-node-wazuh1.indexer-1`.
 
 Run `docker exec -it <WAZUH_INDEXER_CONTAINER_NAME> bash` to enter the container. For example:
-```docker exec -it single-node-wazuh.indexer-1 bash```
+```
+docker exec -it single-node-wazuh.indexer-1 bash
+```
 
 Set the following variables:
 ```
