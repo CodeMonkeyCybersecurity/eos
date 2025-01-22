@@ -1,4 +1,4 @@
-# Change default usernames
+# Change default passwords
 
 Now we have installed Wazuh, we need to change the default passwords and verify it's working correctly before [exposing it to the internet](https://github.com/CodeMonkeyCybersecurity/hetcate.git).
 
