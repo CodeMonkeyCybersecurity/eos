@@ -101,5 +101,5 @@ docker exec -it single-node-wazuh.manager-1 bash
 
 Every change made on this shell persists as long as you have the data volumes configured correctly.
 
-Next: [Upgrading Wazuh Docker]("https://github.com/CodeMonkeyCybersecurity/eos/edit/main/bash/wazuh/4_upgrading_wazuh_docker.md")
+Next: [Upgrading Wazuh Docker](https://github.com/CodeMonkeyCybersecurity/eos/blob/main/bash/wazuh/4_upgrading_wazuh_docker.md)
 
