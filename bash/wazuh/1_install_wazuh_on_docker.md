@@ -241,4 +241,4 @@ By default, the stack exposes the following ports:
 443     | Wazuh dashboard HTTPS |
 
 
-Next: [Change default passwords](https://github.com/CodeMonkeyCybersecurity/eos/edit/main/bash/wazuh/2_change_default_passwds.md)
+Next: [Change default passwords](https://github.com/CodeMonkeyCybersecurity/eos/blob/main/bash/wazuh/2_change_default_passwds.md)
