@@ -1,5 +1,5 @@
 ## Upgrading Wazuh Docker
-Official instructions [here](https://documentation.wazuh.com/current/deployment-options/docker/upgrading-wazuh-docker.html#keeping-custom-docker compose-files)
+Official instructions [here](https://documentation.wazuh.com/current/deployment-options/docker/upgrading-wazuh-docker.html#keeping-custom-docker-compose-files)
 
 This section describes how to upgrade your Wazuh Docker deployment, starting from version 4.3.
 
@@ -48,7 +48,6 @@ And update this value
 uiSettings.overrides.defaultRoute: /app/wz-home
 ```
 
-
 Modify the `OPENSEARCH_JAVA_OPTS` environment variable to allocate more RAM to the Wazuh indexer container.
 
 Multi node deployment
@@ -72,14 +71,16 @@ services:
       image: wazuh/wazuh-certs-generator:0.0.2
 ```
 
-After these changes, recreate the certificates.
+After these steps, if you needed to make changes, you need to recreate the certificates.
+
+If you didn't make any changes, you don't need to recreate certificates.
 ```
 docker compose -f generate-indexer-certs.yml run --rm generator
 ```
 
 If you are upgrading from 4.3, update old paths with the new ones.
 
-Single node deploymentMulti node deployment
+Multi node deployment
 Wazuh dashboard
 
 Edit multi-node/config/wazuh_dashboard/opensearch_dashboards.yml and do the following replacements.
