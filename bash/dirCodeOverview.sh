@@ -15,8 +15,13 @@ if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     usage
 fi
 
-# Set the directory path; default to current directory if not provided
-DIR_PATH="${1:-.}"
+# Set the directory path; prompt if not provided
+if [ -z "$1" ]; then
+    read -rp "Enter the directory path to process (default: current directory): " input_dir
+    DIR_PATH="${input_dir:-.}"
+else
+    DIR_PATH="$1"
+fi
 
 # Verify that the provided path exists and is a directory
 if [ ! -d "$DIR_PATH" ]; then
@@ -25,9 +30,8 @@ if [ ! -d "$DIR_PATH" ]; then
 fi
 
 # Define the output file name based on the provided directory
-# Replace slashes with underscores to create a valid file name
 SAFE_DIR_NAME=$(echo "$DIR_PATH" | tr '/' '_')
-OUTPUT_FILE="$(date)_$(hostname)_dirCodeOverview${SAFE_DIR_NAME}.txt"
+OUTPUT_FILE="website_code_overview_${SAFE_DIR_NAME}.txt"
 
 # Add a header with the directory path
 echo "===== Directory Structure for '$DIR_PATH' =====" > "$OUTPUT_FILE"
@@ -42,11 +46,9 @@ echo "===== File Contents =====" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"
 
 # Find all files and append their contents with headers
-# Adjust the find command to start from the specified directory
 find "$DIR_PATH" -type f ! -path "*/node_modules/*" ! -path "*/.git/*" | while read -r file; do
     echo "----- $file -----" >> "$OUTPUT_FILE"
     echo "" >> "$OUTPUT_FILE"
-    # Ensure binary files are skipped to avoid corrupting the output
     if file "$file" | grep -qv 'binary'; then
         cat "$file" >> "$OUTPUT_FILE"
     else
