@@ -236,7 +236,7 @@ By default, the stack exposes the following ports:
 1514    | Wazuh TCP |
 1515    | Wazuh TCP |
 514     | Wazuh UDP |
-55000   | Wazuh API |
+55000   | Wazuh API (TCP) |
 9200    | Wazuh indexer HTTPS |
 443     | Wazuh dashboard HTTPS |
 
