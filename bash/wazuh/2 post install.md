@@ -342,3 +342,5 @@ And log in via the browser and check everything is still working
 
 ### Note 
 Docker doesn’t reload the configuration dynamically. You need to restart the stack after changing the configuration of a component.
+
+Next: [Docker utilities](https://github.com/CodeMonkeyCybersecurity/eos/edit/main/bash/wazuh/3_docker_utilities.md)
