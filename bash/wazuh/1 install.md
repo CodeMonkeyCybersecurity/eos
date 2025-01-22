@@ -239,3 +239,6 @@ By default, the stack exposes the following ports:
 55000   | Wazuh API |
 9200    | Wazuh indexer HTTPS |
 443     | Wazuh dashboard HTTPS |
+
+
+Next: [Change default passwords](https://github.com/CodeMonkeyCybersecurity/eos/edit/main/bash/wazuh/2_change_default_passwds.md)
