@@ -271,6 +271,11 @@ The `wazuh-wui` user is the user to connect with the Wazuh API by default. Follo
 
 Note The password for Wazuh API users must be between 8 and 64 characters long. It must contain at least one uppercase and one lowercase letter, a number, and a symbol.
 Open the file config/wazuh_dashboard/wazuh.yml and modify the value of password parameter.
+
+Remeber, we still need to avoid the “$” and “&” characters in new passwords stems from the way these symbols will be treated as valiables or commands.
+
+This is a security hole I am following them up to fix.
+
 ```
 cd $HOME/wazuh-docker/multi-node
 nano config/wazuh_dashboard/wazuh.yml
