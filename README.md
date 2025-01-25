@@ -206,7 +206,7 @@ echo "All arguments: $@"
 #	•	cron: Schedule jobs.
 ```
 
-## Complaints, compliments, confusion and other communications:
+# Complaints, compliments, confusion:
 
 Secure email: [git@cybermonkey.net.au](mailto:git@cybermonkey.net.au)  
 
