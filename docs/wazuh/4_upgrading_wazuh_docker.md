@@ -55,8 +55,10 @@ Multi node deployment
 nano multi-node/docker compose.yml
 ```
 ```
+...
 environment:
 - "OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g"
+...
 ```
 
 Modify the the tag of image generator.
@@ -66,51 +68,28 @@ Multi node deployment
 nano multi-node/generate-indexer-certs.yml
 ```
 ```
+...
 services:
    generator:
       image: wazuh/wazuh-certs-generator:0.0.2
+...
 ```
 
 After these steps, if you needed to make changes, you need to recreate the certificates.
-
 If you didn't make any changes, you don't need to recreate certificates.
 ```
 docker compose -f generate-indexer-certs.yml run --rm generator
 ```
 
-If you are upgrading from 4.3, update old paths with the new ones.
+If you are upgrading from 4.3, update old paths with the new ones. See wazuh's documentation linked above
+
+Edit the docker-compose.yml file corresponding to your deployment type. Modify the highlighted lines and add the variable related to the kibanaserver user with the corresponding value.
 
 Multi node deployment
-Wazuh dashboard
-
-Edit multi-node/config/wazuh_dashboard/opensearch_dashboards.yml and do the following replacements.
-
-Replace /usr/share/wazuh-dashboard/config/certs/ with /usr/share/wazuh-dashboard/certs/.
-
-Edit multi-node/docker compose.yml and do the following replacements.
-
-Replace /usr/share/wazuh-dashboard/config/certs/ with /usr/share/wazuh-dashboard/certs/.
-
-Wazuh indexer
-
-Edit multi-node/config/wazuh_indexer/wazuh1.indexer.yml, wazuh2.indexer.yml, and wazuh3.indexer.yml and do the following replacements.
-
-Replace /usr/share/wazuh-indexer/config/certs/ with /usr/share/wazuh-indexer/certs/.
-
-Replace ${OPENSEARCH_PATH_CONF}/certs/ with /usr/share/wazuh-indexer/certs/.
-
-Edit multi-node/docker compose.yml and do the following replacements.
-
-Replace /usr/share/wazuh-indexer/config/certs/ with /usr/share/wazuh-indexer/certs/.
-
-Replace /usr/share/wazuh-indexer/config/opensearch.yml with /usr/share/wazuh-indexer/opensearch.yml.
-
-Replace /usr/share/wazuh-indexer/plugins/opensearch-security/securityconfig/ with /usr/share/wazuh-indexer/opensearch-security/.
-
-Edit the docker compose.yml file corresponding to your deployment type. Modify the highlighted lines and add the variable related to the kibanaserver user with the corresponding value.
-
-Single node deploymentMulti node deployment
-
+```
+nano docker-compose.yml
+```
+```
 wazuh.master:
    image: wazuh/wazuh-manager:4.10.1
 ...
@@ -135,14 +114,22 @@ wazuh.master:
       - API_PASSWORD=MyS3cr37P450r.*-
       - DASHBOARD_USERNAME=kibanaserver
       - DASHBOARD_PASSWORD=kibanaserver
+```
 Replace the following files in your deployment with the ones from the v4.10.1 tag of the wazuh-docker repository.
 
 Single node deploymentMulti node deployment
-multi-node/config/wazuh_cluster/wazuh_manager.conf
-
+```
+cd $HOME/wazuh-docker/multi-node
+nano config/wazuh_cluster/wazuh_manager.conf
+```
+then,
+```
 multi-node/config/wazuh_cluster/wazuh_worker.conf
+```
 
 Start the new version of Wazuh using docker compose.
-
-
+```
 docker compose up -d
+```
+
+Next, FAQs 
