@@ -3,10 +3,10 @@ Official instructions [here](https://documentation.wazuh.com/current/deployment-
 
 This section describes how to upgrade your Wazuh Docker deployment, starting from version 4.3.
 
-To upgrade to version 4.10, you can follow one of two strategies.
+To upgrade to version `4.10.1`, you can follow one of two strategies.
 
 #### Using default docker compose files : 
-This strategy uses the default docker compose files for Wazuh 4.10. It replaces the docker compose files of your outdated Wazuh version.
+This strategy uses the default docker compose files for Wazuh `4.10.1`. It replaces the docker compose files of your outdated Wazuh version.
 
 #### Keeping custom docker compose files : 
 This strategy preserves the docker compose files of your outdated Wazuh deployment. It ignores the docker compose files of the latest Wazuh version.
