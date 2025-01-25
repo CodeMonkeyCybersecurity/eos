@@ -117,7 +117,7 @@ wazuh.master:
 ```
 Replace the following files in your deployment with the ones from the v4.10.1 tag of the wazuh-docker repository.
 
-Single node deploymentMulti node deployment
+Multi node deployment
 ```
 cd $HOME/wazuh-docker/multi-node
 nano config/wazuh_cluster/wazuh_manager.conf
