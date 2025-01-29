@@ -21,12 +21,19 @@
 go.work
 go.work.sum
 
-# Other
+# Secrets
 *.pem
 *.key
 *.env
+**/certs/
 
 # MacOS
 .DS_Store
 desktop.ini
 
+#Matomo
+**/config/
+**/logs/
+
+#Backups 
+*.bak
