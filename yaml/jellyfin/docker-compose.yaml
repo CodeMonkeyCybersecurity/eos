@@ -1,0 +1,12 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    ports:
+      - "8096:8096"        # Web interface
+      - "8920:8920"        # (Optional) HTTPS
+    volumes:
+      - ./config:/config    # Configuration files
+      - ./cache:/cache      # Cache
+      - ./media:/media      # Media library
+    restart: unless-stopped
