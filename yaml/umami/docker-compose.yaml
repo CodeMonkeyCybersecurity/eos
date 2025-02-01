@@ -1,0 +1,28 @@
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:latest
+    container_name: umami
+    ports:
+      - "3080:3000"  # Adjust if needed
+    environment:
+      # URL to connect to your PostgreSQL database
+      DATABASE_URL: "postgresql://umami:umami@db:5432/umami"
+      # Optional: Set the port Umami should listen on
+      PORT: "3000"
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  db:
+    image: postgres:13
+    container_name: umami-db
+    environment:
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: umami
+      POSTGRES_DB: umami
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  db_data:
