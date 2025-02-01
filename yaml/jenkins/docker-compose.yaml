@@ -3,10 +3,10 @@ services:
     image: jenkins/jenkins:lts
     ports:
       - "9080:8080"
+    restart: always
     volumes:
       - jenkins_home:/var/jenkins_home
   ssh-agent:
     image: jenkins/ssh-agent
 volumes:
   jenkins_home:
-    restart: always
