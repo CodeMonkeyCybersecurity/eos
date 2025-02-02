@@ -26,6 +26,7 @@ go.work.sum
 *.key
 *.env
 **/certs/
+*.gpg
 
 # MacOS
 .DS_Store
