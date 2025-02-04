@@ -32,9 +32,14 @@ go.work.sum
 .DS_Store
 desktop.ini
 
-#Matomo
+# Matomo
 **/config/
 **/logs/
 
-#Backups 
+# Backups 
 *.bak
+
+# Apps
+apps/mailcow/mailcow-dockerized/*
+apps/mattermost/docker/*
+apps/umami/umami/*
