@@ -88,6 +88,6 @@ old_BACKEND_PORT="- 443:5601"
 new_BACKEND_PORT="- 8011:5601"
 sed -i "s|${old_BACKEND_PORT}|${new_BACKEND_PORT}|g" docker-compose.yml
 
-docker-compose up -d
+docker compose up -d
 
 echo "finis"
