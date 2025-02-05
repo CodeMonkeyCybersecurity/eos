@@ -3,6 +3,11 @@
 
 generate_hash () {
     echo ""
+    echo "================================"
+    echo "         GENERATE HASH          "
+    echo "================================"
+    echo ""
+    echo ""
     echo "Once you press 'Enter', you will need to re-enter this password in the prompt that appears."
     echo "Make sure the passwords match exactly, if they do not, you won't be able to login."
     echo "After entering your password, a function will scramble your password and output a hash."
@@ -11,8 +16,6 @@ generate_hash () {
     echo "It can be helpful to paste this hash temporarily in your password manager while completing this step."
     echo ""
     read -p "Press 'Enter' to continue..."
-
-    docker compose down
     echo ""
     docker run --rm -ti wazuh/wazuh-indexer:${WZ_VERS} bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh
     echo ""
@@ -30,8 +33,6 @@ apply_user_changes () {
     read -p "Press 'Enter' to continue..."
     docker compose up -d
     echo ""
-
-    echo ""
     echo "================================"
     echo "         APPLY CHANGES          "
     echo "================================"
@@ -45,22 +46,53 @@ apply_user_changes () {
     echo "CERT=$INSTALLATION_DIR/certs/admin.pem"
     echo "export JAVA_HOME=/usr/share/wazuh-indexer/jdk"
     echo ""
-    echo "Paste it into the bash shell, press 'Enter', then wait 1-2mins"
+    echo "Paste it into the bash shell, press 'Enter', then WAIT TWO TO FIVE MINS"
     echo ""
-    echo "After this 1-2min wait, copy this code:"
+    echo "After this wait, copy this code:"
     echo ""
     echo "${APPLY_SCRIPT}"
     echo ""
-    echo "Paste them in the prompt, press 'Enter' again, and wait for the short process to complete"
+    echo "Paste it into the prompt, press 'Enter' again, and wait for the short process to complete"
     echo ""
     echo "After the process completes, type 'exit' to return to the main shell here."
     read -p "Press 'Enter' when you are ready..."
     echo ""
-    docker container exec -it "${INDEX_CONTAINER}" bash
+    docker exec -it "${INDEX_CONTAINER}" bash
 }
 
+echo ""
+echo "Hi!"
+echo ""
+echo "Before installing, we have some house keeping to do"
+echo ""
+read -p "Press 'Enter' to continue..."
+echo ""
+read -p "Type in the version number of the most recent Wazuh version then press 'Enter' (eg. 4.10.1): " WZ_VERS
+echo ""
+read -p "Is this a multi-node or single-node install? (type 1 for 'single-node' or 2 for 'multi-node'): " WZ_DEPL_TYPE
 
+if [ "$WZ_DEPL_TYPE" == "1" ]; then
+    DEPLOY_TYPE="single-node"
+    INDEX_CONTAINER="single-node-wazuh.indexer-1"
+    APPLY_SCRIPT="'bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -cd /usr/share/wazuh-indexer/opensearch-security/ -nhnv -cacert  $CACERT -cert $CERT -key $KEY -p 9200 -icl'"
+elif [ "$WZ_DEPL_TYPE" == "2" ]; then
+    DEPLOY_TYPE="multi-node"
+    INDEX_CONTAINER="multi-node-wazuh1.indexer-1"
+    APPLY_SCRIPT='HOST=$(grep node.name $INSTALLATION_DIR/opensearch.yml | awk '"'"'{printf $2}'"'"') \ 
+    bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -cd /usr/share/wazuh-indexer/opensearch-security/ -nhnv -cacert  $CACERT -cert $CERT -key $KEY -p 9200 -icl -h $HOST'
+else
+    echo "Invalid selection. Please run the script again and choose either 1 or 2."
+    exit 1
+fi
 
+echo ""
+echo "After you press 'Enter', we will temporarily bring Wazuh down. All your data will be preserved."
+echo ""
+read -p "Press 'Enter' to continue..."
+cd wazuh-docker/${DEPLOY_TYPE}
+docker compose down
+echo ""
+echo "Wazuh is off so now we can change the user credentials."
 echo ""
 echo "========================================="
 echo "    CHANGE DEFAULT CREDENTIALS:ADMIN     "
@@ -72,7 +104,6 @@ echo ""
 echo "Mark one of these as for the Admin user, one for your API, and one for your kibana dashboard user."
 echo ""
 read -p "Once this is done, press 'Enter' to continue..."
-
 echo ""
 echo "Now we need to change the default password for the Admin user."
 echo ""
