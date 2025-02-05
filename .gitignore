@@ -24,9 +24,12 @@ go.work.sum
 # Secrets
 *.pem
 *.key
-*.env
 **/certs/
 *.gpg
+
+# Environment
+*.conf
+*.env
 
 # MacOS
 .DS_Store
@@ -43,3 +46,4 @@ desktop.ini
 apps/mailcow/mailcow-dockerized/*
 apps/mattermost/docker/*
 apps/umami/umami/*
+apps/wazuh/wazuh-docker
