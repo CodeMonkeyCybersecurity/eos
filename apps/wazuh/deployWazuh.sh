@@ -43,13 +43,17 @@ apply_user_changes () {
     echo ""
     echo "Paste them in the prompt, press enter again, and wait 1-5mins for the changes to apply"
     echo "Once the process is completed, type 'exit' and press enter to return to the main terminal"
-    read -p "Press enter when you are ready..." 
+    read -p "Press enter when you are ready..."
 
     docker exec -it ${INDEX_CONTAINER} bash
 
     read -p "We now need to apply the changes we made. Press enter when you are ready..."
     bash -c "${APPLY_SCRIPT}"
 }
+
+echo "After you press enter, we will be deleting any old versions"
+echo -p "Press enter to continue..."
+sudo rm -rf wazuh-docker
 
 sudo sysctl -w vm.max_map_count=262144
 
