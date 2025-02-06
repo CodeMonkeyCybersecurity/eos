@@ -1,0 +1,13 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    volumes:
+      - ./data:/data
+    ports:
+      - "9123:9123"     # MinIO API port
+      - "8123:8123"     # MinIO Console port
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: changeme123!@#
+    command: server /data --console-address ":8123"
