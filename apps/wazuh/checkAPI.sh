@@ -80,7 +80,7 @@ WZ_API_PASSWD="$WZ_API_PASSWD"
 TOKEN="$TOKEN"
 EOF
 
-chmod 660 *.conf
+chmod 660 .*.conf
 echo ""
 echo "============="
 echo "    FINIS    "
