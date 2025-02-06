@@ -3,10 +3,10 @@
 import json
 from base64 import b64encode
 
-import requests  To install requests, use: pip install requests
+import requests  # To install requests, use: pip install requests
 import urllib3
 
-Configuration
+# Configuration
 endpoint = '/agents?select=lastKeepAlive&select=id&status=disconnected'
 
 protocol = config.get('protocol', 'https')
@@ -15,10 +15,10 @@ port = config.get('port', '55000')
 user = config.get('user')
 password = config.get('password')
 
-Disable insecure https warnings (for self-signed SSL certificates)
+# Disable insecure https warnings (for self-signed SSL certificates)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-Functions
+# Functions
 def get_response(request_method, url, headers, verify=False, body=None):
     """Get API result"""
     if body is None:
@@ -31,7 +31,7 @@ def get_response(request_method, url, headers, verify=False, body=None):
     else:
         raise Exception(f"Error obtaining response: {request_result.json()}")
 
-Variables
+# Variables
 base_url = f"{protocol}://{host}:{port}"
 login_url = f"{base_url}/security/user/authenticate"
 basic_auth = f"{user}:{password}".encode()
@@ -41,8 +41,8 @@ headers = {
            }
 headers['Authorization'] = f'Bearer {get_response("POST", login_url, headers)["data"]["token"]}'
 
-Request
+# Request
 response = get_response("GET", url=base_url + endpoint, headers=headers)
 
-WORK WITH THE RESPONSE AS YOU LIKE
+# WORK WITH THE RESPONSE AS YOU LIKE
 print(json.dumps(response, indent=4, sort_keys=True))
