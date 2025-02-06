@@ -6,6 +6,10 @@ from base64 import b64encode
 import requests  # To install requests, use: pip install requests
 import urllib3
 
+# Load configuration from file
+with open('config.json') as config_file:
+    config = json.load(config_file)
+
 # Configuration
 endpoint = '/agents?select=lastKeepAlive&select=id&status=disconnected'
 
