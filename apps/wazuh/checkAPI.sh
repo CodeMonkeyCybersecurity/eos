@@ -64,13 +64,6 @@ WZ_FQDN=$(prompt_input "WZ_FQDN" "Enter the Wazuh domain (eg. wazuh.domain.com):
 WZ_API_USR=$(prompt_input "WZ_API_USR" "Enter the API username (eg. wazuh-wui): ")
 WZ_API_PASSWD=$(prompt_input "WZ_API_PASSWD" "Enter the API passwd: ")
 
-# Save the values so future runs start with the same defaults
-cat <<EOF > "$LAST_VALUES_FILE"
-WZ_FQDN="$WZ_FQDN"
-WZ_API_USR="$WZ_API_USR"
-WZ_API_PASSWD="$WZ_API_PASSWD"
-EOF
-
 TOKEN=$(curl -u "${WZ_API_USR}:${WZ_API_PASSWD}" -k -X POST "https://${WZ_FQDN}:55000/security/user/authenticate?raw=true")
 
 echo ""
@@ -78,6 +71,14 @@ echo "Your JWT auth token is:"
 
 echo ""
 echo "$TOKEN"
+
+# Save the values so future runs start with the same defaults
+cat <<EOF > "$LAST_VALUES_FILE"
+WZ_FQDN="$WZ_FQDN"
+WZ_API_USR="$WZ_API_USR"
+WZ_API_PASSWD="$WZ_API_PASSWD"
+TOKEN="$TOKEN"
+EOF
 
 echo ""
 echo "============="
