@@ -1,6 +1,10 @@
 #!/bin/bash
 # removeWazuh.sh
 
+su 
+
+cd /opt
+
 cd wazuh-docker/multi-node
 docker compose down -v
 
