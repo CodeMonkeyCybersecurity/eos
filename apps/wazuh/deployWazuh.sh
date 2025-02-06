@@ -1,6 +1,15 @@
 #!/bin/bash
 # deployWazuh.sh
 
+su 
+cd /opt
+set -e
+
+echo ""
+echo "===================================="
+echo "  DEPLOY DELPHI (powered by Wazuh)  "
+echo "===================================="
+
 echo ""
 echo "Hi!"
 echo ""
@@ -74,7 +83,6 @@ read -p "Press 'Enter' to generate the indexer encryption certificates... "
 echo ""
 docker compose -f generate-indexer-certs.yml run --rm generator
 
-
 echo ""
 echo "================================"
 echo "     MAKE PORTS COMPATIBLE      "
@@ -90,4 +98,10 @@ sed -i "s|${old_BACKEND_PORT}|${new_BACKEND_PORT}|g" docker-compose.yml
 
 docker compose up -d
 
-echo "finis"
+chmod 660 *.conf
+echo ""
+echo "============="
+echo "    FINIS    "
+echo "============="
+
+set +e
