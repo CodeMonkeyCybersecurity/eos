@@ -19,6 +19,8 @@ password = config.get('password')
 TOKEN = os.environ.get("TOKEN")
 if not TOKEN:
     print("Error: Please set the TOKEN environment variable with your JWT token.")
+    print("")
+    print("Tip: run wazuh_api_authenticator.py")
     exit(1)
 
 # Build the URL for the user details endpoint
