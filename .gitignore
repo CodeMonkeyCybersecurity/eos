@@ -27,6 +27,9 @@ go.work.sum
 **/certs/
 *.gpg
 
+# data
+**/data/
+
 # Environment
 *.conf
 *.env
