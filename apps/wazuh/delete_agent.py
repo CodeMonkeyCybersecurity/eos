@@ -12,9 +12,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 with open('config.json') as config_file:
     config = json.load(config_file)
 
-protocol = config.get('protocol', 'https')
-host = config.get('host', 'localhost')
-port = config.get('port', '55000')
+protocol = config.get('protocol')
+host = config.get('host')
+port = config.get('port')
 user = config.get('user')
 password = config.get('password')
 
