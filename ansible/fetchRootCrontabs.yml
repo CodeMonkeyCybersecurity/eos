@@ -18,7 +18,7 @@
     - name: Ensure local directory for crontabs exists
       local_action:
         module: file
-        path: "/opt/crontabs"
+        path: "/opt/data/crontabs"
         state: directory
       run_once: true
       # run_once creates the directory on the control machine only once
@@ -28,5 +28,5 @@
       local_action:
         module: copy
         content: "{{ root_crontab.stdout | default('') }}"
-        dest: "/opt/crontabs/{{ inventory_hostname }}_root_crontab.txt"
+        dest: "/opt/data/crontabs/{{ inventory_hostname }}_root_crontab.txt"
       when: root_crontab.stdout is defined

@@ -1,0 +1,22 @@
+---
+- name: Collect local mail from remote hosts
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Ensure destination directory exists on controller
+      delegate_to: localhost
+      file:
+        path: /opt/data/mail
+        state: directory
+        mode: '0755'
+      run_once: true
+
+    - name: Fetch local mail directory from remote host
+      fetch:
+        src: /var/mail/
+        dest: /opt/data/mail/{{ inventory_hostname }}/
+        flat: no
+        recurse: yes
+        fail_on_missing: no
