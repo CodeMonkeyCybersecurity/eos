@@ -33,6 +33,8 @@ go.work.sum
 # Environment
 *.conf
 *.env
+*.ini
+
 
 # MacOS
 .DS_Store
