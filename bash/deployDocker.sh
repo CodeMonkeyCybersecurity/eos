@@ -1,8 +1,13 @@
 #!/bin/bash
 # deployDocker.sh
 
+echo ""
 echo "uninstalling conflicting packages"
 for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+
+echo ""
+echo "uninstalling docker if installed by snap"
+sudo snap remove docker
 
 echo "updating apt repos"
 sudo apt update 
