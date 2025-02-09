@@ -1,0 +1,15 @@
+---
+- name: Copy SSH public key to remote hosts
+  hosts: all
+  gather_facts: yes
+  vars:
+    # Change these variables as needed.
+    remote_user: "{{ ansible_user | default('youruser') }}"
+    # Path on the control machine where your public key is stored.
+    public_key_path: "{{ lookup('env','HOME') + '/.ssh/id_ed25519.pub' }}"
+  tasks:
+    - name: Add SSH public key to remote authorized_keys
+      authorized_key:
+        user: "{{ remote_user }}"
+        state: present
+        key: "{{ lookup('file', public_key_path) }}"

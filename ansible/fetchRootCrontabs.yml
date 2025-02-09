@@ -1,0 +1,32 @@
+---
+- name: Fetch root crontabs from remote hosts
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Get root's crontab
+      command: crontab -l
+      register: root_crontab
+      ignore_errors: yes
+      # If a host has no crontab, this command will fail; ignore_errors lets the play continue.
+
+    - name: Debug - Show crontab output (optional)
+      debug:
+        msg: "{{ root_crontab.stdout | default('No crontab for root') }}"
+  
+    - name: Ensure local directory for crontabs exists
+      local_action:
+        module: file
+        path: "/opt/crontabs"
+        state: directory
+      run_once: true
+      # run_once creates the directory on the control machine only once
+  
+    - name: Save the root crontab to a local file
+      delegate_to: localhost
+      local_action:
+        module: copy
+        content: "{{ root_crontab.stdout | default('') }}"
+        dest: "/opt/crontabs/{{ inventory_hostname }}_root_crontab.txt"
+      when: root_crontab.stdout is defined
