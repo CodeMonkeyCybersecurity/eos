@@ -3,7 +3,6 @@ services:
     image: netdata/netdata
     container_name: netdata
     pid: host
-    network_mode: host
     restart: unless-stopped
     ports:
       - "8179:2375"
