@@ -5,7 +5,7 @@ services:
     pid: host
     restart: unless-stopped
     ports:
-      - "8179:2375"
+      - "8179:19999"
     cap_add:
       - SYS_PTRACE
       - SYS_ADMIN
