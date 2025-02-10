@@ -47,7 +47,7 @@ def main():
     run_command("systemctl start clamav-freshclam", "Starting the freshclam service")
 
     # 5. Ask the user which directories to scan (default: /home)
-    default_dirs = "/home"
+    default_dirs = "/home,/tmp,/usr,/etc,/var,/dev,/opt,/srv"
     user_input = input(f"Enter directories to scan (comma separated) [Default: {default_dirs}]: ").strip()
     if user_input == "":
         scan_dirs = default_dirs
