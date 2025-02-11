@@ -10,7 +10,7 @@ def main():
     current_dir = os.getcwd()
     
     # Determine the name of the parent directory (last component of the parent path)
-    par_dir = os.path.basename(os.path.abspath(os.path.join(current_dir, os.pardir)))
+    par_dir = os.path.basename(current_dir)
     print(f"Parent directory name (PAR_DIR): {par_dir}")
 
     # Create the target directory in /opt
