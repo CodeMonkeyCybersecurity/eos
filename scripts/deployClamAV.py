@@ -46,7 +46,7 @@ def main():
     # 4. Restart the freshclam service
     run_command("systemctl start clamav-freshclam", "Starting the freshclam service")
 
-    # 5. Ask the user which directories to scan (default: /home)
+    # 5. Ask the user which directories to scan (default: /home,/tmp,/usr,/etc,/var,/dev,/opt,/srv)
     default_dirs = "/home,/tmp,/usr,/etc,/var,/dev,/opt,/srv"
     user_input = input(f"Enter directories to scan (comma separated) [Default: {default_dirs}]: ").strip()
     if user_input == "":
@@ -57,13 +57,13 @@ def main():
         scan_dirs = " ".join(dirs)
     print(f"[*] Directories to be scanned: {scan_dirs}")
 
-    # 6. Create the daily scan script
+    # 6. Create the daily scan script with freshclam update functionality
     daily_scan_path = "/usr/local/bin/daily_clamav_scan.sh"
     daily_scan_content = f"""#!/bin/bash
 #
 # daily_clamav_scan.sh
 #
-# This script scans the following directories:
+# This script updates the ClamAV virus definitions and scans the following directories:
 # {scan_dirs}
 LOGFILE="/var/log/clamav/daily_scan.log"
 
@@ -71,8 +71,13 @@ LOGFILE="/var/log/clamav/daily_scan.log"
 mkdir -p "$(dirname "$LOGFILE")"
 touch "$LOGFILE"
 
-echo "Starting ClamAV scan at $(date)" | tee -a "$LOGFILE"
+echo "Updating ClamAV virus definitions at $(date)" | tee -a "$LOGFILE"
+# Stop the freshclam service to avoid conflicts with manual update
+systemctl stop clamav-freshclam
+freshclam
+systemctl start clamav-freshclam
 
+echo "Starting ClamAV scan at $(date)" | tee -a "$LOGFILE"
 # Run ClamAV scan recursively on the specified directories.
 # The '--infected' flag logs only infected files.
 # The '--remove' flag automatically removes infected files.
