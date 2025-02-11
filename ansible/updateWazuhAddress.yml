@@ -1,0 +1,29 @@
+---
+- name: Update Wazuh address in ossec.conf if needed
+  hosts: all
+  become: yes
+  tasks:
+
+    - name: Check if the old Wazuh address exists in ossec.conf
+      shell: "grep -q '<address>wazuh.chickenj0.cloud</address>' /var/ossec/etc/ossec.conf"
+      register: check_address
+      ignore_errors: yes
+
+    - name: Replace the old address with the new address in ossec.conf
+      replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<address>wazuh\.chickenj0\.cloud</address>'
+        replace: '<address>delphi.cybermonkey.sh</address>'
+        backup: yes
+      when: check_address.rc == 0
+
+    - name: Restart the wazuh agent service
+      service:
+        name: wazuh-agent
+        state: restarted
+      when: check_address.rc == 0
+
+    - name: Report no change needed
+      debug:
+        msg: "Old address not found in ossec.conf; nothing to update."
+      when: check_address.rc != 0
