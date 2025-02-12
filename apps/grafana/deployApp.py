@@ -23,14 +23,11 @@ def main():
         print("No docker-compose.yml or docker-compose.yaml file found in the current directory.")
         return
 
-    # For each compose file found, copy it to the target directory and rename the original with a .bak extension
+    # For each compose file found, copy it to the target directory
     for file in compose_files:
         dest_file = os.path.join(target_dir, os.path.basename(file))
         print(f"Copying {file} to {dest_file}")
         shutil.copy2(file, dest_file)
-        
-        # Update the docker-compose file to change the volume mapping if needed.
-        update_compose_file(dest_file)
 
     # Fix permissions for the target directory so that Grafana can write to volumes or bind mounts.
     # The official Grafana Docker image runs as UID/GID 472, so we adjust ownership accordingly.
