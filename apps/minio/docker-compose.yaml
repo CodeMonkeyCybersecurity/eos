@@ -7,13 +7,9 @@ services:
     ports:
       - "9123:9000"     # MinIO API port
       - "8123:9001"     # MinIO Console port
-    #user: $(id -u):$(id -g)
-    #healthcheck:     # <- needs more testing
-    #  test: ["CMD", "mc", "ready", "local"]
-    #  interval: 5s
-    #  timeout: 5s
-    #  retries: 5
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: Baggie22Promotion99Oblivion21Shale5
     command: server /data --console-address ":9001"
+    restart: always
+
