@@ -45,10 +45,6 @@ def main():
         print(f"Copying {file} to {dest_file}")
         shutil.copy2(file, dest_file)
         
-        backup_file = file + ".bak"
-        print(f"Renaming {file} to {backup_file}")
-        os.rename(file, backup_file)
-        
         # Update the docker-compose file to change the volume mapping if needed.
         update_compose_file(dest_file)
 
