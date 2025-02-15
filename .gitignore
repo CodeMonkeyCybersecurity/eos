@@ -48,7 +48,9 @@ desktop.ini
 *.bak
 
 # Apps
-apps/mailcow/mailcow-dockerized/*
-apps/mattermost/docker/*
-apps/umami/umami/*
-apps/wazuh/wazuh-docker
+apps/mailcow/mailcow-dockerized*
+apps/mattermost/docker*
+apps/umami/umami*
+apps/wazuh/wazuh-docker*
+apps/erpNext/frappe_docker*
+apps/mattermost/docker*
