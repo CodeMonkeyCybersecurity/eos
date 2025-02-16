@@ -3,7 +3,7 @@
   hosts: all
   become: yes
   vars_files:
-    - persephone-vault-enc.yml
+    - persephone-vault.yml.template
 
   tasks:
     - name: Generate random backup time
