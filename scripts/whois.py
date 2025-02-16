@@ -2,6 +2,7 @@
 import os
 import sys
 import subprocess
+import getpass
 
 # --- Automatic Virtual Environment Setup ---
 # Check if we're already in a virtual environment.
