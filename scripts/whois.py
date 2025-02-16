@@ -12,7 +12,9 @@ except ModuleNotFoundError as e:
     missing_module = e.name
     print(f"Error: The '{missing_module}' module is not installed.")
     print("Please install all required dependencies. For example, you can run:")
-    print("    pip3 install ipwhois psycopg2-binary")
+    print("    sudo apt install pipx")
+    print("    pipx install ipwhois psycopg2-binary")
+    
     sys.exit(1)
 except Exception as e:
     print(f"An unexpected error occurred during imports: {e}")
