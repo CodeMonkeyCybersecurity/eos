@@ -47,12 +47,13 @@ except Exception as e:
     print(f"An unexpected error occurred during imports: {e}")
     sys.exit(1)
 
-# --- Database Configuration ---
-DB_NAME = "yourdbname"       # Target database name
-DB_USER = "yourusername"     # Database user (must have CREATE DATABASE privileges)
-DB_PASSWORD = "yourpassword" # Database password
-DB_HOST = "localhost"        # Database host (adjust if needed)
-DB_PORT = "5432"             # Default PostgreSQL port
+# --- Prompt for Database Configuration ---
+print("=== PostgreSQL Database Configuration ===")
+DB_NAME = input("Enter target database name [yourdbname]: ") or "yourdbname"
+DB_USER = input("Enter database user [yourusername]: ") or "yourusername"
+DB_PASSWORD = getpass.getpass("Enter database password [yourpassword]: ") or "yourpassword"
+DB_HOST = input("Enter database host [localhost]: ") or "localhost"
+DB_PORT = input("Enter database port [5432]: ") or "5432"
 
 def create_database():
     """
@@ -98,7 +99,8 @@ def get_random_global_ip():
     """
     while True:
         ip = ipaddress.IPv4Address(random.getrandbits(32))
-        if ip.is_global:
+        # Ensure the IP is global and not multicast.
+        if ip.is_global and not ip.is_multicast:
             return ip
 
 def main():
