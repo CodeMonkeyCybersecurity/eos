@@ -68,22 +68,28 @@ else:
             print("Continuing interactively. Note: if you log out, the script will stop.")
 
 # --- Automatic Virtual Environment Setup ---
+# Check if we're already in a virtual environment.
 if os.environ.get("VENV_ACTIVE") != "1" and sys.prefix == sys.base_prefix:
-    venv_dir = os.path.join(os.path.dirname(__file__), ".venv")
+    # Instead of using a relative path (".venv"), use an absolute path.
+    venv_dir = '/opt/whois/venv'
     
+    # Create the virtual environment if it doesn't exist.
     if not os.path.exists(venv_dir):
         print("Creating virtual environment in", venv_dir)
         import venv
         builder = venv.EnvBuilder(with_pip=True)
         builder.create(venv_dir)
     
+    # Determine the path to the virtual environment's Python executable.
     python_executable = os.path.join(venv_dir, "bin", "python3")
     if not os.path.exists(python_executable):
         python_executable = os.path.join(venv_dir, "bin", "python")
     
+    # Install required packages in the virtual environment.
     print("Installing required packages in the virtual environment...")
     subprocess.check_call([python_executable, "-m", "pip", "install", "ipwhois", "psycopg2-binary"])
     
+    # Set an environment variable to avoid re-entering this block and re-launch the script.
     os.environ["VENV_ACTIVE"] = "1"
     print("Re-launching script inside the virtual environment...\n")
     os.execv(python_executable, [python_executable] + sys.argv)
