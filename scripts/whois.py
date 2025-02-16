@@ -1,8 +1,22 @@
-import random
-import ipaddress
-import time
-import psycopg2
-from ipwhois import IPWhois
+#!/usr/bin/env python3
+import sys
+
+# Attempt to import all required modules. If any are missing, print an error and exit.
+try:
+    import random
+    import ipaddress
+    import time
+    import psycopg2
+    from ipwhois import IPWhois
+except ModuleNotFoundError as e:
+    missing_module = e.name
+    print(f"Error: The '{missing_module}' module is not installed.")
+    print("Please install all required dependencies. For example, you can run:")
+    print("    pip3 install ipwhois psycopg2-binary")
+    sys.exit(1)
+except Exception as e:
+    print(f"An unexpected error occurred during imports: {e}")
+    sys.exit(1)
 
 # --- Database Configuration ---
 DB_NAME = "yourdbname"       # Target database name
@@ -60,7 +74,11 @@ def get_random_global_ip():
 
 def main():
     # Step 1: Create the target database if it doesn't exist.
-    create_database()
+    try:
+        create_database()
+    except Exception as e:
+        print("Exiting due to database creation error.")
+        sys.exit(1)
 
     # Step 2: Connect to the target database and create the table.
     try:
@@ -71,7 +89,7 @@ def main():
         create_table(cursor, conn)
     except Exception as e:
         print(f"Error connecting to the target database: {e}")
-        return
+        sys.exit(1)
 
     # Step 3: Continuously perform WHOIS lookups for a random global IP.
     while True:
