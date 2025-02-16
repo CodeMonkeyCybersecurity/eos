@@ -64,24 +64,50 @@ DB_PASSWORD = getpass.getpass("Enter target database user's password [yourpasswo
 DB_HOST = input("Enter target database host [localhost]: ") or "localhost"
 DB_PORT = input("Enter target database port [5432]: ") or "5432"
 
+def create_target_user():
+    """
+    Connects using admin credentials and checks if the target user exists.
+    If not, creates the user with the provided password and grants CREATEDB privilege.
+    """
+    try:
+        conn = psycopg2.connect(
+            dbname=ADMIN_DB, user=ADMIN_USER, password=ADMIN_PASSWORD, host=ADMIN_HOST, port=ADMIN_PORT
+        )
+        conn.autocommit = True
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname=%s;", (DB_USER,))
+        exists = cursor.fetchone()
+        if not exists:
+            print(f"User '{DB_USER}' does not exist. Creating...")
+            # Create the user with the given password
+            cursor.execute("CREATE USER {} WITH PASSWORD %s;".format(DB_USER), (DB_PASSWORD,))
+            # Grant the CREATEDB privilege so the user can own a database
+            cursor.execute("ALTER USER {} WITH CREATEDB;".format(DB_USER))
+            print(f"User '{DB_USER}' created successfully.")
+        else:
+            print(f"User '{DB_USER}' already exists.")
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error while checking/creating target user: {e}")
+        raise
 
 def create_database():
     """
-    Connects to the default 'postgres' database and checks if the target database exists.
-    If it doesn't exist, it creates the database.
+    Connects to the admin database and checks if the target database exists.
+    If it doesn't exist, it creates the database with DB_USER as the owner.
     """
     try:
-        # Connect to the default database
         conn = psycopg2.connect(
-            dbname="postgres", user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
+            dbname=ADMIN_DB, user=ADMIN_USER, password=ADMIN_PASSWORD, host=ADMIN_HOST, port=ADMIN_PORT
         )
-        conn.autocommit = True  # Needed to execute CREATE DATABASE outside a transaction
+        conn.autocommit = True
         cursor = conn.cursor()
         cursor.execute("SELECT 1 FROM pg_database WHERE datname=%s;", (DB_NAME,))
         exists = cursor.fetchone()
         if not exists:
             print(f"Database '{DB_NAME}' does not exist. Creating...")
-            cursor.execute(f"CREATE DATABASE {DB_NAME};")
+            cursor.execute(f"CREATE DATABASE {DB_NAME} OWNER {DB_USER};")
             print(f"Database '{DB_NAME}' created successfully.")
         else:
             print(f"Database '{DB_NAME}' already exists.")
@@ -114,14 +140,21 @@ def get_random_global_ip():
             return ip
 
 def main():
-    # Step 1: Create the target database if it doesn't exist.
+    # Create the target user if needed (using admin credentials).
+    try:
+        create_target_user()
+    except Exception as e:
+        print("Exiting due to target user creation error.")
+        sys.exit(1)
+        
+    # Create the target database if it doesn't exist.
     try:
         create_database()
     except Exception as e:
         print("Exiting due to database creation error.")
         sys.exit(1)
 
-    # Step 2: Connect to the target database and create the table.
+    # Connect to the target database and create the table.
     try:
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
@@ -132,7 +165,7 @@ def main():
         print(f"Error connecting to the target database: {e}")
         sys.exit(1)
 
-    # Step 3: Continuously perform WHOIS lookups for a random global IP.
+    # Continuously perform WHOIS lookups for a random global IP.
     while True:
         ip = get_random_global_ip()
         ip_str = str(ip)
