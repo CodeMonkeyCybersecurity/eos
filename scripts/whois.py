@@ -1,14 +1,9 @@
-#!/usr/bin/env python3
-import os
+
+
 import sys
 import subprocess
 import getpass
 import logging
-import time
-import random
-import ipaddress
-import psycopg2
-from ipwhois import IPWhois
 
 # Set up logging
 logging.basicConfig(
@@ -17,82 +12,50 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s:%(message)s'
 )
 
-def daemonize():
-    """Perform a UNIX double-fork to daemonize the process."""
-    try:
-        # First fork
-        pid = os.fork()
-        if pid > 0:
-            # Exit parent
-            sys.exit(0)
-    except OSError as e:
-        sys.exit(f"Fork #1 failed: {e}")
-
-    # Decouple from parent environment
-    os.chdir('/')
-    os.setsid()
-    os.umask(0)
-
-    try:
-        # Second fork
-        pid = os.fork()
-        if pid > 0:
-            # Exit from second parent
-            sys.exit(0)
-    except OSError as e:
-        sys.exit(f"Fork #2 failed: {e}")
-
-    # Redirect standard file descriptors to /dev/null
-    sys.stdout.flush()
-    sys.stderr.flush()
-    with open('/dev/null', 'r') as si:
-        os.dup2(si.fileno(), sys.stdin.fileno())
-    with open('/dev/null', 'a+') as so:
-        os.dup2(so.fileno(), sys.stdout.fileno())
-    with open('/dev/null', 'a+') as se:
-        os.dup2(se.fileno(), sys.stderr.fileno())
-
-# --- Check if running in daemon mode or interactively ---
-if "--daemonize" in sys.argv:
-    daemonize()
-else:
-    if sys.stdout.isatty():
-        choice = input(
-            "Warning: It is recommended to run this script as a daemon.\n"
-            "Would you like to daemonize the process now? (Y/n): "
-        )
-        if choice.strip().lower() in ("y", "yes", ""):
-            print("Daemonizing... (exiting the current process)")
-            daemonize()
-        else:
-            print("Continuing interactively. Note: if you log out, the script will stop.")
 
 # --- Automatic Virtual Environment Setup ---
 # Check if we're already in a virtual environment.
+# sys.prefix != sys.base_prefix when in a venv.
 if os.environ.get("VENV_ACTIVE") != "1" and sys.prefix == sys.base_prefix:
-    # Instead of using a relative path (".venv"), use an absolute path.
-    venv_dir = '/opt/whois/venv'
-    
+    venv_dir = os.path.join(os.path.dirname(__file__), ".venv")
+
     # Create the virtual environment if it doesn't exist.
     if not os.path.exists(venv_dir):
         print("Creating virtual environment in", venv_dir)
         import venv
         builder = venv.EnvBuilder(with_pip=True)
         builder.create(venv_dir)
-    
+
     # Determine the path to the virtual environment's Python executable.
     python_executable = os.path.join(venv_dir, "bin", "python3")
     if not os.path.exists(python_executable):
         python_executable = os.path.join(venv_dir, "bin", "python")
-    
+
     # Install required packages in the virtual environment.
     print("Installing required packages in the virtual environment...")
     subprocess.check_call([python_executable, "-m", "pip", "install", "ipwhois", "psycopg2-binary"])
-    
+
     # Set an environment variable to avoid re-entering this block and re-launch the script.
     os.environ["VENV_ACTIVE"] = "1"
     print("Re-launching script inside the virtual environment...\n")
     os.execv(python_executable, [python_executable] + sys.argv)
+
+# --- Imports with Graceful Error Handling ---
+try:
+    import random
+    import ipaddress
+    import time
+    import psycopg2
+    from ipwhois import IPWhois
+except ModuleNotFoundError as e:
+    missing_module = e.name
+    print(f"Error: The '{missing_module}' module is not installed.")
+    print("Please install all required dependencies. For example, you can run:")
+    print("    pip install ipwhois psycopg2-binary")
+    sys.exit(1)
+except Exception as e:
+    print(f"An unexpected error occurred during imports: {e}")
+    sys.exit(1)
 
 # --- Prompt for Admin Credentials (for creating the database) ---
 print("=== PostgreSQL Admin Credentials ===")
@@ -117,8 +80,7 @@ def create_target_user():
     """
     try:
         conn = psycopg2.connect(
-            dbname=ADMIN_DB, user=ADMIN_USER, password=ADMIN_PASSWORD,
-            host=ADMIN_HOST, port=ADMIN_PORT
+            dbname=ADMIN_DB, user=ADMIN_USER, password=ADMIN_PASSWORD, host=ADMIN_HOST, port=ADMIN_PORT
         )
         conn.autocommit = True
         cursor = conn.cursor()
@@ -126,7 +88,9 @@ def create_target_user():
         exists = cursor.fetchone()
         if not exists:
             print(f"User '{DB_USER}' does not exist. Creating...")
+            # Create the user with the given password
             cursor.execute("CREATE USER {} WITH PASSWORD %s;".format(DB_USER), (DB_PASSWORD,))
+            # Grant the CREATEDB privilege so the user can own a database
             cursor.execute("ALTER USER {} WITH CREATEDB;".format(DB_USER))
             print(f"User '{DB_USER}' created successfully.")
         else:
@@ -144,8 +108,7 @@ def create_database():
     """
     try:
         conn = psycopg2.connect(
-            dbname=ADMIN_DB, user=ADMIN_USER, password=ADMIN_PASSWORD,
-            host=ADMIN_HOST, port=ADMIN_PORT
+            dbname=ADMIN_DB, user=ADMIN_USER, password=ADMIN_PASSWORD, host=ADMIN_HOST, port=ADMIN_PORT
         )
         conn.autocommit = True
         cursor = conn.cursor()
@@ -181,26 +144,29 @@ def get_random_global_ip():
     """
     while True:
         ip = ipaddress.IPv4Address(random.getrandbits(32))
+        # Ensure the IP is global and not multicast.
         if ip.is_global and not ip.is_multicast:
             return ip
 
 def main():
+    # Create the target user if needed (using admin credentials).
     try:
         create_target_user()
     except Exception as e:
         print("Exiting due to target user creation error.")
         sys.exit(1)
-        
+
+    # Create the target database if it doesn't exist.
     try:
         create_database()
     except Exception as e:
         print("Exiting due to database creation error.")
         sys.exit(1)
 
+    # Connect to the target database and create the table.
     try:
         conn = psycopg2.connect(
-            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD,
-            host=DB_HOST, port=DB_PORT
+            dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
         )
         cursor = conn.cursor()
         create_table(cursor, conn)
@@ -208,6 +174,7 @@ def main():
         print(f"Error connecting to the target database: {e}")
         sys.exit(1)
 
+    # Continuously perform WHOIS lookups for a random global IP.
     while True:
         ip = get_random_global_ip()
         ip_str = str(ip)
@@ -222,10 +189,9 @@ def main():
                 (ip_str, owner)
             )
             conn.commit()
-            logging.info(f"Inserted IP {ip_str} with owner: {owner}")
         except Exception as e:
             print(f"Error processing IP {ip_str}: {e}")
-            logging.error(f"Error processing IP {ip_str}: {e}")
+        # Pause 1 second between queries.
         time.sleep(1)
 
 if __name__ == "__main__":
