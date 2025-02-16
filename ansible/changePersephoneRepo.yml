@@ -1,0 +1,33 @@
+---
+- name: Change Persephone Repo Location on Endpoints
+  hosts: all
+  become: yes
+  vars_files:
+    - persephone-vault.yml.template
+  tasks:
+    - name: Backup current restic repository configuration (if it exists)
+      copy:
+        src: "{{ restic_repository_file }}"
+        dest: "{{ restic_repository_file }}.bak"
+        backup: yes
+      ignore_errors: yes
+
+    - name: Update restic repository configuration file with new repo URL
+      copy:
+        content: "{{ restic_url }}"
+        dest: "{{ restic_repository_file }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Validate new repository configuration by listing snapshots
+      command: restic snapshots -r {{ restic_url }} --password-file {{ restic_password_file }}
+      environment:
+        AWS_ACCESS_KEY_ID: "{{ aws_access_key_id }}"
+        AWS_SECRET_ACCESS_KEY: "{{ aws_secret_access_key }}"
+      register: restic_validation
+      ignore_errors: yes
+
+    - name: Display restic snapshot command output for verification
+      debug:
+        var: restic_validation.stdout_lines
