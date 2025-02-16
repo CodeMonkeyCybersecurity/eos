@@ -1,5 +1,5 @@
-
-
+#!/usr/bin/env python3
+import os
 import sys
 import subprocess
 import getpass
@@ -12,30 +12,23 @@ logging.basicConfig(
     format='%(asctime)s %(levelname)s:%(message)s'
 )
 
-
 # --- Automatic Virtual Environment Setup ---
-# Check if we're already in a virtual environment.
-# sys.prefix != sys.base_prefix when in a venv.
 if os.environ.get("VENV_ACTIVE") != "1" and sys.prefix == sys.base_prefix:
     venv_dir = os.path.join(os.path.dirname(__file__), ".venv")
-
-    # Create the virtual environment if it doesn't exist.
+    
     if not os.path.exists(venv_dir):
         print("Creating virtual environment in", venv_dir)
         import venv
         builder = venv.EnvBuilder(with_pip=True)
         builder.create(venv_dir)
-
-    # Determine the path to the virtual environment's Python executable.
+    
     python_executable = os.path.join(venv_dir, "bin", "python3")
     if not os.path.exists(python_executable):
         python_executable = os.path.join(venv_dir, "bin", "python")
-
-    # Install required packages in the virtual environment.
+    
     print("Installing required packages in the virtual environment...")
     subprocess.check_call([python_executable, "-m", "pip", "install", "ipwhois", "psycopg2-binary"])
-
-    # Set an environment variable to avoid re-entering this block and re-launch the script.
+    
     os.environ["VENV_ACTIVE"] = "1"
     print("Re-launching script inside the virtual environment...\n")
     os.execv(python_executable, [python_executable] + sys.argv)
@@ -57,7 +50,7 @@ except Exception as e:
     print(f"An unexpected error occurred during imports: {e}")
     sys.exit(1)
 
-# --- Prompt for Admin Credentials (for creating the database) ---
+# --- Prompt for Admin Credentials (for creating the database and user) ---
 print("=== PostgreSQL Admin Credentials ===")
 ADMIN_DB = input("Enter admin database name [postgres]: ") or "postgres"
 ADMIN_USER = input("Enter admin user [postgres]: ") or "postgres"
@@ -144,26 +137,25 @@ def get_random_global_ip():
     """
     while True:
         ip = ipaddress.IPv4Address(random.getrandbits(32))
-        # Ensure the IP is global and not multicast.
         if ip.is_global and not ip.is_multicast:
             return ip
 
 def main():
-    # Create the target user if needed (using admin credentials).
+    # Step 1: Create the target user if needed (using admin credentials).
     try:
         create_target_user()
     except Exception as e:
         print("Exiting due to target user creation error.")
         sys.exit(1)
 
-    # Create the target database if it doesn't exist.
+    # Step 2: Create the target database if it doesn't exist (using admin credentials).
     try:
         create_database()
     except Exception as e:
         print("Exiting due to database creation error.")
         sys.exit(1)
 
-    # Connect to the target database and create the table.
+    # Step 3: Connect to the target database using target credentials and create the table.
     try:
         conn = psycopg2.connect(
             dbname=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port=DB_PORT
@@ -174,7 +166,7 @@ def main():
         print(f"Error connecting to the target database: {e}")
         sys.exit(1)
 
-    # Continuously perform WHOIS lookups for a random global IP.
+    # Step 4: Continuously perform WHOIS lookups for a random global IP.
     while True:
         ip = get_random_global_ip()
         ip_str = str(ip)
@@ -191,7 +183,6 @@ def main():
             conn.commit()
         except Exception as e:
             print(f"Error processing IP {ip_str}: {e}")
-        # Pause 1 second between queries.
         time.sleep(1)
 
 if __name__ == "__main__":
