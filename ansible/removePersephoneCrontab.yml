@@ -25,8 +25,7 @@
 
     - name: Remove lines containing 'restic' from crontab for user {{ crontab_user }}
       shell: "crontab -l -u {{ crontab_user }} 2>/dev/null | grep -v 'restic' | crontab -u {{ crontab_user }} -"
-      args:
-        warn: false
+
       register: update_crontab
       changed_when: update_crontab.rc == 0
 
