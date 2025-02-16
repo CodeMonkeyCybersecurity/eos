@@ -1,7 +1,36 @@
 #!/usr/bin/env python3
+import os
 import sys
+import subprocess
 
-# Attempt to import all required modules. If any are missing, print an error and exit.
+# --- Automatic Virtual Environment Setup ---
+# Check if we're already in a virtual environment.
+# sys.prefix != sys.base_prefix when in a venv.
+if os.environ.get("VENV_ACTIVE") != "1" and sys.prefix == sys.base_prefix:
+    venv_dir = os.path.join(os.path.dirname(__file__), ".venv")
+    
+    # Create the virtual environment if it doesn't exist.
+    if not os.path.exists(venv_dir):
+        print("Creating virtual environment in", venv_dir)
+        import venv
+        builder = venv.EnvBuilder(with_pip=True)
+        builder.create(venv_dir)
+    
+    # Determine the path to the virtual environment's Python executable.
+    python_executable = os.path.join(venv_dir, "bin", "python3")
+    if not os.path.exists(python_executable):
+        python_executable = os.path.join(venv_dir, "bin", "python")
+    
+    # Install required packages in the virtual environment.
+    print("Installing required packages in the virtual environment...")
+    subprocess.check_call([python_executable, "-m", "pip", "install", "ipwhois", "psycopg2-binary"])
+    
+    # Set an environment variable to avoid re-entering this block and re-launch the script.
+    os.environ["VENV_ACTIVE"] = "1"
+    print("Re-launching script inside the virtual environment...\n")
+    os.execv(python_executable, [python_executable] + sys.argv)
+
+# --- Imports with Graceful Error Handling ---
 try:
     import random
     import ipaddress
@@ -12,9 +41,7 @@ except ModuleNotFoundError as e:
     missing_module = e.name
     print(f"Error: The '{missing_module}' module is not installed.")
     print("Please install all required dependencies. For example, you can run:")
-    print("    sudo apt install pipx")
-    print("    pipx install ipwhois psycopg2-binary")
-    
+    print("    pip install ipwhois psycopg2-binary")
     sys.exit(1)
 except Exception as e:
     print(f"An unexpected error occurred during imports: {e}")
