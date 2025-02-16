@@ -48,13 +48,22 @@ except Exception as e:
     print(f"An unexpected error occurred during imports: {e}")
     sys.exit(1)
 
-# --- Prompt for Database Configuration ---
-print("=== PostgreSQL Database Configuration ===")
+# --- Prompt for Admin Credentials (for creating the database) ---
+print("=== PostgreSQL Admin Credentials ===")
+ADMIN_DB = input("Enter admin database name [postgres]: ") or "postgres"
+ADMIN_USER = input("Enter admin user [postgres]: ") or "postgres"
+ADMIN_PASSWORD = getpass.getpass("Enter admin password: ")
+ADMIN_HOST = input("Enter admin host [localhost]: ") or "localhost"
+ADMIN_PORT = input("Enter admin port [5432]: ") or "5432"
+
+# --- Prompt for Target Database Configuration ---
+print("\n=== Target PostgreSQL Database Configuration ===")
 DB_NAME = input("Enter target database name [yourdbname]: ") or "yourdbname"
-DB_USER = input("Enter database user [yourusername]: ") or "yourusername"
-DB_PASSWORD = getpass.getpass("Enter database password [yourpassword]: ") or "yourpassword"
-DB_HOST = input("Enter database host [localhost]: ") or "localhost"
-DB_PORT = input("Enter database port [5432]: ") or "5432"
+DB_USER = input("Enter target database user [yourusername]: ") or "yourusername"
+DB_PASSWORD = getpass.getpass("Enter target database user's password [yourpassword]: ") or "yourpassword"
+DB_HOST = input("Enter target database host [localhost]: ") or "localhost"
+DB_PORT = input("Enter target database port [5432]: ") or "5432"
+
 
 def create_database():
     """
