@@ -3,6 +3,26 @@ import os
 import sys
 import subprocess
 import getpass
+import logging
+
+# Set up logging
+logging.basicConfig(
+    filename='whois.log', 
+    level=logging.INFO, 
+    format='%(asctime)s %(levelname)s:%(message)s'
+)
+
+# --- Check if Running Interactively ---
+# If sys.stdout is attached to a TTY, we assume it's running interactively.
+if sys.stdout.isatty():
+    choice = input(
+        "Warning: It appears you are running this script interactively. "
+        "It is recommended to run it with nohup (e.g., `nohup python3 whois.py > whois.out 2>&1 &`) so it continues after logout.\n"
+        "Do you want to continue running interactively? [Y/n]: "
+    )
+    if choice.strip().lower() not in ("y", "yes", ""):
+        print("Exiting. Please run the script with nohup if you want it to run in the background.")
+        sys.exit(0)
 
 # --- Automatic Virtual Environment Setup ---
 # Check if we're already in a virtual environment.
