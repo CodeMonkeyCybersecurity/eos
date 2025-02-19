@@ -34,5 +34,4 @@ services:
 
 volumes:
   nextcloud_aio_mastercontainer:
-    # Named volume for storing Nextcloud AIO configuration
-    # (no special config necessary, Compose will create it automatically)
+    name: nextcloud_aio_mastercontainer
