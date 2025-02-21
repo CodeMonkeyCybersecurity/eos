@@ -14,15 +14,17 @@ services:
     image: quay.io/keycloak/keycloak:latest
   command: ["start", "--optimized", "--http-enabled"] # replace start with start-dev here to start the server in development mode
     environment:
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: changeme
-      DB_VENDOR: POSTGRES
-      DB_ADDR: postgres
-      DB_DATABASE: keycloak
-      DB_USER: keycloak
-      DB_PASSWORD: changeme
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: changeme
+      # Use the new database configuration variables
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: changeme
+      # Hostname and proxy settings for running behind a reverse proxy
       KC_PROXY: edge
       KC_HOSTNAME: hera.domain.com
+      KC_HTTP_ENABLED: "true"
     ports:
       - "8111:8080"
     depends_on:
