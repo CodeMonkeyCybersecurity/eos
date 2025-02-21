@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: postgres:12
+    image: postgres
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -24,7 +24,6 @@ services:
       - "8111:8080"
     depends_on:
       - postgres
-    command: ["start-dev"]
     networks:
       - eos-network
 
