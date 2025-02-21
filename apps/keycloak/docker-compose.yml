@@ -12,7 +12,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    command: ["start", "--optimized", "--http-enabled"]  # replace start with start-dev here to start the server in development mode
+    command: ["start", "--http-enabled"]  # replace start with start-dev here to start the server in development mode
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: changeme
