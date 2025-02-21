@@ -9,7 +9,9 @@ services:
       - ":8209:8600/udp"
     volumes:
       - consul_data:/consul/data
-
+    networks:
+      - eos-network
+      
   vault:
     image: vault
     container_name: vault
@@ -25,6 +27,11 @@ services:
     environment:
       VAULT_ADDR: "http://0.0.0.0:8179"
     command: "server -config=/vault/config/vault.hcl"
-
+    networks:
+      - eos-network
+      
 volumes:
   consul_data:
+
+networks:
+  eos-network:
