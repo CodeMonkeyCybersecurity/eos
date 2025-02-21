@@ -10,3 +10,8 @@ services:
       - ./cache:/cache      # Cache
       - ./media:/media      # Media library
     restart: unless-stopped
+    networks:
+      - eos-network
+
+networks:
+  eos-network:
