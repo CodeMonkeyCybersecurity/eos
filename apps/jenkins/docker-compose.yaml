@@ -8,5 +8,11 @@ services:
       - jenkins_home:/var/jenkins_home
   ssh-agent:
     image: jenkins/ssh-agent
+    networks:
+      - eos-network
+      
 volumes:
   jenkins_home:
+
+networks:
+  eos-network:
