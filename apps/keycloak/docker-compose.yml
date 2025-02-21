@@ -1,10 +1,9 @@
 services:
   postgres:
     image: postgres
-    name: hera-postgres
     environment:
-      POSTGRES_DB: keycloak_db
-      POSTGRES_USER: keycloak_user
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
       POSTGRES_PASSWORD: changeme
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -13,16 +12,17 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    name: hera-keycloak
-    command: start-dev  # Add this line to start the server in development mode
+  command: ["start", "--optimized", "--http-enabled"] # replace start with start-dev here to start the server in development mode
     environment:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: changeme
       DB_VENDOR: POSTGRES
       DB_ADDR: postgres
-      DB_DATABASE: keycloak_db
-      DB_USER: keycloak_user
+      DB_DATABASE: keycloak
+      DB_USER: keycloak
       DB_PASSWORD: changeme
+      KC_PROXY: edge
+      KC_HOSTNAME: hera.domain.com
     ports:
       - "8111:8080"
     depends_on:
