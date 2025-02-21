@@ -25,6 +25,7 @@ services:
       KC_PROXY: edge
       KC_HOSTNAME: hera.domain.com
       KC_HTTP_ENABLED: "true"
+      KC_EXTERNAL_URL: "https://hera.cybermonkey.dev"
     ports:
       - "8111:8080"
     depends_on:
