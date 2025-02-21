@@ -7,7 +7,9 @@ services:
       POSTGRES_PASSWORD: password
     volumes:
       - pgdata:/var/lib/postgresql/data
-
+    networks:
+      - eos-network
+      
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     environment:
@@ -23,6 +25,11 @@ services:
     depends_on:
       - postgres
     command: ["start-dev"]
+    networks:
+      - eos-network
 
 volumes:
   pgdata:
+  
+networks:
+  eos-network:
