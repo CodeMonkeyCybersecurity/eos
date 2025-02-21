@@ -11,7 +11,9 @@ services:
     restart: unless-stopped
     volumes:
       - db-data:/var/lib/postgresql/data
-
+    networks:
+      - eos-network
+      
   wiki:
     image: ghcr.io/requarks/wiki:2
     depends_on:
@@ -26,6 +28,11 @@ services:
     restart: unless-stopped
     ports:
       - "11080:3000"
-
+    networks:
+      - eos-network
+      
 volumes:
   db-data:
+
+networks:
+  eos-network:
