@@ -14,3 +14,8 @@ services:
       GF_LOG_LEVEL: debug                                               # Change for production
       GF_SERVER_ROOT_URL: http://my.grafana.server/                     # <-
       GF_PLUGINS_PREINSTALL: grafana-clock-panel, grafana-simple-json-datasource
+    networks:
+      - eos-network
+  
+networks:
+  eos-network:
