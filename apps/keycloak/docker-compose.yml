@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: changeme
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
@@ -14,12 +14,12 @@ services:
     image: quay.io/keycloak/keycloak:latest
     environment:
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN_PASSWORD: changeme
       DB_VENDOR: POSTGRES
       DB_ADDR: postgres
       DB_DATABASE: keycloak
       DB_USER: keycloak
-      DB_PASSWORD: password
+      DB_PASSWORD: changeme
     ports:
       - "8111:8080"
     depends_on:
