@@ -4,17 +4,12 @@ services:
     container_name: nextcloud-aio-mastercontainer
     # Equivalent to "--init"
     init: true
-
-    # Docker Compose doesn't directly support `--sig-proxy=false`,
-    # so we'll omit that. Usually `init: true` suffices.
-
-    # Restart policy: "--restart always"
     restart: always
-
-    # Equivalent to "--publish 8080:8080"
     ports:
-      - "18080:8080"
-
+      - "8039:8080"
+    networks:
+      - eos-network
+      
     # Environment variables:
     environment:
       APACHE_PORT: "11000"
@@ -38,3 +33,6 @@ services:
 volumes:
   nextcloud_aio_mastercontainer:
     name: nextcloud_aio_mastercontainer
+
+networks:
+  eos-network:
