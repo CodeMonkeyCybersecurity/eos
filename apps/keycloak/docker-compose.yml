@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres
+    name: hera-postgres
     environment:
       POSTGRES_DB: keycloak_db
       POSTGRES_USER: keycloak_user
@@ -12,6 +13,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
+    name: hera-keycloak
     command: start-dev  # Add this line to start the server in development mode
     environment:
       KEYCLOAK_ADMIN: admin
