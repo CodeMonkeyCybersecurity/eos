@@ -1,0 +1,8 @@
+- name: Enable Osquery integration in ossec.conf
+  replace:
+    path: /var/ossec/etc/ossec.conf
+    regexp: '(<wodle\s+name="osquery">[\s\S]*?<disabled>)[Yy]es(</disabled>)'
+    replace: '\1no\2'
+    backup: yes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
