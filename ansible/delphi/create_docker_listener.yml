@@ -12,7 +12,7 @@
         update_cache: yes
 
     - name: Upgrade pip
-      command: pip3 install --upgrade pip
+      command: pip3 install --upgrade pip --break-system-packages
       environment:
         PATH: "/usr/local/bin:/usr/bin:/bin"
 
