@@ -1,6 +1,6 @@
 ---
 - name: Configure Wazuh agent to monitor /root directory
-  hosts: wazuh_agents  # Replace with your target host group
+  hosts: endpoints  # Replace with your target host group
   become: yes
   tasks:
 
