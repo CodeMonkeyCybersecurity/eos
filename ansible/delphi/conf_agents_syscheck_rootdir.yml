@@ -1,0 +1,39 @@
+---
+- name: Configure Wazuh agent to monitor /root directory
+  hosts: wazuh_agents  # Replace with your target host group
+  become: yes
+  tasks:
+
+    - name: Ensure Wazuh agent is installed
+      command: wazuh-agent -V
+      register: wazuh_installed
+      ignore_errors: yes
+
+    - name: Fail if Wazuh agent is not installed
+      fail:
+        msg: "Wazuh agent is not installed. Install it before running this playbook."
+      when: wazuh_installed.rc != 0
+
+    - name: Backup existing ossec.conf
+      copy:
+        src: /var/ossec/etc/ossec.conf
+        dest: /var/ossec/etc/ossec.conf.bak
+        remote_src: yes
+        mode: 0644
+
+    - name: Ensure /root directory is monitored in ossec.conf
+      blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- ANSIBLE MANAGED SYSCHK -->"
+        block: |
+          <syscheck>
+            <directories check_all="yes" report_changes="yes" realtime="yes">/root</directories>
+          </syscheck>
+        insertafter: "<syscheck>"
+        create: yes
+
+    - name: Restart Wazuh agent
+      systemd:
+        name: wazuh-agent
+        state: restarted
+        enabled: yes
