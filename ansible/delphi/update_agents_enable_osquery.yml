@@ -1,8 +1,31 @@
+---
 - name: Enable Osquery integration in ossec.conf
-  replace:
-    path: /var/ossec/etc/ossec.conf
-    regexp: '(<wodle\s+name="osquery">[\s\S]*?<disabled>)[Yy]es(</disabled>)'
-    replace: '\1no\2'
-    backup: yes
+  hosts: endpoints  # Replace with your target host group
+  become: yes
   vars:
     ansible_python_interpreter: /usr/bin/python3
+  tasks:
+
+    - name: Ensure Wazuh agent is installed
+      command: systemctl is-active wazuh-agent
+      register: wazuh_installed
+      ignore_errors: yes
+
+    - name: Fail if Wazuh agent is not installed
+      fail:
+        msg: "Wazuh agent is not installed. Install it before running this playbook."
+      when: wazuh_installed.rc != 0
+
+    - name: Backup existing ossec.conf
+      copy:
+        src: /var/ossec/etc/ossec.conf
+        dest: /var/ossec/etc/ossec.conf.bak
+        remote_src: yes
+        mode: 0644
+
+    - name: Enable Osquery integration in ossec.conf
+      replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '(<wodle\s+name="osquery">[\s\S]*?<disabled>)[Yy]es(</disabled>)'
+        replace: '\1no\2'
+        backup: yes
