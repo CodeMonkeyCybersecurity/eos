@@ -1,0 +1,50 @@
+---
+- name: Configure Docker host for Wazuh Docker event monitoring
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install python3 and python3-pip
+      apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Upgrade pip
+      command: pip3 install --upgrade pip
+      environment:
+        PATH: "/usr/local/bin:/usr/bin:/bin"
+
+    - name: Install Docker using official install script
+      shell: "curl -sSL https://get.docker.com/ | sh"
+      args:
+        warn: false
+
+    - name: Install Docker Python library and dependencies
+      command: pip3 install docker==7.1.0 urllib3==1.26.20 requests==2.32.2 --break-system-packages
+
+    - name: Ensure Wazuh agent configuration directory exists
+      file:
+        path: /var/ossec/etc
+        state: directory
+
+    - name: Configure docker-listener in ossec.conf
+      blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} ANSIBLE DOCKER LISTENER CONFIG -->"
+        block: |
+          <wodle name="docker-listener">
+            <interval>10m</interval>
+            <attempts>5</attempts>
+            <run_on_start>yes</run_on_start>
+            <disabled>no</disabled>
+          </wodle>
+        insertafter: "<ossec_config>"
+      notify: Restart Wazuh Agent
+
+  handlers:
+    - name: Restart Wazuh Agent
+      systemd:
+        name: wazuh-agent
+        state: restarted
