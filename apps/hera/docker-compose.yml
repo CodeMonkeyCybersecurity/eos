@@ -1,15 +1,4 @@
 services:
-  generate-certs:
-    image: alpine:latest
-    command: >
-      sh -c 'apk add --no-cache openssl &&
-            mkdir -p /certs &&
-            openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout /certs/tls.key -out /certs/tls.crt -subj "/CN=localhost" &&
-            chmod 644 /certs/tls.crt /certs/tls.key &&
-            sleep infinity'
-    volumes:
-      - keycloak-certs:/certs
-
   postgres:
     image: postgres
     container_name: hera-db
@@ -27,7 +16,7 @@ services:
     # Use HTTPS and point to our mounted certificate files:
     command: [
       "start",
-      "--https-port=8443",
+      "--https-port=8111",
       "--https-certificate-file=/etc/x509/https/tls.crt",
       "--https-certificate-key-file=/etc/x509/https/tls.key"
     ]
@@ -46,13 +35,13 @@ services:
       - "8111:8443"
     depends_on:
       - postgres
-      - generate-certs
+    volumes:
+      - ./certs:/etc/x509/https:ro
     networks:
       - eos-network
 
 volumes:
   pgdata:
-  keycloak-certs:
 
 networks:
   eos-network:
