@@ -1,6 +1,6 @@
 package main
 
-import (
+imPort (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
@@ -16,12 +16,12 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol     string `json:"protocol"`
+	Protocol     string `json:"Protocol"`
 	FQDN         string `json:"FQDN"`
-	Port         string `json:"port"`
+	Port         string `json:"Port"`
 	API_User     string `json:"API_User"`
 	API_Password string `json:"API_Password"`
-	Endpoint     string `json:"endpoint"`
+	Endpoint     string `json:"Endpoint"`
 	Token        string `json:"Token,omitempty"`
 }
 
@@ -118,10 +118,10 @@ func authenticate(cfg Config) (string, error) {
 	req.SetBasicAuth(cfg.API_User, cfg.API_Password)
 
 	// Create an HTTP client that skips certificate verification.
-	tr := &http.Transport{
+	tr := &http.TransPort{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{TransPort: tr}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
