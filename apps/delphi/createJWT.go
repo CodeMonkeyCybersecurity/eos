@@ -23,13 +23,17 @@ const configFile = ".delphi.json"
 
 // loadConfig reads the configuration from .delphi.json.
 func loadConfig() (Config, error) {
-	var cfg Config
-	data, err := ioutil.ReadFile(configFile)
-	if err != nil {
-		return cfg, err
-	}
-	err = json.Unmarshal(data, &cfg)
-	return cfg, err
+    var cfg Config
+    data, err := ioutil.ReadFile(configFile)
+    if err != nil {
+        // If the file doesn't exist, return an empty config.
+        if os.IsNotExist(err) {
+            return cfg, nil
+        }
+        return cfg, err
+    }
+    err = json.Unmarshal(data, &cfg)
+    return cfg, err
 }
 
 // saveConfig writes the configuration to .delphi.json.
@@ -112,29 +116,42 @@ func authenticate(cfg Config) (string, error) {
 }
 
 func main() {
-	// Load configuration from .delphi.json.
-	cfg, err := loadConfig()
-	if err != nil {
-		fmt.Printf("Error loading configuration: %v\n", err)
-		os.Exit(1)
-	}
+    // Load configuration from .delphi.json.
+    cfg, err := loadConfig()
+    if err != nil {
+        fmt.Printf("Error loading configuration: %v\n", err)
+        os.Exit(1)
+    }
 
-	// Confirm or update the configuration.
-	cfg = confirmConfig(cfg)
+    // If config file doesn't exist or is empty, prompt user for values.
+    if cfg.WZFQDN == "" || cfg.WZAPIUSR == "" || cfg.WZAPIPASS == "" {
+        fmt.Println("Configuration file not found or incomplete. Please enter new configuration values:")
+        cfg.WZFQDN = promptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", "")
+        cfg.WZAPIUSR = promptInput("Enter the API username (eg. wazuh-wui)", "")
+        cfg.WZAPIPASS = promptInput("Enter the API password", "")
+        if err := saveConfig(cfg); err != nil {
+            fmt.Printf("Error saving configuration: %v\n", err)
+            os.Exit(1)
+        }
+        fmt.Println("Configuration file created.")
+    }
 
-	// Authenticate to get the JWT token.
-	fmt.Println("\nRetrieving JWT token...")
-	token, err := authenticate(cfg)
-	if err != nil {
-		fmt.Printf("Error during authentication: %v\n", err)
-		os.Exit(1)
-	}
-	cfg.Token = token
-	if err := saveConfig(cfg); err != nil {
-		fmt.Printf("Error saving configuration: %v\n", err)
-	}
+    // Confirm or update the configuration.
+    cfg = confirmConfig(cfg)
 
-	fmt.Println("\nYour JWT auth token is:")
-	fmt.Println(token)
-	fmt.Println("\nFINIS")
+    // Authenticate to get the JWT token.
+    fmt.Println("\nRetrieving JWT token...")
+    token, err := authenticate(cfg)
+    if err != nil {
+        fmt.Printf("Error during authentication: %v\n", err)
+        os.Exit(1)
+    }
+    cfg.Token = token
+    if err := saveConfig(cfg); err != nil {
+        fmt.Printf("Error saving configuration: %v\n", err)
+    }
+
+    fmt.Println("\nYour JWT auth token is:")
+    fmt.Println(token)
+    fmt.Println("\nFINIS")
 }
