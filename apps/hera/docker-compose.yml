@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres
-    name: hera-db
+    container_name: hera-db
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: keycloak
@@ -14,7 +14,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     command: ["start", "--http-enabled"]  # For production, you can use "--optimized" if desired.
-    name: hera-keycloak
+    container_name: hera-keycloak
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: changeme
