@@ -16,11 +16,13 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	WZFQDN    string `json:"WZ_FQDN"`
-	WZAPIUSR  string `json:"WZ_API_USR"`
-	WZAPIPASS string `json:"WZ_API_PASSWD"`
+	Protocol  string `json:"protocol"`
+	FQDN    string `json:"FQDN"`
+	Port      string `json:"port"`
+	API_User  string `json:"API_User"`
+	API_Password string `json:"API_Password"`
+	Endpoint  string `json:"endpoint"`
 	Token     string `json:"TOKEN,omitempty"`
-}
 
 const configFile = ".delphi.json"
 
@@ -85,17 +87,17 @@ func promptPassword(prompt, defaultVal string) string {
 // confirmConfig displays the current configuration and allows the user to update values.
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
-	fmt.Printf("  WZ_FQDN:      %s\n", cfg.WZFQDN)
-	fmt.Printf("  WZ_API_USR:   %s\n", cfg.WZAPIUSR)
-	fmt.Printf("  WZ_API_PASSWD: %s\n", cfg.WZAPIPASS)
+	fmt.Printf("  FQDN:      %s\n", cfg.FQDN)
+	fmt.Printf("  API_User:   %s\n", cfg.API_User)
+	fmt.Printf("  API_Password: %s\n", cfg.API_Password)
 
 	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
-		cfg.WZFQDN = promptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", cfg.WZFQDN)
-		cfg.WZAPIUSR = promptInput("Enter the API username (eg. wazuh-wui)", cfg.WZAPIUSR)
+		cfg.FQDN = promptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", cfg.FQDN)
+		cfg.API_User = promptInput("Enter the API username (eg. wazuh-wui)", cfg.API_User)
 		// Use promptPassword for the password.
-		cfg.WZAPIPASS = promptPassword("Enter the API password", cfg.WZAPIPASS)
+		cfg.API_Password = promptPassword("Enter the API password", cfg.API_Password)
 		if err := saveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
@@ -107,12 +109,12 @@ func confirmConfig(cfg Config) Config {
 
 // authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
 func authenticate(cfg Config) (string, error) {
-	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.WZFQDN)
+	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return "", err
 	}
-	req.SetBasicAuth(cfg.WZAPIUSR, cfg.WZAPIPASS)
+	req.SetBasicAuth(cfg.API_User, cfg.API_Password)
 
 	// Create an HTTP client that skips certificate verification.
 	tr := &http.Transport{
@@ -144,9 +146,9 @@ func main() {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		// File not found or error reading? Prompt for new values.
 		fmt.Println("Configuration file not found or incomplete. Please enter new configuration values:")
-		cfg.WZFQDN = promptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", "")
-		cfg.WZAPIUSR = promptInput("Enter the API username (eg. wazuh-wui)", "")
-		cfg.WZAPIPASS = promptPassword("Enter the API password", "")
+		cfg.FQDN = promptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", "")
+		cfg.API_User = promptInput("Enter the API username (eg. wazuh-wui)", "")
+		cfg.API_Password = promptPassword("Enter the API password", "")
 		if err := saveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
