@@ -7,11 +7,12 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"json"
 	"strings"
 )
 
 // configFilename is where we store the last-used values.
-const configFilename = ".wazuh.api.conf"
+const configFilename = ".delphi.json"
 
 // loadConfig reads key="value" lines into a map.
 func loadConfig(filename string) (map[string]string, error) {
