@@ -1,7 +1,7 @@
 services:
   consul:
     image: consul
-    container_name: consul
+    container_name: pandora-consul
     restart: unless-stopped
     command: "agent -server -bootstrap-expect=1 -client=0.0.0.0"
     ports:
@@ -14,7 +14,7 @@ services:
       
   vault:
     image: vault
-    container_name: vault
+    container_name: pandora-vault
     restart: unless-stopped
     cap_add:
       - IPC_LOCK
