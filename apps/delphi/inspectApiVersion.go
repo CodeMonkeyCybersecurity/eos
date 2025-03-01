@@ -16,13 +16,13 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol      string `json:"Protocol"`
-	FQDN          string `json:"FQDN"`
-	Port          string `json:"Port"`
-	API_User      string `json:"API_User"`
-	API_Password  string `json:"API_Password"`
-	Endpoint      string `json:"Endpoint"`
-	Token         string `json:"Token,omitempty"`
+	Protocol     string `json:"Protocol"`
+	FQDN         string `json:"FQDN"`
+	Port         string `json:"Port"`
+	API_User     string `json:"API_User"`
+	API_Password string `json:"API_Password"`
+	Endpoint     string `json:"Endpoint"`
+	Token        string `json:"Token,omitempty"`
 	LatestVersion string `json:"LatestVersion,omitempty"`
 }
 
@@ -48,7 +48,7 @@ func saveConfig(cfg Config) error {
 	return ioutil.WriteFile(configFile, data, 0644)
 }
 
-// promptInput displays a prompt and reads user input; returns the default if input is empty.
+// promptInput displays a prompt and reads user input.
 func promptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
 	if defaultVal != "" {
@@ -206,7 +206,25 @@ func getResponse(method, url string, headers map[string]string, verify bool) map
 	return result
 }
 
+// Agent represents an individual agent returned by the API.
+type Agent struct {
+	ID      string `json:"id"`
+	Version string `json:"version"`
+}
+
+// AgentsResponse represents the API response for the agents query.
+type AgentsResponse struct {
+	Data struct {
+		AffectedItems []Agent `json:"affected_items"`
+	} `json:"data"`
+	Error   int    `json:"error"`
+	Message string `json:"message"`
+}
+
 func main() {
+	// Define the expected version (if not provided by configuration, user will be prompted).
+	// We'll later update configuration with the LatestVersion entered by the user.
+	
 	// Load configuration from .delphi.json.
 	cfg, err := loadConfig()
 	if err != nil {
@@ -241,11 +259,11 @@ func main() {
 		fmt.Println("\nJWT token retrieved.")
 	}
 
-	// Use the configuration values.
-	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
+	// Set the endpoint for querying agent id and version if not provided.
 	if cfg.Endpoint == "" {
 		cfg.Endpoint = "/agents?select=id,version"
 	}
+	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	fullURL := baseURL + cfg.Endpoint
 
 	fmt.Printf("\nRequesting agent information from %s ...\n\n", fullURL)
@@ -255,18 +273,7 @@ func main() {
 	}
 	result := getResponse("GET", fullURL, headers, false)
 
-	// Decode response into a structure (for example, to inspect versions).
-	type Agent struct {
-		ID      string `json:"id"`
-		Version string `json:"version"`
-	}
-	type AgentsResponse struct {
-		Data struct {
-			AffectedItems []Agent `json:"affected_items"`
-		} `json:"data"`
-		Error   int    `json:"error"`
-		Message string `json:"message"`
-	}
+	// Decode response into our AgentsResponse structure.
 	var agentsResp AgentsResponse
 	respBytes, err := json.Marshal(result)
 	if err != nil {
@@ -278,7 +285,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Now ask the user for the expected (latest) version and store it in the configuration.
+	// Ask the user for the expected (latest) API version.
 	expectedVersion := promptInput("Enter the latest API version", cfg.LatestVersion)
 	cfg.LatestVersion = expectedVersion
 	if err := saveConfig(cfg); err != nil {
@@ -290,7 +297,9 @@ func main() {
 	fmt.Printf("\nInspecting agents for version mismatch (expected version: %s):\n", expectedVersion)
 	foundOutdated := false
 	for _, agent := range agentsResp.Data.AffectedItems {
-		if agent.Version != expectedVersion {
+		// Remove "Wazuh v" prefix if present.
+		actualVersion := strings.TrimPrefix(agent.Version, "Wazuh v")
+		if actualVersion != expectedVersion {
 			fmt.Printf("Agent %s is out of date (version: %s)\n", agent.ID, agent.Version)
 			foundOutdated = true
 		}
