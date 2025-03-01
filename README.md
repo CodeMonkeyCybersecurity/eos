@@ -18,6 +18,24 @@ git clone https://github.com/CodeMonkeyCybersecurity/eos.git
 cd eos
 ```
 
+Install goland on RHEL:
+```
+yum update
+yum install golang
+```
+
+Install golang on Debian-based:
+```
+apt update
+apt install golang
+```
+
+Retreive your first JWT token
+```
+go run createJWT.go
+```
+ 
+
 
 # Other links
 See our website: [cybermonkey.net.au](https://cybermonkey.net.au/)
