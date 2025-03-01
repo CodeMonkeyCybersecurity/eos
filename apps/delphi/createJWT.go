@@ -1,6 +1,6 @@
 package main
 
-imPort (
+import (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
@@ -16,13 +16,13 @@ imPort (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol     string `json:"Protocol"`
+	Protocol     string `json:"protocol"`
 	FQDN         string `json:"FQDN"`
-	Port         string `json:"Port"`
+	Port         string `json:"port"`
 	API_User     string `json:"API_User"`
 	API_Password string `json:"API_Password"`
-	Endpoint     string `json:"Endpoint"`
-	Token        string `json:"Token,omitempty"`
+	Endpoint     string `json:"endpoint"`
+	Token        string `json:"TOKEN,omitempty"`
 }
 
 const configFile = ".delphi.json"
@@ -38,7 +38,7 @@ func loadConfig() (Config, error) {
 	return cfg, err
 }
 
-// saveConfig writes the configuration to .delphi.json.
+// saveConfig writes the configuration back to .delphi.json.
 func saveConfig(cfg Config) error {
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
@@ -47,7 +47,7 @@ func saveConfig(cfg Config) error {
 	return ioutil.WriteFile(configFile, data, 0644)
 }
 
-// promptInput displays a prompt and reads user input; returns the default if input is empty.
+// promptInput displays a prompt and reads user input.
 func promptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
 	if defaultVal != "" {
@@ -65,7 +65,7 @@ func promptInput(prompt, defaultVal string) string {
 
 // promptPassword displays a prompt and reads a password without echoing.
 func promptPassword(prompt, defaultVal string) string {
-	// If there's a default, show it in the prompt, but do not echo if user types nothing.
+	// If there's a default, show a masked value.
 	if defaultVal != "" {
 		fmt.Printf("%s [%s]: ", prompt, "********")
 	} else {
@@ -86,11 +86,12 @@ func promptPassword(prompt, defaultVal string) string {
 }
 
 // confirmConfig displays the current configuration and allows the user to update values.
+// The API_Password is masked when displayed.
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
-	fmt.Printf("  FQDN:      %s\n", cfg.FQDN)
-	fmt.Printf("  API_User:   %s\n", cfg.API_User)
-	fmt.Printf("  API_Password: %s\n", cfg.API_Password)
+	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
+	fmt.Printf("  API_User:      %s\n", cfg.API_User)
+	fmt.Printf("  API_Password:  %s\n", "********")
 
 	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
@@ -108,7 +109,7 @@ func confirmConfig(cfg Config) Config {
 	return cfg
 }
 
-// authenticate logs in to the Wazuh API using basic auth and returns the JWT Token.
+// authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
 func authenticate(cfg Config) (string, error) {
 	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
 	req, err := http.NewRequest("POST", url, nil)
@@ -118,10 +119,10 @@ func authenticate(cfg Config) (string, error) {
 	req.SetBasicAuth(cfg.API_User, cfg.API_Password)
 
 	// Create an HTTP client that skips certificate verification.
-	tr := &http.TransPort{
+	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
-	client := &http.Client{TransPort: tr}
+	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
@@ -133,11 +134,11 @@ func authenticate(cfg Config) (string, error) {
 		return "", err
 	}
 
-	Token := strings.TrimSpace(string(body))
-	if Token == "" {
-		return "", fmt.Errorf("no Token received")
+	token := strings.TrimSpace(string(body))
+	if token == "" {
+		return "", fmt.Errorf("no token received")
 	}
-	return Token, nil
+	return token, nil
 }
 
 func main() {
@@ -160,19 +161,29 @@ func main() {
 	// Confirm or update the configuration.
 	cfg = confirmConfig(cfg)
 
-	// Authenticate to get the JWT Token.
-	fmt.Println("\nRetrieving JWT Token...")
-	Token, err := authenticate(cfg)
+	// Set default values for protocol and port if empty.
+	if cfg.Protocol == "" {
+		cfg.Protocol = "https"
+	}
+	if cfg.Port == "" {
+		cfg.Port = "55000"
+	}
+	// Save configuration if defaults were set.
+	saveConfig(cfg)
+
+	// Authenticate to get the JWT token.
+	fmt.Println("\nRetrieving JWT token...")
+	token, err := authenticate(cfg)
 	if err != nil {
 		fmt.Printf("Error during authentication: %v\n", err)
 		os.Exit(1)
 	}
-	cfg.Token = Token
+	cfg.Token = token
 	if err := saveConfig(cfg); err != nil {
 		fmt.Printf("Error saving configuration: %v\n", err)
 	}
 
-	fmt.Println("\nYour JWT auth Token is:")
-	fmt.Println(Token)
+	fmt.Println("\nYour JWT auth token is:")
+	fmt.Println(token)
 	fmt.Println("\nFINIS")
 }
