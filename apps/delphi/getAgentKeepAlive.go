@@ -1,6 +1,6 @@
 package main
 
-imPort (
+import (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
@@ -9,6 +9,9 @@ imPort (
 	"net/http"
 	"os"
 	"strings"
+
+	"golang.org/x/term"
+	"syscall"
 )
 
 // Config represents the configuration stored in .delphi.json.
@@ -35,6 +38,15 @@ func loadConfig() (Config, error) {
 	return cfg, err
 }
 
+// saveConfig writes the configuration back to .delphi.json.
+func saveConfig(cfg Config) error {
+	data, err := json.MarshalIndent(cfg, "", "    ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(configFile, data, 0644)
+}
+
 // promptInput displays a prompt and reads user input.
 func promptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
@@ -51,16 +63,41 @@ func promptInput(prompt, defaultVal string) string {
 	return input
 }
 
+// promptPassword displays a prompt and reads a password without echoing.
+func promptPassword(prompt, defaultVal string) string {
+	if defaultVal != "" {
+		fmt.Printf("%s [%s]: ", prompt, "********")
+	} else {
+		fmt.Printf("%s: ", prompt)
+	}
+	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	if err != nil {
+		fmt.Println("\nError reading password:", err)
+		os.Exit(1)
+	}
+	fmt.Println("")
+	pass := strings.TrimSpace(string(bytePassword))
+	if pass == "" {
+		return defaultVal
+	}
+	return pass
+}
+
 // confirmConfig displays the current configuration and allows the user to update values.
+// The API_Password is masked when displayed.
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
-	fmt.Printf("  Protocol: %s\n", cfg.Protocol)
-	fmt.Printf("  FQDN:  %s\n", cfg.FQDN)
-	fmt.Printf("  Port:     %s\n", cfg.Port)
-	fmt.Printf("  API_User:  %s\n", cfg.API_User)
-	fmt.Printf("  API_Password: %s\n", cfg.API_Password)
+	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)
+	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
+	fmt.Printf("  Port:          %s\n", cfg.Port)
+	fmt.Printf("  API_User:      %s\n", cfg.API_User)
+	if cfg.API_Password != "" {
+		fmt.Printf("  API_Password:  %s\n", "********")
+	} else {
+		fmt.Printf("  API_Password:  \n")
+	}
 
-	answer := strings.ToLower(promptInput("Are these values correct? (y/n): ", "y"))
+	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
 		newVal := promptInput(fmt.Sprintf("  Protocol [%s]: ", cfg.Protocol), cfg.Protocol)
@@ -79,11 +116,10 @@ func confirmConfig(cfg Config) Config {
 		if newVal != "" {
 			cfg.API_User = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  API_Password [%s]: ", cfg.API_Password), cfg.API_Password)
+		newVal = promptPassword("  API_Password", cfg.API_Password)
 		if newVal != "" {
 			cfg.API_Password = newVal
 		}
-		// Optionally save the updated config
 		if err := saveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
@@ -93,21 +129,12 @@ func confirmConfig(cfg Config) Config {
 	return cfg
 }
 
-// saveConfig writes the configuration back to .delphi.json.
-func saveConfig(cfg Config) error {
-	data, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		return err
-	}
-	return ioutil.WriteFile(configFile, data, 0644)
-}
-
 // getResponse makes an HTTP request and returns the parsed JSON response.
 func getResponse(method, url string, headers map[string]string, verify bool) map[string]interface{} {
-	tr := &http.TransPort{
+	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !verify},
 	}
-	client := &http.Client{TransPort: tr}
+	client := &http.Client{Transport: tr}
 
 	req, err := http.NewRequest(strings.ToUpper(method), url, nil)
 	if err != nil {
@@ -164,7 +191,7 @@ func main() {
 	if cfg.Port == "" {
 		cfg.Port = "55000"
 	}
-	// Optionally, save the configuration if defaults were set.
+	// Save configuration if defaults were set.
 	saveConfig(cfg)
 
 	// Use the configuration values.
@@ -176,8 +203,8 @@ func main() {
 
 	fmt.Printf("\nRequesting data from %s ...\n\n", fullURL)
 	headers := map[string]string{
-	    "Content-Type":  "application/json",
-	    "Authorization": fmt.Sprintf("Bearer %s", cfg.Token),
+		"Content-Type":  "application/json",
+		"Authorization": fmt.Sprintf("Bearer %s", cfg.Token),
 	}
 	response := getResponse("GET", fullURL, headers, false)
 
