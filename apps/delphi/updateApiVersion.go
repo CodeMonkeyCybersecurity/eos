@@ -17,13 +17,14 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol     string `json:"Protocol"`
-	FQDN         string `json:"FQDN"`
-	Port         string `json:"Port"`
-	API_User     string `json:"API_User"`
-	API_Password string `json:"API_Password"`
-	Endpoint     string `json:"Endpoint"`
-	Token        string `json:"Token,omitempty"`
+	Protocol      string `json:"Protocol"`
+	FQDN          string `json:"FQDN"`
+	Port          string `json:"Port"`
+	API_User      string `json:"API_User"`
+	API_Password  string `json:"API_Password"`
+	Endpoint      string `json:"Endpoint"`
+	Token         string `json:"Token,omitempty"`
+	LatestVersion string `json:"LatestVersion,omitempty"`
 }
 
 const configFile = ".delphi.json"
@@ -97,6 +98,7 @@ func confirmConfig(cfg Config) Config {
 	} else {
 		fmt.Printf("  API_Password:  \n")
 	}
+	fmt.Printf("  LatestVersion: %s\n", cfg.LatestVersion)
 
 	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
@@ -120,6 +122,10 @@ func confirmConfig(cfg Config) Config {
 		newVal = promptPassword("  API_Password", cfg.API_Password)
 		if newVal != "" {
 			cfg.API_Password = newVal
+		}
+		newVal = promptInput(fmt.Sprintf("  LatestVersion [%s]: ", cfg.LatestVersion), cfg.LatestVersion)
+		if newVal != "" {
+			cfg.LatestVersion = newVal
 		}
 		if err := saveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
@@ -207,21 +213,26 @@ func promptInputShort(prompt string) string {
 
 func main() {
 	// Gather input details for agent upgrade.
-	apiURLInput := promptInput("Enter the Wazuh API URL (e.g., https://wazuh.domain.com:55000, without trailing slash)", "")
-	// Remove any trailing slash:
-	apiURLInput = strings.TrimRight(apiURLInput, "/")
-	username := promptInput("Enter the API username: ", "")
-	password := promptPassword("Enter the API password: ", "")
-	agentsInput := promptInput("Enter the agent IDs to upgrade (comma separated): ", "")
-
-	// If the user did not specify a protocol in the URL, assume HTTPS.
-	if !strings.HasPrefix(apiURLInput, "http://") && !strings.HasPrefix(apiURLInput, "https://") {
-		apiURLInput = "https://" + apiURLInput
+	// First, try to load configuration from .delphi.json.
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Printf("Error loading configuration: %v\n", err)
+		os.Exit(1)
 	}
+	cfg = confirmConfig(cfg)
+
+	// Construct API URL from config.
+	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
+	// Remove any trailing slash.
+	apiURL = strings.TrimRight(apiURL, "/")
+
+	username := cfg.API_User
+	password := cfg.API_Password
+	agentsInput := promptInput("Enter the agent IDs to upgrade (comma separated): ", "")
 
 	// Authenticate to obtain the JWT token.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
-	token, err := authenticate(apiURLInput, username, password)
+	token, err := authenticate(apiURL, username, password)
 	if err != nil {
 		fmt.Printf("Error during authentication: %v\n", err)
 		os.Exit(1)
@@ -240,7 +251,7 @@ func main() {
 			continue
 		}
 		fmt.Printf("\nUpgrading agent %s...\n", agentID)
-		if err := upgradeAgent(apiURLInput, token, agentID); err != nil {
+		if err := upgradeAgent(apiURL, token, agentID); err != nil {
 			fmt.Printf("Error upgrading agent %s: %v\n", agentID, err)
 		}
 	}
