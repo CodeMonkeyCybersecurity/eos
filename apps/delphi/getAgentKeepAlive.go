@@ -3,112 +3,113 @@ package main
 import (
 	"bufio"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 )
 
-const configFile = ".delphi.json"
-
-// Config represents the configuration settings.
+// Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol string `json:"protocol"`
+	Protocol  string `json:"protocol"`
 	WZFQDN    string `json:"WZ_FQDN"`
-	Port     string `json:"port"`
+	Port      string `json:"port"`
 	WZAPIUSR  string `json:"WZ_API_USR"`
 	WZAPIPASS string `json:"WZ_API_PASSWD"`
-	Endpoint string `json:"endpoint"`
+	Endpoint  string `json:"endpoint"`
 	Token     string `json:"TOKEN,omitempty"`
 }
 
-// loadConfig reads the configuration from config.json.
-func loadConfig() Config {
+const configFile = ".delphi.json"
+
+// loadConfig reads the configuration from .delphi.json.
+func loadConfig() (Config, error) {
 	var cfg Config
 	data, err := ioutil.ReadFile(configFile)
 	if err != nil {
-		fmt.Printf("Error loading configuration: %v\n", err)
-		os.Exit(1)
+		return cfg, err
 	}
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		fmt.Printf("Error parsing configuration: %v\n", err)
-		os.Exit(1)
-	}
-	return cfg
-}
-
-// saveConfig writes the configuration back to config.json.
-func saveConfig(cfg Config) {
-	data, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		fmt.Printf("Error encoding configuration: %v\n", err)
-		os.Exit(1)
-	}
-	if err := ioutil.WriteFile(configFile, data, 0644); err != nil {
-		fmt.Printf("Error saving configuration: %v\n", err)
-		os.Exit(1)
-	}
+	err = json.Unmarshal(data, &cfg)
+	return cfg, err
 }
 
 // promptInput displays a prompt and reads user input.
-func promptInput(prompt string) string {
+func promptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(prompt)
+	if defaultVal != "" {
+		fmt.Printf("%s [%s]: ", prompt, defaultVal)
+	} else {
+		fmt.Printf("%s: ", prompt)
+	}
 	input, _ := reader.ReadString('\n')
-	return strings.TrimSpace(input)
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return defaultVal
+	}
+	return input
 }
 
 // confirmConfig displays the current configuration and allows the user to update values.
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  protocol: %s\n", cfg.Protocol)
-	fmt.Printf("  host:     %s\n", cfg.Host)
+	fmt.Printf("  WZ_FQDN:  %s\n", cfg.WZFQDN)
 	fmt.Printf("  port:     %s\n", cfg.Port)
-	fmt.Printf("  user:     %s\n", cfg.User)
-	fmt.Printf("  password: %s\n", cfg.Password)
+	fmt.Printf("  WZ_API_USR:  %s\n", cfg.WZAPIUSR)
+	fmt.Printf("  WZ_API_PASSWD: %s\n", cfg.WZAPIPASS)
 
-	answer := strings.ToLower(promptInput("Are these values correct? (y/n): "))
+	answer := strings.ToLower(promptInput("Are these values correct? (y/n): ", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
-		newVal := promptInput(fmt.Sprintf("  protocol [%s]: ", cfg.Protocol))
+		newVal := promptInput(fmt.Sprintf("  protocol [%s]: ", cfg.Protocol), cfg.Protocol)
 		if newVal != "" {
 			cfg.Protocol = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  host [%s]: ", cfg.Host))
+		newVal = promptInput(fmt.Sprintf("  WZ_FQDN [%s]: ", cfg.WZFQDN), cfg.WZFQDN)
 		if newVal != "" {
-			cfg.Host = newVal
+			cfg.WZFQDN = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  port [%s]: ", cfg.Port))
+		newVal = promptInput(fmt.Sprintf("  port [%s]: ", cfg.Port), cfg.Port)
 		if newVal != "" {
 			cfg.Port = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  user [%s]: ", cfg.User))
+		newVal = promptInput(fmt.Sprintf("  WZ_API_USR [%s]: ", cfg.WZAPIUSR), cfg.WZAPIUSR)
 		if newVal != "" {
-			cfg.User = newVal
+			cfg.WZAPIUSR = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  password [%s]: ", cfg.Password))
+		newVal = promptInput(fmt.Sprintf("  WZ_API_PASSWD [%s]: ", cfg.WZAPIPASS), cfg.WZAPIPASS)
 		if newVal != "" {
-			cfg.Password = newVal
+			cfg.WZAPIPASS = newVal
 		}
-		saveConfig(cfg)
+		// Optionally save the updated config
+		if err := saveConfig(cfg); err != nil {
+			fmt.Printf("Error saving configuration: %v\n", err)
+			os.Exit(1)
+		}
 		fmt.Println("Configuration updated.\n")
 	}
 	return cfg
 }
 
+// saveConfig writes the configuration back to .delphi.json.
+func saveConfig(cfg Config) error {
+	data, err := json.MarshalIndent(cfg, "", "    ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(configFile, data, 0644)
+}
+
 // getResponse makes an HTTP request and returns the parsed JSON response.
-func getResponse(method, url string, headers map[string]string, verify bool, body io.Reader) map[string]interface{} {
-	// Create a custom HTTP client.
+func getResponse(method, url string, headers map[string]string, verify bool) map[string]interface{} {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !verify},
 	}
 	client := &http.Client{Transport: tr}
 
-	req, err := http.NewRequest(strings.ToUpper(method), url, body)
+	req, err := http.NewRequest(strings.ToUpper(method), url, nil)
 	if err != nil {
 		fmt.Printf("Error creating %s request to %s: %v\n", method, url, err)
 		os.Exit(1)
@@ -145,86 +146,47 @@ func getResponse(method, url string, headers map[string]string, verify bool, bod
 	return result
 }
 
-// authenticate logs in to the Wazuh API using Basic Authentication and returns the JWT token.
-func authenticate(cfg Config) string {
-	protocol := cfg.Protocol
-	host := cfg.Host
-	port := cfg.Port
-	user := cfg.User
-	password := cfg.Password
-
-	baseURL := fmt.Sprintf("%s://%s:%s", protocol, host, port)
-	loginURL := baseURL + "/security/user/authenticate"
-
-	// Create the Basic Auth header.
-	authStr := fmt.Sprintf("%s:%s", user, password)
-	encodedAuth := base64.StdEncoding.EncodeToString([]byte(authStr))
-	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": "Basic " + encodedAuth,
-	}
-
-	fmt.Println("\nLogin request ...\n")
-	result := getResponse("POST", loginURL, headers, false, nil)
-	data, ok := result["data"].(map[string]interface{})
-	if !ok {
-		fmt.Println("Error: no data found in authentication response.")
-		os.Exit(1)
-	}
-	token, ok := data["token"].(string)
-	if !ok || token == "" {
-		fmt.Println("Error: No token found in authentication response.")
-		os.Exit(1)
-	}
-
-	fmt.Println("Authentication successful. Token received.")
-	return token
-}
-
 func main() {
-    // Load and confirm configuration.
-    cfg := loadConfig()
-    cfg = confirmConfig(cfg)
+	// Load configuration from .delphi.json.
+	cfg, err := loadConfig()
+	if err != nil {
+		fmt.Printf("Error loading configuration: %v\n", err)
+		os.Exit(1)
+	}
 
-    // Set default values if they are empty.
-    if cfg.Protocol == "" {
-        cfg.Protocol = "https"
-    }
-    if cfg.Port == "" {
-        cfg.Port = "55000"
-    }
+	// Confirm or update the configuration.
+	cfg = confirmConfig(cfg)
 
-    // Optionally save the defaults if they were set.
-    saveConfig(cfg)
+	// Set default values for protocol and port if empty.
+	if cfg.Protocol == "" {
+		cfg.Protocol = "https"
+	}
+	if cfg.Port == "" {
+		cfg.Port = "55000"
+	}
+	// Optionally, save the configuration if defaults were set.
+	saveConfig(cfg)
 
-    // Set default endpoint if not provided.
-    if cfg.Endpoint == "" {
-        cfg.Endpoint = "/agents?select=lastKeepAlive&select=id&status=disconnected"
-    }
+	// Use the configuration values.
+	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.WZFQDN, cfg.Port)
+	if cfg.Endpoint == "" {
+		cfg.Endpoint = "/agents?select=lastKeepAlive&select=id&status=disconnected"
+	}
+	fullURL := baseURL + cfg.Endpoint
 
-    baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.Host, cfg.Port)
+	fmt.Printf("\nRequesting data from %s ...\n\n", fullURL)
+	headers := map[string]string{
+		"Content-Type": "application/json",
+		// Optionally include auth headers if needed.
+	}
+	response := getResponse("GET", fullURL, headers, false)
 
-    // Authenticate to get the JWT token.
-    token := authenticate(cfg)
-    cfg.Token = token
-    saveConfig(cfg)
-
-    // Setup headers for further API requests.
-    headers := map[string]string{
-        "Content-Type":  "application/json",
-        "Authorization": fmt.Sprintf("Bearer %s", token),
-    }
-
-    fullURL := baseURL + cfg.Endpoint
-    fmt.Printf("\nRequesting data from %s ...\n\n", fullURL)
-    response := getResponse("GET", fullURL, headers, false, nil)
-
-    // Pretty-print the JSON response.
-    pretty, err := json.MarshalIndent(response, "", "    ")
-    if err != nil {
-        fmt.Printf("Error formatting response: %v\n", err)
-        os.Exit(1)
-    }
-    fmt.Println("Response:")
-    fmt.Println(string(pretty))
+	// Pretty-print the JSON response.
+	pretty, err := json.MarshalIndent(response, "", "    ")
+	if err != nil {
+		fmt.Printf("Error formatting response: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Println("Response:")
+	fmt.Println(string(pretty))
 }
