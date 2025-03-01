@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -65,7 +64,6 @@ func promptInput(prompt string) string {
 
 // confirmConfig displays the current configuration and allows the user to update values.
 func confirmConfig(cfg Config) Config {
-	keys := []string{"protocol", "host", "port", "user", "password"}
 	fmt.Println("Current configuration:")
 	fmt.Printf("  protocol: %s\n", cfg.Protocol)
 	fmt.Printf("  host:     %s\n", cfg.Host)
