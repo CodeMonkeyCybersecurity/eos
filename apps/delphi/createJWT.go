@@ -16,13 +16,14 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol  string `json:"protocol"`
-	FQDN    string `json:"FQDN"`
-	Port      string `json:"port"`
-	API_User  string `json:"API_User"`
+	Protocol     string `json:"protocol"`
+	FQDN         string `json:"FQDN"`
+	Port         string `json:"port"`
+	API_User     string `json:"API_User"`
 	API_Password string `json:"API_Password"`
-	Endpoint  string `json:"endpoint"`
-	Token     string `json:"TOKEN,omitempty"`
+	Endpoint     string `json:"endpoint"`
+	Token        string `json:"Token,omitempty"`
+}
 
 const configFile = ".delphi.json"
 
@@ -107,7 +108,7 @@ func confirmConfig(cfg Config) Config {
 	return cfg
 }
 
-// authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
+// authenticate logs in to the Wazuh API using basic auth and returns the JWT Token.
 func authenticate(cfg Config) (string, error) {
 	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
 	req, err := http.NewRequest("POST", url, nil)
@@ -132,11 +133,11 @@ func authenticate(cfg Config) (string, error) {
 		return "", err
 	}
 
-	token := strings.TrimSpace(string(body))
-	if token == "" {
-		return "", fmt.Errorf("no token received")
+	Token := strings.TrimSpace(string(body))
+	if Token == "" {
+		return "", fmt.Errorf("no Token received")
 	}
-	return token, nil
+	return Token, nil
 }
 
 func main() {
@@ -159,19 +160,19 @@ func main() {
 	// Confirm or update the configuration.
 	cfg = confirmConfig(cfg)
 
-	// Authenticate to get the JWT token.
-	fmt.Println("\nRetrieving JWT token...")
-	token, err := authenticate(cfg)
+	// Authenticate to get the JWT Token.
+	fmt.Println("\nRetrieving JWT Token...")
+	Token, err := authenticate(cfg)
 	if err != nil {
 		fmt.Printf("Error during authentication: %v\n", err)
 		os.Exit(1)
 	}
-	cfg.Token = token
+	cfg.Token = Token
 	if err := saveConfig(cfg); err != nil {
 		fmt.Printf("Error saving configuration: %v\n", err)
 	}
 
-	fmt.Println("\nYour JWT auth token is:")
-	fmt.Println(token)
+	fmt.Println("\nYour JWT auth Token is:")
+	fmt.Println(Token)
 	fmt.Println("\nFINIS")
 }
