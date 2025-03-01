@@ -11,14 +11,16 @@ services:
     networks:
       - eos-network
 
+services:
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    # Use HTTPS and point to our mounted certificate files:
     command: [
       "start",
-      "--https-port=8111",
+      "--https-port=8443",
       "--https-certificate-file=/etc/x509/https/tls.crt",
-      "--https-certificate-key-file=/etc/x509/https/tls.key"
+      "--https-certificate-key-file=/etc/x509/https/tls.key",
+      "--optimized",
+      "--verbose"
     ]
     container_name: hera-keycloak
     environment:
@@ -29,7 +31,6 @@ services:
       KC_DB_USERNAME: keycloak
       KC_DB_PASSWORD: changeme
       KC_HOSTNAME: hera.domain.com
-      # Optionally, if needed by your setup:
       KC_EXTERNAL_URL: "https://hera.domain.com"
     ports:
       - "8111:8443"
