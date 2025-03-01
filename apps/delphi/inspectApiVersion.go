@@ -16,13 +16,14 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol     string `json:"Protocol"`
-	FQDN         string `json:"FQDN"`
-	Port         string `json:"Port"`
-	API_User     string `json:"API_User"`
-	API_Password string `json:"API_Password"`
-	Endpoint     string `json:"Endpoint"`
-	Token        string `json:"Token,omitempty"`
+	Protocol      string `json:"Protocol"`
+	FQDN          string `json:"FQDN"`
+	Port          string `json:"Port"`
+	API_User      string `json:"API_User"`
+	API_Password  string `json:"API_Password"`
+	Endpoint      string `json:"Endpoint"`
+	Token         string `json:"Token,omitempty"`
+	LatestVersion string `json:"LatestVersion,omitempty"`
 }
 
 const configFile = ".delphi.json"
@@ -47,7 +48,7 @@ func saveConfig(cfg Config) error {
 	return ioutil.WriteFile(configFile, data, 0644)
 }
 
-// promptInput displays a prompt and reads user input.
+// promptInput displays a prompt and reads user input; returns the default if input is empty.
 func promptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
 	if defaultVal != "" {
@@ -96,6 +97,7 @@ func confirmConfig(cfg Config) Config {
 	} else {
 		fmt.Printf("  API_Password:  \n")
 	}
+	fmt.Printf("  LatestVersion: %s\n", cfg.LatestVersion)
 
 	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
@@ -119,6 +121,10 @@ func confirmConfig(cfg Config) Config {
 		newVal = promptPassword("  API_Password", cfg.API_Password)
 		if newVal != "" {
 			cfg.API_Password = newVal
+		}
+		newVal = promptInput(fmt.Sprintf("  LatestVersion [%s]: ", cfg.LatestVersion), cfg.LatestVersion)
+		if newVal != "" {
+			cfg.LatestVersion = newVal
 		}
 		if err := saveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
@@ -200,25 +206,7 @@ func getResponse(method, url string, headers map[string]string, verify bool) map
 	return result
 }
 
-// Agent represents an individual agent returned by the API.
-type Agent struct {
-	ID      string `json:"id"`
-	Version string `json:"version"`
-}
-
-// AgentsResponse represents the API response for the agents query.
-type AgentsResponse struct {
-	Data struct {
-		AffectedItems []Agent `json:"affected_items"`
-	} `json:"data"`
-	Error   int    `json:"error"`
-	Message string `json:"message"`
-}
-
 func main() {
-	// Define the expected version for agents (adjust as needed).
-	const expectedVersion = "4.4.0"
-
 	// Load configuration from .delphi.json.
 	cfg, err := loadConfig()
 	if err != nil {
@@ -238,7 +226,7 @@ func main() {
 	}
 	saveConfig(cfg)
 
-	// Ensure a valid JWT token exists; if not, authenticate.
+	// Authenticate to get the JWT token if not already present.
 	if cfg.Token == "" {
 		fmt.Println("\nRetrieving JWT token...")
 		token, err := authenticate(cfg)
@@ -253,14 +241,13 @@ func main() {
 		fmt.Println("\nJWT token retrieved.")
 	}
 
-	// Set the endpoint to fetch agent id and version.
+	// Use the configuration values.
+	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	if cfg.Endpoint == "" {
 		cfg.Endpoint = "/agents?select=id,version"
 	}
-	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	fullURL := baseURL + cfg.Endpoint
 
-	// Make the GET request with the JWT token.
 	fmt.Printf("\nRequesting agent information from %s ...\n\n", fullURL)
 	headers := map[string]string{
 		"Content-Type":  "application/json",
@@ -268,7 +255,18 @@ func main() {
 	}
 	result := getResponse("GET", fullURL, headers, false)
 
-	// Decode the response into our AgentsResponse structure.
+	// Decode response into a structure (for example, to inspect versions).
+	type Agent struct {
+		ID      string `json:"id"`
+		Version string `json:"version"`
+	}
+	type AgentsResponse struct {
+		Data struct {
+			AffectedItems []Agent `json:"affected_items"`
+		} `json:"data"`
+		Error   int    `json:"error"`
+		Message string `json:"message"`
+	}
 	var agentsResp AgentsResponse
 	respBytes, err := json.Marshal(result)
 	if err != nil {
@@ -277,6 +275,14 @@ func main() {
 	}
 	if err := json.Unmarshal(respBytes, &agentsResp); err != nil {
 		fmt.Printf("Error decoding response: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Now ask the user for the expected (latest) version and store it in the configuration.
+	expectedVersion := promptInput("Enter the latest API version", cfg.LatestVersion)
+	cfg.LatestVersion = expectedVersion
+	if err := saveConfig(cfg); err != nil {
+		fmt.Printf("Error saving configuration with latest version: %v\n", err)
 		os.Exit(1)
 	}
 
