@@ -1,6 +1,6 @@
 package main
 
-import (
+imPort (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
@@ -13,13 +13,13 @@ import (
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol  string `json:"protocol"`
-	FQDN    string `json:"FQDN"`
-	Port      string `json:"port"`
-	API_User  string `json:"API_User"`
+	Protocol     string `json:"Protocol"`
+	FQDN         string `json:"FQDN"`
+	Port         string `json:"Port"`
+	API_User     string `json:"API_User"`
 	API_Password string `json:"API_Password"`
-	Endpoint  string `json:"endpoint"`
-	Token     string `json:"TOKEN,omitempty"`
+	Endpoint     string `json:"Endpoint"`
+	Token        string `json:"Token,omitempty"`
 }
 
 const configFile = ".delphi.json"
@@ -54,16 +54,16 @@ func promptInput(prompt, defaultVal string) string {
 // confirmConfig displays the current configuration and allows the user to update values.
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
-	fmt.Printf("  protocol: %s\n", cfg.Protocol)
+	fmt.Printf("  Protocol: %s\n", cfg.Protocol)
 	fmt.Printf("  FQDN:  %s\n", cfg.FQDN)
-	fmt.Printf("  port:     %s\n", cfg.Port)
-	fmt.Printf("  WZ_API_USR:  %s\n", cfg.API_User)
-	fmt.Printf("  WZ_API_PASSWD: %s\n", cfg.API_Password)
+	fmt.Printf("  Port:     %s\n", cfg.Port)
+	fmt.Printf("  API_User:  %s\n", cfg.API_User)
+	fmt.Printf("  API_Password: %s\n", cfg.API_Password)
 
 	answer := strings.ToLower(promptInput("Are these values correct? (y/n): ", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
-		newVal := promptInput(fmt.Sprintf("  protocol [%s]: ", cfg.Protocol), cfg.Protocol)
+		newVal := promptInput(fmt.Sprintf("  Protocol [%s]: ", cfg.Protocol), cfg.Protocol)
 		if newVal != "" {
 			cfg.Protocol = newVal
 		}
@@ -71,15 +71,15 @@ func confirmConfig(cfg Config) Config {
 		if newVal != "" {
 			cfg.FQDN = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  port [%s]: ", cfg.Port), cfg.Port)
+		newVal = promptInput(fmt.Sprintf("  Port [%s]: ", cfg.Port), cfg.Port)
 		if newVal != "" {
 			cfg.Port = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  WZ_API_USR [%s]: ", cfg.API_User), cfg.API_User)
+		newVal = promptInput(fmt.Sprintf("  API_User [%s]: ", cfg.API_User), cfg.API_User)
 		if newVal != "" {
 			cfg.API_User = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  WZ_API_PASSWD [%s]: ", cfg.API_Password), cfg.API_Password)
+		newVal = promptInput(fmt.Sprintf("  API_Password [%s]: ", cfg.API_Password), cfg.API_Password)
 		if newVal != "" {
 			cfg.API_Password = newVal
 		}
@@ -104,10 +104,10 @@ func saveConfig(cfg Config) error {
 
 // getResponse makes an HTTP request and returns the parsed JSON response.
 func getResponse(method, url string, headers map[string]string, verify bool) map[string]interface{} {
-	tr := &http.Transport{
+	tr := &http.TransPort{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !verify},
 	}
-	client := &http.Client{Transport: tr}
+	client := &http.Client{TransPort: tr}
 
 	req, err := http.NewRequest(strings.ToUpper(method), url, nil)
 	if err != nil {
@@ -157,7 +157,7 @@ func main() {
 	// Confirm or update the configuration.
 	cfg = confirmConfig(cfg)
 
-	// Set default values for protocol and port if empty.
+	// Set default values for Protocol and Port if empty.
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"
 	}
