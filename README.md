@@ -14,7 +14,7 @@ su
 
 ```
 cd /opt
-git pull https://github.com/CodeMonkeyCybersecurity/eos.git
+git clone https://github.com/CodeMonkeyCybersecurity/eos.git
 cd eos
 ```
 
