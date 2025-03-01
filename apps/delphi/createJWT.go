@@ -115,7 +115,7 @@ func authenticate(cfg Config) (string, error) {
 	req.SetBasicAuth(cfg.WZAPIUSR, cfg.WZAPIPASS)
 
 	// Create an HTTP client that skips certificate verification.
-	tr := &tls.Transport{
+	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
 	client := &http.Client{Transport: tr}
