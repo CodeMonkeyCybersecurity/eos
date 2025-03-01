@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-const configFile = "config.json"
+const configFile = ".delphi.json"
 
 // Config represents the configuration settings.
 type Config struct {
