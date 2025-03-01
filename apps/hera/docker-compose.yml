@@ -49,7 +49,7 @@ services:
       - generate-certs
     networks:
       - eos-network
-     
+
 volumes:
   pgdata:
   keycloak-certs:
