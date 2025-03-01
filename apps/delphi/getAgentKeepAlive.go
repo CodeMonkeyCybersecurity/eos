@@ -14,10 +14,10 @@ import (
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
 	Protocol  string `json:"protocol"`
-	WZFQDN    string `json:"WZ_FQDN"`
+	FQDN    string `json:"FQDN"`
 	Port      string `json:"port"`
-	WZAPIUSR  string `json:"WZ_API_USR"`
-	WZAPIPASS string `json:"WZ_API_PASSWD"`
+	API_User  string `json:"API_User"`
+	API_Password string `json:"API_Password"`
 	Endpoint  string `json:"endpoint"`
 	Token     string `json:"TOKEN,omitempty"`
 }
@@ -55,10 +55,10 @@ func promptInput(prompt, defaultVal string) string {
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  protocol: %s\n", cfg.Protocol)
-	fmt.Printf("  WZ_FQDN:  %s\n", cfg.WZFQDN)
+	fmt.Printf("  FQDN:  %s\n", cfg.FQDN)
 	fmt.Printf("  port:     %s\n", cfg.Port)
-	fmt.Printf("  WZ_API_USR:  %s\n", cfg.WZAPIUSR)
-	fmt.Printf("  WZ_API_PASSWD: %s\n", cfg.WZAPIPASS)
+	fmt.Printf("  WZ_API_USR:  %s\n", cfg.API_User)
+	fmt.Printf("  WZ_API_PASSWD: %s\n", cfg.API_Password)
 
 	answer := strings.ToLower(promptInput("Are these values correct? (y/n): ", "y"))
 	if answer != "y" {
@@ -67,21 +67,21 @@ func confirmConfig(cfg Config) Config {
 		if newVal != "" {
 			cfg.Protocol = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  WZ_FQDN [%s]: ", cfg.WZFQDN), cfg.WZFQDN)
+		newVal = promptInput(fmt.Sprintf("  FQDN [%s]: ", cfg.FQDN), cfg.FQDN)
 		if newVal != "" {
-			cfg.WZFQDN = newVal
+			cfg.FQDN = newVal
 		}
 		newVal = promptInput(fmt.Sprintf("  port [%s]: ", cfg.Port), cfg.Port)
 		if newVal != "" {
 			cfg.Port = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  WZ_API_USR [%s]: ", cfg.WZAPIUSR), cfg.WZAPIUSR)
+		newVal = promptInput(fmt.Sprintf("  WZ_API_USR [%s]: ", cfg.API_User), cfg.API_User)
 		if newVal != "" {
-			cfg.WZAPIUSR = newVal
+			cfg.API_User = newVal
 		}
-		newVal = promptInput(fmt.Sprintf("  WZ_API_PASSWD [%s]: ", cfg.WZAPIPASS), cfg.WZAPIPASS)
+		newVal = promptInput(fmt.Sprintf("  WZ_API_PASSWD [%s]: ", cfg.API_Password), cfg.API_Password)
 		if newVal != "" {
-			cfg.WZAPIPASS = newVal
+			cfg.API_Password = newVal
 		}
 		// Optionally save the updated config
 		if err := saveConfig(cfg); err != nil {
@@ -168,7 +168,7 @@ func main() {
 	saveConfig(cfg)
 
 	// Use the configuration values.
-	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.WZFQDN, cfg.Port)
+	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	if cfg.Endpoint == "" {
 		cfg.Endpoint = "/agents?select=lastKeepAlive&select=id&status=disconnected"
 	}
@@ -176,8 +176,8 @@ func main() {
 
 	fmt.Printf("\nRequesting data from %s ...\n\n", fullURL)
 	headers := map[string]string{
-		"Content-Type": "application/json",
-		// Optionally include auth headers if needed.
+	    "Content-Type":  "application/json",
+	    "Authorization": fmt.Sprintf("Bearer %s", cfg.Token),
 	}
 	response := getResponse("GET", fullURL, headers, false)
 
