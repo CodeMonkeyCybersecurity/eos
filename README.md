@@ -22,12 +22,14 @@ Install goland on RHEL:
 ```
 yum update
 yum install golang
+go get golang.org/x/term
 ```
 
 Install golang on Debian-based:
 ```
 apt update
 apt install golang
+go get golang.org/x/term
 ```
 
 Retreive your first JWT token
