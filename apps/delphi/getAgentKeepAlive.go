@@ -18,12 +18,12 @@ const configFile = ".delphi.json"
 // Config represents the configuration settings.
 type Config struct {
 	Protocol string `json:"protocol"`
-	Host     string `json:"host"`
+	WZFQDN    string `json:"WZ_FQDN"`
 	Port     string `json:"port"`
-	User     string `json:"user"`
-	Password string `json:"password"`
+	WZAPIUSR  string `json:"WZ_API_USR"`
+	WZAPIPASS string `json:"WZ_API_PASSWD"`
 	Endpoint string `json:"endpoint"`
-	JwtToken string `json:"jwt_token,omitempty"`
+	Token     string `json:"TOKEN,omitempty"`
 }
 
 // loadConfig reads the configuration from config.json.
@@ -182,41 +182,49 @@ func authenticate(cfg Config) string {
 }
 
 func main() {
-	// Load and confirm configuration.
-	cfg := loadConfig()
-	cfg = confirmConfig(cfg)
+    // Load and confirm configuration.
+    cfg := loadConfig()
+    cfg = confirmConfig(cfg)
 
-	// Set default endpoint if not provided.
-	if cfg.Endpoint == "" {
-		cfg.Endpoint = "/agents?select=lastKeepAlive&select=id&status=disconnected"
-	}
+    // Set default values if they are empty.
+    if cfg.Protocol == "" {
+        cfg.Protocol = "https"
+    }
+    if cfg.Port == "" {
+        cfg.Port = "55000"
+    }
 
-	protocol := cfg.Protocol
-	host := cfg.Host
-	port := cfg.Port
-	baseURL := fmt.Sprintf("%s://%s:%s", protocol, host, port)
+    // Optionally save the defaults if they were set.
+    saveConfig(cfg)
 
-	// Authenticate to get the JWT token.
-	token := authenticate(cfg)
-	cfg.JwtToken = token
-	saveConfig(cfg)
+    // Set default endpoint if not provided.
+    if cfg.Endpoint == "" {
+        cfg.Endpoint = "/agents?select=lastKeepAlive&select=id&status=disconnected"
+    }
 
-	// Setup headers for further API requests.
-	headers := map[string]string{
-		"Content-Type":  "application/json",
-		"Authorization": fmt.Sprintf("Bearer %s", token),
-	}
+    baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.Host, cfg.Port)
 
-	fullURL := baseURL + cfg.Endpoint
-	fmt.Printf("\nRequesting data from %s ...\n\n", fullURL)
-	response := getResponse("GET", fullURL, headers, false, nil)
+    // Authenticate to get the JWT token.
+    token := authenticate(cfg)
+    cfg.Token = token
+    saveConfig(cfg)
 
-	// Pretty-print the JSON response.
-	pretty, err := json.MarshalIndent(response, "", "    ")
-	if err != nil {
-		fmt.Printf("Error formatting response: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Println("Response:")
-	fmt.Println(string(pretty))
+    // Setup headers for further API requests.
+    headers := map[string]string{
+        "Content-Type":  "application/json",
+        "Authorization": fmt.Sprintf("Bearer %s", token),
+    }
+
+    fullURL := baseURL + cfg.Endpoint
+    fmt.Printf("\nRequesting data from %s ...\n\n", fullURL)
+    response := getResponse("GET", fullURL, headers, false, nil)
+
+    // Pretty-print the JSON response.
+    pretty, err := json.MarshalIndent(response, "", "    ")
+    if err != nil {
+        fmt.Printf("Error formatting response: %v\n", err)
+        os.Exit(1)
+    }
+    fmt.Println("Response:")
+    fmt.Println(string(pretty))
 }
