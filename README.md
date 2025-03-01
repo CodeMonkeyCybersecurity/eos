@@ -5,6 +5,20 @@ We use all the tools here on a daily basis. Because of this, you can be assured 
 
 # See out knowledge base, [Athena](https://wiki.cybermonkey.net.au), for more on how to use this.
 
+# Quick deployment
+## Unix-like systems only
+Give yourself admin access
+```
+su
+```
+
+```
+cd /opt
+git pull https://github.com/CodeMonkeyCybersecurity/eos.git
+cd eos
+```
+
+
 # Other links
 See our website: [cybermonkey.net.au](https://cybermonkey.net.au/)
 
