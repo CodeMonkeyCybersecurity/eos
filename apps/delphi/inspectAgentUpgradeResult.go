@@ -184,7 +184,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 	}
 	fmt.Printf("DEBUG: Payload: %s\n", string(payloadBytes))
 	
-	req, err := http.NewRequest("PUT", queryURL, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequest("POST", queryURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return err
 	}
