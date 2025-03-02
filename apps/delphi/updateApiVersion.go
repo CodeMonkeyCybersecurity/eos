@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"strconv"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/term"
@@ -162,17 +162,12 @@ func authenticate(apiURL, username, password string) (string, error) {
 	return token, nil
 }
 
-// upgradeAgent sends a PUT request to the upgrade endpoint with the correct query parameter.
-func upgradeAgent(apiURL, token string, agentIDs []int, payload []byte) error {
-	// Convert agentIDs to a comma-separated string.
-	var idStrs []string
-	for _, id := range agentIDs {
-		idStrs = append(idStrs, strconv.Itoa(id))
-	}
-	agentsQuery := strings.Join(idStrs, ",")
+// upgradeAgent sends a PUT request to the upgrade endpoint with the required agents_list parameter.
+func upgradeAgent(apiURL, token string, agentIDs []string, payload []byte) error {
+	// Join agentIDs as a comma-separated string.
+	agentsQuery := strings.Join(agentIDs, ",")
 	upgradeURL := fmt.Sprintf("%s/agents/upgrade?agents_list=%s&pretty=true", apiURL, agentsQuery)
 	fmt.Printf("DEBUG: Requesting upgrade at %s\n", upgradeURL)
-
 	req, err := http.NewRequest("PUT", upgradeURL, bytes.NewBuffer(payload))
 	if err != nil {
 		return err
@@ -215,7 +210,7 @@ func main() {
 	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	apiURL = strings.TrimRight(apiURL, "/")
 
-	// Authenticate.
+	// Authenticate to obtain the JWT token.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
 	token, err := authenticate(apiURL, cfg.API_User, cfg.API_Password)
 	if err != nil {
@@ -224,21 +219,21 @@ func main() {
 	}
 	fmt.Println("Authentication successful. JWT token acquired.")
 
-	// Prompt for agent IDs.
+	// Prompt for agent IDs to upgrade as strings.
 	agentIDsInput := promptInput("Enter agent IDs to upgrade (comma separated)", "")
 	agentIDsSlice := strings.Split(agentIDsInput, ",")
 	var agentIDs []string
 	for _, s := range agentIDsSlice {
-	    s = strings.TrimSpace(s)
-	    if s == "" {
-	        continue
-	    }
-	    // Keep the string as-is so that "001" stays "001"
-	    agentIDs = append(agentIDs, s)
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		// Preserve the string (e.g., "001" stays "001")
+		agentIDs = append(agentIDs, s)
 	}
 	if len(agentIDs) == 0 {
-	    fmt.Println("No agent IDs provided.")
-	    os.Exit(1)
+		fmt.Println("No agent IDs provided.")
+		os.Exit(1)
 	}
 
 	// Prompt for upgrade parameters.
@@ -255,14 +250,14 @@ func main() {
 	forceUpgrade := strings.ToLower(forceStr) == "true"
 	packageType := promptInput("Enter package type (rpm/deb)", "rpm")
 
-	// Build the payload.
+	// Build the upgrade request payload.
 	payloadMap := map[string]interface{}{
 		"origin": map[string]string{
 			"module": "api",
 		},
 		"command": "upgrade",
 		"parameters": map[string]interface{}{
-			"agents":        agentIDs,  // also included in payload
+			"agents":        agentIDs,
 			"wpk_repo":      wpkRepo,
 			"version":       version,
 			"use_http":      useHTTP,
