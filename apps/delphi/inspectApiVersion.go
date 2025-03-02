@@ -287,7 +287,10 @@ func main() {
 
 	// Ask the user for the expected (latest) API version.
 	expectedVersion := promptInput("Enter the latest API version", cfg.LatestVersion)
-	cfg.LatestVersion = expectedVersion
+	if expectedVersion != "" {
+	    cfg.LatestVersion = expectedVersion
+	}
+	saveConfig(cfg)
 	if err := saveConfig(cfg); err != nil {
 		fmt.Printf("Error saving configuration with latest version: %v\n", err)
 		os.Exit(1)
