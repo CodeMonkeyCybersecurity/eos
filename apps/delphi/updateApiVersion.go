@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 
 	"golang.org/x/term"
@@ -86,7 +87,6 @@ func promptPassword(prompt, defaultVal string) string {
 }
 
 // confirmConfig displays the current configuration and allows the user to update values.
-// The API_Password is masked when displayed.
 func confirmConfig(cfg Config) Config {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)
@@ -136,7 +136,7 @@ func confirmConfig(cfg Config) Config {
 	return cfg
 }
 
-// authenticate logs in to the Wazuh API using HTTP Basic Authentication and returns a JWT token.
+// authenticate logs in to the Wazuh API using basic auth and returns a JWT token.
 func authenticate(apiURL, username, password string) (string, error) {
 	authURL := fmt.Sprintf("%s/security/user/authenticate?raw=true", apiURL)
 	req, err := http.NewRequest("POST", authURL, nil)
@@ -144,7 +144,6 @@ func authenticate(apiURL, username, password string) (string, error) {
 		return "", err
 	}
 	req.SetBasicAuth(username, password)
-
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
@@ -152,137 +151,124 @@ func authenticate(apiURL, username, password string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
-
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("authentication failed (%d): %s", resp.StatusCode, string(bodyBytes))
 	}
-
 	token := strings.TrimSpace(string(bodyBytes))
 	return token, nil
 }
 
-// upgradeAgent sends a PUT request to the /agents/{agent_id}/upgrade endpoint to update the agent.
-func upgradeAgent(apiURL, token, agentID string) error {
-	upgradeURL := fmt.Sprintf("%s/agents/upgrade?agents_list=%s&pretty=true", apiURL, agentID)
-	fmt.Printf("DEBUG: Requesting upgrade for agent %s at %s\n", agentID, upgradeURL)
-
-	// Log the payload details.
-	payload := map[string]interface{}{}
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("DEBUG: Payload: %s\n", string(jsonPayload))
-
-	req, err := http.NewRequest("PUT", upgradeURL, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	fmt.Printf("DEBUG: Request Headers: %+v\n", req.Header)
-
-	// Use a custom HTTP client with insecure TLS for debugging.
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	fmt.Printf("DEBUG: HTTP Response Status: %s\n", resp.Status)
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("DEBUG: HTTP Response Body: %s\n", string(bodyBytes))
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("agent %s upgrade failed (%d): %s", agentID, resp.StatusCode, string(bodyBytes))
-	}
-
-	fmt.Printf("Agent %s upgraded successfully: %s\n", agentID, string(bodyBytes))
-	return nil
-}
-
-// promptInputShort displays a prompt and reads input from stdin.
-func promptInputShort(prompt string) string {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print(prompt)
-	input, _ := reader.ReadString('\n')
-	return strings.TrimSpace(input)
-}
-
 func main() {
-	// Load configuration from .delphi.json.
+	// Load and confirm configuration.
 	cfg, err := loadConfig()
 	if err != nil {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
-
-	// Confirm or update the configuration (only once).
 	cfg = confirmConfig(cfg)
-
-	// Set default values for Protocol and Port if empty.
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"
 	}
 	if cfg.Port == "" {
 		cfg.Port = "55000"
 	}
-
-	// If LatestVersion is still empty, prompt the user.
-	if cfg.LatestVersion == "" {
-		newVer := promptInput("Enter the latest API version", "")
-		if newVer != "" {
-			cfg.LatestVersion = newVer
-			if err := saveConfig(cfg); err != nil {
-				fmt.Printf("Error saving configuration with latest version: %v\n", err)
-				os.Exit(1)
-			}
-		}
-	}
-
-	// Construct API URL from config.
+	// Construct API URL.
 	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	apiURL = strings.TrimRight(apiURL, "/")
 
-	username := cfg.API_User
-	password := cfg.API_Password
-	agentsInput := promptInput("Enter the agent IDs to upgrade (comma separated): ", "")
-
-	// Authenticate to obtain the JWT token.
+	// Authenticate and get JWT token.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
-	token, err := authenticate(apiURL, username, password)
+	token, err := authenticate(apiURL, cfg.API_User, cfg.API_Password)
 	if err != nil {
 		fmt.Printf("Error during authentication: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Println("Authentication successful. JWT token acquired.")
 
-	// Process the list of agent IDs.
-	agentIDs := strings.Split(agentsInput, ",")
-	for i, agentID := range agentIDs {
-		agentIDs[i] = strings.TrimSpace(agentID)
-	}
-
-	// Upgrade each agent.
-	for _, agentID := range agentIDs {
-		if agentID == "" {
+	// Prompt for agent IDs to upgrade.
+	agentIDsInput := promptInput("Enter agent IDs to upgrade (comma separated)", "")
+	agentIDsStr := strings.Split(agentIDsInput, ",")
+	var agentIDs []int
+	for _, s := range agentIDsStr {
+		s = strings.TrimSpace(s)
+		if s == "" {
 			continue
 		}
-		fmt.Printf("\nUpgrading agent %s...\n", agentID)
-		if err := upgradeAgent(apiURL, token, agentID); err != nil {
-			fmt.Printf("Error upgrading agent %s: %v\n", agentID, err)
+		id, err := strconv.Atoi(s)
+		if err != nil {
+			fmt.Printf("Invalid agent ID: %s\n", s)
+			os.Exit(1)
 		}
+		agentIDs = append(agentIDs, id)
+	}
+	if len(agentIDs) == 0 {
+		fmt.Println("No agent IDs provided.")
+		os.Exit(1)
 	}
 
-	fmt.Println("\nAgent upgrade process completed.")
+	// Prompt for upgrade parameters.
+	defaultRepo := "packages.wazuh.com/wpk/"
+	wpkRepo := promptInput("Enter WPK repository", defaultRepo)
+	// Use LatestVersion from config as default version (prepend "v" if not present).
+	defaultVersion := cfg.LatestVersion
+	if defaultVersion != "" && !strings.HasPrefix(defaultVersion, "v") {
+		defaultVersion = "v" + defaultVersion
+	}
+	version := promptInput("Enter upgrade version", defaultVersion)
+	useHTTPStr := promptInput("Use HTTP instead of HTTPS? (true/false)", "false")
+	useHTTP := strings.ToLower(useHTTPStr) == "true"
+	forceStr := promptInput("Force upgrade? (true/false)", "false")
+	forceUpgrade := strings.ToLower(forceStr) == "true"
+	packageType := promptInput("Enter package type (rpm/deb)", "rpm")
+
+	// Build the upgrade request payload.
+	payload := map[string]interface{}{
+		"origin": map[string]string{
+			"module": "api",
+		},
+		"command": "upgrade",
+		"parameters": map[string]interface{}{
+			"agents":        agentIDs,
+			"wpk_repo":      wpkRepo,
+			"version":       version,
+			"use_http":      useHTTP,
+			"force_upgrade": forceUpgrade,
+			"package_type":  packageType,
+		},
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Printf("Error marshaling payload: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("\nPayload:\n%s\n", string(payloadBytes))
+
+	// Send the upgrade request.
+	upgradeURL := fmt.Sprintf("%s/agents/upgrade?pretty=true", apiURL)
+	req, err := http.NewRequest("PUT", upgradeURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		fmt.Printf("Error creating upgrade request: %v\n", err)
+		os.Exit(1)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("Error making upgrade request: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Error reading upgrade response: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("\nUpgrade response (status %d):\n%s\n", resp.StatusCode, string(respBody))
 }
