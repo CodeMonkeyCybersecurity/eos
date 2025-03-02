@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -162,6 +163,42 @@ func authenticate(apiURL, username, password string) (string, error) {
 	return token, nil
 }
 
+// upgradeAgent sends a PUT request to the upgrade endpoint with the correct query parameter.
+func upgradeAgent(apiURL, token string, agentIDs []int, payload []byte) error {
+	// Convert agentIDs to a comma-separated string.
+	var idStrs []string
+	for _, id := range agentIDs {
+		idStrs = append(idStrs, strconv.Itoa(id))
+	}
+	agentsQuery := strings.Join(idStrs, ",")
+	upgradeURL := fmt.Sprintf("%s/agents/upgrade?agents_list=%s&pretty=true", apiURL, agentsQuery)
+	fmt.Printf("DEBUG: Requesting upgrade at %s\n", upgradeURL)
+
+	req, err := http.NewRequest("PUT", upgradeURL, bytes.NewBuffer(payload))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
+	client := &http.Client{Transport: tr}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("DEBUG: HTTP Response Status: %s\n", resp.Status)
+	fmt.Printf("DEBUG: HTTP Response Body: %s\n", string(respBody))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("upgrade request failed (%d): %s", resp.StatusCode, string(respBody))
+	}
+	return nil
+}
+
 func main() {
 	// Load and confirm configuration.
 	cfg, err := loadConfig()
@@ -176,11 +213,10 @@ func main() {
 	if cfg.Port == "" {
 		cfg.Port = "55000"
 	}
-	// Construct API URL.
 	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	apiURL = strings.TrimRight(apiURL, "/")
 
-	// Authenticate and get JWT token.
+	// Authenticate.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
 	token, err := authenticate(apiURL, cfg.API_User, cfg.API_Password)
 	if err != nil {
@@ -189,7 +225,7 @@ func main() {
 	}
 	fmt.Println("Authentication successful. JWT token acquired.")
 
-	// Prompt for agent IDs to upgrade.
+	// Prompt for agent IDs.
 	agentIDsInput := promptInput("Enter agent IDs to upgrade (comma separated)", "")
 	agentIDsStr := strings.Split(agentIDsInput, ",")
 	var agentIDs []int
@@ -213,7 +249,6 @@ func main() {
 	// Prompt for upgrade parameters.
 	defaultRepo := "packages.wazuh.com/wpk/"
 	wpkRepo := promptInput("Enter WPK repository", defaultRepo)
-	// Use LatestVersion from config as default version (prepend "v" if not present).
 	defaultVersion := cfg.LatestVersion
 	if defaultVersion != "" && !strings.HasPrefix(defaultVersion, "v") {
 		defaultVersion = "v" + defaultVersion
@@ -225,14 +260,14 @@ func main() {
 	forceUpgrade := strings.ToLower(forceStr) == "true"
 	packageType := promptInput("Enter package type (rpm/deb)", "rpm")
 
-	// Build the upgrade request payload.
-	payload := map[string]interface{}{
+	// Build the payload.
+	payloadMap := map[string]interface{}{
 		"origin": map[string]string{
 			"module": "api",
 		},
 		"command": "upgrade",
 		"parameters": map[string]interface{}{
-			"agents":        agentIDs,
+			"agents":        agentIDs,  // also included in payload
 			"wpk_repo":      wpkRepo,
 			"version":       version,
 			"use_http":      useHTTP,
@@ -240,8 +275,7 @@ func main() {
 			"package_type":  packageType,
 		},
 	}
-
-	payloadBytes, err := json.Marshal(payload)
+	payloadBytes, err := json.Marshal(payloadMap)
 	if err != nil {
 		fmt.Printf("Error marshaling payload: %v\n", err)
 		os.Exit(1)
@@ -249,26 +283,10 @@ func main() {
 	fmt.Printf("\nPayload:\n%s\n", string(payloadBytes))
 
 	// Send the upgrade request.
-	upgradeURL := fmt.Sprintf("%s/agents/upgrade?pretty=true", apiURL)
-	req, err := http.NewRequest("PUT", upgradeURL, bytes.NewBuffer(payloadBytes))
+	err = upgradeAgent(apiURL, token, agentIDs, payloadBytes)
 	if err != nil {
-		fmt.Printf("Error creating upgrade request: %v\n", err)
+		fmt.Printf("Error upgrading agents: %v\n", err)
 		os.Exit(1)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("Error making upgrade request: %v\n", err)
-		os.Exit(1)
-	}
-	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Printf("Error reading upgrade response: %v\n", err)
-		os.Exit(1)
-	}
-	fmt.Printf("\nUpgrade response (status %d):\n%s\n", resp.StatusCode, string(respBody))
+	fmt.Println("\nAgent upgrade process completed.")
 }
