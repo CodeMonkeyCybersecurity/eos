@@ -169,12 +169,15 @@ func authenticate(apiURL, username, password string) (string, error) {
 // upgradeAgent sends a PUT request to the /agents/{agent_id}/upgrade endpoint to update the agent.
 func upgradeAgent(apiURL, token, agentID string) error {
 	upgradeURL := fmt.Sprintf("%s/agents/%s/upgrade", apiURL, agentID)
-	fmt.Printf("Requesting upgrade for agent %s at %s\n", agentID, upgradeURL)
+	fmt.Printf("DEBUG: Requesting upgrade for agent %s at %s\n", agentID, upgradeURL)
+
+	// Log the payload details.
 	payload := map[string]interface{}{}
 	jsonPayload, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("DEBUG: Payload: %s\n", string(jsonPayload))
 
 	req, err := http.NewRequest("PUT", upgradeURL, bytes.NewBuffer(jsonPayload))
 	if err != nil {
@@ -182,7 +185,9 @@ func upgradeAgent(apiURL, token, agentID string) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	fmt.Printf("DEBUG: Request Headers: %+v\n", req.Header)
 
+	// Use a custom HTTP client with insecure TLS for debugging.
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
@@ -191,10 +196,12 @@ func upgradeAgent(apiURL, token, agentID string) error {
 	}
 	defer resp.Body.Close()
 
+	fmt.Printf("DEBUG: HTTP Response Status: %s\n", resp.Status)
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
+	fmt.Printf("DEBUG: HTTP Response Body: %s\n", string(bodyBytes))
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("agent %s upgrade failed (%d): %s", agentID, resp.StatusCode, string(bodyBytes))
