@@ -126,7 +126,7 @@ func confirmConfig(cfg Config) Config {
 		if newVal != "" {
 			cfg.LatestVersion = newVal
 		}
-		if err := (cfg); err != nil {
+		if err := saveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
