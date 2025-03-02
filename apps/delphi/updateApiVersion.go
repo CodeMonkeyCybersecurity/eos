@@ -226,23 +226,19 @@ func main() {
 
 	// Prompt for agent IDs.
 	agentIDsInput := promptInput("Enter agent IDs to upgrade (comma separated)", "")
-	agentIDsStr := strings.Split(agentIDsInput, ",")
-	var agentIDs []int
-	for _, s := range agentIDsStr {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		id, err := strconv.Atoi(s)
-		if err != nil {
-			fmt.Printf("Invalid agent ID: %s\n", s)
-			os.Exit(1)
-		}
-		agentIDs = append(agentIDs, id)
+	agentIDsSlice := strings.Split(agentIDsInput, ",")
+	var agentIDs []string
+	for _, s := range agentIDsSlice {
+	    s = strings.TrimSpace(s)
+	    if s == "" {
+	        continue
+	    }
+	    // Keep the string as-is so that "001" stays "001"
+	    agentIDs = append(agentIDs, s)
 	}
 	if len(agentIDs) == 0 {
-		fmt.Println("No agent IDs provided.")
-		os.Exit(1)
+	    fmt.Println("No agent IDs provided.")
+	    os.Exit(1)
 	}
 
 	// Prompt for upgrade parameters.
