@@ -244,6 +244,12 @@ func getResponse(method, url string, headers map[string]string, verify bool) map
 	return getResponseWithAttempts(method, url, headers, verify, 0)
 }
 
+// Agent represents an individual agent returned by the API.
+type Agent struct {
+	ID      string `json:"id"`
+	Version string `json:"version"`
+}
+
 // AgentsResponse represents the API response for the agents query.
 type AgentsResponse struct {
 	Data struct {
