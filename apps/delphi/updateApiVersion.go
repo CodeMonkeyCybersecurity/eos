@@ -168,7 +168,7 @@ func authenticate(apiURL, username, password string) (string, error) {
 
 // upgradeAgent sends a PUT request to the /agents/{agent_id}/upgrade endpoint to update the agent.
 func upgradeAgent(apiURL, token, agentID string) error {
-	upgradeURL := fmt.Sprintf("%s://%s:%d/agents/%s/upgrade", Protocol, FQDN, Port, agentID)
+	upgradeURL := fmt.Sprintf("%s/agents/%s/upgrade", apiURL, agentID)
 	fmt.Printf("Requesting upgrade for agent %s at %s\n", agentID, upgradeURL)
 	payload := map[string]interface{}{}
 	jsonPayload, err := json.Marshal(payload)
