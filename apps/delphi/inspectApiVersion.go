@@ -126,7 +126,7 @@ func confirmConfig(cfg Config) Config {
 		if newVal != "" {
 			cfg.LatestVersion = newVal
 		}
-		if err := saveConfig(cfg); err != nil {
+		if err := (cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
@@ -242,7 +242,6 @@ func main() {
 	if cfg.Port == "" {
 		cfg.Port = "55000"
 	}
-	saveConfig(cfg)
 
 	// Authenticate to get the JWT token if not already present.
 	if cfg.Token == "" {
