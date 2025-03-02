@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/term"
@@ -27,6 +28,7 @@ type Config struct {
 }
 
 const configFile = ".delphi.json"
+const maxAttempts = 3
 
 // loadConfig reads the configuration from .delphi.json.
 func loadConfig() (Config, error) {
@@ -166,8 +168,11 @@ func authenticate(cfg Config) (string, error) {
 	return token, nil
 }
 
-// getResponse makes an HTTP request and returns the parsed JSON response.
-func getResponse(method, url string, headers map[string]string, verify bool) map[string]interface{} {
+// getResponseWithAttempts makes an HTTP request and returns the parsed JSON response.
+// If a 401 Unauthorized error is encountered, it logs the error, runs createJWT.go
+// to refresh the token, reloads the configuration, updates the header, and retries.
+// The attempts parameter prevents infinite recursion.
+func getResponseWithAttempts(method, url string, headers map[string]string, verify bool, attempts int) map[string]interface{} {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: !verify},
 	}
@@ -194,6 +199,34 @@ func getResponse(method, url string, headers map[string]string, verify bool) map
 		fmt.Printf("Error reading response from %s: %v\n", url, err)
 		os.Exit(1)
 	}
+
+	// Handle 401 Unauthorized with limited recursion
+	if resp.StatusCode == http.StatusUnauthorized {
+		fmt.Printf("Error obtaining response (%d): %s\n", resp.StatusCode, string(respData))
+		if attempts >= maxAttempts {
+			fmt.Println("Maximum token refresh attempts reached. Exiting.")
+			os.Exit(1)
+		}
+		// Run createJWT.go to refresh the token.
+		cmd := exec.Command("go", "run", "createJWT.go")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			fmt.Printf("Error running createJWT.go: %v\n", err)
+			os.Exit(1)
+		}
+		// Reload the configuration (which should now have a new token).
+		cfg, err := loadConfig()
+		if err != nil {
+			fmt.Printf("Error reloading configuration: %v\n", err)
+			os.Exit(1)
+		}
+		// Update the header with the new token.
+		headers["Authorization"] = fmt.Sprintf("Bearer %s", cfg.Token)
+		// Retry the request with an increased attempt counter.
+		return getResponseWithAttempts(method, url, headers, verify, attempts+1)
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		fmt.Printf("Error obtaining response (%d): %s\n", resp.StatusCode, string(respData))
 		os.Exit(1)
@@ -206,10 +239,9 @@ func getResponse(method, url string, headers map[string]string, verify bool) map
 	return result
 }
 
-// Agent represents an individual agent returned by the API.
-type Agent struct {
-	ID      string `json:"id"`
-	Version string `json:"version"`
+// getResponse is a convenience wrapper that starts with 0 attempts.
+func getResponse(method, url string, headers map[string]string, verify bool) map[string]interface{} {
+	return getResponseWithAttempts(method, url, headers, verify, 0)
 }
 
 // AgentsResponse represents the API response for the agents query.
@@ -289,16 +321,6 @@ func main() {
 	if expectedVersion == "" {
 		expectedVersion = promptInput("Enter the latest API version", expectedVersion)
 		cfg.LatestVersion = expectedVersion
-		if err := saveConfig(cfg); err != nil {
-			fmt.Printf("Error saving configuration with latest version: %v\n", err)
-			os.Exit(1)
-		}
-	}
-	
-	saveConfig(cfg)
-	if err := saveConfig(cfg); err != nil {
-		fmt.Printf("Error saving configuration with latest version: %v\n", err)
-		os.Exit(1)
 	}
 
 	// Inspect agents and print those that are out of date.
