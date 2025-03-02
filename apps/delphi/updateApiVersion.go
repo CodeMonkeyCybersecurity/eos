@@ -220,18 +220,38 @@ func promptInputShort(prompt string) string {
 }
 
 func main() {
-	// Gather input details for agent upgrade.
-	// First, try to load configuration from .delphi.json.
+	// Load configuration from .delphi.json.
 	cfg, err := loadConfig()
 	if err != nil {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Confirm or update the configuration (only once).
 	cfg = confirmConfig(cfg)
+
+	// Set default values for Protocol and Port if empty.
+	if cfg.Protocol == "" {
+		cfg.Protocol = "https"
+	}
+	if cfg.Port == "" {
+		cfg.Port = "55000"
+	}
+
+	// If LatestVersion is still empty, prompt the user.
+	if cfg.LatestVersion == "" {
+		newVer := promptInput("Enter the latest API version", "")
+		if newVer != "" {
+			cfg.LatestVersion = newVer
+			if err := saveConfig(cfg); err != nil {
+				fmt.Printf("Error saving configuration with latest version: %v\n", err)
+				os.Exit(1)
+			}
+		}
+	}
 
 	// Construct API URL from config.
 	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
-	// Remove any trailing slash.
 	apiURL = strings.TrimRight(apiURL, "/")
 
 	username := cfg.API_User
