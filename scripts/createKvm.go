@@ -103,31 +103,36 @@ func main() {
 
 	// Ask the user if they'd like to grant libvirt access to a directory for ISO files.
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("\nThe hypervisor (libvirt-qemu) needs access to at least one directory where your ISO files are stored.")
-	fmt.Print("Would you like to grant access via ACLs? [y/N]: ")
+	defaultDir := "/mnt/iso"
+	fmt.Printf("\nThe hypervisor (libvirt-qemu) needs access to at least one directory where your ISO files are stored.\n")
+	fmt.Printf("The default directory is '%s'. Do you want to use this directory? [Y/n]: ", defaultDir)
 	answer, err := reader.ReadString('\n')
 	if err != nil {
-		log.Fatalf("Error reading input: %v", err)
+	    log.Fatalf("Error reading input: %v", err)
 	}
 	answer = strings.TrimSpace(strings.ToLower(answer))
-	if answer == "y" || answer == "yes" {
-		fmt.Print("Please enter the full path of the directory containing your ISO files: ")
-		dirInput, err := reader.ReadString('\n')
-		if err != nil {
-			log.Fatalf("Error reading directory path: %v", err)
-		}
-		dirInput = strings.TrimSpace(dirInput)
-		// Check if directory exists.
-		info, err := os.Stat(dirInput)
-		if err != nil || !info.IsDir() {
-			fmt.Printf("Directory %s not found or is not a directory; skipping ACL adjustment.\n", dirInput)
-		} else {
-			// Set ACL on the specified directory.
-			setACLForDirectory(dirInput)
-		}
+	
+	var dirToUse string
+	if answer == "" || answer == "y" || answer == "yes" {
+	    dirToUse = defaultDir
 	} else {
-		fmt.Println("Skipping ACL adjustment. Make sure the hypervisor can access your ISO files.")
+	    fmt.Print("Please enter the full path of the directory containing your ISO files: ")
+	    dirInput, err := reader.ReadString('\n')
+	    if err != nil {
+	        log.Fatalf("Error reading directory path: %v", err)
+	    }
+	    dirToUse = strings.TrimSpace(dirInput)
 	}
+	
+	// Check if the directory exists.
+	info, err := os.Stat(dirToUse)
+	if err != nil || !info.IsDir() {
+	    fmt.Printf("Directory %s not found or is not a directory; skipping ACL adjustment.\n", dirToUse)
+	} else {
+	    // Set ACL on the specified directory recursively.
+	    setACLForDirectory(dirToUse)
+	}
+	
 
 	// Ask the user if they'd like to start and autostart the default libvirt network.
 	fmt.Println("\nKVM requires at least one network to be active before you install/start virtual machines.")
