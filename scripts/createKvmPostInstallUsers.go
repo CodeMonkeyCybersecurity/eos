@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
@@ -13,15 +14,12 @@ import (
 
 // generateRandomString creates a random alphanumeric string of the specified length.
 func generateRandomString(n int) (string, error) {
-	// generate random bytes, then base64-encode and remove non-alphanumerics.
 	bytesNeeded := n * 3 / 4 // rough approximation
 	b := make([]byte, bytesNeeded)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	// base64 encode, then remove padding and any non-alphanumerics.
 	s := base64.StdEncoding.EncodeToString(b)
-	// remove any non alphanumeric characters
 	var alnum []rune
 	for _, r := range s {
 		if (r >= 'a' && r <= 'z') ||
@@ -30,7 +28,6 @@ func generateRandomString(n int) (string, error) {
 			alnum = append(alnum, r)
 		}
 	}
-	// ensure the string is at least n characters
 	if len(alnum) < n {
 		return generateRandomString(n)
 	}
@@ -50,17 +47,54 @@ func runCommand(name string, args ...string) (string, error) {
 	return outBuf.String(), nil
 }
 
+// getAdminGroup determines the administrative group based on the OS.
+// For Debian-based systems, it returns "sudo".
+// For RHEL-based systems, it returns "wheel".
+func getAdminGroup() string {
+	file, err := os.Open("/etc/os-release")
+	if err != nil {
+		log.Printf("Error opening /etc/os-release, defaulting to 'sudo': %v", err)
+		return "sudo"
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var id, idLike string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "ID=") {
+			id = strings.Trim(strings.SplitN(line, "=", 2)[1], `"`)
+		}
+		if strings.HasPrefix(line, "ID_LIKE=") {
+			idLike = strings.Trim(strings.SplitN(line, "=", 2)[1], `"`)
+		}
+	}
+	// Check for known IDs or ID_LIKE values.
+	if strings.Contains(id, "debian") || strings.Contains(idLike, "debian") || strings.Contains(id, "ubuntu") {
+		return "sudo"
+	}
+	if strings.Contains(id, "rhel") || strings.Contains(id, "centos") || strings.Contains(id, "fedora") ||
+		strings.Contains(idLike, "rhel") || strings.Contains(idLike, "fedora") {
+		return "wheel"
+	}
+	// Default fallback.
+	return "sudo"
+}
+
 func main() {
+	adminGroup := getAdminGroup()
+	fmt.Printf("Determined administrative group: %s\n", adminGroup)
+
 	// Create the Linux user "hera"
 	fmt.Println("Creating user 'hera'...")
 	if _, err := runCommand("useradd", "-m", "hera"); err != nil {
 		log.Fatalf("Error creating user hera: %v", err)
 	}
 
-	// Add hera to the sudo group
-	fmt.Println("Adding 'hera' to sudo group...")
-	if _, err := runCommand("usermod", "-aG", "sudo", "hera"); err != nil {
-		log.Fatalf("Error adding hera to sudo group: %v", err)
+	// Add hera to the determined admin group
+	fmt.Printf("Adding 'hera' to %s group...\n", adminGroup)
+	if _, err := runCommand("usermod", "-aG", adminGroup, "hera"); err != nil {
+		log.Fatalf("Error adding hera to %s group: %v", adminGroup, err)
 	}
 
 	// Create SSH directory and generate an SSH key for hera
@@ -70,17 +104,14 @@ func main() {
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		log.Fatalf("Error creating .ssh directory: %v", err)
 	}
-	// Change owner of .ssh directory to hera (assumes UID/GID resolution)
 	if _, err := runCommand("chown", "-R", "hera:hera", sshDir); err != nil {
 		log.Fatalf("Error changing ownership of .ssh directory: %v", err)
 	}
-	// Generate an SSH key without a passphrase
 	fmt.Println("Generating SSH key for hera...")
 	sshKeyPath := sshDir + "/id_rsa"
 	if _, err := runCommand("ssh-keygen", "-t", "rsa", "-b", "2048", "-N", "", "-f", sshKeyPath); err != nil {
 		log.Fatalf("Error generating SSH key: %v", err)
 	}
-	// Change ownership of the generated keys
 	if _, err := runCommand("chown", "hera:hera", sshKeyPath, sshKeyPath+".pub"); err != nil {
 		log.Fatalf("Error changing ownership of SSH key files: %v", err)
 	}
@@ -119,33 +150,24 @@ func main() {
 	fmt.Printf("root password: %s\n", rootPass)
 	fmt.Printf("hera password: %s\n", heraPass)
 
-	// Dummy password policy check function
-	// (In real scenarios, this might involve checking against a policy file or using PAM libraries.)
+	// Dummy password policy check function.
 	checkPasswordStrength := func(pw string) bool {
-		// For example, a strong password could be defined as at least 20 characters long
 		return len(pw) >= 20
 	}
 
-	// Check the new passwords against our dummy policy.
 	if !checkPasswordStrength(rootPass) || !checkPasswordStrength(heraPass) {
 		log.Println("One or more passwords do not meet the strong password policy. Please change them immediately.")
 	} else {
 		fmt.Println("Passwords meet the strong password policy. Disabling weak passwords...")
-		// Dummy action: here you could disable legacy password authentication methods,
-		// for example by editing /etc/ssh/sshd_config or enforcing PAM policies.
-		// For demonstration, we just print a message.
+		// Dummy action for disabling weak passwords.
 	}
 
 	// Check current user's password strength.
-	// (This part is highly system-dependent. We will simulate a check.)
 	currentUser := os.Getenv("USER")
 	fmt.Printf("Checking password strength for current user (%s)...\n", currentUser)
-	// Dummy check: In a real scenario, you might interact with PAM or system-specific tools.
-	currentUserStrong := true // assume current user has a strong password for demonstration
-
+	currentUserStrong := true // assume strong for demonstration
 	if !currentUserStrong {
 		fmt.Println("Your current password is weak. Please change it immediately.")
-		// Here you might trigger a password change prompt.
 	} else {
 		fmt.Println("Your current password meets the strength requirements.")
 	}
