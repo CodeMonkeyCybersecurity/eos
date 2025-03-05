@@ -101,4 +101,5 @@ func backupNetplanConfigs() {
 		log.Fatalf("Error backing up Netplan configurations: %v\nOutput: %s", err, string(out))
 	}
 	fmt.Printf("Netplan configurations backed up to %s\n", backupDir)
+	fmt.Printf("Run 'ip addr show br0' to confirm changes")
 }
