@@ -47,6 +47,12 @@ func runCommand(name string, args ...string) (string, error) {
 	return outBuf.String(), nil
 }
 
+// userExists checks if a user exists by using the "id" command.
+func userExists(username string) bool {
+	_, err := runCommand("id", username)
+	return err == nil
+}
+
 // getAdminGroup determines the administrative group based on the OS.
 // For Debian-based systems, it returns "sudo".
 // For RHEL-based systems, it returns "wheel".
@@ -85,19 +91,24 @@ func main() {
 	adminGroup := getAdminGroup()
 	fmt.Printf("Determined administrative group: %s\n", adminGroup)
 
-	// Create the Linux user "hera"
-	fmt.Println("Creating user 'hera'...")
-	if _, err := runCommand("useradd", "-m", "hera"); err != nil {
-		log.Fatalf("Error creating user hera: %v", err)
+	// Check if the user "hera" exists.
+	if userExists("hera") {
+		fmt.Println("User 'hera' already exists. Skipping user creation.")
+	} else {
+		// Create the Linux user "hera"
+		fmt.Println("Creating user 'hera'...")
+		if _, err := runCommand("useradd", "-m", "hera"); err != nil {
+			log.Fatalf("Error creating user hera: %v", err)
+		}
 	}
 
-	// Add hera to the determined admin group
+	// Add hera to the determined admin group.
 	fmt.Printf("Adding 'hera' to %s group...\n", adminGroup)
 	if _, err := runCommand("usermod", "-aG", adminGroup, "hera"); err != nil {
 		log.Fatalf("Error adding hera to %s group: %v", adminGroup, err)
 	}
 
-	// Create SSH directory and generate an SSH key for hera
+	// Create SSH directory and generate an SSH key for hera.
 	heraHome := "/home/hera"
 	sshDir := heraHome + "/.ssh"
 	fmt.Println("Creating .ssh directory for hera...")
@@ -127,7 +138,7 @@ func main() {
 		log.Fatalf("Error generating random password for hera: %v", err)
 	}
 
-	// Change the password for root
+	// Change the password for root.
 	fmt.Println("Changing password for root...")
 	rootPassCmd := exec.Command("chpasswd")
 	rootPassInput := fmt.Sprintf("root:%s", rootPass)
@@ -136,7 +147,7 @@ func main() {
 		log.Fatalf("Error setting root password: %v", err)
 	}
 
-	// Change the password for hera
+	// Change the password for hera.
 	fmt.Println("Changing password for hera...")
 	heraPassCmd := exec.Command("chpasswd")
 	heraPassInput := fmt.Sprintf("hera:%s", heraPass)
