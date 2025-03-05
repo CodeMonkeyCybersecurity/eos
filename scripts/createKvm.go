@@ -51,6 +51,29 @@ func setDefaultNetworkAutostart() {
 	}
 }
 
+// ensureLibvirtdRunning starts and enables the libvirtd daemon.
+func ensureLibvirtdRunning() {
+	fmt.Println("Ensuring libvirtd service is running...")
+	startCmd := exec.Command("systemctl", "start", "libvirtd")
+	startCmd.Stdout = os.Stdout
+	startCmd.Stderr = os.Stderr
+	if err := startCmd.Run(); err != nil {
+		fmt.Printf("Error starting libvirtd: %v\n", err)
+	} else {
+		fmt.Println("libvirtd started successfully.")
+	}
+
+	fmt.Println("Enabling libvirtd service to start on boot...")
+	enableCmd := exec.Command("systemctl", "enable", "libvirtd")
+	enableCmd.Stdout = os.Stdout
+	enableCmd.Stderr = os.Stderr
+	if err := enableCmd.Run(); err != nil {
+		fmt.Printf("Error enabling libvirtd: %v\n", err)
+	} else {
+		fmt.Println("libvirtd enabled successfully.")
+	}
+}
+
 func main() {
 	// Ensure the script is run as root.
 	if os.Geteuid() != 0 {
@@ -101,6 +124,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Ensure that the libvirtd service is running.
+	ensureLibvirtdRunning()
+
 	// Ask the user if they'd like to grant libvirt access to a directory for ISO files.
 	reader := bufio.NewReader(os.Stdin)
 	defaultDir := "/mnt/iso"
@@ -108,31 +134,30 @@ func main() {
 	fmt.Printf("The default directory is '%s'. Do you want to use this directory? [Y/n]: ", defaultDir)
 	answer, err := reader.ReadString('\n')
 	if err != nil {
-	    log.Fatalf("Error reading input: %v", err)
+		log.Fatalf("Error reading input: %v", err)
 	}
 	answer = strings.TrimSpace(strings.ToLower(answer))
-	
+
 	var dirToUse string
 	if answer == "" || answer == "y" || answer == "yes" {
-	    dirToUse = defaultDir
+		dirToUse = defaultDir
 	} else {
-	    fmt.Print("Please enter the full path of the directory containing your ISO files: ")
-	    dirInput, err := reader.ReadString('\n')
-	    if err != nil {
-	        log.Fatalf("Error reading directory path: %v", err)
-	    }
-	    dirToUse = strings.TrimSpace(dirInput)
+		fmt.Print("Please enter the full path of the directory containing your ISO files: ")
+		dirInput, err := reader.ReadString('\n')
+		if err != nil {
+			log.Fatalf("Error reading directory path: %v", err)
+		}
+		dirToUse = strings.TrimSpace(dirInput)
 	}
-	
+
 	// Check if the directory exists.
 	info, err := os.Stat(dirToUse)
 	if err != nil || !info.IsDir() {
-	    fmt.Printf("Directory %s not found or is not a directory; skipping ACL adjustment.\n", dirToUse)
+		fmt.Printf("Directory %s not found or is not a directory; skipping ACL adjustment.\n", dirToUse)
 	} else {
-	    // Set ACL on the specified directory recursively.
-	    setACLForDirectory(dirToUse)
+		// Set ACL on the specified directory recursively.
+		setACLForDirectory(dirToUse)
 	}
-	
 
 	// Ask the user if they'd like to start and autostart the default libvirt network.
 	fmt.Println("\nKVM requires at least one network to be active before you install/start virtual machines.")
