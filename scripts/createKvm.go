@@ -145,6 +145,6 @@ func main() {
 	if netAnswer == "y" || netAnswer == "yes" {
 		setDefaultNetworkAutostart()
 	} else {
-		fmt.Println("Skipping network autostart. You will need to start the default network manually if required.")
+		fmt.Println("Skipping network autostart. You will need to start the default network manually if required with something similar to 'virsh net-start default'.")
 	}
 }
