@@ -18,7 +18,7 @@ git clone https://github.com/CodeMonkeyCybersecurity/eos.git
 cd eos
 ```
 
-Install goland on RHEL:
+Install golang on RHEL:
 ```
 yum update
 yum install golang
