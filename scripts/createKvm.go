@@ -18,7 +18,7 @@ func isCommandAvailable(name string) bool {
 // setACLForDirectory grants the libvirt-qemu user read and execute permissions on the given directory.
 func setACLForDirectory(dir string) {
     fmt.Printf("Adjusting ACLs for directory %s...\n", dir)
-    cmd := exec.Command("setfacl", "-m", "u:libvirt-qemu:rx", dir)
+    cmd := exec.Command("setfacl", "-R", "-m", "u:libvirt-qemu:rx", dir)
     cmd.Stdout = os.Stdout
     cmd.Stderr = os.Stderr
     if err := cmd.Run(); err != nil {
