@@ -129,7 +129,7 @@ func main() {
 
 	// Ask the user if they'd like to grant libvirt access to a directory for ISO files.
 	reader := bufio.NewReader(os.Stdin)
-	defaultDir := "/mnt/iso"
+	defaultDir := "/srv/iso"
 	fmt.Printf("\nThe hypervisor (libvirt-qemu) needs access to at least one directory where your ISO files are stored.\n")
 	fmt.Printf("The default directory is '%s'. Do you want to use this directory? [Y/n]: ", defaultDir)
 	answer, err := reader.ReadString('\n')
