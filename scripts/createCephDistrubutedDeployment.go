@@ -69,23 +69,23 @@ func main() {
 	log.Println("Starting Ceph deployment automation using cephadm...")
 
 
-	// Ensure cephadm is installed; if not, attempt to download it.
+	// Check if cephadm is available in PATH.
 	if err := checkExecutable("cephadm"); err != nil {
-	    log.Printf("cephadm not found in PATH. Attempting to download and install cephadm...")
-	    // Download cephadm from the official source.
-	    // Adjust the URL to the desired release if needed.
-	    downloadCmd := exec.Command("curl", "-L", "https://download.ceph.com/cephadm", "-o", "/usr/local/bin/cephadm")
-	    if output, err := downloadCmd.CombinedOutput(); err != nil {
-	        log.Fatalf("Failed to download cephadm: %v, output: %s", err, string(output))
+	    log.Printf("cephadm not found in PATH. Attempting to install cephadm via apt...");
+	    // Update apt package list.
+	    aptUpdateCmd := exec.Command("sudo", "apt", "update")
+	    if output, err := aptUpdateCmd.CombinedOutput(); err != nil {
+	        log.Fatalf("Failed to update apt: %v, output: %s", err, string(output))
 	    }
-	    // Make cephadm executable.
-	    if err := exec.Command("chmod", "0755", "/usr/local/bin/cephadm").Run(); err != nil {
-	        log.Fatalf("Failed to chmod cephadm: %v", err)
+	    // Install cephadm via apt.
+	    aptInstallCmd := exec.Command("sudo", "apt", "install", "-y", "cephadm")
+	    if output, err := aptInstallCmd.CombinedOutput(); err != nil {
+	        log.Fatalf("Failed to install cephadm via apt: %v, output: %s", err, string(output))
 	    }
-	    log.Println("cephadm successfully installed at /usr/local/bin/cephadm.")
-	    // Check again.
+	    log.Println("cephadm successfully installed via apt.");
+	    // Re-check if cephadm is now available.
 	    if err := checkExecutable("cephadm"); err != nil {
-	        log.Fatalf("Pre-check failed even after installation: %v", err)
+	        log.Fatalf("Pre-check failed even after apt installation: %v", err)
 	    }
 	}
 	
