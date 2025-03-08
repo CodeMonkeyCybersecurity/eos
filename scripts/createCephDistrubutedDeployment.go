@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 )
 
@@ -12,17 +15,6 @@ type Node struct {
 	Hostname string
 	IP       string
 }
-
-var (
-	// primary is the node that will be bootstrapped.
-	primary = Node{Hostname: "ceph-node1", IP: "10.0.0.101"}
-
-	// additional nodes to add to the cluster.
-	nodes = []Node{
-		{Hostname: "ceph-node2", IP: "10.0.0.102"},
-		{Hostname: "ceph-node3", IP: "10.0.0.103"},
-	}
-)
 
 // runCommand executes a command with given arguments and prints its output.
 func runCommand(name string, args ...string) error {
@@ -35,12 +27,63 @@ func runCommand(name string, args ...string) error {
 	return nil
 }
 
+// checkExecutable ensures that the given executable is available in PATH.
+func checkExecutable(executable string) error {
+	_, err := exec.LookPath(executable)
+	if err != nil {
+		return fmt.Errorf("executable %q not found in PATH", executable)
+	}
+	return nil
+}
+
+// getUserNodes prompts the user to enter the total number of nodes and their IP addresses.
+// It returns a slice of Node structures.
+func getUserNodes() ([]Node, error) {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter the total number of nodes in the cluster (minimum 1): ")
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read number of nodes: %v", err)
+	}
+	input = strings.TrimSpace(input)
+	count, err := strconv.Atoi(input)
+	if err != nil || count < 1 {
+		return nil, fmt.Errorf("invalid number of nodes: %s", input)
+	}
+
+	nodes := make([]Node, count)
+	for i := 0; i < count; i++ {
+		defaultHostname := fmt.Sprintf("ceph-node%d", i+1)
+		fmt.Printf("Enter IP address for %s: ", defaultHostname)
+		ip, err := reader.ReadString('\n')
+		if err != nil {
+			return nil, fmt.Errorf("failed to read IP for %s: %v", defaultHostname, err)
+		}
+		ip = strings.TrimSpace(ip)
+		nodes[i] = Node{Hostname: defaultHostname, IP: ip}
+	}
+	return nodes, nil
+}
+
 func main() {
 	log.Println("Starting Ceph deployment automation using cephadm...")
 
+	// Check if cephadm is available in PATH.
+	if err := checkExecutable("cephadm"); err != nil {
+		log.Fatalf("Pre-check failed: %v", err)
+	}
+
+	// Get nodes from user input.
+	userNodes, err := getUserNodes()
+	if err != nil {
+		log.Fatalf("Error obtaining nodes: %v", err)
+	}
+	// The first node will be the primary (bootstrapped) node.
+	primary := userNodes[0]
+	// Additional nodes are any remaining nodes.
+	additionalNodes := userNodes[1:]
+
 	// 1. Bootstrap the cluster on the primary node.
-	// (This command must be run on the primary node.)
-	// It uses the primary node's public IP.
 	bootstrapCmd := []string{"cephadm", "bootstrap", "--mon-ip", primary.IP}
 	log.Printf("Bootstrapping Ceph cluster on primary node %s (%s)...", primary.Hostname, primary.IP)
 	if err := runCommand(bootstrapCmd[0], bootstrapCmd[1:]...); err != nil {
@@ -48,9 +91,8 @@ func main() {
 	}
 
 	// 2. Add additional nodes to the cluster.
-	for _, node := range nodes {
+	for _, node := range additionalNodes {
 		// Copy the cephadm public key to the node.
-		// Note: This assumes key-based auth is in place; adjust if necessary.
 		copyIDCmd := []string{"ssh-copy-id", "-f", "-i", "/etc/ceph/ceph.pub", fmt.Sprintf("root@%s", node.IP)}
 		log.Printf("Copying cephadm SSH key to %s (%s)...", node.Hostname, node.IP)
 		if err := runCommand(copyIDCmd[0], copyIDCmd[1:]...); err != nil {
@@ -65,11 +107,10 @@ func main() {
 		}
 	}
 
-	// 3. Deploy additional MONs (we want one on each node).
-	// Build a comma-separated list of hostnames including the primary.
-	allNodes := []string{primary.Hostname}
-	for _, node := range nodes {
-		allNodes = append(allNodes, node.Hostname)
+	// 3. Deploy additional MONs (one on each node).
+	allNodes := make([]string, len(userNodes))
+	for i, node := range userNodes {
+		allNodes[i] = node.Hostname
 	}
 	placement := strings.Join(allNodes, ",")
 	applyMonCmd := []string{"ceph", "orch", "apply", "mon", "--placement", placement}
@@ -93,20 +134,25 @@ func main() {
 	}
 
 	// (Optional) 6. Deploy CephFS (MDS) if you want to use the filesystem.
-	// This example creates a CephFS volume named "myfs" on two hosts.
-	// Note: Ceph will automatically create the underlying pools.
-	cephfsCmd := []string{"ceph", "fs", "volume", "create", "myfs", "--placement", fmt.Sprintf("%s,%s", primary.Hostname, nodes[0].Hostname)}
-	log.Println("Deploying CephFS (MDS) with volume name 'myfs'...")
-	if err := runCommand(cephfsCmd[0], cephfsCmd[1:]...); err != nil {
-		log.Printf("Warning: Failed to deploy CephFS (MDS): %v", err)
+	if len(userNodes) >= 2 {
+		cephfsCmd := []string{"ceph", "fs", "volume", "create", "myfs", "--placement", fmt.Sprintf("%s,%s", primary.Hostname, userNodes[1].Hostname)}
+		log.Println("Deploying CephFS (MDS) with volume name 'myfs'...")
+		if err := runCommand(cephfsCmd[0], cephfsCmd[1:]...); err != nil {
+			log.Printf("Warning: Failed to deploy CephFS (MDS): %v", err)
+		}
+	} else {
+		log.Println("Skipping CephFS deployment (need at least 2 nodes).")
 	}
 
 	// (Optional) 7. Deploy RADOS Gateway (RGW) if you want object storage.
-	// This example deploys an RGW instance on the second node.
-	rgwCmd := []string{"ceph", "orch", "apply", "rgw", "myrgw", "--placement", nodes[0].Hostname}
-	log.Println("Deploying RADOS Gateway (RGW) on", nodes[0].Hostname)
-	if err := runCommand(rgwCmd[0], rgwCmd[1:]...); err != nil {
-		log.Printf("Warning: Failed to deploy RGW: %v", err)
+	if len(userNodes) >= 2 {
+		rgwCmd := []string{"ceph", "orch", "apply", "rgw", "myrgw", "--placement", userNodes[1].Hostname}
+		log.Printf("Deploying RADOS Gateway (RGW) on %s...", userNodes[1].Hostname)
+		if err := runCommand(rgwCmd[0], rgwCmd[1:]...); err != nil {
+			log.Printf("Warning: Failed to deploy RGW: %v", err)
+		}
+	} else {
+		log.Println("Skipping RGW deployment (need at least 2 nodes).")
 	}
 
 	log.Println("Ceph deployment automation complete!")
