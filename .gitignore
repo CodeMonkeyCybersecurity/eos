@@ -57,7 +57,12 @@ apps/wazuh/wazuh-docker*
 apps/erpNext/frappe_docker*
 apps/mattermost/docker*
 
-Logs and output
+
+
+# Logs and output
 *.log
 *.out
 
+# Other 
+*.deb
+*.rpm
