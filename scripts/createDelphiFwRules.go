@@ -18,8 +18,13 @@ func checkDistro() string {
 	osInfo := string(output)
 	if strings.Contains(osInfo, "ID_LIKE=debian") || strings.Contains(osInfo, "ID=debian") || strings.Contains(osInfo, "ID=ubuntu") {
 		return "debian"
-	} else if strings.Contains(osInfo, "ID_LIKE=rhel fedora") || strings.Contains(osInfo, "ID=rhel") || strings.Contains(osInfo, "ID=centos") || strings.Contains(osInfo, "ID=fedora") {
-		return "rhel"
+	} else  if strings.Contains(osInfo, "ID_LIKE=rhel") || 
+		   strings.Contains(osInfo, "ID=rhel") || 
+		   strings.Contains(osInfo, "ID=centos") || 
+		   strings.Contains(osInfo, "ID=centos-stream") || 
+		   strings.Contains(osInfo, "PLATFORM_ID=platform:el9") || 
+		   strings.Contains(osInfo, "ID=fedora") {
+		    return "rhel"
 	}
 	return "unknown"
 }
