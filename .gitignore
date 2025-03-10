@@ -35,6 +35,7 @@ go.work.sum
 *.conf
 *.env
 *.ini
+*.venv
 
 
 # MacOS
