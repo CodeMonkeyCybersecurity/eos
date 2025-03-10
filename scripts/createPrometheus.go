@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"bytes"
 )
 
 func runCommand(name string, args ...string) error {
@@ -64,8 +65,9 @@ func main() {
 	  | cut -d '"' -f 4 \
 	  | wget -P /tmp/prometheus -qi -`
 	log.Printf("Downloading latest Prometheus release...")
-	if err := runShellCommand(downloadCmd); err != nil {
-		log.Fatalf("Error downloading Prometheus: %v", err)
+	output, err := runShellCommand(downloadCmd)
+	if err != nil {
+	    log.Fatalf("Error downloading Prometheus: %v. Output: %s", err, output)
 	}
 
 	// Locate the downloaded tarball in /tmp/prometheus
