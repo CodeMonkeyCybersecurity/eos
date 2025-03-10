@@ -2,11 +2,43 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
 	"path/filepath"
+	"syscall"
 )
+
+func printFileInfo(path string) {
+	info, err := os.Stat(path)
+	if err != nil {
+		fmt.Printf("Error stating %s: %v\n", path, err)
+		return
+	}
+
+	// File mode and permissions.
+	fmt.Printf("File: %s\n", path)
+	fmt.Printf("Mode: %v\n", info.Mode())
+
+	// Try to get ownership info (works on Unix).
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		fmt.Printf("UID: %d, GID: %d\n", stat.Uid, stat.Gid)
+	} else {
+		fmt.Printf("Ownership info not available\n")
+	}
+
+	// If it's a file, show a snippet of its content.
+	if !info.IsDir() {
+		data, err := ioutil.ReadFile(path)
+		if err == nil {
+			fmt.Printf("Contents (first 300 bytes):\n%s\n", string(data)[:300])
+		} else {
+			fmt.Printf("Error reading file: %v\n", err)
+		}
+	}
+	fmt.Println("-----")
+}
 
 func main() {
 	// Get current user details.
@@ -20,30 +52,41 @@ func main() {
 	sshDir := filepath.Join(homeDir, ".ssh")
 	authKeys := filepath.Join(sshDir, "authorized_keys")
 
-	// Create ~/.ssh if it doesn't exist.
+	// Debug: Print home directory info.
+	fmt.Printf("Current user: %s (%s)\n", usr.Username, homeDir)
+	fmt.Println("-----")
+
+	// Check .ssh directory.
 	if _, err := os.Stat(sshDir); os.IsNotExist(err) {
-		if err := os.Mkdir(sshDir, 0700); err != nil {
-			log.Fatalf("Error creating %s: %v", sshDir, err)
-		}
-		fmt.Printf("Created directory: %s with mode 0700\n", sshDir)
+		fmt.Printf("Directory %s does not exist.\n", sshDir)
 	} else {
-		// Ensure directory has correct permissions.
+		fmt.Printf("Directory %s exists.\n", sshDir)
+		printFileInfo(sshDir)
+
+		// Attempt to set directory permissions.
 		if err := os.Chmod(sshDir, 0700); err != nil {
 			log.Fatalf("Error setting permissions on %s: %v", sshDir, err)
+		} else {
+			fmt.Printf("Permissions for %s set to 0700\n", sshDir)
+			printFileInfo(sshDir)
 		}
-		fmt.Printf("Set permissions for %s to 0700\n", sshDir)
 	}
 
-	// Check if authorized_keys exists.
+	// Check authorized_keys file.
 	if _, err := os.Stat(authKeys); err == nil {
-		// Set correct permissions on authorized_keys.
+		fmt.Printf("File %s exists.\n", authKeys)
+		printFileInfo(authKeys)
+
+		// Attempt to set file permissions.
 		if err := os.Chmod(authKeys, 0600); err != nil {
 			log.Fatalf("Error setting permissions on %s: %v", authKeys, err)
+		} else {
+			fmt.Printf("Permissions for %s set to 0600\n", authKeys)
+			printFileInfo(authKeys)
 		}
-		fmt.Printf("Set permissions for %s to 0600\n", authKeys)
 	} else {
-		fmt.Printf("File %s does not exist; please copy your public key there (e.g., via ssh-copy-id)\n", authKeys)
+		fmt.Printf("File %s does not exist. Please copy your public key into this file (e.g., using ssh-copy-id).\n", authKeys)
 	}
 
-	fmt.Println("Passwordless SSH login should now work if your public key is in authorized_keys and the SSH server is configured properly.")
+	fmt.Println("Debugging complete. Verify that your public key is present in authorized_keys and that permissions/ownership are correct.")
 }
