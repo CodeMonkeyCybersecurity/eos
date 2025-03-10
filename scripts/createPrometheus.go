@@ -2,11 +2,13 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 func runCommand(name string, args ...string) error {
@@ -30,6 +32,56 @@ func runShellCommand(command string) (string, error) {
 		return output, err
 	}
 	return output, nil
+}
+
+// updatePrometheusConfig reads the Prometheus configuration file and replaces
+// any occurrence of "localhost:9090" with "localhost:9091". If a change is made,
+// the file is updated.
+func updatePrometheusConfig(filePath string) error {
+	content, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("reading %s: %v", filePath, err)
+	}
+	// Replace port 9090 with 9091
+	newContent := bytes.Replace(content, []byte("localhost:9090"), []byte("localhost:9091"), -1)
+	if !bytes.Equal(content, newContent) {
+		if err := ioutil.WriteFile(filePath, newContent, 0644); err != nil {
+			return fmt.Errorf("writing updated config: %v", err)
+		}
+		log.Printf("Updated %s to use port 9091", filePath)
+	} else {
+		log.Printf("No changes needed for %s", filePath)
+	}
+	return nil
+}
+
+// enableAndStartPrometheus reloads the systemd daemon, enables the Prometheus service,
+// and starts it.
+func enableAndStartPrometheus() error {
+	if err := runCommand("systemctl", "daemon-reload"); err != nil {
+		return fmt.Errorf("daemon-reload failed: %v", err)
+	}
+	if err := runCommand("systemctl", "enable", "prometheus"); err != nil {
+		return fmt.Errorf("enabling Prometheus failed: %v", err)
+	}
+	if err := runCommand("systemctl", "start", "prometheus"); err != nil {
+		return fmt.Errorf("starting Prometheus failed: %v", err)
+	}
+	return nil
+}
+
+// checkPrometheusRunning verifies if the Prometheus service is active.
+func checkPrometheusRunning() error {
+	output, err := runShellCommand("systemctl is-active prometheus")
+	if err != nil {
+		return fmt.Errorf("failed to check status: %v", err)
+	}
+	trimmed := strings.TrimSpace(output)
+	if trimmed != "active" {
+		return fmt.Errorf("Prometheus service is not active, status: %s", trimmed)
+	}
+	log.Printf("Prometheus is running properly (status: %s)", trimmed)
+	return nil
 }
 
 func main() {
@@ -131,7 +183,7 @@ Group=prometheus
 Type=simple
 ExecStart=/usr/local/bin/prometheus \
   --config.file=/etc/prometheus/prometheus.yml \
-  --storage.tsdb.path=/var/lib/prometheus/
+  --storage.tsdb.path=/var/lib/prometheus/ \
   --web.listen-address=0.0.0.0:9091
 
 [Install]
@@ -142,17 +194,14 @@ WantedBy=multi-user.target
 		log.Fatalf("Error writing systemd service file: %v", err)
 	}
 
-	// 5. Reload systemd daemon, enable, and start Prometheus service
-	if err := runCommand("systemctl", "daemon-reload"); err != nil {
-		log.Fatalf("Error reloading systemd: %v", err)
+	// 5. Enable and start Prometheus service
+	if err := enableAndStartPrometheus(); err != nil {
+		log.Fatalf("Error enabling/starting Prometheus service: %v", err)
 	}
 
-	if err := runCommand("systemctl", "enable", "prometheus"); err != nil {
-		log.Fatalf("Error enabling Prometheus service: %v", err)
-	}
-
-	if err := runCommand("systemctl", "start", "prometheus"); err != nil {
-		log.Fatalf("Error starting Prometheus service: %v", err)
+	// 6. Check whether Prometheus is running properly
+	if err := checkPrometheusRunning(); err != nil {
+		log.Fatalf("Prometheus is not running properly: %v", err)
 	}
 
 	log.Println("Prometheus installation and service setup complete!")
