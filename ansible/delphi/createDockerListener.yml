@@ -5,7 +5,7 @@
   gather_facts: yes
 
   tasks:
-    - name: Install python3 and python3-pip
+    - name: Install python3 and python3-pip if not present
       apt:
         name:
           - python3
@@ -13,14 +13,14 @@
         state: present
         update_cache: yes
 
-    - name: Upgrade pip
-      command: pip3 install --upgrade pip --break-system-packages
-      environment:
-        PATH: "/usr/local/bin:/usr/bin:/bin"
-      ignore_errors: yes
-
-    - name: Install Docker Python library and dependencies
-      command: pip3 install docker==7.1.0 urllib3==1.26.20 requests==2.32.2 --break-system-packages
+    - name: Install required Python packages for Docker integration
+      pip:
+        name:
+          - docker==7.1.0
+          - urllib3==1.26.20
+          - requests==2.32.2
+        extra_args: "--break-system-packages"
+        executable: pip3
 
     - name: Ensure Wazuh agent configuration directory exists
       file:
@@ -33,12 +33,9 @@
         marker: "<!-- {mark} ANSIBLE DOCKER LISTENER CONFIG -->"
         block: |
           <wodle name="docker-listener">
-            <interval>10m</interval>
-            <attempts>5</attempts>
-            <run_on_start>yes</run_on_start>
             <disabled>no</disabled>
           </wodle>
-        insertafter: "<ossec_config>"
+        insertafter: '</ossec_config>'
       notify: Restart Wazuh Agent
 
     - name: Configure monitoring for Docker container runtime logs
@@ -50,7 +47,7 @@
             <log_format>syslog</log_format>
             <location>/var/lib/docker/containers/*/*-json.log</location>
           </localfile>
-        insertafter: "<ossec_config>"
+        insertafter: '</ossec_config>'
       notify: Restart Wazuh Agent
 
   handlers:
