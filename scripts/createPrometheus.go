@@ -132,6 +132,7 @@ Type=simple
 ExecStart=/usr/local/bin/prometheus \
   --config.file=/etc/prometheus/prometheus.yml \
   --storage.tsdb.path=/var/lib/prometheus/
+  --web.listen-address=0.0.0.0:9091
 
 [Install]
 WantedBy=multi-user.target
