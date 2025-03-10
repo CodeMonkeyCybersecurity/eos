@@ -1,12 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"bytes"
 )
 
 func runCommand(name string, args ...string) error {
@@ -39,7 +39,6 @@ func main() {
 		log.Printf("Warning: Could not add user 'prometheus': %v", err)
 	}
 
-
 	dirs := []string{"/etc/prometheus", "/var/lib/prometheus"}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -67,7 +66,7 @@ func main() {
 	log.Printf("Downloading latest Prometheus release...")
 	output, err := runShellCommand(downloadCmd)
 	if err != nil {
-	    log.Fatalf("Error downloading Prometheus: %v. Output: %s", err, output)
+		log.Fatalf("Error downloading Prometheus: %v. Output: %s", err, output)
 	}
 
 	// Locate the downloaded tarball in /tmp/prometheus
@@ -105,20 +104,11 @@ func main() {
 		}
 	}
 
-	// Copy configuration file and directories
+	// Copy configuration file
 	srcConfig := filepath.Join(extractDir, "prometheus.yml")
 	dstConfig := "/etc/prometheus/prometheus.yml"
 	if err := runCommand("cp", srcConfig, dstConfig); err != nil {
 		log.Fatalf("Error copying configuration file: %v", err)
-	}
-
-	dirsToCopy := []string{"consoles", "console_libraries"}
-	for _, d := range dirsToCopy {
-		srcDir := filepath.Join(extractDir, d)
-		dstDir := filepath.Join("/etc/prometheus", d)
-		if err := runCommand("cp", "-r", srcDir, dstDir); err != nil {
-			log.Fatalf("Error copying directory %s: %v", d, err)
-		}
 	}
 
 	// Set ownership for configuration directories
@@ -129,7 +119,7 @@ func main() {
 		log.Fatalf("Error setting ownership for /var/lib/prometheus: %v", err)
 	}
 
-	// 4. Create systemd service file for Prometheus
+	// 4. Create systemd service file for Prometheus (without consoles options)
 	serviceContent := `[Unit]
 Description=Prometheus Monitoring
 Wants=network-online.target
@@ -141,9 +131,7 @@ Group=prometheus
 Type=simple
 ExecStart=/usr/local/bin/prometheus \
   --config.file=/etc/prometheus/prometheus.yml \
-  --storage.tsdb.path=/var/lib/prometheus/ \
-  --web.console.templates=/etc/prometheus/consoles \
-  --web.console.libraries=/etc/prometheus/console_libraries
+  --storage.tsdb.path=/var/lib/prometheus/
 
 [Install]
 WantedBy=multi-user.target
