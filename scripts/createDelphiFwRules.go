@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -9,23 +11,45 @@ import (
 
 // checkDistro determines if the system is Debian-based or RHEL-based
 func checkDistro() string {
-	output, err := exec.Command("cat", "/etc/os-release").Output()
+	file, err := os.Open("/etc/os-release")
 	if err != nil {
-		fmt.Println("Error reading /etc/os-release:", err)
-		os.Exit(1)
+		log.Printf("Error opening /etc/os-release, defaulting to 'unknown': %v", err)
+		return "unknown"
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	var id, idLike string
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "ID=") {
+			id = strings.Trim(strings.SplitN(line, "=", 2)[1], `"`)
+		}
+		if strings.HasPrefix(line, "ID_LIKE=") {
+			idLike = strings.Trim(strings.SplitN(line, "=", 2)[1], `"`)
+		}
 	}
 
-	osInfo := string(output)
-	if strings.Contains(osInfo, "ID_LIKE=debian") || strings.Contains(osInfo, "ID=debian") || strings.Contains(osInfo, "ID=ubuntu") {
+	// Normalize to lowercase
+	id = strings.ToLower(id)
+	idLike = strings.ToLower(idLike)
+
+	// Check for Debian-based OS
+	if strings.Contains(id, "debian") || strings.Contains(idLike, "debian") || strings.Contains(id, "ubuntu") {
 		return "debian"
-	} else  if strings.Contains(osInfo, "ID_LIKE=rhel") || 
-		   strings.Contains(osInfo, "ID=rhel") || 
-		   strings.Contains(osInfo, "ID=centos") || 
-		   strings.Contains(osInfo, "ID=centos-stream") || 
-		   strings.Contains(osInfo, "PLATFORM_ID=platform:el9") || 
-		   strings.Contains(osInfo, "ID=fedora") {
-		    return "rhel"
 	}
+
+	// Check for RHEL-based OS (including CentOS Stream)
+	if strings.Contains(id, "rhel") || strings.Contains(id, "centos") || strings.Contains(id, "fedora") ||
+		strings.Contains(idLike, "rhel") || strings.Contains(idLike, "fedora") || strings.Contains(idLike, "centos") ||
+		strings.Contains(id, "centos-stream") || strings.Contains(idLike, "platform:el") {
+		return "rhel"
+	}
+
+	// Log unknown OS type for debugging
+	log.Printf("Unknown OS detected: ID=%s, ID_LIKE=%s", id, idLike)
+
+	// Explicit fallback
 	return "unknown"
 }
 
