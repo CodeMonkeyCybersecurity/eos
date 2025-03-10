@@ -16,16 +16,28 @@ func runCommand(name string, args ...string) error {
 	return cmd.Run()
 }
 
-func runShellCommand(command string) error {
-	// Use "sh -c" to run a pipeline command
-	return runCommand("sh", "-c", command)
+func runShellCommand(command string) (string, error) {
+	log.Printf("Running shell command: %s", command)
+	cmd := exec.Command("sh", "-c", command)
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	err := cmd.Run()
+	output := outBuf.String() + errBuf.String()
+	if err != nil {
+		log.Printf("Shell command error: %s", output)
+		return output, err
+	}
+	return output, nil
 }
 
 func main() {
 	// 1. Create dedicated prometheus user and directories
 	if err := runCommand("useradd", "--no-create-home", "--shell", "/bin/false", "prometheus"); err != nil {
-		log.Printf("User 'prometheus' might already exist: %v", err)
+		// useradd returns non-zero if the user already exists. Log a warning.
+		log.Printf("Warning: Could not add user 'prometheus': %v", err)
 	}
+
 
 	dirs := []string{"/etc/prometheus", "/var/lib/prometheus"}
 	for _, dir := range dirs {
@@ -47,10 +59,10 @@ func main() {
 
 	// Build and run the shell command to download the latest linux-amd64 tarball
 	downloadCmd := `curl -s https://api.github.com/repos/prometheus/prometheus/releases/latest \
-  | grep browser_download_url \
-  | grep linux-amd64 \
-  | cut -d '"' -f 4 \
-  | wget -qi -`
+	  | grep browser_download_url \
+	  | grep linux-amd64 \
+	  | cut -d '"' -f 4 \
+	  | wget -P /tmp/prometheus -qi -`
 	log.Printf("Downloading latest Prometheus release...")
 	if err := runShellCommand(downloadCmd); err != nil {
 		log.Fatalf("Error downloading Prometheus: %v", err)
