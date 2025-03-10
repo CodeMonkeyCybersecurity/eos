@@ -2,6 +2,8 @@
 - name: Configure Wazuh agent to monitor /root directory
   hosts: endpoints  # Replace with your target host group
   become: yes
+  gather_facts: yes
+  
   tasks:
 
     - name: Ensure Wazuh agent is installed
