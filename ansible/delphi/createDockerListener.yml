@@ -2,7 +2,9 @@
 - name: Configure Docker host for Wazuh Docker event monitoring
   hosts: endpoints
   become: yes
-  tasks:
+  gather_facts: yes
+
+tasks:
     - name: Install python3 and python3-pip
       apt:
         name:
@@ -36,6 +38,18 @@
             <run_on_start>yes</run_on_start>
             <disabled>no</disabled>
           </wodle>
+        insertafter: "<ossec_config>"
+      notify: Restart Wazuh Agent
+
+    - name: Configure monitoring for Docker container runtime logs
+      blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} ANSIBLE DOCKER CONTAINER LOG CONFIG -->"
+        block: |
+          <localfile>
+            <log_format>syslog</log_format>
+            <location>/var/lib/docker/containers/*/*-json.log</location>
+          </localfile>
         insertafter: "<ossec_config>"
       notify: Restart Wazuh Agent
 
