@@ -32,7 +32,7 @@ func main() {
 	}
 
 	fmt.Println("Step 3: Installing GitHub CLI (gh)...")
-	err = runCommand("sudo", "dnf", "install", "gh")
+	err = runCommand("sudo", "dnf", "install", "-y", "gh")
 	if err != nil {
 		fmt.Printf("Error in installing gh: %v\n", err)
 		return
