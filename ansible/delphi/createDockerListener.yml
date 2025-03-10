@@ -1,6 +1,6 @@
 ---
 - name: Configure Docker host for Wazuh Docker event monitoring
-  hosts: agents
+  hosts: endpoints
   become: yes
   tasks:
     - name: Install python3 and python3-pip
