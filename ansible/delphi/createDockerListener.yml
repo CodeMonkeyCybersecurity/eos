@@ -38,7 +38,7 @@
               <run_on_start>yes</run_on_start>
               <disabled>no</disabled>
           </wodle>
-        insertafter: '<wodle>'
+        insertafter: '</wodle>'
       notify: Restart Wazuh Agent
 
   handlers:
