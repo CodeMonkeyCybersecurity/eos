@@ -1,0 +1,39 @@
+---
+- name: Configure Docker host for Wazuh Docker event monitoring
+  hosts: endpoints
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Ensure Wazuh agent configuration directory exists
+      file:
+        path: /var/ossec/etc
+        state: directory
+
+    - name: Check if docker-listener block exists in ossec.conf
+      shell: grep -q '<wodle name="docker-listener">' /var/ossec/etc/ossec.conf && echo "exists" || echo "not_found"
+      register: docker_listener_check
+      changed_when: false
+
+    - name: Replace docker-listener block in ossec.conf
+      blockinfile:
+        path: /var/ossec/etc/ossec.conf
+        marker: "<!-- {mark} ANSIBLE DOCKER LISTENER CONFIG -->"
+        block: |
+          <!-- Docker listener integration -->
+          <wodle name="docker-listener">
+              <interval>6m</interval>
+              <attempts>5</attempts>
+              <run_on_start>yes</run_on_start>
+              <disabled>no</disabled>
+          </wodle>
+        insertafter: '</ossec_config>'
+        state: present
+      when: docker_listener_check.stdout == "exists"
+      notify: Restart Wazuh Agent
+
+  handlers:
+    - name: Restart Wazuh Agent
+      systemd:
+        name: wazuh-agent
+        state: restarted
