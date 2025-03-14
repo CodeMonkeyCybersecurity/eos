@@ -12,4 +12,8 @@ services:
       MINIO_ROOT_PASSWORD: Baggie22Promotion99Oblivion21Shale5
     command: server /data --console-address ":9001"
     restart: always
-
+    networks:
+      - eos-network
+  
+networks:
+  eos-network:
