@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 
-	"gopkg.in/yaml.v3"
 )
 
 
@@ -68,13 +67,13 @@ func CheckSudo() bool {
 
 
 // Recursive function to process and print nested YAML structures
-func processMap(data map[string]interface{}, indent string) {
+func ProcessMap(data map[string]interface{}, indent string) {
 	for key, value := range data {
 		switch v := value.(type) {
 		case map[string]interface{}:
 			// If the value is a nested map, call processMap recursively
 			fmt.Printf("%s%s:\n", indent, key)
-			processMap(v, indent+"  ")
+			ProcessMap(v, indent+"  ")
 		case []interface{}:
 			// If the value is a slice, process each element
 			fmt.Printf("%s%s:\n", indent, key)
