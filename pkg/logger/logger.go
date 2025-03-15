@@ -2,7 +2,6 @@ package logger
 
 import (
 	"os"
-	"os/user"
 	"path/filepath"
 	"strconv"
 
@@ -40,10 +39,6 @@ func EnsureLogPermissions(logFilePath string) error {
 		}
 	}
 
-	// Set ownership to eos_user
-	if err := setOwnershipToEosUser(dir); err != nil {
-		return err // Return the error if ownership setting fails
-	}
 
 	// Ensure the log file exists
 	if _, err := os.Stat(logFilePath); os.IsNotExist(err) {
@@ -59,25 +54,7 @@ func EnsureLogPermissions(logFilePath string) error {
 		return err // Return the error if permission setting fails
 	}
 
-	// Set ownership of the log file to eos_user
-	if err := setOwnershipToEosUser(logFilePath); err != nil {
-		return err // Return the error if ownership setting fails
-	}
-
 	return nil
-}
-
-// setOwnershipToEosUser sets the ownership of the given path to eos_user.
-func setOwnershipToEosUser(path string) error {
-	eosUser, err := user.Lookup("eos_user")
-	if err != nil {
-		return err // Return the error if eos_user lookup fails
-	}
-
-	uid := stringToInt(eosUser.Uid)
-	gid := stringToInt(eosUser.Gid)
-
-	return os.Chown(path, uid, gid) // Change ownership to eos_user
 }
 
 // stringToInt converts a string to an integer. Panics if conversion fails.

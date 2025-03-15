@@ -8,11 +8,11 @@ import (
 	"eos/cmd/delete"
 	"eos/cmd/read"
 	"eos/cmd/update"
+        "eos/cmd/install"
 	"eos/pkg/logger"
 	"eos/pkg/utils"
 
 	"os"
-	"os/user"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -41,24 +41,13 @@ hardware, backups, and more.`,
 	},
 }
 
-func enforceUser() {
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Fatal("Failed to determine current user", zap.Error(err))
-	}
-
-	// Enforce that Eos must be run as 'eos_user'
-	if currentUser.Username != "eos_user" {
-		log.Fatal("Eos must be run as the 'eos_user'. Use 'sudo -u eos_user eos'.")
-	}
-}
-
 // Register all subcommands in the init function
 func init() {
 	rootCmd.AddCommand(create.CreateCmd)
 	rootCmd.AddCommand(read.ReadCmd)
 	rootCmd.AddCommand(update.UpdateCmd)
 	rootCmd.AddCommand(delete.DeleteCmd)
+        rootCmd.AddCommand(install.InstallCmd)
 }
 
 // Execute starts the CLI
@@ -69,9 +58,6 @@ func Execute() {
 
 	// Assign the logger instance globally for reuse
 	log = logger.GetLogger()
-
-	// Enforce user check
-	enforceUser()
 
 	// Execute the root command
 	if err := rootCmd.Execute(); err != nil {
