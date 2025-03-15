@@ -2,6 +2,7 @@ package install
 
 import (
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -10,13 +11,22 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func getInternalHostname() string {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("Unable to retrieve hostname, defaulting to localhost: %v", err)
+		return "localhost"
+	}
+	return hostname
+}
+
 // vaultCmd represents the vault command under the "install" group.
 var vaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Installs and initializes HashiCorp Vault via snap",
-	Long: `This command installs HashiCorp Vault using snap and starts Vault in development mode.
-In dev mode Vault auto-initializes and auto-unseals. For production, follow Vault's guidelines
-for secure initialization, unsealing, and configuration.`,
+	Short: "Installs and initializes HashiCorp Vault in production mode via snap",
+	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
+A minimal configuration file is generated and used to run Vault with persistent file storage.
+This is a quick prod-mode setup, not intended for production use without further hardening.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Check for root privileges.
 		if os.Geteuid() != 0 {
@@ -36,20 +46,47 @@ for secure initialization, unsealing, and configuration.`,
 			log.Fatal("Vault command not found after installation.")
 		}
 
-		// Set VAULT_ADDR environment variable.
-		vaultAddr := "http://0.0.0.0:8179"
+		// Get the internal hostname.
+		hostname := getInternalHostname()
+		// Construct the VAULT_ADDR using the hostname.
+		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
 		os.Setenv("VAULT_ADDR", vaultAddr)
 		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
-		fmt.Println("Starting Vault...")
+		// Create a minimal production config file for Vault.
+		configDir := "/etc/vault"
+		configFile := configDir + "/config.hcl"
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			log.Fatalf("Failed to create config directory %s: %v", configDir, err)
+		}
+
+		configContent := fmt.Sprintf(`
+listener "tcp" {
+  address     = "0.0.0.0:8179"
+  tls_disable = 1
+}
+
+storage "file" {
+  path = "/opt/vault/data"
+}
+
+disable_mlock = true
+api_addr = "%s"
+`, vaultAddr)
+		if err := ioutil.WriteFile(configFile, []byte(configContent), 0644); err != nil {
+			log.Fatalf("Failed to write config file: %v", err)
+		}
+		fmt.Printf("Vault configuration written to %s\n", configFile)
+
+		fmt.Println("Starting Vault in production mode...")
 		// Open the log file for Vault output.
 		logFile, err := os.OpenFile("/var/log/vault.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("Failed to open log file: %v", err)
 		}
 
-		// Start Vault in dev mode in the background.
-		vaultServerCmd := exec.Command("vault", "server", "listen-address=0.0.0.0:8179")
+		// Start Vault in production mode using the config file.
+		vaultServerCmd := exec.Command("vault", "server", "-config="+configFile)
 		vaultServerCmd.Stdout = logFile
 		vaultServerCmd.Stderr = logFile
 
@@ -64,16 +101,15 @@ for secure initialization, unsealing, and configuration.`,
 		// Verify that Vault is running.
 		checkCmd := exec.Command("pgrep", "-f", "vault server")
 		if err := checkCmd.Run(); err != nil {
-			log.Fatal("Vault server does not appear to be running. Please check /var/log/vault-dev.log for details.")
+			log.Fatal("Vault server does not appear to be running. Please check /var/log/vault.log for details.")
 		}
 
-		fmt.Println("Vault is now running...")
+		fmt.Println("Vault is now running in production mode...")
 		fmt.Printf("Access it at %s.\n", vaultAddr)
 		fmt.Println("To view Vault logs, check /var/log/vault.log.")
 	},
 }
 
 func init() {
-	// Assuming you have an "install" parent command in this package.
 	InstallCmd.AddCommand(vaultCmd)
 }
