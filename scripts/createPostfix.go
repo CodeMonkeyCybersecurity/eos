@@ -5,10 +5,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -75,6 +77,43 @@ func runCommand(name string, args ...string) error {
 	return err
 }
 
+// backupFile creates a timestamped backup of the given file if it exists.
+func backupFile(filePath string) error {
+	if _, err := os.Stat(filePath); err == nil {
+		timestamp := time.Now().Format("20060102-150405")
+		backupPath := fmt.Sprintf("%s.backup.%s", filePath, timestamp)
+		fmt.Printf("Backing up %s to %s...\n", filePath, backupPath)
+		// Copy the file.
+		source, err := os.Open(filePath)
+		if err != nil {
+			return err
+		}
+		defer source.Close()
+		dest, err := os.Create(backupPath)
+		if err != nil {
+			return err
+		}
+		defer dest.Close()
+		if _, err := io.Copy(dest, source); err != nil {
+			return err
+		}
+		fmt.Println("Backup complete.")
+	}
+	return nil
+}
+
+// catFile displays the content of a file to stdout.
+func catFile(filePath string) {
+	fmt.Printf("=== Begin %s ===\n", filePath)
+	data, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		fmt.Printf("Error reading %s: %v\n", filePath, err)
+		return
+	}
+	fmt.Println(string(data))
+	fmt.Printf("=== End %s ===\n", filePath)
+}
+
 func main() {
 	// Detect OS type.
 	osType := detectOS()
@@ -122,9 +161,12 @@ func main() {
 
 	// 4. Collect SMTP settings from the user.
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter your smtp/mail hostname (e.g., mail.hostname.com): ")
+	fmt.Print("Enter your smtp/mail hostname (default: smtp.gmail.com): ")
 	smtpHost, _ := reader.ReadString('\n')
 	smtpHost = strings.TrimSpace(smtpHost)
+	if smtpHost == "" {
+		smtpHost = "smtp.gmail.com"
+	}
 
 	fmt.Print("Enter your email you are sending from (e.g., sender@domain.com): ")
 	configuredEmail, _ := reader.ReadString('\n')
@@ -134,7 +176,12 @@ func main() {
 	smtpAppPass, _ := reader.ReadString('\n')
 	smtpAppPass = strings.TrimSpace(smtpAppPass)
 
-	// 5. Append configuration to /etc/postfix/main.cf using user input.
+	// 5. Backup and then append configuration to /etc/postfix/main.cf using user input.
+	mainCfPath := "/etc/postfix/main.cf"
+	if err := backupFile(mainCfPath); err != nil {
+		log.Printf("Warning: could not backup %s: %v", mainCfPath, err)
+	}
+
 	fmt.Println("Appending SMTP relay configuration to /etc/postfix/main.cf...")
 	var postfixConfig string
 	if osType == "debian" {
@@ -170,20 +217,23 @@ smtp_use_tls = yes
 `, smtpHost)
 	}
 
-	// Open file for appending.
-	f, err := os.OpenFile("/etc/postfix/main.cf", os.O_APPEND|os.O_WRONLY, 0644)
+	// Append the configuration.
+	f, err := os.OpenFile(mainCfPath, os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Fatalf("Error opening /etc/postfix/main.cf for writing: %v", err)
+		log.Fatalf("Error opening %s for writing: %v", mainCfPath, err)
 	}
 	defer f.Close()
 	if _, err := f.WriteString(postfixConfig); err != nil {
-		log.Fatalf("Error writing to /etc/postfix/main.cf: %v", err)
+		log.Fatalf("Error writing to %s: %v", mainCfPath, err)
 	}
 	fmt.Println("Configuration appended to /etc/postfix/main.cf.")
 
-	// 6. Set up the SASL password file using the same user inputs.
-	credential := fmt.Sprintf("[%s]:587 %s:%s\n", smtpHost, configuredEmail, smtpAppPass)
+	// 6. Backup and set up the SASL password file using the same user inputs.
 	saslPath := "/etc/postfix/sasl_passwd"
+	if err := backupFile(saslPath); err != nil {
+		log.Printf("Warning: could not backup %s: %v", saslPath, err)
+	}
+	credential := fmt.Sprintf("[%s]:587 %s:%s\n", smtpHost, configuredEmail, smtpAppPass)
 	err = os.WriteFile(saslPath, []byte(credential), 0600)
 	if err != nil {
 		log.Fatalf("Failed to write %s: %v", saslPath, err)
@@ -255,5 +305,11 @@ smtp_use_tls = yes
 		fmt.Println("Postfix configuration appears to be correct.")
 	}
 
-	fmt.Println("Script completed. Please review any output messages for further actions if needed.")
+	// 13. Display the contents of key files for verification.
+	fmt.Println("\nDisplaying final configuration of /etc/postfix/main.cf:")
+	catFile(mainCfPath)
+	fmt.Println("\nDisplaying credentials file (/etc/postfix/sasl_passwd):")
+	catFile(saslPath)
+
+	fmt.Println("Script completed. Please review the output above for verification.")
 }
