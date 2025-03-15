@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"gopkg.in/yaml.v3"
 )
 
 
@@ -57,4 +59,35 @@ func CheckSudo() bool {
 	cmd := exec.Command("sudo", "-n", "true") // Non-interactive sudo check
 	err := cmd.Run()
 	return err == nil
+}
+
+
+//
+//---------------------------- YAML ---------------------------- //
+//
+
+
+// Recursive function to process and print nested YAML structures
+func processMap(data map[string]interface{}, indent string) {
+	for key, value := range data {
+		switch v := value.(type) {
+		case map[string]interface{}:
+			// If the value is a nested map, call processMap recursively
+			fmt.Printf("%s%s:\n", indent, key)
+			processMap(v, indent+"  ")
+		case []interface{}:
+			// If the value is a slice, process each element
+			fmt.Printf("%s%s:\n", indent, key)
+			for _, item := range v {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					processMap(itemMap, indent+"  ")
+				} else {
+					fmt.Printf("%s  - %v\n", indent, item)
+				}
+			}
+		default:
+			// Print scalar values
+			fmt.Printf("%s%s: %v\n", indent, key, v)
+		}
+	}
 }
