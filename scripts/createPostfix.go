@@ -88,7 +88,6 @@ func main() {
 		fmt.Println("Updating package lists and installing required packages on Debian-based system...")
 		// Adjusted package names for Debian/Ubuntu.
 		debianInstallCmd := "apt update && apt install -y postfix bsd-mailx libsasl2-modules"
-		// Use a two-minute timeout (adjust as needed).
 		if err := runShellCommandWithTimeout(debianInstallCmd, 2*time.Minute); err != nil {
 			log.Fatalf("Package installation failed: %v", err)
 		}
@@ -121,43 +120,57 @@ func main() {
 		}
 	}
 
-	// 4. Append configuration to /etc/postfix/main.cf.
+	// 4. Collect SMTP settings from the user.
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter your smtp/mail hostname (e.g., mail.hostname.com): ")
+	smtpHost, _ := reader.ReadString('\n')
+	smtpHost = strings.TrimSpace(smtpHost)
+
+	fmt.Print("Enter your email you are sending from (e.g., sender@domain.com): ")
+	configuredEmail, _ := reader.ReadString('\n')
+	configuredEmail = strings.TrimSpace(configuredEmail)
+
+	fmt.Print("Enter your app password: ")
+	smtpAppPass, _ := reader.ReadString('\n')
+	smtpAppPass = strings.TrimSpace(smtpAppPass)
+
+	// 5. Append configuration to /etc/postfix/main.cf using user input.
 	fmt.Println("Appending SMTP relay configuration to /etc/postfix/main.cf...")
 	var postfixConfig string
 	if osType == "debian" {
-		postfixConfig = `
+		postfixConfig = fmt.Sprintf(`
 # SMTP relay configuration for Debian-based system
-relayhost = [smtp.gmail.com]:587
+relayhost = [%s]:587
 smtp_sasl_auth_enable = yes
 smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
 smtp_sasl_security_options = noanonymous
 smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
 smtp_use_tls = yes
 smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, defer_unauth_destination
-`
+`, smtpHost)
 	} else if osType == "rhel" {
-		postfixConfig = `
+		postfixConfig = fmt.Sprintf(`
 # SMTP relay configuration for RHEL-based system
-relayhost = [smtp.gmail.com]:587
+relayhost = [%s]:587
 smtp_sasl_auth_enable = yes
 smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
 smtp_sasl_security_options = noanonymous
 smtp_tls_CAfile = /etc/ssl/certs/ca-bundle.crt
 smtp_use_tls = yes
-`
+`, smtpHost)
 	} else {
-		postfixConfig = `
+		postfixConfig = fmt.Sprintf(`
 # Generic SMTP relay configuration (please verify settings)
-relayhost = [smtp.gmail.com]:587
+relayhost = [%s]:587
 smtp_sasl_auth_enable = yes
 smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
 smtp_sasl_security_options = noanonymous
 smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
 smtp_use_tls = yes
-`
+`, smtpHost)
 	}
 
-	// Append the configuration.
+	// Open file for appending.
 	f, err := os.OpenFile("/etc/postfix/main.cf", os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalf("Error opening /etc/postfix/main.cf for writing: %v", err)
@@ -168,21 +181,8 @@ smtp_use_tls = yes
 	}
 	fmt.Println("Configuration appended to /etc/postfix/main.cf.")
 
-	// 5. Set up the SASL password file.
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter your smtp/mail hostname (e.g., mail.hostname.com): ")
-	mailHost, _ := reader.ReadString('\n')
-	mailHost = strings.TrimSpace(mailHost)
-
-	fmt.Print("Enter your email you are sending from (e.g., sender@domain.com): ")
-	configuredEmail, _ := reader.ReadString('\n')
-	configuredEmail = strings.TrimSpace(configuredEmail)
-
-	fmt.Print("Enter your app password: ")
-	smtpAppPass, _ := reader.ReadString('\n')
-	smtpAppPass = strings.TrimSpace(smtpAppPass)
-
-	credential := fmt.Sprintf("[%s]:587 %s:%s\n", mailHost, configuredEmail, smtpAppPass)
+	// 6. Set up the SASL password file using the same user inputs.
+	credential := fmt.Sprintf("[%s]:587 %s:%s\n", smtpHost, configuredEmail, smtpAppPass)
 	saslPath := "/etc/postfix/sasl_passwd"
 	err = os.WriteFile(saslPath, []byte(credential), 0600)
 	if err != nil {
@@ -190,13 +190,13 @@ smtp_use_tls = yes
 	}
 	fmt.Printf("Credentials written to %s.\n", saslPath)
 
-	// 6. Run postmap to create the hash database.
+	// 7. Run postmap to create the hash database.
 	if err := runCommand("postmap", saslPath); err != nil {
 		log.Fatalf("Failed to run postmap: %v", err)
 	}
 	fmt.Println("postmap executed successfully.")
 
-	// 7. Secure the credential files.
+	// 8. Secure the credential files.
 	fmt.Println("Securing credential files...")
 	if err := runCommand("chown", "root:root", saslPath, saslPath+".db"); err != nil {
 		log.Printf("Warning: failed to change ownership: %v", err)
@@ -206,7 +206,7 @@ smtp_use_tls = yes
 	}
 	fmt.Println("Credential files secured.")
 
-	// 8. Restart Postfix to apply configuration changes.
+	// 9. Restart Postfix to apply configuration changes.
 	fmt.Println("Restarting Postfix service to apply configuration changes...")
 	if osType == "debian" {
 		if err := runCommand("systemctl", "restart", "postfix"); err != nil {
@@ -221,7 +221,7 @@ smtp_use_tls = yes
 		}
 	}
 
-	// 9. For RHEL-based systems, adjust the TLS fingerprint digest if needed.
+	// 10. For RHEL-based systems, adjust the TLS fingerprint digest if needed.
 	if osType == "rhel" {
 		fmt.Println("Configuring TLS fingerprint digest to use SHA-256 on RHEL-based system...")
 		if err := runCommand("postconf", "-e", "smtp_tls_fingerprint_digest=sha256"); err != nil {
@@ -232,24 +232,22 @@ smtp_use_tls = yes
 		}
 	}
 
-	// 10. Verify configuration: send a test email.
+	// 11. Verify configuration: send a test email.
 	fmt.Println("Verifying configuration by sending a test email...")
-	fmt.Print("Enter the email you are sending from (e.g., sender@domain.com): ")
-	testSender, _ := reader.ReadString('\n')
-	testSender = strings.TrimSpace(testSender)
-
+	// Reuse the sender email for test if desired, but allow a separate recipient.
+	fmt.Printf("Using sender email: %s\n", configuredEmail)
 	fmt.Print("Enter the recipient email address (e.g., receiver@domain.com): ")
 	testReceiver, _ := reader.ReadString('\n')
 	testReceiver = strings.TrimSpace(testReceiver)
 
-	testCmd := fmt.Sprintf(`echo "Test mail from postfix" | mail -s "Test Postfix" -r "%s" %s`, testSender, testReceiver)
+	testCmd := fmt.Sprintf(`echo "Test mail from postfix" | mail -s "Test Postfix" -r "%s" %s`, configuredEmail, testReceiver)
 	if err := runShellCommandWithTimeout(testCmd, 30*time.Second); err != nil {
 		log.Printf("Warning: test email may not have been sent correctly: %v", err)
 	} else {
 		fmt.Println("Test email sent. Please verify receipt.")
 	}
 
-	// 11. Check Postfix configuration.
+	// 12. Check Postfix configuration.
 	fmt.Println("Performing final Postfix configuration check...")
 	if err := runCommand("postfix", "check"); err != nil {
 		log.Printf("Postfix configuration check encountered issues: %v", err)
