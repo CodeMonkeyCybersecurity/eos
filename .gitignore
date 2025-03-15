@@ -26,7 +26,7 @@ go.work.sum
 *.key
 **/certs/
 *.gpg
-*vault*
+*vault
 
 # data
 **/data/
