@@ -77,10 +77,11 @@ func main() {
 	// 1. Install required packages.
 	if osType == "debian" {
 		fmt.Println("Updating package lists and installing required packages on Debian-based system...")
-		if err := runShellCommand("apt update && apt install -y postfix mailx cyrus-sasl cyrus-sasl-plain"); err != nil {
+		// Adjusted package names for Debian/Ubuntu
+		debianInstallCmd := "apt update && apt install -y postfix bsd-mailx libsasl2-modules"
+		if err := runShellCommand(debianInstallCmd); err != nil {
 			log.Fatalf("Package installation failed: %v", err)
 		}
-
 		// 2. Create the main Postfix configuration file.
 		fmt.Println("Copying main.cf configuration file for Debian-based system...")
 		if err := runShellCommand("cp /usr/share/postfix/main.cf.debian /etc/postfix/main.cf"); err != nil {
@@ -105,7 +106,6 @@ func main() {
 			log.Printf("Warning: unable to check postfix status: %v", err)
 		}
 	} else if osType == "rhel" {
-		// For RHEL, we'll assume the init service is used.
 		if err := runShellCommand("service postfix restart"); err != nil {
 			log.Printf("Warning: unable to restart postfix: %v", err)
 		}
@@ -199,7 +199,6 @@ smtp_use_tls = yes
 	// 8. Restart Postfix to apply configuration changes.
 	fmt.Println("Restarting Postfix service to apply configuration changes...")
 	if osType == "debian" {
-		// Try systemd restart first, fallback to postfix reload.
 		if err := runCommand("systemctl", "restart", "postfix"); err != nil {
 			fmt.Println("Falling back to postfix reload...")
 			if err := runCommand("postfix", "reload"); err != nil {
