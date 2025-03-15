@@ -3,12 +3,14 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 )
 
 // detectOS attempts to read /etc/os-release and parse the ID or ID_LIKE field.
@@ -43,7 +45,25 @@ func detectOS() string {
 	return osType
 }
 
-// runCommand runs a command with arguments and returns its combined output.
+// runShellCommandWithTimeout runs a shell command with a given timeout.
+func runShellCommandWithTimeout(cmdStr string, timeout time.Duration) error {
+	fmt.Printf("Executing: %s\n", cmdStr)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "sh", "-c", cmdStr)
+	var out bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	err := cmd.Run()
+	output := out.String()
+	fmt.Println(output)
+	if ctx.Err() == context.DeadlineExceeded {
+		fmt.Printf("Command timed out: %s\n", cmdStr)
+	}
+	return err
+}
+
+// runCommand runs a command with arguments (without shell) and returns its combined output.
 func runCommand(name string, args ...string) error {
 	fmt.Printf("Executing: %s %s\n", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...)
@@ -55,19 +75,8 @@ func runCommand(name string, args ...string) error {
 	return err
 }
 
-// runShellCommand runs a command using the shell (sh -c) for commands that require piping etc.
-func runShellCommand(cmdStr string) error {
-	fmt.Printf("Executing: %s\n", cmdStr)
-	cmd := exec.Command("sh", "-c", cmdStr)
-	var out bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-	err := cmd.Run()
-	fmt.Println(out.String())
-	return err
-}
-
 func main() {
+	// Detect OS type.
 	osType := detectOS()
 	fmt.Printf("Detected OS: %s\n", osType)
 	if osType == "unknown" {
@@ -77,19 +86,20 @@ func main() {
 	// 1. Install required packages.
 	if osType == "debian" {
 		fmt.Println("Updating package lists and installing required packages on Debian-based system...")
-		// Adjusted package names for Debian/Ubuntu
+		// Adjusted package names for Debian/Ubuntu.
 		debianInstallCmd := "apt update && apt install -y postfix bsd-mailx libsasl2-modules"
-		if err := runShellCommand(debianInstallCmd); err != nil {
+		// Use a two-minute timeout (adjust as needed).
+		if err := runShellCommandWithTimeout(debianInstallCmd, 2*time.Minute); err != nil {
 			log.Fatalf("Package installation failed: %v", err)
 		}
 		// 2. Create the main Postfix configuration file.
 		fmt.Println("Copying main.cf configuration file for Debian-based system...")
-		if err := runShellCommand("cp /usr/share/postfix/main.cf.debian /etc/postfix/main.cf"); err != nil {
+		if err := runShellCommandWithTimeout("cp /usr/share/postfix/main.cf.debian /etc/postfix/main.cf", 30*time.Second); err != nil {
 			log.Fatalf("Failed to copy main.cf: %v", err)
 		}
 	} else if osType == "rhel" {
 		fmt.Println("Updating packages and installing required packages on RHEL-based system...")
-		if err := runShellCommand("yum update -y && yum install -y postfix mailx cyrus-sasl cyrus-sasl-plain"); err != nil {
+		if err := runShellCommandWithTimeout("yum update -y && yum install -y postfix mailx cyrus-sasl cyrus-sasl-plain", 2*time.Minute); err != nil {
 			log.Fatalf("Package installation failed: %v", err)
 		}
 	} else {
@@ -106,7 +116,7 @@ func main() {
 			log.Printf("Warning: unable to check postfix status: %v", err)
 		}
 	} else if osType == "rhel" {
-		if err := runShellCommand("service postfix restart"); err != nil {
+		if err := runShellCommandWithTimeout("service postfix restart", 30*time.Second); err != nil {
 			log.Printf("Warning: unable to restart postfix: %v", err)
 		}
 	}
@@ -147,7 +157,7 @@ smtp_use_tls = yes
 `
 	}
 
-	// Open file for appending.
+	// Append the configuration.
 	f, err := os.OpenFile("/etc/postfix/main.cf", os.O_APPEND|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalf("Error opening /etc/postfix/main.cf for writing: %v", err)
@@ -180,7 +190,7 @@ smtp_use_tls = yes
 	}
 	fmt.Printf("Credentials written to %s.\n", saslPath)
 
-	// 6. Run postmap to create the hash db.
+	// 6. Run postmap to create the hash database.
 	if err := runCommand("postmap", saslPath); err != nil {
 		log.Fatalf("Failed to run postmap: %v", err)
 	}
@@ -206,12 +216,12 @@ smtp_use_tls = yes
 			}
 		}
 	} else if osType == "rhel" {
-		if err := runShellCommand("service postfix restart"); err != nil {
+		if err := runShellCommandWithTimeout("service postfix restart", 30*time.Second); err != nil {
 			log.Printf("Warning: unable to restart postfix: %v", err)
 		}
 	}
 
-	// 9. For CentOS/RHEL, adjust the TLS fingerprint digest if needed.
+	// 9. For RHEL-based systems, adjust the TLS fingerprint digest if needed.
 	if osType == "rhel" {
 		fmt.Println("Configuring TLS fingerprint digest to use SHA-256 on RHEL-based system...")
 		if err := runCommand("postconf", "-e", "smtp_tls_fingerprint_digest=sha256"); err != nil {
@@ -233,7 +243,7 @@ smtp_use_tls = yes
 	testReceiver = strings.TrimSpace(testReceiver)
 
 	testCmd := fmt.Sprintf(`echo "Test mail from postfix" | mail -s "Test Postfix" -r "%s" %s`, testSender, testReceiver)
-	if err := runShellCommand(testCmd); err != nil {
+	if err := runShellCommandWithTimeout(testCmd, 30*time.Second); err != nil {
 		log.Printf("Warning: test email may not have been sent correctly: %v", err)
 	} else {
 		fmt.Println("Test email sent. Please verify receipt.")
