@@ -65,6 +65,7 @@ storage "file" {
 
 disable_mlock = true
 api_addr = "%s"
+ui = true
 `, vaultAddr)
 		if err := ioutil.WriteFile(configFile, []byte(configContent), 0644); err != nil {
 			log.Fatalf("Failed to write config file: %v", err)
