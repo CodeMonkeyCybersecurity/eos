@@ -39,7 +39,7 @@ This is a quick prod-mode setup, not intended for production use without further
 		}
 
 		// Get the internal hostname.
-		hostname := getInternalHostname()
+		hostname := utils.GetInternalHostname()
 		// Construct the VAULT_ADDR using the hostname.
 		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
 		os.Setenv("VAULT_ADDR", vaultAddr)
