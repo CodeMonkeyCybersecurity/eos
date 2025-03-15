@@ -44,3 +44,21 @@ func WithErrorHandling(fn func() error) {
 		HandleError(err, "An error occurred", true)
 	}
 }
+
+// pkg/utils/sudo.go
+package utils
+
+import (
+	"os/exec"
+)
+
+//
+//---------------------------- PERMISSIONS ---------------------------- //
+//
+
+// CheckSudo checks if the current user has sudo privileges
+func CheckSudo() bool {
+	cmd := exec.Command("sudo", "-n", "true") // Non-interactive sudo check
+	err := cmd.Run()
+	return err == nil
+}
