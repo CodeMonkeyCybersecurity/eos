@@ -4,7 +4,9 @@ import (
 	"log"
 	"fmt"
 	"os"
+	"os/exec"
 )
+
 
 //
 //---------------------------- HOSTNAME ---------------------------- //
@@ -45,12 +47,6 @@ func WithErrorHandling(fn func() error) {
 	}
 }
 
-// pkg/utils/sudo.go
-package utils
-
-import (
-	"os/exec"
-)
 
 //
 //---------------------------- PERMISSIONS ---------------------------- //
