@@ -12,6 +12,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"golang.org/x/term"
 )
 
 // detectOS attempts to read /etc/os-release and parse the ID or ID_LIKE field.
@@ -113,6 +115,33 @@ func catFile(filePath string) {
 	fmt.Printf("=== End %s ===\n", filePath)
 }
 
+// promptPassword securely prompts the user for a password and confirmation.
+func promptPassword(promptMessage string) string {
+	for {
+		fmt.Print(promptMessage)
+		byteInput, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			log.Printf("Error reading password: %v", err)
+			continue
+		}
+		password := strings.TrimSpace(string(byteInput))
+		fmt.Print("Confirm password: ")
+		byteConfirm, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			log.Printf("Error reading password confirmation: %v", err)
+			continue
+		}
+		confirm := strings.TrimSpace(string(byteConfirm))
+		if password != confirm {
+			fmt.Println("Passwords do not match. Please try again.")
+			continue
+		}
+		return password
+	}
+}
+
 func main() {
 	// Detect OS type.
 	osType := detectOS()
@@ -125,7 +154,7 @@ func main() {
 	if osType == "debian" {
 		fmt.Println("Updating package lists and installing required packages on Debian-based system...")
 		// Adjusted package names for Debian/Ubuntu.
-		debianInstallCmd := "apt update && apt install -y postfix bsd-mailx libsasl2-modules"
+		debianInstallCmd := "DEBIAN_FRONTEND=noninteractive apt update && DEBIAN_FRONTEND=noninteractive apt install -y postfix bsd-mailx libsasl2-modules"
 		if err := runShellCommandWithTimeout(debianInstallCmd, 2*time.Minute); err != nil {
 			log.Fatalf("Package installation failed: %v", err)
 		}
@@ -171,9 +200,8 @@ func main() {
 	configuredEmail, _ := reader.ReadString('\n')
 	configuredEmail = strings.TrimSpace(configuredEmail)
 
-	fmt.Print("Enter your app password: ")
-	smtpAppPass, _ := reader.ReadString('\n')
-	smtpAppPass = strings.TrimSpace(smtpAppPass)
+	// Hide and confirm the app password.
+	smtpAppPass := promptPassword("Enter your app password: ")
 
 	// 5. Backup and then append configuration to /etc/postfix/main.cf using user input.
 	mainCfPath := "/etc/postfix/main.cf"
