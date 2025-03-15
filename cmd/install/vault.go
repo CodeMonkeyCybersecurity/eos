@@ -8,17 +8,9 @@ import (
 	"os/exec"
 	"time"
 
+	"eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
-
-func getInternalHostname() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Printf("Unable to retrieve hostname, defaulting to localhost: %v", err)
-		return "localhost"
-	}
-	return hostname
-}
 
 // vaultCmd represents the vault command under the "install" group.
 var vaultCmd = &cobra.Command{
@@ -54,7 +46,8 @@ This is a quick prod-mode setup, not intended for production use without further
 		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
 		// Create a minimal production config file for Vault.
-		configDir := "/etc/vault"
+		// Use a directory allowed by the snap confinement.
+		configDir := "/var/snap/vault/common"
 		configFile := configDir + "/config.hcl"
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			log.Fatalf("Failed to create config directory %s: %v", configDir, err)
