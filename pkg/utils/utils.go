@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"context"
 	"bufio"
-	"string"
+	"strings"
 	"time"
 
 )
