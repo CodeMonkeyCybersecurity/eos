@@ -60,7 +60,7 @@ listener "tcp" {
 }
 
 storage "file" {
-  path = "/opt/vault/data"
+  path = "/var/snap/vault/common/data"
 }
 
 disable_mlock = true
