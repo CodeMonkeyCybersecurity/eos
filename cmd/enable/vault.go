@@ -32,28 +32,30 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		os.Setenv("VAULT_ADDR", vaultAddr)
 		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
-		// 2. Run "vault operator init -key-shares=5 -key-threshold=3 -format=json"
+		// 2. Initialize Vault (if not already initialized).
 		fmt.Println("\n[1/9] Initializing Vault (operator init)...")
 		initCmd := exec.Command("vault", "operator", "init",
 			"-key-shares=5", "-key-threshold=3", "-format=json")
 		initOut, err := initCmd.CombinedOutput()
+		var initRes initResult
 		if err != nil {
-			// If the error indicates "Vault is already initialized," handle that gracefully.
 			if strings.Contains(string(initOut), "Vault is already initialized") {
 				fmt.Println("Vault is already initialized. Skipping init.")
 			} else {
 				log.Fatalf("Failed to init Vault: %v\nOutput: %s", err, string(initOut))
 			}
-		}
-
-		// Parse out the unseal keys and root token if the init was successful.
-		var initRes initResult
-		if len(initOut) > 0 && !strings.Contains(string(initOut), "already initialized") {
+		} else {
+			// Parse the JSON output.
 			if err := json.Unmarshal(initOut, &initRes); err != nil {
-				log.Fatalf("Failed to parse init output: %v", err)
+				log.Fatalf("Failed to parse initialization output: %v", err)
 			}
 			fmt.Printf("Vault initialized! Received %d unseal keys.\n", len(initRes.UnsealKeysB64))
 			fmt.Println("Storing these keys for demonstration. In production, store them securely!")
+			// Write the JSON output to a secure file.
+			if err := os.WriteFile("vault_init.json", initOut, 0600); err != nil {
+				log.Fatalf("Failed to write initialization output to file: %v", err)
+			}
+			fmt.Println("Initialization data stored securely in vault_init.json")
 		}
 
 		// 3. Unseal Vault with the first three unseal keys.
