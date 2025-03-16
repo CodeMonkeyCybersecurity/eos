@@ -22,13 +22,14 @@ var vaultCmd = &cobra.Command{
 	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
 A minimal configuration file is generated and used to run Vault with persistent file storage.
 After starting, Vault is automatically initialized and unsealed if not already done.
-Additionally, live log monitoring is performed to detect the startup marker.
+Live log monitoring is performed to detect the startup marker.
 This is a quick prod-mode setup, not intended for production use without further hardening.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Check for root privileges.
-		if os.Geteuid() != 0 {
-			log.Fatal("This command must be run with sudo or as root.")
-		}
+		// Ensure no previous Vault instance is running.
+		fmt.Println("Killing any existing Vault server process...")
+		killCmd := exec.Command("pkill", "-f", "vault server")
+		killCmd.Run() // ignore error; process might not be running.
+		time.Sleep(3 * time.Second) // allow time for shutdown
 
 		fmt.Println("Installing HashiCorp Vault via snap...")
 		installCmd := exec.Command("snap", "install", "vault", "--classic")
@@ -38,26 +39,23 @@ This is a quick prod-mode setup, not intended for production use without further
 			log.Fatalf("Failed to install Vault: %v", err)
 		}
 
-		// Verify installation by checking if vault is in PATH.
+		// Verify installation.
 		if _, err := exec.LookPath("vault"); err != nil {
 			log.Fatal("Vault command not found after installation.")
 		}
 
-		// Get the internal hostname.
+		// Set VAULT_ADDR.
 		hostname := utils.GetInternalHostname()
-		// Construct the VAULT_ADDR using the hostname.
 		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
 		os.Setenv("VAULT_ADDR", vaultAddr)
 		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
-		// Create a minimal production config file for Vault.
-		// Use a directory allowed by the snap confinement.
+		// Create configuration file.
 		configDir := "/var/snap/vault/common"
 		configFile := configDir + "/config.hcl"
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			log.Fatalf("Failed to create config directory %s: %v", configDir, err)
 		}
-
 		configContent := fmt.Sprintf(`
 listener "tcp" {
   address     = "0.0.0.0:8179"
@@ -77,15 +75,13 @@ ui = true
 		}
 		fmt.Printf("Vault configuration written to %s\n", configFile)
 
+		// Start Vault.
 		fmt.Println("Starting Vault in production mode...")
-		// Open the log file for Vault output.
 		logFilePath := "/var/log/vault.log"
 		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("Failed to open log file: %v", err)
 		}
-
-		// Start Vault in production mode using the config file.
 		vaultServerCmd := exec.Command("vault", "server", "-config="+configFile)
 		vaultServerCmd.Stdout = logFile
 		vaultServerCmd.Stderr = logFile
@@ -102,7 +98,7 @@ ui = true
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
-		// Run tail command to show last 100 lines and follow new entries.
+		// Run tail command (last 100 lines + follow).
 		tailCmd := exec.CommandContext(ctx, "tail", "-n", "100", "-f", logFilePath)
 		stdout, err := tailCmd.StdoutPipe()
 		if err != nil {
@@ -120,17 +116,17 @@ ui = true
 			fmt.Println(line)
 			if strings.Contains(line, marker) {
 				foundMarker = true
-				cancel() // Stop tailing if marker is found.
+				cancel() // Found marker; cancel the context.
 				break
 			}
 		}
 		if err := scanner.Err(); err != nil {
 			log.Printf("Error reading log output: %v", err)
 		}
-
-		// Wait for tail command to finish.
 		if err := tailCmd.Wait(); err != nil {
-			if ctx.Err() == context.DeadlineExceeded {
+			if ctx.Err() == context.Canceled {
+				log.Println("Tail command canceled after detecting startup marker.")
+			} else if ctx.Err() == context.DeadlineExceeded {
 				log.Println("Timeout reached while waiting for startup marker.")
 			} else {
 				log.Printf("Tail command exited with error: %v", err)
@@ -141,14 +137,12 @@ ui = true
 			log.Println("Startup marker not found; proceeding with existing logs.")
 		}
 
-		// Check Vault status (using JSON output).
+		// Check Vault status.
 		statusCmd := exec.Command("vault", "status", "-format=json")
 		statusOut, err := statusCmd.Output()
 		if err != nil {
 			log.Fatalf("Failed to get Vault status: %v", err)
 		}
-
-		// Parse the status.
 		var vaultStatus struct {
 			Initialized bool `json:"initialized"`
 			Sealed      bool `json:"sealed"`
@@ -157,7 +151,7 @@ ui = true
 			log.Fatalf("Failed to parse Vault status: %v", err)
 		}
 
-		// Initialize and unseal Vault if necessary.
+		// Initialize and unseal if necessary.
 		if !vaultStatus.Initialized {
 			fmt.Println("Vault is not initialized. Initializing Vault...")
 			initCmd := exec.Command("vault", "operator", "init", "-key-shares=5", "-key-threshold=3", "-format=json")
@@ -165,7 +159,6 @@ ui = true
 			if err != nil {
 				log.Fatalf("Failed to initialize Vault: %v", err)
 			}
-
 			var initResult struct {
 				UnsealKeysB64 []string `json:"unseal_keys_b64"`
 				RootToken     string   `json:"root_token"`
@@ -174,7 +167,6 @@ ui = true
 				log.Fatalf("Failed to parse initialization output: %v", err)
 			}
 			fmt.Println("Vault initialized successfully!")
-
 			for i := 0; i < 3; i++ {
 				fmt.Printf("Unsealing Vault with key %d...\n", i+1)
 				unsealCmd := exec.Command("vault", "operator", "unseal", initResult.UnsealKeysB64[i])
