@@ -8,6 +8,7 @@ import (
 	"eos/cmd/delete"
 	"eos/cmd/read"
 	"eos/cmd/update"
+        "eos/cmd/refresh"
         "eos/cmd/install"
 	"eos/pkg/logger"
 	"eos/pkg/utils"
@@ -48,6 +49,7 @@ func init() {
 	rootCmd.AddCommand(update.UpdateCmd)
 	rootCmd.AddCommand(delete.DeleteCmd)
         rootCmd.AddCommand(install.InstallCmd)
+	rootCmd.AddCommand(refresh.RefreshCmd)
 }
 
 // Execute starts the CLI
