@@ -9,8 +9,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"eos/pkg/utils"
 	"github.com/spf13/cobra"
+	"eos/pkg/utils"
+
 )
 
 // initResult is the JSON structure returned by "vault operator init -format=json".
@@ -19,22 +20,13 @@ type initResult struct {
 	RootToken     string   `json:"root_token"`
 }
 
-// For demonstration, if you don't already have a parent command defined,
-// define a placeholder EnableCmd. In your project, remove or replace this.
-var EnableCmd = &cobra.Command{
-	Use:   "enable",
-	Short: "Enable commands",
-	Long:  "Commands to enable and secure Vault.",
-}
-
 var vaultSecureCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Secures Vault by revoking the root token and elevating admin privileges",
-	Long: `This command assumes "eos enable vault" has been run and that the initialization data 
-(unseal keys and root token) is stored in "vault_init.json". It prompts you to confirm that you have securely 
-distributed these secrets by re-entering the first three unseal keys and the root token.
-If the input matches, the root token is revoked, the admin user is updated to have full privileges,
-and the initialization file is securely deleted.
+	Long: `This command secures your Vault setup after "eos enable vault" has been run.
+It reads the stored initialization data (vault_init.json), prompts you to confirm that you have securely 
+distributed the unseal keys and root token, then revokes the root token and updates the admin user to have
+full (root-level) privileges. Finally, it deletes the stored initialization file.
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// 1. Read the vault_init.json file.
@@ -42,10 +34,16 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		if err != nil {
 			log.Fatalf("Failed to read vault_init.json: %v", err)
 		}
-		var initResData initResult
-		if err := json.Unmarshal(data, &initResData); err != nil {
+		var initRes initResult
+		if err := json.Unmarshal(data, &initRes); err != nil {
 			log.Fatalf("Failed to parse vault_init.json: %v", err)
 		}
+
+		// After reading and parsing vault_init.json, hash them
+		hashedKey1 := utils.HashString(initRes.UnsealKeysB64[0])
+		hashedKey2 := utils.HashString(initRes.UnsealKeysB64[1])
+		hashedKey3 := utils.HashString(initRes.UnsealKeysB64[2])
+		hashedRoot := utils.HashString(initRes.RootToken)
 
 		// 2. Prompt the admin to re-enter three unseal keys and the root token.
 		reader := bufio.NewReader(os.Stdin)
@@ -67,20 +65,20 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			token, _ := reader.ReadString('\n')
 			token = strings.TrimSpace(token)
 
-			if utils.HashString(key1) == utils.HashString(initResData.UnsealKeysB64[0]) &&
-				utils.HashString(key2) == utils.HashString(initResData.UnsealKeysB64[1]) &&
-				utils.HashString(key3) == utils.HashString(initResData.UnsealKeysB64[2]) &&
-				utils.HashString(token) == utils.HashString(initResData.RootToken) {
-				fmt.Println("Confirmation successful.")
-				break
+			if utils.HashString(inputKey1) == hashedKey1 &&
+			   utils.HashString(inputKey2) == hashedKey2 &&
+			   utils.HashString(inputKey3) == hashedKey3 &&
+			   utils.HashString(inputRoot) == hashedRoot {
+			    fmt.Println("Confirmation successful.")
+			    // Now you can delete vault_init.json and (optionally) zero out any in-memory plaintext.
 			} else {
-				fmt.Println("One or more entries do not match. Please try again.")
+			    fmt.Println("One or more entries do not match. Please try again.")
 			}
 		}
 
 		// 3. Revoke the root token.
 		fmt.Println("Revoking the root token...")
-		revokeCmd := exec.Command("vault", "token", "revoke", initResData.RootToken)
+		revokeCmd := exec.Command("vault", "token", "revoke", initRes.RootToken)
 		revokeOut, err := revokeCmd.CombinedOutput()
 		if err != nil {
 			log.Printf("Warning: Failed to revoke root token: %v\nOutput: %s", err, string(revokeOut))
@@ -88,7 +86,8 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			fmt.Println("Root token revoked.")
 		}
 
-		// 4. Update the admin user to have full privileges (assign the root policy).
+		// 4. Update the admin user to have full privileges.
+		// We assume that an admin user was created via userpass. We'll update its policies to "root".
 		fmt.Println("Updating admin user to have full privileges...")
 		updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=root")
 		updateOut, err := updateCmd.CombinedOutput()
@@ -106,8 +105,11 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			fmt.Println("vault_init.json deleted successfully.")
 		}
 
+		// 6. Provide instructions to configure MFA.
+		fmt.Println("\nNext Steps:")
+		fmt.Println("Please configure multi-factor authentication (MFA) for your admin user using your organization's preferred method.")
+		fmt.Println("Refer to Vault's documentation for integrating MFA (e.g., via OIDC, LDAP, or a third-party MFA solution).")
 		fmt.Println("\nVault secure setup completed successfully!")
-		fmt.Println("Next, configure MFA for your admin user using your organization's preferred method.")
 	},
 }
 
