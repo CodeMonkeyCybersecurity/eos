@@ -1,11 +1,9 @@
 package logs
 
 import (
-	"bufio"
-	"fmt"
 	"log"
 	"os"
-	"time"
+	"os/exec"
 
 	"github.com/spf13/cobra"
 )
@@ -13,40 +11,21 @@ import (
 // vaultLogsCmd represents the "logs vault" command.
 var vaultLogsCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Tails Vault logs in real time",
-	Long:  "This command tails the Vault log file (/var/log/vault.log) and prints new log lines to the terminal in real time.",
+	Short: "Shows the last 100 Vault log lines then tails the log",
+	Long:  "This command displays the most recent 100 lines from /var/log/vault.log and then tails the log file in real time. This ensures that you see some log history even if Vault is quiet.",
 	Run: func(cmd *cobra.Command, args []string) {
-		logFilePath := "/var/log/vault.log"
+		// Use the tail command with -n 100 to show the last 100 lines and -f to follow the file.
+		tailCmd := exec.Command("tail", "-n", "100", "-f", "/var/log/vault.log")
+		tailCmd.Stdout = os.Stdout
+		tailCmd.Stderr = os.Stderr
 
-		// Open the log file.
-		file, err := os.Open(logFilePath)
-		if err != nil {
-			log.Fatalf("Failed to open log file: %v", err)
-		}
-		defer file.Close()
-
-		// Seek to the end of the file so we only see new log lines.
-		_, err = file.Seek(0, os.SEEK_END)
-		if err != nil {
-			log.Fatalf("Failed to seek to the end of log file: %v", err)
-		}
-
-		fmt.Println("Tailing Vault logs. Press Ctrl+C to exit.")
-		scanner := bufio.NewScanner(file)
-		for {
-			if scanner.Scan() {
-				line := scanner.Text()
-				fmt.Println(line)
-			} else {
-				// No new line available; wait briefly and try again.
-				time.Sleep(1 * time.Second)
-			}
+		log.Println("Tailing Vault logs. Press Ctrl+C to exit.")
+		if err := tailCmd.Run(); err != nil {
+			log.Fatalf("Error executing tail command: %v", err)
 		}
 	},
 }
 
 func init() {
-	// Register the vaultLogsCmd with the parent LogsCmd.
-	// Ensure that LogsCmd is defined in your logs package.
 	LogsCmd.AddCommand(vaultLogsCmd)
 }
