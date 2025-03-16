@@ -1,7 +1,6 @@
 package install
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"os"
@@ -31,7 +30,7 @@ and then unsealed using the first three keys.`,
 		// Kill any existing Vault process.
 		fmt.Println("Killing any existing Vault server process...")
 		killCmd := exec.Command("pkill", "-f", "vault server")
-		killCmd.Run() // Ignore errors if no process is found.
+		killCmd.Run() // Ignore error if no process is found.
 		time.Sleep(3 * time.Second) // Allow time for cleanup.
 
 		// Install Vault via snap.
@@ -91,6 +90,8 @@ ui = true
 		// Wait a fixed 5 seconds for Vault to stabilize.
 		fmt.Println("Waiting 5 seconds for Vault to stabilize...")
 		time.Sleep(5 * time.Second)
+	},
+}
 
 func init() {
 	InstallCmd.AddCommand(vaultCmd)
