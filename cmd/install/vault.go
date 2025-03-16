@@ -161,4 +161,42 @@ ui = true
 		if !vaultStatus.Initialized {
 			fmt.Println("Vault is not initialized. Initializing Vault...")
 			initCmd := exec.Command("vault", "operator", "init", "-key-shares=5", "-key-threshold=3", "-format=json")
-			initOut, err := initCmd.O
+			initOut, err := initCmd.Output()
+			if err != nil {
+				log.Fatalf("Failed to initialize Vault: %v", err)
+			}
+			var initResult struct {
+				UnsealKeysB64 []string `json:"unseal_keys_b64"`
+				RootToken     string   `json:"root_token"`
+			}
+			if err := json.Unmarshal(initOut, &initResult); err != nil {
+				log.Fatalf("Failed to parse initialization output: %v", err)
+			}
+			fmt.Println("Vault initialized successfully!")
+			for i := 0; i < 3; i++ {
+				fmt.Printf("Unsealing Vault with key %d...\n", i+1)
+				unsealCmd := exec.Command("vault", "operator", "unseal", initResult.UnsealKeysB64[i])
+				unsealCmd.Stdout = os.Stdout
+				unsealCmd.Stderr = os.Stderr
+				if err := unsealCmd.Run(); err != nil {
+					log.Fatalf("Failed to unseal Vault: %v", err)
+				}
+			}
+			fmt.Println("Vault unsealed successfully!")
+			fmt.Printf("Root Token (save this securely!): %s\n", initResult.RootToken)
+		} else if vaultStatus.Sealed {
+			fmt.Println("Vault is initialized but sealed. Manual intervention required to unseal.")
+			return
+		} else {
+			fmt.Println("Vault is already initialized and unsealed.")
+		}
+
+		fmt.Println("Vault is now running in production mode...")
+		fmt.Printf("Access it at %s.\n", vaultAddr)
+		fmt.Println("To view Vault logs, check", logFilePath)
+	},
+}
+
+func init() {
+	InstallCmd.AddCommand(vaultCmd)
+}
