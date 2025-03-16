@@ -45,10 +45,13 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		    log.Fatalf("Failed to parse vault_init.json: %v", err)
 		}
 
-		// After reading and parsing vault_init.json, hash the stored values.
-		hashedKey1 := utils.HashString(initRes.UnsealKeysB64[0])
-		hashedKey2 := utils.HashString(initRes.UnsealKeysB64[1])
-		hashedKey3 := utils.HashString(initRes.UnsealKeysB64[2])
+		// Build a slice of the stored hashed unseal keys (all five).
+		var storedHashes []string
+		for _, key := range initRes.UnsealKeysB64 {
+		    storedHashes = append(storedHashes, utils.HashString(key))
+		}
+		
+		// Compute the hash for the stored root token.
 		hashedRoot := utils.HashString(initRes.RootToken)
 		
 		// 2. Prompt the admin to re-enter three unseal keys (in any order) and the root token.
@@ -89,12 +92,8 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		    inputHash3 := utils.HashString(input3)
 		    inputRootHash := utils.HashString(inputRoot)
 		
-		   // Build a slice of the stored hashed unseal keys.
-		    var storedHashes []string
-			for _, key := range initRes.UnsealKeysB64 {
-			    storedHashes = append(storedHashes, utils.HashString(key))
-			}
-		   	matchCount := 0
+		    // Check that each provided key's hash is present in the stored hashes.
+		    matchCount := 0
 		    for _, inpHash := range []string{inputHash1, inputHash2, inputHash3} {
 		        for _, storedHash := range storedHashes {
 		            if inpHash == storedHash {
@@ -104,13 +103,8 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		        }
 		    }
 		
-		    if matchCount != 3 {
-		        fmt.Println("Oops, that hasn't worked! Please try again.")
-		        continue
-		    }
-		
-		    if inputRootHash != hashedRoot {
-		        fmt.Println("Oops, that hasn't worked! Please try again.")
+		    if matchCount != 3 || inputRootHash != hashedRoot {
+		        fmt.Println("Oops, one or more values are incorrect. Please try again.")
 		        continue
 		    }
 		
