@@ -6,8 +6,10 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
+	"eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -16,17 +18,16 @@ var vaultEnableCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Initializes and unseals Vault",
 	Long: `This command assumes Vault is installed and configured.
-It checks Vault's status and, if Vault is not initialized, initializes it with 5 key shares (threshold 3)
-and unseals it using the first three keys.`,
+It sets VAULT_ADDR dynamically based on the host's name, then checks Vault's status.
+If Vault is not initialized, it initializes it (with 5 key shares and a threshold of 3)
+and unseals Vault using the first three keys.
+If Vault is already initialized, it skips initialization.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Check if VAULT_ADDR is set; if not, set it.
-		vaultAddr := os.Getenv("VAULT_ADDR")
-		if vaultAddr == "" {
-			// Fallback: use localhost on port 8179.
-			vaultAddr = "http://127.0.0.1:8179"
-			os.Setenv("VAULT_ADDR", vaultAddr)
-		}
-		fmt.Printf("Using VAULT_ADDR = %s\n", vaultAddr)
+		// Dynamically set VAULT_ADDR.
+		hostname := utils.GetInternalHostname()
+		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
+		os.Setenv("VAULT_ADDR", vaultAddr)
+		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
 		// Poll for Vault status.
 		var vaultStatus struct {
@@ -36,7 +37,7 @@ and unseals it using the first three keys.`,
 		maxAttempts := 60
 		attempt := 0
 		for {
-			statusCmd := exec.Command("vault", "status", "-format=json")
+			statusCmd := exec.Command("vault", "status", "-address="+vaultAddr, "-format=json")
 			statusOut, err := statusCmd.Output()
 			if err == nil {
 				if err := json.Unmarshal(statusOut, &vaultStatus); err == nil {
@@ -53,33 +54,46 @@ and unseals it using the first three keys.`,
 		// If Vault is not initialized, initialize it.
 		if !vaultStatus.Initialized {
 			fmt.Println("Vault is not initialized. Initializing Vault...")
-			initCmd := exec.Command("vault", "operator", "init", "-key-shares=5", "-key-threshold=3", "-format=json")
-			initOut, err := initCmd.Output()
+			initCmd := exec.Command("vault", "operator", "init",
+				"-address="+vaultAddr,
+				"-key-shares=5",
+				"-key-threshold=3",
+				"-format=json")
+			// Use CombinedOutput to capture both stdout and stderr.
+			initOut, err := initCmd.CombinedOutput()
 			if err != nil {
-				log.Fatalf("Failed to initialize Vault: %v", err)
-			}
-			var initResult struct {
-				UnsealKeysB64 []string `json:"unseal_keys_b64"`
-				RootToken     string   `json:"root_token"`
-			}
-			if err := json.Unmarshal(initOut, &initResult); err != nil {
-				log.Fatalf("Failed to parse initialization output: %v", err)
-			}
-			fmt.Println("Vault initialized successfully!")
-			for i := 0; i < 3; i++ {
-				fmt.Printf("Unsealing Vault with key %d...\n", i+1)
-				unsealCmd := exec.Command("vault", "operator", "unseal", initResult.UnsealKeysB64[i])
-				unsealCmd.Stdout = os.Stdout
-				unsealCmd.Stderr = os.Stderr
-				if err := unsealCmd.Run(); err != nil {
-					log.Fatalf("Failed to unseal Vault: %v", err)
+				if strings.Contains(string(initOut), "Vault is already initialized") {
+					fmt.Println("Vault is already initialized. Skipping initialization.")
+					vaultStatus.Initialized = true
+				} else {
+					log.Fatalf("Failed to initialize Vault: %v\nOutput: %s", err, string(initOut))
 				}
+			} else {
+				var initResult struct {
+					UnsealKeysB64 []string `json:"unseal_keys_b64"`
+					RootToken     string   `json:"root_token"`
+				}
+				if err := json.Unmarshal(initOut, &initResult); err != nil {
+					log.Fatalf("Failed to parse initialization output: %v", err)
+				}
+				fmt.Println("Vault initialized successfully!")
+				// Unseal Vault using the first 3 unseal keys.
+				for i := 0; i < 3; i++ {
+					fmt.Printf("Unsealing Vault with key %d...\n", i+1)
+					unsealCmd := exec.Command("vault", "operator", "unseal",
+						"-address="+vaultAddr,
+						initResult.UnsealKeysB64[i])
+					unsealCmd.Stdout = os.Stdout
+					unsealCmd.Stderr = os.Stderr
+					if err := unsealCmd.Run(); err != nil {
+						log.Fatalf("Failed to unseal Vault: %v", err)
+					}
+				}
+				fmt.Println("Vault unsealed successfully!")
+				fmt.Printf("Root Token (save this securely!): %s\n", initResult.RootToken)
 			}
-			fmt.Println("Vault unsealed successfully!")
-			fmt.Printf("Root Token (save this securely): %s\n", initResult.RootToken)
 		} else if vaultStatus.Sealed {
-			// If already initialized but sealed, signal manual intervention.
-			fmt.Println("Vault is initialized but sealed. Please unseal manually.")
+			fmt.Println("Vault is initialized but sealed. Manual intervention required to unseal.")
 			return
 		} else {
 			fmt.Println("Vault is already initialized and unsealed.")
@@ -90,6 +104,5 @@ and unseals it using the first three keys.`,
 }
 
 func init() {
-	// Assuming you have a parent enable command (EnableCmd) defined in your enable package.
 	EnableCmd.AddCommand(vaultEnableCmd)
 }
