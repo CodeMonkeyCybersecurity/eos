@@ -6,6 +6,7 @@ package cmd
 import (
 	"eos/cmd/create"
 	"eos/cmd/enable"
+	"eos/cmd/secure"
 	"eos/cmd/delete"
 	"eos/cmd/read"
 	"eos/cmd/logs"
@@ -54,6 +55,7 @@ func init() {
 	rootCmd.AddCommand(refresh.RefreshCmd)
 	rootCmd.AddCommand(logs.LogsCmd)
 	rootCmd.AddCommand(enable.EnableCmd)
+	rootCmd.AddCommand(secure.SecureCmd)
 }
 
 // Execute starts the CLI
