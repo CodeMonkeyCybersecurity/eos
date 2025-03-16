@@ -45,67 +45,74 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		    log.Fatalf("Failed to parse vault_init.json: %v", err)
 		}
 
-		// After reading and parsing vault_init.json, hash them
+		// After reading and parsing vault_init.json, hash the stored values.
 		hashedKey1 := utils.HashString(initRes.UnsealKeysB64[0])
 		hashedKey2 := utils.HashString(initRes.UnsealKeysB64[1])
 		hashedKey3 := utils.HashString(initRes.UnsealKeysB64[2])
 		hashedRoot := utils.HashString(initRes.RootToken)
-
+		
 		// 2. Prompt the admin to re-enter three unseal keys (in any order) and the root token.
 		reader := bufio.NewReader(os.Stdin)
 		for {
-			fmt.Println("Please re-enter three unique unseal keys (in any order) from the stored set and the root token to confirm secure storage.")
-
-			fmt.Print("Enter Unseal Key 1: ")
-			input1, _ := reader.ReadString('\n')
-			input1 = strings.TrimSpace(input1)
-
-			fmt.Print("Enter Unseal Key 2: ")
-			input2, _ := reader.ReadString('\n')
-			input2 = strings.TrimSpace(input2)
-
-			fmt.Print("Enter Unseal Key 3: ")
-			input3, _ := reader.ReadString('\n')
-			input3 = strings.TrimSpace(input3)
-
-			fmt.Print("Enter Root Token: ")
-			inputRoot, _ := reader.ReadString('\n')
-			inputRoot = strings.TrimSpace(inputRoot)
-
-			// Ensure the three unseal keys are unique.
-			inputs := []string{input1, input2, input3}
-			uniqueInputs := make(map[string]bool)
-			for _, key := range inputs {
-				uniqueInputs[key] = true
-			}
-			if len(uniqueInputs) != 3 {
-				fmt.Println("The unseal keys must be unique. Please try again.")
-				continue
-			}
-
-			// Check that each provided key is present in the stored unseal keys.
-			matchCount := 0
-			for _, inp := range inputs {
-				for _, stored := range initResData.UnsealKeysB64 {
-					if inp == stored {
-						matchCount++
-						break
-					}
-				}
-			}
-			if matchCount != 3 {
-				fmt.Println("One or more unseal keys do not match the stored keys. Please try again.")
-				continue
-			}
-
-			// Check the root token.
-			if inputRoot != initResData.RootToken {
-				fmt.Println("Root token does not match. Please try again.")
-				continue
-			}
-
-			fmt.Println("Confirmation successful.")
-			break
+		    fmt.Println("Please re-enter three unique unseal keys (in any order) from the stored set and the root token to confirm secure storage.")
+		
+		    fmt.Print("Enter Unseal Key 1: ")
+		    input1, _ := reader.ReadString('\n')
+		    input1 = strings.TrimSpace(input1)
+		
+		    fmt.Print("Enter Unseal Key 2: ")
+		    input2, _ := reader.ReadString('\n')
+		    input2 = strings.TrimSpace(input2)
+		
+		    fmt.Print("Enter Unseal Key 3: ")
+		    input3, _ := reader.ReadString('\n')
+		    input3 = strings.TrimSpace(input3)
+		
+		    fmt.Print("Enter Root Token: ")
+		    inputRoot, _ := reader.ReadString('\n')
+		    inputRoot = strings.TrimSpace(inputRoot)
+		
+		    // Ensure the three unseal keys are unique.
+		    inputs := []string{input1, input2, input3}
+		    uniqueInputs := make(map[string]bool)
+		    for _, key := range inputs {
+		        uniqueInputs[key] = true
+		    }
+		    if len(uniqueInputs) != 3 {
+		        fmt.Println("The unseal keys must be unique. Please try again.")
+		        continue
+		    }
+		
+		    // Compute hashes for the input values.
+		    inputHash1 := utils.HashString(input1)
+		    inputHash2 := utils.HashString(input2)
+		    inputHash3 := utils.HashString(input3)
+		    inputRootHash := utils.HashString(inputRoot)
+		
+		   	// Build a slice of the stored hashed unseal keys.
+		    storedHashes := []string{hashedKey1, hashedKey2, hashedKey3}
+		   	matchCount := 0
+		    for _, inpHash := range []string{inputHash1, inputHash2, inputHash3} {
+		        for _, storedHash := range storedHashes {
+		            if inpHash == storedHash {
+		                matchCount++
+		                break
+		            }
+		        }
+		    }
+		
+		    if matchCount != 3 {
+		        fmt.Println("Oops, that hasn't worked! Please try again.")
+		        continue
+		    }
+		
+		    if inputRootHash != hashedRoot {
+		        fmt.Println("Oops, that hasn't worked! Please try again.")
+		        continue
+		    }
+		
+		    fmt.Println("Confirmation successful.")
+		    break
 		}
 
 		// 3. Revoke the root token.
