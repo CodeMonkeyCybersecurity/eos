@@ -51,35 +51,61 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		hashedKey3 := utils.HashString(initRes.UnsealKeysB64[2])
 		hashedRoot := utils.HashString(initRes.RootToken)
 
-		// 2. Prompt the admin to re-enter three unseal keys and the root token.
+		// 2. Prompt the admin to re-enter three unseal keys (in any order) and the root token.
 		reader := bufio.NewReader(os.Stdin)
 		for {
-		    fmt.Println("Please re-enter the following secrets to confirm you have stored them securely.")
-		    fmt.Print("Enter Unseal Key 1: ")
-		    key1, _ := reader.ReadString('\n')
-		    key1 = strings.TrimSpace(key1)
-		
-		    fmt.Print("Enter Unseal Key 2: ")
-		    key2, _ := reader.ReadString('\n')
-		    key2 = strings.TrimSpace(key2)
-		
-		    fmt.Print("Enter Unseal Key 3: ")
-		    key3, _ := reader.ReadString('\n')
-		    key3 = strings.TrimSpace(key3)
-		
-		    fmt.Print("Enter Root Token: ")
-		    token, _ := reader.ReadString('\n')
-		    token = strings.TrimSpace(token)
-		
-		    if utils.HashString(key1) == hashedKey1 &&
-		       utils.HashString(key2) == hashedKey2 &&
-		       utils.HashString(key3) == hashedKey3 &&
-		       utils.HashString(token) == hashedRoot {
-		        fmt.Println("Confirmation successful.")
-		        break
-		    } else {
-		        fmt.Println("One or more entries do not match. Please try again.")
-		    }
+			fmt.Println("Please re-enter three unique unseal keys (in any order) from the stored set and the root token to confirm secure storage.")
+
+			fmt.Print("Enter Unseal Key 1: ")
+			input1, _ := reader.ReadString('\n')
+			input1 = strings.TrimSpace(input1)
+
+			fmt.Print("Enter Unseal Key 2: ")
+			input2, _ := reader.ReadString('\n')
+			input2 = strings.TrimSpace(input2)
+
+			fmt.Print("Enter Unseal Key 3: ")
+			input3, _ := reader.ReadString('\n')
+			input3 = strings.TrimSpace(input3)
+
+			fmt.Print("Enter Root Token: ")
+			inputRoot, _ := reader.ReadString('\n')
+			inputRoot = strings.TrimSpace(inputRoot)
+
+			// Ensure the three unseal keys are unique.
+			inputs := []string{input1, input2, input3}
+			uniqueInputs := make(map[string]bool)
+			for _, key := range inputs {
+				uniqueInputs[key] = true
+			}
+			if len(uniqueInputs) != 3 {
+				fmt.Println("The unseal keys must be unique. Please try again.")
+				continue
+			}
+
+			// Check that each provided key is present in the stored unseal keys.
+			matchCount := 0
+			for _, inp := range inputs {
+				for _, stored := range initResData.UnsealKeysB64 {
+					if inp == stored {
+						matchCount++
+						break
+					}
+				}
+			}
+			if matchCount != 3 {
+				fmt.Println("One or more unseal keys do not match the stored keys. Please try again.")
+				continue
+			}
+
+			// Check the root token.
+			if inputRoot != initResData.RootToken {
+				fmt.Println("Root token does not match. Please try again.")
+				continue
+			}
+
+			fmt.Println("Confirmation successful.")
+			break
 		}
 
 		// 3. Revoke the root token.
