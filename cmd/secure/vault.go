@@ -29,14 +29,20 @@ distributed the unseal keys and root token, then revokes the root token and upda
 full (root-level) privileges. Finally, it deletes the stored initialization file.
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// 1. Read the vault_init.json file.
+		// Check if the file exists.
+		if _, err := os.Stat("vault_init.json"); os.IsNotExist(err) {
+		    log.Fatalf("vault_init.json not found. Please run 'eos enable vault' first to generate initialization data.")
+		}
+		
+		// Read the vault_init.json file.
 		data, err := os.ReadFile("vault_init.json")
 		if err != nil {
-			log.Fatalf("Failed to read vault_init.json: %v", err)
+		    log.Fatalf("Failed to read vault_init.json: %v", err)
 		}
+		
 		var initRes initResult
 		if err := json.Unmarshal(data, &initRes); err != nil {
-			log.Fatalf("Failed to parse vault_init.json: %v", err)
+		    log.Fatalf("Failed to parse vault_init.json: %v", err)
 		}
 
 		// After reading and parsing vault_init.json, hash them
