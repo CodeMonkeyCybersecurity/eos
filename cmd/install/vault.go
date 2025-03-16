@@ -1,14 +1,11 @@
 package install
 
 import (
-	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
-	"strings"
 	"time"
 
 	"eos/pkg/utils"
@@ -21,21 +18,20 @@ var vaultCmd = &cobra.Command{
 	Short: "Installs and initializes HashiCorp Vault in production mode via snap",
 	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
 A minimal configuration file is generated and used to run Vault with persistent file storage.
-After starting, Vault is automatically initialized and unsealed if not already done.
-Live log monitoring is performed to detect the startup marker; then the script polls for a valid status,
-and if necessary, initializes and unseals Vault.
-This is a quick prod-mode setup, not intended for production use without further hardening.`,
+After starting, Vault is given a fixed wait period (5 seconds) before checking its status.
+If Vault is not initialized, it will be initialized (with 5 key shares and a threshold of 3)
+and then unsealed using the first three keys.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Set VAULT_ADDR.
+		// Set VAULT_ADDR as early as possible.
 		hostname := utils.GetInternalHostname()
 		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
 		os.Setenv("VAULT_ADDR", vaultAddr)
 		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
-		
+
 		// Kill any existing Vault process.
 		fmt.Println("Killing any existing Vault server process...")
 		killCmd := exec.Command("pkill", "-f", "vault server")
-		killCmd.Run() // Ignore error if process not running.
+		killCmd.Run() // Ignore errors if no process is found.
 		time.Sleep(3 * time.Second) // Allow time for cleanup.
 
 		// Install Vault via snap.
@@ -47,7 +43,7 @@ This is a quick prod-mode setup, not intended for production use without further
 			log.Fatalf("Failed to install Vault: %v", err)
 		}
 
-		// Verify installation.
+		// Verify Vault installation.
 		if _, err := exec.LookPath("vault"); err != nil {
 			log.Fatal("Vault command not found after installation.")
 		}
@@ -92,70 +88,22 @@ ui = true
 		}
 		fmt.Printf("Vault process started with PID %d\n", vaultServerCmd.Process.Pid)
 
-		// Live log monitoring for startup marker.
-		fmt.Println("Monitoring Vault logs for startup message...")
-		marker := "Vault server started!"
-		timeout := 60 * time.Second
-		ctx, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
+		// Wait a fixed 5 seconds for Vault to stabilize.
+		fmt.Println("Waiting 5 seconds for Vault to stabilize...")
+		time.Sleep(5 * time.Second)
 
-		tailCmd := exec.CommandContext(ctx, "tail", "-n", "100", "-f", logFilePath)
-		stdout, err := tailCmd.StdoutPipe()
+		// Check Vault status.
+		statusCmd := exec.Command("vault", "status", "-format=json")
+		statusOut, err := statusCmd.Output()
 		if err != nil {
-			log.Fatalf("Failed to get stdout pipe: %v", err)
+			log.Fatalf("Failed to get Vault status: %v", err)
 		}
-		if err := tailCmd.Start(); err != nil {
-			log.Fatalf("Failed to start tail command: %v", err)
-		}
-
-		scanner := bufio.NewScanner(stdout)
-		foundMarker := false
-		for scanner.Scan() {
-			line := scanner.Text()
-			fmt.Println(line)
-			if strings.Contains(line, marker) {
-				foundMarker = true
-				fmt.Println("Startup marker detected.")
-				cancel() // Cancel context to stop tailing.
-				break
-			}
-		}
-		if err := scanner.Err(); err != nil {
-			log.Printf("Error reading log output: %v", err)
-		}
-		// Wait for tail command to finish gracefully.
-		if err := tailCmd.Wait(); err != nil && ctx.Err() != context.Canceled {
-			log.Printf("Tail command exited with error: %v", err)
-		}
-
-		// If the startup marker was found, wait a few seconds for Vault to fully stabilize.
-		if foundMarker {
-			fmt.Println("Waiting 5 seconds for Vault to stabilize...")
-			time.Sleep(5 * time.Second)
-		} else {
-			log.Println("Startup marker not found; proceeding with existing logs.")
-		}
-
-		// Poll for Vault status for up to 60 attempts (approx 60 seconds).
 		var vaultStatus struct {
 			Initialized bool `json:"initialized"`
 			Sealed      bool `json:"sealed"`
 		}
-		maxAttempts := 60
-		attempt := 0
-		for {
-			statusCmd := exec.Command("vault", "status", "-format=json")
-			statusOut, err := statusCmd.Output()
-			if err == nil {
-				if err := json.Unmarshal(statusOut, &vaultStatus); err == nil {
-					break
-				}
-			}
-			attempt++
-			if attempt >= maxAttempts {
-				log.Fatalf("Failed to get valid Vault status after %d attempts.", attempt)
-			}
-			time.Sleep(1 * time.Second)
+		if err := json.Unmarshal(statusOut, &vaultStatus); err != nil {
+			log.Fatalf("Failed to parse Vault status: %v", err)
 		}
 
 		// Initialize and unseal Vault if necessary.
@@ -193,7 +141,7 @@ ui = true
 		}
 
 		fmt.Println("Vault is now running in production mode...")
-		fmt.Printf("Access it at %s.\n", vaultAddr)
+		fmt.Printf("Access it at %s\n", vaultAddr)
 		fmt.Println("To view Vault logs, check", logFilePath)
 	},
 }
