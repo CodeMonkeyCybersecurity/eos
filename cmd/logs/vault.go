@@ -3,6 +3,7 @@ package logs
 import (
 	"bufio"
 	"log"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ import (
 var vaultLogsCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Shows the last 100 Vault log lines then tails the log",
-	Long:  "This command displays the most recent 100 lines from /var/log/vault.log and then tails the log file in real time.",
+	Long:  "This command displays the most recent 100 lines from /var/log/vault.log and then tails the log file in real time, with the footer message at the bottom.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize termui.
 		if err := ui.Init(); err != nil {
@@ -39,46 +40,40 @@ var vaultLogsCmd = &cobra.Command{
 
 		ui.Render(logPar, footer)
 
-		// Start tailing logs using "tail -f".
-		cmdTail := exec.Command("tail", "-n", "100", "/var/log/vault.log")
-		out, err := cmdTail.Output()
-		if err != nil {
-			log.Fatalf("failed to get last 100 lines: %v", err)
-		}
-		// Set the initial text to the last 100 lines.
-		allLogs := strings.Split(string(out), "\n")
-		logPar.Text = strings.Join(allLogs, "\n")
-		ui.Render(logPar, footer)
-
-		// Now start a tail -f to follow new log entries.
-		tailCmd := exec.Command("tail", "-f", "/var/log/vault.log")
+		// Use a single tail command to print the last 100 lines and then follow new lines.
+		tailCmd := exec.Command("tail", "-n", "100", "-f", "/var/log/vault.log")
 		stdout, err := tailCmd.StdoutPipe()
 		if err != nil {
 			log.Fatalf("failed to get stdout pipe: %v", err)
 		}
+
 		if err := tailCmd.Start(); err != nil {
 			log.Fatalf("failed to start tail command: %v", err)
 		}
 
-		// Read the new log lines and update the widget.
-		go func() {
-			scanner := bufio.NewScanner(stdout)
-			for scanner.Scan() {
-				line := scanner.Text()
-				allLogs = append(allLogs, line)
-				// Keep only the last 100 lines.
-				if len(allLogs) > 100 {
-					allLogs = allLogs[len(allLogs)-100:]
-				}
-				logPar.Text = strings.Join(allLogs, "\n")
-				ui.Render(logPar, footer)
+		// Read the output continuously.
+		scanner := bufio.NewScanner(stdout)
+		var allLogs []string
+		for scanner.Scan() {
+			line := scanner.Text()
+			allLogs = append(allLogs, line)
+			// Limit to the last 100 lines.
+			if len(allLogs) > 100 {
+				allLogs = allLogs[len(allLogs)-100:]
 			}
-			if err := scanner.Err(); err != nil {
-				log.Printf("scanner error: %v", err)
-			}
-		}()
+			logPar.Text = strings.Join(allLogs, "\n")
+			ui.Render(logPar, footer)
+		}
+		if err := scanner.Err(); err != nil {
+			log.Printf("scanner error: %v", err)
+		}
 
-		// Poll for UI events.
+		// Optionally wait for the tail command to exit.
+		if err := tailCmd.Wait(); err != nil {
+			log.Printf("tail command exited with error: %v", err)
+		}
+
+		// Poll for UI events so the UI doesn't immediately exit.
 		uiEvents := ui.PollEvents()
 		for {
 			e := <-uiEvents
@@ -92,6 +87,5 @@ var vaultLogsCmd = &cobra.Command{
 }
 
 func init() {
-	// Register vaultLogsCmd as a subcommand of LogsCmd.
 	LogsCmd.AddCommand(vaultLogsCmd)
 }
