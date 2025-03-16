@@ -122,7 +122,7 @@ func ProcessMap(data map[string]interface{}, indent string) {
 			fmt.Printf("%s%s:\n", indent, key)
 			for _, item := range v {
 				if itemMap, ok := item.(map[string]interface{}); ok {
-					processMap(itemMap, indent+"  ")
+					ProcessMap(itemMap, indent+"  ")
 				} else {
 					fmt.Printf("%s  - %v\n", indent, item)
 				}
