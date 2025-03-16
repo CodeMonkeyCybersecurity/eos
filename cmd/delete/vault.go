@@ -49,14 +49,6 @@ var vaultDeleteCmd = &cobra.Command{
 			fmt.Printf("Removed configuration directory %s\n", configDir)
 		}
 
-		// Optionally remove the Vault log file.
-		logFilePath := "/var/log/vault.log"
-		if err := os.Remove(logFilePath); err != nil {
-			log.Printf("Warning: failed to remove log file %s: %v", logFilePath, err)
-		} else {
-			fmt.Printf("Removed log file %s\n", logFilePath)
-		}
-
 		fmt.Println("Vault deletion complete.")
 	},
 }
