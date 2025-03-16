@@ -3,7 +3,6 @@ package logs
 import (
 	"bufio"
 	"log"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
