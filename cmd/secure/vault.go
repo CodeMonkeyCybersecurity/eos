@@ -89,8 +89,11 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		    inputHash3 := utils.HashString(input3)
 		    inputRootHash := utils.HashString(inputRoot)
 		
-		   	// Build a slice of the stored hashed unseal keys.
-		    storedHashes := []string{hashedKey1, hashedKey2, hashedKey3}
+		   // Build a slice of the stored hashed unseal keys.
+		    var storedHashes []string
+			for _, key := range initRes.UnsealKeysB64 {
+			    storedHashes = append(storedHashes, utils.HashString(key))
+			}
 		   	matchCount := 0
 		    for _, inpHash := range []string{inputHash1, inputHash2, inputHash3} {
 		        for _, storedHash := range storedHashes {
