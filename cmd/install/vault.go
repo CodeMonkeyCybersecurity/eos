@@ -22,14 +22,15 @@ var vaultCmd = &cobra.Command{
 	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
 A minimal configuration file is generated and used to run Vault with persistent file storage.
 After starting, Vault is automatically initialized and unsealed if not already done.
-Live log monitoring is performed to detect the startup marker, then the script polls for Vault status.
+Live log monitoring is performed to detect the startup marker; then the script polls for a valid status,
+and if necessary, initializes and unseals Vault.
 This is a quick prod-mode setup, not intended for production use without further hardening.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Kill any existing Vault process.
 		fmt.Println("Killing any existing Vault server process...")
 		killCmd := exec.Command("pkill", "-f", "vault server")
-		killCmd.Run() // Ignore error if process is not running.
-		time.Sleep(3 * time.Second)
+		killCmd.Run() // Ignore error if process not running.
+		time.Sleep(3 * time.Second) // Allow time for cleanup.
 
 		// Install Vault via snap.
 		fmt.Println("Installing HashiCorp Vault via snap...")
@@ -91,7 +92,7 @@ ui = true
 		}
 		fmt.Printf("Vault process started with PID %d\n", vaultServerCmd.Process.Pid)
 
-		// Live log monitoring.
+		// Live log monitoring for startup marker.
 		fmt.Println("Monitoring Vault logs for startup message...")
 		marker := "Vault server started!"
 		timeout := 60 * time.Second
@@ -114,6 +115,7 @@ ui = true
 			fmt.Println(line)
 			if strings.Contains(line, marker) {
 				foundMarker = true
+				fmt.Println("Startup marker detected.")
 				cancel() // Cancel context to stop tailing.
 				break
 			}
@@ -121,26 +123,25 @@ ui = true
 		if err := scanner.Err(); err != nil {
 			log.Printf("Error reading log output: %v", err)
 		}
-		// Wait for tail command to finish, but don't exit on cancellation.
-		if err := tailCmd.Wait(); err != nil {
-			if ctx.Err() == context.Canceled {
-				log.Println("Tail command canceled after detecting startup marker.")
-			} else if ctx.Err() == context.DeadlineExceeded {
-				log.Println("Timeout reached while waiting for startup marker.")
-			} else {
-				log.Printf("Tail command exited with error: %v", err)
-			}
+		// Wait for tail command to finish gracefully.
+		if err := tailCmd.Wait(); err != nil && ctx.Err() != context.Canceled {
+			log.Printf("Tail command exited with error: %v", err)
 		}
-		if !foundMarker {
+
+		// If the startup marker was found, wait a few seconds for Vault to fully stabilize.
+		if foundMarker {
+			fmt.Println("Waiting 5 seconds for Vault to stabilize...")
+			time.Sleep(5 * time.Second)
+		} else {
 			log.Println("Startup marker not found; proceeding with existing logs.")
 		}
 
-		// Poll for Vault status up to 30 seconds.
+		// Poll for Vault status for up to 60 attempts (approx 60 seconds).
 		var vaultStatus struct {
 			Initialized bool `json:"initialized"`
 			Sealed      bool `json:"sealed"`
 		}
-		maxAttempts := 30
+		maxAttempts := 60
 		attempt := 0
 		for {
 			statusCmd := exec.Command("vault", "status", "-format=json")
