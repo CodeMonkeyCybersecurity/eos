@@ -112,17 +112,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		    break
 		}
 
-		// 3. Revoke the root token.
-		fmt.Println("Revoking the root token...")
-		revokeCmd := exec.Command("vault", "token", "revoke", initRes.RootToken)
-		revokeOut, err := revokeCmd.CombinedOutput()
-		if err != nil {
-			log.Printf("Warning: Failed to revoke root token: %v\nOutput: %s", err, string(revokeOut))
-		} else {
-			fmt.Println("Root token revoked.")
-		}
-
-		// 4. Update the admin user to have full privileges.
+		// 3. Update the admin user to have full privileges.
 		// We assume that an admin user was created via userpass. We'll update its policies to "root".
 		fmt.Println("Updating admin user to have full privileges...")
 		updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=root")
@@ -131,6 +121,16 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			log.Printf("Warning: Failed to update admin user policies: %v\nOutput: %s", err, string(updateOut))
 		} else {
 			fmt.Println("Admin user updated with full privileges.")
+		}
+		
+		// 4. Revoke the root token.
+		fmt.Println("Revoking the root token...")
+		revokeCmd := exec.Command("vault", "token", "revoke", initRes.RootToken)
+		revokeOut, err := revokeCmd.CombinedOutput()
+		if err != nil {
+			log.Printf("Warning: Failed to revoke root token: %v\nOutput: %s", err, string(revokeOut))
+		} else {
+			fmt.Println("Root token revoked.")
 		}
 
 		// 5. Securely delete the vault_init.json file.
