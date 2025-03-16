@@ -1,6 +1,7 @@
 package install
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -18,6 +19,7 @@ var vaultCmd = &cobra.Command{
 	Short: "Installs and initializes HashiCorp Vault in production mode via snap",
 	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
 A minimal configuration file is generated and used to run Vault with persistent file storage.
+After starting, Vault is automatically initialized and unsealed if not already done.
 This is a quick prod-mode setup, not intended for production use without further hardening.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Check for root privileges.
@@ -92,10 +94,54 @@ ui = true
 		// Allow some time for the Vault server to initialize.
 		time.Sleep(5 * time.Second)
 
-		// Verify that Vault is running.
-		checkCmd := exec.Command("pgrep", "-f", "vault server")
-		if err := checkCmd.Run(); err != nil {
-			log.Fatal("Vault server does not appear to be running. Please check /var/log/vault.log for details.")
+		// Check Vault status (using JSON output).
+		statusCmd := exec.Command("vault", "status", "-format=json")
+		statusOut, err := statusCmd.Output()
+		if err != nil {
+			log.Fatalf("Failed to get Vault status: %v", err)
+		}
+
+		// Define a struct to parse the status.
+		var vaultStatus struct {
+			Initialized bool `json:"initialized"`
+		}
+		if err := json.Unmarshal(statusOut, &vaultStatus); err != nil {
+			log.Fatalf("Failed to parse Vault status: %v", err)
+		}
+
+		// If Vault is not initialized, initialize and unseal it.
+		if !vaultStatus.Initialized {
+			fmt.Println("Vault is not initialized. Initializing Vault...")
+			initCmd := exec.Command("vault", "operator", "init", "-key-shares=5", "-key-threshold=3", "-format=json")
+			initOut, err := initCmd.Output()
+			if err != nil {
+				log.Fatalf("Failed to initialize Vault: %v", err)
+			}
+
+			// Define a struct for the initialization output.
+			var initResult struct {
+				UnsealKeysB64 []string `json:"unseal_keys_b64"`
+				RootToken     string   `json:"root_token"`
+			}
+			if err := json.Unmarshal(initOut, &initResult); err != nil {
+				log.Fatalf("Failed to parse initialization output: %v", err)
+			}
+			fmt.Println("Vault initialized successfully!")
+
+			// Unseal Vault using the first 3 unseal keys.
+			for i := 0; i < 3; i++ {
+				fmt.Printf("Unsealing Vault with key %d...\n", i+1)
+				unsealCmd := exec.Command("vault", "operator", "unseal", initResult.UnsealKeysB64[i])
+				unsealCmd.Stdout = os.Stdout
+				unsealCmd.Stderr = os.Stderr
+				if err := unsealCmd.Run(); err != nil {
+					log.Fatalf("Failed to unseal Vault: %v", err)
+				}
+			}
+			fmt.Println("Vault unsealed successfully!")
+			fmt.Printf("Root Token (save this securely!): %s\n", initResult.RootToken)
+		} else {
+			fmt.Println("Vault is already initialized.")
 		}
 
 		fmt.Println("Vault is now running in production mode...")
