@@ -114,5 +114,5 @@ Please follow up by configuring MFA via your organization's preferred integratio
 }
 
 func init() {
-	EnableCmd.AddCommand(vaultSecureCmd)
+	SecureCmd.AddCommand(vaultSecureCmd)
 }
