@@ -1,17 +1,56 @@
 package install
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
+
+// monitorVaultLogs tails the log file and prints new lines to STDOUT.
+// It returns when it sees a line containing the specified marker or when the context is done.
+func monitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
+	file, err := os.Open(logFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to open log file for monitoring: %w", err)
+	}
+	defer file.Close()
+
+	// Seek to the end of the file so we only see new log lines.
+	_, err = file.Seek(0, os.SEEK_END)
+	if err != nil {
+		return fmt.Errorf("failed to seek log file: %w", err)
+	}
+
+	scanner := bufio.NewScanner(file)
+	for {
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timeout reached while waiting for Vault to start")
+		default:
+			// Read new lines if available.
+			if scanner.Scan() {
+				line := scanner.Text()
+				fmt.Println(line) // Print log line to STDOUT.
+				if strings.Contains(line, "Vault server started!") {
+					return nil
+				}
+			} else {
+				// No new line; wait a bit and try again.
+				time.Sleep(500 * time.Millisecond)
+			}
+		}
+	}
+}
 
 // vaultCmd represents the vault command under the "install" group.
 var vaultCmd = &cobra.Command{
@@ -76,7 +115,8 @@ ui = true
 
 		fmt.Println("Starting Vault in production mode...")
 		// Open the log file for Vault output.
-		logFile, err := os.OpenFile("/var/log/vault.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		logFilePath := "/var/log/vault.log"
+		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			log.Fatalf("Failed to open log file: %v", err)
 		}
@@ -91,8 +131,13 @@ ui = true
 		}
 		fmt.Printf("Vault process started with PID %d\n", vaultServerCmd.Process.Pid)
 
-		// Allow some time for the Vault server to initialize.
-		time.Sleep(5 * time.Second)
+		// Monitor Vault logs until we detect that Vault is up.
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		fmt.Println("Monitoring Vault logs for startup message...")
+		if err := monitorVaultLogs(ctx, logFilePath, "Vault server started!"); err != nil {
+			log.Fatalf("Vault did not start properly: %v", err)
+		}
 
 		// Check Vault status (using JSON output).
 		statusCmd := exec.Command("vault", "status", "-format=json")
@@ -104,6 +149,7 @@ ui = true
 		// Define a struct to parse the status.
 		var vaultStatus struct {
 			Initialized bool `json:"initialized"`
+			Sealed      bool `json:"sealed"`
 		}
 		if err := json.Unmarshal(statusOut, &vaultStatus); err != nil {
 			log.Fatalf("Failed to parse Vault status: %v", err)
@@ -140,13 +186,20 @@ ui = true
 			}
 			fmt.Println("Vault unsealed successfully!")
 			fmt.Printf("Root Token (save this securely!): %s\n", initResult.RootToken)
+		} else if vaultStatus.Sealed {
+			// If already initialized but still sealed, unseal.
+			fmt.Println("Vault is initialized but sealed. Unsealing Vault...")
+			// For simplicity, assume the operator will supply keys manually or
+			// extend the script to unseal with known keys.
+			// Here, you could repeat similar unseal logic if you stored keys.
+			log.Fatal("Vault is sealed. Manual intervention required to unseal.")
 		} else {
-			fmt.Println("Vault is already initialized.")
+			fmt.Println("Vault is already initialized and unsealed.")
 		}
 
 		fmt.Println("Vault is now running in production mode...")
 		fmt.Printf("Access it at %s.\n", vaultAddr)
-		fmt.Println("To view Vault logs, check /var/log/vault.log.")
+		fmt.Println("To view Vault logs, check", logFilePath)
 	},
 }
 
