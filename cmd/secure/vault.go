@@ -112,15 +112,45 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		    break
 		}
 
-		// 3. Update the admin user to have full privileges.
-		// We assume that an admin user was created via userpass. We'll update its policies to "root".
-		fmt.Println("Updating admin user to have full privileges...")
-		updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=root")
-		updateOut, err := updateCmd.CombinedOutput()
+		// 3. Create and write a custom full-access policy, then update the admin user.
+		fmt.Println("Creating custom full-access policy for admin...")
+		
+		// Define the policy content.
+		policyContent := `
+		path "*" {
+		  capabilities = ["create", "read", "update", "delete", "list"]
+		}
+`
+
+		// Write the policy content to a temporary file.
+		policyFile := "admin-full.hcl"
+		if err := os.WriteFile(policyFile, []byte(policyContent), 0600); err != nil {
+		    log.Fatalf("Failed to write policy file: %v", err)
+		}
+		
+		// Write the policy to Vault.
+		policyCmd := exec.Command("vault", "policy", "write", "admin-full", policyFile)
+		policyOut, err := policyCmd.CombinedOutput()
 		if err != nil {
-			log.Printf("Warning: Failed to update admin user policies: %v\nOutput: %s", err, string(updateOut))
+		    log.Fatalf("Failed to write policy to Vault: %v\nOutput: %s", err, string(policyOut))
+		}
+		fmt.Println("Custom full-access policy 'admin-full' created successfully.")
+		
+		// Now update the admin user to use the new policy.
+		fmt.Println("Updating admin user to have full privileges using 'admin-full' policy...")
+			updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=admin-full")
+			updateOut, err := updateCmd.CombinedOutput()
+			if err != nil {
+				log.Printf("Warning: Failed to update admin user policies: %v\nOutput: %s", err, string(updateOut))
+			} else {
+				fmt.Println("Admin user updated with full privileges (admin-full policy).")
+			}
+			
+		// Optionally, delete the temporary policy file.
+		if err := os.Remove(policyFile); err != nil {
+		    log.Printf("Warning: Failed to delete temporary policy file: %v", err)
 		} else {
-			fmt.Println("Admin user updated with full privileges.")
+		    fmt.Println("Temporary policy file deleted.")
 		}
 		
 		// 4. Revoke the root token.
