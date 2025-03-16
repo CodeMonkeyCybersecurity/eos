@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"eos/pkg/utils"
 	"github.com/spf13/cobra"
