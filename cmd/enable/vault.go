@@ -25,18 +25,17 @@ var vaultEnableCmd = &cobra.Command{
 	Long: `This command assumes "eos install vault" has been run.
 It sets VAULT_ADDR dynamically, checks Vault status, and if not initialized,
 initializes Vault with 5 key shares and a threshold of 3, unseals it using the first three keys,
-logs in with the root token, enables audit, KV v2, AppRole and userpass.
-It captures the unseal keys and root token and writes them to a file (vault_init.json)
-with restricted permissions. IMPORTANT: Distribute these keys among trusted parties 
-and store them securely.`,
+logs in with the root token, enables file audit and the KV v2 secrets engine,
+writes a test secret, and sets up AppRole and userpass authentication.
+For demonstration, unseal keys and the root token are printed to the console.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// 1. Set VAULT_ADDR dynamically.
+		// Set VAULT_ADDR dynamically.
 		hostname := utils.GetInternalHostname()
 		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
 		os.Setenv("VAULT_ADDR", vaultAddr)
 		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
-		// 2. Poll for Vault status.
+		// Poll for Vault status.
 		var vaultStatus struct {
 			Initialized bool `json:"initialized"`
 			Sealed      bool `json:"sealed"`
@@ -58,7 +57,7 @@ and store them securely.`,
 			time.Sleep(1 * time.Second)
 		}
 
-		// 3. Initialize Vault if not already initialized.
+		// If Vault is not initialized, initialize it.
 		var initRes initResult
 		if !vaultStatus.Initialized {
 			fmt.Println("\nVault is not initialized. Initializing Vault...")
@@ -69,6 +68,7 @@ and store them securely.`,
 				"-format=json")
 			initOut, err := initCmd.CombinedOutput()
 			if err != nil {
+				// If error indicates already initialized, then continue.
 				if strings.Contains(string(initOut), "Vault is already initialized") {
 					fmt.Println("Vault is already initialized. Skipping initialization.")
 					vaultStatus.Initialized = true
@@ -80,22 +80,15 @@ and store them securely.`,
 					log.Fatalf("Failed to parse initialization output: %v", err)
 				}
 				fmt.Println("\nVault initialized successfully!")
-				// Print keys for demonstration (remove in production).
+				// For demonstration: output the unseal keys and root token.
 				fmt.Println("Unseal Keys:")
 				for i, key := range initRes.UnsealKeysB64 {
 					fmt.Printf("  Key %d: %s\n", i+1, key)
 				}
 				fmt.Printf("Root Token: %s\n", initRes.RootToken)
-
-				// Store the JSON output securely.
-				if err := os.WriteFile("vault_init.json", initOut, 0600); err != nil {
-					log.Fatalf("Failed to write initialization data to file: %v", err)
-				}
-				fmt.Println("Initialization data written to vault_init.json")
-				fmt.Println("IMPORTANT: Distribute the unseal keys and root token securely among trusted parties.")
 			}
 
-			// Unseal Vault if we have new keys.
+			// Unseal Vault using the first three unseal keys.
 			if len(initRes.UnsealKeysB64) >= 3 {
 				fmt.Println("\nUnsealing Vault...")
 				for i := 0; i < 3; i++ {
@@ -110,16 +103,16 @@ and store them securely.`,
 				}
 				fmt.Println("Vault unsealed successfully!")
 			} else {
-				fmt.Println("Skipping unseal as no new unseal keys were obtained (Vault may already be unsealed).")
+				fmt.Println("Skipping unseal because unseal keys were not obtained (Vault may already be unsealed).")
 			}
 		} else if vaultStatus.Sealed {
-			fmt.Println("Vault is initialized but sealed. Manual intervention required to unseal.")
+			fmt.Println("Vault is initialized but sealed. Please unseal manually and then run this command again.")
 			return
 		} else {
 			fmt.Println("Vault is already initialized and unsealed.")
 		}
 
-		// 4. Log in with the root token if available.
+		// Log in with the root token if available from init output.
 		if initRes.RootToken != "" {
 			fmt.Println("\nLogging in with root token...")
 			loginCmd := exec.Command("vault", "login", "-address="+vaultAddr, initRes.RootToken)
@@ -130,7 +123,7 @@ and store them securely.`,
 			fmt.Println("Logged in as root.")
 		}
 
-		// 5. Enable file audit.
+		// Enable file audit device.
 		fmt.Println("\nEnabling file audit device...")
 		auditCmd := exec.Command("vault", "audit", "enable", "file", "file_path=/var/snap/vault/common/vault_audit.log")
 		auditOut, err := auditCmd.CombinedOutput()
@@ -139,9 +132,9 @@ and store them securely.`,
 		}
 		fmt.Println("File audit enabled.")
 
-		// 6. Enable KV v2 secrets engine at "secret".
+		// Enable KV v2 secrets engine.
 		fmt.Println("\nEnabling KV v2 secrets engine at path 'secret'...")
-		// Disable existing mount if necessary.
+		// Disable existing mount (if any)
 		disableCmd := exec.Command("vault", "secrets", "disable", "secret")
 		disableCmd.Run() // Ignore errors.
 		secretsCmd := exec.Command("vault", "secrets", "enable", "-version=2", "-path=secret", "kv")
@@ -149,9 +142,9 @@ and store them securely.`,
 		if err != nil && !strings.Contains(string(secretsOut), "mounted successfully") && !strings.Contains(string(secretsOut), "already enabled") {
 			log.Fatalf("Failed to enable KV v2: %v\nOutput: %s", err, string(secretsOut))
 		}
-		fmt.Println("KV v2 enabled at path 'secret'.")
+		fmt.Println("KV v2 secrets engine enabled at path 'secret'.")
 
-		// 7. Put and get a test secret.
+		// Put and get a test secret.
 		fmt.Println("\nStoring a test secret at secret/hello...")
 		putCmd := exec.Command("vault", "kv", "put", "secret/hello", "value=world")
 		putOut, err := putCmd.CombinedOutput()
@@ -166,7 +159,7 @@ and store them securely.`,
 		fmt.Println("Test secret retrieved:")
 		fmt.Println(string(getOut))
 
-		// 8. Enable AppRole auth and configure a role.
+		// Enable AppRole auth method and configure a role.
 		fmt.Println("\nEnabling AppRole auth method...")
 		approleCmd := exec.Command("vault", "auth", "enable", "approle")
 		approleOut, err := approleCmd.CombinedOutput()
@@ -196,7 +189,7 @@ and store them securely.`,
 		fmt.Println("AppRole role ID:")
 		fmt.Println(string(roleIDOut))
 
-		// 9. Enable userpass auth and create an admin user with a generated password.
+		// Enable userpass auth and create an admin user with a random password.
 		fmt.Println("\nEnabling userpass auth method...")
 		userpassCmd := exec.Command("vault", "auth", "enable", "userpass")
 		userpassOut, err := userpassCmd.CombinedOutput()
