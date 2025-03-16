@@ -16,42 +16,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// monitorVaultLogs tails the log file and prints new lines to STDOUT.
-// It returns when it sees a line containing the specified marker or when the context is done.
-func monitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
-	file, err := os.Open(logFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open log file for monitoring: %w", err)
-	}
-	defer file.Close()
-
-	// Seek to the end of the file so we only see new log lines.
-	_, err = file.Seek(0, os.SEEK_END)
-	if err != nil {
-		return fmt.Errorf("failed to seek log file: %w", err)
-	}
-
-	scanner := bufio.NewScanner(file)
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timeout reached while waiting for Vault to start")
-		default:
-			// Read new lines if available.
-			if scanner.Scan() {
-				line := scanner.Text()
-				fmt.Println(line) // Print log line to STDOUT.
-				if strings.Contains(line, "Vault server started!") {
-					return nil
-				}
-			} else {
-				// No new line; wait a bit and try again.
-				time.Sleep(500 * time.Millisecond)
-			}
-		}
-	}
-}
-
 // vaultCmd represents the vault command under the "install" group.
 var vaultCmd = &cobra.Command{
 	Use:   "vault",
@@ -135,7 +99,7 @@ ui = true
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
 		fmt.Println("Monitoring Vault logs for startup message...")
-		if err := monitorVaultLogs(ctx, logFilePath, "Vault server started!"); err != nil {
+		if err := utils.MonitorVaultLogs(ctx, logFilePath, "Vault server started!"); err != nil {
 			log.Fatalf("Vault did not start properly: %v", err)
 		}
 
