@@ -48,32 +48,32 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		// 2. Prompt the admin to re-enter three unseal keys and the root token.
 		reader := bufio.NewReader(os.Stdin)
 		for {
-			fmt.Println("Please re-enter the following secrets to confirm you have stored them securely.")
-			fmt.Print("Enter Unseal Key 1: ")
-			key1, _ := reader.ReadString('\n')
-			key1 = strings.TrimSpace(key1)
-
-			fmt.Print("Enter Unseal Key 2: ")
-			key2, _ := reader.ReadString('\n')
-			key2 = strings.TrimSpace(key2)
-
-			fmt.Print("Enter Unseal Key 3: ")
-			key3, _ := reader.ReadString('\n')
-			key3 = strings.TrimSpace(key3)
-
-			fmt.Print("Enter Root Token: ")
-			token, _ := reader.ReadString('\n')
-			token = strings.TrimSpace(token)
-
-			if utils.HashString(inputKey1) == hashedKey1 &&
-			   utils.HashString(inputKey2) == hashedKey2 &&
-			   utils.HashString(inputKey3) == hashedKey3 &&
-			   utils.HashString(inputRoot) == hashedRoot {
-			    fmt.Println("Confirmation successful.")
-			    // Now you can delete vault_init.json and (optionally) zero out any in-memory plaintext.
-			} else {
-			    fmt.Println("One or more entries do not match. Please try again.")
-			}
+		    fmt.Println("Please re-enter the following secrets to confirm you have stored them securely.")
+		    fmt.Print("Enter Unseal Key 1: ")
+		    key1, _ := reader.ReadString('\n')
+		    key1 = strings.TrimSpace(key1)
+		
+		    fmt.Print("Enter Unseal Key 2: ")
+		    key2, _ := reader.ReadString('\n')
+		    key2 = strings.TrimSpace(key2)
+		
+		    fmt.Print("Enter Unseal Key 3: ")
+		    key3, _ := reader.ReadString('\n')
+		    key3 = strings.TrimSpace(key3)
+		
+		    fmt.Print("Enter Root Token: ")
+		    token, _ := reader.ReadString('\n')
+		    token = strings.TrimSpace(token)
+		
+		    if utils.HashString(key1) == hashedKey1 &&
+		       utils.HashString(key2) == hashedKey2 &&
+		       utils.HashString(key3) == hashedKey3 &&
+		       utils.HashString(token) == hashedRoot {
+		        fmt.Println("Confirmation successful.")
+		        break
+		    } else {
+		        fmt.Println("One or more entries do not match. Please try again.")
+		    }
 		}
 
 		// 3. Revoke the root token.
