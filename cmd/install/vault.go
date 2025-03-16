@@ -26,6 +26,12 @@ Live log monitoring is performed to detect the startup marker; then the script p
 and if necessary, initializes and unseals Vault.
 This is a quick prod-mode setup, not intended for production use without further hardening.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Set VAULT_ADDR.
+		hostname := utils.GetInternalHostname()
+		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
+		os.Setenv("VAULT_ADDR", vaultAddr)
+		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
+		
 		// Kill any existing Vault process.
 		fmt.Println("Killing any existing Vault server process...")
 		killCmd := exec.Command("pkill", "-f", "vault server")
@@ -45,12 +51,6 @@ This is a quick prod-mode setup, not intended for production use without further
 		if _, err := exec.LookPath("vault"); err != nil {
 			log.Fatal("Vault command not found after installation.")
 		}
-
-		// Set VAULT_ADDR.
-		hostname := utils.GetInternalHostname()
-		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
-		os.Setenv("VAULT_ADDR", vaultAddr)
-		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
 
 		// Create Vault configuration file.
 		configDir := "/var/snap/vault/common"
