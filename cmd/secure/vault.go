@@ -122,8 +122,8 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		}
 `
 
-		// Use an absolute path in the temporary directory.
-		policyFile := os.TempDir() + "/admin-full.hcl"
+		// Use an absolute path
+		policyFile := "/var/snap/vault/common/admin-full.hcl"
 		if err := os.WriteFile(policyFile, []byte(policyContent), 0600); err != nil {
 		    log.Fatalf("Failed to write policy file: %v", err)
 		}
