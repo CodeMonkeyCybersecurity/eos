@@ -2,6 +2,8 @@ package secure
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"eos/pkg/utils"
+
 )
 
 // initResult is the JSON structure returned by "vault operator init -format=json".
@@ -37,6 +41,12 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			log.Fatalf("Failed to parse vault_init.json: %v", err)
 		}
 
+		// After reading and parsing vault_init.json, hash them
+		hashedKey1 := utils.HashString(initRes.UnsealKeysB64[0])
+		hashedKey2 := utils.HashString(initRes.UnsealKeysB64[1])
+		hashedKey3 := utils.HashString(initRes.UnsealKeysB64[2])
+		hashedRoot := utils.HashString(initRes.RootToken)
+
 		// 2. Prompt the admin to re-enter three unseal keys and the root token.
 		reader := bufio.NewReader(os.Stdin)
 		for {
@@ -57,14 +67,14 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			token, _ := reader.ReadString('\n')
 			token = strings.TrimSpace(token)
 
-			if key1 == initRes.UnsealKeysB64[0] &&
-				key2 == initRes.UnsealKeysB64[1] &&
-				key3 == initRes.UnsealKeysB64[2] &&
-				token == initRes.RootToken {
-				fmt.Println("Confirmation successful.")
-				break
+			if utils.HashString(inputKey1) == hashedKey1 &&
+			   utils.HashString(inputKey2) == hashedKey2 &&
+			   utils.HashString(inputKey3) == hashedKey3 &&
+			   utils.HashString(inputRoot) == hashedRoot {
+			    fmt.Println("Confirmation successful.")
+			    // Now you can delete vault_init.json and (optionally) zero out any in-memory plaintext.
 			} else {
-				fmt.Println("One or more entries do not match the stored values. Please try again.")
+			    fmt.Println("One or more entries do not match. Please try again.")
 			}
 		}
 
