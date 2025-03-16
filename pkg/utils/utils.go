@@ -9,8 +9,21 @@ import (
 	"bufio"
 	"strings"
 	"time"
+	"crypto/sha256"
+	"encoding/hex"
 
 )
+
+//
+//---------------------------- CRYPTO AND HASHING ---------------------------- //
+//
+
+// HashString computes and returns the SHA256 hash of the provided string.
+func HashString(s string) string {
+	hash := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(hash[:])
+}
+
 
 //
 //---------------------------- LOGGING ---------------------------- //
