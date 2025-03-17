@@ -1,3 +1,4 @@
+// pkg/config/config.go
 package config
 
 // DelphiListener virtual environment path
