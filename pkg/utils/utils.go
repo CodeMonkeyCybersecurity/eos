@@ -1,17 +1,24 @@
+// pkg/utils/utils.go
 package utils
 
 import (
-	"log"
-	"fmt"
-	"os"
-	"os/exec"
-	"context"
 	"bufio"
-	"strings"
-	"time"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
+	"log"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+
+	"eos/pkg/logger"
 )
+
+var log = logger.GetLogger() // Retrieve the globally initialized logger
 
 //
 //---------------------------- COMMAND EXECUTION ---------------------------- //
@@ -19,7 +26,7 @@ import (
 
 // Execute runs a command with separate arguments.
 func Execute(command string, args ...string) error {
-	logger.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
+	log.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -28,7 +35,7 @@ func Execute(command string, args ...string) error {
 
 // ExecuteShell runs a shell command with pipes (`| grep`).
 func ExecuteShell(command string) error {
-	logger.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
+	log.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
 	cmd := exec.Command("bash", "-c", command) // Runs in shell mode
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
@@ -36,7 +43,7 @@ func ExecuteShell(command string) error {
 }
 
 func ExecuteInDir(dir, name string, args ...string) error {
-	logger.Debug("Executing command in directory", zap.String("directory", dir), zap.String("command", name), zap.Strings("args", args))
+	log.Debug("Executing command in directory", zap.String("directory", dir), zap.String("command", name), zap.Strings("args", args))
 	cmd := exec.Command(name, args...)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -64,6 +71,7 @@ func HashString(s string) string {
 func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	file, err := os.Open(logFilePath)
 	if err != nil {
+		log.Error("Failed to open log file for monitoring", zap.String("logFilePath", logFilePath), zap.Error(err))
 		return fmt.Errorf("failed to open log file for monitoring: %w", err)
 	}
 	defer file.Close()
@@ -71,6 +79,7 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	// Seek to the end of the file so we only see new log lines.
 	_, err = file.Seek(0, os.SEEK_END)
 	if err != nil {
+		log.Error("Failed to seek log file", zap.String("logFilePath", logFilePath), zap.Error(err))
 		return fmt.Errorf("failed to seek log file: %w", err)
 	}
 
@@ -78,18 +87,19 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	for {
 		select {
 		case <-ctx.Done():
+			log.Warn("Timeout reached while waiting for Vault to start")
 			return fmt.Errorf("timeout reached while waiting for Vault to start")
 		default:
-			// Read new lines if available.
 			if scanner.Scan() {
 				line := scanner.Text()
-				fmt.Println(line) // Print the log line to terminal.
+				fmt.Println(line) // Print the log line to terminal
+				log.Debug("Vault Log Line", zap.String("logLine", line))
 				if strings.Contains(line, marker) {
+					log.Info("Vault marker found, exiting log monitor", zap.String("marker", marker))
 					return nil
 				}
 			} else {
-				// No new line; wait briefly and try again.
-				time.Sleep(500 * time.Millisecond)
+				time.Sleep(500 * time.Millisecond) // No new line, wait and try again
 			}
 		}
 	}
