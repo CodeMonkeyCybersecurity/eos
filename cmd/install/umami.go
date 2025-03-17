@@ -26,13 +26,13 @@ var umamiCmd = &cobra.Command{
 		logger.Info("Starting Umami installation using Eos")
 
 		// Ensure the installation directory exists
-		if _, err := os.Stat(umamiDir); os.IsNotExist(err) {
-			logger.Warn("Installation directory does not exist, creating it", zap.String("path", umamiDir))
-			if err := os.MkdirAll(umamiDir, 0755); err != nil {
+		if _, err := os.Stat(config.UmamiDir); os.IsNotExist(err) {
+			logger.Warn("Installation directory does not exist, creating it", zap.String("path", config.UmamiDir))
+			if err := os.MkdirAll(config.UmamiDir, 0755); err != nil {
 				logger.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
-			logger.Info("Installation directory exists", zap.String("path", umamiDir))
+			logger.Info("Installation directory exists", zap.String("path", config.UmamiDir))
 		}
 
 		// Install Yarn
@@ -43,12 +43,12 @@ var umamiCmd = &cobra.Command{
 
 		// Clone the Umami repository into the installation directory
 		logger.Info("Cloning the Umami repository", zap.String("repo", "https://github.com/umami-software/umami.git"))
-		if err := utils.Execute("git", "clone", "https://github.com/umami-software/umami.git", umamiDir); err != nil {
+		if err := utils.Execute("git", "clone", "https://github.com/umami-software/umami.git", config.UmamiDir); err != nil {
 			logger.Fatal("Error cloning Umami repository", zap.Error(err))
 		}
 
 		// Change directory to the cloned repository and run "yarn install"
-		umamiRepoPath := fmt.Sprintf("%s/umami", umamiDir)
+		umamiRepoPath := fmt.Sprintf("%s/umami", config.UmamiDir)
 		logger.Info("Running 'yarn install'", zap.String("directory", umamiRepoPath))
 		if err := utils.ExecuteInDir(umamiRepoPath, "yarn", "install"); err != nil {
 			logger.Fatal("Error running 'yarn install'", zap.Error(err))
@@ -63,8 +63,8 @@ For example:
 DATABASE_URL=postgresql://username:mypassword@localhost:5432/mydb`)
 
 		// Deploy Umami with Docker Compose
-		logger.Info("Deploying Umami with Docker Compose", zap.String("directory", umamiDir))
-		if err := utils.ExecuteInDir(umamiDir, "docker", "compose", "up", "-d"); err != nil {
+		logger.Info("Deploying Umami with Docker Compose", zap.String("directory", config.UmamiDir))
+		if err := utils.ExecuteInDir(config.UmamiDir, "docker", "compose", "up", "-d"); err != nil {
 			logger.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
