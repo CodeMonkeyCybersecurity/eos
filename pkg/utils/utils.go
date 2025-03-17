@@ -14,6 +14,27 @@ import (
 
 )
 
+
+//
+//---------------------------- COMMAND EXECUTION ---------------------------- //
+//
+
+// Execute runs a command with separate arguments.
+func Execute(command string, args ...string) error {
+	cmd := exec.Command(command, args...)
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
+}
+
+// ExecuteShell runs a shell command with pipes (`| grep`).
+func ExecuteShell(command string) error {
+	cmd := exec.Command("bash", "-c", command) // Runs in shell mode
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	return cmd.Run()
+}
+
 //
 //---------------------------- CRYPTO AND HASHING ---------------------------- //
 //
