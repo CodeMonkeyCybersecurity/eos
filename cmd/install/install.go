@@ -11,10 +11,12 @@ var InstallCmd = &cobra.Command{
 	Short: "Install various components",
 	Long: `Install commands allow you to provision additional components or dependencies.
 For example:
-  eos install trivy  - Installs the Trivy vulnerability scanner.`,
+  eos install trivy 
+   eos install delphi-listener `,
 }
 
 // In the init function, attach subcommands (for example, the Trivy installer).
 func init() {
-	InstallCmd.AddCommand(trivyCmd) // trivyCmd is defined in the same package (in trivy.go)
+	InstallCmd.AddCommand(trivyCmd)
+	InstallCmd.AddCommand(delphiListenerCmd)
 }
