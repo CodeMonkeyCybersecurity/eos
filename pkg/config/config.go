@@ -15,7 +15,7 @@ const VenvPath = "/opt/delphi_venv"
 const DockerListener = "/var/ossec/wodles/docker/DockerListener"
 
 // Umami install dir
-const umamiDir = "/opt/umami"
+const UmamiDir = "/opt/umami"
 
 func InitConfig() {
     Log = logger.GetLogger() // Initialize logger once
