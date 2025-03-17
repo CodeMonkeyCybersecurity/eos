@@ -10,8 +10,8 @@ import (
 	"eos/pkg/config"
 )
 
-// delphiListenerCmd represents the "eos install delphi-listener" command
-var delphiListenerCmd = &cobra.Command{
+// delphiListenerCmd represents the "eos delphi install docker-listener" command
+var DockerListenerCmd = &cobra.Command{
 	Use:   "docker-listener",
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",
 	Long:  `This command sets up a Python virtual environment and configures the Wazuh DockerListener to use it.`,
