@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var log *zap.Logger
+var Log *zap.Logger
 
 // DefaultConfig returns a standard zap.Config object with custom settings.
 func DefaultConfig() zap.Config {
