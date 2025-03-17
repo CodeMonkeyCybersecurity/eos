@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+	"io"
 
 	"go.uber.org/zap"
 
@@ -97,7 +98,7 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	defer file.Close()
 
 	// Seek to the end of the file so we only see new log lines.
-	_, err = file.Seek(0, os.SEEK_END)
+	_, err = file.Seek(0, io.SeekEnd)
 	if err != nil {
 		log.Error("Failed to seek log file", zap.String("logFilePath", logFilePath), zap.Error(err))
 		return fmt.Errorf("failed to seek log file: %w", err)
