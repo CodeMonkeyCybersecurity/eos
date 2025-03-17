@@ -3,7 +3,6 @@ package install
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
 	"eos/pkg/utils"
 	"eos/pkg/logger"
@@ -12,9 +11,6 @@ import (
 	"go.uber.org/zap"
 	"github.com/spf13/cobra"
 )
-
-var log = logger.GetLogger() 
-
 
 // umamiCmd represents the Umami installation command.
 var umamiCmd = &cobra.Command{
