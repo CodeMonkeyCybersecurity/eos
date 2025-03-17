@@ -2,7 +2,6 @@ package logs
 
 import (
 	"bufio"
-	"log"
 	"os/exec"
 	"strings"
 	"time"
