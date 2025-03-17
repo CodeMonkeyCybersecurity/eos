@@ -10,13 +10,11 @@ import (
 	"eos/cmd/delete"
 	"eos/cmd/read"
 	"eos/cmd/logs"
-	"eos/cmd/delphi"
 	"eos/cmd/update"
         "eos/cmd/refresh"
         "eos/cmd/install"
 	"eos/pkg/logger"
 	"eos/pkg/utils"
-	"eos/pkg/config"
 
 	"os"
 	"path/filepath"
