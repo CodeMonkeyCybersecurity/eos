@@ -3,7 +3,6 @@ package install
 
 import (
 	"github.com/spf13/cobra"
-	"eos/cmd/delphi/install/dockerlistener"
 )
 
 // InstallCmd is the root command for Delphi installation actions
