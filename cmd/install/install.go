@@ -19,4 +19,5 @@ For example:
 func init() {
 	InstallCmd.AddCommand(trivyCmd)
 	InstallCmd.AddCommand(vaultCmd)
+	InstallCmd.AddCommand(umamiCmd)
 }
