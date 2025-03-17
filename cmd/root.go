@@ -8,6 +8,7 @@ import (
 	"eos/cmd/enable"
 	"eos/cmd/secure"
 	"eos/cmd/delete"
+	"eos/cmd/delphi"
 	"eos/cmd/read"
 	"eos/cmd/logs"
 	"eos/cmd/update"
@@ -56,6 +57,7 @@ func init() {
 	rootCmd.AddCommand(logs.LogsCmd)
 	rootCmd.AddCommand(enable.EnableCmd)
 	rootCmd.AddCommand(secure.SecureCmd)
+	rootCmd.AddCommand(delphi.DelphiCmd)
 }
 
 // Execute starts the CLI
