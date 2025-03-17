@@ -13,7 +13,7 @@ services:
       - db
     restart: unless-stopped
     networks:
-      - eos-network
+      - arachne-net
       
   db:
     image: postgres
@@ -26,10 +26,20 @@ services:
       - db_data:/var/lib/postgresql/data
     restart: unless-stopped
     networks:
-      - eos-network
+      - arachne-net
 
 volumes:
   db_data:
 
 networks:
-  eos-network:
+  arachne-net: 
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-arachne
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/22
+        - subnet: fd42:1a2b:3c4d:5e6f::/64
+
