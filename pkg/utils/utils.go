@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -26,29 +25,47 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 
 // Execute runs a command with separate arguments.
 func Execute(command string, args ...string) error {
-	log.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
-	cmd := exec.Command(name, args...)
+	log.Debug("Executing command", zap.String("command", command), zap.Strings("args", args))
+	cmd := exec.Command(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		log.Error("Command execution failed", zap.String("command", command), zap.Strings("args", args), zap.Error(err))
+	} else {
+		log.Info("Command executed successfully", zap.String("command", command))
+	}
+	return err
 }
 
 // ExecuteShell runs a shell command with pipes (`| grep`).
 func ExecuteShell(command string) error {
-	log.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
+	log.Debug("Executing shell command", zap.String("command", command))
 	cmd := exec.Command("bash", "-c", command) // Runs in shell mode
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		log.Error("Shell command execution failed", zap.String("command", command), zap.Error(err))
+	} else {
+		log.Info("Shell command executed successfully", zap.String("command", command))
+	}
+	return err
 }
 
-func ExecuteInDir(dir, name string, args ...string) error {
-	log.Debug("Executing command in directory", zap.String("directory", dir), zap.String("command", name), zap.Strings("args", args))
-	cmd := exec.Command(name, args...)
+func ExecuteInDir(dir, command string, args ...string) error {
+	log.Debug("Executing command in directory", zap.String("directory", dir), zap.String("command", command), zap.Strings("args", args))
+	cmd := exec.Command(command, args...)
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		log.Error("Command execution failed in directory", zap.String("directory", dir), zap.String("command", command), zap.Strings("args", args), zap.Error(err))
+	} else {
+		log.Info("Command executed successfully in directory", zap.String("directory", dir), zap.String("command", command))
+	}
+	return err
 }
 
 //
@@ -57,8 +74,11 @@ func ExecuteInDir(dir, name string, args ...string) error {
 
 // HashString computes and returns the SHA256 hash of the provided string.
 func HashString(s string) string {
+	log.Debug("Computing SHA256 hash", zap.String("input", s))
 	hash := sha256.Sum256([]byte(s))
-	return hex.EncodeToString(hash[:])
+	hashStr := hex.EncodeToString(hash[:])
+	log.Debug("Computed SHA256 hash", zap.String("hash", hashStr))
+	return hashStr
 }
 
 
@@ -112,11 +132,13 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 // GetInternalHostname returns the machine's hostname.
 // If os.Hostname() fails, it logs the error and returns "localhost".
 func GetInternalHostname() string {
+	log.Info("Retrieving internal hostname")
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Printf("Unable to retrieve hostname, defaulting to localhost: %v", err)
+		log.Error("Unable to retrieve hostname, defaulting to localhost", zap.Error(err))
 		return "localhost"
 	}
+	log.Info("Retrieved hostname", zap.String("hostname", hostname))
 	return hostname
 }
 
@@ -128,10 +150,9 @@ func GetInternalHostname() string {
 // HandleError logs an error and optionally exits the program
 func HandleError(err error, message string, exit bool) {
 	if err != nil {
-		log.Printf("[ERROR] %s: %v\n", message, err)
+		log.Error(message, zap.Error(err))
 		if exit {
-			fmt.Println("Exiting program due to error.")
-			os.Exit(1)
+			log.Fatal("Exiting program due to error", zap.String("message", message))
 		}
 	}
 }
@@ -151,9 +172,15 @@ func WithErrorHandling(fn func() error) {
 
 // CheckSudo checks if the current user has sudo privileges
 func CheckSudo() bool {
+	log.Info("Checking if user has sudo privileges")
 	cmd := exec.Command("sudo", "-n", "true") // Non-interactive sudo check
 	err := cmd.Run()
-	return err == nil
+	if err != nil {
+		log.Warn("User does not have sudo privileges", zap.Error(err))
+		return false
+	}
+	log.Info("User has sudo privileges")
+	return true
 }
 
 
@@ -164,14 +191,13 @@ func CheckSudo() bool {
 
 // Recursive function to process and print nested YAML structures
 func ProcessMap(data map[string]interface{}, indent string) {
+	log.Debug("Processing YAML map")
 	for key, value := range data {
 		switch v := value.(type) {
 		case map[string]interface{}:
-			// If the value is a nested map, call processMap recursively
 			fmt.Printf("%s%s:\n", indent, key)
 			ProcessMap(v, indent+"  ")
 		case []interface{}:
-			// If the value is a slice, process each element
 			fmt.Printf("%s%s:\n", indent, key)
 			for _, item := range v {
 				if itemMap, ok := item.(map[string]interface{}); ok {
@@ -181,8 +207,8 @@ func ProcessMap(data map[string]interface{}, indent string) {
 				}
 			}
 		default:
-			// Print scalar values
 			fmt.Printf("%s%s: %v\n", indent, key, v)
 		}
 	}
+	log.Debug("Completed processing YAML map")
 }
