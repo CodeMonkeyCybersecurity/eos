@@ -20,8 +20,9 @@ var umamiCmd = &cobra.Command{
 	Long:  "Install and deploy Umami to /opt/umami, including installing dependencies, setting up the repository, and deploying with Docker Compose.",
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize Zap logger
-		logger, _ = zap.NewProduction()
-		defer logger.Sync()
+		var log = logger.GetLogger() // Use global logger
+		installDir := config.UmamiDir
+
 
 		logger.Info("Starting Umami installation using Eos")
 
