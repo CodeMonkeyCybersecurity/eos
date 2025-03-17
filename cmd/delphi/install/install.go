@@ -3,7 +3,7 @@ package install
 
 import (
 	"github.com/spf13/cobra"
-  "eos/cmd/delphi/install/dockerlistener"
+        "eos/cmd/delphi/install/dockerlistener"
 )
 
 // InstallCmd is the root command for Delphi installation actions
@@ -12,7 +12,7 @@ var InstallCmd = &cobra.Command{
 	Short: "Install Delphi components",
 	Long:  `Commands to install Wazuh/Delphi components like docker-listener.
 For example:
-  eos install delphi docker-listener`,
+  eos delphi install docker-listener`,
 }
 
 // In the init function, attach subcommands (for example, the Trivy installer).
