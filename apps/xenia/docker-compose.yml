@@ -29,10 +29,21 @@ services:
       # This allows the AIO master container to spin up additional services
       # needed by Nextcloud
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - arachne-net
 
 volumes:
   nextcloud_aio_mastercontainer:
     name: nextcloud_aio_mastercontainer
 
 networks:
-  eos-network:
+  arachne-net: 
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-arachne
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/22
+        - subnet: fd42:1a2b:3c4d:5e6f::/64
