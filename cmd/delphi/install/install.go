@@ -3,7 +3,6 @@ package install
 
 import (
 	"github.com/spf13/cobra"
-        "eos/cmd/delphi/install/dockerlistener"
 )
 
 // InstallCmd is the root command for Delphi installation actions
@@ -17,5 +16,5 @@ For example:
 
 // In the init function, attach subcommands (for example, the Trivy installer).
 func init() {
-	InstallCmd.AddCommand(dockerListener.DockerListenerCmd)
+	InstallCmd.AddCommand(install.DockerListenerCmd)
 }
