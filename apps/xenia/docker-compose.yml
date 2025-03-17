@@ -2,13 +2,12 @@ services:
   nextcloud-aio-mastercontainer:
     image: nextcloud/all-in-one:latest
     container_name: nextcloud-aio-mastercontainer
-    # Equivalent to "--init"
     init: true
     restart: always
     ports:
       - "8039:8080"
     networks:
-      - eos-network
+      - arachne-net
       
     # Environment variables:
     environment:
@@ -20,17 +19,9 @@ services:
       NEXTCLOUD_MEMORY_LIMIT: 2048M # Can be adjusted if you need more. See https://github.com/nextcloud/all-in-one#how-to-adjust-the-php-memory-limit-for-nextcloud
       BORG_RETENTION_POLICY: --keep-within=7d --keep-weekly=4 --keep-monthly=6 # Allows to adjust borgs retention policy. See https://github.com/nextcloud/all-in-one#how-to-adjust-borgs-retention-policy
 
-    # Equivalent to "--volume nextcloud_aio_mastercontainer:/mnt/docker-aio-config"
-    # You can define the named volume below under "volumes:"
     volumes:
       - nextcloud_aio_mastercontainer:/mnt/docker-aio-config
-
-      # Equivalent to "--volume /var/run/docker.sock:/var/run/docker.sock:ro"
-      # This allows the AIO master container to spin up additional services
-      # needed by Nextcloud
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - arachne-net
 
 volumes:
   nextcloud_aio_mastercontainer:
