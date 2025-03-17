@@ -12,6 +12,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+
+// Create a package-level variable 'log' pointing to your global logger:
+var log *zap.Logger
+
+func init() {
+    log = logger.GetLogger()
+}
+
 // umamiCmd represents the Umami installation command.
 var umamiCmd = &cobra.Command{
 	Use:   "umami",
