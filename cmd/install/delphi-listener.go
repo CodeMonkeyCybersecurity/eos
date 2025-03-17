@@ -1,7 +1,6 @@
 package install
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
