@@ -1,5 +1,5 @@
 // cmd/delphi/install/docker-listener.go
-package dockerlistener
+package install
 
 import (
 	"os"
