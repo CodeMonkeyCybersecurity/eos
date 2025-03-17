@@ -1,0 +1,27 @@
+services:
+  jenkins:
+    image: jenkins/jenkins:lts
+    ports:
+      - "8059:8080"
+    restart: always
+    volumes:
+      - jenkins_home:/var/jenkins_home
+  ssh-agent:
+    image: jenkins/ssh-agent
+    networks:
+      - arachne-net
+      
+volumes:
+  jenkins_home:
+
+networks:
+  arachne-net: 
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-arachne
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/22
+        - subnet: fd42:1a2b:3c4d:5e6f::/64
