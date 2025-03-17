@@ -17,5 +17,5 @@ For example:
 
 // In the init function, attach subcommands (for example, the Trivy installer).
 func init() {
-	InstallCmd.AddCommand(install.DockerListenerCmd)
+	InstallCmd.AddCommand(dockerlistener.DockerListenerCmd)
 }
