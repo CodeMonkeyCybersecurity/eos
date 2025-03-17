@@ -5,12 +5,12 @@ import (
 	"go.uber.org/zap"
 	"os"
 	"os/exec"
+	"eos/pkg/logger"
+	"eos/pkg/utils"
+	"eos/pkg/config"
 
 	"github.com/spf13/cobra"
 )
-
-
-var logger *zap.Logger
 
 // umamiCmd represents the Umami installation command.
 var umamiCmd = &cobra.Command{
