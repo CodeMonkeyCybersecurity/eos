@@ -21,17 +21,28 @@ import (
 
 // Execute runs a command with separate arguments.
 func Execute(command string, args ...string) error {
-	cmd := exec.Command(command, args...)
-	cmd.Stderr = os.Stderr
+	logger.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
+	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
 // ExecuteShell runs a shell command with pipes (`| grep`).
 func ExecuteShell(command string) error {
+	logger.Debug("Executing command", zap.String("command", name), zap.Strings("args", args))
 	cmd := exec.Command("bash", "-c", command) // Runs in shell mode
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
+	return cmd.Run()
+}
+
+func ExecuteInDir(dir, name string, args ...string) error {
+	logger.Debug("Executing command in directory", zap.String("directory", dir), zap.String("command", name), zap.Strings("args", args))
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
