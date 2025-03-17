@@ -1,6 +1,13 @@
 // pkg/config/config.go
 package config
 
+import (
+    "eos/pkg/logger"
+    "go.uber.org/zap"
+)
+
+var Log *zap.Logger // Global logger
+
 // DelphiListener virtual environment path
 const VenvPath = "/opt/delphi_venv"
 
@@ -9,3 +16,7 @@ const DockerListener = "/var/ossec/wodles/docker/DockerListener"
 
 // Umami install dir
 const umamiDir = "/opt/umami"
+
+func InitConfig() {
+    Log = logger.GetLogger() // Initialize logger once
+}
