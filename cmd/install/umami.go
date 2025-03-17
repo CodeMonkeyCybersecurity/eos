@@ -2,13 +2,14 @@ package install
 
 import (
 	"fmt"
-	"go.uber.org/zap"
 	"os"
 	"os/exec"
 
 	"eos/pkg/utils"
+	"eos/pkg/logger"
 	"eos/pkg/config"
 
+	"go.uber.org/zap"
 	"github.com/spf13/cobra"
 )
 
