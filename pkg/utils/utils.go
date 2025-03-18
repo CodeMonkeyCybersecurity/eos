@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 	"io"
@@ -26,6 +27,25 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
+
+// BackupVolume backs up a single Docker volume by running a temporary Alpine container.
+// It returns the full path to the backup file.
+func BackupVolume(volumeName, backupDir string) (string, error) {
+	timestamp := time.Now().Format("20060102_150405")
+	backupFile := fmt.Sprintf("%s_%s.tar.gz", timestamp, volumeName)
+	cmd := []string{
+		"run", "--rm",
+		"-v", fmt.Sprintf("%s:/volume", volumeName),
+		"-v", fmt.Sprintf("%s:/backup", backupDir),
+		"alpine",
+		"tar", "czf", fmt.Sprintf("/backup/%s", backupFile),
+		"-C", "/volume", ".",
+	}
+	if err := Execute("docker", cmd...); err != nil {
+		return "", fmt.Errorf("failed to backup volume %s: %w", volumeName, err)
+	}
+	return filepath.Join(backupDir, backupFile), nil
+}
 
 // BackupVolumes backs up all provided volumes to the specified backupDir.
 // It returns a map with volume names as keys and their backup file paths as values.
