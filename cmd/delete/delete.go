@@ -8,6 +8,7 @@ import (
 	"eos/pkg/logger"
 
 	"github.com/spf13/cobra"
+	
 	"go.uber.org/zap"
 )
 
@@ -16,15 +17,14 @@ var DeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete resources (e.g., processes, users, storage)",
 	Long:  `The delete command allows you to remove various resources such as processes, users, or storage.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.GetLogger()
-		log.Info("No subcommand provided for delete.", zap.String("command", cmd.Use))
-		_ = cmd.Help() // Display help if no subcommand is provided
-	},
-}
 
-// init registers subcommands for the delete command
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
 func init() {
+    // Initialize the shared logger for the entire install package
+    log = logger.GetLogger()
+
 	DeleteCmd.AddCommand(deleteProcessCmd)
 	DeleteCmd.AddCommand(deleteUsersCmd)
 	DeleteCmd.AddCommand(deleteStorageCmd)
