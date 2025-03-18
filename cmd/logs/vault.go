@@ -9,17 +9,20 @@ import (
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
 	"github.com/spf13/cobra"
+
+	"eos/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // vaultLogsCmd represents the "logs vault" command.
 var vaultLogsCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Shows the last 100 Vault log lines then tails the log",
-	Long:  "This command displays the most recent 100 lines from /var/log/vault.log and then tails the log file in real time, with the footer message at the bottom.",
+	Long:  `This command displays the most recent 100 lines from /var/log/vault.log and then tails the log file in real time, with the footer message at the bottom.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize termui.
 		if err := ui.Init(); err != nil {
-			log.Fatalf("failed to initialize termui: %v", err)
+			logger.Log.Fatal("failed to initialize termui", zap.Error(err))
 		}
 		defer ui.Close()
 
@@ -32,7 +35,7 @@ var vaultLogsCmd = &cobra.Command{
 
 		// Create a Paragraph widget for the footer.
 		footer := widgets.NewParagraph()
-		footer.Text = "Tailing Vault logs. Press Ctrl+C to exit."
+		footer.Text = "Tailing Vault logs. Press q or Ctrl+C to exit."
 		footer.SetRect(0, 20, 100, 23)
 		footer.Border = false
 
@@ -42,11 +45,11 @@ var vaultLogsCmd = &cobra.Command{
 		tailCmd := exec.Command("tail", "-n", "100", "-f", "/var/log/vault.log")
 		stdout, err := tailCmd.StdoutPipe()
 		if err != nil {
-			log.Fatalf("failed to get stdout pipe: %v", err)
+			logger.Log.Fatal("failed to get stdout pipe", zap.Error(err))
 		}
 
 		if err := tailCmd.Start(); err != nil {
-			log.Fatalf("failed to start tail command: %v", err)
+			logger.Log.Fatal("failed to start tail command", zap.Error(err))
 		}
 
 		// Read the output continuously.
@@ -55,6 +58,7 @@ var vaultLogsCmd = &cobra.Command{
 		for scanner.Scan() {
 			line := scanner.Text()
 			allLogs = append(allLogs, line)
+
 			// Limit to the last 100 lines.
 			if len(allLogs) > 100 {
 				allLogs = allLogs[len(allLogs)-100:]
@@ -63,12 +67,12 @@ var vaultLogsCmd = &cobra.Command{
 			ui.Render(logPar, footer)
 		}
 		if err := scanner.Err(); err != nil {
-			log.Printf("scanner error: %v", err)
+			logger.Log.Sugar().Infof("scanner error: %v", err)
 		}
 
 		// Optionally wait for the tail command to exit.
 		if err := tailCmd.Wait(); err != nil {
-			log.Printf("tail command exited with error: %v", err)
+			logger.Log.Sugar().Infof("tail command exited with error: %v", err)
 		}
 
 		// Poll for UI events so the UI doesn't immediately exit.
