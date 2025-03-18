@@ -57,6 +57,14 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.
 			log.Error("Error removing images", zap.Error(err))
 		}
 
+		// Now remove the volumes after backup.
+		log.Info("Removing volumes defined in docker-compose", zap.Any("volumes", volumes))
+		if err := utils.RemoveVolumes(volumes); err != nil {
+			log.Error("Error removing volumes", zap.Error(err))
+		} else {
+			log.Info("Volumes removed successfully")
+		}
+		
 		log.Info("Umami deletion process complete")
 	},
 }
