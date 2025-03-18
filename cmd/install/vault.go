@@ -12,11 +12,6 @@ import (
     "github.com/spf13/cobra"
 )
 
-var log *zap.Logger // package-level
-func init() {
-    log = logger.GetLogger() // One-time assignment
-}
-
 // vaultCmd represents the vault command under the "install" group.
 var vaultCmd = &cobra.Command{
     Use:   "vault",
