@@ -2,7 +2,6 @@ package install
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"time"
