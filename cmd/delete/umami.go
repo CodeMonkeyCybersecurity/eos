@@ -14,7 +14,7 @@ import (
 )
 
 // umamiDeleteCmd represents the command to delete Umami.
-var umamiDeleteCmd = &cobra.Command{
+var deleteUmamiCmd = &cobra.Command{
 	Use:   "umami",
 	Short: "Delete and clean up Umami",
 	Long: `Stops and removes Umami containers, backs up the data volumes,
