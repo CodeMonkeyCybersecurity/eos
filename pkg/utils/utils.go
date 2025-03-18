@@ -28,6 +28,21 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
 
+// StopContainers stops the specified Docker containers.
+func StopContainers(containers []string) error {
+	// Build the arguments for "docker stop" command.
+	args := append([]string{"stop"}, containers...)
+	
+	// Execute the command.
+	if err := Execute("docker", args...); err != nil {
+		return fmt.Errorf("failed to stop containers %v: %w", containers, err)
+	}
+	
+	// Log the successful stopping of containers.
+	log.Info("Containers stopped successfully", zap.Any("containers", containers))
+	return nil
+}
+
 // RemoveContainers removes the specified Docker containers.
 func RemoveContainers(containers []string) error {
 	args := append([]string{"rm"}, containers...)
