@@ -42,7 +42,7 @@ var umamiCmd = &cobra.Command{
 		}
 
 		// Prepare the Docker Compose file paths
-		sourceComposeFile := "eos/assets/umami-docker-compose.yml"
+		sourceComposeFile := "assets/umami-docker-compose.yml"
 		destComposeFile := filepath.Join(config.UmamiDir, "umami-docker-compose.yml")
 
 		log.Info("Copying and processing Docker Compose file",
