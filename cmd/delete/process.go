@@ -2,23 +2,21 @@
 package delete
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
-// deleteProcessesCmd represents the command to delete process
+// deleteProcessCmd represents the command to delete a process.
 var deleteProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Delete process",
-	Long:  `Delete process by specifying the target process.`,
+	Long:  `Delete a process by specifying the target process.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			fmt.Println("Please specify the process to delete.")
-			return
+			log.Fatal("Please specify the process to delete.")
 		}
 		process := args[0]
-		fmt.Printf("Deleting process: %s...\n", process)
-		// Add your delete logic here
+		log.Info("Deleting process", zap.String("process", process))
+		// Add your delete logic here.
 	},
 }
