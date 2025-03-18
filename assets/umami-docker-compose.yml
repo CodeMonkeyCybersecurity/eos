@@ -5,7 +5,7 @@ services:
     ports:
       - "8117:3000"  # Adjust if needed
     environment:
-      DATABASE_URL: "postgresql://umami:umami@db:5432/umami"
+      DATABASE_URL: "postgresql://umami:umami@db:5432/changeme"
       DATABASE_TYPE: postgresql
       APP_SECRET: changeme
     depends_on:
