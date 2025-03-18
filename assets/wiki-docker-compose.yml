@@ -27,7 +27,7 @@ services:
       DB_NAME: wiki_db
     restart: always
     ports:
-      - "11080:3000"
+      - "8161:3000"
     networks:
       - arachne-net
       
