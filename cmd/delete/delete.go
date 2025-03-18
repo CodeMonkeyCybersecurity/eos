@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
 */
-//cmd/delete.go
+//cmd//delete/delete.go
 package delete
 
 import (
