@@ -20,7 +20,7 @@ services:
     container_name: umami-db
     environment:
       POSTGRES_USER: umami
-      POSTGRES_PASSWORD: umami
+      POSTGRES_PASSWORD: changeme
       POSTGRES_DB: umami
     volumes:
       - db_data:/var/lib/postgresql/data
