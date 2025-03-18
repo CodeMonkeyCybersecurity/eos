@@ -4,6 +4,9 @@ package install
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"eos/pkg/config"
 	"eos/pkg/utils"
@@ -16,8 +19,12 @@ import (
 var umamiCmd = &cobra.Command{
 	Use:   "umami",
 	Short: "Install and deploy Umami",
-	Long: `Install and deploy Umami to /opt/umami, including installing 
-dependencies, setting up the repository, and deploying with Docker Compose.`,
+	Long: `Install and deploy Umami to /opt/umami by:
+- Copying the Docker Compose file from eos/assets/umami-docker-compose.yml to /opt/umami
+- Replacing all instances of "changeme" with a strong random alphanumeric password
+- Running "docker compose up -d" to deploy
+- Waiting 5 seconds and listing running containers via "docker ps"
+- Informing the user to navigate to :8117 and log in with default credentials (admin/umami) and change the password immediately.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		log.Info("Starting Umami installation using Eos")
@@ -34,43 +41,56 @@ dependencies, setting up the repository, and deploying with Docker Compose.`,
 				zap.String("path", config.UmamiDir))
 		}
 
-		// Install Yarn
-		log.Info("Installing Yarn")
-		if err := utils.Execute("sudo", "npm", "install", "-g", "yarn"); err != nil {
-			log.Fatal("Error installing Yarn", zap.Error(err))
+		// Prepare the Docker Compose file paths
+		sourceComposeFile := "eos/assets/umami-docker-compose.yml"
+		destComposeFile := filepath.Join(config.UmamiDir, "umami-docker-compose.yml")
+
+		log.Info("Copying and processing Docker Compose file",
+			zap.String("source", sourceComposeFile),
+			zap.String("destination", destComposeFile))
+
+		// Read the source Docker Compose file
+		data, err := os.ReadFile(sourceComposeFile)
+		if err != nil {
+			log.Fatal("Failed to read Docker Compose file from assets", zap.Error(err))
 		}
 
-		// Clone the Umami repository into the installation directory
-		log.Info("Cloning the Umami repository",
-			zap.String("repo", "https://github.com/umami-software/umami.git"))
-		if err := utils.Execute("git", "clone",
-			"https://github.com/umami-software/umami.git", config.UmamiDir); err != nil {
-			log.Fatal("Error cloning Umami repository", zap.Error(err))
+		// Generate a strong random alphanumeric password (16 characters)
+		log.Info("Generating strong random password")
+		password, err := utils.GeneratePassword(16)
+		if err != nil {
+			log.Fatal("Failed to generate password", zap.Error(err))
 		}
 
-		// Change directory to the cloned repository and run "yarn install"
-		umamiRepoPath := config.UmamiDir
-		log.Info("Running 'yarn install'",
-			zap.String("directory", umamiRepoPath))
-		if err := utils.ExecuteInDir(umamiRepoPath, "yarn", "install"); err != nil {
-			log.Fatal("Error running 'yarn install'", zap.Error(err))
+		// Replace all occurrences of "changeme" with the generated password
+		newData := strings.ReplaceAll(string(data), "changeme", password)
+		log.Info("Replaced 'changeme' with generated password", zap.String("password", password))
+
+		// Write the processed Docker Compose file to the destination directory
+		if err := os.WriteFile(destComposeFile, []byte(newData), 0644); err != nil {
+			log.Fatal("Failed to write processed Docker Compose file", zap.Error(err))
 		}
+		log.Info("Docker Compose file processed and copied successfully")
 
-		// Display configuration instructions for .env file
-		log.Info("Configuration required: Create an .env file with DATABASE_URL")
-		fmt.Println(`Create an .env file with the following content:
-DATABASE_URL={connection url}
-
-For example:
-DATABASE_URL=postgresql://username:mypassword@localhost:5432/mydb`)
-
-		// Deploy Umami with Docker Compose
+		// Deploy Umami with Docker Compose using the processed file
 		log.Info("Deploying Umami with Docker Compose",
 			zap.String("directory", config.UmamiDir))
-		if err := utils.ExecuteInDir(config.UmamiDir, "docker", "compose", "up", "-d"); err != nil {
+		if err := utils.ExecuteInDir(config.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
-		log.Info("Umami installation and deployment complete!")
+		// Wait 5 seconds for the containers to start
+		log.Info("Waiting 5 seconds for containers to initialize...")
+		time.Sleep(5 * time.Second)
+
+		// Execute "docker ps" to list running containers
+		log.Info("Listing running Docker containers")
+		if err := utils.Execute("docker", "ps"); err != nil {
+			log.Fatal("Error executing 'docker ps'", zap.Error(err))
+		}
+
+		// Final congratulatory message with instructions
+		log.Info("Umami installation complete",
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", utils.GetInternalHostname())))
 	},
 }
