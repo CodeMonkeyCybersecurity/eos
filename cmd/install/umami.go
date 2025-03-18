@@ -14,7 +14,6 @@ import (
 
 
 // Create a package-level variable 'log' pointing to your global logger:
-var log *zap.Logger
 
 func init() {
     log = logger.GetLogger()
