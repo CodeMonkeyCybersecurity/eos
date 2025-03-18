@@ -9,7 +9,7 @@ services:
       - "8123:9001"     # MinIO Console port
     environment:
       MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: Baggie22Promotion99Oblivion21Shale5
+      MINIO_ROOT_PASSWORD: changeme
     command: server /data --console-address ":9001"
     restart: always
     networks:
