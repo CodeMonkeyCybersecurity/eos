@@ -3,6 +3,7 @@ package install
 
 import (
     	"eos/pkg/logger"
+	
     	"go.uber.org/zap"
 	
 	"github.com/spf13/cobra"
