@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 // deleteStorageCmd represents the command for deleting storage resources.
