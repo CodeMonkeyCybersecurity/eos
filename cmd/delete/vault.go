@@ -1,12 +1,12 @@
+// cmd/delete/vault.go
 package delete
 
 import (
-	"fmt"
-	"log"
 	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // vaultDeleteCmd represents the "delete vault" command.
@@ -20,16 +20,16 @@ var deleteVaultCmd = &cobra.Command{
 			log.Fatal("This command must be run with sudo or as root.")
 		}
 
-		fmt.Println("Deleting Vault installation...")
+		log.Info("Deleting Vault installation...")
 
 		// Kill any running Vault process.
 		killCmd := exec.Command("pkill", "-f", "vault server")
 		killCmd.Stdout = os.Stdout
 		killCmd.Stderr = os.Stderr
 		if err := killCmd.Run(); err != nil {
-			log.Printf("Warning: could not kill Vault process (it might not be running): %v", err)
+			log.Warn("Could not kill Vault process (it might not be running)", zap.Error(err))
 		} else {
-			fmt.Println("Stopped Vault process.")
+			log.Info("Stopped Vault process.")
 		}
 
 		// Remove the Vault snap.
@@ -37,18 +37,18 @@ var deleteVaultCmd = &cobra.Command{
 		removeCmd.Stdout = os.Stdout
 		removeCmd.Stderr = os.Stderr
 		if err := removeCmd.Run(); err != nil {
-			log.Fatalf("Failed to remove Vault snap: %v", err)
+			log.Fatal("Failed to remove Vault snap", zap.Error(err))
 		}
-		fmt.Println("Vault snap removed successfully.")
+		log.Info("Vault snap removed successfully.")
 
 		// Optionally remove Vault configuration and data.
 		configDir := "/var/snap/vault"
 		if err := os.RemoveAll(configDir); err != nil {
-			log.Printf("Warning: failed to remove configuration directory %s: %v", configDir, err)
+			log.Warn("Failed to remove configuration directory", zap.String("directory", configDir), zap.Error(err))
 		} else {
-			fmt.Printf("Removed configuration directory %s\n", configDir)
+			log.Info("Removed configuration directory", zap.String("directory", configDir))
 		}
 
-		fmt.Println("Vault deletion complete.")
+		log.Info("Vault deletion complete.")
 	},
 }
