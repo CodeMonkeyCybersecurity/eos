@@ -3,26 +3,22 @@ package delete
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
-// deleteStorageCmd represents the create command for storage
+// deleteStorageCmd represents the command for deleting storage resources.
 var deleteStorageCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete new storage resources",
+	Use:   "storage",
+	Short: "Delete storage resources",
 	Long:  `This command allows you to delete storage resources in the system.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			log.Fatalf("Please specify the storage details to delete.")
+			log.Fatal("Please specify the storage details to delete.")
 		}
 		storageDetails := args[0]
-		fmt.Printf("Deleting storage: %s...\n", storageDetails)
+		log.Info(fmt.Sprintf("Deleting storage: %s...", storageDetails))
 		// Add your logic to delete storage resources
 	},
-}
-
-func init() {
-	DeleteCmd.AddCommand(deleteStorageCmd)
 }
