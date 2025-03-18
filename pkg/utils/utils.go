@@ -60,6 +60,8 @@ func EnsureArachneNetwork() error {
 func CheckDockerContainers() error {
 	cmd := exec.Command("docker", "ps")
 	output, err := cmd.CombinedOutput()
+	// Print output to terminal
+	fmt.Println(string(output))
 	if err != nil {
 		return fmt.Errorf("failed to run docker ps: %v, output: %s", err, output)
 	}
