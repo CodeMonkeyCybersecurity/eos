@@ -81,8 +81,3 @@ DATABASE_URL=postgresql://username:mypassword@localhost:5432/mydb`)
 		log.Info("Umami installation and deployment complete!")
 	},
 }
-
-func init() {
-	// Assuming InstallCmd is declared in this same package (install.go, for instance).
-	InstallCmd.AddCommand(umamiCmd)
-}
