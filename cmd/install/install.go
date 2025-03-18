@@ -15,8 +15,9 @@ var InstallCmd = &cobra.Command{
 	Short: "Install various components",
 	Long: `Install commands allow you to provision additional components or dependencies.
 For example:
-  eos install trivy 
-  eos install vault`,
+	eos install trivy 
+	eos install vault
+	eos install umami`,
 }
 
 // log is a package-level variable for the Zap logger.
