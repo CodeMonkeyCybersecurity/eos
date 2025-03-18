@@ -70,7 +70,7 @@ func ExecuteInDir(dir, command string, args ...string) error {
 }
 
 //
-//---------------------------- CRYPTO AND HASHING ---------------------------- //
+//---------------------------- CRYPTO, HASHING, SECRETS ---------------------------- //
 //
 
 // HashString computes and returns the SHA256 hash of the provided string.
@@ -80,6 +80,18 @@ func HashString(s string) string {
 	hashStr := hex.EncodeToString(hash[:])
 	log.Debug("Computed SHA256 hash", zap.String("hash", hashStr))
 	return hashStr
+}
+
+// generatePassword creates a random alphanumeric password of the given length.
+func GeneratePassword(length int) (string, error) {
+	// Generate random bytes. Since hex encoding doubles the length, we need length/2 bytes.
+	bytes := make([]byte, length/2)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return "", err
+	}
+	// Encode to hex and trim to required length.
+	return hex.EncodeToString(bytes)[:length], nil
 }
 
 
