@@ -2,10 +2,6 @@
 package delete
 
 import (
-	"fmt"
-	"os"
-	"time"
-	
 	"eos/pkg/config"
 	"eos/pkg/utils"
 
