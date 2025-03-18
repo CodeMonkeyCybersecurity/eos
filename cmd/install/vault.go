@@ -7,7 +7,6 @@ import (
     "time"
 
     "eos/pkg/utils"
-    "eos/pkg/logger"
     "go.uber.org/zap"
     "github.com/spf13/cobra"
 )
