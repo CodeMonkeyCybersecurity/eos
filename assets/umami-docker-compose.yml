@@ -5,13 +5,19 @@ services:
     ports:
       - "8117:3000"  # Adjust if needed
     environment:
-      # URL to connect to your PostgreSQL database
       DATABASE_URL: "postgresql://umami:umami@db:5432/umami"
-      # Optional: Set the port Umami should listen on
-      PORT: "3000"
+      DATABASE_TYPE: postgresql
+      APP_SECRET: changeme
     depends_on:
-      - db
-    restart: unless-stopped
+      db:
+        condition: service_healthy
+    init: true
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:8117/api/heartbeat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - arachne-net
       
@@ -24,12 +30,17 @@ services:
       POSTGRES_DB: umami
     volumes:
       - db_data:/var/lib/postgresql/data
-    restart: unless-stopped
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - arachne-net
 
 volumes:
-  db_data:
+  umami_db_data:
 
 networks:
   arachne-net: 
