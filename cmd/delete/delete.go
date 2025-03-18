@@ -16,7 +16,13 @@ import (
 var DeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete resources (e.g., processes, users, storage)",
-	Long:  `The delete command allows you to remove various resources such as processes, users, or storage.`,
+	Long:  `The delete command allows you to remove various resources such as processes, users, or storage.
+For example:
+	eos delete trivy 
+	eos delete vault
+	eos delete umami`,
+}
+
 
 // log is a package-level variable for the Zap logger.
 var log *zap.Logger
