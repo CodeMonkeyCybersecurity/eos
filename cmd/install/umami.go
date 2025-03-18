@@ -92,9 +92,8 @@ var umamiCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		// Execute "docker ps" to list running containers
-		log.Info("Listing running Docker containers")
-		if err := utils.Execute("docker", "ps"); err != nil {
-			log.Fatal("Error executing 'docker ps'", zap.Error(err))
+		if err := utils.CheckDockerContainers(); err != nil {
+			log.Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 
 		// Final congratulatory message with instructions
