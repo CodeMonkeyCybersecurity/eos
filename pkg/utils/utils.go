@@ -34,7 +34,7 @@ func RemoveContainers(containers []string) error {
 	if err := Execute("docker", args...); err != nil {
 		return fmt.Errorf("failed to remove containers %v: %w", containers, err)
 	}
-	GetLogger().Info("Containers removed successfully", zap.Any("containers", containers))
+	log.Info("Containers removed successfully", zap.Any("containers", containers))
 	return nil
 }
 
@@ -43,10 +43,10 @@ func RemoveContainers(containers []string) error {
 func RemoveImages(images []string) error {
 	for _, image := range images {
 		if err := Execute("docker", "rmi", image); err != nil {
-			GetLogger().Warn("failed to remove image (it might be used elsewhere)",
+			log.Warn("failed to remove image (it might be used elsewhere)",
 				zap.String("image", image), zap.Error(err))
 		} else {
-			GetLogger().Info("Image removed successfully", zap.String("image", image))
+			log.Info("Image removed successfully", zap.String("image", image))
 		}
 	}
 	return nil
@@ -76,7 +76,6 @@ func BackupVolume(volumeName, backupDir string) (string, error) {
 // If any backup fails, it logs the error but continues processing the remaining volumes.
 func BackupVolumes(volumes []string, backupDir string) (map[string]string, error) {
 	backupResults := make(map[string]string)
-	logger := GetLogger()
 
 	// Ensure the backup directory exists.
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
@@ -85,13 +84,13 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 
 	// Loop through each volume and back it up.
 	for _, vol := range volumes {
-		logger.Info("Backing up volume", zap.String("volume", vol))
+		log.Info("Backing up volume", zap.String("volume", vol))
 		backupFile, err := BackupVolume(vol, backupDir)
 		if err != nil {
-			logger.Error("Error backing up volume", zap.String("volume", vol), zap.Error(err))
+			log.Error("Error backing up volume", zap.String("volume", vol), zap.Error(err))
 			// Continue processing other volumes even if one fails.
 		} else {
-			logger.Info("Volume backup completed", zap.String("volume", vol), zap.String("backupFile", backupFile))
+			log.Info("Volume backup completed", zap.String("volume", vol), zap.String("backupFile", backupFile))
 			backupResults[vol] = backupFile
 		}
 	}
@@ -140,7 +139,7 @@ func ParseComposeFile(composePath string) (containers []string, images []string,
 		volumes = append(volumes, volName)
 	}
 
-	GetLogger().Info("Parsed compose file successfully", zap.String("path", composePath),
+	log.Info("Parsed compose file successfully", zap.String("path", composePath),
 		zap.Any("containers", containers), zap.Any("images", images), zap.Any("volumes", volumes))
 
 	return containers, images, volumes, nil
@@ -187,7 +186,7 @@ func CheckDockerContainers() error {
 	if err != nil {
 		return fmt.Errorf("failed to run docker ps: %v, output: %s", err, output)
 	}
-	GetLogger().Info("Docker ps output", zap.String("output", string(output)))
+	log.Info("Docker ps output", zap.String("output", string(output)))
 	return nil
 }
 
