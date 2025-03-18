@@ -15,6 +15,12 @@ import (
 // log is our package-level pointer to the Zap logger.
 var log *zap.Logger
 
+// init: set up the global Zap logger for this package, and attach vaultCmd to the InstallCmd.
+func init() {
+    // Grab the shared logger from pkg/logger.
+    log = logger.GetLogger()
+}
+
 // vaultCmd represents the vault command under the "install" group.
 var vaultCmd = &cobra.Command{
     Use:   "vault",
@@ -108,8 +114,3 @@ ui = true
     },
 }
 
-// init: set up the global Zap logger for this package, and attach vaultCmd to the InstallCmd.
-func init() {
-    // Grab the shared logger from pkg/logger.
-    log = logger.GetLogger()
-}
