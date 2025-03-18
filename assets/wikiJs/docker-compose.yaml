@@ -3,9 +3,9 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: wiki
-      POSTGRES_PASSWORD: wikijsrocks
-      POSTGRES_USER: wikijs
+      POSTGRES_DB: wiki_db
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_USER: wiki_user
     logging:
       driver: "none"
     restart: unless-stopped
@@ -22,9 +22,9 @@ services:
       DB_TYPE: postgres
       DB_HOST: db
       DB_PORT: 5432
-      DB_USER: wikijs
+      DB_USER: wiki_user
       DB_PASS: wikijsrocks
-      DB_NAME: wiki
+      DB_NAME: wiki_db
     restart: unless-stopped
     ports:
       - "11080:3000"
