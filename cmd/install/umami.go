@@ -17,8 +17,6 @@ func init() {
     log = logger.GetLogger() // One-time assignment
 }
 
-log.Info("Starting Umami installation")
-
 // umamiCmd represents the Umami installation command.
 var umamiCmd = &cobra.Command{
 	Use:   "umami",
