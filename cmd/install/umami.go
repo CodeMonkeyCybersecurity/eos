@@ -72,6 +72,14 @@ var umamiCmd = &cobra.Command{
 		}
 		log.Info("Docker Compose file processed and copied successfully")
 
+		// Check if arache-net docker network already exists, create if not
+		// Check if arachne-net docker network exists, creating it if not
+		if err := utils.EnsureArachneNetwork(); err != nil {
+		    log.Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
+		} else {
+		    log.Info("Successfully ensured 'arachne-net' exists")
+		}
+		
 		// Deploy Umami with Docker Compose using the processed file
 		log.Info("Deploying Umami with Docker Compose",
 			zap.String("directory", config.UmamiDir))
