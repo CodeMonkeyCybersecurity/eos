@@ -28,6 +28,20 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
 
+// RemoveVolumes removes the specified Docker volumes.
+func RemoveVolumes(volumes []string) error {
+	for _, volume := range volumes {
+		// Execute the docker volume rm command.
+		if err := Execute("docker", "volume", "rm", volume); err != nil {
+			// Log a warning if removal fails, but continue processing the rest.
+			log.Warn("failed to remove volume", zap.String("volume", volume), zap.Error(err))
+		} else {
+			log.Info("Volume removed successfully", zap.String("volume", volume))
+		}
+	}
+	return nil
+}
+
 // StopContainers stops the specified Docker containers.
 func StopContainers(containers []string) error {
 	// Build the arguments for "docker stop" command.
