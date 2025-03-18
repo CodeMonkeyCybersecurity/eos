@@ -21,7 +21,6 @@ and deletes the installed images.
 The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.tar.gz`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		log := utils.GetLogger()
 		log.Info("Starting Umami deletion process using Eos")
 
 		// Stop containers (umami and umami-db)
