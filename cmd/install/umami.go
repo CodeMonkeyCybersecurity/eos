@@ -78,5 +78,5 @@ DATABASE_URL=postgresql://username:mypassword@localhost:5432/mydb`)
 
 func init() {
 	// Assuming you have an 'install' command group, add the umami command as a subcommand.
-	installCmd.AddCommand(umamiCmd)
+	InstallCmd.AddCommand(umamiCmd)
 }
