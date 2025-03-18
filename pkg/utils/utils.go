@@ -27,6 +27,33 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
 
+// BackupVolumes backs up all provided volumes to the specified backupDir.
+// It returns a map with volume names as keys and their backup file paths as values.
+// If any backup fails, it logs the error but continues processing the remaining volumes.
+func BackupVolumes(volumes []string, backupDir string) (map[string]string, error) {
+	backupResults := make(map[string]string)
+	logger := GetLogger()
+
+	// Ensure the backup directory exists.
+	if err := os.MkdirAll(backupDir, 0755); err != nil {
+		return backupResults, fmt.Errorf("failed to create backup directory %s: %w", backupDir, err)
+	}
+
+	// Loop through each volume and back it up.
+	for _, vol := range volumes {
+		logger.Info("Backing up volume", zap.String("volume", vol))
+		backupFile, err := BackupVolume(vol, backupDir)
+		if err != nil {
+			logger.Error("Error backing up volume", zap.String("volume", vol), zap.Error(err))
+			// Continue processing other volumes even if one fails.
+		} else {
+			logger.Info("Volume backup completed", zap.String("volume", vol), zap.String("backupFile", backupFile))
+			backupResults[vol] = backupFile
+		}
+	}
+	return backupResults, nil
+}
+
 // ComposeFile represents the minimal structure of your docker-compose file.
 type ComposeFile struct {
 	Services map[string]Service `yaml:"services"`
