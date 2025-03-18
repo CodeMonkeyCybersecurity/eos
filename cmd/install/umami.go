@@ -12,11 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var log *zap.Logger // package-level
-func init() {
-    log = logger.GetLogger() // One-time assignment
-}
-
 // umamiCmd represents the Umami installation command.
 var umamiCmd = &cobra.Command{
 	Use:   "umami",
