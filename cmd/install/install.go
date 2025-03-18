@@ -2,6 +2,9 @@
 package install
 
 import (
+    	"eos/pkg/logger"
+    	"go.uber.org/zap"
+	
 	"github.com/spf13/cobra"
 )
 
@@ -15,8 +18,14 @@ For example:
   eos install vault`,
 }
 
-// In the init function, attach subcommands (for example, the Trivy installer).
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
 func init() {
+    // Initialize the shared logger for the entire install package
+    log = logger.GetLogger()
+	
+    	// Attach subcommands
 	InstallCmd.AddCommand(trivyCmd)
 	InstallCmd.AddCommand(vaultCmd)
 	InstallCmd.AddCommand(umamiCmd)
