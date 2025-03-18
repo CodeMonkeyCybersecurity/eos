@@ -22,6 +22,41 @@ import (
 var log = logger.GetLogger() // Retrieve the globally initialized logger
 
 //
+//---------------------------- DOCKER FUNCTIONS ---------------------------- //
+//
+
+// EnsureArachneNetwork checks if the Docker network "arachne-net" exists.
+// If it does not exist, it creates it with the desired IPv4 and IPv6 subnets.
+func EnsureArachneNetwork() error {
+	networkName := "arachne-net"
+	desiredIPv4 := "172.28.0.0/22"
+	desiredIPv6 := "fd42:1a2b:3c4d:5e6f::/64"
+
+	// Check if the network exists by running: docker network inspect arachne-net
+	cmd := exec.Command("docker", "network", "inspect", networkName)
+	if err := cmd.Run(); err == nil {
+		// Network exists, so just return
+		return nil
+	}
+
+	// If the network does not exist, create it with the specified subnets.
+	createCmd := exec.Command("docker", "network", "create",
+		"--driver", "bridge",
+		"--subnet", desiredIPv4,
+		"--ipv6",
+		"--subnet", desiredIPv6,
+		networkName,
+	)
+	output, err := createCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create network %s: %v, output: %s", networkName, err, output)
+	}
+
+	return nil
+}
+
+
+//
 //---------------------------- COMMAND EXECUTION ---------------------------- //
 //
 
