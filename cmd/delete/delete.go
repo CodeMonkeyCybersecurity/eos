@@ -28,4 +28,5 @@ func init() {
 	DeleteCmd.AddCommand(deleteProcessCmd)
 	DeleteCmd.AddCommand(deleteUsersCmd)
 	DeleteCmd.AddCommand(deleteStorageCmd)
+	DeleteCmd.AddCommand(deleteUmamiCmd)
 }
