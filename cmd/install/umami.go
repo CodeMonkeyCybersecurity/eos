@@ -1,3 +1,4 @@
+// cmd/install/umami.go
 package install
 
 import (
