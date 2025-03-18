@@ -92,7 +92,3 @@ ui = true
 		time.Sleep(5 * time.Second)
 	},
 }
-
-func init() {
-	InstallCmd.AddCommand(vaultCmd)
-}
