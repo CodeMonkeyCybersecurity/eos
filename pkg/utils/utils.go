@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 	"io"
+	"io/ioutil"
 
+	"gopkg.in/yaml.v2"
 	"go.uber.org/zap"
 
 	"eos/pkg/logger"
@@ -24,6 +26,55 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
+
+// ComposeFile represents the minimal structure of your docker-compose file.
+type ComposeFile struct {
+	Services map[string]Service `yaml:"services"`
+	Volumes  map[string]interface{} `yaml:"volumes"`
+}
+
+// Service holds the details we care about for each service.
+type Service struct {
+	Image         string `yaml:"image"`
+	ContainerName string `yaml:"container_name"`
+}
+
+// ParseComposeFile reads a docker-compose file and returns container names, images, and volumes.
+func ParseComposeFile(composePath string) (containers []string, images []string, volumes []string, err error) {
+	data, err := ioutil.ReadFile(composePath)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to read compose file: %w", err)
+	}
+
+	var compose ComposeFile
+	if err := yaml.Unmarshal(data, &compose); err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to unmarshal compose file: %w", err)
+	}
+
+	// Extract container names and images from services.
+	for key, svc := range compose.Services {
+		// If ContainerName is not provided, you can decide to use the service key
+		if svc.ContainerName != "" {
+			containers = append(containers, svc.ContainerName)
+		} else {
+			containers = append(containers, key)
+		}
+		if svc.Image != "" {
+			images = append(images, svc.Image)
+		}
+	}
+
+	// Extract volume names.
+	for volName := range compose.Volumes {
+		volumes = append(volumes, volName)
+	}
+
+	GetLogger().Info("Parsed compose file successfully", zap.String("path", composePath),
+		zap.Any("containers", containers), zap.Any("images", images), zap.Any("volumes", volumes))
+
+	return containers, images, volumes, nil
+}
+
 
 // EnsureArachneNetwork checks if the Docker network "arachne-net" exists.
 // If it does not exist, it creates it with the desired IPv4 and IPv6 subnets.
