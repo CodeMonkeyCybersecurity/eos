@@ -22,7 +22,7 @@ import (
 var log = logger.GetLogger() // Retrieve the globally initialized logger
 
 //
-//---------------------------- DOCKER FUNCTIONS ---------------------------- //
+//---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
 
 // EnsureArachneNetwork checks if the Docker network "arachne-net" exists.
@@ -55,6 +55,17 @@ func EnsureArachneNetwork() error {
 	return nil
 }
 
+// CheckDockerContainers runs "docker ps" and logs its output.
+// It returns an error if the command fails.
+func CheckDockerContainers() error {
+	cmd := exec.Command("docker", "ps")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to run docker ps: %v, output: %s", err, output)
+	}
+	GetLogger().Info("Docker ps output", zap.String("output", string(output)))
+	return nil
+}
 
 //
 //---------------------------- COMMAND EXECUTION ---------------------------- //
