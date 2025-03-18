@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"eos/pkg/config"
 	"eos/pkg/utils"
 
 	"go.uber.org/zap"
