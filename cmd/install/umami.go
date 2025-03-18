@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"eos/pkg/config"
-	"eos/pkg/logger"
 	"eos/pkg/utils"
 
 	"go.uber.org/zap"
