@@ -28,6 +28,30 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
 //
 
+// RemoveContainers removes the specified Docker containers.
+func RemoveContainers(containers []string) error {
+	args := append([]string{"rm"}, containers...)
+	if err := Execute("docker", args...); err != nil {
+		return fmt.Errorf("failed to remove containers %v: %w", containers, err)
+	}
+	GetLogger().Info("Containers removed successfully", zap.Any("containers", containers))
+	return nil
+}
+
+// RemoveImages removes the specified Docker images.
+// It logs a warning if an image cannot be removed, but continues with the others.
+func RemoveImages(images []string) error {
+	for _, image := range images {
+		if err := Execute("docker", "rmi", image); err != nil {
+			GetLogger().Warn("failed to remove image (it might be used elsewhere)",
+				zap.String("image", image), zap.Error(err))
+		} else {
+			GetLogger().Info("Image removed successfully", zap.String("image", image))
+		}
+	}
+	return nil
+}
+
 // BackupVolume backs up a single Docker volume by running a temporary Alpine container.
 // It returns the full path to the backup file.
 func BackupVolume(volumeName, backupDir string) (string, error) {
