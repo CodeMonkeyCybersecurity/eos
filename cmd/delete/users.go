@@ -2,8 +2,7 @@
 package delete
 
 import (
-	"fmt"
-
+	"go.uber.org/zap"
 	"github.com/spf13/cobra"
 )
 
@@ -14,11 +13,10 @@ var deleteUsersCmd = &cobra.Command{
 	Long:  `Delete users by specifying the target user.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) < 1 {
-			fmt.Println("Please specify the user to delete.")
-			return
+			log.Fatal("Please specify the user to delete.")
 		}
 		user := args[0]
-		fmt.Printf("Deleting user: %s...\n", user)
-		// Add your delete logic here
+		log.Info("Deleting user", zap.String("user", user))
+		// Add your delete logic here.
 	},
 }
