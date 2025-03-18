@@ -48,7 +48,7 @@ dependencies, setting up the repository, and deploying with Docker Compose.`,
 		}
 
 		// Change directory to the cloned repository and run "yarn install"
-		umamiRepoPath := fmt.Sprintf("%s/umami", config.UmamiDir)
+		umamiRepoPath := config.UmamiDir
 		log.Info("Running 'yarn install'",
 			zap.String("directory", umamiRepoPath))
 		if err := utils.ExecuteInDir(umamiRepoPath, "yarn", "install"); err != nil {
