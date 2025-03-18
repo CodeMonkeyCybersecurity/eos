@@ -8,11 +8,11 @@ services:
       POSTGRES_USER: wiki_user
     logging:
       driver: "none"
-    restart: unless-stopped
+    restart: always
     volumes:
       - db-data:/var/lib/postgresql/data
     networks:
-      - eos-network
+      - arachne-net
       
   wiki:
     image: ghcr.io/requarks/wiki:2
@@ -23,16 +23,25 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_USER: wiki_user
-      DB_PASS: wikijsrocks
+      DB_PASS: changeme
       DB_NAME: wiki_db
-    restart: unless-stopped
+    restart: always
     ports:
       - "11080:3000"
     networks:
-      - eos-network
+      - arachne-net
       
 volumes:
   db-data:
 
 networks:
-  eos-network:
+  arachne-net: 
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-arachne
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/22
+        - subnet: fd42:1a2b:3c4d:5e6f::/64
