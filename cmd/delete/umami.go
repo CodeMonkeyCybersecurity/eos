@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"os"
 	"time"
-
+	
+	"eos/pkg/config"
 	"eos/pkg/utils"
 
 	"go.uber.org/zap"
@@ -20,66 +21,46 @@ var deleteUmamiCmd = &cobra.Command{
 and deletes the installed images.
 The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.tar.gz`,
 	Run: func(cmd *cobra.Command, args []string) {
-
 		log.Info("Starting Umami deletion process using Eos")
 
-		// Stop containers (umami and umami-db)
-		log.Info("Stopping Umami containers")
-		if err := utils.Execute("docker", "stop", "umami", "umami-db"); err != nil {
-			log.Error("Error stopping containers", zap.Error(err))
-		} else {
-			log.Info("Containers stopped successfully")
+		// Define the path to the docker-compose file used during installation.
+		composePath := config.UmamiDir + "/umami-docker-compose.yml"
+
+		// Parse the compose file to retrieve container names, images, and volumes.
+		containers, images, volumes, err := utils.ParseComposeFile(composePath)
+		if err != nil {
+			log.Fatal("Error parsing docker-compose file", zap.Error(err))
 		}
 
-		// Backup volumes: assuming the data volume is named "umami_db_data"
+		// Backup all volumes defined in the compose file.
 		backupDir := "/srv/container-volume-backups"
-		// Ensure the backup directory exists
-		if err := os.MkdirAll(backupDir, 0755); err != nil {
-			log.Fatal("Failed to create backup directory", zap.Error(err))
-		}
-
-		timestamp := time.Now().Format("20060102_150405")
-		backupFile := fmt.Sprintf("%s/%s_umami_db_data.tar.gz", backupDir, timestamp)
-		log.Info("Backing up volume 'umami_db_data'", zap.String("backupFile", backupFile))
-
-		// Run a temporary container to backup the volume using alpine and tar
-		backupCmd := []string{
-			"docker", "run", "--rm",
-			"-v", "umami_db_data:/volume",
-			"-v", fmt.Sprintf("%s:/backup", backupDir),
-			"alpine",
-			"tar", "czf", fmt.Sprintf("/backup/%s_umami_db_data.tar.gz", timestamp),
-			"-C", "/volume", ".",
-		}
-		if err := utils.Execute(backupCmd[0], backupCmd[1:]...); err != nil {
-			log.Fatal("Error backing up volume", zap.Error(err))
+		backupResults, err := utils.BackupVolumes(volumes, backupDir)
+		if err != nil {
+			log.Error("Error backing up volumes", zap.Error(err))
 		} else {
-			log.Info("Volume backup completed successfully")
+			log.Info("All volumes backed up successfully", zap.Any("backups", backupResults))
+		}
+		
+		// Stop all containers defined in the compose file.
+		log.Info("Stopping containers defined in docker-compose", zap.Any("containers", containers))
+		if err := utils.StopContainers(containers); err != nil {
+		    log.Error("Error stopping containers", zap.Error(err))
+		} else {
+		    log.Info("Containers stopped successfully")
 		}
 
-		// Remove containers
-		log.Info("Removing Umami containers")
-		if err := utils.Execute("docker", "rm", "umami", "umami-db"); err != nil {
+		// Remove containers.
+		log.Info("Removing containers defined in docker-compose", zap.Any("containers", containers))
+		if err := utils.RemoveContainers(containers); err != nil {
 			log.Error("Error removing containers", zap.Error(err))
-		} else {
-			log.Info("Containers removed successfully")
 		}
 
-		// Delete installed images
-		log.Info("Removing Umami images")
-		// Remove the Umami image
-		if err := utils.Execute("docker", "rmi", "ghcr.io/umami-software/umami:postgresql-latest"); err != nil {
-			log.Error("Error removing Umami image", zap.Error(err))
-		} else {
-			log.Info("Umami image removed successfully")
-		}
-		// Remove the Postgres image used by Umami
-		if err := utils.Execute("docker", "rmi", "postgres:15-alpine"); err != nil {
-			log.Error("Error removing Postgres image", zap.Error(err))
-		} else {
-			log.Info("Postgres image removed successfully")
+		// Remove images.
+		log.Info("Removing images defined in docker-compose", zap.Any("images", images))
+		if err := utils.RemoveImages(images); err != nil {
+			log.Error("Error removing images", zap.Error(err))
 		}
 
-		log.Info("Umami deletion process complete. Data backup is available at", zap.String("backupFile", backupFile))
+		log.Info("Umami deletion process complete")
 	},
 }
