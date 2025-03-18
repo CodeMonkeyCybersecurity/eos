@@ -85,7 +85,7 @@ func InitializeWithConfig(cfg zap.Config) {
 	if err != nil {
 		// Fallback to console-only logging if file logging fails
 		cfg.OutputPaths = []string{"stdout"}
-		log, err = cfg.Build()
+		Log, err = cfg.Build()
 		if err != nil {
 			panic("failed to initialize logger with fallback config: " + err.Error())
 		}
@@ -108,7 +108,7 @@ func GetLogger() *zap.Logger {
 // LogCommandExecution logs when a command is executed
 func LogCommandExecution(cmdName string, args []string) {
 	Log := GetLogger()
-	log.Info("Command executed", zap.String("command", cmdName), zap.Strings("args", args))
+	Log.Info("Command executed", zap.String("command", cmdName), zap.Strings("args", args))
 }
 
 // Sync flushes any buffered log entries. Should be called before the application exits.
@@ -116,7 +116,7 @@ func Sync() {
 	if Log != nil {
 		err := Log.Sync()
 		if err != nil && err.Error() != "sync /dev/stdout: invalid argument" { // failed to sync logger kept getting logged for no reason and its sometthing to do with the stout function itself , no this code, so i just said ignore it
-			log.Error("Failed to sync logger", zap.Error(err))
+			Log.Error("Failed to sync logger", zap.Error(err))
 		}
 	}
 }
