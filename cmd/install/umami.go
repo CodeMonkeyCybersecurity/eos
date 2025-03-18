@@ -12,6 +12,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Declare a package-level Zap logger pointer:
+var log *zap.Logger
+
 // umamiCmd represents the Umami installation command.
 var umamiCmd = &cobra.Command{
 	Use:   "umami",
@@ -20,44 +23,44 @@ var umamiCmd = &cobra.Command{
 dependencies, setting up the repository, and deploying with Docker Compose.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
-		logger.Log.Info("Starting Umami installation using Eos")
+		Log.Info("Starting Umami installation using Eos")
 
 		// Ensure the installation directory exists
 		if _, err := os.Stat(config.UmamiDir); os.IsNotExist(err) {
-			logger.Log.Warn("Installation directory does not exist; creating it",
+			Log.Warn("Installation directory does not exist; creating it",
 				zap.String("path", config.UmamiDir))
 			if err := os.MkdirAll(config.UmamiDir, 0755); err != nil {
-				logger.Log.Fatal("Failed to create installation directory", zap.Error(err))
+				Log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
-			logger.Log.Info("Installation directory exists",
+			Log.Info("Installation directory exists",
 				zap.String("path", config.UmamiDir))
 		}
 
 		// Install Yarn
-		logger.Log.Info("Installing Yarn")
+		Log.Info("Installing Yarn")
 		if err := utils.Execute("sudo", "npm", "install", "-g", "yarn"); err != nil {
-			logger.Log.Fatal("Error installing Yarn", zap.Error(err))
+			Log.Fatal("Error installing Yarn", zap.Error(err))
 		}
 
 		// Clone the Umami repository into the installation directory
-		logger.Log.Info("Cloning the Umami repository",
+		Log.Info("Cloning the Umami repository",
 			zap.String("repo", "https://github.com/umami-software/umami.git"))
 		if err := utils.Execute("git", "clone",
 			"https://github.com/umami-software/umami.git", config.UmamiDir); err != nil {
-			logger.Log.Fatal("Error cloning Umami repository", zap.Error(err))
+			Log.Fatal("Error cloning Umami repository", zap.Error(err))
 		}
 
 		// Change directory to the cloned repository and run "yarn install"
 		umamiRepoPath := fmt.Sprintf("%s/umami", config.UmamiDir)
-		logger.Log.Info("Running 'yarn install'",
+		Log.Info("Running 'yarn install'",
 			zap.String("directory", umamiRepoPath))
 		if err := utils.ExecuteInDir(umamiRepoPath, "yarn", "install"); err != nil {
-			logger.Log.Fatal("Error running 'yarn install'", zap.Error(err))
+			Log.Fatal("Error running 'yarn install'", zap.Error(err))
 		}
 
 		// Display configuration instructions for .env file
-		logger.Log.Info("Configuration required: Create an .env file with DATABASE_URL")
+		Log.Info("Configuration required: Create an .env file with DATABASE_URL")
 		fmt.Println(`Create an .env file with the following content:
 DATABASE_URL={connection url}
 
@@ -65,13 +68,13 @@ For example:
 DATABASE_URL=postgresql://username:mypassword@localhost:5432/mydb`)
 
 		// Deploy Umami with Docker Compose
-		logger.Log.Info("Deploying Umami with Docker Compose",
+		Log.Info("Deploying Umami with Docker Compose",
 			zap.String("directory", config.UmamiDir))
 		if err := utils.ExecuteInDir(config.UmamiDir, "docker", "compose", "up", "-d"); err != nil {
-			logger.Log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
+			Log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
-		logger.Log.Info("Umami installation and deployment complete!")
+		Log.Info("Umami installation and deployment complete!")
 	},
 }
 
