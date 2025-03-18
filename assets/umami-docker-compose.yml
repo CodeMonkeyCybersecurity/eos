@@ -1,6 +1,6 @@
 services:
   umami:
-    image: ghcr.io/umami-software/umami:latest
+    image: ghcr.io/umami-software/umami:postgresql-latest
     container_name: umami
     ports:
       - "8117:3000"  # Adjust if needed
@@ -22,7 +22,7 @@ services:
       - arachne-net
       
   db:
-    image: postgres
+    image: postgres:15-alpine
     container_name: umami-db
     environment:
       POSTGRES_USER: umami
