@@ -12,13 +12,9 @@ import (
     "github.com/spf13/cobra"
 )
 
-// log is our package-level pointer to the Zap logger.
-var log *zap.Logger
-
-// init: set up the global Zap logger for this package, and attach vaultCmd to the InstallCmd.
+var log *zap.Logger // package-level
 func init() {
-    // Grab the shared logger from pkg/logger.
-    log = logger.GetLogger()
+    log = logger.GetLogger() // One-time assignment
 }
 
 // vaultCmd represents the vault command under the "install" group.
