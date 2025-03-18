@@ -10,7 +10,7 @@ import (
 )
 
 // vaultDeleteCmd represents the "delete vault" command.
-var vaultDeleteCmd = &cobra.Command{
+var deleteVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Deletes the Vault installation",
 	Long:  `Removes the Vault snap package and optionally cleans up its configuration, data, and logs.`,
@@ -51,10 +51,4 @@ var vaultDeleteCmd = &cobra.Command{
 
 		fmt.Println("Vault deletion complete.")
 	},
-}
-
-func init() {
-	// Add the vaultDeleteCmd to your parent DeleteCmd.
-	// Make sure DeleteCmd is defined in your cmd/delete package.
-	DeleteCmd.AddCommand(vaultDeleteCmd)
 }
