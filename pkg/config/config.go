@@ -17,6 +17,9 @@ const DockerListener = "/var/ossec/wodles/docker/DockerListener"
 // Umami install dir
 const UmamiDir = "/opt/umami"
 
+// Umami install dir
+const JenkinsDir = "/opt/jenkins"
+
 func InitConfig() {
     Log = logger.GetLogger() // Initialize logger once
 }
