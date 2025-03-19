@@ -2,7 +2,8 @@ services:
   jenkins:
     image: jenkins/jenkins:lts
     ports:
-      - "8059:8080"
+      - "8059:8080"   # For the Jenkins web UI
+      - "9059:50000"  # For inbound agent connections
     restart: always
     volumes:
       - jenkins_home:/var/jenkins_home
