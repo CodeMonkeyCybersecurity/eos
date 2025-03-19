@@ -31,4 +31,5 @@ func init() {
 	InstallCmd.AddCommand(trivyCmd)
 	InstallCmd.AddCommand(vaultCmd)
 	InstallCmd.AddCommand(umamiCmd)
+	InstallCmd.AddCommand(jenkinsCmd)
 }
