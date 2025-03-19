@@ -41,6 +41,7 @@ services:
 
 volumes:
   umami_db_data:
+    name: umami_db_data
 
 networks:
   arachne-net:
