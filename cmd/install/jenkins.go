@@ -120,8 +120,8 @@ var jenkinsCmd = &cobra.Command{
 		outputInitialAdminPassword()
 
 		// Final congratulatory message with instructions
-		log.Info("Umami installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Umami. In line with best practice, change your password immediately.", utils.GetInternalHostname())))
+		log.Info("Jenkins installation complete",
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", utils.GetInternalHostname())))
 
 	},
 }
