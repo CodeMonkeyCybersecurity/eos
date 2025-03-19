@@ -1,13 +1,16 @@
 services:
   jenkins:
     image: jenkins/jenkins:lts
-    name: jenkins
+    container_name: jenkins
     ports:
       - "8059:8080"   # For the Jenkins web UI
       - "9059:50000"  # For inbound agent connections
     restart: always
     volumes:
       - jenkins_home:/var/jenkins_home
+    networks:
+      - arachne-net
+      
   ssh-agent:
     image: jenkins/ssh-agent
     networks:
