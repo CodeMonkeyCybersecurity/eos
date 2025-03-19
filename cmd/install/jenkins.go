@@ -24,7 +24,7 @@ var jenkinsCmd = &cobra.Command{
 - Replacing all instances of "changeme" with a strong random alphanumeric password
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
-- Informing the user to navigate to :8080 and log in with default credentials (admin/<generated_password>), and change the password immediately.`,
+- Informing the user to navigate to :8059 and log in with default credentials (admin/<generated_password>), and change the password immediately.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		log.Info("Starting Jenkins installation using Eos")
@@ -94,6 +94,6 @@ var jenkinsCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Jenkins installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8080 to access Jenkins. Login with username 'admin' and password '%s'. Change your password immediately.", utils.GetInternalHostname(), password)))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. Login with username 'admin' and password '%s'. Change your password immediately.", utils.GetInternalHostname(), password)))
 	},
 }
