@@ -12,7 +12,9 @@ services:
       - arachne-net
       
   ssh-agent:
+    container_name: ssh-agent
     image: jenkins/ssh-agent
+    restart: always
     networks:
       - arachne-net
       
