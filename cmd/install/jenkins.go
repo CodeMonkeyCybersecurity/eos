@@ -121,7 +121,7 @@ var jenkinsCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Umami installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", utils.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Umami. In line with best practice, change your password immediately.", utils.GetInternalHostname())))
 
 	},
 }
