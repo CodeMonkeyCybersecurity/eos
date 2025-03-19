@@ -36,4 +36,5 @@ func init() {
 	DeleteCmd.AddCommand(deleteStorageCmd)
 	DeleteCmd.AddCommand(deleteUmamiCmd)
 	DeleteCmd.AddCommand(deleteVaultCmd)
+	DeleteCmd.AddCommand(deleteJenkinsCmd)
 }
