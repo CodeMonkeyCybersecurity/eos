@@ -178,7 +178,7 @@ func ParseComposeFile(composePath string) (containers []string, images []string,
 // If it does not exist, it creates it with the desired IPv4 and IPv6 subnets.
 func EnsureArachneNetwork() error {
 	networkName := "arachne-net"
-	desiredIPv4 := "172.30.0.0/22"
+	desiredIPv4 := "10.1.0.0/16"
 	desiredIPv6 := "fd42:1a2b:3c4d:5e6f::/64"
 
 	// Check if the network exists by running: docker network inspect arachne-net
