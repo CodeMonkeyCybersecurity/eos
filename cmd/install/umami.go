@@ -55,9 +55,9 @@ var umamiCmd = &cobra.Command{
 			log.Fatal("Failed to read Docker Compose file from assets", zap.Error(err))
 		}
 
-		// Generate a strong random alphanumeric password (16 characters)
+		// Generate a strong random alphanumeric password (20 characters)
 		log.Info("Generating strong random password")
-		password, err := utils.GeneratePassword(16)
+		password, err := utils.GeneratePassword(20)
 		if err != nil {
 			log.Fatal("Failed to generate password", zap.Error(err))
 		}
