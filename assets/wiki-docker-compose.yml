@@ -10,7 +10,7 @@ services:
       driver: "none"
     restart: always
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - wiki_db_data:/var/lib/postgresql/data
     networks:
       - arachne-net
       
@@ -32,7 +32,8 @@ services:
       - arachne-net
       
 volumes:
-  db-data:
+  wiki_db_data:
+    name: wiki_db_data
 
 networks:
   arachne-net: 
