@@ -94,9 +94,9 @@ var jenkinsCmd = &cobra.Command{
 
 		// outputInitialAdminPassword retrieves the initial Jenkins admin password from the running container
 		// and outputs it to the terminal with instructions for the user.
-		func outputInitialAdminPassword() {
+		outputInitialAdminPassword := func() {
 			// Define the Jenkins container name as used in your docker-compose file.
-			containerName := "jenkins-jenkins-1"
+			containerName := "jenkins"
 		
 			// Execute the command to retrieve the initial admin password from the container.
 			cmd := exec.Command("docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
@@ -114,5 +114,8 @@ var jenkinsCmd = &cobra.Command{
 			// Print the instructions along with the password.
 			fmt.Printf("\nUnlock Jenkins:\nTo unlock Jenkins, please copy the following administrator password and paste it into the Jenkins unlock prompt:\n\n%s\n\n", password)
 		}
+		
+		// Call the inline function.
+		outputInitialAdminPassword()
 	},
 }
