@@ -117,6 +117,6 @@ var jenkinsCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Jenkins installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. Login with username 'admin' and password '%s'. Change your password immediately.", utils.GetInternalHostname(), password)))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins.", utils.GetInternalHostname(), password)))
 	},
 }
