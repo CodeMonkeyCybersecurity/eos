@@ -114,9 +114,5 @@ var jenkinsCmd = &cobra.Command{
 			// Print the instructions along with the password.
 			fmt.Printf("\nUnlock Jenkins:\nTo unlock Jenkins, please copy the following administrator password and paste it into the Jenkins unlock prompt:\n\n%s\n\n", password)
 		}
-
-		// Final congratulatory message with instructions
-		log.Info("Jenkins installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins.", utils.GetInternalHostname(), password)))
 	},
 }
