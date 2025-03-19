@@ -29,17 +29,23 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 //
 
 // RemoveVolumes removes the specified Docker volumes.
-func RemoveVolumes(volumes []string) error {
-	for _, volume := range volumes {
-		// Execute the docker volume rm command.
-		if err := Execute("docker", "volume", "rm", volume); err != nil {
-			// Log a warning if removal fails, but continue processing the rest.
-			log.Warn("failed to remove volume", zap.String("volume", volume), zap.Error(err))
-		} else {
-			log.Info("Volume removed successfully", zap.String("volume", volume))
-		}
-	}
-	return nil
+// It accepts a projectName parameter to account for Docker Compose’s volume name prefix.
+func RemoveVolumes(volumes []string, projectName string) error {
+    for _, volume := range volumes {
+        // Determine the actual volume name.
+        // If the volume does not already start with the project name and an underscore, prepend it.
+        actualVolume := volume
+        if projectName != "" && !strings.HasPrefix(volume, projectName+"_") {
+            actualVolume = projectName + "_" + volume
+        }
+        // Execute the docker volume rm command.
+        if err := Execute("docker", "volume", "rm", actualVolume); err != nil {
+            log.Warn("failed to remove volume", zap.String("volume", actualVolume), zap.Error(err))
+        } else {
+            log.Info("Volume removed successfully", zap.String("volume", actualVolume))
+        }
+    }
+    return nil
 }
 
 // StopContainers stops the specified Docker containers.
