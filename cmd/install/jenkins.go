@@ -92,6 +92,29 @@ var jenkinsCmd = &cobra.Command{
 			log.Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 
+		// outputInitialAdminPassword retrieves the initial Jenkins admin password from the running container
+		// and outputs it to the terminal with instructions for the user.
+		func outputInitialAdminPassword() {
+			// Define the Jenkins container name as used in your docker-compose file.
+			containerName := "jenkins-jenkins-1"
+		
+			// Execute the command to retrieve the initial admin password from the container.
+			cmd := exec.Command("docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				log.Warn("Failed to retrieve initial admin password from container", zap.Error(err))
+				fmt.Println("Warning: Could not retrieve the initial admin password. Please check the container logs for more details.")
+				return
+			}
+		
+			// Trim any whitespace from the output.
+			password := strings.TrimSpace(string(output))
+			log.Info("Retrieved initial admin password", zap.String("password", password))
+		
+			// Print the instructions along with the password.
+			fmt.Printf("\nUnlock Jenkins:\nTo unlock Jenkins, please copy the following administrator password and paste it into the Jenkins unlock prompt:\n\n%s\n\n", password)
+		}
+
 		// Final congratulatory message with instructions
 		log.Info("Jenkins installation complete",
 			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. Login with username 'admin' and password '%s'. Change your password immediately.", utils.GetInternalHostname(), password)))
