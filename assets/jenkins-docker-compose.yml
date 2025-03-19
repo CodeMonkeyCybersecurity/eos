@@ -1,6 +1,7 @@
 services:
   jenkins:
     image: jenkins/jenkins:lts
+    name: jenkins
     ports:
       - "8059:8080"   # For the Jenkins web UI
       - "9059:50000"  # For inbound agent connections
