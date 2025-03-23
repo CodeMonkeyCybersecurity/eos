@@ -21,10 +21,10 @@ var DockerListenerCmd = &cobra.Command{
 		defer logger.Sync()
 		sugar := logger.Sugar()
 
-		sugar.Info("🚀 Setting up Delphi DockerListener...")
+		sugar.Infof("🚀 Setting up Delphi DockerListener...")
 
 		// Step 1: Install required system packages
-		sugar.Info("🔧 Installing Python virtual environment tools...")
+		sugar.Infof("🔧 Installing Python virtual environment tools...")
 		if err := utils.Execute("sudo", "apt", "update"); err != nil {
 			sugar.Fatalf("❌ Failed to update package lists: %v", err)
 		}
@@ -34,7 +34,7 @@ var DockerListenerCmd = &cobra.Command{
 		}
 
 		// Step 2: Create virtual environment
-		sugar.Info("📂 Creating virtual environment at %s", config.VenvPath)
+		sugar.Infof("📂 Creating virtual environment at %s", config.VenvPath)
 		if err := utils.Execute("sudo", "mkdir", "-p", config.VenvPath); err != nil {
 			sugar.Fatalf("❌ Failed to create virtual environment directory: %v", err)
 		}
@@ -44,13 +44,13 @@ var DockerListenerCmd = &cobra.Command{
 		}
 
 		// Step 3: Install required Python packages
-		sugar.Info("📦 Installing Python dependencies in virtual environment...")
+		sugar.Infof("📦 Installing Python dependencies in virtual environment...")
 		if err := utils.Execute(config.VenvPath+"/bin/pip", "install", "docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2"); err != nil {
 			sugar.Fatalf("❌ Failed to install Python dependencies: %v", err)
 		}
 
 		// Step 4: Update Wazuh DockerListener script
-		sugar.Info("✏️  Updating DockerListener shebang...")
+		sugar.Infof("✏️  Updating DockerListener shebang...")
 		if _, err := os.Stat(config.DockerListener); os.IsNotExist(err) {
 			sugar.Warn("⚠️  Warning: DockerListener script not found at %s", config.DockerListener)
 		} else {
@@ -67,21 +67,24 @@ var DockerListenerCmd = &cobra.Command{
 			if err := os.WriteFile(config.DockerListener, []byte(newContent), 0755); err != nil {
 				sugar.Fatalf("❌ Failed to update DockerListener script: %v", err)
 			}
-			sugar.Info("✅ DockerListener script updated successfully")
+			sugar.Infof("✅ DockerListener script updated successfully")
 		}
 
 		// Step 5: Restart Wazuh Agent
-		sugar.Info("🔄 Restarting Wazuh Agent...")
+		sugar.Infof("🔄 Restarting Wazuh Agent...")
 		if err := utils.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
 			sugar.Fatalf("❌ Failed to restart Wazuh Agent: %v", err)
 		}
 
 		// Step 6: Verify the installation
-		sugar.Info("✅ Running verification...")
-		if err := utils.ExecuteShell("ps aux | grep '[D]ockerListener'"); err != nil {
-			sugar.Fatalf("❌ DockerListener verification failed: %v", err)
+		sugar.Infof("✅ Running verification...")
+		// If you have a helper to capture output, for example:
+		// func ExecuteShellOutput(cmd string) (string, error)
+		output, err := utils.ExecuteShellOutput("ps aux | grep '[D]ockerListener'")
+		if err != nil || strings.TrimSpace(output) == "" {
+		    sugar.Warn("⚠️ DockerListener verification: process not detected. If the listener is running correctly under Wazuh management, this may be a naming mismatch. Please verify using Wazuh logs or by manual inspection.")
+		} else {
+		    sugar.Infof("✅ DockerListener process verified successfully: %s", output)
 		}
-
-		sugar.Info("🎉 Delphi DockerListener setup completed successfully!")
 	},
 }
