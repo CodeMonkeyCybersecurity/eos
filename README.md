@@ -53,7 +53,8 @@ brew install go
 ```
 
 #### On Windows:
-Go to https://go.dev/dl/
+Go to `https://go.dev/dl/`
+
 Download and run the .msi installer for Windows.
 
 Run the installer
