@@ -1,45 +1,77 @@
 # Eos
-Eos aims to help make ubuntu server administration easier for those of us who weren't born in a bash shell.
+**Eos** aims to help make ubuntu server administration easier for those of us who weren't born in a bash shell.
 
-We use all the tools here on a daily basis. Because of this, you can be assured they are actively used and maintained. You should also be aware, therefore, that because they are being actively updated and adjusted, they should be considered 'current best effort' and not a perfect product.
+We use all the tools here on a daily basis - this means that they're **actively maintained**, but also **constantly evolving**.
 
-# See out knowledge base, [Athena](https://wiki.cybermonkey.net.au), for more on how to use this.
+See our knowledge base, [Athena](https://wiki.cybermonkey.net.au), for more on how to use this.
 
-# Quick deployment
-## Unix-like systems only
-Give yourself admin access
+---
+
+## 🚀 Quick Deployment
+
+### Get admin access 
+
+#### UNIX-like systems, including MacOS):
 ```
-su
+sudo -i  # or 'su' if you prefer
 ```
 
+#### On Windows
+Open PowerShell or Command Prompt as Administrator
+
+
+### Clone the repo and prep Go modules:
 ```
 cd /opt
 git clone https://github.com/CodeMonkeyCybersecurity/eos.git
 cd eos
+go mod tidy
 ```
 
-Install golang on RHEL:
+#### On RHEL:
 ```
 yum update
 yum install golang
-go install golang.org/x/term
 ```
 
-Install golang on Debian-based:
+#### On Debian-based systems:
 ```
 apt update
 apt install golang
-go install golang.org/x/term
 ```
  
+#### On MacOS X:
+Install Homebrew if you haven’t:
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Update and install Go using Homebrew
+```
+brew update
+brew install go
+```
+
+#### On Windows:
+Go to https://go.dev/dl/
+Download and run the .msi installer for Windows.
+
+Run the installer
+
+After install, restart your terminal (PowerShell or CMD)
+
 
 
 # Other links
-See our website: [cybermonkey.net.au](https://cybermonkey.net.au/)
+Website: [cybermonkey.net.au](https://cybermonkey.net.au/)
 
-Our [Facebook](https://www.facebook.com/codemonkeycyber)
+[Facebook](https://www.facebook.com/codemonkeycyber)
 
-Or [X/Twitter](https://x.com/codemonkeycyber)
+[X/Twitter](https://x.com/codemonkeycyber)
+
+[LinkedIn](https://www.linkedin.com/company/codemonkeycyber)
+
+[YouTube](https://www.youtube.com/@CodeMonkeyCybersecurity)
 
 
 # Complaints, compliments, confusion:
