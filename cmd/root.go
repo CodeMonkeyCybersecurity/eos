@@ -14,6 +14,7 @@ import (
 	"eos/cmd/update"
         "eos/cmd/refresh"
         "eos/cmd/install"
+	"eos/cmd/treecat"
 	"eos/pkg/logger"
 	"eos/pkg/utils"
 
@@ -58,6 +59,7 @@ func init() {
 	rootCmd.AddCommand(enable.EnableCmd)
 	rootCmd.AddCommand(secure.SecureCmd)
 	rootCmd.AddCommand(delphi.DelphiCmd)
+	rootCmd.AddCommand(treecatCmd)
 }
 
 // Execute starts the CLI
