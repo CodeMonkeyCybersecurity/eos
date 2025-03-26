@@ -59,7 +59,7 @@ func init() {
 	rootCmd.AddCommand(enable.EnableCmd)
 	rootCmd.AddCommand(secure.SecureCmd)
 	rootCmd.AddCommand(delphi.DelphiCmd)
-	rootCmd.AddCommand(treecatCmd)
+	rootCmd.AddCommand(treecat.TreecatCmd)
 }
 
 // Execute starts the CLI

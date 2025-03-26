@@ -1,6 +1,6 @@
 // cmd/treecat.go
 
-package main
+package treecat
 
 import (
 	"bufio"
@@ -15,10 +15,10 @@ import (
 	"go.uber.org/zap"
 
 	"eos/pkg/config"
-  "eos/pkg/logger"
+	"eos/pkg/logger"
 )
 
-var treecatCmd = &cobra.Command{
+var TreecatCmd = &cobra.Command{
 	Use:   "treecat [path]",
 	Short: "Recursively show directory structure and preview file contents",
 	Args:  cobra.ExactArgs(1),
