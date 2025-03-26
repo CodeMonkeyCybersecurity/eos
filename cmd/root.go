@@ -1,34 +1,30 @@
-/*
-Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
-*/
 package cmd
 
 import (
-	"eos/cmd/create"
-	"eos/cmd/enable"
-	"eos/cmd/secure"
-	"eos/cmd/delete"
-	"eos/cmd/delphi"
-	"eos/cmd/read"
-	"eos/cmd/logs"
-	"eos/cmd/update"
-        "eos/cmd/refresh"
-        "eos/cmd/install"
-	"eos/cmd/treecat"
-	"eos/pkg/logger"
-	"eos/pkg/utils"
-
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+
+	"eos/cmd/create"
+	"eos/cmd/delete"
+	"eos/cmd/deploy"
+	"eos/cmd/inspect"
+	"eos/cmd/install"
+	"eos/cmd/logs"
+	"eos/cmd/read"
+	"eos/cmd/refresh"
+	"eos/cmd/secure"
+	"eos/cmd/update"
+	"eos/pkg/logger"
+	"eos/pkg/utils"
 )
 
 var log *zap.Logger // Global logger instance
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &cobra.Command{
+// RootCmd represents the base command for both eos and hecate commands
+var RootCmd = &cobra.Command{
 	Use:   "eos",
 	Short: "Eos CLI for managing local and remote environments",
 	Long: `Eos is a command-line application for managing processes, users,
@@ -47,19 +43,24 @@ hardware, backups, and more.`,
 	},
 }
 
-// Register all subcommands in the init function
-func init() {
-	rootCmd.AddCommand(create.CreateCmd)
-	rootCmd.AddCommand(read.ReadCmd)
-	rootCmd.AddCommand(update.UpdateCmd)
-	rootCmd.AddCommand(delete.DeleteCmd)
-        rootCmd.AddCommand(install.InstallCmd)
-	rootCmd.AddCommand(refresh.RefreshCmd)
-	rootCmd.AddCommand(logs.LogsCmd)
-	rootCmd.AddCommand(enable.EnableCmd)
-	rootCmd.AddCommand(secure.SecureCmd)
-	rootCmd.AddCommand(delphi.DelphiCmd)
-	rootCmd.AddCommand(treecat.TreecatCmd)
+// Register all subcommands in a unified function
+func RegisterCommands() {
+	commands := []*cobra.Command{
+		create.CreateCmd,
+		read.ReadCmd,
+		update.UpdateCmd,
+		delete.DeleteCmd,
+		install.InstallCmd,
+		refresh.RefreshCmd,
+		logs.LogsCmd,
+		secure.SecureCmd,
+		deploy.DeployCmd,
+		inspect.InspectCmd,
+	}
+
+	for _, cmd := range commands {
+		RootCmd.AddCommand(cmd)
+	}
 }
 
 // Execute starts the CLI
@@ -71,8 +72,11 @@ func Execute() {
 	// Assign the logger instance globally for reuse
 	log = logger.GetLogger()
 
+	// Register commands
+	RegisterCommands()
+
 	// Execute the root command
-	if err := rootCmd.Execute(); err != nil {
+	if err := RootCmd.Execute(); err != nil {
 		log.Error("CLI execution error", zap.Error(err))
 		os.Exit(1)
 	}

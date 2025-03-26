@@ -4,25 +4,26 @@ package utils
 import (
 	"bufio"
 	"context"
-	"crypto/sha256"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
-	"io"
-	"io/ioutil"
 
-	"gopkg.in/yaml.v2"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v2"
 
+	"eos/pkg/config"
 	"eos/pkg/logger"
 )
 
-var log = logger.GetLogger() // Retrieve the globally initialized logger
+var log = logger.L() // Retrieve the globally initialized logger
 
 //
 //---------------------------- CONTAINER FUNCTIONS ---------------------------- //
@@ -30,28 +31,24 @@ var log = logger.GetLogger() // Retrieve the globally initialized logger
 
 // RemoveVolumes removes the specified Docker volumes.
 func RemoveVolumes(volumes []string) error {
-    for _, volume := range volumes {
-        // Execute the docker volume rm command.
-        if err := Execute("docker", "volume", "rm", volume); err != nil {
-            log.Warn("failed to remove volume", zap.String("volume", volume), zap.Error(err))
-        } else {
-            log.Info("Volume removed successfully", zap.String("volume", volume))
-        }
-    }
-    return nil
+	for _, volume := range volumes {
+		// Execute the docker volume rm command.
+		if err := Execute("docker", "volume", "rm", volume); err != nil {
+			log.Warn("failed to remove volume", zap.String("volume", volume), zap.Error(err))
+		} else {
+			log.Info("Volume removed successfully", zap.String("volume", volume))
+		}
+	}
+	return nil
 }
 
 // StopContainers stops the specified Docker containers.
 func StopContainers(containers []string) error {
 	// Build the arguments for "docker stop" command.
 	args := append([]string{"stop"}, containers...)
-	
-	// Execute the command.
 	if err := Execute("docker", args...); err != nil {
 		return fmt.Errorf("failed to stop containers %v: %w", containers, err)
 	}
-	
-	// Log the successful stopping of containers.
 	log.Info("Containers stopped successfully", zap.Any("containers", containers))
 	return nil
 }
@@ -80,7 +77,6 @@ func RemoveImages(images []string) error {
 	return nil
 }
 
-// BackupVolume backs up a single Docker volume by running a temporary Alpine container.
 // It returns the full path to the backup file.
 func BackupVolume(volumeName, backupDir string) (string, error) {
 	timestamp := time.Now().Format("20060102_150405")
@@ -100,8 +96,6 @@ func BackupVolume(volumeName, backupDir string) (string, error) {
 }
 
 // BackupVolumes backs up all provided volumes to the specified backupDir.
-// It returns a map with volume names as keys and their backup file paths as values.
-// If any backup fails, it logs the error but continues processing the remaining volumes.
 func BackupVolumes(volumes []string, backupDir string) (map[string]string, error) {
 	backupResults := make(map[string]string)
 
@@ -110,13 +104,11 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 		return backupResults, fmt.Errorf("failed to create backup directory %s: %w", backupDir, err)
 	}
 
-	// Loop through each volume and back it up.
 	for _, vol := range volumes {
 		log.Info("Backing up volume", zap.String("volume", vol))
 		backupFile, err := BackupVolume(vol, backupDir)
 		if err != nil {
 			log.Error("Error backing up volume", zap.String("volume", vol), zap.Error(err))
-			// Continue processing other volumes even if one fails.
 		} else {
 			log.Info("Volume backup completed", zap.String("volume", vol), zap.String("backupFile", backupFile))
 			backupResults[vol] = backupFile
@@ -125,9 +117,14 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 	return backupResults, nil
 }
 
+// LogCommandExecution logs a command and its arguments using structured logging.
+func LogCommandExecution(cmdName string, args []string) {
+	logger.GetLogger().Info("Command executed", zap.String("command", cmdName), zap.Strings("args", args))
+}
+
 // ComposeFile represents the minimal structure of your docker-compose file.
 type ComposeFile struct {
-	Services map[string]Service `yaml:"services"`
+	Services map[string]Service     `yaml:"services"`
 	Volumes  map[string]interface{} `yaml:"volumes"`
 }
 
@@ -139,7 +136,7 @@ type Service struct {
 
 // ParseComposeFile reads a docker-compose file and returns container names, images, and volumes.
 func ParseComposeFile(composePath string) (containers []string, images []string, volumes []string, err error) {
-	data, err := ioutil.ReadFile(composePath)
+	data, err := os.ReadFile(composePath)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to read compose file: %w", err)
 	}
@@ -172,7 +169,6 @@ func ParseComposeFile(composePath string) (containers []string, images []string,
 
 	return containers, images, volumes, nil
 }
-
 
 // EnsureArachneNetwork checks if the Docker network "arachne-net" exists.
 // If it does not exist, it creates it with the desired IPv4 and IPv6 subnets.
@@ -292,7 +288,6 @@ func GeneratePassword(length int) (string, error) {
 	return hex.EncodeToString(bytes)[:length], nil
 }
 
-
 //
 //---------------------------- LOGGING ---------------------------- //
 //
@@ -353,7 +348,6 @@ func GetInternalHostname() string {
 	return hostname
 }
 
-
 //
 //---------------------------- ERROR HANDLING ---------------------------- //
 //
@@ -376,7 +370,6 @@ func WithErrorHandling(fn func() error) {
 	}
 }
 
-
 //
 //---------------------------- PERMISSIONS ---------------------------- //
 //
@@ -394,11 +387,9 @@ func CheckSudo() bool {
 	return true
 }
 
-
 //
 //---------------------------- YAML ---------------------------- //
 //
-
 
 // Recursive function to process and print nested YAML structures
 func ProcessMap(data map[string]interface{}, indent string) {
@@ -422,4 +413,260 @@ func ProcessMap(data map[string]interface{}, indent string) {
 		}
 	}
 	log.Debug("Completed processing YAML map")
+}
+
+// Convenience logging wrappers that call logger.GetLogger()
+func Info(msg string, fields ...zap.Field)  { logger.GetLogger().Info(msg, fields...) }
+func Warn(msg string, fields ...zap.Field)  { logger.GetLogger().Warn(msg, fields...) }
+func Error(msg string, fields ...zap.Field) { logger.GetLogger().Error(msg, fields...) }
+func Debug(msg string, fields ...zap.Field) { logger.GetLogger().Debug(msg, fields...) }
+func Fatal(msg string, fields ...zap.Field) { logger.GetLogger().Fatal(msg, fields...) }
+func Panic(msg string, fields ...zap.Field) { logger.GetLogger().Panic(msg, fields...) }
+func SyncLogger() error                     { return logger.Sync() }
+
+//
+//---------------------------- FILE COMMANDS ---------------------------- //
+//
+
+// CopyFile copies a file from src to dst.
+func CopyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open src file: %w", err)
+	}
+	defer srcFile.Close()
+
+	srcInfo, err := srcFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat src file: %w", err)
+	}
+
+	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
+	if err != nil {
+		return fmt.Errorf("failed to create dst file: %w", err)
+	}
+	defer dstFile.Close()
+
+	if _, err := io.Copy(dstFile, srcFile); err != nil {
+		return fmt.Errorf("failed to copy contents: %w", err)
+	}
+
+	return nil
+}
+
+// CopyDir recursively copies a directory from src to dst.
+func CopyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat src: %w", err)
+	}
+	if !srcInfo.IsDir() {
+		return fmt.Errorf("source is not a directory: %s", src)
+	}
+
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to create dst dir: %w", err)
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := CopyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := CopyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// RemoveIfExists deletes the given path if it exists.
+func RemoveIfExists(path string) error {
+	if _, err := os.Stat(path); err == nil {
+		return os.RemoveAll(path)
+	} else if os.IsNotExist(err) {
+		return nil // Nothing to do
+	} else {
+		return fmt.Errorf("failed to check path %s: %w", path, err)
+	}
+}
+
+// DeployApp deploys the application by copying necessary config files and restarting services
+func DeployApp(app string, force bool) error {
+	log.Info("🚀 Starting deployment", zap.String("app", app), zap.Bool("force", force))
+
+	if err := ValidateConfigPaths(app); err != nil {
+		return fmt.Errorf("failed to validate config paths: %w", err)
+	}
+
+	// Test Nginx configuration
+	cmdTest := exec.Command("nginx", "-t")
+	if output, err := cmdTest.CombinedOutput(); err != nil {
+		log.Error("❌ Nginx config test failed", zap.String("output", string(output)), zap.Error(err))
+		return fmt.Errorf("nginx config test failed: %s", string(output))
+	}
+
+	// Restart Nginx
+	cmdRestart := exec.Command("systemctl", "restart", "nginx")
+	if err := cmdRestart.Run(); err != nil {
+		log.Error("❌ Failed to restart Nginx", zap.Error(err))
+		return fmt.Errorf("failed to restart nginx: %w", err)
+	}
+
+	log.Info("✅ Deployment successful", zap.String("app", app))
+	return nil
+}
+
+//
+//---------------------------- FACT CHECKING ---------------------------- //
+//
+
+// ✅ Moved here since it may be used in multiple commands
+func IsValidApp(app string) bool {
+	for _, validApp := range config.GetSupportedAppNames() {
+		if app == validApp {
+			return true
+		}
+	}
+	return false
+}
+
+func OrganizeAssetsForDeployment(app string) error {
+	assetsDir := "assets"
+	otherDir := "other" // "other" is at the project root
+
+	// Ensure the "other" directory exists.
+	if err := os.MkdirAll(otherDir, 0755); err != nil {
+		return fmt.Errorf("failed to create 'other' directory: %w", err)
+	}
+	log.Info("OrganizeAssetsForDeployment: 'other' directory verified", zap.String("other_Dir", otherDir))
+
+	// Define the generic allowed filenames (lowercase).
+	allowedGenerics := map[string]bool{
+		"http.conf":   true,
+		"stream.conf": true,
+		"nginx.conf":  true,
+	}
+
+	// Walk the assets directory.
+	err := filepath.Walk(assetsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Error("Error accessing path", zap.String("path", path), zap.Error(err))
+			return err
+		}
+
+		// Skip directories.
+		if info.IsDir() {
+			log.Debug("Skipping directory", zap.String("dir", path))
+			return nil
+		}
+
+		// Compute the file's relative path from assetsDir.
+		relPath, err := filepath.Rel(assetsDir, path)
+		if err != nil {
+			log.Error("Failed to compute relative path", zap.String("path", path), zap.Error(err))
+			return err
+		}
+		log.Debug("Processing file", zap.String("relativePath", relPath))
+
+		// Get the base filename in lowercase.
+		base := strings.ToLower(filepath.Base(path))
+		log.Debug("Base filename", zap.String("base", base))
+
+		// Check if the file is relevant.
+		if allowedGenerics[base] || strings.Contains(base, strings.ToLower(app)) {
+			log.Debug("File is relevant; leaving it in assets", zap.String("file", path))
+			return nil
+		}
+
+		// File is not relevant; log that it will be moved.
+		dest := filepath.Join(otherDir, relPath)
+		log.Debug("File not relevant; preparing to move", zap.String("file", path), zap.String("destination", dest))
+
+		// Ensure the destination directory exists.
+		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+			log.Error("Failed to create destination directory", zap.String("destDir", filepath.Dir(dest)), zap.Error(err))
+			return fmt.Errorf("failed to create destination directory %s: %w", filepath.Dir(dest), err)
+		}
+
+		// Move (rename) the file.
+		if err := os.Rename(path, dest); err != nil {
+			log.Error("Failed to move file to 'other'", zap.String("from", path), zap.String("to", dest), zap.Error(err))
+			return fmt.Errorf("failed to move file %s to %s: %w", path, dest, err)
+		}
+
+		log.Info("Moved unused asset file to 'other'", zap.String("from", path), zap.String("to", dest))
+		return nil
+	})
+	if err != nil {
+		log.Error("Error during asset organization", zap.Error(err))
+	}
+	return err
+}
+
+func ReplaceTokensInAllFiles(rootDir, baseDomain, backendIP string) error {
+	return filepath.WalkDir(rootDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		// Read the file
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %w", path, err)
+		}
+		content := string(data)
+		// Replace tokens
+		content = strings.ReplaceAll(content, "${BASE_DOMAIN}", baseDomain)
+		content = strings.ReplaceAll(content, "${backendIP}", backendIP)
+		content = strings.ReplaceAll(content, "${BACKEND_IP}", backendIP)
+		// Write the file back with the same permissions
+		info, err := os.Stat(path)
+		if err != nil {
+			return fmt.Errorf("failed to stat file %s: %w", path, err)
+		}
+		if err := os.WriteFile(path, []byte(content), info.Mode()); err != nil {
+			return fmt.Errorf("failed to write file %s: %w", path, err)
+		}
+		return nil
+	})
+}
+
+//
+//---------------------------- DEPLOY HELPERS ---------------------------- //
+//
+
+// quote adds quotes around a string for cleaner logging
+func quote(s string) string {
+	return fmt.Sprintf("%q", s)
+}
+
+// ValidateConfigPaths checks that the app’s Nginx source config files exist
+func ValidateConfigPaths(app string) error {
+
+	httpSrc := filepath.Join("assets/servers", app+".conf")
+
+	if _, err := os.Stat(httpSrc); err != nil {
+		if os.IsNotExist(err) {
+			log.Error("❌ Required config file not found", zap.String("file", httpSrc))
+			return fmt.Errorf("missing HTTP config: %s", httpSrc)
+		}
+		return fmt.Errorf("error checking config file: %w", err)
+	}
+
+	// Stream config is optional — no error if missing
+	return nil
 }

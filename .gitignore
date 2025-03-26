@@ -37,7 +37,6 @@ go.work.sum
 *.ini
 *.venv
 
-
 # MacOS
 .DS_Store
 desktop.ini
@@ -56,8 +55,6 @@ apps/umami/umami*
 apps/wazuh/wazuh-docker*
 apps/erpNext/frappe_docker*
 apps/mattermost/docker*
-
-
 
 # Logs and output
 *.log

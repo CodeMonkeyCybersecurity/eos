@@ -5,15 +5,12 @@ package install
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-  	"eos/pkg/utils"
 	"eos/pkg/config"
-	"eos/pkg/logger"
+	"eos/pkg/utils"
 
-	"go.uber.org/zap"
 	"github.com/spf13/cobra"
-
+	"go.uber.org/zap"
 )
 
 var log *zap.Logger
@@ -51,8 +48,6 @@ func installZabbix() error {
 	if err := os.MkdirAll(config.ZabbixDir, 0755); err != nil {
 		return fmt.Errorf("failed to create %s: %w", config.ZabbixDir, err)
 	}
-
-
 
 	// Start the stack
 	log.Info("Running docker compose up...")

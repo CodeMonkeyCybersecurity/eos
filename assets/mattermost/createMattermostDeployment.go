@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
 )
 
 func main() {

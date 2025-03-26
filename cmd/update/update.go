@@ -1,6 +1,7 @@
 // cmd/update/update.go
 /*
-Copyright © 2024 Henry Oliver henry@cybermonkey.net.au
+Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
+
 */
 package update
 

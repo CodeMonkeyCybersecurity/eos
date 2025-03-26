@@ -1,3 +1,5 @@
+// eos/assets/hera/createCerts.go
+
 package main
 
 import (
@@ -13,7 +15,8 @@ import (
 	"time"
 )
 
-func main() {
+// GenerateSelfSignedCerts generates a self-signed TLS cert + key into the given directory.
+func GenerateSelfSignedCerts(certsDir string) error
 	// Create the "certs" directory if it doesn't exist.
 	certsDir := "certs"
 	if err := os.MkdirAll(certsDir, 0755); err != nil {
