@@ -1,3 +1,5 @@
+// cmd/install/zabbix.go
+
 package install
 
 import (
@@ -5,11 +7,16 @@ import (
 	"os"
 	"path/filepath"
 
-  "eos/pkg/utils"
+  	"eos/pkg/utils"
+	"eos/pkg/config"
+	"eos/pkg/logger"
 
+	"go.uber.org/zap"
 	"github.com/spf13/cobra"
 
 )
+
+var log = config.Log
 
 var installZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
@@ -29,11 +36,6 @@ var installZabbixCmd = &cobra.Command{
 }
 
 func installZabbix() error {
-	const (
-		zabbixDir       = "/opt/zabbix"
-		composeURL      = "https://raw.githubusercontent.com/CodeMonkeyCybersecurity/assets/main/zabbix/docker-compose.yml" // replace with real URL
-		composeFilePath = "/opt/zabbix/docker-compose.yml"
-	)
 
 	// Ensure Docker is installed
 	if err := utils.CheckIfDockerInstalled(); err != nil {
@@ -46,19 +48,15 @@ func installZabbix() error {
 	}
 
 	// Create target directory
-	if err := os.MkdirAll(zabbixDir, 0755); err != nil {
-		return fmt.Errorf("failed to create %s: %w", zabbixDir, err)
+	if err := os.MkdirAll(config.ZabbixDir, 0755); err != nil {
+		return fmt.Errorf("failed to create %s: %w", config.ZabbixDir, err)
 	}
 
-	// Download docker-compose.yml
-	log.Info("Downloading docker-compose.yml for Zabbix...")
-	if err := utils.DownloadFile(composeFilePath, composeURL); err != nil {
-		return fmt.Errorf("failed to download docker-compose.yml: %w", err)
-	}
+
 
 	// Start the stack
 	log.Info("Running docker compose up...")
-	if err := utils.RunCommand("docker", "compose", "-f", composeFilePath, "up", "-d"); err != nil {
+	if err := utils.RunCommand("docker", "compose", "-f", config.ZabbixComposeYML, "up", "-d"); err != nil {
 		return fmt.Errorf("failed to run docker compose: %w", err)
 	}
 
