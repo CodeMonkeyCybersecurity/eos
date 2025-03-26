@@ -20,6 +20,10 @@ const UmamiDir = "/opt/umami"
 // Umami install dir
 const JenkinsDir = "/opt/jenkins"
 
+// Treecat
+const maxPreviewSize = 5 * 1024       // 5KB max preview
+const maxPreviewLines = 100           // 100 lines max
+
 func InitConfig() {
     Log = logger.GetLogger() // Initialize logger once
 }
