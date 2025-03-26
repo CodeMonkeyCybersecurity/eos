@@ -5,11 +5,13 @@ services:
     environment:
       MYSQL_DATABASE: zabbix
       MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix_pass
+      MYSQL_PASSWORD: changeme
       MYSQL_ROOT_PASSWORD: root_pass
     volumes:
       - zabbix-db:/var/lib/mysql
     restart: always
+    networks:
+      - arachne-net
 
   zabbix-server:
     image: zabbix/zabbix-server-mysql:alpine-6.4-latest
@@ -17,12 +19,14 @@ services:
     environment:
       DB_SERVER_HOST: mysql-server
       MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix_pass
+      MYSQL_PASSWORD: changeme
     depends_on:
       - mysql-server
     ports:
-      - "10051:10051"
+      - "8233:10051"
     restart: always
+    networks:
+      - arachne-net
 
   zabbix-web:
     image: zabbix/zabbix-web-nginx-mysql:alpine-6.4-latest
@@ -30,15 +34,17 @@ services:
     environment:
       DB_SERVER_HOST: mysql-server
       MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix_pass
+      MYSQL_PASSWORD: changeme
       ZBX_SERVER_HOST: zabbix-server
-      PHP_TZ: Australia/Sydney
+      PHP_TZ: Australia/Perth
     ports:
-      - "8080:8080"
+      - "8237:8080"
     depends_on:
       - mysql-server
       - zabbix-server
     restart: always
+    networks:
+      - arachne-net
 
   zabbix-agent:
     image: zabbix/zabbix-agent:alpine-6.4-latest
@@ -47,6 +53,12 @@ services:
       ZBX_HOSTNAME: zabbix-agent
       ZBX_SERVER_HOST: zabbix-server
     restart: always
+    networks:
+      - arachne-net
 
 volumes:
   zabbix-db:
+
+networks:
+  arachne-net:
+    external: true
