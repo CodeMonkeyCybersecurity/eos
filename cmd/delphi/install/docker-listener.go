@@ -75,16 +75,5 @@ var DockerListenerCmd = &cobra.Command{
 		if err := utils.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
 			sugar.Fatalf("❌ Failed to restart Wazuh Agent: %v", err)
 		}
-
-		// Step 6: Verify the installation
-		sugar.Infof("✅ Running verification...")
-		// If you have a helper to capture output, for example:
-		// func ExecuteShellOutput(cmd string) (string, error)
-		output, err := utils.ExecuteShellOutput("ps aux | grep '[D]ockerListener'")
-		if err != nil || strings.TrimSpace(output) == "" {
-		    sugar.Warn("⚠️ DockerListener verification: process not detected. If the listener is running correctly under Wazuh management, this may be a naming mismatch. Please verify using Wazuh logs or by manual inspection.")
-		} else {
-		    sugar.Infof("✅ DockerListener process verified successfully: %s", output)
-		}
 	},
 }
