@@ -16,7 +16,7 @@ import (
 
 )
 
-var log = config.Log
+var log *zap.Logger
 
 var installZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
