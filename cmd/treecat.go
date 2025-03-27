@@ -1,6 +1,6 @@
 // cmd/treecat.go
 
-package treecat
+package cmd
 
 import (
 	"bufio"

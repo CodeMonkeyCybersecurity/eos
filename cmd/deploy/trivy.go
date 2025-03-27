@@ -1,5 +1,5 @@
 // cmd/install/trivy.go
-package install
+package deploy
 
 import (
 	"fmt"

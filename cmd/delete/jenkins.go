@@ -3,10 +3,10 @@ package delete
 
 import (
 	"eos/pkg/config"
-	"eos/pkg/utils"
+	"eos/pkg/docker"
 
-	"go.uber.org/zap"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // deleteJenkinsCmd represents the command to delete Jenkins.
@@ -23,14 +23,14 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 		composePath := config.JenkinsDir + "/jenkins-docker-compose.yml"
 
 		// Parse the compose file to retrieve container names, images, and volumes.
-		containers, images, volumes, err := utils.ParseComposeFile(composePath)
+		containers, images, volumes, err := docker.ParseComposeFile(composePath)
 		if err != nil {
 			log.Fatal("Error parsing docker-compose file", zap.Error(err))
 		}
 
 		// Backup all volumes defined in the compose file.
 		backupDir := "/srv/container-volume-backups"
-		backupResults, err := utils.BackupVolumes(volumes, backupDir)
+		backupResults, err := docker.BackupVolumes(volumes, backupDir)
 		if err != nil {
 			log.Error("Error backing up volumes", zap.Error(err))
 		} else {
@@ -39,7 +39,7 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 
 		// Stop all containers defined in the compose file.
 		log.Info("Stopping containers defined in docker-compose", zap.Any("containers", containers))
-		if err := utils.StopContainers(containers); err != nil {
+		if err := docker.StopContainers(containers); err != nil {
 			log.Error("Error stopping containers", zap.Error(err))
 		} else {
 			log.Info("Containers stopped successfully")
@@ -47,19 +47,19 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 
 		// Remove containers.
 		log.Info("Removing containers defined in docker-compose", zap.Any("containers", containers))
-		if err := utils.RemoveContainers(containers); err != nil {
+		if err := docker.RemoveContainers(containers); err != nil {
 			log.Error("Error removing containers", zap.Error(err))
 		}
 
 		// Remove images.
 		log.Info("Removing images defined in docker-compose", zap.Any("images", images))
-		if err := utils.RemoveImages(images); err != nil {
+		if err := docker.RemoveImages(images); err != nil {
 			log.Error("Error removing images", zap.Error(err))
 		}
 
 		// Now remove the volumes after backup.
 		log.Info("Removing volumes defined in docker-compose", zap.Any("volumes", volumes))
-		if err := utils.RemoveVolumes(volumes); err != nil {
+		if err := docker.RemoveVolumes(volumes); err != nil {
 			log.Error("Error removing volumes", zap.Error(err))
 		} else {
 			log.Info("Volumes removed successfully")

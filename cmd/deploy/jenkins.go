@@ -1,5 +1,5 @@
-// cmd/install/jenkins.go
-package install
+// cmd/deploy/jenkins.go
+package deploy
 
 import (
 	"fmt"
@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"eos/pkg/config"
+	"eos/pkg/docker"
+	"eos/pkg/execute"
 	"eos/pkg/utils"
 
-	"go.uber.org/zap"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // jenkinsCmd represents the Jenkins installation command.
@@ -72,7 +74,7 @@ var jenkinsCmd = &cobra.Command{
 		log.Info("Docker Compose file processed and copied successfully")
 
 		// Check if arachne-net docker network exists, creating it if not
-		if err := utils.EnsureArachneNetwork(); err != nil {
+		if err := docker.EnsureArachneNetwork(); err != nil {
 			log.Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
 		} else {
 			log.Info("Successfully ensured 'arachne-net' exists")
@@ -80,7 +82,7 @@ var jenkinsCmd = &cobra.Command{
 
 		// Deploy Jenkins with Docker Compose using the processed file
 		log.Info("Deploying Jenkins with Docker Compose", zap.String("directory", config.JenkinsDir))
-		if err := utils.ExecuteInDir(config.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+		if err := execute.ExecuteInDir(config.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
@@ -89,7 +91,7 @@ var jenkinsCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		// Execute "docker ps" to list running containers
-		if err := utils.CheckDockerContainers(); err != nil {
+		if err := docker.CheckDockerContainers(); err != nil {
 			log.Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 
@@ -98,7 +100,7 @@ var jenkinsCmd = &cobra.Command{
 		outputInitialAdminPassword := func() {
 			// Define the Jenkins container name as used in your docker-compose file.
 			containerName := "jenkins"
-		
+
 			// Execute the command to retrieve the initial admin password from the container.
 			cmd := exec.Command("docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
 			output, err := cmd.CombinedOutput()
@@ -107,15 +109,15 @@ var jenkinsCmd = &cobra.Command{
 				fmt.Println("Warning: Could not retrieve the initial admin password. Please check the container logs for more details.")
 				return
 			}
-		
+
 			// Trim any whitespace from the output.
 			password := strings.TrimSpace(string(output))
 			log.Info("Retrieved initial admin password", zap.String("password", password))
-		
+
 			// Print the instructions along with the password.
 			fmt.Printf("\nUnlock Jenkins:\nTo unlock Jenkins, please copy the following administrator password and paste it into the Jenkins unlock prompt:\n\n%s\n\n", password)
 		}
-		
+
 		// Call the inline function.
 		outputInitialAdminPassword()
 

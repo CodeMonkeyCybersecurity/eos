@@ -1,14 +1,15 @@
-// cmd/delphi/install/docker-listener.go
-package install
+// cmd/delphi/deploy/docker-listener.go
+package deploy
 
 import (
 	"os"
 	"strings"
 
+	"eos/pkg/config"
+	"eos/pkg/execute"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-	"eos/pkg/utils"
-	"eos/pkg/config"
 )
 
 // delphiListenerCmd represents the "eos delphi install docker-listener" command
@@ -25,27 +26,27 @@ var DockerListenerCmd = &cobra.Command{
 
 		// Step 1: Install required system packages
 		sugar.Infof("🔧 Installing Python virtual environment tools...")
-		if err := utils.Execute("sudo", "apt", "update"); err != nil {
+		if err := execute.Execute("sudo", "apt", "update"); err != nil {
 			sugar.Fatalf("❌ Failed to update package lists: %v", err)
 		}
 
-		if err := utils.Execute("sudo", "apt", "install", "-y", "python3-venv", "python3-pip"); err != nil {
+		if err := execute.Execute("sudo", "apt", "install", "-y", "python3-venv", "python3-pip"); err != nil {
 			sugar.Fatalf("❌ Failed to install required Python packages: %v", err)
 		}
 
 		// Step 2: Create virtual environment
 		sugar.Infof("📂 Creating virtual environment at %s", config.VenvPath)
-		if err := utils.Execute("sudo", "mkdir", "-p", config.VenvPath); err != nil {
+		if err := execute.Execute("sudo", "mkdir", "-p", config.VenvPath); err != nil {
 			sugar.Fatalf("❌ Failed to create virtual environment directory: %v", err)
 		}
 
-		if err := utils.Execute("sudo", "python3", "-m", "venv", config.VenvPath); err != nil {
+		if err := execute.Execute("sudo", "python3", "-m", "venv", config.VenvPath); err != nil {
 			sugar.Fatalf("❌ Failed to create virtual environment: %v", err)
 		}
 
 		// Step 3: Install required Python packages
 		sugar.Infof("📦 Installing Python dependencies in virtual environment...")
-		if err := utils.Execute(config.VenvPath+"/bin/pip", "install", "docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2"); err != nil {
+		if err := execute.Execute(config.VenvPath+"/bin/pip", "install", "docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2"); err != nil {
 			sugar.Fatalf("❌ Failed to install Python dependencies: %v", err)
 		}
 
@@ -56,7 +57,7 @@ var DockerListenerCmd = &cobra.Command{
 		} else {
 			// Backup the original script
 			backupPath := config.DockerListener + ".bak"
-			utils.Execute("sudo", "cp", config.DockerListener, backupPath)
+			execute.Execute("sudo", "cp", config.DockerListener, backupPath)
 
 			// Modify shebang
 			shebang := "#!" + config.VenvPath + "/bin/python3\n"
@@ -72,7 +73,7 @@ var DockerListenerCmd = &cobra.Command{
 
 		// Step 5: Restart Wazuh Agent
 		sugar.Infof("🔄 Restarting Wazuh Agent...")
-		if err := utils.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
+		if err := execute.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
 			sugar.Fatalf("❌ Failed to restart Wazuh Agent: %v", err)
 		}
 	},

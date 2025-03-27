@@ -1,27 +1,23 @@
-// cmd/install/zabbix.go
-
-package install
+package deploy
 
 import (
 	"fmt"
 	"os"
 
 	"eos/pkg/config"
-	"eos/pkg/utils"
+	"eos/pkg/docker"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-var log *zap.Logger
-
-var installZabbixCmd = &cobra.Command{
+var zabbixCmd = &cobra.Command{
 	Use:   "zabbix",
-	Short: "Install Zabbix monitoring stack using Docker Compose",
+	Short: "Deploy Zabbix monitoring stack using Docker Compose",
 	Run: func(cmd *cobra.Command, args []string) {
 		log.Info("Starting Zabbix installation...")
 
-		if err := installZabbix(); err != nil {
+		if err := deployZabbix(); err != nil {
 			log.Error("Zabbix installation failed", zap.Error(err))
 			fmt.Println("Zabbix installation failed:", err)
 			os.Exit(1)
@@ -32,15 +28,15 @@ var installZabbixCmd = &cobra.Command{
 	},
 }
 
-func installZabbix() error {
+func deployZabbix() error {
 
 	// Ensure Docker is installed
-	if err := utils.CheckIfDockerInstalled(); err != nil {
+	if err := docker.CheckIfDockerInstalled(); err != nil {
 		return fmt.Errorf("docker check failed: %w", err)
 	}
 
 	// Ensure Docker Compose is installed
-	if err := utils.CheckIfDockerComposeInstalled(); err != nil {
+	if err := docker.CheckIfDockerComposeInstalled(); err != nil {
 		return fmt.Errorf("docker-compose check failed: %w", err)
 	}
 
@@ -51,13 +47,9 @@ func installZabbix() error {
 
 	// Start the stack
 	log.Info("Running docker compose up...")
-	if err := utils.RunCommand("docker", "compose", "-f", config.ZabbixComposeYML, "up", "-d"); err != nil {
+	if err := docker.RunCommand("docker", "compose", "-f", config.ZabbixComposeYML, "up", "-d"); err != nil {
 		return fmt.Errorf("failed to run docker compose: %w", err)
 	}
 
 	return nil
-}
-
-func init() {
-	installCmd.AddCommand(installZabbixCmd)
 }

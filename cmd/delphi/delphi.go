@@ -2,8 +2,9 @@
 package delphi
 
 import (
+	"eos/cmd/delphi/deploy"
+
 	"github.com/spf13/cobra"
-	"eos/cmd/delphi/install"
 )
 
 // DelphiCmd is the root command for Delphi-related actions
@@ -15,5 +16,5 @@ var DelphiCmd = &cobra.Command{
 
 func init() {
 	// Register subcommands
-	DelphiCmd.AddCommand(install.InstallCmd)
+	DelphiCmd.AddCommand(deploy.DeployCmd)
 }

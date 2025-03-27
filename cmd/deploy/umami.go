@@ -1,5 +1,5 @@
 // cmd/install/umami.go
-package install
+package deploy
 
 import (
 	"fmt"
@@ -9,10 +9,12 @@ import (
 	"time"
 
 	"eos/pkg/config"
+	"eos/pkg/docker"
+	"eos/pkg/execute"
 	"eos/pkg/utils"
 
-	"go.uber.org/zap"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // umamiCmd represents the Umami installation command.
@@ -74,16 +76,16 @@ var umamiCmd = &cobra.Command{
 
 		// Check if arache-net docker network already exists, create if not
 		// Check if arachne-net docker network exists, creating it if not
-		if err := utils.EnsureArachneNetwork(); err != nil {
-		    log.Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
+		if err := docker.EnsureArachneNetwork(); err != nil {
+			log.Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
 		} else {
-		    log.Info("Successfully ensured 'arachne-net' exists")
+			log.Info("Successfully ensured 'arachne-net' exists")
 		}
-		
+
 		// Deploy Umami with Docker Compose using the processed file
 		log.Info("Deploying Umami with Docker Compose",
 			zap.String("directory", config.UmamiDir))
-		if err := utils.ExecuteInDir(config.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+		if err := execute.ExecuteInDir(config.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
@@ -92,7 +94,7 @@ var umamiCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		// Execute "docker ps" to list running containers
-		if err := utils.CheckDockerContainers(); err != nil {
+		if err := docker.CheckDockerContainers(); err != nil {
 			log.Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 
