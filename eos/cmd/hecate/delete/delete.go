@@ -1,3 +1,5 @@
+// cmd/hecate/delete/delete.go
+
 package delete
 
 import (

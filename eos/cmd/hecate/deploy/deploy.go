@@ -1,4 +1,4 @@
-// cmd/deploy/deploy.go
+// cmd/hecate/deploy/deploy.go
 
 package deploy
 

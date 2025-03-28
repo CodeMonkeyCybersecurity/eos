@@ -6,8 +6,6 @@ import (
 	"eos/pkg/config"
 	"fmt"
 	"os/exec"
-
-	"go.uber.org/zap"
 )
 
 //
@@ -21,7 +19,7 @@ func EnsureArachneNetwork() error {
 	ipv6 := config.DockerIPv6Subnet
 
 	if err := CheckIfDockerInstalled(); err != nil {
-		return fmt.Errorf("Docker is not installed or not in PATH: %w", err)
+		return fmt.Errorf("docker is not installed or not in PATH: %w", err)
 	}
 
 	if networkName == "" || ipv4 == "" || ipv6 == "" {
@@ -31,7 +29,6 @@ func EnsureArachneNetwork() error {
 	// Check if the network exists
 	cmd := exec.Command("docker", "network", "inspect", networkName)
 	if err := cmd.Run(); err == nil {
-		log.Info("Docker network already exists", zap.String("network", networkName))
 		return nil
 	}
 
@@ -46,10 +43,8 @@ func EnsureArachneNetwork() error {
 
 	output, err := createCmd.CombinedOutput()
 	if err != nil {
-		log.Error("Failed to create Docker network", zap.String("network", networkName), zap.Error(err), zap.String("output", string(output)))
 		return fmt.Errorf("failed to create network %s: %v, output: %s", networkName, err, output)
 	}
 
-	log.Info("Created Docker network", zap.String("network", networkName))
 	return nil
 }

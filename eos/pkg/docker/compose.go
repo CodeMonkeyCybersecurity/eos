@@ -9,8 +9,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-
-	"go.uber.org/zap"
 )
 
 // UncommentSegment finds the marker (e.g. "uncomment if using Jenkins behind Hecate")
@@ -80,12 +78,11 @@ func UncommentSegment(segmentComment string) error {
 //
 
 // RunDockerComposeService starts a specific service from a docker-compose file
-func RunDockerComposeAllServices() error {
-	dockerComposePath := "docker-compose.yml" // Always use this file.
-	log.Info("Starting all Docker services", zap.String("composeFile", dockerComposePath))
+// RunDockerComposeAllServices starts a specific service from a docker-compose file.
+func RunDockerComposeAllServices(composeFile, service string) error {
 
 	// Build arguments for the compose command.
-	args := []string{"-f", dockerComposePath, "up", "-d"}
+	args := []string{"-f", composeFile, "up", "-d"}
 	cmd, err := GetDockerComposeCmd(args...)
 	if err != nil {
 		return err
@@ -95,11 +92,9 @@ func RunDockerComposeAllServices() error {
 	fmt.Println(string(output)) // Print logs to console
 
 	if err != nil {
-		log.Error("Failed to start Docker services", zap.Error(err), zap.String("output", string(output)))
 		return fmt.Errorf("docker-compose up failed: %s", output)
 	}
 
-	log.Info("All Docker services started successfully")
 	return nil
 }
 
@@ -109,17 +104,14 @@ func RunDockerComposeAllServices() error {
 func GetDockerComposeCmd(args ...string) (*exec.Cmd, error) {
 	// Check for the old docker-compose binary.
 	if _, err := exec.LookPath("docker-compose"); err == nil {
-		log.Info("Using legacy docker-compose binary")
 		return exec.Command("docker-compose", args...), nil
 	}
 	// Fallback to "docker compose" (as two separate tokens).
 	if _, err := exec.LookPath("docker"); err == nil {
-		log.Info("Using docker CLI with compose plugin")
 		// Prepend "compose" as the first argument.
 		newArgs := append([]string{"compose"}, args...)
 		return exec.Command("docker", newArgs...), nil
 	}
-	log.Error("Neither docker-compose binary nor docker compose plugin found in PATH")
 	return nil, fmt.Errorf("neither docker-compose nor docker CLI with compose plugin found in PATH")
 }
 
