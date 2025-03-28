@@ -3,6 +3,7 @@
 package utils
 
 import (
+	"bufio"
 	"fmt"
 	"io/fs"
 	"os"
@@ -153,10 +154,15 @@ func ValidateConfigPaths(app string) error {
 	return nil
 }
 
-func splitLines(s string) []string {
-	return strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+func SplitLines(s string) []string {
+	scanner := bufio.NewScanner(strings.NewReader(s))
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	return lines
 }
 
-func joinLines(lines []string) string {
+func JoinLines(lines []string) string {
 	return strings.Join(lines, "\n")
 }

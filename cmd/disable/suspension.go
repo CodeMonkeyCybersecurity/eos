@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -18,6 +20,12 @@ var disableSuspensionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 		log.Info("Disabling system suspension and hibernation...")
+
+		if runtime.GOOS != "linux" {
+			log.Warn("System suspension disabling is only supported on Linux.")
+			fmt.Println("❌ This command is not supported on your operating system.")
+			return
+		}
 
 		if err := disableSystemdTargets(); err != nil {
 			log.Error("Failed to disable suspend/hibernate targets", zap.Error(err))
@@ -77,8 +85,8 @@ func disableLogindSleep() error {
 	logindPath := "/etc/systemd/logind.conf"
 
 	patches := map[string]string{
-		"HandleSuspendKey": "ignore",
-		"HandleLidSwitch":  "ignore",
+		"HandleSuspendKey":      "ignore",
+		"HandleLidSwitch":       "ignore",
 		"HandleLidSwitchDocked": "ignore",
 	}
 
@@ -103,7 +111,7 @@ func disableLogindSleep() error {
 func replaceOrAppend(content, key, newLine string) string {
 	lines := []string{}
 	found := false
-	for _, line := range splitLines(content) {
+	for _, line := range utils.SplitLines(content) {
 		if startsWithKey(line, key) {
 			lines = append(lines, newLine)
 			found = true
@@ -114,17 +122,9 @@ func replaceOrAppend(content, key, newLine string) string {
 	if !found {
 		lines = append(lines, newLine)
 	}
-	return joinLines(lines)
+	return utils.JoinLines(lines)
 }
 
 func startsWithKey(line, key string) bool {
 	return len(line) >= len(key) && line[:len(key)] == key
-}
-
-func splitLines(s string) []string {
-	return []string{}
-}
-
-func joinLines(lines []string) string {
-	return ""
 }
