@@ -58,7 +58,3 @@ func deployHera() error {
 
 	return nil
 }
-
-func init() {
-	deployCmd.AddCommand(heraCmd)
-}

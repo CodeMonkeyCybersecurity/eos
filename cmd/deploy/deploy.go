@@ -30,4 +30,5 @@ func init() {
 	DeployCmd.AddCommand(umamiCmd)
 	DeployCmd.AddCommand(jenkinsCmd)
 	DeployCmd.AddCommand(zabbixCmd)
+	DeployCmd.AddCommand(heraCmd)
 }
