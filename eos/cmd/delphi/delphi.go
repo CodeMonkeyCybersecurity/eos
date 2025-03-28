@@ -1,22 +1,31 @@
 // cmd/delphi/delphi.go
+
 package delphi
 
 import (
+	"eos/cmd/delphi/create"
 	"eos/cmd/delphi/deploy"
 	"eos/cmd/delphi/inspect"
 
 	"github.com/spf13/cobra"
 )
 
-// DelphiCmd is the root command for Delphi-related actions
+// DelphiCmd groups commands related to managing Delphi (Wazuh) components.
 var DelphiCmd = &cobra.Command{
 	Use:   "delphi",
 	Short: "Manage Delphi (Wazuh) components",
-	Long:  "Commands related to Wazuh and Delphi integrations such as install, remove, inspect.",
+	Long:  "Commands related to Wazuh and Delphi integrations such as install, remove, and inspect.",
+	// Optionally, you can define a Run function to display help if no subcommand is provided.
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+	},
 }
 
 func init() {
 	// Register subcommands
+	DelphiCmd.AddCommand(create.CreateCmd)
 	DelphiCmd.AddCommand(deploy.DeployCmd)
 	DelphiCmd.AddCommand(inspect.InspectCmd)
+
+	// TODO: Example persistent flags: DelphiCmd.PersistentFlags().String("config", "", "Path to the Delphi configuration file")
 }
