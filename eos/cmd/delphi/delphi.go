@@ -3,6 +3,7 @@ package delphi
 
 import (
 	"eos/cmd/delphi/deploy"
+	"eos/cmd/delphi/inspect"
 
 	"github.com/spf13/cobra"
 )
@@ -17,4 +18,5 @@ var DelphiCmd = &cobra.Command{
 func init() {
 	// Register subcommands
 	DelphiCmd.AddCommand(deploy.DeployCmd)
+	DelphiCmd.AddCommand(inspect.InspectCmd)
 }

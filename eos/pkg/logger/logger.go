@@ -2,13 +2,16 @@
 package logger
 
 import (
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
-var Log *zap.Logger
+var log *zap.Logger
 
 // DefaultConfig returns a standard zap.Config object with custom settings.
 func DefaultConfig() zap.Config {
@@ -62,7 +65,7 @@ func EnsureLogPermissions(logFilePath string) error {
 
 // InitializeWithConfig initializes the logger with a given config.
 func InitializeWithConfig(cfg zap.Config) {
-	if Log != nil {
+	if log != nil {
 		return
 	}
 
@@ -76,16 +79,16 @@ func InitializeWithConfig(cfg zap.Config) {
 	}
 
 	var err error
-	Log, err = cfg.Build()
+	log, err = cfg.Build()
 	if err != nil {
 		cfg.OutputPaths = []string{"stdout"}
-		Log, err = cfg.Build()
+		log, err = cfg.Build()
 		if err != nil {
 			panic("Failed to initialize logger with fallback config: " + err.Error())
 		}
 	}
-	zap.ReplaceGlobals(Log)
-	Log.Info("Logger successfully initialized", zap.String("log_level", cfg.Level.String()))
+	zap.ReplaceGlobals(log)
+	log.Info("Logger successfully initialized", zap.String("log_level", cfg.Level.String()))
 }
 
 // Initialize initializes the logger with the default configuration.
@@ -95,10 +98,10 @@ func Initialize() {
 
 // GetLogger returns the global logger instance.
 func GetLogger() *zap.Logger {
-	if Log == nil {
+	if log == nil {
 		Initialize()
 	}
-	return Log
+	return log
 }
 
 // Info logs an informational message.
@@ -133,18 +136,76 @@ func Panic(msg string, fields ...zap.Field) {
 
 // Sync flushes any buffered log entries and safely ignores stdout sync errors.
 func Sync() error {
-	if Log == nil {
+	if log == nil {
 		Initialize() // Ensure logger is initialized
 	}
-	if Log != nil {
-		if err := Log.Sync(); err != nil {
+	if log != nil {
+		if err := log.Sync(); err != nil {
 			if _, ok := err.(*os.PathError); !ok && err.Error() != "sync /dev/stdout: invalid argument" {
-				Log.Error("Failed to sync logger", zap.Error(err))
+				log.Error("Failed to sync logger", zap.Error(err))
 			}
 			return err
 		}
 	}
 	return nil
+}
+
+// ResolveLogPath determines the best default log file path based on the OS.
+func ResolveLogPath() string {
+	paths := []string{
+		"/var/log/cyberMonkey/eos.log",                                       // Linux/Unix standard
+		filepath.Join(os.Getenv("HOME"), "Library/Logs/cyberMonkey/eos.log"), // macOS
+		"./eos.log", // fallback for restricted environments
+	}
+
+	for _, path := range paths {
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			continue
+		}
+		// Try writing a test file
+		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		if err == nil {
+			file.Close()
+			return path
+		}
+	}
+
+	return "" // Let caller handle this (e.g., main.go exits)
+}
+
+// InitializeWithFallback sets up the Zap logger and returns any error encountered.
+func InitializeWithFallback(logPath string) error {
+	if logPath == "" {
+		return errors.New("no writable log path found")
+	}
+
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	core := zapcore.NewTee(
+		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(cfg), getLogFileWriter(logPath), zap.InfoLevel),
+	)
+
+	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))
+	zap.ReplaceGlobals(log)
+
+	return nil
+}
+
+// getLogFileWriter creates a zapcore.WriteSyncer for the log file.
+func getLogFileWriter(logPath string) zapcore.WriteSyncer {
+	if err := EnsureLogPermissions(logPath); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️ Could not prepare log file %s: %v\n", logPath, err)
+		return zapcore.AddSync(os.Stdout)
+	}
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️ Could not open log file %s: %v\n", logPath, err)
+		return zapcore.AddSync(os.Stdout)
+	}
+	return zapcore.AddSync(file)
 }
 
 // L returns the globally configured logger instance.

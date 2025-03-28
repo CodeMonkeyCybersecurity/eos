@@ -4,9 +4,9 @@ package create
 import (
 	"crypto/tls"
 	"encoding/json"
+	"eos/cmd/delphi"
+	"eos/cmd/delphi/create"
 	"eos/pkg/config"
-	"eos/pkg/delphi"
-	"eos/pkg/delphi/create"
 	"eos/pkg/logger"
 	"eos/pkg/utils"
 	"fmt"

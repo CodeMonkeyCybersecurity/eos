@@ -9,7 +9,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// umamiDeleteCmd represents the command to delete Umami.
 var deleteUmamiCmd = &cobra.Command{
 	Use:   "umami",
 	Short: "Delete and clean up Umami",
@@ -20,10 +19,14 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.
 		log.Info("Starting Umami deletion process using Eos")
 
 		// Define the path to the docker-compose file used during installation.
-		composePath := config.UmamiDir + "/umami-docker-compose.yml"
+		composePath := config.UmamiComposeYML
 
 		// Parse the compose file to retrieve container names, images, and volumes.
-		containers, images, volumes, err := docker.ParseComposeFile(composePath)
+		data, err := docker.ParseComposeFile(composePath)
+		if err != nil {
+			log.Fatal("Error parsing docker-compose file", zap.Error(err))
+		}
+		containers, images, volumes := docker.ExtractComposeMetadata(data)
 		if err != nil {
 			log.Fatal("Error parsing docker-compose file", zap.Error(err))
 		}

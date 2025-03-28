@@ -2,7 +2,8 @@
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 
 */
-//cmd//delete/delete.go
+
+// cmd/delete/delete.go
 package delete
 
 import (

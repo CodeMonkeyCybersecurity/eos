@@ -140,14 +140,21 @@ func FindDockerComposeFile() (string, error) {
 
 // ParseComposeFile attempts to read and parse the docker-compose file.
 // It returns the file contents as a byte slice.
-func ParseComposeFile() ([]byte, error) {
-	composeFile, err := FindDockerComposeFile()
+func ParseComposeFile(composePath string) ([]byte, error) {
+	data, err := os.ReadFile(composePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find docker-compose file: %w", err)
-	}
-	data, err := os.ReadFile(composeFile)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read docker-compose file: %w", err)
+		return nil, fmt.Errorf("failed to read %s: %w", composePath, err)
 	}
 	return data, nil
+}
+
+// ExtractComposeMetadata is a stub function that simulates parsing docker-compose metadata.
+// You can replace this with real YAML parsing later.
+func ExtractComposeMetadata(data []byte) ([]string, []string, []string) {
+	// Example dummy data for testing
+	containers := []string{"app", "db"}
+	images := []string{"ghcr.io/example/app", "postgres:15-alpine"}
+	volumes := []string{"app_data", "db_data"}
+
+	return containers, images, volumes
 }

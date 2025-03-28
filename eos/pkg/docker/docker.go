@@ -11,7 +11,7 @@ import (
 
 var log = logger.L()
 
-func runDockerAction(action string, args ...string) error {
+func RunDockerAction(action string, args ...string) error {
 	fullArgs := append([]string{action}, args...)
 	if err := execute.Execute("docker", fullArgs...); err != nil {
 		log.Warn("Docker action failed", zap.String("action", action), zap.Strings("args", args), zap.Error(err))

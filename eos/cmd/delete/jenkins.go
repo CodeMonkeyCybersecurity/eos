@@ -20,10 +20,14 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 		log.Info("Starting Jenkins deletion process using Eos")
 
 		// Define the path to the docker-compose file used during installation.
-		composePath := config.JenkinsDir + "/jenkins-docker-compose.yml"
+		composePath := config.JenkinsComposeYML
 
 		// Parse the compose file to retrieve container names, images, and volumes.
-		containers, images, volumes, err := docker.ParseComposeFile(composePath)
+		data, err := docker.ParseComposeFile(composePath)
+		if err != nil {
+			log.Fatal("Error parsing docker-compose file", zap.Error(err))
+		}
+		containers, images, volumes := docker.ExtractComposeMetadata(data)
 		if err != nil {
 			log.Fatal("Error parsing docker-compose file", zap.Error(err))
 		}
