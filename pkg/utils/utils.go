@@ -152,3 +152,11 @@ func ValidateConfigPaths(app string) error {
 	// Stream config is optional — no error if missing
 	return nil
 }
+
+func splitLines(s string) []string {
+	return strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+}
+
+func joinLines(lines []string) string {
+	return strings.Join(lines, "\n")
+}
