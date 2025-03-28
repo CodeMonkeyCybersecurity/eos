@@ -1,12 +1,12 @@
 services:
   mysql-server:
-    image: mysql:5.7
+    image: mysql:latest
     container_name: zabbix-mysql
     environment:
       MYSQL_DATABASE: zabbix
       MYSQL_USER: zabbix
       MYSQL_PASSWORD: changeme
-      MYSQL_ROOT_PASSWORD: root_pass
+      MYSQL_ROOT_PASSWORD: changeme1
     volumes:
       - zabbix-db:/var/lib/mysql
     restart: always
