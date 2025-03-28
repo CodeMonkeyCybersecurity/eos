@@ -29,8 +29,8 @@ services:
       AUTHENTIK_POSTGRESQL__PASSWORD: changeme
       AUTHENTIK_REDIS__HOST: redis
     ports:
-      - "9000:9000"  # internal admin and UI
-      - "9443:9443"  # reverse proxy (optional, TLS)
+      - "8243:9000"  # internal admin and UI
+      - "8263:9443"  # reverse proxy (optional, TLS)
     volumes:
       - media:/media
       - custom-templates:/templates
