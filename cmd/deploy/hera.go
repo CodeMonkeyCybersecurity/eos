@@ -5,49 +5,60 @@ package deploy
 import (
 	"fmt"
 	"os"
-	"path/filepath"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
-	"eos/pkg/docker"
-	"eos/pkg/logger"
-	"eos/pkg/utils"
+	"go.uber.org/zap"
 )
 
-var deployHeraCmd = &cobra.Command{
+var heraCmd = &cobra.Command{
 	Use:   "hera",
-	Short: "Deploy Hera (Authentik) for identity and access management",
+	Short: "Deploy Hera (Authentik) for self-service identity & access management",
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
-
 		log.Info("Starting Hera (Authentik) deployment...")
 
-		composeURL := "https://raw.githubusercontent.com/CodeMonkeyCybersecurity/assets/main/hera/docker-compose.yml"
-		composeFile := "/opt/hera/docker-compose.yml"
-
-		// Create target directory
-		if err := os.MkdirAll(filepath.Dir(composeFile), 0755); err != nil {
-			log.Fatal("Failed to create directory for Hera deployment", zap.Error(err))
+		if err := deployHera(); err != nil {
+			log.Error("Hera deployment failed", zap.Error(err))
+			fmt.Println("Hera deployment failed:", err)
+			os.Exit(1)
 		}
 
-		// Download Compose file
-		if err := utils.DownloadFile(composeURL, composeFile); err != nil {
-			log.Fatal("Failed to download Hera Compose file", zap.Error(err))
-		}
-
-		// Validate Docker/Compose
-		if err := docker.CheckIfDockerComposeInstalled(); err != nil {
-			log.Fatal("Docker Compose is not installed", zap.Error(err))
-		}
-
-		// Start Hera
-		if err := docker.ComposeUp(filepath.Dir(composeFile)); err != nil {
-			log.Fatal("Failed to start Hera stack", zap.Error(err))
-		}
-
-		log.Info("✅ Hera has been deployed at https://hera.cybermonkey.net.au 🎉")
+		log.Info("✅ Hera successfully deployed")
+		fmt.Println("Hera available at https://hera.domain.com")
 	},
 }
 
+func deployHera() error {
+	log := logger.GetLogger()
+
+	// Ensure Docker is installed
+	if err := docker.CheckIfDockerInstalled(); err != nil {
+		return fmt.Errorf("docker check failed: %w", err)
+	}
+
+	// Ensure Docker Compose is installed
+	if err := docker.CheckIfDockerComposeInstalled(); err != nil {
+		return fmt.Errorf("docker-compose check failed: %w", err)
+	}
+
+	// Create target directory
+	if err := os.MkdirAll(config.HeraDir, 0755); err != nil {
+		return fmt.Errorf("failed to create %s: %w", config.HeraDir, err)
+	}
+
+	// Run docker compose up
+	log.Info("Running docker compose up...")
+	if err := docker.RunCommand("docker", "compose", "-f", config.HeraComposeYML, "up", "-d"); err != nil {
+		return fmt.Errorf("failed to run docker compose: %w", err)
+	}
+
+	return nil
+}
+
 func init() {
-	deployCmd.AddCommand(deployHeraCmd)
+	deployCmd.AddCommand(heraCmd)
 }
