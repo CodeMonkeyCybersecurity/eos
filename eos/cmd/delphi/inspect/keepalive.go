@@ -4,8 +4,9 @@ package inspect
 
 import (
 	"encoding/json"
-	"eos/pkg/delphi"
 	"fmt"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

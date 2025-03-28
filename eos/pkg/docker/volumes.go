@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
 	"go.uber.org/zap"
 )

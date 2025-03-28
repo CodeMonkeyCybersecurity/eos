@@ -3,9 +3,9 @@
 package delphi
 
 import (
-	"eos/cmd/delphi/create"
-	"eos/cmd/delphi/deploy"
-	"eos/cmd/delphi/inspect"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/deploy"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
 
 	"github.com/spf13/cobra"
 )

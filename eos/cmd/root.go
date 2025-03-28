@@ -10,32 +10,32 @@ import (
 	"go.uber.org/zap"
 
 	// Eos commands
-	"eos/cmd/create"
-	"eos/cmd/delete"
-	"eos/cmd/deploy"
-	"eos/cmd/logs"
-	"eos/cmd/read"
-	"eos/cmd/refresh"
-	"eos/cmd/secure"
-	"eos/cmd/update"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/deploy"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 
 	// Grouping commands
-	"eos/cmd/delphi"
-	"eos/cmd/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 
-	"eos/pkg/logger"
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 var log = logger.L()
 
 var RootCmd = &cobra.Command{
-	Use:   "eos",
-	Short: "Eos CLI for managing local and remote environments and reverse proxy configurations",
+	Use:   "github.com/CodeMonkeyCybersecurity/eos",
+	Short: "github.com/CodeMonkeyCybersecurity/eos CLI for managing local and remote environments and reverse proxy configurations",
 	Long: `Eos is a command-line application for managing processes, users, hardware, backups, 
 and reverse proxy configurations via Hecate.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Info("Eos CLI started successfully.")
+		log.Info("github.com/CodeMonkeyCybersecurity/eos CLI started successfully.")
 		if !utils.CheckSudo() {
 			log.Error("Sudo privileges are required to create a backup.")
 			return

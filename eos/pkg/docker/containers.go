@@ -9,7 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 )
 
 //

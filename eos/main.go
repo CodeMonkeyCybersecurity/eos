@@ -15,10 +15,11 @@ See LICENSE.agpl and LICENSE.dnh for full details.
 package main
 
 import (
-	"eos/cmd"
-	"eos/pkg/logger"
 	"fmt"
 	"os"
+
+	"github.com/CodeMonkeyCybersecurity/eos/cmd"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 func main() {

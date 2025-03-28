@@ -5,14 +5,14 @@ import (
 	"os"
 	"strings"
 
-	"eos/pkg/config"
-	"eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-// delphiListenerCmd represents the "eos delphi install docker-listener" command
+// delphiListenerCmd represents the "github.com/CodeMonkeyCybersecurity/eos delphi install docker-listener" command
 var DockerListenerCmd = &cobra.Command{
 	Use:   "docker-listener",
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",

@@ -3,9 +3,10 @@
 package docker
 
 import (
-	"eos/pkg/config"
 	"fmt"
 	"os/exec"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 )
 
 //

@@ -5,8 +5,8 @@ package docker
 import (
 	"go.uber.org/zap"
 
-	"eos/pkg/execute"
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var log = logger.L()

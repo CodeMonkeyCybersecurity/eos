@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"eos/pkg/config"
-	"eos/pkg/docker"
-	"eos/pkg/execute"
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

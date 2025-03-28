@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"eos/pkg/logger"
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"go.uber.org/zap"
 )

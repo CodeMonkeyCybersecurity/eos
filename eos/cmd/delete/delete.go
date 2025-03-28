@@ -7,7 +7,7 @@ Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 package delete
 
 import (
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
 

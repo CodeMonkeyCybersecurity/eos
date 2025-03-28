@@ -1,4 +1,4 @@
-module eos
+module github.com/CodeMonkeyCybersecurity/eos
 
 go 1.23.0
 

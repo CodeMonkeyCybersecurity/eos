@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ type initResult struct {
 var vaultEnableCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Enables Vault with sane and secure defaults",
-	Long: `This command assumes "eos install vault" has been run.
+	Long: `This command assumes "github.com/CodeMonkeyCybersecurity/eos install vault" has been run.
 It initializes and unseals Vault, sets up auditing, KV v2, 
 AppRole, userpass, and creates an admin user with a random password.`,
 	Run: func(cmd *cobra.Command, args []string) {

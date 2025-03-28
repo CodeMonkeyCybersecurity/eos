@@ -11,10 +11,10 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"eos/pkg/certs"
-	"eos/pkg/config"
-	"eos/pkg/docker"
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/certs"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 // NewDeployJenkinsCmd returns the Jenkins-specific deploy command.

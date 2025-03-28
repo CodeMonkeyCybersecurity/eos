@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var log = logger.L()

@@ -10,7 +10,7 @@ import (
 	"os"
 	"os/exec"
 
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -93,7 +93,7 @@ func generateSSHKeys() error {
 
 // copySSHKeys copies the generated SSH keys to the backup server
 func copySSHKeys() error {
-	cmd := exec.Command("ssh-copy-id", "eos_user@backup")
+	cmd := exec.Command("ssh-copy-id", "github.com/CodeMonkeyCybersecurity/eos_user@backup")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

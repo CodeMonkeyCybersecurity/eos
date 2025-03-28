@@ -3,7 +3,7 @@
 package create
 
 import (
-	"eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

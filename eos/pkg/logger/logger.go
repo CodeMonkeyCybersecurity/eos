@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
-	"eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 )
 
 var log *zap.Logger
@@ -178,8 +178,8 @@ func ResolveLogPath() string {
 		}
 	case "windows":
 		paths = []string{
-			filepath.Join(os.Getenv("ProgramData"), "cyberMonkey", "eos.log"),
-			filepath.Join(os.Getenv("LOCALAPPDATA"), "cyberMonkey", "eos.log"),
+			filepath.Join(os.Getenv("ProgramData"), "cyberMonkey", "github.com/CodeMonkeyCybersecurity/eos.log"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "cyberMonkey", "github.com/CodeMonkeyCybersecurity/eos.log"),
 			"./eos.log",
 		}
 	default:

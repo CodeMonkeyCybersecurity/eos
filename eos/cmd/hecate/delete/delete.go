@@ -121,7 +121,7 @@ func deleteEosConfig() {
 	if err != nil {
 		fmt.Printf("Error deleting Eos configuration directory %s: %v\n", confDir, err)
 	} else {
-		fmt.Printf("Eos backend configuration files deleted (directory '%s' removed).\n", confDir)
+		fmt.Printf("github.com/CodeMonkeyCybersecurity/eos backend configuration files deleted (directory '%s' removed).\n", confDir)
 	}
 }
 

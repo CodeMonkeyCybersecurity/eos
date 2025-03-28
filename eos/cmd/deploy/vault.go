@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"time"
 
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

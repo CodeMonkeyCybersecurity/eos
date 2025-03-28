@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -48,7 +48,7 @@ func runInspectConfig() {
 		utils.InspectCertificates()
 	case "2", "compose", "docker-compose":
 		utils.InspectDockerCompose()
-	case "3", "eos":
+	case "3", "github.com/CodeMonkeyCybersecurity/eos":
 		utils.InspectEosConfig()
 	case "4", "nginx":
 		utils.InspectNginxDefaults()

@@ -3,11 +3,12 @@ package utils
 
 import (
 	"bufio"
-	"eos/pkg/config"
 	"fmt"
 	"os"
 	"strings"
 	"syscall"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 
 	"golang.org/x/term"
 )

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

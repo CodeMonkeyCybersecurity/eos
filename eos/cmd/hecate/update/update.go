@@ -44,7 +44,7 @@ var runCertsCmd = &cobra.Command{
 
 // runEosCmd updates the EOS system
 var runEosCmd = &cobra.Command{
-	Use:   "eos",
+	Use:   "github.com/CodeMonkeyCybersecurity/eos",
 	Short: "Update EOS system",
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Updating EOS system...")

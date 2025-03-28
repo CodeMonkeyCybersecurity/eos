@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"eos/pkg/backup"
-	"eos/pkg/config"
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
 )

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"go.uber.org/zap"
 )

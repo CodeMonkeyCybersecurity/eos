@@ -3,7 +3,7 @@
 package utils
 
 import (
-	"eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 )
 
 //

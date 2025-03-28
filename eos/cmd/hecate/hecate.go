@@ -5,13 +5,13 @@ package hecate
 import (
 	"github.com/spf13/cobra"
 
-	"eos/cmd/hecate/backup"
-	"eos/cmd/hecate/create"
-	"eos/cmd/hecate/delete"
-	"eos/cmd/hecate/deploy"
-	"eos/cmd/hecate/inspect"
-	"eos/cmd/hecate/restore"
-	"eos/cmd/hecate/update"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/create"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/deploy"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/inspect"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/restore"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/update"
 )
 
 // HecateCmd groups reverse proxy–related commands.

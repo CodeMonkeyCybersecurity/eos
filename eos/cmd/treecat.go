@@ -14,8 +14,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"eos/pkg/config"
-	"eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var TreecatCmd = &cobra.Command{
@@ -99,5 +99,5 @@ func init() {
 
 // To hook it up, make sure you do:
 // In cmd/root.go or main.go:
-// import _ "eos/cmd/treecat"
+// import _ "github.com/CodeMonkeyCybersecurity/eos/cmd/treecat"
 // And call treecat.init() or AddCommand(treecatCmd) appropriately

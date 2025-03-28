@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"eos/pkg/config"
-	"eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
