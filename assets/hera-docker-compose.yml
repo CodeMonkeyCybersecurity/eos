@@ -1,23 +1,31 @@
 services:
   postgresql:
     image: postgres:latest
-    restart: unless-stopped
+    container_name: hera-postgresql
+    restart: always
     environment:
       POSTGRES_USER: authentik
-      POSTGRES_PASSWORD: changeme  # change this
+      POSTGRES_PASSWORD: changeme
       POSTGRES_DB: authentik
     volumes:
       - postgresql:/var/lib/postgresql/data
+    network:
+      - arachne-net
 
   redis:
     image: redis:alpine
-    restart: unless-stopped
+    container_name: hera-redis
+    restart: always
     volumes:
       - redis:/data
+    network:
+      - arachne-net
+
 
   authentik-server:
     image: ghcr.io/goauthentik/server:latest
-    restart: unless-stopped
+    container_name: hera-authentik
+    restart: always
     depends_on:
       - postgresql
       - redis
@@ -34,10 +42,14 @@ services:
     volumes:
       - media:/media
       - custom-templates:/templates
+    network:
+      - arachne-net
+
 
   authentik-worker:
     image: ghcr.io/goauthentik/server:latest
-    restart: unless-stopped
+    container_name: hera-authentic-worker
+    restart: always
     depends_on:
       - authentik-server
     environment:
@@ -50,9 +62,15 @@ services:
     volumes:
       - media:/media
       - custom-templates:/templates
+    network:
+      - arachne-net
 
 volumes:
   postgresql:
   redis:
   media:
   custom-templates:
+
+networks:
+  arachne-net:
+    external: true
