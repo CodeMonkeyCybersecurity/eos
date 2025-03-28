@@ -15,7 +15,6 @@ import (
 
 var log *zap.Logger
 
-// DefaultConfig returns a standard zap.Config object with custom settings.
 func DefaultConfig() zap.Config {
 	level := zap.InfoLevel
 	switch os.Getenv("LOG_LEVEL") {
@@ -33,11 +32,18 @@ func DefaultConfig() zap.Config {
 		level = zap.FatalLevel
 	}
 
+	// Use ResolveLogPath to get the appropriate log file path for the OS.
+	logPath := ResolveLogPath()
+	if logPath == "" {
+		// If no candidate path is available, fallback to the current directory.
+		logPath = "./eos.log"
+	}
+
 	return zap.Config{
 		Level:            zap.NewAtomicLevelAt(level),
 		Development:      true,
 		Encoding:         "json",
-		OutputPaths:      []string{"stdout", "/var/log/cyberMonkey/eos.log"},
+		OutputPaths:      []string{"stdout", logPath},
 		ErrorOutputPaths: []string{"stderr"},
 		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
 	}
@@ -161,22 +167,27 @@ func ResolveLogPath() string {
 	case "macos":
 		paths = []string{
 			filepath.Join(os.Getenv("HOME"), "Library/Logs/cyberMonkey/eos.log"),
+			"/tmp/cyberMonkey/eos.log",
 			"./eos.log",
 		}
 	case "linux":
 		paths = []string{
 			"/var/log/cyberMonkey/eos.log",
+			"/tmp/cyberMonkey/eos.log",
+			"./eos.log",
+		}
+	case "windows":
+		paths = []string{
+			filepath.Join(os.Getenv("ProgramData"), "cyberMonkey", "eos.log"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "cyberMonkey", "eos.log"),
 			"./eos.log",
 		}
 	default:
-		paths = []string{
-			"./eos.log",
-		}
+		paths = []string{"./eos.log"}
 	}
 
 	for _, path := range paths {
 		dir := filepath.Dir(path)
-
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			continue
 		}
@@ -187,6 +198,7 @@ func ResolveLogPath() string {
 		}
 	}
 
+	// If we get here, no candidate path worked.
 	return ""
 }
 
