@@ -36,6 +36,7 @@ go.work.sum
 *.env
 *.ini
 *.venv
+*.json
 
 # MacOS
 .DS_Store
