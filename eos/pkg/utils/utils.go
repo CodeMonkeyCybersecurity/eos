@@ -121,12 +121,9 @@ func WithErrorHandling(fn func() error) {
 
 // CheckSudo checks if the current user has sudo privileges
 func CheckSudo() bool {
-	cmd := exec.Command("sudo", "-n", "true") // Non-interactive sudo check
+	cmd := exec.Command("sudo", "-n", "true")
 	err := cmd.Run()
-	if err != nil {
-		return false
-	}
-	return true
+	return err != nil
 }
 
 //
@@ -365,7 +362,7 @@ func ReplaceTokensInAllFiles(rootDir, baseDomain, backendIP string) error {
 //
 
 // quote adds quotes around a string for cleaner logging
-func quote(s string) string {
+func Quote(s string) string {
 	return fmt.Sprintf("%q", s)
 }
 
@@ -383,4 +380,10 @@ func ValidateConfigPaths(app string) error {
 
 	// Stream config is optional — no error if missing
 	return nil
+}
+
+// PathExists returns true if the file or directory at the given path exists.
+func PathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil || !os.IsNotExist(err)
 }

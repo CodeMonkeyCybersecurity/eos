@@ -6,7 +6,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -31,8 +31,8 @@ func GetJSON(url string, headers map[string]string) (map[string]interface{}, err
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Wazuh API returned %d: %s", resp.StatusCode, string(body))
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("delphi API returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result map[string]interface{}

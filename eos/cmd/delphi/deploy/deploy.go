@@ -7,7 +7,7 @@ import (
 )
 
 // InstallCmd is the root command for Delphi installation actions
-var InstallCmd = &cobra.Command{
+var DeployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy Delphi components",
 	Long: `Commands to install Wazuh/Delphi components like docker-listener.

@@ -7,17 +7,16 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 	"syscall"
 
-	"go.uber.org/zap"
 	"golang.org/x/term"
-)
 
-var log *zap.Logger
+	"eos/pkg/config"
+)
 
 const configFile = ".delphi.json"
 
@@ -35,7 +34,7 @@ type Config struct {
 // LoadConfig reads the configuration from .delphi.json.
 func LoadConfig() (Config, error) {
 	var cfg Config
-	data, err := ioutil.ReadFile(configFile)
+	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return cfg, err
 	}
@@ -49,7 +48,7 @@ func SaveConfig(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(configFile, data, 0644)
+	return os.WriteFile(configFile, data, 0644)
 }
 
 // ConfirmConfig displays the current configuration and allows the user to update values.
@@ -69,13 +68,13 @@ func ConfirmConfig(cfg Config) Config {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("Configuration updated.\n")
+		fmt.Println("Configuration updated.")
 	}
 	return cfg
 }
 
 // Authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
-func Authenticate(cfg Config) (string, error) {
+func Authenticate(cfg config.DelphiConfig) (string, error) {
 	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -94,7 +93,7 @@ func Authenticate(cfg Config) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
