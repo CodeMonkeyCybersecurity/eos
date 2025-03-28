@@ -25,7 +25,7 @@ go.work.sum
 *.pem
 *.key
 *.gpg
-*vault
+*.vault
 *.asc
 
 # data
