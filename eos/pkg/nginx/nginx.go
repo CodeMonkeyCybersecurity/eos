@@ -50,7 +50,7 @@ func DeployApp(app string, cmd *cobra.Command) error {
 		noTalk, _ := cmd.Flags().GetBool("without-talk")
 		if !noTalk {
 			logger.Info("Deploying Coturn for NextCloud Talk")
-			if err := docker.RunComposeService(config.DefaultComposeYML, "coturn"); err != nil {
+			if err := docker.RunDockerComposeAllServices(config.DefaultComposeYML, "coturn"); err != nil {
 				return fmt.Errorf("failed to deploy Coturn: %w", err)
 			}
 		} else {

@@ -3,232 +3,17 @@
 package utils
 
 import (
-	"bufio"
-	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
-
-	"eos/pkg/config"
 )
 
 //
-//---------------------------- CRYPTO, HASHING, SECRETS ---------------------------- //
+//---------------------------- DEPLOY COMMANDS ---------------------------- //
 //
-
-// HashString computes and returns the SHA256 hash of the provided string.
-func HashString(s string) string {
-	hash := sha256.Sum256([]byte(s))
-	hashStr := hex.EncodeToString(hash[:])
-	return hashStr
-}
-
-// generatePassword creates a random alphanumeric password of the given length.
-func GeneratePassword(length int) (string, error) {
-	// Generate random bytes. Since hex encoding doubles the length, we need length/2 bytes.
-	bytes := make([]byte, length/2)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-	// Encode to hex and trim to required length.
-	return hex.EncodeToString(bytes)[:length], nil
-}
-
-//
-//---------------------------- LOGGING ---------------------------- //
-//
-
-// monitorVaultLogs tails the log file and prints new lines to STDOUT.
-// It returns when it sees a line containing the specified marker or when the context is done.
-func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
-	file, err := os.Open(logFilePath)
-	if err != nil {
-		return fmt.Errorf("failed to open log file for monitoring: %w", err)
-	}
-	defer file.Close()
-
-	// Seek to the end of the file so we only see new log lines.
-	_, err = file.Seek(0, io.SeekEnd)
-	if err != nil {
-		return fmt.Errorf("failed to seek log file: %w", err)
-	}
-
-	scanner := bufio.NewScanner(file)
-	for {
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("timeout reached while waiting for Vault to start")
-		default:
-			if scanner.Scan() {
-				line := scanner.Text()
-				fmt.Println(line) // Print the log line to terminal
-				if strings.Contains(line, marker) {
-					return nil
-				}
-			} else {
-				time.Sleep(500 * time.Millisecond) // No new line, wait and try again
-			}
-		}
-	}
-}
-
-//
-//---------------------------- HOSTNAME ---------------------------- //
-//
-
-// GetInternalHostname returns the machine's hostname.
-// If os.Hostname() fails, it logs the error and returns "localhost".
-func GetInternalHostname() string {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return "localhost"
-	}
-	return hostname
-}
-
-//
-//---------------------------- ERROR HANDLING ---------------------------- //
-//
-
-// HandleError logs an error and optionally exits the program
-func HandleError(err error, message string, exit bool) {
-	if err != nil {
-		if exit {
-		}
-	}
-}
-
-// WithErrorHandling wraps a function with error handling
-func WithErrorHandling(fn func() error) {
-	err := fn()
-	if err != nil {
-		HandleError(err, "An error occurred", true)
-	}
-}
-
-//
-//---------------------------- PERMISSIONS ---------------------------- //
-//
-
-// CheckSudo checks if the current user has sudo privileges
-func CheckSudo() bool {
-	cmd := exec.Command("sudo", "-n", "true")
-	err := cmd.Run()
-	return err != nil
-}
-
-//
-//---------------------------- YAML ---------------------------- //
-//
-
-// Recursive function to process and print nested YAML structures
-func ProcessMap(data map[string]interface{}, indent string) {
-	for key, value := range data {
-		switch v := value.(type) {
-		case map[string]interface{}:
-			fmt.Printf("%s%s:\n", indent, key)
-			ProcessMap(v, indent+"  ")
-		case []interface{}:
-			fmt.Printf("%s%s:\n", indent, key)
-			for _, item := range v {
-				if itemMap, ok := item.(map[string]interface{}); ok {
-					ProcessMap(itemMap, indent+"  ")
-				} else {
-					fmt.Printf("%s  - %v\n", indent, item)
-				}
-			}
-		default:
-			fmt.Printf("%s%s: %v\n", indent, key, v)
-		}
-	}
-}
-
-//
-//---------------------------- FILE COMMANDS ---------------------------- //
-//
-
-// CopyFile copies a file from src to dst.
-func CopyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("failed to open src file: %w", err)
-	}
-	defer srcFile.Close()
-
-	srcInfo, err := srcFile.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to stat src file: %w", err)
-	}
-
-	dstFile, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, srcInfo.Mode())
-	if err != nil {
-		return fmt.Errorf("failed to create dst file: %w", err)
-	}
-	defer dstFile.Close()
-
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("failed to copy contents: %w", err)
-	}
-
-	return nil
-}
-
-// CopyDir recursively copies a directory from src to dst.
-func CopyDir(src, dst string) error {
-	srcInfo, err := os.Stat(src)
-	if err != nil {
-		return fmt.Errorf("failed to stat src: %w", err)
-	}
-	if !srcInfo.IsDir() {
-		return fmt.Errorf("source is not a directory: %s", src)
-	}
-
-	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
-		return fmt.Errorf("failed to create dst dir: %w", err)
-	}
-
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return fmt.Errorf("failed to read dir: %w", err)
-	}
-
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
-
-		if entry.IsDir() {
-			if err := CopyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := CopyFile(srcPath, dstPath); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-// RemoveIfExists deletes the given path if it exists.
-func RemoveIfExists(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return os.RemoveAll(path)
-	} else if os.IsNotExist(err) {
-		return nil // Nothing to do
-	} else {
-		return fmt.Errorf("failed to check path %s: %w", path, err)
-	}
-}
 
 // DeployApp deploys the application by copying necessary config files and restarting services
 func DeployApp(app string, force bool) error {
@@ -250,20 +35,6 @@ func DeployApp(app string, force bool) error {
 	}
 
 	return nil
-}
-
-//
-//---------------------------- FACT CHECKING ---------------------------- //
-//
-
-// ✅ Moved here since it may be used in multiple commands
-func IsValidApp(app string) bool {
-	for _, validApp := range config.GetSupportedAppNames() {
-		if app == validApp {
-			return true
-		}
-	}
-	return false
 }
 
 func OrganizeAssetsForDeployment(app string) error {
@@ -380,10 +151,4 @@ func ValidateConfigPaths(app string) error {
 
 	// Stream config is optional — no error if missing
 	return nil
-}
-
-// PathExists returns true if the file or directory at the given path exists.
-func PathExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil || !os.IsNotExist(err)
 }
