@@ -4,11 +4,8 @@ package delphi
 
 import (
 	"bufio"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"strings"
 	"syscall"
@@ -19,7 +16,7 @@ import (
 const configFile = ".delphi.json"
 
 // Config represents the configuration stored in .delphi.json.
-type Config struct {
+type DelphiConfig struct {
 	Protocol           string `json:"protocol"`
 	FQDN               string `json:"FQDN"`
 	Port               string `json:"port"`
@@ -31,8 +28,8 @@ type Config struct {
 }
 
 // LoadConfig reads the configuration from .delphi.json.
-func LoadConfig() (Config, error) {
-	var cfg Config
+func LoadConfig() (DelphiConfig, error) {
+	var cfg DelphiConfig
 	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return cfg, err
@@ -42,7 +39,7 @@ func LoadConfig() (Config, error) {
 }
 
 // SaveConfig writes the configuration back to .delphi.json.
-func SaveConfig(cfg Config) error {
+func SaveConfig(cfg DelphiConfig) error {
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
 		return err
@@ -51,7 +48,7 @@ func SaveConfig(cfg Config) error {
 }
 
 // ConfirmConfig displays the current configuration and allows the user to update values.
-func ConfirmConfig(cfg Config) Config {
+func ConfirmConfig(cfg DelphiConfig) DelphiConfig {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
 	fmt.Printf("  API_User:      %s\n", cfg.API_User)
@@ -70,40 +67,6 @@ func ConfirmConfig(cfg Config) Config {
 		fmt.Println("Configuration updated.")
 	}
 	return cfg
-}
-
-// Authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
-func Authenticate(cfg Config) (string, error) {
-	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
-	req, err := http.NewRequest("POST", url, nil)
-	if err != nil {
-		return "", err
-	}
-	req.SetBasicAuth(cfg.API_User, cfg.API_Password)
-
-	// Create an HTTP client that skips certificate verification.
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
-	}
-
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	token := strings.TrimSpace(string(body))
-	if token == "" {
-		return "", fmt.Errorf("no token received")
-	}
-	return token, nil
 }
 
 // promptInput displays a prompt and reads user input.

@@ -13,7 +13,7 @@ import (
 	"golang.org/x/term"
 )
 
-func promptInput(prompt, defaultVal string) string {
+func PromptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
 	if defaultVal != "" {
 		fmt.Printf("%s [%s]: ", prompt, defaultVal)
@@ -28,7 +28,7 @@ func promptInput(prompt, defaultVal string) string {
 	return input
 }
 
-func promptPassword(prompt, defaultVal string) string {
+func PromptPassword(prompt, defaultVal string) string {
 	if defaultVal != "" {
 		fmt.Printf("%s [%s]: ", prompt, "********")
 	} else {
@@ -60,15 +60,15 @@ func ConfirmDelphiConfig(cfg config.DelphiConfig) config.DelphiConfig {
 	}
 	fmt.Printf("  LatestVersion: %s\n", cfg.LatestVersion)
 
-	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
+	answer := strings.ToLower(PromptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
-		cfg.Protocol = promptInput("  Protocol", cfg.Protocol)
-		cfg.FQDN = promptInput("  FQDN", cfg.FQDN)
-		cfg.Port = promptInput("  Port", cfg.Port)
-		cfg.API_User = promptInput("  API_User", cfg.API_User)
-		cfg.API_Password = promptPassword("  API_Password", cfg.API_Password)
-		cfg.LatestVersion = promptInput("  LatestVersion", cfg.LatestVersion)
+		cfg.Protocol = PromptInput("  Protocol", cfg.Protocol)
+		cfg.FQDN = PromptInput("  FQDN", cfg.FQDN)
+		cfg.Port = PromptInput("  Port", cfg.Port)
+		cfg.API_User = PromptInput("  API_User", cfg.API_User)
+		cfg.API_Password = PromptPassword("  API_Password", cfg.API_Password)
+		cfg.LatestVersion = PromptInput("  LatestVersion", cfg.LatestVersion)
 
 		if err := config.SaveDelphiConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
@@ -77,4 +77,15 @@ func ConfirmDelphiConfig(cfg config.DelphiConfig) config.DelphiConfig {
 		fmt.Println("Configuration updated.")
 	}
 	return cfg
+}
+
+func ReadLine() string {
+	reader := bufio.NewReader(os.Stdin)
+	text, _ := reader.ReadString('\n')
+	return strings.TrimSpace(text)
+}
+
+func YesOrNo() bool {
+	text := ReadLine()
+	return strings.ToLower(text) == "y" || strings.ToLower(text) == "yes"
 }
