@@ -30,12 +30,12 @@ import (
 var log = logger.L()
 
 var RootCmd = &cobra.Command{
-	Use:   "github.com/CodeMonkeyCybersecurity/eos",
-	Short: "github.com/CodeMonkeyCybersecurity/eos CLI for managing local and remote environments and reverse proxy configurations",
+	Use:   "eos",
+	Short: "eos CLI for managing local and remote environments and reverse proxy configurations",
 	Long: `Eos is a command-line application for managing processes, users, hardware, backups, 
 and reverse proxy configurations via Hecate.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Info("github.com/CodeMonkeyCybersecurity/eos CLI started successfully.")
+		log.Info("eos CLI started successfully.")
 		if !utils.CheckSudo() {
 			log.Error("Sudo privileges are required to create a backup.")
 			return
