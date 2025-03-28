@@ -14,21 +14,20 @@ import (
 	"syscall"
 
 	"golang.org/x/term"
-
-	"eos/pkg/config"
 )
 
 const configFile = ".delphi.json"
 
 // Config represents the configuration stored in .delphi.json.
 type Config struct {
-	Protocol     string `json:"protocol"`
-	FQDN         string `json:"FQDN"`
-	Port         string `json:"port"`
-	API_User     string `json:"API_User"`
-	API_Password string `json:"API_Password"`
-	Endpoint     string `json:"endpoint"`
-	Token        string `json:"TOKEN,omitempty"`
+	Protocol           string `json:"protocol"`
+	FQDN               string `json:"FQDN"`
+	Port               string `json:"port"`
+	API_User           string `json:"API_User"`
+	API_Password       string `json:"API_Password"`
+	Endpoint           string `json:"endpoint"`
+	Token              string `json:"TOKEN,omitempty"`
+	VerifyCertificates bool   `json:"verify_certificates"`
 }
 
 // LoadConfig reads the configuration from .delphi.json.
@@ -74,7 +73,7 @@ func ConfirmConfig(cfg Config) Config {
 }
 
 // Authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
-func Authenticate(cfg config.DelphiConfig) (string, error) {
+func Authenticate(cfg Config) (string, error) {
 	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -84,13 +83,15 @@ func Authenticate(cfg config.DelphiConfig) (string, error) {
 
 	// Create an HTTP client that skips certificate verification.
 	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
 	}
+
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
+
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
