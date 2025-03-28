@@ -24,9 +24,9 @@ go.work.sum
 # Secrets
 *.pem
 *.key
-**/certs/
 *.gpg
 *vault
+*.asc
 
 # data
 **/data/
@@ -41,9 +41,6 @@ go.work.sum
 # MacOS
 .DS_Store
 desktop.ini
-
-# Matomo
-**/logs/
 
 # Backups 
 *.bak
