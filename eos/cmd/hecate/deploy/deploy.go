@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"eos/cmd/hecate/deploy/jenkins"
 	"eos/pkg/config"
 	"eos/pkg/logger"
 	"eos/pkg/utils"
@@ -64,12 +63,12 @@ func runDeploy(cmd *cobra.Command, args []string) {
 
 func deployApplication(app string) error {
 	if err := utils.DeployApp(app, false); err != nil {
-		return fmt.Errorf("Deployment failed for '%s': %w", app, err)
+		return fmt.Errorf("deployment failed for '%s': %w", app, err)
 	}
 	return nil
 }
 
 func init() {
 	// Register the Jenkins subcommand as a child of DeployCmd.
-	DeployCmd.AddCommand(jenkins.NewDeployJenkinsCmd())
+	DeployCmd.AddCommand(NewDeployJenkinsCmd())
 }

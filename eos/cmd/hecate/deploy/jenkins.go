@@ -1,6 +1,6 @@
 // cmd/heacte/deploy/jenkins.go
 
-package jenkins
+package deploy
 
 import (
 	"fmt"
@@ -14,11 +14,8 @@ import (
 	"eos/pkg/certs"
 	"eos/pkg/config"
 	"eos/pkg/docker"
-	"eos/pkg/logger"
 	"eos/pkg/utils"
 )
-
-var log = logger.L()
 
 // NewDeployJenkinsCmd returns the Jenkins-specific deploy command.
 func NewDeployJenkinsCmd() *cobra.Command {

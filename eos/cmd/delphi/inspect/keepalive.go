@@ -5,14 +5,11 @@ package inspect
 import (
 	"encoding/json"
 	"eos/pkg/delphi"
-	"eos/pkg/logger"
 	"fmt"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
-
-var var log = logger.L()
 
 var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",

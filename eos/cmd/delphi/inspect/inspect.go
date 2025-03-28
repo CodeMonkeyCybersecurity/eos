@@ -4,7 +4,11 @@ package inspect
 
 import (
 	"github.com/spf13/cobra"
+
+	"eos/pkg/logger"
 )
+
+var log = logger.L()
 
 var InspectCmd = &cobra.Command{
 	Use:   "inspect",
