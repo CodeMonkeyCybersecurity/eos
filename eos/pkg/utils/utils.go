@@ -17,13 +17,8 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-
 	"eos/pkg/config"
-	"eos/pkg/logger"
 )
-
-var log = logger.L()
 
 //
 //---------------------------- CRYPTO, HASHING, SECRETS ---------------------------- //
@@ -31,10 +26,8 @@ var log = logger.L()
 
 // HashString computes and returns the SHA256 hash of the provided string.
 func HashString(s string) string {
-	log.Debug("Computing SHA256 hash", zap.String("input", s))
 	hash := sha256.Sum256([]byte(s))
 	hashStr := hex.EncodeToString(hash[:])
-	log.Debug("Computed SHA256 hash", zap.String("hash", hashStr))
 	return hashStr
 }
 
@@ -59,7 +52,6 @@ func GeneratePassword(length int) (string, error) {
 func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	file, err := os.Open(logFilePath)
 	if err != nil {
-		log.Error("Failed to open log file for monitoring", zap.String("logFilePath", logFilePath), zap.Error(err))
 		return fmt.Errorf("failed to open log file for monitoring: %w", err)
 	}
 	defer file.Close()
@@ -67,7 +59,6 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	// Seek to the end of the file so we only see new log lines.
 	_, err = file.Seek(0, io.SeekEnd)
 	if err != nil {
-		log.Error("Failed to seek log file", zap.String("logFilePath", logFilePath), zap.Error(err))
 		return fmt.Errorf("failed to seek log file: %w", err)
 	}
 
@@ -75,15 +66,12 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Warn("Timeout reached while waiting for Vault to start")
 			return fmt.Errorf("timeout reached while waiting for Vault to start")
 		default:
 			if scanner.Scan() {
 				line := scanner.Text()
 				fmt.Println(line) // Print the log line to terminal
-				log.Debug("Vault Log Line", zap.String("logLine", line))
 				if strings.Contains(line, marker) {
-					log.Info("Vault marker found, exiting log monitor", zap.String("marker", marker))
 					return nil
 				}
 			} else {
@@ -100,13 +88,10 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 // GetInternalHostname returns the machine's hostname.
 // If os.Hostname() fails, it logs the error and returns "localhost".
 func GetInternalHostname() string {
-	log.Info("Retrieving internal hostname")
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Error("Unable to retrieve hostname, defaulting to localhost", zap.Error(err))
 		return "localhost"
 	}
-	log.Info("Retrieved hostname", zap.String("hostname", hostname))
 	return hostname
 }
 
@@ -117,9 +102,7 @@ func GetInternalHostname() string {
 // HandleError logs an error and optionally exits the program
 func HandleError(err error, message string, exit bool) {
 	if err != nil {
-		log.Error(message, zap.Error(err))
 		if exit {
-			log.Fatal("Exiting program due to error", zap.String("message", message))
 		}
 	}
 }
@@ -138,14 +121,11 @@ func WithErrorHandling(fn func() error) {
 
 // CheckSudo checks if the current user has sudo privileges
 func CheckSudo() bool {
-	log.Info("Checking if user has sudo privileges")
 	cmd := exec.Command("sudo", "-n", "true") // Non-interactive sudo check
 	err := cmd.Run()
 	if err != nil {
-		log.Warn("User does not have sudo privileges", zap.Error(err))
 		return false
 	}
-	log.Info("User has sudo privileges")
 	return true
 }
 
@@ -155,7 +135,6 @@ func CheckSudo() bool {
 
 // Recursive function to process and print nested YAML structures
 func ProcessMap(data map[string]interface{}, indent string) {
-	log.Debug("Processing YAML map")
 	for key, value := range data {
 		switch v := value.(type) {
 		case map[string]interface{}:
@@ -174,17 +153,7 @@ func ProcessMap(data map[string]interface{}, indent string) {
 			fmt.Printf("%s%s: %v\n", indent, key, v)
 		}
 	}
-	log.Debug("Completed processing YAML map")
 }
-
-// Convenience logging wrappers that call logger.GetLogger()
-func Info(msg string, fields ...zap.Field)  { logger.GetLogger().Info(msg, fields...) }
-func Warn(msg string, fields ...zap.Field)  { logger.GetLogger().Warn(msg, fields...) }
-func Error(msg string, fields ...zap.Field) { logger.GetLogger().Error(msg, fields...) }
-func Debug(msg string, fields ...zap.Field) { logger.GetLogger().Debug(msg, fields...) }
-func Fatal(msg string, fields ...zap.Field) { logger.GetLogger().Fatal(msg, fields...) }
-func Panic(msg string, fields ...zap.Field) { logger.GetLogger().Panic(msg, fields...) }
-func SyncLogger() error                     { return logger.Sync() }
 
 //
 //---------------------------- FILE COMMANDS ---------------------------- //
@@ -266,7 +235,6 @@ func RemoveIfExists(path string) error {
 
 // DeployApp deploys the application by copying necessary config files and restarting services
 func DeployApp(app string, force bool) error {
-	log.Info("🚀 Starting deployment", zap.String("app", app), zap.Bool("force", force))
 
 	if err := ValidateConfigPaths(app); err != nil {
 		return fmt.Errorf("failed to validate config paths: %w", err)
@@ -275,18 +243,15 @@ func DeployApp(app string, force bool) error {
 	// Test Nginx configuration
 	cmdTest := exec.Command("nginx", "-t")
 	if output, err := cmdTest.CombinedOutput(); err != nil {
-		log.Error("❌ Nginx config test failed", zap.String("output", string(output)), zap.Error(err))
 		return fmt.Errorf("nginx config test failed: %s", string(output))
 	}
 
 	// Restart Nginx
 	cmdRestart := exec.Command("systemctl", "restart", "nginx")
 	if err := cmdRestart.Run(); err != nil {
-		log.Error("❌ Failed to restart Nginx", zap.Error(err))
 		return fmt.Errorf("failed to restart nginx: %w", err)
 	}
 
-	log.Info("✅ Deployment successful", zap.String("app", app))
 	return nil
 }
 
@@ -312,7 +277,6 @@ func OrganizeAssetsForDeployment(app string) error {
 	if err := os.MkdirAll(otherDir, 0755); err != nil {
 		return fmt.Errorf("failed to create 'other' directory: %w", err)
 	}
-	log.Info("OrganizeAssetsForDeployment: 'other' directory verified", zap.String("other_Dir", otherDir))
 
 	// Define the generic allowed filenames (lowercase).
 	allowedGenerics := map[string]bool{
@@ -324,55 +288,44 @@ func OrganizeAssetsForDeployment(app string) error {
 	// Walk the assets directory.
 	err := filepath.Walk(assetsDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			log.Error("Error accessing path", zap.String("path", path), zap.Error(err))
 			return err
 		}
 
 		// Skip directories.
 		if info.IsDir() {
-			log.Debug("Skipping directory", zap.String("dir", path))
 			return nil
 		}
 
 		// Compute the file's relative path from assetsDir.
 		relPath, err := filepath.Rel(assetsDir, path)
 		if err != nil {
-			log.Error("Failed to compute relative path", zap.String("path", path), zap.Error(err))
 			return err
 		}
-		log.Debug("Processing file", zap.String("relativePath", relPath))
 
 		// Get the base filename in lowercase.
 		base := strings.ToLower(filepath.Base(path))
-		log.Debug("Base filename", zap.String("base", base))
 
 		// Check if the file is relevant.
 		if allowedGenerics[base] || strings.Contains(base, strings.ToLower(app)) {
-			log.Debug("File is relevant; leaving it in assets", zap.String("file", path))
 			return nil
 		}
 
 		// File is not relevant; log that it will be moved.
 		dest := filepath.Join(otherDir, relPath)
-		log.Debug("File not relevant; preparing to move", zap.String("file", path), zap.String("destination", dest))
 
 		// Ensure the destination directory exists.
 		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-			log.Error("Failed to create destination directory", zap.String("destDir", filepath.Dir(dest)), zap.Error(err))
 			return fmt.Errorf("failed to create destination directory %s: %w", filepath.Dir(dest), err)
 		}
 
 		// Move (rename) the file.
 		if err := os.Rename(path, dest); err != nil {
-			log.Error("Failed to move file to 'other'", zap.String("from", path), zap.String("to", dest), zap.Error(err))
 			return fmt.Errorf("failed to move file %s to %s: %w", path, dest, err)
 		}
 
-		log.Info("Moved unused asset file to 'other'", zap.String("from", path), zap.String("to", dest))
 		return nil
 	})
 	if err != nil {
-		log.Error("Error during asset organization", zap.Error(err))
 	}
 	return err
 }
@@ -423,7 +376,6 @@ func ValidateConfigPaths(app string) error {
 
 	if _, err := os.Stat(httpSrc); err != nil {
 		if os.IsNotExist(err) {
-			log.Error("❌ Required config file not found", zap.String("file", httpSrc))
 			return fmt.Errorf("missing HTTP config: %s", httpSrc)
 		}
 		return fmt.Errorf("error checking config file: %w", err)

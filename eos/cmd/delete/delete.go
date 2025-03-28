@@ -29,9 +29,9 @@ For example:
 var log *zap.Logger
 
 func init() {
-	// Initialize the shared logger for the entire install package
 	log = logger.GetLogger()
 
+	// Initialize the shared logger for the entire install package
 	DeleteCmd.AddCommand(deleteProcessCmd)
 	DeleteCmd.AddCommand(deleteUsersCmd)
 	DeleteCmd.AddCommand(deleteStorageCmd)

@@ -4,11 +4,6 @@ package create
 import (
 	"crypto/tls"
 	"encoding/json"
-	"eos/cmd/delphi"
-	"eos/cmd/delphi/create"
-	"eos/pkg/config"
-	"eos/pkg/logger"
-	"eos/pkg/utils"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,9 +11,14 @@ import (
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+
+	"eos/pkg/config"
+	"eos/pkg/delphi"
+	"eos/pkg/logger"
+	"eos/pkg/utils"
 )
 
-var log = logger.GetLogger()
+var log = logger.L()
 
 // CreateCmd is the root command for creation-related Delphi actions
 var CreateCmd = &cobra.Command{
@@ -40,7 +40,7 @@ var mappingCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(mappingCmd)
-	CreateCmd.AddCommand(create.CreateJWTCmd)
+	CreateCmd.AddCommand(CreateJWTCmd)
 }
 
 type OSInfo struct {
@@ -89,7 +89,7 @@ func runMapping() {
 	apiURL = strings.TrimRight(apiURL, "/")
 
 	log.Info("Authenticating to Wazuh API", zap.String("url", apiURL))
-	token, err := delphi.Authenticate(apiURL, cfg.API_User, cfg.API_Password)
+	token, err := delphi.Authenticate(cfg)
 	if err != nil {
 		log.Fatal("Authentication failed", zap.Error(err))
 	}

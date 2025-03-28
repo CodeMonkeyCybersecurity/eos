@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var createJWTCmd = &cobra.Command{
+var CreateJWTCmd = &cobra.Command{
 	Use:   "jwt",
 	Short: "Generate and store a JWT token for Delphi (Wazuh) API access",
 	Run: func(cmd *cobra.Command, args []string) {

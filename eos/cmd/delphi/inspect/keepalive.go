@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var log = logger.GetLogger()
+var var log = logger.L()
 
 var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",

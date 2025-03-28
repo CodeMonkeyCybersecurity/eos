@@ -99,7 +99,7 @@ func Execute() {
 	defer logger.Sync()
 
 	// Assign the logger instance globally for reuse
-	log = logger.GetLogger()
+	var log = logger.L()
 
 	// Register commands
 	RegisterCommands()

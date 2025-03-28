@@ -1,19 +1,23 @@
 // pkg/delphi/config.go
 
+package delphi
+
 import (
 	"bufio"
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strings"
 	"syscall"
 
-	"golang.org/x/term"
-	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
-var log = logger.GetLogger()
+var log *zap.Logger
 
 const configFile = ".delphi.json"
 
@@ -55,12 +59,12 @@ func ConfirmConfig(cfg Config) Config {
 	fmt.Printf("  API_User:      %s\n", cfg.API_User)
 	fmt.Printf("  API_Password:  %s\n", "********")
 
-	answer := strings.ToLower(promptInput("Are these values correct? (y/n)", "y"))
+	answer := strings.ToLower(PromptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
-		cfg.FQDN = promptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", cfg.FQDN)
-		cfg.API_User = promptInput("Enter the API username (eg. wazuh-wui)", cfg.API_User)
-		cfg.API_Password = promptPassword("Enter the API password", cfg.API_Password)
+		cfg.FQDN = PromptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", cfg.FQDN)
+		cfg.API_User = PromptInput("Enter the API username (eg. wazuh-wui)", cfg.API_User)
+		cfg.API_Password = PromptPassword("Enter the API password", cfg.API_Password)
 		if err := SaveConfig(cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)

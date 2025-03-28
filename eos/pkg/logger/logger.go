@@ -9,6 +9,8 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+
+	"eos/pkg/platform"
 )
 
 var log *zap.Logger
@@ -152,18 +154,32 @@ func Sync() error {
 
 // ResolveLogPath determines the best default log file path based on the OS.
 func ResolveLogPath() string {
-	paths := []string{
-		"/var/log/cyberMonkey/eos.log",                                       // Linux/Unix standard
-		filepath.Join(os.Getenv("HOME"), "Library/Logs/cyberMonkey/eos.log"), // macOS
-		"./eos.log", // fallback for restricted environments
+	platform := platform.GetOSPlatform()
+	var paths []string
+
+	switch platform {
+	case "macos":
+		paths = []string{
+			filepath.Join(os.Getenv("HOME"), "Library/Logs/cyberMonkey/eos.log"),
+			"./eos.log",
+		}
+	case "linux":
+		paths = []string{
+			"/var/log/cyberMonkey/eos.log",
+			"./eos.log",
+		}
+	default:
+		paths = []string{
+			"./eos.log",
+		}
 	}
 
 	for _, path := range paths {
 		dir := filepath.Dir(path)
+
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			continue
 		}
-		// Try writing a test file
 		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err == nil {
 			file.Close()
@@ -171,7 +187,7 @@ func ResolveLogPath() string {
 		}
 	}
 
-	return "" // Let caller handle this (e.g., main.go exits)
+	return ""
 }
 
 // InitializeWithFallback sets up the Zap logger and returns any error encountered.
