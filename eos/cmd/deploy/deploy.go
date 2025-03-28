@@ -22,7 +22,7 @@ For example:
 
 func init() {
 	// Initialize the shared logger for the entire deploy package
-	var log = logger.L()
+	log = logger.L()
 
 	// Attach subcommands
 	DeployCmd.AddCommand(trivyCmd)
