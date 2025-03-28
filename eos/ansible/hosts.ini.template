@@ -1,0 +1,14 @@
+# hosts.ini.template
+# replace: hostname with the hostnames of your computers 
+#          ansible_user=<the username to ssh into>
+#          ansible_ssh_pass=<the passwd for ansible_user ssh>
+#          ansible_become_pass="{{ ansible_ssh_pass }}" keep like this if your ansible_user has sudo permissions. Otherwise, replace it with the root user's password.
+
+[hosts]
+hostname ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"
+hostname2 ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"
+hostname3 ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"
+hostname5 ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"
+hostname7 ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"
+hostname11 ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"
+hostname13 ansible_user= ansible_ssh_private_key_file= ansible_ssh_pass= ansible_become_pass="{{ ansible_ssh_pass }}"

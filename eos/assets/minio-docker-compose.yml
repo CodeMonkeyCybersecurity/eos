@@ -1,0 +1,28 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    volumes:
+      - ./data:/data
+    ports:
+      - "9123:9000"     # MinIO API port
+      - "8123:9001"     # MinIO Console port
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: changeme
+    command: server /data --console-address ":9001"
+    restart: always
+    networks:
+      - arachne-net
+  
+networks:
+  arachne-net: 
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br-arachne
+    enable_ipv6: true
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/22
+        - subnet: fd42:1a2b:3c4d:5e6f::/64

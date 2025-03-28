@@ -1,0 +1,37 @@
+services:
+  consul:
+    image: consul
+    container_name: pandora-consul
+    restart: unless-stopped
+    command: "agent -server -bootstrap-expect=1 -client=0.0.0.0"
+    ports:
+      - ":8191:8500"
+      - ":8209:8600/udp"
+    volumes:
+      - consul_data:/consul/data
+    networks:
+      - eos-network
+      
+  vault:
+    image: vault
+    container_name: pandora-vault
+    restart: unless-stopped
+    cap_add:
+      - IPC_LOCK
+    ports:
+      - "8179:8200"
+    depends_on:
+      - consul
+    volumes:
+      - ./vault/config:/vault/config
+    environment:
+      VAULT_ADDR: "http://0.0.0.0:8179"
+    command: "server -config=/vault/config/vault.hcl"
+    networks:
+      - eos-network
+      
+volumes:
+  consul_data:
+
+networks:
+  eos-network:

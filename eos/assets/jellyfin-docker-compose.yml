@@ -1,0 +1,22 @@
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    container_name: jellyfin
+    ports:
+      - "8171:8096"        # Web interface
+      - "9171:8920"        # (Optional) HTTPS
+    volumes:
+      - ./config:/config    # Configuration files
+      - ./cache:/cache      # Cache
+      - ./media:/media      # Media library
+    restart: always
+    networks:
+      - arachne-net
+      
+volumes:
+  jellyfin_db_data:
+    name: jellyfin_db_data
+
+networks:
+  arachne-net:
+    external: true

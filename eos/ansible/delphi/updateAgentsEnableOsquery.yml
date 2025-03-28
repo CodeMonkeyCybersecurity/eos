@@ -1,0 +1,88 @@
+---
+- name: Install osquery on supported systems
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  vars:
+    # For Debian/Ubuntu, map ansible_architecture to repo arch
+    osquery_deb_arch: >-
+      {% if ansible_architecture == "x86_64" %}
+      amd64
+      {% elif ansible_architecture == "aarch64" %}
+      arm64
+      {% else %}
+      unsupported
+      {% endif %}
+
+  tasks:
+    - name: Fail if neither Debian/Ubuntu nor RedHat family
+      fail:
+        msg: "This playbook supports only Debian/Ubuntu and RedHat-based systems. Detected OS family: {{ ansible_os_family }}"
+      when: ansible_os_family not in ["Debian", "RedHat"]
+
+    # --- Tasks for Debian/Ubuntu systems ---
+    - name: Fail if unsupported architecture for Debian/Ubuntu
+      fail:
+        msg: "Architecture {{ ansible_architecture }} is not supported on Debian/Ubuntu. Supported: x86_64 (amd64) or aarch64 (arm64)."
+      when: ansible_os_family == "Debian" and osquery_deb_arch == "unsupported"
+
+    - block:
+        - name: Create /etc/apt/keyrings directory
+          file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+
+        - name: Download osquery GPG key for APT
+          get_url:
+            url: "https://pkg.osquery.io/deb/pubkey.gpg"
+            dest: /etc/apt/keyrings/osquery.asc
+            mode: '0644'
+            force: yes
+
+        - name: Add osquery APT repository file
+          copy:
+            dest: /etc/apt/sources.list.d/osquery.list
+            content: "deb [arch={{ osquery_deb_arch }} signed-by=/etc/apt/keyrings/osquery.asc] https://pkg.osquery.io/deb deb main\n"
+            mode: '0644'
+
+        - name: Update apt cache
+          apt:
+            update_cache: yes
+
+        - name: Install osquery using apt
+          apt:
+            name: osquery
+            state: present
+      when: ansible_os_family == "Debian"
+
+    # --- Tasks for RPM-based systems (RedHat family) ---
+    - block:
+        - name: Create /etc/pki/rpm-gpg directory (if not exists)
+          file:
+            path: /etc/pki/rpm-gpg
+            state: directory
+            mode: '0755'
+
+        - name: Download osquery GPG key for YUM
+          get_url:
+            url: "https://pkg.osquery.io/rpm/GPG"
+            dest: "/etc/pki/rpm-gpg/RPM-GPG-KEY-osquery"
+            mode: '0644'
+            force: yes
+
+        - name: Add osquery repository for RPM systems
+          yum_repository:
+            name: osquery-s3-rpm-repo
+            description: "osquery repository"
+            baseurl: "https://pkg.osquery.io/rpm/"
+            enabled: yes
+            gpgcheck: yes
+            gpgkey: "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-osquery"
+
+        - name: Install osquery using yum
+          yum:
+            name: osquery
+            state: present
+      when: ansible_os_family == "RedHat"

@@ -1,0 +1,40 @@
+services:
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: wiki_db
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_USER: wiki_user
+    logging:
+      driver: "none"
+    restart: always
+    volumes:
+      - wiki_db_data:/var/lib/postgresql/data
+    networks:
+      - arachne-net
+      
+  wiki:
+    image: ghcr.io/requarks/wiki:2
+    depends_on:
+      - db
+    environment:
+      DB_TYPE: postgres
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: wiki_user
+      DB_PASS: changeme
+      DB_NAME: wiki_db
+    restart: always
+    ports:
+      - "8161:3000"
+    networks:
+      - arachne-net
+      
+volumes:
+  wiki_db_data:
+    name: wiki_db_data
+
+networks:
+  arachne-net:
+    external: true
