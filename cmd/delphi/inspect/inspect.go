@@ -15,13 +15,13 @@ var log = logger.L()
 var InspectCmd = &cobra.Command{
 	Use:   "inspect",
 	Short: "Inspect Delphi (Wazuh) data",
-	Long: `The 'inspect' command provides diagnostic and introspection tools 
-for your Delphi (Wazuh) instance.
+	Long: `The 'inspect' command provides diagnostic and introspection tools for your Delphi (Wazuh) instance.
 
 Use this command to view configuration details, authentication info, 
 user permissions, versioning data, keepalive status, and other useful insights.
 
 Subcommands are required to specify which type of information to inspect.`,
+	Aliases: []string{"read", "get"},
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 		log.Info("'eos delphi inspect' was called without a subcommand")

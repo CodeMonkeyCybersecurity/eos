@@ -14,8 +14,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
@@ -50,7 +50,7 @@ func RegisterCommands() {
 	// Register standard Eos commands
 	eosCommands := []*cobra.Command{
 		create.CreateCmd,
-		read.ReadCmd,
+		inspect.InspectCmd,
 		update.UpdateCmd,
 		delete.DeleteCmd,
 		deploy.DeployCmd,

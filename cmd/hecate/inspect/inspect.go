@@ -16,8 +16,9 @@ var InspectCmd = &cobra.Command{
 reverse proxy applications deployed via Hecate.
 
 Examples:
-  hecate inspect config
-  hecate inspect`,
+	hecate inspect config
+	hecate inspect`,
+	Aliases: []string{"read", "get"},
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("🔍 Please use a subcommand (e.g. 'inspect config') to inspect a resource.")
 	},

@@ -1,5 +1,5 @@
-// cmd/read/storage.go
-package read
+// cmd/inspect/storage.go
+package inspect
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 )
 
 // readStorageCmd represents the create command for storage
-var readStorageCmd = &cobra.Command{
+var InspectStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Retrieve information about storage devices and filesystem usage",
 	Long: `The read storage command displays detailed information about block devices 
@@ -42,8 +42,4 @@ func runCommand(command string, args ...string) error {
 	}
 	fmt.Println(string(output))
 	return nil
-}
-
-func init() {
-	ReadCmd.AddCommand(readStorageCmd)
 }

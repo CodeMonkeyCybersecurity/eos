@@ -1,5 +1,5 @@
-// cmd/read/users.go
-package read
+// cmd/inspect/users.go
+package inspect
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 )
 
 // readUsersCmd represents the command to read users
-var readUsersCmd = &cobra.Command{
+var InspectUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Retrieve information about system users",
 	Long: `This command retrieves a list of all system users on the current machine
@@ -57,8 +57,4 @@ func getSystemUsers() ([]string, error) {
 	}
 
 	return users, nil
-}
-
-func init() {
-	ReadCmd.AddCommand(readUsersCmd)
 }

@@ -1,9 +1,9 @@
-// cmd/read.go
+// cmd/inspect.go
 /*
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 
 */
-package read
+package inspect
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -13,10 +13,11 @@ import (
 )
 
 // ReadCmd is the root command for read operations
-var ReadCmd = &cobra.Command{
-	Use:   "read",
-	Short: "Read resources (e.g., processes, users, storage)",
-	Long:  `The read command retrieves information about various resources such as processes, users, or storage.`,
+var InspectCmd = &cobra.Command{
+	Use:     "inspect",
+	Short:   "Inspect resources (e.g., processes, users, storage)",
+	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
+	Aliases: []string{"read", "get"},
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for read.", zap.String("command", cmd.Use))
@@ -26,7 +27,7 @@ var ReadCmd = &cobra.Command{
 
 // init registers subcommands for the read command
 func init() {
-	ReadCmd.AddCommand(readProcessCmd)
-	ReadCmd.AddCommand(readUsersCmd)
-	ReadCmd.AddCommand(readStorageCmd)
+	InspectCmd.AddCommand(InspectProcessCmd)
+	InspectCmd.AddCommand(InspectUsersCmd)
+	InspectCmd.AddCommand(InspectStorageCmd)
 }
