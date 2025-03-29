@@ -8,7 +8,7 @@ import (
 
 var UpdateCmd = &cobra.Command{
 	Use:     "update",
-	Aliases: []string{"set", "change"},
+	Aliases: []string{"set", "change", "upgrade"},
 	Short:   "Update Delphi resources",
 	Long:    "Update configuration and user information in your Delphi (Wazuh) instance.",
 	Run: func(cmd *cobra.Command, args []string) {
