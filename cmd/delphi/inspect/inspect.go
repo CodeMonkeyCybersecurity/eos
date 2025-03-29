@@ -13,7 +13,7 @@ import (
 var log = logger.L()
 
 var (
-	showSecrets     bool
+	showSecrets bool
 )
 
 var InspectCmd = &cobra.Command{
@@ -34,13 +34,4 @@ Subcommands are required to specify which type of information to inspect.`,
 		fmt.Println("ℹ️  Run `eos delphi inspect --help` to see available options.")
 		_ = cmd.Help() // Print built-in help with formatting
 	},
-}
-
-func init() {
-	InspectCmd.AddCommand(KeepAliveCmd)
-
-
-
-	InspectCmd.AddCommand(InspectConfigCmd)
-	InspectConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }
