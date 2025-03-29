@@ -4,9 +4,10 @@ package delphi
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
 	"github.com/spf13/cobra"
 )
@@ -28,6 +29,7 @@ func init() {
 	DelphiCmd.AddCommand(deploy.DeployCmd)
 	DelphiCmd.AddCommand(inspect.InspectCmd)
 	DelphiCmd.AddCommand(delete.DeleteCmd)
+	DelphiCmd.AddCommand(update.UpdateCmd)
 
 	// TODO: Example persistent flags: DelphiCmd.PersistentFlags().String("config", "", "Path to the Delphi configuration file")
 }

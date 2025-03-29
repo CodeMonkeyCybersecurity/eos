@@ -20,7 +20,11 @@ var CreateJWTCmd = &cobra.Command{
 			log.Warn("Config not found, prompting for values", zap.Error(err))
 			cfg.FQDN = interaction.PromptInput("Enter the Wazuh domain (eg. delphi.domain.com)", "")
 			cfg.API_User = interaction.PromptInput("Enter the API username (eg. wazuh-wui)", "")
-			cfg.API_Password = interaction.PromptPassword("Enter the API password", "")
+			pw, err := interaction.PromptPassword("Enter the API password")
+			if err != nil {
+				log.Fatal("Failed to read password", zap.Error(err))
+			}
+			cfg.API_Password = pw
 			if err := config.SaveDelphiConfig(cfg); err != nil {
 				log.Fatal("Error saving configuration", zap.Error(err))
 			}

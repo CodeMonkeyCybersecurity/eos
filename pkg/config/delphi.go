@@ -46,7 +46,12 @@ func LoadDelphiConfig() (*DelphiConfig, error) {
 			cfg.Port = interaction.PromptInput("Enter the port (default: 55000)", "55000")
 			cfg.Protocol = interaction.PromptInput("Enter the protocol (http or https)", "https")
 			cfg.API_User = interaction.PromptInput("Enter the API username (e.g. wazuh-wui)", "wazuh-wui")
-			cfg.API_Password = interaction.PromptPassword("Enter the API password", "")
+			pw, err := interaction.PromptPassword("Enter the API password")
+			if err != nil {
+				fmt.Printf("❌ Failed to read password: %v\n", err)
+				os.Exit(1)
+			}
+			cfg.API_Password = pw
 			cfg.VerifyCertificates = false // default for now, optional: prompt here too
 
 			cfg.Endpoint = fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
@@ -94,7 +99,12 @@ func ConfirmDelphiConfig(cfg *DelphiConfig) *DelphiConfig {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
 		cfg.FQDN = interaction.PromptInput("Enter the Wazuh domain (e.g. delphi.domain.com)", cfg.FQDN)
 		cfg.API_User = interaction.PromptInput("Enter the API username (e.g. wazuh-wui)", cfg.API_User)
-		cfg.API_Password = interaction.PromptPassword("Enter the API password", cfg.API_Password)
+		pw, err := interaction.PromptPassword("Enter the API password")
+		if err != nil {
+			fmt.Printf("❌ Failed to read password: %v\n", err)
+			os.Exit(1)
+		}
+		cfg.API_Password = pw
 
 		if err := SaveDelphiConfig(cfg); err != nil {
 			fmt.Printf("❌ Error saving configuration: %v\n", err)

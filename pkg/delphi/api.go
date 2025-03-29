@@ -15,6 +15,11 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
+type User struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+}
+
 func LoadAndConfirmConfig() (*config.DelphiConfig, error) {
 	raw, err := os.ReadFile("config.json")
 	if err != nil {
@@ -176,6 +181,29 @@ func AuthenticatedPost(cfg *config.DelphiConfig, path string, body io.Reader) (*
 	return client.Do(req)
 }
 
+func AuthenticatedPut(cfg *config.DelphiConfig, path string, payload interface{}) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, strings.NewReader(string(data)))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+		},
+	}
+	return client.Do(req)
+}
+
 func BaseURL(cfg *config.DelphiConfig) string {
 	return fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 }
@@ -203,4 +231,54 @@ func HandleAPIResponse(label string, body []byte, code int) {
 	}
 	output, _ := json.MarshalIndent(prettyJSON, "", "  ")
 	fmt.Printf("✅ %s:\n%s\n", label, string(output))
+}
+
+// GetAllUsers returns all users
+func GetAllUsers(cfg *config.DelphiConfig) ([]User, error) {
+	path := "/security/users?pretty=true"
+	resp, err := AuthenticatedGet(cfg, path)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Data []User `json:"data"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	return result.Data, nil
+}
+
+// GetUserIDByUsername fetches the user ID given a username
+func GetUserIDByUsername(cfg *config.DelphiConfig, username string) (string, error) {
+	users, err := GetAllUsers(cfg)
+	if err != nil {
+		return "", err
+	}
+	for _, user := range users {
+		if user.Username == username {
+			return user.ID, nil
+		}
+	}
+	return "", fmt.Errorf("user not found: %s", username)
+}
+
+// UpdateUserPassword changes a user's password
+func UpdateUserPassword(cfg *config.DelphiConfig, userID string, newPassword string) error {
+	path := fmt.Sprintf("/security/users/%s", userID)
+	payload := map[string]string{"password": newPassword}
+
+	resp, err := AuthenticatedPut(cfg, path, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("failed to update password (%d): %s", resp.StatusCode, string(body))
+	}
+	return nil
 }

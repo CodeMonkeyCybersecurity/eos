@@ -29,21 +29,14 @@ func PromptInput(prompt, defaultVal string) string {
 }
 
 // promptPassword displays a prompt and reads a password without echoing.
-func PromptPassword(prompt, defaultVal string) string {
-	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", prompt, "********")
-	} else {
-		fmt.Printf("%s: ", prompt)
-	}
+func PromptPassword(prompt string) (string, error) {
+	fmt.Printf("%s: ", prompt)
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		fmt.Println("\nError reading password:", err)
-		os.Exit(1)
+		return "", err
 	}
 	fmt.Println("")
 	pass := strings.TrimSpace(string(bytePassword))
-	if pass == "" {
-		return defaultVal
-	}
-	return pass
+	return pass, nil
 }
