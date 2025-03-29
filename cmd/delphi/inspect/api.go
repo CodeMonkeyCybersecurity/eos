@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -34,6 +35,10 @@ var InspectAPICmd = &cobra.Command{
 			}
 			cfg.Token = token
 			_ = config.SaveDelphiConfig(cfg)
+		}
+
+		if !utils.EnforceSecretsAccess(log, showSecrets) {
+			return
 		}
 
 		if showPermissions {

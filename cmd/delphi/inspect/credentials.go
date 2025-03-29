@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -23,6 +24,10 @@ var InspectCredentialsCmd = &cobra.Command{
 		}
 
 		cfg = config.ConfirmDelphiConfig(cfg)
+
+		if !utils.EnforceSecretsAccess(log, showSecrets) {
+			return
+		}
 
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(cfg)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 var showSecrets bool
@@ -27,6 +28,10 @@ var InspectConfigCmd = &cobra.Command{
 		if err != nil {
 			log.Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)
+			return
+		}
+
+		if !utils.EnforceSecretsAccess(log, showSecrets) {
 			return
 		}
 

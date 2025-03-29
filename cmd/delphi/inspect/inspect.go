@@ -34,8 +34,13 @@ Subcommands are required to specify which type of information to inspect.`,
 
 func init() {
 	InspectCmd.AddCommand(KeepAliveCmd)
+
 	InspectCmd.AddCommand(InspectAPICmd)
+	InspectAPICmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
+
 	InspectCmd.AddCommand(InspectCredentialsCmd)
+	InspectCredentialsCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
+
 	InspectCmd.AddCommand(InspectConfigCmd)
 	InspectConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }
