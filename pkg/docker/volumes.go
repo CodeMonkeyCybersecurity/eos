@@ -9,8 +9,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-
-	"go.uber.org/zap"
 )
 
 // RemoveVolumes removes the specified Docker volumes.
@@ -18,9 +16,7 @@ func RemoveVolumes(volumes []string) error {
 	for _, volume := range volumes {
 		// Execute the docker volume rm command.
 		if err := execute.Execute("docker", "volume", "rm", volume); err != nil {
-			log.Warn("failed to remove volume", zap.String("volume", volume), zap.Error(err))
 		} else {
-			log.Info("Volume removed successfully", zap.String("volume", volume))
 		}
 	}
 	return nil
@@ -54,12 +50,9 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 	}
 
 	for _, vol := range volumes {
-		log.Info("Backing up volume", zap.String("volume", vol))
 		backupFile, err := BackupVolume(vol, backupDir)
 		if err != nil {
-			log.Error("Error backing up volume", zap.String("volume", vol), zap.Error(err))
 		} else {
-			log.Info("Volume backup completed", zap.String("volume", vol), zap.String("backupFile", backupFile))
 			backupResults[vol] = backupFile
 		}
 	}

@@ -34,3 +34,10 @@ func EnforceSecretsAccess(log *zap.Logger, show bool) bool {
 	}
 	return true
 }
+
+func RequireRoot(log *zap.Logger) {
+	if !IsPrivilegedUser() {
+		fmt.Fprintln(os.Stderr, "❌ This command must be run as root (try sudo).")
+		os.Exit(1)
+	}
+}

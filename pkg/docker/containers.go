@@ -7,8 +7,6 @@ import (
 	"os/exec"
 	"strings"
 
-	"go.uber.org/zap"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 )
 
@@ -26,7 +24,6 @@ func StopContainersBySubstring(substring string) error {
 
 	outputStr := strings.TrimSpace(string(out))
 	if outputStr == "" {
-		log.Info("No containers found matching substring", zap.String("substring", substring))
 		return nil
 	}
 
@@ -37,11 +34,8 @@ func StopContainersBySubstring(substring string) error {
 		if name == "" {
 			continue
 		}
-		log.Info("Stopping container", zap.String("container", name))
 		if err := execute.Execute("docker", "stop", name); err != nil {
-			log.Error("Failed to stop container", zap.String("container", name), zap.Error(err))
 		} else {
-			log.Info("Container stopped successfully", zap.String("container", name))
 		}
 	}
 	return nil
@@ -58,17 +52,14 @@ func StopContainer(containerName string) error {
 	containerNames := strings.TrimSpace(string(out))
 	if containerNames == "" {
 		// Container is not running.
-		log.Info("Container not running", zap.String("container", containerName))
 		return nil
 	}
 
-	log.Info("Container is running; stopping container", zap.String("container", containerName))
 	// Run "docker stop" on the container.
 	if err := execute.Execute("docker", "stop", containerName); err != nil {
 		return fmt.Errorf("failed to stop container %s: %w", containerName, err)
 	}
 
-	log.Info("Container stopped successfully", zap.String("container", containerName))
 	return nil
 }
 
@@ -79,7 +70,6 @@ func StopContainers(containers []string) error {
 		return fmt.Errorf("failed to stop containers %v: %w", containers, err)
 	}
 
-	log.Info("Containers stopped successfully", zap.Any("containers", containers))
 	return nil
 }
 
@@ -89,6 +79,5 @@ func RemoveContainers(containers []string) error {
 	if err := execute.Execute("docker", args...); err != nil {
 		return fmt.Errorf("failed to remove containers %v: %w", containers, err)
 	}
-	log.Info("Containers removed successfully", zap.Any("containers", containers))
 	return nil
 }
