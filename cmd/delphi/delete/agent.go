@@ -33,7 +33,7 @@ var DeleteAgentCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		token, err := delphi.Authenticate(*config)
+		token, err := delphi.Authenticate(config)
 		if err != nil {
 			log.Error("Authentication failed", zap.Error(err))
 			os.Exit(1)

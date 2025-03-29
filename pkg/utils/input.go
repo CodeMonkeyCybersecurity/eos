@@ -73,7 +73,7 @@ func ConfirmDelphiConfig(cfg config.DelphiConfig) config.DelphiConfig {
 		cfg.API_Password = PromptPassword("  API_Password", cfg.API_Password)
 		cfg.LatestVersion = PromptInput("  LatestVersion", cfg.LatestVersion)
 
-		if err := config.SaveDelphiConfig(cfg); err != nil {
+		if err := config.SaveDelphiConfig(&cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}

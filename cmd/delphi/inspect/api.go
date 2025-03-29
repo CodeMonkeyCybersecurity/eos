@@ -25,8 +25,12 @@ var InspectAPICmd = &cobra.Command{
 			fmt.Printf("❌ Error loading Delphi config: %v\n", err)
 			os.Exit(1)
 		}
+
+		// ✅ Step 2: Toggle ShowSecrets and confirm config
+		config.ShowSecrets = showSecrets
 		cfg = config.ConfirmDelphiConfig(cfg)
 
+		// ✅ Step 3: Authenticate if needed
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(cfg)
 			if err != nil {
@@ -37,16 +41,18 @@ var InspectAPICmd = &cobra.Command{
 			_ = config.SaveDelphiConfig(cfg)
 		}
 
+		// ✅ Step 4: Secret access control
 		if !utils.EnforceSecretsAccess(log, showSecrets) {
 			return
 		}
 
+		// ✅ Step 5: Execute inspection
 		if showPermissions {
 			body, code := delphi.GetUserDetails(cfg)
-			delphi.HandleAPIResponse("API User Permissions", body, code)
+			delphi.HandleAPIResponse("API User Permissions", []byte(body), code)
 		} else if showVersion {
 			body, code := delphi.AuthenticatedGetJSON(cfg, "/manager/status")
-			delphi.HandleAPIResponse("Wazuh Manager Version", body, code)
+			delphi.HandleAPIResponse("Wazuh Manager Version", []byte(body), code)
 		} else {
 			fmt.Println("⚠️  No flags provided. Use --permissions or --version to query specific information.")
 		}

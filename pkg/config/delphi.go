@@ -17,6 +17,10 @@ import (
 
 var delphiConfigPath = xdg.XDGConfigPath("eos", "delphi.json")
 
+// ShowSecrets is a toggle used by ConfirmDelphiConfig() to control password display.
+// It is set from the calling command before invoking the function.
+var ShowSecrets bool
+
 // Config represents the configuration stored in .delphi.json.
 type DelphiConfig struct {
 	API_User           string `json:"API_User"`
@@ -31,8 +35,8 @@ type DelphiConfig struct {
 }
 
 // LoadDelphiConfig reads the Delphi config file from the XDG path.
-func LoadDelphiConfig() (DelphiConfig, error) {
-	var cfg DelphiConfig
+func LoadDelphiConfig() (*DelphiConfig, error) {
+	cfg := &DelphiConfig{}
 	data, err := os.ReadFile(delphiConfigPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -62,7 +66,7 @@ func LoadDelphiConfig() (DelphiConfig, error) {
 }
 
 // SaveDelphiConfig writes the Delphi config to the XDG path.
-func SaveDelphiConfig(cfg DelphiConfig) error {
+func SaveDelphiConfig(cfg *DelphiConfig) error {
 	if err := xdg.EnsureDir(delphiConfigPath); err != nil {
 		return fmt.Errorf("unable to create config path: %w", err)
 	}
@@ -74,11 +78,16 @@ func SaveDelphiConfig(cfg DelphiConfig) error {
 }
 
 // ConfirmDelphiConfig displays the current configuration and allows
-func ConfirmDelphiConfig(cfg DelphiConfig) DelphiConfig {
+func ConfirmDelphiConfig(cfg *DelphiConfig) *DelphiConfig {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  FQDN:         %s\n", cfg.FQDN)
 	fmt.Printf("  API_User:     %s\n", cfg.API_User)
-	fmt.Printf("  API_Password: %s\n", "********")
+
+	if ShowSecrets {
+		fmt.Printf("  API_Password: %s\n", cfg.API_Password)
+	} else {
+		fmt.Printf("  API_Password: ********\n")
+	}
 
 	answer := strings.ToLower(interaction.PromptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
@@ -97,13 +106,14 @@ func ConfirmDelphiConfig(cfg DelphiConfig) DelphiConfig {
 }
 
 // Authenticate connects to the Wazuh API using Basic Auth and returns a JWT token.
-func Authenticate(apiURL, username, password string) (string, error) {
-	authURL := fmt.Sprintf("%s/security/user/authenticate?raw=true", strings.TrimRight(apiURL, "/"))
+func Authenticate(cfg *DelphiConfig) (string, error) {
+	authURL := fmt.Sprintf("%s/security/user/authenticate?raw=true", strings.TrimRight(cfg.Endpoint, "/"))
 	req, err := http.NewRequest("POST", authURL, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
-	req.SetBasicAuth(username, password)
+	req.SetBasicAuth(cfg.API_User, cfg.API_Password)
+
 	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)

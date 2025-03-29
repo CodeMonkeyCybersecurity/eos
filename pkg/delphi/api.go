@@ -32,7 +32,7 @@ func LoadAndConfirmConfig() (*config.DelphiConfig, error) {
 	if !utils.YesOrNo() {
 		fields := []string{"protocol", "host", "port", "user", "password"}
 		for _, field := range fields {
-			fmt.Printf("  %s [%v]: ", field, GetFieldValue(cfg, field))
+			fmt.Printf("  %s [%v]: ", field, GetFieldValue(&cfg, field))
 			if v := utils.ReadLine(); v != "" {
 				SetFieldValue(&cfg, field, v)
 			}
@@ -63,7 +63,7 @@ func DeleteAgent(agentID string, token string, config *config.DelphiConfig) (map
 	return result, nil
 }
 
-func GetFieldValue(config config.DelphiConfig, field string) string {
+func GetFieldValue(config *config.DelphiConfig, field string) string {
 	switch field {
 	case "protocol":
 		return config.Protocol
@@ -96,8 +96,8 @@ func SetFieldValue(config *config.DelphiConfig, field, value string) {
 }
 
 // Authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
-func Authenticate(cfg config.DelphiConfig) (string, error) {
-	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
+func Authenticate(cfg *config.DelphiConfig) (string, error) {
+	url := fmt.Sprintf("%s/security/user/authenticate?raw=true", strings.TrimRight(cfg.Endpoint, "/"))
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return "", err
@@ -130,7 +130,7 @@ func Authenticate(cfg config.DelphiConfig) (string, error) {
 }
 
 // GetUserDetails queries Wazuh API for user info using a valid token.
-func GetUserDetails(cfg config.DelphiConfig) ([]byte, int) {
+func GetUserDetails(cfg *config.DelphiConfig) (string, int) {
 	resp, err := AuthenticatedGet(cfg, fmt.Sprintf("/security/users/%s", cfg.API_User))
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
@@ -139,11 +139,10 @@ func GetUserDetails(cfg config.DelphiConfig) ([]byte, int) {
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
-	return body, resp.StatusCode
+	return string(body), resp.StatusCode
 }
 
-
-func AuthenticatedGet(cfg config.DelphiConfig, path string) (*http.Response, error) {
+func AuthenticatedGet(cfg *config.DelphiConfig, path string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -160,7 +159,7 @@ func AuthenticatedGet(cfg config.DelphiConfig, path string) (*http.Response, err
 	return client.Do(req)
 }
 
-func AuthenticatedPost(cfg config.DelphiConfig, path string, body io.Reader) (*http.Response, error) {
+func AuthenticatedPost(cfg *config.DelphiConfig, path string, body io.Reader) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
@@ -177,12 +176,11 @@ func AuthenticatedPost(cfg config.DelphiConfig, path string, body io.Reader) (*h
 	return client.Do(req)
 }
 
-
-func BaseURL(cfg config.DelphiConfig) string {
+func BaseURL(cfg *config.DelphiConfig) string {
 	return fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 }
 
-func AuthenticatedGetJSON(cfg config.DelphiConfig, path string) ([]byte, int) {
+func AuthenticatedGetJSON(cfg *config.DelphiConfig, path string) (string, int) {
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
@@ -190,7 +188,7 @@ func AuthenticatedGetJSON(cfg config.DelphiConfig, path string) ([]byte, int) {
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
-	return body, resp.StatusCode
+	return string(body), resp.StatusCode
 }
 
 func HandleAPIResponse(label string, body []byte, code int) {
