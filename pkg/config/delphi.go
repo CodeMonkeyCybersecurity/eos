@@ -38,10 +38,10 @@ func LoadDelphiConfig() (DelphiConfig, error) {
 		if os.IsNotExist(err) {
 			fmt.Println("⚠️  Delphi config not found. Let's set it up.")
 
-			cfg.FQDN = interaction.PromptInput("Enter the Wazuh FQDN (e.g. delphi.domain.com)", "")
+			cfg.FQDN = interaction.PromptInput("Enter the Wazuh FQDN (e.g. delphi.domain.com)", "delphi.domain.com")
 			cfg.Port = interaction.PromptInput("Enter the port (default: 55000)", "55000")
 			cfg.Protocol = interaction.PromptInput("Enter the protocol (http or https)", "https")
-			cfg.API_User = interaction.PromptInput("Enter the API username (e.g. wazuh-wui)", "")
+			cfg.API_User = interaction.PromptInput("Enter the API username (e.g. wazuh-wui)", "wazuh-wui")
 			cfg.API_Password = interaction.PromptPassword("Enter the API password", "")
 			cfg.VerifyCertificates = false // default for now, optional: prompt here too
 
