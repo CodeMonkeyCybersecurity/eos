@@ -13,6 +13,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
+var showSecrets bool
+
 var InspectConfigCmd = &cobra.Command{
 	Use:     "config",
 	Short:   "Inspect the currently loaded Delphi configuration",
@@ -29,8 +31,10 @@ var InspectConfigCmd = &cobra.Command{
 		}
 
 		// Mask sensitive fields
-		cfg.API_Password = "********"
-		cfg.Token = "********"
+		if !showSecrets {
+			cfg.API_Password = "********"
+			cfg.Token = "********"
+		}
 
 		cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {

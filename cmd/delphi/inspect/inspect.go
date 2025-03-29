@@ -37,4 +37,5 @@ func init() {
 	InspectCmd.AddCommand(InspectAPICmd)
 	InspectCmd.AddCommand(InspectCredentialsCmd)
 	InspectCmd.AddCommand(InspectConfigCmd)
+	InspectConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }
