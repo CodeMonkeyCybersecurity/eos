@@ -13,6 +13,7 @@ import (
 	"golang.org/x/term"
 )
 
+// PromptInput displays a prompt and reads user input.
 func PromptInput(prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
 	if defaultVal != "" {
@@ -28,6 +29,7 @@ func PromptInput(prompt, defaultVal string) string {
 	return input
 }
 
+// promptPassword displays a prompt and reads a password without echoing.
 func PromptPassword(prompt, defaultVal string) string {
 	if defaultVal != "" {
 		fmt.Printf("%s [%s]: ", prompt, "********")
@@ -46,6 +48,7 @@ func PromptPassword(prompt, defaultVal string) string {
 	}
 	return pass
 }
+
 
 func ConfirmDelphiConfig(cfg config.DelphiConfig) config.DelphiConfig {
 	fmt.Println("Current configuration:")

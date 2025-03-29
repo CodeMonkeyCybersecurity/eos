@@ -28,6 +28,7 @@ Subcommands are required to specify which type of information to inspect.`,
 
 		fmt.Println("❌ Missing subcommand.")
 		fmt.Println("ℹ️  Run `eos delphi inspect --help` to see available options.")
+		_ = cmd.Help() // Print built-in help with formatting
 	},
 }
 

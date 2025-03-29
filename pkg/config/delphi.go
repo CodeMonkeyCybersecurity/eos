@@ -3,7 +3,6 @@
 package config
 
 import (
-	"bufio"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -11,12 +10,11 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"syscall"
 
-	"golang.org/x/term"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 )
 
-const delphiConfigFile = ".delphi.json"
+var delphiConfigPath = xdg.XDGConfigPath("eos", "delphi.json")
 
 // Config represents the configuration stored in .delphi.json.
 type DelphiConfig struct {
@@ -31,9 +29,10 @@ type DelphiConfig struct {
 	VerifyCertificates bool   `json:"verify_certificates"`
 }
 
+// LoadDelphiConfig reads the Delphi config file from the XDG path.
 func LoadDelphiConfig() (DelphiConfig, error) {
 	var cfg DelphiConfig
-	data, err := os.ReadFile(delphiConfigFile)
+	data, err := os.ReadFile(delphiConfigPath)
 	if err != nil {
 		return cfg, fmt.Errorf("unable to read config: %w", err)
 	}
@@ -43,29 +42,34 @@ func LoadDelphiConfig() (DelphiConfig, error) {
 	return cfg, nil
 }
 
+// SaveDelphiConfig writes the Delphi config to the XDG path.
 func SaveDelphiConfig(cfg DelphiConfig) error {
+	if err := utils.EnsureDir(delphiConfigPath); err != nil {
+		return fmt.Errorf("unable to create config path: %w", err)
+	}
 	data, err := json.MarshalIndent(cfg, "", "    ")
 	if err != nil {
 		return fmt.Errorf("unable to marshal config: %w", err)
 	}
-	return os.WriteFile(delphiConfigFile, data, 0644)
+	return os.WriteFile(delphiConfigPath, data, 0644)
 }
 
-// ConfirmDelphiConfig displays the current configuration and allows the user to update values.
+// ConfirmDelphiConfig displays the current configuration and allows
 func ConfirmDelphiConfig(cfg DelphiConfig) DelphiConfig {
 	fmt.Println("Current configuration:")
-	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
-	fmt.Printf("  API_User:      %s\n", cfg.API_User)
-	fmt.Printf("  API_Password:  %s\n", "********")
+	fmt.Printf("  FQDN:         %s\n", cfg.FQDN)
+	fmt.Printf("  API_User:     %s\n", cfg.API_User)
+	fmt.Printf("  API_Password: %s\n", "********")
 
-	answer := strings.ToLower(PromptInput("Are these values correct? (y/n)", "y"))
+	answer := strings.ToLower(interaction.PromptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
-		cfg.FQDN = PromptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", cfg.FQDN)
-		cfg.API_User = PromptInput("Enter the API username (eg. wazuh-wui)", cfg.API_User)
-		cfg.API_Password = PromptPassword("Enter the API password", cfg.API_Password)
+		cfg.FQDN = interaction.PromptInput("Enter the Wazuh domain (e.g. delphi.domain.com)", cfg.FQDN)
+		cfg.API_User = interaction.PromptInput("Enter the API username (e.g. wazuh-wui)", cfg.API_User)
+		cfg.API_Password = interaction.PromptPassword("Enter the API password", cfg.API_Password)
+
 		if err := SaveDelphiConfig(cfg); err != nil {
-			fmt.Printf("Error saving configuration: %v\n", err)
+			fmt.Printf("❌ Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println("✅ Configuration updated.")
@@ -99,40 +103,4 @@ func Authenticate(apiURL, username, password string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(body)), nil
-}
-
-// PromptInput displays a prompt and reads user input.
-func PromptInput(prompt, defaultVal string) string {
-	reader := bufio.NewReader(os.Stdin)
-	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", prompt, defaultVal)
-	} else {
-		fmt.Printf("%s: ", prompt)
-	}
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return defaultVal
-	}
-	return input
-}
-
-// promptPassword displays a prompt and reads a password without echoing.
-func PromptPassword(prompt, defaultVal string) string {
-	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", prompt, "********")
-	} else {
-		fmt.Printf("%s: ", prompt)
-	}
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-	if err != nil {
-		fmt.Println("\nError reading password:", err)
-		os.Exit(1)
-	}
-	fmt.Println("")
-	pass := strings.TrimSpace(string(bytePassword))
-	if pass == "" {
-		return defaultVal
-	}
-	return pass
 }

@@ -10,28 +10,21 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-
-	"go.uber.org/zap"
 )
-
-//
-// ---------------------------- LOGGER ---------------------------- //
-
-var log = logger.L()
 
 //
 // ---------------------------- CONSTANTS ---------------------------- //
 
 const (
-	// Delphi & Install Paths
+	// Delphi Paths
 	VenvPath       = "/opt/delphi_venv"
 	DockerListener = "/var/ossec/wodles/docker/DockerListener"
-	UmamiDir       = "/opt/umami"
-	JenkinsDir     = "/opt/jenkins"
-	ZabbixDir      = "/opt/zabbix"
-	HeraDir        = "/opt/hera"
+
+	// Install Paths
+	UmamiDir   = "/opt/umami"
+	JenkinsDir = "/opt/jenkins"
+	ZabbixDir  = "/opt/zabbix"
+	HeraDir    = "/opt/hera"
 
 	JenkinsComposeYML = JenkinsDir + "/jenkins-docker-compose.yml"
 	UmamiComposeYML   = UmamiDir + "/umami-docker-compose.yml"
@@ -91,7 +84,6 @@ var Apps = []App{
 }
 
 func GetSupportedAppNames() []string {
-	log.Info("Retrieving supported app names")
 	var names []string
 	for _, app := range Apps {
 		names = append(names, strings.ToLower(app.Name))
@@ -108,8 +100,6 @@ func DisplayOptions() {
 		}
 	}
 	sort.Ints(sortedApps)
-	log.Info("Displaying available Hecate backend web apps")
-	log.Info("Sorted app options", zap.Ints("sortedApps", sortedApps))
 	for _, num := range sortedApps {
 		for _, app := range Apps {
 			if app.Option == strconv.Itoa(num) {
@@ -121,14 +111,11 @@ func DisplayOptions() {
 }
 
 func GetAppByOption(option string) (App, bool) {
-	log.Info("Searching for app by option", zap.String("option", option))
 	for _, app := range Apps {
 		if app.Option == option {
-			log.Info("App found", zap.String("appName", app.Name))
 			return app, true
 		}
 	}
-	log.Warn("App not found", zap.String("option", option))
 	return App{}, false
 }
 
@@ -139,7 +126,7 @@ func GetUserSelection(defaultSelection string) (map[string]App, string) {
 		promptMsg += fmt.Sprintf(" [default: %s]", defaultSelection)
 	}
 	promptMsg += ": "
-	log.Info("Prompting user for app selection", zap.String("message", promptMsg))
+
 	fmt.Print(promptMsg)
 	selection, _ := reader.ReadString('\n')
 	selection = strings.TrimSpace(selection)
@@ -160,18 +147,16 @@ func GetUserSelection(defaultSelection string) (map[string]App, string) {
 		token = strings.TrimSpace(token)
 		app, ok := GetAppByOption(token)
 		if !ok {
-			log.Warn("Invalid option selected", zap.String("option", token))
+
 			fmt.Printf("Invalid option: %s\n", token)
 			return GetUserSelection(defaultSelection)
 		}
 		selectedApps[strings.ToLower(app.Name)] = app
 	}
 	if len(selectedApps) == 0 {
-		log.Warn("No valid options selected")
 		fmt.Println("No valid options selected.")
 		return GetUserSelection(defaultSelection)
 	}
-	log.Info("User selection made", zap.String("selection", selection))
 	return selectedApps, selection
 }
 
@@ -188,12 +173,10 @@ type HecateConfig struct {
 func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 	cfg := &HecateConfig{}
 
-	log.Info("Loading configuration from file", zap.String("file", LastValuesFile))
-
 	if _, err := os.Stat(LastValuesFile); err == nil {
 		f, err := os.Open(LastValuesFile)
 		if err != nil {
-			log.Error("Unable to open configuration file", zap.String("file", LastValuesFile), zap.Error(err))
+
 			return nil, fmt.Errorf("unable to open %s: %w", LastValuesFile, err)
 		}
 		defer f.Close()
@@ -204,20 +187,20 @@ func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 			switch {
 			case strings.HasPrefix(line, "BASE_DOMAIN="):
 				cfg.BaseDomain = strings.TrimSpace(strings.TrimPrefix(line, "BASE_DOMAIN="))
-				log.Info("Found Base Domain", zap.String("baseDomain", cfg.BaseDomain))
+
 			case strings.HasPrefix(line, "backendIP="):
 				cfg.BackendIP = strings.TrimSpace(strings.TrimPrefix(line, "backendIP="))
-				log.Info("Found Backend IP", zap.String("backendIP", cfg.BackendIP))
+
 			case strings.HasPrefix(line, "SUBDOMAIN="):
 				cfg.Subdomain = strings.TrimSpace(strings.TrimPrefix(line, "SUBDOMAIN="))
-				log.Info("Found Subdomain", zap.String("subdomain", cfg.Subdomain))
+
 			case strings.HasPrefix(line, "EMAIL="):
 				cfg.Email = strings.TrimSpace(strings.TrimPrefix(line, "EMAIL="))
-				log.Info("Found Email", zap.String("email", cfg.Email))
+
 			}
 		}
 		if err := scanner.Err(); err != nil {
-			log.Error("Error reading configuration file", zap.Error(err))
+
 			return nil, fmt.Errorf("error reading %s: %w", LastValuesFile, err)
 		}
 	}
@@ -225,10 +208,8 @@ func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 	// Handle missing configuration values and log the prompts
 	if cfg.Subdomain == "" && defaultSubdomain != "" {
 		cfg.Subdomain = defaultSubdomain
-		log.Info("No subdomain found, defaulting to", zap.String("subdomain", defaultSubdomain))
-	}
 
-	log.Info("Current configuration", zap.String("BaseDomain", cfg.BaseDomain), zap.String("BackendIP", cfg.BackendIP), zap.String("Subdomain", cfg.Subdomain), zap.String("Email", cfg.Email))
+	}
 
 	// Check if there are missing fields and log them
 	missing := []string{}
@@ -242,7 +223,7 @@ func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 		missing = append(missing, "Email")
 	}
 	if len(missing) > 0 {
-		log.Warn("Missing required configuration fields", zap.Strings("missingFields", missing))
+
 		fmt.Printf("The following fields need to be set: %s\n", strings.Join(missing, ", "))
 		if cfg.BaseDomain == "" {
 			cfg.BaseDomain = prompt("Please enter the Base Domain (e.g., example.com): ")
@@ -259,11 +240,9 @@ func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 	content := fmt.Sprintf("BASE_DOMAIN=%s\nbackendIP=%s\nSUBDOMAIN=%s\nEMAIL=%s\n",
 		cfg.BaseDomain, cfg.BackendIP, cfg.Subdomain, cfg.Email)
 	if err := os.WriteFile(LastValuesFile, []byte(content), 0644); err != nil {
-		log.Error("Failed to write configuration file", zap.String("file", LastValuesFile), zap.Error(err))
+
 		return nil, fmt.Errorf("failed to write %s: %w", LastValuesFile, err)
 	}
-
-	log.Info("Configuration successfully loaded and saved", zap.String("file", LastValuesFile))
 
 	return cfg, nil
 }
@@ -275,16 +254,6 @@ func prompt(message string) string {
 	userInput := strings.TrimSpace(text)
 
 	// Log the user input action, but avoid logging sensitive information.
-	log.Info("Prompted user", zap.String("message", message), zap.String("userInput", userInput))
 
 	return userInput
 }
-
-//func yesOrNo(message string) bool {
-//	response := prompt(message)
-//	if response == "" {
-//		return true
-//	}
-//	response = strings.ToLower(response)
-//	return response == "y" || response == "yes"
-//}
