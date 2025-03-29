@@ -12,8 +12,8 @@
     - name: Replace the old address with the new address in ossec.conf
       replace:
         path: /var/ossec/etc/ossec.conf
-        regexp: '<address>delphi\.cybermonkey\.sh</address>'
-        replace: '<address>delphi.cybermonkey.net.au</address>'
+        regexp: '<address>delphi\.domain\.com</address>'
+        replace: '<address>delphi.domain.com</address>'
         backup: yes
       when: check_address.rc == 0
 
