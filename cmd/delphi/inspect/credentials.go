@@ -13,6 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+
 var InspectCredentialsCmd = &cobra.Command{
 	Use:   "credentials",
 	Short: "List all Delphi (Wazuh) user credentials",
@@ -74,4 +75,9 @@ var InspectCredentialsCmd = &cobra.Command{
 			fmt.Printf("  • %-15s | Role: %-10s | Status: %s\n", user.Username, user.Role, status)
 		}
 	},
+}
+
+func init() {
+	InspectCmd.AddCommand(InspectCredentialsCmd)
+	InspectCredentialsCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }

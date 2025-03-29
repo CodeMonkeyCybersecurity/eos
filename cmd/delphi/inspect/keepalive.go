@@ -54,3 +54,7 @@ var KeepAliveCmd = &cobra.Command{
 		fmt.Println(string(pretty))
 	},
 }
+
+func init() {
+	InspectCmd.AddCommand(KeepAliveCmd)
+}

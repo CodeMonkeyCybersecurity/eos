@@ -14,8 +14,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
-var showSecrets bool
-
 var InspectConfigCmd = &cobra.Command{
 	Use:     "config",
 	Short:   "Inspect the currently loaded Delphi configuration",
@@ -51,4 +49,10 @@ var InspectConfigCmd = &cobra.Command{
 		fmt.Println("📄 Delphi Configuration:")
 		fmt.Println(string(cfgJSON))
 	},
+}
+
+
+func init() {
+	InspectCmd.AddCommand(InspectConfigCmd)
+	InspectConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }
