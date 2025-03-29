@@ -36,4 +36,5 @@ func init() {
 	InspectCmd.AddCommand(KeepAliveCmd)
 	InspectCmd.AddCommand(InspectAPICmd)
 	InspectCmd.AddCommand(InspectCredentialsCmd)
+	InspectCmd.AddCommand(InspectConfigCmd)
 }
