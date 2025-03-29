@@ -32,7 +32,6 @@ go.work.sum
 **/data/
 
 # Environment
-*.conf
 *.env
 *.ini
 *.venv
