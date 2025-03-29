@@ -26,7 +26,7 @@ var DeleteAgentCmd = &cobra.Command{
 			return
 		}
 
-		log.Info("Loading and confirming Wazuh API configuration...")
+		log.Info("Loading and confirming Delphi API configuration...")
 		config, err := delphi.LoadAndConfirmConfig()
 		if err != nil {
 			log.Error("Failed to load config", zap.Error(err))

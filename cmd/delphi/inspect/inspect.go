@@ -21,4 +21,5 @@ var InspectCmd = &cobra.Command{
 
 func init() {
 	InspectCmd.AddCommand(KeepAliveCmd)
+	InspectCmd.AddCommand(InspectAPICmd)
 }

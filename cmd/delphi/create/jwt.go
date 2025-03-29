@@ -3,6 +3,7 @@
 package create
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
 	"github.com/spf13/cobra"
@@ -13,19 +14,19 @@ var CreateJWTCmd = &cobra.Command{
 	Use:   "jwt",
 	Short: "Generate and store a JWT token for Delphi (Wazuh) API access",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := delphi.LoadConfig()
+		cfg, err := config.LoadDelphiConfig()
 		if err != nil {
 			log.Warn("Config not found, prompting for values", zap.Error(err))
-			cfg.FQDN = delphi.PromptInput("Enter the Wazuh domain (eg. wazuh.domain.com)", "")
-			cfg.API_User = delphi.PromptInput("Enter the API username (eg. wazuh-wui)", "")
-			cfg.API_Password = delphi.PromptPassword("Enter the API password", "")
-			if err := delphi.SaveConfig(cfg); err != nil {
+			cfg.FQDN = config.PromptInput("Enter the Wazuh domain (eg. delphi.domain.com)", "")
+			cfg.API_User = config.PromptInput("Enter the API username (eg. wazuh-wui)", "")
+			cfg.API_Password = config.PromptPassword("Enter the API password", "")
+			if err := config.SaveDelphiConfig(cfg); err != nil {
 				log.Fatal("Error saving configuration", zap.Error(err))
 			}
 			log.Info("Configuration file created.")
 		}
 
-		cfg = delphi.ConfirmConfig(cfg)
+		cfg = config.ConfirmDelphiConfig(cfg)
 
 		if cfg.Protocol == "" {
 			cfg.Protocol = "https"
@@ -34,7 +35,7 @@ var CreateJWTCmd = &cobra.Command{
 			cfg.Port = "55000"
 		}
 
-		delphi.SaveConfig(cfg)
+		config.SaveDelphiConfig(cfg)
 
 		log.Info("Retrieving JWT token...")
 		token, err := delphi.Authenticate(cfg)
@@ -42,7 +43,7 @@ var CreateJWTCmd = &cobra.Command{
 			log.Fatal("Authentication failed", zap.Error(err))
 		}
 		cfg.Token = token
-		if err := delphi.SaveConfig(cfg); err != nil {
+		if err := config.SaveDelphiConfig(cfg); err != nil {
 			log.Fatal("Failed to save token", zap.Error(err))
 		}
 

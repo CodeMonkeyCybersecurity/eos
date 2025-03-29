@@ -11,40 +11,40 @@ import (
 
 	"net/http"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
-func LoadAndConfirmConfig() (*DelphiConfig, error) {
-
+func LoadAndConfirmConfig() (*config.DelphiConfig, error) {
 	raw, err := os.ReadFile("config.json")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config.json: %w", err)
 	}
 
-	var config DelphiConfig
-	if err := json.Unmarshal(raw, &config); err != nil {
+	var cfg config.DelphiConfig
+	if err := json.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("invalid config.json: %w", err)
 	}
 
 	fmt.Println("Loaded configuration:")
-	fmt.Printf("  Protocol: %s\n  Host: %s\n  Port: %s\n  User: %s\n", config.Protocol, config.FQDN, config.Port, config.API_User)
+	fmt.Printf("  Protocol: %s\n  Host: %s\n  Port: %s\n  User: %s\n", cfg.Protocol, cfg.FQDN, cfg.Port, cfg.API_User)
 	fmt.Print("Are these values correct? (y/N): ")
-	if utils.YesOrNo() == false {
+	if !utils.YesOrNo() {
 		fields := []string{"protocol", "host", "port", "user", "password"}
 		for _, field := range fields {
-			fmt.Printf("  %s [%v]: ", field, GetFieldValue(config, field))
+			fmt.Printf("  %s [%v]: ", field, GetFieldValue(cfg, field))
 			if v := utils.ReadLine(); v != "" {
-				SetFieldValue(&config, field, v)
+				SetFieldValue(&cfg, field, v)
 			}
 		}
-		newConfig, _ := json.MarshalIndent(config, "", "  ")
+		newConfig, _ := json.MarshalIndent(cfg, "", "  ")
 		_ = os.WriteFile("config.json", newConfig, 0644)
 	}
 
-	return &config, nil
+	return &cfg, nil
 }
 
-func DeleteAgent(agentID string, token string, config *DelphiConfig) (map[string]interface{}, error) {
+func DeleteAgent(agentID string, token string, config *config.DelphiConfig) (map[string]interface{}, error) {
 	url := fmt.Sprintf("%s://%s:%s/agents/%s?pretty=true", config.Protocol, config.FQDN, config.Port, agentID)
 
 	req, _ := http.NewRequest("DELETE", url, nil)
@@ -63,7 +63,7 @@ func DeleteAgent(agentID string, token string, config *DelphiConfig) (map[string
 	return result, nil
 }
 
-func GetFieldValue(config DelphiConfig, field string) string {
+func GetFieldValue(config config.DelphiConfig, field string) string {
 	switch field {
 	case "protocol":
 		return config.Protocol
@@ -80,7 +80,7 @@ func GetFieldValue(config DelphiConfig, field string) string {
 	}
 }
 
-func SetFieldValue(config *DelphiConfig, field, value string) {
+func SetFieldValue(config *config.DelphiConfig, field, value string) {
 	switch field {
 	case "protocol":
 		config.Protocol = value
@@ -96,7 +96,7 @@ func SetFieldValue(config *DelphiConfig, field, value string) {
 }
 
 // Authenticate logs in to the Wazuh API using basic auth and returns the JWT token.
-func Authenticate(cfg DelphiConfig) (string, error) {
+func Authenticate(cfg config.DelphiConfig) (string, error) {
 	url := fmt.Sprintf("https://%s:55000/security/user/authenticate?raw=true", cfg.FQDN)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
@@ -127,4 +127,82 @@ func Authenticate(cfg DelphiConfig) (string, error) {
 		return "", fmt.Errorf("no token received")
 	}
 	return token, nil
+}
+
+// GetUserDetails queries Wazuh API for user info using a valid token.
+func GetUserDetails(cfg config.DelphiConfig) ([]byte, int) {
+	resp, err := AuthenticatedGet(cfg, fmt.Sprintf("/security/users/%s", cfg.API_User))
+	if err != nil {
+		fmt.Printf("❌ Request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	return body, resp.StatusCode
+}
+
+
+func AuthenticatedGet(cfg config.DelphiConfig, path string) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+		},
+	}
+	return client.Do(req)
+}
+
+func AuthenticatedPost(cfg config.DelphiConfig, path string, body io.Reader) (*http.Response, error) {
+	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+cfg.Token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+		},
+	}
+	return client.Do(req)
+}
+
+
+func BaseURL(cfg config.DelphiConfig) string {
+	return fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
+}
+
+func AuthenticatedGetJSON(cfg config.DelphiConfig, path string) ([]byte, int) {
+	resp, err := AuthenticatedGet(cfg, path)
+	if err != nil {
+		fmt.Printf("❌ Request failed: %v\n", err)
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return body, resp.StatusCode
+}
+
+func HandleAPIResponse(label string, body []byte, code int) {
+	if code != http.StatusOK {
+		fmt.Printf("❌ Failed to retrieve %s (%d): %s\n", label, code, string(body))
+		os.Exit(1)
+	}
+	var prettyJSON map[string]interface{}
+	if err := json.Unmarshal(body, &prettyJSON); err != nil {
+		fmt.Printf("❌ Failed to parse JSON: %v\n", err)
+		os.Exit(1)
+	}
+	output, _ := json.MarshalIndent(prettyJSON, "", "  ")
+	fmt.Printf("✅ %s:\n%s\n", label, string(output))
 }
