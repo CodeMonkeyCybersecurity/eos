@@ -282,3 +282,38 @@ func UpdateUserPassword(cfg *config.DelphiConfig, userID string, newPassword str
 	}
 	return nil
 }
+
+// AuthenticateUser tries to authenticate any given username/password pair.
+func AuthenticateUser(cfg config.DelphiConfig, username, password string) (string, error) {
+	url := fmt.Sprintf("%s://%s:%s/security/user/authenticate?raw=true",
+		cfg.Protocol, cfg.FQDN, cfg.Port)
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return "", err
+	}
+	req.SetBasicAuth(username, password)
+
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: !cfg.VerifyCertificates},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("authentication failed (%d): %s", resp.StatusCode, body)
+	}
+
+	return strings.TrimSpace(string(body)), nil
+}

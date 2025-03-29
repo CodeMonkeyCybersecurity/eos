@@ -39,6 +39,18 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
+		// Prompt for current password
+		currentPassword, err := interaction.PromptPassword("Current password")
+		if err != nil {
+			return fmt.Errorf("failed to read current password: %w", err)
+		}
+
+		log.Info("Authenticating with current password...")
+
+		if _, err := delphi.AuthenticateUser(*cfg, username, currentPassword); err != nil {
+			return fmt.Errorf("authentication failed: %w", err)
+		}
+
 		userID, err := delphi.GetUserIDByUsername(cfg, username)
 		if err != nil {
 			return fmt.Errorf("unable to resolve user ID for username %s: %w", username, err)
