@@ -1,5 +1,6 @@
-// pkg/utils/xdg.go
-package utils
+// pkg/xdg/xdg.go
+
+package xdg
 
 import (
 	"errors"

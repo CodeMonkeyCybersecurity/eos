@@ -5,6 +5,7 @@ package create
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -17,9 +18,9 @@ var CreateJWTCmd = &cobra.Command{
 		cfg, err := config.LoadDelphiConfig()
 		if err != nil {
 			log.Warn("Config not found, prompting for values", zap.Error(err))
-			cfg.FQDN = config.PromptInput("Enter the Wazuh domain (eg. delphi.domain.com)", "")
-			cfg.API_User = config.PromptInput("Enter the API username (eg. wazuh-wui)", "")
-			cfg.API_Password = config.PromptPassword("Enter the API password", "")
+			cfg.FQDN = interaction.PromptInput("Enter the Wazuh domain (eg. delphi.domain.com)", "")
+			cfg.API_User = interaction.PromptInput("Enter the API username (eg. wazuh-wui)", "")
+			cfg.API_Password = interaction.PromptPassword("Enter the API password", "")
 			if err := config.SaveDelphiConfig(cfg); err != nil {
 				log.Fatal("Error saving configuration", zap.Error(err))
 			}

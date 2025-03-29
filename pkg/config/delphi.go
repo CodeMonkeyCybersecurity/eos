@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
 var delphiConfigPath = xdg.XDGConfigPath("eos", "delphi.json")
@@ -44,7 +45,7 @@ func LoadDelphiConfig() (DelphiConfig, error) {
 
 // SaveDelphiConfig writes the Delphi config to the XDG path.
 func SaveDelphiConfig(cfg DelphiConfig) error {
-	if err := utils.EnsureDir(delphiConfigPath); err != nil {
+	if err := xdg.EnsureDir(delphiConfigPath); err != nil {
 		return fmt.Errorf("unable to create config path: %w", err)
 	}
 	data, err := json.MarshalIndent(cfg, "", "    ")
