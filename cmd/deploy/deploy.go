@@ -31,4 +31,6 @@ func init() {
 	DeployCmd.AddCommand(jenkinsCmd)
 	DeployCmd.AddCommand(zabbixCmd)
 	DeployCmd.AddCommand(heraCmd)
+	DeployCmd.AddCommand(DockerCmd)
+	DeployCmd.AddCommand(PostfixCmd)
 }
