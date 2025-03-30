@@ -3,9 +3,10 @@
 package platform
 
 import (
-	"runtime"
 	"bufio"
+	"fmt"
 	"os"
+	"runtime"
 	"strings"
 )
 
@@ -46,4 +47,23 @@ func DetectLinuxDistro() string {
 		}
 	}
 	return "unknown"
+}
+
+func RequireLinuxDistro(allowed []string) error {
+	if GetOSPlatform() != "linux" {
+		return fmt.Errorf("unsupported platform: %s (only 'linux' is supported)", GetOSPlatform())
+	}
+
+	distro := DetectLinuxDistro()
+	for _, d := range allowed {
+		if distro == d {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("unsupported Linux distribution: %s", distro)
+}
+
+func GetArch() string {
+	return runtime.GOARCH
 }

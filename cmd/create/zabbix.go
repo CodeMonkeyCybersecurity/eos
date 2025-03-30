@@ -1,4 +1,4 @@
-package deploy
+package create
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var ZabbixCmd = &cobra.Command{
+var CreateZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
 	Short: "Deploy Zabbix monitoring stack using Docker Compose",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -56,6 +56,6 @@ func deployZabbix() error {
 
 func init() {
 
-	DeployCmd.AddCommand(ZabbixCmd)
+	CreateCmd.AddCommand(CreateZabbixCmd)
 
 }

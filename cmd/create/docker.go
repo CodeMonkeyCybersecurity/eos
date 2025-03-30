@@ -1,6 +1,6 @@
-// cmd/deploy/docker.go
+// cmd/create/docker.go
 
-package deploy
+package create
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var DockerCmd = &cobra.Command{
+var CreateDockerCmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Install Docker and configure it for non-root usage",
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
@@ -97,5 +97,5 @@ func setupDockerNonRoot(log *zap.Logger) {
 }
 
 func init() {
-	DeployCmd.AddCommand(DockerCmd)
+	CreateCmd.AddCommand(CreateDockerCmd)
 }

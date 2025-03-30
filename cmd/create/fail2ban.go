@@ -1,6 +1,6 @@
-// cmd/deploy/fail2ban.go
+// cmd/create/fail2ban.go
 
-package deploy
+package create
 
 import (
 	"os"
@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var Fail2banCmd = &cobra.Command{
+var CreateFail2banCmd = &cobra.Command{
 	Use:   "fail2ban",
 	Short: "Deploy and configure Fail2Ban",
 	Long:  "Install Fail2Ban, apply secure jail.local settings, and enable basic SSH protection.",
@@ -69,5 +69,5 @@ maxretry = 5
 }
 
 func init() {
-	DeployCmd.AddCommand(Fail2banCmd)
+	CreateCmd.AddCommand(CreateFail2banCmd)
 }

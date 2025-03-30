@@ -1,6 +1,6 @@
-// cmd/deploy/postfix.go
+// cmd/create/postfix.go
 
-package deploy
+package create
 
 import (
 	"bufio"
@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var PostfixCmd = &cobra.Command{
+var CreatePostfixCmd = &cobra.Command{
 	Use:   "postfix",
 	Short: "Install and configure Postfix as an SMTP relay",
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
@@ -149,5 +149,5 @@ smtp_use_tls = yes
 
 func init() {
 
-	DeployCmd.AddCommand(PostfixCmd)
+	CreateCmd.AddCommand(CreatePostfixCmd)
 }

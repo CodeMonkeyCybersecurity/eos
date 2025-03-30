@@ -1,6 +1,6 @@
-// cmd/deploy/hera.go
+// cmd/create/hera.go
 
-package deploy
+package create
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var HeraCmd = &cobra.Command{
+var CreateHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deploy Hera (Authentik) for self-service identity & access management",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -61,6 +61,6 @@ func deployHera() error {
 
 func init() {
 
-	DeployCmd.AddCommand(HeraCmd)
+	CreateCmd.AddCommand(CreateHeraCmd)
 
 }

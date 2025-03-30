@@ -1,4 +1,4 @@
-package deploy
+package create
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 )
 
 // vaultCmd represents the vault command under the "install" group.
-var VaultCmd = &cobra.Command{
+var CreateVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Installs and initializes HashiCorp Vault in production mode via snap",
 	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
@@ -107,6 +107,6 @@ ui = true
 
 func init() {
 
-	DeployCmd.AddCommand(VaultCmd)
+	CreateCmd.AddCommand(CreateVaultCmd)
 
 }

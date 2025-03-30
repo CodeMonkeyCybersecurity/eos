@@ -1,9 +1,10 @@
 /*
+cmd/delete/delete.go
+
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 
 */
 
-// cmd/delete/delete.go
 package delete
 
 import (
@@ -23,6 +24,8 @@ For example:
 	eos delete trivy 
 	eos delete vault
 	eos delete umami`,
+
+	Aliases: []string{"remove", "install"},
 }
 
 // log is a package-level variable for the Zap logger.

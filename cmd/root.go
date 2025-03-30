@@ -12,7 +12,6 @@ import (
 	// Eos commands
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
@@ -53,7 +52,6 @@ func RegisterCommands() {
 		inspect.InspectCmd,
 		update.UpdateCmd,
 		delete.DeleteCmd,
-		deploy.DeployCmd,
 		refresh.RefreshCmd,
 		logs.LogsCmd,
 		secure.SecureCmd,

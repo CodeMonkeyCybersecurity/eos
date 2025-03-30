@@ -1,22 +1,31 @@
 /*
+cmd/create/create.go
+
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 
 */
-// cmd/create/create.go
 package create
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
+
 	"go.uber.org/zap"
 )
 
 // CreateCmd is the root command for create operations
 var CreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "Create resources (e.g., processes, users, storage)",
-	Long:  `The create command allows you to create various resources such as processes, users, or storage.`,
+	Short: "Create, deploy, install resources programmes and components (e.g., processes, users, storage, application containers)",
+	Long: `The create command allows you to create various resources such as processes, users, or storage, components or dependencies.
+For example:
+	eos deploy trivy 
+	eos deploy vault
+	eos deploy umami`,
+
+	Aliases: []string{"deploy", "install"},
+
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
@@ -24,10 +33,9 @@ var CreateCmd = &cobra.Command{
 	},
 }
 
-// init registers subcommands for the create command
+var log *zap.Logger
+
 func init() {
-	CreateCmd.AddCommand(createProcessCmd)
-	CreateCmd.AddCommand(createUserCmd)
-	CreateCmd.AddCommand(createStorageCmd)
-	CreateCmd.AddCommand(createBackupCmd)
+	// Initialize the shared logger for the entire deploy package
+	log = logger.L()
 }

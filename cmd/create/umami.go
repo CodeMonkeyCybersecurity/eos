@@ -1,5 +1,5 @@
-// cmd/install/umami.go
-package deploy
+// cmd/create/umami.go
+package create
 
 import (
 	"fmt"
@@ -18,7 +18,7 @@ import (
 )
 
 // umamiCmd represents the Umami installation command.
-var UmamiCmd = &cobra.Command{
+var CreateUmamiCmd = &cobra.Command{
 	Use:   "umami",
 	Short: "Install and deploy Umami",
 	Long: `Install and deploy Umami to /opt/umami by:
@@ -105,6 +105,6 @@ var UmamiCmd = &cobra.Command{
 }
 
 func init() {
-	DeployCmd.AddCommand(TrivyCmd)
+	CreateCmd.AddCommand(CreateUmamiCmd)
 
 }

@@ -1,5 +1,5 @@
-// cmd/deploy/jenkins.go
-package deploy
+// cmd/create/jenkins.go
+package create
 
 import (
 	"fmt"
@@ -19,7 +19,7 @@ import (
 )
 
 // jenkinsCmd represents the Jenkins installation command.
-var JenkinsCmd = &cobra.Command{
+var CreateJenkinsCmd = &cobra.Command{
 	Use:   "jenkins",
 	Short: "Install and deploy Jenkins",
 	Long: `Install and deploy Jenkins to /opt/jenkins by:
@@ -130,6 +130,6 @@ var JenkinsCmd = &cobra.Command{
 
 func init() {
 
-	DeployCmd.AddCommand(JenkinsCmd)
+	CreateCmd.AddCommand(CreateJenkinsCmd)
 
 }

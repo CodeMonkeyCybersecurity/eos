@@ -1,8 +1,10 @@
 /*
+cmd/create/backup.go
+
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 
 */
-// cmd/create/backup.go
+
 package create
 
 import (
@@ -17,7 +19,7 @@ import (
 )
 
 // createBackupCmd represents the createBackup command
-var createBackupCmd = &cobra.Command{
+var CreateBackupCmd = &cobra.Command{
 	Use:   "backup",
 	Short: "Create a new restic backup",
 	Long: `This command initializes a restic repository if not already initialized,
@@ -77,7 +79,7 @@ func ensureResticInstalled() error {
 	_, err := exec.LookPath("restic")
 	if err != nil {
 		log.Error("Restic is not installed", zap.Error(err))
-		return fmt.Errorf("Restic is not installed: run `sudo apt install restic`")
+		return fmt.Errorf("restic is not installed: run `sudo apt install restic`")
 	}
 	log.Info("Restic is installed and ready to use")
 	return nil
@@ -159,5 +161,5 @@ func hostname() string {
 }
 
 func init() {
-	CreateCmd.AddCommand(createBackupCmd)
+	CreateCmd.AddCommand(CreateBackupCmd)
 }
