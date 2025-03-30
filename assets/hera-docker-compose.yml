@@ -32,7 +32,7 @@ services:
       - postgresql
       - redis
     environment:
-      AUTHENTIK_SECRET_KEY: "changeme1"
+      AUTHENTIK_SECRET_KEY: "changeme"
       AUTHENTIK_POSTGRESQL__HOST: postgresql
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__NAME: authentik
@@ -54,7 +54,7 @@ services:
     depends_on:
       - authentik-server
     environment:
-      AUTHENTIK_SECRET_KEY: "change_this_secret_key"
+      AUTHENTIK_SECRET_KEY: "changeme"
       AUTHENTIK_POSTGRESQL__HOST: postgresql
       AUTHENTIK_POSTGRESQL__USER: authentik
       AUTHENTIK_POSTGRESQL__NAME: authentik

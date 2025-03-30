@@ -1,4 +1,4 @@
-// cmd/deploy/hera.go
+// cmd/create/hera.go
 
 package create
 
@@ -48,13 +48,16 @@ var CreateHeraCmd = &cobra.Command{
 			log.Fatal("Failed to read Hera Compose file", zap.Error(err))
 		}
 
-		// Generate password and inject it
-		password, err := utils.GeneratePassword(20)
+		// Inject secrets from placeholders
+		newDataBytes, replacements, err := utils.InjectSecretsFromPlaceholders(data)
 		if err != nil {
-			log.Fatal("Failed to generate password", zap.Error(err))
+			log.Fatal("Failed to inject secrets", zap.Error(err))
 		}
-		newData := strings.ReplaceAll(string(data), "changeme", password)
-		log.Info("🔐 Password injected into Compose file", zap.String("password", password))
+		newData := string(newDataBytes)
+
+		for placeholder, secret := range replacements {
+			log.Info("🔐 Secret injected", zap.String("placeholder", placeholder), zap.String("value", secret))
+		}
 
 		// Add 'version: "3.8"' if missing
 		if !strings.HasPrefix(newData, "version:") {
@@ -87,8 +90,7 @@ var CreateHeraCmd = &cobra.Command{
 
 		// Output info
 		fmt.Println("\n🔗 Hera is now deploying.")
-		fmt.Printf("Access the Authentik UI at: https://hera.cybermonkey.net.au (or your assigned domain)\n")
-		fmt.Printf("Admin credentials are likely seeded inside the UI setup. The injected password: %s\n", password)
+
 		fmt.Println("🎉 Deployment complete — follow the web UI instructions to finish setup.")
 	},
 }
