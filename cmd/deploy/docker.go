@@ -95,3 +95,7 @@ func setupDockerNonRoot(log *zap.Logger) {
 	}
 	log.Info("Note: Log out and log back in or run 'newgrp docker' to apply group membership.")
 }
+
+func init() {
+	DeployCmd.AddCommand(DockerCmd)
+}

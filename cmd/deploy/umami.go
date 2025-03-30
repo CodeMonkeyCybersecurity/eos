@@ -18,7 +18,7 @@ import (
 )
 
 // umamiCmd represents the Umami installation command.
-var umamiCmd = &cobra.Command{
+var UmamiCmd = &cobra.Command{
 	Use:   "umami",
 	Short: "Install and deploy Umami",
 	Long: `Install and deploy Umami to /opt/umami by:
@@ -102,4 +102,9 @@ var umamiCmd = &cobra.Command{
 		log.Info("Umami installation complete",
 			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", utils.GetInternalHostname())))
 	},
+}
+
+func init() {
+	DeployCmd.AddCommand(TrivyCmd)
+
 }

@@ -146,3 +146,8 @@ smtp_use_tls = yes
 	defer f.Close()
 	f.WriteString(config)
 }
+
+func init() {
+
+	DeployCmd.AddCommand(PostfixCmd)
+}

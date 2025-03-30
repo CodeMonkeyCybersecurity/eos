@@ -13,7 +13,7 @@ import (
 )
 
 // vaultCmd represents the vault command under the "install" group.
-var vaultCmd = &cobra.Command{
+var VaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Installs and initializes HashiCorp Vault in production mode via snap",
 	Long: `This command installs HashiCorp Vault using snap and starts Vault in production mode.
@@ -103,4 +103,10 @@ ui = true
 
 		// Additional logic to check Vault status, init/unseal, etc. can go here
 	},
+}
+
+func init() {
+
+	DeployCmd.AddCommand(VaultCmd)
+
 }

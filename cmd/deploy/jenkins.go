@@ -19,7 +19,7 @@ import (
 )
 
 // jenkinsCmd represents the Jenkins installation command.
-var jenkinsCmd = &cobra.Command{
+var JenkinsCmd = &cobra.Command{
 	Use:   "jenkins",
 	Short: "Install and deploy Jenkins",
 	Long: `Install and deploy Jenkins to /opt/jenkins by:
@@ -126,4 +126,10 @@ var jenkinsCmd = &cobra.Command{
 			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", utils.GetInternalHostname())))
 
 	},
+}
+
+func init() {
+
+	DeployCmd.AddCommand(JenkinsCmd)
+
 }

@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var heraCmd = &cobra.Command{
+var HeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deploy Hera (Authentik) for self-service identity & access management",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -57,4 +57,10 @@ func deployHera() error {
 	}
 
 	return nil
+}
+
+func init() {
+
+	DeployCmd.AddCommand(HeraCmd)
+
 }

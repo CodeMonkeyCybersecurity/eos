@@ -10,7 +10,7 @@ import (
 )
 
 // trivyCmd represents the trivy installation command.
-var trivyCmd = &cobra.Command{
+var TrivyCmd = &cobra.Command{
 	Use:   "trivy",
 	Short: "Install Trivy vulnerability scanner",
 	Long: `This command installs the Trivy vulnerability scanner on your system.
@@ -43,4 +43,8 @@ func installTrivy() {
 		}
 	}
 	fmt.Println("Trivy installation completed successfully.")
+}
+
+func init() {
+	DeployCmd.AddCommand(TrivyCmd)
 }

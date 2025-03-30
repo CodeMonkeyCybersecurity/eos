@@ -23,14 +23,4 @@ For example:
 func init() {
 	// Initialize the shared logger for the entire deploy package
 	log = logger.L()
-
-	// Attach subcommands
-	DeployCmd.AddCommand(trivyCmd)
-	DeployCmd.AddCommand(vaultCmd)
-	DeployCmd.AddCommand(umamiCmd)
-	DeployCmd.AddCommand(jenkinsCmd)
-	DeployCmd.AddCommand(zabbixCmd)
-	DeployCmd.AddCommand(heraCmd)
-	DeployCmd.AddCommand(DockerCmd)
-	DeployCmd.AddCommand(PostfixCmd)
 }

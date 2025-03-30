@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var zabbixCmd = &cobra.Command{
+var ZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
 	Short: "Deploy Zabbix monitoring stack using Docker Compose",
 	Run: func(cmd *cobra.Command, args []string) {
@@ -52,4 +52,10 @@ func deployZabbix() error {
 	}
 
 	return nil
+}
+
+func init() {
+
+	DeployCmd.AddCommand(ZabbixCmd)
+
 }
