@@ -9,7 +9,7 @@ services:
       POSTGRES_DB: authentik
     volumes:
       - postgresql:/var/lib/postgresql/data
-    network:
+    networks:
       - arachne-net
 
   redis:
@@ -18,7 +18,7 @@ services:
     restart: always
     volumes:
       - redis:/data
-    network:
+    networks:
       - arachne-net
 
 
@@ -42,7 +42,7 @@ services:
     volumes:
       - media:/media
       - custom-templates:/templates
-    network:
+    networks:
       - arachne-net
 
 
@@ -62,7 +62,7 @@ services:
     volumes:
       - media:/media
       - custom-templates:/templates
-    network:
+    networks:
       - arachne-net
 
 volumes:
