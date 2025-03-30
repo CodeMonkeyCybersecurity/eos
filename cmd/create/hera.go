@@ -1,16 +1,18 @@
-// cmd/create/hera.go
+// cmd/deploy/hera.go
 
 package create
 
 import (
 	"fmt"
-	"io"
 	"os"
-	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -19,96 +21,78 @@ import (
 var CreateHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deploy Hera (Authentik) for self-service identity & access management",
+	Long: `Deploy Hera (Authentik) to /opt/hera by:
+- Copying the Docker Compose file from eos/assets/hera-docker-compose.yml
+- Replacing all instances of 'changeme' with a secure, random password
+- Ensuring the 'arachne-net' Docker network exists
+- Running docker compose up -d
+- Showing running containers and service access info`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
-		log.Info("Starting Hera (Authentik) deployment...")
+		log.Info("🚀 Starting Hera (Authentik) deployment")
 
-		if err := deployHera(); err != nil {
-			log.Error("Hera deployment failed", zap.Error(err))
-			fmt.Println("Hera deployment failed:", err)
-			os.Exit(1)
+		// Ensure installation directory exists
+		if _, err := os.Stat(config.HeraDir); os.IsNotExist(err) {
+			log.Warn("Hera directory does not exist; creating it", zap.String("path", config.HeraDir))
+			if err := os.MkdirAll(config.HeraDir, 0755); err != nil {
+				log.Fatal("Failed to create Hera directory", zap.Error(err))
+			}
 		}
 
-		log.Info("✅ Hera successfully deployed")
-		fmt.Println("Hera available at https://hera.domain.com")
+		src := "assets/hera-docker-compose.yml"
+		dst := config.HeraComposeYML
+
+		// Read compose file
+		data, err := os.ReadFile(src)
+		if err != nil {
+			log.Fatal("Failed to read Hera Compose file", zap.Error(err))
+		}
+
+		// Generate password and inject it
+		password, err := utils.GeneratePassword(20)
+		if err != nil {
+			log.Fatal("Failed to generate password", zap.Error(err))
+		}
+		newData := strings.ReplaceAll(string(data), "changeme", password)
+		log.Info("🔐 Password injected into Compose file", zap.String("password", password))
+
+		// Add 'version: "3.8"' if missing
+		if !strings.HasPrefix(newData, "version:") {
+			newData = "version: \"3.8\"\n" + newData
+			log.Info("Inserted Compose version declaration")
+		}
+
+		// Write the processed file
+		if err := os.WriteFile(dst, []byte(newData), 0644); err != nil {
+			log.Fatal("Failed to write processed Compose file", zap.Error(err))
+		}
+		log.Info("✅ Compose file prepared", zap.String("path", dst))
+
+		// Ensure external network
+		if err := docker.EnsureArachneNetwork(); err != nil {
+			log.Fatal("Could not create or verify arachne-net", zap.Error(err))
+		}
+
+		// Deploy containers
+		log.Info("Running docker compose up -d", zap.String("dir", config.HeraDir))
+		if err := execute.ExecuteInDir(config.HeraDir, "docker", "compose", "-f", dst, "up", "-d"); err != nil {
+			log.Fatal("Failed to run docker compose", zap.Error(err))
+		}
+
+		// Wait for services to come up
+		time.Sleep(5 * time.Second)
+		if err := docker.CheckDockerContainers(); err != nil {
+			log.Warn("Docker containers may not have started cleanly", zap.Error(err))
+		}
+
+		// Output info
+		fmt.Println("\n🔗 Hera is now deploying.")
+		fmt.Printf("Access the Authentik UI at: https://hera.cybermonkey.net.au (or your assigned domain)\n")
+		fmt.Printf("Admin credentials are likely seeded inside the UI setup. The injected password: %s\n", password)
+		fmt.Println("🎉 Deployment complete — follow the web UI instructions to finish setup.")
 	},
 }
 
-func deployHera() error {
-	log := logger.GetLogger()
-
-	// Ensure Docker is installed
-	if err := docker.CheckIfDockerInstalled(); err != nil {
-		return fmt.Errorf("docker check failed: %w", err)
-	}
-
-	// Ensure Docker Compose is installed
-	if err := docker.CheckIfDockerComposeInstalled(); err != nil {
-		return fmt.Errorf("docker-compose check failed: %w", err)
-	}
-
-	// Create target directory if it doesn't exist
-	if err := os.MkdirAll(config.HeraDir, 0755); err != nil {
-		return fmt.Errorf("failed to create %s: %w", config.HeraDir, err)
-	}
-
-	// Copy the compose file if it doesn't exist in the target directory
-	if _, err := os.Stat(config.HeraComposeYML); os.IsNotExist(err) {
-		// Assume assets directory is relative to the current working directory
-		src := filepath.Join("assets", "hera-docker-compose.yml")
-		dst := config.HeraComposeYML
-		log.Info("Copying compose file", zap.String("from", src), zap.String("to", dst))
-		if err := copyFile(src, dst); err != nil {
-			return fmt.Errorf("failed to copy compose file: %w", err)
-		}
-	}
-
-	// Run docker compose up
-	log.Info("Running docker compose up...")
-	if err := docker.RunCommand("docker", "compose", "-f", config.HeraComposeYML, "up", "-d"); err != nil {
-		return fmt.Errorf("failed to run docker compose: %w", err)
-	}
-
-	return nil
-}
-
-// copyFile copies a file from src to dst.
-func copyFile(src, dst string) error {
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return fmt.Errorf("could not stat source file: %w", err)
-	}
-
-	if !sourceFileStat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file", src)
-	}
-
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("could not open source file: %w", err)
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("could not create destination file: %w", err)
-	}
-	defer dstFile.Close()
-
-	if _, err := io.Copy(dstFile, srcFile); err != nil {
-		return fmt.Errorf("copy failed: %w", err)
-	}
-
-	// Optionally, copy file permissions.
-	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
-		return fmt.Errorf("chmod failed: %w", err)
-	}
-
-	return nil
-}
-
 func init() {
-
 	CreateCmd.AddCommand(CreateHeraCmd)
-
 }
