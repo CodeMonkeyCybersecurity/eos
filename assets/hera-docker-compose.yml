@@ -42,7 +42,8 @@ services:
     volumes:
       - media:/media
       - custom-templates:/templates
-
+    networks:
+      - arachne-net
 
   authentik-worker:
     image: ghcr.io/goauthentik/server:latest
