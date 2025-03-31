@@ -5,6 +5,7 @@ package create
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -22,16 +22,16 @@ var CreateHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deploy Hera (Authentik) for self-service identity & access management",
 	Long: `Deploy Hera (Authentik) to /opt/hera by:
-- Copying the Docker Compose file from eos/assets/hera-docker-compose.yml
-- Replacing all instances of 'changeme' with a secure, random password
-- Ensuring the 'arachne-net' Docker network exists
+- Downloading the latest docker-compose.yml from goauthentik.io
+- Generating secrets and writing them to a .env file
+- Creating the external Docker network 'arachne-net'
 - Running docker compose up -d
-- Showing running containers and service access info`,
+- Displaying service status and access URL`,
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 		log.Info("🚀 Starting Hera (Authentik) deployment")
 
-		// Ensure installation directory exists
+		// Ensure target directory exists
 		if _, err := os.Stat(config.HeraDir); os.IsNotExist(err) {
 			log.Warn("Hera directory does not exist; creating it", zap.String("path", config.HeraDir))
 			if err := os.MkdirAll(config.HeraDir, 0755); err != nil {
@@ -39,59 +39,77 @@ var CreateHeraCmd = &cobra.Command{
 			}
 		}
 
-		src := "assets/hera-docker-compose.yml"
-		dst := config.HeraComposeYML
+		// Download the latest docker-compose.yml
+		log.Info("📦 Downloading latest docker-compose.yml")
+		if err := execute.ExecuteInDir(config.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
+			log.Fatal("Failed to download docker-compose.yml", zap.Error(err))
+		}
 
-		// Read compose file
-		data, err := os.ReadFile(src)
+		// Generate secrets
+		log.Info("🔐 Generating secrets for .env file")
+		pgPassCmd := exec.Command("openssl", "rand", "-base64", "36")
+		secretKeyCmd := exec.Command("openssl", "rand", "-base64", "60")
+
+		pgPassBytes, err := pgPassCmd.Output()
 		if err != nil {
-			log.Fatal("Failed to read Hera Compose file", zap.Error(err))
+			log.Fatal("Failed to generate PG_PASS", zap.Error(err))
 		}
-
-		// Inject secrets from placeholders
-		newDataBytes, replacements, err := utils.InjectSecretsFromPlaceholders(data)
+		secretKeyBytes, err := secretKeyCmd.Output()
 		if err != nil {
-			log.Fatal("Failed to inject secrets", zap.Error(err))
-		}
-		newData := string(newDataBytes)
-
-		for placeholder, secret := range replacements {
-			log.Info("🔐 Secret injected", zap.String("placeholder", placeholder), zap.String("value", secret))
+			log.Fatal("Failed to generate AUTHENTIK_SECRET_KEY", zap.Error(err))
 		}
 
-		// Add 'version: "3.8"' if missing
-		if !strings.HasPrefix(newData, "version:") {
-			newData = "version: \"3.8\"\n" + newData
-			log.Info("Inserted Compose version declaration")
+		pgPass := strings.TrimSpace(string(pgPassBytes))
+		secretKey := strings.TrimSpace(string(secretKeyBytes))
+
+		envContents := []string{
+			fmt.Sprintf("PG_PASS=%s", pgPass),
+			fmt.Sprintf("AUTHENTIK_SECRET_KEY=%s", secretKey),
+			"AUTHENTIK_ERROR_REPORTING__ENABLED=true",
+			"COMPOSE_PORT_HTTP=80",
+			"COMPOSE_PORT_HTTPS=443",
+			"AUTHENTIK_EMAIL__HOST=localhost",
+			"AUTHENTIK_EMAIL__PORT=25",
+			"AUTHENTIK_EMAIL__USERNAME=",
+			"AUTHENTIK_EMAIL__PASSWORD=",
+			"AUTHENTIK_EMAIL__USE_TLS=false",
+			"AUTHENTIK_EMAIL__USE_SSL=false",
+			"AUTHENTIK_EMAIL__TIMEOUT=10",
+			"AUTHENTIK_EMAIL__FROM=authentik@localhost",
 		}
 
-		// Write the processed file
-		if err := os.WriteFile(dst, []byte(newData), 0644); err != nil {
-			log.Fatal("Failed to write processed Compose file", zap.Error(err))
+		envPath := config.HeraDir + "/.env"
+		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
+			log.Fatal("Failed to write .env file", zap.Error(err))
 		}
-		log.Info("✅ Compose file prepared", zap.String("path", dst))
+		log.Info("✅ .env file created", zap.String("path", envPath))
 
 		// Ensure external network
 		if err := docker.EnsureArachneNetwork(); err != nil {
 			log.Fatal("Could not create or verify arachne-net", zap.Error(err))
 		}
 
-		// Deploy containers
-		log.Info("Running docker compose up -d", zap.String("dir", config.HeraDir))
-		if err := execute.ExecuteInDir(config.HeraDir, "docker", "compose", "-f", dst, "up", "-d"); err != nil {
+		// Pull images and deploy
+		log.Info("🐳 Pulling docker images")
+		if err := execute.ExecuteInDir(config.HeraDir, "docker", "compose", "pull"); err != nil {
+			log.Fatal("Failed to pull docker images", zap.Error(err))
+		}
+
+		log.Info("🚀 Launching Hera via docker compose")
+		if err := execute.ExecuteInDir(config.HeraDir, "docker", "compose", "up", "-d"); err != nil {
 			log.Fatal("Failed to run docker compose", zap.Error(err))
 		}
 
-		// Wait for services to come up
 		time.Sleep(5 * time.Second)
+
+		log.Info("🔍 Verifying container status")
 		if err := docker.CheckDockerContainers(); err != nil {
 			log.Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 
-		// Output info
-		fmt.Println("\n🔗 Hera is now deploying.")
-
-		fmt.Println("🎉 Deployment complete — follow the web UI instructions to finish setup.")
+		fmt.Println("\n🎉 Hera (Authentik) is deploying.")
+		fmt.Println("Visit: http://<your-server>:9000/if/flow/initial-setup/")
+		fmt.Println("Be sure to include the trailing slash or you may see a 404.")
 	},
 }
 
