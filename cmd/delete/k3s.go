@@ -3,6 +3,7 @@ package delete
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
