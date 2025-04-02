@@ -2,7 +2,6 @@
 cmd/create/create.go
 
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
-
 */
 package create
 
@@ -24,7 +23,7 @@ For example:
 	eos deploy vault
 	eos deploy umami`,
 
-	Aliases: []string{"deploy", "install"},
+	Aliases: []string{"deploy", "install", "setup"},
 
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
