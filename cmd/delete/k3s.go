@@ -4,10 +4,12 @@ package delete
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var DeleteK3sCmd = &cobra.Command{
@@ -15,12 +17,13 @@ var DeleteK3sCmd = &cobra.Command{
 	Short: "Uninstall K3s from this machine",
 	Long: `Detects whether this machine is running a K3s server or agent,
 and removes it by running the appropriate uninstall scripts in the correct order.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := uninstallK3s(); err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to uninstall K3s: %v\n", err)
-			os.Exit(1)
+			log.Error("❌ Failed to uninstall K3s", zap.Error(err))
+			return err
 		}
-		fmt.Println("✅ K3s uninstallation completed.")
+		log.Info("✅ K3s uninstallation completed.")
+		return nil
 	},
 }
 
@@ -33,12 +36,13 @@ func uninstallK3s() error {
 
 	var ranAny bool
 	for role, path := range scripts {
-		if fileExists(path) {
-			fmt.Printf("▶ Detected %s uninstall script: %s\n", role, path)
-			err := runScript(path)
+		if utils.FileExists(path) {
+			log.Sugar().Infof("▶ Detected %s uninstall script: %s", role, path)
+			err := execute.Execute("sudo", path)
 			if err != nil {
 				return fmt.Errorf("failed to run %s script: %w", role, err)
 			}
+			log.Sugar().Infof("✅ Successfully ran %s script", role)
 			ranAny = true
 		}
 	}
@@ -50,23 +54,6 @@ func uninstallK3s() error {
 	return nil
 }
 
-func runScript(path string) error {
-	cmd := exec.Command("sudo", path)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Env = os.Environ()
-	fmt.Printf("➡ Running %s...\n", filepath.Base(path))
-	return cmd.Run()
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 func init() {
-
-	// Initialize the shared logger for the entire install package
 	DeleteCmd.AddCommand(DeleteK3sCmd)
-
 }
