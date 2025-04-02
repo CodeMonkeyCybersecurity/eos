@@ -112,3 +112,8 @@ func CatFile(path string) error {
 	_, err = os.Stdout.Write(data)
 	return err
 }
+
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
