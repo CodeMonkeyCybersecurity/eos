@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -77,27 +77,31 @@ func deployK3s() {
 	checkFirewallPorts()
 
 	var installCmd string
+
 	if role == "server" {
-		// Ask for TLS SAN with default "cluster.k3s.domain.com".
+		// Ask for TLS SAN with default
 		fmt.Print("Enter TLS SAN (default: cluster.k3s.domain.com): ")
 		tlsSANInput, _ := reader.ReadString('\n')
 		tlsSAN := strings.TrimSpace(tlsSANInput)
 		if tlsSAN == "" {
 			tlsSAN = "cluster.k3s.domain.com"
 		}
-		// Build the server install command.
+
 		installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | sh -s - server --tls-san %s", tlsSAN)
+		if nodeIP != "" {
+			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
+		}
+
 	} else if role == "worker" {
-		// Ask for the server URL and node token.
+		// Ask for the server URL and node token
 		fmt.Print("Enter the K3s server URL (e.g., https://server-ip:6443): ")
 		serverURLInput, _ := reader.ReadString('\n')
 		serverURL := strings.TrimSpace(serverURLInput)
 
-		// Wrap IPv6 addresses in brackets if needed
+		// Wrap IPv6 in brackets
 		if strings.Contains(serverURL, ":") && !strings.Contains(serverURL, "[") {
 			serverURL = fmt.Sprintf("https://[%s]:6443", serverURL)
 		} else if !strings.HasPrefix(serverURL, "https://") {
-			// Default to HTTPS if no scheme provided
 			serverURL = fmt.Sprintf("https://%s:6443", serverURL)
 		}
 
@@ -105,15 +109,17 @@ func deployK3s() {
 		tokenInput, _ := reader.ReadString('\n')
 		token := strings.TrimSpace(tokenInput)
 
-		installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | K3S_URL=%s K3S_TOKEN=%s sh -", serverURL, token)
+		// Worker: export env vars + pipe
+		installCmd = fmt.Sprintf(
+			"export K3S_URL=%s\nexport K3S_TOKEN=%s\ncurl -sfL https://get.k3s.io | sh -",
+			serverURL, token,
+		)
+		if nodeIP != "" {
+			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
+		}
 	} else {
 		fmt.Println("Invalid role. Please enter 'server' or 'worker'.")
 		os.Exit(1)
-	}
-
-	// Append the --node-ip flag if we detected a Tailscale IPv6 address.
-	if nodeIP != "" {
-		installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
 	}
 
 	// Display the generated install command for user confirmation.
