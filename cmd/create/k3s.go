@@ -4,7 +4,6 @@ package create
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -147,7 +146,7 @@ func saveScript(cmdStr string) string {
 	os.MkdirAll(dir, 0755)
 	scriptPath := dir + "/k3s-install.sh"
 	scriptContent := "#!/bin/sh\n" + cmdStr + "\n"
-	err = ioutil.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
 	if err != nil {
 		fmt.Printf("Warning: Failed to write script file: %v\n", err)
 	}
