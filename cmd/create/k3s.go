@@ -86,37 +86,38 @@ func deployK3s() {
 		if tlsSAN == "" {
 			tlsSAN = "cluster.k3s.domain.com"
 		}
-
+	
 		installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | sh -s - server --tls-san %s", tlsSAN)
 		if nodeIP != "" {
 			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
 		}
-
+	
 	} else if role == "worker" {
 		// Ask for the server URL and node token
 		fmt.Print("Enter the K3s server URL (e.g., https://server-ip:6443): ")
 		serverURLInput, _ := reader.ReadString('\n')
 		serverURL := strings.TrimSpace(serverURLInput)
-
-		// Wrap IPv6 in brackets
+	
+		// Wrap IPv6 in brackets if needed
 		if strings.Contains(serverURL, ":") && !strings.Contains(serverURL, "[") {
 			serverURL = fmt.Sprintf("https://[%s]:6443", serverURL)
 		} else if !strings.HasPrefix(serverURL, "https://") {
 			serverURL = fmt.Sprintf("https://%s:6443", serverURL)
 		}
-
+	
 		fmt.Print("Enter the K3s node token: ")
 		tokenInput, _ := reader.ReadString('\n')
 		token := strings.TrimSpace(tokenInput)
-
-		// Worker: export env vars + pipe
+	
+		// Worker: export env vars + pipe (using "sh -s -" for correct argument handling)
 		installCmd = fmt.Sprintf(
-			"export K3S_URL=%s\nexport K3S_TOKEN=%s\ncurl -sfL https://get.k3s.io | sh -",
+			"export K3S_URL=%s\nexport K3S_TOKEN=%s\ncurl -sfL https://get.k3s.io | sh -s -",
 			serverURL, token,
 		)
 		if nodeIP != "" {
 			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
 		}
+	
 	} else {
 		fmt.Println("Invalid role. Please enter 'server' or 'worker'.")
 		os.Exit(1)
