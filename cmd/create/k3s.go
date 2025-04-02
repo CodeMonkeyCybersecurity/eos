@@ -138,6 +138,9 @@ func deployK3s() {
 	// Write the command to a script file.
 	scriptPath := saveScript(installCmd)
 	fmt.Printf("Executing the install script: %s\n", scriptPath)
+	// Provide additional user guidance:
+	fmt.Println("The installation process may take some time. If it appears to hang, please check /var/log/eos/k3s-deploy.log for detailed output or run the install script manually with debugging enabled.")
+	fmt.Println("To monitor logs in real time, run: tail -f /var/log/eos/k3s-deploy.log")
 
 	// Execute the script using sh.
 	if err := execute.Execute("sh", scriptPath); err != nil {
@@ -155,6 +158,11 @@ func deployK3s() {
 
 // saveScript writes the install command to a script file and returns the file path.
 func saveScript(cmdStr string) string {
+	// Ensure the log directory exists
+	logDir := "/var/log/eos"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		fmt.Printf("Warning: Could not create log directory %s: %v\n", logDir, err)
+	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		homeDir = "."
@@ -162,8 +170,12 @@ func saveScript(cmdStr string) string {
 	dir := homeDir + "/.local/state/eos"
 	os.MkdirAll(dir, 0755)
 	scriptPath := dir + "/k3s-install.sh"
-	// Prepend with set -x for debugging; you could also add redirection to a log file
-	scriptContent := "#!/bin/sh\nset -x\n" + cmdStr + "\n"
+	// Prepend with set -x for debugging and redirect output to a log file.
+	scriptContent := fmt.Sprintf(`#!/bin/sh
+set -x
+exec > >(tee -a %s/k3s-deploy.log) 2>&1
+%s
+`, logDir, cmdStr)
 	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
 	if err != nil {
 		fmt.Printf("Warning: Failed to write script file: %v\n", err)
