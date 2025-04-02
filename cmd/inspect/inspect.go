@@ -17,7 +17,7 @@ var InspectCmd = &cobra.Command{
 	Use:     "inspect",
 	Short:   "Inspect resources (e.g., processes, users, storage)",
 	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
-	Aliases: []string{"read", "get"},
+	Aliases: []string{"read", "get", "list", "ls"},
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for read.", zap.String("command", cmd.Use))
