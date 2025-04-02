@@ -92,6 +92,14 @@ func deployK3s() {
 		serverURLInput, _ := reader.ReadString('\n')
 		serverURL := strings.TrimSpace(serverURLInput)
 
+		// Wrap IPv6 addresses in brackets if needed
+		if strings.Contains(serverURL, ":") && !strings.Contains(serverURL, "[") {
+			serverURL = fmt.Sprintf("https://[%s]:6443", serverURL)
+		} else if !strings.HasPrefix(serverURL, "https://") {
+			// Default to HTTPS if no scheme provided
+			serverURL = fmt.Sprintf("https://%s:6443", serverURL)
+		}
+
 		fmt.Print("Enter the K3s node token: ")
 		tokenInput, _ := reader.ReadString('\n')
 		token := strings.TrimSpace(tokenInput)
