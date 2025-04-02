@@ -15,6 +15,15 @@ import (
 
 var log *zap.Logger
 
+func GetLogFileWriter(logPath string) zapcore.WriteSyncer {
+    file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+    if err != nil {
+        fmt.Fprintf(os.Stderr, "⚠️ Could not open log file %s: %v\n", logPath, err)
+        return zapcore.AddSync(os.Stdout)
+    }
+    return zapcore.AddSync(file)
+}
+
 func DefaultConfig() zap.Config {
 	level := zap.InfoLevel
 	switch os.Getenv("LOG_LEVEL") {
@@ -32,6 +41,7 @@ func DefaultConfig() zap.Config {
 		level = zap.FatalLevel
 	}
 
+	isDev := os.Getenv("ENV") == "development"
 	// Use ResolveLogPath to get the appropriate log file path for the OS.
 	logPath := ResolveLogPath()
 	if logPath == "" {
@@ -41,7 +51,7 @@ func DefaultConfig() zap.Config {
 
 	return zap.Config{
 		Level:            zap.NewAtomicLevelAt(level),
-		Development:      true,
+		Development:      isDev,
 		Encoding:         "json",
 		OutputPaths:      []string{"stdout", logPath},
 		ErrorOutputPaths: []string{"stderr"},
@@ -188,10 +198,10 @@ func ResolveLogPath() string {
 
 	for _, path := range paths {
 		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			continue
 		}
-		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err == nil {
 			file.Close()
 			return path
@@ -228,7 +238,7 @@ func getLogFileWriter(logPath string) zapcore.WriteSyncer {
 		fmt.Fprintf(os.Stderr, "⚠️ Could not prepare log file %s: %v\n", logPath, err)
 		return zapcore.AddSync(os.Stdout)
 	}
-	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "⚠️ Could not open log file %s: %v\n", logPath, err)
 		return zapcore.AddSync(os.Stdout)
