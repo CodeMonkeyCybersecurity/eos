@@ -3,7 +3,6 @@ package delete
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -58,14 +57,12 @@ func uninstallK3s() error {
 
 	if !ranAny {
 		log.Warn("⚠️ No uninstall scripts were found at expected paths. Assuming K3s is not installed.")
-		// Instead of returning an error, we exit gracefully
 		return nil
 	}
 
 	return nil
 }
 
-// DeleteCmd represents the delete command
 func init() {
 	DeleteCmd.AddCommand(DeleteK3sCmd)
 }
