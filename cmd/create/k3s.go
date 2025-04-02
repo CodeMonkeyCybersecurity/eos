@@ -132,8 +132,8 @@ func deployK3s() {
 
 	fmt.Println("K3s deployment initiated. Follow any on-screen instructions as needed.")
 	if role == "server" {
-		// Inform the user where to find the join token.
-		fmt.Println("Once the server is installed, the join token will be available at /var/lib/rancher/k3s/server/node-token")
+		// Output the join token after installation.
+		outputJoinToken()
 	}
 }
 
