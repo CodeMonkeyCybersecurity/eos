@@ -129,8 +129,8 @@ func deployK3s() {
 	confirmInput, _ := reader.ReadString('\n')
 	confirm := strings.TrimSpace(strings.ToLower(confirmInput))
 	if confirm != "y" && confirm != "yes" {
-		fmt.Println("Installation command not executed. The command has been saved for manual execution.")
-		saveScript(installCmd)
+		scriptPath := saveScript(installCmd)
+		fmt.Printf("Installation command not executed. It has been saved to: %s\n", scriptPath)
 		return
 	}
 
