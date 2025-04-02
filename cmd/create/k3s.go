@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
@@ -190,4 +191,23 @@ func checkFirewallPorts() {
 	fmt.Println("- TCP 6443 (Kubernetes API server)")
 	fmt.Println("- TCP 10250 (kubelet)")
 	fmt.Println("- Other required ports as per your network configuration")
+}
+
+// outputJoinToken waits for the K3s join token to be available and prints it.
+func outputJoinToken() {
+	tokenPath := "/var/lib/rancher/k3s/server/node-token"
+	fmt.Println("Retrieving K3s join token...")
+	maxAttempts := 30
+	for i := 0; i < maxAttempts; i++ {
+		tokenData, err := os.ReadFile(tokenPath)
+		if err == nil {
+			token := strings.TrimSpace(string(tokenData))
+			if token != "" {
+				fmt.Printf("K3s Join Token: %s\n", token)
+				return
+			}
+		}
+		time.Sleep(1 * time.Second)
+	}
+	fmt.Println("Unable to retrieve join token. Please check the K3s server status.")
 }
