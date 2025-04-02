@@ -37,17 +37,29 @@ func uninstallK3s() error {
 	var ranAny bool
 	for role, path := range scripts {
 		if utils.FileExists(path) {
-			log.Sugar().Infof("▶ Detected %s uninstall script: %s", role, path)
+			log.Info("▶ Detected uninstall script",
+				zap.String("role", role),
+				zap.String("path", path),
+			)
+
 			err := execute.Execute("sudo", path)
 			if err != nil {
+				log.Error("❌ Script execution failed",
+					zap.String("script", filepath.Base(path)),
+					zap.Error(err),
+				)
 				return fmt.Errorf("failed to run %s script: %w", role, err)
 			}
-			log.Sugar().Infof("✅ Successfully ran %s script", role)
+
+			log.Info("✅ Script executed successfully",
+				zap.String("role", role),
+			)
 			ranAny = true
 		}
 	}
 
 	if !ranAny {
+		log.Warn("⚠️ No uninstall scripts were found at expected paths")
 		return fmt.Errorf("no uninstall scripts found at expected paths")
 	}
 
