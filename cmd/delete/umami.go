@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var deleteUmamiCmd = &cobra.Command{
+var DeleteUmamiCmd = &cobra.Command{
 	Use:   "umami",
 	Short: "Delete and clean up Umami",
 	Long: `Stops and removes Umami containers, backs up the data volumes,
@@ -70,4 +70,10 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.
 
 		log.Info("Umami deletion process complete")
 	},
+}
+
+func init() {
+
+	DeleteCmd.AddCommand(DeleteUmamiCmd)
+
 }

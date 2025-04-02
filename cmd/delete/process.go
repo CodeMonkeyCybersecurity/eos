@@ -7,7 +7,7 @@ import (
 )
 
 // deleteProcessCmd represents the command to delete a process.
-var deleteProcessCmd = &cobra.Command{
+var DeleteProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Delete process",
 	Long:  `Delete a process by specifying the target process.`,
@@ -19,4 +19,11 @@ var deleteProcessCmd = &cobra.Command{
 		log.Info("Deleting process", zap.String("process", process))
 		// Add your delete logic here.
 	},
+}
+
+func init() {
+
+	// Initialize the shared logger for the entire install package
+	DeleteCmd.AddCommand(DeleteProcessCmd)
+
 }

@@ -2,12 +2,12 @@
 package delete
 
 import (
-	"go.uber.org/zap"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // deleteUsersCmd represents the command to delete users
-var deleteUsersCmd = &cobra.Command{
+var DeleteUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Delete users",
 	Long:  `Delete users by specifying the target user.`,
@@ -19,4 +19,10 @@ var deleteUsersCmd = &cobra.Command{
 		log.Info("Deleting user", zap.String("user", user))
 		// Add your delete logic here.
 	},
+}
+
+func init() {
+
+	DeleteCmd.AddCommand(DeleteUsersCmd)
+
 }

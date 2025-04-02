@@ -10,7 +10,7 @@ import (
 )
 
 // deleteJenkinsCmd represents the command to delete Jenkins.
-var deleteJenkinsCmd = &cobra.Command{
+var DeleteJenkinsCmd = &cobra.Command{
 	Use:   "jenkins",
 	Short: "Delete and clean up Jenkins",
 	Long: `Stops and removes Jenkins containers, backs up the data volumes,
@@ -71,4 +71,10 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 
 		log.Info("Jenkins deletion process complete")
 	},
+}
+
+func init() {
+
+	DeleteCmd.AddCommand(DeleteJenkinsCmd)
+
 }

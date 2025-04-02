@@ -8,7 +8,7 @@ import (
 )
 
 // deleteStorageCmd represents the command for deleting storage resources.
-var deleteStorageCmd = &cobra.Command{
+var DeleteStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Delete storage resources",
 	Long:  `This command allows you to delete storage resources in the system.`,
@@ -20,4 +20,10 @@ var deleteStorageCmd = &cobra.Command{
 		log.Info(fmt.Sprintf("Deleting storage: %s...", storageDetails))
 		// Add your logic to delete storage resources
 	},
+}
+
+func init() {
+
+	DeleteCmd.AddCommand(DeleteStorageCmd)
+
 }

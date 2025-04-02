@@ -34,11 +34,4 @@ var log *zap.Logger
 func init() {
 	log = logger.GetLogger()
 
-	// Initialize the shared logger for the entire install package
-	DeleteCmd.AddCommand(deleteProcessCmd)
-	DeleteCmd.AddCommand(deleteUsersCmd)
-	DeleteCmd.AddCommand(deleteStorageCmd)
-	DeleteCmd.AddCommand(deleteUmamiCmd)
-	DeleteCmd.AddCommand(deleteVaultCmd)
-	DeleteCmd.AddCommand(deleteJenkinsCmd)
 }
