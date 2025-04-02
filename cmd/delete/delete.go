@@ -25,7 +25,7 @@ For example:
 	eos delete vault
 	eos delete umami`,
 
-	Aliases: []string{"remove", "install"},
+	Aliases: []string{"remove", "uninstall"},
 }
 
 // log is a package-level variable for the Zap logger.
