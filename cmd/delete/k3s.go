@@ -63,3 +63,10 @@ func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
+func init() {
+
+	// Initialize the shared logger for the entire install package
+	DeleteCmd.AddCommand(DeleteK3sCmd)
+
+}
