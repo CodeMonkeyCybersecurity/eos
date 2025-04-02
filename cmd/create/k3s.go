@@ -11,6 +11,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -132,7 +133,7 @@ func deployK3s() {
 	fmt.Printf("Executing the install script: %s\n", scriptPath)
 
 	// Execute the script using sh.
-	if err := exec.Command("sh", scriptPath).Run(); err != nil {
+	if err := execute.Execute("sh", scriptPath); err != nil {
 		log.Error("Failed to execute install script", zap.Error(err))
 		fmt.Println("Installation failed. Please check the logs for more details.")
 		os.Exit(1)

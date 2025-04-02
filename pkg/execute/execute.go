@@ -1,13 +1,10 @@
-// pkg/exec.go
+// pkg/execute/execute.go
 package execute
 
 import (
 	"fmt"
 	"os/exec"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-
-	"go.uber.org/zap"
+	"strings"
 )
 
 //
@@ -16,61 +13,38 @@ import (
 
 // Execute runs a command with separate arguments.
 func Execute(command string, args ...string) error {
-	logger.Debug("Executing command", zap.String("command", command), zap.Strings("args", args))
-
+	fmt.Printf("➡ Executing command: %s %s\n", command, strings.Join(args, " "))
 	cmd := exec.Command(command, args...)
-	output, err := cmd.CombinedOutput() // Captures both stdout and stderr
-	fmt.Println(string(output))         // Always print command output for visibility
+	output, err := cmd.CombinedOutput()
+	fmt.Print(string(output)) // Always show output
 
 	if err != nil {
-		logger.Error("Command execution failed", zap.String("command", command), zap.Strings("args", args), zap.Error(err), zap.String("output", string(output)))
-		return fmt.Errorf("command failed: %s, output: %s", err, output)
+		return fmt.Errorf("command failed: %s\noutput:\n%s", err, string(output))
 	}
-
-	logger.Info("Command executed successfully", zap.String("command", command), zap.String("output", string(output)))
 	return nil
 }
 
-// ExecuteShell runs a shell command with pipes (`| grep`).
 func ExecuteShell(command string) error {
-	logger.Debug("Executing shell command", zap.String("command", command))
-
+	fmt.Printf("➡ Executing shell command: %s\n", command)
 	cmd := exec.Command("bash", "-c", command)
-	output, err := cmd.CombinedOutput() // Capture full output
-	fmt.Println(string(output))         // Print output for visibility
+	output, err := cmd.CombinedOutput()
+	fmt.Print(string(output))
 
 	if err != nil {
-		logger.Error("Shell command execution failed", zap.String("command", command), zap.Error(err), zap.String("output", string(output)))
-		return fmt.Errorf("shell command failed: %s, output: %s", err, output)
+		return fmt.Errorf("shell command failed: %s\noutput:\n%s", err, string(output))
 	}
-
-	logger.Info("Shell command executed successfully", zap.String("command", command), zap.String("output", string(output)))
 	return nil
 }
 
 func ExecuteInDir(dir, command string, args ...string) error {
-	logger.Debug("Executing command in directory", zap.String("directory", dir), zap.String("command", command), zap.Strings("args", args))
-
+	fmt.Printf("➡ Executing in %s: %s %s\n", dir, command, strings.Join(args, " "))
 	cmd := exec.Command(command, args...)
 	cmd.Dir = dir
-	output, err := cmd.CombinedOutput() // Capture output
-	fmt.Println(string(output))         // Print output for visibility
+	output, err := cmd.CombinedOutput()
+	fmt.Print(string(output))
 
 	if err != nil {
-		logger.Error("Command execution failed in directory",
-			zap.String("directory", dir),
-			zap.String("command", command),
-			zap.Strings("args", args),
-			zap.Error(err),
-			zap.String("output", string(output)),
-		)
-		return fmt.Errorf("command in directory failed: %s, output: %s", err, output)
+		return fmt.Errorf("command in directory failed: %s\noutput:\n%s", err, string(output))
 	}
-
-	logger.Info("Command executed successfully in directory",
-		zap.String("directory", dir),
-		zap.String("command", command),
-		zap.String("output", string(output)),
-	)
 	return nil
 }
