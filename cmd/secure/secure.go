@@ -11,5 +11,6 @@ var SecureCmd = &cobra.Command{
 	Short: "Secure various components",
 	Long: `Secure commands allow you to provision additional components or dependencies.
 For example:
-  eos secure Trivy  - Secures the Trivy vulnerability scanner.`,
+	eos secure Trivy  - Secures the Trivy vulnerability scanner.`,
+	Aliases: []string{"harden"},
 }

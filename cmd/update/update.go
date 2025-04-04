@@ -22,6 +22,7 @@ var UpdateCmd = &cobra.Command{
 		log.Info("No subcommand provided for update.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 	},
+	Aliases: []string{"upgrade", "modify", "change"},
 }
 
 // init registers subcommands for the update command
