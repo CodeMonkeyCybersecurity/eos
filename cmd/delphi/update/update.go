@@ -19,5 +19,4 @@ var UpdateCmd = &cobra.Command{
 func init() {
 	// Will be registered by root or parent{
 	// in update/password.go
-
 }
