@@ -25,7 +25,7 @@ For example:
 	eos deploy umami`,
 
 	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.GetLogger()
+		log := logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 	},

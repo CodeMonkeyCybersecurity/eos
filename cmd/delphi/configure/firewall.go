@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -17,8 +16,6 @@ var ConfigureFirewallCmd = &cobra.Command{
 	Short: "Auto-configure firewall rules for Wazuh on Linux",
 	Long:  "Detects Debian or RHEL and configures UFW or Firewalld for Wazuh agent ports.",
 	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.GetLogger()
-
 		switch platform.DetectLinuxDistro() {
 		case "debian":
 			log.Info("🔧 Configuring UFW on Debian-based system...")
@@ -47,13 +44,23 @@ func configureUFW(log *zap.Logger) {
 }
 
 func configureFirewalld(log *zap.Logger) {
+	log.Info("🚦 Checking Firewalld state")
 	execute.Execute("sudo", "firewall-cmd", "--state")
+
 	for _, port := range wazuhPorts {
+		log.Info("📦 Allowing port", zap.String("port", port))
 		execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-port="+port)
 	}
+
+	log.Info("🔒 Allowing https service")
 	execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-service=https")
+
+	log.Info("🔁 Reloading Firewalld")
 	execute.Execute("sudo", "firewall-cmd", "--reload")
+
+	log.Info("📖 Listing open ports")
 	execute.Execute("sudo", "firewall-cmd", "--list-ports")
+
 	log.Info("✅ Firewalld configuration complete.")
 }
 
