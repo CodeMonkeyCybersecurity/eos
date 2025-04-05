@@ -199,6 +199,12 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		fmt.Println("Admin user created successfully.")
 		fmt.Println("Admin user created successfully with userpass auth.")
 		fmt.Println("\nVault enable steps completed successfully!")
+		fmt.Println("\nYou can now log in with the admin user using the generated password.")
+		fmt.Println("\nRemember to store the unseal keys and root token securely!")
+		fmt.Println("\nPlease now run 'eos secure vault' to secure the Vault service.")
+		fmt.Println("\nYou can also run 'eos logs vault' to view the Vault logs.")
+		fmt.Println("You can also run 'eos update vault' to update the Vault service.")
+		fmt.Println("You can also run 'eos refresh vault' to refresh the Vault service.")
 	},
 }
 
