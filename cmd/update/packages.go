@@ -74,11 +74,13 @@ func scheduleCron(cmd string, osType string) error {
 
 	schedule := fmt.Sprintf("%d %d * * * %s", minute, hour, cmd)
 	log.Info("Generated cron schedule", zap.String("schedule", schedule))
+	log.Info("Scheduled update time", zap.Int("hour", hour), zap.Int("minute", minute))
 
 	// Check for existing cron jobs that already run this command
 	existing, err := exec.Command("crontab", "-l").Output()
 	if err == nil && len(existing) > 0 {
 		if strings.Contains(string(existing), cmd) {
+			log.Debug("Current crontab contents", zap.String("output", string(existing)))
 			log.Warn("Cron job for this update command already exists — skipping scheduling")
 			return nil
 		}
@@ -97,7 +99,7 @@ func scheduleCron(cmd string, osType string) error {
 		taskName := "EosSystemUpdate"
 		timeStr := fmt.Sprintf("%02d:%02d", hour, minute)
 		createTask := exec.Command("schtasks", "/Create", "/SC", "DAILY", "/TN", taskName, "/TR", cmd, "/ST", timeStr)
-		err := createTask.Run()
+		err = createTask.Run()
 		if err != nil {
 			log.Error("Failed to schedule Windows task", zap.Error(err))
 			return err
@@ -113,6 +115,5 @@ func scheduleCron(cmd string, osType string) error {
 
 func init() {
 	UpdateCmd.AddCommand(UpdatePackagesCmd)
-
 	UpdatePackagesCmd.Flags().BoolVar(&Cron, "cron", false, "Schedule this update to run daily at a random time")
 }
