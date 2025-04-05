@@ -26,7 +26,7 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	if err := utils.DownloadFile(config.DelphiPasswdToolPath, config.DelphiPasswdToolURL); err != nil {
 		return fmt.Errorf("failed to download password tool: %w", err)
 	}
-	if err := os.Chmod(config.DelphiPasswdToolURL, 0755); err != nil {
+	if err := os.Chmod(config.DelphiPasswdToolPath, 0755); err != nil {
 		return fmt.Errorf("failed to chmod tool: %w", err)
 	}
 
@@ -39,7 +39,7 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info("Rotating API passwords with admin user 'wazuh'")
-	cmd2 := exec.Command("bash", config.DelphiPasswdToolURL, "-a", "-A", "-au", "wazuh", "-ap", "KTb+Md+rR74J2yHfoGGnFGHGm03Gadyu") // TODO: Replace this with dynamic secret loading
+	cmd2 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", "KTb+Md+rR74J2yHfoGGnFGHGm03Gadyu") // TODO: Replace this with dynamic secret loading
 	cmd2.Stdout = os.Stdout
 	cmd2.Stderr = os.Stderr
 	if err := cmd2.Run(); err != nil {
