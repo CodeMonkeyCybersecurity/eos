@@ -10,5 +10,5 @@ var ConfigureCmd = &cobra.Command{
 }
 
 func init() {
-	ConfigureCmd.AddCommand(ConfigureFirewallCmd)
+	ConfigureCmd.AddCommand(ConfigureCmd)
 }
