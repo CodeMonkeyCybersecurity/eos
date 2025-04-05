@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
@@ -20,7 +21,6 @@ var CreateDelphiCmd = &cobra.Command{
 	Long:    `Installs Wazuh server, dashboard, and indexer using the official Wazuh quickstart script.`,
 	RunE:    runDelphiInstall,
 }
-
 
 func runDelphiInstall(cmd *cobra.Command, args []string) error {
 	tmpDir := "/tmp"
@@ -51,20 +51,36 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to extract credentials: %w", err)
 	}
 
-	log.Info("Disabling Wazuh updates (disabling yum repo)")
-	disableCmd := exec.Command("sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
-	disableCmd.Stdout = os.Stdout
-	disableCmd.Stderr = os.Stderr
-	if err := disableCmd.Run(); err != nil {
-		log.Warn("Could not disable Wazuh repo", zap.Error(err))
-	} else {
-		log.Info("Wazuh repo disabled")
+	log.Info("Disabling Wazuh updates (repo disable)")
+
+	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}); err != nil {
+		log.Fatal("Unsupported Linux distro", zap.Error(err))
 	}
 
-	log.Info("Delphi (Wazuh) installation completed.")
+	distro := platform.DetectLinuxDistro()
+	switch distro {
+	case "ubuntu", "debian":
+		disableCmd := exec.Command("sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
+		disableCmd.Stdout = os.Stdout
+		disableCmd.Stderr = os.Stderr
+		if err := disableCmd.Run(); err != nil {
+			log.Warn("Failed to comment out Wazuh APT repo", zap.Error(err))
+		} else {
+			log.Info("Commented out Wazuh APT repo successfully")
+			exec.Command("apt", "update").Run()
+		}
+	default:
+		disableCmd := exec.Command("sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
+		disableCmd.Stdout = os.Stdout
+		disableCmd.Stderr = os.Stderr
+		if err := disableCmd.Run(); err != nil {
+			log.Warn("Could not disable Wazuh yum repo", zap.Error(err))
+		} else {
+			log.Info("Wazuh yum repo disabled")
+		}
+	}
 	return nil
 }
-
 
 func init() {
 	CreateCmd.AddCommand(CreateDelphiCmd)
