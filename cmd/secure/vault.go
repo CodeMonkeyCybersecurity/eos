@@ -62,6 +62,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			log.Fatal("Failed to unmarshal vault_init.json", zap.Error(err))
 		}
 
+		
 		// Build a slice of the stored hashed unseal keys (all five).
 		var storedHashes []string
 		for _, key := range initRes.UnsealKeysB64 {
@@ -140,9 +141,9 @@ Please follow up by configuring MFA via your organization's preferred integratio
 `
 
 		// Use an absolute path
-		policyFile := "/var/snap/vault/common/admin-full.hcl"
+		policyFile := "/tmp/admin-full.hcl"
 		if err := os.WriteFile(policyFile, []byte(policyContent), 0600); err != nil {
-			log.Fatal("Failed to write policy file: %v", zap.Error(err))
+			log.Fatal("Failed to write policy file", zap.Error(err))
 		}
 
 		fmt.Printf("Policy file written to: %s\n", policyFile)
@@ -161,14 +162,16 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=admin-full")
 		updateOut, err := updateCmd.CombinedOutput()
 		if err != nil {
-			log.Fatal("Failed to update admin user: %v\nOutput: %s", zap.Error(err), zap.String("output", string(updateOut)))
+			fmt.Println("Vault returned:")
+			fmt.Println(string(updateOut))
+			log.Fatal("Failed to update admin user", zap.Error(err))
 		} else {
 			fmt.Println("Admin user updated with full privileges (admin-full policy).")
 		}
 
 		// Optionally, delete the temporary policy file.
 		if err := os.Remove(policyFile); err != nil {
-			log.Warn("Warning: Failed to delete temporary policy file: %v", zap.Error(err))
+			log.Warn("Warning: Failed to delete temporary policy file", zap.Error(err))
 		} else {
 			fmt.Println("Temporary policy file deleted.")
 		}
@@ -186,7 +189,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		// 5. Securely delete the vault_init.json file.
 		fmt.Println("Deleting vault_init.json to remove sensitive initialization data...")
 		if err := os.Remove("vault_init.json"); err != nil {
-			log.Warn("Warning: Failed to delete vault_init.json: %v", zap.Error(err))
+			log.Warn("Warning: Failed to delete vault_init.json", zap.Error(err))
 		} else {
 			fmt.Println("vault_init.json deleted successfully.")
 		}
