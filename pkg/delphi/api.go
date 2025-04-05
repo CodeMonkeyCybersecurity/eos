@@ -251,13 +251,30 @@ func GetAllUsers(cfg *config.DelphiConfig) ([]User, error) {
 	return result.Data, nil
 }
 
-// GetUserIDByUsername fetches the user ID given a username
+// GetUserIDByUsername fetches the user ID given a username and prints the raw JSON response.
 func GetUserIDByUsername(cfg *config.DelphiConfig, username string) (string, error) {
-	users, err := GetAllUsers(cfg)
+	path := "/security/users?pretty=true"
+	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		return "", err
 	}
-	for _, user := range users {
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Print out the raw JSON response
+	fmt.Printf("Verbose: Raw JSON response from %s: %s\n", path, body)
+
+	var result struct {
+		Data []User `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+	for _, user := range result.Data {
 		if user.Username == username {
 			return user.ID, nil
 		}
