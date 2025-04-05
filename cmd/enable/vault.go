@@ -6,8 +6,10 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -27,16 +29,16 @@ AppRole, userpass, and creates an admin user with a random password.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// 1. Dynamically set VAULT_ADDR based on hostname.
-		hostname := utils.GetInternalHostname()
-		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
-		os.Setenv("VAULT_ADDR", vaultAddr)
-		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
+		vault.SetVaultEnv()
 
 		// 2. Initialize Vault (if not already initialized).
 		fmt.Println("\n[1/9] Initializing Vault (operator init)...")
 		initCmd := exec.Command("vault", "operator", "init",
 			"-key-shares=5", "-key-threshold=3", "-format=json")
-		initOut, err := initCmd.CombinedOutput()
+
+		var initOut []byte
+		err := execute.RetryCaptureOutput(3, 2*time.Second, initCmd, &initOut)
+
 		var initRes initResult
 		if err != nil {
 			if strings.Contains(string(initOut), "Vault is already initialized") {
@@ -196,15 +198,17 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		if err != nil {
 			log.Fatal("Failed to create admin user", zap.Error(err), zap.String("output", string(createUserOut)))
 		}
-		fmt.Println("Admin user created successfully.")
-		fmt.Println("Admin user created successfully with userpass auth.")
+
+		if err := vault.SaveToVault("vault-init", initRes); err != nil {
+			log.Warn("Failed to store vault-init data in Vault", zap.Error(err))
+		}
+
+		fmt.Println("\nAdmin user created successfully with userpass auth.")
 		fmt.Println("\nVault enable steps completed successfully!")
 		fmt.Println("\nYou can now log in with the admin user using the generated password.")
 		fmt.Println("\nRemember to store the unseal keys and root token securely!")
 		fmt.Println("\nPlease now run 'eos secure vault' to secure the Vault service.")
 		fmt.Println("\nYou can also run 'eos logs vault' to view the Vault logs.")
-		fmt.Println("You can also run 'eos update vault' to update the Vault service.")
-		fmt.Println("You can also run 'eos refresh vault' to refresh the Vault service.")
 	},
 }
 
