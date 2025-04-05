@@ -7,8 +7,9 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var UsersCmd = &cobra.Command{
@@ -23,14 +24,14 @@ var UsersCmd = &cobra.Command{
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
-		users, err := config.GetAllUsers(cfg)
+		users, err := delphi.GetAllUsers(cfg)
 		if err != nil {
 			log.Fatal("Failed to fetch users", zap.Error(err))
 		}
 
 		fmt.Println("Wazuh Users:")
 		for _, user := range users {
-			fmt.Printf("• %s (ID: %s)\n", user.Username, user.ID)
+			fmt.Printf("• %s (ID: %d)\n", user.Username, user.ID)
 		}
 	},
 }
