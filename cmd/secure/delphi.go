@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
@@ -24,27 +25,34 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 
 	log.Info("Downloading Wazuh password management tool")
 	if err := utils.DownloadFile(config.DelphiPasswdToolPath, config.DelphiPasswdToolURL); err != nil {
+		log.Error("Failed to download Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to download password tool: %w", err)
 	}
-	if err := os.Chmod(config.DelphiPasswdToolPath, 0755); err != nil {
+	if err := os.Chmod(config.DelphiPasswdToolPath, 0700); err != nil {
+		log.Error("Failed to set permissions on Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to chmod tool: %w", err)
+
 	}
 
+	log.Info("Extracting current API admin password (user: wazuh)")
+	apiPassword, err := delphi.ExtractWazuhUserPassword()
+	log.Debug("Extracted password for user 'wazuh'", zap.String("password", apiPassword))
+	if err != nil {
+		log.Error("Failed to extract Wazuh API password", zap.Error(err))
+		return fmt.Errorf("failed to extract wazuh API password: %w", err)
+	}
+	log.Info("Successfully extracted wazuh API password")
+
 	log.Info("Rotating all passwords with --change-all")
-	cmd1 := exec.Command("bash", config.DelphiPasswdToolPath, "-a")
+	cmd1 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", apiPassword)
 	cmd1.Stdout = os.Stdout
 	cmd1.Stderr = os.Stderr
 	if err := cmd1.Run(); err != nil {
-		return fmt.Errorf("failed to rotate indexer passwords: %w", err)
+		log.Error("Failed to rotate all Wazuh passwords", zap.Error(err))
+		return fmt.Errorf("failed to rotate all Wazuh passwords: %w", err)
 	}
 
-	log.Info("Rotating API passwords with admin user 'wazuh'")
-	cmd2 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", "wazuh") // TODO: Replace this with dynamic secret loading
-	cmd2.Stdout = os.Stdout
-	cmd2.Stderr = os.Stderr
-	if err := cmd2.Run(); err != nil {
-		return fmt.Errorf("failed to rotate API passwords: %w", err)
-	}
+	log.Info("Successfully rotated all passwords")
 
 	log.Info("Restarting Wazuh services to apply new credentials")
 
@@ -52,8 +60,11 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	for _, svc := range services {
 		log.Info("Restarting", zap.String("service", svc))
 		restart := exec.Command("systemctl", "restart", svc)
+		output, err := restart.CombinedOutput()
+		if err != nil {
+			log.Warn("Failed to restart service", zap.String("service", svc), zap.Error(err), zap.String("output", string(output)))
+		}
 		restart.Stdout = os.Stdout
-		restart.Stderr = os.Stderr
 		if err := restart.Run(); err != nil {
 			log.Warn("Failed to restart service", zap.String("service", svc), zap.Error(err))
 		}
