@@ -73,7 +73,7 @@ func Execute() {
 	if logger.GetLogger() == nil {
 		logger.Initialize()
 	}
-	defer logger.Sync()
+	logger.Sync()
 
 	// Register commands and execute the CLI
 	RegisterCommands()
