@@ -18,7 +18,6 @@ import (
 // vaultUpdateCmd represents the "update vault" command.
 var VaultUpdateCmd = &cobra.Command{
 	Use:     "vault",
-	Aliases: []string{"sync"},
 	Short:   "Updates Vault and syncs any fallback secrets",
 	Long: `Runs a snap refresh for Vault, updating it to the latest version.
 If Vault is available, this command will also upload fallback secrets from disk to Vault.`,
