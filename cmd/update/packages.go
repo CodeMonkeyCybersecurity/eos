@@ -28,7 +28,7 @@ var UpdatePackagesCmd = &cobra.Command{
 		switch osType {
 		case "linux":
 			if isRHEL() {
-				updateCmd = "yum update -y && yum upgrade -y && yum autoremove -y"
+				updateCmd = "dnf upgrade --refresh -y && dnf autoremove -y && dnf clean all"
 				log.Info("Detected RHEL-based system")
 			} else {
 				updateCmd = "apt update -y && apt upgrade -y && apt autoremove -y && apt autoclean -y"
