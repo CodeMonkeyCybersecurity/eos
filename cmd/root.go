@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
@@ -56,6 +57,7 @@ func RegisterCommands() {
 		logs.LogsCmd,
 		secure.SecureCmd,
 		disable.DisableCmd,
+		enable.EnableCmd,
 	}
 	for _, cmd := range eosCommands {
 		RootCmd.AddCommand(cmd)
