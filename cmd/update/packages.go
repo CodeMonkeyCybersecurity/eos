@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -20,7 +19,6 @@ var UpdatePackagesCmd = &cobra.Command{
 	Short: "Update system packages based on detected OS",
 	Long:  "Detects the host OS and executes appropriate update and cleanup commands. Supports scheduling via --cron.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log = logger.GetLogger()
 
 		osType := runtime.GOOS
 		log.Info("Detected OS", zap.String("os", osType))
@@ -104,5 +102,7 @@ func scheduleCron(cmd string, osType string) error {
 }
 
 func init() {
+	UpdateCmd.AddCommand(UpdatePackagesCmd)
+
 	UpdatePackagesCmd.Flags().BoolVar(&Cron, "cron", false, "Schedule this update to run daily at a random time")
 }
