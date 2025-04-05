@@ -25,4 +25,5 @@ var log *zap.Logger
 func init() {
 	// Initialize the shared logger for the entire deploy package
 	log = logger.L()
+	ConfigureCmd.AddCommand(ConfigureFirewallCmd)
 }

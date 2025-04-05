@@ -63,7 +63,3 @@ func configureFirewalld(log *zap.Logger) {
 
 	log.Info("✅ Firewalld configuration complete.")
 }
-
-func init() {
-	ConfigureCmd.AddCommand(ConfigureFirewallCmd)
-}
