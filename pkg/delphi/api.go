@@ -265,18 +265,22 @@ func GetUserIDByUsername(cfg *config.DelphiConfig, username string) (string, err
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Print out the raw JSON response
+	// Print out the raw JSON response for debugging
 	fmt.Printf("Verbose: Raw JSON response from %s: %s\n", path, body)
 
 	var result struct {
-		Data []User `json:"data"`
+		Data struct {
+			AffectedItems []User `json:"affected_items"`
+		} `json:"data"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
 		return "", fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
-	for _, user := range result.Data {
+	for _, user := range result.Data.AffectedItems {
 		if user.Username == username {
-			return user.ID, nil
+			// If User.ID is defined as a string in your struct but the JSON provides a number,
+			// consider changing it to int and converting here.
+			return fmt.Sprintf("%v", user.ID), nil
 		}
 	}
 	return "", fmt.Errorf("user not found: %s", username)
