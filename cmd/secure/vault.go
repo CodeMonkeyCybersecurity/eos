@@ -31,6 +31,11 @@ full (root-level) privileges. Finally, it deletes the stored initialization file
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
+		hostname := utils.GetInternalHostname()
+		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
+		os.Setenv("VAULT_ADDR", vaultAddr)
+		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
+
 		// 0. Check for root privileges.
 		if os.Geteuid() != 0 {
 			fmt.Println("This command must be run with sudo or as root.")
