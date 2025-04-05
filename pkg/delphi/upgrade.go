@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 )
 

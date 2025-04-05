@@ -59,14 +59,14 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	services := []string{"filebeat", "wazuh-manager", "wazuh-dashboard", "wazuh-indexer"}
 	for _, svc := range services {
 		log.Info("Restarting", zap.String("service", svc))
-		restart := exec.Command("systemctl", "restart", svc)
-		output, err := restart.CombinedOutput()
+	
+		cmd := exec.Command("systemctl", "restart", svc)
+		output, err := cmd.CombinedOutput()
+	
 		if err != nil {
 			log.Warn("Failed to restart service", zap.String("service", svc), zap.Error(err), zap.String("output", string(output)))
-		}
-		restart.Stdout = os.Stdout
-		if err := restart.Run(); err != nil {
-			log.Warn("Failed to restart service", zap.String("service", svc), zap.Error(err))
+		} else {
+			log.Info("Service restarted successfully", zap.String("service", svc), zap.String("output", string(output)))
 		}
 	}
 
