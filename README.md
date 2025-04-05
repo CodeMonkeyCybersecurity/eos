@@ -25,19 +25,20 @@ Open PowerShell or Command Prompt as Administrator
 cd /opt
 git clone https://github.com/CodeMonkeyCybersecurity/eos.git
 cd eos
-go mod tidy
 ```
 
 #### On RHEL:
 ```
 yum update
 yum install golang
+go mod tidy
 ```
 
 #### On Debian-based systems:
 ```
 apt update
 apt install golang
+go mod tidy
 ```
  
 #### On MacOS X:
