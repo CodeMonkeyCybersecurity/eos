@@ -22,6 +22,43 @@ var CreateDelphiCmd = &cobra.Command{
 	RunE:    runDelphiInstall,
 }
 
+// FindAndExtractWazuhPasswords attempts to locate wazuh-install-files.tar and extract wazuh-passwords.txt
+func findAndExtractWazuhPasswords() error {
+
+	searchPaths := []string{
+		"/root",
+		"/tmp",
+		"/opt",
+		"/var/tmp",
+		".", // current working directory
+	}
+
+	found := false
+	var tarPath string
+	for _, dir := range searchPaths {
+		candidate := filepath.Join(dir, "wazuh-install-files.tar")
+		if utils.FileExists(candidate) {
+			tarPath = candidate
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("could not locate wazuh-install-files.tar in common paths")
+	}
+
+	log.Info("Found Wazuh tar file", zap.String("path", tarPath))
+	cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to extract passwords: %w", err)
+	}
+
+	return nil
+}
+
 func runDelphiInstall(cmd *cobra.Command, args []string) error {
 	tmpDir := "/tmp"
 	scriptURL := "https://packages.wazuh.com/4.11/wazuh-install.sh"
@@ -42,13 +79,10 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 	if err := installCmd.Run(); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
-
+	log.Info("Wazuh installation completed successfully")
 	log.Info("Extracting admin credentials from wazuh-passwords.txt")
-	extractCmd := exec.Command("tar", "-O", "-xvf", "wazuh-install-files.tar", "wazuh-install-files/wazuh-passwords.txt")
-	extractCmd.Stdout = os.Stdout
-	extractCmd.Stderr = os.Stderr
-	if err := extractCmd.Run(); err != nil {
-		return fmt.Errorf("failed to extract credentials: %w", err)
+	if err := findAndExtractWazuhPasswords(); err != nil {
+		log.Warn("Could not extract Wazuh credentials", zap.Error(err))
 	}
 
 	log.Info("Disabling Wazuh updates (repo disable)")
@@ -89,7 +123,7 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 		log.Info("    ssh -L 8443:localhost:443 user@your-server-ip")
 		log.Info("Then open: https://localhost:8443 in your browser.")
 		log.Info("To harden this installation, consider running the following commands: 'eos harden delphi'.")
-		
+
 	}
 	return nil
 }
