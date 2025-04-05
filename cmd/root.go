@@ -18,6 +18,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 
 	// Grouping commands
@@ -58,6 +59,7 @@ func RegisterCommands() {
 		secure.SecureCmd,
 		disable.DisableCmd,
 		enable.EnableCmd,
+		sync.SyncCmd,
 	}
 	for _, cmd := range eosCommands {
 		RootCmd.AddCommand(cmd)
