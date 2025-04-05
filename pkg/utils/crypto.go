@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"strings"
 )
 
@@ -23,14 +24,82 @@ func HashString(s string) string {
 
 // generatePassword creates a random alphanumeric password of the given length.
 func GeneratePassword(length int) (string, error) {
-	// Generate random bytes. Since hex encoding doubles the length, we need length/2 bytes.
-	bytes := make([]byte, length/2)
-	_, err := rand.Read(bytes)
+	if length < 4 {
+		return "", fmt.Errorf("password length must be at least 4")
+	}
+
+	lower := "abcdefghijklmnopqrstuvwxyz"
+	upper := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	digits := "0123456789"
+	symbols := "!@#$%&*?" // bash-safe symbols
+	all := lower + upper + digits + symbols
+
+	var passwordChars []byte
+
+	// Ensure each category is represented.
+	char, err := randomChar(lower)
 	if err != nil {
 		return "", err
 	}
-	// Encode to hex and trim to required length.
-	return hex.EncodeToString(bytes)[:length], nil
+	passwordChars = append(passwordChars, char)
+
+	char, err = randomChar(upper)
+	if err != nil {
+		return "", err
+	}
+	passwordChars = append(passwordChars, char)
+
+	char, err = randomChar(digits)
+	if err != nil {
+		return "", err
+	}
+	passwordChars = append(passwordChars, char)
+
+	char, err = randomChar(symbols)
+	if err != nil {
+		return "", err
+	}
+	passwordChars = append(passwordChars, char)
+
+	// Fill the remaining length with random characters from all groups.
+	for i := 4; i < length; i++ {
+		char, err = randomChar(all)
+		if err != nil {
+			return "", err
+		}
+		passwordChars = append(passwordChars, char)
+	}
+
+	// Shuffle the characters to avoid predictable positions.
+	if err := shuffle(passwordChars); err != nil {
+		return "", err
+	}
+
+	return string(passwordChars), nil
+
+}
+
+// randomChar returns a random character from the provided charset.
+func randomChar(charset string) (byte, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+	if err != nil {
+		return 0, err
+	}
+	return charset[n.Int64()], nil
+}
+
+// shuffle shuffles a slice of bytes using the Fisher-Yates algorithm with crypto/rand.
+func shuffle(data []byte) error {
+	n := len(data)
+	for i := n - 1; i > 0; i-- {
+		jBig, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		j := int(jBig.Int64())
+		data[i], data[j] = data[j], data[i]
+	}
+	return nil
 }
 
 // InjectSecretsFromPlaceholders scans the file content for "changeme", "changeme1", ..., "changeme9"
