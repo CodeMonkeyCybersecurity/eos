@@ -39,7 +39,7 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info("Rotating API passwords with admin user 'wazuh'")
-	cmd2 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", "KTb+Md+rR74J2yHfoGGnFGHGm03Gadyu") // TODO: Replace this with dynamic secret loading
+	cmd2 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", "wazuh") // TODO: Replace this with dynamic secret loading
 	cmd2.Stdout = os.Stdout
 	cmd2.Stderr = os.Stderr
 	if err := cmd2.Run(); err != nil {
@@ -48,7 +48,7 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 
 	log.Info("Restarting Wazuh services to apply new credentials")
 
-	services := []string{"filebeat", "wazuh-manager", "wazuh-dashboard"}
+	services := []string{"filebeat", "wazuh-manager", "wazuh-dashboard", "wazuh-indexer"}
 	for _, svc := range services {
 		log.Info("Restarting", zap.String("service", svc))
 		restart := exec.Command("systemctl", "restart", svc)
