@@ -30,14 +30,14 @@ cd eos
 #### On RHEL:
 ```
 yum update
-yum install golang
+yum install golang -y
 go mod tidy
 ```
 
 #### On Debian-based systems:
 ```
 apt update
-apt install golang
+apt install golang -y
 go mod tidy
 ```
  
