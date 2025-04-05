@@ -16,7 +16,7 @@ import (
 )
 
 type User struct {
-	ID       string `json:"id"`
+	ID       int    `json:"id"`
 	Username string `json:"username"`
 }
 
@@ -243,12 +243,14 @@ func GetAllUsers(cfg *config.DelphiConfig) ([]User, error) {
 	defer resp.Body.Close()
 
 	var result struct {
-		Data []User `json:"data"`
+		Data struct {
+			AffectedItems []User `json:"affected_items"`
+		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, err
 	}
-	return result.Data, nil
+	return result.Data.AffectedItems, nil
 }
 
 // GetUserIDByUsername fetches the user ID given a username and prints the raw JSON response.
@@ -280,7 +282,7 @@ func GetUserIDByUsername(cfg *config.DelphiConfig, username string) (string, err
 		if user.Username == username {
 			// If User.ID is defined as a string in your struct but the JSON provides a number,
 			// consider changing it to int and converting here.
-			return fmt.Sprintf("%v", user.ID), nil
+			return fmt.Sprintf("%d", user.ID), nil
 		}
 	}
 	return "", fmt.Errorf("user not found: %s", username)
