@@ -56,3 +56,7 @@ func configureFirewalld(log *zap.Logger) {
 	execute.Execute("sudo", "firewall-cmd", "--list-ports")
 	log.Info("✅ Firewalld configuration complete.")
 }
+
+func init() {
+	ConfigureCmd.AddCommand(ConfigureFirewallCmd)
+}
