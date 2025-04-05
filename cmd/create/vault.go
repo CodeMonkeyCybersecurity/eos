@@ -60,17 +60,24 @@ and then unsealed using the first three keys.`,
 				fmt.Println("Installing HashiCorp Vault via yum...")
 				repoFile := "/etc/yum.repos.d/hashicorp.repo"
 				repoContent := `[hashicorp]
-			name=HashiCorp Stable - $basearch
-			baseurl=https://rpm.releases.hashicorp.com/RHEL/7/$basearch/stable
-			enabled=1
-			gpgcheck=1
-			gpgkey=https://rpm.releases.hashicorp.com/gpg`
+name=HashiCorp Stable - $basearch
+baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.releases.hashicorp.com/gpg`
+
+
+
 				if _, err := os.Stat(repoFile); os.IsNotExist(err) {
 					if err := os.WriteFile(repoFile, []byte(repoContent), 0644); err != nil {
 						log.Fatal("Failed to write HashiCorp repo file", zap.Error(err))
 					}
 				}
-				installCmd := exec.Command("yum", "install", "-y", "vault")
+				exec.Command("dnf", "clean", "all").Run()
+				exec.Command("dnf", "makecache").Run()
+
+
+				installCmd := exec.Command("dnf", "install", "-y", "vault")
 				installCmd.Stdout = os.Stdout
 				installCmd.Stderr = os.Stderr
 				if err := installCmd.Run(); err != nil {
