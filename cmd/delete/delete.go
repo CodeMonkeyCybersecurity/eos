@@ -2,7 +2,6 @@
 cmd/delete/delete.go
 
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
-
 */
 
 package delete
@@ -26,12 +25,18 @@ For example:
 	eos delete umami`,
 
 	Aliases: []string{"remove", "uninstall", "rm"},
+
+	Run: func(cmd *cobra.Command, args []string) {
+		log := logger.GetLogger()
+		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+		_ = cmd.Help() // Display help if no subcommand is provided
+	},
 }
 
 // log is a package-level variable for the Zap logger.
 var log *zap.Logger
 
 func init() {
-	log = logger.GetLogger()
-
+	// Initialize the shared logger for the entire deploy package
+	log = logger.L()
 }

@@ -16,19 +16,25 @@ import (
 	"go.uber.org/zap"
 )
 
-// LogsCmd represents the parent "logs" command.
-var LogsCmd = &cobra.Command{
-	Use:   "logs",
-	Short: "Log related commands",
-	Long:  "Commands for viewing and tailing logs for various components.",
-}
-
 // log is a package-level variable for the Zap logger.
 var log *zap.Logger
+
+
+// LogsCmd represents the parent "logs" command.
+var LogsCmd = &cobra.Command{
+	Use:     "logs",
+	Aliases: []string{"log", "tail", "view", "debug"},
+	Short:   "Log related commands",
+	Long:    "Commands for viewing and tailing logs for various components.",
+	Run: func(cmd *cobra.Command, args []string) {
+		log = logger.L()
+		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+		_ = cmd.Help() // Display help if no subcommand is provided
+	},
+}
+
 
 func init() {
 	// Initialize the shared logger for the entire install package
 	log = logger.L()
-
-	LogsCmd.AddCommand(vaultLogsCmd)
 }

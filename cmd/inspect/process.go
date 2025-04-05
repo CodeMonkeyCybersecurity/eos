@@ -254,3 +254,8 @@ func printProcessTable(process []ProcessInfo) {
 	}
 	w.Flush()
 }
+
+// init registers subcommands for the read command
+func init() {
+	InspectCmd.AddCommand(InspectProcessCmd)
+}

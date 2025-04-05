@@ -8,7 +8,7 @@ import (
 )
 
 // updateProcessCmd handles updating process
-var updateProcessCmd = &cobra.Command{
+var UpdateProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Update process",
 	Long:  `Use this command to update details about running process.`,
@@ -24,5 +24,5 @@ var updateProcessCmd = &cobra.Command{
 }
 
 func init() {
-	UpdateCmd.AddCommand(updateProcessCmd)
+	UpdateCmd.AddCommand(UpdateProcessCmd)
 }

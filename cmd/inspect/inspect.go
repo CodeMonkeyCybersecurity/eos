@@ -12,6 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
+
 // ReadCmd is the root command for read operations
 var InspectCmd = &cobra.Command{
 	Use:     "inspect",
@@ -19,15 +23,16 @@ var InspectCmd = &cobra.Command{
 	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
 	Aliases: []string{"read", "get", "list", "ls"},
 	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.GetLogger()
-		log.Info("No subcommand provided for read.", zap.String("command", cmd.Use))
+		log = logger.L()
+		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	},
+	}	,
+}	
+
+
+func init() {
+	// Initialize the shared logger for the entire install package
+	log = logger.L()
 }
 
-// init registers subcommands for the read command
-func init() {
-	InspectCmd.AddCommand(InspectProcessCmd)
-	InspectCmd.AddCommand(InspectUsersCmd)
-	InspectCmd.AddCommand(InspectStorageCmd)
-}
+

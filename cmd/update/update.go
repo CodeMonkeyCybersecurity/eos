@@ -15,20 +15,24 @@ import (
 // UpdateCmd is the root command for update operations
 var UpdateCmd = &cobra.Command{
 	Use:   "update",
+	Aliases: []string{"upgrade", "modify", "change"},
 	Short: "Update resources (e.g., processes, users, storage)",
 	Long:  `The update command allows you to modify existing resources such as processes, users, or storage.`,
+
 	Run: func(cmd *cobra.Command, args []string) {
-		log := logger.GetLogger()
-		log.Info("No subcommand provided for update.", zap.String("command", cmd.Use))
+		log = logger.L()
+		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	},
-	Aliases: []string{"upgrade", "modify", "change"},
+	}	,
+}	
+
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
+func init() {
+	// Initialize the shared logger for the entire install package
+	log = logger.L()
 }
 
-// init registers subcommands for the update command
-func init() {
-	UpdateCmd.AddCommand(updateProcessCmd)
-	UpdateCmd.AddCommand(updateUsersCmd)
-	UpdateCmd.AddCommand(updateStorageCmd)
-	UpdateCmd.AddCommand(hostnameCmd)
-}
+// Add any subcommands to the UpdateCmd here, if needed
+// For example, you can add a subcommand like this:	

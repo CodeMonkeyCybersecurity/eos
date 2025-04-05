@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// vaultLogsCmd represents the "logs vault" command.
-var vaultLogsCmd = &cobra.Command{
+// VaultLogsCmd represents the "logs vault" command.
+var VaultLogsCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Shows the last 100 Vault log lines then tails the log",
 	Long:  `This command displays the most recent 100 lines from /var/log/vault.log and then tails the log file in real time, with the footer message at the bottom.`,
@@ -85,4 +85,8 @@ var vaultLogsCmd = &cobra.Command{
 			time.Sleep(100 * time.Millisecond)
 		}
 	},
+}
+
+func init() {
+	LogsCmd.AddCommand(VaultLogsCmd)
 }

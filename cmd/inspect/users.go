@@ -2,8 +2,8 @@
 package inspect
 
 import (
-	"fmt"
 	"bufio"
+	"fmt"
 	"os"
 	"strings"
 
@@ -15,7 +15,7 @@ var InspectUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Retrieve information about system users",
 	Long: `This command retrieves a list of all system users on the current machine
-by reading the /etc/passwd file.`,	
+by reading the /etc/passwd file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Reading users...")
 		users, err := getSystemUsers()
@@ -57,4 +57,9 @@ func getSystemUsers() ([]string, error) {
 	}
 
 	return users, nil
+}
+
+// init registers subcommands for the read command
+func init() {
+	InspectCmd.AddCommand(InspectUsersCmd)
 }

@@ -8,7 +8,7 @@ import (
 )
 
 // updateStorageCmd handles updating storage information
-var updateStorageCmd = &cobra.Command{
+var UpdateStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Update storage",
 	Long:  `Use this command to update storage configurations or details.`,
@@ -21,4 +21,10 @@ var updateStorageCmd = &cobra.Command{
 		fmt.Printf("Updating storage: %s\n", storage)
 		// Add your logic here
 	},
+}
+
+
+// init registers subcommands for the update command
+func init() {
+	UpdateCmd.AddCommand(UpdateStorageCmd)
 }

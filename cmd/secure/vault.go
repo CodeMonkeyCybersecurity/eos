@@ -1,16 +1,18 @@
+// cmd/secure/vault.go
+
 package secure
 
 import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // initResult is the JSON structure returned by "vault operator init -format=json".
@@ -19,7 +21,7 @@ type initResult struct {
 	RootToken     string   `json:"root_token"`
 }
 
-var vaultSecureCmd = &cobra.Command{
+var SecureVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Secures Vault by revoking the root token and elevating admin privileges",
 	Long: `This command secures your Vault setup after "github.com/CodeMonkeyCybersecurity/eos enable vault" has been run.
@@ -28,20 +30,30 @@ distributed the unseal keys and root token, then revokes the root token and upda
 full (root-level) privileges. Finally, it deletes the stored initialization file.
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	Run: func(cmd *cobra.Command, args []string) {
+
+		// 0. Check for root privileges.
+		if os.Geteuid() != 0 {
+			fmt.Println("This command must be run with sudo or as root.")
+			return
+		}
+
+		fmt.Println("Secure Vault setup in progress...")
+		fmt.Println("This process will revoke the root token and elevate admin privileges.")
+		// 1. Check if the vault_init.json file exists and read it.
 		// Check if the file exists.
+
 		if _, err := os.Stat("vault_init.json"); os.IsNotExist(err) {
-			log.Fatalf("vault_init.json not found. Please run 'eos enable vault' first to generate initialization data.")
+			log.Fatal("vault_init.json not found", zap.Error(err))
 		}
 
 		// Read the vault_init.json file.
 		data, err := os.ReadFile("vault_init.json")
 		if err != nil {
-			log.Fatalf("Failed to read vault_init.json: %v", err)
+			log.Fatal("Failed to read vault_init.json", zap.Error(err))
 		}
 
 		var initRes initResult
 		if err := json.Unmarshal(data, &initRes); err != nil {
-			log.Fatalf("Failed to parse vault_init.json: %v", err)
 		}
 
 		// Build a slice of the stored hashed unseal keys (all five).
@@ -124,16 +136,17 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		// Use an absolute path
 		policyFile := "/var/snap/vault/common/admin-full.hcl"
 		if err := os.WriteFile(policyFile, []byte(policyContent), 0600); err != nil {
-			log.Fatalf("Failed to write policy file: %v", err)
+			log.Fatal("Failed to write policy file: %v", zap.Error(err))
 		}
 
 		fmt.Printf("Policy file written to: %s\n", policyFile)
+		fmt.Println("Writing custom policy to Vault...")
 
 		// Write the policy to Vault using the full path.
 		policyCmd := exec.Command("vault", "policy", "write", "admin-full", policyFile)
 		policyOut, err := policyCmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to write policy to Vault: %v\nOutput: %s", err, string(policyOut))
+			log.Fatal("Failed to write policy to Vault: %v\nOutput: %s", zap.Error(err), zap.String("output", string(policyOut)))
 		}
 		fmt.Println("Custom full-access policy 'admin-full' created successfully.")
 
@@ -142,14 +155,14 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=admin-full")
 		updateOut, err := updateCmd.CombinedOutput()
 		if err != nil {
-			log.Printf("Warning: Failed to update admin user policies: %v\nOutput: %s", err, string(updateOut))
+			log.Fatal("Failed to update admin user: %v\nOutput: %s", zap.Error(err), zap.String("output", string(updateOut)))
 		} else {
 			fmt.Println("Admin user updated with full privileges (admin-full policy).")
 		}
 
 		// Optionally, delete the temporary policy file.
 		if err := os.Remove(policyFile); err != nil {
-			log.Printf("Warning: Failed to delete temporary policy file: %v", err)
+			log.Warn("Warning: Failed to delete temporary policy file: %v", zap.Error(err))
 		} else {
 			fmt.Println("Temporary policy file deleted.")
 		}
@@ -159,7 +172,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		revokeCmd := exec.Command("vault", "token", "revoke", initRes.RootToken)
 		revokeOut, err := revokeCmd.CombinedOutput()
 		if err != nil {
-			log.Printf("Warning: Failed to revoke root token: %v\nOutput: %s", err, string(revokeOut))
+			log.Warn("Warning: Failed to revoke root token: %v\nOutput: %s", zap.Error(err), zap.String("output", string(revokeOut)))
 		} else {
 			fmt.Println("Root token revoked.")
 		}
@@ -167,7 +180,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		// 5. Securely delete the vault_init.json file.
 		fmt.Println("Deleting vault_init.json to remove sensitive initialization data...")
 		if err := os.Remove("vault_init.json"); err != nil {
-			log.Printf("Warning: Failed to delete vault_init.json: %v", err)
+			log.Warn("Warning: Failed to delete vault_init.json: %v", zap.Error(err))
 		} else {
 			fmt.Println("vault_init.json deleted successfully.")
 		}
@@ -181,5 +194,5 @@ Please follow up by configuring MFA via your organization's preferred integratio
 }
 
 func init() {
-	SecureCmd.AddCommand(vaultSecureCmd)
+	SecureCmd.AddCommand(SecureVaultCmd)
 }

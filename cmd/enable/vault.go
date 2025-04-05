@@ -3,13 +3,13 @@ package enable
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // initResult is the JSON structure returned by "vault operator init -format=json".
@@ -18,7 +18,7 @@ type initResult struct {
 	RootToken     string   `json:"root_token"`
 }
 
-var vaultEnableCmd = &cobra.Command{
+var EnableVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Enables Vault with sane and secure defaults",
 	Long: `This command assumes "github.com/CodeMonkeyCybersecurity/eos install vault" has been run.
@@ -42,18 +42,24 @@ AppRole, userpass, and creates an admin user with a random password.`,
 			if strings.Contains(string(initOut), "Vault is already initialized") {
 				fmt.Println("Vault is already initialized. Skipping init.")
 			} else {
-				log.Fatalf("Failed to init Vault: %v\nOutput: %s", err, string(initOut))
+				log.Fatal("Failed to init Vault",
+					zap.Error(err),
+					zap.String("output", string(initOut)),
+				)
 			}
 		} else {
 			// Parse the JSON output.
 			if err := json.Unmarshal(initOut, &initRes); err != nil {
-				log.Fatalf("Failed to parse initialization output: %v", err)
+				log.Fatal("Failed to parse init output", zap.Error(err))
 			}
+
+			// Print the unseal keys and root token.
+			fmt.Println("Unseal keys:")
 			fmt.Printf("Vault initialized! Received %d unseal keys.\n", len(initRes.UnsealKeysB64))
 			fmt.Println("Storing these keys for demonstration. In production, store them securely!")
 			// Write the JSON output to a secure file.
 			if err := os.WriteFile("vault_init.json", initOut, 0600); err != nil {
-				log.Fatalf("Failed to write initialization output to file: %v", err)
+				log.Fatal("Failed to write initialization output", zap.Error(err))
 			}
 			fmt.Println("Initialization data stored securely in vault_init.json")
 		}
@@ -67,7 +73,7 @@ AppRole, userpass, and creates an admin user with a random password.`,
 				unsealCmd := exec.Command("vault", "operator", "unseal", initRes.UnsealKeysB64[i])
 				unsealOut, err := unsealCmd.CombinedOutput()
 				if err != nil {
-					log.Fatalf("Failed to unseal Vault (key %d): %v\nOutput: %s", i+1, err, string(unsealOut))
+					log.Fatal("Failed to put test secret", zap.Error(err), zap.String("output", string(unsealOut)))
 				}
 			}
 			fmt.Println("Unseal completed.")
@@ -82,7 +88,7 @@ AppRole, userpass, and creates an admin user with a random password.`,
 			loginCmd := exec.Command("vault", "login", initRes.RootToken)
 			loginOut, err := loginCmd.CombinedOutput()
 			if err != nil {
-				log.Fatalf("Failed to log in with root token: %v\nOutput: %s", err, string(loginOut))
+				log.Fatal("Failed to log in with root token", zap.Error(err), zap.String("output", string(loginOut)))
 			}
 			fmt.Println("Logged in as root.")
 		} else {
@@ -94,7 +100,7 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		auditCmd := exec.Command("vault", "audit", "enable", "file", "file_path=/var/snap/vault/common/vault_audit.log")
 		auditOut, err := auditCmd.CombinedOutput()
 		if err != nil && !strings.Contains(string(auditOut), "already enabled") {
-			log.Fatalf("Failed to enable file audit: %v\nOutput: %s", err, string(auditOut))
+			log.Fatal("Failed to enable file audit", zap.Error(err), zap.String("output", string(auditOut)))
 		}
 		fmt.Println("File audit enabled.")
 
@@ -103,7 +109,7 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		secretsCmd := exec.Command("vault", "secrets", "enable", "-version=2", "-path=secret", "kv")
 		secretsOut, err := secretsCmd.CombinedOutput()
 		if err != nil && !strings.Contains(string(secretsOut), "mounted successfully") && !strings.Contains(string(secretsOut), "already enabled") {
-			log.Fatalf("Failed to enable KV v2: %v\nOutput: %s", err, string(secretsOut))
+			log.Fatal("Failed to enable KV v2", zap.Error(err), zap.String("output", string(secretsOut)))
 		}
 		fmt.Println("KV v2 enabled at path=secret.")
 
@@ -112,13 +118,13 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		putCmd := exec.Command("vault", "kv", "put", "secret/hello", "value=world")
 		putOut, err := putCmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to put test secret: %v\nOutput: %s", err, string(putOut))
+			log.Fatal("Failed to put test secret", zap.Error(err), zap.String("output", string(putOut)))
 		}
 
 		getCmd := exec.Command("vault", "kv", "get", "secret/hello")
 		getOut, err := getCmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to get test secret: %v\nOutput: %s", err, string(getOut))
+			log.Fatal("Failed to get test secret", zap.Error(err), zap.String("output", string(getOut)))
 		}
 		fmt.Println(string(getOut))
 
@@ -127,7 +133,7 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		approleCmd := exec.Command("vault", "auth", "enable", "approle")
 		approleOut, err := approleCmd.CombinedOutput()
 		if err != nil && !strings.Contains(string(approleOut), "already enabled") {
-			log.Fatalf("Failed to enable AppRole auth: %v\nOutput: %s", err, string(approleOut))
+			log.Fatal("Failed to enable AppRole auth", zap.Error(err), zap.String("output", string(approleOut)))
 		}
 
 		fmt.Println("Configuring role my-role...")
@@ -139,14 +145,16 @@ AppRole, userpass, and creates an admin user with a random password.`,
 			"secret_id_num_uses=0")
 		writeRoleOut, err := writeRoleCmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to create my-role: %v\nOutput: %s", err, string(writeRoleOut))
+			log.Fatal("Failed to write role my-role", zap.Error(err), zap.String("output", string(writeRoleOut)))
 		}
+		fmt.Println("Role my-role created successfully.")
 
 		roleIDCmd := exec.Command("vault", "read", "auth/approle/role/my-role/role-id")
 		roleIDOut, err := roleIDCmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to read my-role's role-id: %v\nOutput: %s", err, string(roleIDOut))
+			log.Fatal("Failed to read role ID", zap.Error(err), zap.String("output", string(roleIDOut)))
 		}
+		fmt.Println("Role ID for my-role:")
 		fmt.Println(string(roleIDOut))
 
 		// 9. Enable userpass auth
@@ -154,8 +162,9 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		userpassCmd := exec.Command("vault", "auth", "enable", "userpass")
 		userpassOut, err := userpassCmd.CombinedOutput()
 		if err != nil && !strings.Contains(string(userpassOut), "already enabled") {
-			log.Fatalf("Failed to enable userpass auth: %v\nOutput: %s", err, string(userpassOut))
+			log.Fatal("Failed to enable userpass auth", zap.Error(err), zap.String("output", string(userpassOut)))
 		}
+		fmt.Println("Userpass auth enabled.")
 
 		// 10. Generate a random password and create an admin user with it
 		fmt.Println("\n[9/9] Generating random password and creating admin user...")
@@ -164,15 +173,17 @@ AppRole, userpass, and creates an admin user with a random password.`,
 		randomCmd := exec.Command("vault", "write", "sys/tools/random", "bytes=16", "-format=json")
 		randomOut, err := randomCmd.Output()
 		if err != nil {
-			log.Fatalf("Failed to generate random password: %v", err)
+			log.Fatal("Failed to generate random password", zap.Error(err), zap.String("output", string(randomOut)))
 		}
+
+		// Parse the JSON output to get the random bytes
 		var randomData struct {
 			Data struct {
 				RandomBytes string `json:"random_bytes"`
 			} `json:"data"`
 		}
 		if err := json.Unmarshal(randomOut, &randomData); err != nil {
-			log.Fatalf("Failed to parse random output: %v", err)
+			log.Fatal("Failed to parse random password output", zap.Error(err))
 		}
 		randomPassword := randomData.Data.RandomBytes
 		fmt.Printf("Generated admin password: %s\n", randomPassword)
@@ -183,14 +194,14 @@ AppRole, userpass, and creates an admin user with a random password.`,
 			"policies=admin")
 		createUserOut, err := createUserCmd.CombinedOutput()
 		if err != nil {
-			log.Fatalf("Failed to create admin user: %v\nOutput: %s", err, string(createUserOut))
+			log.Fatal("Failed to create admin user", zap.Error(err), zap.String("output", string(createUserOut)))
 		}
+		fmt.Println("Admin user created successfully.")
 		fmt.Println("Admin user created successfully with userpass auth.")
-
 		fmt.Println("\nVault enable steps completed successfully!")
 	},
 }
 
 func init() {
-	EnableCmd.AddCommand(vaultEnableCmd)
+	EnableCmd.AddCommand(EnableVaultCmd)
 }

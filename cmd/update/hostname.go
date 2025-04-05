@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var hostnameCmd = &cobra.Command{
+var UpdateHostnameCmd = &cobra.Command{
 	Use:   "hostname",
 	Short: "Update the system hostname",
 	Long:  `Update the system hostname by modifying /etc/hostname and /etc/hosts.`,
@@ -74,4 +74,9 @@ func UpdateHostname() {
 	}
 
 	fmt.Printf("Hostname changed successfully to %s\n", newHostname)
+}
+
+// init registers subcommands for the update command
+func init() {
+	UpdateCmd.AddCommand(UpdateHostnameCmd)
 }

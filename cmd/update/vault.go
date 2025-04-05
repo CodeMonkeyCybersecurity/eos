@@ -2,15 +2,15 @@ package update
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // vaultUpdateCmd represents the "update vault" command.
-var vaultUpdateCmd = &cobra.Command{
+var VaultUpdateCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Updates the Vault installation via snap",
 	Long:  `Runs a snap refresh for Vault, updating it to the latest available version.`,
@@ -26,7 +26,7 @@ var vaultUpdateCmd = &cobra.Command{
 		updateCmd.Stderr = os.Stderr
 
 		if err := updateCmd.Run(); err != nil {
-			log.Fatalf("Failed to update Vault: %v", err)
+			log.Fatal("Failed to update Vault: %v", zap.Error(err))
 		}
 
 		fmt.Println("Vault updated successfully.")
@@ -35,5 +35,5 @@ var vaultUpdateCmd = &cobra.Command{
 
 func init() {
 	// Assuming you have a parent "update" command.
-	UpdateCmd.AddCommand(vaultUpdateCmd)
+	UpdateCmd.AddCommand(VaultUpdateCmd)
 }

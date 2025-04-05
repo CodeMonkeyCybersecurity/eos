@@ -43,3 +43,9 @@ func runCommand(command string, args ...string) error {
 	fmt.Println(string(output))
 	return nil
 }
+
+// init registers subcommands for the read command
+func init() {
+
+	InspectCmd.AddCommand(InspectStorageCmd)
+}

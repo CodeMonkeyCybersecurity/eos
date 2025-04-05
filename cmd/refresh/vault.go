@@ -2,16 +2,18 @@ package refresh
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"go.uber.org/zap"
+
 )
 
 // vaultRefreshCmd represents the "refresh vault" command.
-var vaultRefreshCmd = &cobra.Command{
+var VaultRefreshCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Refreshes (restarts) the Vault service",
 	Long:  `Stops the running Vault server and restarts it using the configured settings.`,
@@ -28,7 +30,7 @@ var vaultRefreshCmd = &cobra.Command{
 		killCmd.Stdout = os.Stdout
 		killCmd.Stderr = os.Stderr
 		if err := killCmd.Run(); err != nil {
-			log.Printf("Warning: unable to kill Vault process (it might not be running): %v", err)
+			log.Warn("Warning: unable to kill Vault process (it might not be running): %v", zap.Error(err))
 		} else {
 			fmt.Println("Stopped Vault process.")
 		}
@@ -43,7 +45,7 @@ var vaultRefreshCmd = &cobra.Command{
 		// Open (or create) the log file.
 		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
-			log.Fatalf("Failed to open log file: %v", err)
+			log.Fatal("Failed to open log file: %v", zap.Error(err))
 		}
 		defer logFile.Close()
 
@@ -53,7 +55,7 @@ var vaultRefreshCmd = &cobra.Command{
 		vaultCmd.Stderr = logFile
 
 		if err := vaultCmd.Start(); err != nil {
-			log.Fatalf("Failed to start Vault: %v", err)
+			log.Fatal("Failed to start Vault: %v", zap.Error(err))
 		}
 
 		fmt.Printf("Vault process restarted with PID %d\n", vaultCmd.Process.Pid)
@@ -63,5 +65,5 @@ var vaultRefreshCmd = &cobra.Command{
 
 func init() {
 	// Assuming you have a parent "refresh" command.
-	RefreshCmd.AddCommand(vaultRefreshCmd)
+	RefreshCmd.AddCommand(VaultRefreshCmd)
 }

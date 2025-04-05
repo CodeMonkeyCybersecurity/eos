@@ -8,7 +8,7 @@ import (
 )
 
 // updateUsersCmd handles updating user information
-var updateUsersCmd = &cobra.Command{
+var UpdateUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Update users",
 	Long:  `Use this command to update user information.`,
@@ -24,5 +24,5 @@ var updateUsersCmd = &cobra.Command{
 }
 
 func init() {
-	UpdateCmd.AddCommand(updateUsersCmd)
+	UpdateCmd.AddCommand(UpdateUsersCmd)
 }
