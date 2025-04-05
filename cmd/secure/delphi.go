@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"bufio"
+	"bytes"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -45,15 +48,34 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	log.Info("Successfully extracted wazuh API password")
 
 	log.Info("Rotating all passwords with --change-all")
+	var stdout bytes.Buffer
 	cmd1 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", apiPassword)
-	cmd1.Stdout = os.Stdout
+	cmd1.Stdout = &stdout
 	cmd1.Stderr = os.Stderr
+
 	if err := cmd1.Run(); err != nil {
 		log.Error("Failed to rotate all Wazuh passwords", zap.Error(err))
 		return fmt.Errorf("failed to rotate all Wazuh passwords: %w", err)
 	}
-
 	log.Info("Successfully rotated all passwords")
+
+	secrets := make(map[string]string)
+
+	scanner := bufio.NewScanner(&stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "The password for user") {
+			// e.g., line = "05/04/2025 23:00:39 INFO: The password for user kibanaserver is W+.S*xbCsJ8YwMKrhO*vXScnW7?7euM?"
+			parts := strings.Split(line, " ")
+			if len(parts) >= 8 {
+				user := parts[6]
+				pass := parts[8]
+				secrets[user] = pass
+				fmt.Printf("🔐 Parsed secret for %s\n", user)
+			}
+		}
+	}
 
 	log.Info("Restarting Wazuh services to apply new credentials")
 
@@ -72,7 +94,9 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	}
 
 	// EXTRA VASULT LOGIC
-	if err := vault.HandleFallbackOrStore(); err != nil {
+	log.Info("Storing secrets in vault")
+	if err := vault.HandleFallbackOrStore(secrets); err != nil {
+		log.Error("Failed to store secrets in vault", zap.Error(err))
 		return err
 	}
 

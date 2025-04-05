@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -49,17 +50,12 @@ func SaveToVault(name string, in any) error {
 }
 
 // HandleFallbackOrStore checks if Vault is installed and running, and either stores secrets in Vault or prompts the user for action
-func HandleFallbackOrStore() error {
+func HandleFallbackOrStore(secrets map[string]string) error {
 	SetVaultEnv()
 
 	if IsVaultInstalled() && IsVaultRunning() {
 		fmt.Println("Vault detected and healthy. Proceeding to store secrets securely.")
-		// TODO: Replace this dummy struct with real secrets
-		dummySecrets := map[string]string{
-			"wazuh":     "new-wazuh-pass",
-			"wazuh-wui": "new-wazuh-wui-pass",
-		}
-		if err := SaveToVault("delphi", dummySecrets); err != nil {
+		if err := SaveToVault("delphi", secrets); err != nil {
 			return fmt.Errorf("failed to store secrets in Vault: %w", err)
 		}
 		return nil
@@ -74,12 +70,37 @@ func HandleFallbackOrStore() error {
 	switch choice {
 	case "Deploy local Vault now [recommended]":
 		fmt.Println("Launching vault deployment sequence...")
-		// TODO: Call `eos deploy vault` or invoke the logic directly
+
+		// Run: eos deploy vault && eos enable vault && eos secure vault
+		if err := execute.ExecuteAndLog("eos", "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
+			return fmt.Errorf("failed to deploy vault: %w", err)
+		}
+
+		if err := execute.ExecuteAndLog("eos", "enable", "vault"); err != nil {
+			fmt.Println("⚠️ Vault enable failed. You may need to unseal Vault manually or re-init.")
+			return fmt.Errorf("failed to enable vault: %w", err)
+		}
+
+		if err := execute.ExecuteAndLog("eos", "secure", "vault"); err != nil {
+			return fmt.Errorf("failed to secure vault: %w", err)
+		}
+
+		fmt.Println("Vault deployment finished. Verifying status...")
+		if !IsVaultRunning() {
+			return fmt.Errorf("vault does not appear to be running after setup. Please run 'eos logs vault'")
+		}
+	
+		fmt.Println("✅ Vault is running. Saving Delphi secrets to Vault...")
+		if err := SaveToVault("delphi", secrets); err != nil {
+			return fmt.Errorf("failed to store secrets in Vault: %w", err)
+		}
+
 	case "Skip and save credentials to disk":
 		fmt.Println("Saving credentials to fallback location: /var/lib/eos/secrets/delphi-fallback.yaml")
-		if err := writeFallbackSecrets(); err != nil {
+		if err := WriteFallbackSecrets(secrets); err != nil {
 			return fmt.Errorf("failed to write fallback secrets: %w", err)
 		}
+
 	case "Abort":
 		return fmt.Errorf("vault not available, user aborted")
 	}

@@ -3,6 +3,7 @@ package execute
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -52,4 +53,36 @@ func ExecuteInDir(dir, command string, args ...string) error {
 func ExecuteRaw(command string, args ...string) *exec.Cmd {
 	fmt.Printf("➡ Executing (raw): %s %s\n", command, strings.Join(args, " "))
 	return exec.Command(command, args...)
+}
+
+
+// ExecuteAndLog runs a command and streams stdout/stderr directly.
+// It returns an error if the command fails.
+func ExecuteAndLog(name string, args ...string) error {
+	fmt.Printf("🚀 Running: %s %s\n", name, joinArgs(args))
+
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("command failed: %s %s: %w", name, joinArgs(args), err)
+	}
+
+	fmt.Printf("✅ Completed: %s %s\n", name, joinArgs(args))
+	return nil
+}
+
+// joinArgs formats arguments for display
+func joinArgs(args []string) string {
+	return fmt.Sprintf("%s", shellQuote(args))
+}
+
+// shellQuote ensures args are properly quoted for visibility
+func shellQuote(args []string) string {
+	quoted := ""
+	for _, arg := range args {
+		quoted += fmt.Sprintf("'%s' ", arg)
+	}
+	return quoted
 }

@@ -13,13 +13,10 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func writeFallbackSecrets() error {
+func WriteFallbackSecrets(secrets map[string]string) error {
 	path := "/var/lib/eos/secrets/delphi-fallback.yaml"
 
-	data := map[string]string{
-		"wazuh":     "new-wazuh-pass",
-		"wazuh-wui": "new-wazuh-wui-pass",
-	}
+	data := secrets
 
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("failed to create fallback directory: %w", err)
