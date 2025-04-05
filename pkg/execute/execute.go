@@ -48,3 +48,8 @@ func ExecuteInDir(dir, command string, args ...string) error {
 	}
 	return nil
 }
+
+func ExecuteRaw(command string, args ...string) *exec.Cmd {
+	fmt.Printf("➡ Executing (raw): %s %s\n", command, strings.Join(args, " "))
+	return exec.Command(command, args...)
+}
