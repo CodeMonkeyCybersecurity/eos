@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 var SecureDelphiCmd = &cobra.Command{
@@ -59,15 +60,20 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	services := []string{"filebeat", "wazuh-manager", "wazuh-dashboard", "wazuh-indexer"}
 	for _, svc := range services {
 		log.Info("Restarting", zap.String("service", svc))
-	
+
 		cmd := exec.Command("systemctl", "restart", svc)
 		output, err := cmd.CombinedOutput()
-	
+
 		if err != nil {
 			log.Warn("Failed to restart service", zap.String("service", svc), zap.Error(err), zap.String("output", string(output)))
 		} else {
 			log.Info("Service restarted successfully", zap.String("service", svc), zap.String("output", string(output)))
 		}
+	}
+
+	// EXTRA VASULT LOGIC
+	if err := vault.HandleFallbackOrStore(); err != nil {
+		return err
 	}
 
 	log.Info("Delphi hardening complete")

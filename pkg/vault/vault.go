@@ -8,23 +8,9 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
-
-// LoadWithFallback attempts to load a configuration from the vault first, and if that fails,
-// it falls back to loading from a local JSON file on disk.
-// It uses the XDG_CONFIG_HOME environment variable to determine the path to the local config file.
-// The function takes a name string to identify the configuration and an output variable to store the loaded data.
-// It returns an error if both loading attempts fail.
-// The function first constructs the vault path and the disk path for the configuration file.
-// If the vault is available, it tries to read the configuration from the vault.
-// If that fails, it attempts to read the configuration from the local disk.
-// If both attempts fail, it returns an error indicating the failure to read the configuration.
-// The function uses the vault package to read JSON data from the vault and the os package to read files from disk.
-// It also uses the filepath package to construct file paths in a platform-independent way.
-// The function is designed to be flexible and can be used in various contexts where configuration loading is needed.
-// It is particularly useful in scenarios where configurations are stored in a vault for security reasons,
-// but a fallback to local storage is also required.
 
 // IsAvailable checks if Vault is accessible
 func IsAvailable() bool {
@@ -32,6 +18,7 @@ func IsAvailable() bool {
 	return cmd.Run() == nil
 }
 
+// LoadWithFallback attempts to load a JSON secret from Vault, falling back to a local file if Vault is unavailable
 func LoadWithFallback(name string, out any) error {
 	vaultPath := fmt.Sprintf("secret/eos/%s/config", name)
 	diskPath := xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
@@ -55,51 +42,47 @@ func LoadWithFallback(name string, out any) error {
 	return json.Unmarshal(b, out)
 }
 
+// SaveToVault saves a JSON secret to Vault at the given path
 func SaveToVault(name string, in any) error {
 	path := fmt.Sprintf("secret/eos/%s/config", name)
 	return WriteVaultJSON(path, in)
 }
 
-// ReadJSON reads a JSON secret from Vault at the given path
-func ReadVaultJSON(path string, out any) error {
-	cmd := execute.ExecuteRaw("vault", "kv", "get", "-format=json", path)
-	outBytes, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("vault read failed: %w", err)
+// HandleFallbackOrStore checks if Vault is installed and running, and either stores secrets in Vault or prompts the user for action
+func HandleFallbackOrStore() error {
+	SetVaultEnv()
+
+	if IsVaultInstalled() && IsVaultRunning() {
+		fmt.Println("Vault detected and healthy. Proceeding to store secrets securely.")
+		// TODO: Replace this dummy struct with real secrets
+		dummySecrets := map[string]string{
+			"wazuh":     "new-wazuh-pass",
+			"wazuh-wui": "new-wazuh-wui-pass",
+		}
+		if err := SaveToVault("delphi", dummySecrets); err != nil {
+			return fmt.Errorf("failed to store secrets in Vault: %w", err)
+		}
+		return nil
 	}
 
-	var raw struct {
-		Data struct {
-			Data json.RawMessage `json:"data"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(outBytes, &raw); err != nil {
-		return fmt.Errorf("unmarshal vault json: %w", err)
-	}
-	return json.Unmarshal(raw.Data.Data, out)
-}
+	choice := interaction.PromptSelect("Vault not detected. What would you like to do?", []string{
+		"Deploy local Vault now [recommended]",
+		"Skip and save credentials to disk",
+		"Abort",
+	})
 
-// WriteJSON writes a JSON object to Vault at the given path
-func WriteVaultJSON(path string, in any) error {
-	b, err := json.Marshal(in)
-	if err != nil {
-		return fmt.Errorf("json marshal: %w", err)
-	}
-
-	// Flatten JSON to key=value pairs
-	var flat map[string]interface{}
-	if err := json.Unmarshal(b, &flat); err != nil {
-		return fmt.Errorf("flatten json: %w", err)
+	switch choice {
+	case "Deploy local Vault now [recommended]":
+		fmt.Println("Launching vault deployment sequence...")
+		// TODO: Call `eos deploy vault` or invoke the logic directly
+	case "Skip and save credentials to disk":
+		fmt.Println("Saving credentials to fallback location: /var/lib/eos/secrets/delphi-fallback.yaml")
+		if err := writeFallbackSecrets(); err != nil {
+			return fmt.Errorf("failed to write fallback secrets: %w", err)
+		}
+	case "Abort":
+		return fmt.Errorf("vault not available, user aborted")
 	}
 
-	args := []string{"kv", "put", path}
-	for k, v := range flat {
-		args = append(args, fmt.Sprintf("%s=%v", k, v))
-	}
-
-	cmd := execute.ExecuteRaw("vault", args...)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("vault write failed: %w\nOutput: %s", err, string(output))
-	}
 	return nil
 }
