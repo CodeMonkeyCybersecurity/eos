@@ -1,12 +1,12 @@
-// cmd/secure/delphi.go
 package secure
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
-	"bufio"
-	"bytes"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,9 +25,9 @@ var SecureDelphiCmd = &cobra.Command{
 	RunE:  runDelphiHardening,
 }
 
-func runDelphiHardening(cmd *cobra.Command, args []string) error {
-
+func downloadPasswordTool() error {
 	log.Info("Downloading Wazuh password management tool")
+
 	if err := utils.DownloadFile(config.DelphiPasswdToolPath, config.DelphiPasswdToolURL); err != nil {
 		log.Error("Failed to download Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to download password tool: %w", err)
@@ -35,7 +35,94 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	if err := os.Chmod(config.DelphiPasswdToolPath, 0700); err != nil {
 		log.Error("Failed to set permissions on Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to chmod tool: %w", err)
+	}
+	return nil
+}
 
+func runPrimaryPasswordRotation(apiPassword string) (*bytes.Buffer, error) {
+	log.Info("Rotating all passwords with --change-all")
+
+	var stdout bytes.Buffer
+	cmd := exec.Command("bash", config.DelphiPasswdToolPath,
+		"-a", "-A",
+		"-au", "wazuh",
+		"-ap", apiPassword)
+
+	cmd.Stdout = &stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Warn("Primary password rotation failed", zap.Error(err))
+		return nil, err
+	}
+
+	log.Info("Primary password rotation succeeded")
+	return &stdout, nil
+}
+
+func runFallbackPasswordRotation() (string, error) {
+	log.Info("Starting fallback password reset logic...")
+
+	ymlPath := "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
+	ymlContent, err := os.ReadFile(ymlPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read wazuh.yml: %w", err)
+	}
+
+	re := regexp.MustCompile(`password:\s*"(.*?)"`)
+	match := re.FindStringSubmatch(string(ymlContent))
+	if len(match) < 2 {
+		return "", fmt.Errorf("could not extract wazuh-wui password from wazuh.yml")
+	}
+	extractedPass := match[1]
+	log.Info("Extracted wazuh-wui password from wazuh.yml")
+
+	cfg := config.DelphiConfig{
+		Protocol:           "https",
+		FQDN:               "127.0.0.1",
+		Port:               "55000",
+		VerifyCertificates: false,
+	}
+
+	token, err := delphi.AuthenticateUser(cfg, "wazuh-wui", extractedPass)
+	if err != nil {
+		return "", fmt.Errorf("fallback: failed to authenticate with wazuh-wui: %w", err)
+	}
+	cfg.Token = token
+	log.Info("Fallback: authenticated with wazuh-wui")
+
+	userID, err := delphi.GetUserIDByUsername(&cfg, "wazuh")
+	if err != nil {
+		return "", fmt.Errorf("fallback: failed to get wazuh user ID: %w", err)
+	}
+	log.Info("Found wazuh user ID", zap.String("userID", userID))
+
+	newWazuhPass, _ := utils.GeneratePassword(20)
+	if err := delphi.UpdateUserPassword(&cfg, userID, newWazuhPass); err != nil {
+		return "", fmt.Errorf("fallback: failed to update wazuh password: %w", err)
+	}
+	log.Info("Fallback: updated wazuh user password")
+
+	retryCmd := exec.Command("bash", config.DelphiPasswdToolPath,
+		"-a", "-A",
+		"-au", "wazuh",
+		"-ap", newWazuhPass)
+	retryCmd.Stdout = os.Stdout
+	retryCmd.Stderr = os.Stderr
+	if err := retryCmd.Run(); err != nil {
+		return "", fmt.Errorf("fallback: password tool retry failed: %w", err)
+	}
+
+	log.Info("Fallback password rotation succeeded after fixing wazuh credentials")
+	return newWazuhPass, nil
+}
+
+func runDelphiHardening(cmd *cobra.Command, args []string) error {
+
+	secrets := make(map[string]string)
+
+	if err := downloadPasswordTool(); err != nil {
+		return err
 	}
 
 	log.Info("Extracting current API admin password (user: wazuh)")
@@ -47,34 +134,34 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	}
 	log.Info("Successfully extracted wazuh API password")
 
-	log.Info("Rotating all passwords with --change-all")
-	var stdout bytes.Buffer
-	cmd1 := exec.Command("bash", config.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", apiPassword)
-	cmd1.Stdout = &stdout
-	cmd1.Stderr = os.Stderr
-
-	if err := cmd1.Run(); err != nil {
-		log.Error("Failed to rotate all Wazuh passwords", zap.Error(err))
-		return fmt.Errorf("failed to rotate all Wazuh passwords: %w", err)
+	stdout, err := runPrimaryPasswordRotation(apiPassword)
+	if err != nil {
+		log.Warn("Primary password rotation failed, attempting fallback", zap.Error(err))
+		newPass, err := runFallbackPasswordRotation()
+		if err != nil {
+			return err
+		}
+		stdout = &bytes.Buffer{}
+		fmt.Fprintf(stdout, "The password for user wazuh is %s\n", newPass)
 	}
-	log.Info("Successfully rotated all passwords")
 
-	secrets := make(map[string]string)
-
-	scanner := bufio.NewScanner(&stdout)
+	log.Info("Parsing output for new passwords")
+	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		line := scanner.Text()
 
 		if strings.Contains(line, "The password for user") {
-			// e.g., line = "05/04/2025 23:00:39 INFO: The password for user kibanaserver is W+.S*xbCsJ8YwMKrhO*vXScnW7?7euM?"
 			parts := strings.Split(line, " ")
-			if len(parts) >= 8 {
-				user := parts[6]
-				pass := parts[8]
+			if len(parts) >= 7 {
+				user := strings.TrimSpace(parts[4])
+				pass := strings.TrimSpace(parts[6])
 				secrets[user] = pass
 				fmt.Printf("🔐 Parsed secret for %s\n", user)
 			}
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		log.Warn("Error reading rotation output", zap.Error(err))
 	}
 
 	log.Info("Restarting Wazuh services to apply new credentials")
@@ -93,7 +180,6 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// EXTRA VASULT LOGIC
 	log.Info("Storing secrets in vault")
 	if err := vault.HandleFallbackOrStore(secrets); err != nil {
 		log.Error("Failed to store secrets in vault", zap.Error(err))
