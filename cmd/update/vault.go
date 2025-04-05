@@ -1,4 +1,4 @@
-// File: cmd/update/vault.go
+// cmd/update/vault.go
 
 package update
 
@@ -9,34 +9,49 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
-// vaultUpdateCmd represents the "update vault" command.
 var VaultUpdateCmd = &cobra.Command{
 	Use:     "vault",
 	Short:   "Updates Vault and syncs any fallback secrets",
-	Long: `Runs a snap refresh for Vault, updating it to the latest version.
-If Vault is available, this command will also upload fallback secrets from disk to Vault.`,
+	Long: `Updates Vault based on your system's package manager (e.g., dnf or snap).
+Also syncs any fallback secrets from disk into Vault if it's running.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")
 		}
 
-		fmt.Println("🔄 Updating Vault via snap...")
-		updateCmd := exec.Command("snap", "refresh", "vault")
+		distro := platform.DetectLinuxDistro()
+		var updateCmd *exec.Cmd
+
+		switch distro {
+		case "rhel":
+			fmt.Println("🔄 Updating Vault via dnf...")
+			updateCmd = exec.Command("dnf", "upgrade", "-y", "vault")
+		case "debian":
+			fmt.Println("🔄 Updating Vault via apt...")
+			updateCmd = exec.Command("apt", "update")
+			if err := updateCmd.Run(); err != nil {
+				log.Fatal("Failed to run apt update", zap.Error(err))
+			}
+			updateCmd = exec.Command("apt", "install", "-y", "vault")
+		default:
+			log.Fatal("Unsupported or unknown distro", zap.String("distro", distro))
+		}
+
 		updateCmd.Stdout = os.Stdout
 		updateCmd.Stderr = os.Stderr
 
 		if err := updateCmd.Run(); err != nil {
-			log.Fatal("Failed to update Vault: %v", zap.Error(err))
+			log.Fatal("Failed to update Vault", zap.Error(err))
 		}
 		fmt.Println("✅ Vault updated successfully.")
 
-		// Now sync secrets from disk to Vault if possible
 		if err := syncFallbackSecrets(); err != nil {
 			log.Warn("Failed to sync fallback secrets", zap.Error(err))
 		} else {
@@ -65,7 +80,11 @@ func syncFallbackSecrets() error {
 	}
 
 	for _, f := range files {
-		if f.IsDir() || !strings.HasSuffix(f.Name(), ".yaml") {
+		if f.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(f.Name(), ".yaml") {
+			log.Debug("Skipping non-YAML file", zap.String("file", f.Name()))
 			continue
 		}
 
