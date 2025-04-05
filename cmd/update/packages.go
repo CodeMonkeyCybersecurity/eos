@@ -95,6 +95,17 @@ func scheduleCron(cmd string, osType string) error {
 			return err
 		}
 		log.Info("Cron job successfully scheduled")
+		log.Info("Cron job created", zap.String("schedule", schedule))
+		log.Info("Cron job command", zap.String("command", cmd))
+		log.Info("Cron job time", zap.Int("hour", hour), zap.Int("minute", minute))
+		// Read back the crontab to confirm
+		out, err := exec.Command("crontab", "-l").Output()
+		if err != nil {
+			log.Error("Failed to read back crontab after writing", zap.Error(err))
+		} else {
+			log.Info("Updated crontab contents", zap.String("crontab", string(out)))
+		}
+
 	case "windows":
 		taskName := "EosSystemUpdate"
 		timeStr := fmt.Sprintf("%02d:%02d", hour, minute)
