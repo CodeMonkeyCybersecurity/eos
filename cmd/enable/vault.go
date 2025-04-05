@@ -28,6 +28,22 @@ It initializes and unseals Vault, sets up auditing, KV v2,
 AppRole, userpass, and creates an admin user with a random password.`,
 	Run: func(cmd *cobra.Command, args []string) {
 
+		// 0. Install Vault via dnf if not already installed
+		fmt.Println("[0/9] Checking if Vault is installed...")
+		_, err := exec.LookPath("vault")
+		if err != nil {
+			fmt.Println("Vault binary not found. Installing via dnf...")
+
+			dnfCmd := exec.Command("dnf", "install", "-y", "vault")
+			dnfOut, err := dnfCmd.CombinedOutput()
+			if err != nil {
+				log.Fatal("Failed to install Vault via dnf", zap.Error(err), zap.String("output", string(dnfOut)))
+			}
+			fmt.Println("Vault installed successfully via dnf.")
+		} else {
+			fmt.Println("Vault is already installed.")
+		}
+
 		// 1. Dynamically set VAULT_ADDR based on hostname.
 		vault.SetVaultEnv()
 
@@ -37,7 +53,7 @@ AppRole, userpass, and creates an admin user with a random password.`,
 			"-key-shares=5", "-key-threshold=3", "-format=json")
 
 		var initOut []byte
-		err := execute.RetryCaptureOutput(3, 2*time.Second, initCmd, &initOut)
+		err = execute.RetryCaptureOutput(3, 2*time.Second, initCmd, &initOut)
 
 		var initRes initResult
 		if err != nil {
