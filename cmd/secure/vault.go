@@ -59,6 +59,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		var initRes initResult
 		if err := json.Unmarshal(data, &initRes); err != nil {
+			log.Fatal("Failed to unmarshal vault_init.json", zap.Error(err))
 		}
 
 		// Build a slice of the stored hashed unseal keys (all five).
