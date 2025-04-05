@@ -78,6 +78,18 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 		} else {
 			log.Info("Wazuh yum repo disabled")
 		}
+
+		log.Info("Delphi (Wazuh) installation completed")
+
+		log.Info("To access the Wazuh Dashboard:")
+		log.Info("👉 Run this on your **local machine** (not over SSH):")
+		log.Info("    firefox https://$(hostname -I | awk '{print $1}')  # or use your preferred browser")
+
+		log.Info("Alternatively, forward the port over SSH and access via localhost:")
+		log.Info("    ssh -L 8443:localhost:443 user@your-server-ip")
+		log.Info("Then open: https://localhost:8443 in your browser.")
+		log.Info("To harden this installation, consider running the following commands: 'eos harden delphi'.")
+		
 	}
 	return nil
 }

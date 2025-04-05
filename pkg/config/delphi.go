@@ -21,6 +21,11 @@ var delphiConfigPath = xdg.XDGConfigPath("eos", "delphi.json")
 // It is set from the calling command before invoking the function.
 var ShowSecrets bool
 
+const (
+	DelphiPasswdToolURL = "https://packages.wazuh.com/4.11/wazuh-passwords-tool.sh"
+	DelphiPasswdToolPath = "/usr/local/bin/wazuh-passwords-tool.sh"
+)
+
 // Config represents the configuration stored in .delphi.json.
 type DelphiConfig struct {
 	API_User           string `json:"API_User"`
