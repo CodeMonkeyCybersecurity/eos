@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os/exec"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -67,12 +68,21 @@ func isRHEL() bool {
 }
 
 func scheduleCron(cmd string, osType string) error {
-	rand.Seed(time.Now().UnixNano())
-	hour := rand.Intn(24)
-	minute := rand.Intn(60)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	hour := r.Intn(24)
+	minute := r.Intn(60)
 
 	schedule := fmt.Sprintf("%d %d * * * %s", minute, hour, cmd)
 	log.Info("Generated cron schedule", zap.String("schedule", schedule))
+
+	// Check for existing cron jobs that already run this command
+	existing, err := exec.Command("crontab", "-l").Output()
+	if err == nil && len(existing) > 0 {
+		if strings.Contains(string(existing), cmd) {
+			log.Warn("Cron job for this update command already exists — skipping scheduling")
+			return nil
+		}
+	}
 
 	switch osType {
 	case "linux", "darwin":
