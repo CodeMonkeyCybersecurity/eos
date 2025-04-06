@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"gopkg.in/ldap.v3"
+	"github.com/go-ldap/ldap/v3"
 	"gopkg.in/yaml.v3"
 )
 
