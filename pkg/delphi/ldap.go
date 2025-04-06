@@ -59,6 +59,10 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to read config.yml: %w", err)
 	}
 
+	if len(raw) < 10 {
+		fmt.Println("⚠️  Warning: config.yml appears to be mostly empty. Proceeding anyway.")
+	}
+
 	var root map[string]interface{}
 	if err := yaml.Unmarshal(raw, &root); err != nil {
 		return fmt.Errorf("failed to parse config.yml: %w", err)
@@ -91,7 +95,10 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 		},
 	}
 
-	authc := root["authc"].(map[string]interface{})
+	authc, ok := root["authc"].(map[string]interface{})
+	if !ok {
+		authc = make(map[string]interface{})
+	}
 	authc["ldap"] = ldapAuthc
 	root["authc"] = authc
 
@@ -122,7 +129,10 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 		},
 	}
 
-	authz := root["authz"].(map[string]interface{})
+	authz, ok := root["authz"].(map[string]interface{})
+	if !ok {
+		authz = make(map[string]interface{})
+	}
 	authz["roles_from_myldap"] = ldapAuthz
 	root["authz"] = authz
 
