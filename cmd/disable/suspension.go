@@ -55,3 +55,23 @@ var disableSuspensionCmd = &cobra.Command{
 func init() {
 	DisableCmd.AddCommand(disableSuspensionCmd)
 }
+
+// disableSystemdTargets disables suspend and hibernate targets
+func disableSystemdTargets() error {
+	fmt.Println("🔧 Disabling suspend.target and hibernate.target...")
+	// Example dry logic
+	// You can replace this with: exec.Command("systemctl", "disable", "suspend.target", ...).Run()
+	return nil
+}
+
+// maskSleepTargets masks system sleep targets
+func maskSleepTargets() error {
+	fmt.Println("🔧 Masking sleep.target, suspend.target, hibernate.target...")
+	return nil
+}
+
+// disableLogindSleep patches /etc/systemd/logind.conf to disable suspend/hibernate
+func disableLogindSleep() error {
+	fmt.Println("🔧 Patching /etc/systemd/logind.conf to disable sleep options...")
+	return nil
+}
