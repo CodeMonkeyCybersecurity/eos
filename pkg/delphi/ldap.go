@@ -37,6 +37,12 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	cfg.RoleBase = interaction.PromptInput("RoleBase", "Role base DN (e.g., ou=Groups,dc=example,dc=org)")
 	cfg.AdminRole = interaction.PromptInput("AdminRole", "Admin group name (e.g., Administrator)")
 	cfg.ReadonlyRole = interaction.PromptInput("ReadonlyRole", "Readonly group name (e.g., readonly)")
+
+	// Validate required fields
+	if cfg.FQDN == "" || cfg.BindDN == "" || cfg.Password == "" || cfg.UserBase == "" || cfg.RoleBase == "" {
+		return nil, fmt.Errorf("missing required LDAP fields (FQDN, BindDN, Password, UserBase, or RoleBase)")
+	}
+
 	return cfg, nil
 }
 
@@ -173,6 +179,15 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 	var data map[string]interface{}
 	if err := yaml.Unmarshal(raw, &data); err != nil {
 		return fmt.Errorf("failed to parse roles_mapping.yml: %w", err)
+	}
+
+	// 🛡 Safeguard for empty or nil content
+	if data == nil {
+		data = make(map[string]interface{})
+	}
+
+	if len(raw) < 10 {
+		fmt.Println("⚠️  Warning: roles_mapping.yml appears to be mostly empty. Proceeding anyway.")
 	}
 
 	data["all_access"] = map[string]interface{}{
