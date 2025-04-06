@@ -63,6 +63,7 @@ func RegisterCommands() {
 	}
 	RootCmd.AddCommand(hecate.HecateCmd)
 	RootCmd.AddCommand(delphi.DelphiCmd)
+	RootCmd.AddCommand(undo.UndoCmd)
 }
 
 func Execute() {
