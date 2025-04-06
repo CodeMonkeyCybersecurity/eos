@@ -4,13 +4,10 @@ package disable
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"runtime"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
