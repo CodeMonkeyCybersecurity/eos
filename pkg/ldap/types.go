@@ -25,3 +25,18 @@ type LDAPGroup struct {
 	DN      string
 	Members []string
 }
+
+// pkg/ldap/types.go
+func DefaultLDAPConfig() *LDAPConfig {
+	return &LDAPConfig{
+		FQDN:         "ldap.domain.com",
+		Port:         389,
+		UseTLS:       false,
+		BindDN:       "cn=admin,dc=domain,dc=com",
+		Password:     "",
+		UserBase:     "ou=Users,dc=domain,dc=com",
+		RoleBase:     "ou=Groups,dc=domain,dc=com",
+		AdminRole:    "AdminRole",
+		ReadonlyRole: "ReadonlyRole",
+	}
+}
