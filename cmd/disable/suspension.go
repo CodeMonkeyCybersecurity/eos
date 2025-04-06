@@ -21,7 +21,6 @@ var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		flags.ParseDryRunAliases(cmd)
 		log := logger.GetLogger()
 		log.Info("Disabling system suspension and hibernation...")
 
