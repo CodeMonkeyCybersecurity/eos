@@ -34,3 +34,9 @@ var InspectLDAPUserCmd = &cobra.Command{
 		return ldap.PrintUser(args[0])
 	},
 }
+
+func init() {
+	InspectCmd.AddCommand(InspectLDAPUsersCmd)
+	InspectCmd.AddCommand(InspectLDAPGroupsCmd)
+	InspectCmd.AddCommand(InspectLDAPUserCmd)
+}
