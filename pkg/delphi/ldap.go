@@ -8,12 +8,12 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+
 	"github.com/go-ldap/ldap/v3"
 	"gopkg.in/yaml.v3"
 )
-
-var dryRun bool
 
 type LDAPConfig struct {
 	FQDN         string
@@ -48,6 +48,11 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 }
 
 func DownloadAndPlaceCert(fqdn string) error {
+	if flags.IsDryRun() {
+		fmt.Printf("🧪 Dry run: would fetch and store LDAP cert from %s\n", fqdn)
+		return nil
+	}
+
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(
 		`echo -n | openssl s_client -connect %s:636 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /etc/wazuh-indexer/opensearch-security/ldapcacert.pem`,
 		fqdn,
@@ -75,6 +80,7 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to parse config.yml: %w", err)
 	}
 
+	// Build authc block
 	ldapAuthc := map[string]interface{}{
 		"description":       "Authenticate via LDAP or Active Directory",
 		"http_enabled":      true,
@@ -109,6 +115,7 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	authc["ldap"] = ldapAuthc
 	root["authc"] = authc
 
+	// Build authz block
 	ldapAuthz := map[string]interface{}{
 		"description":       "Authorize via LDAP or Active Directory",
 		"http_enabled":      true,
@@ -143,12 +150,14 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	authz["roles_from_myldap"] = ldapAuthz
 	root["authz"] = authz
 
+	// Marshal new config
 	out, err := yaml.Marshal(root)
 	if err != nil {
 		return fmt.Errorf("failed to re-encode config.yml: %w", err)
 	}
 
-	if dryRun {
+	// 🧪 Dry run preview
+	if flags.IsDryRun() {
 		fmt.Println("🧪 Dry run: changes to config.yml would look like:")
 		fmt.Println(string(out))
 		return nil
@@ -160,6 +169,7 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	}
 	fmt.Printf("🧾 Backup created: %s\n", backupPath)
 
+	// Write patched config
 	if err := os.WriteFile(configPath, out, 0644); err != nil {
 		return fmt.Errorf("failed to write config.yml: %w", err)
 	}
@@ -177,18 +187,17 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to read roles_mapping.yml: %w", err)
 	}
 
+	if len(raw) < 10 {
+		fmt.Println("⚠️  Warning: roles_mapping.yml appears to be mostly empty. Proceeding anyway.")
+	}
+
 	var data map[string]interface{}
 	if err := yaml.Unmarshal(raw, &data); err != nil {
 		return fmt.Errorf("failed to parse roles_mapping.yml: %w", err)
 	}
-
 	// 🛡 Safeguard for empty or nil content
 	if data == nil {
 		data = make(map[string]interface{})
-	}
-
-	if len(raw) < 10 {
-		fmt.Println("⚠️  Warning: roles_mapping.yml appears to be mostly empty. Proceeding anyway.")
 	}
 
 	data["all_access"] = map[string]interface{}{
@@ -209,7 +218,8 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to marshal roles_mapping.yml: %w", err)
 	}
 
-	if dryRun {
+	// 🧪 Dry run preview
+	if flags.IsDryRun() {
 		fmt.Println("🧪 Dry run: changes to roles_mapping.yml would look like:")
 		fmt.Println(string(out))
 		return nil
@@ -246,10 +256,6 @@ func RestartDashboard() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-func SetDryRun(value bool) {
-	dryRun = value
 }
 
 // pkg/delphi/ldap.go (inside or near PatchConfigYML or in a new func)

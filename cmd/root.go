@@ -25,11 +25,13 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 var log = logger.L()
+var liveRun bool // inverse of dry-run
 
 var RootCmd = &cobra.Command{
 	Use:   "eos",
@@ -83,4 +85,11 @@ func Execute() {
 		log.Error("CLI execution error", zap.Error(err))
 		os.Exit(1)
 	}
+}
+
+func init() {
+	RootCmd.PersistentFlags().BoolVar(&liveRun, "live-run", false, "Actually apply changes (default is dry-run)")
+	cobra.OnInitialize(func() {
+		flags.SetDryRunMode(!liveRun) // Invert logic: live-run → dryRun false
+	})
 }

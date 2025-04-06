@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/spf13/cobra"
 )
 
-var dryRun bool
+var liveRun bool
 
 var SyncDelphiLDAPCmd = &cobra.Command{
 	Use:   "ldap",
@@ -21,7 +22,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - role sync
 - securityadmin reload`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		delphi.SetDryRun(dryRun)
+		flags.SetDryRunMode(!liveRun)
 		cfg, err := delphi.PromptLDAPDetails()
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
@@ -43,7 +44,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 			return fmt.Errorf("failed to patch roles_mapping.yml: %w", err)
 		}
 
-		if dryRun {
+		if flags.IsDryRun() {
 			fmt.Println("🧪 Dry run complete. No files were changed.")
 			return nil
 		}
@@ -68,5 +69,5 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 
 func init() {
 	SyncCmd.AddCommand(SyncDelphiLDAPCmd)
-	SyncDelphiLDAPCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without modifying any files")
+	SyncDelphiLDAPCmd.Flags().BoolVar(&liveRun, "live-run", false, "Actually apply changes (default is dry-run)")
 }
