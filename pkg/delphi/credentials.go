@@ -11,7 +11,7 @@ import (
 
 	"os/exec"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Struct to model the section of wazuh.yml we're interested in
