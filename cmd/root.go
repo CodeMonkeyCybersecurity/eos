@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -23,7 +22,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 var log = logger.L()
