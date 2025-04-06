@@ -11,6 +11,4 @@ var DisableCmd = &cobra.Command{
 	Short: "Disable system features (e.g., suspension, hibernation)",
 }
 
-func init() {
-	DisableCmd.AddCommand(disableSuspensionCmd)
-}
+
