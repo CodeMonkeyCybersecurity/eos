@@ -12,6 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	enableBridge bool
+)
+
 var CreateKvmCmd = &cobra.Command{
 	Use:   "kvm",
 	Short: "Install and configure KVM and libvirt",
@@ -21,6 +25,7 @@ var CreateKvmCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(CreateKvmCmd)
+	CreateKvmCmd.Flags().BoolVar(&enableBridge, "network-bridge", false, "Configure a bridge (br0) using the default network interface via Netplan")
 }
 
 func runDeployKVM(cmd *cobra.Command, args []string) error {
@@ -32,6 +37,13 @@ func runDeployKVM(cmd *cobra.Command, args []string) error {
 
 	if err := system.InstallKVM(); err != nil {
 		return err
+	}
+
+	if enableBridge {
+		fmt.Println("🛠️ Configuring network bridge...")
+		if err := system.ConfigureKVMBridge(); err != nil {
+			return fmt.Errorf("failed to configure network bridge: %w", err)
+		}
 	}
 
 	if err := system.EnsureLibvirtd(); err != nil {
