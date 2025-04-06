@@ -55,7 +55,6 @@ func ExecuteRaw(command string, args ...string) *exec.Cmd {
 	return exec.Command(command, args...)
 }
 
-
 // ExecuteAndLog runs a command and streams stdout/stderr directly.
 // It returns an error if the command fails.
 func ExecuteAndLog(name string, args ...string) error {

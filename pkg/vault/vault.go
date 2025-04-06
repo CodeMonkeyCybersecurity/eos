@@ -89,7 +89,7 @@ func HandleFallbackOrStore(secrets map[string]string) error {
 		if !IsVaultRunning() {
 			return fmt.Errorf("vault does not appear to be running after setup. Please run 'eos logs vault'")
 		}
-	
+
 		fmt.Println("✅ Vault is running. Saving Delphi secrets to Vault...")
 		if err := SaveToVault("delphi", secrets); err != nil {
 			return fmt.Errorf("failed to store secrets in Vault: %w", err)

@@ -11,7 +11,6 @@ import (
 
 var dryRun bool
 
-
 var SyncDelphiLDAPCmd = &cobra.Command{
 	Use:   "ldap",
 	Short: "Sync LDAP configuration into Delphi (Wazuh)",
@@ -22,7 +21,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - role sync
 - securityadmin reload`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		delphi.SetDryRun(dryRun) 
+		delphi.SetDryRun(dryRun)
 		cfg, err := delphi.PromptLDAPDetails()
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
@@ -62,8 +61,6 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 		return nil
 	},
 }
-
-
 
 func init() {
 	SyncCmd.AddCommand(SyncDelphiLDAPCmd)

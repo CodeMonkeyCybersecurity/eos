@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
 	"github.com/spf13/cobra"
@@ -32,6 +33,7 @@ func init() {
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(configure.ConfigureCmd)
+	DelphiCmd.AddCommand(sync.SyncCmd)
 
 	// TODO: Example persistent flags: DelphiCmd.PersistentFlags().String("config", "", "Path to the Delphi configuration file")
 }

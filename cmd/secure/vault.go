@@ -62,7 +62,6 @@ Please follow up by configuring MFA via your organization's preferred integratio
 			log.Fatal("Failed to unmarshal vault_init.json", zap.Error(err))
 		}
 
-		
 		// Build a slice of the stored hashed unseal keys (all five).
 		var storedHashes []string
 		for _, key := range initRes.UnsealKeysB64 {
