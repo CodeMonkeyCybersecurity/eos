@@ -49,7 +49,6 @@ func PromptPassword(prompt, defaultVal string) string {
 	return pass
 }
 
-
 func ConfirmDelphiConfig(cfg delphi.DelphiConfig) delphi.DelphiConfig {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)

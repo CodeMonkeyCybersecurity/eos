@@ -8,10 +8,10 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 
 	"github.com/go-ldap/ldap/v3"
 	"gopkg.in/yaml.v3"

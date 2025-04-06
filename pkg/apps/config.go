@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 )
 

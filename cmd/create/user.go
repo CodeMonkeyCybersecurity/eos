@@ -1,113 +1,149 @@
+// cmd/create/user.go
+
 package create
 
 import (
 	"bufio"
+
+	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"os/signal"
 	"strings"
 	"syscall"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
-// createUserCmd represents the command for creating a single user
+var (
+	username string
+	auto     bool
+)
+
 var CreateUserCmd = &cobra.Command{
 	Use:   "user",
-	Short: "Create a new user",
-	Long:  `Create a new user account interactively in the system.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		CreateUser() // Call the interactive function
-	},
+	Short: "Create a new Linux user",
+	Long: `Creates a new user account and optionally adds them to the admin group, 
+generates SSH keys, and sets a secure password.`,
+	RunE: runCreateUser,
 }
 
-// CreateUser handles the creation of a new user interactively
-func CreateUser() {
-	// Handle interrupt signals (Ctrl+C)
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+func init() {
+	CreateCmd.AddCommand(CreateUserCmd)
+	CreateUserCmd.Flags().StringVar(&username, "username", "hera", "Username for the new account")
+	CreateUserCmd.Flags().BoolVar(&auto, "auto", false, "Enable non-interactive auto mode with secure random password")
+}
+
+func runCreateUser(cmd *cobra.Command, args []string) error {
+	log := logger.L()
+
+	// Ctrl+C cancel handler
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		<-signalChan
-		fmt.Println("\nOperation canceled. Exiting...")
+		<-sig
+		fmt.Println("\n❌ Operation canceled.")
 		os.Exit(1)
 	}()
 
-	// Ensure the script is run as root
-	if os.Getenv("SUDO_USER") == "" && os.Geteuid() != 0 {
-		fmt.Println("Please run as root or with sudo")
-		return
+	if os.Geteuid() != 0 {
+		return errors.New("please run as root or with sudo")
 	}
 
 	reader := bufio.NewReader(os.Stdin)
 
-	// Prompt for new username
-	fmt.Print("Enter the new username: ")
-	username, _ := reader.ReadString('\n')
-	username = strings.TrimSpace(username)
-
-	// Check if the username is not empty
-	if username == "" {
-		fmt.Println("Username cannot be empty!")
-		return
-	}
-
-	// Check if user already exists
-	_, err := exec.Command("id", username).Output()
-	if err == nil {
-		fmt.Printf("User %s already exists!\n", username)
-		return
-	}
-
-	// Prompt for password
-	fmt.Print("Enter the password: ")
-	password, _ := reader.ReadString('\n')
-	password = strings.TrimSpace(password)
-
-	// Confirm password
-	fmt.Print("Confirm password: ")
-	password2, _ := reader.ReadString('\n')
-	password2 = strings.TrimSpace(password2)
-
-	// Check if passwords match
-	if password != password2 {
-		fmt.Println("Passwords do not match!")
-		return
-	}
-
-	// Add user
-	err = exec.Command("useradd", "-m", "-s", "/bin/bash", username).Run()
-	if err != nil {
-		fmt.Printf("Error creating user: %v\n", err)
-		return
-	}
-
-	// Set the user password
-	passCmd := fmt.Sprintf("echo %s:%s | chpasswd", username, password)
-	err = exec.Command("sh", "-c", passCmd).Run()
-	if err != nil {
-		fmt.Printf("Error setting password for user: %v\n", err)
-		return
-	}
-
-	// Ask for sudo privileges
-	fmt.Print("Should this user have sudo privileges? (yes/no): ")
-	grantsudo, _ := reader.ReadString('\n')
-	grantsudo = strings.TrimSpace(strings.ToLower(grantsudo))
-
-	if grantsudo == "yes" {
-		err = exec.Command("usermod", "-aG", "sudo", username).Run()
-		if err != nil {
-			fmt.Printf("Error granting sudo privileges: %v\n", err)
-			return
+	// Prompt if interactive
+	if !auto {
+		fmt.Print("Enter new username (default: hera): ")
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input != "" {
+			username = input
 		}
-		fmt.Printf("User %s has been granted sudo privileges.\n", username)
 	}
 
-	fmt.Printf("User %s created successfully.\n", username)
-}
+	// Check if user exists
+	if system.UserExists(username) {
+		log.Warn("User already exists", zap.String("username", username))
+		return nil
+	}
 
-func init() {
-	// Register the create user command with the create command
-	CreateCmd.AddCommand(CreateUserCmd)
+	log.Info("Creating user", zap.String("username", username))
+	if err := execute.Execute("useradd", "-m", "-s", "/bin/bash", username); err != nil {
+		return fmt.Errorf("error creating user: %w", err)
+	}
+
+	// Set password
+	var password string
+	if auto {
+		pw, err := utils.GeneratePassword(20)
+		if err != nil {
+			return err
+		}
+		password = pw
+	} else {
+		fmt.Print("Enter password: ")
+		pw1, _ := reader.ReadString('\n')
+		fmt.Print("Confirm password: ")
+		pw2, _ := reader.ReadString('\n')
+		if strings.TrimSpace(pw1) != strings.TrimSpace(pw2) {
+			return errors.New("passwords do not match")
+		}
+		password = strings.TrimSpace(pw1)
+	}
+
+	if err := system.SetPassword(username, password); err != nil {
+		return err
+	}
+
+	// Admin group prompt or auto-detect
+	adminGroup := platform.GuessAdminGroup()
+	if !auto {
+		fmt.Print("Should this user have sudo privileges? (yes/no): ")
+		input, _ := reader.ReadString('\n')
+		if strings.TrimSpace(strings.ToLower(input)) == "no" {
+			adminGroup = ""
+		}
+	}
+
+	if adminGroup != "" {
+		log.Info("Granting admin privileges", zap.String("group", adminGroup))
+		if err := execute.Execute("usermod", "-aG", adminGroup, username); err != nil {
+			return fmt.Errorf("error adding to admin group: %w", err)
+		}
+	}
+
+	// SSH keygen
+	home := "/home/" + username
+	sshDir := home + "/.ssh"
+	log.Info("Creating SSH key")
+	_ = os.MkdirAll(sshDir, 0700)
+	_ = execute.Execute("chown", "-R", username+":"+username, sshDir)
+
+	keyPath := sshDir + "/id_rsa"
+	_ = execute.Execute("ssh-keygen", "-t", "rsa", "-b", "2048", "-N", "", "-f", keyPath)
+	_ = execute.Execute("chown", username+":"+username, keyPath, keyPath+".pub")
+
+	fmt.Println("✅ User created:", username)
+	fmt.Println("🔐 Password:", password)
+	fmt.Println("📁 SSH key:", keyPath)
+
+	// Attempt to store password in Vault
+	if err := vault.StoreUserSecret(username, password, keyPath); err != nil {
+		log.Warn("Vault is not available or write failed", zap.Error(err))
+		fmt.Println("⚠️ Vault write failed. Save these credentials manually:")
+		fmt.Printf("🔐 Password for %s: %s\n", username, password)
+	} else {
+		log.Info("User credentials securely stored in Vault")
+		fmt.Println("🔐 Credentials stored in Vault for user:", username)
+	}
+	return nil
 }

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-
 )
 
 func DeleteAgent(agentID string, token string, config *DelphiConfig) (map[string]interface{}, error) {
