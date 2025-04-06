@@ -22,7 +22,6 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - role sync
 - securityadmin reload`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		flags.SetDryRunMode(!liveRun)
 		cfg, err := delphi.PromptLDAPDetails()
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
