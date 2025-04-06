@@ -3,8 +3,13 @@
 package disable
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
 	"runtime"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -16,6 +21,7 @@ var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		flags.ParseDryRunAliases(cmd)
 		log := logger.GetLogger()
 		log.Info("Disabling system suspension and hibernation...")
 
@@ -54,24 +60,87 @@ var disableSuspensionCmd = &cobra.Command{
 
 func init() {
 	DisableCmd.AddCommand(disableSuspensionCmd)
+	flags.AddDryRunFlags(disableSuspensionCmd)
 }
 
 // disableSystemdTargets disables suspend and hibernate targets
 func disableSystemdTargets() error {
 	fmt.Println("🔧 Disabling suspend.target and hibernate.target...")
-	// Example dry logic
-	// You can replace this with: exec.Command("systemctl", "disable", "suspend.target", ...).Run()
-	return nil
+	cmd := exec.Command("systemctl", "disable", "suspend.target", "hibernate.target")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // maskSleepTargets masks system sleep targets
 func maskSleepTargets() error {
 	fmt.Println("🔧 Masking sleep.target, suspend.target, hibernate.target...")
-	return nil
+	cmd := exec.Command("systemctl", "mask", "sleep.target", "suspend.target", "hibernate.target")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
-// disableLogindSleep patches /etc/systemd/logind.conf to disable suspend/hibernate
 func disableLogindSleep() error {
-	fmt.Println("🔧 Patching /etc/systemd/logind.conf to disable sleep options...")
+	const configPath = "/etc/systemd/logind.conf"
+	fmt.Println("🔧 Patching", configPath, "to disable sleep options...")
+
+	input, err := os.ReadFile(configPath)
+	if err != nil {
+		return fmt.Errorf("could not read %s: %w", configPath, err)
+	}
+
+	var output bytes.Buffer
+	scanner := bufio.NewScanner(bytes.NewReader(input))
+	settings := map[string]string{
+		"HandleSuspendKey":   "ignore",
+		"HandleHibernateKey": "ignore",
+		"HandleLidSwitch":    "ignore",
+	}
+
+	seen := map[string]bool{}
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmed := strings.TrimSpace(line)
+
+		for key := range settings {
+			if strings.HasPrefix(trimmed, key+"=") {
+				output.WriteString(fmt.Sprintf("%s=%s\n", key, settings[key]))
+				seen[key] = true
+				goto next
+			}
+		}
+
+		output.WriteString(line + "\n")
+	next:
+	}
+
+	for key, value := range settings {
+		if !seen[key] {
+			output.WriteString(fmt.Sprintf("%s=%s\n", key, value))
+		}
+	}
+
+	if err := os.WriteFile(configPath, output.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write updated config: %w", err)
+	}
+
+	fmt.Println("🔄 Reloading systemd daemon and restarting systemd-logind...")
+
+	// Reload systemd to apply changes
+	if err := exec.Command("systemctl", "daemon-reexec").Run(); err != nil {
+		return fmt.Errorf("failed to reload systemd: %w", err)
+	}
+
+	// Restart logind to pick up the config changes
+	if err := exec.Command("systemctl", "restart", "systemd-logind").Run(); err != nil {
+		return fmt.Errorf("failed to restart systemd-logind: %w", err)
+	}
+
+	// ✅ Logging fix
+	logger.L().Info("Suspension hardening complete", zap.Strings("modified_units", []string{
+		"suspend.target", "hibernate.target", "sleep.target", "systemd-logind",
+	}))
+
 	return nil
 }
