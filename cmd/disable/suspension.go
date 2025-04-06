@@ -55,3 +55,6 @@ var disableSuspensionCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	DisableCmd.AddCommand(disableSuspensionCmd)
+}
