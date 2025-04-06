@@ -1,15 +1,14 @@
-/*
-cmd/create/create.go
+// cmd/create/create.go
 
-Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
-*/
 package create
 
 import (
+	"fmt"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
-
 	"go.uber.org/zap"
 )
 
@@ -24,16 +23,16 @@ For example:
 	eos deploy vault
 	eos deploy umami`,
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		log := logger.L()
+
+		if flags.IsDryRun() {
+			log.Info("Dry-run mode: no subcommand executed", zap.String("command", cmd.Use))
+			fmt.Printf("💡 [dry-run] No subcommand was executed for '%s'\n", cmd.Use)
+			return nil
+		}
+
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
-		_ = cmd.Help() // Display help if no subcommand is provided
+		return cmd.Help()
 	},
-}
-
-var log *zap.Logger
-
-func init() {
-	// Initialize the shared logger for the entire deploy package
-	log = logger.L()
 }
