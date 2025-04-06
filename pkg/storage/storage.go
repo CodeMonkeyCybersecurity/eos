@@ -1,3 +1,5 @@
+// pkg/storage/storage.go
+
 package storage
 
 import (
@@ -16,6 +18,10 @@ func SetVaultClient(client *api.Client) {
 
 // SaveToVault stores any struct at the given Vault path
 func SaveToVault(path string, v interface{}) error {
+	if vaultClient == nil {
+		return fmt.Errorf("vault client is not initialized; call SetVaultClient first")
+	}
+
 	data, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("failed to marshal struct: %w", err)
@@ -34,6 +40,10 @@ func SaveToVault(path string, v interface{}) error {
 
 // LoadFromVault retrieves a struct from Vault into the given reference
 func LoadFromVault(path string, v interface{}) error {
+	if vaultClient == nil {
+		return fmt.Errorf("vault client is not initialized; call SetVaultClient first")
+	}
+
 	secret, err := vaultClient.Logical().Read(path)
 	if err != nil || secret == nil {
 		return fmt.Errorf("no data found at path: %s", path)
