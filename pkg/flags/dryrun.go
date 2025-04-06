@@ -2,11 +2,11 @@ package flags
 
 import (
 	"fmt"
-
 	"github.com/spf13/cobra"
 )
 
 var DryRun = true // Default is dry-run mode (safe)
+var addedDryRunFlags = false
 
 func IsDryRun() bool {
 	return DryRun
@@ -31,24 +31,23 @@ func SetDryRunMode(v bool) {
 	}
 }
 
-// Call this inside main.go to define all aliases
+// Register dry-run flags exactly once
 func AddDryRunFlags(cmd *cobra.Command) {
+	if addedDryRunFlags {
+		return
+	}
+	addedDryRunFlags = true
+
 	cmd.PersistentFlags().Bool("live-run", false, "Apply changes (default is dry-run)")
-	cmd.PersistentFlags().Bool("apply", false, "Alias for --live-run")
-	cmd.PersistentFlags().Bool("force", false, "Alias for --live-run")
-	cmd.PersistentFlags().Bool("do-it", false, "Alias for --live-run")
 	cmd.PersistentFlags().BoolP("live", "L", false, "Alias for --live-run")
 }
 
-// Call this inside each command’s RunE() to parse flags
+// Evaluate dry-run flags (call in RunE)
 func ParseDryRunAliases(cmd *cobra.Command) {
 	liveRun, _ := cmd.Flags().GetBool("live-run")
-	apply, _ := cmd.Flags().GetBool("apply")
-	force, _ := cmd.Flags().GetBool("force")
-	doit, _ := cmd.Flags().GetBool("do-it")
 	liveShort, _ := cmd.Flags().GetBool("live")
 
-	if liveRun || apply || force || doit || liveShort {
+	if liveRun || liveShort {
 		SetDryRunMode(false)
 	}
 }
