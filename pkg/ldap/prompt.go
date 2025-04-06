@@ -1,3 +1,5 @@
+// pkg/ldap/prompt.go
+
 package ldap
 
 import (
