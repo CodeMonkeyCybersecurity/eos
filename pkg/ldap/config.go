@@ -8,29 +8,20 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
-func LoadLDAPConfig() (*LDAPConfig, error) {
-	// Step 1: Attempt to load from Vault (preferred)
-	if cfg, err := LoadFromVault(); err == nil {
-		return cfg, nil
+func LoadLDAPConfig() (*LDAPConfig, string, error) {
+	if cfg, err := LoadFromVault(); err == nil && cfg.FQDN != "" {
+		return cfg, "vault", nil
 	}
-
-	// Step 2: Fallback to environment variables (for runtime override)
-	if cfg := LoadFromEnv(); cfg != nil {
-		return cfg, nil
+	if cfg := LoadFromEnv(); cfg != nil && cfg.FQDN != "" {
+		return cfg, "env", nil
 	}
-
-	// Step 3: Sane defaults for local dev or demos
-	return &LDAPConfig{
-		FQDN:         "ldap.domain.com",
-		Port:         389,
-		UseTLS:       false,
-		BindDN:       "cn=admin,dc=domain,dc=com",
-		Password:     "",
-		UserBase:     "ou=Users,dc=domain,dc=com",
-		RoleBase:     "ou=Groups,dc=domain,dc=com",
-		AdminRole:    "AdminRole",
-		ReadonlyRole: "ReadonlyRole",
-	}, nil
+	if cfg := TryDetectFromHost(); cfg != nil {
+		return cfg, "host", nil
+	}
+	if cfg := TryDetectFromContainer(); cfg != nil {
+		return cfg, "container", nil
+	}
+	return ReturnFallbackDefaults(), "fallback", nil
 }
 
 func LoadFromVault() (*LDAPConfig, error) {

@@ -13,7 +13,7 @@ func ListUsers() ([]LDAPUser, error) {
 	}
 	defer conn.Close()
 
-	cfg, err := LoadLDAPConfig()
+	cfg, _, err := LoadLDAPConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func ListGroups() ([]LDAPGroup, error) {
 	}
 	defer conn.Close()
 
-	cfg, err := LoadLDAPConfig()
+	cfg, _, err := LoadLDAPConfig()
 	if err != nil {
 		return nil, err
 	}
