@@ -108,6 +108,6 @@ func HandleFallbackOrStore(secrets map[string]string) error {
 	return nil
 }
 
-func WriteStruct(path string, v interface{}) error {
-	return SaveToVault(path, v)
+func WriteStruct(fullPath string, v interface{}) error {
+	return WriteVaultJSON(fullPath, v)
 }

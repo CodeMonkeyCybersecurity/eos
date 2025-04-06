@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -66,4 +67,10 @@ func RequireLinuxDistro(allowed []string) error {
 
 func GetArch() string {
 	return runtime.GOARCH
+}
+
+// IsCommandAvailable checks if a command exists in the system PATH.
+func IsCommandAvailable(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
 }
