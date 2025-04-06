@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -32,16 +32,16 @@ var CreateHeraCmd = &cobra.Command{
 		log.Info("🚀 Starting Hera (Authentik) deployment")
 
 		// Ensure target directory exists
-		if _, err := os.Stat(config.HeraDir); os.IsNotExist(err) {
-			log.Warn("Hera directory does not exist; creating it", zap.String("path", config.HeraDir))
-			if err := os.MkdirAll(config.HeraDir, 0755); err != nil {
+		if _, err := os.Stat(consts.HeraDir); os.IsNotExist(err) {
+			log.Warn("Hera directory does not exist; creating it", zap.String("path", consts.HeraDir))
+			if err := os.MkdirAll(consts.HeraDir, 0755); err != nil {
 				log.Fatal("Failed to create Hera directory", zap.Error(err))
 			}
 		}
 
 		// Download the latest docker-compose.yml
 		log.Info("📦 Downloading latest docker-compose.yml")
-		if err := execute.ExecuteInDir(config.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
+		if err := execute.ExecuteInDir(consts.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
 			log.Fatal("Failed to download docker-compose.yml", zap.Error(err))
 		}
 
@@ -78,7 +78,7 @@ var CreateHeraCmd = &cobra.Command{
 			"AUTHENTIK_EMAIL__FROM=authentik@localhost",
 		}
 
-		envPath := config.HeraDir + "/.env"
+		envPath := consts.HeraDir + "/.env"
 		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
 			log.Fatal("Failed to write .env file", zap.Error(err))
 		}
@@ -91,12 +91,12 @@ var CreateHeraCmd = &cobra.Command{
 
 		// Pull images and deploy
 		log.Info("🐳 Pulling docker images")
-		if err := execute.ExecuteInDir(config.HeraDir, "docker", "compose", "pull"); err != nil {
+		if err := execute.ExecuteInDir(consts.HeraDir, "docker", "compose", "pull"); err != nil {
 			log.Fatal("Failed to pull docker images", zap.Error(err))
 		}
 
 		log.Info("🚀 Launching Hera via docker compose")
-		if err := execute.ExecuteInDir(config.HeraDir, "docker", "compose", "up", "-d"); err != nil {
+		if err := execute.ExecuteInDir(consts.HeraDir, "docker", "compose", "up", "-d"); err != nil {
 			log.Fatal("Failed to run docker compose", zap.Error(err))
 		}
 

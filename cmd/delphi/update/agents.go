@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -22,7 +21,7 @@ var UpdateAgentsCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
-		cfg, err := config.LoadDelphiConfig()
+		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Error("Failed to load Delphi config", zap.Error(err))
 			return err

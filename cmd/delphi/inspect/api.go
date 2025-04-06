@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
@@ -20,15 +19,15 @@ var InspectAPICmd = &cobra.Command{
 	Use:   "api",
 	Short: "Inspect API details from Delphi (Wazuh)",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadDelphiConfig()
+		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			fmt.Printf("❌ Error loading Delphi config: %v\n", err)
 			os.Exit(1)
 		}
 
 		// ✅ Step 2: Toggle ShowSecrets and confirm config
-		config.ShowSecrets = showSecrets
-		cfg = config.ConfirmDelphiConfig(cfg)
+		delphi.ShowSecrets = showSecrets
+		cfg = delphi.ConfirmDelphiConfig(cfg)
 
 		// ✅ Step 3: Authenticate if needed
 		if cfg.Token == "" {
@@ -38,7 +37,7 @@ var InspectAPICmd = &cobra.Command{
 				os.Exit(1)
 			}
 			cfg.Token = token
-			_ = config.SaveDelphiConfig(cfg)
+			_ = delphi.SaveDelphiConfig(cfg)
 		}
 
 		// ✅ Step 4: Secret access control

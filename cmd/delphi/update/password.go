@@ -9,7 +9,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -34,7 +33,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			return errors.New("username is required (use --username)")
 		}
 
-		cfg, err := config.LoadDelphiConfig()
+		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}
@@ -47,7 +46,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 
 		log.Info("Authenticating with current password...")
 
-		if _, err := delphi.AuthenticateUser(*cfg, username, currentPassword); err != nil {
+		if _, err := delphi.AuthenticateUser(cfg, username, currentPassword); err != nil {
 			return fmt.Errorf("authentication failed: %w", err)
 		}
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 )
 
 //
@@ -15,9 +14,9 @@ import (
 
 // EnsureArachneNetwork checks if the Docker network exists, and creates it if not.
 func EnsureArachneNetwork() error {
-	networkName := config.DockerNetworkName
-	ipv4 := config.DockerIPv4Subnet
-	ipv6 := config.DockerIPv6Subnet
+	networkName := DockerNetworkName
+	ipv4 := DockerIPv4Subnet
+	ipv6 := DockerIPv6Subnet
 
 	if err := CheckIfDockerInstalled(); err != nil {
 		return fmt.Errorf("docker is not installed or not in PATH: %w", err)

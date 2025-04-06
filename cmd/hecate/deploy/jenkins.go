@@ -12,7 +12,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/certs"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
@@ -46,7 +48,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			log.Info("Assets organized successfully for Jenkins")
 
 			// Load configuration from .hecate.conf.
-			cfg, err := config.LoadConfig("jenkins")
+			cfg, err := hecate.LoadConfig("jenkins")
 			if err != nil {
 				log.Error("Configuration error", zap.Error(err))
 				fmt.Printf("Configuration error: %v\n", err)
@@ -83,7 +85,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			log.Info("Successfully uncommented Jenkins lines")
 
 			// Now use the compose file for starting the services.
-			if err := docker.RunDockerComposeAllServices(config.DefaultComposeYML, "jenkins"); err != nil {
+			if err := docker.RunDockerComposeAllServices(consts.DefaultComposeYML, "jenkins"); err != nil {
 				log.Error("Failed to start Docker services", zap.Error(err))
 				fmt.Printf("Failed to run docker-compose up: %v\n", err)
 				return

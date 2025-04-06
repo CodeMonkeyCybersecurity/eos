@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
@@ -70,12 +69,12 @@ type PackageMapping struct {
 }
 
 func runMapping() {
-	cfg, err := config.LoadDelphiConfig()
+	cfg, err := delphi.LoadDelphiConfig()
 	if err != nil {
 		log.Fatal("Failed to load config", zap.Error(err))
 	}
 
-	cfg = config.ConfirmDelphiConfig(cfg)
+	cfg = delphi.ConfirmDelphiConfig(cfg)
 
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"

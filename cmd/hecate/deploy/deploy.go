@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/apps"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
@@ -46,8 +46,8 @@ Examples:
 
 func runDeploy(cmd *cobra.Command, args []string) {
 	app := strings.ToLower(args[0])
-	if !utils.IsValidApp(app) {
-		fmt.Printf("❌ Invalid application: %s. Supported: %v\n", app, config.GetSupportedAppNames())
+	if !utils.IsValidApp(app, apps.GetSupportedAppNames()) {
+		fmt.Printf("❌ Invalid application: %s. Supported: %v\n", app, apps.GetSupportedAppNames())
 		return
 	}
 

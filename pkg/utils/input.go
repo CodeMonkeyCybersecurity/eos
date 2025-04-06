@@ -8,7 +8,7 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
 	"golang.org/x/term"
 )
@@ -50,16 +50,16 @@ func PromptPassword(prompt, defaultVal string) string {
 }
 
 
-func ConfirmDelphiConfig(cfg config.DelphiConfig) config.DelphiConfig {
+func ConfirmDelphiConfig(cfg delphi.DelphiConfig) delphi.DelphiConfig {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)
 	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
 	fmt.Printf("  Port:          %s\n", cfg.Port)
-	fmt.Printf("  API_User:      %s\n", cfg.API_User)
-	if cfg.API_Password != "" {
-		fmt.Printf("  API_Password:  %s\n", "********")
+	fmt.Printf("  APIUser:      %s\n", cfg.APIUser)
+	if cfg.APIPassword != "" {
+		fmt.Printf("  APIPassword:  %s\n", "********")
 	} else {
-		fmt.Printf("  API_Password:  \n")
+		fmt.Printf("  APIPassword:  \n")
 	}
 	fmt.Printf("  LatestVersion: %s\n", cfg.LatestVersion)
 
@@ -69,11 +69,11 @@ func ConfirmDelphiConfig(cfg config.DelphiConfig) config.DelphiConfig {
 		cfg.Protocol = PromptInput("  Protocol", cfg.Protocol)
 		cfg.FQDN = PromptInput("  FQDN", cfg.FQDN)
 		cfg.Port = PromptInput("  Port", cfg.Port)
-		cfg.API_User = PromptInput("  API_User", cfg.API_User)
-		cfg.API_Password = PromptPassword("  API_Password", cfg.API_Password)
+		cfg.APIUser = PromptInput("  APIUser", cfg.APIUser)
+		cfg.APIPassword = PromptPassword("  APIPassword", cfg.APIPassword)
 		cfg.LatestVersion = PromptInput("  LatestVersion", cfg.LatestVersion)
 
-		if err := config.SaveDelphiConfig(&cfg); err != nil {
+		if err := delphi.SaveDelphiConfig(&cfg); err != nil {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}

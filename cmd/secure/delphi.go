@@ -12,7 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -28,11 +27,11 @@ var SecureDelphiCmd = &cobra.Command{
 func downloadPasswordTool() error {
 	log.Info("Downloading Wazuh password management tool")
 
-	if err := utils.DownloadFile(config.DelphiPasswdToolPath, config.DelphiPasswdToolURL); err != nil {
+	if err := utils.DownloadFile(delphi.DelphiPasswdToolPath, delphi.DelphiPasswdToolURL); err != nil {
 		log.Error("Failed to download Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to download password tool: %w", err)
 	}
-	if err := os.Chmod(config.DelphiPasswdToolPath, 0700); err != nil {
+	if err := os.Chmod(delphi.DelphiPasswdToolPath, 0700); err != nil {
 		log.Error("Failed to set permissions on Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to chmod tool: %w", err)
 	}
@@ -43,7 +42,7 @@ func runPrimaryPasswordRotation(apiPassword string) (*bytes.Buffer, error) {
 	log.Info("Rotating all passwords with --change-all")
 
 	var stdout bytes.Buffer
-	cmd := exec.Command("bash", config.DelphiPasswdToolPath,
+	cmd := exec.Command("bash", delphi.DelphiPasswdToolPath,
 		"-a", "-A",
 		"-au", "wazuh",
 		"-ap", apiPassword)
@@ -77,14 +76,14 @@ func runFallbackPasswordRotation() (string, error) {
 	extractedPass := match[1]
 	log.Info("Extracted wazuh-wui password from wazuh.yml")
 
-	cfg := config.DelphiConfig{
+	cfg := delphi.DelphiConfig{
 		Protocol:           "https",
 		FQDN:               "127.0.0.1",
 		Port:               "55000",
 		VerifyCertificates: false,
 	}
 
-	token, err := delphi.AuthenticateUser(cfg, "wazuh-wui", extractedPass)
+	token, err := delphi.AuthenticateUser(&cfg, "wazuh-wui", extractedPass)
 	if err != nil {
 		return "", fmt.Errorf("fallback: failed to authenticate with wazuh-wui: %w", err)
 	}
@@ -103,7 +102,7 @@ func runFallbackPasswordRotation() (string, error) {
 	}
 	log.Info("Fallback: updated wazuh user password")
 
-	retryCmd := exec.Command("bash", config.DelphiPasswdToolPath,
+	retryCmd := exec.Command("bash", delphi.DelphiPasswdToolPath,
 		"-a", "-A",
 		"-au", "wazuh",
 		"-ap", newWazuhPass)

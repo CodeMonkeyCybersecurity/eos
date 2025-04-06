@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
@@ -66,7 +66,7 @@ func previewFile(path string) (string, error) {
 	}
 	defer f.Close()
 
-	buf := make([]byte, config.MaxPreviewSize)
+	buf := make([]byte, consts.MaxPreviewSize)
 	n, err := f.Read(buf)
 	if err != nil && err != io.EOF {
 		return "", err
@@ -81,7 +81,7 @@ func previewFile(path string) (string, error) {
 	_, _ = f.Seek(0, 0)
 	scanner := bufio.NewScanner(f)
 	var lines []string
-	for i := 0; scanner.Scan() && i < config.MaxPreviewLines; i++ {
+	for i := 0; scanner.Scan() && i < consts.MaxPreviewLines; i++ {
 		lines = append(lines, scanner.Text())
 	}
 

@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
@@ -34,13 +34,13 @@ var BackupCmd = &cobra.Command{
 // runBackup is called when the user runs "hecate create backup".
 func runBackup() {
 	timestamp := time.Now().Format("20060102-150405")
-	backupConf := config.DefaultConfDir + "." + timestamp + ".bak"
-	backupCerts := config.DefaultCertsDir + "." + timestamp + ".bak"
-	backupCompose := config.DefaultComposeYML + "." + timestamp + ".bak"
+	backupConf := consts.DefaultConfDir + "." + timestamp + ".bak"
+	backupCerts := consts.DefaultCertsDir + "." + timestamp + ".bak"
+	backupCompose := consts.DefaultComposeYML + "." + timestamp + ".bak"
 
 	// conf.d
-	if info, err := os.Stat(config.DefaultConfDir); err != nil || !info.IsDir() {
-		log.Error("Missing or invalid conf.d", zap.String("dir", config.DefaultConfDir), zap.Error(err))
+	if info, err := os.Stat(consts.DefaultConfDir); err != nil || !info.IsDir() {
+		log.Error("Missing or invalid conf.d", zap.String("dir", consts.DefaultConfDir), zap.Error(err))
 		os.Exit(1)
 	}
 	if err := utils.RemoveIfExists(backupConf); err != nil {
@@ -48,38 +48,38 @@ func runBackup() {
 		os.Exit(1)
 	}
 
-	if err := utils.CopyDir(config.DefaultConfDir, backupConf); err != nil {
-		log.Error("Backup failed", zap.String("src", config.DefaultConfDir), zap.Error(err))
+	if err := utils.CopyDir(consts.DefaultConfDir, backupConf); err != nil {
+		log.Error("Backup failed", zap.String("src", consts.DefaultConfDir), zap.Error(err))
 		os.Exit(1)
 	}
 	log.Info("✅ conf.d backed up", zap.String("dest", backupConf))
 
 	// certs
-	if info, err := os.Stat(config.DefaultCertsDir); err != nil || !info.IsDir() {
-		log.Error("Missing or invalid certs", zap.String("dir", config.DefaultCertsDir), zap.Error(err))
+	if info, err := os.Stat(consts.DefaultCertsDir); err != nil || !info.IsDir() {
+		log.Error("Missing or invalid certs", zap.String("dir", consts.DefaultCertsDir), zap.Error(err))
 		os.Exit(1)
 	}
 	if err := utils.RemoveIfExists(backupCerts); err != nil {
 		log.Error("Failed to remove existing backup", zap.String("path", backupCerts), zap.Error(err))
 		os.Exit(1)
 	}
-	if err := utils.CopyDir(config.DefaultCertsDir, backupCerts); err != nil {
-		log.Error("Backup failed", zap.String("src", config.DefaultCertsDir), zap.Error(err))
+	if err := utils.CopyDir(consts.DefaultCertsDir, backupCerts); err != nil {
+		log.Error("Backup failed", zap.String("src", consts.DefaultCertsDir), zap.Error(err))
 		os.Exit(1)
 	}
 	log.Info("✅ certs backed up", zap.String("dest", backupCerts))
 
 	// docker-compose.yml
-	if info, err := os.Stat(config.DefaultComposeYML); err != nil || info.IsDir() {
-		log.Error("Missing or invalid compose file", zap.String("file", config.DefaultComposeYML), zap.Error(err))
+	if info, err := os.Stat(consts.DefaultComposeYML); err != nil || info.IsDir() {
+		log.Error("Missing or invalid compose file", zap.String("file", consts.DefaultComposeYML), zap.Error(err))
 		os.Exit(1)
 	}
 	if err := utils.RemoveIfExists(backupCompose); err != nil {
 		log.Error("Failed to remove existing backup", zap.String("path", backupCompose), zap.Error(err))
 		os.Exit(1)
 	}
-	if err := utils.CopyFile(config.DefaultComposeYML, backupCompose); err != nil {
-		log.Error("Backup failed", zap.String("src", config.DefaultComposeYML), zap.Error(err))
+	if err := utils.CopyFile(consts.DefaultComposeYML, backupCompose); err != nil {
+		log.Error("Backup failed", zap.String("src", consts.DefaultComposeYML), zap.Error(err))
 		os.Exit(1)
 	}
 	log.Info("✅ docker-compose.yml backed up", zap.String("dest", backupCompose))

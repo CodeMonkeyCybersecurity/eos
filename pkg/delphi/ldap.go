@@ -10,6 +10,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 
 	"github.com/go-ldap/ldap/v3"
 	"gopkg.in/yaml.v3"
@@ -25,15 +27,38 @@ type LDAPConfig struct {
 	ReadonlyRole string
 }
 
-func PromptLDAPDetails() (*LDAPConfig, error) {
-	cfg := &LDAPConfig{}
-	cfg.FQDN = interaction.PromptInput("FQDN", "FQDN of your LDAP server (e.g., ldap.example.org)")
-	cfg.BindDN = interaction.PromptInput("BindDN", "Bind DN (e.g., cn=admin,dc=example,dc=org)")
-	var err error
-	cfg.Password, err = interaction.PromptPassword("Bind password")
+func LoadLDAPConfig() (*LDAPConfig, error) {
+	var cfg LDAPConfig
+	err := storage.LoadFromVault(consts.LDAPVaultPath, &cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get password: %w", err)
+		return nil, err
 	}
+	return &cfg, nil
+}
+
+func PromptLDAPDetails() (*LDAPConfig, error) {
+	existing, _ := LoadLDAPConfig() // best-effort load
+
+	cfg := existing
+	if cfg == nil {
+		cfg = &LDAPConfig{}
+	}
+
+	// Prompt only if missing
+	if cfg.FQDN == "" {
+		cfg.FQDN = interaction.PromptInput("FQDN", "FQDN of your LDAP server")
+	}
+	if cfg.BindDN == "" {
+		cfg.BindDN = interaction.PromptInput("BindDN", "Bind DN")
+	}
+	if cfg.Password == "" {
+		var err error
+		cfg.Password, err = interaction.PromptPassword("Bind password")
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	cfg.UserBase = interaction.PromptInput("UserBase", "User base DN (e.g., ou=people,dc=example,dc=org)")
 	cfg.RoleBase = interaction.PromptInput("RoleBase", "Role base DN (e.g., ou=Groups,dc=example,dc=org)")
 	cfg.AdminRole = interaction.PromptInput("AdminRole", "Admin group name (e.g., Administrator)")
@@ -42,6 +67,11 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	// Validate required fields
 	if cfg.FQDN == "" || cfg.BindDN == "" || cfg.Password == "" || cfg.UserBase == "" || cfg.RoleBase == "" {
 		return nil, fmt.Errorf("missing required LDAP fields (FQDN, BindDN, Password, UserBase, or RoleBase)")
+	}
+
+	// 🔐 Save to Vault
+	if err := storage.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
+		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
 	return cfg, nil
@@ -257,8 +287,6 @@ func RestartDashboard() error {
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
-
-// pkg/delphi/ldap.go (inside or near PatchConfigYML or in a new func)
 
 func CheckLDAPGroupsExist(cfg *LDAPConfig) error {
 	l, err := ldap.DialURL("ldaps://" + cfg.FQDN + ":636")

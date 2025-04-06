@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -26,21 +25,21 @@ func DeployApp(app string, cmd *cobra.Command) error {
 	fmt.Printf("Deploying %s...\n", app)                       // 👈 Added for user visibility
 
 	// Check if the required HTTP config exists
-	httpConfig := filepath.Join(config.AssetsPath, "servers", app+".conf")
+	httpConfig := filepath.Join(AssetsPath, "servers", app+".conf")
 	if !utils.PathExists(httpConfig) {
 		logger.Error("Missing HTTP config file", zap.String("file", httpConfig))
 		return fmt.Errorf("missing Nginx HTTP config for %s", app)
 	}
 
 	// Copy HTTP config
-	if err := utils.CopyFile(httpConfig, filepath.Join(config.NginxConfPath, app+".conf")); err != nil {
+	if err := utils.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf")); err != nil {
 		return fmt.Errorf("failed to copy HTTP config: %w", err)
 	}
 
 	// Copy Stream config if available
-	streamConfig := filepath.Join(config.AssetsPath, "stream", app+".conf")
+	streamConfig := filepath.Join(AssetsPath, "stream", app+".conf")
 	if utils.PathExists(streamConfig) {
-		if err := utils.CopyFile(streamConfig, filepath.Join(config.NginxStreamPath, app+".conf")); err != nil {
+		if err := utils.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf")); err != nil {
 			return fmt.Errorf("failed to copy Stream config: %w", err)
 		}
 	}
@@ -50,7 +49,7 @@ func DeployApp(app string, cmd *cobra.Command) error {
 		noTalk, _ := cmd.Flags().GetBool("without-talk")
 		if !noTalk {
 			logger.Info("Deploying Coturn for NextCloud Talk")
-			if err := docker.RunDockerComposeAllServices(config.DefaultComposeYML, "coturn"); err != nil {
+			if err := docker.RunDockerComposeAllServices(DefaultComposeYML, "coturn"); err != nil {
 				return fmt.Errorf("failed to deploy Coturn: %w", err)
 			}
 		} else {

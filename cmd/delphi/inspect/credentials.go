@@ -7,24 +7,22 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
-
 var InspectCredentialsCmd = &cobra.Command{
 	Use:   "credentials",
 	Short: "List all Delphi (Wazuh) user credentials",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadDelphiConfig()
+		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			fmt.Printf("❌ Error loading Delphi config: %v\n", err)
 			os.Exit(1)
 		}
 
-		cfg = config.ConfirmDelphiConfig(cfg)
+		cfg = delphi.ConfirmDelphiConfig(cfg)
 
 		if !utils.EnforceSecretsAccess(log, showSecrets) {
 			return
@@ -37,7 +35,7 @@ var InspectCredentialsCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			cfg.Token = token
-			_ = config.SaveDelphiConfig(cfg)
+			_ = delphi.SaveDelphiConfig(cfg)
 		}
 
 		resp, err := delphi.AuthenticatedGet(cfg, "/security/users")

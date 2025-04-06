@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 
 	"github.com/spf13/cobra"
@@ -41,13 +41,13 @@ func deployZabbix() error {
 	}
 
 	// Create target directory
-	if err := os.MkdirAll(config.ZabbixDir, 0755); err != nil {
-		return fmt.Errorf("failed to create %s: %w", config.ZabbixDir, err)
+	if err := os.MkdirAll(consts.ZabbixDir, 0755); err != nil {
+		return fmt.Errorf("failed to create %s: %w", consts.ZabbixDir, err)
 	}
 
 	// Start the stack
 	log.Info("Running docker compose up...")
-	if err := docker.RunCommand("docker", "compose", "-f", config.ZabbixComposeYML, "up", "-d"); err != nil {
+	if err := docker.RunCommand("docker", "compose", "-f", consts.ZabbixComposeYML, "up", "-d"); err != nil {
 		return fmt.Errorf("failed to run docker compose: %w", err)
 	}
 

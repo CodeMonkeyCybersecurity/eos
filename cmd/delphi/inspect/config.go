@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
@@ -22,7 +22,7 @@ var InspectConfigCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		log := logger.GetLogger()
 
-		cfg, err := config.LoadDelphiConfig()
+		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)
@@ -35,7 +35,7 @@ var InspectConfigCmd = &cobra.Command{
 
 		// Mask sensitive fields
 		if !showSecrets {
-			cfg.API_Password = "********"
+			cfg.APIPassword = "********"
 			cfg.Token = "********"
 		}
 
@@ -50,7 +50,6 @@ var InspectConfigCmd = &cobra.Command{
 		fmt.Println(string(cfgJSON))
 	},
 }
-
 
 func init() {
 	InspectCmd.AddCommand(InspectConfigCmd)

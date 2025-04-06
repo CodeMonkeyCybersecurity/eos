@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
 	"github.com/spf13/cobra"
@@ -17,12 +16,12 @@ var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",
 	Short: "Check disconnected agents from Wazuh API",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadDelphiConfig()
+		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
-		cfg = config.ConfirmDelphiConfig(cfg)
+		cfg = delphi.ConfirmDelphiConfig(cfg)
 		if cfg.Protocol == "" {
 			cfg.Protocol = "https"
 		}
