@@ -48,6 +48,6 @@ func ParseDryRunAliases(cmd *cobra.Command) {
 	liveShort, _ := cmd.Flags().GetBool("live")
 
 	if liveRun || liveShort {
-		SetDryRunMode(false)
+		SetDryRunMode(true)
 	}
 }
