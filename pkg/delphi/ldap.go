@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"gopkg.in/ldap.v3"
 	"gopkg.in/yaml.v3"
 )
 
@@ -249,4 +250,57 @@ func RestartDashboard() error {
 
 func SetDryRun(value bool) {
 	dryRun = value
+}
+
+// pkg/delphi/ldap.go (inside or near PatchConfigYML or in a new func)
+
+func CheckLDAPGroupsExist(cfg *LDAPConfig) error {
+	l, err := ldap.DialURL("ldaps://" + cfg.FQDN + ":636")
+	if err != nil {
+		return fmt.Errorf("failed to connect to LDAP: %w", err)
+	}
+	defer l.Close()
+
+	err = l.Bind(cfg.BindDN, cfg.Password)
+	if err != nil {
+		return fmt.Errorf("failed to bind to LDAP: %w", err)
+	}
+
+	groupSearch := func(groupCN string) (bool, error) {
+		searchRequest := ldap.NewSearchRequest(
+			cfg.RoleBase,
+			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+			fmt.Sprintf("(cn=%s)", groupCN),
+			[]string{"dn"},
+			nil,
+		)
+		sr, err := l.Search(searchRequest)
+		if err != nil {
+			return false, err
+		}
+		return len(sr.Entries) > 0, nil
+	}
+
+	adminExists, err := groupSearch(cfg.AdminRole)
+	if err != nil {
+		return fmt.Errorf("error searching for AdminRole group: %w", err)
+	}
+
+	readonlyExists, err := groupSearch(cfg.ReadonlyRole)
+	if err != nil {
+		return fmt.Errorf("error searching for ReadonlyRole group: %w", err)
+	}
+
+	if !adminExists || !readonlyExists {
+		missing := []string{}
+		if !adminExists {
+			missing = append(missing, cfg.AdminRole)
+		}
+		if !readonlyExists {
+			missing = append(missing, cfg.ReadonlyRole)
+		}
+		return fmt.Errorf("the following required groups are missing in LDAP: %v", missing)
+	}
+
+	return nil
 }

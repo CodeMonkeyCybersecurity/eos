@@ -27,6 +27,10 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
 		}
 
+		if err := delphi.CheckLDAPGroupsExist(cfg); err != nil {
+			return fmt.Errorf("LDAP group validation failed: %w", err)
+		}
+
 		if err := delphi.DownloadAndPlaceCert(cfg.FQDN); err != nil {
 			return fmt.Errorf("failed to download LDAP cert: %w", err)
 		}
