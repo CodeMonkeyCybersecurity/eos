@@ -1,14 +1,13 @@
-// cmd/undo.go
-
 package undo
 
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"github.com/spf13/cobra"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	undoengine "github.com/CodeMonkeyCybersecurity/eos/pkg/undo" // 👈 alias to avoid name clash
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
@@ -19,17 +18,21 @@ var UndoCmd = &cobra.Command{
 Dry-run by default. Use --live-run to apply changes.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		flags.ParseDryRunAliases(cmd)
+		log := logger.L()
 
-		logFile := "/var/lib/eos/actions/latest.yaml" // Placeholder path
+		logDir := undoengine.GetActionLogDir()
+		logFile := logDir + "/latest.json"
+
 		if _, err := os.Stat(logFile); os.IsNotExist(err) {
+			log.Warn("No action log found to undo", zap.String("file", logFile))
 			fmt.Println("❌ No action log found to undo.")
 			return nil
 		}
 
-		fmt.Printf("🔍 Reading recorded actions from %s...\n", logFile)
-
-		actions, err := LoadActions(logFile)
+		log.Info("Reading recorded actions", zap.String("path", logFile))
+		actions, err := undoengine.LoadActions(logFile)
 		if err != nil {
+			log.Error("Failed to load actions", zap.Error(err))
 			return fmt.Errorf("failed to load action log: %w", err)
 		}
 
@@ -39,18 +42,19 @@ Dry-run by default. Use --live-run to apply changes.`,
 				fmt.Printf("🧪 [dry-run] Would undo: %s → %s\n", act.Type, act.Target)
 			} else {
 				fmt.Printf("↩️  Undoing: %s → %s...\n", act.Type, act.Target)
-				if err := ApplyUndo(act); err != nil {
+				if err := undoengine.ApplyUndo(act); err != nil {
+					log.Warn("Undo failed", zap.String("target", act.Target), zap.Error(err))
 					fmt.Fprintf(os.Stderr, "❌ Failed to undo %s: %v\n", act.Target, err)
 				}
 			}
 		}
 
+		log.Info("Undo complete")
 		fmt.Println("✅ Undo complete (dry-run unless --live-run was passed).")
 		return nil
 	},
 }
 
 func init() {
-	// Register the command during startup
 	flags.AddDryRunFlags(UndoCmd)
 }

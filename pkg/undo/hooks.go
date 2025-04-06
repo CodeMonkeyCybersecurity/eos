@@ -4,6 +4,7 @@ package undo
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+	"go.uber.org/zap"
 )
 
 // FinalizeIfLiveRun writes the undo log if the command actually mutated the system.

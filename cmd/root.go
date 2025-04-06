@@ -9,16 +9,17 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/undo"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -57,13 +58,13 @@ func RegisterCommands() {
 		disable.DisableCmd,
 		enable.EnableCmd,
 		sync.SyncCmd,
+		undo.UndoCmd,
 	}
 	for _, cmd := range eosCommands {
 		RootCmd.AddCommand(cmd)
 	}
 	RootCmd.AddCommand(hecate.HecateCmd)
 	RootCmd.AddCommand(delphi.DelphiCmd)
-	RootCmd.AddCommand(undo.UndoCmd)
 }
 
 func Execute() {
