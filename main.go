@@ -20,7 +20,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 )
 
 func main() {
@@ -32,8 +31,5 @@ func main() {
 		os.Exit(1)
 	}
 	defer logger.Sync()
-	logger.GetLogger().Info("Eos CLI initialized and ready.")
-	flags.AddDryRunFlags(cmd.RootCmd)
-
 	cmd.Execute()
 }
