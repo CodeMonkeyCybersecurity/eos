@@ -3,25 +3,41 @@ package ldap
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 func LoadLDAPConfig() (*LDAPConfig, string, error) {
+	// Step 1: Attempt to load from Vault
 	if cfg, err := LoadFromVault(); err == nil && cfg.FQDN != "" {
+		fmt.Println("✅ LDAP config loaded from Vault:", cfg.FQDN)
 		return cfg, "vault", nil
 	}
+
+	// Step 2: Fallback to environment variables
 	if cfg := LoadFromEnv(); cfg != nil && cfg.FQDN != "" {
+		fmt.Println("✅ LDAP config loaded from env:", cfg.FQDN)
 		return cfg, "env", nil
 	}
+
+	// Step 3: Detect from host (systemd or open port)
 	if cfg := TryDetectFromHost(); cfg != nil {
+		fmt.Println("✅ LDAP config auto-detected from host:", cfg.FQDN)
 		return cfg, "host", nil
 	}
+
+	// Step 4: Detect from Docker container
 	if cfg := TryDetectFromContainer(); cfg != nil {
+		fmt.Println("✅ LDAP config auto-detected from container:", cfg.FQDN)
 		return cfg, "container", nil
 	}
-	return ReturnFallbackDefaults(), "fallback", nil
+
+	// Step 5: Fallback defaults
+	cfg := ReturnFallbackDefaults()
+	fmt.Println("⚠️  Using fallback LDAP config:", cfg.FQDN)
+	return cfg, "default", nil
 }
 
 func LoadFromVault() (*LDAPConfig, error) {

@@ -10,7 +10,7 @@ import (
 
 // AddUser creates a new LDAP user entry
 func AddUser(config *LDAPConfig, user LDAPUser, password string) error {
-	conn, err := ConnectWithConfig(config)
+	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func AddUser(config *LDAPConfig, user LDAPUser, password string) error {
 
 // DeleteUser removes a user from LDAP
 func DeleteUser(dn string, config *LDAPConfig) error {
-	conn, err := ConnectWithConfig(config)
+	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}

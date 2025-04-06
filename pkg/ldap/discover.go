@@ -3,9 +3,12 @@ package ldap
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -78,4 +81,24 @@ func TryDetectFromHost() *LDAPConfig {
 		AdminRole:    "AdminRole",
 		ReadonlyRole: "ReadonlyRole",
 	}
+}
+
+// IsPortOpen checks if a port is listening on localhost (e.g. 389 for LDAP)
+func IsPortOpen(port int) bool {
+	address := fmt.Sprintf("127.0.0.1:%d", port)
+	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
+}
+
+// IsSystemdUnitActive checks if a systemd service (e.g. slapd) is active
+func IsSystemdUnitActive(name string) bool {
+	out, err := exec.Command("systemctl", "is-active", name).Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(out)) == "active"
 }
