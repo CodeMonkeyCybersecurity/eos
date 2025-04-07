@@ -2,7 +2,6 @@
 package inspect
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -22,14 +21,35 @@ var InspectVaultCmd = &cobra.Command{
 
 		if !utils.IsPrivilegedUser() {
 			log.Error("Access denied: must be root or the 'eos' user to inspect Vault")
-			return errors.New("access denied: must be root or the 'eos' user to inspect Vault")
+			fmt.Println(`
+		❌ Access denied.
+		This command requires elevated privileges to inspect Vault contents.
+		
+		✅ Try again as root or the 'eos' user:
+			sudo eos inspect vault
+		`)
+			return fmt.Errorf("requires root or eos user to continue")
+		}
+
+		if _, err := exec.LookPath("vault"); err != nil {
+			fmt.Println(`
+		❌ HashiCorp Vault CLI not found in $PATH.
+		
+		💡 You can install it with:
+			sudo apt install vault
+		
+		Or verify it's available to the current user:
+			which vault
+			echo $PATH
+		`)
+			return fmt.Errorf("vault CLI binary not found in PATH")
 		}
 
 		log.Info("Querying Vault for secrets under path", zap.String("path", "secret/eos/"))
 		cmdExec := exec.Command("vault", "kv", "list", "-format=json", "secret/eos")
 		output, err := cmdExec.Output()
 		if err != nil {
-			log.Error("Failed to list Vault secrets", zap.Error(err))
+			log.Error("Vault CLI call failed — check if vault is installed and in PATH", zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
 		}
 
