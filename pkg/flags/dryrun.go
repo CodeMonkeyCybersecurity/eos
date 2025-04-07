@@ -43,10 +43,11 @@ func AddDryRunFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolP("live", "L", false, "Alias for --live-run")
 }
 
-// Evaluate dry-run flags (call in RunE)
 func ParseDryRunAliases(cmd *cobra.Command) {
-	liveRun, _ := cmd.InheritedFlags().GetBool("live-run")
-	liveShort, _ := cmd.InheritedFlags().GetBool("live")
+	// Access the flags from the root command
+	liveRun, _ := cmd.Root().PersistentFlags().GetBool("live-run")
+	liveShort, _ := cmd.Root().PersistentFlags().GetBool("live")
+	fmt.Printf("Debug: root live-run=%v, live=%v\n", liveRun, liveShort)
 
 	if liveRun || liveShort {
 		SetDryRunMode(true)
