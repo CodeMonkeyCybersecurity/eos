@@ -5,6 +5,7 @@ package disable
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
@@ -16,7 +17,7 @@ var DisableCmd = &cobra.Command{
 	Use:   "disable",
 	Short: "Disable system features (e.g., suspension, hibernation)",
 
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.L()
 
 		if flags.IsDryRun() {
@@ -27,5 +28,5 @@ var DisableCmd = &cobra.Command{
 
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		return cmd.Help()
-	},
+	}),
 }

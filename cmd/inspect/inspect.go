@@ -8,6 +8,8 @@ package inspect
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,11 +23,12 @@ var InspectCmd = &cobra.Command{
 	Short:   "Inspect resources (e.g., processes, users, storage)",
 	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
 	Aliases: []string{"read", "get", "list", "ls", "query"},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	},
+		return nil
+	}),
 }
 
 func init() {

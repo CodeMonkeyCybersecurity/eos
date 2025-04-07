@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ import (
 var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Disabling system suspension and hibernation...")
 
@@ -54,7 +55,7 @@ var disableSuspensionCmd = &cobra.Command{
 		log.Info("✅ System suspension and hibernation disabled successfully.")
 		fmt.Println("✅ Suspension/hibernation is now disabled and persistent.")
 		return nil
-	},
+	}),
 }
 
 func init() {

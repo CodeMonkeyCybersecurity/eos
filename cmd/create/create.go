@@ -5,6 +5,7 @@ package create
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
@@ -23,7 +24,7 @@ For example:
 	eos deploy vault
 	eos deploy umami`,
 
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.L()
 
 		if flags.IsDryRun() {
@@ -34,5 +35,5 @@ For example:
 
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		return cmd.Help()
-	},
+	}),
 }
