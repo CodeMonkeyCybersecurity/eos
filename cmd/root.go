@@ -26,8 +26,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
-var log = logger.L()
-
 // RootCmd is the base command for eos.
 var RootCmd = &cobra.Command{
 	Use:   "eos",
@@ -70,17 +68,14 @@ func RegisterCommands() {
 
 // Execute initializes and runs the root command.
 func Execute() {
-	// Ensure the logger is initialized.
-	if logger.GetLogger() == nil {
-		logger.Initialize()
-	}
-	// Ensure logs are flushed when Execute returns.
 	defer logger.Sync()
+
+	logger.L().Info("Eos CLI starting")
 
 	RegisterCommands()
 
 	if err := RootCmd.Execute(); err != nil {
-		log.Error("CLI execution error", zap.Error(err))
+		logger.L().Error("CLI execution error", zap.Error(err))
 		os.Exit(1)
 	}
 }

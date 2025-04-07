@@ -93,82 +93,6 @@ func InitializeWithConfig(cfg zap.Config) {
 	log.Info("Logger successfully initialized", zap.String("log_level", cfg.Level.String()))
 }
 
-// Initialize initializes the logger with the default configuration.
-func Initialize() {
-	ensureLogger()
-}
-
-// GetLogger returns the global logger instance.
-func GetLogger() *zap.Logger {
-	ensureLogger()
-	return log
-}
-
-// Info logs an informational message.
-func Info(msg string, fields ...zap.Field) {
-	GetLogger().Info(msg, fields...)
-}
-
-// Warn logs a warning message.
-func Warn(msg string, fields ...zap.Field) {
-	GetLogger().Warn(msg, fields...)
-}
-
-// Error logs an error message.
-func Error(msg string, fields ...zap.Field) {
-	GetLogger().Error(msg, fields...)
-}
-
-// Debug logs a debug message.
-func Debug(msg string, fields ...zap.Field) {
-	GetLogger().Debug(msg, fields...)
-}
-
-// Fatal logs a fatal error and exits.
-func Fatal(msg string, fields ...zap.Field) {
-	GetLogger().Fatal(msg, fields...)
-}
-
-// Panic logs a message and panics.
-func Panic(msg string, fields ...zap.Field) {
-	GetLogger().Panic(msg, fields...)
-}
-
-// Sync flushes log entries. If strict is true, all errors are returned.
-func Sync(strict ...bool) error {
-	ensureLogger()
-	if log == nil {
-		return nil
-	}
-
-	if err := log.Sync(); err != nil {
-		if len(strict) > 0 && strict[0] {
-			return err
-		}
-		if _, ok := err.(*os.PathError); !ok && err.Error() != "sync /dev/stdout: invalid argument" {
-			log.Error("Failed to sync logger", zap.Error(err))
-		}
-		return err
-	}
-	return nil
-}
-
-// ResolveLogPath determines the best default log file path based on the OS.
-func ResolveLogPath() string {
-	for _, path := range PlatformLogPaths() {
-		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0700); err != nil {
-			continue
-		}
-		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-		if err == nil {
-			file.Close()
-			return path
-		}
-	}
-	return ""
-}
-
 // InitializeWithFallback sets up the Zap logger and returns any error encountered.
 func InitializeWithFallback(logPath string) error {
 	if logPath == "" {
@@ -215,12 +139,6 @@ func NewLogger() *zap.Logger {
 	return logger
 }
 
-// L returns the globally configured logger instance.
-// It's a shorthand for logger.GetLogger() used across packages.
-func L() *zap.Logger {
-	return GetLogger()
-}
-
 func ParseLogLevel(env string) zapcore.Level {
 	switch env {
 	case "TRACE", "DEBUG":
@@ -238,10 +156,40 @@ func ParseLogLevel(env string) zapcore.Level {
 	}
 }
 
-// ensureLogger initializes the logger if not already set.
-func ensureLogger() {
+// GetLogger ensures and returns the global logger instance.
+func GetLogger() *zap.Logger {
 	if log == nil {
 		log = NewLogger()
 		zap.ReplaceGlobals(log)
 	}
+	return log
+}
+
+// L is a shorthand for GetLogger().
+func L() *zap.Logger {
+	return GetLogger()
+}
+
+// Sync flushes log entries. If strict is true, all errors are returned.
+func Sync(strict ...bool) error {
+	if log == nil {
+		return nil
+	}
+	err := log.Sync()
+	if err == nil {
+		return nil
+	}
+
+	// Strict mode returns all errors
+	if len(strict) > 0 && strict[0] {
+		return err
+	}
+
+	// Ignore known benign sync errors
+	if _, ok := err.(*os.PathError); ok || err.Error() == "sync /dev/stdout: invalid argument" {
+		return nil
+	}
+
+	log.Error("Failed to sync logger", zap.Error(err))
+	return err
 }

@@ -1,9 +1,10 @@
 // pkg/logger/lifecycle.go
-
 package logger
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/uuid"
@@ -36,7 +37,7 @@ func WithCommandLogging(name string, fn func() error) error {
 	return err
 }
 
-// For use in pkg/ without zap
+// For pkg/* use when zap is unavailable
 func LogCommandStart(cmd string) (string, time.Time) {
 	traceID := generateTraceID()
 	start := time.Now()
@@ -47,4 +48,20 @@ func LogCommandStart(cmd string) (string, time.Time) {
 func LogCommandEnd(cmd string, traceID string, start time.Time) {
 	duration := time.Since(start)
 	fmt.Printf("[INFO] Command completed: %s | duration=%s | trace_id=%s\n", cmd, duration, traceID)
+}
+
+// ResolveLogPath attempts to find the best writable log file path.
+func ResolveLogPath() string {
+	for _, path := range PlatformLogPaths() {
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			continue
+		}
+		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+		if err == nil {
+			file.Close()
+			return path
+		}
+	}
+	return ""
 }

@@ -27,7 +27,7 @@ func DeployApp(app string, cmd *cobra.Command) error {
 	// Check if the required HTTP config exists
 	httpConfig := filepath.Join(AssetsPath, "servers", app+".conf")
 	if !utils.PathExists(httpConfig) {
-		logger.Error("Missing HTTP config file", zap.String("file", httpConfig))
+		log.Error("Missing HTTP config file", zap.String("file", httpConfig))
 		return fmt.Errorf("missing Nginx HTTP config for %s", app)
 	}
 
@@ -79,7 +79,7 @@ func ValidateNginx() error {
 	fmt.Println(string(output))         // Print to console for visibility
 
 	if err != nil {
-		logger.Error("Nginx configuration validation failed",
+		log.Error("Nginx configuration validation failed",
 			zap.Error(err), zap.String("output", string(output)))
 		return fmt.Errorf("nginx validation failed: %s", output)
 	}
@@ -95,7 +95,7 @@ func RestartNginx() error {
 	fmt.Println(string(output))         // Print to console
 
 	if err != nil {
-		logger.Error("Failed to restart Nginx",
+		log.Error("Failed to restart Nginx",
 			zap.Error(err), zap.String("output", string(output)))
 		return fmt.Errorf("nginx reload failed: %s", output)
 	}

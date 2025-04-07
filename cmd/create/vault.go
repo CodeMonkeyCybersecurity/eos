@@ -11,18 +11,16 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-var logFile = os.Stdout
-
 var CreateVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Installs and initializes HashiCorp Vault in production mode",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		log := zap.L().Named("create").With(zap.String("component", "vault"))
 		// Set Vault environment variables.
 		vault.SetVaultEnv()
 
@@ -50,7 +48,7 @@ echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://
 				log.Fatal("Failed to add APT repo", zap.Error(err))
 			}
 
-			fmt.Println("Installing Vault via apt...")
+			log.Info("Installing Vault via apt", zap.String("action", "install"), zap.String("distro", "debian"))
 			_ = exec.Command("apt-get", "update").Run()
 			installCmd := exec.Command("apt-get", "install", "-y", "vault")
 			installCmd.Stdout = os.Stdout
@@ -63,7 +61,7 @@ echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://
 				log.Fatal("Vault CLI not found after install", zap.Error(err))
 			}
 		} else if distro == "rhel" {
-			fmt.Println("Installing Vault via dnf...")
+			log.Info("Installing Vault via dnf", zap.String("action", "install"), zap.String("distro", "debian"))
 			repoFile := "/etc/yum.repos.d/hashicorp.repo"
 			if _, err := os.Stat(repoFile); os.IsNotExist(err) {
 				repoContent := `[hashicorp]
@@ -112,21 +110,17 @@ api_addr = "%s"
 ui = true
 `, vaultAddr)
 
-		fmt.Printf("Writing Vault config to %s\n", configFile)
+		log.Info("Writing Vault config", zap.String("path", configFile))
 		if err := os.WriteFile(configFile, []byte(config), 0644); err != nil {
 			log.Fatal("Failed to write Vault config", zap.Error(err))
 		}
 
-		fmt.Println("Starting Vault in production mode...")
 		startCmd := exec.Command("vault", "server", "-config="+configFile)
-		startCmd.Stdout = logFile
-		startCmd.Stderr = logFile
+		log.Info("Starting Vault process", zap.String("config", configFile))
 		if err := startCmd.Start(); err != nil {
-			log.Fatal("Failed to start Vault", zap.Error(err))
+			log.Fatal("Failed to start Vault", zap.String("action", "start"), zap.Error(err))
 		}
-		fmt.Printf("Vault process started with PID %d\n", startCmd.Process.Pid)
-
-		go utils.DetachAfterDelay(5, "Vault")
+		log.Info("Vault started", zap.String("status", "success"), zap.Int("pid", startCmd.Process.Pid))
 
 		return nil
 	}),
