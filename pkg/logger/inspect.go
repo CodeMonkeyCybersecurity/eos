@@ -3,8 +3,8 @@
 package logger
 
 import (
+	"encoding/json"
 	"os"
-	"strings"
 )
 
 // ReadLogFile returns the contents of a given log file.
@@ -16,17 +16,33 @@ func ReadLogFile(path string) (string, error) {
 	return string(data), nil
 }
 
-func ColorizeLogLine(line string) string {
-	switch {
-	case strings.Contains(line, "ERROR"), strings.Contains(line, "FATAL"):
-		return "\033[31m" + line + "\033[0m" // Red
-	case strings.Contains(line, "WARN"):
-		return "\033[33m" + line + "\033[0m" // Yellow
-	case strings.Contains(line, "DEBUG"), strings.Contains(line, "TRACE"):
-		return "\033[34m" + line + "\033[0m" // Blue
-	case strings.Contains(line, "INFO"):
-		return "\033[32m" + line + "\033[0m" // Green
-	default:
-		return line
+// ColorizeLogLine takes a raw JSON log line and applies ANSI color to the level field.
+func ColorizeLogLine(jsonLine string) string {
+	var entry map[string]interface{}
+	if err := json.Unmarshal([]byte(jsonLine), &entry); err != nil {
+		return jsonLine // skip if it's not valid JSON
 	}
+
+	rawLevel, ok := entry["L"].(string)
+	if !ok {
+		return jsonLine
+	}
+
+	var colored string
+	switch rawLevel {
+	case "DEBUG":
+		colored = "\033[90m" + jsonLine + "\033[0m"
+	case "INFO":
+		colored = "\033[32m" + jsonLine + "\033[0m"
+	case "WARN", "WARNING":
+		colored = "\033[33m" + jsonLine + "\033[0m"
+	case "ERROR":
+		colored = "\033[31m" + jsonLine + "\033[0m"
+	case "FATAL", "PANIC", "DPANIC":
+		colored = "\033[1;31m" + jsonLine + "\033[0m"
+	default:
+		colored = jsonLine
+	}
+
+	return colored
 }
