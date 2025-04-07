@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -14,7 +15,7 @@ import (
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or hera)",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if !utils.IsPrivilegedUser() {
 			return errors.New("access denied: must be root or the 'hera' user to inspect Vault")
 		}
@@ -39,7 +40,7 @@ var InspectVaultCmd = &cobra.Command{
 
 		fmt.Printf("\n✅ %d entries found.\n", count)
 		return nil
-	},
+	}),
 }
 
 func init() {
