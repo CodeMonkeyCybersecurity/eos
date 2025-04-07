@@ -9,8 +9,10 @@ import (
 	"os/exec"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +21,7 @@ var logLevel string
 var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "Inspect EOS logs (requires root or hera privileges)",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if !utils.IsPrivilegedUser() {
 			return errors.New("you must be root or the 'hera' user to view logs")
 		}
@@ -65,7 +67,7 @@ var InspectLogsCmd = &cobra.Command{
 		}
 
 		return nil
-	},
+	}),
 }
 
 func filterLogsByLevel(content string, level string) string {
