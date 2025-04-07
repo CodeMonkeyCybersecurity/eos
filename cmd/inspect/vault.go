@@ -120,3 +120,8 @@ validates the token at /run/eos/.vault-token, and attempts a test query.`,
 		return nil
 	}),
 }
+
+func init() {
+	InspectVaultCmd.AddCommand(InspectVaultAgentCmd) // nested command
+	InspectCmd.AddCommand(InspectVaultCmd)           // top-level command
+}
