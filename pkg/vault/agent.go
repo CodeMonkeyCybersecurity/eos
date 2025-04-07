@@ -1,5 +1,3 @@
-// pkg/vault/agent.go
-
 package vault
 
 import (
@@ -9,12 +7,33 @@ import (
 	"strings"
 )
 
-func SetupVaultAgentService(password string) error {
+func setupVaultAgent(password string) error {
 	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
 
-	// 1. Vault Agent Config
-	agentConfig := `/etc/vault-agent-eos.hcl`
-	agentConfigContent := `
+	if err := writeAgentConfig(); err != nil {
+		return err
+	}
+	if err := writeAgentPassword(password); err != nil {
+		return err
+	}
+	if err := writeSystemdUnit(); err != nil {
+		return err
+	}
+	if err := prepareRuntimeDir(); err != nil {
+		return err
+	}
+	if err := reloadAndStartService(); err != nil {
+		return err
+	}
+
+	fmt.Println("✅ Vault Agent for eos is running and ready.")
+	return nil
+}
+
+// --- Helpers ---
+
+func writeAgentConfig() error {
+	content := `
 pid_file = "/run/eos/vault-agent.pid"
 auto_auth {
   method "userpass" {
@@ -30,28 +49,21 @@ auto_auth {
     }
   }
 }
-
 vault {
   address = "http://127.0.0.1:8179"
 }
-
 cache {
   use_auto_auth_token = true
+}`
+	return os.WriteFile("/etc/vault-agent-eos.hcl", []byte(strings.TrimSpace(content)+"\n"), 0644)
 }
-`
-	if err := os.WriteFile(agentConfig, []byte(strings.TrimSpace(agentConfigContent)+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write Vault Agent config: %w", err)
-	}
 
-	// 2. Password File
-	passFile := "/etc/vault-agent-eos.pass"
-	if err := os.WriteFile(passFile, []byte(password+"\n"), 0600); err != nil {
-		return fmt.Errorf("failed to write Vault password file: %w", err)
-	}
+func writeAgentPassword(password string) error {
+	return os.WriteFile("/etc/vault-agent-eos.pass", []byte(password+"\n"), 0600)
+}
 
-	// 3. Systemd Unit
-	unitFile := `/etc/systemd/system/vault-agent-eos.service`
-	unitContent := `
+func writeSystemdUnit() error {
+	unit := `
 [Unit]
 Description=Vault Agent (EOS)
 After=network.target
@@ -65,32 +77,28 @@ RuntimeDirectory=eos
 RuntimeDirectoryMode=0750
 
 [Install]
-WantedBy=multi-user.target
-`
-	if err := os.WriteFile(unitFile, []byte(strings.TrimSpace(unitContent)+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write systemd unit file: %w", err)
-	}
+WantedBy=multi-user.target`
+	return os.WriteFile("/etc/systemd/system/vault-agent-eos.service", []byte(strings.TrimSpace(unit)+"\n"), 0644)
+}
 
-	// 4. Ensure runtime dir
+func prepareRuntimeDir() error {
 	if err := os.MkdirAll("/run/eos", 0750); err != nil {
-		return fmt.Errorf("failed to create /run/eos: %w", err)
+		return fmt.Errorf("create /run/eos: %w", err)
 	}
-	if err := os.Chown("/run/eos", 0, 0); err != nil {
-		return fmt.Errorf("failed to chown /run/eos: %w", err)
-	}
+	return os.Chown("/run/eos", 0, 0)
+}
 
-	// 5. Reload systemd and start agent
+func reloadAndStartService() error {
 	fmt.Println("🔄 Reloading systemd and starting Vault Agent service...")
-	if err := exec.Command("systemctl", "daemon-reexec").Run(); err != nil {
-		return fmt.Errorf("failed to daemon-reexec: %w", err)
+	cmds := [][]string{
+		{"systemctl", "daemon-reexec"},
+		{"systemctl", "daemon-reload"},
+		{"systemctl", "enable", "--now", "vault-agent-eos.service"},
 	}
-	if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
-		return fmt.Errorf("failed to daemon-reload: %w", err)
+	for _, args := range cmds {
+		if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
+			return fmt.Errorf("failed to run %v: %w", args, err)
+		}
 	}
-	if err := exec.Command("systemctl", "enable", "--now", "vault-agent-eos.service").Run(); err != nil {
-		return fmt.Errorf("failed to enable/start Vault Agent service: %w", err)
-	}
-
-	fmt.Println("✅ Vault Agent for eos is running and ready.")
 	return nil
 }

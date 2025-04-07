@@ -46,7 +46,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		// 1. Dynamically set VAULT_ADDR based on hostname.
-		vault.SetVaultEnv()
+		vault.setVaultEnv()
 
 		// 2. Initialize Vault (if not already initialized).
 		fmt.Println("\n[1/10] Initializing Vault (operator init)...")

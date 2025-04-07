@@ -48,7 +48,7 @@ func LoadLDAPConfig() (*LDAPConfig, string, error) {
 
 func LoadFromVault() (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := vault.LoadWithFallback("ldap", &cfg)
+	err := vault.ReadFallbackSecrets("ldap", &cfg)
 	if err != nil || cfg.FQDN == "" {
 		return nil, errors.New("LDAP config not found in Vault")
 	}

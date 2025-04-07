@@ -9,7 +9,7 @@ import (
 )
 
 // SetVaultEnv sets the VAULT_ADDR environment variable to the correct internal URL
-func SetVaultEnv() {
+func setVaultEnv() {
 	hostname := utils.GetInternalHostname()
 	vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
 	os.Setenv("VAULT_ADDR", vaultAddr)

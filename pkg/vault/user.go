@@ -12,36 +12,34 @@ type UserSecret struct {
 	SSHKey   string `json:"ssh_private_key,omitempty"`
 }
 
-// StoreUserSecret stores a user's credentials and SSH key in Vault.
+// StoreUserSecret reads an SSH key and stores full user credentials in Vault.
 func StoreUserSecret(username, password, keyPath string) error {
-	secret := UserSecret{
-		Username: username,
-		Password: password,
-	}
-
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		return fmt.Errorf("failed to read SSH key from %s: %w", keyPath, err)
 	}
-	secret.SSHKey = string(keyData)
-
-	vaultPath := fmt.Sprintf("secret/users/%s", username)
-	return WriteStruct(vaultPath, &secret)
+	secret := UserSecret{Username: username, Password: password, SSHKey: string(keyData)}
+	return writeVaultJSON(userVaultPath(username), &secret)
 }
 
-func WriteUserSecret(username string, data any) error {
-	return WriteVaultJSON(fmt.Sprintf("secret/users/%s", username), data)
-}
-
+// LoadUserSecret retrieves and validates a user's secret from Vault.
 func LoadUserSecret(username string) (*UserSecret, error) {
 	var secret UserSecret
-	err := ReadVaultJSON(fmt.Sprintf("secret/users/%s", username), &secret)
-	if err != nil {
+	if err := readVaultJSON(userVaultPath(username), &secret); err != nil {
 		return nil, err
+	}
+	if !secret.IsValid() {
+		return nil, fmt.Errorf("incomplete secret for user %s", username)
 	}
 	return &secret, nil
 }
 
+// IsValid ensures required fields are populated.
 func (s *UserSecret) IsValid() bool {
 	return s.Username != "" && s.Password != ""
+}
+
+// userVaultPath returns the Vault path for a given user.
+func userVaultPath(username string) string {
+	return fmt.Sprintf("secret/users/%s", username)
 }
