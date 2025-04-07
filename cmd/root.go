@@ -14,7 +14,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/logs"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
@@ -53,7 +52,6 @@ func RegisterCommands() {
 		update.UpdateCmd,
 		delete.DeleteCmd,
 		refresh.RefreshCmd,
-		logs.LogsCmd,
 		secure.SecureCmd,
 		disable.DisableCmd,
 		enable.EnableCmd,
