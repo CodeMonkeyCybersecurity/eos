@@ -57,7 +57,7 @@ into Vault, then removes them from disk if the sync is successful.`,
 				continue
 			}
 
-			if err := vault.SaveToVault(base, data); err != nil {
+			if err := vault.Save(base, data); err != nil {
 				log.Warn("Failed to store fallback data to Vault", zap.Error(err))
 				continue
 			}

@@ -46,7 +46,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		// 1. Dynamically set VAULT_ADDR based on hostname.
-		vault.setVaultEnv()
+		vault.SetVaultEnv()
 
 		// 2. Initialize Vault (if not already initialized).
 		fmt.Println("\n[1/10] Initializing Vault (operator init)...")
@@ -229,7 +229,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		// Also store in Vault (if online and unsealed)
-		if err := vault.SaveToVault("secret/bootstrap/eos-user", map[string]string{
+		if err := vault.Save("secret/bootstrap/eos-user", map[string]string{
 			"username": "eos",
 			"password": randomPassword,
 		}); err != nil {
@@ -238,7 +238,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			fmt.Println("🔐 Stored eos user credentials inside Vault at secret/bootstrap/eos-user")
 		}
 
-		if err := vault.SetupVaultAgentService(randomPassword); err != nil {
+		if err := vault.SetupVaultAgent(randomPassword); err != nil {
 			log.Fatal("Failed to set up Vault Agent service", zap.Error(err))
 		}
 
@@ -251,7 +251,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			log.Fatal("Failed to create eos Administrative user", zap.Error(err), zap.String("output", string(createUserOut)))
 		}
 
-		if err := vault.SaveToVault("vault-init", initRes); err != nil {
+		if err := vault.Save("vault-init", initRes); err != nil {
 			log.Warn("Failed to store vault-init data in Vault", zap.Error(err))
 		}
 

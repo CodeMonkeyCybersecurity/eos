@@ -18,7 +18,7 @@ import (
 // It returns nil if not found or incomplete.
 func TryLoadFromVault() (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	if err := vault.LoadWithFallback("secret/ldap/config", &cfg); err != nil {
+	if err := vault.Load("secret/ldap/config", &cfg); err != nil {
 		return nil, err
 	}
 	if cfg.FQDN == "" || cfg.BindDN == "" {

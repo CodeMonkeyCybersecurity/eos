@@ -196,7 +196,7 @@ func runDelphiHardening() error {
 
 	// Step 6: Store updated secrets in the vault.
 	log.Info("Storing secrets in vault")
-	if err := vault.HandleFallbackOrStore(secrets); err != nil {
+	if err := vault.HandleFallbackOrStore("delphi", secrets); err != nil {
 		log.Error("Failed to store secrets in vault", zap.Error(err))
 		return err
 	}

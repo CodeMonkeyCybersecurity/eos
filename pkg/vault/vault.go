@@ -16,4 +16,5 @@ var (
 	LoadFromVault         = loadFromVault
 	ReadFallbackSecrets   = readFallbackSecrets
 	WriteStruct           = writeStruct
+	SetVaultEnv           = setVaultEnv
 )
