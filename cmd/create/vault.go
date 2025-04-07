@@ -1,3 +1,6 @@
+/* cmd/create/vault.go
+ */
+
 package create
 
 import (
@@ -8,6 +11,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -121,6 +125,9 @@ ui = true
 			log.Fatal("Failed to start Vault", zap.Error(err))
 		}
 		fmt.Printf("Vault process started with PID %d\n", startCmd.Process.Pid)
+
+		go utils.DetachAfterDelay(5, "Vault")
+
 		return nil
 	}),
 }
