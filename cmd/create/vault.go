@@ -162,4 +162,5 @@ ui = true
 
 func init() {
 	CreateCmd.AddCommand(CreateVaultCmd)
+	flags.AddDryRunFlags(CreateVaultCmd)
 }
