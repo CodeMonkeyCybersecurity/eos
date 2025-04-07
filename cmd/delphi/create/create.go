@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -23,19 +24,20 @@ var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create Delphi resources",
 	Long:  "Create or generate Delphi-related resources, configurations, and mappings.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("'eos delphi create' was called without a subcommand")
-	},
+		return nil 
+	}),
 }
 
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		runMapping()
-	},
+		return nil 
+	}),
 }
-
 func init() {
 	CreateCmd.AddCommand(mappingCmd)
 	CreateCmd.AddCommand(CreateJWTCmd)

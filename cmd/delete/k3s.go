@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -16,14 +17,14 @@ var DeleteK3sCmd = &cobra.Command{
 	Short:        "Uninstall K3s from this machine",
 	Long: `Detects whether this machine is running a K3s server or agent,
 and removes it by running the appropriate uninstall scripts in the correct order.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if err := uninstallK3s(); err != nil {
 			log.Error("❌ Failed to uninstall K3s", zap.Error(err))
 			return err
 		}
 		log.Info("✅ K3s uninstallation completed.")
-		return nil
-	},
+		return nil 
+	}),
 }
 
 func uninstallK3s() error {

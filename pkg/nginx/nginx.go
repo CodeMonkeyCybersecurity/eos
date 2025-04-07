@@ -21,7 +21,7 @@ var log = logger.L()
 
 // DeployApp deploys an application by copying necessary configs and restarting services
 func DeployApp(app string, cmd *cobra.Command) error {
-	logger.Info("Starting deployment", zap.String("app", app)) // ✅ Use logger.Info directly
+	log.Info("Starting deployment", zap.String("app", app)) // ✅ Use log.Info directly
 	fmt.Printf("Deploying %s...\n", app)                       // 👈 Added for user visibility
 
 	// Check if the required HTTP config exists
@@ -48,12 +48,12 @@ func DeployApp(app string, cmd *cobra.Command) error {
 	if app == "nextcloud" {
 		noTalk, _ := cmd.Flags().GetBool("without-talk")
 		if !noTalk {
-			logger.Info("Deploying Coturn for NextCloud Talk")
+			log.Info("Deploying Coturn for NextCloud Talk")
 			if err := docker.RunDockerComposeAllServices(DefaultComposeYML, "coturn"); err != nil {
 				return fmt.Errorf("failed to deploy Coturn: %w", err)
 			}
 		} else {
-			logger.Info("Skipping Coturn deployment")
+			log.Info("Skipping Coturn deployment")
 		}
 	}
 
@@ -66,14 +66,14 @@ func DeployApp(app string, cmd *cobra.Command) error {
 		return fmt.Errorf("failed to restart Nginx: %w", err)
 	}
 
-	logger.Info("Deployment successful", zap.String("app", app))
+	log.Info("Deployment successful", zap.String("app", app))
 	fmt.Printf("Successfully deployed %s!\n", app)
 	return nil
 }
 
 // ValidateNginx runs `nginx -t` to check configuration validity
 func ValidateNginx() error {
-	logger.Info("Validating Nginx configuration...")
+	log.Info("Validating Nginx configuration...")
 	cmd := exec.Command("nginx", "-t")
 	output, err := cmd.CombinedOutput() // Capture full output
 	fmt.Println(string(output))         // Print to console for visibility
@@ -83,13 +83,13 @@ func ValidateNginx() error {
 			zap.Error(err), zap.String("output", string(output)))
 		return fmt.Errorf("nginx validation failed: %s", output)
 	}
-	logger.Info("Nginx configuration is valid", zap.String("output", "\n"+string(output)))
+	log.Info("Nginx configuration is valid", zap.String("output", "\n"+string(output)))
 	return nil
 }
 
 // RestartNginx reloads the Nginx service
 func RestartNginx() error {
-	logger.Info("Restarting Nginx...")
+	log.Info("Restarting Nginx...")
 	cmd := exec.Command("systemctl", "reload", "nginx")
 	output, err := cmd.CombinedOutput() // Capture full output
 	fmt.Println(string(output))         // Print to console
@@ -99,6 +99,6 @@ func RestartNginx() error {
 			zap.Error(err), zap.String("output", string(output)))
 		return fmt.Errorf("nginx reload failed: %s", output)
 	}
-	logger.Info("Nginx restarted successfully", zap.String("output", "\n"+string(output)))
+	log.Info("Nginx restarted successfully", zap.String("output", "\n"+string(output)))
 	return nil
 }

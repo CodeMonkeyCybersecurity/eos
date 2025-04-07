@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"go.uber.org/zap"
 
@@ -17,7 +18,7 @@ var VaultRefreshCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Refreshes (restarts) the Vault service",
 	Long:  `Stops the running Vault server and restarts it using the configured settings.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		// Check for root privileges.
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")
@@ -60,7 +61,8 @@ var VaultRefreshCmd = &cobra.Command{
 
 		fmt.Printf("Vault process restarted with PID %d\n", vaultCmd.Process.Pid)
 		fmt.Println("Vault refresh complete. Check logs at", logFilePath)
-	},
+		return nil 
+	}),
 }
 
 func init() {

@@ -9,13 +9,14 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
 var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",
 	Short: "Check disconnected agents from Wazuh API",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
@@ -51,7 +52,8 @@ var KeepAliveCmd = &cobra.Command{
 		}
 		fmt.Println("Disconnected agents:")
 		fmt.Println(string(pretty))
-	},
+		return nil 
+	}),
 }
 
 func init() {

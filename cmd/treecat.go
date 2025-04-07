@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
@@ -22,7 +23,7 @@ var TreecatCmd = &cobra.Command{
 	Use:   "treecat [path]",
 	Short: "Recursively show directory structure and preview file contents",
 	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		root := args[0]
 
@@ -56,7 +57,8 @@ var TreecatCmd = &cobra.Command{
 			log.Error("Failed to walk directory", zap.Error(err))
 			os.Exit(1)
 		}
-	},
+		return nil 
+	}),
 }
 
 func previewFile(path string) (string, error) {

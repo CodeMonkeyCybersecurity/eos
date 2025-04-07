@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var log = logger.L()
@@ -29,13 +30,14 @@ If --timestamp is provided (e.g. --timestamp 20250325-101010), then restore will
   docker-compose.yml.<timestamp>.bak
 
 If no --timestamp is given, the command enters interactive mode to choose which resources to restore.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if timestampFlag != "" {
 			runAutoRestore(timestampFlag)
 		} else {
 			runInteractiveRestore()
 		}
-	},
+		return nil 
+	}),
 }
 
 func init() {

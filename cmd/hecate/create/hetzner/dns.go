@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -83,7 +84,7 @@ To confirm that your variable is set correctly, run:
    
 Then, run this command again.
      `,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 			// Basic validation
 			if domain == "" || ip == "" {
 				err := fmt.Errorf("domain and ip are required")
@@ -157,8 +158,8 @@ Then, run this command again.
 				zap.String("wildcard", "*."+domain),
 				zap.String("ip", ip),
 			)
-			return nil
-		},
+			return nil 
+		}),
 	}
 
 	cmd.Flags().StringVar(&domain, "domain", "", "Root domain name (e.g. example.com)")

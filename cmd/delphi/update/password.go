@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -26,7 +27,7 @@ var PasswordCmd = &cobra.Command{
 	Short: "Update a Wazuh user's password",
 	Long: `Update the password of a Wazuh (Delphi) user using their username.
 Supports interactive confirmation and XDG-safe password storage if requested.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		if username == "" {
@@ -94,7 +95,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 		}
 
 		return nil
-	},
+	}),
 }
 
 func init() {

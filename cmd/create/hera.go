@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -27,7 +29,7 @@ var CreateHeraCmd = &cobra.Command{
 - Creating the external Docker network 'arachne-net'
 - Running docker compose up -d
 - Displaying service status and access URL`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("🚀 Starting Hera (Authentik) deployment")
 
@@ -110,7 +112,8 @@ var CreateHeraCmd = &cobra.Command{
 		fmt.Println("\n🎉 Hera (Authentik) is deploying.")
 		fmt.Println("Visit: http://<your-server>:9000/if/flow/initial-setup/")
 		fmt.Println("Be sure to include the trailing slash or you may see a 404.")
-	},
+		return nil
+	}),
 }
 
 func init() {

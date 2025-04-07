@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // inspectConfigCmd represents the "inspect config" subcommand
@@ -24,9 +25,10 @@ You can choose from:
   3) Inspect Eos backend web apps configuration
   4) Inspect Nginx defaults
   5) Inspect all configurations`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		runInspectConfig()
-	},
+		return nil 
+	}),
 }
 
 // runInspectConfig presents an interactive menu for inspection

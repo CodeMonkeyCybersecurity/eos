@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -18,7 +19,7 @@ var UpdateAgentsCmd = &cobra.Command{
 	Use:   "agents",
 	Short: "Upgrade Wazuh agents via the Wazuh API",
 	Long:  "Upgrades one or more Wazuh agents using a remote package (WPK) via the API.",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		cfg, err := delphi.LoadDelphiConfig()
@@ -61,8 +62,8 @@ var UpdateAgentsCmd = &cobra.Command{
 		}
 
 		log.Info("✅ Agent upgrade request sent successfully.")
-		return nil
-	},
+		return nil 
+	}),
 }
 
 func init() {

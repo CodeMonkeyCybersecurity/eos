@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
@@ -26,9 +27,10 @@ var BackupCmd = &cobra.Command{
 	Use:   "backup",
 	Short: "Backup configuration and files",
 	Long:  `Backup important configuration directories and files.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		runBackup()
-	},
+		return nil 
+	}),
 }
 
 // runBackup is called when the user runs "hecate create backup".

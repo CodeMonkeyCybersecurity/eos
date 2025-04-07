@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -27,7 +28,7 @@ var CreateUmamiCmd = &cobra.Command{
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
 - Informing the user to navigate to :8117 and log in with default credentials (admin/umami) and change the password immediately.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
 		log.Info("Starting Umami installation using Eos")
 
@@ -101,7 +102,8 @@ var CreateUmamiCmd = &cobra.Command{
 		// Final congratulatory message with instructions
 		log.Info("Umami installation complete",
 			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", utils.GetInternalHostname())))
-	},
+		return nil 
+	}),
 }
 
 func init() {

@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -26,7 +27,7 @@ var EnableVaultCmd = &cobra.Command{
 	Long: `This command assumes "github.com/CodeMonkeyCybersecurity/eos install vault" has been run.
 It initializes and unseals Vault, sets up auditing, KV v2, 
 AppRole, userpass, and creates an eos user with a random password.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
 		// 0. Install Vault via dnf if not already installed
 		fmt.Println("[0/10] Checking if Vault is installed...")
@@ -259,7 +260,8 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		fmt.Println("\nYou can now log in with the eos user using the generated password.")
 		fmt.Println("\nRemember to store the unseal keys and root token securely!")
 		fmt.Println("\nPlease now run 'eos secure vault' to secure the Vault service.")
-	},
+		return nil 
+	}),
 }
 
 func init() {

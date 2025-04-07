@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -28,7 +29,7 @@ var CreateJenkinsCmd = &cobra.Command{
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
 - Informing the user to navigate to :8059 and log in with default credentials (admin/<generated_password>), and change the password immediately.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
 		log.Info("Starting Jenkins installation using Eos")
 
@@ -125,7 +126,8 @@ var CreateJenkinsCmd = &cobra.Command{
 		log.Info("Jenkins installation complete",
 			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", utils.GetInternalHostname())))
 
-	},
+		return nil
+	}),
 }
 
 func init() {

@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +30,7 @@ It reads the stored initialization data (vault_init.json), prompts you to confir
 distributed the unseal keys and root token, then revokes the root token and updates the admin user to have
 full (root-level) privileges. Finally, it deletes the stored initialization file.
 Please follow up by configuring MFA via your organization's preferred integration method.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
 		hostname := utils.GetInternalHostname()
 		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
@@ -39,7 +40,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		// 0. Check for root privileges.
 		if os.Geteuid() != 0 {
 			fmt.Println("This command must be run with sudo or as root.")
-			return
+			return nil
 		}
 
 		fmt.Println("Secure Vault setup in progress...")
@@ -198,7 +199,8 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		fmt.Println("Please configure multi-factor authentication (MFA) for your admin user using your organization's preferred method.")
 		fmt.Println("Refer to Vault's documentation for integrating MFA (e.g., via OIDC, LDAP, or a third-party MFA solution).")
 		fmt.Println("\nVault secure setup completed successfully!")
-	},
+		return nil 
+	}),
 }
 
 func init() {

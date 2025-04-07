@@ -7,13 +7,14 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
 var CreateJWTCmd = &cobra.Command{
 	Use:   "jwt",
 	Short: "Generate and store a JWT token for Delphi (Wazuh) API access",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Warn("Config not found, prompting for values", zap.Error(err))
@@ -52,5 +53,6 @@ var CreateJWTCmd = &cobra.Command{
 		}
 
 		log.Info("JWT token retrieved successfully", zap.String("token", token))
-	},
+		return nil 
+	}),
 }

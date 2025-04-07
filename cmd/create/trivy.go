@@ -9,6 +9,7 @@ import (
 	"os/exec"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // trivyCmd represents the trivy installation command.
@@ -20,9 +21,10 @@ It performs the following steps:
   1. Installs required packages (wget, gnupg)
   2. Imports the Trivy public key and adds the Trivy APT repository
   3. Updates package lists and installs Trivy`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		installTrivy()
-	},
+		return nil 
+	}),
 }
 
 func installTrivy() {

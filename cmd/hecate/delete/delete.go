@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // DeleteCmd is the root "delete" command: supports either `delete <app>` or subcommands like `delete resources`
@@ -22,16 +23,17 @@ Examples:
   hecate delete jenkins
   hecate delete resources`,
 	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			fmt.Println("🗑️  Please use a subcommand like 'delete resources' or specify an app name.")
-			return
+			return nil
 		}
 
 		app := args[0]
 		fmt.Printf("🗑️  Deleting application: %s\n", app)
 		// TODO: Add logic to delete individual app configuration
-	},
+		return nil 
+	}),
 }
 
 var deleteResourcesCmd = &cobra.Command{
@@ -44,9 +46,10 @@ var deleteResourcesCmd = &cobra.Command{
   3) Delete Eos backend web apps configuration files
   4) Delete (or revert) Nginx defaults
   5) Delete all specified resources`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		runDeleteConfig()
-	},
+		return nil 
+	}),
 }
 
 func init() {

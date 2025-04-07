@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var (
@@ -18,7 +19,7 @@ var (
 var InspectAPICmd = &cobra.Command{
 	Use:   "api",
 	Short: "Inspect API details from Delphi (Wazuh)",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			fmt.Printf("❌ Error loading Delphi config: %v\n", err)
@@ -42,7 +43,7 @@ var InspectAPICmd = &cobra.Command{
 
 		// ✅ Step 4: Secret access control
 		if !utils.EnforceSecretsAccess(log, showSecrets) {
-			return
+			return err
 		}
 
 		// ✅ Step 5: Execute inspection
@@ -55,7 +56,8 @@ var InspectAPICmd = &cobra.Command{
 		} else {
 			fmt.Println("⚠️  No flags provided. Use --permissions or --version to query specific information.")
 		}
-	},
+		return nil 
+	}),
 }
 
 func init() {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	undoengine "github.com/CodeMonkeyCybersecurity/eos/pkg/undo" // 👈 alias to avoid name clash
@@ -16,7 +17,7 @@ var UndoCmd = &cobra.Command{
 	Short: "Undo the last set of system changes made by eos",
 	Long: `Attempts to revert the last actions performed by Eos by reading the last recorded action log.
 Dry-run by default. Use --live-run to apply changes.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		flags.ParseDryRunAliases(cmd)
 		log := logger.L()
 
@@ -52,7 +53,7 @@ Dry-run by default. Use --live-run to apply changes.`,
 		log.Info("Undo complete")
 		fmt.Println("✅ Undo complete (dry-run unless --live-run was passed).")
 		return nil
-	},
+	}),
 }
 
 func init() {

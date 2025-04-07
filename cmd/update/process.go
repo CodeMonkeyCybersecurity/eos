@@ -4,6 +4,7 @@ package update
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 )
 
@@ -12,15 +13,16 @@ var UpdateProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Update process",
 	Long:  `Use this command to update details about running process.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			fmt.Println("Please specify the process to update.")
-			return
+			return nil
 		}
 		process := args[0]
 		fmt.Printf("Updating process: %s\n", process)
 		// Add your logic here
-	},
+		return nil
+	}),
 }
 
 func init() {

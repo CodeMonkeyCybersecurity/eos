@@ -8,6 +8,7 @@ package delete
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"github.com/spf13/cobra"
 
@@ -26,11 +27,12 @@ For example:
 
 	Aliases: []string{"remove", "uninstall", "rm"},
 
-	Run: func(cmd *cobra.Command, args []string) {
+RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	},
+		return nil 
+	}),
 }
 
 // log is a package-level variable for the Zap logger.

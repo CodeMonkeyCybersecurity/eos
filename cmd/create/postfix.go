@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -23,7 +25,7 @@ var CreatePostfixCmd = &cobra.Command{
 	Use:   "postfix",
 	Short: "Install and configure Postfix as an SMTP relay",
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		utils.RequireRoot(log)
 
@@ -114,7 +116,8 @@ var CreatePostfixCmd = &cobra.Command{
 		utils.CatFile("/etc/postfix/sasl_passwd")
 
 		log.Info("✅ Postfix SMTP relay setup complete.")
-	},
+		return nil
+	}),
 }
 
 func appendPostfixConfig(smtpHost, osType string) {

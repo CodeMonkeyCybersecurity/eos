@@ -5,6 +5,7 @@ package create
 import (
 	"os"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -16,7 +17,7 @@ var CreateFail2banCmd = &cobra.Command{
 	Use:   "fail2ban",
 	Short: "Deploy and configure Fail2Ban",
 	Long:  "Install Fail2Ban, apply secure jail.local settings, and enable basic SSH protection.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Starting Fail2Ban setup...")
 
@@ -45,7 +46,8 @@ var CreateFail2banCmd = &cobra.Command{
 		}
 
 		log.Info("✅ Fail2Ban deployed successfully!")
-	},
+		return nil
+	}),
 }
 
 func createJailLocal() error {

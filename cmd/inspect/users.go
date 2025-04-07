@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // readUsersCmd represents the command to read users
@@ -16,19 +17,20 @@ var InspectUsersCmd = &cobra.Command{
 	Short: "Retrieve information about system users",
 	Long: `This command retrieves a list of all system users on the current machine
 by reading the /etc/passwd file.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Reading users...")
 		users, err := getSystemUsers()
 		if err != nil {
 			fmt.Printf("Error reading users: %v\n", err)
-			return
+			return (err) 
 		}
 
 		fmt.Println("Current users:")
 		for _, user := range users {
 			fmt.Println(user)
 		}
-	},
+		return nil 
+	}),
 }
 
 // getSystemUsers reads the /etc/passwd file and returns a list of usernames

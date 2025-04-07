@@ -2,6 +2,7 @@ package create
 
 import (
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/create/hetzner"
@@ -16,13 +17,14 @@ var CreateCmd = &cobra.Command{
 	Short: "Create resources for Hecate",
 	Long: `The create command allows you to create specific resources
 needed for your Hecate deployment, such as certificates, proxy configurations, DNS records with Hetzner Cloud, etc.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		// Instead of printing, use the centralized logger:
 		log.Info("Create command executed!",
 			zap.String("command", cmd.Name()),
 			zap.Strings("args", args),
 		)
-	},
+		return nil 
+	}),
 }
 
 // init gets called automatically at package load time

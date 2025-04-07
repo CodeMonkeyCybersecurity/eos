@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // InspectCmd is the top-level `inspect` command
@@ -19,9 +20,10 @@ Examples:
 	hecate inspect config
 	hecate inspect`,
 	Aliases: []string{"read", "get"},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("🔍 Please use a subcommand (e.g. 'inspect config') to inspect a resource.")
-	},
+		return nil 
+	}),
 }
 
 // Register subcommands when the package is loaded

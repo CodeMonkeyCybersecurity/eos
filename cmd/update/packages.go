@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -19,7 +20,7 @@ var UpdatePackagesCmd = &cobra.Command{
 	Use:   "packages",
 	Short: "Update system packages based on detected OS",
 	Long:  "Detects the host OS and executes appropriate update and cleanup commands. Supports scheduling via --cron.",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
 		osType := runtime.GOOS
 		log.Info("Detected OS", zap.String("os", osType))
@@ -59,7 +60,7 @@ var UpdatePackagesCmd = &cobra.Command{
 
 		log.Info("Package update completed successfully")
 		return nil
-	},
+	}),
 }
 
 func isRHEL() bool {

@@ -4,6 +4,7 @@ package configure
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -13,13 +14,13 @@ var ConfigureCmd = &cobra.Command{
 	Short:   "Configure Delphi (Wazuh) related services",
 	Long:    "Run configuration commands such as setting up firewall rules, tuning agent settings, and more.",
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	},
+		return nil 
+	}),
 }
-
 var log *zap.Logger
 
 func init() {

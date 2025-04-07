@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
@@ -26,9 +28,10 @@ For worker nodes, you'll be prompted for the server URL and node token.
 Additional checks for IPv6 and Tailscale are performed.
 The generated install command is previewed and saved to a script file
 for safe, human-approved execution.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		deployK3s()
-	},
+		return nil
+	}),
 }
 
 func init() {

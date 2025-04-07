@@ -5,6 +5,7 @@ package sync
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -13,11 +14,12 @@ var SyncCmd = &cobra.Command{
 	Short: "Sync Delphi components (e.g., LDAP backend)",
 	Long:  "Synchronize data or configuration from fallback or external sources.",
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	},
+		return nil 
+	}),
 }
 
 // log is a package-level variable for the Zap logger.

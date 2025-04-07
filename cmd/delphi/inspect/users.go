@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -15,7 +16,7 @@ var UsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "List Wazuh users and their IDs",
 	Long:  "Fetches and displays all Wazuh users along with their associated user IDs from the Delphi (Wazuh) API.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		cfg, err := delphi.LoadDelphiConfig()
@@ -32,7 +33,8 @@ var UsersCmd = &cobra.Command{
 		for _, user := range users {
 			fmt.Printf("• %s (ID: %d)\n", user.Username, user.ID)
 		}
-	},
+		return nil 
+	}),
 }
 
 func init() {

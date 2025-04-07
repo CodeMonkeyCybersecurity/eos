@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
@@ -19,7 +21,7 @@ var createOsQueryCmd = &cobra.Command{
 	Use:   "osquery",
 	Short: "Install osquery and configure its APT repository",
 	Long:  "Installs osquery on Debian/Ubuntu-based systems by configuring the GPG key and APT repository.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		if err := platform.RequireLinuxDistro([]string{"debian"}); err != nil {
@@ -51,7 +53,8 @@ var createOsQueryCmd = &cobra.Command{
 		if err := installOsquery(log, arch); err != nil {
 			log.Fatal("Failed to install osquery", zap.Error(err))
 		}
-	},
+		return nil
+	}),
 }
 
 func installOsquery(log *zap.Logger, arch string) error {

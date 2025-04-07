@@ -1,25 +1,21 @@
-// cmd/heacte/deploy/jenkins.go
+// pkg/deploy/jenkins
 
 package deploy
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/certs"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
-// NewDeployJenkinsCmd returns the Jenkins-specific deploy command.
 func NewDeployJenkinsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "jenkins",
@@ -28,14 +24,14 @@ func NewDeployJenkinsCmd() *cobra.Command {
 
 This command stops the Hecate container (if running) and then organizes assets by moving files 
 that are not relevant to Jenkins into the "other" directory at the project root.`,
-		Run: func(cmd *cobra.Command, args []string) {
+		RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 			log.Info("Starting Jenkins deployment")
 
 			// Stop the container if it's running.
 			if err := docker.StopContainersBySubstring("hecate"); err != nil {
 				log.Error("Error stopping container", zap.String("substring", "hecate"), zap.Error(err))
 				fmt.Printf("Error stopping container: %v\n", err)
-				return
+				return err
 			}
 			log.Info("Containers with 'hecate' in the name stopped successfully")
 
@@ -43,7 +39,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			if err := utils.OrganizeAssetsForDeployment("jenkins"); err != nil {
 				log.Error("Failed to organize assets", zap.Error(err))
 				fmt.Printf("Failed to organize assets: %v\n", err)
-				return
+				return err
 			}
 			log.Info("Assets organized successfully for Jenkins")
 
@@ -52,7 +48,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			if err != nil {
 				log.Error("Configuration error", zap.Error(err))
 				fmt.Printf("Configuration error: %v\n", err)
-				return
+				return err
 			}
 			log.Info("Configuration loaded", zap.Any("config", cfg))
 			fmt.Printf("Configuration loaded:\n  Base Domain: %s\n  Backend IP: %s\n  Subdomain: %s\n  Email: %s\n",
@@ -62,7 +58,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			if err := utils.ReplaceTokensInAllFiles(assetsDir, cfg.BaseDomain, cfg.BackendIP); err != nil {
 				log.Error("Failed to replace tokens in assets", zap.Error(err))
 				fmt.Printf("Error replacing tokens: %v\n", err)
-				return
+				return err
 			}
 			log.Info("Tokens replaced successfully in all files under assets")
 
@@ -72,7 +68,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			if err := certs.EnsureCertificates(cfg.Subdomain, cfg.BaseDomain, cfg.Email); err != nil {
 				log.Error("Certificate generation failed", zap.Error(err))
 				fmt.Printf("Certificate generation failed: %v\n", err)
-				return
+				return err
 			}
 			log.Info("Certificate retrieved successfully", zap.String("domain", fullDomain))
 
@@ -80,7 +76,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			if err := docker.UncommentSegment("uncomment if using Jenkins behind Hecate"); err != nil {
 				log.Error("Failed to uncomment Jenkins section", zap.Error(err))
 				fmt.Printf("Failed to uncomment Jenkins section: %v\n", err)
-				return
+				return err
 			}
 			log.Info("Successfully uncommented Jenkins lines")
 
@@ -88,84 +84,12 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			if err := docker.RunDockerComposeAllServices(consts.DefaultComposeYML, "jenkins"); err != nil {
 				log.Error("Failed to start Docker services", zap.Error(err))
 				fmt.Printf("Failed to run docker-compose up: %v\n", err)
-				return
+				return err
 			}
 
 			fmt.Println("🎉 Jenkins reverse proxy deployed successfully.")
-		},
+			return nil
+		}),
 	}
 	return cmd
-}
-
-func OrganizeAssetsForDeployment(app string) error {
-	assetsDir := "assets"
-	otherDir := "other" // "other" is at the project root
-
-	// Ensure the "other" directory exists.
-	if err := os.MkdirAll(otherDir, 0755); err != nil {
-		return fmt.Errorf("failed to create 'other' directory: %w", err)
-	}
-	log.Info("OrganizeAssetsForDeployment: 'other' directory verified", zap.String("other_Dir", otherDir))
-
-	// Define the generic allowed filenames (lowercase).
-	allowedGenerics := map[string]bool{
-		"http.conf":   true,
-		"stream.conf": true,
-		"nginx.conf":  true,
-	}
-
-	// Walk the assets directory.
-	err := filepath.Walk(assetsDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Error("Error accessing path", zap.String("path", path), zap.Error(err))
-			return err
-		}
-
-		// Skip directories.
-		if info.IsDir() {
-			log.Debug("Skipping directory", zap.String("dir", path))
-			return nil
-		}
-
-		// Compute the file's relative path from assetsDir.
-		relPath, err := filepath.Rel(assetsDir, path)
-		if err != nil {
-			log.Error("Failed to compute relative path", zap.String("path", path), zap.Error(err))
-			return err
-		}
-		log.Debug("Processing file", zap.String("relativePath", relPath))
-
-		// Get the base filename in lowercase.
-		base := strings.ToLower(filepath.Base(path))
-		log.Debug("Base filename", zap.String("base", base))
-
-		// Check if the file is relevant.
-		if allowedGenerics[base] || strings.Contains(base, strings.ToLower(app)) {
-			log.Debug("File is relevant; leaving it in assets", zap.String("file", path))
-			return nil
-		}
-
-		// File is not relevant; log that it will be moved.
-		dest := filepath.Join(otherDir, relPath)
-		log.Debug("File not relevant; preparing to move", zap.String("file", path), zap.String("destination", dest))
-
-		// Ensure the destination directory exists.
-		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
-			log.Error("Failed to create destination directory", zap.String("destDir", filepath.Dir(dest)), zap.Error(err))
-			return fmt.Errorf("failed to create destination directory %s: %w", filepath.Dir(dest), err)
-		}
-
-		// Move (rename) the file.
-		if err := os.Rename(path, dest); err != nil {
-			log.Error("Failed to move file to 'other'", zap.String("from", path), zap.String("to", dest), zap.Error(err))
-			return fmt.Errorf("failed to move file %s to %s: %w", path, dest, err)
-		}
-
-		log.Info("Moved unused asset file to 'other'", zap.String("from", path), zap.String("to", dest))
-		return nil
-	})
-	if err != nil {
-		log.Error("Error during asset organization", zap.Error(err))
-	}
-	return err
 }

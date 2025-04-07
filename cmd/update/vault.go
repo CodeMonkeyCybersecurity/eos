@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -16,7 +17,7 @@ var VaultUpdateCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Updates Vault using the system's package manager",
 	Long:  `Updates Vault using dnf or apt depending on the host's Linux distribution.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")
 		}
@@ -46,7 +47,8 @@ var VaultUpdateCmd = &cobra.Command{
 			log.Fatal("Failed to update Vault", zap.Error(err))
 		}
 		fmt.Println("✅ Vault updated successfully.")
-	},
+		return nil 
+	}),
 }
 
 func init() {

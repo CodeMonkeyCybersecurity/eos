@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -16,7 +17,7 @@ import (
 
 var log = logger.L()
 
-// DeployCmd represents the deploy command
+// DeployCmd represents the deploy command.
 var DeployCmd = &cobra.Command{
 	Use:   "deploy [app]",
 	Short: "Deploy an application behind the Hecate reverse proxy",
@@ -41,10 +42,14 @@ Examples:
   hecate deploy nextcloud
   hecate deploy jenkins`,
 	Args: cobra.ExactArgs(1),
-	Run:  runDeploy, // This generic function is used for non-specific deployments.
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		runDeploy(cmd, args) // Call the helper function with its parameters.
+		return nil
+	}),
 }
 
-func runDeploy(cmd *cobra.Command, args []string) {
+// runDeploy validates the app name and calls deployApplication.
+func runDeploy(_ *cobra.Command, args []string) {
 	app := strings.ToLower(args[0])
 	if !utils.IsValidApp(app, apps.GetSupportedAppNames()) {
 		fmt.Printf("❌ Invalid application: %s. Supported: %v\n", app, apps.GetSupportedAppNames())
@@ -61,6 +66,7 @@ func runDeploy(cmd *cobra.Command, args []string) {
 	fmt.Printf("✅ Deployment completed successfully for %s\n", app)
 }
 
+// deployApplication calls the deployment function from the utils package.
 func deployApplication(app string) error {
 	if err := utils.DeployApp(app, false); err != nil {
 		return fmt.Errorf("deployment failed for '%s': %w", app, err)
@@ -69,6 +75,6 @@ func deployApplication(app string) error {
 }
 
 func init() {
-	// Register the Jenkins subcommand as a child of DeployCmd.
+	// Register Jenkins as a subcommand of DeployCmd.
 	DeployCmd.AddCommand(NewDeployJenkinsCmd())
 }

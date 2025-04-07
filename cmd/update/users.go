@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // updateUsersCmd handles updating user information
@@ -12,15 +13,17 @@ var UpdateUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Update users",
 	Long:  `Use this command to update user information.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			fmt.Println("Please specify the user to update.")
-			return
+			return nil
 		}
 		user := args[0]
 		fmt.Printf("Updating user: %s\n", user)
 		// Add your logic here
-	},
+		cmd.Help()
+		return nil 
+	}),
 }
 
 func init() {

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/apt"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -20,7 +22,7 @@ var CreateDockerCmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Install Docker and configure it for non-root usage",
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		utils.RequireRoot(log)
 
@@ -43,7 +45,8 @@ var CreateDockerCmd = &cobra.Command{
 		verifyDockerHelloWorld(false)
 
 		log.Info("✅ Docker installation and post-install steps complete.")
-	},
+		return nil
+	}),
 }
 
 func addDockerRepo(log *zap.Logger) {

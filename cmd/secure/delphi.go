@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -17,16 +18,17 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
+// SecureDelphiCmd rotates credentials and updates configurations for Delphi.
 var SecureDelphiCmd = &cobra.Command{
 	Use:   "delphi",
 	Short: "Harden Delphi (Wazuh) by rotating passwords and updating configs",
 	Long:  `Downloads and runs the Wazuh password tool to rotate all credentials and restart relevant services.`,
-	RunE:  runDelphiHardening,
+	RunE:  eos.Wrap(func(_ *cobra.Command, _ []string) error { return runDelphiHardening() }),
 }
 
+// downloadPasswordTool downloads the Wazuh password tool and sets executable permissions.
 func downloadPasswordTool() error {
 	log.Info("Downloading Wazuh password management tool")
-
 	if err := utils.DownloadFile(delphi.DelphiPasswdToolPath, delphi.DelphiPasswdToolURL); err != nil {
 		log.Error("Failed to download Wazuh password management tool", zap.Error(err))
 		return fmt.Errorf("failed to download password tool: %w", err)
@@ -38,15 +40,15 @@ func downloadPasswordTool() error {
 	return nil
 }
 
+// runPrimaryPasswordRotation attempts to rotate passwords using the provided API password.
 func runPrimaryPasswordRotation(apiPassword string) (*bytes.Buffer, error) {
 	log.Info("Rotating all passwords with --change-all")
-
 	var stdout bytes.Buffer
 	cmd := exec.Command("bash", delphi.DelphiPasswdToolPath,
 		"-a", "-A",
 		"-au", "wazuh",
-		"-ap", apiPassword)
-
+		"-ap", apiPassword,
+	)
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
 
@@ -54,11 +56,11 @@ func runPrimaryPasswordRotation(apiPassword string) (*bytes.Buffer, error) {
 		log.Warn("Primary password rotation failed", zap.Error(err))
 		return nil, err
 	}
-
 	log.Info("Primary password rotation succeeded")
 	return &stdout, nil
 }
 
+// runFallbackPasswordRotation performs fallback rotation using credentials extracted from wazuh.yml.
 func runFallbackPasswordRotation() (string, error) {
 	log.Info("Starting fallback password reset logic...")
 
@@ -105,7 +107,8 @@ func runFallbackPasswordRotation() (string, error) {
 	retryCmd := exec.Command("bash", delphi.DelphiPasswdToolPath,
 		"-a", "-A",
 		"-au", "wazuh",
-		"-ap", newWazuhPass)
+		"-ap", newWazuhPass,
+	)
 	retryCmd.Stdout = os.Stdout
 	retryCmd.Stderr = os.Stderr
 	if err := retryCmd.Run(); err != nil {
@@ -116,41 +119,15 @@ func runFallbackPasswordRotation() (string, error) {
 	return newWazuhPass, nil
 }
 
-func runDelphiHardening(cmd *cobra.Command, args []string) error {
-
+// parseSecrets scans output and extracts new password information.
+func parseSecrets(stdout *bytes.Buffer) map[string]string {
 	secrets := make(map[string]string)
-
-	if err := downloadPasswordTool(); err != nil {
-		return err
-	}
-
-	log.Info("Extracting current API admin password (user: wazuh)")
-	apiPassword, err := delphi.ExtractWazuhUserPassword()
-	log.Debug("Extracted password for user 'wazuh'", zap.String("password", apiPassword))
-	if err != nil {
-		log.Error("Failed to extract Wazuh API password", zap.Error(err))
-		return fmt.Errorf("failed to extract wazuh API password: %w", err)
-	}
-	log.Info("Successfully extracted wazuh API password")
-
-	stdout, err := runPrimaryPasswordRotation(apiPassword)
-	if err != nil {
-		log.Warn("Primary password rotation failed, attempting fallback", zap.Error(err))
-		newPass, err := runFallbackPasswordRotation()
-		if err != nil {
-			return err
-		}
-		stdout = &bytes.Buffer{}
-		fmt.Fprintf(stdout, "The password for user wazuh is %s\n", newPass)
-	}
-
-	log.Info("Parsing output for new passwords")
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		line := scanner.Text()
-
 		if strings.Contains(line, "The password for user") {
 			parts := strings.Split(line, " ")
+			// Expected format: "The password for user wazuh is XYZ"
 			if len(parts) >= 7 {
 				user := strings.TrimSpace(parts[4])
 				pass := strings.TrimSpace(parts[6])
@@ -162,23 +139,62 @@ func runDelphiHardening(cmd *cobra.Command, args []string) error {
 	if err := scanner.Err(); err != nil {
 		log.Warn("Error reading rotation output", zap.Error(err))
 	}
+	return secrets
+}
 
-	log.Info("Restarting Wazuh services to apply new credentials")
-
-	services := []string{"filebeat", "wazuh-manager", "wazuh-dashboard", "wazuh-indexer"}
+// restartServices restarts system services and logs the outcome.
+func restartServices(services []string) {
 	for _, svc := range services {
-		log.Info("Restarting", zap.String("service", svc))
-
+		log.Info("Restarting service", zap.String("service", svc))
 		cmd := exec.Command("systemctl", "restart", svc)
 		output, err := cmd.CombinedOutput()
-
 		if err != nil {
 			log.Warn("Failed to restart service", zap.String("service", svc), zap.Error(err), zap.String("output", string(output)))
 		} else {
 			log.Info("Service restarted successfully", zap.String("service", svc), zap.String("output", string(output)))
 		}
 	}
+}
 
+// runDelphiHardening coordinates the hardening steps for Delphi.
+func runDelphiHardening() error {
+	// Step 1: Download the password tool.
+	if err := downloadPasswordTool(); err != nil {
+		return err
+	}
+
+	// Step 2: Extract the current API admin password.
+	log.Info("Extracting current API admin password (user: wazuh)")
+	apiPassword, err := delphi.ExtractWazuhUserPassword()
+	if err != nil {
+		log.Error("Failed to extract Wazuh API password", zap.Error(err))
+		return fmt.Errorf("failed to extract wazuh API password: %w", err)
+	}
+	log.Debug("Extracted password for user 'wazuh'", zap.String("password", apiPassword))
+	log.Info("Successfully extracted wazuh API password")
+
+	// Step 3: Attempt primary password rotation.
+	stdout, err := runPrimaryPasswordRotation(apiPassword)
+	if err != nil {
+		log.Warn("Primary password rotation failed, attempting fallback", zap.Error(err))
+		newPass, err := runFallbackPasswordRotation()
+		if err != nil {
+			return err
+		}
+		stdout = &bytes.Buffer{}
+		fmt.Fprintf(stdout, "The password for user wazuh is %s\n", newPass)
+	}
+
+	// Step 4: Parse output for new secrets.
+	log.Info("Parsing output for new passwords")
+	secrets := parseSecrets(stdout)
+
+	// Step 5: Restart required Wazuh services.
+	services := []string{"filebeat", "wazuh-manager", "wazuh-dashboard", "wazuh-indexer"}
+	log.Info("Restarting Wazuh services to apply new credentials")
+	restartServices(services)
+
+	// Step 6: Store updated secrets in the vault.
 	log.Info("Storing secrets in vault")
 	if err := vault.HandleFallbackOrStore(secrets); err != nil {
 		log.Error("Failed to store secrets in vault", zap.Error(err))

@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +24,7 @@ var InspectProcessCmd = &cobra.Command{
 	Short: "Retrieve detailed information about running processes",
 	Long: `This command retrieves detailed information about all running processes on the system
 by reading the /proc directory and outputs it in a table format.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Executing read process command", zap.Strings("args", args))
 
@@ -31,13 +32,14 @@ by reading the /proc directory and outputs it in a table format.`,
 		process, err := getProcessDetails()
 		if err != nil {
 			log.Error("Failed to retrieve process details", zap.Error(err))
-			return
+			return err
 		}
 
 		// Log success and print the process table
 		log.Info("Successfully retrieved process details", zap.Int("processCount", len(process)))
 		printProcessTable(process)
-	},
+		return nil 
+	}),
 }
 
 // ProcessInfo holds details about a process

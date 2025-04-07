@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var liveRun bool
@@ -21,7 +22,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - roles_mapping.yml updates
 - role sync
 - securityadmin reload`,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.PromptLDAPDetails()
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
@@ -62,8 +63,8 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 
 		fmt.Println("✅ LDAP configuration synced to Delphi successfully!")
 		fmt.Println("🔐 Please test logging in to the Wazuh dashboard using your LDAP credentials.")
-		return nil
-	},
+		return nil 
+	}),
 }
 
 func init() {

@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -16,7 +17,7 @@ var DeleteUmamiCmd = &cobra.Command{
 	Long: `Stops and removes Umami containers, backs up the data volumes,
 and deletes the installed images.
 The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.tar.gz`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("Starting Umami deletion process using Eos")
 
 		// Define the path to the docker-compose file used during installation.
@@ -70,7 +71,8 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.
 		}
 
 		log.Info("Umami deletion process complete")
-	},
+		return nil 
+	}),
 }
 
 func init() {

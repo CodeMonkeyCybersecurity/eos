@@ -4,6 +4,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"go.uber.org/zap"
 )
@@ -17,13 +18,13 @@ var EnableCmd = &cobra.Command{
 	Short: "Commands to enable or start services",
 	Long:  "Commands to enable or start services, such as initializing and unsealing Vault.",
 	Aliases: []string{"start", "init", "unseal"},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-	}	,
-}	
-
+		return nil 
+	}),
+}
 
 
 func init() {

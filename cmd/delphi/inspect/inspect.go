@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
@@ -26,12 +27,13 @@ user permissions, versioning data, keepalive status, and other useful insights.
 
 Subcommands are required to specify which type of information to inspect.`,
 	Aliases: []string{"read", "get"},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("'eos delphi inspect' was called without a subcommand")
 
 		fmt.Println("❌ Missing subcommand.")
 		fmt.Println("ℹ️  Run `eos delphi inspect --help` to see available options.")
 		_ = cmd.Help() // Print built-in help with formatting
-	},
+		return nil 
+	}),
 }

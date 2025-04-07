@@ -91,6 +91,7 @@ Next, include Cobra in your application:
 
 ```go
 import "github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 ```
 
 # Usage

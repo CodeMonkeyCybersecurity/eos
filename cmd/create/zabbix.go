@@ -6,6 +6,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -14,7 +16,7 @@ import (
 var CreateZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
 	Short: "Deploy Zabbix monitoring stack using Docker Compose",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("Starting Zabbix installation...")
 
 		if err := deployZabbix(); err != nil {
@@ -25,7 +27,8 @@ var CreateZabbixCmd = &cobra.Command{
 
 		log.Info("Zabbix successfully installed")
 		fmt.Println("Zabbix successfully deployed at http://localhost:8080")
-	},
+		return nil 
+	}),
 }
 
 func deployZabbix() error {

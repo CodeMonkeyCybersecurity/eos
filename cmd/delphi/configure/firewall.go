@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -15,7 +16,7 @@ var ConfigureFirewallCmd = &cobra.Command{
 	Use:   "firewall",
 	Short: "Auto-configure firewall rules for Wazuh on Linux",
 	Long:  "Detects Debian or RHEL and configures UFW or Firewalld for Wazuh agent ports.",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		switch platform.DetectLinuxDistro() {
 		case "debian":
 			log.Info("🔧 Configuring UFW on Debian-based system...")
@@ -28,7 +29,8 @@ var ConfigureFirewallCmd = &cobra.Command{
 			fmt.Println("⚠️  Unsupported Linux distribution for automated firewall setup.")
 			os.Exit(1)
 		}
-	},
+		return nil 
+	}),
 }
 
 var wazuhPorts = []string{"55000/tcp", "1516/tcp", "1515/tcp", "1514/tcp", "443/tcp"}

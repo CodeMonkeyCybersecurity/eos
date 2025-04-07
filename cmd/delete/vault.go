@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -18,7 +19,7 @@ var DeleteVaultCmd = &cobra.Command{
 	Short: "Deletes the Vault installation",
 	Long:  `Removes the Vault package (via snap, apt, or dnf) and optionally purges all configuration, data, and logs.`,
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		// Ensure the command is run as root.
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")
@@ -89,7 +90,8 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		log.Info("Vault deletion complete.")
-	},
+		return nil 
+	}),
 }
 
 func init() {

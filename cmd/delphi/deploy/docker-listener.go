@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -17,7 +18,7 @@ var DockerListenerCmd = &cobra.Command{
 	Use:   "docker-listener",
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",
 	Long:  `This command sets up a Python virtual environment and configures the Wazuh DockerListener to use it.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 		sugar := logger.Sugar()
@@ -76,5 +77,6 @@ var DockerListenerCmd = &cobra.Command{
 		if err := execute.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
 			sugar.Fatalf("❌ Failed to restart Wazuh Agent: %v", err)
 		}
-	},
+		return nil 
+	}),
 }

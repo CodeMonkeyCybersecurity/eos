@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -19,18 +20,18 @@ var InspectConfigCmd = &cobra.Command{
 	Short:   "Inspect the currently loaded Delphi configuration",
 	Long:    "Displays the contents of the delphi.json config file, with sensitive fields masked for safety.",
 	Aliases: []string{"cfg", "settings"},
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		cfg, err := delphi.LoadDelphiConfig()
 		if err != nil {
 			log.Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)
-			return
+			return err
 		}
 
 		if !utils.EnforceSecretsAccess(log, showSecrets) {
-			return
+			return nil
 		}
 
 		// Mask sensitive fields
@@ -43,12 +44,13 @@ var InspectConfigCmd = &cobra.Command{
 		if err != nil {
 			log.Error("Failed to marshal Delphi config", zap.Error(err))
 			fmt.Println("❌ Error printing config:", err)
-			return
+			return err
 		}
 
 		fmt.Println("📄 Delphi Configuration:")
 		fmt.Println(string(cfgJSON))
-	},
+		return nil 
+	}),
 }
 
 func init() {

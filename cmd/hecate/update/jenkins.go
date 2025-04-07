@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var backendIP string
@@ -31,10 +32,10 @@ Example configuration:
 
 Usage:
   hecate update jenkins --backendIP <new-ip>`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if backendIP == "" {
 			fmt.Println("Error: please provide a new backend IP using the --backendIP flag")
-			return
+			return nil
 		}
 
 		// Define the directory and token placeholder
@@ -44,7 +45,7 @@ Usage:
 		fmt.Printf("Updating backend IP to %s in assets directory...\n", backendIP)
 		if err := updateFilesInDir(assetsDir, token, backendIP); err != nil {
 			fmt.Printf("Error updating files: %v\n", err)
-			return
+			return nil
 		}
 		fmt.Println("Assets updated successfully with new backend IP.")
 
@@ -55,10 +56,12 @@ Usage:
 		cmdDocker.Stderr = os.Stderr
 		if err := cmdDocker.Run(); err != nil {
 			fmt.Printf("Error redeploying Hecate: %v\n", err)
-			return
+			return err
 		}
 		fmt.Println("Hecate redeployed successfully with new Jenkins backend IP.")
-	},
+		cmd.Help()
+		return nil 
+	}),
 }
 
 // updateFilesInDir recursively scans the specified directory and replaces any occurrence

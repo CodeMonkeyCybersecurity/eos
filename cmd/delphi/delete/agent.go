@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
@@ -28,13 +30,13 @@ Supported OS uninstallers:
 - macOS: /Library/Ossec/uninstall.sh
 - Linux: apt-get, yum, or dnf depending on distribution
 - Windows: wmic + msiexec`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		if agentID == "" {
 			log.Error("Agent ID is required")
 			fmt.Println("❌ Please provide an agent ID using --agent-id")
-			return
+			return nil
 		}
 
 		log.Info("🔐 Authenticating and loading Delphi config...")
@@ -71,7 +73,9 @@ Supported OS uninstallers:
 		default:
 			log.Warn("Unsupported OS for local uninstall", zap.String("os", runtime.GOOS))
 		}
-	},
+		cmd.Help()
+		return nil
+	}),
 }
 
 func init() {

@@ -3,6 +3,7 @@ package delete
 
 import (
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -11,14 +12,15 @@ var DeleteProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Delete process",
 	Long:  `Delete a process by specifying the target process.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Fatal("Please specify the process to delete.")
 		}
 		process := args[0]
 		log.Info("Deleting process", zap.String("process", process))
 		// Add your delete logic here.
-	},
+		return nil 
+	}),
 }
 
 func init() {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // UpdateCmd represents the update command
@@ -17,12 +18,13 @@ Examples:
   hecate update eos
   hecate update http
 `,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Update command executed")
 		if len(args) == 0 {
 			fmt.Println("No specific update target provided.")
 		}
-	},
+		return nil 
+	}),
 }
 
 // Attach subcommands to UpdateCmd
@@ -36,28 +38,30 @@ func init() {
 var runCertsCmd = &cobra.Command{
 	Use:   "certs",
 	Short: "Renew SSL certificates",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Renewing SSL certificates...")
 		// Implement logic for renewing certificates
-	},
+		return nil 
+	}),
 }
-
 // runEosCmd updates the EOS system
 var runEosCmd = &cobra.Command{
 	Use:   "github.com/CodeMonkeyCybersecurity/eos",
 	Short: "Update EOS system",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Updating EOS system...")
 		// Implement logic for updating EOS
-	},
+		return nil 
+	}),
 }
 
 // runHttpCmd updates the HTTP server
 var runHttpCmd = &cobra.Command{
 	Use:   "http",
 	Short: "Update HTTP configurations",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Updating HTTP configurations...")
 		// Implement logic for updating HTTP configurations
-	},
+		return nil 
+	}),
 }
