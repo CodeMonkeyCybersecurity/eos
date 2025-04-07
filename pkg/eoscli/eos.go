@@ -17,7 +17,7 @@ func Wrap(runE func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Co
 		log := logger.GetLogger()
 		cmdPath := cmd.CommandPath()
 
-		startMsg := fmt.Sprintf("───────[ START %s @ %s ]───────", cmdPath, time.Now().Format("2006-01-02 15:04:05"))
+		startMsg := fmt.Sprintf("\n───────[ START %s @ %s ]───────\n", cmdPath, time.Now().Format("2006-01-02 15:04:05"))
 		log.Info(startMsg)
 
 		// DRY RUN ENFORCEMENT
@@ -27,7 +27,7 @@ func Wrap(runE func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Co
 
 		err := runE(cmd, args)
 
-		endMsg := fmt.Sprintf("───────[ END %s @ %s ]───────", cmdPath, time.Now().Format("2006-01-02 15:04:05"))
+		endMsg := fmt.Sprintf("\n───────[ END %s @ %s ]───────\n", cmdPath, time.Now().Format("2006-01-02 15:04:05"))
 		if err != nil {
 			log.Error(endMsg, zap.Error(err))
 		} else {
