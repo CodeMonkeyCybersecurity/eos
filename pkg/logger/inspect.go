@@ -1,4 +1,5 @@
-// pkg/logger/inspect.go
+/* pkg/logger/inspect.go
+ */
 
 package logger
 
