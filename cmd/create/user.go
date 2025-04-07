@@ -24,8 +24,9 @@ import (
 )
 
 var (
-	username string
-	auto     bool
+	username   string
+	auto       bool
+	loginShell bool
 )
 
 var CreateUserCmd = &cobra.Command{
@@ -40,6 +41,7 @@ func init() {
 	CreateCmd.AddCommand(CreateUserCmd)
 	CreateUserCmd.Flags().StringVar(&username, "username", "hera", "Username for the new account")
 	CreateUserCmd.Flags().BoolVar(&auto, "auto", false, "Enable non-interactive auto mode with secure random password")
+	CreateUserCmd.Flags().BoolVar(&loginShell, "login", false, "Allow login shell for this user (default is no shell)")
 }
 
 func runCreateUser(cmd *cobra.Command, args []string) error {
@@ -76,9 +78,17 @@ func runCreateUser(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	shell := "/usr/sbin/nologin"
+	if loginShell {
+		log.Info("Creating user with login shell")
+		shell = "/bin/bash"
+	} else {
+		log.Info("Creating system user with no login shell")
+	}
+
 	log.Info("Creating user", zap.String("username", username))
-	if err := execute.Execute("useradd", "-m", "-s", "/bin/bash", username); err != nil {
-		return fmt.Errorf("error creating user: %w", err)
+	if err := execute.Execute("useradd", "-m", "-s", shell, username); err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
 	}
 
 	// Set password
