@@ -25,21 +25,7 @@ func GetLogFileWriter(logPath string) zapcore.WriteSyncer {
 }
 
 func DefaultConfig() zap.Config {
-	level := zap.InfoLevel
-	switch os.Getenv("LOG_LEVEL") {
-	case "trace":
-		level = zap.DebugLevel
-	case "debug":
-		level = zap.DebugLevel
-	case "dpanic":
-		level = zap.DPanicLevel
-	case "warn":
-		level = zap.WarnLevel
-	case "error":
-		level = zap.ErrorLevel
-	case "fatal":
-		level = zap.FatalLevel
-	}
+	level := ParseLogLevel(os.Getenv("LOG_LEVEL"))
 
 	isDev := os.Getenv("ENV") == "development"
 	// Use ResolveLogPath to get the appropriate log file path for the OS.
@@ -90,7 +76,7 @@ func InitializeWithConfig(cfg zap.Config) {
 	for _, path := range cfg.OutputPaths {
 		if path != "stdout" && path != "stderr" {
 			if err := EnsureLogPermissions(path); err != nil {
-				println("Permission error:", err.Error())
+				fmt.Fprintln(os.Stderr, "Permission error:", err.Error())
 				panic("Failed to ensure permissions for log file: " + err.Error())
 			}
 		}
@@ -111,18 +97,12 @@ func InitializeWithConfig(cfg zap.Config) {
 
 // Initialize initializes the logger with the default configuration.
 func Initialize() {
-	if log != nil {
-		return
-	}
-	log = NewLogger()
-	zap.ReplaceGlobals(log)
+	ensureLogger()
 }
 
 // GetLogger returns the global logger instance.
 func GetLogger() *zap.Logger {
-	if log == nil {
-		Initialize()
-	}
+	ensureLogger()
 	return log
 }
 
@@ -156,18 +136,21 @@ func Panic(msg string, fields ...zap.Field) {
 	GetLogger().Panic(msg, fields...)
 }
 
-// Sync flushes any buffered log entries and safely ignores stdout sync errors.
-func Sync() error {
+// Sync flushes log entries. If strict is true, all errors are returned.
+func Sync(strict ...bool) error {
+	ensureLogger()
 	if log == nil {
-		Initialize() // Ensure logger is initialized
+		return nil
 	}
-	if log != nil {
-		if err := log.Sync(); err != nil {
-			if _, ok := err.(*os.PathError); !ok && err.Error() != "sync /dev/stdout: invalid argument" {
-				log.Error("Failed to sync logger", zap.Error(err))
-			}
+
+	if err := log.Sync(); err != nil {
+		if len(strict) > 0 && strict[0] {
 			return err
 		}
+		if _, ok := err.(*os.PathError); !ok && err.Error() != "sync /dev/stdout: invalid argument" {
+			log.Error("Failed to sync logger", zap.Error(err))
+		}
+		return err
 	}
 	return nil
 }
@@ -193,6 +176,9 @@ func InitializeWithFallback(logPath string) error {
 	if logPath == "" {
 		return errors.New("no writable log path found")
 	}
+	if err := EnsureLogPermissions(logPath); err != nil {
+		return fmt.Errorf("unable to ensure log path: %w", err)
+	}
 
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
@@ -211,17 +197,7 @@ func InitializeWithFallback(logPath string) error {
 func NewLogger() *zap.Logger {
 	isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
 
-	level := zapcore.InfoLevel
-	switch os.Getenv("LOG_LEVEL") {
-	case "trace", "debug":
-		level = zapcore.DebugLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	case "fatal":
-		level = zapcore.FatalLevel
-	}
+	level := ParseLogLevel(os.Getenv("LOG_LEVEL"))
 
 	encoderCfg := zap.NewProductionEncoderConfig()
 	encoderCfg.TimeKey = "T"
@@ -253,4 +229,29 @@ func NewLogger() *zap.Logger {
 // It's a shorthand for logger.GetLogger() used across packages.
 func L() *zap.Logger {
 	return GetLogger()
+}
+
+func ParseLogLevel(env string) zapcore.Level {
+	switch env {
+	case "TRACE", "DEBUG":
+		return zapcore.DebugLevel
+	case "WARN":
+		return zapcore.WarnLevel
+	case "ERROR":
+		return zapcore.ErrorLevel
+	case "FATAL":
+		return zapcore.FatalLevel
+	case "DPANIC":
+		return zapcore.DPanicLevel
+	default:
+		return zapcore.InfoLevel
+	}
+}
+
+// ensureLogger initializes the logger if not already set.
+func ensureLogger() {
+	if log == nil {
+		log = NewLogger()
+		zap.ReplaceGlobals(log)
+	}
 }
