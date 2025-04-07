@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"golang.org/x/term"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -195,8 +193,6 @@ func InitializeWithFallback(logPath string) error {
 }
 
 func NewLogger() *zap.Logger {
-	isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
-
 	level := ParseLogLevel(os.Getenv("LOG_LEVEL"))
 
 	encoderCfg := zap.NewProductionEncoderConfig()
@@ -206,13 +202,7 @@ func NewLogger() *zap.Logger {
 	encoderCfg.CallerKey = "C"
 	encoderCfg.MessageKey = "M"
 	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderCfg.EncodeLevel = func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
-		if isTerminal {
-			enc.AppendString(ColouredLevel(level))
-		} else {
-			enc.AppendString(level.CapitalString())
-		}
-	}
+	encoderCfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(encoderCfg),
