@@ -39,7 +39,7 @@ generates SSH keys, and sets a secure password.`,
 
 func init() {
 	CreateCmd.AddCommand(CreateUserCmd)
-	CreateUserCmd.Flags().StringVar(&username, "username", "hera", "Username for the new account")
+	CreateUserCmd.Flags().StringVar(&username, "username", "eos", "Username for the new account")
 	CreateUserCmd.Flags().BoolVar(&auto, "auto", false, "Enable non-interactive auto mode with secure random password")
 	CreateUserCmd.Flags().BoolVar(&loginShell, "login", false, "Allow login shell for this user (default is no shell)")
 }
@@ -64,7 +64,7 @@ func runCreateUser(cmd *cobra.Command, args []string) error {
 
 	// Prompt if interactive
 	if !auto {
-		fmt.Print("Enter new username (default: hera): ")
+		fmt.Print("Enter new username (default: eos): ")
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
 		if input != "" {

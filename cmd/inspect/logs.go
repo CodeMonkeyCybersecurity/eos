@@ -20,10 +20,10 @@ var logLevel string
 
 var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
-	Short: "Inspect EOS logs (requires root or hera privileges)",
+	Short: "Inspect EOS logs (requires root or eos privileges)",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		if !utils.IsPrivilegedUser() {
-			return errors.New("you must be root or the 'hera' user to view logs")
+			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 
 		active := logger.ResolveLogPath()

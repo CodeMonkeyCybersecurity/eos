@@ -15,13 +15,13 @@ import (
 
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Inspect current Vault paths (requires root or hera)",
+	Short: "Inspect current Vault paths (requires root or eos)",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L()
 
 		if !utils.IsPrivilegedUser() {
-			log.Error("Access denied: must be root or the 'hera' user to inspect Vault")
-			return errors.New("access denied: must be root or the 'hera' user to inspect Vault")
+			log.Error("Access denied: must be root or the 'eos' user to inspect Vault")
+			return errors.New("access denied: must be root or the 'eos' user to inspect Vault")
 		}
 
 		log.Info("Querying Vault for secrets under path", zap.String("path", "secret/eos/"))

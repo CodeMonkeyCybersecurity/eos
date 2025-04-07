@@ -26,9 +26,9 @@ func UserExists(name string) bool {
 	return exec.Command("id", name).Run() == nil
 }
 
-// CreateHeraUser creates a special EOS system user "hera" with a secure password and no login shell.
-func CreateHeraUser(auto bool, loginShell bool) (string, error) {
-	const defaultUsername = "hera"
+// CreateEosUser creates a special EOS system user "eos" with a secure password and no login shell.
+func CreateEosUser(auto bool, loginShell bool) (string, error) {
+	const defaultUsername = "eos"
 	username := defaultUsername
 
 	if UserExists(username) {
@@ -38,7 +38,7 @@ func CreateHeraUser(auto bool, loginShell bool) (string, error) {
 	// Interactive prompt
 	if !auto {
 		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Enter username (default: hera): ")
+		fmt.Print("Enter username (default: eos): ")
 		input, _ := reader.ReadString('\n')
 		if strings.TrimSpace(input) != "" {
 			username = strings.TrimSpace(input)
@@ -109,23 +109,23 @@ func CreateHeraUser(auto bool, loginShell bool) (string, error) {
 	// Save password to file
 	secretsPath := "/var/lib/eos/secrets"
 	_ = os.MkdirAll(secretsPath, 0700)
-	outFile := secretsPath + "/hera-password.txt"
+	outFile := secretsPath + "/eos-password.txt"
 
 	f, err := os.Create(outFile)
 	if err != nil {
 		fmt.Println("⚠️ Warning: Could not save password to disk.")
 	} else {
 		defer f.Close()
-		f.WriteString(fmt.Sprintf("hera:%s\n", password))
-		fmt.Printf("🔐 Hera password saved to: %s\n", outFile)
+		f.WriteString(fmt.Sprintf("eos:%s\n", password))
+		fmt.Printf("🔐 eos password saved to: %s\n", outFile)
 		fmt.Println("💡 Please store this password in a secure password manager.")
 	}
 
 	// Backup password to Vault if available
-	if err = vault.StoreUserSecret("hera", password, ""); err != nil {
+	if err = vault.StoreUserSecret("eos", password, ""); err != nil {
 		fmt.Println("⚠️ Vault backup failed. You should store the password manually.")
 	} else {
-		fmt.Println("✅ Password securely backed up to Vault (path: secret/eos/users/hera)")
+		fmt.Println("✅ Password securely backed up to Vault (path: secret/eos/users/eos)")
 	}
 	return username, nil
 }

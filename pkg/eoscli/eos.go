@@ -1,6 +1,6 @@
 // pkg/eoscli/eos.go
 
-package handler
+package eoscli
 
 import (
 	"fmt"
