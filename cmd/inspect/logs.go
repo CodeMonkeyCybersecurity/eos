@@ -1,5 +1,6 @@
 /* cmd/inspect/log.go
  */
+
 package inspect
 
 import (
@@ -7,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,66 +24,49 @@ var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "Inspect EOS logs (requires root or eos privileges)",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		log := logger.L().Named("inspect")
-		component := "logs"
-		action := "search"
+		log := zap.L().Named("inspect")
 
 		if !utils.IsPrivilegedUser() {
-			log.Warn("Insufficient permissions",
-				zap.String("component", component),
-				zap.String("action", action),
-				zap.String("status", "denied"))
 			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 
-		log.Info("Searching for log files",
-			zap.String("component", component),
-			zap.String("action", action),
-			zap.String("status", "started"))
-
-		activeLog := logger.ResolveLogPath()
+		log.Info("Searching for log files", zap.String("component", "logs"), zap.String("action", "search"), zap.String("status", "started"))
 		found := false
-		fmt.Println("🔍 Searching for logs:")
+		active := logger.ResolveLogPath()
 
-		for _, path := range logger.PlatformLogPaths() {
-			full := os.ExpandEnv(path)
-			if _, err := os.Stat(full); err != nil {
-				continue
-			}
+		for _, candidate := range logger.PlatformLogPaths() {
+			path := os.ExpandEnv(candidate)
+			if _, err := os.Stat(path); err == nil {
+				prefix := "📄"
+				if path == active {
+					prefix = "⭐"
+				}
+				fmt.Printf("\n%s %s\n", prefix, path)
 
-			found = true
-			prefix := "📄"
-			if full == activeLog {
-				prefix = "⭐"
+				content, err := logger.ReadLogFile(path)
+				if err != nil {
+					fmt.Printf("❌ Failed to read %s: %v\n", path, err)
+					continue
+				}
+				fmt.Println(strings.TrimSpace(content))
+				found = true
 			}
-			fmt.Printf("\n%s %s\n", prefix, full)
 		}
 
 		if !found {
-			log.Warn("No local logs found; attempting journalctl fallback",
-				zap.String("component", component),
-				zap.String("action", action),
-				zap.String("status", "fallback"))
-			return tryJournalctl(log)
+			log.Warn("No log files found, falling back to journalctl")
+			fmt.Println("⚠️ No Eos logs found in known locations. Trying journalctl...")
+			return tryJournalctl()
 		}
 
-		log.Info("Log search complete",
-			zap.String("component", component),
-			zap.String("action", action),
-			zap.String("status", "complete"))
+		log.Info("Log search complete", zap.String("component", "logs"), zap.String("action", "search"), zap.String("status", "complete"))
 		return nil
 	}),
 }
 
-func tryJournalctl(log *zap.Logger) error {
-	cmd := exec.Command("journalctl", "-u", "eos", "--no-pager", "--since", "today")
-	out, err := cmd.CombinedOutput()
+func tryJournalctl() error {
+	out, err := exec.Command("journalctl", "-u", "eos", "--no-pager", "--since", "today").CombinedOutput()
 	if err != nil {
-		log.Error("journalctl failed",
-			zap.String("component", "logs"),
-			zap.String("action", "journalctl"),
-			zap.String("status", "error"),
-			zap.Error(err))
 		return fmt.Errorf("could not query logs via journalctl: %w", err)
 	}
 	fmt.Println(string(out))
