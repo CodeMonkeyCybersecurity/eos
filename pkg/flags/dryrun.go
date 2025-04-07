@@ -2,6 +2,7 @@ package flags
 
 import (
 	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -44,8 +45,8 @@ func AddDryRunFlags(cmd *cobra.Command) {
 
 // Evaluate dry-run flags (call in RunE)
 func ParseDryRunAliases(cmd *cobra.Command) {
-	liveRun, _ := cmd.Flags().GetBool("live-run")
-	liveShort, _ := cmd.Flags().GetBool("live")
+	liveRun, _ := cmd.InheritedFlags().GetBool("live-run")
+	liveShort, _ := cmd.InheritedFlags().GetBool("live")
 
 	if liveRun || liveShort {
 		SetDryRunMode(true)
