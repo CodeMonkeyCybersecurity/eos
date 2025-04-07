@@ -16,22 +16,28 @@ func Wrap(runE func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Co
 	return func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		cmdPath := cmd.CommandPath()
+		timestamp := time.Now().Format("2006-01-02 15:04:05")
 
-		startMsg := fmt.Sprintf("\n───────[ START %s @ %s ]───────\n", cmdPath, time.Now().Format("2006-01-02 15:04:05"))
-		log.Info(startMsg)
+		startBanner := fmt.Sprintf("───────[ START %s @ %s ]───────", cmdPath, timestamp)
+		fmt.Println("\n" + startBanner)
+		log.Info("Command started", zap.String("command", cmdPath), zap.String("time", timestamp))
 
 		// DRY RUN ENFORCEMENT
 		if !flags.IsLiveRun() {
+			fmt.Println("⚠️  Dry run mode: this command will not apply changes unless --live-run is set.")
 			log.Warn("Dry run mode: this command will not apply changes unless --live-run is set.")
 		}
 
 		err := runE(cmd, args)
 
-		endMsg := fmt.Sprintf("\n───────[ END %s @ %s ]───────\n", cmdPath, time.Now().Format("2006-01-02 15:04:05"))
+		endTime := time.Now().Format("2006-01-02 15:04:05")
+		endBanner := fmt.Sprintf("───────[ END %s @ %s ]───────", cmdPath, endTime)
+		fmt.Println(endBanner)
+
 		if err != nil {
-			log.Error(endMsg, zap.Error(err))
+			log.Error("Command failed", zap.String("command", cmdPath), zap.String("time", endTime), zap.Error(err))
 		} else {
-			log.Info(endMsg)
+			log.Info("Command completed", zap.String("command", cmdPath), zap.String("time", endTime))
 		}
 
 		return err
