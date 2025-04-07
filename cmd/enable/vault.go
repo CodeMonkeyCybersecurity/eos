@@ -216,7 +216,30 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			log.Fatal("Failed to parse random password output", zap.Error(err))
 		}
 		randomPassword := randomData.Data.RandomBytes
-		fmt.Printf("Generated eos password: %s\n", randomPassword)
+
+		// Save to fallback file (for emergency recovery)
+		fallbackFile := "/var/lib/eos/secrets/vault-userpass.yaml"
+		os.MkdirAll("/var/lib/eos/secrets", 0700)
+		fallbackContent := fmt.Sprintf("username: eos\npassword: %s\n", randomPassword)
+		if err := os.WriteFile(fallbackFile, []byte(fallbackContent), 0600); err != nil {
+			log.Warn("Failed to write fallback password file", zap.Error(err))
+		} else {
+			fmt.Printf("🔐 Stored eos Vault user password at %s\n", fallbackFile)
+		}
+
+		// Also store in Vault (if online and unsealed)
+		if err := vault.SaveToVault("secret/bootstrap/eos-user", map[string]string{
+			"username": "eos",
+			"password": randomPassword,
+		}); err != nil {
+			log.Warn("Failed to store eos Vault credentials in Vault", zap.Error(err))
+		} else {
+			fmt.Println("🔐 Stored eos user credentials inside Vault at secret/bootstrap/eos-user")
+		}
+
+		if err := vault.SetupVaultAgentService(randomPassword); err != nil {
+			log.Fatal("Failed to set up Vault Agent service", zap.Error(err))
+		}
 
 		// Create the eos user
 		createUserCmd := exec.Command("vault", "write", "auth/userpass/users/eos",

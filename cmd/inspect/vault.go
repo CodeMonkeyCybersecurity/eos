@@ -4,6 +4,7 @@ package inspect
 import (
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -53,6 +54,48 @@ var InspectVaultCmd = &cobra.Command{
 	}),
 }
 
+var InspectVaultAgentCmd = &cobra.Command{
+	Use:   "agent",
+	Short: "Check status of the Vault Agent running as eos",
+	Long: `Checks whether the Vault Agent systemd service is running,
+validates the token at /run/eos/.vault-token, and attempts a test query.`,
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		fmt.Println("🔍 Checking Vault Agent (eos) service status...")
+
+		// 1. Check if systemd service is running
+		status := exec.Command("systemctl", "is-active", "--quiet", "vault-agent-eos.service")
+		if err := status.Run(); err != nil {
+			fmt.Println("❌ Vault Agent service is NOT running.")
+		} else {
+			fmt.Println("✅ Vault Agent service is active.")
+		}
+
+		// 2. Check for the token file
+		tokenPath := "/run/eos/.vault-token"
+		if _, err := os.Stat(tokenPath); os.IsNotExist(err) {
+			fmt.Println("❌ Vault token file not found:", tokenPath)
+			return nil
+		}
+		fmt.Println("✅ Vault token file exists at", tokenPath)
+
+		// 3. Try accessing Vault using the token
+		fmt.Println("📦 Running vault kv get secret/hello as eos...")
+		cmdTest := exec.Command("sudo", "-u", "eos", "vault", "kv", "get", "-format=json", "secret/hello")
+		cmdTest.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+tokenPath)
+		out, err := cmdTest.CombinedOutput()
+		if err != nil {
+			fmt.Println("❌ Vault test query failed:", err)
+			fmt.Println(string(out))
+		} else {
+			fmt.Println("✅ Vault responded successfully:")
+			fmt.Println(string(out))
+		}
+
+		return nil
+	}),
+}
+
 func init() {
-	InspectCmd.AddCommand(InspectVaultCmd)
+	InspectVaultCmd.AddCommand(InspectVaultAgentCmd) // nested!
+	InspectCmd.AddCommand(InspectVaultCmd)           // top-level
 }
