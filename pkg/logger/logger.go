@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"golang.org/x/term"
+
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -109,7 +111,11 @@ func InitializeWithConfig(cfg zap.Config) {
 
 // Initialize initializes the logger with the default configuration.
 func Initialize() {
-	InitializeWithConfig(DefaultConfig())
+	if log != nil {
+		return
+	}
+	log = NewLogger()
+	zap.ReplaceGlobals(log)
 }
 
 // GetLogger returns the global logger instance.
@@ -193,7 +199,7 @@ func InitializeWithFallback(logPath string) error {
 
 	core := zapcore.NewTee(
 		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
-		zapcore.NewCore(zapcore.NewJSONEncoder(cfg), getLogFileWriter(logPath), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(cfg), GetLogFileWriter(logPath), zap.InfoLevel),
 	)
 
 	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))
@@ -202,18 +208,45 @@ func InitializeWithFallback(logPath string) error {
 	return nil
 }
 
-// getLogFileWriter creates a zapcore.WriteSyncer for the log file.
-func getLogFileWriter(logPath string) zapcore.WriteSyncer {
-	if err := EnsureLogPermissions(logPath); err != nil {
-		fmt.Fprintf(os.Stderr, "⚠️ Could not prepare log file %s: %v\n", logPath, err)
-		return zapcore.AddSync(os.Stdout)
+func NewLogger() *zap.Logger {
+	isTerminal := term.IsTerminal(int(os.Stdout.Fd()))
+
+	level := zapcore.InfoLevel
+	switch os.Getenv("LOG_LEVEL") {
+	case "trace", "debug":
+		level = zapcore.DebugLevel
+	case "warn":
+		level = zapcore.WarnLevel
+	case "error":
+		level = zapcore.ErrorLevel
+	case "fatal":
+		level = zapcore.FatalLevel
 	}
-	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "⚠️ Could not open log file %s: %v\n", logPath, err)
-		return zapcore.AddSync(os.Stdout)
+
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.TimeKey = "T"
+	encoderCfg.LevelKey = "L"
+	encoderCfg.NameKey = "N"
+	encoderCfg.CallerKey = "C"
+	encoderCfg.MessageKey = "M"
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderCfg.EncodeLevel = func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+		if isTerminal {
+			enc.AppendString(ColouredLevel(level))
+		} else {
+			enc.AppendString(level.CapitalString())
+		}
 	}
-	return zapcore.AddSync(file)
+
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderCfg),
+		zapcore.AddSync(os.Stdout),
+		level,
+	)
+
+	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	logger.Info("Logger successfully initialized", zap.String("log_level", level.CapitalString()))
+	return logger
 }
 
 // L returns the globally configured logger instance.
