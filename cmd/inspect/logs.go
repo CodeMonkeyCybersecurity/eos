@@ -47,12 +47,13 @@ var InspectLogsCmd = &cobra.Command{
 					continue
 				}
 
-				if logLevel != "" {
-					filtered := filterLogsByLevel(content, logLevel)
-					fmt.Println(filtered)
-				} else {
-					fmt.Println(content)
+				lines := strings.Split(content, "\n")
+				for _, line := range lines {
+					if logLevel == "" || passesLevelFilter(line, logLevel) {
+						fmt.Println(logger.ColorizeLogLine(line))
+					}
 				}
+
 				found = true
 			}
 		}
@@ -70,10 +71,7 @@ var InspectLogsCmd = &cobra.Command{
 	}),
 }
 
-func filterLogsByLevel(content string, level string) string {
-	lines := strings.Split(content, "\n")
-	var result []string
-
+func passesLevelFilter(line, level string) bool {
 	threshold := map[string]int{
 		"debug": 0,
 		"info":  1,
@@ -81,29 +79,22 @@ func filterLogsByLevel(content string, level string) string {
 		"error": 3,
 		"fatal": 4,
 	}
-
-	currentThreshold := threshold[strings.ToLower(level)]
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		var entry map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &entry); err != nil {
-			continue
-		}
-
-		lvl, ok := entry["L"].(string)
-		if !ok {
-			continue
-		}
-
-		if threshold[strings.ToLower(lvl)] >= currentThreshold {
-			result = append(result, line)
-		}
+	currentThreshold, ok := threshold[strings.ToLower(level)]
+	if !ok {
+		return true // unknown level passed, don't filter
 	}
 
-	return strings.Join(result, "\n")
+	var entry map[string]interface{}
+	if err := json.Unmarshal([]byte(line), &entry); err != nil {
+		return false
+	}
+
+	lvl, ok := entry["L"].(string)
+	if !ok {
+		return false
+	}
+
+	return threshold[strings.ToLower(lvl)] >= currentThreshold
 }
 
 func init() {
