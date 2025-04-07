@@ -2,8 +2,8 @@
 package delete
 
 import (
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -19,7 +19,7 @@ var DeleteProcessCmd = &cobra.Command{
 		process := args[0]
 		log.Info("Deleting process", zap.String("process", process))
 		// Add your delete logic here.
-		return nil 
+		return nil
 	}),
 }
 

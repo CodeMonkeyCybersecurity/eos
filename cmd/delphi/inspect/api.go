@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var (
@@ -56,7 +56,7 @@ var InspectAPICmd = &cobra.Command{
 		} else {
 			fmt.Println("⚠️  No flags provided. Use --permissions or --version to query specific information.")
 		}
-		return nil 
+		return nil
 	}),
 }
 

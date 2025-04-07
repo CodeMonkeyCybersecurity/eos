@@ -3,8 +3,8 @@
 package hecate
 
 import (
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/create"
@@ -22,9 +22,9 @@ var HecateCmd = &cobra.Command{
 	Long:  "Hecate commands allow you to deploy, inspect, and manage reverse proxy configurations.",
 	// You can optionally add a Run function if you want to provide default behavior when no subcommand is used.
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-	    // For example, display help if no subcommand is provided.
-	     cmd.Help()
-		return nil 
+		// For example, display help if no subcommand is provided.
+		cmd.Help()
+		return nil
 	}),
 }
 

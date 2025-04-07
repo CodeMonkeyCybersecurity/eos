@@ -4,10 +4,10 @@ package delete
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +23,7 @@ and removes it by running the appropriate uninstall scripts in the correct order
 			return err
 		}
 		log.Info("✅ K3s uninstallation completed.")
-		return nil 
+		return nil
 	}),
 }
 

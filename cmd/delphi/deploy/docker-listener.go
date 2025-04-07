@@ -8,8 +8,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -77,6 +77,6 @@ var DockerListenerCmd = &cobra.Command{
 		if err := execute.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
 			sugar.Fatalf("❌ Failed to restart Wazuh Agent: %v", err)
 		}
-		return nil 
+		return nil
 	}),
 }

@@ -5,9 +5,8 @@ package create
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-
 )
 
 // createProcessCmd represents the create command for processes
@@ -22,7 +21,7 @@ var CreateProcessCmd = &cobra.Command{
 		processDetails := args[0]
 		fmt.Printf("Creating process: %s...\n", processDetails)
 		// Add your logic to create a process
-		return nil 
+		return nil
 	}),
 }
 

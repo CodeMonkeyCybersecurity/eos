@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // DeleteCmd is the root "delete" command: supports either `delete <app>` or subcommands like `delete resources`
@@ -32,7 +32,7 @@ Examples:
 		app := args[0]
 		fmt.Printf("🗑️  Deleting application: %s\n", app)
 		// TODO: Add logic to delete individual app configuration
-		return nil 
+		return nil
 	}),
 }
 
@@ -48,7 +48,7 @@ var deleteResourcesCmd = &cobra.Command{
   5) Delete all specified resources`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		runDeleteConfig()
-		return nil 
+		return nil
 	}),
 }
 

@@ -2,9 +2,9 @@
 package secure
 
 import (
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +23,7 @@ For example:
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-		return nil 
+		return nil
 	}),
 }
 

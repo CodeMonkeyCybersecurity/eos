@@ -6,8 +6,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -53,6 +53,6 @@ var CreateJWTCmd = &cobra.Command{
 		}
 
 		log.Info("JWT token retrieved successfully", zap.String("token", token))
-		return nil 
+		return nil
 	}),
 }

@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var InspectCredentialsCmd = &cobra.Command{
@@ -73,7 +73,7 @@ var InspectCredentialsCmd = &cobra.Command{
 			}
 			fmt.Printf("  • %-15s | Role: %-10s | Status: %s\n", user.Username, user.Role, status)
 		}
-		return nil 
+		return nil
 	}),
 }
 

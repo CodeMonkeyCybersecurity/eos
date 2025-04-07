@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os/exec"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // readStorageCmd represents the create command for storage
@@ -22,16 +22,16 @@ and the usage of mounted filesystems, combining the functionality of lsblk and d
 		fmt.Println("\nBlock Devices (lsblk):")
 		if err := runCommand("lsblk", "--all", "--output", "NAME,SIZE,TYPE,MOUNTPOINT"); err != nil {
 			fmt.Printf("Error running lsblk: %v\n", err)
-			return(err)
+			return (err)
 		}
 
 		// Run df -h
 		fmt.Println("\nFilesystem Usage (df -h):")
 		if err := runCommand("df", "-h"); err != nil {
 			fmt.Printf("Error running df -h: %v\n", err)
-			return (err) 
+			return (err)
 		}
-		return nil 
+		return nil
 	}),
 }
 

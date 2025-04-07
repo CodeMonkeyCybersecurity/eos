@@ -10,9 +10,9 @@ import (
 	"os/exec"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -199,7 +199,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		fmt.Println("Please configure multi-factor authentication (MFA) for your admin user using your organization's preferred method.")
 		fmt.Println("Refer to Vault's documentation for integrating MFA (e.g., via OIDC, LDAP, or a third-party MFA solution).")
 		fmt.Println("\nVault secure setup completed successfully!")
-		return nil 
+		return nil
 	}),
 }
 

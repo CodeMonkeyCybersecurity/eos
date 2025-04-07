@@ -4,8 +4,8 @@ package delete
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // deleteStorageCmd represents the command for deleting storage resources.
@@ -20,7 +20,7 @@ var DeleteStorageCmd = &cobra.Command{
 		storageDetails := args[0]
 		log.Info(fmt.Sprintf("Deleting storage: %s...", storageDetails))
 		// Add your logic to delete storage resources
-		return nil 
+		return nil
 	}),
 }
 

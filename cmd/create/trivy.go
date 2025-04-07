@@ -1,5 +1,5 @@
 /* cmd/create/trivy.go
-*/
+ */
 
 package create
 
@@ -8,8 +8,8 @@ import (
 	"os"
 	"os/exec"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // trivyCmd represents the trivy installation command.
@@ -23,7 +23,7 @@ It performs the following steps:
   3. Updates package lists and installs Trivy`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		installTrivy()
-		return nil 
+		return nil
 	}),
 }
 

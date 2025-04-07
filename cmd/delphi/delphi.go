@@ -11,8 +11,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // DelphiCmd groups commands related to managing Delphi (Wazuh) components.
@@ -23,7 +23,7 @@ var DelphiCmd = &cobra.Command{
 	// Optionally, you can define a Run function to display help if no subcommand is provided.
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		cmd.Help()
-		return nil 
+		return nil
 	}),
 }
 

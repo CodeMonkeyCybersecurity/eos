@@ -4,9 +4,9 @@ package update
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var (
@@ -47,6 +47,6 @@ var UpdateDelphiApiCmd = &cobra.Command{
 			return fmt.Errorf("unknown upgrade target")
 		}
 
-		return nil 
+		return nil
 	}),
 }

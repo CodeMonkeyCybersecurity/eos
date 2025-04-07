@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var liveRun bool
@@ -63,7 +63,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 
 		fmt.Println("✅ LDAP configuration synced to Delphi successfully!")
 		fmt.Println("🔐 Please test logging in to the Wazuh dashboard using your LDAP credentials.")
-		return nil 
+		return nil
 	}),
 }
 

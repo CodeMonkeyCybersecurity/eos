@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -49,7 +49,7 @@ var InspectConfigCmd = &cobra.Command{
 
 		fmt.Println("📄 Delphi Configuration:")
 		fmt.Println(string(cfgJSON))
-		return nil 
+		return nil
 	}),
 }
 

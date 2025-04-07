@@ -5,9 +5,9 @@ import (
 	"os"
 	"os/exec"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -90,7 +90,7 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		log.Info("Vault deletion complete.")
-		return nil 
+		return nil
 	}),
 }
 

@@ -22,7 +22,7 @@ var log = logger.L()
 // DeployApp deploys an application by copying necessary configs and restarting services
 func DeployApp(app string, cmd *cobra.Command) error {
 	log.Info("Starting deployment", zap.String("app", app)) // ✅ Use log.Info directly
-	fmt.Printf("Deploying %s...\n", app)                       // 👈 Added for user visibility
+	fmt.Printf("Deploying %s...\n", app)                    // 👈 Added for user visibility
 
 	// Check if the required HTTP config exists
 	httpConfig := filepath.Join(AssetsPath, "servers", app+".conf")

@@ -8,7 +8,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
-
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -27,7 +26,7 @@ var CreateZabbixCmd = &cobra.Command{
 
 		log.Info("Zabbix successfully installed")
 		fmt.Println("Zabbix successfully deployed at http://localhost:8080")
-		return nil 
+		return nil
 	}),
 }
 

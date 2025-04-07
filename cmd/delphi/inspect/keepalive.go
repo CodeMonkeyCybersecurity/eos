@@ -8,8 +8,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -52,7 +52,7 @@ var KeepAliveCmd = &cobra.Command{
 		}
 		fmt.Println("Disconnected agents:")
 		fmt.Println(string(pretty))
-		return nil 
+		return nil
 	}),
 }
 

@@ -5,8 +5,8 @@ package inspect
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // InspectCmd is the top-level `inspect` command
@@ -22,7 +22,7 @@ Examples:
 	Aliases: []string{"read", "get"},
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("🔍 Please use a subcommand (e.g. 'inspect config') to inspect a resource.")
-		return nil 
+		return nil
 	}),
 }
 

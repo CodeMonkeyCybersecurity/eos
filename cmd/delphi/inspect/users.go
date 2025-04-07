@@ -4,8 +4,8 @@ package inspect
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -33,7 +33,7 @@ var UsersCmd = &cobra.Command{
 		for _, user := range users {
 			fmt.Printf("• %s (ID: %d)\n", user.Username, user.ID)
 		}
-		return nil 
+		return nil
 	}),
 }
 

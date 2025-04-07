@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -260,7 +260,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		fmt.Println("\nYou can now log in with the eos user using the generated password.")
 		fmt.Println("\nRemember to store the unseal keys and root token securely!")
 		fmt.Println("\nPlease now run 'eos secure vault' to secure the Vault service.")
-		return nil 
+		return nil
 	}),
 }
 

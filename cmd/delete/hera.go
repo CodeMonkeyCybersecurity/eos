@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -40,7 +40,7 @@ var DeleteHeraCmd = &cobra.Command{
 		}
 
 		log.Info("Hera deletion complete. Directory /opt/hera still exists.")
-		return nil 
+		return nil
 	}),
 }
 

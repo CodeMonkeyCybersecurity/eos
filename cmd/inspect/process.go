@@ -11,8 +11,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -38,7 +38,7 @@ by reading the /proc directory and outputs it in a table format.`,
 		// Log success and print the process table
 		log.Info("Successfully retrieved process details", zap.Int("processCount", len(process)))
 		printProcessTable(process)
-		return nil 
+		return nil
 	}),
 }
 

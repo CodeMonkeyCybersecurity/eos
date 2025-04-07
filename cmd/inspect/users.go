@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // readUsersCmd represents the command to read users
@@ -22,14 +22,14 @@ by reading the /etc/passwd file.`,
 		users, err := getSystemUsers()
 		if err != nil {
 			fmt.Printf("Error reading users: %v\n", err)
-			return (err) 
+			return (err)
 		}
 
 		fmt.Println("Current users:")
 		for _, user := range users {
 			fmt.Println(user)
 		}
-		return nil 
+		return nil
 	}),
 }
 

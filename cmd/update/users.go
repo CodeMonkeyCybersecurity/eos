@@ -4,8 +4,8 @@ package update
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // updateUsersCmd handles updating user information
@@ -22,7 +22,7 @@ var UpdateUsersCmd = &cobra.Command{
 		fmt.Printf("Updating user: %s\n", user)
 		// Add your logic here
 		cmd.Help()
-		return nil 
+		return nil
 	}),
 }
 

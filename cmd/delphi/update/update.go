@@ -3,8 +3,8 @@ package update
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var UpdateCmd = &cobra.Command{
@@ -14,7 +14,7 @@ var UpdateCmd = &cobra.Command{
 	Long:    "Update configuration and user information in your Delphi (Wazuh) instance.",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("🔄 Updating Delphi configuration or components...")
-		return nil 
+		return nil
 	}),
 }
 

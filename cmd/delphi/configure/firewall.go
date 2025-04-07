@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -29,7 +29,7 @@ var ConfigureFirewallCmd = &cobra.Command{
 			fmt.Println("⚠️  Unsupported Linux distribution for automated firewall setup.")
 			os.Exit(1)
 		}
-		return nil 
+		return nil
 	}),
 }
 

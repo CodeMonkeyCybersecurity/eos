@@ -6,11 +6,10 @@ import (
 	"os/exec"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"go.uber.org/zap"
-
 )
 
 // vaultRefreshCmd represents the "refresh vault" command.
@@ -61,7 +60,7 @@ var VaultRefreshCmd = &cobra.Command{
 
 		fmt.Printf("Vault process restarted with PID %d\n", vaultCmd.Process.Pid)
 		fmt.Println("Vault refresh complete. Check logs at", logFilePath)
-		return nil 
+		return nil
 	}),
 }
 

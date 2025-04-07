@@ -4,8 +4,8 @@ package update
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // updateStorageCmd handles updating storage information
@@ -21,7 +21,7 @@ var UpdateStorageCmd = &cobra.Command{
 		storage := args[0]
 		fmt.Printf("Updating storage: %s\n", storage)
 		// Add your logic here
-		return nil 
+		return nil
 	}),
 }
 

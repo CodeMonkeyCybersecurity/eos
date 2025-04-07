@@ -5,8 +5,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -71,7 +71,7 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 		}
 
 		log.Info("Jenkins deletion process complete")
-		return nil 
+		return nil
 	}),
 }
 

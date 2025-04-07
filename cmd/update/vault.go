@@ -7,9 +7,9 @@ import (
 	"os"
 	"os/exec"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 )
 
@@ -47,7 +47,7 @@ var VaultUpdateCmd = &cobra.Command{
 			log.Fatal("Failed to update Vault", zap.Error(err))
 		}
 		fmt.Println("✅ Vault updated successfully.")
-		return nil 
+		return nil
 	}),
 }
 

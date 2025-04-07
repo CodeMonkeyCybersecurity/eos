@@ -4,9 +4,8 @@ package create
 import (
 	"fmt"
 
-
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // createStorageCmd represents the create command for storage
@@ -21,7 +20,7 @@ var CreateStorageCmd = &cobra.Command{
 		storageDetails := args[0]
 		fmt.Printf("Creating storage: %s...\n", storageDetails)
 		// Add your logic to create storage resources
-		return nil 
+		return nil
 	}),
 }
 

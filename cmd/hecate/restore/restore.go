@@ -11,8 +11,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var log = logger.L()
@@ -36,7 +36,7 @@ If no --timestamp is given, the command enters interactive mode to choose which 
 		} else {
 			runInteractiveRestore()
 		}
-		return nil 
+		return nil
 	}),
 }
 

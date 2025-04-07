@@ -11,8 +11,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
@@ -57,7 +57,7 @@ var TreecatCmd = &cobra.Command{
 			log.Error("Failed to walk directory", zap.Error(err))
 			os.Exit(1)
 		}
-		return nil 
+		return nil
 	}),
 }
 

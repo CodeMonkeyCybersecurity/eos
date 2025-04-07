@@ -8,8 +8,8 @@ package update
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
-	"github.com/spf13/cobra"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
@@ -24,7 +24,7 @@ var UpdateCmd = &cobra.Command{
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-		return nil 
+		return nil
 	}),
 }
 

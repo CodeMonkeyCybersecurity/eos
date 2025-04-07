@@ -3,8 +3,8 @@ package update
 import (
 	"fmt"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 // UpdateCmd represents the update command
@@ -23,7 +23,7 @@ Examples:
 		if len(args) == 0 {
 			fmt.Println("No specific update target provided.")
 		}
-		return nil 
+		return nil
 	}),
 }
 
@@ -41,9 +41,10 @@ var runCertsCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Renewing SSL certificates...")
 		// Implement logic for renewing certificates
-		return nil 
+		return nil
 	}),
 }
+
 // runEosCmd updates the EOS system
 var runEosCmd = &cobra.Command{
 	Use:   "github.com/CodeMonkeyCybersecurity/eos",
@@ -51,7 +52,7 @@ var runEosCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Updating EOS system...")
 		// Implement logic for updating EOS
-		return nil 
+		return nil
 	}),
 }
 
@@ -62,6 +63,6 @@ var runHttpCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Updating HTTP configurations...")
 		// Implement logic for updating HTTP configurations
-		return nil 
+		return nil
 	}),
 }

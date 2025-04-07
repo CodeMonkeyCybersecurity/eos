@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -158,7 +158,7 @@ Then, run this command again.
 				zap.String("wildcard", "*."+domain),
 				zap.String("ip", ip),
 			)
-			return nil 
+			return nil
 		}),
 	}
 

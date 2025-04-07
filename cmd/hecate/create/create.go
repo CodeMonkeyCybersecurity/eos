@@ -1,8 +1,8 @@
 package create
 
 import (
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/create/hetzner"
@@ -23,7 +23,7 @@ needed for your Hecate deployment, such as certificates, proxy configurations, D
 			zap.String("command", cmd.Name()),
 			zap.Strings("args", args),
 		)
-		return nil 
+		return nil
 	}),
 }
 

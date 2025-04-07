@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var backendIP string
@@ -60,7 +60,7 @@ Usage:
 		}
 		fmt.Println("Hecate redeployed successfully with new Jenkins backend IP.")
 		cmd.Help()
-		return nil 
+		return nil
 	}),
 }
 

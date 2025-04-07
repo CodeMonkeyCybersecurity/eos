@@ -11,8 +11,8 @@ import (
 	"os"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
@@ -29,7 +29,7 @@ var BackupCmd = &cobra.Command{
 	Long:  `Backup important configuration directories and files.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		runBackup()
-		return nil 
+		return nil
 	}),
 }
 

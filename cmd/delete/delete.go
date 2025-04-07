@@ -7,8 +7,8 @@ Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 package delete
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
 
@@ -27,11 +27,11 @@ For example:
 
 	Aliases: []string{"remove", "uninstall", "rm"},
 
-RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
-		return nil 
+		return nil
 	}),
 }
 

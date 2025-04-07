@@ -8,8 +8,8 @@ import (
 	"os/exec"
 	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 )
 
 var UpdateHostnameCmd = &cobra.Command{
@@ -18,7 +18,7 @@ var UpdateHostnameCmd = &cobra.Command{
 	Long:  `Update the system hostname by modifying /etc/hostname and /etc/hosts.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		UpdateHostname()
-		return nil 
+		return nil
 	}),
 }
 
