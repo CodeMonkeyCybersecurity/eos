@@ -17,62 +17,58 @@ var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		log := zap.L()
+		log := zap.L().Named("inspect").With(zap.String("component", "vault"))
 
 		if !utils.IsPrivilegedUser() {
-			log.Error("Access denied: must be root or the 'eos' user to inspect Vault")
-			fmt.Println(`
-		❌ Access denied.
-		This command requires elevated privileges to inspect Vault contents.
-		
-		✅ Try again as root or the 'eos' user:
-			sudo eos inspect vault
-		`)
-			return fmt.Errorf("requires root or eos user to continue")
+			log.Error("Access denied", zap.String("action", "permission-check"), zap.String("status", "denied"))
+			fmt.Println(`❌ Access denied. You must be root or the 'eos' user.
+
+✅ Try again with:
+   sudo eos inspect vault`)
+			return fmt.Errorf("requires root or eos user")
 		}
 
 		if _, err := exec.LookPath("vault"); err != nil {
-			fmt.Println(`
-		❌ HashiCorp Vault CLI not found in $PATH.
-		
-		💡 You can install it with:
-			sudo apt install vault
-		
-		Or verify it's available to the current user:
-			which vault
-			echo $PATH
-		`)
-			return fmt.Errorf("vault CLI binary not found in PATH")
+			log.Error("Vault CLI not found", zap.String("action", "lookup"), zap.String("status", "missing"))
+			fmt.Println(`❌ HashiCorp Vault CLI not found in $PATH
+
+💡 You can install it with:
+   sudo apt install vault
+
+Or verify it's available to the current user:
+   which vault
+   echo $PATH`)
+			return fmt.Errorf("vault CLI binary not found")
 		}
 
-		log.Info("Querying Vault for secrets under path", zap.String("path", "secret/eos/"))
+		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos/"))
+
 		cmdExec := exec.Command("vault", "kv", "list", "-format=json", "secret/eos")
 		output, err := cmdExec.Output()
 		if err != nil {
-			log.Error("Vault CLI call failed — check if vault is installed and in PATH", zap.Error(err))
+			log.Error("Vault list failed", zap.String("action", "list"), zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
 		}
 
-		rawOutput := string(output)
-		log.Debug("Raw Vault output", zap.String("output", rawOutput))
-
-		paths := strings.Split(rawOutput, ",")
+		paths := strings.Split(string(output), ",")
 		count := 0
 		for _, raw := range paths {
-			path := strings.Trim(strings.Trim(raw, "\" \n[]"), "/")
-			if path != "" {
-				secretPath := "secret/eos/" + path
-				log.Info("Found Vault entry", zap.String("path", secretPath))
-				fmt.Printf(" - %s\n", secretPath)
+			entry := strings.Trim(strings.Trim(raw, "\" \n[]"), "/")
+			if entry != "" {
+				fullPath := "secret/eos/" + entry
+				log.Info("Found Vault entry", zap.String("path", fullPath))
+				fmt.Printf(" - %s\n", fullPath)
 				count++
 			}
 		}
 
-		log.Info("Vault secret list complete", zap.Int("count", count))
+		log.Info("Vault secrets query complete", zap.String("action", "list"), zap.String("status", "success"), zap.Int("count", count))
 		fmt.Printf("\n✅ %d entries found.\n", count)
 		return nil
 	}),
 }
+
+// cmd/inspect/vault.go (continuation)
 
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
@@ -80,42 +76,47 @@ var InspectVaultAgentCmd = &cobra.Command{
 	Long: `Checks whether the Vault Agent systemd service is running,
 validates the token at /run/eos/.vault-token, and attempts a test query.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		fmt.Println("🔍 Checking Vault Agent (eos) service status...")
+		log := zap.L().Named("vault-agent").With(zap.String("component", "vault-agent"))
 
-		// 1. Check if systemd service is running
+		fmt.Println("🔍 Checking Vault Agent (eos) service status...")
+		log.Info("Checking systemd service", zap.String("action", "check-systemd"))
+
 		status := exec.Command("systemctl", "is-active", "--quiet", "vault-agent-eos.service")
 		if err := status.Run(); err != nil {
 			fmt.Println("❌ Vault Agent service is NOT running.")
+			log.Warn("Vault Agent service inactive", zap.String("status", "inactive"))
 		} else {
 			fmt.Println("✅ Vault Agent service is active.")
+			log.Info("Vault Agent service is running", zap.String("status", "active"))
 		}
 
-		// 2. Check for the token file
 		tokenPath := "/run/eos/.vault-token"
+		log.Info("Checking for Vault token file", zap.String("action", "check-token"), zap.String("path", tokenPath))
+
 		if _, err := os.Stat(tokenPath); os.IsNotExist(err) {
 			fmt.Println("❌ Vault token file not found:", tokenPath)
+			log.Error("Vault token missing", zap.String("status", "missing"))
 			return nil
 		}
 		fmt.Println("✅ Vault token file exists at", tokenPath)
+		log.Info("Vault token found", zap.String("status", "exists"))
 
-		// 3. Try accessing Vault using the token
 		fmt.Println("📦 Running vault kv get secret/hello as eos...")
+		log.Info("Attempting test query", zap.String("action", "query"))
+
 		cmdTest := exec.Command("sudo", "-u", "eos", "vault", "kv", "get", "-format=json", "secret/hello")
 		cmdTest.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+tokenPath)
 		out, err := cmdTest.CombinedOutput()
 		if err != nil {
 			fmt.Println("❌ Vault test query failed:", err)
 			fmt.Println(string(out))
+			log.Error("Vault test query failed", zap.String("output", string(out)), zap.Error(err))
 		} else {
 			fmt.Println("✅ Vault responded successfully:")
 			fmt.Println(string(out))
+			log.Info("Vault test query succeeded", zap.String("status", "success"))
 		}
 
 		return nil
 	}),
-}
-
-func init() {
-	InspectVaultCmd.AddCommand(InspectVaultAgentCmd) // nested!
-	InspectCmd.AddCommand(InspectVaultCmd)           // top-level
 }
