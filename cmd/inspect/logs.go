@@ -8,7 +8,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "Inspect EOS logs (requires root or hera privileges)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !system.IsPrivileged() {
+		if !utils.IsPrivilegedUser() {
 			return errors.New("you must be root or the 'hera' user to view logs")
 		}
 

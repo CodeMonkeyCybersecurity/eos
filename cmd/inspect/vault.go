@@ -41,3 +41,7 @@ var InspectVaultCmd = &cobra.Command{
 		return nil
 	},
 }
+
+func init() {
+	InspectCmd.AddCommand(InspectVaultCmd)
+}
