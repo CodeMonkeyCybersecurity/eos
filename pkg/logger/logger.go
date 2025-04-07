@@ -9,19 +9,17 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 )
 
 var log *zap.Logger
 
 func GetLogFileWriter(logPath string) zapcore.WriteSyncer {
-    file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "⚠️ Could not open log file %s: %v\n", logPath, err)
-        return zapcore.AddSync(os.Stdout)
-    }
-    return zapcore.AddSync(file)
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "⚠️ Could not open log file %s: %v\n", logPath, err)
+		return zapcore.AddSync(os.Stdout)
+	}
+	return zapcore.AddSync(file)
 }
 
 func DefaultConfig() zap.Config {
@@ -170,33 +168,7 @@ func Sync() error {
 
 // ResolveLogPath determines the best default log file path based on the OS.
 func ResolveLogPath() string {
-	platform := platform.GetOSPlatform()
-	var paths []string
-
-	switch platform {
-	case "macos":
-		paths = []string{
-			filepath.Join(os.Getenv("HOME"), "Library/Logs/cyberMonkey/eos.log"),
-			"/tmp/cyberMonkey/eos.log",
-			"./eos.log",
-		}
-	case "linux":
-		paths = []string{
-			"/var/log/cyberMonkey/eos.log",
-			"/tmp/cyberMonkey/eos.log",
-			"./eos.log",
-		}
-	case "windows":
-		paths = []string{
-			filepath.Join(os.Getenv("ProgramData"), "cyberMonkey", "github.com/CodeMonkeyCybersecurity/eos.log"),
-			filepath.Join(os.Getenv("LOCALAPPDATA"), "cyberMonkey", "github.com/CodeMonkeyCybersecurity/eos.log"),
-			"./eos.log",
-		}
-	default:
-		paths = []string{"./eos.log"}
-	}
-
-	for _, path := range paths {
+	for _, path := range PlatformLogPaths() {
 		dir := filepath.Dir(path)
 		if err := os.MkdirAll(dir, 0700); err != nil {
 			continue
@@ -207,8 +179,6 @@ func ResolveLogPath() string {
 			return path
 		}
 	}
-
-	// If we get here, no candidate path worked.
 	return ""
 }
 

@@ -1,5 +1,3 @@
-// cmd/inspect/logs.go
-
 package inspect
 
 import (
@@ -8,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 )
@@ -20,16 +19,17 @@ var InspectLogsCmd = &cobra.Command{
 			return errors.New("you must be root or the 'hera' user to view logs")
 		}
 
-		logPaths := []string{
-			"/var/log/eos/eos.log",
-			"/var/log/eos/k3s-deploy.log",
-			"/var/log/eos/vault.log",
-		}
+		active := logger.ResolveLogPath()
+		paths := logger.PlatformLogPaths()
 
 		found := false
-		for _, path := range logPaths {
+		for _, path := range paths {
 			if _, err := os.Stat(path); err == nil {
-				fmt.Printf("\n📄 %s\n", path)
+				prefix := "📄"
+				if path == active {
+					prefix = "⭐"
+				}
+				fmt.Printf("\n%s %s\n", prefix, path)
 				content, _ := os.ReadFile(path)
 				fmt.Println(string(content))
 				found = true
@@ -37,7 +37,7 @@ var InspectLogsCmd = &cobra.Command{
 		}
 
 		if !found {
-			fmt.Println("⚠️ No Eos logs found in /var/log/eos/. Falling back to journalctl...")
+			fmt.Println("⚠️ No Eos logs found in common paths. Falling back to journalctl...")
 			cmd := exec.Command("journalctl", "-u", "eos", "--no-pager", "--since", "today")
 			out, err := cmd.CombinedOutput()
 			if err != nil {
