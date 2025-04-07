@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"time"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 
@@ -26,7 +27,7 @@ After starting, Vault is given a fixed wait period (5 seconds) before checking i
 
 If Vault is not initialized, it will be initialized (with 5 key shares and a threshold of 3) and then unsealed using the first three keys.`,
 
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
 		vault.SetVaultEnv()
 
@@ -42,10 +43,24 @@ If Vault is not initialized, it will be initialized (with 5 key shares and a thr
 		if osPlatform != "linux" {
 			log.Fatal("Vault deployment only supported on Linux")
 		}
+
 		distro := platform.DetectLinuxDistro()
 
 		// Install Vault using the appropriate package manager.
 		if distro == "debian" {
+			fmt.Println("Adding HashiCorp APT repository...")
+
+			aptRepoCmd := exec.Command("bash", "-c", `
+			curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+			echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
+			`)
+
+			aptRepoCmd.Stdout = os.Stdout
+			aptRepoCmd.Stderr = os.Stderr
+			if err := aptRepoCmd.Run(); err != nil {
+				log.Fatal("Failed to add HashiCorp APT repository", zap.Error(err))
+			}
+
 			fmt.Println("Installing HashiCorp Vault via apt...")
 			updateCmd := exec.Command("apt-get", "update")
 			updateCmd.Stdout = os.Stdout
@@ -114,7 +129,7 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 				zap.String("dir", "/opt/vault/data"),
 				zap.Error(err))
 		}
-		
+
 		configContent := fmt.Sprintf(`
 listener "tcp" {
 address     = "0.0.0.0:8179"
@@ -158,7 +173,8 @@ ui = true
 		time.Sleep(5 * time.Second)
 
 		// Additional logic to check Vault status, init/unseal, etc. can go here
-	},
+		return nil
+	}),
 }
 
 func init() {
