@@ -7,7 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+
 	"github.com/spf13/cobra"
 )
 
@@ -42,11 +42,6 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 
 		if err := delphi.PatchRolesMappingYML(cfg); err != nil {
 			return fmt.Errorf("failed to patch roles_mapping.yml: %w", err)
-		}
-
-		if flags.IsDryRun() {
-			fmt.Println("🧪 Dry run complete. No files were changed.")
-			return nil
 		}
 
 		if err := delphi.RunSecurityAdmin("config.yml"); err != nil {

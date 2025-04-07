@@ -19,11 +19,10 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/undo"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 
 	// Internal packages
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
@@ -37,7 +36,6 @@ var RootCmd = &cobra.Command{
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRunE executes before any subcommand.
 	PersistentPreRunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		flags.ParseDryRunAliases(cmd)
 		return nil
 	}),
 	// Default action if no subcommand is provided.
@@ -45,11 +43,6 @@ and reverse proxy configurations via Hecate.`,
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
 		return cmd.Help()
 	}),
-}
-
-func init() {
-	// Register global dry-run flags.
-	flags.AddDryRunFlags(RootCmd)
 }
 
 // RegisterCommands adds all subcommands to the root command.
@@ -65,7 +58,6 @@ func RegisterCommands() {
 		disable.DisableCmd,
 		enable.EnableCmd,
 		sync.SyncCmd,
-		undo.UndoCmd,
 	}
 	for _, cmd := range subCommands {
 		RootCmd.AddCommand(cmd)

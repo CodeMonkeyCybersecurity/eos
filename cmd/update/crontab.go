@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
@@ -58,15 +58,6 @@ func runCrontabUpdate(cmd *cobra.Command, args []string) error {
 
 	// Patch the crontab with the MAILTO variable.
 	updated := system.PatchMailto(current, email)
-
-	// If dry-run mode is active, display the updated crontab without applying changes.
-	if flags.IsDryRun() {
-		fmt.Println("🧪 Dry run mode: this is what your crontab would look like:")
-		fmt.Println("\n==============================")
-		fmt.Println(updated)
-		fmt.Println("==============================")
-		return nil
-	}
 
 	// Apply the updated crontab.
 	if err := system.SetCrontab(updated); err != nil {

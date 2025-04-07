@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 
@@ -78,10 +78,6 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 }
 
 func DownloadAndPlaceCert(fqdn string) error {
-	if flags.IsDryRun() {
-		fmt.Printf("🧪 Dry run: would fetch and store LDAP cert from %s\n", fqdn)
-		return nil
-	}
 
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(
 		`echo -n | openssl s_client -connect %s:636 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /etc/wazuh-indexer/opensearch-security/ldapcacert.pem`,
@@ -186,13 +182,6 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to re-encode config.yml: %w", err)
 	}
 
-	// 🧪 Dry run preview
-	if flags.IsDryRun() {
-		fmt.Println("🧪 Dry run: changes to config.yml would look like:")
-		fmt.Println(string(out))
-		return nil
-	}
-
 	// Backup
 	if err := os.WriteFile(backupPath, raw, 0644); err != nil {
 		return fmt.Errorf("failed to write backup of config.yml: %w", err)
@@ -246,13 +235,6 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 	out, err := yaml.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("failed to marshal roles_mapping.yml: %w", err)
-	}
-
-	// 🧪 Dry run preview
-	if flags.IsDryRun() {
-		fmt.Println("🧪 Dry run: changes to roles_mapping.yml would look like:")
-		fmt.Println(string(out))
-		return nil
 	}
 
 	// Backup

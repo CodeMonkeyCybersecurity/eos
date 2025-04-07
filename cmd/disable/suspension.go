@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,12 +24,6 @@ var disableSuspensionCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Disabling system suspension and hibernation...")
-
-		if flags.IsDryRun() {
-			log.Info("Dry-run mode: skipping system suspension disable")
-			fmt.Println("💡 [dry-run] Suspension/hibernation *would* be disabled.")
-			return nil
-		}
 
 		if runtime.GOOS != "linux" {
 			log.Warn("System suspension disabling is only supported on Linux.")
@@ -60,7 +54,6 @@ var disableSuspensionCmd = &cobra.Command{
 
 func init() {
 	DisableCmd.AddCommand(disableSuspensionCmd)
-	flags.AddDryRunFlags(disableSuspensionCmd)
 }
 
 // disableSystemdTargets disables suspend and hibernate targets

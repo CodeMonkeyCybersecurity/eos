@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/flags"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,12 +20,6 @@ func Wrap(runE func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Co
 		startBanner := fmt.Sprintf("───────[ START %s @ %s ]───────", cmdPath, timestamp)
 		fmt.Println("\n" + startBanner)
 		log.Info("Command started", zap.String("command", cmdPath), zap.String("time", timestamp))
-
-		// DRY RUN ENFORCEMENT
-		if !flags.IsLiveRun() {
-			fmt.Println("⚠️  Dry run mode: this command will not apply changes unless --live-run is set.")
-			log.Warn("Dry run mode: this command will not apply changes unless --live-run is set.")
-		}
 
 		err := runE(cmd, args)
 
