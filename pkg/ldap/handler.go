@@ -21,11 +21,11 @@ func InteractiveLDAPQuery() error {
 	if err != nil {
 		return err
 	}
-	baseDN := interaction.PromptInput("Search base DN", "e.g. ou=Users,dc=domain,dc=com (leave blank to search entire tree)")
+	fmt.Println("Search base DN (e.g. ou=Users,dc=domain,dc=com). Leave blank to search entire tree.")
+	baseDN := interaction.PromptInput("Search base DN", "")
 	if baseDN == "" {
 		fmt.Println("⚠️  No base DN provided — defaulting to root (searching entire tree).")
 		fmt.Println("   This may return a large number of entries and be slower than expected.")
-		baseDN = ""
 	}
 
 	filter := interaction.PromptInput("Search filter", "(objectClass=*)")
