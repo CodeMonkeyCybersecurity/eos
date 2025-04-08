@@ -1,4 +1,4 @@
-// pkg/schema/meta.go
+/* pkg/schema/meta.go */
 package schema
 
 type FieldMeta struct {

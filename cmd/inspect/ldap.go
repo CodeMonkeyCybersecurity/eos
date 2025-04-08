@@ -25,4 +25,5 @@ func init() {
 
 	// Core LDAP command
 	InspectCmd.AddCommand(InspectLDAPCmd)
+	ldap.InitFlags(InspectLDAPCmd)
 }
