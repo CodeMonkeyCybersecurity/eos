@@ -35,10 +35,26 @@ var CreateVaultCmd = &cobra.Command{
 		switch distro {
 		case "debian":
 			log.Info("Adding HashiCorp APT repository")
-			aptCmd := exec.Command("bash", "-c", `
-curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
-echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/hashicorp.list
-`)
+			keyringPath := "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
+			listPath := "/etc/apt/sources.list.d/hashicorp.list"
+
+			// Clean up if keyring already exists to avoid interactive overwrite prompt
+			if _, err := os.Stat(keyringPath); err == nil {
+				log.Warn("Vault APT keyring already exists, removing to prevent prompt", zap.String("path", keyringPath))
+				if err := os.Remove(keyringPath); err != nil {
+					log.Fatal("Failed to remove existing APT keyring", zap.Error(err))
+				}
+			}
+
+			// Clean up the repo list file as well if needed
+			if _, err := os.Stat(listPath); err == nil {
+				log.Warn("Vault APT source list already exists, removing to avoid duplicate", zap.String("path", listPath))
+				if err := os.Remove(listPath); err != nil {
+					log.Fatal("Failed to remove existing source list", zap.Error(err))
+				}
+			}
+
+			aptCmd := exec.Command("bash", "-c", `curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list`)
 			aptCmd.Stdout = os.Stdout
 			aptCmd.Stderr = os.Stderr
 			if err := aptCmd.Run(); err != nil {

@@ -13,6 +13,32 @@ import (
 
 var purge bool // <-- global flag for --purge
 
+func purgeVaultRepoArtifacts(distro string) {
+	log := zap.L()
+
+	switch distro {
+	case "debian":
+		paths := []string{
+			"/usr/share/keyrings/hashicorp-archive-keyring.gpg",
+			"/etc/apt/sources.list.d/hashicorp.list",
+		}
+		for _, path := range paths {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				log.Warn("Failed to remove APT repo artifact", zap.String("path", path), zap.Error(err))
+			} else {
+				log.Info("Removed APT repo artifact", zap.String("path", path))
+			}
+		}
+	case "rhel":
+		repoFile := "/etc/yum.repos.d/hashicorp.repo"
+		if err := os.Remove(repoFile); err != nil && !os.IsNotExist(err) {
+			log.Warn("Failed to remove YUM repo file", zap.String("path", repoFile), zap.Error(err))
+		} else {
+			log.Info("Removed YUM repo file", zap.String("path", repoFile))
+		}
+	}
+}
+
 // vaultDeleteCmd represents the "delete vault" command.
 var DeleteVaultCmd = &cobra.Command{
 	Use:   "vault",
@@ -71,6 +97,7 @@ var DeleteVaultCmd = &cobra.Command{
 
 		if purge {
 			log.Info("Purging Vault configuration, data, and logs...")
+
 			configDirs := []string{
 				"/etc/vault.d",
 				"/opt/vault",
@@ -78,6 +105,7 @@ var DeleteVaultCmd = &cobra.Command{
 				"/var/log/vault.log",
 				"/var/snap/vault",
 			}
+
 			for _, dir := range configDirs {
 				if err := os.RemoveAll(dir); err != nil {
 					log.Warn("Failed to remove", zap.String("path", dir), zap.Error(err))
@@ -85,6 +113,9 @@ var DeleteVaultCmd = &cobra.Command{
 					log.Info("Removed", zap.String("path", dir))
 				}
 			}
+
+			// 🧼 Repo + keyring cleanup
+			purgeVaultRepoArtifacts(distro)
 		} else {
 			log.Info("Purge flag not set; skipping configuration and data cleanup.")
 		}
