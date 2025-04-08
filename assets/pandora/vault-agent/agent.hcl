@@ -1,25 +1,17 @@
-pid_file = "/run/vault/agent.pid"
-
 auto_auth {
-  method "userpass" {
-    mount_path = "auth/userpass"
+  method {
+    type = "approle"
     config = {
-      username = "eos"
-      password_file = "/etc/vault-agent/password.txt"
+      role_id_file_path = "/etc/vault-agent/role_id"
+      secret_id_file_path = "/etc/vault-agent/secret_id"
+      remove_secret_id_file_after_reading = false
     }
   }
 
-  sink "file" {
+  sink {
+    type = "file"
     config = {
-      path = "/run/vault/.vault-token"
+      path = "/etc/vault-agent/token"
     }
   }
-}
-
-vault {
-  address = "http://vault:8200"
-}
-
-cache {
-  use_auto_auth_token = true
 }
