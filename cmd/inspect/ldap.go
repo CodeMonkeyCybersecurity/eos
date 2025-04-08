@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var forceAuth bool
+
 var InspectLDAPCmd = &cobra.Command{
 	Use:     "ldap",
 	Aliases: []string{"directory"},
@@ -88,20 +90,22 @@ var InspectLDAPDebugCmd = &cobra.Command{
 		log.Info("Running anonymous ldapsearch probe")
 
 		// Step 1: Anonymous probe
-		if err := ldap.RunLDAPProbe(); err != nil {
-			log.Warn("Anonymous LDAP probe failed, trying with credentials", zap.Error(err))
-
-			// Step 2: Prompt for credentials
-			bindDN := interaction.PromptInput("Enter bind DN (e.g. cn=admin,dc=domain,dc=com):", "")
+		err := ldap.RunLDAPProbe()
+		if err != nil || forceAuth {
 			if err != nil {
-				return err
+				log.Warn("Anonymous LDAP probe failed", zap.Error(err))
+			} else {
+				log.Info("Anonymous probe succeeded but --force-auth was set; prompting for credentials")
 			}
+
+			// Prompt for credentials
+			bindDN := interaction.PromptInput("Enter bind DN (e.g. cn=admin,dc=domain,dc=com):", "")
 			bindPW, err := interaction.PromptPassword("Enter LDAP password:")
 			if err != nil {
 				return err
 			}
 
-			// Step 3: Authenticated probe
+			// Authenticated probe
 			if err := ldap.RunLDAPAuthProbe(bindDN, bindPW); err != nil {
 				log.Error("Authenticated LDAP search failed", zap.Error(err))
 				return err
@@ -130,5 +134,5 @@ func init() {
 	InspectLDAPCmd.AddCommand(InspectLDAPUserCmd)
 	InspectLDAPCmd.AddCommand(InspectLDAPGroupCmd)
 	InspectLDAPCmd.AddCommand(InspectLDAPDebugCmd)
-
+	InspectLDAPDebugCmd.Flags().BoolVar(&forceAuth, "force-auth", false, "Force LDAP authentication even if anonymous search works")
 }
