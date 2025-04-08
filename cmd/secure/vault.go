@@ -27,7 +27,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		vault.SetVaultEnv()
 
 		initRes, creds, storedHashes, hashedRoot := vault.LoadVaultSecureData()
-		vault.ConfirmVaultSecrets(storedHashes, hashedRoot)
+		vault.CheckVaultSecrets(storedHashes, hashedRoot)
 		applyAdminPolicy(creds)
 
 		vault.RevokeRootToken(initRes.RootToken)

@@ -9,9 +9,9 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
@@ -56,7 +56,7 @@ func CreateEosUser(auto bool, loginShell bool) (string, error) {
 
 	var password string
 	if auto {
-		pw, err := utils.GeneratePassword(20)
+		pw, err := crypto.GeneratePassword(20)
 		if err != nil {
 			return "", err
 		}
@@ -68,7 +68,7 @@ func CreateEosUser(auto bool, loginShell bool) (string, error) {
 			pw1, _ := reader.ReadString('\n')
 			pw1 = strings.TrimSpace(pw1)
 
-			if !utils.IsPasswordStrong(pw1) {
+			if !crypto.IsPasswordStrong(pw1) {
 				fmt.Println("❌ Password is too weak. Please use at least 12 characters, a mix of upper/lowercase, number, and special character.")
 				continue
 			}

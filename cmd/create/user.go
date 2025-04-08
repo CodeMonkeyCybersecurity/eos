@@ -9,12 +9,12 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -91,7 +91,7 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 	// Determine the password.
 	var password string
 	if auto {
-		pw, err := utils.GeneratePassword(20)
+		pw, err := crypto.GeneratePassword(20)
 		if err != nil {
 			return err
 		}

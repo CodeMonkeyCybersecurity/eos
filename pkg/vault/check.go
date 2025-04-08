@@ -7,12 +7,14 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"go.uber.org/zap"
 )
 
 // CheckVaultProcesses logs if any Vault-related processes are still running.
-func CheckVaultProcesses(log *zap.Logger) {
+func checkVaultProcesses(log *zap.Logger) {
 	output, err := utils.GrepProcess("vault")
 	if err != nil {
 		log.Warn("Failed to check Vault processes", zap.Error(err))
@@ -41,22 +43,32 @@ func isInitialized() bool {
 	return err == nil && strings.Contains(string(out), `"initialized": true`)
 }
 
-func confirmVaultSecrets(storedHashes []string, hashedRoot string) {
+func checkVaultSecrets(storedHashes []string, hashedRoot string) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
 		fmt.Println("Please re-enter three unique unseal keys (any order) and the root token:")
 
-		keys := readNInputs(reader, "Enter Unseal Key", 3)
-		root := readInput(reader, "Enter Root Token")
+		keys, err := interaction.PromptInputs(reader, "Enter Unseal Key", 3)
+		if err != nil {
+			fmt.Printf("❌ Error reading unseal keys: %v\n", err)
+			continue
+		}
 
-		if !utils.AllUnique(keys) {
+		rootInput, err := interaction.PromptInputs(reader, "Enter Root Token", 1)
+		if err != nil || len(rootInput) == 0 {
+			fmt.Printf("❌ Error reading root token: %v\n", err)
+			continue
+		}
+		root := rootInput[0]
+
+		if !crypto.AllUnique(keys) {
 			fmt.Println("The unseal keys must be unique. Please try again.")
 			continue
 		}
 
-		hashedInputs := utils.HashStrings(keys)
-		if !utils.AllHashesPresent(hashedInputs, storedHashes) || utils.HashString(root) != hashedRoot {
+		hashedInputs := crypto.HashStrings(keys)
+		if !crypto.AllHashesPresent(hashedInputs, storedHashes) || crypto.HashString(root) != hashedRoot {
 			fmt.Println("Oops, one or more values are incorrect. Please try again.")
 			continue
 		}

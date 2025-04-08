@@ -1,10 +1,10 @@
-// pkg/utils/passwd.go
+// pkg/crypto/passwd.go
 
-package utils
+package crypto
 
 import "unicode"
 
-func IsPasswordStrong(password string) bool {
+func isPasswordStrong(password string) bool {
 	var (
 		hasMinLen  = false
 		hasUpper   = false

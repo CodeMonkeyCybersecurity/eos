@@ -8,12 +8,12 @@ import "fmt"
 
 // RememberValue prompts the user to either reuse an existing value or enter a new one.
 // It returns the chosen value.
-func RememberValue(field, prompt, defaultValue, currentValue string) string {
+func rememberValue(field, prompt, defaultValue, currentValue string) string {
 	if currentValue != "" {
-		choice := PromptSelect(fmt.Sprintf("Use stored value for %s (%s)?", field, currentValue), []string{"Yes", "No"})
+		choice := promptSelect(fmt.Sprintf("Use stored value for %s (%s)?", field, currentValue), []string{"Yes", "No"})
 		if choice == "Yes" {
 			return currentValue
 		}
 	}
-	return PromptInput(prompt, defaultValue)
+	return promptInput(prompt, defaultValue)
 }

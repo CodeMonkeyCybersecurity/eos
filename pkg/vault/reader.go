@@ -1,18 +1,16 @@
 package vault
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
@@ -118,26 +116,8 @@ func loadVaultSecureData() (initResult, UserpassCreds, []string, string) {
 	}
 
 	// Prehash values
-	hashedKeys := utils.HashStrings(initRes.UnsealKeysB64)
-	hashedRoot := utils.HashString(initRes.RootToken)
+	hashedKeys := crypto.HashStrings(initRes.UnsealKeysB64)
+	hashedRoot := crypto.HashString(initRes.RootToken)
 
 	return initRes, creds, hashedKeys, hashedRoot
-}
-
-//
-// 🧑‍💻 Interactive Helpers
-//
-
-func readInput(reader *bufio.Reader, label string) string {
-	fmt.Print(label + ": ")
-	text, _ := reader.ReadString('\n')
-	return strings.TrimSpace(text)
-}
-
-func readNInputs(reader *bufio.Reader, label string, n int) []string {
-	inputs := make([]string, n)
-	for i := 0; i < n; i++ {
-		inputs[i] = readInput(reader, fmt.Sprintf("%s %d", label, i+1))
-	}
-	return inputs
 }

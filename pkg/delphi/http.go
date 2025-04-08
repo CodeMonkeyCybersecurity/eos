@@ -34,7 +34,7 @@ func GetJSON(url string, headers map[string]string) (map[string]interface{}, err
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("Delphi API returned %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("delphi API returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result map[string]interface{}

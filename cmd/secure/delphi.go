@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -98,7 +99,7 @@ func runFallbackPasswordRotation() (string, error) {
 	}
 	log.Info("Found wazuh user ID", zap.String("userID", userID))
 
-	newWazuhPass, _ := utils.GeneratePassword(20)
+	newWazuhPass, _ := crypto.GeneratePassword(20)
 	if err := delphi.UpdateUserPassword(&cfg, userID, newWazuhPass); err != nil {
 		return "", fmt.Errorf("fallback: failed to update wazuh password: %w", err)
 	}

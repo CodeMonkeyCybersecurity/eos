@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -59,7 +60,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Generate a strong random alphanumeric password (20 characters)
 		log.Info("Generating strong random password")
-		password, err := utils.GeneratePassword(20)
+		password, err := crypto.GeneratePassword(20)
 		if err != nil {
 			log.Fatal("Failed to generate password", zap.Error(err))
 		}

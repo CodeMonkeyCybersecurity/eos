@@ -12,24 +12,8 @@ import (
 	"golang.org/x/term"
 )
 
-// PromptInput displays a prompt and reads user input.
-func PromptInput(prompt, defaultVal string) string {
-	reader := bufio.NewReader(os.Stdin)
-	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", prompt, defaultVal)
-	} else {
-		fmt.Printf("%s: ", prompt)
-	}
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return defaultVal
-	}
-	return input
-}
-
 // promptPassword displays a prompt and reads a password without echoing.
-func PromptPassword(prompt string) (string, error) {
+func promptPassword(prompt string) (string, error) {
 	fmt.Printf("%s: ", prompt)
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
@@ -43,7 +27,7 @@ func PromptPassword(prompt string) (string, error) {
 
 // PromptRequired prompts the user for input and returns the trimmed value.
 // It keeps asking until a non-empty string is entered.
-func PromptRequired(label string) string {
+func promptRequired(label string) string {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("%s: ", label)
@@ -57,7 +41,7 @@ func PromptRequired(label string) string {
 }
 
 // PromptWithDefault prompts the user and returns their response or a default value if empty.
-func PromptWithDefault(label, defaultValue string) string {
+func promptWithDefault(label, defaultValue string) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s [%s]: ", label, defaultValue)
 	text, _ := reader.ReadString('\n')

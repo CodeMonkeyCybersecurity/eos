@@ -1,4 +1,6 @@
-package utils
+/* pkg/crypto/handler.go */
+
+package crypto
 
 import (
 	"crypto/rand"
@@ -14,22 +16,22 @@ import (
 // ----------------------------
 
 // HashString returns the SHA256 hash of a string as hex.
-func HashString(s string) string {
+func hashString(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
 
 // HashStrings returns SHA256 hashes of each string in the input slice.
-func HashStrings(inputs []string) []string {
+func hashStrings(inputs []string) []string {
 	out := make([]string, len(inputs))
 	for i, s := range inputs {
-		out[i] = HashString(s)
+		out[i] = hashString(s)
 	}
 	return out
 }
 
 // AllUnique reports whether all strings in the slice are unique.
-func AllUnique(items []string) bool {
+func allUnique(items []string) bool {
 	seen := make(map[string]struct{}, len(items))
 	for _, item := range items {
 		if _, exists := seen[item]; exists {
@@ -41,7 +43,7 @@ func AllUnique(items []string) bool {
 }
 
 // AllHashesPresent checks that each hash in `hashes` exists in `known`.
-func AllHashesPresent(hashes, known []string) bool {
+func allHashesPresent(hashes, known []string) bool {
 	for _, h := range hashes {
 		found := false
 		for _, k := range known {
@@ -62,7 +64,7 @@ func AllHashesPresent(hashes, known []string) bool {
 // ----------------------------
 
 // GeneratePassword creates a strong random password with at least 1 of each char class.
-func GeneratePassword(length int) (string, error) {
+func generatePassword(length int) (string, error) {
 	if length < 4 {
 		return "", fmt.Errorf("password length must be at least 4")
 	}
@@ -125,7 +127,7 @@ func shuffle(b []byte) error {
 // ----------------------------
 
 // InjectSecretsFromPlaceholders replaces "changeme" and "changeme[1-9]" with passwords.
-func InjectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, error) {
+func injectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, error) {
 	content := string(data)
 	replacements := make(map[string]string)
 
@@ -135,7 +137,7 @@ func InjectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, erro
 			placeholder = fmt.Sprintf("changeme%d", i)
 		}
 
-		pw, err := GeneratePassword(20)
+		pw, err := generatePassword(20)
 		if err != nil {
 			return nil, nil, fmt.Errorf("generate password for %s: %w", placeholder, err)
 		}

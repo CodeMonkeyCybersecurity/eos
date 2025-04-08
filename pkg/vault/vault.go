@@ -19,11 +19,10 @@ var (
 	SetVaultEnv           = setVaultEnv
 	Purge                 = purge
 	WriteFallbackSecrets  = writeFallbackSecrets
-	ReadInput             = readInput
-	ReadNInputs           = readNInputs
-	ConfirmVaultSecrets   = confirmVaultSecrets
+	CheckVaultSecrets     = checkVaultSecrets
 	RevokeRootToken       = revokeRootToken
 	CleanupInitFile       = cleanupInitFile
 	LoadVaultSecureData   = loadVaultSecureData
 	PrintNextSteps        = printNextSteps
+	CheckVaultProcesses   = checkVaultProcesses
 )
