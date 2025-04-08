@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 // initResult is the JSON structure returned by "vault operator init -format=json".
@@ -56,6 +57,25 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		data, err := os.ReadFile("vault_init.json")
 		if err != nil {
 			log.Fatal("Failed to read vault_init.json", zap.Error(err))
+		}
+
+		type userpassCreds struct {
+			Username string `yaml:"username"`
+			Password string `yaml:"password"`
+		}
+
+		yamlData, err := os.ReadFile("/var/lib/eos/secrets/vault-userpass.yaml")
+		if err != nil {
+			log.Fatal("Failed to read Vault userpass credentials", zap.Error(err))
+		}
+
+		var creds userpassCreds
+		if err := yaml.Unmarshal(yamlData, &creds); err != nil {
+			log.Fatal("Failed to parse Vault userpass credentials", zap.Error(err))
+		}
+
+		if creds.Password == "" {
+			log.Fatal("Parsed password is empty — aborting.")
 		}
 
 		var initRes initResult
@@ -159,7 +179,13 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		// Now update the admin user to use the new policy.
 		fmt.Println("Updating admin user to have full privileges using 'admin-full' policy...")
-		updateCmd := exec.Command("vault", "write", "auth/userpass/users/admin", "policies=admin-full")
+
+		updateCmd := exec.Command("vault", "write",
+			"auth/userpass/users/admin",
+			"policies=admin-full",
+			fmt.Sprintf("password=%s", creds.Password),
+		)
+
 		updateOut, err := updateCmd.CombinedOutput()
 		if err != nil {
 			fmt.Println("Vault returned:")
