@@ -1,4 +1,4 @@
-// pkg/ldap/inspect.go
+// pkg/ldap/read.go
 
 package ldap
 
@@ -7,8 +7,8 @@ import (
 )
 
 // PrintGroup returns detailed info for a single group by CN
-func PrintGroup(cn string) error {
-	group, err := GetGroupByCN(cn)
+func printGroup(cn string) error {
+	group, err := getGroupByCN(cn)
 	if err != nil {
 		return fmt.Errorf("failed to get group: %w", err)
 	}
@@ -20,8 +20,8 @@ func PrintGroup(cn string) error {
 }
 
 // PrintUser returns detailed info for a single user by UID
-func PrintUser(uid string) error {
-	user, err := GetUserByUID(uid)
+func printUser(uid string) error {
+	user, err := getUserByUID(uid)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}

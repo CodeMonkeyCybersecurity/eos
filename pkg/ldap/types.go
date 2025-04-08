@@ -1,32 +1,36 @@
-// pkg/ldap/types.go
+/* pkg/ldap/types.go */
+
 package ldap
 
+import "github.com/CodeMonkeyCybersecurity/eos/pkg/schema"
+
 type LDAPConfig struct {
-	FQDN         string `yaml:"fqdn"`    // e.g. ldap.cybermonkey.dev
-	Port         int    `yaml:"port"`    // default: 389 or 636
-	UseTLS       bool   `yaml:"use_tls"` // enable StartTLS or LDAPS
+	FQDN         string `yaml:"fqdn"`
+	Port         int    `yaml:"port"`
+	UseTLS       bool   `yaml:"use_tls"`
 	BindDN       string `yaml:"bind_dn"`
 	Password     string `yaml:"password"`
-	UserBase     string `yaml:"user_base"`     // e.g. ou=Users,dc=cybermonkey,dc=dev
-	RoleBase     string `yaml:"role_base"`     // e.g. ou=Groups,dc=cybermonkey,dc=dev
-	AdminRole    string `yaml:"admin_role"`    // e.g. AdminRole
-	ReadonlyRole string `yaml:"readonly_role"` // e.g. ReadonlyRole
+	UserBase     string `yaml:"user_base"`
+	RoleBase     string `yaml:"role_base"`
+	AdminRole    string `yaml:"admin_role"`
+	ReadonlyRole string `yaml:"readonly_role"`
 }
 
-// LDAPUser represents an LDAP user
 type LDAPUser struct {
-	UID string
-	DN  string
+	UID  string
+	CN   string
+	Mail string
+	DN   string
 }
 
-// LDAPGroup represents an LDAP group
 type LDAPGroup struct {
 	CN      string
 	DN      string
 	Members []string
 }
 
-// pkg/ldap/types.go
+var defaultBaseDN = "dc=domain,dc=com"
+
 func DefaultLDAPConfig() *LDAPConfig {
 	return &LDAPConfig{
 		FQDN:         "ldap.domain.com",
@@ -39,4 +43,49 @@ func DefaultLDAPConfig() *LDAPConfig {
 		AdminRole:    "AdminRole",
 		ReadonlyRole: "ReadonlyRole",
 	}
+}
+
+var LDAPFieldMeta = map[string]schema.FieldMeta{
+	"FQDN": {
+		Label:     "FQDN",
+		Help:      "FQDN of your LDAP server",
+		Required:  true,
+		Sensitive: false,
+	},
+	"BindDN": {
+		Label:     "BindDN",
+		Help:      "Bind DN",
+		Required:  true,
+		Sensitive: false,
+	},
+	"Password": {
+		Label:     "Password",
+		Help:      "Bind password",
+		Required:  true,
+		Sensitive: true,
+	},
+	"UserBase": {
+		Label:     "UserBase",
+		Help:      "User base DN",
+		Required:  true,
+		Sensitive: false,
+	},
+	"RoleBase": {
+		Label:     "RoleBase",
+		Help:      "Role base DN",
+		Required:  true,
+		Sensitive: false,
+	},
+	"AdminRole": {
+		Label:     "AdminRole",
+		Help:      "Admin group name",
+		Required:  false,
+		Sensitive: false,
+	},
+	"ReadonlyRole": {
+		Label:     "ReadonlyRole",
+		Help:      "Readonly group name",
+		Required:  false,
+		Sensitive: false,
+	},
 }

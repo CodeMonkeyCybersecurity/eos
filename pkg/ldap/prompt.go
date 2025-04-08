@@ -1,5 +1,3 @@
-// pkg/ldap/prompt.go
-
 package ldap
 
 import (
@@ -10,31 +8,26 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 )
 
-func PromptLDAPDetails() (*LDAPConfig, error) {
+// PromptLDAPDetails interactively builds an LDAPConfig using field metadata.
+func promptLDAPDetails() (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
-	_ = storage.LoadFromVault(consts.LDAPVaultPath, cfg) // best-effort
+	_ = storage.LoadFromVault(consts.LDAPVaultPath, cfg) // best-effort prefill
 
-	if cfg.FQDN == "" {
-		cfg.FQDN = interaction.PromptInput("FQDN", "FQDN of your LDAP server")
-	}
-	if cfg.BindDN == "" {
-		cfg.BindDN = interaction.PromptInput("BindDN", "Bind DN")
-	}
-	if cfg.Password == "" {
-		var err error
-		cfg.Password, err = interaction.PromptPassword("Bind password")
-		if err != nil {
-			return nil, err
+	for fieldName, meta := range LDAPFieldMeta {
+		val := getLDAPField(cfg, fieldName)
+
+		if val == "" || meta.Required {
+			if meta.Sensitive {
+				secret, err := interaction.PromptPassword(meta.Label)
+				if err != nil {
+					return nil, err
+				}
+				val = secret
+			} else {
+				val = interaction.PromptInput(meta.Label, meta.Help)
+			}
+			setLDAPField(cfg, fieldName, val)
 		}
-	}
-
-	cfg.UserBase = interaction.PromptInput("UserBase", "User base DN")
-	cfg.RoleBase = interaction.PromptInput("RoleBase", "Role base DN")
-	cfg.AdminRole = interaction.PromptInput("AdminRole", "Admin group name")
-	cfg.ReadonlyRole = interaction.PromptInput("ReadonlyRole", "Readonly group name")
-
-	if cfg.FQDN == "" || cfg.BindDN == "" || cfg.Password == "" || cfg.UserBase == "" || cfg.RoleBase == "" {
-		return nil, fmt.Errorf("missing required LDAP fields")
 	}
 
 	if err := storage.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
@@ -42,4 +35,44 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	}
 
 	return cfg, nil
+}
+
+func getLDAPField(cfg *LDAPConfig, field string) string {
+	switch field {
+	case "FQDN":
+		return cfg.FQDN
+	case "BindDN":
+		return cfg.BindDN
+	case "Password":
+		return cfg.Password
+	case "UserBase":
+		return cfg.UserBase
+	case "RoleBase":
+		return cfg.RoleBase
+	case "AdminRole":
+		return cfg.AdminRole
+	case "ReadonlyRole":
+		return cfg.ReadonlyRole
+	default:
+		return ""
+	}
+}
+
+func setLDAPField(cfg *LDAPConfig, field, value string) {
+	switch field {
+	case "FQDN":
+		cfg.FQDN = value
+	case "BindDN":
+		cfg.BindDN = value
+	case "Password":
+		cfg.Password = value
+	case "UserBase":
+		cfg.UserBase = value
+	case "RoleBase":
+		cfg.RoleBase = value
+	case "AdminRole":
+		cfg.AdminRole = value
+	case "ReadonlyRole":
+		cfg.ReadonlyRole = value
+	}
 }
