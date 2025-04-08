@@ -33,7 +33,7 @@ func InteractiveLDAPQuery() error {
 	baseDN := interaction.PromptInput("Search base DN", "")
 	if baseDN == "" {
 		fmt.Println("⚠️  No base DN provided — defaulting to root (searching entire tree).")
-		fmt.Println("   This may return a large number of entries and be slower than expected.")
+		fmt.Println("⚠️  This may return a large number of entries and be slower than expected.")
 		baseDN = `""` // 👈 Make sure ldapsearch gets -b ""
 	}
 
