@@ -1,0 +1,16 @@
+# /etc/systemd/system/vault-stack.service
+[Unit]
+Description=Vault + Agent + Nginx Stack
+Requires=docker.service
+After=docker.service
+
+[Service]
+WorkingDirectory=/opt/eos/compose/vault
+ExecStart=/usr/bin/docker-compose -f docker-compose.production.yaml up -d
+ExecStop=/usr/bin/docker-compose -f docker-compose.production.yaml down
+Restart=always
+TimeoutStartSec=0
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
