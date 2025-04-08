@@ -12,6 +12,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -33,15 +34,11 @@ full (root-level) privileges. Finally, it deletes the stored initialization file
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 
-		hostname := utils.GetInternalHostname()
-		vaultAddr := fmt.Sprintf("http://%s:8179", hostname)
-		os.Setenv("VAULT_ADDR", vaultAddr)
-		fmt.Printf("VAULT_ADDR is set to %s\n", vaultAddr)
+		vault.SetVaultEnv()
 
-		// 0. Check for root privileges.
-		if os.Geteuid() != 0 {
-			fmt.Println("This command must be run with sudo or as root.")
-			return nil
+		// 0. Ensure eos system user exists
+		if err := eos.EnsureEOSSystemUser(); err != nil {
+			log.Fatal("Failed to ensure eos system user", zap.Error(err))
 		}
 
 		fmt.Println("Secure Vault setup in progress...")
@@ -76,6 +73,11 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		if creds.Password == "" {
 			log.Fatal("Parsed password is empty — aborting.")
+		}
+
+		// 0b. Enable Vault auth methods and create eos user
+		if err := eos.EnableVaultAuthMethods(creds.Password); err != nil {
+			log.Fatal("Failed to configure Vault auth methods", zap.Error(err))
 		}
 
 		var initRes initResult
