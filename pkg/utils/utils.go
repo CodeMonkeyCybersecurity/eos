@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+var (
+	GrepProcess = grepProcess
+)
+
 //
 //---------------------------- DEPLOY COMMANDS ---------------------------- //
 //

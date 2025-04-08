@@ -1,3 +1,5 @@
+/* pkg/vault/reader.go */
+
 package vault
 
 import (
@@ -6,6 +8,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
+
+const fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
 
 // vaultPath constructs the Vault KV path like: secret/eos/<name>/config
 func vaultPath(name string) string {

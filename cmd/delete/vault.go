@@ -7,37 +7,12 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
 var purge bool // <-- global flag for --purge
-
-func purgeVaultRepoArtifacts(distro string) {
-	log := zap.L()
-
-	switch distro {
-	case "debian":
-		paths := []string{
-			"/usr/share/keyrings/hashicorp-archive-keyring.gpg",
-			"/etc/apt/sources.list.d/hashicorp.list",
-		}
-		for _, path := range paths {
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				log.Warn("Failed to remove APT repo artifact", zap.String("path", path), zap.Error(err))
-			} else {
-				log.Info("Removed APT repo artifact", zap.String("path", path))
-			}
-		}
-	case "rhel":
-		repoFile := "/etc/yum.repos.d/hashicorp.repo"
-		if err := os.Remove(repoFile); err != nil && !os.IsNotExist(err) {
-			log.Warn("Failed to remove YUM repo file", zap.String("path", repoFile), zap.Error(err))
-		} else {
-			log.Info("Removed YUM repo file", zap.String("path", repoFile))
-		}
-	}
-}
 
 // vaultDeleteCmd represents the "delete vault" command.
 var DeleteVaultCmd = &cobra.Command{
@@ -115,10 +90,12 @@ var DeleteVaultCmd = &cobra.Command{
 			}
 
 			// 🧼 Repo + keyring cleanup
-			purgeVaultRepoArtifacts(distro)
+			vault.Purge(distro)
 		} else {
 			log.Info("Purge flag not set; skipping configuration and data cleanup.")
 		}
+
+		vault.CheckVaultProcesses(log)
 
 		log.Info("Vault deletion complete.")
 		return nil

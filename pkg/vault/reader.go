@@ -1,3 +1,5 @@
+/* pkg/vault/reader.go */
+
 package vault
 
 import (
@@ -10,8 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"gopkg.in/yaml.v3"
 )
-
-const fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
 
 // Load retrieves a struct from Vault or fallback if Vault is unavailable.
 func load(name string, out any) error {

@@ -3,7 +3,7 @@ package vault
 
 // rememberLDAPField prompts for a remembered value stored under the "ldap" path.
 func rememberLDAPField(key, prompt, def string) (string, error) {
-	return rememberedPrompt("ldap", key, prompt, def)
+	return remember("ldap", key, prompt, def)
 }
 
 // LDAP field prompts

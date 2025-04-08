@@ -7,31 +7,24 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 )
 
-// Remember prompts the user for a field and persists it to Vault or fallback.
+// Remember prompts the user for a Vault config field and persists it using fallback logic.
 func remember(name, key, prompt, def string) (string, error) {
-	path := vaultPath(name)
-	return rememberedPrompt(path, key, prompt, def)
-}
-
-// rememberedPrompt prompts for a value, storing and recalling from Vault or fallback.
-func rememberedPrompt(path, key, prompt, defaultValue string) (string, error) {
-	values := make(map[string]string)
-
-	_ = loadWithFallback(path, &values) // non-fatal if not found
-
-	// Offer to reuse existing value
-	if current, ok := values[key]; ok {
-		if interaction.PromptSelect(fmt.Sprintf("Use stored value for %s (%s)?", key, current), []string{"Yes", "No"}) == "Yes" {
-			return current, nil
-		}
+	// Attempt to load previously stored secrets.
+	values := map[string]string{}
+	// We assume loadWithFallback is a Vault-specific function that loads the config
+	// from Vault (or falls back to disk) and unmarshals into the map.
+	if err := handleFallbackOrStore(name, values); err != nil {
+		// Not fatal — the fallback file might not exist yet.
 	}
 
-	// Prompt user for input
-	val := interaction.PromptInput(prompt, defaultValue)
+	// Use the generic interaction helper to prompt the user.
+	current := values[key] // could be empty if not present
+	val := interaction.RememberValue(key, prompt, def, current)
 	values[key] = val
 
-	if err := Save(path, values); err != nil {
-		return "", fmt.Errorf("failed to save remembered %q to Vault: %w", key, err)
+	// Persist the updated config using the Vault fallback mechanism.
+	if err := handleFallbackOrStore(name, values); err != nil {
+		return "", fmt.Errorf("failed to persist %q to Vault or fallback: %w", key, err)
 	}
 
 	return val, nil

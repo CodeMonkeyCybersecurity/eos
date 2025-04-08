@@ -1,3 +1,5 @@
+/* pkg/vault/writer.go */
+
 package vault
 
 import (
@@ -11,8 +13,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"gopkg.in/yaml.v3"
 )
-
-const fallbackPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
 
 //
 // === Vault Write Helpers ===
@@ -101,7 +101,7 @@ func writeStruct(path string, v interface{}) error {
 
 // writeFallbackSecrets writes fallback secrets as YAML to a secure path on disk.
 func writeFallbackSecrets(secrets map[string]string) error {
-	if err := os.MkdirAll(filepath.Dir(fallbackPath), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(fallbackSecretsPath), 0700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
 
@@ -110,11 +110,11 @@ func writeFallbackSecrets(secrets map[string]string) error {
 		return fmt.Errorf("marshal fallback secrets: %w", err)
 	}
 
-	if err := os.WriteFile(fallbackPath, b, 0600); err != nil {
+	if err := os.WriteFile(fallbackSecretsPath, b, 0600); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
 
-	fmt.Printf("✅ Fallback credentials saved to %s\n", fallbackPath)
+	fmt.Printf("✅ Fallback credentials saved to %s\n", fallbackSecretsPath)
 	fmt.Println("💡 Run `eos vault sync` later to upload them to Vault.")
 	return nil
 }
