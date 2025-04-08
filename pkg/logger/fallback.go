@@ -1,5 +1,3 @@
-/* pkg/logger/fallback.go */
-
 package logger
 
 import (
@@ -8,19 +6,11 @@ import (
 	"os"
 
 	"go.uber.org/zap"
-
 	"go.uber.org/zap/zapcore"
 )
 
 func newFallbackLogger() *zap.Logger {
-	cfg := zap.NewProductionEncoderConfig()
-	cfg.TimeKey = "T"
-	cfg.LevelKey = "L"
-	cfg.NameKey = "N"
-	cfg.CallerKey = "C"
-	cfg.MessageKey = "M"
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	cfg := defaultConsoleEncoderConfig()
 
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
@@ -33,7 +23,6 @@ func newFallbackLogger() *zap.Logger {
 	return logger
 }
 
-// InitializeWithFallback sets up Zap with hardcoded encoder + logPath.
 func initializeWithFallback(logPath string) error {
 	if logPath == "" {
 		return errors.New("no writable log path found")
@@ -42,15 +31,29 @@ func initializeWithFallback(logPath string) error {
 		return fmt.Errorf("unable to prepare log path: %w", err)
 	}
 
-	cfg := zap.NewProductionEncoderConfig()
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg := defaultConsoleEncoderConfig()
+	jsonCfg := zap.NewProductionEncoderConfig()
+	jsonCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	jsonCfg.EncodeLevel = zapcore.CapitalLevelEncoder
 
 	core := zapcore.NewTee(
 		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
-		zapcore.NewCore(zapcore.NewJSONEncoder(cfg), getLogFileWriter(logPath), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(jsonCfg), getLogFileWriter(logPath), zap.InfoLevel),
 	)
 
-	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))
+	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(log)
 	return nil
+}
+
+func defaultConsoleEncoderConfig() zapcore.EncoderConfig {
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.TimeKey = "T"
+	cfg.LevelKey = "L"
+	cfg.NameKey = "N"
+	cfg.CallerKey = "C"
+	cfg.MessageKey = "M"
+	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	return cfg
 }
