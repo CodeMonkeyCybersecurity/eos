@@ -1,4 +1,5 @@
-// pkg/vault/ldap.go
+/* pkg/vault/ldap.go */
+
 package vault
 
 // rememberLDAPField prompts for a remembered value stored under the "ldap" path.

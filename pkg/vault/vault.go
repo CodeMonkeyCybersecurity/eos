@@ -12,11 +12,18 @@ var (
 	Read                  = read
 	Write                 = write
 	HandleFallbackOrStore = handleFallbackOrStore
-	ReadStruct            = readStruct
+	ReadVaultJSON         = readVaultJSON
 	LoadFromVault         = loadFromVault
 	ReadFallbackSecrets   = readFallbackSecrets
 	WriteStruct           = writeStruct
 	SetVaultEnv           = setVaultEnv
 	Purge                 = purge
 	WriteFallbackSecrets  = writeFallbackSecrets
+	ReadInput             = readInput
+	ReadNInputs           = readNInputs
+	ConfirmVaultSecrets   = confirmVaultSecrets
+	RevokeRootToken       = revokeRootToken
+	CleanupInitFile       = cleanupInitFile
+	LoadVaultSecureData   = loadVaultSecureData
+	PrintNextSteps        = printNextSteps
 )

@@ -1,5 +1,3 @@
-// pkg/utils/crypto.go
-
 package utils
 
 import (
@@ -11,18 +9,59 @@ import (
 	"strings"
 )
 
-//
-//---------------------------- CRYPTO, HASHING, SECRETS ---------------------------- //
-//
+// ----------------------------
+// 🔐 Hashing
+// ----------------------------
 
-// HashString computes and returns the SHA256 hash of the provided string.
+// HashString returns the SHA256 hash of a string as hex.
 func HashString(s string) string {
-	hash := sha256.Sum256([]byte(s))
-	hashStr := hex.EncodeToString(hash[:])
-	return hashStr
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
 }
 
-// generatePassword creates a random alphanumeric password of the given length.
+// HashStrings returns SHA256 hashes of each string in the input slice.
+func HashStrings(inputs []string) []string {
+	out := make([]string, len(inputs))
+	for i, s := range inputs {
+		out[i] = HashString(s)
+	}
+	return out
+}
+
+// AllUnique reports whether all strings in the slice are unique.
+func AllUnique(items []string) bool {
+	seen := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		if _, exists := seen[item]; exists {
+			return false
+		}
+		seen[item] = struct{}{}
+	}
+	return true
+}
+
+// AllHashesPresent checks that each hash in `hashes` exists in `known`.
+func AllHashesPresent(hashes, known []string) bool {
+	for _, h := range hashes {
+		found := false
+		for _, k := range known {
+			if h == k {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+// ----------------------------
+// 🔐 Passwords
+// ----------------------------
+
+// GeneratePassword creates a strong random password with at least 1 of each char class.
 func GeneratePassword(length int) (string, error) {
 	if length < 4 {
 		return "", fmt.Errorf("password length must be at least 4")
@@ -31,55 +70,36 @@ func GeneratePassword(length int) (string, error) {
 	lower := "abcdefghijklmnopqrstuvwxyz"
 	upper := "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digits := "0123456789"
-	symbols := "!@#$%&*?" // bash-safe symbols
+	symbols := "!@#$%&*?" // bash-safe
 	all := lower + upper + digits + symbols
 
-	var passwordChars []byte
+	var pw []byte
 
-	// Ensure each category is represented.
-	char, err := randomChar(lower)
-	if err != nil {
-		return "", err
-	}
-	passwordChars = append(passwordChars, char)
-
-	char, err = randomChar(upper)
-	if err != nil {
-		return "", err
-	}
-	passwordChars = append(passwordChars, char)
-
-	char, err = randomChar(digits)
-	if err != nil {
-		return "", err
-	}
-	passwordChars = append(passwordChars, char)
-
-	char, err = randomChar(symbols)
-	if err != nil {
-		return "", err
-	}
-	passwordChars = append(passwordChars, char)
-
-	// Fill the remaining length with random characters from all groups.
-	for i := 4; i < length; i++ {
-		char, err = randomChar(all)
+	// Guarantee 1 character from each category
+	for _, group := range []string{lower, upper, digits, symbols} {
+		c, err := randomChar(group)
 		if err != nil {
 			return "", err
 		}
-		passwordChars = append(passwordChars, char)
+		pw = append(pw, c)
 	}
 
-	// Shuffle the characters to avoid predictable positions.
-	if err := shuffle(passwordChars); err != nil {
+	// Fill the rest
+	for i := len(pw); i < length; i++ {
+		c, err := randomChar(all)
+		if err != nil {
+			return "", err
+		}
+		pw = append(pw, c)
+	}
+
+	if err := shuffle(pw); err != nil {
 		return "", err
 	}
 
-	return string(passwordChars), nil
-
+	return string(pw), nil
 }
 
-// randomChar returns a random character from the provided charset.
 func randomChar(charset string) (byte, error) {
 	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
 	if err != nil {
@@ -88,43 +108,42 @@ func randomChar(charset string) (byte, error) {
 	return charset[n.Int64()], nil
 }
 
-// shuffle shuffles a slice of bytes using the Fisher-Yates algorithm with crypto/rand.
-func shuffle(data []byte) error {
-	n := len(data)
-	for i := n - 1; i > 0; i-- {
+func shuffle(b []byte) error {
+	for i := len(b) - 1; i > 0; i-- {
 		jBig, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
 		if err != nil {
 			return err
 		}
 		j := int(jBig.Int64())
-		data[i], data[j] = data[j], data[i]
+		b[i], b[j] = b[j], b[i]
 	}
 	return nil
 }
 
-// InjectSecretsFromPlaceholders scans the file content for "changeme", "changeme1", ..., "changeme9"
-// and replaces each with a unique generated password. It returns the updated content and the replacements map.
+// ----------------------------
+// 🔐 Injecting secrets
+// ----------------------------
+
+// InjectSecretsFromPlaceholders replaces "changeme" and "changeme[1-9]" with passwords.
 func InjectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, error) {
-	newData := string(data)
-	replacements := map[string]string{}
+	content := string(data)
+	replacements := make(map[string]string)
 
 	for i := 0; i < 10; i++ {
-		var placeholder string
-		if i == 0 {
-			placeholder = "changeme"
-		} else {
+		placeholder := "changeme"
+		if i > 0 {
 			placeholder = fmt.Sprintf("changeme%d", i)
 		}
 
-		password, err := GeneratePassword(20)
+		pw, err := GeneratePassword(20)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to generate password for placeholder %s: %w", placeholder, err)
+			return nil, nil, fmt.Errorf("generate password for %s: %w", placeholder, err)
 		}
 
-		newData = strings.ReplaceAll(newData, placeholder, password)
-		replacements[placeholder] = password
-		fmt.Printf("🔐 Secret injected: %s = %s\n", placeholder, password)
+		content = strings.ReplaceAll(content, placeholder, pw)
+		replacements[placeholder] = pw
+		fmt.Printf("🔐 Secret injected: %s = %s\n", placeholder, pw)
 	}
 
-	return []byte(newData), replacements, nil
+	return []byte(content), replacements, nil
 }

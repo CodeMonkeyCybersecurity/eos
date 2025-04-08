@@ -1,6 +1,9 @@
 package vault
 
 import (
+	"bufio"
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -36,4 +39,29 @@ func isInstalled() bool {
 func isInitialized() bool {
 	out, err := exec.Command("vault", "status", "-format=json").CombinedOutput()
 	return err == nil && strings.Contains(string(out), `"initialized": true`)
+}
+
+func confirmVaultSecrets(storedHashes []string, hashedRoot string) {
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Println("Please re-enter three unique unseal keys (any order) and the root token:")
+
+		keys := readNInputs(reader, "Enter Unseal Key", 3)
+		root := readInput(reader, "Enter Root Token")
+
+		if !utils.AllUnique(keys) {
+			fmt.Println("The unseal keys must be unique. Please try again.")
+			continue
+		}
+
+		hashedInputs := utils.HashStrings(keys)
+		if !utils.AllHashesPresent(hashedInputs, storedHashes) || utils.HashString(root) != hashedRoot {
+			fmt.Println("Oops, one or more values are incorrect. Please try again.")
+			continue
+		}
+
+		fmt.Println("✅ Confirmation successful.")
+		break
+	}
 }

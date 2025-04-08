@@ -1,19 +1,26 @@
-/* pkg/vault/reader.go */
-
 package vault
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
-// Load retrieves a struct from Vault or fallback if Vault is unavailable.
+//
+// 🔐 Vault JSON Reads
+//
+
 func load(name string, out any) error {
 	if isAvailable() {
 		return readVaultJSON(vaultPath(name), out)
@@ -21,88 +28,116 @@ func load(name string, out any) error {
 	return readFallbackYAML(diskPath(name), out)
 }
 
-//
-// === Vault Read Helpers ===
-//
-
-// read fetches raw secret data from Vault and returns it as a flat map.
 func read(path string) (map[string]interface{}, error) {
-	cmd := exec.Command("vault", "kv", "get", "-format=json", path)
-	output, err := cmd.Output()
+	output, err := exec.Command("vault", "kv", "get", "-format=json", path).Output()
 	if err != nil {
 		return nil, fmt.Errorf("vault command failed: %w", err)
 	}
-
-	var resp map[string]interface{}
-	if err := json.Unmarshal(output, &resp); err != nil {
+	var wrapper struct {
+		Data struct {
+			Data map[string]interface{} `json:"data"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(output, &wrapper); err != nil {
 		return nil, fmt.Errorf("unmarshal vault response: %w", err)
 	}
-
-	data := resp["data"].(map[string]interface{})
-	return data["data"].(map[string]interface{}), nil
+	return wrapper.Data.Data, nil
 }
 
-// readVaultJSON extracts a JSON-encoded secret from Vault and unmarshals it into `out`.
 func readVaultJSON(path string, out any) error {
-	cmd := execute.ExecuteRaw("vault", "kv", "get", "-format=json", path)
-	output, err := cmd.Output()
+	output, err := execute.ExecuteRaw("vault", "kv", "get", "-format=json", path).Output()
 	if err != nil {
 		return fmt.Errorf("vault read failed: %w", err)
 	}
 
-	var raw struct {
+	var wrapper struct {
 		Data struct {
 			Data json.RawMessage `json:"data"`
 		} `json:"data"`
 	}
-	if err := json.Unmarshal(output, &raw); err != nil {
+	if err := json.Unmarshal(output, &wrapper); err != nil {
 		return fmt.Errorf("unmarshal vault json: %w", err)
 	}
-
-	return json.Unmarshal(raw.Data.Data, out)
+	return json.Unmarshal(wrapper.Data.Data, out)
 }
 
-// readFallbackYAML reads YAML from the given fallback path into the provided struct.
+func loadFromVault(name string, out any) error {
+	return readVaultJSON(fmt.Sprintf("secret/eos/%s/config", name), out)
+}
+
+//
+// 🛟 Fallback YAML Reads
+//
+
 func readFallbackYAML(path string, out any) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read fallback file: %w", err)
 	}
-
 	if err := yaml.Unmarshal(b, out); err != nil {
 		return fmt.Errorf("unmarshal fallback YAML: %w", err)
 	}
-
 	return nil
 }
 
-// readStruct is an alias for reading JSON data into a provided struct.
-func readStruct(path string, out any) error {
-	return readVaultJSON(path, out)
-}
-
-// loadFromVault reads a secret from a default path: secret/eos/{{name}}/config
-func loadFromVault(name string, out any) error {
-	path := fmt.Sprintf("secret/eos/%s/config", name)
-	return readVaultJSON(path, out)
-}
-
-//
-// === Fallback Read Helpers ===
-//
-
-// readFallbackSecrets reads fallback YAML-based secrets from disk.
 func readFallbackSecrets() (map[string]string, error) {
-	b, err := os.ReadFile(filepath.Clean(fallbackSecretsPath))
-	if err != nil {
-		return nil, fmt.Errorf("read fallback file: %w", err)
-	}
-
 	var secrets map[string]string
-	if err := yaml.Unmarshal(b, &secrets); err != nil {
-		return nil, fmt.Errorf("unmarshal fallback secrets: %w", err)
+	err := readFallbackYAML(filepath.Clean(fallbackSecretsPath), &secrets)
+	if err != nil {
+		return nil, err
 	}
-
 	fmt.Printf("📥 Fallback credentials loaded from %s\n", fallbackSecretsPath)
 	return secrets, nil
+}
+
+//
+// 🔐 Secure Vault Loader
+//
+
+func loadVaultSecureData() (initResult, UserpassCreds, []string, string) {
+	if err := eos.EnsureEOSSystemUser(); err != nil {
+		log.Fatal("Failed to ensure eos system user", zap.Error(err))
+	}
+
+	fmt.Println("Secure Vault setup in progress...")
+	fmt.Println("This process will revoke the root token and elevate admin privileges.")
+
+	// Load vault_init.json
+	var initRes initResult
+	if err := readFallbackYAML("vault_init.json", &initRes); err != nil {
+		log.Fatal("Failed to load vault_init.json", zap.Error(err))
+	}
+
+	// Load Vault userpass credentials
+	var creds UserpassCreds
+	if err := readFallbackYAML("/var/lib/eos/secrets/vault-userpass.yaml", &creds); err != nil {
+		log.Fatal("Failed to load Vault userpass credentials", zap.Error(err))
+	}
+	if creds.Password == "" {
+		log.Fatal("Parsed password is empty — aborting.")
+	}
+
+	// Prehash values
+	hashedKeys := utils.HashStrings(initRes.UnsealKeysB64)
+	hashedRoot := utils.HashString(initRes.RootToken)
+
+	return initRes, creds, hashedKeys, hashedRoot
+}
+
+//
+// 🧑‍💻 Interactive Helpers
+//
+
+func readInput(reader *bufio.Reader, label string) string {
+	fmt.Print(label + ": ")
+	text, _ := reader.ReadString('\n')
+	return strings.TrimSpace(text)
+}
+
+func readNInputs(reader *bufio.Reader, label string, n int) []string {
+	inputs := make([]string, n)
+	for i := 0; i < n; i++ {
+		inputs[i] = readInput(reader, fmt.Sprintf("%s %d", label, i+1))
+	}
+	return inputs
 }

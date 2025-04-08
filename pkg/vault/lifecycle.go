@@ -4,6 +4,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -62,4 +63,26 @@ func deployAndStoreSecrets(name string, secrets map[string]string) error {
 
 	fmt.Println("✅ Vault is running. Storing secrets...")
 	return saveToVault(name, secrets)
+}
+
+func revokeRootToken(token string) {
+	fmt.Println("Revoking the root token...")
+
+	cmd := exec.Command("vault", "token", "revoke", token)
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		fmt.Printf("❌ Failed to revoke root token. Output:\n%s\n", string(output))
+	} else {
+		fmt.Println("✅ Root token revoked.")
+	}
+}
+
+func cleanupInitFile() {
+	fmt.Println("Deleting vault_init.json to remove sensitive initialization data...")
+	if err := os.Remove("vault_init.json"); err != nil {
+		fmt.Println("Failed to delete vault_init.json")
+	} else {
+		fmt.Println("🧹 vault_init.json deleted successfully.")
+	}
 }

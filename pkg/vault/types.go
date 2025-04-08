@@ -20,3 +20,14 @@ func vaultPath(name string) string {
 func diskPath(name string) string {
 	return xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 }
+
+// initResult is the JSON structure returned by "vault operator init -format=json".
+type initResult struct {
+	UnsealKeysB64 []string `json:"unseal_keys_b64"`
+	RootToken     string   `json:"root_token"`
+}
+
+type UserpassCreds struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
