@@ -17,7 +17,15 @@ func InteractiveLDAPQuery() error {
 	proto := interaction.PromptInput("Connection type [ldap, ldaps, ldapi]", "ldap")
 	host := interaction.PromptInput("LDAP host or IP", "localhost")
 	bindDN := interaction.PromptInput("Bind DN (e.g. cn=admin,dc=domain,dc=com)", "")
+	if bindDN == "" {
+		fmt.Println("⚠️  No BindDN provided — defaulting to cn=anonymous instead.")
+		bindDN = "cn=anonymous"
+	}
 	password, err := interaction.PromptPassword("LDAP password")
+	if password == "" {
+		fmt.Println("⚠️  No password provided — binding may fail if anonymous access is not allowed.")
+		password = `""`
+	}
 	if err != nil {
 		return err
 	}
@@ -26,9 +34,13 @@ func InteractiveLDAPQuery() error {
 	if baseDN == "" {
 		fmt.Println("⚠️  No base DN provided — defaulting to root (searching entire tree).")
 		fmt.Println("   This may return a large number of entries and be slower than expected.")
+		baseDN = `""` // 👈 Make sure ldapsearch gets -b ""
 	}
 
 	filter := interaction.PromptInput("Search filter", "(objectClass=*)")
+	if filter == "" {
+		filter = "(objectClass=*)"
+	}
 	attrLine := interaction.PromptInput("Attributes (comma-separated, or leave blank for all)", "")
 	attrs := strings.FieldsFunc(attrLine, func(r rune) bool { return r == ',' || r == ' ' })
 
