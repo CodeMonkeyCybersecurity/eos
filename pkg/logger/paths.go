@@ -4,7 +4,7 @@ package logger
 import "runtime"
 
 // PlatformLogPaths returns all fallback log paths in order of priority for the platform.
-func PlatformLogPaths() []string {
+func platformLogPaths() []string {
 	switch runtime.GOOS {
 	case "darwin":
 		return []string{
