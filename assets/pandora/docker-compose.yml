@@ -5,15 +5,18 @@ services:
     restart: unless-stopped
     cap_add:
       - IPC_LOCK
+    user: "100:100"  # Needed for permission to write /vault/data
     environment:
       VAULT_ADDR: http://0.0.0.0:8200
     ports:
-      - "127.0.0.1:8200:8200"  # only accessible locally or through nginx
+      - "127.0.0.1:8200:8200"
     volumes:
       - vault-data:/vault/data
       - ./config:/vault/config
       - ./vault-agent:/etc/vault-agent
     command: vault server -config=/vault/config/vault.hcl
+    networks:
+      - vault-net
 
   vault-agent:
     image: hashicorp/vault:1.19.1
@@ -21,11 +24,16 @@ services:
     restart: unless-stopped
     depends_on:
       - vault
+    cap_add:
+      - IPC_LOCK
     volumes:
       - ./vault-agent:/etc/vault-agent
       - vault-agent-sink:/run/vault
     command: >
       vault agent -config=/etc/vault-agent/agent.hcl
+    networks:
+      - vault-net
+    # ⚠️ Make sure your agent.hcl uses a supported method like "approle", not "userpass"
 
   nginx:
     image: nginx:alpine
@@ -35,9 +43,16 @@ services:
       - "8201:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/ssl/certs:ro  # Include vault.crt and vault.key here
     depends_on:
       - vault
+    networks:
+      - vault-net
 
 volumes:
   vault-data:
   vault-agent-sink:
+
+networks:
+  vault-net:
+    driver: bridge
