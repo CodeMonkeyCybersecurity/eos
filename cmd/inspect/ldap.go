@@ -3,6 +3,7 @@ package inspect
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
@@ -80,6 +81,43 @@ var InspectLDAPGroupCmd = &cobra.Command{
 	}),
 }
 
+var InspectLDAPDebugCmd = &cobra.Command{
+	Use:   "debug",
+	Short: "Run LDAP diagnostic checks with optional credential prompt",
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		log.Info("Running anonymous ldapsearch probe")
+
+		// Step 1: Anonymous probe
+		if err := ldap.RunLDAPProbe(); err != nil {
+			log.Warn("Anonymous LDAP probe failed, trying with credentials", zap.Error(err))
+
+			// Step 2: Prompt for credentials
+			bindDN := interaction.PromptInput("Enter bind DN (e.g. cn=admin,dc=domain,dc=com):", "")
+			if err != nil {
+				return err
+			}
+			bindPW, err := interaction.PromptPassword("Enter LDAP password:")
+			if err != nil {
+				return err
+			}
+
+			// Step 3: Authenticated probe
+			if err := ldap.RunLDAPAuthProbe(bindDN, bindPW); err != nil {
+				log.Error("Authenticated LDAP search failed", zap.Error(err))
+				return err
+			}
+		}
+
+		// Step 4: Run config dump via ldapi
+		log.Info("Running ldapsearch against cn=config")
+		if err := ldap.RunLDAPConfigDump(); err != nil {
+			log.Warn("Could not access cn=config (may require sudo or EXTERNAL bind)", zap.Error(err))
+		}
+
+		return nil
+	}),
+}
+
 func init() {
 	log = logger.L()
 
@@ -91,4 +129,6 @@ func init() {
 	InspectLDAPCmd.AddCommand(InspectLDAPGroupsCmd)
 	InspectLDAPCmd.AddCommand(InspectLDAPUserCmd)
 	InspectLDAPCmd.AddCommand(InspectLDAPGroupCmd)
+	InspectLDAPCmd.AddCommand(InspectLDAPDebugCmd)
+
 }
