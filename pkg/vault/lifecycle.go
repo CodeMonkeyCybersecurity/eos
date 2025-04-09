@@ -123,7 +123,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 			// 1. Try to load from fallback YAML first
 			var initRes api.InitResponse
 			if err := readFallbackYAML(diskPath("vault-init"), &initRes); err != nil {
-				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w", err)
+				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
 
 			// 2. Use the token to authenticate the client
@@ -142,7 +142,13 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 		return nil, nil, fmt.Errorf("init failed: %w", err)
 	}
 
+	// ✅ Save the init result to fallback and optionally Vault
 	DumpInitResult(initRes)
+	if err := Save(client, "vault-init", initRes); err != nil {
+		fmt.Println("⚠️ Failed to persist Vault init result:", err)
+	}
+
+	// 🔓 Proceed to unseal
 	if err := UnsealVault(client, initRes); err != nil {
 		return nil, nil, err
 	}
