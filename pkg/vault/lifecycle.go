@@ -117,38 +117,44 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 		SecretThreshold: 3,
 	})
 	if err != nil {
+		// If Vault is already initialized, try to load the fallback file
 		if IsAlreadyInitialized(err) {
 			fmt.Println("⚠️ Vault already initialized.")
 			var initRes api.InitResponse
 			if err := readFallbackYAML(diskPath("vault-init"), &initRes); err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
+			// Set the root token on the client for further operations
 			client.SetToken(initRes.RootToken)
 
+			// Optionally, try to reload from Vault to verify
 			var vaultRes api.InitResponse
 			if err := loadFromVault(client, "vault-init", &vaultRes); err != nil {
 				fmt.Println("⚠️ Could not verify Vault load: continuing with fallback initRes")
 			} else {
 				initRes = vaultRes
 			}
-
 			return client, &initRes, nil
 		}
 		return nil, nil, fmt.Errorf("init failed: %w", err)
 	}
 
-	// Print locally for dev
+	// Dump init result for developer diagnostics
 	DumpInitResult(initRes)
 
-	// 🚨 DO NOT call Save() here — Vault is still sealed and will reject writes
+	// Unseal Vault now that initialization is complete.
 	if err := UnsealVault(client, initRes); err != nil {
 		return nil, nil, err
 	}
 
-	// ✅ Now it's safe to authenticate and save
+	// Set the root token after unsealing so that future calls are authenticated
 	client.SetToken(initRes.RootToken)
+
+	// Persist the Vault init result now that Vault is unsealed and the token is valid.
 	if err := Save(client, "vault-init", initRes); err != nil {
-		fmt.Println("⚠️ Failed to persist Vault init result:", err)
+		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
+	} else {
+		fmt.Println("✅ Vault init result persisted successfully")
 	}
 
 	return client, initRes, nil
