@@ -24,12 +24,17 @@ It initializes and unseals Vault, sets up auditing, KV v2,
 AppRole, userpass, and creates an eos user with a random password.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		// 0. Ensure Vault is installed
+		log.Info("Starting Vault enable workflow")
+
+		// 0. Ensure Vault is installed
 		if err := installVaultViaDnf(); err != nil {
+			log.Error("Vault installation check failed", zap.Error(err))
 			return err
 		}
 
-		// 1. Set VAULT_ADDR env var
+		// 1. Set VAULT_ADDR
 		vault.SetVaultEnv()
+		log.Info("Set VAULT_ADDR from hostname")
 
 		// 2. Create Vault client
 		client, err := vault.NewClient()
@@ -37,43 +42,59 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			log.Fatal("Failed to create Vault client", zap.Error(err))
 		}
 
-		// 3. Init & unseal Vault
+		// 3. Init & unseal
 		client, initRes, err := setupVault(client)
 		if err != nil {
+			log.Error("Failed to initialize and unseal Vault", zap.Error(err))
 			return err
 		}
+		if initRes == nil {
+			log.Warn("Vault already initialized — skipping root-token workflows")
+			return fmt.Errorf("vault already initialized: no root token available")
+		}
 
-		// 4. Enable audit
+		// 4. Enable file audit
+		log.Info("Enabling file audit")
 		enableFileAudit(client)
 
-		// 5. Enable KV
+		// 5. Enable KV v2
+		log.Info("Enabling KV v2 secrets engine")
 		if err := enableKV2(client); err != nil {
-			return err
+			log.Error("KV v2 setup failed", zap.Error(err))
 		}
 
-		// 6. Test KV
+		// 6. Test KV write/read
+		log.Info("Testing KV put/get")
 		if err := testKVSecret(client); err != nil {
-			return err
+			log.Error("KV secret test failed", zap.Error(err))
 		}
 
 		// 7. Enable AppRole
+		log.Info("Enabling AppRole auth method")
 		if err := enableAppRoleAuth(client); err != nil {
+			log.Error("AppRole setup failed", zap.Error(err))
 			return err
 		}
 
 		// 8. Enable userpass
+		log.Info("Enabling userpass auth method")
 		if err := enableUserPassAuth(client); err != nil {
+			log.Error("Userpass setup failed", zap.Error(err))
 			return err
 		}
 
-		// 9. Create eos user + store secrets
+		// 9. Create eos user
+		log.Info("Creating eos user and storing secrets")
 		if err := createEosAndSecret(client, initRes); err != nil {
+			log.Error("Failed to create eos user or store secrets", zap.Error(err))
 			return err
 		}
 
+		log.Info("Vault enable workflow complete")
 		fmt.Println("\n✅ Vault enable steps completed successfully!")
 		fmt.Println("🔑 You can now log in with the eos user using the generated password.")
 		fmt.Println("📦 Please run 'eos secure vault' to secure the Vault service.")
+
 		return nil
 	}),
 }
