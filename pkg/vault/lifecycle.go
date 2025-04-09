@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -124,15 +125,30 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 			if err := readFallbackYAML(diskPath("vault-init"), &initRes); err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
-			// Set the root token on the client for further operations
+			// Set the root token after unsealing so that future calls are authenticated.
 			client.SetToken(initRes.RootToken)
 
-			// Optionally, try to reload from Vault to verify
-			var vaultRes api.InitResponse
-			if err := loadFromVault(client, "vault-init", &vaultRes); err != nil {
-				fmt.Println("⚠️ Could not verify Vault load: continuing with fallback initRes")
+			// Retry loop: wait until Vault reports that it is unsealed.
+			const maxRetries = 5
+			for i := 0; i < maxRetries; i++ {
+				health, err := client.Sys().Health()
+				if err != nil {
+					fmt.Printf("Error checking Vault health: %v\n", err)
+				}
+				if !health.Sealed {
+					fmt.Println("✅ Vault reports as unsealed")
+					break
+				}
+				fmt.Printf("Vault still sealed, waiting 5 seconds... (attempt %d/%d)\n", i+1, maxRetries)
+				time.Sleep(5 * time.Second)
+			}
+
+			// Now, persist the Vault init result using the updated API-based Save().
+			if err := Save(client, "vault-init", initRes); err != nil {
+				fmt.Println("Failed to persist Vault init result")
+				return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 			} else {
-				initRes = vaultRes
+				fmt.Println("✅ Vault init result persisted successfully")
 			}
 			return client, &initRes, nil
 		}
