@@ -1,3 +1,5 @@
+/* pkg/vault/check.go */
+
 package vault
 
 import (

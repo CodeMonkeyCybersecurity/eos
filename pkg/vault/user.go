@@ -3,14 +3,9 @@ package vault
 import (
 	"fmt"
 	"os"
-)
 
-// UserSecret holds login and SSH key material for a system user.
-type UserSecret struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	SSHKey   string `json:"ssh_private_key,omitempty"`
-}
+	"github.com/hashicorp/vault/api"
+)
 
 // StoreUserSecret reads an SSH key and stores full user credentials in Vault.
 func StoreUserSecret(username, password, keyPath string) error {
@@ -23,9 +18,9 @@ func StoreUserSecret(username, password, keyPath string) error {
 }
 
 // LoadUserSecret retrieves and validates a user's secret from Vault.
-func LoadUserSecret(username string) (*UserSecret, error) {
+func LoadUserSecret(client *api.Client, username string) (*UserSecret, error) {
 	var secret UserSecret
-	if err := readVaultJSON(userVaultPath(username), &secret); err != nil {
+	if err := readVaultKV(client, userVaultPath(username), &secret); err != nil {
 		return nil, err
 	}
 	if !secret.IsValid() {

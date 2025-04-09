@@ -12,13 +12,14 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/hashicorp/vault/api"
 )
 
 // TryLoadFromVault attempts to load the LDAP config from Vault.
 // It returns nil if not found or incomplete.
-func TryLoadFromVault() (*LDAPConfig, error) {
+func TryLoadFromVault(client *api.Client) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	if err := vault.Load("secret/ldap/config", &cfg); err != nil {
+	if err := vault.Load(client, "secret/ldap/config", &cfg); err != nil {
 		return nil, err
 	}
 	if cfg.FQDN == "" || cfg.BindDN == "" {

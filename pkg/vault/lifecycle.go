@@ -4,10 +4,10 @@ package vault
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/hashicorp/vault/api"
 )
 
 // Purge removes Vault repo artifacts based on the Linux distro.
@@ -41,7 +41,7 @@ func purge(distro string) (removed []string, errs map[string]error) {
 }
 
 // deployAndStoreSecrets automates Vault setup and stores secrets after confirmation.
-func deployAndStoreSecrets(name string, secrets map[string]string) error {
+func deployAndStoreSecrets(client *api.Client, path string, secrets map[string]string) error {
 	fmt.Println("🚀 Deploying Vault...")
 
 	if err := execute.ExecuteAndLog("eos", "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
@@ -62,27 +62,29 @@ func deployAndStoreSecrets(name string, secrets map[string]string) error {
 	}
 
 	fmt.Println("✅ Vault is running. Storing secrets...")
-	return saveToVault(name, secrets)
+
+	// Convert string map to interface{}
+	data := make(map[string]interface{}, len(secrets))
+	for k, v := range secrets {
+		data[k] = v
+	}
+
+	return saveSecret(client, path, data)
 }
 
-func revokeRootToken(token string) {
-	fmt.Println("Revoking the root token...")
+func revokeRootToken(client *api.Client, token string) error {
+	client.SetToken(token)
 
-	cmd := exec.Command("vault", "token", "revoke", token)
-	output, err := cmd.CombinedOutput()
-
+	err := client.Auth().Token().RevokeSelf("")
 	if err != nil {
-		fmt.Printf("❌ Failed to revoke root token. Output:\n%s\n", string(output))
-	} else {
-		fmt.Println("✅ Root token revoked.")
+		return fmt.Errorf("failed to revoke root token: %w", err)
 	}
+
+	fmt.Println("✅ Root token revoked.")
+	return nil
 }
 
-func cleanupInitFile() {
-	fmt.Println("Deleting vault_init.json to remove sensitive initialization data...")
-	if err := os.Remove("vault_init.json"); err != nil {
-		fmt.Println("Failed to delete vault_init.json")
-	} else {
-		fmt.Println("🧹 vault_init.json deleted successfully.")
-	}
+func saveSecret(client *api.Client, path string, data map[string]interface{}) error {
+	_, err := client.Logical().Write(path, data)
+	return err
 }

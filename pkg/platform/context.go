@@ -1,4 +1,4 @@
-// pkg/platform/detect.go
+/* pkg/platform/context.go */
 
 package platform
 

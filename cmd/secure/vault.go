@@ -9,7 +9,9 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -26,12 +28,17 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		vault.SetVaultEnv()
 
-		initRes, creds, storedHashes, hashedRoot := vault.LoadVaultSecureData()
+		client, err := vault.NewClient()
+		if err != nil {
+			log.Fatal("Failed to create Vault client", zap.Error(err))
+		}
+
+		initRes, creds, storedHashes, hashedRoot := vault.LoadVaultSecureData(client)
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
 		applyAdminPolicy(creds)
 
-		vault.RevokeRootToken(initRes.RootToken)
-		vault.CleanupInitFile()
+		vault.RevokeRootToken(client, initRes.RootToken)
+		platform.CleanupFile("vault_init.json")
 		vault.PrintNextSteps()
 		return nil
 	}),

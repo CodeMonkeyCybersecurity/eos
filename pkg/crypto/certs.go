@@ -1,6 +1,6 @@
-// pkg/certs/certs.go
+// pkg/crypto/certs.go
 
-package certs
+package crypto
 
 import (
 	"fmt"

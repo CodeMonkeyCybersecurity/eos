@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
@@ -19,48 +18,38 @@ import (
 // 🔐 Vault JSON Reads
 //
 
-func load(name string, out any) error {
+func load(client *api.Client, name string, out any) error {
 	if isAvailable() {
-		return readVaultJSON(vaultPath(name), out)
+		return loadFromVault(client, name, out)
 	}
 	return readFallbackYAML(diskPath(name), out)
 }
 
-func read(path string) (map[string]interface{}, error) {
-	output, err := exec.Command("vault", "kv", "get", "-format=json", path).Output()
-	if err != nil {
-		return nil, fmt.Errorf("vault command failed: %w", err)
-	}
-	var wrapper struct {
-		Data struct {
-			Data map[string]interface{} `json:"data"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(output, &wrapper); err != nil {
-		return nil, fmt.Errorf("unmarshal vault response: %w", err)
-	}
-	return wrapper.Data.Data, nil
-}
-
-func readVaultJSON(path string, out any) error {
-	output, err := execute.ExecuteRaw("vault", "kv", "get", "-format=json", path).Output()
+func readVaultKV(client *api.Client, path string, out any) error {
+	secret, err := client.Logical().Read(path)
 	if err != nil {
 		return fmt.Errorf("vault read failed: %w", err)
 	}
+	if secret == nil || secret.Data == nil {
+		return fmt.Errorf("no data found at %s", path)
+	}
 
-	var wrapper struct {
-		Data struct {
-			Data json.RawMessage `json:"data"`
-		} `json:"data"`
+	// Vault KV v2 nesting
+	data, ok := secret.Data["data"]
+	if !ok {
+		return fmt.Errorf("unexpected secret format: missing 'data'")
 	}
-	if err := json.Unmarshal(output, &wrapper); err != nil {
-		return fmt.Errorf("unmarshal vault json: %w", err)
+
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("failed to marshal secret data: %w", err)
 	}
-	return json.Unmarshal(wrapper.Data.Data, out)
+	return json.Unmarshal(raw, out)
 }
 
-func loadFromVault(name string, out any) error {
-	return readVaultJSON(fmt.Sprintf("secret/eos/%s/config", name), out)
+func loadFromVault(client *api.Client, name string, out any) error {
+	path := fmt.Sprintf("secret/eos/%s/config", name)
+	return readVaultKV(client, path, out)
 }
 
 //
@@ -92,8 +81,8 @@ func readFallbackSecrets() (map[string]string, error) {
 // 🔐 Secure Vault Loader
 //
 
-func loadVaultSecureData() (InitResult, UserpassCreds, []string, string) {
-	if err := eos.EnsureEOSSystemUser(); err != nil {
+func loadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, []string, string) {
+	if err := eos.EnsureEosUser(); err != nil {
 		log.Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
 
@@ -101,22 +90,23 @@ func loadVaultSecureData() (InitResult, UserpassCreds, []string, string) {
 	fmt.Println("This process will revoke the root token and elevate admin privileges.")
 
 	// Load vault_init.json
-	var initRes InitResult
-	if err := readFallbackYAML("vault_init.json", &initRes); err != nil {
-		log.Fatal("Failed to load vault_init.json", zap.Error(err))
+	var initRes *api.InitResponse
+	if err := load(client, "vault-init", &initRes); err != nil {
+		log.Fatal("Failed to load Vault init result", zap.Error(err))
 	}
 
 	// Load Vault userpass credentials
 	var creds UserpassCreds
-	if err := readFallbackYAML("/var/lib/eos/secrets/vault-userpass.yaml", &creds); err != nil {
+	if err := load(client, "bootstrap/eos-user", &creds); err != nil {
 		log.Fatal("Failed to load Vault userpass credentials", zap.Error(err))
 	}
+
 	if creds.Password == "" {
 		log.Fatal("Parsed password is empty — aborting.")
 	}
 
 	// Prehash values
-	hashedKeys := crypto.HashStrings(initRes.UnsealKeysB64)
+	hashedKeys := crypto.HashStrings(initRes.KeysB64)
 	hashedRoot := crypto.HashString(initRes.RootToken)
 
 	return initRes, creds, hashedKeys, hashedRoot

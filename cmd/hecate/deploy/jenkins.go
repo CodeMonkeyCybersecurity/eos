@@ -5,8 +5,8 @@ package deploy
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/certs"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -65,7 +65,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			// Define fullDomain using subdomain and base domain.
 			fullDomain := fmt.Sprintf("%s.%s", cfg.Subdomain, cfg.BaseDomain)
 
-			if err := certs.EnsureCertificates(cfg.Subdomain, cfg.BaseDomain, cfg.Email); err != nil {
+			if err := crypto.EnsureCertificates(cfg.Subdomain, cfg.BaseDomain, cfg.Email); err != nil {
 				log.Error("Certificate generation failed", zap.Error(err))
 				fmt.Printf("Certificate generation failed: %v\n", err)
 				return err

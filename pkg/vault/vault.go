@@ -8,11 +8,9 @@ var (
 	Remember              = remember
 	VaultPath             = vaultPath
 	DiskPath              = diskPath
-	Load                  = load
-	Read                  = read
 	Write                 = write
 	HandleFallbackOrStore = handleFallbackOrStore
-	ReadVaultJSON         = readVaultJSON
+	ReadVaultKV           = readVaultKV
 	LoadFromVault         = loadFromVault
 	ReadFallbackSecrets   = readFallbackSecrets
 	WriteStruct           = writeStruct
@@ -21,8 +19,9 @@ var (
 	WriteFallbackSecrets  = writeFallbackSecrets
 	CheckVaultSecrets     = checkVaultSecrets
 	RevokeRootToken       = revokeRootToken
-	CleanupInitFile       = cleanupInitFile
 	LoadVaultSecureData   = loadVaultSecureData
 	PrintNextSteps        = printNextSteps
 	CheckVaultProcesses   = checkVaultProcesses
+	Load                  = load
+	SaveSecret            = saveSecret
 )
