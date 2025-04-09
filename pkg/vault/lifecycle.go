@@ -124,15 +124,25 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	if err != nil {
 		if IsAlreadyInitialized(err) {
 			fmt.Println("⚠️ Vault already initialized.")
-
-			// ✅ Load init data from Vault or fallback
+		
+			// 1. Try to load from fallback YAML first
 			var initRes api.InitResponse
-			if err := load(client, "vault-init", &initRes); err != nil {
-				return nil, nil, fmt.Errorf("vault already initialized and token could not be loaded: %w", err)
+			if err := readFallbackYAML(diskPath("vault-init"), &initRes); err != nil {
+				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w", err)
 			}
-
+		
+			// 2. Use the token to authenticate the client
 			client.SetToken(initRes.RootToken)
-			return client, nil, nil
+		
+			// 3. Optionally try to re-load from Vault to verify
+			var vaultRes api.InitResponse
+			if err := loadFromVault(client, "vault-init", &vaultRes); err != nil {
+				fmt.Println("⚠️ Could not verify Vault load: continuing with fallback initRes")
+			} else {
+				initRes = vaultRes
+			}
+		
+			return client, &initRes, nil
 		}
 		return nil, nil, fmt.Errorf("init failed: %w", err)
 	}
