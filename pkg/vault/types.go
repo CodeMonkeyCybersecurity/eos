@@ -22,7 +22,7 @@ func diskPath(name string) string {
 }
 
 // initResult is the JSON structure returned by "vault operator init -format=json".
-type initResult struct {
+type InitResult struct {
 	UnsealKeysB64 []string `json:"unseal_keys_b64"`
 	RootToken     string   `json:"root_token"`
 }

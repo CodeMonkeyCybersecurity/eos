@@ -92,7 +92,7 @@ func readFallbackSecrets() (map[string]string, error) {
 // 🔐 Secure Vault Loader
 //
 
-func loadVaultSecureData() (initResult, UserpassCreds, []string, string) {
+func loadVaultSecureData() (InitResult, UserpassCreds, []string, string) {
 	if err := eos.EnsureEOSSystemUser(); err != nil {
 		log.Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
@@ -101,7 +101,7 @@ func loadVaultSecureData() (initResult, UserpassCreds, []string, string) {
 	fmt.Println("This process will revoke the root token and elevate admin privileges.")
 
 	// Load vault_init.json
-	var initRes initResult
+	var initRes InitResult
 	if err := readFallbackYAML("vault_init.json", &initRes); err != nil {
 		log.Fatal("Failed to load vault_init.json", zap.Error(err))
 	}

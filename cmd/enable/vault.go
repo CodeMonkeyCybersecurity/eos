@@ -15,12 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// initResult is the JSON structure returned by "vault operator init -format=json".
-type initResult struct {
-	UnsealKeysB64 []string `json:"unseal_keys_b64"`
-	RootToken     string   `json:"root_token"`
-}
-
 var EnableVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Enables Vault with sane and secure defaults",
@@ -56,7 +50,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		var initOut []byte
 		err = execute.RetryCaptureOutput(3, 2*time.Second, initCmd, &initOut)
 
-		var initRes initResult
+		var initRes vault.InitResult
 		if err != nil {
 			if strings.Contains(string(initOut), "Vault is already initialized") {
 				fmt.Println("Vault is already initialized. Skipping init.")
@@ -71,6 +65,9 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			if err := json.Unmarshal(initOut, &initRes); err != nil {
 				log.Fatal("Failed to parse init output", zap.Error(err))
 			}
+
+			b, _ := json.MarshalIndent(initRes, "", "  ")
+			os.WriteFile("/tmp/vault_init.json", b, 0600)
 
 			// Print the unseal keys and root token.
 			fmt.Println("Unseal keys:")
