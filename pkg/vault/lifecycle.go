@@ -124,6 +124,14 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	if err != nil {
 		if IsAlreadyInitialized(err) {
 			fmt.Println("⚠️ Vault already initialized.")
+
+			// ✅ Load init data from Vault or fallback
+			var initRes api.InitResponse
+			if err := load(client, "vault-init", &initRes); err != nil {
+				return nil, nil, fmt.Errorf("vault already initialized and token could not be loaded: %w", err)
+			}
+
+			client.SetToken(initRes.RootToken)
 			return client, nil, nil
 		}
 		return nil, nil, fmt.Errorf("init failed: %w", err)
