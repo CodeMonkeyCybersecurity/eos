@@ -95,7 +95,7 @@ var DeleteVaultCmd = &cobra.Command{
 			log.Info("Purge flag not set; skipping configuration and data cleanup.")
 		}
 
-		vault.CheckVaultProcesses(log)
+		vault.CheckVaultProcesses()
 
 		log.Info("Vault deletion complete.")
 		return nil

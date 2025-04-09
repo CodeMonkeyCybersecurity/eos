@@ -19,7 +19,7 @@ import (
 //
 
 func load(client *api.Client, name string, out any) error {
-	if isAvailable() {
+	if IsVaultAvailable(client) {
 		return loadFromVault(client, name, out)
 	}
 	return readFallbackYAML(diskPath(name), out)

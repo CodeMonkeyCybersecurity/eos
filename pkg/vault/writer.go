@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/hashicorp/vault/api"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,8 +20,8 @@ import (
 //
 
 // Save stores a struct in Vault or falls back to disk if unavailable.
-func save(name string, data any) error {
-	if isAvailable() {
+func Save(client *api.Client, name string, data any) error {
+	if IsVaultAvailable(client) {
 		return writeVaultJSON(vaultPath(name), data)
 	}
 	return writeFallbackYAML(diskPath(name), data)

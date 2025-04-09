@@ -3,8 +3,6 @@ package vault
 
 var (
 	SetupVaultAgent       = setupVaultAgent
-	IsAvailable           = isAvailable
-	Save                  = save
 	Remember              = remember
 	VaultPath             = vaultPath
 	DiskPath              = diskPath
@@ -17,11 +15,7 @@ var (
 	SetVaultEnv           = setVaultEnv
 	Purge                 = purge
 	WriteFallbackSecrets  = writeFallbackSecrets
-	CheckVaultSecrets     = checkVaultSecrets
-	RevokeRootToken       = revokeRootToken
 	LoadVaultSecureData   = loadVaultSecureData
 	PrintNextSteps        = printNextSteps
-	CheckVaultProcesses   = checkVaultProcesses
 	Load                  = load
-	SaveSecret            = saveSecret
 )

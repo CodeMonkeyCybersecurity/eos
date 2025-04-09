@@ -24,7 +24,13 @@ into Vault, then removes them from disk if the sync is successful.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		vault.SetVaultEnv()
 
-		if !vault.IsAvailable() {
+		client, err := vault.NewClient()
+		if err != nil {
+			fmt.Println("❌ Failed to create Vault client:", err)
+			return nil
+		}
+
+		if !vault.IsVaultAvailable(client) {
 			fmt.Println("Vault is not currently available — skipping secret sync.")
 			return nil
 		}
@@ -57,7 +63,7 @@ into Vault, then removes them from disk if the sync is successful.`,
 				continue
 			}
 
-			if err := vault.Save(base, data); err != nil {
+			if err := vault.Save(client, base, data); err != nil {
 				log.Warn("Failed to store fallback data to Vault", zap.Error(err))
 				continue
 			}

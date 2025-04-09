@@ -1,4 +1,3 @@
-// pkg/vault/fallback.go
 package vault
 
 import (
@@ -10,7 +9,12 @@ import (
 func handleFallbackOrStore(name string, secrets map[string]string) error {
 	setVaultEnv()
 
-	if isAvailable() {
+	client, err := NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to create Vault client: %w", err)
+	}
+
+	if IsVaultAvailable(client) {
 		fmt.Println("🔐 Vault is available. Storing secrets securely.")
 		return saveToVault(name, secrets)
 	}
@@ -27,7 +31,7 @@ func handleFallbackOrStore(name string, secrets map[string]string) error {
 			if err != nil {
 				return fmt.Errorf("failed to create Vault client: %w", err)
 			}
-			return deployAndStoreSecrets(client, name, secrets)
+			return DeployAndStoreSecrets(client, name, secrets)
 		},
 		"disk": func() error {
 			return interaction.WriteFallbackSecrets(name, secrets)

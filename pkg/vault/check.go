@@ -1,9 +1,8 @@
-/* pkg/vault/check.go */
-
 package vault
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,27 +11,29 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
-	"go.uber.org/zap"
+	"github.com/hashicorp/vault/api"
 )
 
-// CheckVaultProcesses logs if any Vault-related processes are still running.
-func checkVaultProcesses(log *zap.Logger) {
+// CheckVaultProcesses prints if any Vault-related processes are still running.
+func CheckVaultProcesses() {
 	output, err := utils.GrepProcess("vault")
 	if err != nil {
-		log.Warn("Failed to check Vault processes", zap.Error(err))
+		fmt.Println("⚠️ Failed to check Vault processes:", err)
 		return
 	}
 
 	if strings.TrimSpace(output) != "" {
-		log.Warn("Potential Vault processes still running", zap.String("output", output))
+		fmt.Println("⚠️ Potential Vault processes still running:\n", output)
 	} else {
-		log.Info("No Vault processes detected — system appears clean.")
+		fmt.Println("✅ No Vault processes detected — system appears clean.")
 	}
 }
 
 // IsVaultAvailable returns true if Vault is installed and initialized.
-func isAvailable() bool {
-	return isInstalled() && isInitialized()
+func IsVaultAvailable(client *api.Client) bool {
+	installed := isInstalled()
+	initialized, err := isVaultInitialized(client)
+	return installed && err == nil && initialized
 }
 
 func isInstalled() bool {
@@ -40,16 +41,20 @@ func isInstalled() bool {
 	return err == nil
 }
 
-func isInitialized() bool {
-	out, err := exec.Command("vault", "status", "-format=json").CombinedOutput()
-	return err == nil && strings.Contains(string(out), `"initialized": true`)
+func isVaultInitialized(client *api.Client) (bool, error) {
+	status, err := client.Sys().Health()
+	if err != nil {
+		return false, err
+	}
+	return status.Initialized, nil
 }
 
-func checkVaultSecrets(storedHashes []string, hashedRoot string) {
+// CheckVaultSecrets verifies that entered unseal keys and root token match the stored hashes.
+func CheckVaultSecrets(storedHashes []string, hashedRoot string) {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Println("Please re-enter three unique unseal keys (any order) and the root token:")
+		fmt.Println("🔐 Please re-enter three unique unseal keys (any order) and the root token:")
 
 		keys, err := interaction.PromptInputs(reader, "Enter Unseal Key", 3)
 		if err != nil {
@@ -65,17 +70,36 @@ func checkVaultSecrets(storedHashes []string, hashedRoot string) {
 		root := rootInput[0]
 
 		if !crypto.AllUnique(keys) {
-			fmt.Println("The unseal keys must be unique. Please try again.")
+			fmt.Println("❌ The unseal keys must be unique. Please try again.")
 			continue
 		}
 
 		hashedInputs := crypto.HashStrings(keys)
 		if !crypto.AllHashesPresent(hashedInputs, storedHashes) || crypto.HashString(root) != hashedRoot {
-			fmt.Println("Oops, one or more values are incorrect. Please try again.")
+			fmt.Println("❌ One or more values are incorrect. Please try again.")
 			continue
 		}
 
 		fmt.Println("✅ Confirmation successful.")
 		break
 	}
+}
+
+// TestKVSecret writes and reads a test secret from the KV engine.
+func TestKVSecret(client *api.Client) error {
+	fmt.Println("\n[6/10] Writing and reading test secret...")
+
+	kv := client.KVv2("secret")
+
+	if _, err := kv.Put(context.Background(), "hello", map[string]interface{}{"value": "world"}); err != nil {
+		return fmt.Errorf("failed to write test secret: %w", err)
+	}
+
+	secret, err := kv.Get(context.Background(), "hello")
+	if err != nil {
+		return fmt.Errorf("failed to read test secret: %w", err)
+	}
+
+	fmt.Println("✅ Test secret value:", secret.Data["value"])
+	return nil
 }
