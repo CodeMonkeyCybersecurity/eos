@@ -1,5 +1,3 @@
-/* pkg/vault/writer.go */
-
 package vault
 
 import (
@@ -22,27 +20,25 @@ import (
 // Save stores a struct in Vault or falls back to disk if unavailable.
 func Save(client *api.Client, name string, data any) error {
 	if IsVaultAvailable(client) {
-		return writeVaultJSON(vaultPath(name), data)
+		return saveToVault(name, data)
 	}
+
+	fmt.Println("⚠️ Vault not available — using fallback disk write.")
 	return writeFallbackYAML(diskPath(name), data)
 }
 
-// write puts raw key-value data into Vault at the given path.
-func write(path string, data map[string]interface{}) error {
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	cmd := exec.Command("vault", "kv", "put", path)
-	cmd.Stdin = strings.NewReader(string(jsonData))
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+// saveToVault writes a structured secret to Vault using a standard namespaced path.
+func saveToVault(name string, in any) error {
+	return writeVaultJSON(vaultPath(name), in)
 }
 
-// writeVaultJSON marshals `in` to JSON, flattens, and writes to Vault at the given path.
+// SaveSecret writes a map directly to Vault.
+func SaveSecret(client *api.Client, path string, data map[string]interface{}) error {
+	_, err := client.Logical().Write(path, data)
+	return err
+}
+
+// writeVaultJSON marshals `in` to JSON, flattens, and writes to Vault at the given path using the Vault CLI.
 func writeVaultJSON(path string, in any) error {
 	b, err := json.Marshal(in)
 	if err != nil {
@@ -66,7 +62,27 @@ func writeVaultJSON(path string, in any) error {
 	return nil
 }
 
-// writeFallbackJSON writes any struct as YAML to a fallback path on disk.
+// write uses stdin to pass data to Vault's CLI as JSON.
+// (Legacy - not used in Save. Kept for future flexibility.)
+func write(path string, data map[string]interface{}) error {
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	cmd := exec.Command("vault", "kv", "put", path)
+	cmd.Stdin = strings.NewReader(string(jsonData))
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+//
+// === Fallback (YAML) Helpers ===
+//
+
+// writeFallbackYAML writes any struct as YAML to a fallback path on disk.
 func writeFallbackYAML(path string, data any) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
@@ -86,21 +102,7 @@ func writeFallbackYAML(path string, data any) error {
 	return nil
 }
 
-// saveToVault writes a structured secret to Vault using a standard path.
-func saveToVault(name string, in any) error {
-	return writeVaultJSON(fmt.Sprintf("secret/eos/%s/config", name), in)
-}
-
-// writeStruct is an alias for writeVaultJSON.
-func writeStruct(path string, v interface{}) error {
-	return writeVaultJSON(path, v)
-}
-
-//
-// === Fallback (YAML) Helpers ===
-//
-
-// writeFallbackSecrets writes fallback secrets as YAML to a secure path on disk.
+// writeFallbackSecrets writes fallback secrets as YAML to a fixed secure path on disk.
 func writeFallbackSecrets(secrets map[string]string) error {
 	if err := os.MkdirAll(filepath.Dir(fallbackSecretsPath), 0700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
@@ -118,4 +120,9 @@ func writeFallbackSecrets(secrets map[string]string) error {
 	fmt.Printf("✅ Fallback credentials saved to %s\n", fallbackSecretsPath)
 	fmt.Println("💡 Run `eos vault sync` later to upload them to Vault.")
 	return nil
+}
+
+// writeStruct is an alias for writeVaultJSON (kept for compatibility).
+func writeStruct(path string, v interface{}) error {
+	return writeVaultJSON(path, v)
 }

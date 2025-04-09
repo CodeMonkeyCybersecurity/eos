@@ -87,11 +87,6 @@ func RevokeRootToken(client *api.Client, token string) error {
 	return nil
 }
 
-func SaveSecret(client *api.Client, path string, data map[string]interface{}) error {
-	_, err := client.Logical().Write(path, data)
-	return err
-}
-
 // 0. Install Vault via dnf if not already installed
 func InstallVaultViaDnf() error {
 	fmt.Println("[0/10] Checking if Vault is installed...")
@@ -124,16 +119,16 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	if err != nil {
 		if IsAlreadyInitialized(err) {
 			fmt.Println("⚠️ Vault already initialized.")
-		
+
 			// 1. Try to load from fallback YAML first
 			var initRes api.InitResponse
 			if err := readFallbackYAML(diskPath("vault-init"), &initRes); err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w", err)
 			}
-		
+
 			// 2. Use the token to authenticate the client
 			client.SetToken(initRes.RootToken)
-		
+
 			// 3. Optionally try to re-load from Vault to verify
 			var vaultRes api.InitResponse
 			if err := loadFromVault(client, "vault-init", &vaultRes); err != nil {
@@ -141,7 +136,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 			} else {
 				initRes = vaultRes
 			}
-		
+
 			return client, &initRes, nil
 		}
 		return nil, nil, fmt.Errorf("init failed: %w", err)
