@@ -5,24 +5,33 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
+// setupVaultAgent configures the Vault Agent to run as the eos user.
 func setupVaultAgent(password string) error {
 	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
 
 	if err := writeAgentConfig(); err != nil {
+		zap.L().Error("Failed to write agent config", zap.Error(err))
 		return err
 	}
 	if err := writeAgentPassword(password); err != nil {
+		zap.L().Error("Failed to write agent password", zap.Error(err))
 		return err
 	}
 	if err := writeSystemdUnit(); err != nil {
+		zap.L().Error("Failed to write systemd unit", zap.Error(err))
 		return err
 	}
 	if err := prepareRuntimeDir(); err != nil {
+		zap.L().Error("Failed to prepare runtime directory", zap.Error(err))
 		return err
 	}
 	if err := reloadAndStartService(); err != nil {
+		zap.L().Error("Failed to reload/start service", zap.Error(err))
 		return err
 	}
 
@@ -30,7 +39,7 @@ func setupVaultAgent(password string) error {
 	return nil
 }
 
-// --- Helpers ---
+// --- Helper Functions ---
 
 func writeAgentConfig() error {
 	content := `
@@ -55,11 +64,21 @@ vault {
 cache {
   use_auto_auth_token = true
 }`
-	return os.WriteFile("/etc/vault-agent-eos.hcl", []byte(strings.TrimSpace(content)+"\n"), 0644)
+	configPath := "/etc/vault-agent-eos.hcl"
+	if err := os.WriteFile(configPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write Vault Agent config to %s: %w", configPath, err)
+	}
+	fmt.Printf("✅ Vault Agent config written to %s\n", configPath)
+	return nil
 }
 
 func writeAgentPassword(password string) error {
-	return os.WriteFile("/etc/vault-agent-eos.pass", []byte(password+"\n"), 0600)
+	passPath := "/etc/vault-agent-eos.pass"
+	if err := os.WriteFile(passPath, []byte(password+"\n"), 0600); err != nil {
+		return fmt.Errorf("failed to write Vault Agent password to %s: %w", passPath, err)
+	}
+	fmt.Printf("✅ Vault Agent password file written to %s\n", passPath)
+	return nil
 }
 
 func writeSystemdUnit() error {
@@ -78,14 +97,23 @@ RuntimeDirectoryMode=0750
 
 [Install]
 WantedBy=multi-user.target`
-	return os.WriteFile("/etc/systemd/system/vault-agent-eos.service", []byte(strings.TrimSpace(unit)+"\n"), 0644)
+	unitPath := "/etc/systemd/system/vault-agent-eos.service"
+	if err := os.WriteFile(unitPath, []byte(strings.TrimSpace(unit)+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write systemd unit file to %s: %w", unitPath, err)
+	}
+	fmt.Printf("✅ Systemd unit file written to %s\n", unitPath)
+	return nil
 }
 
 func prepareRuntimeDir() error {
-	if err := os.MkdirAll("/run/eos", 0750); err != nil {
-		return fmt.Errorf("create /run/eos: %w", err)
+	dir := "/run/eos"
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create %s: %w", dir, err)
 	}
-	return os.Chown("/run/eos", 0, 0)
+	if err := os.Chown(dir, 0, 0); err != nil {
+		return fmt.Errorf("failed to change ownership of %s: %w", dir, err)
+	}
+	return nil
 }
 
 func reloadAndStartService() error {
@@ -96,9 +124,41 @@ func reloadAndStartService() error {
 		{"systemctl", "enable", "--now", "vault-agent-eos.service"},
 	}
 	for _, args := range cmds {
-		if err := exec.Command(args[0], args[1:]...).Run(); err != nil {
-			return fmt.Errorf("failed to run %v: %w", args, err)
+		cmd := exec.Command(args[0], args[1:]...)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("failed to run %v: %w, output: %s", args, err, string(output))
 		}
 	}
+	return nil
+}
+
+// applyAdminPolicy applies a full-access ("eos-full") policy via the Vault API and updates the admin user.
+// Note: UserpassCreds is assumed to be defined in this package.
+func ApplyAdminPolicy(creds UserpassCreds, client *api.Client) error {
+	const policyName = "eos-full"
+	const policyContent = `
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list"]
+}`
+
+	fmt.Println("Creating full-access policy for admin.")
+	// Apply policy using the Vault API.
+	if err := client.Sys().PutPolicy(policyName, policyContent); err != nil {
+		zap.L().Error("Failed to apply policy via API", zap.Error(err))
+		return err
+	}
+	zap.L().Info("✅ Custom policy applied via API", zap.String("policy", policyName))
+
+	// Update the admin user with the policy using the Vault API.
+	_, err := client.Logical().Write("auth/userpass/users/admin", map[string]interface{}{
+		"password": creds.Password,
+		"policies": policyName,
+	})
+	if err != nil {
+		zap.L().Error("Failed to update admin user with policy", zap.Error(err))
+		return err
+	}
+	zap.L().Info("✅ Admin user updated with full privileges", zap.String("policy", policyName))
 	return nil
 }

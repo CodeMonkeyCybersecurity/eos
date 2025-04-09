@@ -3,15 +3,9 @@
 package secure
 
 import (
-	"fmt"
-	"os"
-	"os/exec"
-	"strings"
-
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -25,74 +19,39 @@ distributed the unseal keys and root token, then revokes the root token and upda
 full (root-level) privileges. Finally, it deletes the stored initialization file.
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-
+		// Set the Vault environment (VAULT_ADDR, etc.)
 		vault.SetVaultEnv()
 
+		// Create a Vault client using the Vault API.
 		client, err := vault.NewClient()
 		if err != nil {
 			log.Fatal("Failed to create Vault client", zap.Error(err))
 		}
+		log.Info("✅ Created new vault client")
 
+		log.Info("Loading the stored initialization data and EOS user credentials...")
 		initRes, creds, storedHashes, hashedRoot := vault.LoadVaultSecureData(client)
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
-		applyAdminPolicy(creds)
+		log.Info("✅ Loaded the stored initialization data and EOS user credentials")
 
+		log.Info("Applying permissive policy (eos-full) via the API for eos system user...")
+		vault.ApplyAdminPolicy(creds, client)
+		log.Info("✅ Policy applied")
+
+		log.Info("Revoking the root token now that the Eos admin user has been configured....")
 		vault.RevokeRootToken(client, initRes.RootToken)
+		log.Info("✅ Done")
+
+		log.Info("Cleaning up the stored initialization file...")
 		platform.CleanupFile("vault_init.json")
+		log.Info("✅ Done")
+
+		log.Info("Informing the user of the next steps...")
 		vault.PrintNextSteps()
+		log.Info("✅ Done")
+
 		return nil
 	}),
-}
-
-func applyAdminPolicy(creds vault.UserpassCreds) {
-	const (
-		policyName    = "admin-full"
-		policyPath    = "/tmp/admin-full.hcl"
-		policyContent = `
-path "*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-}`
-	)
-
-	fmt.Println("Creating full-access policy for admin...")
-
-	// Write the policy file to disk
-	if err := os.WriteFile(policyPath, []byte(policyContent), 0600); err != nil {
-		log.Fatal("Failed to write policy file", zap.Error(err))
-	}
-	defer func() {
-		if err := os.Remove(policyPath); err != nil {
-			log.Warn("Failed to delete temp policy file", zap.Error(err))
-		} else {
-			fmt.Println("Temporary policy file deleted.")
-		}
-	}()
-
-	// Apply policy to Vault
-	if err := runVaultCmd("policy", "write", policyName, policyPath); err != nil {
-		log.Fatal("Failed to apply policy to Vault", zap.Error(err))
-	}
-	fmt.Println("✅ Custom policy applied to Vault.")
-
-	// Attach policy to admin user
-	err := runVaultCmd("write",
-		"auth/userpass/users/admin",
-		"policies="+policyName,
-		fmt.Sprintf("password=%s", creds.Password),
-	)
-	if err != nil {
-		log.Fatal("Failed to update admin user with policy", zap.Error(err))
-	}
-	fmt.Println("✅ Admin user updated with full privileges.")
-}
-
-func runVaultCmd(args ...string) error {
-	cmd := exec.Command("vault", args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("❌ Vault command failed: %s\n%s\n", strings.Join(args, " "), string(output))
-	}
-	return err
 }
 
 func init() {

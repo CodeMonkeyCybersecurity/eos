@@ -19,34 +19,34 @@ import (
 
 // Save stores a struct in Vault using the API or falls back to disk if the API call fails.
 func Save(client *api.Client, name string, data any) error {
-    // Try saving using the API.
-    if err := saveToVaultAPI(client, name, data); err == nil {
-        return nil
-    } else {
-        fmt.Println("⚠️ Vault API write failed — falling back to disk:", err)
-        return writeFallbackYAML(diskPath(name), data)
-    }
+	// Try saving using the API.
+	if err := saveToVaultAPI(client, name, data); err == nil {
+		return nil
+	} else {
+		fmt.Println("⚠️ Vault API write failed — falling back to disk:", err)
+		return writeFallbackYAML(diskPath(name), data)
+	}
 }
 
 // saveToVaultAPI marshals data and writes it via the Vault API.
 func saveToVaultAPI(client *api.Client, name string, data any) error {
-    // Marshal the data to a map (so it can be written as key-value pairs).
-    b, err := json.Marshal(data)
-    if err != nil {
-        return fmt.Errorf("json marshal: %w", err)
-    }
-    var m map[string]interface{}
-    if err := json.Unmarshal(b, &m); err != nil {
-        return fmt.Errorf("json unmarshal: %w", err)
-    }
-    // Construct the standard namespaced path.
-    path := vaultPath(name)
-    // Use the Vault API to write the data.
-    _, err = client.Logical().Write(path, m)
-    if err != nil {
-        return fmt.Errorf("vault API write failed: %w", err)
-    }
-    return nil
+	// Marshal the data to a map (so it can be written as key-value pairs).
+	b, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("json marshal: %w", err)
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return fmt.Errorf("json unmarshal: %w", err)
+	}
+	// Construct the standard namespaced path.
+	path := vaultPath(name)
+	// Use the Vault API to write the data.
+	_, err = client.Logical().Write(path, m)
+	if err != nil {
+		return fmt.Errorf("vault API write failed: %w", err)
+	}
+	return nil
 }
 
 // saveToVault writes a structured secret to Vault using a standard namespaced path.
