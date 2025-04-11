@@ -81,7 +81,8 @@ func deployK3s() {
 
 	var installCmd string
 
-	if role == "server" {
+	switch role {
+	case "server":
 		// Ask for TLS SAN with default
 		fmt.Print("Enter TLS SAN (default: cluster.k3s.domain.com): ")
 		tlsSANInput, _ := reader.ReadString('\n')
@@ -95,7 +96,7 @@ func deployK3s() {
 			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
 		}
 
-	} else if role == "worker" {
+	case "worker":
 		// Ask for the server URL and node token
 		fmt.Print("Enter the K3s server URL (e.g., https://server-ip:6443): ")
 		serverURLInput, _ := reader.ReadString('\n')
@@ -121,7 +122,7 @@ func deployK3s() {
 			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
 		}
 
-	} else {
+	default:
 		fmt.Println("Invalid role. Please enter 'server' or 'worker'.")
 		os.Exit(1)
 	}

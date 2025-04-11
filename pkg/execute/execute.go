@@ -74,7 +74,7 @@ func ExecuteAndLog(name string, args ...string) error {
 
 // joinArgs formats arguments for display
 func joinArgs(args []string) string {
-	return fmt.Sprintf("%s", shellQuote(args))
+	return shellQuote(args)
 }
 
 // shellQuote ensures args are properly quoted for visibility

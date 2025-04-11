@@ -45,10 +45,7 @@ func TryLoadFromEnv() *LDAPConfig {
 		}
 	}
 
-	useTLS := false
-	if os.Getenv("LDAP_USE_TLS") == "true" {
-		useTLS = true
-	}
+	useTLS := os.Getenv("LDAP_USE_TLS") == "true"
 
 	return &LDAPConfig{
 		FQDN:         fqdn,

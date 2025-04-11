@@ -252,7 +252,7 @@ func createRecord(token, zoneID, name, ip string) error {
 			responseBody.String(),
 		)
 		log.Error("createRecord: unexpected status", zap.String("error", errMsg))
-		return fmt.Errorf(errMsg)
+		return errors.New(errMsg)
 	}
 
 	var recordResp RecordResponse

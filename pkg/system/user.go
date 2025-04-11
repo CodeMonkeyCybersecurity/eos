@@ -116,7 +116,7 @@ func CreateEosUser(auto bool, loginShell bool) (string, error) {
 		fmt.Println("⚠️ Warning: Could not save password to disk.")
 	} else {
 		defer f.Close()
-		f.WriteString(fmt.Sprintf("eos:%s\n", password))
+		fmt.Fprintf(f, "eos:%s\n", password)
 		fmt.Printf("🔐 eos password saved to: %s\n", outFile)
 		fmt.Println("💡 Please store this password in a secure password manager.")
 	}

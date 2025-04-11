@@ -44,10 +44,11 @@ var CreatePostfixCmd = &cobra.Command{
 		}
 
 		// Start/restart service
-		if osType == "debian" {
+		switch osType {
+		case "debian":
 			execute.Execute("postfix", "start")
 			execute.Execute("postfix", "status")
-		} else if osType == "rhel" {
+		case "rhel":
 			execute.ExecuteShell("service postfix restart")
 		}
 
@@ -87,11 +88,12 @@ var CreatePostfixCmd = &cobra.Command{
 		execute.Execute("chmod", "0600", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db")
 
 		// Restart postfix
-		if osType == "debian" {
+		switch osType {
+		case "debian":
 			if err := execute.Execute("systemctl", "restart", "postfix"); err != nil {
 				execute.Execute("postfix", "reload")
 			}
-		} else if osType == "rhel" {
+		case "rhel":
 			execute.ExecuteShell("service postfix restart")
 		}
 

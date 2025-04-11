@@ -101,7 +101,7 @@ func ValidateStrongPassword(input string) error {
 		}
 	}
 
-	if !(hasUpper && hasLower && hasDigit && hasSymbol) {
+	if !hasUpper || !hasLower || !hasDigit || !hasSymbol {
 		return errors.New("password must include upper/lower case letters, numbers, and symbols")
 	}
 

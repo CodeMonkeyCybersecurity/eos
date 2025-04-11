@@ -131,7 +131,7 @@ func confirmConfig(cfg Config) Config {
 			fmt.Printf("Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("Configuration updated.\n")
+		fmt.Println("Configuration updated.")
 	}
 	return cfg
 }
