@@ -1,4 +1,4 @@
-package main
+package create
 
 import (
 	"bufio"
@@ -6,10 +6,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-)
 
-// File used to save last entered values.
-const LastValuesFile = ".hecate.conf"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+)
 
 // runCommand executes a command represented as a slice of strings.
 // It prints the command, attaches Stdout/Stderr, and returns an error if the command fails.
@@ -25,7 +24,7 @@ func runCommand(cmd []string) error {
 // If the file does not exist, an empty map is returned.
 func loadLastValues() (map[string]string, error) {
 	values := make(map[string]string)
-	file, err := os.Open(LastValuesFile)
+	file, err := os.Open(hecate.LastValuesFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return values, nil
@@ -55,7 +54,7 @@ func loadLastValues() (map[string]string, error) {
 
 // saveLastValues writes the provided key/value pairs to .hecate.conf.
 func saveLastValues(values map[string]string) error {
-	file, err := os.Create(LastValuesFile)
+	file, err := os.Create(hecate.LastValuesFile)
 	if err != nil {
 		return err
 	}
