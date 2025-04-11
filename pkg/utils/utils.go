@@ -98,8 +98,6 @@ func OrganizeAssetsForDeployment(app string) error {
 
 		return nil
 	})
-	if err != nil {
-	}
 	return err
 }
 

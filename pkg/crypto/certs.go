@@ -23,15 +23,19 @@ func EnsureCertificates(appName, baseDomain, email string) error {
 	// Check if the private key exists.
 	if _, err := os.Stat(privKey); os.IsNotExist(err) {
 		// Execute certbot to obtain a certificate.
-		cmd := exec.Command("sudo", "certbot", "certonly", "--standalone", "--preferred-challenges", "http", "-d", fqdn, "-m", email, "--agree-tos", "--non-interactive")
-		_, err := cmd.CombinedOutput()
+		cmd := exec.Command("sudo", "certbot", "certonly", "--standalone",
+			"--preferred-challenges", "http", "-d", fqdn, "-m", email,
+			"--agree-tos", "--non-interactive")
+		output, err := cmd.CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("failed to generate certificate: %w", err)
+			return fmt.Errorf("failed to generate certificate: %w\nOutput: %s", err, output)
 		}
 		// In production, you would move or copy the generated certificates to certDir.
 	} else if _, err := os.Stat(fullChain); os.IsNotExist(err) {
-		return fmt.Errorf("fullchain certificate missing")
-	} else {
+		// If the private key exists but the fullchain is missing, return an error.
+		return fmt.Errorf("fullchain certificate missing for domain %s", fqdn)
 	}
+
+	// If both files exist, no action is needed.
 	return nil
 }

@@ -42,7 +42,10 @@ func ConnectWithConfig() (*ldap.Conn, *LDAPConfig, error) {
 
 	err = conn.Bind(cfg.BindDN, cfg.Password)
 	if err != nil {
-		conn.Close()
+		// Check the error return from conn.Close() when binding fails.
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("failed to close LDAP connection after bind failure: %v\n", cerr)
+		}
 		return nil, nil, fmt.Errorf("failed to bind to LDAP as %s: %w", cfg.BindDN, err)
 	}
 
@@ -67,7 +70,10 @@ func ConnectWithGivenConfig(cfg *LDAPConfig) (*ldap.Conn, error) {
 	}
 
 	if err := conn.Bind(cfg.BindDN, cfg.Password); err != nil {
-		conn.Close()
+		// Check the error return from conn.Close() when binding fails.
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("failed to close LDAP connection after bind failure: %v\n", cerr)
+		}
 		return nil, fmt.Errorf("failed to bind to LDAP as %s: %w", cfg.BindDN, err)
 	}
 

@@ -9,13 +9,10 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 )
 
-var log = logger.L()
 var timestampFlag string
 
 // RestoreCmd represents the restore command.

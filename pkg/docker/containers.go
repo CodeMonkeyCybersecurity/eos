@@ -34,8 +34,10 @@ func StopContainersBySubstring(substring string) error {
 		if name == "" {
 			continue
 		}
+		// Attempt to stop the container and log an error if it fails.
 		if err := execute.Execute("docker", "stop", name); err != nil {
-		} else {
+			// Log the error. You can adjust how you log it (e.g. using a logger instead of fmt).
+			fmt.Printf("failed to stop container %s: %v\n", name, err)
 		}
 	}
 	return nil

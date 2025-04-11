@@ -21,7 +21,13 @@ func UncommentSegment(segmentComment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", dockerComposePath, err)
 	}
-	defer inputFile.Close()
+	// Defer a closure that checks the error return from Close.
+	defer func() {
+		if err := inputFile.Close(); err != nil {
+			// Optionally, log or print this error.
+			fmt.Fprintf(os.Stderr, "failed to close input file: %v\n", err)
+		}
+	}()
 
 	var lines []string
 	scanner := bufio.NewScanner(inputFile)
@@ -64,7 +70,12 @@ func UncommentSegment(segmentComment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file for writing %s: %w", dockerComposePath, err)
 	}
-	defer outputFile.Close()
+	// Defer a closure that checks the error return from Close.
+	defer func() {
+		if err := outputFile.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to close output file: %v\n", err)
+		}
+	}()
 
 	for _, l := range lines {
 		_, _ = fmt.Fprintln(outputFile, l)

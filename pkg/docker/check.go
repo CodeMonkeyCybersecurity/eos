@@ -42,13 +42,14 @@ func CheckIfDockerComposeInstalled() error {
 	return fmt.Errorf("docker compose not found")
 }
 
-// RunCommand executes a command and returns an error if it fails.
+/* RunCommand executes a command and returns an error if it fails. */
 func RunCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	err := cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("failed to execute command %s: %v\n", name, err)
+		return err
 	}
-	return err
+	return nil
 }

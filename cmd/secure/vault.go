@@ -20,7 +20,12 @@ full (root-level) privileges. Finally, it deletes the stored initialization file
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		// Set the Vault environment (VAULT_ADDR, etc.)
-		vault.SetVaultEnv()
+		addr, err := vault.SetVaultEnv()
+		if err != nil {
+			log.Error("Failed to set Vault environment", zap.Error(err))
+			return err
+		}
+		log.Info("Vault environment set", zap.String("VAULT_ADDR", addr))
 
 		// Create a Vault client using the Vault API.
 		client, err := vault.NewClient()
@@ -35,11 +40,17 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("✅ Loaded the stored initialization data and EOS user credentials")
 
 		log.Info("Applying permissive policy (eos-full) via the API for eos system user...")
-		vault.ApplyAdminPolicy(creds, client)
+		if err := vault.ApplyAdminPolicy(creds, client); err != nil {
+			log.Error("Failed to apply admin policy", zap.Error(err))
+			return err
+		}
 		log.Info("✅ Policy applied")
 
 		log.Info("Revoking the root token now that the Eos admin user has been configured....")
-		vault.RevokeRootToken(client, initRes.RootToken)
+		if err := vault.RevokeRootToken(client, initRes.RootToken); err != nil {
+			log.Error("Failed to revoke root token", zap.Error(err))
+			return err
+		}
 		log.Info("✅ Done")
 
 		log.Info("Cleaning up the stored initialization file...")
