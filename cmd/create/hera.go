@@ -4,8 +4,10 @@ package create
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -24,11 +26,11 @@ var CreateHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deploy Hera (Authentik) for self-service identity & access management",
 	Long: `Deploy Hera (Authentik) to /opt/hera by:
-- Downloading the latest docker-compose.yml from goauthentik.io
+- Using a local docker-compose file if available, otherwise downloading the latest from goauthentik.io
 - Generating secrets and writing them to a .env file
 - Creating the external Docker network 'arachne-net'
-- Running docker compose up -d
-- Displaying service status and access URL`,
+- Fixing directory ownership for proper volume permissions
+- Running docker compose up -d and displaying service status & access URL`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("🚀 Starting Hera (Authentik) deployment")
@@ -41,10 +43,34 @@ var CreateHeraCmd = &cobra.Command{
 			}
 		}
 
-		// Download the latest docker-compose.yml
-		log.Info("📦 Downloading latest docker-compose.yml")
-		if err := execute.ExecuteInDir(consts.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
-			log.Fatal("Failed to download docker-compose.yml", zap.Error(err))
+		// Check for a local docker-compose file in current directory
+		var composeFiles []string
+		localYml, err := filepath.Glob("docker-compose.yml")
+		if err != nil {
+			log.Warn("Error globbing docker-compose.yml", zap.Error(err))
+		}
+		localYaml, err := filepath.Glob("docker-compose.yaml")
+		if err != nil {
+			log.Warn("Error globbing docker-compose.yaml", zap.Error(err))
+		}
+		composeFiles = append(composeFiles, localYml...)
+		composeFiles = append(composeFiles, localYaml...)
+
+		if len(composeFiles) > 0 {
+			// Use local docker-compose file(s)
+			for _, file := range composeFiles {
+				destFile := filepath.Join(consts.HeraDir, filepath.Base(file))
+				log.Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
+				if err := copyFile(file, destFile); err != nil {
+					log.Fatal("Failed to copy docker-compose file", zap.Error(err))
+				}
+			}
+		} else {
+			// Download the latest docker-compose.yml from the remote URL
+			log.Info("📦 Downloading latest docker-compose.yml")
+			if err := execute.ExecuteInDir(consts.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
+				log.Fatal("Failed to download docker-compose.yml", zap.Error(err))
+			}
 		}
 
 		// Generate secrets
@@ -80,13 +106,22 @@ var CreateHeraCmd = &cobra.Command{
 			"AUTHENTIK_EMAIL__FROM=authentik@localhost",
 		}
 
-		envPath := consts.HeraDir + "/.env"
+		envPath := filepath.Join(consts.HeraDir, ".env")
 		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
 			log.Fatal("Failed to write .env file", zap.Error(err))
 		}
 		log.Info("✅ .env file created", zap.String("path", envPath))
 
-		// Ensure external network
+		// Fix directory ownership so the container can write as needed.
+		log.Info("🔧 Fixing ownership of directory", zap.String("path", consts.HeraDir))
+		chownCmd := exec.Command("chown", "-R", "472:472", consts.HeraDir)
+		chownCmd.Stdout = os.Stdout
+		chownCmd.Stderr = os.Stderr
+		if err := chownCmd.Run(); err != nil {
+			log.Fatal("Error running chown", zap.Error(err))
+		}
+
+		// Ensure external network is present
 		if err := docker.EnsureArachneNetwork(); err != nil {
 			log.Fatal("Could not create or verify arachne-net", zap.Error(err))
 		}
@@ -118,4 +153,40 @@ var CreateHeraCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(CreateHeraCmd)
+}
+
+// copyFile copies a file from src to dst while preserving file permissions.
+func copyFile(src, dst string) error {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	// Ensure that the source is a regular file.
+	if !sourceFileStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destination.Close()
+
+	if _, err := io.Copy(destination, source); err != nil {
+		return err
+	}
+
+	// Copy the file permissions from source to destination.
+	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
+		return err
+	}
+
+	return nil
 }
