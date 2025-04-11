@@ -17,15 +17,14 @@ import (
 
 // DeleteCmd is the root command for delete operations
 var DeleteCmd = &cobra.Command{
-	Use:   "delete",
-	Short: "Delete resources (e.g., processes, users, storage)",
+	Use:     "delete",
+	Aliases: []string{"remove", "uninstall", "rm"},
+	Short:   "Delete resources (e.g., processes, users, storage)",
 	Long: `The delete command allows you to remove various resources such as processes, users, or storage.
 For example:
 	eos delete trivy 
 	eos delete vault
 	eos delete umami`,
-
-	Aliases: []string{"remove", "uninstall", "rm"},
 
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()

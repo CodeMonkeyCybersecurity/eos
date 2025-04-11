@@ -11,7 +11,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/apt"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -23,7 +22,7 @@ var CreateDockerCmd = &cobra.Command{
 	Short: "Install Docker and configure it for non-root usage",
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+		// Assume that 'log' is globally defined or available in context.
 		utils.RequireRoot(log)
 
 		log.Info("Uninstalling conflicting Docker packages...")
@@ -40,9 +39,9 @@ var CreateDockerCmd = &cobra.Command{
 
 		addDockerRepo(log)
 		installDocker(log)
-		verifyDockerHelloWorld(true)
+		verifyDockerHelloWorld(log, true)
 		setupDockerNonRoot(log)
-		verifyDockerHelloWorld(false)
+		verifyDockerHelloWorld(log, false)
 
 		log.Info("✅ Docker installation and post-install steps complete.")
 		return nil
@@ -59,9 +58,13 @@ func addDockerRepo(log *zap.Logger) {
 	)
 	err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0644)
 	if err != nil {
+		// log.Fatal will exit the application if repo file writing fails.
 		log.Fatal("Error writing Docker repo file", zap.Error(err))
 	}
-	_ = execute.Execute("apt-get", "update")
+	if err := execute.Execute("apt-get", "update"); err != nil {
+		log.Error("Failed to update apt repositories", zap.Error(err))
+		return
+	}
 }
 
 func installDocker(log *zap.Logger) {
@@ -70,20 +73,27 @@ func installDocker(log *zap.Logger) {
 		"docker-ce", "docker-ce-cli", "containerd.io",
 		"docker-buildx-plugin", "docker-compose-plugin",
 	}
-	args := append([]string{"apt-get", "install", "-y"}, packages...)
-	_ = execute.Execute(args[0], args[1:]...)
+	args := append([]string{"apt", "install", "-y"}, packages...)
+
+	if err := execute.Execute(args[0], args[1:]...); err != nil {
+		log.Error("Docker installation failed", zap.Error(err))
+	}
 }
 
-func verifyDockerHelloWorld(useSudo bool) {
+func verifyDockerHelloWorld(log *zap.Logger, useSudo bool) {
 	cmd := []string{"docker", "run", "hello-world"}
 	if useSudo {
 		cmd = append([]string{"sudo"}, cmd...)
 	}
-	_ = execute.Execute(cmd[0], cmd[1:]...)
+	if err := execute.Execute(cmd[0], cmd[1:]...); err != nil {
+		log.Error("'docker run hello-world' failed", zap.Error(err))
+	}
 }
 
 func setupDockerNonRoot(log *zap.Logger) {
-	_ = execute.Execute("groupadd", "docker")
+	if err := execute.Execute("groupadd", "docker"); err != nil {
+		log.Warn("groupadd failed", zap.Error(err))
+	}
 
 	user := os.Getenv("SUDO_USER")
 	if user == "" {
@@ -93,8 +103,12 @@ func setupDockerNonRoot(log *zap.Logger) {
 	if user == "" || user == "root" {
 		log.Warn("No non-root user detected; skipping usermod step.")
 	} else {
-		_ = execute.Execute("usermod", "-aG", "docker", user)
-		log.Sugar().Infof("User '%s' has been added to the docker group.", user)
+		if err := execute.Execute("usermod", "-aG", "docker", user); err != nil {
+			log.Warn("usermod failed", zap.Error(err))
+			return
+		}
+		// Use structured logging instead of fmt.Sprintf-style formatting.
+		log.Info("User has been added to the docker group", zap.String("user", user))
 	}
 	log.Info("Note: Log out and log back in or run 'newgrp docker' to apply group membership.")
 }

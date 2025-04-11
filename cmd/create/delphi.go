@@ -15,8 +15,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
-var log *zap.Logger
-
 var CreateDelphiCmd = &cobra.Command{
 	Use:     "delphi",
 	Aliases: []string{"wazuh"},

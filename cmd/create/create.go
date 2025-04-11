@@ -23,9 +23,17 @@ For example:
 	eos deploy umami`,
 
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		log := logger.L()
-
+		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
-		return cmd.Help()
+		_ = cmd.Help() // Display help if no subcommand is provided
+		return nil
 	}),
+}
+
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
+func init() {
+	// Initialize the shared logger for the entire deploy package
+	log = logger.L()
 }
