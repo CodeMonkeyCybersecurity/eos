@@ -21,7 +21,8 @@ jobs:
         with:
           go-version: 1.23
 
-      - name: Install golangci-lint
+      - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
+          args: --out-format colored-line-number

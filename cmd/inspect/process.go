@@ -245,19 +245,36 @@ func getSystemUptime() float64 {
 	return uptime
 }
 
-// printProcessTable prints the process information in a table format
+/* printProcessTable prints the process information in a table format */
 func printProcessTable(process []ProcessInfo) {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', tabwriter.Debug)
-	fmt.Fprintln(w, "PID\tComm\tState\tName\tUser\tCPU%\tMemory%\tRunning Time")
-	fmt.Fprintln(w, "----\t----\t----\t----\t----\t----\t----\t----")
-	for _, proc := range process {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-			proc.PID, proc.Comm, proc.State, proc.Name, proc.User, proc.CPUPercent, proc.MemPercent, proc.RunTime)
+
+	// Write table header
+	if _, err := fmt.Fprintln(w, "PID\tComm\tState\tName\tUser\tCPU%\tMemory%\tRunning Time"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing header: %v\n", err)
+		return
 	}
-	w.Flush()
+	if _, err := fmt.Fprintln(w, "----\t----\t----\t----\t----\t----\t----\t----"); err != nil {
+		fmt.Fprintf(os.Stderr, "Error writing header divider: %v\n", err)
+		return
+	}
+
+	// Write each process's data in a formatted row.
+	for _, proc := range process {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+			proc.PID, proc.Comm, proc.State, proc.Name, proc.User, proc.CPUPercent, proc.MemPercent, proc.RunTime); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing process info: %v\n", err)
+			return
+		}
+	}
+
+	// Flush the writer and check for errors.
+	if err := w.Flush(); err != nil {
+		fmt.Fprintf(os.Stderr, "Error flushing tabwriter: %v\n", err)
+	}
 }
 
-// init registers subcommands for the read command
+/* init registers subcommands for the read command */
 func init() {
 	InspectCmd.AddCommand(InspectProcessCmd)
 }
