@@ -1,13 +1,17 @@
+/* cmd/hecate/update/update.go */
+
 package update
 
 import (
-	"fmt"
-
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
-// UpdateCmd represents the update command
+var log *zap.Logger
+
+// UpdateCmd represents the "update" command.
 var UpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update configurations and services",
@@ -17,52 +21,55 @@ Examples:
   hecate update certs
   hecate update eos
   hecate update http
-`,
+  hecate update docker-compose`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Update command executed")
-		if len(args) == 0 {
-			fmt.Println("No specific update target provided.")
-		}
+		log.Info("No subcommand provided for update command.", zap.String("command", cmd.Use))
+		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),
 }
 
-// Attach subcommands to UpdateCmd
 func init() {
-	UpdateCmd.AddCommand(runCertsCmd) // ✅ Fix: Use correct variable for subcommand
-	UpdateCmd.AddCommand(runEosCmd)   // ✅ Fix: Use correct variable for subcommand
-	UpdateCmd.AddCommand(runHttpCmd)  // ✅ Fix: Use correct variable for subcommand
+	// Initialize the shared global logger.
+	log = logger.L()
+
+	// Attach subcommands to UpdateCmd.
+	UpdateCmd.AddCommand(runCertsCmd)
+	UpdateCmd.AddCommand(runEosCmd)
+	UpdateCmd.AddCommand(runHttpCmd)
+	// The docker-compose subcommand is defined in docker_compose.go.
+	UpdateCmd.AddCommand(dockerComposeCmd)
 }
 
-// runCertsCmd renews SSL certificates
+// runCertsCmd renews SSL certificates.
 var runCertsCmd = &cobra.Command{
 	Use:   "certs",
 	Short: "Renew SSL certificates",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Renewing SSL certificates...")
-		// Implement logic for renewing certificates
+		log.Info("No subcommand provided for certs command.", zap.String("command", cmd.Use))
+		_ = cmd.Help()
 		return nil
 	}),
 }
 
-// runEosCmd updates the EOS system
+// runEosCmd updates the EOS system.
 var runEosCmd = &cobra.Command{
-	Use:   "github.com/CodeMonkeyCybersecurity/eos",
+	Use:   "eos",
 	Short: "Update EOS system",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Updating EOS system...")
-		// Implement logic for updating EOS
+		log.Info("No subcommand provided for eos command.", zap.String("command", cmd.Use))
+		_ = cmd.Help()
 		return nil
 	}),
 }
 
-// runHttpCmd updates the HTTP server
+// runHttpCmd updates the HTTP server configuration.
 var runHttpCmd = &cobra.Command{
 	Use:   "http",
 	Short: "Update HTTP configurations",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Updating HTTP configurations...")
-		// Implement logic for updating HTTP configurations
+		log.Info("No subcommand provided for http command.", zap.String("command", cmd.Use))
+		_ = cmd.Help()
 		return nil
 	}),
 }
