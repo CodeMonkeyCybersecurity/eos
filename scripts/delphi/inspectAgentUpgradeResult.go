@@ -6,13 +6,14 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"strings"
 
-	"golang.org/x/term"
 	"syscall"
+
+	"golang.org/x/term"
 )
 
 // Config represents the configuration stored in .delphi.json.
@@ -32,7 +33,7 @@ const configFile = ".delphi.json"
 // loadConfig reads the configuration from .delphi.json.
 func loadConfig() (Config, error) {
 	var cfg Config
-	data, err := ioutil.ReadFile(configFile)
+	data, err := os.ReadFile(configFile)
 	if err != nil {
 		return cfg, err
 	}
@@ -46,7 +47,7 @@ func saveConfig(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(configFile, data, 0644)
+	return os.WriteFile(configFile, data, 0644)
 }
 
 // promptInput displays a prompt and reads user input.
@@ -150,7 +151,7 @@ func authenticate(apiURL, username, password string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +168,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 	agentsQuery := strings.Join(agentIDs, ",")
 	queryURL := fmt.Sprintf("%s/agents/upgrade_result?agents_list=%s&pretty=true", apiURL, agentsQuery)
 	fmt.Printf("DEBUG: Requesting upgrade result at %s\n", queryURL)
-	
+
 	// Build payload for upgrade_result request.
 	payloadMap := map[string]interface{}{
 		"origin": map[string]string{
@@ -183,7 +184,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 		return err
 	}
 	fmt.Printf("DEBUG: Payload: %s\n", string(payloadBytes))
-	
+
 	req, err := http.NewRequest("POST", queryURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return err
@@ -197,7 +198,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	respBody, err := ioutil.ReadAll(resp.Body)
+	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -225,7 +226,7 @@ func main() {
 	}
 	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	apiURL = strings.TrimRight(apiURL, "/")
-	
+
 	// Authenticate.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
 	token, err := authenticate(apiURL, cfg.API_User, cfg.API_Password)
@@ -234,7 +235,7 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Println("Authentication successful. JWT token acquired.")
-	
+
 	// Prompt for agent IDs (as strings).
 	agentIDsInput := promptInput("Enter agent IDs to query upgrade result (comma separated)", "")
 	agentIDsSlice := strings.Split(agentIDsInput, ",")
@@ -250,13 +251,13 @@ func main() {
 		fmt.Println("No agent IDs provided.")
 		os.Exit(1)
 	}
-	
+
 	// Query upgrade result.
 	err = queryUpgradeResult(apiURL, token, agentIDs)
 	if err != nil {
 		fmt.Printf("Error querying upgrade result: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	fmt.Println("\nUpgrade result query completed.")
 }

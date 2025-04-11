@@ -1,9 +1,8 @@
-// cmd/update/jenkins.go
+/* cmd/update/jenkins.go */
 package update
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,14 +75,14 @@ func updateFilesInDir(dir, token, replacement string) error {
 		if info.IsDir() {
 			return nil
 		}
-		data, err := ioutil.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
 		contents := string(data)
 		if strings.Contains(contents, token) {
 			newContents := strings.ReplaceAll(contents, token, replacement)
-			if err := ioutil.WriteFile(path, []byte(newContents), info.Mode()); err != nil {
+			if err := os.WriteFile(path, []byte(newContents), info.Mode()); err != nil {
 				return err
 			}
 			fmt.Printf("Updated file: %s\n", path)
