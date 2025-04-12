@@ -112,9 +112,6 @@ func InstallVaultViaDnf() error {
 
 /* Initialize Vault (if not already initialized) */
 func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
-	if err := EnsureVaultUnsealed(); err != nil {
-		return nil, nil, fmt.Errorf("vault is sealed and could not be unsealed: %w", err)
-	}
 
 	fmt.Println("\nInitializing Vault...")
 

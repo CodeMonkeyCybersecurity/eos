@@ -48,23 +48,15 @@ func enableMount(client *api.Client, path, engineType string, options map[string
 	return nil
 }
 
-func EnsureVaultUnsealed() error {
-	client, err := NewClient()
-	if err != nil {
-		return fmt.Errorf("vault client error: %w", err)
-	}
-
-	// Delegate everything to SetupVault
-	_, _, err = SetupVault(client)
-	return err
-}
-
 func EnsureVaultReady() (*api.Client, error) {
 	client, err := NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("vault client error: %w", err)
 	}
-	if err := EnsureVaultUnsealed(); err != nil {
+
+	// Call SetupVault to initialize/unseal Vault.
+	client, _, err = SetupVault(client)
+	if err != nil {
 		return nil, fmt.Errorf("vault not ready: %w", err)
 	}
 	return client, nil
