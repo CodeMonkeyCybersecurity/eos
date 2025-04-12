@@ -112,7 +112,6 @@ func InstallVaultViaDnf() error {
 
 /* Initialize Vault (if not already initialized) */
 func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
-
 	fmt.Println("\nInitializing Vault...")
 
 	initRes, err := client.Sys().Init(&api.InitRequest{
@@ -127,6 +126,12 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 			if err := readFallbackYAML(diskPath("vault_init"), &initRes); err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
+
+			// ✅ Unseal Vault using the fallback keys
+			if err := UnsealVault(client, &initRes); err != nil {
+				return nil, nil, fmt.Errorf("failed to unseal already-initialized Vault: %w", err)
+			}
+
 			// Set the root token after unsealing so that future calls are authenticated.
 			client.SetToken(initRes.RootToken)
 
@@ -136,6 +141,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 				health, err := client.Sys().Health()
 				if err != nil {
 					fmt.Printf("Error checking Vault health: %v\n", err)
+					continue
 				}
 				if !health.Sealed {
 					fmt.Println("✅ Vault reports as unsealed")
@@ -145,7 +151,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 				time.Sleep(5 * time.Second)
 			}
 
-			// Now, persist the Vault init result using the updated API-based Write().
+			// Persist the Vault init result again for redundancy
 			if err := Write(client, "vault_init", initRes); err != nil {
 				fmt.Println("Failed to persist Vault init result")
 				return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
@@ -177,7 +183,6 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 
 	return client, initRes, nil
 }
-
 func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }
