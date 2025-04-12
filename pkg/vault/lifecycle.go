@@ -268,7 +268,7 @@ func EnableUserPass(client *api.Client) error {
 
 /* Generate a random password and create an eos user with it */
 func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
-	fmt.Println("\n[10/10] Generating random password and creating eos user...")
+	fmt.Println("\nGenerating random password and creating eos user...")
 
 	password, err := crypto.GeneratePassword(20)
 	if err != nil {
