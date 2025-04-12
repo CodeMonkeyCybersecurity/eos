@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/vault/api"
-	"gopkg.in/yaml.v3"
 )
 
 //
@@ -56,44 +55,45 @@ func Read(client *api.Client, name string, out any) error {
 		fmt.Printf("⚠️  Vault read failed for %q: %v\n", name, err)
 		fmt.Println("💡 Falling back to local config...")
 	}
-	return readFallbackYAML(diskPath(name), out)
+	return ReadFallbackIntoJSON(diskPath(name), out)
 }
 
 //
 // === Fallback Read Helpers ===
 //
 
-func readFallbackYAML(path string, out any) error {
-	b, err := os.ReadFile(path)
+// ReadFallbackJSON reads any struct from JSON at the given path.
+func ReadFallbackJSON[T any](path string) (*T, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to read fallback file %q: %w", path, err)
+		return nil, fmt.Errorf("read fallback JSON: %w", err)
 	}
-	if err := yaml.Unmarshal(b, out); err != nil {
-		return fmt.Errorf("failed to parse fallback YAML at %q: %w", path, err)
-	}
-	return nil
-}
 
-func readFallbackMap(name string) (map[string]string, error) {
-	var data map[string]string
-	path := filepath.Join(diskSecretsPath, name)
-	err := readFallbackYAML(path, &data)
-	if err != nil {
-		return nil, fmt.Errorf("could not load fallback secrets from %s: %w", path, err)
+	var result T
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("unmarshal fallback JSON: %w", err)
 	}
-	fmt.Printf("📥 Fallback secrets loaded from %s\n", path)
-	return data, nil
+
+	return &result, nil
 }
 
 // readFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
 func readFallbackSecrets() (map[string]string, error) {
-	var secrets map[string]string
 	path := filepath.Join(diskSecretsPath, "delphi-fallback.yaml")
 
-	err := readFallbackYAML(path, &secrets)
+	secretsPtr, err := ReadFallbackJSON[map[string]string](path)
 	if err != nil {
 		return nil, fmt.Errorf("could not load fallback secrets from %s: %w", path, err)
 	}
+
 	fmt.Printf("📥 Fallback credentials loaded from %s\n", path)
-	return secrets, nil
+	return *secretsPtr, nil
+}
+
+func ReadFallbackIntoJSON(path string, out any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return fmt.Errorf("read fallback JSON: %w", err)
+	}
+	return json.Unmarshal(data, out)
 }

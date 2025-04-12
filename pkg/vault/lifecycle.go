@@ -122,10 +122,12 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 		// If Vault is already initialized, try to load the fallback file
 		if IsAlreadyInitialized(err) {
 			fmt.Println("⚠️ Vault already initialized.")
-			var initRes api.InitResponse
-			if err := readFallbackYAML(diskPath("vault_init"), &initRes); err != nil {
+
+			initResPtr, err := ReadFallbackJSON[api.InitResponse](diskPath("vault_init"))
+			if err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
+			initRes := *initResPtr
 
 			// ✅ Unseal Vault using the fallback keys
 			if err := UnsealVault(client, &initRes); err != nil {

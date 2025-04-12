@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/vault/api"
-	"gopkg.in/yaml.v3"
 )
 
 //
@@ -29,7 +28,7 @@ func Write(client *api.Client, name string, data any) error {
 
 	fmt.Println("⚠️ Vault API write failed for:", path)
 	fmt.Println("💾 Falling back to local disk:", diskPath(name))
-	return writeFallbackYAML(diskPath(name), data)
+	return WriteFallbackJSON(diskPath(name), data)
 }
 
 // WriteToVault stores a serializable struct to Vault at a given KV v2 path.
@@ -62,18 +61,18 @@ func WriteSecret(client *api.Client, path string, data map[string]interface{}) e
 }
 
 //
-// === Fallback (YAML) Helpers ===
+// === Fallback (JSON) Helpers ===
 //
 
-// writeFallbackYAML writes any struct as YAML to a fallback path on disk.
-func writeFallbackYAML(path string, data any) error {
+// WriteFallbackJSON saves any struct as JSON to the given path (used for Vault fallback or CLI secrets).
+func WriteFallbackJSON(path string, data any) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
 
-	b, err := yaml.Marshal(data)
+	b, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal fallback data: %w", err)
+		return fmt.Errorf("marshal fallback JSON: %w", err)
 	}
 
 	if err := os.WriteFile(path, b, 0600); err != nil {
@@ -83,8 +82,4 @@ func writeFallbackYAML(path string, data any) error {
 	fmt.Printf("✅ Fallback data saved to %s\n", path)
 	fmt.Println("💡 Run `eos vault sync` later to upload it to Vault.")
 	return nil
-}
-
-func writeFallbackSecrets(secrets map[string]string) error {
-	return writeFallbackYAML(delphiFallbackSecretsPath, secrets)
 }
