@@ -87,20 +87,40 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		log.Info("[7/7] Vault enable workflow complete")
-		log.Info("\n✅ Vault enable steps completed successfully!")
-		log.Info("🔑 Vault has been initialized and unsealed.")
-		log.Info("🔐 The eos user's Vault password is stored at /var/lib/eos/secrets/vault-userpass.yaml")
-		log.Info("📄 Unseal keys and root token are stored in Vault and also in vault-init.json")
-		log.Info("🛡️  It will be deleted after you run: eos secure vault")
-		log.Info("🔑  Please copy the unseal keys and root token to a password manager now.")
-		log.Info("⚠️ IMPORTANT: Open the Vault Web UI and confirm that:")
-		log.Info("   - The eos user exists and can log in")
-		log.Info("   - The unseal keys and root token are backed up")
-		log.Info("💾 Then move the keys to a password manager and run:")
-		log.Info("      eos secure vault")
-		log.Info("   to promote the eos user and revoke the root token.")
-		log.Info("💬 Or run 'eos secure vault --dry-run' to preview changes before committing.")
-		log.Info("📦 A local backup of your Vault init data was written to vault-init.json")
+
+		fmt.Println("\n✅ Vault enable steps completed successfully!")
+		log.Info("✅ Vault enable steps completed successfully")
+
+		fmt.Println("🔑 Vault has been initialized and unsealed.")
+		log.Info("🔑 Vault has been initialized and unsealed")
+
+		fmt.Println("🔐 The eos user's Vault password is stored at /var/lib/eos/secrets/vault-userpass.yaml")
+		log.Info("🔐 The eos user's Vault password is stored", zap.String("path", "/var/lib/eos/secrets/vault-userpass.yaml"))
+
+		fmt.Println("📄 Unseal keys and root token are stored in Vault and also in /var/lib/eos/secrets/vault-init.json")
+		log.Info("📄 Vault init data written to Vault and local fallback", zap.String("path", "/var/lib/eos/secrets/vault-init.json"))
+
+		fmt.Println("🛡️  This file will be deleted after you run: eos secure vault")
+		log.Info("🛡️  vault-init.json will be deleted after eos secure vault is run")
+
+		fmt.Println("🔑  Please copy the unseal keys and root token to a password manager now.")
+		log.Info("🔑 Prompting user to copy unseal keys and root token to password manager")
+
+		fmt.Println("⚠️ IMPORTANT: Open the Vault Web UI and confirm that:")
+		fmt.Println("   - The eos user exists and can log in")
+		fmt.Println("   - The unseal keys and root token are backed up")
+		log.Info("⚠️  Reminder to verify eos user and secrets via the Vault Web UI")
+
+		fmt.Println("💾 Then move the keys to a password manager and run:")
+		fmt.Println("      eos secure vault")
+		fmt.Println("   to promote the eos user and revoke the root token.")
+		log.Info("💾 Prompting user to run eos secure vault after backup")
+
+		fmt.Println("💬 Or run 'eos secure vault --dry-run' to preview changes before committing.")
+		log.Info("💬 User may run eos secure vault --dry-run to preview actions")
+
+		fmt.Println("📦 A local backup of your Vault init data was written to /var/lib/eos/secrets/vault-init.json")
+		log.Info("📦 Vault init data backup confirmed at /var/lib/eos/secrets/vault-init.json")
 
 		return nil
 	}),
