@@ -5,6 +5,7 @@ package eoscli
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
@@ -14,6 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var vaultCheck sync.Once
+
 // Wrap adds automatic logger injection and scoped metadata based on calling package.
 func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
@@ -22,15 +25,17 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 		log.Info("Command started", zap.Time("start_time", start))
 
 		// ✅ Ensure Vault is ready BEFORE we run the command
-		log.Info("🔒 Checking Vault sealed state...")
-		_, err := vault.EnsureVaultReady()
-		if err != nil {
-			log.Warn("⚠️ Vault is not fully prepared (sealed or missing fallback)", zap.Error(err))
-			log.Warn("Continuing anyway — downstream commands may fail if Vault is required.")
-		}
+		vaultCheck.Do(func() {
+			log.Info("🔒 Checking Vault sealed state...")
+			_, err := vault.EnsureVaultReady()
+			if err != nil {
+				log.Warn("⚠️ Vault is not fully prepared (sealed or missing fallback)", zap.Error(err))
+				log.Warn("Continuing anyway — downstream commands may fail if Vault is required.")
+			}
+		})
 
 		// Now run the command itself
-		err = fn(cmd, args)
+		err := fn(cmd, args)
 		duration := time.Since(start)
 
 		if err != nil {
