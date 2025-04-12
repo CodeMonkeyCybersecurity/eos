@@ -87,7 +87,7 @@ func CheckVaultSecrets(storedHashes []string, hashedRoot string) {
 
 // TestKVSecret writes and reads a test secret from the KV engine.
 func TestKVSecret(client *api.Client) error {
-	fmt.Println("\n[6/10] Writing and reading test secret...")
+	fmt.Println("\nWriting and reading test secret...")
 
 	kv := client.KVv2("secret")
 
