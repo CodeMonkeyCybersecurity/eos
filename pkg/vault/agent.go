@@ -1,3 +1,5 @@
+/* pkg/vault/agent.go */
+
 package vault
 
 import (
@@ -133,32 +135,32 @@ func reloadAndStartService() error {
 	return nil
 }
 
-// applyAdminPolicy applies a full-access ("eos-full") policy via the Vault API and updates the admin user.
-// Note: UserpassCreds is assumed to be defined in this package.
+// ApplyAdminPolicy applies a full-access policy from the Policies map to the eos user.
 func ApplyAdminPolicy(creds UserpassCreds, client *api.Client) error {
-	const policyName = "eos-full"
-	const policyContent = `
-path "*" {
-  capabilities = ["create", "read", "update", "delete", "list"]
-}`
+	fmt.Println("Creating full-access policy for eos.")
 
-	fmt.Println("Creating full-access policy for admin.")
+	policyName := EosVaultPolicy
+	policy, ok := Policies[policyName]
+	if !ok {
+		return fmt.Errorf("policy %q not found in Policies map", policyName)
+	}
+
 	// Apply policy using the Vault API.
-	if err := client.Sys().PutPolicy(policyName, policyContent); err != nil {
+	if err := client.Sys().PutPolicy(policyName, policy); err != nil {
 		zap.L().Error("Failed to apply policy via API", zap.Error(err))
 		return err
 	}
 	zap.L().Info("✅ Custom policy applied via API", zap.String("policy", policyName))
 
-	// Update the admin user with the policy using the Vault API.
-	_, err := client.Logical().Write("auth/userpass/users/admin", map[string]interface{}{
+	// Update the eos user with the policy.
+	_, err := client.Logical().Write("auth/userpass/users/eos", map[string]interface{}{
 		"password": creds.Password,
 		"policies": policyName,
 	})
 	if err != nil {
-		zap.L().Error("Failed to update admin user with policy", zap.Error(err))
+		zap.L().Error("Failed to update eos user with policy", zap.Error(err))
 		return err
 	}
-	zap.L().Info("✅ Admin user updated with full privileges", zap.String("policy", policyName))
+	zap.L().Info("✅ eos user updated with full privileges", zap.String("policy", policyName))
 	return nil
 }

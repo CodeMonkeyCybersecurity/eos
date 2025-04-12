@@ -14,6 +14,7 @@ const (
 	fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
 	auditPath           = "file/"
 	mountPath           = "sys/audit/" + auditPath
+	EosVaultPolicy      = "eos-policy"
 )
 
 // vaultPath constructs the Vault KV path like: secret/eos/<name>/config
