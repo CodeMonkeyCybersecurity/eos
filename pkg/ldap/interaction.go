@@ -20,7 +20,11 @@ func InteractiveLDAPQuery() error {
 	cfg := &LDAPConfig{}
 
 	// Try to load existing config from Vault to prefill
-	_ = vault.ReadFromVaultAt(context.Background(), consts.LDAPVaultMount, consts.LDAPVaultPath, cfg)
+	if err := vault.ReadFromVaultAt(context.Background(), consts.LDAPVaultMount, consts.LDAPVaultPath, cfg); err == nil {
+		fmt.Println("✅ LDAP config prefilled from Vault")
+	} else {
+		fmt.Printf("⚠️  Vault fallback: could not load LDAP config: %v\n", err)
+	}
 
 	// Prompts
 	proto := interaction.PromptInput("Connection type [ldap, ldaps, ldapi]", "ldap")
@@ -30,13 +34,13 @@ func InteractiveLDAPQuery() error {
 		fmt.Println("⚠️  No BindDN provided — defaulting to cn=anonymous instead.")
 		bindDN = "cn=anonymous"
 	}
-	password, err := interaction.PromptPassword("LDAP password")
+	password := cfg.Password
 	if password == "" {
-		fmt.Println("⚠️  No password provided — binding may fail if anonymous access is not allowed.")
-		password = `""`
-	}
-	if err != nil {
-		return err
+		var err error
+		password, err = interaction.PromptPassword("LDAP password")
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Println("Search base DN (e.g. ou=Users,dc=domain,dc=com). Leave blank to search entire tree.")
