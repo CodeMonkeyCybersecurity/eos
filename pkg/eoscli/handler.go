@@ -23,13 +23,14 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 
 		// ✅ Ensure Vault is ready BEFORE we run the command
 		log.Info("🔒 Checking Vault sealed state...")
-		if err := vault.EnsureVaultUnsealed(); err != nil {
-			log.Error("Vault could not be unsealed", zap.Error(err))
+		_, err := vault.EnsureVaultReady()
+		if err != nil {
+			log.Error("Vault could not be prepared", zap.Error(err))
 			return err
 		}
 
 		// Now run the command itself
-		err := fn(cmd, args)
+		err = fn(cmd, args)
 		duration := time.Since(start)
 
 		if err != nil {

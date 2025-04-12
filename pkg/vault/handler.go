@@ -4,8 +4,6 @@ package vault
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/hashicorp/vault/api"
@@ -56,50 +54,18 @@ func EnsureVaultUnsealed() error {
 		return fmt.Errorf("vault client error: %w", err)
 	}
 
-	if !IsVaultSealed(client) {
-		return nil // ✅ already unsealed
-	}
-
-	fmt.Println("🔒 Vault is sealed. Attempting privileged unseal...")
-
-	if _, err := os.Stat("/var/lib/eos/secrets/vault_init.json"); os.IsNotExist(err) {
-		return fmt.Errorf("vault init file not found — run `eos enable vault` first")
-	}
-
-	return RunAsEos("internal", "unseal")
+	// Delegate everything to SetupVault
+	_, _, err = SetupVault(client)
+	return err
 }
 
-// isBinary checks if the file at path looks like a compiled binary (not just ASCII text)
-func isBinary(path string) bool {
-	data, err := os.ReadFile(path)
-	return err == nil && len(data) > 4 && data[0] != '#'
-}
-
-// RunAsEos runs the eos CLI (or go run main.go) as the eos system user, in dev or prod mode.
-func RunAsEos(args ...string) error {
-	const eosBin = "/usr/local/bin/eos"
-	const devDir = "/opt/eos"
-
-	var cmd *exec.Cmd
-
-	if _, err := os.Stat(eosBin); os.IsNotExist(err) || !isBinary(eosBin) {
-		// Fall back to go run mode
-		fmt.Println("🛠️ Dev mode — using `go run main.go`")
-		goArgs := append([]string{"go", "run", "main.go"}, args...)
-		argsWithSudo := append([]string{"-u", "eos"}, goArgs...)
-		cmd = exec.Command("sudo", argsWithSudo...)
-		cmd.Dir = devDir
-	} else {
-		// Use the installed binary
-		fmt.Printf("🧭 Using installed eos binary at %s\n", eosBin)
-		binArgs := append([]string{eosBin}, args...)
-		cmdArgs := append([]string{"-u", "eos"}, binArgs...)
-		cmd = exec.Command("sudo", cmdArgs...)
+func EnsureVaultReady() (*api.Client, error) {
+	client, err := NewClient()
+	if err != nil {
+		return nil, fmt.Errorf("vault client error: %w", err)
 	}
-
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	return cmd.Run()
+	if err := EnsureVaultUnsealed(); err != nil {
+		return nil, fmt.Errorf("vault not ready: %w", err)
+	}
+	return client, nil
 }
