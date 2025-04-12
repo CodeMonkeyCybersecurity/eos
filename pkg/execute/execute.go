@@ -2,10 +2,13 @@
 package execute
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/errorer"
 )
 
 //
@@ -61,11 +64,15 @@ func ExecuteAndLog(name string, args ...string) error {
 	fmt.Printf("🚀 Running: %s %s\n", name, joinArgs(args))
 
 	cmd := exec.Command(name, args...)
+	var outputBuf bytes.Buffer
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("command failed: %s %s: %w", name, joinArgs(args), err)
+		fullOutput := outputBuf.String()
+		// Extract a concise error message—e.g., the first error line
+		summary := errorer.ExtractSummary(fullOutput)
+		return fmt.Errorf("command failed: %s %s: %w - %s", name, joinArgs(args), err, summary)
 	}
 
 	fmt.Printf("✅ Completed: %s %s\n", name, joinArgs(args))
