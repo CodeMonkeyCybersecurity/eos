@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/hashicorp/vault/api"
 )
 
 const fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
@@ -32,3 +33,5 @@ type UserSecret struct {
 	Password string `json:"password"`
 	SSHKey   string `json:"ssh_private_key,omitempty"`
 }
+
+var vaultClient *api.Client

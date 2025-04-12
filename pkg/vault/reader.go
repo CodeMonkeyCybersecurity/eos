@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -15,16 +16,53 @@ import (
 )
 
 //
-// 🔐 Vault JSON Reads
+// === Vault Read Helpers ===
 //
 
-func load(client *api.Client, name string, out any) error {
-	if IsVaultAvailable(client) {
-		return loadFromVault(client, name, out)
-	}
-	return readFallbackYAML(diskPath(name), out)
+// LoadFromVault loads a struct from a Vault KV v2 path (default mount "secret").
+func LoadFromVault(path string, v interface{}) error {
+	return LoadFromVaultAt(context.Background(), "secret", path, v)
 }
 
+// LoadFromVaultAt loads from a custom KV v2 mount.
+func LoadFromVaultAt(ctx context.Context, mount, path string, v interface{}) error {
+	client, err := GetVaultClient()
+	if err != nil {
+		return err
+	}
+
+	kv := client.KVv2(mount)
+	secret, err := kv.Get(ctx, path)
+	if err != nil {
+		return fmt.Errorf("failed to read from Vault: %w", err)
+	}
+
+	raw, ok := secret.Data["json"].(string)
+	if !ok {
+		return fmt.Errorf("missing or malformed 'json' field at path: %s", path)
+	}
+
+	if err := json.Unmarshal([]byte(raw), v); err != nil {
+		return fmt.Errorf("failed to unmarshal Vault JSON: %w", err)
+	}
+	return nil
+}
+
+// Load loads from Vault or fallback to disk, based on availability.
+func Load(client *api.Client, name string, v any) error {
+	if IsVaultAvailable(client) {
+		return loadFromVault(client, name, v)
+	}
+	return readFallbackYAML(diskPath(name), v)
+}
+
+// loadFromVault reads from logical path "secret/eos/<name>/config".
+func loadFromVault(client *api.Client, name string, out any) error {
+	path := fmt.Sprintf("secret/eos/%s/config", name)
+	return readVaultKV(client, path, out)
+}
+
+// readVaultKV reads directly from the logical API and parses Vault's KV v2 structure.
 func readVaultKV(client *api.Client, path string, out any) error {
 	secret, err := client.Logical().Read(path)
 	if err != nil {
@@ -34,7 +72,6 @@ func readVaultKV(client *api.Client, path string, out any) error {
 		return fmt.Errorf("no data found at %s", path)
 	}
 
-	// Vault KV v2 nesting
 	data, ok := secret.Data["data"]
 	if !ok {
 		return fmt.Errorf("unexpected secret format: missing 'data'")
@@ -47,13 +84,8 @@ func readVaultKV(client *api.Client, path string, out any) error {
 	return json.Unmarshal(raw, out)
 }
 
-func loadFromVault(client *api.Client, name string, out any) error {
-	path := fmt.Sprintf("secret/eos/%s/config", name)
-	return readVaultKV(client, path, out)
-}
-
 //
-// 🛟 Fallback YAML Reads
+// === Fallback Read Helpers ===
 //
 
 func readFallbackYAML(path string, out any) error {
@@ -78,7 +110,7 @@ func readFallbackSecrets() (map[string]string, error) {
 }
 
 //
-// 🔐 Secure Vault Loader
+// === Secure Vault Loaders ===
 //
 
 func loadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, []string, string) {
@@ -89,15 +121,14 @@ func loadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, 
 	fmt.Println("Secure Vault setup in progress...")
 	fmt.Println("This process will revoke the root token and elevate admin privileges.")
 
-	// Load vault_init.json
+	// Load vault-init metadata
 	var initRes *api.InitResponse
-	if err := load(client, "vault-init", &initRes); err != nil {
+	if err := Load(client, "vault-init", &initRes); err != nil {
 		log.Fatal("Failed to load Vault init result", zap.Error(err))
 	}
 
-	// Load Vault userpass credentials
 	var creds UserpassCreds
-	if err := load(client, "bootstrap/eos-user", &creds); err != nil {
+	if err := Load(client, "bootstrap/eos-user", &creds); err != nil {
 		log.Fatal("Failed to load Vault userpass credentials", zap.Error(err))
 	}
 
@@ -105,7 +136,6 @@ func loadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, 
 		log.Fatal("Parsed password is empty — aborting.")
 	}
 
-	// Prehash values
 	hashedKeys := crypto.HashStrings(initRes.KeysB64)
 	hashedRoot := crypto.HashString(initRes.RootToken)
 

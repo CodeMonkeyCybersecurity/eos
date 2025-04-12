@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 
 	"github.com/go-ldap/ldap/v3"
 	"gopkg.in/yaml.v3"
@@ -29,7 +29,7 @@ type LDAPConfig struct {
 
 func LoadLDAPConfig() (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := storage.LoadFromVault(consts.LDAPVaultPath, &cfg)
+	err := vault.LoadFromVault(consts.LDAPVaultPath, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	}
 
 	// 🔐 Save to Vault
-	if err := storage.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

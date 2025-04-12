@@ -29,3 +29,16 @@ func NewClient() (*api.Client, error) {
 
 	return client, nil
 }
+
+// SetVaultClient allows other packages to reuse the Vault client.
+func SetVaultClient(client *api.Client) {
+	vaultClient = client
+}
+
+// GetVaultClient returns the cached Vault client (if set).
+func GetVaultClient() (*api.Client, error) {
+	if vaultClient == nil {
+		return nil, fmt.Errorf("vault client is not initialized; call SetVaultClient first")
+	}
+	return vaultClient, nil
+}

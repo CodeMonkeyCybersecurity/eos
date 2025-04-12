@@ -1,17 +1,22 @@
+/* pkg/ldap/prompt.go */
+
 package ldap
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 // PromptLDAPDetails interactively builds an LDAPConfig using field metadata.
 func promptLDAPDetails() (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
-	_ = storage.LoadFromVault(consts.LDAPVaultPath, cfg) // best-effort prefill
+	if _, err := vault.GetVaultClient(); err == nil {
+		_ = vault.LoadFromVaultAt(context.Background(), "secret", consts.LDAPVaultPath, cfg) // best-effort prefill
+	}
 
 	for fieldName, meta := range LDAPFieldMeta {
 		val := getLDAPField(cfg, fieldName)
@@ -30,7 +35,7 @@ func promptLDAPDetails() (*LDAPConfig, error) {
 		}
 	}
 
-	if err := storage.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
