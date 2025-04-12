@@ -16,7 +16,6 @@ import (
 )
 
 func InteractiveLDAPQuery() error {
-	vault.EnsureVaultClient()
 
 	cfg := &LDAPConfig{}
 

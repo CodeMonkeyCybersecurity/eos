@@ -24,6 +24,8 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 		log := contextualLogger()
 		log.Info("Command started", zap.Time("start_time", start))
 
+		vault.EnsureVaultClient()
+
 		// ✅ Ensure Vault is ready BEFORE we run the command
 		vaultCheck.Do(func() {
 			log.Info("🔒 Checking Vault sealed state...")
