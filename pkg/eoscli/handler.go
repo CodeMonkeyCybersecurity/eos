@@ -61,15 +61,19 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, vault.UserpassC
 	fmt.Println("🔐 Secure Vault setup in progress...")
 	fmt.Println("This will revoke the root token and promote the eos admin user.")
 
-	var initRes *api.InitResponse
-	if err := vault.Read(client, "vault_init", &initRes); err != nil {
-		log.Fatal("❌ Failed to read vault_init", zap.String("path", vault.DiskPath("vault_init")), zap.Error(err))
+	// Load vault_init.json from fallback file
+	initResPtr, err := vault.ReadFallbackJSON[api.InitResponse](vault.DiskPath("vault_init"))
+	if err != nil {
+		log.Fatal("❌ Failed to read vault_init.json", zap.Error(err))
 	}
+	initRes := *initResPtr
 
-	var creds vault.UserpassCreds
-	if err := vault.Read(client, "bootstrap/eos-user", &creds); err != nil {
-		log.Fatal("❌ Failed to load eos userpass credentials", zap.Error(err))
+	// Load eos user creds from fallback file
+	credsPtr, err := vault.ReadFallbackJSON[vault.UserpassCreds](vault.EosUserFallbackFile)
+	if err != nil {
+		log.Fatal("❌ Failed to read vault_userpass.json", zap.Error(err))
 	}
+	creds := *credsPtr
 
 	if creds.Password == "" {
 		log.Fatal("❌ Loaded Vault credentials but password is empty — aborting.")
@@ -78,7 +82,7 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, vault.UserpassC
 	hashedKeys := crypto.HashStrings(initRes.KeysB64)
 	hashedRoot := crypto.HashString(initRes.RootToken)
 
-	return initRes, creds, hashedKeys, hashedRoot
+	return initResPtr, creds, hashedKeys, hashedRoot
 }
 
 func RequireVault(client *api.Client) error {

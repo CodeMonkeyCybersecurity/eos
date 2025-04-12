@@ -1,4 +1,4 @@
-// cmd/secure/vault.go
+/* cmd/secure/vault.go */
 
 package secure
 
