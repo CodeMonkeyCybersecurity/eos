@@ -91,7 +91,7 @@ func RevokeRootToken(client *api.Client, token string) error {
 
 /* Install Vault via dnf if not already installed */
 func InstallVaultViaDnf() error {
-	fmt.Println("[0/10] Checking if Vault is installed...")
+	fmt.Println("Checking if Vault is installed...")
 	_, err := exec.LookPath("vault")
 	if err != nil {
 		fmt.Println("Vault binary not found. Installing via dnf...")
@@ -197,7 +197,7 @@ func UnsealVault(client *api.Client, initRes *api.InitResponse) error {
 		return fmt.Errorf("not enough unseal keys")
 	}
 
-	fmt.Println("\n[2/10] Unsealing Vault...")
+	fmt.Println("\nUnsealing Vault...")
 	for i, key := range initRes.KeysB64[:3] {
 		resp, err := client.Sys().Unseal(key)
 		if err != nil {
