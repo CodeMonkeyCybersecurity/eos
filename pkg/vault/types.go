@@ -24,11 +24,12 @@ var (
 )
 
 // vaultPath returns the full KV v2 path for data reads/writes.
+// vaultPath returns the full KV v2 path for data reads/writes.
 func vaultPath(name string) string {
 	if strings.Contains(name, "/") {
-		fmt.Println("vaultPath received a nested path — only pass the base name!")
+		fmt.Printf("⚠️  vaultPath should not receive slashes — got: %q\n", name)
 	}
-	return fmt.Sprintf("secret/data/eos/%s", name)
+	return fmt.Sprintf("eos/%s", name)
 }
 
 // diskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
