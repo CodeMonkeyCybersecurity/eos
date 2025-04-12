@@ -320,7 +320,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 
 	// Create eos user with userpass auth
 	_, err = client.Logical().Write(
-		vaultPath("auth/userpass/users/eos"),
+		"auth/userpass/users/eos",
 		map[string]interface{}{
 			"password": password,
 			"policies": "default," + EosVaultPolicy,
@@ -355,7 +355,7 @@ func CreateUserpassAccount(client *api.Client, username, password string) error 
 	fmt.Printf("👤 Creating Vault userpass account for %q...\n", username)
 
 	_, err := client.Logical().Write(
-		vaultPath("auth/userpass/users/"+username),
+		"auth/userpass/users/"+username,
 		map[string]interface{}{
 			"password": password,
 			"policies": EosVaultPolicy,
