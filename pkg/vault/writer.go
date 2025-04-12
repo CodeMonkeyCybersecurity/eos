@@ -17,7 +17,7 @@ import (
 // === Vault Write Helpers ===
 //
 
-// Save stores a struct in Vault using the API or falls back to disk if the API call fails.
+// Write stores a struct in Vault using the API or falls back to disk if the API call fails.
 func Write(client *api.Client, name string, data any) error {
 	SetVaultClient(client)
 	path := vaultPath(name)

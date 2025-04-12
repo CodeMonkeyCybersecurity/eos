@@ -1,4 +1,4 @@
-// pkg/ldap/config.go
+/* pkg/ldap/config.go */
 package ldap
 
 import (
