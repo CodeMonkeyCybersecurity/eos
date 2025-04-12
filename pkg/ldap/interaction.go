@@ -42,9 +42,14 @@ func InteractiveLDAPQuery() error {
 	fmt.Println("Search base DN (e.g. ou=Users,dc=domain,dc=com). Leave blank to search entire tree.")
 	baseDN := interaction.PromptInput("Search base DN", cfg.UserBase)
 	if baseDN == "" {
-		fmt.Println("⚠️  No base DN provided — defaulting to root (searching entire tree).")
-		fmt.Println("⚠️  This may return a large number of entries and be slower than expected.")
-		baseDN = `""`
+		inferred := inferBaseDN(bindDN)
+		if inferred != "" {
+			fmt.Printf("⚠️  No base DN provided — using inferred root (%s)\n", inferred)
+			baseDN = inferred
+		} else {
+			fmt.Println("⚠️  No base DN could be inferred — aborting for safety.")
+			return fmt.Errorf("invalid base DN")
+		}
 	}
 
 	filter := interaction.PromptInput("Search filter", "(objectClass=*)")
@@ -73,4 +78,16 @@ func InteractiveLDAPQuery() error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func inferBaseDN(bindDN string) string {
+	parts := strings.Split(bindDN, ",")
+	var base []string
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(strings.ToLower(part), "dc=") {
+			base = append(base, part)
+		}
+	}
+	return strings.Join(base, ",")
 }
