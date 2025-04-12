@@ -284,7 +284,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		os.Exit(1)
 	}
 
-	os.MkdirAll("diskSecretsPath", 0700)
+	os.MkdirAll(diskSecretsPath, 0700)
 
 	creds := UserpassCreds{
 		Username: "eos",
