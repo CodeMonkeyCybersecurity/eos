@@ -11,12 +11,15 @@ import (
 )
 
 const (
-	diskSecretsPath           = "/var/lib/eos/secrets"
-	delphiFallbackSecretsPath = diskSecretsPath + "delphi-fallback.json"
-	auditPath                 = "file/"
-	mountPath                 = "sys/audit/" + auditPath
-	EosVaultPolicy            = "eos-policy"
-	EosUserFallbackFile       = diskSecretsPath + "vault-userpass.json"
+	diskSecretsPath = "/var/lib/eos/secrets"
+	auditPath       = "file/"
+	mountPath       = "sys/audit/" + auditPath
+	EosVaultPolicy  = "eos-policy"
+)
+
+var (
+	DelphiFallbackSecretsPath = filepath.Join(diskSecretsPath, "delphi_fallback.json")
+	EosUserFallbackFile       = filepath.Join(diskSecretsPath, "vault_userpass.json")
 )
 
 // vaultPath returns the full KV v2 path for data reads/writes.
