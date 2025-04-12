@@ -94,8 +94,8 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		fmt.Println("🔑 Vault has been initialized and unsealed.")
 		log.Info("🔑 Vault has been initialized and unsealed")
 
-		fmt.Println("🔐 The eos user's Vault password is stored at /var/lib/eos/secrets/vault-userpass.yaml")
-		log.Info("🔐 The eos user's Vault password is stored", zap.String("path", "/var/lib/eos/secrets/vault-userpass.yaml"))
+		fmt.Println("🔐 The eos user's Vault password is stored at /var/lib/eos/secrets/vault-userpass.json")
+		log.Info("🔐 The eos user's Vault password is stored", zap.String("path", "/var/lib/eos/secrets/vault-userpass.json"))
 
 		fmt.Println("📄 Unseal keys and root token are stored in Vault and also in /var/lib/eos/secrets/vault_init.json")
 		log.Info("📄 Vault init data written to Vault and local fallback", zap.String("path", "/var/lib/eos/secrets/vault_init.json"))

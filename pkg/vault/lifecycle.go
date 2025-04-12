@@ -284,14 +284,16 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		os.Exit(1)
 	}
 
-	// Write to fallback file
-	fallbackFile := "/var/lib/eos/secrets/vault-userpass.yaml"
-	os.MkdirAll("/var/lib/eos/secrets", 0700)
-	fallbackContent := fmt.Sprintf("username: eos\npassword: %s\n", password)
-	if err := os.WriteFile(fallbackFile, []byte(fallbackContent), 0600); err != nil {
-		fmt.Println("⚠️ Failed to write fallback password file:", err)
+	os.MkdirAll("diskSecretsPath", 0700)
+
+	creds := UserpassCreds{
+		Username: "eos",
+		Password: password,
+	}
+	if err := WriteFallbackJSON("vault-userpass", creds); err != nil {
+		fmt.Println("⚠️ Failed to write eos Vault user fallback secret:", err)
 	} else {
-		fmt.Printf("🔐 Stored eos Vault user password at %s\n", fallbackFile)
+		fmt.Printf("🔐 Stored eos Vault user password as fallback\n")
 	}
 
 	// Store in Vault
@@ -317,17 +319,20 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	}
 
 	// Create eos user with userpass auth
-	_, err = client.Logical().Write("auth/userpass/users/eos", map[string]interface{}{
-		"password": password,
-		"policies": "default," + EosVaultPolicy,
-	})
+	_, err = client.Logical().Write(
+		vaultPath("auth/userpass/users/eos"),
+		map[string]interface{}{
+			"password": password,
+			"policies": "default," + EosVaultPolicy,
+		},
+	)
 	if err != nil {
 		fmt.Println("❌ Failed to create eos user:", err)
 		os.Exit(1)
 	}
 
 	// Write init result
-	if err := Write(client, "vault_init", initRes); err != nil {
+	if err := Write(client, vaultPath("vault_init"), initRes); err != nil {
 		fmt.Println("⚠️ Failed to store vault_init data in Vault:", err)
 	} else {
 		fmt.Println("✅ vault_init successfully written to Vault.")
@@ -349,22 +354,28 @@ func EnableVaultAuthMethods(client *api.Client) error {
 func CreateUserpassAccount(client *api.Client, username, password string) error {
 	fmt.Printf("👤 Creating Vault userpass account for %q...\n", username)
 
-	_, err := client.Logical().Write("auth/userpass/users/"+username, map[string]interface{}{
-		"password": password,
-		"policies": EosVaultPolicy, // from types.go
-	})
+	_, err := client.Logical().Write(
+		vaultPath("auth/userpass/users/"+username),
+		map[string]interface{}{
+			"password": password,
+			"policies": EosVaultPolicy,
+		},
+	)
 	return err
 }
 
 func CreateAppRole(client *api.Client, roleName string) error {
 	fmt.Printf("🔐 Creating AppRole for %q...\n", roleName)
 
-	_, err := client.Logical().Write("auth/approle/role/"+roleName, map[string]interface{}{
-		"policies":      EosVaultPolicy,
-		"secret_id_ttl": "0",
-		"token_ttl":     "1h",
-		"token_max_ttl": "4h",
-	})
+	_, err := client.Logical().Write(
+		vaultPath("auth/approle/role/"+roleName),
+		map[string]interface{}{
+			"policies":      EosVaultPolicy,
+			"secret_id_ttl": "0",
+			"token_ttl":     "1h",
+			"token_max_ttl": "4h",
+		},
+	)
 	return err
 }
 

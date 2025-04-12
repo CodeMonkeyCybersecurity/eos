@@ -12,10 +12,11 @@ import (
 
 const (
 	diskSecretsPath           = "/var/lib/eos/secrets"
-	delphiFallbackSecretsPath = diskSecretsPath + "delphi-fallback.yaml"
+	delphiFallbackSecretsPath = diskSecretsPath + "delphi-fallback.json"
 	auditPath                 = "file/"
 	mountPath                 = "sys/audit/" + auditPath
 	EosVaultPolicy            = "eos-policy"
+	EosUserFallbackFile       = diskSecretsPath + "vault-userpass.json"
 )
 
 // vaultPath returns the full KV v2 path for data reads/writes.
@@ -32,8 +33,8 @@ func diskPath(name string) string {
 }
 
 type UserpassCreds struct {
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 // UserSecret holds login and SSH key material for a system user.
