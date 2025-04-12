@@ -40,9 +40,6 @@ const (
 	DefaultConfigPath    = "./config/default.yaml"
 	AssetServerPath      = "assets/servers"
 	AssetStreamPath      = "assets/stream"
-
-	// Vault
-	LDAPVaultPath = "secret/ldap/config"
 )
 
 var DefaultMarkers = []string{"80", "443"}

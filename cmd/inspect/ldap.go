@@ -1,4 +1,4 @@
-// cmd/inspect/ldap.go
+/* cmd/inspect/ldap.go */
 package inspect
 
 import (
