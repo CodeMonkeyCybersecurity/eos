@@ -1,15 +1,15 @@
-// cmd/update/packages.go
+/* cmd/update/packages.go */
 package update
 
 import (
 	"fmt"
 	"math/rand"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -17,42 +17,53 @@ import (
 var Cron bool
 
 var UpdatePackagesCmd = &cobra.Command{
-	Use:   "packages",
-	Short: "Update system packages based on detected OS",
-	Long:  "Detects the host OS and executes appropriate update and cleanup commands. Supports scheduling via --cron.",
+	Use:     "packages",
+	Aliases: []string{"pkgs"},
+	Short:   "Update system packages based on detected OS",
+	Long:    "Detects the host OS and executes appropriate update and cleanup commands. Supports scheduling via --cron.",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-
-		osType := runtime.GOOS
-		log.Info("Detected OS", zap.String("os", osType))
+		osPlatform := platform.GetOSPlatform()
+		log.Info("Detected OS", zap.String("os", osPlatform))
 
 		var updateCmd string
-		switch osType {
+		switch osPlatform {
 		case "linux":
-			if isRHEL() {
+			// Use the helper to detect the Linux distro type.
+			distro := platform.DetectLinuxDistro()
+			if distro == "rhel" {
 				updateCmd = "dnf upgrade --refresh -y && dnf autoremove -y && dnf clean all"
 				log.Info("Detected RHEL-based system")
-			} else {
+			} else if distro == "debian" {
 				updateCmd = "apt update -y && apt upgrade -y && apt autoremove -y && apt autoclean -y"
 				log.Info("Detected Debian-based system")
+			} else {
+				log.Warn("Unrecognized Linux distribution, defaulting to Debian-based update command")
+				updateCmd = "apt update -y && apt upgrade -y && apt autoremove -y && apt autoclean -y"
 			}
-		case "darwin":
+		case "macos":
 			updateCmd = "brew update && brew upgrade && brew cleanup"
 			log.Info("Detected macOS")
 		case "windows":
-			updateCmd = "winget upgrade --all"
+			updateCmd = "winget update --all"
 			log.Info("Detected Windows")
 		default:
-			log.Error("Unsupported OS", zap.String("os", osType))
-			return fmt.Errorf("unsupported OS: %s", osType)
+			log.Error("Unsupported OS", zap.String("os", osPlatform))
+			return fmt.Errorf("unsupported OS: %s", osPlatform)
 		}
 
 		if Cron {
 			log.Info("Scheduling cron job for package update")
-			return scheduleCron(updateCmd, osType)
+			return scheduleCron(updateCmd, osPlatform)
 		}
 
 		log.Info("Running update command", zap.String("cmd", updateCmd))
-		err := exec.Command("bash", "-c", updateCmd).Run()
+		var err error
+		// Use appropriate shell depending on the OS.
+		if osPlatform == "windows" {
+			err = exec.Command("cmd", "/C", updateCmd).Run()
+		} else {
+			err = exec.Command("bash", "-c", updateCmd).Run()
+		}
 		if err != nil {
 			log.Error("Failed to execute update command", zap.Error(err))
 			return err
@@ -63,12 +74,8 @@ var UpdatePackagesCmd = &cobra.Command{
 	}),
 }
 
-func isRHEL() bool {
-	out, err := exec.Command("grep", "-i", "rhel", "/etc/os-release").Output()
-	return err == nil && len(out) > 0
-}
-
-func scheduleCron(cmd string, osType string) error {
+func scheduleCron(cmd string, osPlatform string) error {
+	// Generate a random update time.
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	hour := r.Intn(24)
 	minute := r.Intn(60)
@@ -77,7 +84,7 @@ func scheduleCron(cmd string, osType string) error {
 	log.Info("Generated cron schedule", zap.String("schedule", schedule))
 	log.Info("Scheduled update time", zap.Int("hour", hour), zap.Int("minute", minute))
 
-	// Check for existing cron jobs that already run this command
+	// Check for existing cron jobs that already run this command.
 	existing, err := exec.Command("crontab", "-l").Output()
 	if err == nil && len(existing) > 0 {
 		if strings.Contains(string(existing), cmd) {
@@ -87,8 +94,8 @@ func scheduleCron(cmd string, osType string) error {
 		}
 	}
 
-	switch osType {
-	case "linux", "darwin":
+	switch osPlatform {
+	case "linux", "macos":
 		crontabCmd := fmt.Sprintf("(crontab -l 2>/dev/null; echo \"%s\") | crontab -", schedule)
 		err := exec.Command("bash", "-c", crontabCmd).Run()
 		if err != nil {
@@ -99,14 +106,13 @@ func scheduleCron(cmd string, osType string) error {
 		log.Info("Cron job created", zap.String("schedule", schedule))
 		log.Info("Cron job command", zap.String("command", cmd))
 		log.Info("Cron job time", zap.Int("hour", hour), zap.Int("minute", minute))
-		// Read back the crontab to confirm
+		// Read back the crontab to confirm.
 		out, err := exec.Command("crontab", "-l").Output()
 		if err != nil {
 			log.Error("Failed to read back crontab after writing", zap.Error(err))
 		} else {
 			log.Info("Updated crontab contents", zap.String("crontab", string(out)))
 		}
-
 	case "windows":
 		taskName := "EosSystemUpdate"
 		timeStr := fmt.Sprintf("%02d:%02d", hour, minute)
@@ -118,8 +124,8 @@ func scheduleCron(cmd string, osType string) error {
 		}
 		log.Info("Windows scheduled task created", zap.String("task", taskName), zap.String("time", timeStr))
 	default:
-		log.Error("Cron scheduling not supported on this OS", zap.String("os", osType))
-		return fmt.Errorf("cron scheduling not supported on: %s", osType)
+		log.Error("Cron scheduling not supported on this OS", zap.String("os", osPlatform))
+		return fmt.Errorf("cron scheduling not supported on: %s", osPlatform)
 	}
 
 	return nil

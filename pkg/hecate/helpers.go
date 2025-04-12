@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -21,7 +20,7 @@ import (
 // loadLastValues reads key="value" pairs from LastValuesFile and returns them as a map.
 func LoadLastValues() map[string]string {
 	values := make(map[string]string)
-	file, err := os.Open(hecate.LastValuesFile)
+	file, err := os.Open(LastValuesFile)
 	if err != nil {
 		// If the file doesn't exist, return an empty map.
 		return values
@@ -91,32 +90,39 @@ func SaveLastValues(values map[string]string) {
 }
 
 // backupFile creates a backup of the provided file by copying it to a new file with a timestamp.
-func BackupFile(filepathStr string) {
-	if info, err := os.Stat(filepathStr); err == nil && !info.IsDir() {
-		timestamp := time.Now().Format("20060102-150405")
-		baseName := filepath.Base(filepathStr)
-		dirName := filepath.Dir(filepathStr)
-		backupName := fmt.Sprintf("%s_%s.bak", timestamp, baseName)
-		backupPath := filepath.Join(dirName, backupName)
-
-		src, err := os.Open(filepathStr)
-		if err != nil {
-			logger.GetLogger().Fatal("Error opening source file for backup", zap.Error(err))
-		}
-		defer src.Close()
-
-		dest, err := os.Create(backupPath)
-		if err != nil {
-			logger.GetLogger().Fatal("Error creating backup file", zap.Error(err))
-		}
-		defer dest.Close()
-
-		_, err = io.Copy(dest, src)
-		if err != nil {
-			logger.GetLogger().Fatal("Error copying to backup file", zap.Error(err))
-		}
-		fmt.Printf("Backup of '%s' created as '%s'.\n", filepathStr, backupPath)
+func BackupFile(filepathStr string) error {
+	info, err := os.Stat(filepathStr)
+	if err != nil {
+		return err
 	}
+	if !info.Mode().IsRegular() {
+		// If not a regular file, simply do nothing.
+		return nil
+	}
+
+	timestamp := time.Now().Format("20060102-150405")
+	baseName := filepath.Base(filepathStr)
+	dirName := filepath.Dir(filepathStr)
+	backupName := fmt.Sprintf("%s_%s.bak", timestamp, baseName)
+	backupPath := filepath.Join(dirName, backupName)
+
+	src, err := os.Open(filepathStr)
+	if err != nil {
+		return fmt.Errorf("error opening source file for backup: %w", err)
+	}
+	defer src.Close()
+
+	dest, err := os.Create(backupPath)
+	if err != nil {
+		return fmt.Errorf("error creating backup file: %w", err)
+	}
+	defer dest.Close()
+
+	if _, err = io.Copy(dest, src); err != nil {
+		return fmt.Errorf("error copying to backup file: %w", err)
+	}
+	fmt.Printf("Backup of '%s' created as '%s'.\n", filepathStr, backupPath)
+	return nil
 }
 
 // displayOptions prints the available EOS backend web apps.
@@ -125,7 +131,7 @@ func DisplayOptions() {
 	// To display options in order, first sort the keys numerically.
 	var keys []int
 	keyMap := make(map[int]string)
-	for keyStr := range hecate.AppsSelection {
+	for keyStr := range AppsSelection {
 		var num int
 		fmt.Sscanf(keyStr, "%d", &num)
 		keys = append(keys, num)
@@ -134,7 +140,7 @@ func DisplayOptions() {
 	sort.Ints(keys)
 	for _, num := range keys {
 		keyStr := keyMap[num]
-		app := hecate.AppsSelection[keyStr]
+		app := AppsSelection[keyStr]
 		fmt.Printf("  %d. %s  -> %s\n", num, app.AppName, app.ConfFile)
 	}
 }
@@ -163,7 +169,7 @@ func GetUserSelection(defaultSelection string, reader *bufio.Reader) (map[string
 		// If user entered "all", add all configuration filenames.
 		if strings.ToLower(input) == "all" {
 			allowed := make(map[string]bool)
-			for _, app := range hecate.AppsSelection {
+			for _, app := range AppsSelection {
 				allowed[app.ConfFile] = true
 			}
 			return allowed, "all"
@@ -174,7 +180,7 @@ func GetUserSelection(defaultSelection string, reader *bufio.Reader) (map[string
 		tokens := strings.Split(input, ",")
 		for _, token := range tokens {
 			token = strings.TrimSpace(token)
-			if app, ok := hecate.AppsSelection[token]; ok {
+			if app, ok := AppsSelection[token]; ok {
 				allowed[app.ConfFile] = true
 			} else {
 				fmt.Printf("Invalid option: %s\n", token)
@@ -192,9 +198,9 @@ func GetUserSelection(defaultSelection string, reader *bufio.Reader) (map[string
 
 // updateComposeFile reads docker-compose.yml and uncomments lines for selected apps.
 func UpdateComposeFile(selectedApps map[string]bool) error {
-	data, err := os.ReadFile(hecate.DockerComposeFile)
+	data, err := os.ReadFile(DockerComposeFile)
 	if err != nil {
-		return fmt.Errorf("Error: %s not found", hecate.hecate.DockerComposeFile)
+		return fmt.Errorf("error: %s not found", DockerComposeFile)
 	}
 
 	lines := strings.Split(string(data), "\n")
@@ -203,7 +209,7 @@ func UpdateComposeFile(selectedApps map[string]bool) error {
 	re := regexp.MustCompile(`^(\s*)#\s*(-)`)
 	for _, line := range lines {
 		modifiedLine := line
-		for app, markers := range hecate.supportedApps {
+		for app, markers := range SupportedApps {
 			if selectedApps[app] {
 				for _, marker := range markers {
 					if strings.Contains(line, marker) {
@@ -217,12 +223,12 @@ func UpdateComposeFile(selectedApps map[string]bool) error {
 	}
 
 	// Backup the original docker-compose file.
-	if err = BackupFile(hecate.DockerComposeFile); err != nil {
+	if err = BackupFile(DockerComposeFile); err != nil {
 		return err
 	}
 
 	output := strings.Join(newLines, "\n")
-	if err = os.WriteFile(hecate.DockerComposeFile, []byte(output), 0644); err != nil {
+	if err = os.WriteFile(DockerComposeFile, []byte(output), 0644); err != nil {
 		return err
 	}
 
@@ -230,12 +236,12 @@ func UpdateComposeFile(selectedApps map[string]bool) error {
 	for app := range selectedApps {
 		apps = append(apps, app)
 	}
-	fmt.Printf("Updated %s for apps: %s\n", hecate.DockerComposeFile, strings.Join(apps, ", "))
+	fmt.Printf("Updated %s for apps: %s\n", DockerComposeFile, strings.Join(apps, ", "))
 	return nil
 }
 
 // updateFile replaces the placeholder variables in a single file.
-func updateFile(filePath, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_DOMAIN string) {
+func UpdateFile(filePath, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_DOMAIN string) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		fmt.Printf("Error reading %s: %v\n", filePath, err)
@@ -261,14 +267,14 @@ func updateFile(filePath, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_D
 }
 
 // processConfDirectory recursively processes all .conf files in the specified directory.
-func processConfDirectory(directory, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_DOMAIN string) {
+func ProcessConfDirectory(directory, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_DOMAIN string) {
 	err := filepath.Walk(directory, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			fmt.Printf("Error accessing path %s: %v\n", path, err)
 			return nil
 		}
 		if !info.IsDir() && strings.HasSuffix(info.Name(), ".conf") {
-			updateFile(path, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_DOMAIN)
+			UpdateFile(path, BACKEND_IP, PERS_BACKEND_IP, DELPHI_BACKEND_IP, BASE_DOMAIN)
 		}
 		return nil
 	})

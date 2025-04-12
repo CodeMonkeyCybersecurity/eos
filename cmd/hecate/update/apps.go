@@ -69,7 +69,7 @@ var appsCmd = &cobra.Command{
 		log := logger.GetLogger()
 		log.Info("Running update apps command")
 
-		fmt.Println("=== EOS Backend Web Apps Selector ===\n")
+		log.Info("=== EOS Backend Web Apps Selector ===\n")
 		reader := bufio.NewReader(os.Stdin)
 
 		// Load previous values from the configuration file.

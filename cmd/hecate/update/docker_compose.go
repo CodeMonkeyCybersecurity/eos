@@ -1,9 +1,11 @@
-/* cmd/hecate/update/docker_compose.go */
+// cmd/hecate/update/docker_compose.go
 
 package update
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -21,10 +23,10 @@ var dockerComposeCmd = &cobra.Command{
 		log := logger.GetLogger()
 		lastValues := hecate.LoadLastValues()
 		selectedApps := make(map[string]bool)
-		var selectionStr string
 
 		// Command-line mode: if arguments are provided.
 		if len(args) > 0 {
+			// Command-line mode: if arguments are provided.
 			for _, arg := range args {
 				lower := strings.ToLower(arg)
 				if _, ok := hecate.SupportedApps[lower]; ok {
@@ -39,19 +41,19 @@ var dockerComposeCmd = &cobra.Command{
 			for k := range selectedApps {
 				keys = append(keys, k)
 			}
-			selectionStr = strings.Join(keys, ", ")
+			lastValues["APPS_SELECTION"] = strings.Join(keys, ", ")
 		} else {
 			// Interactive mode.
 			hecate.DisplayOptions()
 			defaultSelection := lastValues["APPS_SELECTION"]
+
+			// Create a reader for input.
+			reader := bufio.NewReader(os.Stdin)
+
 			var sel string
-			selectedApps, sel = hecate.GetUserSelection(defaultSelection)
-			selectionStr = sel
-			lastValues["APPS_SELECTION"] = selectionStr
-			if err := hecate.SaveLastValues(lastValues); err != nil {
-				log.Error("Error saving last values.", zap.Error(err))
-				return err
-			}
+			selectedApps, sel = hecate.GetUserSelection(defaultSelection, reader)
+			lastValues["APPS_SELECTION"] = sel
+			hecate.SaveLastValues(lastValues)
 		}
 		if err := hecate.UpdateComposeFile(selectedApps); err != nil {
 			log.Error("Error updating docker-compose file.", zap.Error(err))

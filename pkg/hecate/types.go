@@ -4,8 +4,9 @@ package hecate
 
 // Constants for file locations.
 const (
-	LastValuesFile = ".hecate.conf"
-	ConfDir        = "conf.d"
+	LastValuesFile    = ".hecate.conf"
+	ConfDir           = "conf.d"
+	DockerComposeFile = "docker-compose.yml"
 )
 
 // AppSelection holds an app name and its configuration file.
