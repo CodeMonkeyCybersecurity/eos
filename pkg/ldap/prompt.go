@@ -15,7 +15,7 @@ import (
 func promptLDAPDetails() (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
 	if _, err := vault.GetVaultClient(); err == nil {
-		_ = vault.LoadFromVaultAt(context.Background(), "secret", consts.LDAPVaultPath, cfg) // best-effort prefill
+		_ = vault.ReadFromVaultAt(context.Background(), "secret", consts.LDAPVaultPath, cfg) // best-effort prefill
 	}
 
 	for fieldName, meta := range LDAPFieldMeta {
@@ -35,7 +35,7 @@ func promptLDAPDetails() (*LDAPConfig, error) {
 		}
 	}
 
-	if err := vault.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(consts.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

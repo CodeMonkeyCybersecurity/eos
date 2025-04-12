@@ -18,11 +18,11 @@ import (
 //
 
 // Save stores a struct in Vault using the API or falls back to disk if the API call fails.
-func Save(client *api.Client, name string, data any) error {
+func Write(client *api.Client, name string, data any) error {
 	SetVaultClient(client)
 	path := vaultPath(name)
 
-	if err := SaveToVault(path, data); err == nil {
+	if err := WriteToVault(path, data); err == nil {
 		return nil
 	}
 
@@ -30,12 +30,12 @@ func Save(client *api.Client, name string, data any) error {
 	return writeFallbackYAML(diskPath(name), data)
 }
 
-// SaveToVault stores a serializable struct to Vault at a given KV v2 path.
-func SaveToVault(path string, v interface{}) error {
-	return SaveToVaultAt("secret", path, v)
+// WriteToVault stores a serializable struct to Vault at a given KV v2 path.
+func WriteToVault(path string, v interface{}) error {
+	return WriteToVaultAt("secret", path, v)
 }
 
-func SaveToVaultAt(mount, path string, v interface{}) error {
+func WriteToVaultAt(mount, path string, v interface{}) error {
 	client, err := GetVaultClient()
 	if err != nil {
 		return err
@@ -53,8 +53,8 @@ func SaveToVaultAt(mount, path string, v interface{}) error {
 	return err
 }
 
-// SaveSecret writes a raw map directly to Vault.
-func SaveSecret(client *api.Client, path string, data map[string]interface{}) error {
+// WriteSecret writes a raw map directly to Vault.
+func WriteSecret(client *api.Client, path string, data map[string]interface{}) error {
 	_, err := client.Logical().Write(path, data)
 	return err
 }

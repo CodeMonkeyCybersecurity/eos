@@ -35,7 +35,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("✅ Created new vault client")
 
 		log.Info("Loading the stored initialization data and EOS user credentials...")
-		initRes, creds, storedHashes, hashedRoot := vault.LoadVaultSecureData(client)
+		initRes, creds, storedHashes, hashedRoot := vault.ReadVaultSecureData(client)
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
 		log.Info("✅ Loaded the stored initialization data and EOS user credentials")
 

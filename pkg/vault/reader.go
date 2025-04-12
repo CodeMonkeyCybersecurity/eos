@@ -1,3 +1,5 @@
+/* pkg/vault/reader */
+
 package vault
 
 import (
@@ -19,13 +21,13 @@ import (
 // === Vault Read Helpers ===
 //
 
-// LoadFromVault loads a struct from a Vault KV v2 path (default mount "secret").
-func LoadFromVault(path string, v interface{}) error {
-	return LoadFromVaultAt(context.Background(), "secret", path, v)
+// ReadFromVault loads a struct from a Vault KV v2 path (default mount "secret").
+func ReadFromVault(path string, v interface{}) error {
+	return ReadFromVaultAt(context.Background(), "secret", path, v)
 }
 
-// LoadFromVaultAt loads from a custom KV v2 mount.
-func LoadFromVaultAt(ctx context.Context, mount, path string, v interface{}) error {
+// ReadFromVaultAt loads from a custom KV v2 mount.
+func ReadFromVaultAt(ctx context.Context, mount, path string, v interface{}) error {
 	client, err := GetVaultClient()
 	if err != nil {
 		return err
@@ -49,15 +51,15 @@ func LoadFromVaultAt(ctx context.Context, mount, path string, v interface{}) err
 }
 
 // Load loads from Vault or fallback to disk, based on availability.
-func Load(client *api.Client, name string, v any) error {
+func Read(client *api.Client, name string, v any) error {
 	if IsVaultAvailable(client) {
-		return loadFromVault(client, name, v)
+		return readFromVault(client, name, v)
 	}
 	return readFallbackYAML(diskPath(name), v)
 }
 
-// loadFromVault reads from logical path "secret/eos/<name>/config".
-func loadFromVault(client *api.Client, name string, out any) error {
+// readFromVault reads from logical path "secret/eos/<name>/config".
+func readFromVault(client *api.Client, name string, out any) error {
 	path := fmt.Sprintf("secret/eos/%s/config", name)
 	return readVaultKV(client, path, out)
 }
@@ -113,7 +115,7 @@ func readFallbackSecrets() (map[string]string, error) {
 // === Secure Vault Loaders ===
 //
 
-func loadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, []string, string) {
+func ReadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, []string, string) {
 	if err := eos.EnsureEosUser(); err != nil {
 		log.Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
@@ -123,12 +125,12 @@ func loadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, 
 
 	// Load vault-init metadata
 	var initRes *api.InitResponse
-	if err := Load(client, "vault-init", &initRes); err != nil {
+	if err := Read(client, "vault-init", &initRes); err != nil {
 		log.Fatal("Failed to load Vault init result", zap.Error(err))
 	}
 
 	var creds UserpassCreds
-	if err := Load(client, "bootstrap/eos-user", &creds); err != nil {
+	if err := Read(client, "bootstrap/eos-user", &creds); err != nil {
 		log.Fatal("Failed to load Vault userpass credentials", zap.Error(err))
 	}
 

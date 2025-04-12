@@ -14,7 +14,7 @@ func LoadLDAPConfig() (*LDAPConfig, string, error) {
 		name string
 		load func() (*LDAPConfig, error)
 	}{
-		{"vault", loadFromVault},
+		{"vault", readFromVault},
 		{"env", loadFromEnv},
 		{"host", tryDetectFromHost},
 		{"container", tryDetectFromContainer},
@@ -34,14 +34,14 @@ func LoadLDAPConfig() (*LDAPConfig, string, error) {
 	return cfg, "default", nil
 }
 
-func loadFromVault() (*LDAPConfig, error) {
+func readFromVault() (*LDAPConfig, error) {
 	client, err := vault.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
 	var cfg LDAPConfig
-	if err := vault.Load(client, "ldap", &cfg); err != nil || cfg.FQDN == "" {
+	if err := vault.Read(client, "ldap", &cfg); err != nil || cfg.FQDN == "" {
 		return nil, errors.New("LDAP config not found in Vault")
 	}
 	return &cfg, nil

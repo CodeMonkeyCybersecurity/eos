@@ -12,6 +12,5 @@ var (
 	SetVaultEnv           = setVaultEnv
 	Purge                 = purge
 	WriteFallbackSecrets  = writeFallbackSecrets
-	LoadVaultSecureData   = loadVaultSecureData
 	PrintNextSteps        = printNextSteps
 )

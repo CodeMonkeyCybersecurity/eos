@@ -90,7 +90,7 @@ func BaseURL(cfg *DelphiConfig) string {
 
 func LoadAndConfirmConfig() (*DelphiConfig, error) {
 	var cfg DelphiConfig
-	err := vault.LoadFromVault("secret/delphi/config", &cfg)
+	err := vault.ReadFromVault("secret/delphi/config", &cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load Delphi config: %w", err)
 	}

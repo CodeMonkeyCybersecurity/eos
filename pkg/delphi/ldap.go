@@ -29,7 +29,7 @@ type LDAPConfig struct {
 
 func LoadLDAPConfig() (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := vault.LoadFromVault(consts.LDAPVaultPath, &cfg)
+	err := vault.ReadFromVault(consts.LDAPVaultPath, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	}
 
 	// 🔐 Save to Vault
-	if err := vault.SaveToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(consts.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

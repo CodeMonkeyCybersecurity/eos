@@ -16,7 +16,7 @@ func handleFallbackOrStore(name string, secrets map[string]string) error {
 
 	if IsVaultAvailable(client) {
 		fmt.Println("🔐 Vault is available. Storing secrets securely.")
-		return SaveToVault(name, secrets)
+		return WriteToVault(name, secrets)
 	}
 
 	choice := interaction.PromptGenericFallback("Vault not detected. What would you like to do?", []interaction.FallbackOption{

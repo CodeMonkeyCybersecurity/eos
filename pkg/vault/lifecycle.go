@@ -73,7 +73,7 @@ func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]s
 		data[k] = v
 	}
 
-	return SaveSecret(client, path, data)
+	return WriteSecret(client, path, data)
 }
 
 func RevokeRootToken(client *api.Client, token string) error {
@@ -143,8 +143,8 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 				time.Sleep(5 * time.Second)
 			}
 
-			// Now, persist the Vault init result using the updated API-based Save().
-			if err := Save(client, "vault-init", initRes); err != nil {
+			// Now, persist the Vault init result using the updated API-based Write().
+			if err := Write(client, "vault-init", initRes); err != nil {
 				fmt.Println("Failed to persist Vault init result")
 				return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 			} else {
@@ -167,7 +167,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	client.SetToken(initRes.RootToken)
 
 	// Persist the Vault init result now that Vault is unsealed and the token is valid.
-	if err := Save(client, "vault-init", initRes); err != nil {
+	if err := Write(client, "vault-init", initRes); err != nil {
 		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 	} else {
 		fmt.Println("✅ Vault init result persisted successfully")
@@ -245,7 +245,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		os.Exit(1)
 	}
 
-	// Save to fallback file
+	// Write to fallback file
 	fallbackFile := "/var/lib/eos/secrets/vault-userpass.yaml"
 	os.MkdirAll("/var/lib/eos/secrets", 0700)
 	fallbackContent := fmt.Sprintf("username: eos\npassword: %s\n", password)
@@ -256,7 +256,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	}
 
 	// Store in Vault
-	SaveSecret(client, "secret/bootstrap/eos-user", map[string]interface{}{
+	WriteSecret(client, "secret/bootstrap/eos-user", map[string]interface{}{
 		"username": "eos",
 		"password": password,
 	})
@@ -276,8 +276,8 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		os.Exit(1)
 	}
 
-	// Save init result
-	if err := Save(client, "vault-init", initRes); err != nil {
+	// Write init result
+	if err := Write(client, "vault-init", initRes); err != nil {
 		fmt.Println("⚠️ Failed to store vault-init data in Vault:", err)
 	}
 

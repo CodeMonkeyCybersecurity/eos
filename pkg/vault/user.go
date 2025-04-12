@@ -14,7 +14,7 @@ func StoreUserSecret(username, password, keyPath string) error {
 		return fmt.Errorf("failed to read SSH key from %s: %w", keyPath, err)
 	}
 	secret := UserSecret{Username: username, Password: password, SSHKey: string(keyData)}
-	return SaveToVaultAt("secret", fmt.Sprintf("users/%s", username), &secret)
+	return WriteToVaultAt("secret", fmt.Sprintf("users/%s", username), &secret)
 }
 
 // LoadUserSecret retrieves and validates a user's secret from Vault.
