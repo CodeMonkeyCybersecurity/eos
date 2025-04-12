@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 // Purge removes Vault repo artifacts based on the Linux distro.
@@ -208,8 +209,23 @@ func UnsealVault(client *api.Client, initRes *api.InitResponse) error {
 }
 
 /* Enable file audit at "/var/snap/vault/common/vault_audit.log" */
-func EnableFileAudit(client *api.Client) error {
-	return enableFeature(client, "sys/audit/file",
+func EnableFileAudit(client *api.Client, log *zap.Logger) error {
+	const auditPath = "file/"
+	const mountPath = "sys/audit/" + auditPath
+
+	// Check if the audit device is already enabled
+	audits, err := client.Sys().ListAudit()
+	if err != nil {
+		return fmt.Errorf("failed to list audit devices: %w", err)
+	}
+
+	if _, exists := audits[auditPath]; exists {
+		log.Info("Audit device already enabled at sys/audit/file. Skipping.")
+		return nil
+	}
+
+	// Enable the audit device
+	return enableFeature(client, mountPath,
 		map[string]interface{}{
 			"type": "file",
 			"options": map[string]string{

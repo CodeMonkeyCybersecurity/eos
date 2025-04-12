@@ -45,7 +45,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		/* Enable file audit */
 		log.Info("[1/7] Enabling file audit")
-		if err := vault.EnableFileAudit(client); err != nil {
+		if err := vault.EnableFileAudit(client, log); err != nil {
 			log.Error("Failed to enable file audit", zap.Error(err))
 			return err
 		}
