@@ -61,6 +61,9 @@ func EnsureVaultUnsealed() error {
 	}
 
 	fmt.Println("🔒 Vault is sealed. Attempting privileged unseal...")
+	if _, err := os.Stat("/var/lib/eos/secrets/vault_init.json"); os.IsNotExist(err) {
+		return fmt.Errorf("vault init file not found — run `eos enable vault` first")
+	}
 
 	cmd := exec.Command("sudo", "-u", "eos", "/usr/local/bin/eos", "internal", "unseal")
 	cmd.Stdout = os.Stdout

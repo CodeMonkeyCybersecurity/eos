@@ -89,7 +89,7 @@ func RevokeRootToken(client *api.Client, token string) error {
 	return nil
 }
 
-// 0. Install Vault via dnf if not already installed
+/* Install Vault via dnf if not already installed */
 func InstallVaultViaDnf() error {
 	fmt.Println("[0/10] Checking if Vault is installed...")
 	_, err := exec.LookPath("vault")
@@ -110,9 +110,13 @@ func InstallVaultViaDnf() error {
 	return nil
 }
 
-/* 2. Initialize Vault (if not already initialized) */
+/* Initialize Vault (if not already initialized) */
 func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
-	fmt.Println("\n[1/10] Initializing Vault...")
+	if err := EnsureVaultUnsealed(); err != nil {
+		return nil, nil, fmt.Errorf("vault is sealed and could not be unsealed: %w", err)
+	}
+
+	fmt.Println("\nInitializing Vault...")
 
 	initRes, err := client.Sys().Init(&api.InitRequest{
 		SecretShares:    5,
