@@ -1,4 +1,4 @@
-// cmd/inspect/vault.go
+/* cmd/inspect/vault.go */
 package inspect
 
 import (
@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,56 +23,24 @@ var InspectVaultCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("inspect").With(zap.String("component", "vault"))
 
-		if !utils.IsPrivilegedUser() {
-			log.Error("Access denied", zap.String("action", "permission-check"), zap.String("status", "denied"))
-			fmt.Println(`❌ Access denied. You must be root or the 'eos' user.
+		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos"))
 
-✅ Try again with:
-   sudo eos inspect vault`)
-			return fmt.Errorf("requires root or eos user")
-		}
-
-		if _, err := exec.LookPath("vault"); err != nil {
-			log.Error("Vault CLI not found", zap.String("action", "lookup"), zap.String("status", "missing"))
-			fmt.Println(`❌ HashiCorp Vault CLI not found in $PATH
-
-💡 You can install it with:
-   sudo apt install vault
-
-Or verify it's available to the current user:
-   which vault
-   echo $PATH`)
-			return fmt.Errorf("vault CLI binary not found")
-		}
-
-		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos/"))
-
-		cmdExec := exec.Command("vault", "kv", "list", "-format=json", "secret/eos")
-		output, err := cmdExec.Output()
+		entries, err := vault.ListUnder("eos")
 		if err != nil {
 			log.Error("Vault list failed", zap.String("action", "list"), zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
 		}
 
-		paths := strings.Split(string(output), ",")
-		count := 0
-		for _, raw := range paths {
-			entry := strings.Trim(strings.Trim(raw, "\" \n[]"), "/")
-			if entry != "" {
-				fullPath := "secret/eos/" + entry
-				log.Info("Found Vault entry", zap.String("path", fullPath))
-				fmt.Printf(" - %s\n", fullPath)
-				count++
-			}
+		for _, entry := range entries {
+			fullPath := "secret/eos/" + strings.TrimSuffix(entry, "/")
+			log.Info("Found Vault entry", zap.String("path", fullPath))
+			fmt.Printf(" - %s\n", fullPath)
 		}
 
-		log.Info("Vault secrets query complete", zap.String("action", "list"), zap.String("status", "success"), zap.Int("count", count))
-		fmt.Printf("\n✅ %d entries found.\n", count)
+		fmt.Printf("\n✅ %d entries found.\n", len(entries))
 		return nil
 	}),
 }
-
-// cmd/inspect/vault.go (continuation)
 
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",

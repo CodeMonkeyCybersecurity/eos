@@ -97,3 +97,31 @@ func ReadFallbackIntoJSON(path string, out any) error {
 	}
 	return json.Unmarshal(data, out)
 }
+
+func ListUnder(path string) ([]string, error) {
+	client, err := GetPrivilegedVaultClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Vault client: %w", err)
+	}
+
+	list, err := client.Logical().List("secret/metadata/" + path)
+	if err != nil {
+		return nil, fmt.Errorf("vault list failed: %w", err)
+	}
+	if list == nil || list.Data == nil {
+		return nil, fmt.Errorf("no data found at secret/metadata/%s", path)
+	}
+
+	raw, ok := list.Data["keys"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected Vault list format")
+	}
+
+	keys := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			keys = append(keys, s)
+		}
+	}
+	return keys, nil
+}
