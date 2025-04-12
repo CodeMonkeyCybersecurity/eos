@@ -9,6 +9,13 @@ path "secret/data/*" {
 	capabilities = ["create", "read", "update", "delete", "list"]
 }
 
+path "secret/data/eos/vault-init" {
+  capabilities = ["read", "list"]
+}
+path "secret/data/eos/bootstrap/eos-user" {
+  capabilities = ["read", "list"]
+}
+
 # Access metadata (KV v2)
 path "secret/metadata/*" {
 	capabilities = ["read", "list"]
