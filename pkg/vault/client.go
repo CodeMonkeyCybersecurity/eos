@@ -43,9 +43,12 @@ func GetVaultClient() (*api.Client, error) {
 	return vaultClient, nil
 }
 
-
 // EnsureVaultClient guarantees the Vault client is set, using the privileged eos user.
 func EnsureVaultClient() {
+	if _, err := SetVaultEnv(); err != nil {
+		fmt.Println("⚠️  Failed to set Vault environment:", err)
+	}
+
 	if _, err := GetVaultClient(); err == nil {
 		return // already set
 	}
