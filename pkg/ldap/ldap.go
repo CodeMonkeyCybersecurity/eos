@@ -16,5 +16,4 @@ var (
 	ReadGroup            = readGroup
 	CreateUser           = createUser
 	CreateGroup          = createGroup
-	PromptLDAPDetails    = promptLDAPDetails
 )

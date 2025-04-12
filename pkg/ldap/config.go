@@ -83,31 +83,31 @@ func tryDetectFromContainer() (*LDAPConfig, error) {
 }
 
 func loadFromPrompt() (*LDAPConfig, error) {
-	fqdn, err := vault.RememberFQDN()
+	fqdn, err := RememberFQDN()
 	if err != nil {
 		return nil, err
 	}
-	bindDN, err := vault.RememberBindDN()
+	bindDN, err := RememberBindDN()
 	if err != nil {
 		return nil, err
 	}
-	password, err := vault.RememberPassword()
+	password, err := RememberPassword()
 	if err != nil {
 		return nil, err
 	}
-	userBase, err := vault.RememberUserBase()
+	userBase, err := RememberUserBase()
 	if err != nil {
 		return nil, err
 	}
-	roleBase, err := vault.RememberGroupBase()
+	roleBase, err := RememberGroupBase()
 	if err != nil {
 		return nil, err
 	}
-	adminRole, err := vault.RememberAdminRole()
+	adminRole, err := RememberAdminRole()
 	if err != nil {
 		return nil, err
 	}
-	readonlyRole, err := vault.RememberReadonlyRole()
+	readonlyRole, err := RememberReadonlyRole()
 	if err != nil {
 		return nil, err
 	}

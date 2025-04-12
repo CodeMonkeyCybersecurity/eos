@@ -1,10 +1,12 @@
-/* pkg/vault/ldap.go */
+/* pkg/ldap/vault.go */
 
-package vault
+package ldap
+
+import "github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 
 // rememberLDAPField prompts for a remembered value stored under the "ldap" path.
 func rememberLDAPField(key, prompt, def string) (string, error) {
-	return remember("ldap", key, prompt, def)
+	return vault.Remember("ldap", key, prompt, def)
 }
 
 // LDAP field prompts

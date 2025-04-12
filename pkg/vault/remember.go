@@ -1,4 +1,5 @@
-// pkg/vault/remember.go
+/* pkg/vault/remember.go */
+
 package vault
 
 import (
@@ -8,7 +9,7 @@ import (
 )
 
 // Remember prompts the user for a Vault config field and persists it using fallback logic.
-func remember(name, key, prompt, def string) (string, error) {
+func Remember(name, key, prompt, def string) (string, error) {
 	// Attempt to load previously stored secrets.
 	values := map[string]string{}
 	// We assume loadWithFallback is a Vault-specific function that loads the config

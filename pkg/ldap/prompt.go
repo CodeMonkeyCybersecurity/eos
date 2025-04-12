@@ -12,14 +12,14 @@ import (
 )
 
 // PromptLDAPDetails interactively builds an LDAPConfig using field metadata.
-func promptLDAPDetails() (*LDAPConfig, error) {
+func PromptLDAPDetails() (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
 	if _, err := vault.GetVaultClient(); err == nil {
 		_ = vault.ReadFromVaultAt(context.Background(), "secret", consts.LDAPVaultPath, cfg) // best-effort prefill
 	}
 
 	for fieldName, meta := range LDAPFieldMeta {
-		val := getLDAPField(cfg, fieldName)
+		val := GetLDAPField(cfg, fieldName)
 
 		if val == "" || meta.Required {
 			if meta.Sensitive {
@@ -31,7 +31,7 @@ func promptLDAPDetails() (*LDAPConfig, error) {
 			} else {
 				val = interaction.PromptInput(meta.Label, meta.Help)
 			}
-			setLDAPField(cfg, fieldName, val)
+			SetLDAPField(cfg, fieldName, val)
 		}
 	}
 
@@ -42,7 +42,7 @@ func promptLDAPDetails() (*LDAPConfig, error) {
 	return cfg, nil
 }
 
-func getLDAPField(cfg *LDAPConfig, field string) string {
+func GetLDAPField(cfg *LDAPConfig, field string) string {
 	switch field {
 	case "FQDN":
 		return cfg.FQDN
@@ -63,7 +63,7 @@ func getLDAPField(cfg *LDAPConfig, field string) string {
 	}
 }
 
-func setLDAPField(cfg *LDAPConfig, field, value string) {
+func SetLDAPField(cfg *LDAPConfig, field, value string) {
 	switch field {
 	case "FQDN":
 		cfg.FQDN = value
