@@ -5,29 +5,18 @@ package vault
 var Policies = map[string]string{
 	EosVaultPolicy: `
 # Read and write actual data (KV v2)
-path "secret/data/*" {
+path "secret/*" {
 	capabilities = ["create", "read", "update", "delete", "list"]
 }
 
-path "secret/data/eos/vault-init" {
-  capabilities = ["read", "list"]
-}
-path "secret/data/eos/bootstrap/eos-user" {
-  capabilities = ["read", "list"]
-}
-
-# Access metadata (KV v2)
-path "secret/metadata/*" {
-	capabilities = ["read", "list"]
-}
 
 # Optional: Allow checking mounts
-path "sys/mounts" {
-	capabilities = ["read", "list"]
+path "sys/*" {
+	capabilities = ["create", "read", "update", "delete", "list"]
 }
 
 # 🔐 Allow eos user to manage userpass accounts
-path "auth/userpass/users/*" {
+path "auth/*" {
 	capabilities = ["create", "read", "update", "delete", "list"]
 }
 `,
