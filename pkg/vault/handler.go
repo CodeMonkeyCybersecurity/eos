@@ -1,8 +1,11 @@
 /* pkg/vault/handler.go */
+
 package vault
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/hashicorp/vault/api"
@@ -44,5 +47,30 @@ func enableMount(client *api.Client, path, engineType string, options map[string
 		return fmt.Errorf("failed to mount %s: %w", engineType, err)
 	}
 	fmt.Println(msg)
+	return nil
+}
+
+func EnsureVaultUnsealed() error {
+	client, err := NewClient()
+	if err != nil {
+		return fmt.Errorf("vault client error: %w", err)
+	}
+
+	if !IsVaultSealed(client) {
+		return nil // ✅ already unsealed
+	}
+
+	fmt.Println("🔒 Vault is sealed. Attempting privileged unseal...")
+
+	cmd := exec.Command("sudo", "-u", "eos", "/usr/local/bin/eos", "internal", "unseal")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("unseal failed via sudo: %w", err)
+	}
+
+	fmt.Println("✅ Vault successfully unsealed.")
 	return nil
 }

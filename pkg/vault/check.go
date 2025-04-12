@@ -1,3 +1,5 @@
+/* pkg/vault/check.go */
+
 package vault
 
 import (
@@ -102,4 +104,13 @@ func TestKVSecret(client *api.Client) error {
 
 	fmt.Println("✅ Test secret value:", secret.Data["value"])
 	return nil
+}
+
+func IsVaultSealed(client *api.Client) bool {
+	health, err := client.Sys().Health()
+	if err != nil {
+		// fallback: assume not sealed (or log?)
+		return false
+	}
+	return health.Sealed
 }

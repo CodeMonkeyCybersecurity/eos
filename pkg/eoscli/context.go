@@ -1,37 +1,14 @@
-/* pkg/eoscli/context.go
- */
+/* pkg/eoscli/context.go */
 
 package eoscli
 
 import (
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
-
-// Wrap adds automatic logger injection and scoped metadata based on calling package.
-func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		start := time.Now()
-		log := contextualLogger()
-
-		log.Info("Command started", zap.Time("start_time", start))
-		err := fn(cmd, args)
-		duration := time.Since(start)
-
-		if err != nil {
-			log.Error("Command failed", zap.Duration("duration", duration), zap.Error(err))
-		} else {
-			log.Info("Command completed", zap.Duration("duration", duration))
-		}
-
-		return err
-	}
-}
 
 // resolveContext extracts the calling package (as "component") and
 // function name (as "action") to enrich log context.

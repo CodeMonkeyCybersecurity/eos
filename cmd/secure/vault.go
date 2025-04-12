@@ -60,7 +60,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("✅ Vault unsealed and authenticated as eos admin")
 
 		log.Info("Loading the stored initialization data and EOS user credentials...")
-		initRes, creds, storedHashes, hashedRoot := vault.ReadVaultSecureData(client)
+		initRes, creds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client)
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
 		log.Info("✅ Loaded the stored initialization data and EOS user credentials")
 
