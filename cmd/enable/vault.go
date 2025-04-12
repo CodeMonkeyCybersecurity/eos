@@ -53,7 +53,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		/* Enable KV v2 */
 		log.Info("[2/7] Enabling KV v2 secrets engine")
-		if err := vault.EnableKV2(client); err != nil {
+		if err := vault.EnableKV2(client, log); err != nil {
 			log.Error("KV v2 setup failed", zap.Error(err))
 		}
 

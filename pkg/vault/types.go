@@ -10,7 +10,11 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
-const fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
+const (
+	fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
+	auditPath           = "file/"
+	mountPath           = "sys/audit/" + auditPath
+)
 
 // vaultPath constructs the Vault KV path like: secret/eos/<name>/config
 func vaultPath(name string) string {
