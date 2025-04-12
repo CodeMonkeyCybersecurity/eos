@@ -5,6 +5,7 @@ package vault
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"github.com/hashicorp/vault/api"
@@ -24,6 +25,9 @@ var (
 
 // vaultPath returns the full KV v2 path for data reads/writes.
 func vaultPath(name string) string {
+	if strings.Contains(name, "/") {
+		fmt.Println("vaultPath received a nested path — only pass the base name!")
+	}
 	return fmt.Sprintf("secret/data/eos/%s", name)
 }
 

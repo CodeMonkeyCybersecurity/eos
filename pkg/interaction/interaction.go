@@ -13,6 +13,6 @@ var (
 	PromptInput           = promptInput
 	PromptInputs          = promptInputs
 
-	ReadLine              = readLine
-	RememberValue         = rememberValue
+	ReadLine      = readLine
+	RememberValue = rememberValue
 )

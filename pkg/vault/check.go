@@ -50,7 +50,6 @@ func isVaultInitialized(client *api.Client) (bool, error) {
 }
 
 // CheckVaultSecrets verifies that entered unseal keys and root token match the stored hashes.
-// CheckVaultSecrets verifies that entered unseal keys and root token match the stored hashes.
 func CheckVaultSecrets(storedHashes []string, hashedRoot string) {
 
 	for {

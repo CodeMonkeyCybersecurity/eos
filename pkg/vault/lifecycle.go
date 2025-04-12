@@ -332,7 +332,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	}
 
 	// Write init result
-	if err := Write(client, vaultPath("vault_init"), initRes); err != nil {
+	if err := Write(client, "vault_init", initRes); err != nil {
 		fmt.Println("⚠️ Failed to store vault_init data in Vault:", err)
 	} else {
 		fmt.Println("✅ vault_init successfully written to Vault.")
