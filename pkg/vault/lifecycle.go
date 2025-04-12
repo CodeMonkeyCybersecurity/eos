@@ -290,10 +290,10 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		Username: "eos",
 		Password: password,
 	}
-	if err := WriteFallbackJSON("vault-userpass", creds); err != nil {
+	if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
 		fmt.Println("⚠️ Failed to write eos Vault user fallback secret:", err)
 	} else {
-		fmt.Printf("🔐 Stored eos Vault user password as fallback\n")
+		fmt.Printf("🔐 Stored eos Vault user password at %s\n", EosUserFallbackFile)
 	}
 
 	// Store in Vault
