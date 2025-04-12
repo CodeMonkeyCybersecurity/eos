@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
@@ -26,7 +27,7 @@ func DeployApp(app string, cmd *cobra.Command) error {
 
 	// Check if the required HTTP config exists
 	httpConfig := filepath.Join(AssetsPath, "servers", app+".conf")
-	if !utils.PathExists(httpConfig) {
+	if !system.Exists(httpConfig) {
 		log.Error("Missing HTTP config file", zap.String("file", httpConfig))
 		return fmt.Errorf("missing Nginx HTTP config for %s", app)
 	}
@@ -38,7 +39,7 @@ func DeployApp(app string, cmd *cobra.Command) error {
 
 	// Copy Stream config if available
 	streamConfig := filepath.Join(AssetsPath, "stream", app+".conf")
-	if utils.PathExists(streamConfig) {
+	if system.Exists(streamConfig) {
 		if err := utils.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf")); err != nil {
 			return fmt.Errorf("failed to copy Stream config: %w", err)
 		}

@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
@@ -38,7 +38,7 @@ func findAndExtractWazuhPasswords() error {
 	var tarPath string
 	for _, dir := range searchPaths {
 		candidate := filepath.Join(dir, "wazuh-install-files.tar")
-		if utils.FileExists(candidate) {
+		if system.Exists(candidate) {
 			tarPath = candidate
 			found = true
 			break
@@ -130,6 +130,5 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 }
 
 func init() {
-	log = logger.L() // <-- INITIALIZE it
 	CreateCmd.AddCommand(CreateDelphiCmd)
 }

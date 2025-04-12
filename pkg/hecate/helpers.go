@@ -81,7 +81,7 @@ func SaveLastValues(values map[string]string) {
 	writer := bufio.NewWriter(file)
 	for key, value := range values {
 		// Write each line as: key="value"
-		_, err := writer.WriteString(fmt.Sprintf("%s=\"%s\"\n", key, value))
+		_, err := fmt.Fprintf(writer, "%s=\"%s\"\n", key, value)
 		if err != nil {
 			logger.GetLogger().Fatal("Error writing to file", zap.Error(err))
 		}

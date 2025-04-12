@@ -4,7 +4,7 @@ package secure
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -54,7 +54,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("✅ Done")
 
 		log.Info("Cleaning up the stored initialization file...")
-		platform.CleanupFile("vault_init.json")
+		system.Rm("vault_init.json", "vault_init.json")
 		log.Info("✅ Done")
 
 		log.Info("Informing the user of the next steps...")

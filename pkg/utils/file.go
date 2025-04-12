@@ -76,23 +76,6 @@ func CopyDir(src, dst string) error {
 	return nil
 }
 
-// RemoveIfExists deletes the given path if it exists.
-func RemoveIfExists(path string) error {
-	if _, err := os.Stat(path); err == nil {
-		return os.RemoveAll(path)
-	} else if os.IsNotExist(err) {
-		return nil // Nothing to do
-	} else {
-		return fmt.Errorf("failed to check path %s: %w", path, err)
-	}
-}
-
-// PathExists returns true if the file or directory at the given path exists.
-func PathExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil || !os.IsNotExist(err)
-}
-
 // BackupFile makes a simple timestamped backup of the original file.
 func BackupFile(path string) error {
 	backupPath := path + ".bak"
@@ -111,9 +94,4 @@ func CatFile(path string) error {
 	}
 	_, err = os.Stdout.Write(data)
 	return err
-}
-
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }

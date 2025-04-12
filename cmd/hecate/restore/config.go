@@ -5,16 +5,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-)
 
-// Define backup and destination paths.
-const (
-	backupConf    = "conf.d.bak"
-	backupCerts   = "certs.bak"
-	backupCompose = "docker-compose.yml.bak"
-	dstConf       = "conf.d"
-	dstCerts      = "certs"
-	dstCompose    = "docker-compose.yml"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 )
 
 // removeIfExists removes the file or directory at the given path if it exists.
@@ -104,50 +96,50 @@ func copyDir(src string, dst string) error {
 
 func main() {
 	// Restore conf.d directory.
-	info, err := os.Stat(backupConf)
+	info, err := os.Stat(hecate.BackupConf)
 	if err != nil || !info.IsDir() {
-		fmt.Printf("Error: Backup directory '%s' does not exist.\n", backupConf)
+		fmt.Printf("Error: Backup directory '%s' does not exist.\n", hecate.BackupConf)
 		os.Exit(1)
 	}
-	if err := removeIfExists(dstConf); err != nil {
-		fmt.Printf("Error removing directory '%s': %v\n", dstConf, err)
+	if err := removeIfExists(hecate.DstConf); err != nil {
+		fmt.Printf("Error removing directory '%s': %v\n", hecate.DstConf, err)
 		os.Exit(1)
 	}
-	if err := copyDir(backupConf, dstConf); err != nil {
-		fmt.Printf("Error during restore of %s: %v\n", backupConf, err)
+	if err := copyDir(hecate.BackupConf, hecate.DstConf); err != nil {
+		fmt.Printf("Error during restore of %s: %v\n", hecate.BackupConf, err)
 		os.Exit(1)
 	}
-	fmt.Printf("Restore complete: '%s' has been restored to '%s'.\n", backupConf, dstConf)
+	fmt.Printf("Restore complete: '%s' has been restored to '%s'.\n", hecate.BackupConf, hecate.DstConf)
 
 	// Restore certs directory.
-	info, err = os.Stat(backupCerts)
+	info, err = os.Stat(hecate.BackupCerts)
 	if err != nil || !info.IsDir() {
-		fmt.Printf("Error: Backup directory '%s' does not exist.\n", backupCerts)
+		fmt.Printf("Error: Backup directory '%s' does not exist.\n", hecate.BackupCerts)
 		os.Exit(1)
 	}
-	if err := removeIfExists(dstCerts); err != nil {
-		fmt.Printf("Error removing directory '%s': %v\n", dstCerts, err)
+	if err := removeIfExists(hecate.DstCerts); err != nil {
+		fmt.Printf("Error removing directory '%s': %v\n", hecate.DstCerts, err)
 		os.Exit(1)
 	}
-	if err := copyDir(backupCerts, dstCerts); err != nil {
-		fmt.Printf("Error during restore of %s: %v\n", backupCerts, err)
+	if err := copyDir(hecate.BackupCerts, hecate.DstCerts); err != nil {
+		fmt.Printf("Error during restore of %s: %v\n", hecate.BackupCerts, err)
 		os.Exit(1)
 	}
-	fmt.Printf("Restore complete: '%s' has been restored to '%s'.\n", backupCerts, dstCerts)
+	fmt.Printf("Restore complete: '%s' has been restored to '%s'.\n", hecate.BackupCerts, hecate.DstCerts)
 
 	// Restore docker-compose.yml file.
-	info, err = os.Stat(backupCompose)
+	info, err = os.Stat(hecate.BackupCompose)
 	if err != nil || info.IsDir() {
-		fmt.Printf("Error: Backup file '%s' does not exist.\n", backupCompose)
+		fmt.Printf("Error: Backup file '%s' does not exist.\n", hecate.BackupCompose)
 		os.Exit(1)
 	}
-	if err := removeIfExists(dstCompose); err != nil {
-		fmt.Printf("Error removing file '%s': %v\n", dstCompose, err)
+	if err := removeIfExists(hecate.DstCompose); err != nil {
+		fmt.Printf("Error removing file '%s': %v\n", hecate.DstCompose, err)
 		os.Exit(1)
 	}
-	if err := copyFile(backupCompose, dstCompose); err != nil {
-		fmt.Printf("Error during restore of %s: %v\n", backupCompose, err)
+	if err := copyFile(hecate.BackupCompose, hecate.DstCompose); err != nil {
+		fmt.Printf("Error during restore of %s: %v\n", hecate.BackupCompose, err)
 		os.Exit(1)
 	}
-	fmt.Printf("Restore complete: '%s' has been restored to '%s'.\n", backupCompose, dstCompose)
+	fmt.Printf("Restore complete: '%s' has been restored to '%s'.\n", hecate.BackupCompose, hecate.DstCompose)
 }

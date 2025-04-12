@@ -2,11 +2,38 @@
 
 package hecate
 
+import (
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+)
+
 // Constants for file locations.
+// Constant file and directory names.
 const (
 	LastValuesFile    = ".hecate.conf"
 	ConfDir           = "conf.d"
 	DockerComposeFile = "docker-compose.yml"
+	DstConf           = "conf.d"
+	DstCerts          = "certs"
+	DstCompose        = "docker-compose.yml"
+)
+
+const (
+	SRC_CONF       = "conf.d"
+	SRC_CERTS      = "certs"
+	SRC_COMPOSE    = "docker-compose.yml"
+	BACKUP_CONF    = "conf.d.bak"
+	BACKUP_CERTS   = "certs.bak"
+	BACKUP_COMPOSE = "docker-compose.yml.bak"
+)
+
+// Dynamic values computed at runtime.
+var (
+	Timestamp     = time.Now().Format("20060102-150405")
+	BackupConf    = consts.DefaultConfDir + "." + Timestamp + ".bak"
+	BackupCerts   = consts.DefaultCertsDir + "." + Timestamp + ".bak"
+	BackupCompose = consts.DefaultComposeYML + "." + Timestamp + ".bak"
 )
 
 // AppSelection holds an app name and its configuration file.

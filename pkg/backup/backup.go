@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"go.uber.org/zap"
@@ -29,7 +30,7 @@ func RestoreFile(src, dst string) {
 func RestoreDir(src, dst string) {
 	log.Info("Restoring directory", zap.String("source", src), zap.String("destination", dst))
 
-	if err := utils.RemoveIfExists(dst); err != nil {
+	if err := system.Rm(dst, "destination directory"); err != nil {
 		log.Error("Failed to clean destination", zap.String("destination", dst), zap.Error(err))
 		return
 	}

@@ -6,7 +6,8 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -36,7 +37,7 @@ func uninstallK3s() error {
 
 	var ranAny bool
 	for role, path := range scripts {
-		if utils.FileExists(path) {
+		if system.Exists(path) {
 			log.Info("▶ Detected uninstall script",
 				zap.String("role", role),
 				zap.String("path", path),
