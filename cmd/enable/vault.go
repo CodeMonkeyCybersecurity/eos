@@ -1,3 +1,5 @@
+/* cmd/enable/vault */
+
 package enable
 
 import (

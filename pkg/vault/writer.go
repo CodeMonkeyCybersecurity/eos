@@ -23,10 +23,12 @@ func Write(client *api.Client, name string, data any) error {
 	path := vaultPath(name)
 
 	if err := WriteToVault(path, data); err == nil {
+		fmt.Println("✅ Vault secret written:", path)
 		return nil
 	}
 
-	fmt.Println("⚠️ Vault API write failed — falling back to disk:")
+	fmt.Println("⚠️ Vault API write failed for:", path)
+	fmt.Println("💾 Falling back to local disk:", diskPath(name))
 	return writeFallbackYAML(diskPath(name), data)
 }
 

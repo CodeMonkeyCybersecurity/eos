@@ -287,10 +287,14 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	}
 
 	// Store in Vault
-	WriteSecret(client, "secret/bootstrap/eos-user", map[string]interface{}{
+	if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
 		"username": "eos",
 		"password": password,
-	})
+	}); err != nil {
+		fmt.Println("❌ Failed to store eos-user secret in Vault:", err)
+	} else {
+		fmt.Println("✅ eos-user secret successfully written to Vault.")
+	}
 
 	// Setup Vault Agent
 	if err := setupVaultAgent(password); err != nil {
@@ -317,6 +321,8 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	// Write init result
 	if err := Write(client, "vault-init", initRes); err != nil {
 		fmt.Println("⚠️ Failed to store vault-init data in Vault:", err)
+	} else {
+		fmt.Println("✅ vault-init successfully written to Vault.")
 	}
 
 	return nil
