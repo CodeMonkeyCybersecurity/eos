@@ -2,13 +2,18 @@
 package inspect
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -121,7 +126,29 @@ validates the token at /run/eos/.vault-token, and attempts a test query.`,
 	}),
 }
 
+var InspectVaultLDAPCmd = &cobra.Command{
+	Use:   "ldap",
+	Short: "View stored LDAP config in Vault",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		cfg := &ldap.LDAPConfig{}
+		err := vault.ReadFromVaultAt(context.Background(), consts.LDAPVaultMount, consts.LDAPVaultPath, cfg)
+		if err != nil {
+			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
+		}
+		fmt.Println("✅ LDAP config from Vault:")
+		fmt.Printf("  FQDN:         %s\n", cfg.FQDN)
+		fmt.Printf("  BindDN:       %s\n", cfg.BindDN)
+		fmt.Printf("  UserBase:     %s\n", cfg.UserBase)
+		fmt.Printf("  RoleBase:     %s\n", cfg.RoleBase)
+		fmt.Printf("  AdminRole:    %s\n", cfg.AdminRole)
+		fmt.Printf("  ReadonlyRole: %s\n", cfg.ReadonlyRole)
+		fmt.Printf("  Password:     %s\n", crypto.Redact(cfg.Password))
+		return nil
+	},
+}
+
 func init() {
 	InspectVaultCmd.AddCommand(InspectVaultAgentCmd) // nested command
 	InspectCmd.AddCommand(InspectVaultCmd)           // top-level command
+	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
 }

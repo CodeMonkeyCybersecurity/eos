@@ -149,3 +149,10 @@ func injectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, erro
 
 	return []byte(content), replacements, nil
 }
+
+func Redact(s string) string {
+	if s == "" {
+		return "(empty)"
+	}
+	return strings.Repeat("*", 8)
+}
