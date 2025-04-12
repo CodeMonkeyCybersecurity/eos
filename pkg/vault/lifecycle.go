@@ -245,7 +245,7 @@ func IsMountEnabled(client *api.Client, mount string) (bool, error) {
 
 /* Enable KV v2 */
 func EnableKV2(client *api.Client, log *zap.Logger) error {
-		ok, err := IsMountEnabled(client, "secret/")
+	ok, err := IsMountEnabled(client, "secret/")
 	if err != nil {
 		return fmt.Errorf("failed to check if KV is mounted: %w", err)
 	}
@@ -297,10 +297,16 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		fmt.Println("⚠️ Failed to set up Vault Agent service:", err)
 	}
 
+	err = client.Sys().PutPolicy(EosVaultPolicy, Policies[EosVaultPolicy])
+	if err != nil {
+		fmt.Println("❌ Failed to create eos policy:", err)
+		os.Exit(1)
+	}
+
 	// Create eos user with userpass auth
 	_, err = client.Logical().Write("auth/userpass/users/eos", map[string]interface{}{
 		"password": password,
-		"policies": "eos",
+		"policies": "default," + EosVaultPolicy,
 	})
 	if err != nil {
 		fmt.Println("❌ Failed to create eos user:", err)
