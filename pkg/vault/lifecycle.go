@@ -123,7 +123,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 		if IsAlreadyInitialized(err) {
 			fmt.Println("⚠️ Vault already initialized.")
 			var initRes api.InitResponse
-			if err := readFallbackYAML(diskPath("vault-init"), &initRes); err != nil {
+			if err := readFallbackYAML(diskPath("vault_init"), &initRes); err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
 			// Set the root token after unsealing so that future calls are authenticated.
@@ -145,7 +145,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 			}
 
 			// Now, persist the Vault init result using the updated API-based Write().
-			if err := Write(client, "vault-init", initRes); err != nil {
+			if err := Write(client, "vault_init", initRes); err != nil {
 				fmt.Println("Failed to persist Vault init result")
 				return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 			} else {
@@ -168,7 +168,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	client.SetToken(initRes.RootToken)
 
 	// Persist the Vault init result now that Vault is unsealed and the token is valid.
-	if err := Write(client, "vault-init", initRes); err != nil {
+	if err := Write(client, "vault_init", initRes); err != nil {
 		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 	} else {
 		fmt.Println("✅ Vault init result persisted successfully")
@@ -184,7 +184,7 @@ func IsAlreadyInitialized(err error) bool {
 func DumpInitResult(initRes *api.InitResponse) {
 	b, _ := json.MarshalIndent(initRes, "", "  ")
 	_ = os.WriteFile("/tmp/vault_init.json", b, 0600)
-	_ = os.WriteFile(diskPath("vault-init"), b, 0600)
+	_ = os.WriteFile(diskPath("vault_init"), b, 0600)
 	fmt.Printf("✅ Vault initialized with %d unseal keys.\n", len(initRes.KeysB64))
 }
 
@@ -319,10 +319,10 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	}
 
 	// Write init result
-	if err := Write(client, "vault-init", initRes); err != nil {
-		fmt.Println("⚠️ Failed to store vault-init data in Vault:", err)
+	if err := Write(client, "vault_init", initRes); err != nil {
+		fmt.Println("⚠️ Failed to store vault_init data in Vault:", err)
 	} else {
-		fmt.Println("✅ vault-init successfully written to Vault.")
+		fmt.Println("✅ vault_init successfully written to Vault.")
 	}
 
 	return nil

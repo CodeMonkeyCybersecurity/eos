@@ -97,11 +97,11 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		fmt.Println("🔐 The eos user's Vault password is stored at /var/lib/eos/secrets/vault-userpass.yaml")
 		log.Info("🔐 The eos user's Vault password is stored", zap.String("path", "/var/lib/eos/secrets/vault-userpass.yaml"))
 
-		fmt.Println("📄 Unseal keys and root token are stored in Vault and also in /var/lib/eos/secrets/vault-init.json")
-		log.Info("📄 Vault init data written to Vault and local fallback", zap.String("path", "/var/lib/eos/secrets/vault-init.json"))
+		fmt.Println("📄 Unseal keys and root token are stored in Vault and also in /var/lib/eos/secrets/vault_init.json")
+		log.Info("📄 Vault init data written to Vault and local fallback", zap.String("path", "/var/lib/eos/secrets/vault_init.json"))
 
 		fmt.Println("🛡️  This file will be deleted after you run: eos secure vault")
-		log.Info("🛡️  vault-init.json will be deleted after eos secure vault is run")
+		log.Info("🛡️  vault_init.json will be deleted after eos secure vault is run")
 
 		fmt.Println("🔑  Please copy the unseal keys and root token to a password manager now.")
 		log.Info("🔑 Prompting user to copy unseal keys and root token to password manager")
@@ -119,8 +119,8 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		fmt.Println("💬 Or run 'eos secure vault --dry-run' to preview changes before committing.")
 		log.Info("💬 User may run eos secure vault --dry-run to preview actions")
 
-		fmt.Println("📦 A local backup of your Vault init data was written to /var/lib/eos/secrets/vault-init.json")
-		log.Info("📦 Vault init data backup confirmed at /var/lib/eos/secrets/vault-init.json")
+		fmt.Println("📦 A local backup of your Vault init data was written to /var/lib/eos/secrets/vault_init.json")
+		log.Info("📦 Vault init data backup confirmed at /var/lib/eos/secrets/vault_init.json")
 
 		return nil
 	}),

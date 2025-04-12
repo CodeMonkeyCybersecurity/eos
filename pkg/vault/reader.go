@@ -106,7 +106,7 @@ func readFallbackSecrets() (map[string]string, error) {
 // === Secure Vault Loaders ===
 //
 
-// ReadVaultSecureData loads bootstrap Vault secrets (vault-init, userpass creds).
+// ReadVaultSecureData loads bootstrap Vault secrets (vault_init, userpass creds).
 func ReadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, []string, string) {
 	if err := eos.EnsureEosUser(); err != nil {
 		log.Fatal("❌ Failed to ensure eos system user", zap.Error(err))
@@ -116,8 +116,8 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, 
 	fmt.Println("This will revoke the root token and promote the eos admin user.")
 
 	var initRes *api.InitResponse
-	if err := Read(client, "vault-init", &initRes); err != nil {
-		log.Fatal("❌ Failed to read vault-init", zap.String("path", diskPath("vault-init")), zap.Error(err))
+	if err := Read(client, "vault_init", &initRes); err != nil {
+		log.Fatal("❌ Failed to read vault_init", zap.String("path", diskPath("vault_init")), zap.Error(err))
 	}
 
 	var creds UserpassCreds

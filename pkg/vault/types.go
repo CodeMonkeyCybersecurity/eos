@@ -25,8 +25,8 @@ func vaultPath(name string) string {
 
 // diskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
 func diskPath(name string) string {
-	if name == "vault-init" {
-		return filepath.Join(diskSecretsPath, "vault-init.json")
+	if name == "vault_init" {
+		return filepath.Join(diskSecretsPath, "vault_init.json")
 	}
 	return xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 }
