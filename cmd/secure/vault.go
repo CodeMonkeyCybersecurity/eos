@@ -37,30 +37,13 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		vault.SetVaultClient(client)
 
 		// Prompt the user (or reuse saved) unseal keys and root token
-		keys, rootToken, err := vault.PromptOrRecallUnsealKeys()
-		if err != nil {
-			log.Error("Failed to retrieve unseal keys or root token", zap.Error(err))
-			return err
-		}
+		// Reuse secured Vault data (no prompt)
+		initRes, creds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client)
+		client.SetToken(initRes.RootToken)
 
-		// Unseal Vault
-		log.Info("🔐 Vault appears sealed — requesting manual unseal keys and root token...")
-		for i, key := range keys {
-			resp, err := client.Sys().Unseal(key)
-			if err != nil {
-				log.Error("Unseal failed", zap.Int("index", i+1), zap.Error(err))
-				return err
-			}
-			if !resp.Sealed {
-				log.Info("✅ Vault unsealed after key %d\n", zap.Int("index", i+1))
-				break
-			}
-		}
-		client.SetToken(rootToken)
 		log.Info("✅ Vault unsealed and authenticated as eos admin")
 
 		log.Info("Loading the stored initialization data and EOS user credentials...")
-		initRes, creds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client)
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
 		log.Info("✅ Loaded the stored initialization data and EOS user credentials")
 
