@@ -61,19 +61,29 @@ func EnsureVaultUnsealed() error {
 	}
 
 	fmt.Println("🔒 Vault is sealed. Attempting privileged unseal...")
+
 	if _, err := os.Stat("/var/lib/eos/secrets/vault_init.json"); os.IsNotExist(err) {
 		return fmt.Errorf("vault init file not found — run `eos enable vault` first")
 	}
 
-	cmd := exec.Command("sudo", "-u", "eos", "/usr/local/bin/eos", "internal", "unseal")
+	// Detect dev mode or installed
+	eosPath := "/usr/local/bin/eos"
+	if _, err := os.Stat(eosPath); os.IsNotExist(err) {
+		// We're in dev mode — assume go run from /opt/eos
+		fmt.Println("🛠️ Running in development mode — using go run main.go")
+		cmd := exec.Command("sudo", "-u", "eos", "go", "run", "main.go", "internal", "unseal")
+		cmd.Dir = "/opt/eos" // or wherever the project root is
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+		return cmd.Run()
+	}
+
+	// Normal install mode
+	fmt.Println("🧭 Using installed eos binary at /usr/local/bin/eos")
+	cmd := exec.Command("sudo", "-u", "eos", eosPath, "internal", "unseal")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("unseal failed via sudo: %w", err)
-	}
-
-	fmt.Println("✅ Vault successfully unsealed.")
-	return nil
+	return cmd.Run()
 }
