@@ -1,4 +1,4 @@
-/* pkg/vault/handler.go */
+/* pkg/vault/handlers.go */
 
 package vault
 

@@ -121,7 +121,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	if err != nil {
 		// If Vault is already initialized, try to load the fallback file
 		if IsAlreadyInitialized(err) {
-			fmt.Println("⚠️ Vault already initialized.")
+			fmt.Println("✅ Vault already initialized.")
 
 			initResPtr, err := ReadFallbackJSON[api.InitResponse](diskPath("vault_init"))
 			if err != nil {
