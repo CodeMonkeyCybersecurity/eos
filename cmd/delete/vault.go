@@ -79,6 +79,7 @@ var DeleteVaultCmd = &cobra.Command{
 				"/var/lib/vault",
 				"/var/log/vault.log",
 				"/var/snap/vault",
+				"/var/lib/eos",
 			}
 
 			for _, dir := range configDirs {
