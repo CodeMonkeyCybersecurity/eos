@@ -297,6 +297,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		fmt.Println("⚠️ Failed to set up Vault Agent service:", err)
 	}
 
+	fmt.Println("📜 Re-applying eos policy:\n" + Policies[EosVaultPolicy])
 	err = client.Sys().PutPolicy(EosVaultPolicy, Policies[EosVaultPolicy])
 	if err != nil {
 		fmt.Println("❌ Failed to create eos policy:", err)
