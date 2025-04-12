@@ -29,3 +29,22 @@ func remember(name, key, prompt, def string) (string, error) {
 
 	return val, nil
 }
+
+func PromptOrRecallUnsealKeys() ([]string, string, error) {
+	keys := make([]string, 0, 3)
+
+	for i := 1; i <= 3; i++ {
+		key, err := Remember("vault-init", fmt.Sprintf("unseal_key_%d", i), fmt.Sprintf("Enter Unseal Key %d", i), "")
+		if err != nil {
+			return nil, "", err
+		}
+		keys = append(keys, key)
+	}
+
+	root, err := Remember("vault-init", "root_token", "Enter Root Token", "")
+	if err != nil {
+		return nil, "", err
+	}
+
+	return keys, root, nil
+}
