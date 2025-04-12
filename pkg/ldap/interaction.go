@@ -16,6 +16,8 @@ import (
 )
 
 func InteractiveLDAPQuery() error {
+	vault.EnsureVaultClient()
+
 	cfg := &LDAPConfig{}
 
 	// Try to load existing config from Vault to prefill

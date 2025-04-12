@@ -42,3 +42,19 @@ func GetVaultClient() (*api.Client, error) {
 	}
 	return vaultClient, nil
 }
+
+
+// EnsureVaultClient guarantees the Vault client is set, using the privileged eos user.
+func EnsureVaultClient() {
+	if _, err := GetVaultClient(); err == nil {
+		return // already set
+	}
+
+	client, err := GetPrivilegedVaultClient()
+	if err != nil {
+		fmt.Printf("⚠️  Vault client could not be initialized: %v\n", err)
+		return
+	}
+
+	SetVaultClient(client)
+}
