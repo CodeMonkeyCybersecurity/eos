@@ -25,8 +25,8 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 		log.Info("🔒 Checking Vault sealed state...")
 		_, err := vault.EnsureVaultReady()
 		if err != nil {
-			log.Error("Vault could not be prepared", zap.Error(err))
-			return err
+			log.Warn("⚠️ Vault is not fully prepared (sealed or missing fallback)", zap.Error(err))
+			log.Warn("Continuing anyway — downstream commands may fail if Vault is required.")
 		}
 
 		// Now run the command itself
@@ -74,4 +74,11 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, vault.UserpassC
 	hashedRoot := crypto.HashString(initRes.RootToken)
 
 	return initRes, creds, hashedKeys, hashedRoot
+}
+
+func RequireVault(client *api.Client) error {
+	if client == nil {
+		return fmt.Errorf("vault is required for this command, but not available")
+	}
+	return nil
 }
