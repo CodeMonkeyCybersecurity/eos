@@ -10,6 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
+var revokeRoot bool
+
 var SecureVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Secures Vault by revoking the root token and elevating admin privileges",
@@ -54,12 +56,17 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		}
 		log.Info("✅ Policy applied")
 
-		log.Info("Revoking the root token now that the Eos admin user has been configured....")
-		if err := vault.RevokeRootToken(client, initRes.RootToken); err != nil {
-			log.Error("Failed to revoke root token", zap.Error(err))
-			return err
+		if revokeRoot {
+			log.Info("Revoking the root token now that the eos admin user has been configured...")
+			if err := vault.RevokeRootToken(client, initRes.RootToken); err != nil {
+				log.Error("Failed to revoke root token", zap.Error(err))
+				return err
+			}
+			log.Info("✅ Root token revoked")
+		} else {
+			log.Info("Skipping root token revocation — use --revoke-root to enable this step")
+			log.Info("🔐 Root token is still valid. Run `eos secure vault --revoke-root` when you're ready to revoke it.")
 		}
-		log.Info("✅ Done")
 
 		log.Info("Cleaning up the stored initialization file...")
 		system.Rm("vault_init.json", vault.DiskPath("vault_init"))
@@ -75,4 +82,5 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 func init() {
 	SecureCmd.AddCommand(SecureVaultCmd)
+	SecureVaultCmd.Flags().BoolVar(&revokeRoot, "revoke-root", false, "Revoke the root token after securing Vault")
 }
