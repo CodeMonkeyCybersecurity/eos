@@ -43,11 +43,11 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		log.Info("✅ Vault unsealed and authenticated as eos admin")
 
-		log.Info("Loading the stored initialization data and EOS user credentials...")
+		log.Info("Loading the stored initialization data and eos user credentials...")
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
-		log.Info("✅ Loaded the stored initialization data and EOS user credentials")
+		log.Info("✅ Loaded the stored initialization data and eos user credentials")
 
-		log.Info("Applying permissive policy (eos-full) via the API for eos system user...")
+		log.Info("Applying permissive policy (eos-policy) via the API for eos system user...")
 		if err := vault.ApplyAdminPolicy(creds, client); err != nil {
 			log.Error("Failed to apply admin policy", zap.Error(err))
 			return err

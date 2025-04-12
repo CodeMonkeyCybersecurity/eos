@@ -12,9 +12,7 @@ var (
 	PromptConfirmOrValue  = promptConfirmOrValue
 	PromptInput           = promptInput
 	PromptInputs          = promptInputs
-	PromptWithDefault     = promptWithDefault
-	PromptRequired        = promptRequired
-	PromptPassword        = promptPassword
+
 	ReadLine              = readLine
 	RememberValue         = rememberValue
 )

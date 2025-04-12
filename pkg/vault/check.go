@@ -3,10 +3,8 @@
 package vault
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 
@@ -52,33 +50,35 @@ func isVaultInitialized(client *api.Client) (bool, error) {
 }
 
 // CheckVaultSecrets verifies that entered unseal keys and root token match the stored hashes.
+// CheckVaultSecrets verifies that entered unseal keys and root token match the stored hashes.
 func CheckVaultSecrets(storedHashes []string, hashedRoot string) {
-	reader := bufio.NewReader(os.Stdin)
 
 	for {
-		fmt.Println("🔐 Please re-enter three unique unseal keys (any order) and the root token:")
+		fmt.Println("🔐 Please re-enter three unique base64-encoded unseal keys (any order) and the root token:")
 
-		keys, err := interaction.PromptInputs(reader, "Enter Unseal Key", 3)
+		keys, err := interaction.PromptSecrets("Enter Unseal Key", 3)
 		if err != nil {
-			fmt.Printf("❌ Error reading unseal keys: %v\n", err)
+			fmt.Println("❌ Oh no, that didn't work! Please try again.")
 			continue
 		}
 
-		rootInput, err := interaction.PromptInputs(reader, "Enter Root Token", 1)
+		rootInput, err := interaction.PromptSecrets("Enter Root Token", 1)
 		if err != nil || len(rootInput) == 0 {
-			fmt.Printf("❌ Error reading root token: %v\n", err)
+			fmt.Println("❌ Oh no, that didn't work! Please try again.")
 			continue
 		}
 		root := rootInput[0]
 
+		// Prevent duplicated keys
 		if !crypto.AllUnique(keys) {
-			fmt.Println("❌ The unseal keys must be unique. Please try again.")
+			fmt.Println("❌ Oh no, that didn't work! Please try again.")
 			continue
 		}
 
+		// Hash and verify all
 		hashedInputs := crypto.HashStrings(keys)
 		if !crypto.AllHashesPresent(hashedInputs, storedHashes) || crypto.HashString(root) != hashedRoot {
-			fmt.Println("❌ One or more values are incorrect. Please try again.")
+			fmt.Println("❌ Oh no, that didn't work! Please try again.")
 			continue
 		}
 
