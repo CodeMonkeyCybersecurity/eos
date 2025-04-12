@@ -86,5 +86,5 @@ func writeFallbackYAML(path string, data any) error {
 }
 
 func writeFallbackSecrets(secrets map[string]string) error {
-	return writeFallbackYAML(fallbackSecretsPath, secrets)
+	return writeFallbackYAML(delphiFallbackSecretsPath, secrets)
 }

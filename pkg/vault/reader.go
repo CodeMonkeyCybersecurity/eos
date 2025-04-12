@@ -78,13 +78,27 @@ func readFallbackYAML(path string, out any) error {
 	return nil
 }
 
+func readFallbackMap(name string) (map[string]string, error) {
+	var data map[string]string
+	path := filepath.Join(diskSecretsPath, name)
+	err := readFallbackYAML(path, &data)
+	if err != nil {
+		return nil, fmt.Errorf("could not load fallback secrets from %s: %w", path, err)
+	}
+	fmt.Printf("📥 Fallback secrets loaded from %s\n", path)
+	return data, nil
+}
+
+// readFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
 func readFallbackSecrets() (map[string]string, error) {
 	var secrets map[string]string
-	err := readFallbackYAML(filepath.Clean(fallbackSecretsPath), &secrets)
+	path := filepath.Join(diskSecretsPath, "delphi-fallback.yaml")
+
+	err := readFallbackYAML(path, &secrets)
 	if err != nil {
-		return nil, fmt.Errorf("could not load fallback secrets: %w", err)
+		return nil, fmt.Errorf("could not load fallback secrets from %s: %w", path, err)
 	}
-	fmt.Printf("📥 Fallback credentials loaded from %s\n", fallbackSecretsPath)
+	fmt.Printf("📥 Fallback credentials loaded from %s\n", path)
 	return secrets, nil
 }
 
@@ -103,7 +117,7 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, UserpassCreds, 
 
 	var initRes *api.InitResponse
 	if err := Read(client, "vault-init", &initRes); err != nil {
-		log.Fatal("❌ Failed to load vault-init metadata", zap.Error(err))
+		log.Fatal("❌ Failed to read vault-init", zap.String("path", diskPath("vault-init")), zap.Error(err))
 	}
 
 	var creds UserpassCreds

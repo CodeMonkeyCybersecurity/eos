@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	fallbackSecretsPath = "/var/lib/eos/secrets/delphi-fallback.yaml"
-	auditPath           = "file/"
-	mountPath           = "sys/audit/" + auditPath
-	EosVaultPolicy      = "eos-policy"
+	diskSecretsPath           = "/var/lib/eos/secrets"
+	delphiFallbackSecretsPath = diskSecretsPath + "delphi-fallback.yaml"
+	auditPath                 = "file/"
+	mountPath                 = "sys/audit/" + auditPath
+	EosVaultPolicy            = "eos-policy"
 )
 
 // vaultPath returns the full KV v2 path for data reads/writes.
@@ -24,6 +25,9 @@ func vaultPath(name string) string {
 
 // diskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
 func diskPath(name string) string {
+	if name == "vault-init" {
+		return filepath.Join(diskSecretsPath, "vault-init.json")
+	}
 	return xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 }
 

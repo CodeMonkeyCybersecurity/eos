@@ -184,7 +184,7 @@ func IsAlreadyInitialized(err error) bool {
 func DumpInitResult(initRes *api.InitResponse) {
 	b, _ := json.MarshalIndent(initRes, "", "  ")
 	_ = os.WriteFile("/tmp/vault_init.json", b, 0600)
-	_ = os.WriteFile("vault_init.json", b, 0600)
+	_ = os.WriteFile(diskPath("vault-init"), b, 0600)
 	fmt.Printf("✅ Vault initialized with %d unseal keys.\n", len(initRes.KeysB64))
 }
 
