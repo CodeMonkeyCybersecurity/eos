@@ -1,4 +1,4 @@
-/* pkg/vault/reader.go */
+/* pkg/vault/types.go */
 
 package vault
 
@@ -17,9 +17,9 @@ const (
 	EosVaultPolicy      = "eos-policy"
 )
 
-// vaultPath constructs the Vault KV path like: secret/eos/<name>/config
+// vaultPath returns the full KV v2 path for data reads/writes.
 func vaultPath(name string) string {
-	return fmt.Sprintf("secret/eos/%s/config", name)
+	return fmt.Sprintf("secret/data/eos/%s", name)
 }
 
 // diskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json

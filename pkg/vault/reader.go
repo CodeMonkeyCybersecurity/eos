@@ -1,9 +1,10 @@
+/* pkg/vault/reader.go */
+
 package vault
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -52,7 +53,7 @@ func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}) e
 // Read loads a namespaced config from Vault, or falls back to YAML if unavailable.
 func Read(client *api.Client, name string, out any) error {
 	if IsVaultAvailable(client) {
-		err := readFromVault(client, name, out)
+		err := ReadFromVaultAt(context.Background(), "secret", name, out)
 		if err == nil {
 			return nil
 		}
@@ -60,34 +61,6 @@ func Read(client *api.Client, name string, out any) error {
 		fmt.Println("💡 Falling back to local config...")
 	}
 	return readFallbackYAML(diskPath(name), out)
-}
-
-// readFromVault reads from logical path "secret/eos/<name>/config".
-func readFromVault(client *api.Client, name string, out any) error {
-	path := fmt.Sprintf("secret/eos/%s/config", name)
-	return readVaultKV(client, path, out)
-}
-
-// readVaultKV reads raw KV v2 data from Vault and unmarshals into out.
-func readVaultKV(client *api.Client, path string, out any) error {
-	secret, err := client.Logical().Read(path)
-	if err != nil {
-		return fmt.Errorf("vault read failed for path %q: %w", path, err)
-	}
-	if secret == nil || secret.Data == nil {
-		return fmt.Errorf("no data found at %q", path)
-	}
-
-	data, ok := secret.Data["data"]
-	if !ok {
-		return errors.New("vault KV response missing 'data' key")
-	}
-
-	raw, err := json.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("failed to re-marshal Vault data: %w", err)
-	}
-	return json.Unmarshal(raw, out)
 }
 
 //

@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -20,7 +21,7 @@ func StoreUserSecret(username, password, keyPath string) error {
 // LoadUserSecret retrieves and validates a user's secret from Vault.
 func LoadUserSecret(client *api.Client, username string) (*UserSecret, error) {
 	var secret UserSecret
-	if err := readVaultKV(client, userVaultPath(username), &secret); err != nil {
+	if err := ReadFromVaultAt(context.Background(), "secret", userVaultPath(username), &secret); err != nil {
 		return nil, err
 	}
 	if !secret.IsValid() {

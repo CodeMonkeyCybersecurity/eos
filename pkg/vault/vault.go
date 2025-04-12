@@ -7,7 +7,6 @@ var (
 	VaultPath             = vaultPath
 	DiskPath              = diskPath
 	HandleFallbackOrStore = handleFallbackOrStore
-	ReadVaultKV           = readVaultKV
 	ReadFallbackSecrets   = readFallbackSecrets
 	SetVaultEnv           = setVaultEnv
 	Purge                 = purge
