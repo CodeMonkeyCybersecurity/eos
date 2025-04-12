@@ -18,5 +18,10 @@ path "secret/metadata/*" {
 path "sys/mounts" {
 	capabilities = ["read", "list"]
 }
+
+# 🔐 Allow eos user to manage userpass accounts
+path "auth/userpass/users/*" {
+	capabilities = ["create", "read", "update", "delete", "list"]
+}
 `,
 }
