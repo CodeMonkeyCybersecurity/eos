@@ -320,3 +320,48 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 
 	return nil
 }
+
+func EnableVaultAuthMethods(client *api.Client) error {
+	if err := enableAuth(client, "userpass"); err != nil {
+		return err
+	}
+	if err := enableAuth(client, "approle"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func CreateUserpassAccount(client *api.Client, username, password string) error {
+	fmt.Printf("👤 Creating Vault userpass account for %q...\n", username)
+
+	_, err := client.Logical().Write("auth/userpass/users/"+username, map[string]interface{}{
+		"password": password,
+		"policies": EosVaultPolicy, // from types.go
+	})
+	return err
+}
+
+func CreateAppRole(client *api.Client, roleName string) error {
+	fmt.Printf("🔐 Creating AppRole for %q...\n", roleName)
+
+	_, err := client.Logical().Write("auth/approle/role/"+roleName, map[string]interface{}{
+		"policies":      EosVaultPolicy,
+		"secret_id_ttl": "0",
+		"token_ttl":     "1h",
+		"token_max_ttl": "4h",
+	})
+	return err
+}
+
+func SetupEosVaultUser(client *api.Client, password string) error {
+	if err := EnableVaultAuthMethods(client); err != nil {
+		return err
+	}
+	if err := CreateUserpassAccount(client, "eos", password); err != nil {
+		return err
+	}
+	if err := CreateAppRole(client, "eos"); err != nil {
+		return err
+	}
+	return nil
+}

@@ -13,7 +13,7 @@ import (
 )
 
 // ensureEosUser ensures the 'eos' user exists and has the correct attributes.
-func ensureEosUser() error {
+func EnsureEosUser() error {
 	const eosUsername = "eos"
 
 	if !platform.UserExists(eosUsername) {

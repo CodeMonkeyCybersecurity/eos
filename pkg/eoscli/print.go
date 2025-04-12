@@ -10,12 +10,12 @@ import (
 )
 
 // PrintBanner prints a formatted ASCII banner with a label.
-func printBanner(label string) {
+func PrintBanner(label string) {
 	fmt.Printf("\n───────[ %s ]───────\n", label)
 }
 
 // PrintJSON pretty-prints any struct or map as JSON.
-func printJSON(data interface{}) {
+func PrintJSON(data interface{}) {
 	out, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "❌ Failed to encode JSON: %v\n", err)

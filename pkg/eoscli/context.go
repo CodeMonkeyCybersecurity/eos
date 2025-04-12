@@ -14,7 +14,7 @@ import (
 )
 
 // Wrap adds automatic logger injection and scoped metadata based on calling package.
-func wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
+func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
 		log := contextualLogger()
