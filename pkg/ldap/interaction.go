@@ -34,18 +34,15 @@ func InteractiveLDAPQuery() error {
 		fmt.Println("⚠️  No BindDN provided — defaulting to cn=anonymous instead.")
 		bindDN = "cn=anonymous"
 	}
-	password := cfg.Password
-	if password == "" {
-		var err error
-		password, err = interaction.PromptPassword("LDAP password")
-		if err != nil {
-			return err
-		}
-	}
 
+	password, err := interaction.PromptPasswordWithDefault("LDAP password [press Enter to keep existing]", cfg.Password)
+	if err != nil {
+		fmt.Println("⚠️  No Password provided.")
+		return err
+	}
 	fmt.Println("Search base DN (e.g. ou=Users,dc=domain,dc=com). Leave blank to search entire tree.")
 	baseDN := interaction.PromptInput("Search base DN", cfg.UserBase)
-	if baseDN == "" {
+	if baseDN == "" || baseDN == `""` {
 		inferred := inferBaseDN(bindDN)
 		if inferred != "" {
 			fmt.Printf("⚠️  No base DN provided — using inferred root (%s)\n", inferred)
