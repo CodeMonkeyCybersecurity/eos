@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 )
 
 //
@@ -25,19 +25,19 @@ type App struct {
 }
 
 var Apps = []App{
-	{"1", "Static website", "base.conf", consts.DefaultMarkers},
-	{"2", "Wazuh", "delphi.conf", consts.CombineMarkers("1515", "1514", "55000")},
-	{"3", "Mattermost", "collaborate.conf", consts.DefaultMarkers},
-	{"4", "Nextcloud", "cloud.conf", consts.CombineMarkers("3478", "coturn:")},
-	{"5", "Mailcow", "mailcow.conf", consts.CombineMarkers("25", "587", "465", "110", "995", "143", "993")},
-	{"6", "Jenkins", "jenkins.conf", consts.DefaultMarkers},
-	{"7", "Grafana", "observe.conf", consts.DefaultMarkers},
-	{"8", "Umami", "analytics.conf", consts.DefaultMarkers},
-	{"9", "MinIO", "s3.conf", consts.DefaultMarkers},
-	{"10", "Wiki.js", "wiki.conf", consts.DefaultMarkers},
-	{"11", "ERPNext", "erp.conf", consts.DefaultMarkers},
-	{"12", "Jellyfin", "jellyfin.conf", consts.DefaultMarkers},
-	{"13", "Persephone", "persephone.conf", consts.DefaultMarkers},
+	{"1", "Static website", "base.conf", types.DefaultMarkers},
+	{"2", "Wazuh", "delphi.conf", types.CombineMarkers("1515", "1514", "55000")},
+	{"3", "Mattermost", "collaborate.conf", types.DefaultMarkers},
+	{"4", "Nextcloud", "cloud.conf", types.CombineMarkers("3478", "coturn:")},
+	{"5", "Mailcow", "mailcow.conf", types.CombineMarkers("25", "587", "465", "110", "995", "143", "993")},
+	{"6", "Jenkins", "jenkins.conf", types.DefaultMarkers},
+	{"7", "Grafana", "observe.conf", types.DefaultMarkers},
+	{"8", "Umami", "analytics.conf", types.DefaultMarkers},
+	{"9", "MinIO", "s3.conf", types.DefaultMarkers},
+	{"10", "Wiki.js", "wiki.conf", types.DefaultMarkers},
+	{"11", "ERPNext", "erp.conf", types.DefaultMarkers},
+	{"12", "Jellyfin", "jellyfin.conf", types.DefaultMarkers},
+	{"13", "Persephone", "persephone.conf", types.DefaultMarkers},
 }
 
 func GetSupportedAppNames() []string {

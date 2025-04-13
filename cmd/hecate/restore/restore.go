@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -46,14 +46,14 @@ func init() {
 
 // runAutoRestore automatically restores resources using the provided timestamp.
 func runAutoRestore(ts string) {
-	backupConf := fmt.Sprintf("%s.%s.bak", consts.DefaultConfDir, ts)
-	backupCerts := fmt.Sprintf("%s.%s.bak", consts.DefaultCertsDir, ts)
-	backupCompose := fmt.Sprintf("%s.%s.bak", consts.DefaultComposeYML, ts)
+	backupConf := fmt.Sprintf("%s.%s.bak", types.DefaultConfDir, ts)
+	backupCerts := fmt.Sprintf("%s.%s.bak", types.DefaultCertsDir, ts)
+	backupCompose := fmt.Sprintf("%s.%s.bak", types.DefaultComposeYML, ts)
 
 	fmt.Printf("Restoring backups with timestamp %s...\n", ts)
-	backup.RestoreDir(backupConf, consts.DefaultConfDir)
-	backup.RestoreDir(backupCerts, consts.DefaultCertsDir)
-	backup.RestoreFile(backupCompose, consts.DefaultComposeYML)
+	backup.RestoreDir(backupConf, types.DefaultConfDir)
+	backup.RestoreDir(backupCerts, types.DefaultCertsDir)
+	backup.RestoreFile(backupCompose, types.DefaultComposeYML)
 }
 
 // runInteractiveRestore presents a menu to choose which resource(s) to restore.
@@ -87,31 +87,31 @@ func runInteractiveRestore() {
 }
 
 func restoreConf() {
-	backupConf, err := backup.FindLatestBackup(fmt.Sprintf("%s.", consts.DefaultConfDir))
+	backupConf, err := backup.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultConfDir))
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", consts.DefaultConfDir, err)
+		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultConfDir, err)
 		return
 	}
 	fmt.Printf("Restoring configuration from backup: %s\n", backupConf)
-	backup.RestoreDir(backupConf, consts.DefaultConfDir)
+	backup.RestoreDir(backupConf, types.DefaultConfDir)
 }
 
 func restoreCerts() {
-	backupCerts, err := backup.FindLatestBackup(fmt.Sprintf("%s.", consts.DefaultCertsDir))
+	backupCerts, err := backup.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultCertsDir))
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", consts.DefaultCertsDir, err)
+		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultCertsDir, err)
 		return
 	}
 	fmt.Printf("Restoring certificates from backup: %s\n", backupCerts)
-	backup.RestoreDir(backupCerts, consts.DefaultCertsDir)
+	backup.RestoreDir(backupCerts, types.DefaultCertsDir)
 }
 
 func restoreCompose() {
-	backupCompose, err := backup.FindLatestBackup(fmt.Sprintf("%s.", consts.DefaultComposeYML))
+	backupCompose, err := backup.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultComposeYML))
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", consts.DefaultComposeYML, err)
+		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultComposeYML, err)
 		return
 	}
 	fmt.Printf("Restoring docker-compose file from backup: %s\n", backupCompose)
-	backup.RestoreFile(backupCompose, consts.DefaultComposeYML)
+	backup.RestoreFile(backupCompose, types.DefaultComposeYML)
 }

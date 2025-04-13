@@ -1,4 +1,4 @@
-/* pkg/vault/handler.go */
+/* pkg/vault/agent_handler.go */
 
 package vault
 
@@ -17,7 +17,7 @@ import (
 func readTokenFromSink(path string) (string, error) {
 	out, err := exec.Command("sudo", "-u", "eos", "cat", path).Output()
 	if err != nil {
-		return "", fmt.Errorf("failed to read token from Vault Agent sink: %w", err)
+		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}
 	return strings.TrimSpace(string(out)), nil
 }

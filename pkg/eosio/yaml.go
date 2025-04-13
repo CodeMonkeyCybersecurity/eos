@@ -1,4 +1,4 @@
-// pkg/eosio/yaml.go
+/* pkg/eosio/yaml.go */
 
 package eosio
 

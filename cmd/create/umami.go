@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -34,20 +34,20 @@ var CreateUmamiCmd = &cobra.Command{
 		log.Info("Starting Umami installation using Eos")
 
 		// Ensure the installation directory exists
-		if _, err := os.Stat(consts.UmamiDir); os.IsNotExist(err) {
+		if _, err := os.Stat(types.UmamiDir); os.IsNotExist(err) {
 			log.Warn("Installation directory does not exist; creating it",
-				zap.String("path", consts.UmamiDir))
-			if err := os.MkdirAll(consts.UmamiDir, 0755); err != nil {
+				zap.String("path", types.UmamiDir))
+			if err := os.MkdirAll(types.UmamiDir, 0755); err != nil {
 				log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
 			log.Info("Installation directory exists",
-				zap.String("path", consts.UmamiDir))
+				zap.String("path", types.UmamiDir))
 		}
 
 		// Prepare the Docker Compose file paths
 		sourceComposeFile := "assets/umami-docker-compose.yml"
-		destComposeFile := filepath.Join(consts.UmamiDir, "umami-docker-compose.yml")
+		destComposeFile := filepath.Join(types.UmamiDir, "umami-docker-compose.yml")
 
 		log.Info("Copying and processing Docker Compose file",
 			zap.String("source", sourceComposeFile),
@@ -86,8 +86,8 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Deploy Umami with Docker Compose using the processed file
 		log.Info("Deploying Umami with Docker Compose",
-			zap.String("directory", consts.UmamiDir))
-		if err := execute.ExecuteInDir(consts.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+			zap.String("directory", types.UmamiDir))
+		if err := execute.ExecuteInDir(types.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 

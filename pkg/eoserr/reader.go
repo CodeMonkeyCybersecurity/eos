@@ -1,6 +1,6 @@
-/* pkg/errorer/reader.go */
+/* pkg/eoserr/reader.go */
 
-package errorer
+package eoserr
 
 import "strings"
 

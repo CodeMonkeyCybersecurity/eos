@@ -5,9 +5,9 @@ package backup
 import (
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -38,7 +38,7 @@ var BackupConfigCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		if err := utils.CopyDir(hecate.ConfDir, hecate.BackupConf); err != nil {
-			log.Error("Backup failed", zap.String("src", consts.DefaultConfDir), zap.Error(err))
+			log.Error("Backup failed", zap.String("src", types.DefaultConfDir), zap.Error(err))
 			os.Exit(1)
 		}
 		log.Info("Backup complete: '%s' has been backed up to '%s'.\n")
@@ -46,7 +46,7 @@ var BackupConfigCmd = &cobra.Command{
 		// Backup the certs directory.
 		srcInfo, err = os.Stat(hecate.DstCerts)
 		if err != nil || !srcInfo.IsDir() {
-			log.Error("Missing or invalid certs", zap.String("dir", consts.DefaultCertsDir), zap.Error(err))
+			log.Error("Missing or invalid certs", zap.String("dir", types.DefaultCertsDir), zap.Error(err))
 			os.Exit(1)
 		}
 		if err := system.Rm(hecate.BackupCerts, "backup certs"); err != nil {
@@ -54,7 +54,7 @@ var BackupConfigCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		if err := utils.CopyDir(hecate.DstCerts, hecate.BackupCerts); err != nil {
-			log.Error("Backup failed", zap.String("src", consts.DefaultCertsDir), zap.Error(err))
+			log.Error("Backup failed", zap.String("src", types.DefaultCertsDir), zap.Error(err))
 			os.Exit(1)
 		}
 		log.Info("Backup complete: '%s' has been backed up to '%s'.\n")
@@ -62,7 +62,7 @@ var BackupConfigCmd = &cobra.Command{
 		// Backup the docker-compose.yml file.
 		srcInfo, err = os.Stat(hecate.DockerComposeFile)
 		if err != nil || srcInfo.IsDir() {
-			log.Error("Missing or invalid compose file", zap.String("file", consts.DefaultComposeYML), zap.Error(err))
+			log.Error("Missing or invalid compose file", zap.String("file", types.DefaultComposeYML), zap.Error(err))
 			os.Exit(1)
 		}
 		if err := system.Rm(hecate.BackupCompose, "backup 'docker-compose.yml'"); err != nil {
@@ -70,7 +70,7 @@ var BackupConfigCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		if err := utils.CopyFile(hecate.DockerComposeFile, hecate.BackupCompose); err != nil {
-			log.Error("Backup failed", zap.String("src", consts.DefaultComposeYML), zap.Error(err))
+			log.Error("Backup failed", zap.String("src", types.DefaultComposeYML), zap.Error(err))
 			os.Exit(1)
 		}
 		log.Info("✅ docker-compose.yml backed up", zap.String("dest", hecate.BackupCompose))

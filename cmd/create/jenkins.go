@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -35,18 +35,18 @@ var CreateJenkinsCmd = &cobra.Command{
 		log.Info("Starting Jenkins installation using Eos")
 
 		// Ensure the installation directory exists
-		if _, err := os.Stat(consts.JenkinsDir); os.IsNotExist(err) {
-			log.Warn("Installation directory does not exist; creating it", zap.String("path", consts.JenkinsDir))
-			if err := os.MkdirAll(consts.JenkinsDir, 0755); err != nil {
+		if _, err := os.Stat(types.JenkinsDir); os.IsNotExist(err) {
+			log.Warn("Installation directory does not exist; creating it", zap.String("path", types.JenkinsDir))
+			if err := os.MkdirAll(types.JenkinsDir, 0755); err != nil {
 				log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
-			log.Info("Installation directory exists", zap.String("path", consts.JenkinsDir))
+			log.Info("Installation directory exists", zap.String("path", types.JenkinsDir))
 		}
 
 		// Prepare the Docker Compose file paths
 		sourceComposeFile := "assets/jenkins-docker-compose.yml"
-		destComposeFile := filepath.Join(consts.JenkinsDir, "jenkins-docker-compose.yml")
+		destComposeFile := filepath.Join(types.JenkinsDir, "jenkins-docker-compose.yml")
 
 		log.Info("Copying and processing Docker Compose file",
 			zap.String("source", sourceComposeFile),
@@ -83,8 +83,8 @@ var CreateJenkinsCmd = &cobra.Command{
 		}
 
 		// Deploy Jenkins with Docker Compose using the processed file
-		log.Info("Deploying Jenkins with Docker Compose", zap.String("directory", consts.JenkinsDir))
-		if err := execute.ExecuteInDir(consts.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+		log.Info("Deploying Jenkins with Docker Compose", zap.String("directory", types.JenkinsDir))
+		if err := execute.ExecuteInDir(types.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 

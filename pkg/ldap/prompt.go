@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
@@ -15,7 +15,7 @@ import (
 func PromptLDAPDetails() (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
 	if _, err := vault.GetVaultClient(); err == nil {
-		_ = vault.ReadFromVaultAt(context.Background(), "secret", consts.LDAPVaultPath, cfg) // best-effort prefill
+		_ = vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg) // best-effort prefill
 	}
 
 	for fieldName, meta := range LDAPFieldMeta {
@@ -35,7 +35,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 		}
 	}
 
-	if err := vault.WriteToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(types.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

@@ -1,4 +1,5 @@
 /* pkg/execute/execute.go */
+
 package execute
 
 import (
@@ -8,7 +9,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/errorer"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 )
 
 //
@@ -71,7 +72,7 @@ func ExecuteAndLog(name string, args ...string) error {
 	if err := cmd.Run(); err != nil {
 		fullOutput := outputBuf.String()
 		// Extract a concise error message—e.g., the first error line
-		summary := errorer.ExtractSummary(fullOutput)
+		summary := eoserr.ExtractSummary(fullOutput)
 		return fmt.Errorf("command failed: %s %s: %w - %s", name, joinArgs(args), err, summary)
 	}
 

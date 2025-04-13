@@ -8,10 +8,10 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -98,7 +98,7 @@ var InspectVaultLDAPCmd = &cobra.Command{
 	Short: "View stored LDAP config in Vault",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := &ldap.LDAPConfig{}
-		err := vault.ReadFromVaultAt(context.Background(), consts.LDAPVaultMount, consts.LDAPVaultPath, cfg)
+		err := vault.ReadFromVaultAt(context.Background(), types.LDAPVaultMount, types.LDAPVaultPath, cfg)
 		if err != nil {
 			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
 		}

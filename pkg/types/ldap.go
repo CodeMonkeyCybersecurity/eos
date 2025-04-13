@@ -1,6 +1,6 @@
-/* pkg/consts/ldap.go */
+/* pkg/types/ldap.go */
 
-package consts
+package types
 
 const (
 	LDAPVaultPath        = "eos/ldap"             // For use with WriteToVault, ReadFromVaultAt

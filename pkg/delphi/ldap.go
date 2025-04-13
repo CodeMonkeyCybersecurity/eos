@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -29,7 +29,7 @@ type LDAPConfig struct {
 
 func LoadLDAPConfig() (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := vault.ReadFromVault(consts.LDAPVaultPath, &cfg)
+	err := vault.ReadFromVault(types.LDAPVaultPath, &cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	}
 
 	// 🔐 Save to Vault
-	if err := vault.WriteToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(types.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

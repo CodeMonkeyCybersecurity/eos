@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/consts"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
@@ -20,7 +20,7 @@ func InteractiveLDAPQuery() error {
 	cfg := &LDAPConfig{}
 
 	// Try to load existing config from Vault to prefill
-	if err := vault.ReadFromVaultAt(context.Background(), consts.LDAPVaultMount, consts.LDAPVaultPath, cfg); err == nil {
+	if err := vault.ReadFromVaultAt(context.Background(), types.LDAPVaultMount, types.LDAPVaultPath, cfg); err == nil {
 		fmt.Println("✅ LDAP config prefilled from Vault")
 	} else {
 		fmt.Printf("⚠️  Vault fallback: could not load LDAP config: %v\n", err)
@@ -64,7 +64,7 @@ func InteractiveLDAPQuery() error {
 	cfg.UserBase = baseDN
 
 	// Save config to Vault
-	if err := vault.WriteToVault(consts.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(types.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

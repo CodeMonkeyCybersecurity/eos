@@ -1,6 +1,6 @@
-// pkg/consts/config.go
+// pkg/types/config.go
 
-package consts
+package types
 
 //
 // ---------------------------- CONSTANTS ---------------------------- //
