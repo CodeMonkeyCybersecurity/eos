@@ -102,8 +102,11 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 			log.Warn("Failed to comment out Wazuh APT repo", zap.Error(err))
 		} else {
 			log.Info("Commented out Wazuh APT repo successfully")
-			exec.Command("apt", "update").Run()
+			if err := exec.Command("apt", "update").Run(); err != nil {
+				log.Warn("APT update failed", zap.Error(err))
+			}
 		}
+
 	default:
 		disableCmd := exec.Command("sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
 		disableCmd.Stdout = os.Stdout

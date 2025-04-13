@@ -66,3 +66,18 @@ func ResolveLogPath() string {
 	}
 	return ""
 }
+
+// LogCommandLifecycle returns a deferred function for consistent start/stop logging.
+func LogCommandLifecycle(cmdName string) func(err *error) {
+	start := time.Now()
+	L().Info("Command started", zap.String("command", cmdName), zap.Time("start_time", start))
+
+	return func(err *error) {
+		duration := time.Since(start)
+		if *err != nil {
+			L().Error("Command failed", zap.String("command", cmdName), zap.Duration("duration", duration), zap.Error(*err))
+		} else {
+			L().Info("Command completed", zap.String("command", cmdName), zap.Duration("duration", duration))
+		}
+	}
+}

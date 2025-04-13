@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
@@ -26,14 +27,7 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 
 		var err error
 
-		defer func() {
-			duration := time.Since(start)
-			if err != nil {
-				log.Error("Command failed", zap.Duration("duration", duration), zap.Error(err))
-			} else {
-				log.Info("Command completed", zap.Duration("duration", duration))
-			}
-		}()
+		defer logger.LogCommandLifecycle(cmd.Name())(&err)
 
 		vault.EnsureVaultClient()
 

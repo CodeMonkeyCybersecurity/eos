@@ -5,11 +5,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -51,7 +51,7 @@ func deployK3s() {
 	}
 	role := strings.TrimSpace(strings.ToLower(roleInput))
 
-	// Check for IPv6 support and try to detect a Tailscale IPv6 address.
+	// Check for IPv6 support and Tailscale IPv6.
 	nodeIP := ""
 	if network.CheckIPv6Enabled() {
 		tailscaleIP, err := network.GetTailscaleIPv6()
@@ -62,47 +62,41 @@ func deployK3s() {
 			log.Info("Tailscale IPv6 not detected; proceeding without --node-ip flag")
 		}
 	} else {
-		log.Warn("IPv6 is disabled on this kernel. Attempting to enable it...")
+		log.Warn("IPv6 is disabled. Attempting to enable it...")
 		if err := network.EnableIPv6(); err != nil {
-			log.Warn("Failed to enable IPv6 automatically; please enable it manually", zap.Error(err))
+			log.Warn("Could not enable IPv6", zap.Error(err))
 		} else {
-			log.Info("IPv6 enabled successfully.")
-		}
-		// Try again after enabling
-		tailscaleIP, err := network.GetTailscaleIPv6()
-		if err == nil && tailscaleIP != "" {
-			nodeIP = tailscaleIP
-			log.Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
+			log.Info("IPv6 enabled. Retrying Tailscale detection...")
+			if ip, err := network.GetTailscaleIPv6(); err == nil && ip != "" {
+				nodeIP = ip
+				log.Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
+			}
 		}
 	}
 
-	// Check firewall ports (this stub can be extended as needed).
-	checkFirewallPorts()
+	// 🔥 Unified firewall status check
+	platform.CheckFirewallStatus(log)
 
 	var installCmd string
 
 	switch role {
 	case "server":
-		// Ask for TLS SAN with default
 		fmt.Print("Enter TLS SAN (default: cluster.k3s.domain.com): ")
 		tlsSANInput, _ := reader.ReadString('\n')
 		tlsSAN := strings.TrimSpace(tlsSANInput)
 		if tlsSAN == "" {
 			tlsSAN = "cluster.k3s.domain.com"
 		}
-
 		installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | sh -s - server --tls-san %s", tlsSAN)
 		if nodeIP != "" {
 			installCmd += fmt.Sprintf(" --node-ip %s", nodeIP)
 		}
 
 	case "worker":
-		// Ask for the server URL and node token
 		fmt.Print("Enter the K3s server URL (e.g., https://server-ip:6443): ")
 		serverURLInput, _ := reader.ReadString('\n')
 		serverURL := strings.TrimSpace(serverURLInput)
 
-		// Wrap IPv6 in brackets if needed
 		if strings.Contains(serverURL, ":") && !strings.Contains(serverURL, "[") {
 			serverURL = fmt.Sprintf("https://[%s]:6443", serverURL)
 		} else if !strings.HasPrefix(serverURL, "https://") {
@@ -113,7 +107,6 @@ func deployK3s() {
 		tokenInput, _ := reader.ReadString('\n')
 		token := strings.TrimSpace(tokenInput)
 
-		// Worker: export env vars + pipe (using "sh -s -" for correct argument handling)
 		installCmd = fmt.Sprintf(
 			"export K3S_URL=%s\nexport K3S_TOKEN=%s\ncurl -sfL https://get.k3s.io | sh -s -",
 			serverURL, token,
@@ -127,7 +120,6 @@ func deployK3s() {
 		os.Exit(1)
 	}
 
-	// Display the generated install command for user confirmation.
 	fmt.Println("\nGenerated install command:")
 	fmt.Println(installCmd)
 	fmt.Print("\nDo you want to execute this command? [y/N]: ")
@@ -135,27 +127,23 @@ func deployK3s() {
 	confirm := strings.TrimSpace(strings.ToLower(confirmInput))
 	if confirm != "y" && confirm != "yes" {
 		scriptPath := saveScript(installCmd)
-		fmt.Printf("Installation command not executed. It has been saved to: %s\n", scriptPath)
+		fmt.Printf("Installation command not executed. Saved to: %s\n", scriptPath)
 		return
 	}
 
-	// Write the command to a script file.
 	scriptPath := saveScript(installCmd)
 	fmt.Printf("Executing the install script: %s\n", scriptPath)
-	// Provide additional user guidance:
-	fmt.Println("The installation process may take some time. If it appears to hang, please check /var/log/eos/k3s-deploy.log for detailed output or run the install script manually with debugging enabled.")
-	fmt.Println("To monitor logs in real time, run: tail -f /var/log/eos/k3s-deploy.log")
+	fmt.Println("Check /var/log/eos/k3s-deploy.log for details.")
+	fmt.Println("To monitor logs in real time: tail -f /var/log/eos/k3s-deploy.log")
 
-	// Execute the script using sh.
 	if err := execute.Execute("sh", scriptPath); err != nil {
 		log.Error("Failed to execute install script", zap.Error(err))
-		fmt.Println("Installation failed. Please check the logs for more details.")
+		fmt.Println("Installation failed. Check logs for details.")
 		os.Exit(1)
 	}
 
-	fmt.Println("K3s deployment initiated. Follow any on-screen instructions as needed.")
+	fmt.Println("K3s deployment initiated.")
 	if role == "server" {
-		// Output the join token after installation.
 		outputJoinToken()
 	}
 }
@@ -172,7 +160,9 @@ func saveScript(cmdStr string) string {
 		homeDir = "."
 	}
 	dir := homeDir + "/.local/state/eos"
-	os.MkdirAll(dir, 0755)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		log.Warn("Failed to create directory for install script", zap.String("path", dir), zap.Error(err))
+	}
 	scriptPath := dir + "/k3s-install.sh"
 	// Prepend with set -x for debugging and redirect output to a log file.
 	scriptContent := fmt.Sprintf(`#!/bin/sh
@@ -185,45 +175,6 @@ exec > >(tee -a %s/k3s-deploy.log) 2>&1
 		fmt.Printf("Warning: Failed to write script file: %v\n", err)
 	}
 	return scriptPath
-}
-
-// checkFirewallPorts performs a basic check for firewall status by attempting
-// to list firewall rules using common tools (ufw or iptables).
-func checkFirewallPorts() {
-	fmt.Println("Checking firewall ports...")
-
-	// Try to detect UFW (Uncomplicated Firewall)
-	if ufwPath, err := exec.LookPath("ufw"); err == nil {
-		fmt.Printf("UFW detected at %s. Fetching status...\n", ufwPath)
-		out, err := exec.Command("sudo", "ufw", "status", "verbose").CombinedOutput()
-		if err != nil {
-			fmt.Printf("Warning: Failed to get UFW status: %v\n", err)
-		} else {
-			fmt.Println("UFW status:")
-			fmt.Println(string(out))
-		}
-		return
-	}
-
-	// If UFW isn't found, try iptables
-	if iptablesPath, err := exec.LookPath("iptables"); err == nil {
-		fmt.Printf("iptables detected at %s. Listing rules...\n", iptablesPath)
-		out, err := exec.Command("sudo", "iptables", "-L", "-n").CombinedOutput()
-		if err != nil {
-			fmt.Printf("Warning: Failed to get iptables status: %v\n", err)
-		} else {
-			fmt.Println("iptables status:")
-			fmt.Println(string(out))
-		}
-		return
-	}
-
-	// If neither firewall tool is detected, warn the user.
-	fmt.Println("No recognized firewall management tool (ufw or iptables) was found.")
-	fmt.Println("Please ensure that the following ports are not blocked by your firewall:")
-	fmt.Println("- TCP 6443 (Kubernetes API server)")
-	fmt.Println("- TCP 10250 (kubelet)")
-	fmt.Println("- Other required ports as per your network configuration")
 }
 
 // outputJoinToken waits for the K3s join token to be available and prints it.

@@ -4,7 +4,6 @@ package create
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
@@ -61,7 +61,7 @@ var CreateHeraCmd = &cobra.Command{
 			for _, file := range composeFiles {
 				destFile := filepath.Join(types.HeraDir, filepath.Base(file))
 				log.Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
-				if err := copyFile(file, destFile); err != nil {
+				if err := system.CopyFile(file, destFile, log); err != nil {
 					log.Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}
 			}
@@ -153,40 +153,4 @@ var CreateHeraCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(CreateHeraCmd)
-}
-
-// copyFile copies a file from src to dst while preserving file permissions.
-func copyFile(src, dst string) error {
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	// Ensure that the source is a regular file.
-	if !sourceFileStat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file", src)
-	}
-
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	if _, err := io.Copy(destination, source); err != nil {
-		return err
-	}
-
-	// Copy the file permissions from source to destination.
-	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
-		return err
-	}
-
-	return nil
 }

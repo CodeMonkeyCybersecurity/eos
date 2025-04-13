@@ -4,6 +4,7 @@ package system
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -45,5 +46,49 @@ func Rm(path, label string, log *zap.Logger) error {
 
 	log.Info("Successfully removed", zap.String("label", label), zap.String("path", path))
 	fmt.Printf("✅ %s removed: %s\n", label, path)
+	return nil
+}
+
+/* copyFile copies a file from src to dst while preserving file permissions. */
+func CopyFile(src, dst string, log *zap.Logger) error {
+	sourceFileStat, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	// Ensure that the source is a regular file.
+	if !sourceFileStat.Mode().IsRegular() {
+		return fmt.Errorf("%s is not a regular file", src)
+	}
+
+	source, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := source.Close(); cerr != nil {
+			log.Warn("Failed to close source file", zap.Error(cerr))
+		}
+	}()
+
+	destination, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if cerr := destination.Close(); cerr != nil {
+			log.Warn("Failed to close destination file", zap.Error(cerr))
+		}
+	}()
+
+	if _, err := io.Copy(destination, source); err != nil {
+		return err
+	}
+
+	// Copy the file permissions from source to destination.
+	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
+		return err
+	}
+
 	return nil
 }
