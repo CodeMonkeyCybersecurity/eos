@@ -16,6 +16,14 @@ import (
 // === Vault Write Helpers ===
 //
 
+func WriteAuto(path string, data any) error {
+	client, err := NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to create Vault client: %w", err)
+	}
+	return Write(client, path, data)
+}
+
 // Write stores a struct in Vault using the API or falls back to disk if the API call fails.
 func Write(client *api.Client, name string, data any) error {
 	SetVaultClient(client)
