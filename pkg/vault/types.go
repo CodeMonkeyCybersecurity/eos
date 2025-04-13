@@ -21,6 +21,10 @@ const (
 	RoleIDPath           = "/etc/vault/role_id"
 	SecretIDPath         = "/etc/vault/secret_id"
 	VaultAgentTokenPath  = "/run/eos/vault-agent-eos.token"
+	roleName             = "eos-approle"
+	rolePath             = "auth/approle/role/" + roleName
+	roleIDPath           = "/etc/vault/role_id"
+	secretIDPath         = "/etc/vault/secret_id"
 )
 
 var (

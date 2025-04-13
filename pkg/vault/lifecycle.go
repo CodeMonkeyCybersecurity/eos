@@ -366,21 +366,6 @@ func CreateUserpassAccount(client *api.Client, username, password string) error 
 	return err
 }
 
-func CreateAppRole(client *api.Client, roleName string) error {
-	fmt.Printf("🔐 Creating AppRole for %q...\n", roleName)
-
-	_, err := client.Logical().Write(
-		vaultPath("auth/approle/role/"+roleName),
-		map[string]interface{}{
-			"policies":      EosVaultPolicy,
-			"secret_id_ttl": "0",
-			"token_ttl":     "1h",
-			"token_max_ttl": "4h",
-		},
-	)
-	return err
-}
-
 func SetupEosVaultUser(client *api.Client, password string) error {
 	if err := EnableVaultAuthMethods(client); err != nil {
 		return err
