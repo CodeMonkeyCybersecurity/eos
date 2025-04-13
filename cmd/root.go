@@ -30,6 +30,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
+var helpLogged = false
+
 // RootCmd is the base command for eos.
 var RootCmd = &cobra.Command{
 	Use:   "eos",
@@ -40,8 +42,9 @@ and reverse proxy configurations via Hecate.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// ✅ Log early if user invoked --help
 		for _, arg := range os.Args {
-			if arg == "--help" || arg == "-h" {
+			if !helpLogged && (arg == "--help" || arg == "-h") {
 				logger.L().Info("Help flag invoked", zap.String("source", "PersistentPreRun"))
+				helpLogged = true
 			}
 		}
 
