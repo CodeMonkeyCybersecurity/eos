@@ -47,5 +47,5 @@ var CreateLDAPCmd = &cobra.Command{
 var noTest bool
 
 func init() {
-	CreateLDAPCmd.Flags().BoolVar(&noTest, "no-test", false, "Skip LDAP connection test")
+	CreateCmd.AddCommand(CreateLDAPCmd)
 }
