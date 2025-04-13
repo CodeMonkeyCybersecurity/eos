@@ -17,7 +17,6 @@ const (
 	mountPath            = "sys/audit/" + auditPath
 	EosVaultPolicy       = "eos-policy"
 	VaultAgentConfigPath = "/etc/vault-agent-eos.hcl"
-	VaultTokenSinkPath   = "/etc/vault-agent-eos.token"
 	RoleIDPath           = "/etc/vault/role_id"
 	SecretIDPath         = "/etc/vault/secret_id"
 	VaultAgentTokenPath  = "/run/eos/vault-agent-eos.token"

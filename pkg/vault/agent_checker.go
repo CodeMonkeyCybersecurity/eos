@@ -17,7 +17,7 @@ func EnsureVaultAgentRunning() error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("vault agent service is not active")
 	}
-	if _, err := os.Stat("/etc/vault-agent-eos.token"); err != nil {
+	if _, err := os.Stat(VaultAgentTokenPath); err != nil {
 		return fmt.Errorf("vault token sink is missing")
 	}
 	return nil

@@ -27,7 +27,7 @@ func readTokenFromSink(path string) (string, error) {
 
 // GetPrivilegedVaultClient returns a Vault client authenticated as 'eos' system user
 func GetPrivilegedVaultClient() (*api.Client, error) {
-	token, err := readTokenFromSink("/etc/vault-agent-eos.token")
+	token, err := readTokenFromSink(VaultAgentTokenPath)
 	if err != nil {
 		return nil, err
 	}
