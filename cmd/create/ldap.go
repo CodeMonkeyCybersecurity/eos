@@ -18,7 +18,7 @@ var CreateLDAPCmd = &cobra.Command{
 		logger.Info("Starting LDAP creation workflow")
 
 		// Step 1: Load config via layered fallback
-		cfg, source, err := ldap.LoadLDAPConfig()
+		cfg, source, err := ldap.ReadLDAPConfig()
 		if err != nil {
 			return fmt.Errorf("failed to load LDAP config: %w", err)
 		}

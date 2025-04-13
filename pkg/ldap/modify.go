@@ -20,7 +20,7 @@ func updateUserAttributes(uid string, attrs map[string][]string) error {
 		}
 	}()
 
-	user, err := getUserByUID(uid)
+	user, err := readUserByUID(uid)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
@@ -48,11 +48,11 @@ func addUserToGroup(uid, groupCN string) error {
 		}
 	}()
 
-	user, err := getUserByUID(uid)
+	user, err := readUserByUID(uid)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
-	group, err := getGroupByCN(groupCN)
+	group, err := readGroupByCN(groupCN)
 	if err != nil {
 		return fmt.Errorf("group not found: %w", err)
 	}
@@ -78,11 +78,11 @@ func removeUserFromGroup(uid, groupCN string) error {
 		}
 	}()
 
-	user, err := getUserByUID(uid)
+	user, err := readUserByUID(uid)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
-	group, err := getGroupByCN(groupCN)
+	group, err := readGroupByCN(groupCN)
 	if err != nil {
 		return fmt.Errorf("group not found: %w", err)
 	}

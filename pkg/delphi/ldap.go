@@ -27,7 +27,7 @@ type LDAPConfig struct {
 	ReadonlyRole string
 }
 
-func LoadLDAPConfig() (*LDAPConfig, error) {
+func ReadLDAPConfig() (*LDAPConfig, error) {
 	var cfg LDAPConfig
 	err := vault.ReadFromVault(types.LDAPVaultPath, &cfg)
 	if err != nil {
@@ -37,7 +37,7 @@ func LoadLDAPConfig() (*LDAPConfig, error) {
 }
 
 func PromptLDAPDetails() (*LDAPConfig, error) {
-	existing, _ := LoadLDAPConfig() // best-effort load
+	existing, _ := ReadLDAPConfig() // best-effort load
 
 	cfg := existing
 	if cfg == nil {

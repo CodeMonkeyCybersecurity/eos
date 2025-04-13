@@ -33,7 +33,7 @@ var defaultBaseDN = "dc=domain,dc=com"
 
 func DefaultLDAPConfig() *LDAPConfig {
 	return &LDAPConfig{
-		FQDN:         "ldap.domain.com",
+		FQDN:         "localhost",
 		Port:         389,
 		UseTLS:       false,
 		BindDN:       "cn=admin,dc=domain,dc=com",

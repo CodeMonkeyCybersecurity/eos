@@ -1,4 +1,4 @@
-/* pkg/ldap/delete.go */
+/* pkg/ldap/lifecycle.go */
 
 package ldap
 
