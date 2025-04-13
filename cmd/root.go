@@ -1,3 +1,5 @@
+/* cmd/root.go */
+
 package cmd
 
 import (
@@ -24,6 +26,7 @@ import (
 	// Internal packages
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 // RootCmd is the base command for eos.
@@ -33,10 +36,18 @@ var RootCmd = &cobra.Command{
 	Long: `Eos is a command-line application for managing processes, users, hardware, backups,
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRunE executes before any subcommand.
-	PersistentPreRunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		return nil
-	}),
-	// Default action if no subcommand is provided.
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// ✅ Always run this first, even for --help
+		logger.InitializeWithFallback()
+
+		// 🔐 Set VAULT_ADDR
+		if _, err := vault.SetVaultEnv(); err != nil {
+			fmt.Printf("⚠️  Failed to set VAULT_ADDR: %v\n", err)
+		}
+
+		// 🚀 Setup Vault client for fallback read/writes
+		vault.EnsureVaultClient()
+	},
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
 		return cmd.Help()

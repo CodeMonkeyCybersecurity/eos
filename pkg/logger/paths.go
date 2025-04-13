@@ -1,14 +1,21 @@
-// pkg/logger/paths.go
+/* pkg/logger/paths.go */
+
 package logger
 
-import "runtime"
+import (
+	"os"
+	"path/filepath"
+	"runtime"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+)
 
 // PlatformLogPaths returns all fallback log paths in order of priority for the platform.
-func platformLogPaths() []string {
+func PlatformLogPaths() []string {
 	switch runtime.GOOS {
 	case "darwin":
 		return []string{
-			"$HOME/Library/Logs/cyberMonkey/eos.log",
+			xdg.XDGStatePath("cyberMonkey", "eos.log"),
 			"/tmp/cyberMonkey/eos.log",
 			"./eos.log",
 		}
@@ -20,8 +27,8 @@ func platformLogPaths() []string {
 		}
 	case "windows":
 		return []string{
-			"%ProgramData%\\cyberMonkey\\github.com\\CodeMonkeyCybersecurity\\eos.log",
-			"%LOCALAPPDATA%\\cyberMonkey\\github.com\\CodeMonkeyCybersecurity\\eos.log",
+			filepath.Join(os.Getenv("ProgramData"), "cyberMonkey", "eos.log"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), "cyberMonkey", "eos.log"),
 			".\\eos.log",
 		}
 	default:

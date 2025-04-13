@@ -15,21 +15,13 @@ See LICENSE.agpl and LICENSE.dnh for full details.
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 func main() {
-	logFilePath := logger.ResolveLogPath()
-	if err := logger.InitializeWithFallback(logFilePath); err != nil {
-		// Fallback failed; explain and exit
-		fmt.Fprintf(os.Stderr, "❌ Logging initialization failed: %v\n", err)
-		fmt.Fprintln(os.Stderr, "Logging is essential for Eos CLI to run safely. Please provide a writable log file path using --logfile.")
-		os.Exit(1)
-	}
+	logger.InitializeWithFallback() // no args
 	defer logger.Sync()
+
 	cmd.Execute()
 }

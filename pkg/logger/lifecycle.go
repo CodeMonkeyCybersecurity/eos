@@ -1,4 +1,5 @@
 /* pkg/logger/lifecycle.go */
+
 package logger
 
 import (
@@ -12,13 +13,13 @@ import (
 )
 
 // generateTraceID returns a short 8-char trace ID.
-func generateTraceID() string {
+func GenerateTraceID() string {
 	return uuid.New().String()[:8]
 }
 
-func withCommandLogging(name string, fn func() error) error {
+func WithCommandLogging(name string, fn func() error) error {
 	log := L()
-	traceID := generateTraceID()
+	traceID := GenerateTraceID()
 	start := time.Now()
 
 	log.Info("Command started", zap.String("command", name), zap.Time("start_time", start), zap.String("trace_id", traceID))
@@ -38,20 +39,20 @@ func withCommandLogging(name string, fn func() error) error {
 }
 
 // For pkg/* use when zap is unavailable
-func logCommandStart(cmd string) (string, time.Time) {
-	traceID := generateTraceID()
+func LogCommandStart(cmd string) (string, time.Time) {
+	traceID := GenerateTraceID()
 	start := time.Now()
 	fmt.Printf("[INFO] Command starting: %s | trace_id=%s\n", cmd, traceID)
 	return traceID, start
 }
 
-func logCommandEnd(cmd string, traceID string, start time.Time) {
+func LogCommandEnd(cmd string, traceID string, start time.Time) {
 	duration := time.Since(start)
 	fmt.Printf("[INFO] Command completed: %s | duration=%s | trace_id=%s\n", cmd, duration, traceID)
 }
 
 // ResolveLogPath attempts to find the best writable log file path.
-func resolveLogPath() string {
+func ResolveLogPath() string {
 	for _, path := range PlatformLogPaths() {
 		dir := filepath.Dir(path)
 		if err := os.MkdirAll(dir, 0700); err != nil {

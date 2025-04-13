@@ -1,7 +1,8 @@
+/* pkg/logger/fallback.go */
+
 package logger
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -9,13 +10,13 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func newFallbackLogger() *zap.Logger {
-	cfg := defaultConsoleEncoderConfig()
+func NewFallbackLogger() *zap.Logger {
+	cfg := DefaultConsoleEncoderConfig()
 
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
 		zapcore.AddSync(os.Stdout),
-		parseLogLevel(os.Getenv("LOG_LEVEL")),
+		ParseLogLevel(os.Getenv("LOG_LEVEL")),
 	)
 
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
@@ -23,30 +24,37 @@ func newFallbackLogger() *zap.Logger {
 	return logger
 }
 
-func initializeWithFallback(logPath string) error {
-	if logPath == "" {
-		return errors.New("no writable log path found")
-	}
-	if err := ensureLogPermissions(logPath); err != nil {
-		return fmt.Errorf("unable to prepare log path: %w", err)
+func InitializeWithFallback() {
+	path, err := FindWritableLogPath()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "⚠️  No writable log path found. Logging to console only.")
+		log = NewFallbackLogger()
+		zap.ReplaceGlobals(log)
+		return
 	}
 
-	cfg := defaultConsoleEncoderConfig()
+	cfg := DefaultConsoleEncoderConfig()
 	jsonCfg := zap.NewProductionEncoderConfig()
 	jsonCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 	jsonCfg.EncodeLevel = zapcore.CapitalLevelEncoder
 
+	writer, err := GetLogFileWriter(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "⚠️  Could not write to log file, falling back to stdout:", err)
+		writer = zapcore.AddSync(os.Stdout)
+	}
+
 	core := zapcore.NewTee(
 		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
-		zapcore.NewCore(zapcore.NewJSONEncoder(jsonCfg), getLogFileWriter(logPath), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(jsonCfg), writer, zap.InfoLevel),
 	)
 
 	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(log)
-	return nil
+	log.Info("Logger fallback initialized", zap.String("log_path", path))
 }
 
-func defaultConsoleEncoderConfig() zapcore.EncoderConfig {
+func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.TimeKey = "T"
 	cfg.LevelKey = "L"

@@ -1,5 +1,4 @@
-/* pkg/logger/reader.go
- */
+/* pkg/logger/reader.go */
 
 package logger
 
@@ -8,7 +7,7 @@ import (
 )
 
 // ReadLogFile returns the contents of a given log file.
-func readLogFile(path string) (string, error) {
+func ReadLogFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err

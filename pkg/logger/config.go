@@ -10,14 +10,14 @@ import (
 )
 
 // DefaultConfig returns a sane default Zap config.
-func defaultConfig() zap.Config {
+func DefaultConfig() zap.Config {
 	logPath := ResolveLogPath()
 	if logPath == "" {
 		logPath = "./eos.log"
 	}
 
 	return zap.Config{
-		Level:            zap.NewAtomicLevelAt(parseLogLevel(os.Getenv("LOG_LEVEL"))),
+		Level:            zap.NewAtomicLevelAt(ParseLogLevel(os.Getenv("LOG_LEVEL"))),
 		Development:      os.Getenv("ENV") == "development",
 		Encoding:         "json",
 		OutputPaths:      []string{"stdout", logPath},
@@ -26,7 +26,7 @@ func defaultConfig() zap.Config {
 	}
 }
 
-func parseLogLevel(level string) zapcore.Level {
+func ParseLogLevel(level string) zapcore.Level {
 	switch level {
 	case "TRACE", "DEBUG":
 		return zapcore.DebugLevel

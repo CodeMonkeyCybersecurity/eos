@@ -1,3 +1,5 @@
+/* pkg/logger/handler.go */
+
 package logger
 
 import (
@@ -10,14 +12,24 @@ import (
 
 var log *zap.Logger
 
-func initializeWithConfig(cfg zap.Config) {
+// InitFallback sets up an in-memory console logger and replaces globals.
+func InitFallback() {
+	log = NewFallbackLogger()
+	zap.ReplaceGlobals(log)
+}
+
+func L() *zap.Logger {
+	return GetLogger()
+}
+
+func InitializeWithConfig(cfg zap.Config) {
 	if log != nil {
 		return
 	}
 
 	for _, path := range cfg.OutputPaths {
 		if path != "stdout" && path != "stderr" {
-			if err := ensureLogPermissions(path); err != nil {
+			if err := EnsureLogPermissions(path); err != nil {
 				fmt.Fprintln(os.Stderr, "⚠️ Log permission error:", err)
 				panic(err)
 			}
@@ -34,35 +46,31 @@ func initializeWithConfig(cfg zap.Config) {
 	log.Info("Logger initialized", zap.String("log_level", cfg.Level.String()))
 }
 
-func getLogger() *zap.Logger {
+func GetLogger() *zap.Logger {
 	if log == nil {
-		log = newFallbackLogger()
+		log = NewFallbackLogger()
 		zap.ReplaceGlobals(log)
 	}
 	return log
 }
 
-func L() *zap.Logger {
-	return GetLogger()
-}
-
-func sync(strict ...bool) error {
+func Sync(strict ...bool) error {
 	if log == nil {
 		return nil
 	}
 	err := log.Sync()
-	if err == nil || (!strictEnabled(strict) && isIgnorableSyncError(err)) {
+	if err == nil || (!StrictEnabled(strict) && IsIgnorableSyncError(err)) {
 		return nil
 	}
 	log.Error("Failed to sync logger", zap.Error(err))
 	return err
 }
 
-func isIgnorableSyncError(err error) bool {
+func IsIgnorableSyncError(err error) bool {
 	var pathErr *os.PathError
 	return errors.As(err, &pathErr) || err.Error() == "sync /dev/stdout: invalid argument"
 }
 
-func strictEnabled(flags []bool) bool {
+func StrictEnabled(flags []bool) bool {
 	return len(flags) > 0 && flags[0]
 }

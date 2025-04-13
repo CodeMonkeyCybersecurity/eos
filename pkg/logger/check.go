@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func ensureLogPermissions(path string) error {
+func EnsureLogPermissions(path string) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return err
@@ -25,6 +25,6 @@ func ensureLogPermissions(path string) error {
 	return os.Chmod(path, 0600)
 }
 
-func isStrict(strict []bool) bool {
+func IsStrict(strict []bool) bool {
 	return len(strict) > 0 && strict[0]
 }
