@@ -65,6 +65,11 @@ vault {
   address = "http://127.0.0.1:8179"
 }
 
+listener "tcp" {
+  address     = "127.0.0.1:9200"
+  tls_disable = true
+}
+
 cache {
   use_auto_auth_token = true
 }`
