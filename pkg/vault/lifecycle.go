@@ -17,7 +17,7 @@ import (
 
 // Purge removes Vault repo artifacts based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.
-func purge(distro string) (removed []string, errs map[string]error) {
+func Purge(distro string) (removed []string, errs map[string]error) {
 	errs = make(map[string]error)
 
 	switch distro {
@@ -123,7 +123,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 		if IsAlreadyInitialized(err) {
 			fmt.Println("✅ Vault already initialized.")
 
-			initResPtr, err := ReadFallbackJSON[api.InitResponse](diskPath("vault_init"))
+			initResPtr, err := ReadFallbackJSON[api.InitResponse](DiskPath("vault_init"))
 			if err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
@@ -192,7 +192,7 @@ func IsAlreadyInitialized(err error) bool {
 func DumpInitResult(initRes *api.InitResponse) {
 	b, _ := json.MarshalIndent(initRes, "", "  ")
 	_ = os.WriteFile("/tmp/vault_init.json", b, 0600)
-	_ = os.WriteFile(diskPath("vault_init"), b, 0600)
+	_ = os.WriteFile(DiskPath("vault_init"), b, 0600)
 	fmt.Printf("✅ Vault initialized with %d unseal keys.\n", len(initRes.KeysB64))
 }
 

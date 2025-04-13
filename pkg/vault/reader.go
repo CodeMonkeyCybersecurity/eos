@@ -55,7 +55,7 @@ func Read(client *api.Client, name string, out any) error {
 		fmt.Printf("⚠️  Vault read failed for %q: %v\n", name, err)
 		fmt.Println("💡 Falling back to local config...")
 	}
-	return ReadFallbackIntoJSON(diskPath(name), out)
+	return ReadFallbackIntoJSON(DiskPath(name), out)
 }
 
 //
@@ -78,7 +78,7 @@ func ReadFallbackJSON[T any](path string) (*T, error) {
 }
 
 // readFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
-func readFallbackSecrets() (map[string]string, error) {
+func ReadFallbackSecrets() (map[string]string, error) {
 	path := filepath.Join(diskSecretsPath, "delphi-fallback.yaml")
 
 	secretsPtr, err := ReadFallbackJSON[map[string]string](path)

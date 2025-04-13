@@ -46,23 +46,25 @@ func setupVaultAgent(password string) error {
 func writeAgentConfig() error {
 	content := `
 pid_file = "/run/eos/vault-agent.pid"
+
 auto_auth {
-  method "userpass" {
-    mount_path = "auth/userpass"
+  method "approle" {
     config = {
-      username = "eos"
-      password_file = "/etc/vault-agent-eos.pass"
+      role_id_file_path   = "/etc/vault/role_id"
+      secret_id_file_path = "/etc/vault/secret_id"
     }
   }
   sink "file" {
     config = {
-      path = "/run/eos/.vault-token"
+      path = "/etc/vault-agent-eos.token"
     }
   }
 }
+
 vault {
   address = "http://127.0.0.1:8179"
 }
+
 cache {
   use_auto_auth_token = true
 }`

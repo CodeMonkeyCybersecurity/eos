@@ -16,7 +16,7 @@ func getVaultAddr() string {
 }
 
 // SetVaultEnv sets VAULT_ADDR in the environment
-func setVaultEnv() (string, error) {
+func SetVaultEnv() (string, error) {
 	addr := getVaultAddr()
 	if err := os.Setenv("VAULT_ADDR", addr); err != nil {
 		return "", fmt.Errorf("failed to set VAULT_ADDR: %w", err)

@@ -12,10 +12,14 @@ import (
 )
 
 const (
-	diskSecretsPath = "/var/lib/eos/secrets"
-	auditPath       = "file/"
-	mountPath       = "sys/audit/" + auditPath
-	EosVaultPolicy  = "eos-policy"
+	diskSecretsPath      = "/var/lib/eos/secrets"
+	auditPath            = "file/"
+	mountPath            = "sys/audit/" + auditPath
+	EosVaultPolicy       = "eos-policy"
+	VaultAgentConfigPath = "/etc/vault-agent-eos.hcl"
+	VaultTokenSinkPath   = "/etc/vault-agent-eos.token"
+	RoleIDPath           = "/etc/vault/role_id"
+	SecretIDPath         = "/etc/vault/secret_id"
 )
 
 var (
@@ -32,8 +36,8 @@ func vaultPath(name string) string {
 	return fmt.Sprintf("eos/%s", name)
 }
 
-// diskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
-func diskPath(name string) string {
+// DiskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
+func DiskPath(name string) string {
 	if name == "vault_init" {
 		return filepath.Join(diskSecretsPath, "vault_init.json")
 	}

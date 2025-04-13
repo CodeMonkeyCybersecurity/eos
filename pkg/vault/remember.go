@@ -14,7 +14,7 @@ func Remember(name, key, prompt, def string) (string, error) {
 	values := map[string]string{}
 	// We assume loadWithFallback is a Vault-specific function that loads the config
 	// from Vault (or falls back to disk) and unmarshals into the map.
-	if err := handleFallbackOrStore(name, values); err != nil {
+	if err := HandleFallbackOrStore(name, values); err != nil {
 		// Not fatal — the fallback file might not exist yet.
 	}
 
@@ -24,7 +24,7 @@ func Remember(name, key, prompt, def string) (string, error) {
 	values[key] = val
 
 	// Persist the updated config using the Vault fallback mechanism.
-	if err := handleFallbackOrStore(name, values); err != nil {
+	if err := HandleFallbackOrStore(name, values); err != nil {
 		return "", fmt.Errorf("failed to persist %q to Vault or fallback: %w", key, err)
 	}
 

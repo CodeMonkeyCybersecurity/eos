@@ -27,8 +27,8 @@ func Write(client *api.Client, name string, data any) error {
 	}
 
 	fmt.Println("⚠️ Vault API write failed for:", path)
-	fmt.Println("💾 Falling back to local disk:", diskPath(name))
-	return WriteFallbackJSON(diskPath(name), data)
+	fmt.Println("💾 Falling back to local disk:", DiskPath(name))
+	return WriteFallbackJSON(DiskPath(name), data)
 }
 
 // WriteToVault stores a serializable struct to Vault at a given KV v2 path.

@@ -8,8 +8,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 )
 
-func handleFallbackOrStore(name string, secrets map[string]string) error {
-	setVaultEnv()
+func HandleFallbackOrStore(name string, secrets map[string]string) error {
+	SetVaultEnv()
 
 	client, err := NewClient()
 	if err != nil {
