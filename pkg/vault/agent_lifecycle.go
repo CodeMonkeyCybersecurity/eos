@@ -10,10 +10,6 @@ import (
 )
 
 func CreateAppRole(client *api.Client, roleName string) error {
-	const (
-		roleIDPath   = "/etc/vault/role_id"
-		secretIDPath = "/etc/vault/secret_id"
-	)
 
 	rolePath := "auth/approle/role/" + roleName
 	fmt.Println("🔐 Creating AppRole:", roleName)
