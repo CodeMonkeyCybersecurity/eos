@@ -17,35 +17,35 @@ import (
 
 var vaultCheck sync.Once
 
-// Wrap adds automatic logger injection and scoped metadata based on calling package.
+/* Wrap adds automatic logger injection and scoped metadata based on calling package. */
 func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
 		log := contextualLogger()
 		log.Info("Command started", zap.Time("start_time", start))
 
+		var err error
+
+		defer func() {
+			duration := time.Since(start)
+			if err != nil {
+				log.Error("Command failed", zap.Duration("duration", duration), zap.Error(err))
+			} else {
+				log.Info("Command completed", zap.Duration("duration", duration))
+			}
+		}()
+
 		vault.EnsureVaultClient()
 
-		// ✅ Ensure Vault is ready BEFORE we run the command
 		vaultCheck.Do(func() {
 			log.Info("🔒 Checking Vault sealed state...")
-			_, err := vault.EnsureVaultReady()
-			if err != nil {
-				log.Warn("⚠️ Vault is not fully prepared (sealed or missing fallback)", zap.Error(err))
+			if _, vaultErr := vault.EnsureVaultReady(); vaultErr != nil {
+				log.Warn("⚠️ Vault is not fully prepared (sealed or missing fallback)", zap.Error(vaultErr))
 				log.Warn("Continuing anyway — downstream commands may fail if Vault is required.")
 			}
 		})
 
-		// Now run the command itself
-		err := fn(cmd, args)
-		duration := time.Since(start)
-
-		if err != nil {
-			log.Error("Command failed", zap.Duration("duration", duration), zap.Error(err))
-		} else {
-			log.Info("Command completed", zap.Duration("duration", duration))
-		}
-
+		err = fn(cmd, args)
 		return err
 	}
 }
