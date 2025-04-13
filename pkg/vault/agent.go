@@ -56,7 +56,7 @@ auto_auth {
   }
   sink "file" {
     config = {
-      path = "/etc/vault-agent-eos.token"
+      path = "/run/eos/vault-agent-eos.token"
     }
   }
 }
