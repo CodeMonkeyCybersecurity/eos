@@ -38,7 +38,13 @@ var RootCmd = &cobra.Command{
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRunE executes before any subcommand.
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// ✅ Always run this first, even for --help
+		// ✅ Log early if user invoked --help
+		for _, arg := range os.Args {
+			if arg == "--help" || arg == "-h" {
+				logger.L().Info("Help flag invoked", zap.String("source", "PersistentPreRun"))
+			}
+		}
+
 		logger.InitializeWithFallback()
 
 		// 🔐 Set VAULT_ADDR
