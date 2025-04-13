@@ -82,7 +82,12 @@ var HelpCmd = &cobra.Command{
 // RegisterCommands adds all subcommands to the root command.
 func RegisterCommands() {
 	RootCmd.SetHelpCommand(HelpCmd)
-
+	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		logger.L().Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
+		defer logger.L().Info("Global help display complete", zap.String("command", cmd.Name()))
+		cmd.Root().Help()
+	})
+	
 	// List of primary subcommands.
 	subCommands := []*cobra.Command{
 		create.CreateCmd,
