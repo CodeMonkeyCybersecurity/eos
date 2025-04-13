@@ -14,7 +14,11 @@ func updateUserAttributes(uid string, attrs map[string][]string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️ Failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	user, err := getUserByUID(uid)
 	if err != nil {
@@ -38,7 +42,11 @@ func addUserToGroup(uid, groupCN string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️ Failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	user, err := getUserByUID(uid)
 	if err != nil {
@@ -64,7 +72,11 @@ func removeUserFromGroup(uid, groupCN string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️ Failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	user, err := getUserByUID(uid)
 	if err != nil {

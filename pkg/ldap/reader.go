@@ -58,7 +58,11 @@ func searchAndMapUsers(baseDN, filter string) ([]LDAPUser, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️ Warning: failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	req := ldap.NewSearchRequest(
 		baseDN, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
@@ -87,7 +91,11 @@ func searchAndMapGroups(baseDN, filter string) ([]LDAPGroup, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️ Warning: failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	req := ldap.NewSearchRequest(
 		baseDN, ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,

@@ -39,35 +39,63 @@ func CheckFirewallStatus(log *zap.Logger) {
 
 // ConfigureUFW sets up UFW for wazuh ports.
 func ConfigureUFW(log *zap.Logger, wazuhPorts []string) error {
-	execute.Execute("sudo", "ufw", "enable")
-	for _, port := range wazuhPorts {
-		execute.Execute("sudo", "ufw", "allow", port)
+	if err := execute.Execute("sudo", "ufw", "enable"); err != nil {
+		log.Error("Failed to enable UFW", zap.Error(err))
+		return err
 	}
-	execute.Execute("sudo", "ufw", "reload")
-	execute.Execute("sudo", "ufw", "status")
-	log.Info("✅ UFW configuration complete.")
 
+	for _, port := range wazuhPorts {
+		if err := execute.Execute("sudo", "ufw", "allow", port); err != nil {
+			log.Error("Failed to allow port", zap.String("port", port), zap.Error(err))
+			return err
+		}
+	}
+
+	if err := execute.Execute("sudo", "ufw", "reload"); err != nil {
+		log.Error("Failed to reload UFW", zap.Error(err))
+		return err
+	}
+
+	if err := execute.Execute("sudo", "ufw", "status"); err != nil {
+		log.Warn("Failed to get UFW status", zap.Error(err)) // Not fatal
+	}
+
+	log.Info("✅ UFW configuration complete.")
 	return nil
 }
 
 // ConfigureFirewalld sets up firewalld for wazuh ports.
 func ConfigureFirewalld(log *zap.Logger, wazuhPorts []string) error {
 	log.Info("🚦 Checking Firewalld state")
-	execute.Execute("sudo", "firewall-cmd", "--state")
+	if err := execute.Execute("sudo", "firewall-cmd", "--state"); err != nil {
+		log.Error("Firewalld not running", zap.Error(err))
+		return err
+	}
 
 	for _, port := range wazuhPorts {
 		log.Info("📦 Allowing port", zap.String("port", port))
-		execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-port="+port)
+		if err := execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-port="+port); err != nil {
+			log.Error("Failed to add port to firewalld", zap.String("port", port), zap.Error(err))
+			return err
+		}
 	}
 
 	log.Info("🔒 Allowing https service")
-	execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-service=https")
+	if err := execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-service=https"); err != nil {
+		log.Error("Failed to add https service to firewalld", zap.Error(err))
+		return err
+	}
 
 	log.Info("🔁 Reloading Firewalld")
-	execute.Execute("sudo", "firewall-cmd", "--reload")
+	if err := execute.Execute("sudo", "firewall-cmd", "--reload"); err != nil {
+		log.Error("Failed to reload firewalld", zap.Error(err))
+		return err
+	}
 
 	log.Info("📖 Listing open ports")
-	execute.Execute("sudo", "firewall-cmd", "--list-ports")
+	if err := execute.Execute("sudo", "firewall-cmd", "--list-ports"); err != nil {
+		log.Warn("Failed to list open ports", zap.Error(err)) // Not fatal
+	}
 
 	log.Info("✅ Firewalld configuration complete.")
 	return nil

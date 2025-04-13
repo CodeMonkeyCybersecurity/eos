@@ -33,7 +33,9 @@ func FindWritableLogPath() (string, error) {
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err == nil {
 			f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 			if err == nil {
-				f.Close()
+				if cerr := f.Close(); cerr != nil {
+					return "", fmt.Errorf("failed to close log file at %s: %w", path, cerr)
+				}
 				return path, nil
 			}
 		}

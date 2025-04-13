@@ -13,13 +13,21 @@ func DownloadFile(filepath string, url string) error {
 	if err != nil {
 		return fmt.Errorf("create file: %w", err)
 	}
-	defer out.Close()
+	defer func() {
+		if cerr := out.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️ Failed to close output file: %v\n", cerr)
+		}
+	}()
 
 	resp, err := http.Get(url)
 	if err != nil {
 		return fmt.Errorf("http get: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if cerr := resp.Body.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️ Failed to close HTTP response body: %v\n", cerr)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status: %s", resp.Status)

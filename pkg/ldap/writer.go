@@ -14,7 +14,11 @@ func createUser(config *LDAPConfig, user LDAPUser, password string) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️ Warning: failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	req := ldap.NewAddRequest(user.DN, nil)
 	req.Attribute("objectClass", []string{"inetOrgPerson", "organizationalPerson", "person", "top"})

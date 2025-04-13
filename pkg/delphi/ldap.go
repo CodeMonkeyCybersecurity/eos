@@ -270,12 +270,16 @@ func RestartDashboard() error {
 	return cmd.Run()
 }
 
-func CheckLDAPGroupsExist(cfg *LDAPConfig) error {
+func CheckLDAPGroupsExist(cfg *LDAPConfig) (err error) {
 	l, err := ldap.DialURL("ldaps://" + cfg.FQDN + ":636")
 	if err != nil {
 		return fmt.Errorf("failed to connect to LDAP: %w", err)
 	}
-	defer l.Close()
+	defer func() {
+		if cerr := l.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("failed to close LDAP connection: %w", cerr)
+		}
+	}()
 
 	err = l.Bind(cfg.BindDN, cfg.Password)
 	if err != nil {

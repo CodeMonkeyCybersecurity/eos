@@ -25,7 +25,11 @@ func LoadLastValues() map[string]string {
 		// If the file doesn't exist, return an empty map.
 		return values
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			logger.GetLogger().Warn("Failed to close LastValuesFile", zap.Error(cerr))
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -76,7 +80,11 @@ func SaveLastValues(values map[string]string) {
 	if err != nil {
 		logger.GetLogger().Fatal("Unable to save values", zap.Error(err))
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			logger.GetLogger().Warn("Failed to close LastValuesFile", zap.Error(cerr))
+		}
+	}()
 
 	writer := bufio.NewWriter(file)
 	for key, value := range values {
@@ -110,13 +118,21 @@ func BackupFile(filepathStr string) error {
 	if err != nil {
 		return fmt.Errorf("error opening source file for backup: %w", err)
 	}
-	defer src.Close()
+	defer func() {
+		if cerr := src.Close(); cerr != nil {
+			logger.GetLogger().Warn("Failed to close source file during backup", zap.Error(cerr))
+		}
+	}()
 
 	dest, err := os.Create(backupPath)
 	if err != nil {
 		return fmt.Errorf("error creating backup file: %w", err)
 	}
-	defer dest.Close()
+	defer func() {
+		if cerr := dest.Close(); cerr != nil {
+			logger.GetLogger().Warn("Failed to close destination file during backup", zap.Error(cerr))
+		}
+	}()
 
 	if _, err = io.Copy(dest, src); err != nil {
 		return fmt.Errorf("error copying to backup file: %w", err)

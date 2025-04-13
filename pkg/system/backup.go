@@ -1,5 +1,6 @@
-// pkg/backup/backup.go
-package backup
+/* pkg/system/backup.go */
+
+package system
 
 import (
 	"fmt"
@@ -7,8 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"go.uber.org/zap"
 )
@@ -19,7 +18,7 @@ var log = logger.L()
 func RestoreFile(src, dst string) {
 	log.Info("Restoring file", zap.String("source", src), zap.String("destination", dst))
 
-	if err := utils.CopyFile(src, dst); err != nil {
+	if err := CopyFile(src, dst, log); err != nil {
 		log.Error("Failed to restore file", zap.Error(err))
 	} else {
 		log.Info("File restored successfully", zap.String("destination", dst))
@@ -30,11 +29,11 @@ func RestoreFile(src, dst string) {
 func RestoreDir(src, dst string) {
 	log.Info("Restoring directory", zap.String("source", src), zap.String("destination", dst))
 
-	if err := system.Rm(dst, "destination directory", log); err != nil {
+	if err := Rm(dst, "destination directory", log); err != nil {
 		log.Error("Failed to clean destination", zap.String("destination", dst), zap.Error(err))
 		return
 	}
-	if err := utils.CopyDir(src, dst); err != nil {
+	if err := CopyDir(src, dst); err != nil {
 		log.Error("Failed to restore directory", zap.String("source", src), zap.Error(err))
 	} else {
 		log.Info("Directory restored successfully", zap.String("destination", dst))

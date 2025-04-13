@@ -280,16 +280,18 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 
 	password, err := crypto.GeneratePassword(20)
 	if err != nil {
-		fmt.Println("❌ Failed to generate password:", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	os.MkdirAll(diskSecretsPath, 0700)
+	if err := os.MkdirAll(diskSecretsPath, 0700); err != nil {
+		return fmt.Errorf("failed to create secrets directory: %w", err)
+	}
 
 	creds := UserpassCreds{
 		Username: "eos",
 		Password: password,
 	}
+
 	if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
 		fmt.Println("⚠️ Failed to write eos Vault user fallback secret:", err)
 	} else {

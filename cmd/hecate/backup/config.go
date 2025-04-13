@@ -8,7 +8,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -37,7 +36,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Failed to remove existing backup", zap.String("path", hecate.BackupConf), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := utils.CopyDir(hecate.ConfDir, hecate.BackupConf); err != nil {
+		if err := system.CopyDir(hecate.ConfDir, hecate.BackupConf); err != nil {
 			log.Error("Backup failed", zap.String("src", types.DefaultConfDir), zap.Error(err))
 			os.Exit(1)
 		}
@@ -53,7 +52,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Failed to remove existing hecate.Backup", zap.String("path", hecate.BackupCerts), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := utils.CopyDir(hecate.DstCerts, hecate.BackupCerts); err != nil {
+		if err := system.CopyDir(hecate.DstCerts, hecate.BackupCerts); err != nil {
 			log.Error("Backup failed", zap.String("src", types.DefaultCertsDir), zap.Error(err))
 			os.Exit(1)
 		}
@@ -69,7 +68,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Failed to remove existing backup", zap.String("path", hecate.BackupCompose), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := utils.CopyFile(hecate.DockerComposeFile, hecate.BackupCompose); err != nil {
+		if err := system.CopyFile(hecate.DockerComposeFile, hecate.BackupCompose, log); err != nil {
 			log.Error("Backup failed", zap.String("src", types.DefaultComposeYML), zap.Error(err))
 			os.Exit(1)
 		}

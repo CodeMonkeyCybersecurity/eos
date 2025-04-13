@@ -11,7 +11,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 var log = logger.L()
@@ -33,14 +32,14 @@ func DeployApp(app string, cmd *cobra.Command) error {
 	}
 
 	// Copy HTTP config
-	if err := utils.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf")); err != nil {
+	if err := system.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf"), log); err != nil {
 		return fmt.Errorf("failed to copy HTTP config: %w", err)
 	}
 
 	// Copy Stream config if available
 	streamConfig := filepath.Join(AssetsPath, "stream", app+".conf")
 	if system.Exists(streamConfig) {
-		if err := utils.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf")); err != nil {
+		if err := system.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf"), log); err != nil {
 			return fmt.Errorf("failed to copy Stream config: %w", err)
 		}
 	}

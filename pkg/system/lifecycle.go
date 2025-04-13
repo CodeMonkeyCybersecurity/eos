@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"go.uber.org/zap"
@@ -49,7 +50,7 @@ func Rm(path, label string, log *zap.Logger) error {
 	return nil
 }
 
-/* copyFile copies a file from src to dst while preserving file permissions. */
+/* CopyFile copies a file from src to dst while preserving file permissions. */
 func CopyFile(src, dst string, log *zap.Logger) error {
 	sourceFileStat, err := os.Stat(src)
 	if err != nil {
@@ -88,6 +89,43 @@ func CopyFile(src, dst string, log *zap.Logger) error {
 	// Copy the file permissions from source to destination.
 	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+// CopyDir recursively copies a directory from src to dst.
+func CopyDir(src, dst string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return fmt.Errorf("failed to stat src: %w", err)
+	}
+	if !srcInfo.IsDir() {
+		return fmt.Errorf("source is not a directory: %s", src)
+	}
+
+	if err := os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to create dst dir: %w", err)
+	}
+
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return fmt.Errorf("failed to read dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := CopyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := CopyFile(srcPath, dstPath, zap.L()); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

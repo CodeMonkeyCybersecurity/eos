@@ -8,13 +8,16 @@ import (
 	"github.com/go-ldap/ldap/v3"
 )
 
-// DeleteUser removes a user from LDAP
 func deleteUser(dn string, config *LDAPConfig) error {
 	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️  Warning: failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	del := ldap.NewDelRequest(dn, nil)
 	if err := conn.Del(del); err != nil {
@@ -23,13 +26,16 @@ func deleteUser(dn string, config *LDAPConfig) error {
 	return nil
 }
 
-// DeleteGroup removes a group entry by DN
 func deleteGroup(dn string, config *LDAPConfig) error {
 	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer func() {
+		if cerr := conn.Close(); cerr != nil {
+			fmt.Printf("⚠️  Warning: failed to close LDAP connection: %v\n", cerr)
+		}
+	}()
 
 	del := ldap.NewDelRequest(dn, nil)
 	if err := conn.Del(del); err != nil {

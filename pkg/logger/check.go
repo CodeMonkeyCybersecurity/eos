@@ -16,11 +16,13 @@ func EnsureLogPermissions(path string) error {
 		return err
 	}
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		file, err := os.Create(path)
+		f, err := os.Create(path)
 		if err != nil {
 			return err
 		}
-		file.Close()
+		if cerr := f.Close(); cerr != nil {
+			return cerr
+		}
 	}
 	return os.Chmod(path, 0600)
 }

@@ -4,11 +4,15 @@ package docker
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 )
+
+var log = logger.L()
 
 // DeployCompose performs the following actions:
 // 1. Gets the current working directory and uses its base name as the application name.
@@ -52,7 +56,7 @@ func DeployCompose() error {
 	for _, file := range composeFiles {
 		destFile := filepath.Join(targetDir, filepath.Base(file))
 		fmt.Printf("Copying %s to %s\n", file, destFile)
-		if err := copyFile(file, destFile); err != nil {
+		if err := system.CopyFile(file, destFile, log); err != nil {
 			return fmt.Errorf("error copying file %s: %v", file, err)
 		}
 	}
@@ -78,41 +82,5 @@ func DeployCompose() error {
 	}
 
 	fmt.Println("Docker compose is now up and running in the new directory.")
-	return nil
-}
-
-// copyFile copies a file from src to dst, preserving file permissions.
-func copyFile(src, dst string) error {
-	sourceFileStat, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	// Ensure the source is a regular file.
-	if !sourceFileStat.Mode().IsRegular() {
-		return fmt.Errorf("%s is not a regular file", src)
-	}
-
-	source, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-
-	destination, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer destination.Close()
-
-	if _, err := io.Copy(destination, source); err != nil {
-		return err
-	}
-
-	// Copy file permissions.
-	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
-		return err
-	}
-
 	return nil
 }

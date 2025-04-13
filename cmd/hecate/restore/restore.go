@@ -6,11 +6,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var timestampFlag string
@@ -28,11 +30,9 @@ If --timestamp is provided (e.g. --timestamp 20250325-101010), then restore will
 
 If no --timestamp is given, the command enters interactive mode to choose which resources to restore.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		if timestampFlag != "" {
-			runAutoRestore(timestampFlag)
-		} else {
-			runInteractiveRestore()
-		}
+		log := logger.GetLogger()
+		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),
 }
@@ -45,19 +45,19 @@ func init() {
 }
 
 // runAutoRestore automatically restores resources using the provided timestamp.
-func runAutoRestore(ts string) {
+func RunAutoRestore(ts string) {
 	backupConf := fmt.Sprintf("%s.%s.bak", types.DefaultConfDir, ts)
 	backupCerts := fmt.Sprintf("%s.%s.bak", types.DefaultCertsDir, ts)
 	backupCompose := fmt.Sprintf("%s.%s.bak", types.DefaultComposeYML, ts)
 
 	fmt.Printf("Restoring backups with timestamp %s...\n", ts)
-	backup.RestoreDir(backupConf, types.DefaultConfDir)
-	backup.RestoreDir(backupCerts, types.DefaultCertsDir)
-	backup.RestoreFile(backupCompose, types.DefaultComposeYML)
+	system.RestoreDir(backupConf, types.DefaultConfDir)
+	system.RestoreDir(backupCerts, types.DefaultCertsDir)
+	system.RestoreFile(backupCompose, types.DefaultComposeYML)
 }
 
 // runInteractiveRestore presents a menu to choose which resource(s) to restore.
-func runInteractiveRestore() {
+func RunInteractiveRestore() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("=== Interactive Restore ===")
 	fmt.Println("Select the resource you want to restore:")
@@ -71,47 +71,55 @@ func runInteractiveRestore() {
 
 	switch choice {
 	case "1":
-		restoreConf()
+		RestoreConf()
 	case "2":
-		restoreCerts()
+		RestoreCerts()
 	case "3":
-		restoreCompose()
+		RestoreCompose()
 	case "4":
-		restoreConf()
-		restoreCerts()
-		restoreCompose()
+		RestoreConf()
+		RestoreCerts()
+		RestoreCompose()
 	default:
 		fmt.Println("Invalid choice. Exiting.")
 		os.Exit(1)
 	}
 }
 
-func restoreConf() {
-	backupConf, err := backup.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultConfDir))
+func RestoreConf() {
+	backupConf, err := system.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultConfDir))
 	if err != nil {
 		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultConfDir, err)
 		return
 	}
 	fmt.Printf("Restoring configuration from backup: %s\n", backupConf)
-	backup.RestoreDir(backupConf, types.DefaultConfDir)
+	system.RestoreDir(backupConf, types.DefaultConfDir)
 }
 
-func restoreCerts() {
-	backupCerts, err := backup.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultCertsDir))
+func RestoreCerts() {
+	backupCerts, err := system.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultCertsDir))
 	if err != nil {
 		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultCertsDir, err)
 		return
 	}
 	fmt.Printf("Restoring certificates from backup: %s\n", backupCerts)
-	backup.RestoreDir(backupCerts, types.DefaultCertsDir)
+	system.RestoreDir(backupCerts, types.DefaultCertsDir)
 }
 
-func restoreCompose() {
-	backupCompose, err := backup.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultComposeYML))
+func RestoreCompose() {
+	backupCompose, err := system.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultComposeYML))
 	if err != nil {
 		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultComposeYML, err)
 		return
 	}
 	fmt.Printf("Restoring docker-compose file from backup: %s\n", backupCompose)
-	backup.RestoreFile(backupCompose, types.DefaultComposeYML)
+	system.RestoreFile(backupCompose, types.DefaultComposeYML)
+}
+
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
+func init() {
+	// Initialize the shared logger for the entire deploy package
+	log = logger.L()
 }

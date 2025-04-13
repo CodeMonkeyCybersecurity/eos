@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 // SetPassword sets the Linux user's password using chpasswd.
@@ -108,24 +107,27 @@ func CreateEosUser(auto bool, loginShell bool) (string, error) {
 
 	// Save password to file
 	secretsPath := "/var/lib/eos/secrets"
-	_ = os.MkdirAll(secretsPath, 0700)
-	outFile := secretsPath + "/eos-password.txt"
-
-	f, err := os.Create(outFile)
-	if err != nil {
-		fmt.Println("⚠️ Warning: Could not save password to disk.")
+	if err := os.MkdirAll(secretsPath, 0700); err != nil {
+		fmt.Printf("⚠️ Warning: could not create secrets directory: %v\n", err)
 	} else {
-		defer f.Close()
-		fmt.Fprintf(f, "eos:%s\n", password)
-		fmt.Printf("🔐 eos password saved to: %s\n", outFile)
-		fmt.Println("💡 Please store this password in a secure password manager.")
-	}
+		outFile := secretsPath + "/eos-password.txt"
+		f, err := os.Create(outFile)
+		if err != nil {
+			fmt.Println("⚠️ Warning: Could not save password to disk.")
+		} else {
+			defer func() {
+				if cerr := f.Close(); cerr != nil {
+					fmt.Printf("⚠️ Warning: failed to close file %s: %v\n", outFile, cerr)
+				}
+			}()
 
-	// Backup password to Vault if available
-	if err = vault.StoreUserSecret("eos", password, ""); err != nil {
-		fmt.Println("⚠️ Vault backup failed. You should store the password manually.")
-	} else {
-		fmt.Println("✅ Password securely backed up to Vault (path: secret/eos/users/eos)")
+			if _, err := fmt.Fprintf(f, "eos:%s\n", password); err != nil {
+				fmt.Printf("⚠️ Warning: failed to write password to file: %v\n", err)
+			} else {
+				fmt.Printf("🔐 eos password saved to: %s\n", outFile)
+				fmt.Println("💡 Please store this password in a secure password manager.")
+			}
+		}
 	}
 	return username, nil
 }

@@ -16,15 +16,17 @@ import (
 //---------------------------- COMMAND EXECUTION ---------------------------- //
 //
 
-// Execute runs a command with separate arguments.
+// Execute runs a command with separate arguments and returns a rich error if it fails.
 func Execute(command string, args ...string) error {
-	fmt.Printf("➡ Executing command: %s %s\n", command, strings.Join(args, " "))
+	cmdStr := fmt.Sprintf("%s %s", command, strings.Join(args, " "))
+	fmt.Printf("➡ Executing command: %s\n", cmdStr)
+
 	cmd := exec.Command(command, args...)
 	output, err := cmd.CombinedOutput()
-	fmt.Print(string(output)) // Always show output
+	fmt.Print(string(output)) // Always print combined stdout+stderr
 
 	if err != nil {
-		return fmt.Errorf("command failed: %s\noutput:\n%s", err, string(output))
+		return fmt.Errorf("❌ command failed: %s\n%s", cmdStr, string(output))
 	}
 	return nil
 }

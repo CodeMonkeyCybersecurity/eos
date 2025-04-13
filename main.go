@@ -15,13 +15,20 @@ See LICENSE.agpl and LICENSE.dnh for full details.
 package main
 
 import (
+	"log"
+
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 func main() {
-	logger.InitializeWithFallback() // no args
-	defer logger.Sync()
+	logger.InitializeWithFallback()
+
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			log.Printf("⚠️ Failed to sync logger: %v\n", err)
+		}
+	}()
 
 	cmd.Execute()
 }

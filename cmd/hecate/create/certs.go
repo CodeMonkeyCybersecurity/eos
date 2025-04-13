@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 )
 
 // runCommand executes a command represented as a slice of strings.
@@ -31,7 +32,11 @@ func loadLastValues() (map[string]string, error) {
 		}
 		return nil, err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			fmt.Printf("⚠️ Warning: failed to close file %s: %v\n", hecate.LastValuesFile, cerr)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -42,7 +47,6 @@ func loadLastValues() (map[string]string, error) {
 		parts := strings.SplitN(line, "=", 2)
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-		// Remove surrounding quotes if present.
 		value = strings.Trim(value, `"`)
 		values[key] = value
 	}
@@ -58,7 +62,12 @@ func saveLastValues(values map[string]string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			fmt.Printf("⚠️ Warning: failed to close file %s: %v\n", hecate.LastValuesFile, cerr)
+		}
+	}()
+
 	for key, value := range values {
 		_, err := fmt.Fprintf(file, `%s="%s"`+"\n", key, value)
 		if err != nil {
@@ -66,31 +75,6 @@ func saveLastValues(values map[string]string) error {
 		}
 	}
 	return nil
-}
-
-// promptInput displays a prompt with an optional default value.
-// If defaultVal is provided and the user inputs nothing, the default is returned.
-// If no default is provided, the user is repeatedly prompted until they provide a value.
-func promptInput(promptMessage, defaultVal string) string {
-	reader := bufio.NewReader(os.Stdin)
-	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", promptMessage, defaultVal)
-		inp, _ := reader.ReadString('\n')
-		inp = strings.TrimSpace(inp)
-		if inp == "" {
-			return defaultVal
-		}
-		return inp
-	}
-	for {
-		fmt.Printf("%s: ", promptMessage)
-		inp, _ := reader.ReadString('\n')
-		inp = strings.TrimSpace(inp)
-		if inp != "" {
-			return inp
-		}
-		fmt.Println("Input cannot be empty. Please try again.")
-	}
 }
 
 // promptSubdomain asks for a subdomain and, if the user leaves it blank,
@@ -135,9 +119,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	baseDomain := promptInput("Enter the base domain (e.g. domain.com)", prevValues["BASE_DOMAIN"])
+	baseDomain := interaction.PromptInput("Enter the base domain (e.g. domain.com)", prevValues["BASE_DOMAIN"])
 	subdomain := promptSubdomain()
-	mailCert := promptInput("Enter the contact email (e.g. example@domain.com)", prevValues["EMAIL"])
+	mailCert := interaction.PromptInput("Enter the contact email (e.g. example@domain.com)", prevValues["EMAIL"])
 
 	// Save the new values for future runs.
 	newValues := map[string]string{
@@ -203,7 +187,7 @@ func main() {
 			certName = defaultCertName
 			break
 		} else if confirm == "no" || confirm == "n" {
-			certName = promptInput("Enter the desired certificate name (for file naming)", "")
+			certName = interaction.PromptInput("Enter the desired certificate name (for file naming)", "")
 			break
 		} else {
 			fmt.Println("Please answer yes or no.")
