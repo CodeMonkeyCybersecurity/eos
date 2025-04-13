@@ -33,7 +33,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Error: Source directory '%s' does not exist.\n")
 			os.Exit(1)
 		}
-		if err := system.Rm(hecate.BackupConf, "backup conf"); err != nil {
+		if err := system.Rm(hecate.BackupConf, "backup conf", log); err != nil {
 			log.Error("Failed to remove existing backup", zap.String("path", hecate.BackupConf), zap.Error(err))
 			os.Exit(1)
 		}
@@ -49,7 +49,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Missing or invalid certs", zap.String("dir", types.DefaultCertsDir), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.Rm(hecate.BackupCerts, "backup certs"); err != nil {
+		if err := system.Rm(hecate.BackupConf, "backup conf", log); err != nil {
 			log.Error("Failed to remove existing hecate.Backup", zap.String("path", hecate.BackupCerts), zap.Error(err))
 			os.Exit(1)
 		}
@@ -65,7 +65,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Missing or invalid compose file", zap.String("file", types.DefaultComposeYML), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.Rm(hecate.BackupCompose, "backup 'docker-compose.yml'"); err != nil {
+		if err := system.Rm(hecate.BackupConf, "backup conf", log); err != nil {
 			log.Error("Failed to remove existing backup", zap.String("path", hecate.BackupCompose), zap.Error(err))
 			os.Exit(1)
 		}

@@ -69,7 +69,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		}
 
 		log.Info("Cleaning up the stored initialization file...")
-		system.Rm("vault_init.json", vault.DiskPath("vault_init"))
+		system.Rm("vault_init.json", vault.DiskPath("vault_init"), log)
 		log.Info("✅ Done")
 
 		log.Info("Informing the user of the next steps...")
