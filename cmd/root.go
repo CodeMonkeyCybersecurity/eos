@@ -5,6 +5,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -54,8 +55,28 @@ and reverse proxy configurations via Hecate.`,
 	}),
 }
 
+var HelpCmd = &cobra.Command{
+	Use:   "help",
+	Short: "Help about any command",
+	Long:  "Displays help for eos or a specific subcommand.",
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		// If no args, show root help
+		if len(args) == 0 {
+			return RootCmd.Help()
+		}
+		// Delegate to cobra’s default help logic
+		c, _, err := RootCmd.Find(args)
+		if err != nil || c == nil {
+			return fmt.Errorf("command not found: %s", strings.Join(args, " "))
+		}
+		return c.Help()
+	}),
+}
+
 // RegisterCommands adds all subcommands to the root command.
 func RegisterCommands() {
+	RootCmd.SetHelpCommand(HelpCmd)
+
 	// List of primary subcommands.
 	subCommands := []*cobra.Command{
 		create.CreateCmd,
