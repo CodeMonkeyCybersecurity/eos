@@ -12,7 +12,7 @@ Clean, production-ready folder structure using ASCII tree layout for your Vault 
 │   └── vault.hcl                      # Vault config using Raft backend
 ├── agent/
 │   ├── vault-agent.hcl                # Vault Agent config (token sink)
-│   └── vault-agent.pass               # EOS user password (600 perms)
+│   └── vault-agent.pass               # Eos user password (600 perms)
 ├── nginx/
 │   ├── nginx.conf                     # Reverse proxy config
 │   └── ssl/

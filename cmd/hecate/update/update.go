@@ -52,10 +52,10 @@ var runCertsCmd = &cobra.Command{
 	}),
 }
 
-// runEosCmd updates the EOS system.
+// runEosCmd updates the Eos system.
 var runEosCmd = &cobra.Command{
 	Use:   "eos",
-	Short: "Update EOS system",
+	Short: "Update Eos system",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for eos command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()

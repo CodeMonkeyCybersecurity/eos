@@ -141,9 +141,9 @@ func BackupFile(filepathStr string) error {
 	return nil
 }
 
-// displayOptions prints the available EOS backend web apps.
+// displayOptions prints the available Eos backend web apps.
 func DisplayOptions() {
-	fmt.Println("Available EOS backend web apps:")
+	fmt.Println("Available Eos backend web apps:")
 	// To display options in order, first sort the keys numerically.
 	var keys []int
 	keyMap := make(map[int]string)

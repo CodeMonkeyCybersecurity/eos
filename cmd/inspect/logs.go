@@ -22,7 +22,7 @@ var logLevel string
 
 var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
-	Short: "Inspect EOS logs (requires root or eos privileges)",
+	Short: "Inspect Eos logs (requires root or eos privileges)",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("inspect")
 

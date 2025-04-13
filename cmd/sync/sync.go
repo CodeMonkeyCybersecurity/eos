@@ -11,7 +11,7 @@ import (
 
 var SyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Sync EOS components (e.g., secrets into Vault)",
+	Short: "Sync Eos components (e.g., secrets into Vault)",
 	Long:  "Synchronize data or configuration from fallback or external sources.",
 
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {

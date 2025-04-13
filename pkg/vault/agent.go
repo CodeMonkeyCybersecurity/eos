@@ -86,7 +86,7 @@ func writeAgentPassword(password string) error {
 func writeSystemdUnit() error {
 	unit := `
 [Unit]
-Description=Vault Agent (EOS)
+Description=Vault Agent (Eos)
 After=network.target
 
 [Service]

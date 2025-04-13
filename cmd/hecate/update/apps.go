@@ -64,12 +64,12 @@ func removeUnwantedConfFiles(allowedFiles map[string]bool) {
 var appsCmd = &cobra.Command{
 	Use:   "apps",
 	Short: "Update enabled applications in the conf.d directory",
-	Long:  `Select and keep configuration files for enabled EOS backend web apps while removing others.`,
+	Long:  `Select and keep configuration files for enabled Eos backend web apps while removing others.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Running update apps command")
 
-		log.Info("=== EOS Backend Web Apps Selector ===\n")
+		log.Info("=== Eos Backend Web Apps Selector ===\n")
 		reader := bufio.NewReader(os.Stdin)
 
 		// Load previous values from the configuration file.

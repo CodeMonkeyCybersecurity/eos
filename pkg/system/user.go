@@ -25,7 +25,7 @@ func UserExists(name string) bool {
 	return exec.Command("id", name).Run() == nil
 }
 
-// CreateEosUser creates a special EOS system user "eos" with a secure password and no login shell.
+// CreateEosUser creates a special Eos system user "eos" with a secure password and no login shell.
 func CreateEosUser(auto bool, loginShell bool) (string, error) {
 	const defaultUsername = "eos"
 	username := defaultUsername
