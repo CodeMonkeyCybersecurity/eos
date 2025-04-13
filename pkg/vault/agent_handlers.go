@@ -15,6 +15,9 @@ import (
 
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
 func readTokenFromSink(path string) (string, error) {
+	if path == "" {
+		path = "/etc/vault-agent-eos.token"
+	}
 	out, err := exec.Command("sudo", "-u", "eos", "cat", path).Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
