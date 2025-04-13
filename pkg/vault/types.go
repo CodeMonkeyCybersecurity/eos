@@ -27,7 +27,6 @@ const (
 	secretIDPath         = "/etc/vault/secret_id"
 )
 
-
 var (
 	DelphiFallbackSecretsPath = filepath.Join(diskSecretsPath, "delphi_fallback.json")
 	EosUserFallbackFile       = filepath.Join(diskSecretsPath, "vault_userpass.json")
