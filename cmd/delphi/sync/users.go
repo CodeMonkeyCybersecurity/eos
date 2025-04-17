@@ -6,6 +6,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hera"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -17,12 +18,14 @@ var SyncUsersCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("delphi.sync.users")
 
-		realm, _ := cmd.Flags().GetString("realm")
+		realm, _ := interaction.PromptIfMissing(cmd, "realm", "Enter Keycloak realm", false)
 		sinceStr, _ := cmd.Flags().GetString("since")
 
-		kcURL, _ := cmd.Flags().GetString("url")
-		clientID, _ := cmd.Flags().GetString("client-id")
-		clientSecret, _ := cmd.Flags().GetString("client-secret")
+		kcURL, _ := interaction.PromptIfMissing(cmd, "url", "Enter Keycloak base URL", false)
+
+		clientID, _ := interaction.PromptIfMissing(cmd, "client-id", "Enter Keycloak client ID", false)
+
+		clientSecret, _ := interaction.PromptIfMissing(cmd, "client-secret", "Enter Keycloak client secret", true)
 
 		sinceDur, err := time.ParseDuration(sinceStr)
 		if err != nil {
