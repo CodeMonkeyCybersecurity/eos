@@ -46,13 +46,13 @@ func CreateAppRole(client *api.Client, roleName string, log *zap.Logger) error {
 	if err := os.WriteFile(AppRoleIDPath, []byte(roleID+"\n"), 0640); err != nil {
 		return fmt.Errorf("failed to write role_id: %w", err)
 	}
-	if err := os.WriteFile(SecretsDir, []byte(secretID+"\n"), 0640); err != nil {
+	if err := os.WriteFile(AppSecretIDPath, []byte(secretID+"\n"), 0640); err != nil {
 		return fmt.Errorf("failed to write secret_id: %w", err)
 	}
 
 	fmt.Println("✅ AppRole credentials written to disk:")
 	fmt.Println("   •", AppRoleIDPath)
-	fmt.Println("   •", SecretsDir)
+	fmt.Println("   •", AppSecretIDPath)
 
 	return nil
 }
@@ -70,7 +70,7 @@ func WriteAppRoleCredentials(client *api.Client, log *zap.Logger) error {
 	if err := os.WriteFile(AppRoleIDPath, []byte(roleID.Data["role_id"].(string)), 0400); err != nil {
 		return err
 	}
-	if err := os.WriteFile(SecretsDir, []byte(secretID.Data["secret_id"].(string)), 0400); err != nil {
+	if err := os.WriteFile(AppSecretIDPath, []byte(secretID.Data["secret_id"].(string)), 0400); err != nil {
 		return err
 	}
 	return nil
