@@ -5,6 +5,8 @@ package vault
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -73,5 +75,39 @@ func WriteAppRoleCredentials(client *api.Client, log *zap.Logger) error {
 	if err := os.WriteFile(AppSecretIDPath, []byte(secretID.Data["secret_id"].(string)), 0400); err != nil {
 		return err
 	}
+	return nil
+}
+
+func killVaultAgentPort() error {
+	out, err := exec.Command("lsof", "-i", ":8179", "-t").Output()
+	if err != nil {
+		return nil // No process
+	}
+
+	pids := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, pid := range pids {
+		if pid == "" {
+			continue
+		}
+		_ = exec.Command("kill", "-9", pid).Run()
+	}
+	return nil
+}
+
+// PrepareVaultAgentEnvironment ensures /run/eos exists and port 8179 is free.
+func PrepareVaultAgentEnvironment(log *zap.Logger) error {
+	log.Info("🧼 Preparing Vault Agent environment")
+
+	if err := prepareRuntimeDir(); err != nil {
+		log.Error("Failed to prepare runtime dir", zap.Error(err))
+		return err
+	}
+
+	if err := killVaultAgentPort(); err != nil {
+		log.Warn("Failed to kill Vault Agent port", zap.Error(err))
+		return err
+	}
+
+	log.Info("✅ Vault Agent environment ready")
 	return nil
 }

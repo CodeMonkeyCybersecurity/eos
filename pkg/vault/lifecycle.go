@@ -320,7 +320,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse, log *zap.
 	}
 
 	// Setup Vault Agent
-	if err := SetupVaultAgent(password); err != nil {
+	if err := SetupVaultAgent(password, log); err != nil {
 		fmt.Println("⚠️ Failed to set up Vault Agent service:", err)
 	}
 

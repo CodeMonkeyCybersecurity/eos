@@ -8,32 +8,39 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
+
 	"go.uber.org/zap"
 )
 
 // setupVaultAgent configures the Vault Agent to run as the eos user.
-func SetupVaultAgent(password string) error {
+func SetupVaultAgent(password string, log *zap.Logger) error {
+
+	if err := PrepareVaultAgentEnvironment(zap.L()); err != nil {
+		return err
+	}
+
 	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
 
 	if err := writeAgentConfig(); err != nil {
-		zap.L().Error("Failed to write agent config", zap.Error(err))
+		log.Error("Failed to write agent config", zap.Error(err))
 		return err
 	}
 	if err := writeAgentPassword(password); err != nil {
-		zap.L().Error("Failed to write agent password", zap.Error(err))
+		log.Error("Failed to write agent password", zap.Error(err))
 		return err
 	}
 	if err := writeSystemdUnit(); err != nil {
-		zap.L().Error("Failed to write systemd unit", zap.Error(err))
+		log.Error("Failed to write systemd unit", zap.Error(err))
 		return err
 	}
 	if err := prepareRuntimeDir(); err != nil {
-		zap.L().Error("Failed to prepare runtime directory", zap.Error(err))
+		log.Error("Failed to prepare runtime directory", zap.Error(err))
 		return err
 	}
 	if err := reloadAndStartService(); err != nil {
-		zap.L().Error("Failed to reload/start service", zap.Error(err))
+		log.Error("Failed to reload/start service", zap.Error(err))
 		return err
 	}
 
@@ -119,8 +126,10 @@ func prepareRuntimeDir() error {
 	if err := os.MkdirAll(dir, 0750); err != nil {
 		return fmt.Errorf("failed to create %s: %w", dir, err)
 	}
-	if err := os.Chown(dir, 0, 0); err != nil {
-		return fmt.Errorf("failed to change ownership of %s: %w", dir, err)
+
+	// Force ownership to eos:eos so that the Vault agent can access it
+	if err := system.EnsureEosUser(); err != nil {
+		return fmt.Errorf("eos user validation failed: %w", err)
 	}
 	return nil
 }

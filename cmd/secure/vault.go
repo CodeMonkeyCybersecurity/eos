@@ -56,7 +56,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		}
 
 		/* Start Vault Agent (writes HCL, unit, starts service) */
-		if err := vault.SetupVaultAgent(creds.Password); err != nil {
+		if err := vault.SetupVaultAgent(creds.Password, log); err != nil {
 			log.Error("Failed to set up Vault Agent", zap.Error(err))
 			return err
 		}
