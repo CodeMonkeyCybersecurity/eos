@@ -144,7 +144,7 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 	fmt.Println("📁 SSH key:", "/home/"+username+"/.ssh/id_rsa")
 
 	// Attempt to store the credentials in Vault.
-	if err := vault.StoreUserSecret(username, password, "/home/"+username+"/.ssh/id_rsa"); err != nil {
+	if err := vault.StoreUserSecret(username, password, "/home/"+username+"/.ssh/id_rsa", log); err != nil {
 		log.Warn("Vault is not available or write failed", zap.Error(err))
 		fmt.Println("⚠️ Vault write failed. Save these credentials manually:")
 		fmt.Printf("🔐 Password for %s: %s\n", username, password)

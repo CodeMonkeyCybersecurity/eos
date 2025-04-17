@@ -48,3 +48,13 @@ type Config struct {
 	Token              string `json:"token,omitempty"`
 	VerifyCertificates bool   `json:"verify_certificates"`
 }
+
+type LDAPConfig struct {
+	FQDN         string
+	BindDN       string
+	Password     string
+	UserBase     string
+	RoleBase     string
+	AdminRole    string
+	ReadonlyRole string
+}

@@ -46,7 +46,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("✅ Vault unsealed and authenticated as eos admin")
 
 		log.Info("Loading the stored initialization data and eos user credentials...")
-		vault.CheckVaultSecrets(storedHashes, hashedRoot, log)
+		vault.Check(client, log, storedHashes, hashedRoot)
 		log.Info("✅ Loaded the stored initialization data and eos user credentials")
 
 		/* Create AppRole credentials */
@@ -71,7 +71,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		if revokeRoot {
 			log.Info("Revoking the root token now that the eos admin user has been configured...")
-			if err := vault.RevokeRootToken(client, initRes.RootToken); err != nil {
+			if err := vault.RevokeRootToken(client, initRes.RootToken, log); err != nil {
 				log.Error("Failed to revoke root token", zap.Error(err))
 				return err
 			}

@@ -98,7 +98,18 @@ var DeleteVaultCmd = &cobra.Command{
 			log.Info("Purge flag not set; skipping configuration and data cleanup.")
 		}
 
-		vault.CheckVaultProcesses(log)
+		// Attempt a best-effort Vault client setup
+		client, err := vault.NewClient()
+		if err != nil {
+			log.Warn("Skipping Vault health check — client unavailable", zap.Error(err))
+		} else {
+			report, _ := vault.Check(client, log, nil, "") // no storedHashes or root token
+			if report == nil || !report.Installed {
+				log.Warn("Vault not detected after deletion")
+			} else {
+				log.Info("Post-delete Vault check complete", zap.Any("report", report))
+			}
+		}
 
 		log.Info("Vault deletion complete.")
 		return nil

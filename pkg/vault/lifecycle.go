@@ -45,28 +45,32 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	return removed, errs
 }
 
-// deployAndStoreSecrets automates Vault setup and stores secrets after confirmation.
+// DeployAndStoreSecrets automates Vault setup and stores secrets after confirmation.
 func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]string, log *zap.Logger) error {
-	fmt.Println("🚀 Deploying Vault...")
+	log.Info("🚀 Starting Vault deployment")
 
 	if err := execute.ExecuteAndLog("eos", "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
+		log.Error("Vault deploy failed", zap.Error(err))
 		return fmt.Errorf("vault deploy failed: %w", err)
 	}
 
 	if err := execute.ExecuteAndLog("eos", "enable", "vault"); err != nil {
-		fmt.Println("⚠️ Vault enable failed — manual unseal may be required.")
+		log.Warn("Vault enable failed — manual unseal may be required", zap.Error(err))
 		return fmt.Errorf("vault enable failed: %w", err)
 	}
 
 	if err := execute.ExecuteAndLog("eos", "secure", "vault"); err != nil {
+		log.Error("Vault secure failed", zap.Error(err))
 		return fmt.Errorf("vault secure failed: %w", err)
 	}
 
-	if !IsVaultAvailable(client, log) {
+	report, client := Check(client, log, nil, "")
+	if !report.Initialized || report.Sealed || !report.KVWorking {
+		log.Error("Vault is not fully operational after setup", zap.Any("report", report))
 		return fmt.Errorf("vault does not appear to be running after setup. Try 'eos logs vault'")
 	}
 
-	fmt.Println("✅ Vault is running. Storing secrets...")
+	log.Info("✅ Vault is ready. Proceeding to store secrets...", zap.String("path", path))
 
 	// Convert string map to interface{}
 	data := make(map[string]interface{}, len(secrets))
@@ -74,10 +78,16 @@ func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]s
 		data[k] = v
 	}
 
-	return WriteSecret(client, path, data)
+	if err := WriteSecret(client, path, data); err != nil {
+		log.Error("Failed to write secrets to Vault", zap.String("path", path), zap.Error(err))
+		return err
+	}
+
+	log.Info("✅ Secrets written to Vault successfully", zap.String("path", path))
+	return nil
 }
 
-func RevokeRootToken(client *api.Client, token string) error {
+func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 	client.SetToken(token)
 
 	err := client.Auth().Token().RevokeSelf("")
@@ -90,7 +100,7 @@ func RevokeRootToken(client *api.Client, token string) error {
 }
 
 /* Install Vault via dnf if not already installed */
-func InstallVaultViaDnf() error {
+func InstallVaultViaDnf(log *zap.Logger) error {
 	fmt.Println("Checking if Vault is installed...")
 	_, err := exec.LookPath("vault")
 	if err != nil {
@@ -123,7 +133,7 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 		if IsAlreadyInitialized(err) {
 			fmt.Println("✅ Vault already initialized.")
 
-			initResPtr, err := ReadFallbackJSON[api.InitResponse](DiskPath("vault_init", log))
+			initResPtr, err := ReadFallbackJSON[api.InitResponse](DiskPath("vault_init", log), log)
 			if err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
@@ -185,6 +195,7 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 
 	return client, initRes, nil
 }
+
 func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }

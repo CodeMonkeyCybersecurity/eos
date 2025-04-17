@@ -57,14 +57,14 @@ func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse
 	fmt.Println("This will revoke the root token and promote the eos admin user.")
 
 	// Load vault_init.json from fallback file
-	initResPtr, err := vault.ReadFallbackJSON[api.InitResponse](vault.DiskPath("vault_init", log))
+	initResPtr, err := vault.ReadFallbackJSON[api.InitResponse](vault.DiskPath("vault_init", log), log)
 	if err != nil {
 		log.Fatal("❌ Failed to read vault_init.json", zap.Error(err))
 	}
 	initRes := *initResPtr
 
 	// Load eos user creds from fallback file
-	credsPtr, err := vault.ReadFallbackJSON[vault.UserpassCreds](vault.EosUserFallbackFile)
+	credsPtr, err := vault.ReadFallbackJSON[vault.UserpassCreds](vault.EosUserFallbackFile, log)
 	if err != nil {
 		log.Fatal("❌ Failed to read vault_userpass.json", zap.Error(err))
 	}

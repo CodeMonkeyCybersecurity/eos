@@ -6,10 +6,11 @@ import (
 	"os"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 // StoreUserSecret reads an SSH key and stores full user credentials in Vault.
-func StoreUserSecret(username, password, keyPath string) error {
+func StoreUserSecret(username, password, keyPath string, log *zap.Logger) error {
 	keyData, err := os.ReadFile(keyPath)
 	if err != nil {
 		return fmt.Errorf("failed to read SSH key from %s: %w", keyPath, err)
@@ -19,9 +20,9 @@ func StoreUserSecret(username, password, keyPath string) error {
 }
 
 // LoadUserSecret retrieves and validates a user's secret from Vault.
-func LoadUserSecret(client *api.Client, username string) (*UserSecret, error) {
+func LoadUserSecret(client *api.Client, username string, log *zap.Logger) (*UserSecret, error) {
 	var secret UserSecret
-	if err := ReadFromVaultAt(context.Background(), "secret", userVaultPath(username), &secret); err != nil {
+	if err := ReadFromVaultAt(context.Background(), "secret", userVaultPath(username, log), &secret, log); err != nil {
 		return nil, err
 	}
 	if !secret.IsValid() {
@@ -31,11 +32,14 @@ func LoadUserSecret(client *api.Client, username string) (*UserSecret, error) {
 }
 
 // IsValid ensures required fields are populated.
+// IsValid ensures required fields are populated.
 func (s *UserSecret) IsValid() bool {
 	return s.Username != "" && s.Password != ""
 }
 
 // userVaultPath returns the Vault path for a given user.
-func userVaultPath(username string) string {
-	return fmt.Sprintf("secret/users/%s", username)
+func userVaultPath(username string, log *zap.Logger) string {
+	path := fmt.Sprintf("secret/users/%s", username)
+	log.Debug("Resolved Vault path for user", zap.String("username", username), zap.String("path", path))
+	return path
 }

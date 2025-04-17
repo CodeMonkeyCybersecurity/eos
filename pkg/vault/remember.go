@@ -50,3 +50,21 @@ func PromptOrRecallUnsealKeys(log *zap.Logger) ([]string, string, error) {
 
 	return keys, root, nil
 }
+
+// pkg/vault/remember.go or a new pkg/vault/bootstrap.go
+
+func rememberBootstrapHashes(log *zap.Logger) ([]string, string, error) {
+	secrets, err := ReadFallbackSecrets(log)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to load vault_init fallback secrets: %w", err)
+	}
+
+	hashes := []string{
+		secrets["unseal_key_1_hash"],
+		secrets["unseal_key_2_hash"],
+		secrets["unseal_key_3_hash"],
+	}
+	root := secrets["root_token_hash"]
+
+	return hashes, root, nil
+}

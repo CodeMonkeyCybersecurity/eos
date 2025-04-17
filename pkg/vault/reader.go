@@ -17,13 +17,30 @@ import (
 // === Vault Read Helpers ===
 //
 
+// Read loads a namespaced config from Vault, or falls back to YAML if unavailable.
+func Read(client *api.Client, name string, out any, log *zap.Logger) error {
+	report, client := Check(client, log, nil, "")
+	if client == nil {
+		return fmt.Errorf("vault client is not ready")
+	}
+	if report.Initialized && !report.Sealed {
+		err := ReadFromVaultAt(context.Background(), "secret", name, out, log)
+		if err == nil {
+			return nil
+		}
+		log.Warn("Vault read failed, falling back", zap.String("path", name), zap.Error(err))
+	}
+
+	return ReadFallbackIntoJSON(DiskPath(name, log), out, log)
+}
+
 // ReadFromVault loads a struct from a Vault KV v2 path (default mount "secret").
-func ReadFromVault(path string, out interface{}) error {
-	return ReadFromVaultAt(context.Background(), "secret", path, out)
+func ReadFromVault(path string, out interface{}, log *zap.Logger) error {
+	return ReadFromVaultAt(context.Background(), "secret", path, out, log)
 }
 
 // ReadFromVaultAt loads a struct from a custom KV v2 mount.
-func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}) error {
+func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}, log *zap.Logger) error {
 	client, err := GetVaultClient()
 	if err != nil {
 		return fmt.Errorf("unable to get Vault client: %w", err)
@@ -46,25 +63,12 @@ func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}) e
 	return nil
 }
 
-// Read loads a namespaced config from Vault, or falls back to YAML if unavailable.
-func Read(client *api.Client, name string, out any, log *zap.Logger) error {
-	if IsVaultAvailable(client, log) {
-		err := ReadFromVaultAt(context.Background(), "secret", name, out)
-		if err == nil {
-			return nil
-		}
-		fmt.Printf("⚠️  Vault read failed for %q: %v\n", name, err)
-		fmt.Println("💡 Falling back to local config...")
-	}
-	return ReadFallbackIntoJSON(DiskPath(name, log), out)
-}
-
 //
 // === Fallback Read Helpers ===
 //
 
 // ReadFallbackJSON reads any struct from JSON at the given path.
-func ReadFallbackJSON[T any](path string) (*T, error) {
+func ReadFallbackJSON[T any](path string, log *zap.Logger) (*T, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read fallback JSON: %w", err)
@@ -79,10 +83,10 @@ func ReadFallbackJSON[T any](path string) (*T, error) {
 }
 
 // readFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
-func ReadFallbackSecrets() (map[string]string, error) {
+func ReadFallbackSecrets(log *zap.Logger) (map[string]string, error) {
 	path := filepath.Join(SecretsDir, "delphi-fallback.yaml")
 
-	secretsPtr, err := ReadFallbackJSON[map[string]string](path)
+	secretsPtr, err := ReadFallbackJSON[map[string]string](path, log)
 	if err != nil {
 		return nil, fmt.Errorf("could not load fallback secrets from %s: %w", path, err)
 	}
@@ -91,7 +95,7 @@ func ReadFallbackSecrets() (map[string]string, error) {
 	return *secretsPtr, nil
 }
 
-func ReadFallbackIntoJSON(path string, out any) error {
+func ReadFallbackIntoJSON(path string, out any, log *zap.Logger) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read fallback JSON: %w", err)
@@ -99,7 +103,7 @@ func ReadFallbackIntoJSON(path string, out any) error {
 	return json.Unmarshal(data, out)
 }
 
-func ListUnder(path string) ([]string, error) {
+func ListUnder(path string, log *zap.Logger) ([]string, error) {
 	client, err := GetPrivilegedVaultClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Vault client: %w", err)

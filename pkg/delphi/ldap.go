@@ -18,19 +18,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type LDAPConfig struct {
-	FQDN         string
-	BindDN       string
-	Password     string
-	UserBase     string
-	RoleBase     string
-	AdminRole    string
-	ReadonlyRole string
-}
-
 func ReadLDAPConfig(log *zap.Logger) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := vault.ReadFromVault(types.LDAPVaultPath, &cfg)
+	err := vault.ReadFromVault(types.LDAPVaultPath, &cfg, log)
 	if err != nil {
 		return nil, err
 	}

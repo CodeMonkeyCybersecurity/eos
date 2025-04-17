@@ -43,6 +43,15 @@ var (
 	EosUserFallbackFile       = filepath.Join(SecretsDir, "vault_userpass.json")
 )
 
+type CheckReport struct {
+	Installed   bool
+	Initialized bool
+	Sealed      bool
+	TokenReady  bool
+	KVWorking   bool
+	Notes       []string
+}
+
 // VaultPath returns the full KV v2 path for data reads/writes.
 func vaultPath(name string, log *zap.Logger) string {
 	if strings.Contains(name, "/") {

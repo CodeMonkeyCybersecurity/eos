@@ -20,7 +20,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 	cfg := &LDAPConfig{}
 
 	// Try to load existing config from Vault to prefill
-	if err := vault.ReadFromVaultAt(context.Background(), types.LDAPVaultMount, types.LDAPVaultPath, cfg); err == nil {
+	if err := vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg, log); err == nil {
 		fmt.Println("✅ LDAP config prefilled from Vault")
 	} else {
 		fmt.Printf("⚠️  Vault fallback: could not load LDAP config: %v\n", err)
@@ -151,7 +151,7 @@ func loadFromPrompt(log *zap.Logger) (*LDAPConfig, error) {
 func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
 	if _, err := vault.GetVaultClient(); err == nil {
-		_ = vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg) // best-effort prefill
+		_ = vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg, log)
 	}
 
 	for fieldName, meta := range LDAPFieldMeta {

@@ -20,7 +20,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		/* Ensure Vault is installed */
 		log.Info("[0/7] Starting Vault enable workflow")
-		if err := vault.InstallVaultViaDnf(); err != nil {
+		if err := vault.InstallVaultViaDnf(log); err != nil {
 			log.Error("Failed to install Vault", zap.Error(err))
 			return err
 		}
@@ -61,8 +61,9 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		/* Test KV write/read */
 		log.Info("[3/7] Testing KV put/get")
-		if err := vault.TestKVSecret(client, log); err != nil {
-			log.Error("KV secret test failed", zap.Error(err))
+		report, _ := vault.Check(client, log, nil, "")
+		if report == nil || !report.KVWorking {
+			log.Error("KV secret test failed or unavailable")
 		}
 
 		/* Enable AppRole */

@@ -25,7 +25,7 @@ var InspectVaultCmd = &cobra.Command{
 
 		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos"))
 
-		entries, err := vault.ListUnder("eos")
+		entries, err := vault.ListUnder("eos", log)
 		if err != nil {
 			log.Error("Vault list failed", zap.String("action", "list"), zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
@@ -98,7 +98,7 @@ var InspectVaultLDAPCmd = &cobra.Command{
 	Short: "View stored LDAP config in Vault",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := &ldap.LDAPConfig{}
-		err := vault.ReadFromVaultAt(context.Background(), types.LDAPVaultMount, types.LDAPVaultPath, cfg)
+		err := vault.ReadFromVaultAt(context.Background(), types.LDAPVaultMount, types.LDAPVaultPath, cfg, log)
 		if err != nil {
 			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
 		}

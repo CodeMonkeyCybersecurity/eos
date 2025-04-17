@@ -30,9 +30,10 @@ into Vault, then removes them from disk if the sync is successful.`,
 			return nil
 		}
 
-		if !vault.IsVaultAvailable(client, log) {
-			fmt.Println("Vault is not currently available — skipping secret sync.")
-			return nil
+		report, client := vault.Check(client, log, nil, "")
+		if !report.Initialized || report.Sealed {
+			log.Warn("Vault is not ready")
+			return fmt.Errorf("vault is not ready")
 		}
 
 		secretsDir := "/var/lib/eos/secrets"
