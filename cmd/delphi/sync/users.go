@@ -85,9 +85,10 @@ var SyncUsersCmd = &cobra.Command{
 }
 
 func init() {
+	SyncCmd.AddCommand(SyncUsersCmd)
 	SyncUsersCmd.Flags().String("realm", "", "Keycloak realm")
 	SyncUsersCmd.Flags().String("since", "10m", "How far back to scan for registration events (e.g., 5m, 1h)")
-	SyncUsersCmd.Flags().String("url", "https://hera.cybermonkey.dev", "Keycloak base URL")
+	SyncUsersCmd.Flags().String("url", "https://hera.domain.com", "Keycloak base URL")
 	SyncUsersCmd.Flags().String("client-id", "keycloak-api-bot", "Keycloak client ID")
 	SyncUsersCmd.Flags().String("client-secret", "", "Keycloak client secret")
 }
