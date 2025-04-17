@@ -6,10 +6,16 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func HandleFallbackOrStore(name string, secrets map[string]string) error {
-	SetVaultEnv()
+	log := logger.GetLogger()
+
+	if _, err := SetVaultEnv(); err != nil {
+		log.Warn("Failed to set VAULT_ADDR environment", zap.Error(err))
+	}
 
 	client, err := NewClient()
 	if err != nil {

@@ -8,6 +8,10 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"go.uber.org/zap"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 //
@@ -26,8 +30,13 @@ func GetInternalHostname() string {
 
 // GetUbuntuCodename reads /etc/os-release and returns UBUNTU_CODENAME or VERSION_CODENAME
 func GetUbuntuCodename() string {
+	log := logger.GetLogger()
 	file, _ := os.Open("/etc/os-release")
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Warn("Failed to close log file", zap.Error(err))
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	var codename string

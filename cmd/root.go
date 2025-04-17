@@ -67,19 +67,22 @@ var HelpCmd = &cobra.Command{
 func RegisterCommands() {
 	RootCmd.SetHelpCommand(HelpCmd)
 
-	// Override the global help function to use Cobra's default help function,
-	// but protect with a global guard to avoid looping.
+	// Fix: logger.GetLogger is a function, call it
+	log := logger.GetLogger()
+
 	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !helpLogged {
-			logger.L().Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
+			log.Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
 			helpLogged = true
-			defer logger.L().Info("Global help display complete", zap.String("command", cmd.Name()))
+			defer log.Info("Global help display complete", zap.String("command", cmd.Name()))
 		}
-		cmd.Root().Usage()
+		if err := cmd.Root().Usage(); err != nil {
+			log.Warn("Failed to print usage", zap.Error(err))
+		}
 	})
 
-	// List of primary subcommands.
-	subCommands := []*cobra.Command{
+	// Group subcommands for cleanliness
+	for _, subCmd := range []*cobra.Command{
 		create.CreateCmd,
 		inspect.InspectCmd,
 		update.UpdateCmd,
@@ -89,19 +92,20 @@ func RegisterCommands() {
 		disable.DisableCmd,
 		enable.EnableCmd,
 		sync.SyncCmd,
-	}
-	for _, subCmd := range subCommands {
+		hecate.HecateCmd,
+		delphi.DelphiCmd,
+	} {
 		RootCmd.AddCommand(subCmd)
 	}
-
-	// Additional standalone commands.
-	RootCmd.AddCommand(hecate.HecateCmd)
-	RootCmd.AddCommand(delphi.DelphiCmd)
 }
 
 // Execute initializes and runs the root command.
 func Execute() {
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			fmt.Fprintf(os.Stderr, "⚠️  Failed to flush logs: %v\n", err)
+		}
+	}()
 
 	logger.L().Info("Eos CLI starting")
 

@@ -20,7 +20,9 @@ var CreateVaultCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L()
 
-		vault.SetVaultEnv()
+		if _, err := vault.SetVaultEnv(); err != nil {
+			log.Fatal("Unable to set VAULT_ADDR", zap.Error(err))
+		}
 
 		log.Info("Killing any existing Vault server process")
 		_ = exec.Command("pkill", "-f", "vault server").Run()

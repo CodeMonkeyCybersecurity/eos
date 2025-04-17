@@ -6,16 +6,19 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"go.uber.org/zap"
 )
 
 // Remember prompts the user for a Vault config field and persists it using fallback logic.
 func Remember(name, key, prompt, def string) (string, error) {
+	log := logger.GetLogger().Named("vault.remember")
 	// Attempt to load previously stored secrets.
 	values := map[string]string{}
 	// We assume loadWithFallback is a Vault-specific function that loads the config
 	// from Vault (or falls back to disk) and unmarshals into the map.
 	if err := HandleFallbackOrStore(name, values); err != nil {
-		// Not fatal — the fallback file might not exist yet.
+		log.Warn("Fallback config not loaded; may be first-time use", zap.Error(err))
 	}
 
 	// Use the generic interaction helper to prompt the user.

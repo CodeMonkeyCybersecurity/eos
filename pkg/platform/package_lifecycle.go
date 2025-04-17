@@ -59,7 +59,9 @@ func runDnfWithRetry(pkgName string) error {
 	if ctx.Err() == context.DeadlineExceeded {
 		log.Warn("DNF timed out. Running mirror recovery...")
 
-		exec.Command("dnf", "clean", "all").Run()
+		if err := exec.Command("dnf", "clean", "all").Run(); err != nil {
+			log.Warn("Failed to clean DNF cache", zap.Error(err))
+		}
 		makecache := exec.Command("dnf", "--setopt=timeout=10", "--setopt=retries=0", "--setopt=fastestmirror=True", "makecache")
 		if out, err := makecache.CombinedOutput(); err != nil {
 			log.Error("DNF makecache failed", zap.ByteString("output", out), zap.Error(err))
