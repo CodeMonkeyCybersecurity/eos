@@ -12,7 +12,7 @@ import (
 )
 
 var SyncUsersCmd = &cobra.Command{
-	Use:   "create",
+	Use:   "users",
 	Short: "Create user-specific groups from Keycloak registration events",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("delphi.sync.users")
