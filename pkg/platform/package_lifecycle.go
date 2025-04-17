@@ -11,8 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func PackageUpdate(cron bool) error {
-	log := logger.GetLogger()
+func PackageUpdate(cron bool, log *zap.Logger) error {
 	osPlatform := GetOSPlatform()
 	log.Info("Detected OS", zap.String("os", osPlatform))
 
@@ -23,7 +22,7 @@ func PackageUpdate(cron bool) error {
 
 	switch osPlatform {
 	case "linux":
-		distro := DetectLinuxDistro()
+		distro := DetectLinuxDistro(log)
 		switch distro {
 		case "rhel":
 			return runDnfWithRetry("")

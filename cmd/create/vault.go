@@ -32,7 +32,7 @@ var CreateVaultCmd = &cobra.Command{
 			log.Fatal("Vault deployment only supported on Linux")
 		}
 
-		distro := platform.DetectLinuxDistro()
+		distro := platform.DetectLinuxDistro(log)
 
 		switch distro {
 		case "debian":

@@ -5,14 +5,20 @@ import (
 	"bufio"
 	"os"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
-func GuessAdminGroup() string {
+func GuessAdminGroup(log *zap.Logger) string {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "sudo"
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Warn("Failed to close log file", zap.Error(err))
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	var idLike string

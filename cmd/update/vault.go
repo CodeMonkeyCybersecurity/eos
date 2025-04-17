@@ -22,7 +22,7 @@ var VaultUpdateCmd = &cobra.Command{
 			log.Fatal("This command must be run with sudo or as root.")
 		}
 
-		distro := platform.DetectLinuxDistro()
+		distro := platform.DetectLinuxDistro(log)
 		var updateCmd *exec.Cmd
 
 		switch distro {

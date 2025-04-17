@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"go.uber.org/zap"
 )
 
 // SetPassword sets the Linux user's password using chpasswd.
@@ -26,7 +27,8 @@ func UserExists(name string) bool {
 }
 
 // CreateEosUser creates a special Eos system user "eos" with a secure password and no login shell.
-func CreateEosUser(auto bool, loginShell bool) (string, error) {
+func CreateEosUser(auto bool, loginShell bool, log *zap.Logger) (string, error) {
+
 	const defaultUsername = "eos"
 	username := defaultUsername
 
@@ -89,7 +91,8 @@ func CreateEosUser(auto bool, loginShell bool) (string, error) {
 		return "", err
 	}
 
-	adminGroup := platform.GuessAdminGroup()
+	adminGroup := platform.GuessAdminGroup(log)
+
 	if !auto {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Should this user have sudo privileges? (yes/no): ")

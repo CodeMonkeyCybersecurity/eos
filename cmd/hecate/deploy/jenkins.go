@@ -44,7 +44,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			log.Info("Assets organized successfully for Jenkins")
 
 			// Load configuration from .hecate.conf.
-			cfg, err := hecate.LoadConfig("jenkins")
+			cfg, err := hecate.LoadConfig("jenkins", log)
 			if err != nil {
 				log.Error("Configuration error", zap.Error(err))
 				fmt.Printf("Configuration error: %v\n", err)

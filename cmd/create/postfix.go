@@ -29,7 +29,7 @@ var CreatePostfixCmd = &cobra.Command{
 		log := logger.GetLogger()
 		utils.RequireRoot(log)
 
-		osType := platform.DetectLinuxDistro()
+		osType := platform.DetectLinuxDistro(log)
 		log.Info("Detected OS", zap.String("type", osType))
 
 		// Package install

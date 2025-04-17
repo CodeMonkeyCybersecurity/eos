@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"go.uber.org/zap"
 )
 
 //
@@ -22,18 +23,22 @@ type HecateConfig struct {
 	Email      string
 }
 
-func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
+func LoadConfig(defaultSubdomain string, log *zap.Logger) (*HecateConfig, error) {
 	cfg := &HecateConfig{}
 
 	if _, err := os.Stat(types.HecateLastValuesFile); err == nil {
-		f, err := os.Open(types.HecateLastValuesFile)
+		file, err := os.Open(types.HecateLastValuesFile)
 		if err != nil {
 
 			return nil, fmt.Errorf("unable to open %s: %w", types.HecateLastValuesFile, err)
 		}
-		defer f.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				log.Warn("Failed to close log file", zap.Error(err))
+			}
+		}()
 
-		scanner := bufio.NewScanner(f)
+		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := scanner.Text()
 			switch {

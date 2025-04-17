@@ -24,7 +24,7 @@ var createOsQueryCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
-		if err := platform.RequireLinuxDistro([]string{"debian"}); err != nil {
+		if err := platform.RequireLinuxDistro([]string{"debian"}, log); err != nil {
 			log.Fatal("Platform requirement not met", zap.Error(err))
 		}
 
@@ -34,7 +34,7 @@ var createOsQueryCmd = &cobra.Command{
 		}
 
 		// Check distro support
-		distro := platform.DetectLinuxDistro()
+		distro := platform.DetectLinuxDistro(log)
 		log.Info("Detected Linux distribution", zap.String("distro", distro))
 
 		if distro != "debian" {

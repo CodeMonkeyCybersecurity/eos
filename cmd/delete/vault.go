@@ -39,7 +39,7 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		osPlatform := platform.GetOSPlatform()
-		distro := platform.DetectLinuxDistro()
+		distro := platform.DetectLinuxDistro(log)
 
 		switch {
 		case osPlatform != "linux":

@@ -117,7 +117,7 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 	}
 
 	// Decide if the user should have admin privileges.
-	adminGroup := platform.GuessAdminGroup()
+	adminGroup := platform.GuessAdminGroup(log)
 	if !auto {
 		input, err := prompt(reader, "Should this user have sudo privileges? (yes/no): ")
 		if err != nil {

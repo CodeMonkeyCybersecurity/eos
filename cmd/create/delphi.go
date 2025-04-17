@@ -106,11 +106,11 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 
 	log.Info("Disabling Wazuh updates (repo disable)")
 
-	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}); err != nil {
+	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}, log); err != nil {
 		log.Fatal("Unsupported Linux distro", zap.Error(err))
 	}
 
-	distro := platform.DetectLinuxDistro()
+	distro := platform.DetectLinuxDistro(log)
 	switch distro {
 	case "ubuntu", "debian":
 		disableCmd := exec.Command("sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")

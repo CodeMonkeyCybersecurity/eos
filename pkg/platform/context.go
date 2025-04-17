@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"runtime"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
 //
@@ -30,12 +32,16 @@ func GetOSPlatform() string {
 }
 
 // DetectLinuxDistro returns "debian", "rhel", or "unknown"
-func DetectLinuxDistro() string {
+func DetectLinuxDistro(log *zap.Logger) string {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "unknown"
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Warn("Failed to close log file", zap.Error(err))
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -50,12 +56,12 @@ func DetectLinuxDistro() string {
 	return "unknown"
 }
 
-func RequireLinuxDistro(allowed []string) error {
+func RequireLinuxDistro(allowed []string, log *zap.Logger) error {
 	if GetOSPlatform() != "linux" {
 		return fmt.Errorf("unsupported platform: %s (only 'linux' is supported)", GetOSPlatform())
 	}
 
-	distro := DetectLinuxDistro()
+	distro := DetectLinuxDistro(log)
 	for _, d := range allowed {
 		if distro == d {
 			return nil

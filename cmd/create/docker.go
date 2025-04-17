@@ -32,7 +32,7 @@ var CreateDockerCmd = &cobra.Command{
 		docker.UninstallSnapDocker()
 
 		log.Info("Updating apt repositories...")
-		if err := platform.PackageUpdate(false); err != nil {
+		if err := platform.PackageUpdate(false, log); err != nil {
 			log.Warn("Package update failed", zap.Error(err))
 		}
 
