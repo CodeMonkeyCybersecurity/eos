@@ -8,9 +8,9 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/apt"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -32,7 +32,9 @@ var CreateDockerCmd = &cobra.Command{
 		docker.UninstallSnapDocker()
 
 		log.Info("Updating apt repositories...")
-		apt.Update()
+		if err := platform.PackageUpdate(false); err != nil {
+			log.Warn("Package update failed", zap.Error(err))
+		}
 
 		log.Info("Installing prerequisites and Docker GPG key...")
 		docker.InstallPrerequisitesAndGpg()

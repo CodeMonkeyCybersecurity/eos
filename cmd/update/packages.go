@@ -15,7 +15,7 @@ var UpdatePackagesCmd = &cobra.Command{
 	Short:   "Update system packages based on detected OS",
 	Long:    "Detects the host OS and executes the appropriate update and cleanup commands. Supports scheduling via --cron.",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		return platform.RunPackageUpdate(Cron)
+		return platform.PackageUpdate(Cron)
 	}),
 }
 
