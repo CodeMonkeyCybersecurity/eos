@@ -2,6 +2,8 @@
 package vault
 
 import (
+	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -253,93 +255,108 @@ func EnableKV2(client *api.Client, log *zap.Logger) error {
 	return enableMount(client, "secret", "kv", map[string]string{"version": "2"}, "✅ KV v2 enabled at path=secret.")
 }
 
+// EnsureVaultUser enables auth methods, applies policies, and provisions the eos Vault user.
+func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
+	log.Info("🔐 Ensuring Vault user 'eos' is configured")
+
+	// Retrieve password
+	password, err := EnsureEosPassword(log)
+	if err != nil {
+		log.Error("Failed to ensure eos Vault password", zap.Error(err))
+		return err
+	}
+
+	// Enable auth methods (idempotent)
+	if err := EnsureVaultAuthMethods(client, log); err != nil {
+		log.Error("Failed to enable auth methods", zap.Error(err))
+		return err
+	}
+
+	// Ensure eos policy exists
+	if err := client.Sys().PutPolicy(EosVaultPolicy, Policies[EosVaultPolicy]); err != nil {
+		log.Warn("Failed to apply eos policy", zap.Error(err))
+	}
+
+	// Ensure userpass user exists
+	if err := EnsureEosUserpassAccount(client, "eos", password, log); err != nil {
+		log.Error("Failed to ensure eos userpass account", zap.Error(err))
+		return err
+	}
+
+	// Ensure AppRole and write credentials
+	if err := EnsureAppRole(client, log); err != nil {
+		log.Error("Failed to ensure eos AppRole", zap.Error(err))
+		return err
+	}
+
+	// Persist fallback file locally
+	creds := UserpassCreds{Username: "eos", Password: password}
+	if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
+		log.Warn("Failed to write fallback userpass secret", zap.Error(err))
+	} else {
+		log.Info("📦 eos Vault user fallback password saved", zap.String("path", EosUserFallbackFile))
+	}
+
+	// Persist in Vault KV (e.g. for web UI consumption or bootstrap reuse)
+	if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
+		"username": "eos",
+		"password": password,
+	}); err != nil {
+		log.Warn("Failed to write eos-user secret to Vault", zap.Error(err))
+	} else {
+		log.Info("✅ eos-user secret written to Vault KV")
+	}
+
+	// Start Vault Agent (if needed)
+	if err := EnsureVaultAgent(client, password, log); err != nil {
+		log.Warn("Vault Agent startup failed", zap.Error(err))
+	}
+
+	log.Info("✅ Vault user 'eos' fully ensured")
+	return nil
+}
+
 /* Enable UserPass */
 func EnableUserPass(client *api.Client) error {
 	return enableAuth(client, "userpass")
 }
 
-/* Generate a random password and create an eos user with it */
-func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
-	fmt.Println("\nGenerating random password and creating eos user...")
+func EnsureVaultAuthMethods(client *api.Client, log *zap.Logger) error {
+	if err := EnsureAuthMethod(client, "userpass", "userpass/", log); err != nil {
+		return err
+	}
+	if err := EnsureAuthMethod(client, "approle", "approle/", log); err != nil {
+		return err
+	}
+	return nil
+}
 
-	password, err := crypto.GeneratePassword(20)
+func EnsureAuthMethod(client *api.Client, methodType, mountPath string, log *zap.Logger) error {
+	existing, err := client.Sys().ListAuth()
 	if err != nil {
-		return fmt.Errorf("failed to generate password: %w", err)
+		return fmt.Errorf("failed to list Vault auth methods: %w", err)
 	}
 
-	if err := os.MkdirAll(SecretsDir, 0700); err != nil {
-		return fmt.Errorf("failed to create secrets directory: %w", err)
+	if _, ok := existing[mountPath]; ok {
+		return nil // Already enabled
 	}
 
-	creds := UserpassCreds{
-		Username: "eos",
-		Password: password,
-	}
-
-	if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
-		fmt.Println("⚠️ Failed to write eos Vault user fallback secret:", err)
-	} else {
-		fmt.Printf("🔐 Stored eos Vault user password at %s\n", EosUserFallbackFile)
-	}
-
-	// Store in Vault
-	if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
-		"username": "eos",
-		"password": password,
-	}); err != nil {
-		fmt.Println("❌ Failed to store eos-user secret in Vault:", err)
-	} else {
-		fmt.Println("✅ eos-user secret successfully written to Vault.")
-	}
-
-	// Setup Vault Agent
-	if err := EnsureVaultAgent(client, password, log); err != nil {
-		fmt.Println("⚠️ Failed to set up Vault Agent service:", err)
-	}
-
-	fmt.Println("📜 Re-applying eos policy:\n" + Policies[EosVaultPolicy])
-	err = client.Sys().PutPolicy(EosVaultPolicy, Policies[EosVaultPolicy])
-	if err != nil {
-		fmt.Println("❌ Failed to create eos policy:", err)
-		os.Exit(1)
-	}
-
-	// Create eos user with userpass auth
-	_, err = client.Logical().Write(
-		"auth/userpass/users/eos",
-		map[string]interface{}{
-			"password": password,
-			"policies": "default," + EosVaultPolicy,
-		},
+	return client.Sys().EnableAuthWithOptions(
+		strings.TrimSuffix(mountPath, "/"),
+		&api.EnableAuthOptions{Type: methodType},
 	)
-	if err != nil {
-		fmt.Println("❌ Failed to create eos user:", err)
-		os.Exit(1)
-	}
-
-	// Write init result
-	if err := Write(client, "vault_init", initRes, log); err != nil {
-		fmt.Println("⚠️ Failed to store vault_init data in Vault:", err)
-	} else {
-		fmt.Println("✅ vault_init successfully written to Vault.")
-	}
-
-	return nil
 }
 
-func EnableVaultAuthMethods(client *api.Client) error {
-	if err := enableAuth(client, "userpass"); err != nil {
-		return err
-	}
-	if err := enableAuth(client, "approle"); err != nil {
-		return err
-	}
-	return nil
-}
+func EnsureEosUserpassAccount(client *api.Client, username, password string, log *zap.Logger) error {
+	log.Info("🔍 Checking for existing Vault userpass account", zap.String("username", username))
 
-func CreateUserpassAccount(client *api.Client, username, password string) error {
-	fmt.Printf("👤 Creating Vault userpass account for %q...\n", username)
+	// Pre-check if the user already exists
+	if _, err := client.Logical().Read("auth/userpass/users/" + username); err == nil {
+		log.Info("✅ Vault userpass account already exists — skipping creation", zap.String("username", username))
+		return nil
+	}
 
+	log.Info("👤 Creating Vault userpass account", zap.String("username", username))
 	_, err := client.Logical().Write(
 		"auth/userpass/users/"+username,
 		map[string]interface{}{
@@ -347,18 +364,75 @@ func CreateUserpassAccount(client *api.Client, username, password string) error 
 			"policies": EosVaultPolicy,
 		},
 	)
-	return err
+	if err != nil {
+		log.Error("❌ Failed to create userpass account", zap.String("username", username), zap.Error(err))
+		return err
+	}
+
+	log.Info("✅ Created Vault userpass account", zap.String("username", username))
+	return nil
 }
 
-func SetupEosVaultUser(client *api.Client, password string, log *zap.Logger) error {
-	if err := EnableVaultAuthMethods(client); err != nil {
-		return err
+// EnsureEosPassword retrieves the eos Vault password from Vault, fallback file, or generates a new one.
+func EnsureEosPassword(log *zap.Logger) (string, error) {
+	// 1. Try Vault
+	var data map[string]interface{} // 👈 this was missing
+	if err := ReadFromVaultAt(context.Background(), "secret", "bootstrap/eos-user", &data, log); err == nil {
+		if pw, ok := data["password"].(string); ok && pw != "" {
+			log.Info("🔐 Loaded eos Vault password from Vault")
+			return pw, nil
+		}
 	}
-	if err := CreateUserpassAccount(client, "eos", password); err != nil {
-		return err
+
+	// 2. Try fallback file
+	var creds UserpassCreds
+	if err := ReadFallbackIntoJSON(EosUserFallbackFile, &creds, log); err == nil && creds.Password != "" {
+		log.Info("🔐 Loaded eos Vault password from fallback file")
+		return creds.Password, nil
 	}
-	if err := EnsureAppRole(client, "eos", log); err != nil {
-		return err
+
+	// 3. Prompt the user interactively
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("🔐 Please enter a secure password for the eos Vault user.")
+	for {
+		fmt.Print("Enter password: ")
+		pw1, _ := reader.ReadString('\n')
+		pw1 = strings.TrimSpace(pw1)
+
+		if !crypto.IsPasswordStrong(pw1) {
+			fmt.Println("❌ Password too weak. Use at least 12 characters, mix of upper/lowercase, numbers, and symbols.")
+			continue
+		}
+
+		fmt.Print("Confirm password: ")
+		pw2, _ := reader.ReadString('\n')
+		pw2 = strings.TrimSpace(pw2)
+
+		if pw1 != pw2 {
+			fmt.Println("❌ Passwords do not match. Try again.")
+			continue
+		}
+
+		log.Info("🔐 Password entered interactively")
+
+		// Save fallback
+		creds := UserpassCreds{Username: "eos", Password: pw1}
+		if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
+			log.Warn("⚠️ Failed to write eos fallback password", zap.Error(err))
+		} else {
+			log.Info("📦 eos Vault user password saved to fallback file")
+		}
+
+		// Save to Vault KV
+		if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
+			"username": "eos",
+			"password": pw1,
+		}); err != nil {
+			log.Warn("❌ Failed to store eos password in Vault", zap.Error(err))
+		} else {
+			log.Info("✅ eos Vault password stored in Vault KV")
+		}
+
+		return pw1, nil
 	}
-	return nil
 }

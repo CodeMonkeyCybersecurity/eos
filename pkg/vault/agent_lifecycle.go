@@ -19,8 +19,8 @@ func EnsureVaultAgent(client *api.Client, password string, log *zap.Logger) erro
 
 	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
 
-	if err := system.EnsureEosUser(true, false, log); err != nil {
-		log.Error("Failed to ensure eos user", zap.Error(err))
+	if err := EnsureEosVaultUser(client, log); err != nil {
+		log.Error("Failed to ensure eos vault user", zap.Error(err))
 		return err
 	}
 
@@ -38,7 +38,7 @@ func EnsureVaultAgent(client *api.Client, password string, log *zap.Logger) erro
 		return err
 	}
 
-	if err := EnsureAppRole(client, "eos", log); err != nil {
+	if err := EnsureAppRole(client, log); err != nil {
 		log.Error("AppRole setup failed", zap.Error(err))
 		return err
 	}
@@ -197,53 +197,47 @@ func reloadAndStartService(log *zap.Logger) error {
 	return nil
 }
 
-func EnsureAppRole(client *api.Client, roleName string, log *zap.Logger) error {
+func EnsureAppRole(client *api.Client, log *zap.Logger) error {
+	// Fast-exit if creds already on disk
 	if _, err := os.Stat(AppRoleIDPath); err == nil {
-		if _, err := os.Stat(AppSecretIDPath); err == nil {
-			log.Info("✅ AppRole credentials already present — skipping generation")
-			return nil
-		}
+		log.Info("🔐 AppRole credentials already present — skipping creation")
+		return nil
 	}
 
-	log.Info("🔐 Creating AppRole", zap.String("role", roleName))
+	log.Info("Creating AppRole 'eos'...")
 
-	if err := enableAuth(client, "approle"); err != nil {
-		return fmt.Errorf("failed to enable AppRole auth: %w", err)
+	// Enable auth method (idempotent)
+	if err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"}); err != nil {
+		log.Warn("Auth method approle may already be enabled", zap.Error(err))
 	}
 
-	rolePath := "auth/approle/role/" + roleName
+	// Create or update the AppRole
 	_, err := client.Logical().Write(rolePath, map[string]interface{}{
 		"policies":      []string{EosVaultPolicy},
 		"token_ttl":     "60m",
 		"token_max_ttl": "120m",
 	})
 	if err != nil {
-		return fmt.Errorf("failed to write AppRole config: %w", err)
+		return fmt.Errorf("failed to create AppRole %q: %w", rolePath, err)
 	}
 
-	roleIDResp, err := client.Logical().Read(rolePath + "/role-id")
+	// Generate and write credentials
+	roleID, err := client.Logical().Read(rolePath + "/role-id")
 	if err != nil {
 		return fmt.Errorf("failed to read role_id: %w", err)
 	}
-	secretIDResp, err := client.Logical().Write(rolePath+"/secret-id", nil)
+	secretID, err := client.Logical().Write(rolePath+"/secret-id", nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate secret_id: %w", err)
 	}
 
-	roleID := roleIDResp.Data["role_id"].(string)
-	secretID := secretIDResp.Data["secret_id"].(string)
-
-	if err := os.WriteFile(AppRoleIDPath, []byte(roleID+"\n"), 0400); err != nil {
+	if err := os.WriteFile(AppRoleIDPath, []byte(roleID.Data["role_id"].(string)+"\n"), 0640); err != nil {
 		return fmt.Errorf("failed to write role_id: %w", err)
 	}
-	if err := os.WriteFile(AppSecretIDPath, []byte(secretID+"\n"), 0400); err != nil {
+	if err := os.WriteFile(AppSecretIDPath, []byte(secretID.Data["secret_id"].(string)+"\n"), 0640); err != nil {
 		return fmt.Errorf("failed to write secret_id: %w", err)
 	}
 
-	log.Info("✅ AppRole credentials written",
-		zap.String("role_id_path", AppRoleIDPath),
-		zap.String("secret_id_path", AppSecretIDPath),
-	)
-
+	log.Info("✅ AppRole created and credentials written", zap.String("role_id_path", AppRoleIDPath), zap.String("secret_id_path", AppSecretIDPath))
 	return nil
 }

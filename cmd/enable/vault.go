@@ -68,7 +68,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		/* Enable AppRole */
 		log.Info("[4/7] Ensuring AppRole auth method")
-		if err := vault.EnsureAppRole(client, "eos", log); err != nil {
+		if err := vault.EnsureAppRole(client, log); err != nil {
 			log.Error("AppRole setup failed", zap.Error(err))
 			return err
 		}
@@ -81,8 +81,9 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		// 9. Create eos user
-		log.Info("[6/7] Creating eos user and storing secrets")
-		if err := vault.CreateEosAndSecret(client, initRes, log); err != nil {
+		log.Info("[6/7] Ensure eos user exists and storing secrets")
+		// Assume you've already generated or loaded `vaultPassword` above
+		if err := vault.EnsureEosVaultUser(client, log); err != nil {
 			log.Error("Failed to create eos user or store secrets", zap.Error(err))
 			return err
 		}
