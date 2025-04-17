@@ -1,4 +1,4 @@
-// pkg/interaction/prompt.go
+/* pkg/interaction/prompt.go */
 package interaction
 
 import (
@@ -7,7 +7,35 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
+
+// PromptIfMissing checks if a flag was set, otherwise prompts the user interactively.
+// Supports optional secret input for sensitive values.
+func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool) (string, error) {
+	val, err := cmd.Flags().GetString(flagName)
+	if err != nil {
+		return "", err
+	}
+	if val != "" {
+		return val, nil
+	}
+
+	if isSecret {
+		return promptSecret(prompt), nil
+	}
+	return promptInput(prompt, ""), nil
+}
+
+// promptSecret hides terminal input for sensitive values like passwords or client secrets.
+func promptSecret(prompt string) string {
+	fmt.Print(prompt + ": ")
+	bytePassword, _ := term.ReadPassword(int(os.Stdin.Fd()))
+	fmt.Println()
+	return strings.TrimSpace(string(bytePassword))
+}
 
 // PromptSelect shows a list of options and returns the chosen value.
 func promptSelect(prompt string, options []string) string {

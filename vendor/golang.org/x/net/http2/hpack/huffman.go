@@ -98,7 +98,7 @@ func huffmanDecode(buf *bytes.Buffer, maxLen int, v []byte) error {
 		return ErrInvalidHuffman
 	}
 	if mask := uint(1<<cbits - 1); cur&mask != mask {
-		// Trailing bits must be a prefix of Eos per RFC 7541 section 5.2.
+		// Trailing bits must be a prefix of EOS per RFC 7541 section 5.2.
 		return ErrInvalidHuffman
 	}
 

@@ -1,0 +1,93 @@
+package sync
+
+import (
+	"fmt"
+	"time"
+
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/hera"
+
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+)
+
+var SyncUsersCmd = &cobra.Command{
+	Use:   "create",
+	Short: "Create user-specific groups from Keycloak registration events",
+	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		log := zap.L().Named("delphi.sync.users")
+
+		realm, _ := cmd.Flags().GetString("realm")
+		sinceStr, _ := cmd.Flags().GetString("since")
+
+		kcURL, _ := cmd.Flags().GetString("url")
+		clientID, _ := cmd.Flags().GetString("client-id")
+		clientSecret, _ := cmd.Flags().GetString("client-secret")
+
+		sinceDur, err := time.ParseDuration(sinceStr)
+		if err != nil {
+			log.Error("Invalid --since duration", zap.Error(err))
+			return err
+		}
+
+		client, err := hera.NewClient(kcURL, clientID, clientSecret)
+		if err != nil {
+			log.Error("Failed to initialize Keycloak client", zap.Error(err))
+			return err
+		}
+
+		cutoff := time.Now().Add(-sinceDur)
+		log.Info("Fetching registration events", zap.Time("since", cutoff))
+
+		events, err := client.GetRegistrationEvents(realm, cutoff)
+		if err != nil {
+			log.Error("Failed to fetch registration events", zap.Error(err))
+			return err
+		}
+
+		log.Info("Processing registration events", zap.Int("count", len(events)))
+		for _, ev := range events {
+			username := ev.Details["username"]
+			groupName := fmt.Sprintf("tenant-%s", username)
+
+			exists, err := client.GroupExists(realm, groupName)
+			if err != nil {
+				log.Warn("Failed to check group existence", zap.String("group", groupName), zap.Error(err))
+				continue
+			}
+
+			if !exists {
+				log.Info("Creating new group", zap.String("group", groupName))
+				if err := client.CreateGroup(realm, groupName); err != nil {
+					log.Warn("Failed to create group", zap.String("group", groupName), zap.Error(err))
+					continue
+				}
+			} else {
+				log.Debug("Group already exists", zap.String("group", groupName))
+			}
+
+			userID, err := client.GetUserID(realm, username)
+			if err != nil {
+				log.Warn("Failed to fetch user ID", zap.String("user", username), zap.Error(err))
+				continue
+			}
+
+			log.Info("Assigning user to group", zap.String("user", username), zap.String("group", groupName))
+			if err := client.AssignUserToGroup(realm, userID, groupName); err != nil {
+				log.Warn("Failed to assign user to group", zap.String("user", username), zap.String("group", groupName), zap.Error(err))
+				continue
+			}
+		}
+
+		log.Info("User group synchronization complete")
+		return nil
+	}),
+}
+
+func init() {
+	SyncUsersCmd.Flags().String("realm", "", "Keycloak realm")
+	SyncUsersCmd.Flags().String("since", "10m", "How far back to scan for registration events (e.g., 5m, 1h)")
+	SyncUsersCmd.Flags().String("url", "https://hera.cybermonkey.dev", "Keycloak base URL")
+	SyncUsersCmd.Flags().String("client-id", "keycloak-api-bot", "Keycloak client ID")
+	SyncUsersCmd.Flags().String("client-secret", "", "Keycloak client secret")
+}
