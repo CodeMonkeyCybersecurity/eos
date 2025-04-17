@@ -10,18 +10,20 @@ import (
 	"github.com/Nerzal/gocloak/v13"
 )
 
-func NewClient(url, clientID, clientSecret string) (*Client, error) {
+func NewClient(url, clientID, clientSecret string, realm string) (*Client, error) {
 	ctx := context.Background()
 	kc := gocloak.NewClient(url)
-	token, err := kc.LoginClient(ctx, clientID, clientSecret, "master") // adjust realm if needed
+
+	// ✅ Don't use LoginClientWithScope — most 401s from Keycloak are due to invalid scopes in client_credentials flow
+	token, err := kc.LoginClient(ctx, clientID, clientSecret, realm)
 	if err != nil {
-		return nil, fmt.Errorf("login failed: %w", err)
+		return nil, fmt.Errorf("keycloak login failed (check client ID/secret/realm): %w", err)
 	}
 
 	return &Client{
 		client: kc,
 		token:  token,
-		realm:  "master", // override if needed later
+		realm:  realm,
 		ctx:    ctx,
 	}, nil
 }

@@ -39,7 +39,7 @@ var SyncUsersCmd = &cobra.Command{
 			return err
 		}
 
-		client, err := hera.NewClient(kcURL, clientID, clientSecret)
+		client, err := hera.NewClient(kcURL, clientID, clientSecret, realm)
 		if err != nil {
 			log.Error("Failed to initialize Keycloak client",
 				zap.String("url", kcURL),
