@@ -16,6 +16,15 @@ import (
 func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoot string) (*CheckReport, *api.Client) {
 	report := &CheckReport{}
 
+	if client == nil {
+		var err error
+		client, err = NewClient()
+		if err != nil {
+			log.Warn("Vault client creation failed", zap.Error(err))
+			return &CheckReport{Notes: []string{"Vault client creation failed"}}, nil
+		}
+	}
+
 	// 1. Binary check
 	report.Installed = isInstalled(log)
 	if !report.Installed {
