@@ -17,6 +17,7 @@ import (
 )
 
 var ignoreHardwareCheck bool
+var overwriteInstall bool
 
 var CreateDelphiCmd = &cobra.Command{
 	Use:     "delphi",
@@ -79,9 +80,15 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 
 	log.Info("Running Wazuh installer")
 	args = []string{"-a"}
+
 	if ignoreHardwareCheck {
 		log.Info("Ignoring hardware checks (passing -i to installer)")
 		args = append(args, "-i")
+	}
+
+	if overwriteInstall {
+		log.Info("Overwriting existing installation (passing -o to installer)")
+		args = append(args, "-o")
 	}
 
 	cmdArgs := append([]string{scriptPath}, args...)
@@ -146,4 +153,5 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 func init() {
 	CreateCmd.AddCommand(CreateDelphiCmd)
 	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check (passes -i)")
+	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation (passes -o)")
 }
