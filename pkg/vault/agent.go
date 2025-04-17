@@ -143,7 +143,7 @@ func reloadAndStartService() error {
 }
 
 // ApplyAdminPolicy applies a full-access policy from the Policies map to the eos user.
-func ApplyAdminPolicy(creds UserpassCreds, client *api.Client) error {
+func ApplyAdminPolicy(creds UserpassCreds, client *api.Client, log *zap.Logger) error {
 	fmt.Println("Creating full-access policy for eos.")
 
 	policyName := EosVaultPolicy

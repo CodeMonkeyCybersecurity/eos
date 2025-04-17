@@ -22,3 +22,11 @@ var DisableCmd = &cobra.Command{
 		return cmd.Help()
 	}),
 }
+
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
+func init() {
+	// Initialize the shared logger for the entire deploy package
+	log = logger.L()
+}
