@@ -35,7 +35,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			log.Fatal("Failed to create Vault client", zap.Error(err))
 		}
 
-		client, initRes, err := vault.SetupVault(client)
+		client, initRes, err := vault.SetupVault(client, log)
 		if err != nil {
 			log.Error("Failed to initialise and unseal Vault", zap.Error(err))
 			return err
@@ -81,7 +81,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		// 9. Create eos user
 		log.Info("[6/7] Creating eos user and storing secrets")
-		if err := vault.CreateEosAndSecret(client, initRes); err != nil {
+		if err := vault.CreateEosAndSecret(client, initRes, log); err != nil {
 			log.Error("Failed to create eos user or store secrets", zap.Error(err))
 			return err
 		}

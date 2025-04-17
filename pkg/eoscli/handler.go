@@ -4,7 +4,6 @@ package eoscli
 
 import (
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -33,7 +32,7 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 			vault.EnsureVaultClient()
 
 			log.Info("🔒 Checking Vault sealed state...")
-			if _, vaultErr := vault.EnsureVaultReady(); vaultErr != nil {
+			if _, vaultErr := vault.EnsureVaultReady(log); vaultErr != nil {
 				log.Warn("⚠️ Vault is not fully prepared...", zap.Error(vaultErr))
 				log.Warn("Continuing anyway — downstream commands may fail if Vault is required.")
 			}
@@ -49,7 +48,7 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 //
 
 // ReadVaultSecureData loads bootstrap Vault secrets (vault_init, userpass creds).
-func ReadVaultSecureData(client *api.Client) (*api.InitResponse, vault.UserpassCreds, []string, string) {
+func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse, vault.UserpassCreds, []string, string) {
 	if err := EnsureEosUser(); err != nil {
 		log.Fatal("❌ Failed to ensure eos system user", zap.Error(err))
 	}
@@ -58,7 +57,7 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, vault.UserpassC
 	fmt.Println("This will revoke the root token and promote the eos admin user.")
 
 	// Load vault_init.json from fallback file
-	initResPtr, err := vault.ReadFallbackJSON[api.InitResponse](vault.DiskPath("vault_init"))
+	initResPtr, err := vault.ReadFallbackJSON[api.InitResponse](vault.DiskPath("vault_init", log))
 	if err != nil {
 		log.Fatal("❌ Failed to read vault_init.json", zap.Error(err))
 	}

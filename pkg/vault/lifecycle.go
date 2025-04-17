@@ -111,7 +111,7 @@ func InstallVaultViaDnf() error {
 }
 
 /* Initialize Vault (if not already initialized) */
-func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
+func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
 	fmt.Println("\nInitializing Vault...")
 
 	initRes, err := client.Sys().Init(&api.InitRequest{
@@ -123,7 +123,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 		if IsAlreadyInitialized(err) {
 			fmt.Println("✅ Vault already initialized.")
 
-			initResPtr, err := ReadFallbackJSON[api.InitResponse](DiskPath("vault_init"))
+			initResPtr, err := ReadFallbackJSON[api.InitResponse](DiskPath("vault_init", log))
 			if err != nil {
 				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
@@ -154,7 +154,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 			}
 
 			// Persist the Vault init result again for redundancy
-			if err := Write(client, "vault_init", initRes); err != nil {
+			if err := Write(client, "vault_init", initRes, log); err != nil {
 				fmt.Println("Failed to persist Vault init result")
 				return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 			} else {
@@ -166,7 +166,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	}
 
 	// Dump init result for developer diagnostics
-	DumpInitResult(initRes)
+	DumpInitResult(initRes, log)
 
 	// Unseal Vault now that initialization is complete.
 	if err := UnsealVault(client, initRes); err != nil {
@@ -177,7 +177,7 @@ func SetupVault(client *api.Client) (*api.Client, *api.InitResponse, error) {
 	client.SetToken(initRes.RootToken)
 
 	// Persist the Vault init result now that Vault is unsealed and the token is valid.
-	if err := Write(client, "vault_init", initRes); err != nil {
+	if err := Write(client, "vault_init", initRes, log); err != nil {
 		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
 	} else {
 		fmt.Println("✅ Vault init result persisted successfully")
@@ -189,10 +189,10 @@ func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }
 
-func DumpInitResult(initRes *api.InitResponse) {
+func DumpInitResult(initRes *api.InitResponse, log *zap.Logger) {
 	b, _ := json.MarshalIndent(initRes, "", "  ")
 	_ = os.WriteFile("/tmp/vault_init.json", b, 0600)
-	_ = os.WriteFile(DiskPath("vault_init"), b, 0600)
+	_ = os.WriteFile(DiskPath("vault_init", log), b, 0600)
 	fmt.Printf("✅ Vault initialized with %d unseal keys.\n", len(initRes.KeysB64))
 }
 
@@ -275,7 +275,7 @@ func EnableUserPass(client *api.Client) error {
 }
 
 /* Generate a random password and create an eos user with it */
-func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
+func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
 	fmt.Println("\nGenerating random password and creating eos user...")
 
 	password, err := crypto.GeneratePassword(20)
@@ -334,7 +334,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 	}
 
 	// Write init result
-	if err := Write(client, "vault_init", initRes); err != nil {
+	if err := Write(client, "vault_init", initRes, log); err != nil {
 		fmt.Println("⚠️ Failed to store vault_init data in Vault:", err)
 	} else {
 		fmt.Println("✅ vault_init successfully written to Vault.")

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 /* enableFeature is a generic Logical().Write wrapper for enabling things like audit devices, etc. */
@@ -48,14 +49,14 @@ func enableMount(client *api.Client, path, engineType string, options map[string
 	return nil
 }
 
-func EnsureVaultReady() (*api.Client, error) {
+func EnsureVaultReady(log *zap.Logger) (*api.Client, error) {
 	client, err := NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("vault client error: %w", err)
 	}
 
 	// Call SetupVault to initialize/unseal Vault.
-	client, _, err = SetupVault(client)
+	client, _, err = SetupVault(client, log)
 	if err != nil {
 		return nil, fmt.Errorf("vault not ready: %w", err)
 	}

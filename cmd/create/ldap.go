@@ -35,7 +35,7 @@ var CreateLDAPCmd = &cobra.Command{
 		}
 
 		// Step 3: Write to Vault
-		if err := vault.WriteAuto("eos/ldap/config", cfg); err != nil {
+		if err := vault.WriteAuto("eos/ldap/config", cfg, log); err != nil {
 			return fmt.Errorf("failed to write LDAP config to Vault: %w", err)
 		}
 		logger.Info("LDAP config written to Vault", zap.String("path", "eos/ldap/config"))

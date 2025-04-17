@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 //
@@ -46,7 +47,7 @@ func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}) e
 }
 
 // Read loads a namespaced config from Vault, or falls back to YAML if unavailable.
-func Read(client *api.Client, name string, out any) error {
+func Read(client *api.Client, name string, out any, log *zap.Logger) error {
 	if IsVaultAvailable(client) {
 		err := ReadFromVaultAt(context.Background(), "secret", name, out)
 		if err == nil {
@@ -55,7 +56,7 @@ func Read(client *api.Client, name string, out any) error {
 		fmt.Printf("⚠️  Vault read failed for %q: %v\n", name, err)
 		fmt.Println("💡 Falling back to local config...")
 	}
-	return ReadFallbackIntoJSON(DiskPath(name), out)
+	return ReadFallbackIntoJSON(DiskPath(name, log), out)
 }
 
 //

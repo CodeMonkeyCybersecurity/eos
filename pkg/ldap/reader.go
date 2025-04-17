@@ -8,6 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/go-ldap/ldap/v3"
+	"go.uber.org/zap"
 )
 
 // --- Read helpers ---
@@ -126,11 +127,15 @@ func readAndMapGroups(baseDN, filter string) ([]LDAPGroup, error) {
 }
 
 func ReadLDAPConfig() (*LDAPConfig, string, error) {
+	log := zap.L().Named("ldap.config") // or use your logger.GetLogger()
+
 	loaders := []struct {
 		name string
 		load func() (*LDAPConfig, error)
 	}{
-		{"vault", readFromVault},
+		{"vault", func() (*LDAPConfig, error) {
+			return readFromVault(log)
+		}},
 		{"env", loadFromEnv},
 		{"host", tryDetectFromHost},
 		{"container", tryDetectFromContainer},
@@ -144,20 +149,20 @@ func ReadLDAPConfig() (*LDAPConfig, string, error) {
 		}
 	}
 
-	// Fallback default
+	// Fallback
 	cfg := DefaultLDAPConfig()
 	fmt.Printf("⚠️  Using fallback LDAP config: %s\n", cfg.FQDN)
 	return cfg, "default", nil
 }
 
-func readFromVault() (*LDAPConfig, error) {
+func readFromVault(log *zap.Logger) (*LDAPConfig, error) {
 	client, err := vault.NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
 	var cfg LDAPConfig
-	if err := vault.Read(client, "ldap", &cfg); err != nil || cfg.FQDN == "" {
+	if err := vault.Read(client, "ldap", cfg, log); err != nil || cfg.FQDN == "" {
 		return nil, errors.New("LDAP config not found in Vault")
 	}
 	return &cfg, nil

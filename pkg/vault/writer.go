@@ -10,24 +10,25 @@ import (
 	"path/filepath"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 //
 // === Vault Write Helpers ===
 //
 
-func WriteAuto(path string, data any) error {
+func WriteAuto(path string, data any, log *zap.Logger) error {
 	client, err := NewClient()
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
-	return Write(client, path, data)
+	return Write(client, path, data, log)
 }
 
 // Write stores a struct in Vault using the API or falls back to disk if the API call fails.
-func Write(client *api.Client, name string, data any) error {
+func Write(client *api.Client, name string, data any, log *zap.Logger) error {
 	SetVaultClient(client)
-	path := vaultPath(name) // ✅ fix: removed invalid argument
+	path := vaultPath(name, log) // ✅ fix: removed invalid argument
 
 	if err := WriteToVault(path, data); err == nil {
 		fmt.Println("✅ Vault secret written:", path)
@@ -35,8 +36,8 @@ func Write(client *api.Client, name string, data any) error {
 	}
 
 	fmt.Println("⚠️ Vault API write failed for:", path)
-	fmt.Println("💾 Falling back to local disk:", DiskPath(name))
-	return WriteFallbackJSON(DiskPath(name), data)
+	fmt.Println("💾 Falling back to local disk:", DiskPath(name, log))
+	return WriteFallbackJSON(DiskPath(name, log), data)
 }
 
 // WriteToVault stores a serializable struct to Vault at a given KV v2 path.

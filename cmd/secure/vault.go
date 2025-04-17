@@ -40,7 +40,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 
 		// Prompt the user (or reuse saved) unseal keys and root token
 		// Reuse secured Vault data (no prompt)
-		initRes, creds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client)
+		initRes, creds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client, log)
 		client.SetToken(initRes.RootToken)
 
 		log.Info("✅ Vault unsealed and authenticated as eos admin")
@@ -82,7 +82,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		}
 
 		log.Info("Cleaning up the stored initialization file...")
-		system.Rm("vault_init.json", vault.DiskPath("vault_init"), log)
+		system.Rm(vault.DiskPath("vault_init", log), "Vault init file", log)
 		log.Info("✅ Done")
 
 		log.Info("Informing the user of the next steps...")

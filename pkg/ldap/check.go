@@ -12,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 // TestConnection attempts a bind to verify the LDAP connection works.
@@ -27,9 +28,9 @@ func CheckConnection(cfg *LDAPConfig) error {
 
 // TryReadFromVault attempts to load the LDAP config from Vault.
 // It returns nil if not found or incomplete.
-func TryReadFromVault(client *api.Client) (*LDAPConfig, error) {
+func TryReadFromVault(client *api.Client, log *zap.Logger) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	if err := vault.Read(client, "secret/ldap/config", &cfg); err != nil {
+	if err := vault.Read(client, "secret/ldap/config", &cfg, log); err != nil {
 		return nil, err
 	}
 	if cfg.FQDN == "" || cfg.BindDN == "" {
