@@ -10,7 +10,6 @@ import (
 	"github.com/Nerzal/gocloak/v13"
 )
 
-
 func NewClient(url, clientID, clientSecret string) (*Client, error) {
 	ctx := context.Background()
 	kc := gocloak.NewClient(url)
