@@ -41,7 +41,7 @@ func ReadFromVault(path string, out interface{}, log *zap.Logger) error {
 
 // ReadFromVaultAt loads a struct from a custom KV v2 mount.
 func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}, log *zap.Logger) error {
-	client, err := GetVaultClient()
+	client, err := GetVaultClient(log)
 	if err != nil {
 		return fmt.Errorf("unable to get Vault client: %w", err)
 	}
@@ -111,7 +111,7 @@ func ReadFallbackIntoJSON(path string, out any, log *zap.Logger) error {
 }
 
 func ListUnder(path string, log *zap.Logger) ([]string, error) {
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Vault client: %w", err)
 	}

@@ -61,7 +61,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	}
 
 	// 🔐 Save to Vault
-	if err := vault.WriteToVault(types.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(types.LDAPVaultPath, cfg, log); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

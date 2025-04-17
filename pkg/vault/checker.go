@@ -18,7 +18,7 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 
 	if client == nil {
 		var err error
-		client, err = NewClient()
+		client, err = NewClient(log)
 		if err != nil {
 			log.Warn("Vault client creation failed", zap.Error(err))
 			return &CheckReport{Notes: []string{"Vault client creation failed"}}, nil
@@ -35,7 +35,7 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 	// 2. Attempt to recover nil client
 	if client == nil {
 		var err error
-		client, err = NewClient()
+		client, err = NewClient(log)
 		if err != nil {
 			log.Warn("Vault client creation failed", zap.Error(err))
 			report.Notes = append(report.Notes, "Could not initialize Vault client")

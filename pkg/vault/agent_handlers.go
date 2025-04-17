@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
@@ -26,12 +27,12 @@ func readTokenFromSink(path string) (string, error) {
 }
 
 // GetPrivilegedVaultClient returns a Vault client authenticated as 'eos' system user
-func GetPrivilegedVaultClient() (*api.Client, error) {
+func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
 	token, err := readTokenFromSink(VaultAgentTokenPath)
 	if err != nil {
 		return nil, err
 	}
-	client, err := NewClient()
+	client, err := NewClient(log)
 	if err != nil {
 		return nil, err
 	}
@@ -40,8 +41,8 @@ func GetPrivilegedVaultClient() (*api.Client, error) {
 }
 
 // VaultCreate creates a secret only if it doesn't already exist
-func VaultCreate(path string, value interface{}) error {
-	client, err := GetPrivilegedVaultClient()
+func VaultCreate(path string, value interface{}, log *zap.Logger) error {
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return err
 	}
@@ -61,8 +62,8 @@ func VaultCreate(path string, value interface{}) error {
 }
 
 // VaultRead reads and decodes a secret struct from Vault
-func VaultRead[T any](path string) (*T, error) {
-	client, err := GetPrivilegedVaultClient()
+func VaultRead[T any](path string, log *zap.Logger) (*T, error) {
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return nil, err
 	}
@@ -84,8 +85,8 @@ func VaultRead[T any](path string) (*T, error) {
 }
 
 // VaultUpdate reads existing secret and applies a patch map
-func VaultUpdate(path string, update map[string]interface{}) error {
-	client, err := GetPrivilegedVaultClient()
+func VaultUpdate(path string, update map[string]interface{}, log *zap.Logger) error {
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return err
 	}
@@ -105,8 +106,8 @@ func VaultUpdate(path string, update map[string]interface{}) error {
 }
 
 // VaultDelete removes a secret at the given KV v2 path
-func VaultDelete(path string) error {
-	client, err := GetPrivilegedVaultClient()
+func VaultDelete(path string, log *zap.Logger) error {
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return err
 	}
@@ -115,8 +116,8 @@ func VaultDelete(path string) error {
 }
 
 // VaultDestroy permanently deletes a secret at the given KV v2 path
-func VaultPurge(path string) error {
-	client, err := GetPrivilegedVaultClient()
+func VaultPurge(path string, log *zap.Logger) error {
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return err
 	}
@@ -125,8 +126,8 @@ func VaultPurge(path string) error {
 }
 
 // VaultList returns keys under a path
-func VaultList(path string) ([]string, error) {
-	client, err := GetPrivilegedVaultClient()
+func VaultList(path string, log *zap.Logger) ([]string, error) {
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		return nil, err
 	}

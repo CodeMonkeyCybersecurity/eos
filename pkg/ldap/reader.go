@@ -162,7 +162,7 @@ func ReadConfig(log *zap.Logger) (*LDAPConfig, string, error) {
 }
 
 func readFromVault(log *zap.Logger) (*LDAPConfig, error) {
-	client, err := vault.NewClient()
+	client, err := vault.NewClient(log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}

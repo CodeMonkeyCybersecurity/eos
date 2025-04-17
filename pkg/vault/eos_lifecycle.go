@@ -301,7 +301,7 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 	if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
 		"username": "eos",
 		"password": password,
-	}); err != nil {
+	}, log); err != nil {
 		log.Warn("Failed to write eos-user secret to Vault", zap.Error(err))
 	} else {
 		log.Info("✅ eos-user secret written to Vault KV")
@@ -427,10 +427,10 @@ func EnsureEosPassword(log *zap.Logger) (string, error) {
 		if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
 			"username": "eos",
 			"password": pw1,
-		}); err != nil {
-			log.Warn("❌ Failed to store eos password in Vault", zap.Error(err))
+		}, log); err != nil {
+			log.Warn("Failed to write eos-user secret to Vault", zap.Error(err))
 		} else {
-			log.Info("✅ eos Vault password stored in Vault KV")
+			log.Info("✅ eos-user secret written to Vault KV")
 		}
 
 		return pw1, nil

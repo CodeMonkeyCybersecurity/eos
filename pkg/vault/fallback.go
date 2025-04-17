@@ -10,11 +10,11 @@ import (
 )
 
 func HandleFallbackOrStore(name string, secrets map[string]string, log *zap.Logger) error {
-	if _, err := SetVaultEnv(); err != nil {
+	if _, err := EnsureVaultAddr(log); err != nil {
 		log.Warn("Failed to set VAULT_ADDR environment", zap.Error(err))
 	}
 
-	client, err := NewClient()
+	client, err := NewClient(log)
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
@@ -22,7 +22,7 @@ func HandleFallbackOrStore(name string, secrets map[string]string, log *zap.Logg
 	report, _ := Check(client, log, nil, "")
 	if report.Initialized && !report.Sealed && report.KVWorking {
 		log.Info("🔐 Vault is available and healthy — storing secrets securely")
-		return WriteToVault(name, secrets)
+		return WriteToVault(name, secrets, log)
 	}
 
 	// Vault is not ready — offer fallback options
@@ -34,7 +34,7 @@ func HandleFallbackOrStore(name string, secrets map[string]string, log *zap.Logg
 
 	return interaction.HandleFallbackChoice(choice, map[string]func() error{
 		"deploy": func() error {
-			client, err := NewClient()
+			client, err := NewClient(log)
 			if err != nil {
 				return fmt.Errorf("failed to create Vault client: %w", err)
 			}

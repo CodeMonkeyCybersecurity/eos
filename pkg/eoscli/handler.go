@@ -30,7 +30,7 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 		defer logger.LogCommandLifecycle(cmd.Name())(&err)
 
 		vaultCheck.Do(func() {
-			vault.EnsureVaultClient()
+			vault.EnsureVaultClient(log)
 
 			log.Info("🔒 Checking Vault sealed state...")
 			if _, vaultErr := vault.EnsureVaultReady(log); vaultErr != nil {

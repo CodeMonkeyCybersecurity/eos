@@ -50,7 +50,7 @@ func enableMount(client *api.Client, path, engineType string, options map[string
 }
 
 func EnsureVaultReady(log *zap.Logger) (*api.Client, error) {
-	client, err := NewClient()
+	client, err := NewClient(log)
 	if err != nil {
 		return nil, fmt.Errorf("vault client error: %w", err)
 	}

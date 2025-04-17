@@ -24,10 +24,12 @@ func EnsureVaultAgent(client *api.Client, password string, log *zap.Logger) erro
 		return err
 	}
 
-	if err := writeAgentConfig(); err != nil {
-		log.Error("Failed to write agent config", zap.Error(err))
+	addr := getVaultAddr()
+	if err := EnsureAgentConfig(addr, log); err != nil {
+		log.Error("Failed to write agent config", zap.String("addr", addr), zap.Error(err))
 		return err
 	}
+
 	if err := writeAgentPassword(password); err != nil {
 		log.Error("Failed to write agent password", zap.Error(err))
 		return err

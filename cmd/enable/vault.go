@@ -24,13 +24,13 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			log.Error("Failed to install Vault", zap.Error(err))
 			return err
 		}
-		addr, err := vault.SetVaultEnv()
+		addr, err := vault.EnsureVaultAddr(log)
 		if err != nil {
 			log.Error("Failed to set VAULT_ADDR", zap.Error(err))
 			return err
 		}
 		log.Info("Set VAULT_ADDR from hostname", zap.String("VAULT_ADDR", addr))
-		client, err := vault.NewClient()
+		client, err := vault.NewClient(log)
 		if err != nil {
 			log.Fatal("Failed to create Vault client", zap.Error(err))
 		}

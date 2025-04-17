@@ -38,8 +38,27 @@ WantedBy=multi-user.target`
 	return nil
 }
 
-func writeAgentConfig() error {
-	content := `
+func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
+	const configPath = "/etc/vault-agent-eos.hcl"
+
+	// ✅ Check for existing config first
+	if _, err := os.Stat(configPath); err == nil {
+		log.Info("✅ Vault Agent config already exists — skipping rewrite", zap.String("path", configPath))
+		return nil
+	}
+
+	// ✅ Check AppRole files exist
+	if _, err := os.Stat("/etc/vault/role_id"); err != nil {
+		return fmt.Errorf("role_id not found: %w", err)
+	}
+	if _, err := os.Stat("/etc/vault/secret_id"); err != nil {
+		return fmt.Errorf("secret_id not found: %w", err)
+	}
+
+	log.Info("✍️ Writing Vault Agent config file", zap.String("path", configPath))
+
+	// Use dynamic Vault address and listener
+	content := fmt.Sprintf(`
 pid_file = "/run/eos/vault-agent.pid"
 
 auto_auth {
@@ -57,7 +76,7 @@ auto_auth {
 }
 
 vault {
-  address = "http://127.0.0.1:8179"
+  address = "%s"
 }
 
 listener "tcp" {
@@ -67,12 +86,13 @@ listener "tcp" {
 
 cache {
   use_auto_auth_token = true
-}`
-	configPath := "/etc/vault-agent-eos.hcl"
+}`, vaultAddr)
+
 	if err := os.WriteFile(configPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
 		return fmt.Errorf("failed to write Vault Agent config to %s: %w", configPath, err)
 	}
-	fmt.Printf("✅ Vault Agent config written to %s\n", configPath)
+
+	log.Info("✅ Vault Agent config written successfully", zap.String("path", configPath))
 	return nil
 }
 

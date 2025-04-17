@@ -22,9 +22,9 @@ var SyncVaultCmd = &cobra.Command{
 	Long: `Syncs all fallback secrets stored locally (e.g. from /var/lib/eos/secrets)
 into Vault, then removes them from disk if the sync is successful.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		vault.SetVaultEnv()
+		vault.EnsureVaultAddr(log)
 
-		client, err := vault.NewClient()
+		client, err := vault.NewClient(log)
 		if err != nil {
 			fmt.Println("❌ Failed to create Vault client:", err)
 			return nil

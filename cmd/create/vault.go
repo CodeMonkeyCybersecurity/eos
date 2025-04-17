@@ -20,7 +20,7 @@ var CreateVaultCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L()
 
-		if _, err := vault.SetVaultEnv(); err != nil {
+		if _, err := vault.EnsureVaultAddr(log); err != nil {
 			log.Fatal("Unable to set VAULT_ADDR", zap.Error(err))
 		}
 

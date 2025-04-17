@@ -99,7 +99,7 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		// Attempt a best-effort Vault client setup
-		client, err := vault.NewClient()
+		client, err := vault.NewClient(log)
 		if err != nil {
 			log.Warn("Skipping Vault health check — client unavailable", zap.Error(err))
 		} else {

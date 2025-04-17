@@ -7,9 +7,10 @@ import (
 	"os"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
-func NewClient() (*api.Client, error) {
+func NewClient(log *zap.Logger) (*api.Client, error) {
 	config := api.DefaultConfig()
 
 	// Let it read VAULT_ADDR, VAULT_TOKEN, etc from the environment
@@ -31,12 +32,12 @@ func NewClient() (*api.Client, error) {
 }
 
 // SetVaultClient allows other packages to reuse the Vault client.
-func SetVaultClient(client *api.Client) {
+func SetVaultClient(client *api.Client, log *zap.Logger) {
 	vaultClient = client
 }
 
 // GetVaultClient returns the cached Vault client (if set).
-func GetVaultClient() (*api.Client, error) {
+func GetVaultClient(log *zap.Logger) (*api.Client, error) {
 	if vaultClient == nil {
 		return nil, fmt.Errorf("vault client is not initialized; call SetVaultClient first")
 	}
@@ -44,20 +45,20 @@ func GetVaultClient() (*api.Client, error) {
 }
 
 // EnsureVaultClient guarantees the Vault client is set, using the privileged eos user.
-func EnsureVaultClient() {
-	if _, err := SetVaultEnv(); err != nil {
+func EnsureVaultClient(log *zap.Logger) {
+	if _, err := EnsureVaultAddr(log); err != nil {
 		fmt.Println("⚠️  Failed to set Vault environment:", err)
 	}
 
-	if _, err := GetVaultClient(); err == nil {
+	if _, err := GetVaultClient(log); err == nil {
 		return // already set
 	}
 
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
 		fmt.Printf("⚠️  Vault client could not be initialized: %v\n", err)
 		return
 	}
 
-	SetVaultClient(client)
+	SetVaultClient(client, log)
 }

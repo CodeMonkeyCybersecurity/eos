@@ -22,7 +22,7 @@ full (root-level) privileges. Finally, it deletes the stored initialization file
 Please follow up by configuring MFA via your organization's preferred integration method.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		// Set the Vault environment (VAULT_ADDR, etc.)
-		addr, err := vault.SetVaultEnv()
+		addr, err := vault.EnsureVaultAddr(log)
 		if err != nil {
 			log.Error("Failed to set Vault environment", zap.Error(err))
 			return err
@@ -30,13 +30,13 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("Vault environment set", zap.String("VAULT_ADDR", addr))
 
 		// Create a Vault client using the Vault API.
-		client, err := vault.NewClient()
+		client, err := vault.NewClient(log)
 		if err != nil {
 			log.Fatal("Failed to create Vault client", zap.Error(err))
 		}
 		log.Info("✅ Created new vault client")
 
-		vault.SetVaultClient(client)
+		vault.SetVaultClient(client, log)
 
 		// Prompt the user (or reuse saved) unseal keys and root token
 		// Reuse secured Vault data (no prompt)

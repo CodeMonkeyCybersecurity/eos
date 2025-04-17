@@ -22,24 +22,24 @@ import (
 func Write(client *api.Client, name string, data any, log *zap.Logger) error {
 	var err error
 	if client == nil {
-		client, err = NewClient()
+		client, err = NewClient(log)
 		if err != nil {
 			log.Warn("Vault client creation failed", zap.Error(err))
 			return writeToDisk(name, data, log)
 		}
 	}
 
-	SetVaultClient(client)
+	SetVaultClient(client, log)
 	path := vaultPath(name, log)
 
-	if err := WriteToVault(path, data); err == nil {
+	if err := WriteToVault(path, data, log); err == nil {
 		log.Info("✅ Vault secret written", zap.String("path", path))
 		return nil
 	}
 
 	log.Warn("⚠️ Vault API write failed", zap.String("path", path), zap.Error(err))
 
-	if err := WriteToVault(path, data); err == nil {
+	if err := WriteToVault(path, data, log); err == nil {
 		log.Info("✅ Vault secret written", zap.String("path", path))
 		return nil
 	}
@@ -48,12 +48,12 @@ func Write(client *api.Client, name string, data any, log *zap.Logger) error {
 }
 
 // WriteToVault stores a serializable struct to Vault at a given KV v2 path.
-func WriteToVault(path string, v interface{}) error {
-	return WriteToVaultAt("secret", path, v)
+func WriteToVault(path string, v interface{}, log *zap.Logger) error {
+	return WriteToVaultAt("secret", path, v, log)
 }
 
-func WriteToVaultAt(mount, path string, v interface{}) error {
-	client, err := GetVaultClient()
+func WriteToVaultAt(mount, path string, v interface{}, log *zap.Logger) error {
+	client, err := GetVaultClient(log)
 	if err != nil {
 		return err
 	}

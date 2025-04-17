@@ -64,7 +64,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 	cfg.UserBase = baseDN
 
 	// Save config to Vault
-	if err := vault.WriteToVault(types.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(types.LDAPVaultPath, cfg, log); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
@@ -150,7 +150,7 @@ func loadFromPrompt(log *zap.Logger) (*LDAPConfig, error) {
 // PromptLDAPDetails interactively builds an LDAPConfig using field metadata.
 func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
-	if _, err := vault.GetVaultClient(); err == nil {
+	if _, err := vault.GetVaultClient(log); err == nil {
 		_ = vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg, log)
 	}
 
@@ -171,7 +171,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 		}
 	}
 
-	if err := vault.WriteToVault(types.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(types.LDAPVaultPath, cfg, log); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
