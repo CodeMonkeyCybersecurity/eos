@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -20,10 +21,10 @@ var ignoreHardwareCheck bool
 var CreateDelphiCmd = &cobra.Command{
 	Use:     "delphi",
 	Aliases: []string{"wazuh"},
-	Short: "Deploy Delphi (Wazuh all-in-one) with optional hardware check override",
+	Short:   "Deploy Delphi (Wazuh all-in-one) with optional hardware check override",
 	Long: `Installs the full Wazuh stack (server, dashboard, and indexer) using the official quickstart script.
 By default, this checks your system's hardware (4GB RAM, 2+ cores). Use --ignore to bypass this check.`,
-	RunE:    runDelphiInstall,
+	RunE: eos.Wrap(runDelphiInstall),
 }
 
 // FindAndExtractWazuhPasswords attempts to locate wazuh-install-files.tar and extract wazuh-passwords.txt
