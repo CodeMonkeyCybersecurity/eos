@@ -20,8 +20,9 @@ var ignoreHardwareCheck bool
 var CreateDelphiCmd = &cobra.Command{
 	Use:     "delphi",
 	Aliases: []string{"wazuh"},
-	Short:   "Deploy Delphi (Wazuh all-in-one)",
-	Long:    `Installs Wazuh server, dashboard, and indexer using the official Wazuh quickstart script.`,
+	Short: "Deploy Delphi (Wazuh all-in-one) with optional hardware check override",
+	Long: `Installs the full Wazuh stack (server, dashboard, and indexer) using the official quickstart script.
+By default, this checks your system's hardware (4GB RAM, 2+ cores). Use --ignore to bypass this check.`,
 	RunE:    runDelphiInstall,
 }
 
