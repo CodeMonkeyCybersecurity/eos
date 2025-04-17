@@ -33,7 +33,7 @@ func RestoreDir(src, dst string) {
 		log.Error("Failed to clean destination", zap.String("destination", dst), zap.Error(err))
 		return
 	}
-	if err := CopyDir(src, dst); err != nil {
+	if err := CopyDir(src, dst, log); err != nil {
 		log.Error("Failed to restore directory", zap.String("source", src), zap.Error(err))
 	} else {
 		log.Info("Directory restored successfully", zap.String("destination", dst))

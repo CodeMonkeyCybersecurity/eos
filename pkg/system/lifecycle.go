@@ -16,8 +16,9 @@ import (
 func Rm(path, label string, log *zap.Logger) error {
 	info, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		log.Warn("Path not found", zap.String("label", label), zap.String("path", path))
-		fmt.Printf("⚠️  %s not found: %s\n", label, path)
+		abs, _ := filepath.Abs(path)
+		log.Warn("Path not found", zap.String("label", label), zap.String("path", abs))
+		fmt.Printf("⚠️  %s not found: %s\n", label, abs)
 		return nil
 	}
 
@@ -95,7 +96,7 @@ func CopyFile(src, dst string, log *zap.Logger) error {
 }
 
 // CopyDir recursively copies a directory from src to dst.
-func CopyDir(src, dst string) error {
+func CopyDir(src, dst string, log *zap.Logger) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
 		return fmt.Errorf("failed to stat src: %w", err)
@@ -118,7 +119,7 @@ func CopyDir(src, dst string) error {
 		dstPath := filepath.Join(dst, entry.Name())
 
 		if entry.IsDir() {
-			if err := CopyDir(srcPath, dstPath); err != nil {
+			if err := CopyDir(srcPath, dstPath, log); err != nil {
 				return err
 			}
 		} else {

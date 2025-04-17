@@ -36,7 +36,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Failed to remove existing backup", zap.String("path", hecate.BackupConf), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.CopyDir(hecate.ConfDir, hecate.BackupConf); err != nil {
+		if err := system.CopyDir(hecate.ConfDir, hecate.BackupConf, log); err != nil {
 			log.Error("Backup failed", zap.String("src", types.DefaultConfDir), zap.Error(err))
 			os.Exit(1)
 		}
@@ -52,7 +52,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Failed to remove existing hecate.Backup", zap.String("path", hecate.BackupCerts), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.CopyDir(hecate.DstCerts, hecate.BackupCerts); err != nil {
+		if err := system.CopyDir(hecate.DstCerts, hecate.BackupCerts, log); err != nil {
 			log.Error("Backup failed", zap.String("src", types.DefaultCertsDir), zap.Error(err))
 			os.Exit(1)
 		}

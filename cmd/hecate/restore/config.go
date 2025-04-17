@@ -19,7 +19,7 @@ func main() {
 		fmt.Printf("Error removing directory '%s': %v\n", hecate.DstConf, err)
 		os.Exit(1)
 	}
-	if err := system.CopyDir(hecate.BackupConf, hecate.DstConf); err != nil {
+	if err := system.CopyDir(hecate.BackupConf, hecate.DstConf, log); err != nil {
 		fmt.Printf("Error during restore of %s: %v\n", hecate.BackupConf, err)
 		os.Exit(1)
 	}
@@ -35,7 +35,7 @@ func main() {
 		fmt.Printf("Error removing directory '%s': %v\n", hecate.DstCerts, err)
 		os.Exit(1)
 	}
-	if err := system.CopyDir(hecate.BackupCerts, hecate.DstCerts); err != nil {
+	if err := system.CopyDir(hecate.BackupCerts, hecate.DstCerts, log); err != nil {
 		fmt.Printf("Error during restore of %s: %v\n", hecate.BackupCerts, err)
 		os.Exit(1)
 	}
