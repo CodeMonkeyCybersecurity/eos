@@ -50,7 +50,7 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		log.Info("✅ Loaded the stored initialization data and eos user credentials")
 
 		/* Create AppRole credentials */
-		if err := vault.CreateAppRole(client, "eos-approle"); err != nil {
+		if err := vault.CreateAppRole(client, "eos-approle", log); err != nil {
 			log.Error("Failed to create AppRole", zap.Error(err))
 			return err
 		}

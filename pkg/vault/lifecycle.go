@@ -283,7 +283,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse) error {
 		return fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	if err := os.MkdirAll(diskSecretsPath, 0700); err != nil {
+	if err := os.MkdirAll(SecretsDir, 0700); err != nil {
 		return fmt.Errorf("failed to create secrets directory: %w", err)
 	}
 
@@ -366,14 +366,14 @@ func CreateUserpassAccount(client *api.Client, username, password string) error 
 	return err
 }
 
-func SetupEosVaultUser(client *api.Client, password string) error {
+func SetupEosVaultUser(client *api.Client, password string, log *zap.Logger) error {
 	if err := EnableVaultAuthMethods(client); err != nil {
 		return err
 	}
 	if err := CreateUserpassAccount(client, "eos", password); err != nil {
 		return err
 	}
-	if err := CreateAppRole(client, "eos"); err != nil {
+	if err := CreateAppRole(client, "eos", log); err != nil {
 		return err
 	}
 	return nil

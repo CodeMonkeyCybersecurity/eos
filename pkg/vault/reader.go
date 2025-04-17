@@ -79,7 +79,7 @@ func ReadFallbackJSON[T any](path string) (*T, error) {
 
 // readFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
 func ReadFallbackSecrets() (map[string]string, error) {
-	path := filepath.Join(diskSecretsPath, "delphi-fallback.yaml")
+	path := filepath.Join(SecretsDir, "delphi-fallback.yaml")
 
 	secretsPtr, err := ReadFallbackJSON[map[string]string](path)
 	if err != nil {

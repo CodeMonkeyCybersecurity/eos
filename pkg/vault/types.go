@@ -11,24 +11,35 @@ import (
 	"github.com/hashicorp/vault/api"
 )
 
+var (
+	// Vault Secrets + Tokens
+	SecretsDir          = "/var/lib/eos/secrets"
+	VaultInitPath       = filepath.Join(SecretsDir, "vault_init.json")
+	VaultUserPath       = filepath.Join(SecretsDir, "vault_userpass.json")
+	AppRoleIDPath       = filepath.Join(SecretsDir, "vault_role_id")
+	AppSecretIDPath     = filepath.Join(SecretsDir, "vault_secret_id")
+	VaultAgentTokenPath = "/run/eos/vault-agent-eos.token"
+)
+
 const (
-	diskSecretsPath      = "/var/lib/eos/secrets"
-	auditPath            = "file/"
-	mountPath            = "sys/audit/" + auditPath
-	EosVaultPolicy       = "eos-policy"
+	// Vault Agent & Policy Paths
 	VaultAgentConfigPath = "/etc/vault-agent-eos.hcl"
-	RoleIDPath           = "/etc/vault/role_id"
-	SecretIDPath         = "/etc/vault/secret_id"
-	VaultAgentTokenPath  = "/run/eos/vault-agent-eos.token"
-	roleName             = "eos-approle"
-	rolePath             = "auth/approle/role/" + roleName
-	roleIDPath           = "/etc/vault/role_id"
-	secretIDPath         = "/etc/vault/secret_id"
+	VaultAgentPassPath   = "/etc/vault-agent-eos.pass"
+	VaultAgentUnitPath   = "/etc/systemd/system/vault-agent-eos.service"
+	EosVaultPolicy       = "eos-policy"
+
+	// AppRole-specific
+	roleName = "eos-approle"
+	rolePath = "auth/approle/role/" + roleName
+
+	// Audit
+	auditPath = "file/"
+	mountPath = "sys/audit/" + auditPath
 )
 
 var (
-	DelphiFallbackSecretsPath = filepath.Join(diskSecretsPath, "delphi_fallback.json")
-	EosUserFallbackFile       = filepath.Join(diskSecretsPath, "vault_userpass.json")
+	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
+	EosUserFallbackFile       = filepath.Join(SecretsDir, "vault_userpass.json")
 )
 
 // vaultPath returns the full KV v2 path for data reads/writes.
@@ -43,7 +54,7 @@ func vaultPath(name string) string {
 // DiskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
 func DiskPath(name string) string {
 	if name == "vault_init" {
-		return filepath.Join(diskSecretsPath, "vault_init.json")
+		return filepath.Join(SecretsDir, "vault_init.json")
 	}
 	return xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 }

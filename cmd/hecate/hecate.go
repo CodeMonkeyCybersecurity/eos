@@ -18,6 +18,9 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
 // HecateCmd groups reverse proxy–related commands.
 var HecateCmd = &cobra.Command{
 	Use:   "hecate",
@@ -32,15 +35,10 @@ var HecateCmd = &cobra.Command{
 	}),
 }
 
-// log is a package-level variable for the Zap logger.
-var log *zap.Logger
-
 func init() {
 	// Initialize the shared logger for the entire deploy package
 	log = logger.L()
-}
 
-func init() {
 	// Register Hecate subcommands
 	HecateCmd.AddCommand(create.CreateCmd)
 	HecateCmd.AddCommand(delete.DeleteCmd)

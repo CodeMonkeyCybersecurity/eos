@@ -7,9 +7,10 @@ import (
 	"os"
 
 	"github.com/hashicorp/vault/api"
+	"go.uber.org/zap"
 )
 
-func CreateAppRole(client *api.Client, roleName string) error {
+func CreateAppRole(client *api.Client, roleName string, log *zap.Logger) error {
 	fmt.Println("🔐 Creating AppRole:", roleName)
 
 	// Enable AppRole auth method (idempotent)
@@ -42,21 +43,21 @@ func CreateAppRole(client *api.Client, roleName string) error {
 	secretID := secretIDResp.Data["secret_id"].(string)
 
 	// Write both values to disk
-	if err := os.WriteFile(RoleIDPath, []byte(roleID+"\n"), 0640); err != nil {
+	if err := os.WriteFile(AppRoleIDPath, []byte(roleID+"\n"), 0640); err != nil {
 		return fmt.Errorf("failed to write role_id: %w", err)
 	}
-	if err := os.WriteFile(SecretIDPath, []byte(secretID+"\n"), 0640); err != nil {
+	if err := os.WriteFile(SecretsDir, []byte(secretID+"\n"), 0640); err != nil {
 		return fmt.Errorf("failed to write secret_id: %w", err)
 	}
 
 	fmt.Println("✅ AppRole credentials written to disk:")
-	fmt.Println("   •", RoleIDPath)
-	fmt.Println("   •", SecretIDPath)
+	fmt.Println("   •", AppRoleIDPath)
+	fmt.Println("   •", SecretsDir)
 
 	return nil
 }
 
-func WriteAppRoleCredentials(client *api.Client) error {
+func WriteAppRoleCredentials(client *api.Client, log *zap.Logger) error {
 	roleID, err := client.Logical().Read(rolePath + "/role-id")
 	if err != nil {
 		return fmt.Errorf("failed to read role_id: %w", err)
@@ -66,10 +67,10 @@ func WriteAppRoleCredentials(client *api.Client) error {
 		return fmt.Errorf("failed to generate secret_id: %w", err)
 	}
 
-	if err := os.WriteFile(RoleIDPath, []byte(roleID.Data["role_id"].(string)), 0400); err != nil {
+	if err := os.WriteFile(AppRoleIDPath, []byte(roleID.Data["role_id"].(string)), 0400); err != nil {
 		return err
 	}
-	if err := os.WriteFile(SecretIDPath, []byte(secretID.Data["secret_id"].(string)), 0400); err != nil {
+	if err := os.WriteFile(SecretsDir, []byte(secretID.Data["secret_id"].(string)), 0400); err != nil {
 		return err
 	}
 	return nil

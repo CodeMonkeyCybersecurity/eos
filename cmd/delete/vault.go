@@ -74,12 +74,14 @@ var DeleteVaultCmd = &cobra.Command{
 			log.Info("Purging Vault configuration, data, and logs...")
 
 			configDirs := []string{
-				"/etc/vault.d",
+				"/etc/vault*",
 				"/opt/vault",
 				"/var/lib/vault",
 				"/var/log/vault.log",
 				"/var/snap/vault",
 				"/var/lib/eos",
+				"/run/eos/",
+				"/etc/systemd/system/vault*",
 			}
 
 			for _, dir := range configDirs {
