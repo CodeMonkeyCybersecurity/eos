@@ -9,12 +9,13 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 	"golang.org/x/term"
 )
 
 // PromptIfMissing checks if a flag was set, otherwise prompts the user interactively.
 // Supports optional secret input for sensitive values.
-func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool) (string, error) {
+func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool, log *zap.Logger) (string, error) {
 	val, err := cmd.Flags().GetString(flagName)
 	if err != nil {
 		return "", err
@@ -26,7 +27,7 @@ func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool)
 	if isSecret {
 		return promptSecret(prompt), nil
 	}
-	return promptInput(prompt, ""), nil
+	return PromptInput(prompt, "", log), nil
 }
 
 // promptSecret hides terminal input for sensitive values like passwords or client secrets.
@@ -59,7 +60,7 @@ func promptSelect(prompt string, options []string) string {
 }
 
 // PromptYesNo asks a yes/no question, optionally defaulting to yes or no.
-func promptYesNo(prompt string, defaultYes bool) bool {
+func PromptYesNo(prompt string, defaultYes bool) bool {
 	def := "Y/n"
 	if !defaultYes {
 		def = "y/N"
@@ -79,7 +80,7 @@ func promptYesNo(prompt string, defaultYes bool) bool {
 }
 
 // PromptConfirmOrValue asks the user to accept a default value or enter a new one.
-func promptConfirmOrValue(prompt, defaultValue string) string {
+func PromptConfirmOrValue(prompt, defaultValue string) string {
 	if PromptYesNo(fmt.Sprintf("%s (default: %s)?", prompt, defaultValue), true) {
 		return defaultValue
 	}
@@ -89,29 +90,8 @@ func promptConfirmOrValue(prompt, defaultValue string) string {
 	return input
 }
 
-// PromptInputs collects one or more lines of input with labels like "Field", "Field 1", etc.
-func promptInputs(reader *bufio.Reader, label string, n int) ([]string, error) {
-	if n <= 0 {
-		return nil, fmt.Errorf("invalid input count: %d", n)
-	}
-	inputs := make([]string, n)
-	for i := 0; i < n; i++ {
-		prompt := label
-		if n > 1 {
-			prompt = fmt.Sprintf("%s %d", label, i+1)
-		}
-		fmt.Print(prompt + ": ")
-		text, err := reader.ReadString('\n')
-		if err != nil {
-			return inputs[:i], fmt.Errorf("failed to read input for '%s': %w", prompt, err)
-		}
-		inputs[i] = strings.TrimSpace(text)
-	}
-	return inputs, nil
-}
-
 // PromptInput displays a prompt and reads user input.
-func promptInput(prompt, defaultVal string) string {
+func PromptInput(prompt, defaultVal string, log *zap.Logger) string {
 	reader := bufio.NewReader(os.Stdin)
 	if defaultVal != "" {
 		fmt.Printf("%s [%s]: ", prompt, defaultVal)

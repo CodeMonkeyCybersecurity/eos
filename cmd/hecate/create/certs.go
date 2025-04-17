@@ -119,9 +119,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	baseDomain := interaction.PromptInput("Enter the base domain (e.g. domain.com)", prevValues["BASE_DOMAIN"])
+	baseDomain := interaction.PromptInput("Enter the base domain (e.g. domain.com)", prevValues["BASE_DOMAIN"], log)
 	subdomain := promptSubdomain()
-	mailCert := interaction.PromptInput("Enter the contact email (e.g. example@domain.com)", prevValues["EMAIL"])
+	mailCert := interaction.PromptInput("Enter the contact email (e.g. example@domain.com)", prevValues["EMAIL"], log)
 
 	// Save the new values for future runs.
 	newValues := map[string]string{
@@ -187,7 +187,7 @@ func main() {
 			certName = defaultCertName
 			break
 		} else if confirm == "no" || confirm == "n" {
-			certName = interaction.PromptInput("Enter the desired certificate name (for file naming)", "")
+			certName = interaction.PromptInput("Enter the desired certificate name (for file naming)", "", log)
 			break
 		} else {
 			fmt.Println("Please answer yes or no.")

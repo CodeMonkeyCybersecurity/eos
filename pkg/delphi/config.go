@@ -33,10 +33,10 @@ func PromptDelphiConfig(log *zap.Logger) *Config {
 	}
 
 	return &Config{
-		FQDN:               interaction.PromptInput("Enter the Wazuh FQDN", "delphi.domain.com"),
-		Port:               interaction.PromptInput("Enter the port", "55000"),
-		Protocol:           interaction.PromptInput("Enter the protocol (http or https)", "https"),
-		APIUser:            interaction.PromptInput("Enter the API username", "wazuh-wui"),
+		FQDN:               interaction.PromptInput("Enter the Wazuh FQDN", "delphi.domain.com", log),
+		Port:               interaction.PromptInput("Enter the port", "55000", log),
+		Protocol:           interaction.PromptInput("Enter the protocol (http or https)", "https", log),
+		APIUser:            interaction.PromptInput("Enter the API username", "wazuh-wui", log),
 		APIPassword:        password,
 		VerifyCertificates: false,
 	}

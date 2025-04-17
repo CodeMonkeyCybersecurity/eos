@@ -37,10 +37,10 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 
 	// Prompt only if missing
 	if cfg.FQDN == "" {
-		cfg.FQDN = interaction.PromptInput("FQDN", "FQDN of your LDAP server")
+		cfg.FQDN = interaction.PromptInput("FQDN", "FQDN of your LDAP server", log)
 	}
 	if cfg.BindDN == "" {
-		cfg.BindDN = interaction.PromptInput("BindDN", "Bind DN")
+		cfg.BindDN = interaction.PromptInput("BindDN", "Bind DN", log)
 	}
 	if cfg.Password == "" {
 		var err error
@@ -50,10 +50,10 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 		}
 	}
 
-	cfg.UserBase = interaction.PromptInput("UserBase", "User base DN (e.g., ou=people,dc=example,dc=org)")
-	cfg.RoleBase = interaction.PromptInput("RoleBase", "Role base DN (e.g., ou=Groups,dc=example,dc=org)")
-	cfg.AdminRole = interaction.PromptInput("AdminRole", "Admin group name (e.g., Administrator)")
-	cfg.ReadonlyRole = interaction.PromptInput("ReadonlyRole", "Readonly group name (e.g., readonly)")
+	cfg.UserBase = interaction.PromptInput("UserBase", "User base DN (e.g., ou=people,dc=example,dc=org)", log)
+	cfg.RoleBase = interaction.PromptInput("RoleBase", "Role base DN (e.g., ou=Groups,dc=example,dc=org)", log)
+	cfg.AdminRole = interaction.PromptInput("AdminRole", "Admin group name (e.g., Administrator)", log)
+	cfg.ReadonlyRole = interaction.PromptInput("ReadonlyRole", "Readonly group name (e.g., readonly)", log)
 
 	// Validate required fields
 	if cfg.FQDN == "" || cfg.BindDN == "" || cfg.Password == "" || cfg.UserBase == "" || cfg.RoleBase == "" {

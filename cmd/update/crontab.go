@@ -34,7 +34,7 @@ func runCrontabUpdate(cmd *cobra.Command, args []string) error {
 	// Prompt for email if not provided via flag.
 	email = strings.TrimSpace(email)
 	if email == "" {
-		email = interaction.PromptInput("Email address for cron failure alerts", "e.g., your@email.com")
+		email = interaction.PromptInput("Email address for cron failure alerts", "e.g., your@email.com", log)
 	}
 	if email == "" {
 		log.Error("No email provided. Aborting.")

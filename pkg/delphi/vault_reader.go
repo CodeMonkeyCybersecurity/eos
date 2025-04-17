@@ -50,7 +50,7 @@ func GetDelphiAPICredsOrPrompt(log *zap.Logger) (string, string, error) {
 
 // promptDelphiAPICreds prompts interactively, then optionally writes back to Vault
 func promptDelphiAPICreds(log *zap.Logger) (string, string, error) {
-	user := interaction.PromptInput("Enter the API username (e.g. wazuh-wui): ", "")
+	user := interaction.PromptInput("Enter the API username (e.g. wazuh-wui): ", "", log)
 	pass, err := interaction.PromptPassword("Enter the API password", log)
 	if err != nil {
 		log.Error("Failed to read password", zap.Error(err))

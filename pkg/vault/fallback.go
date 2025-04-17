@@ -26,11 +26,11 @@ func HandleFallbackOrStore(name string, secrets map[string]string, log *zap.Logg
 	}
 
 	// Vault is not ready — offer fallback options
-	choice := interaction.PromptGenericFallback("Vault not detected or not ready. What would you like to do?", []interaction.FallbackOption{
+	choice := interaction.FallbackPrompter("Vault not detected or not ready. What would you like to do?", []interaction.FallbackOption{
 		{Label: "Deploy local Vault now [recommended]", Code: "deploy"},
 		{Label: "Skip and save credentials to disk", Code: "disk"},
 		{Label: "Abort", Code: "abort"},
-	})
+	}, log)
 
 	return interaction.HandleFallbackChoice(choice, map[string]func() error{
 		"deploy": func() error {

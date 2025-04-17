@@ -59,7 +59,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 
 	// Prompt for target login if not provided.
 	if targetLogin == "" {
-		targetLogin = interaction.PromptInput("Enter target login (<user@host>)", "")
+		targetLogin = interaction.PromptInput("Enter target login (<user@host>)", "", log)
 	}
 	parts := strings.Split(strings.TrimSpace(targetLogin), "@")
 	if len(parts) != 2 {

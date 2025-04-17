@@ -27,9 +27,9 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 	}
 
 	// Prompts
-	proto := interaction.PromptInput("Connection type [ldap, ldaps, ldapi]", "ldap")
-	host := interaction.PromptInput("LDAP host or IP", cfg.FQDN)
-	bindDN := interaction.PromptInput("Bind DN (e.g. cn=admin,dc=domain,dc=com)", cfg.BindDN)
+	proto := interaction.PromptInput("Connection type [ldap, ldaps, ldapi]", "ldap", log)
+	host := interaction.PromptInput("LDAP host or IP", cfg.FQDN, log)
+	bindDN := interaction.PromptInput("Bind DN (e.g. cn=admin,dc=domain,dc=com)", cfg.BindDN, log)
 	if bindDN == "" {
 		fmt.Println("⚠️  No BindDN provided — defaulting to cn=anonymous instead.")
 		bindDN = "cn=anonymous"
@@ -41,7 +41,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 		return err
 	}
 	fmt.Println("Search base DN (e.g. ou=Users,dc=domain,dc=com). Leave blank to search entire tree.")
-	baseDN := interaction.PromptInput("Search base DN", cfg.UserBase)
+	baseDN := interaction.PromptInput("Search base DN", cfg.UserBase, log)
 	if baseDN == "" || baseDN == `""` {
 		inferred := inferBaseDN(bindDN, log)
 		if inferred != "" {
@@ -53,8 +53,8 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 		}
 	}
 
-	filter := interaction.PromptInput("Search filter", "(objectClass=*)")
-	attrLine := interaction.PromptInput("Attributes (comma-separated, or leave blank for all)", "")
+	filter := interaction.PromptInput("Search filter", "(objectClass=*)", log)
+	attrLine := interaction.PromptInput("Attributes (comma-separated, or leave blank for all)", "", log)
 	attrs := strings.FieldsFunc(attrLine, func(r rune) bool { return r == ',' || r == ' ' })
 
 	// Save values into cfg
@@ -165,7 +165,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 				}
 				val = secret
 			} else {
-				val = interaction.PromptInput(meta.Label, meta.Help)
+				val = interaction.PromptInput(meta.Label, meta.Help, log)
 			}
 			SetLDAPField(cfg, fieldName, val, log)
 		}

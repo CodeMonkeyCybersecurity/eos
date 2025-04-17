@@ -82,25 +82,32 @@ func ReadFallbackJSON[T any](path string, log *zap.Logger) (*T, error) {
 	return &result, nil
 }
 
-// readFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
+// ReadFallbackSecrets loads fallback secrets for Delphi (or other shared secrets).
 func ReadFallbackSecrets(log *zap.Logger) (map[string]string, error) {
-	path := filepath.Join(SecretsDir, "delphi-fallback.yaml")
+	path := filepath.Join(SecretsDir, "delphi-fallback.json") // or .yaml if you support YAML decoding
 
 	secretsPtr, err := ReadFallbackJSON[map[string]string](path, log)
 	if err != nil {
-		return nil, fmt.Errorf("could not load fallback secrets from %s: %w", path, err)
+		log.Error("Could not load fallback secrets", zap.String("path", path), zap.Error(err))
+		return nil, err
 	}
 
-	fmt.Printf("📥 Fallback credentials loaded from %s\n", path)
+	log.Info("📥 Fallback credentials loaded", zap.String("path", path))
 	return *secretsPtr, nil
 }
 
+// ReadFallbackIntoJSON reads a fallback JSON file into the given output struct.
 func ReadFallbackIntoJSON(path string, out any, log *zap.Logger) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("read fallback JSON: %w", err)
+		log.Warn("Fallback file missing — skipping file read", zap.String("path", path), zap.Error(err))
+		return err
 	}
-	return json.Unmarshal(data, out)
+	if err := json.Unmarshal(data, out); err != nil {
+		log.Warn("unmarshal fallback JSON", zap.String("path", path), zap.Error(err))
+		return err
+	}
+	return nil
 }
 
 func ListUnder(path string, log *zap.Logger) ([]string, error) {

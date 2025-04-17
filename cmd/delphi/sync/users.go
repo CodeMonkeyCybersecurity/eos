@@ -18,14 +18,14 @@ var SyncUsersCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("delphi.sync.users")
 
-		realm, _ := interaction.PromptIfMissing(cmd, "realm", "Enter Keycloak realm", false)
+		realm, _ := interaction.PromptIfMissing(cmd, "realm", "Enter Keycloak realm", false, log)
 		sinceStr, _ := cmd.Flags().GetString("since")
 
-		kcURL, _ := interaction.PromptIfMissing(cmd, "url", "Enter Keycloak base URL", false)
+		kcURL, _ := interaction.PromptIfMissing(cmd, "url", "Enter Keycloak base URL", false, log)
 
-		clientID, _ := interaction.PromptIfMissing(cmd, "client-id", "Enter Keycloak client ID", false)
+		clientID, _ := interaction.PromptIfMissing(cmd, "client-id", "Enter Keycloak client ID", false, log)
 
-		clientSecret, _ := interaction.PromptIfMissing(cmd, "client-secret", "Enter Keycloak client secret", true)
+		clientSecret, _ := interaction.PromptIfMissing(cmd, "client-secret", "Enter Keycloak client secret", true, log)
 
 		log.Debug("Initializing Keycloak client",
 			zap.String("url", kcURL),

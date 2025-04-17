@@ -9,15 +9,16 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"go.uber.org/zap"
 )
 
-func promptGenericFallback(title string, options []FallbackOption) string {
+func FallbackPrompter(title string, options []FallbackOption, log *zap.Logger) string {
 	var labels []string
 	for _, opt := range options {
 		labels = append(labels, opt.Label)
 	}
 
-	choice := PromptSelect(title, labels)
+	choice := promptSelect(title, labels)
 	for _, opt := range options {
 		if opt.Label == choice {
 			return opt.Code
@@ -26,14 +27,14 @@ func promptGenericFallback(title string, options []FallbackOption) string {
 	return ""
 }
 
-func handleFallbackChoice(choice string, handlers map[string]func() error) error {
+func HandleFallbackChoice(choice string, handlers map[string]func() error) error {
 	if handler, ok := handlers[choice]; ok {
 		return handler()
 	}
 	return fmt.Errorf("unexpected fallback choice: %s", choice)
 }
 
-func writeFallbackSecrets(name string, secrets map[string]string) error {
+func WriteFallbackSecrets(name string, secrets map[string]string) error {
 	path := xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
@@ -50,7 +51,7 @@ func writeFallbackSecrets(name string, secrets map[string]string) error {
 }
 
 // ReadFallbackSecrets loads secrets from ~/.config/eos/<name>/config.json
-func readFallbackSecrets(name string) (map[string]string, error) {
+func ReadFallbackSecrets(name string) (map[string]string, error) {
 	path := xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -62,4 +63,33 @@ func readFallbackSecrets(name string) (map[string]string, error) {
 		return nil, fmt.Errorf("unmarshal fallback secrets: %w", err)
 	}
 	return secrets, nil
+}
+
+func ReadFallbackJSON[T any](path string, log *zap.Logger) (*T, error) {
+	log.Debug("Reading fallback config", zap.String("path", path))
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read: %w", err)
+	}
+	var out T
+	if err := json.Unmarshal(data, &out); err != nil {
+		return nil, fmt.Errorf("unmarshal: %w", err)
+	}
+	return &out, nil
+}
+
+func WriteFallbackJSON[T any](path string, data *T, log *zap.Logger) error {
+	log.Debug("Writing fallback config", zap.String("path", path))
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return fmt.Errorf("create config dir: %w", err)
+	}
+	b, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	return os.WriteFile(path, b, 0600)
+}
+
+func FallbackPath(name string) string {
+	return xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
 }

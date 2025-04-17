@@ -21,7 +21,7 @@ func Remember(name, key, prompt, def string, log *zap.Logger) (string, error) {
 
 	// Use the generic interaction helper to prompt the user.
 	current := values[key] // could be empty if not present
-	val := interaction.RememberValue(key, prompt, def, current)
+	val := interaction.Remember(key, prompt, def, current, log)
 	values[key] = val
 
 	// Persist the updated config using the Vault fallback mechanism.

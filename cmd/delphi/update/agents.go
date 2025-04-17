@@ -34,12 +34,12 @@ var UpdateAgentsCmd = &cobra.Command{
 			return fmt.Errorf("authentication failed: %w", err)
 		}
 
-		agentRaw := interaction.PromptInput("Enter agent IDs (comma-separated)", "")
+		agentRaw := interaction.PromptInput("Enter agent IDs (comma-separated)", "", log)
 		agentIDs := strings.Split(agentRaw, ",")
 
-		version := interaction.PromptInput("Enter version (e.g., v4.6.0)", "")
-		repo := interaction.PromptInput("Enter WPK repo", "packages.wazuh.com/wpk/")
-		packageType := interaction.PromptInput("Enter package type (rpm/deb)", "rpm")
+		version := interaction.PromptInput("Enter version (e.g., v4.6.0)", "", log)
+		repo := interaction.PromptInput("Enter WPK repo", "packages.wazuh.com/wpk/", log)
+		packageType := interaction.PromptInput("Enter package type (rpm/deb)", "rpm", log)
 		force, _ := interaction.Resolve("Force upgrade?", log)
 		useHTTP, _ := interaction.Resolve("Use HTTP (instead of HTTPS)?", log)
 

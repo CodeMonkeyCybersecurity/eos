@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -129,69 +128,43 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 		SecretThreshold: 3,
 	})
 	if err != nil {
-		// If Vault is already initialized, try to load the fallback file
 		if IsAlreadyInitialized(err) {
 			fmt.Println("✅ Vault already initialized.")
 
-			initResPtr, err := ReadFallbackJSON[api.InitResponse](DiskPath("vault_init", log), log)
+			// ✨ Reuse fallback or prompt logic
+			initRes, err := LoadInitResultOrPrompt(client, log)
 			if err != nil {
-				return nil, nil, fmt.Errorf("vault already initialized and fallback read failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
+				return nil, nil, fmt.Errorf("vault already initialized and fallback failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
 			}
-			initRes := *initResPtr
 
-			// ✅ Unseal Vault using the fallback keys
-			if err := UnsealVault(client, &initRes); err != nil {
+			// 🔓 Unseal and auth
+			if err := UnsealVault(client, initRes, log); err != nil {
 				return nil, nil, fmt.Errorf("failed to unseal already-initialized Vault: %w", err)
 			}
-
-			// Set the root token after unsealing so that future calls are authenticated.
 			client.SetToken(initRes.RootToken)
 
-			// Retry loop: wait until Vault reports that it is unsealed.
-			const maxRetries = 5
-			for i := 0; i < maxRetries; i++ {
-				health, err := client.Sys().Health()
-				if err != nil {
-					fmt.Printf("Error checking Vault health: %v\n", err)
-					continue
-				}
-				if !health.Sealed {
-					fmt.Println("✅ Vault reports as unsealed")
-					break
-				}
-				fmt.Printf("Vault still sealed, waiting 5 seconds... (attempt %d/%d)\n", i+1, maxRetries)
-				time.Sleep(5 * time.Second)
-			}
-
-			// Persist the Vault init result again for redundancy
+			// ✅ Re-store init result
 			if err := Write(client, "vault_init", initRes, log); err != nil {
-				fmt.Println("Failed to persist Vault init result")
-				return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
+				log.Warn("Failed to persist Vault init result", zap.Error(err))
 			} else {
 				fmt.Println("✅ Vault init result persisted successfully")
 			}
-			return client, &initRes, nil
+			return client, initRes, nil
 		}
 		return nil, nil, fmt.Errorf("init failed: %w", err)
 	}
 
-	// Dump init result for developer diagnostics
+	// 🆕 Vault just initialized: unseal and persist
 	DumpInitResult(initRes, log)
-
-	// Unseal Vault now that initialization is complete.
-	if err := UnsealVault(client, initRes); err != nil {
+	if err := UnsealVault(client, initRes, log); err != nil {
 		return nil, nil, err
 	}
-
-	// Set the root token after unsealing so that future calls are authenticated
 	client.SetToken(initRes.RootToken)
 
-	// Persist the Vault init result now that Vault is unsealed and the token is valid.
 	if err := Write(client, "vault_init", initRes, log); err != nil {
 		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
-	} else {
-		fmt.Println("✅ Vault init result persisted successfully")
 	}
+	fmt.Println("✅ Vault init result persisted successfully")
 
 	return client, initRes, nil
 }
@@ -207,7 +180,7 @@ func DumpInitResult(initRes *api.InitResponse, log *zap.Logger) {
 	fmt.Printf("✅ Vault initialized with %d unseal keys.\n", len(initRes.KeysB64))
 }
 
-func UnsealVault(client *api.Client, initRes *api.InitResponse) error {
+func UnsealVault(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
 	if len(initRes.KeysB64) < 3 {
 		return fmt.Errorf("not enough unseal keys")
 	}
