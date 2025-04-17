@@ -54,8 +54,6 @@ and reverse proxy configurations via Hecate.`,
 			fmt.Printf("⚠️  Failed to set VAULT_ADDR: %v\n", err)
 		}
 
-		// Setup Vault client (ensures fallback support)
-		vault.EnsureVaultClient()
 	},
 
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
