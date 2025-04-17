@@ -27,6 +27,12 @@ var SyncUsersCmd = &cobra.Command{
 
 		clientSecret, _ := interaction.PromptIfMissing(cmd, "client-secret", "Enter Keycloak client secret", true)
 
+		log.Debug("Initializing Keycloak client",
+			zap.String("url", kcURL),
+			zap.String("realm", realm),
+			zap.String("clientID", clientID),
+		)
+
 		sinceDur, err := time.ParseDuration(sinceStr)
 		if err != nil {
 			log.Error("Invalid --since duration", zap.Error(err))
@@ -35,6 +41,13 @@ var SyncUsersCmd = &cobra.Command{
 
 		client, err := hera.NewClient(kcURL, clientID, clientSecret)
 		if err != nil {
+			log.Error("Failed to initialize Keycloak client",
+				zap.String("url", kcURL),
+				zap.String("clientID", clientID),
+				zap.String("realm", realm),
+				zap.Error(err),
+			)
+			err := fmt.Errorf("keycloak login failed (check client ID/secret/realm)")
 			log.Error("Failed to initialize Keycloak client", zap.Error(err))
 			return err
 		}
