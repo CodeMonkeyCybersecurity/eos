@@ -16,8 +16,8 @@ import (
 )
 
 // TestConnection attempts a bind to verify the LDAP connection works.
-func CheckConnection(cfg *LDAPConfig) error {
-	conn, err := ConnectWithGivenConfig(cfg)
+func CheckConnection(cfg *LDAPConfig, log *zap.Logger) error {
+	conn, err := ConnectWithGivenConfig(cfg, log)
 	if err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
@@ -39,7 +39,7 @@ func TryReadFromVault(client *api.Client, log *zap.Logger) (*LDAPConfig, error) 
 	return &cfg, nil
 }
 
-func TryLoadFromEnv() *LDAPConfig {
+func TryLoadFromEnv(log *zap.Logger) *LDAPConfig {
 	fqdn := os.Getenv("LDAP_FQDN")
 	bind := os.Getenv("LDAP_BIND_DN")
 	pass := os.Getenv("LDAP_PASSWORD")
@@ -71,7 +71,7 @@ func TryLoadFromEnv() *LDAPConfig {
 	}
 }
 
-func TryDetectFromHost() *LDAPConfig {
+func TryDetectFromHost(log *zap.Logger) *LDAPConfig {
 	timeout := 500 * time.Millisecond
 	conn, err := net.DialTimeout("tcp", "localhost:389", timeout)
 	if err != nil {
@@ -93,7 +93,7 @@ func TryDetectFromHost() *LDAPConfig {
 }
 
 // IsPortOpen checks if a port is listening on localhost (e.g. 389 for LDAP)
-func IsPortOpen(port int) bool {
+func IsPortOpen(port int, log *zap.Logger) bool {
 	address := fmt.Sprintf("127.0.0.1:%d", port)
 	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 	if err != nil {
@@ -104,7 +104,7 @@ func IsPortOpen(port int) bool {
 }
 
 // IsSystemdUnitActive checks if a systemd service (e.g. slapd) is active
-func IsSystemdUnitActive(name string) bool {
+func IsSystemdUnitActive(name string, log *zap.Logger) bool {
 	out, err := exec.Command("systemctl", "is-active", name).Output()
 	if err != nil {
 		return false
@@ -112,14 +112,14 @@ func IsSystemdUnitActive(name string) bool {
 	return strings.TrimSpace(string(out)) == "active"
 }
 
-func runLDAPProbe() error {
+func runLDAPProbe(log *zap.Logger) error {
 	cmd := exec.Command("ldapsearch", "-x", "-H", "ldap://localhost", "-b", "", "-s", "base")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run()
 }
 
-func runLDAPAuthProbe(bindDN, password string) error {
+func runLDAPAuthProbe(bindDN, password string, log *zap.Logger) error {
 	cmd := exec.Command("ldapsearch", "-x", "-H", "ldap://localhost", "-D", bindDN, "-w", password, "-b", "", "-s", "base")
 	cmd.Stdout = nil
 	cmd.Stderr = nil

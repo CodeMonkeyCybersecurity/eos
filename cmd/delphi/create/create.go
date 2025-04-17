@@ -72,12 +72,15 @@ type PackageMapping struct {
 }
 
 func runMapping() {
-	cfg, err := delphi.LoadDelphiConfig()
+	cfg, err := delphi.ReadConfig(log)
 	if err != nil {
 		log.Fatal("Failed to load config", zap.Error(err))
 	}
 
-	cfg = delphi.ConfirmDelphiConfig(cfg)
+	cfg, err = delphi.ResolveConfig(log)
+	if err != nil {
+		log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+	}
 
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"

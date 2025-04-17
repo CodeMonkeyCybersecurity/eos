@@ -1,4 +1,4 @@
-// pkg/delphi/api.go
+/* pkg/delphi/api.go */
 
 package delphi
 
@@ -9,10 +9,8 @@ import (
 	"os"
 )
 
-
-
 // GetFieldValue returns the value of a DelphiConfig field by name
-func GetFieldValue(cfg *DelphiConfig, field string) string {
+func GetFieldValue(cfg *Config, field string) string {
 	switch field {
 	case "protocol":
 		return cfg.Protocol
@@ -30,7 +28,7 @@ func GetFieldValue(cfg *DelphiConfig, field string) string {
 }
 
 // SetFieldValue updates a field in DelphiConfig by name
-func SetFieldValue(cfg *DelphiConfig, field, value string) {
+func SetFieldValue(cfg *Config, field, value string) {
 	switch field {
 	case "protocol":
 		cfg.Protocol = value

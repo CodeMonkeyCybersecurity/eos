@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var (
@@ -20,15 +21,13 @@ var InspectAPICmd = &cobra.Command{
 	Use:   "api",
 	Short: "Inspect API details from Delphi (Wazuh)",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		cfg, err := delphi.LoadDelphiConfig()
-		if err != nil {
-			fmt.Printf("❌ Error loading Delphi config: %v\n", err)
-			os.Exit(1)
-		}
 
 		// ✅ Step 2: Toggle ShowSecrets and confirm config
 		delphi.ShowSecrets = showSecrets
-		cfg = delphi.ConfirmDelphiConfig(cfg)
+		cfg, err := delphi.ResolveConfig(log)
+		if err != nil {
+			log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+		}
 
 		// ✅ Step 3: Authenticate if needed
 		if cfg.Token == "" {
@@ -38,7 +37,7 @@ var InspectAPICmd = &cobra.Command{
 				os.Exit(1)
 			}
 			cfg.Token = token
-			_ = delphi.SaveDelphiConfig(cfg)
+			_ = delphi.WriteConfig(cfg, log)
 		}
 
 		// ✅ Step 4: Secret access control

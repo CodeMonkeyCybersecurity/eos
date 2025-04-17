@@ -30,7 +30,7 @@ into Vault, then removes them from disk if the sync is successful.`,
 			return nil
 		}
 
-		if !vault.IsVaultAvailable(client) {
+		if !vault.IsVaultAvailable(client, log) {
 			fmt.Println("Vault is not currently available — skipping secret sync.")
 			return nil
 		}

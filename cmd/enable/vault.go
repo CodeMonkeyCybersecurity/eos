@@ -61,7 +61,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		/* Test KV write/read */
 		log.Info("[3/7] Testing KV put/get")
-		if err := vault.TestKVSecret(client); err != nil {
+		if err := vault.TestKVSecret(client, log); err != nil {
 			log.Error("KV secret test failed", zap.Error(err))
 		}
 

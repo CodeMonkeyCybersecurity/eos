@@ -1,4 +1,5 @@
-// pkg/interaction/confirm.go
+/* pkg/interaction/resolver.go */
+
 package interaction
 
 import (
@@ -6,9 +7,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
-func Confirm(prompt string) (bool, error) {
+func Resolve(prompt string, log *zap.Logger) (bool, error) {
 	fmt.Printf("%s (y/N): ", prompt)
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
@@ -17,4 +20,9 @@ func Confirm(prompt string) (bool, error) {
 	}
 	input = strings.TrimSpace(strings.ToLower(input))
 	return input == "y" || input == "yes", nil
+}
+
+func ResolveObject(c Confirmable, log *zap.Logger) (bool, error) {
+	fmt.Println(c.Summary())
+	return Resolve("Are these values correct?", log)
 }

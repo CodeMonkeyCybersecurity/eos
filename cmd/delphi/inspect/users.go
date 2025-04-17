@@ -19,7 +19,7 @@ var UsersCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
-		cfg, err := delphi.LoadDelphiConfig()
+		cfg, err := delphi.ReadConfig(log)
 		if err != nil {
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}

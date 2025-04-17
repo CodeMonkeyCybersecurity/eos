@@ -23,36 +23,36 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - role sync
 - securityadmin reload`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		cfg, err := delphi.PromptLDAPDetails()
+		cfg, err := delphi.PromptLDAPDetails(log)
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)
 		}
 
-		if err := delphi.CheckLDAPGroupsExist(cfg); err != nil {
+		if err := delphi.CheckLDAPGroupsExist(cfg, log); err != nil {
 			return fmt.Errorf("LDAP group validation failed: %w", err)
 		}
 
-		if err := delphi.DownloadAndPlaceCert(cfg.FQDN); err != nil {
+		if err := delphi.DownloadAndPlaceCert(cfg.FQDN, log); err != nil {
 			return fmt.Errorf("failed to download LDAP cert: %w", err)
 		}
 
-		if err := delphi.PatchConfigYML(cfg); err != nil {
+		if err := delphi.PatchConfigYML(cfg, log); err != nil {
 			return fmt.Errorf("failed to patch config.yml: %w", err)
 		}
 
-		if err := delphi.PatchRolesMappingYML(cfg); err != nil {
+		if err := delphi.PatchRolesMappingYML(cfg, log); err != nil {
 			return fmt.Errorf("failed to patch roles_mapping.yml: %w", err)
 		}
 
-		if err := delphi.RunSecurityAdmin("config.yml"); err != nil {
+		if err := delphi.RunSecurityAdmin("config.yml", log); err != nil {
 			return fmt.Errorf("failed to apply config.yml: %w", err)
 		}
 
-		if err := delphi.RunSecurityAdmin("roles_mapping.yml"); err != nil {
+		if err := delphi.RunSecurityAdmin("roles_mapping.yml", log); err != nil {
 			return fmt.Errorf("failed to apply roles_mapping.yml: %w", err)
 		}
 
-		if err := delphi.RestartDashboard(); err != nil {
+		if err := delphi.RestartDashboard(log); err != nil {
 			return fmt.Errorf("failed to restart wazuh-dashboard: %w", err)
 		}
 

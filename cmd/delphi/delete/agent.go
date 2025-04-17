@@ -14,7 +14,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -31,7 +30,6 @@ Supported OS uninstallers:
 - Linux: apt-get, yum, or dnf depending on distribution
 - Windows: wmic + msiexec`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
 
 		if agentID == "" {
 			log.Error("Agent ID is required")
@@ -40,7 +38,7 @@ Supported OS uninstallers:
 		}
 
 		log.Info("🔐 Authenticating and loading Delphi config...")
-		config, err := delphi.LoadAndConfirmConfig()
+		config, err := delphi.ResolveConfig(log)
 		if err != nil {
 			log.Error("Failed to load config", zap.Error(err))
 			os.Exit(1)

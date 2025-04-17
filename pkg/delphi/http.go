@@ -46,7 +46,7 @@ func GetJSON(url string, headers map[string]string) (map[string]interface{}, err
 }
 
 // AuthenticatedGet sends a GET request using a Bearer token.
-func AuthenticatedGet(cfg *DelphiConfig, path string) (*http.Response, error) {
+func AuthenticatedGet(cfg *Config, path string) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -66,7 +66,7 @@ func AuthenticatedGet(cfg *DelphiConfig, path string) (*http.Response, error) {
 }
 
 // AuthenticatedPost sends a POST request using a Bearer token.
-func AuthenticatedPost(cfg *DelphiConfig, path string, body io.Reader) (*http.Response, error) {
+func AuthenticatedPost(cfg *Config, path string, body io.Reader) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
 
 	req, err := http.NewRequest("POST", url, body)
@@ -86,7 +86,7 @@ func AuthenticatedPost(cfg *DelphiConfig, path string, body io.Reader) (*http.Re
 }
 
 // AuthenticatedPut sends a PUT request with a JSON payload using a Bearer token.
-func AuthenticatedPut(cfg *DelphiConfig, path string, payload interface{}) (*http.Response, error) {
+func AuthenticatedPut(cfg *Config, path string, payload interface{}) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
 
 	data, err := json.Marshal(payload)

@@ -13,32 +13,32 @@ import (
 
 // --- Read helpers ---
 
-func readUser() ([]LDAPUser, error) {
-	return readUsersWithFilter("(objectClass=inetOrgPerson)")
+func readUser(log *zap.Logger) ([]LDAPUser, error) {
+	return readUsersWithFilter("(objectClass=inetOrgPerson)", log)
 }
 
-func readGroup() ([]LDAPGroup, error) {
-	return readGroupsWithFilter("(objectClass=groupOfNames)")
+func readGroup(log *zap.Logger) ([]LDAPGroup, error) {
+	return readGroupsWithFilter("(objectClass=groupOfNames)", log)
 }
 
-func readUsersWithFilter(filter string) ([]LDAPUser, error) {
-	cfg, _, err := ReadLDAPConfig()
+func readUsersWithFilter(filter string, log *zap.Logger) ([]LDAPUser, error) {
+	cfg, _, err := ReadConfig(log)
 	if err != nil {
 		return nil, err
 	}
-	return readAndMapUsers(cfg.UserBase, filter)
+	return readAndMapUsers(cfg.UserBase, filter, log)
 }
 
-func readGroupsWithFilter(filter string) ([]LDAPGroup, error) {
-	cfg, _, err := ReadLDAPConfig()
+func readGroupsWithFilter(filter string, log *zap.Logger) ([]LDAPGroup, error) {
+	cfg, _, err := ReadConfig(log)
 	if err != nil {
 		return nil, err
 	}
-	return readAndMapGroups(cfg.RoleBase, filter)
+	return readAndMapGroups(cfg.RoleBase, filter, log)
 }
 
-func readUserByUID(uid string) (*LDAPUser, error) {
-	results, err := readAndMapUsers(defaultBaseDN, fmt.Sprintf("(uid=%s)", uid))
+func readUserByUID(uid string, log *zap.Logger) (*LDAPUser, error) {
+	results, err := readAndMapUsers(defaultBaseDN, fmt.Sprintf("(uid=%s)", uid), log)
 	if err != nil {
 		return nil, err
 	}
@@ -48,8 +48,8 @@ func readUserByUID(uid string) (*LDAPUser, error) {
 	return &results[0], nil
 }
 
-func readGroupByCN(cn string) (*LDAPGroup, error) {
-	results, err := readAndMapGroups(defaultBaseDN, fmt.Sprintf("(cn=%s)", cn))
+func readGroupByCN(cn string, log *zap.Logger) (*LDAPGroup, error) {
+	results, err := readAndMapGroups(defaultBaseDN, fmt.Sprintf("(cn=%s)", cn), log)
 	if err != nil {
 		return nil, err
 	}
@@ -62,8 +62,8 @@ func readGroupByCN(cn string) (*LDAPGroup, error) {
 // --- Internal mappers ---
 
 // readAndMapUsers performs an LDAP search and maps results to LDAPUser structs.
-func readAndMapUsers(baseDN, filter string) ([]LDAPUser, error) {
-	conn, err := Connect()
+func readAndMapUsers(baseDN, filter string, log *zap.Logger) ([]LDAPUser, error) {
+	conn, err := Connect(log)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +95,8 @@ func readAndMapUsers(baseDN, filter string) ([]LDAPUser, error) {
 	return users, nil
 }
 
-func readAndMapGroups(baseDN, filter string) ([]LDAPGroup, error) {
-	conn, err := Connect()
+func readAndMapGroups(baseDN, filter string, log *zap.Logger) ([]LDAPGroup, error) {
+	conn, err := Connect(log)
 	if err != nil {
 		return nil, err
 	}
@@ -126,9 +126,7 @@ func readAndMapGroups(baseDN, filter string) ([]LDAPGroup, error) {
 	return groups, nil
 }
 
-func ReadLDAPConfig() (*LDAPConfig, string, error) {
-	log := zap.L().Named("ldap.config") // or use your logger.GetLogger()
-
+func ReadConfig(log *zap.Logger) (*LDAPConfig, string, error) {
 	loaders := []struct {
 		name string
 		load func() (*LDAPConfig, error)
@@ -136,10 +134,18 @@ func ReadLDAPConfig() (*LDAPConfig, string, error) {
 		{"vault", func() (*LDAPConfig, error) {
 			return readFromVault(log)
 		}},
-		{"env", loadFromEnv},
-		{"host", tryDetectFromHost},
-		{"container", tryDetectFromContainer},
-		{"prompt", loadFromPrompt},
+		{"env", func() (*LDAPConfig, error) {
+			return loadFromEnv(log)
+		}},
+		{"host", func() (*LDAPConfig, error) {
+			return tryDetectFromHost(log)
+		}},
+		{"container", func() (*LDAPConfig, error) {
+			return tryDetectFromContainer(log)
+		}},
+		{"prompt", func() (*LDAPConfig, error) {
+			return loadFromPrompt(log)
+		}},
 	}
 
 	for _, source := range loaders {

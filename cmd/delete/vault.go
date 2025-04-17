@@ -93,12 +93,12 @@ var DeleteVaultCmd = &cobra.Command{
 			}
 
 			// 🧼 Repo + keyring cleanup
-			vault.Purge(distro)
+			vault.Purge(distro, log)
 		} else {
 			log.Info("Purge flag not set; skipping configuration and data cleanup.")
 		}
 
-		vault.CheckVaultProcesses()
+		vault.CheckVaultProcesses(log)
 
 		log.Info("Vault deletion complete.")
 		return nil

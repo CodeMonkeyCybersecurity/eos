@@ -14,7 +14,7 @@ var CreateLDAPCmd = &cobra.Command{
 		log.Info("Starting LDAP creation workflow")
 
 		// Step 1: Load config via layered fallback
-		cfg, source, err := ldap.ReadLDAPConfig()
+		cfg, source, err := ldap.ReadConfig(log)
 		if err != nil {
 			log.Error("Failed to load LDAP config", zap.Error(err))
 			return err
@@ -23,7 +23,7 @@ var CreateLDAPCmd = &cobra.Command{
 
 		// Step 2: Optional connection test
 		if !noTest {
-			if err := ldap.CheckConnection(cfg); err != nil {
+			if err := ldap.CheckConnection(cfg, log); err != nil {
 				log.Error("LDAP connection test failed", zap.Error(err))
 				return err
 			}

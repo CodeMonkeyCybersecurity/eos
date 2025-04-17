@@ -23,7 +23,7 @@ var InspectConfigCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
-		cfg, err := delphi.LoadDelphiConfig()
+		cfg, err := delphi.ReadConfig(log)
 		if err != nil {
 			log.Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)

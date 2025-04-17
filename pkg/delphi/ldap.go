@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
@@ -27,7 +28,7 @@ type LDAPConfig struct {
 	ReadonlyRole string
 }
 
-func ReadLDAPConfig() (*LDAPConfig, error) {
+func ReadLDAPConfig(log *zap.Logger) (*LDAPConfig, error) {
 	var cfg LDAPConfig
 	err := vault.ReadFromVault(types.LDAPVaultPath, &cfg)
 	if err != nil {
@@ -36,8 +37,8 @@ func ReadLDAPConfig() (*LDAPConfig, error) {
 	return &cfg, nil
 }
 
-func PromptLDAPDetails() (*LDAPConfig, error) {
-	existing, _ := ReadLDAPConfig() // best-effort load
+func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
+	existing, _ := ReadLDAPConfig(log) // best-effort load
 
 	cfg := existing
 	if cfg == nil {
@@ -53,7 +54,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	}
 	if cfg.Password == "" {
 		var err error
-		cfg.Password, err = interaction.PromptPassword("Bind password")
+		cfg.Password, err = interaction.PromptPassword("Bind password", log)
 		if err != nil {
 			return nil, err
 		}
@@ -77,7 +78,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	return cfg, nil
 }
 
-func DownloadAndPlaceCert(fqdn string) error {
+func DownloadAndPlaceCert(fqdn string, log *zap.Logger) error {
 
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(
 		`echo -n | openssl s_client -connect %s:636 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /etc/wazuh-indexer/opensearch-security/ldapcacert.pem`,
@@ -88,7 +89,7 @@ func DownloadAndPlaceCert(fqdn string) error {
 	return cmd.Run()
 }
 
-func PatchConfigYML(cfg *LDAPConfig) error {
+func PatchConfigYML(cfg *LDAPConfig, log *zap.Logger) error {
 	configPath := "/etc/wazuh-indexer/opensearch-security/config.yml"
 	backupPath := configPath + ".bak"
 
@@ -197,7 +198,7 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	return nil
 }
 
-func PatchRolesMappingYML(cfg *LDAPConfig) error {
+func PatchRolesMappingYML(cfg *LDAPConfig, log *zap.Logger) error {
 	path := "/etc/wazuh-indexer/opensearch-security/roles_mapping.yml"
 	backupPath := path + ".bak"
 
@@ -251,7 +252,7 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 	return nil
 }
 
-func RunSecurityAdmin(filename string) error {
+func RunSecurityAdmin(filename string, log *zap.Logger) error {
 	path := filepath.Join("/etc/wazuh-indexer/opensearch-security", filename)
 
 	cmd := exec.Command("bash", "-c", fmt.Sprintf(
@@ -263,14 +264,14 @@ func RunSecurityAdmin(filename string) error {
 	return cmd.Run()
 }
 
-func RestartDashboard() error {
+func RestartDashboard(log *zap.Logger) error {
 	cmd := exec.Command("systemctl", "restart", "wazuh-dashboard")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func CheckLDAPGroupsExist(cfg *LDAPConfig) (err error) {
+func CheckLDAPGroupsExist(cfg *LDAPConfig, log *zap.Logger) (err error) {
 	l, err := ldap.DialURL("ldaps://" + cfg.FQDN + ":636")
 	if err != nil {
 		return fmt.Errorf("failed to connect to LDAP: %w", err)

@@ -4,11 +4,13 @@ package ldap
 
 import (
 	"fmt"
+
+	"go.uber.org/zap"
 )
 
 // PrintGroup returns detailed info for a single group by CN
-func printGroup(cn string) error {
-	group, err := readGroupByCN(cn)
+func printGroup(cn string, log *zap.Logger) error {
+	group, err := readGroupByCN(cn, log)
 	if err != nil {
 		return fmt.Errorf("failed to get group: %w", err)
 	}
@@ -20,8 +22,8 @@ func printGroup(cn string) error {
 }
 
 // PrintUser returns detailed info for a single user by UID
-func printUser(uid string) error {
-	user, err := readUserByUID(uid)
+func printUser(uid string, log *zap.Logger) error {
+	user, err := readUserByUID(uid, log)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}

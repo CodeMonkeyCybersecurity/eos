@@ -7,11 +7,12 @@ import (
 	"fmt"
 
 	"github.com/go-ldap/ldap/v3"
+	"go.uber.org/zap"
 )
 
 // Connect returns a default LDAP connection using autodiscovered config
-func Connect() (*ldap.Conn, error) {
-	conn, _, err := ConnectWithConfig()
+func Connect(log *zap.Logger) (*ldap.Conn, error) {
+	conn, _, err := ConnectWithConfig(log)
 	if err != nil {
 		return nil, fmt.Errorf("Connect() failed: %w", err)
 	}
@@ -19,8 +20,8 @@ func Connect() (*ldap.Conn, error) {
 }
 
 // ConnectWithConfig tries all discovery methods to return an active LDAP connection
-func ConnectWithConfig() (*ldap.Conn, *LDAPConfig, error) {
-	cfg, source, err := ReadLDAPConfig()
+func ConnectWithConfig(log *zap.Logger) (*ldap.Conn, *LDAPConfig, error) {
+	cfg, source, err := ReadConfig(log)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load LDAP config: %w", err)
 	}
@@ -55,7 +56,7 @@ func ConnectWithConfig() (*ldap.Conn, *LDAPConfig, error) {
 	return conn, cfg, nil
 }
 
-func ConnectWithGivenConfig(cfg *LDAPConfig) (*ldap.Conn, error) {
+func ConnectWithGivenConfig(cfg *LDAPConfig, log *zap.Logger) (*ldap.Conn, error) {
 	addr := fmt.Sprintf("ldap://%s:%d", cfg.FQDN, cfg.Port)
 	var conn *ldap.Conn
 	var err error

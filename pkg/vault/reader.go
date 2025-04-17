@@ -48,7 +48,7 @@ func ReadFromVaultAt(ctx context.Context, mount, path string, out interface{}) e
 
 // Read loads a namespaced config from Vault, or falls back to YAML if unavailable.
 func Read(client *api.Client, name string, out any, log *zap.Logger) error {
-	if IsVaultAvailable(client) {
+	if IsVaultAvailable(client, log) {
 		err := ReadFromVaultAt(context.Background(), "secret", name, out)
 		if err == nil {
 			return nil

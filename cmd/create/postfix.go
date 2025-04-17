@@ -91,7 +91,7 @@ var CreatePostfixCmd = &cobra.Command{
 		}
 		email = strings.TrimSpace(email)
 
-		password, err := interaction.PromptPassword("Enter your app password: ")
+		password, err := interaction.PromptPassword("Enter your app password: ", log)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "❌ Failed to read password:", err)
 			os.Exit(1)

@@ -6,3 +6,7 @@ type FallbackOption struct {
 	Label string // shown to user
 	Code  string // passed back to logic
 }
+
+type Confirmable interface {
+	Summary() string
+}

@@ -6,11 +6,12 @@ import (
 	"fmt"
 
 	"github.com/go-ldap/ldap/v3"
+	"go.uber.org/zap"
 )
 
 // AddUser creates a new LDAP user entry
-func createUser(config *LDAPConfig, user LDAPUser, password string) error {
-	conn, err := ConnectWithGivenConfig(config)
+func createUser(config *LDAPConfig, user LDAPUser, password string, log *zap.Logger) error {
+	conn, err := ConnectWithGivenConfig(config, log)
 	if err != nil {
 		return err
 	}
@@ -34,8 +35,8 @@ func createUser(config *LDAPConfig, user LDAPUser, password string) error {
 }
 
 // CreateGroup adds a new LDAP group (groupOfNames) with no members yet
-func createGroup(config *LDAPConfig, group LDAPGroup) error {
-	conn, err := ConnectWithGivenConfig(config)
+func createGroup(config *LDAPConfig, group LDAPGroup, log *zap.Logger) error {
+	conn, err := ConnectWithGivenConfig(config, log)
 	if err != nil {
 		return err
 	}

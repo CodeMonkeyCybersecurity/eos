@@ -79,7 +79,7 @@ func runFallbackPasswordRotation() (string, error) {
 	extractedPass := match[1]
 	log.Info("Extracted wazuh-wui password from wazuh.yml")
 
-	cfg := delphi.DelphiConfig{
+	cfg := delphi.Config{
 		Protocol:           "https",
 		FQDN:               "127.0.0.1",
 		Port:               "55000",
@@ -197,7 +197,7 @@ func runDelphiHardening() error {
 
 	// Step 6: Store updated secrets in the vault.
 	log.Info("Storing secrets in vault")
-	if err := vault.HandleFallbackOrStore("delphi", secrets); err != nil {
+	if err := vault.HandleFallbackOrStore("delphi", secrets, log); err != nil {
 		log.Error("Failed to store secrets in vault", zap.Error(err))
 		return err
 	}

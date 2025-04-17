@@ -22,7 +22,7 @@ var UpdateAgentsCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
-		cfg, err := delphi.LoadDelphiConfig()
+		cfg, err := delphi.ReadConfig(log)
 		if err != nil {
 			log.Error("Failed to load Delphi config", zap.Error(err))
 			return err
@@ -40,8 +40,8 @@ var UpdateAgentsCmd = &cobra.Command{
 		version := interaction.PromptInput("Enter version (e.g., v4.6.0)", "")
 		repo := interaction.PromptInput("Enter WPK repo", "packages.wazuh.com/wpk/")
 		packageType := interaction.PromptInput("Enter package type (rpm/deb)", "rpm")
-		force, _ := interaction.Confirm("Force upgrade?")
-		useHTTP, _ := interaction.Confirm("Use HTTP (instead of HTTPS)?")
+		force, _ := interaction.Resolve("Force upgrade?", log)
+		useHTTP, _ := interaction.Resolve("Use HTTP (instead of HTTPS)?", log)
 
 		payload := map[string]interface{}{
 			"origin":  map[string]string{"module": "api"},

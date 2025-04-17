@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func DeleteAgent(agentID string, token string, config *DelphiConfig) (map[string]interface{}, error) {
+func DeleteAgent(agentID string, token string, config *Config) (map[string]interface{}, error) {
 	url := fmt.Sprintf("%s://%s:%s/agents/%s?pretty=true", config.Protocol, config.FQDN, config.Port, agentID)
 
 	req, _ := http.NewRequest("DELETE", url, nil)
@@ -30,7 +30,7 @@ func DeleteAgent(agentID string, token string, config *DelphiConfig) (map[string
 }
 
 // UpgradeAgents calls the Wazuh API to upgrade a list of agent IDs.
-func UpgradeAgents(cfg *DelphiConfig, token string, agentIDs []string, payload map[string]interface{}) error {
+func UpgradeAgents(cfg *Config, token string, agentIDs []string, payload map[string]interface{}) error {
 	url := fmt.Sprintf("%s://%s:%s/agents/upgrade?agents_list=%s&pretty=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port, strings.Join(agentIDs, ","))
 

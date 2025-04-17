@@ -17,7 +17,7 @@ import (
 
 // Purge removes Vault repo artifacts based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.
-func Purge(distro string) (removed []string, errs map[string]error) {
+func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]error) {
 	errs = make(map[string]error)
 
 	switch distro {
@@ -46,7 +46,7 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 }
 
 // deployAndStoreSecrets automates Vault setup and stores secrets after confirmation.
-func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]string) error {
+func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]string, log *zap.Logger) error {
 	fmt.Println("🚀 Deploying Vault...")
 
 	if err := execute.ExecuteAndLog("eos", "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
@@ -62,7 +62,7 @@ func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]s
 		return fmt.Errorf("vault secure failed: %w", err)
 	}
 
-	if !IsVaultAvailable(client) {
+	if !IsVaultAvailable(client, log) {
 		return fmt.Errorf("vault does not appear to be running after setup. Try 'eos logs vault'")
 	}
 

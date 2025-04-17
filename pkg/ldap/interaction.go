@@ -13,9 +13,10 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"go.uber.org/zap"
 )
 
-func InteractiveLDAPQuery() error {
+func InteractiveLDAPQuery(log *zap.Logger) error {
 	cfg := &LDAPConfig{}
 
 	// Try to load existing config from Vault to prefill
@@ -34,7 +35,7 @@ func InteractiveLDAPQuery() error {
 		bindDN = "cn=anonymous"
 	}
 
-	password, err := interaction.PromptPasswordWithDefault("LDAP password [press Enter to keep existing]", cfg.Password)
+	password, err := interaction.PromptPasswordWithDefault("LDAP password [press Enter to keep existing]", cfg.Password, log)
 	if err != nil {
 		fmt.Println("⚠️  No Password provided.")
 		return err
@@ -42,7 +43,7 @@ func InteractiveLDAPQuery() error {
 	fmt.Println("Search base DN (e.g. ou=Users,dc=domain,dc=com). Leave blank to search entire tree.")
 	baseDN := interaction.PromptInput("Search base DN", cfg.UserBase)
 	if baseDN == "" || baseDN == `""` {
-		inferred := inferBaseDN(bindDN)
+		inferred := inferBaseDN(bindDN, log)
 		if inferred != "" {
 			fmt.Printf("⚠️  No base DN provided — using inferred root (%s)\n", inferred)
 			baseDN = inferred
@@ -80,44 +81,55 @@ func InteractiveLDAPQuery() error {
 	return cmd.Run()
 }
 
-func inferBaseDN(bindDN string) string {
+func inferBaseDN(bindDN string, log *zap.Logger) string {
+	log.Debug("Inferring base DN from BindDN", zap.String("bindDN", bindDN))
+
 	parts := strings.Split(bindDN, ",")
 	var base []string
+
 	for _, part := range parts {
 		part = strings.TrimSpace(part)
 		if strings.HasPrefix(strings.ToLower(part), "dc=") {
 			base = append(base, part)
 		}
 	}
-	return strings.Join(base, ",")
+
+	inferred := strings.Join(base, ",")
+	if inferred == "" {
+		log.Warn("Could not infer base DN from BindDN", zap.String("bindDN", bindDN))
+	} else {
+		log.Info("✅ Inferred base DN", zap.String("baseDN", inferred))
+	}
+
+	return inferred
 }
 
-func loadFromPrompt() (*LDAPConfig, error) {
-	fqdn, err := RememberFQDN()
+func loadFromPrompt(log *zap.Logger) (*LDAPConfig, error) {
+	fqdn, err := RememberFQDN(log)
 	if err != nil {
 		return nil, err
 	}
-	bindDN, err := RememberBindDN()
+	bindDN, err := RememberBindDN(log)
 	if err != nil {
 		return nil, err
 	}
-	password, err := RememberPassword()
+	password, err := RememberPassword(log)
 	if err != nil {
 		return nil, err
 	}
-	userBase, err := RememberUserBase()
+	userBase, err := RememberUserBase(log)
 	if err != nil {
 		return nil, err
 	}
-	roleBase, err := RememberGroupBase()
+	roleBase, err := RememberGroupBase(log)
 	if err != nil {
 		return nil, err
 	}
-	adminRole, err := RememberAdminRole()
+	adminRole, err := RememberAdminRole(log)
 	if err != nil {
 		return nil, err
 	}
-	readonlyRole, err := RememberReadonlyRole()
+	readonlyRole, err := RememberReadonlyRole(log)
 	if err != nil {
 		return nil, err
 	}
@@ -136,18 +148,18 @@ func loadFromPrompt() (*LDAPConfig, error) {
 }
 
 // PromptLDAPDetails interactively builds an LDAPConfig using field metadata.
-func PromptLDAPDetails() (*LDAPConfig, error) {
+func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
 	if _, err := vault.GetVaultClient(); err == nil {
 		_ = vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg) // best-effort prefill
 	}
 
 	for fieldName, meta := range LDAPFieldMeta {
-		val := GetLDAPField(cfg, fieldName)
+		val := GetLDAPField(cfg, fieldName, log)
 
 		if val == "" || meta.Required {
 			if meta.Sensitive {
-				secret, err := interaction.PromptPassword(meta.Label)
+				secret, err := interaction.PromptPassword(meta.Label, log)
 				if err != nil {
 					return nil, err
 				}
@@ -155,7 +167,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 			} else {
 				val = interaction.PromptInput(meta.Label, meta.Help)
 			}
-			SetLDAPField(cfg, fieldName, val)
+			SetLDAPField(cfg, fieldName, val, log)
 		}
 	}
 
@@ -166,7 +178,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	return cfg, nil
 }
 
-func GetLDAPField(cfg *LDAPConfig, field string) string {
+func GetLDAPField(cfg *LDAPConfig, field string, log *zap.Logger) string {
 	switch field {
 	case "FQDN":
 		return cfg.FQDN
@@ -187,7 +199,7 @@ func GetLDAPField(cfg *LDAPConfig, field string) string {
 	}
 }
 
-func SetLDAPField(cfg *LDAPConfig, field, value string) {
+func SetLDAPField(cfg *LDAPConfig, field, value string, log *zap.Logger) {
 	switch field {
 	case "FQDN":
 		cfg.FQDN = value

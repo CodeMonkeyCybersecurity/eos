@@ -15,23 +15,26 @@ var CreateJWTCmd = &cobra.Command{
 	Use:   "jwt",
 	Short: "Generate and store a JWT token for Delphi (Wazuh) API access",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		cfg, err := delphi.LoadDelphiConfig()
+		cfg, err := delphi.ReadConfig(log)
 		if err != nil {
 			log.Warn("Config not found, prompting for values", zap.Error(err))
 			cfg.FQDN = interaction.PromptInput("Enter the Wazuh domain (eg. delphi.domain.com)", "")
 			cfg.APIUser = interaction.PromptInput("Enter the API username (eg. wazuh-wui)", "")
-			pw, err := interaction.PromptPassword("Enter the API password")
+			pw, err := interaction.PromptPassword("Enter the API password", log)
 			if err != nil {
 				log.Fatal("Failed to read password", zap.Error(err))
 			}
 			cfg.APIPassword = pw
-			if err := delphi.SaveDelphiConfig(cfg); err != nil {
+			if err := delphi.WriteConfig(cfg, log); err != nil {
 				log.Fatal("Error saving configuration", zap.Error(err))
 			}
 			log.Info("Configuration file created.")
 		}
 
-		cfg = delphi.ConfirmDelphiConfig(cfg)
+		cfg, err = delphi.ResolveConfig(log)
+		if err != nil {
+			log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+		}
 
 		if cfg.Protocol == "" {
 			cfg.Protocol = "https"
@@ -40,7 +43,7 @@ var CreateJWTCmd = &cobra.Command{
 			cfg.Port = "55000"
 		}
 
-		delphi.SaveDelphiConfig(cfg)
+		delphi.WriteConfig(cfg, log)
 
 		log.Info("Retrieving JWT token...")
 		token, err := delphi.Authenticate(cfg)
@@ -48,7 +51,7 @@ var CreateJWTCmd = &cobra.Command{
 			log.Fatal("Authentication failed", zap.Error(err))
 		}
 		cfg.Token = token
-		if err := delphi.SaveDelphiConfig(cfg); err != nil {
+		if err := delphi.WriteConfig(cfg, log); err != nil {
 			log.Fatal("Failed to save token", zap.Error(err))
 		}
 

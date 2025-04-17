@@ -34,13 +34,13 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			return errors.New("username is required (use --username)")
 		}
 
-		cfg, err := delphi.LoadDelphiConfig()
+		cfg, err := delphi.ReadConfig(log)
 		if err != nil {
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
 		// Prompt for current password
-		currentPassword, err := interaction.PromptPassword("Current password")
+		currentPassword, err := interaction.PromptPassword("Current password", log)
 		if err != nil {
 			return fmt.Errorf("failed to read current password: %w", err)
 		}
@@ -57,7 +57,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 		}
 
 		if strings.EqualFold(username, "wazuh-wui") {
-			confirm, err := interaction.Confirm("You are updating the wazuh-wui user. This will impact the Wazuh dashboard. Proceed?")
+			confirm, err := interaction.Resolve("You are updating the wazuh-wui user. This will impact the Wazuh dashboard. Proceed?", log)
 			if err != nil || !confirm {
 				return errors.New("aborted by user")
 			}
@@ -65,11 +65,11 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 
 		// Prompt for password (if not provided via flag)
 		if password == "" {
-			pw1, err := interaction.PromptPassword("New password")
+			pw1, err := interaction.PromptPassword("New password", log)
 			if err != nil {
 				return err
 			}
-			pw2, err := interaction.PromptPassword("Confirm password")
+			pw2, err := interaction.PromptPassword("Confirm password", log)
 			if err != nil {
 				return err
 			}

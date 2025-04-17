@@ -11,19 +11,18 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var InspectCredentialsCmd = &cobra.Command{
 	Use:   "credentials",
 	Short: "List all Delphi (Wazuh) user credentials",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		cfg, err := delphi.LoadDelphiConfig()
-		if err != nil {
-			fmt.Printf("❌ Error loading Delphi config: %v\n", err)
-			os.Exit(1)
-		}
 
-		cfg = delphi.ConfirmDelphiConfig(cfg)
+		cfg, err := delphi.ResolveConfig(log)
+		if err != nil {
+			log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+		}
 
 		if !utils.EnforceSecretsAccess(log, showSecrets) {
 			return nil
@@ -36,7 +35,7 @@ var InspectCredentialsCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			cfg.Token = token
-			_ = delphi.SaveDelphiConfig(cfg)
+			_ = delphi.WriteConfig(cfg, log)
 		}
 
 		resp, err := delphi.AuthenticatedGet(cfg, "/security/users")

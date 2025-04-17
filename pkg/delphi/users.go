@@ -1,4 +1,4 @@
-// pkg/delphi/users.go
+/* pkg/delphi/users.go */
 
 package delphi
 
@@ -11,7 +11,7 @@ import (
 )
 
 // GetUserDetails queries Wazuh API for user info using a valid token.
-func GetUserDetails(cfg *DelphiConfig) (string, int) {
+func GetUserDetails(cfg *Config) (string, int) {
 	resp, err := AuthenticatedGet(cfg, fmt.Sprintf("/security/users/%s", cfg.APIUser))
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
@@ -24,7 +24,7 @@ func GetUserDetails(cfg *DelphiConfig) (string, int) {
 }
 
 // GetAllUsers returns all users
-func GetAllUsers(cfg *DelphiConfig) ([]User, error) {
+func GetAllUsers(cfg *Config) ([]User, error) {
 	path := "/security/users?pretty=true"
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
@@ -44,7 +44,7 @@ func GetAllUsers(cfg *DelphiConfig) ([]User, error) {
 }
 
 // GetUserIDByUsername fetches the user ID given a username and prints the raw JSON response.
-func GetUserIDByUsername(cfg *DelphiConfig, username string) (string, error) {
+func GetUserIDByUsername(cfg *Config, username string) (string, error) {
 	path := "/security/users?pretty=true"
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
@@ -79,7 +79,7 @@ func GetUserIDByUsername(cfg *DelphiConfig, username string) (string, error) {
 }
 
 // UpdateUserPassword changes a user's password
-func UpdateUserPassword(cfg *DelphiConfig, userID string, newPassword string) error {
+func UpdateUserPassword(cfg *Config, userID string, newPassword string) error {
 	path := fmt.Sprintf("/security/users/%s", userID)
 	payload := map[string]string{"password": newPassword}
 

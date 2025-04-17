@@ -8,10 +8,11 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"go.uber.org/zap"
 )
 
-// ConfirmDelphiConfig allows the user to review and optionally edit the current config
-func ConfirmDelphiConfig(cfg *DelphiConfig) *DelphiConfig {
+// ConfirmConfig allows the user to review and optionally edit the current config
+func ConfirmConfig(cfg *Config, log *zap.Logger) *Config {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  FQDN:         %s\n", cfg.FQDN)
 	fmt.Printf("  API_User:     %s\n", cfg.APIUser)
@@ -28,14 +29,14 @@ func ConfirmDelphiConfig(cfg *DelphiConfig) *DelphiConfig {
 		cfg.FQDN = interaction.PromptInput("FQDN", cfg.FQDN)
 		cfg.APIUser = interaction.PromptInput("API Username", cfg.APIUser)
 
-		pw, err := interaction.PromptPassword("API Password")
+		pw, err := interaction.PromptPassword("API Password", log)
 		if err != nil {
 			fmt.Printf("❌ Failed to read password: %v\n", err)
 			os.Exit(1)
 		}
 		cfg.APIPassword = pw
 
-		if err := SaveDelphiConfig(cfg); err != nil {
+		if err := WriteConfig(cfg, log); err != nil {
 			fmt.Printf("❌ Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}

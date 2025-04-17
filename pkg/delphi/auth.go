@@ -12,7 +12,7 @@ import (
 
 // Authenticate logs in to the Wazuh API using the current Delphi config
 // and returns a JWT token.
-func Authenticate(cfg *DelphiConfig) (string, error) {
+func Authenticate(cfg *Config) (string, error) {
 	authURL := fmt.Sprintf("%s/security/user/authenticate?raw=true", strings.TrimRight(cfg.Endpoint, "/"))
 
 	req, err := http.NewRequest("POST", authURL, nil)
@@ -54,7 +54,7 @@ func Authenticate(cfg *DelphiConfig) (string, error) {
 
 // AuthenticatedGetJSON performs a GET request using the stored JWT token
 // and returns the response body and HTTP status code.
-func AuthenticatedGetJSON(cfg *DelphiConfig, path string) (string, int) {
+func AuthenticatedGetJSON(cfg *Config, path string) (string, int) {
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
@@ -68,7 +68,7 @@ func AuthenticatedGetJSON(cfg *DelphiConfig, path string) (string, int) {
 
 // AuthenticateUser tries to log in using an arbitrary username/password pair.
 // Useful for testing or rotating credentials.
-func AuthenticateUser(cfg *DelphiConfig, username, password string) (string, error) {
+func AuthenticateUser(cfg *Config, username, password string) (string, error) {
 	url := fmt.Sprintf("%s://%s:%s/security/user/authenticate?raw=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port)
 

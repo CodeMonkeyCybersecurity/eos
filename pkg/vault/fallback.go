@@ -6,12 +6,10 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"go.uber.org/zap"
 )
 
-func HandleFallbackOrStore(name string, secrets map[string]string) error {
-	log := logger.GetLogger()
+func HandleFallbackOrStore(name string, secrets map[string]string, log *zap.Logger) error {
 
 	if _, err := SetVaultEnv(); err != nil {
 		log.Warn("Failed to set VAULT_ADDR environment", zap.Error(err))
@@ -22,7 +20,7 @@ func HandleFallbackOrStore(name string, secrets map[string]string) error {
 		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	if IsVaultAvailable(client) {
+	if IsVaultAvailable(client, log) {
 		fmt.Println("🔐 Vault is available. Storing secrets securely.")
 		return WriteToVault(name, secrets)
 	}
@@ -39,7 +37,7 @@ func HandleFallbackOrStore(name string, secrets map[string]string) error {
 			if err != nil {
 				return fmt.Errorf("failed to create Vault client: %w", err)
 			}
-			return DeployAndStoreSecrets(client, name, secrets)
+			return DeployAndStoreSecrets(client, name, secrets, log)
 		},
 		"disk": func() error {
 			return interaction.WriteFallbackSecrets(name, secrets)

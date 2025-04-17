@@ -17,12 +17,11 @@ var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",
 	Short: "Check disconnected agents from Wazuh API",
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		cfg, err := delphi.LoadDelphiConfig()
-		if err != nil {
-			log.Fatal("Failed to load Delphi config", zap.Error(err))
-		}
 
-		cfg = delphi.ConfirmDelphiConfig(cfg)
+		cfg, err := delphi.ResolveConfig(log)
+		if err != nil {
+			log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+		}
 		if cfg.Protocol == "" {
 			cfg.Protocol = "https"
 		}

@@ -16,7 +16,7 @@ var InspectLDAPCmd = &cobra.Command{
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("Launching interactive LDAP query tool")
 
-		return ldap.InteractiveLDAPQuery()
+		return ldap.InteractiveLDAPQuery(log)
 	}),
 }
 

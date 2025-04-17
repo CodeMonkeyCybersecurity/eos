@@ -7,11 +7,12 @@ import (
 	"strings"
 	"syscall"
 
+	"go.uber.org/zap"
 	"golang.org/x/term"
 )
 
 // PromptWithDefault prompts the user and returns their response or a default value if empty.
-func PromptWithDefault(label, defaultValue string) string {
+func PromptWithDefault(label, defaultValue string, log *zap.Logger) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s [%s]: ", label, defaultValue)
 	text, _ := reader.ReadString('\n')
@@ -23,7 +24,7 @@ func PromptWithDefault(label, defaultValue string) string {
 }
 
 // PromptRequired prompts the user for input and loops until a non-empty string is entered.
-func PromptRequired(label string) string {
+func PromptRequired(label string, log *zap.Logger) string {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("%s: ", label)
@@ -37,7 +38,7 @@ func PromptRequired(label string) string {
 }
 
 // PromptPassword hides user input and returns the entered password.
-func PromptPassword(label string) (string, error) {
+func PromptPassword(label string, log *zap.Logger) (string, error) {
 	fmt.Printf("%s: ", label)
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println("")
@@ -48,7 +49,7 @@ func PromptPassword(label string) (string, error) {
 }
 
 // PromptPasswordWithDefault hides user input and returns password or default if blank.
-func PromptPasswordWithDefault(label, defaultValue string) (string, error) {
+func PromptPasswordWithDefault(label, defaultValue string, log *zap.Logger) (string, error) {
 	fmt.Printf("%s [%s]: ", label, "********")
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println("")
@@ -64,7 +65,7 @@ func PromptPasswordWithDefault(label, defaultValue string) (string, error) {
 
 // PromptSecrets prompts the user for n secret values (like unseal keys), hiding input.
 // It returns a slice of strings (one per secret).
-func PromptSecrets(prompt string, count int) ([]string, error) {
+func PromptSecrets(prompt string, count int, log *zap.Logger) ([]string, error) {
 	secrets := make([]string, 0, count)
 	for i := 1; i <= count; i++ {
 		label := fmt.Sprintf("%s %d", prompt, i)
