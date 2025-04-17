@@ -56,12 +56,12 @@ func CreateAppRole(client *api.Client, roleName string) error {
 	return nil
 }
 
-func writeAppRoleCredentials(client *api.Client) error {
+func WriteAppRoleCredentials(client *api.Client) error {
 	roleID, err := client.Logical().Read(rolePath + "/role-id")
 	if err != nil {
 		return fmt.Errorf("failed to read role_id: %w", err)
 	}
-	secretID, err := client.Logical().Write(rolePath + "/secret-id", nil)
+	secretID, err := client.Logical().Write(rolePath+"/secret-id", nil)
 	if err != nil {
 		return fmt.Errorf("failed to generate secret_id: %w", err)
 	}

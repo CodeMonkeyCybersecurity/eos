@@ -8,6 +8,25 @@ import (
 	"go.uber.org/zap"
 )
 
+// AllowPorts opens multiple ports based on the system's firewall backend.
+func AllowPorts(log *zap.Logger, ports []string) error {
+	if _, err := exec.LookPath("ufw"); err == nil {
+		log.Info("Using UFW for firewall changes")
+		return allowPortsUFW(log, ports)
+	}
+	if _, err := exec.LookPath("firewall-cmd"); err == nil {
+		log.Info("Using Firewalld for firewall changes")
+		return allowPortsFirewalld(log, ports)
+	}
+	if _, err := exec.LookPath("pfctl"); err == nil {
+		log.Info("Detected macOS PF firewall — not yet supported")
+		return fmt.Errorf("macOS firewall (pfctl) support not yet implemented")
+	}
+
+	log.Warn("⚠️ No supported firewall backend found")
+	return fmt.Errorf("no supported firewall backend (ufw, firewalld, pfctl)")
+}
+
 // CheckFirewallStatus tries UFW, then iptables, and returns a string status.
 func CheckFirewallStatus(log *zap.Logger) {
 	fmt.Println("🔍 Checking firewall status...")
@@ -37,66 +56,33 @@ func CheckFirewallStatus(log *zap.Logger) {
 	log.Warn("No supported firewall tool found (ufw or iptables)")
 }
 
-// ConfigureUFW sets up UFW for wazuh ports.
-func ConfigureUFW(log *zap.Logger, wazuhPorts []string) error {
+func allowPortsUFW(log *zap.Logger, ports []string) error {
 	if err := execute.Execute("sudo", "ufw", "enable"); err != nil {
-		log.Error("Failed to enable UFW", zap.Error(err))
-		return err
+		log.Warn("UFW already enabled or error", zap.Error(err))
 	}
 
-	for _, port := range wazuhPorts {
+	for _, port := range ports {
 		if err := execute.Execute("sudo", "ufw", "allow", port); err != nil {
 			log.Error("Failed to allow port", zap.String("port", port), zap.Error(err))
 			return err
 		}
 	}
 
-	if err := execute.Execute("sudo", "ufw", "reload"); err != nil {
-		log.Error("Failed to reload UFW", zap.Error(err))
-		return err
-	}
-
-	if err := execute.Execute("sudo", "ufw", "status"); err != nil {
-		log.Warn("Failed to get UFW status", zap.Error(err)) // Not fatal
-	}
-
-	log.Info("✅ UFW configuration complete.")
-	return nil
+	return execute.Execute("sudo", "ufw", "reload")
 }
 
-// ConfigureFirewalld sets up firewalld for wazuh ports.
-func ConfigureFirewalld(log *zap.Logger, wazuhPorts []string) error {
-	log.Info("🚦 Checking Firewalld state")
+func allowPortsFirewalld(log *zap.Logger, ports []string) error {
 	if err := execute.Execute("sudo", "firewall-cmd", "--state"); err != nil {
 		log.Error("Firewalld not running", zap.Error(err))
 		return err
 	}
 
-	for _, port := range wazuhPorts {
-		log.Info("📦 Allowing port", zap.String("port", port))
+	for _, port := range ports {
 		if err := execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-port="+port); err != nil {
-			log.Error("Failed to add port to firewalld", zap.String("port", port), zap.Error(err))
+			log.Error("Failed to allow port in firewalld", zap.String("port", port), zap.Error(err))
 			return err
 		}
 	}
 
-	log.Info("🔒 Allowing https service")
-	if err := execute.Execute("sudo", "firewall-cmd", "--permanent", "--add-service=https"); err != nil {
-		log.Error("Failed to add https service to firewalld", zap.Error(err))
-		return err
-	}
-
-	log.Info("🔁 Reloading Firewalld")
-	if err := execute.Execute("sudo", "firewall-cmd", "--reload"); err != nil {
-		log.Error("Failed to reload firewalld", zap.Error(err))
-		return err
-	}
-
-	log.Info("📖 Listing open ports")
-	if err := execute.Execute("sudo", "firewall-cmd", "--list-ports"); err != nil {
-		log.Warn("Failed to list open ports", zap.Error(err)) // Not fatal
-	}
-
-	log.Info("✅ Firewalld configuration complete.")
-	return nil
+	return execute.Execute("sudo", "firewall-cmd", "--reload")
 }
