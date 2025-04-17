@@ -123,6 +123,11 @@ func InstallVaultViaDnf(log *zap.Logger) error {
 func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
 	fmt.Println("\nInitializing Vault...")
 
+	if err := EnsureRuntimeDir(log); err != nil {
+		log.Error("Runtime dir missing or invalid", zap.Error(err))
+		return nil, nil, err
+	}
+
 	initRes, err := client.Sys().Init(&api.InitRequest{
 		SecretShares:    5,
 		SecretThreshold: 3,
@@ -293,7 +298,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse, log *zap.
 	}
 
 	// Setup Vault Agent
-	if err := SetupVaultAgent(password, log); err != nil {
+	if err := EnsureVaultAgent(password, log); err != nil {
 		fmt.Println("⚠️ Failed to set up Vault Agent service:", err)
 	}
 

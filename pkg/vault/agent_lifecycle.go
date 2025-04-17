@@ -7,10 +7,55 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
+
+// setupVaultAgent configures the Vault Agent to run as the eos user.
+func EnsureVaultAgent(password string, log *zap.Logger) error {
+
+	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
+
+	if err := system.EnsureEosUser(true, false, log); err != nil {
+		log.Error("Failed to ensure eos user", zap.Error(err))
+		return err
+	}
+
+	if err := writeAgentConfig(); err != nil {
+		log.Error("Failed to write agent config", zap.Error(err))
+		return err
+	}
+	if err := writeAgentPassword(password); err != nil {
+		log.Error("Failed to write agent password", zap.Error(err))
+		return err
+	}
+
+	if err := EnsureRuntimeDir(log); err != nil {
+		log.Error("Failed to prepare runtime directory", zap.Error(err))
+		return err
+	}
+
+	if err := writeSystemdUnit(); err != nil {
+		log.Error("Failed to write systemd unit", zap.Error(err))
+		return err
+	}
+
+	if err := PrepareVaultAgentEnvironment(log); err != nil {
+		log.Error("Failed to vault agent environment", zap.Error(err))
+		return err
+	}
+
+	if err := reloadAndStartService(log); err != nil {
+		log.Error("Failed to reload/start service", zap.Error(err))
+		return err
+	}
+
+	fmt.Println("✅ Vault Agent for eos is running and ready.")
+	return nil
+}
 
 func CreateAppRole(client *api.Client, roleName string, log *zap.Logger) error {
 	fmt.Println("🔐 Creating AppRole:", roleName)
@@ -98,7 +143,7 @@ func killVaultAgentPort() error {
 func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 	log.Info("🧼 Preparing Vault Agent environment")
 
-	if err := prepareRuntimeDir(); err != nil {
+	if err := EnsureRuntimeDir(log); err != nil {
 		log.Error("Failed to prepare runtime dir", zap.Error(err))
 		return err
 	}
@@ -109,5 +154,87 @@ func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 	}
 
 	log.Info("✅ Vault Agent environment ready")
+	return nil
+}
+
+func EnsureRuntimeDir(log *zap.Logger) error {
+	const dir = "/run/eos"
+
+	if err := os.MkdirAll(dir, 0750); err != nil {
+		return fmt.Errorf("failed to create runtime dir: %w", err)
+	}
+
+	info, err := os.Stat(dir)
+	if err != nil {
+		return fmt.Errorf("failed to stat %s: %w", dir, err)
+	}
+
+	uid, gid, err := system.LookupUser("eos")
+	if err != nil {
+		return fmt.Errorf("failed to lookup eos user: %w", err)
+	}
+
+	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+		if int(stat.Uid) != uid || int(stat.Gid) != gid {
+			if err := os.Chown(dir, uid, gid); err != nil {
+				return fmt.Errorf("failed to chown %s to eos:eos: %w", dir, err)
+			}
+			log.Info("🔧 Updated ownership of runtime dir", zap.String("path", dir))
+		}
+	}
+
+	return nil
+}
+
+func EnsureVaultAgentRunning(log *zap.Logger) error {
+	if err := EnsureAppRoleFiles(log); err != nil {
+		return err
+	}
+
+	cmd := exec.Command("systemctl", "is-active", "--quiet", "vault-agent-eos.service")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("vault agent service is not active")
+	}
+	if _, err := os.Stat(VaultAgentTokenPath); err != nil {
+		return fmt.Errorf("vault token sink is missing")
+	}
+	return nil
+}
+
+func EnsureAppRoleFiles(log *zap.Logger) error {
+	paths := []string{"/etc/vault/role_id", "/etc/vault/secret_id"}
+	for _, path := range paths {
+		if _, err := os.Stat(path); err != nil {
+			return fmt.Errorf("required AppRole file missing: %s", path)
+		}
+	}
+	return nil
+}
+
+func reloadAndStartService(log *zap.Logger) error {
+	log.Info("🔄 Reloading systemd and starting Vault Agent service...")
+
+	cmds := [][]string{
+		{"systemctl", "daemon-reexec"},
+		{"systemctl", "daemon-reload"},
+		{"systemctl", "enable", "--now", "vault-agent-eos.service"},
+	}
+
+	for _, args := range cmds {
+		cmd := exec.Command(args[0], args[1:]...)
+		_, err := cmd.CombinedOutput()
+		if err != nil {
+			log.Error("failed to run")
+			return err
+		}
+	}
+
+	// 🔁 Restart the service after setup and reload
+	if err := exec.Command("systemctl", "restart", "vault-agent-eos.service").Run(); err != nil {
+		log.Error("failed to restart Vault Agent")
+		return err
+	}
+
+	log.Info("✅ Vault Agent service started")
 	return nil
 }

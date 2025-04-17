@@ -50,7 +50,7 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 
 // ReadVaultSecureData loads bootstrap Vault secrets (vault_init, userpass creds).
 func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse, vault.UserpassCreds, []string, string) {
-	if err := system.EnsureEosUser(); err != nil {
+	if err := system.EnsureEosUser(true, false, log); err != nil {
 		log.Fatal("❌ Failed to ensure eos system user", zap.Error(err))
 	}
 

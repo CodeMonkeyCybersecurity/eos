@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"os/user"
@@ -28,40 +29,59 @@ func UserExists(name string) bool {
 	return exec.Command("id", name).Run() == nil
 }
 
-// CreateEosUser creates a special Eos system user "eos" with a secure password and no login shell.
-func CreateEosUser(auto bool, loginShell bool, log *zap.Logger) (string, error) {
-
+func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	const defaultUsername = "eos"
 	username := defaultUsername
 
+	// Check if user already exists
 	if UserExists(username) {
-		return "", nil // Already exists
+		log.Info("✅ eos user exists")
+
+		_, err := user.Lookup(username)
+		if err != nil {
+			return fmt.Errorf("failed to lookup user '%s': %w", username, err)
+		}
+		shell, err := getUserShell(username)
+		if err != nil {
+			return err
+		}
+		if !strings.Contains(shell, "nologin") {
+			return fmt.Errorf("user '%s' has shell access: %s (expected /usr/sbin/nologin)", username, shell)
+		}
+
+		log.Info("✅ eos user has no shell access")
+		log.Info("✅ eos user validation complete")
+		return nil
 	}
 
-	// Interactive prompt
+	log.Warn("👤 eos user not found — creating...")
+
+	// Interactive username override (optional)
 	if !auto {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Enter username (default: eos): ")
 		input, _ := reader.ReadString('\n')
-		if strings.TrimSpace(input) != "" {
-			username = strings.TrimSpace(input)
+		if trimmed := strings.TrimSpace(input); trimmed != "" {
+			username = trimmed
 		}
 	}
 
+	// Determine login shell
 	shell := "/usr/sbin/nologin"
 	if loginShell {
 		shell = "/bin/bash"
 	}
 
 	if err := execute.Execute("useradd", "-m", "-s", shell, username); err != nil {
-		return "", fmt.Errorf("failed to create user: %w", err)
+		return fmt.Errorf("failed to create user: %w", err)
 	}
 
+	// Set password
 	var password string
 	if auto {
 		pw, err := crypto.GeneratePassword(20)
 		if err != nil {
-			return "", err
+			return err
 		}
 		password = pw
 	} else {
@@ -72,7 +92,7 @@ func CreateEosUser(auto bool, loginShell bool, log *zap.Logger) (string, error) 
 			pw1 = strings.TrimSpace(pw1)
 
 			if !crypto.IsPasswordStrong(pw1) {
-				fmt.Println("❌ Password is too weak. Please use at least 12 characters, a mix of upper/lowercase, number, and special character.")
+				fmt.Println("❌ Password is too weak. Please use at least 12 characters, with mixed case, numbers, and symbols.")
 				continue
 			}
 
@@ -90,11 +110,11 @@ func CreateEosUser(auto bool, loginShell bool, log *zap.Logger) (string, error) 
 	}
 
 	if err := SetPassword(username, password); err != nil {
-		return "", err
+		return err
 	}
 
+	// Handle sudo group
 	adminGroup := platform.GuessAdminGroup(log)
-
 	if !auto {
 		reader := bufio.NewReader(os.Stdin)
 		fmt.Print("Should this user have sudo privileges? (yes/no): ")
@@ -103,76 +123,33 @@ func CreateEosUser(auto bool, loginShell bool, log *zap.Logger) (string, error) 
 			adminGroup = ""
 		}
 	}
-
 	if adminGroup != "" {
 		if err := execute.Execute("usermod", "-aG", adminGroup, username); err != nil {
-			return "", fmt.Errorf("failed to add user to group: %w", err)
+			return fmt.Errorf("failed to add user to group: %w", err)
 		}
 	}
 
-	// Save password to file
+	// Save password to secrets dir
 	secretsPath := "/var/lib/eos/secrets"
 	if err := os.MkdirAll(secretsPath, 0700); err != nil {
-		fmt.Printf("⚠️ Warning: could not create secrets directory: %v\n", err)
+		fmt.Printf("⚠️ Could not create secrets directory: %v\n", err)
 	} else {
-		outFile := secretsPath + "/eos-password.txt"
+		outFile := filepath.Join(secretsPath, "eos-password.txt")
 		f, err := os.Create(outFile)
 		if err != nil {
-			fmt.Println("⚠️ Warning: Could not save password to disk.")
+			fmt.Println("⚠️ Could not save password to disk.")
 		} else {
-			defer func() {
-				if cerr := f.Close(); cerr != nil {
-					fmt.Printf("⚠️ Warning: failed to close file %s: %v\n", outFile, cerr)
-				}
-			}()
-
+			defer f.Close()
 			if _, err := fmt.Fprintf(f, "eos:%s\n", password); err != nil {
-				fmt.Printf("⚠️ Warning: failed to write password to file: %v\n", err)
+				fmt.Printf("⚠️ Failed to write password: %v\n", err)
 			} else {
 				fmt.Printf("🔐 eos password saved to: %s\n", outFile)
 				fmt.Println("💡 Please store this password in a secure password manager.")
 			}
 		}
 	}
-	return username, nil
-}
 
-// ensureEosUser ensures the 'eos' user exists and has the correct attributes.
-func EnsureEosUser() error {
-	const eosUsername = "eos"
-
-	if !platform.UserExists(eosUsername) {
-		fmt.Println("👤 eos user not found, creating...")
-		if err := platform.EnsureSystemUserExists(eosUsername); err != nil {
-			return fmt.Errorf("failed to create eos user: %w", err)
-		}
-		fmt.Println("✅ eos user created successfully")
-	} else {
-		fmt.Println("✅ eos user exists")
-
-		u, err := user.Lookup(eosUsername)
-		if err != nil {
-			return fmt.Errorf("failed to lookup user '%s': %w", eosUsername, err)
-		}
-
-		// Basic sanity check on name
-		if u.Username != eosUsername {
-			return fmt.Errorf("⚠️ eos username mismatch '%s': %w", eosUsername, err)
-		}
-
-		// Check shell is nologin
-		shell, err := getUserShell(eosUsername)
-		if err != nil {
-			return err
-		}
-		if !strings.Contains(shell, "nologin") {
-			return fmt.Errorf("user '%s' has shell access: %s (expected /usr/sbin/nologin)", eosUsername, shell)
-		}
-
-		fmt.Println("✅ eos user has no shell access")
-		fmt.Println("✅ eos user validation complete")
-		return nil
-	}
+	log.Info("✅ eos user created and configured")
 	return nil
 }
 
