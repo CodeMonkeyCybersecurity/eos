@@ -18,18 +18,28 @@ var EnableVaultCmd = &cobra.Command{
 It initializes and unseals Vault, sets up auditing, KV v2, 
 AppRole, userpass, and creates an eos user with a random password.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
-		/* Ensure Vault is installed */
 		log.Info("[0/7] Starting Vault enable workflow")
+
+		// 0. Ensure Vault is installed
 		if err := vault.InstallVaultViaDnf(log); err != nil {
 			log.Error("Failed to install Vault", zap.Error(err))
 			return err
 		}
+
+		// 1. Set VAULT_ADDR
 		addr, err := vault.EnsureVaultAddr(log)
 		if err != nil {
 			log.Error("Failed to set VAULT_ADDR", zap.Error(err))
 			return err
 		}
 		log.Info("Set VAULT_ADDR from hostname", zap.String("VAULT_ADDR", addr))
+
+		// 2. Ensure Vault Agent is running (before attempting client connection)
+		if err := vault.EnsureVaultAgentRunning(log); err != nil {
+			log.Warn("Vault Agent not ready, some operations may fail", zap.Error(err))
+		}
+
+		// 3. Get Vault client
 		client, err := vault.NewClient(log)
 		if err != nil {
 			log.Fatal("Failed to create Vault client", zap.Error(err))
@@ -37,7 +47,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		client, initRes, err := vault.SetupVault(client, log)
 		if err != nil {
-			log.Error("Failed to initialise and unseal Vault", zap.Error(err))
+			log.Error("Failed to initialize and unseal Vault", zap.Error(err))
 			return err
 		}
 		if initRes == nil {
@@ -45,7 +55,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			return fmt.Errorf("vault already initialized: no root token available")
 		}
 
-		/* Enable file audit */
+		// Remaining steps
 		log.Info("[1/7] Enabling file audit")
 		if err := vault.EnableFileAudit(client, log); err != nil {
 			log.Error("Failed to enable file audit", zap.Error(err))
@@ -53,77 +63,37 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 		log.Info("✅ File audit enabled successfully")
 
-		/* Enable KV v2 */
 		log.Info("[2/7] Enabling KV v2 secrets engine")
 		if err := vault.EnableKV2(client, log); err != nil {
 			log.Error("KV v2 setup failed", zap.Error(err))
 		}
 
-		/* Test KV write/read */
 		log.Info("[3/7] Testing KV put/get")
 		report, _ := vault.Check(client, log, nil, "")
 		if report == nil || !report.KVWorking {
 			log.Error("KV secret test failed or unavailable")
 		}
 
-		/* Enable AppRole */
 		log.Info("[4/7] Ensuring AppRole auth method")
 		if err := vault.EnsureAppRole(client, log); err != nil {
 			log.Error("AppRole setup failed", zap.Error(err))
 			return err
 		}
 
-		// 8. Enable userpass
 		log.Info("[5/7] Enabling userpass auth method")
 		if err := vault.EnableUserPass(client); err != nil {
 			log.Error("Userpass setup failed", zap.Error(err))
 			return err
 		}
 
-		// 9. Create eos user
-		log.Info("[6/7] Ensure eos user exists and storing secrets")
-		// Assume you've already generated or loaded `vaultPassword` above
+		log.Info("[6/7] Ensuring eos user exists and storing secrets")
 		if err := vault.EnsureEosVaultUser(client, log); err != nil {
 			log.Error("Failed to create eos user or store secrets", zap.Error(err))
 			return err
 		}
 
 		log.Info("[7/7] Vault enable workflow complete")
-
 		fmt.Println("\n✅ Vault enable steps completed successfully!")
-		log.Info("✅ Vault enable steps completed successfully")
-
-		fmt.Println("🔑 Vault has been initialized and unsealed.")
-		log.Info("🔑 Vault has been initialized and unsealed")
-
-		fmt.Println("🔐 The eos user's Vault password is stored at /var/lib/eos/secrets/vault_userpass.json")
-		log.Info("🔐 The eos user's Vault password is stored", zap.String("path", "/var/lib/eos/secrets/vault_userpass.json"))
-
-		fmt.Println("📄 Unseal keys and root token are stored in Vault and also in /var/lib/eos/secrets/vault_init.json")
-		log.Info("📄 Vault init data written to Vault and local fallback", zap.String("path", "/var/lib/eos/secrets/vault_init.json"))
-
-		fmt.Println("🛡️  This file will be deleted after you run: eos secure vault")
-		log.Info("🛡️  vault_init.json will be deleted after eos secure vault is run")
-
-		fmt.Println("🔑  Please copy the unseal keys and root token to a password manager now.")
-		log.Info("🔑 Prompting user to copy unseal keys and root token to password manager")
-
-		fmt.Println("⚠️ IMPORTANT: Open the Vault Web UI and confirm that:")
-		fmt.Println("   - The eos user exists and can log in")
-		fmt.Println("   - The unseal keys and root token are backed up")
-		log.Info("⚠️  Reminder to verify eos user and secrets via the Vault Web UI")
-
-		fmt.Println("💾 Then move the keys to a password manager and run:")
-		fmt.Println("      eos secure vault")
-		fmt.Println("   to promote the eos user and revoke the root token.")
-		log.Info("💾 Prompting user to run eos secure vault after backup")
-
-		fmt.Println("💬 Or run 'eos secure vault --dry-run' to preview changes before committing.")
-		log.Info("💬 User may run eos secure vault --dry-run to preview actions")
-
-		fmt.Println("📦 A local backup of your Vault init data was written to /var/lib/eos/secrets/vault_init.json")
-		log.Info("📦 Vault init data backup confirmed at /var/lib/eos/secrets/vault_init.json")
-
 		return nil
 	}),
 }
