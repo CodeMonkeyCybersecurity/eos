@@ -26,7 +26,6 @@ import (
 
 	// Internal packages
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
 var helpLogged bool // global guard to log help only once
@@ -38,23 +37,6 @@ var RootCmd = &cobra.Command{
 	Long: `Eos is a command-line application for managing processes, users, hardware, backups,
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Only on the root command do we check for help flags.
-		if cmd.Parent() == nil {
-			// Check if help flag was provided as the first flag.
-			if len(os.Args) > 1 && (os.Args[1] == "--help" || os.Args[1] == "-h") {
-				fmt.Println("Help requested – minimal initialization.")
-			} else {
-				logger.InitializeWithFallback()
-			}
-		}
-
-		// Set VAULT_ADDR
-		if _, err := vault.SetVaultEnv(); err != nil {
-			fmt.Printf("⚠️  Failed to set VAULT_ADDR: %v\n", err)
-		}
-
-	},
 
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
