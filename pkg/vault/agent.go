@@ -13,7 +13,7 @@ import (
 )
 
 // setupVaultAgent configures the Vault Agent to run as the eos user.
-func setupVaultAgent(password string) error {
+func SetupVaultAgent(password string) error {
 	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
 
 	if err := writeAgentConfig(); err != nil {

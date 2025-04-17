@@ -49,6 +49,19 @@ Please follow up by configuring MFA via your organization's preferred integratio
 		vault.CheckVaultSecrets(storedHashes, hashedRoot)
 		log.Info("✅ Loaded the stored initialization data and eos user credentials")
 
+		/* Create AppRole credentials */
+		if err := vault.CreateAppRole(client, "eos-approle"); err != nil {
+			log.Error("Failed to create AppRole", zap.Error(err))
+			return err
+		}
+
+		/* Start Vault Agent (writes HCL, unit, starts service) */
+		if err := vault.SetupVaultAgent(creds.Password); err != nil {
+			log.Error("Failed to set up Vault Agent", zap.Error(err))
+			return err
+		}
+		log.Info("✅ Vault Agent setup complete")
+
 		log.Info("Applying permissive policy (eos-policy) via the API for eos system user...")
 		if err := vault.ApplyAdminPolicy(creds, client); err != nil {
 			log.Error("Failed to apply admin policy", zap.Error(err))

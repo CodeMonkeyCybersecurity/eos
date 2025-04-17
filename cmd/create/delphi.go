@@ -15,6 +15,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
+var ignoreHardwareCheck bool
+
 var CreateDelphiCmd = &cobra.Command{
 	Use:     "delphi",
 	Aliases: []string{"wazuh"},
@@ -74,7 +76,14 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	log.Info("Running Wazuh installer")
-	installCmd := exec.Command("bash", scriptPath, "-a")
+	args = []string{"-a"}
+	if ignoreHardwareCheck {
+		log.Info("Ignoring hardware checks (passing -i to installer)")
+		args = append(args, "-i")
+	}
+
+	cmdArgs := append([]string{scriptPath}, args...)
+	installCmd := exec.Command("bash", cmdArgs...)
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
 	if err := installCmd.Run(); err != nil {
@@ -134,4 +143,5 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 
 func init() {
 	CreateCmd.AddCommand(CreateDelphiCmd)
+	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check (passes -i)")
 }
