@@ -9,3 +9,13 @@ var DefaultPorts = []string{
 	"1515/tcp",  // Agent registration
 	"55000/tcp", // API
 }
+
+// User represents a Wazuh API user object
+type User struct {
+	ID       int    `json:"id"`
+	Username string `json:"username"`
+}
+
+const (
+	APICreds = "eos/delphi/api_creds"
+)

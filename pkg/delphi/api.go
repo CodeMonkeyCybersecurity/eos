@@ -9,11 +9,7 @@ import (
 	"os"
 )
 
-// User represents a Wazuh API user object
-type User struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
-}
+
 
 // GetFieldValue returns the value of a DelphiConfig field by name
 func GetFieldValue(cfg *DelphiConfig, field string) string {

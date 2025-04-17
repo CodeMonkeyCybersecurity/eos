@@ -17,27 +17,34 @@ import (
 // === Vault Write Helpers ===
 //
 
-func WriteAuto(path string, data any, log *zap.Logger) error {
-	client, err := NewClient()
-	if err != nil {
-		return fmt.Errorf("failed to create Vault client: %w", err)
-	}
-	return Write(client, path, data, log)
-}
-
-// Write stores a struct in Vault using the API or falls back to disk if the API call fails.
+// Write stores a struct in Vault using the API or falls back to disk if Vault is unavailable.
+// If client is nil, it initializes one automatically.
 func Write(client *api.Client, name string, data any, log *zap.Logger) error {
+	var err error
+	if client == nil {
+		client, err = NewClient()
+		if err != nil {
+			log.Warn("Vault client creation failed", zap.Error(err))
+			return writeToDisk(name, data, log)
+		}
+	}
+
 	SetVaultClient(client)
-	path := vaultPath(name, log) // ✅ fix: removed invalid argument
+	path := vaultPath(name, log)
 
 	if err := WriteToVault(path, data); err == nil {
-		fmt.Println("✅ Vault secret written:", path)
+		log.Info("✅ Vault secret written", zap.String("path", path))
 		return nil
 	}
 
-	fmt.Println("⚠️ Vault API write failed for:", path)
-	fmt.Println("💾 Falling back to local disk:", DiskPath(name, log))
-	return WriteFallbackJSON(DiskPath(name, log), data)
+	log.Warn("⚠️ Vault API write failed", zap.String("path", path), zap.Error(err))
+
+	if err := WriteToVault(path, data); err == nil {
+		log.Info("✅ Vault secret written", zap.String("path", path))
+		return nil
+	}
+	log.Warn("⚠️ Vault API write failed", zap.String("path", path), zap.Error(err))
+	return writeToDisk(name, data, log)
 }
 
 // WriteToVault stores a serializable struct to Vault at a given KV v2 path.
@@ -91,4 +98,10 @@ func WriteFallbackJSON(path string, data any) error {
 	fmt.Printf("✅ Fallback data saved to %s\n", path)
 	fmt.Println("💡 Run `eos vault sync` later to upload it to Vault.")
 	return nil
+}
+
+func writeToDisk(name string, data any, log *zap.Logger) error {
+	fallbackPath := DiskPath(name, log)
+	log.Info("💾 Falling back to local disk", zap.String("path", fallbackPath))
+	return WriteFallbackJSON(fallbackPath, data)
 }
