@@ -253,11 +253,6 @@ func EnableKV2(client *api.Client, log *zap.Logger) error {
 	return enableMount(client, "secret", "kv", map[string]string{"version": "2"}, "✅ KV v2 enabled at path=secret.")
 }
 
-/* Enable AppRole */
-func EnableAppRole(client *api.Client) error {
-	return enableAuth(client, "approle")
-}
-
 /* Enable UserPass */
 func EnableUserPass(client *api.Client) error {
 	return enableAuth(client, "userpass")
@@ -298,7 +293,7 @@ func CreateEosAndSecret(client *api.Client, initRes *api.InitResponse, log *zap.
 	}
 
 	// Setup Vault Agent
-	if err := EnsureVaultAgent(password, log); err != nil {
+	if err := EnsureVaultAgent(client, password, log); err != nil {
 		fmt.Println("⚠️ Failed to set up Vault Agent service:", err)
 	}
 
@@ -362,7 +357,7 @@ func SetupEosVaultUser(client *api.Client, password string, log *zap.Logger) err
 	if err := CreateUserpassAccount(client, "eos", password); err != nil {
 		return err
 	}
-	if err := CreateAppRole(client, "eos", log); err != nil {
+	if err := EnsureAppRole(client, "eos", log); err != nil {
 		return err
 	}
 	return nil

@@ -15,7 +15,7 @@ import (
 )
 
 // setupVaultAgent configures the Vault Agent to run as the eos user.
-func EnsureVaultAgent(password string, log *zap.Logger) error {
+func EnsureVaultAgent(client *api.Client, password string, log *zap.Logger) error {
 
 	fmt.Println("🔧 Setting up Vault Agent to run as 'eos'...")
 
@@ -38,6 +38,11 @@ func EnsureVaultAgent(password string, log *zap.Logger) error {
 		return err
 	}
 
+	if err := EnsureAppRole(client, "eos", log); err != nil {
+		log.Error("AppRole setup failed", zap.Error(err))
+		return err
+	}
+
 	if err := writeSystemdUnit(); err != nil {
 		log.Error("Failed to write systemd unit", zap.Error(err))
 		return err
@@ -54,53 +59,6 @@ func EnsureVaultAgent(password string, log *zap.Logger) error {
 	}
 
 	fmt.Println("✅ Vault Agent for eos is running and ready.")
-	return nil
-}
-
-func CreateAppRole(client *api.Client, roleName string, log *zap.Logger) error {
-	fmt.Println("🔐 Creating AppRole:", roleName)
-
-	// Enable AppRole auth method (idempotent)
-	_ = client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{
-		Type: "approle",
-	})
-
-	// Define AppRole in Vault with the eos-policy
-	_, err := client.Logical().Write(rolePath, map[string]interface{}{
-		"policies":      []string{EosVaultPolicy},
-		"token_ttl":     "60m",
-		"token_max_ttl": "120m",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create AppRole %q: %w", roleName, err)
-	}
-
-	// Read role_id from Vault
-	roleIDResp, err := client.Logical().Read(rolePath + "/role-id")
-	if err != nil {
-		return fmt.Errorf("failed to read role_id: %w", err)
-	}
-	roleID := roleIDResp.Data["role_id"].(string)
-
-	// Generate a new secret_id
-	secretIDResp, err := client.Logical().Write(rolePath+"/secret-id", nil)
-	if err != nil {
-		return fmt.Errorf("failed to generate secret_id: %w", err)
-	}
-	secretID := secretIDResp.Data["secret_id"].(string)
-
-	// Write both values to disk
-	if err := os.WriteFile(AppRoleIDPath, []byte(roleID+"\n"), 0640); err != nil {
-		return fmt.Errorf("failed to write role_id: %w", err)
-	}
-	if err := os.WriteFile(AppSecretIDPath, []byte(secretID+"\n"), 0640); err != nil {
-		return fmt.Errorf("failed to write secret_id: %w", err)
-	}
-
-	fmt.Println("✅ AppRole credentials written to disk:")
-	fmt.Println("   •", AppRoleIDPath)
-	fmt.Println("   •", AppSecretIDPath)
-
 	return nil
 }
 
@@ -236,5 +194,56 @@ func reloadAndStartService(log *zap.Logger) error {
 	}
 
 	log.Info("✅ Vault Agent service started")
+	return nil
+}
+
+func EnsureAppRole(client *api.Client, roleName string, log *zap.Logger) error {
+	if _, err := os.Stat(AppRoleIDPath); err == nil {
+		if _, err := os.Stat(AppSecretIDPath); err == nil {
+			log.Info("✅ AppRole credentials already present — skipping generation")
+			return nil
+		}
+	}
+
+	log.Info("🔐 Creating AppRole", zap.String("role", roleName))
+
+	if err := enableAuth(client, "approle"); err != nil {
+		return fmt.Errorf("failed to enable AppRole auth: %w", err)
+	}
+
+	rolePath := "auth/approle/role/" + roleName
+	_, err := client.Logical().Write(rolePath, map[string]interface{}{
+		"policies":      []string{EosVaultPolicy},
+		"token_ttl":     "60m",
+		"token_max_ttl": "120m",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to write AppRole config: %w", err)
+	}
+
+	roleIDResp, err := client.Logical().Read(rolePath + "/role-id")
+	if err != nil {
+		return fmt.Errorf("failed to read role_id: %w", err)
+	}
+	secretIDResp, err := client.Logical().Write(rolePath+"/secret-id", nil)
+	if err != nil {
+		return fmt.Errorf("failed to generate secret_id: %w", err)
+	}
+
+	roleID := roleIDResp.Data["role_id"].(string)
+	secretID := secretIDResp.Data["secret_id"].(string)
+
+	if err := os.WriteFile(AppRoleIDPath, []byte(roleID+"\n"), 0400); err != nil {
+		return fmt.Errorf("failed to write role_id: %w", err)
+	}
+	if err := os.WriteFile(AppSecretIDPath, []byte(secretID+"\n"), 0400); err != nil {
+		return fmt.Errorf("failed to write secret_id: %w", err)
+	}
+
+	log.Info("✅ AppRole credentials written",
+		zap.String("role_id_path", AppRoleIDPath),
+		zap.String("secret_id_path", AppSecretIDPath),
+	)
+
 	return nil
 }

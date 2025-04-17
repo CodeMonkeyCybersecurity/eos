@@ -67,8 +67,8 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		/* Enable AppRole */
-		log.Info("[4/7] Enabling AppRole auth method")
-		if err := vault.EnableAppRole(client); err != nil {
+		log.Info("[4/7] Ensuring AppRole auth method")
+		if err := vault.EnsureAppRole(client, "eos", log); err != nil {
 			log.Error("AppRole setup failed", zap.Error(err))
 			return err
 		}
