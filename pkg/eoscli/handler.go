@@ -29,12 +29,12 @@ func Wrap(fn func(cmd *cobra.Command, args []string) error) func(cmd *cobra.Comm
 
 		defer logger.LogCommandLifecycle(cmd.Name())(&err)
 
-		vault.EnsureVaultClient()
-
 		vaultCheck.Do(func() {
+			vault.EnsureVaultClient()
+
 			log.Info("🔒 Checking Vault sealed state...")
 			if _, vaultErr := vault.EnsureVaultReady(); vaultErr != nil {
-				log.Warn("⚠️ Vault is not fully prepared (sealed or missing fallback)", zap.Error(vaultErr))
+				log.Warn("⚠️ Vault is not fully prepared...", zap.Error(vaultErr))
 				log.Warn("Continuing anyway — downstream commands may fail if Vault is required.")
 			}
 		})
