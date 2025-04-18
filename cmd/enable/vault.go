@@ -62,7 +62,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		if initRes == nil {
 			log.Warn("Vault already initialized — attempting to load existing credentials")
-			initRes, _, _, _ = eos.ReadVaultSecureData(client, log)
+			initRes, _, _, _ = vault.ReadVaultSecureData(client, log)
 		}
 
 		// Prompt the user (or reuse saved) unseal keys and root token
@@ -72,7 +72,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			hashedRoot   string
 		)
 
-		fallbackInitRes, rawCreds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client, log)
+		fallbackInitRes, rawCreds, storedHashes, hashedRoot := vault.ReadVaultSecureData(client, log)
 		if initRes == nil {
 			initRes = fallbackInitRes
 		}
