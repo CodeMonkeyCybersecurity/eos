@@ -71,31 +71,19 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		if purge {
-			log.Info("Purging Vault configuration, data, and logs...")
-
-			configDirs := []string{
-				"/etc/vault*",
-				"/opt/vault",
-				"/var/lib/vault",
-				"/var/log/vault.log",
-				"/var/snap/vault",
-				"/var/lib/eos",
-				"/run/eos/",
-				"/etc/systemd/system/vault*",
-			}
-
-			for _, dir := range configDirs {
-				if err := os.RemoveAll(dir); err != nil {
-					log.Warn("Failed to remove", zap.String("path", dir), zap.Error(err))
+			log.Info("🧨 Purging Vault config, data, and runtime paths...")
+			for _, path := range vault.GetVaultPurgePaths() {
+				if err := os.RemoveAll(path); err != nil {
+					log.Warn("Failed to remove path during purge", zap.String("path", path), zap.Error(err))
 				} else {
-					log.Info("Removed", zap.String("path", dir))
+					log.Info("🧹 Removed path", zap.String("path", path))
 				}
 			}
 
-			// 🧼 Repo + keyring cleanup
+			log.Info("🧼 Cleaning up Vault repo and keyring files...")
 			vault.Purge(distro, log)
 		} else {
-			log.Info("Purge flag not set; skipping configuration and data cleanup.")
+			log.Info("Skipping purge because --no-purge was specified.")
 		}
 
 		// Attempt a best-effort Vault client setup
@@ -117,6 +105,7 @@ var DeleteVaultCmd = &cobra.Command{
 }
 
 func init() {
-	DeleteVaultCmd.Flags().BoolVar(&purge, "purge", false, "Also remove Vault config, secrets, and logs")
+	DeleteVaultCmd.Flags().BoolVar(&purge, "purge", true, "Remove Vault config, secrets, and logs (default: true)")
+	DeleteVaultCmd.Flags().Lookup("purge").NoOptDefVal = "true" // support --no-purge
 	DeleteCmd.AddCommand(DeleteVaultCmd)
 }

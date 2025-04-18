@@ -32,15 +32,37 @@ var (
 	vaultClient               *api.Client
 	EosRunDir                 = "/run/eos"
 	VaultAgentTokenPath       = filepath.Join(EosRunDir, "vault-agent-eos.token")
-	PIDfile                   = filepath.Join(EosRunDir, "vault-agent.pid")
+	AgentPID                  = filepath.Join(EosRunDir, "vault-agent.pid")
+	VaultPID                  = filepath.Join(EosRunDir, "vault.pid")
 	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
 )
+
+// VaultPurgePaths defines directories and files to remove when purging Vault
+var VaultPurgePaths = []string{
+	"/etc/vault*",         // Vault config
+	"/opt/vault",          // legacy data
+	"/var/lib/vault",      // Vault file storage
+	"/var/log/vault.log",  // Vault logs
+	"/var/snap/vault",     // Snap data
+	SecretsDir,            // eos secrets
+	EosRunDir,             // eos runtime (includes agent token, pid)
+	VaultAgentTokenPath,   // vault-agent-eos.token
+	VaultAgentPassPath,    // agent secret pass
+	VaultAgentConfigPath,  // agent config file
+	VaultTokenSinkPath,    // sink token file
+	VaultServicePath,      // systemd service
+	VaultAgentServicePath, // agent systemd service
+	VaultPID,
+	AgentPID,
+	binaryPath,
+}
 
 //
 // ------------------------- CONSTANTS -------------------------
 //
 
 const (
+
 	// Config paths
 	VaultConfigDirDebian = "/etc/vault.d"
 	VaultConfigDirSnap   = "/var/snap/vault/common"
@@ -48,6 +70,8 @@ const (
 	VaultDefaultPort     = "8179"
 	VaultDefaultAddr     = "http://127.0.0.1:8179"
 	VaultConfigFileName  = "config.hcl"
+
+	binaryPath = "/usr/bin/vault"
 
 	// Debian APT
 	AptKeyringPath = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
@@ -195,4 +219,8 @@ func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, 
 	vaultAddr := GetVaultAddr()
 
 	return configDir, configFile, vaultAddr
+}
+
+func GetVaultPurgePaths() []string {
+	return VaultPurgePaths
 }

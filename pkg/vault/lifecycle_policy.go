@@ -78,7 +78,7 @@ listener "tcp" {
 
 cache {
   use_auto_auth_token = true
-}`, PIDfile, AppRoleIDPath, AppSecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
+}`, AgentPID, AppRoleIDPath, AppSecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
 
 	if err := os.WriteFile(VaultAgentConfigPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
 		return fmt.Errorf("failed to write Vault Agent config to %s: %w", VaultAgentConfigPath, err)
