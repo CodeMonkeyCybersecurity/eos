@@ -21,15 +21,35 @@ import (
 // ========================== CREATE ==========================
 //
 
-// VaultCreate creates a secret only if it doesn't already exist
-func EnsureVault(path string, value interface{}, log *zap.Logger) error {
+func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error {
+	log.Info("🔐 Vault setup starting")
 
-	if _, err := EnsureVaultAddr(log); err != nil {
-		log.Error("Unable to determine VAULT_ADDR", zap.Error(err))
-		return fmt.Errorf("could not set VAULT_ADDR: %w", err)
+	if err := phaseInstallVault(log); err != nil {
+		return fmt.Errorf("install: %w", err)
 	}
+	if err := phasePatchVaultConfigIfNeeded(log); err != nil {
+		return fmt.Errorf("patch-config: %w", err)
+	}
+	if err := phaseEnsureVaultRuntimeDir(log); err != nil {
+		return fmt.Errorf("runtime-dir: %w", err)
+	}
+	if err := phaseEnsureClientHealthy(log); err != nil {
+		return fmt.Errorf("client-health: %w", err)
+	}
+	client, err := phaseInitAndUnsealVault(log)
+	if err != nil {
+		return fmt.Errorf("init-unseal: %w", err)
+	}
+	if err := phaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {
+		return fmt.Errorf("apply-secrets: %w", err)
+	}
+	log.Info("✅ Vault setup complete")
+	return nil
+}
 
-	log.Info("[1/9] Ensuring Vault is installed")
+// phaseInstallVault ensures Vault is installed using the appropriate package manager.
+func phaseInstallVault(log *zap.Logger) error {
+	log.Info("[1/6] Ensuring Vault is installed")
 
 	distro := platform.DetectLinuxDistro(log)
 	log.Info("Detected Linux distribution", zap.String("distro", distro))
@@ -52,60 +72,185 @@ func EnsureVault(path string, value interface{}, log *zap.Logger) error {
 		return fmt.Errorf("unsupported distro for Vault install: %s", distro)
 	}
 
-	log.Info("[2/9] Checking for port mismatch (8200 → 8179)")
-	TryPatchVaultPortIfNeeded(log)
+	log.Info("✅ Vault installed successfully")
+	return nil
+}
 
-	log.Info("[3/9] Ensuring Vault runtime directory exists")
-	if err := EnsureRuntimeDir(log); err != nil {
-		log.Error("❌ Failed to create Vault runtime directory", zap.Error(err))
-		return fmt.Errorf("runtime dir check failed: %w", err)
-	}
+// phasePatchVaultConfigIfNeeded ensures Vault is configured to use the expected port (8179).
+func phasePatchVaultConfigIfNeeded(log *zap.Logger) error {
+	log.Info("[2/6] Checking for Vault port mismatch (8200 → 8179)")
 
-	log.Info("[4/9] Ensuring Vault client is available and healthy")
-	EnsureVaultClient(log)
-
-	log.Info("[5/9] Getting Vault client for setup")
-	client, err := GetVaultClient(log)
+	data, err := os.ReadFile(VaultConfigPath)
 	if err != nil {
-		log.Error("❌ Failed to get Vault client", zap.Error(err))
-		return fmt.Errorf("could not get client: %w", err)
+		log.Warn("Could not read Vault config file", zap.String("path", VaultConfigPath), zap.Error(err))
+		return nil // Not fatal, just warn
+	}
+	content := string(data)
+
+	// Skip if already using the correct port
+	if strings.Contains(content, "8179") {
+		log.Info("✅ Vault config already uses port 8179 — no patch needed")
+		return nil
 	}
 
-	log.Info("[6/9] Initializing and unsealing Vault if necessary")
-	_, _, err = SetupVault(client, log)
+	// Replace 8200 with 8179
+	if strings.Contains(content, "8200") {
+		log.Warn("🔧 Vault config uses port 8200 — patching to 8179")
+		newContent := strings.ReplaceAll(content, "8200", "8179")
+		if err := os.WriteFile(VaultConfigPath, []byte(newContent), 0644); err != nil {
+			return fmt.Errorf("failed to write patched Vault config: %w", err)
+		}
+
+		// Restart Vault service to apply change
+		log.Info("🔁 Restarting Vault service to apply config changes...")
+		cmd := exec.Command("systemctl", "restart", "vault")
+		if err := cmd.Run(); err != nil {
+			log.Error("❌ Failed to restart Vault service", zap.Error(err))
+			return fmt.Errorf("vault restart failed after patch: %w", err)
+		}
+
+		log.Info("✅ Vault config patched and service restarted successfully")
+		return nil
+	}
+
+	log.Info("ℹ️ No 8200 port found in Vault config — no changes applied")
+	return nil
+}
+
+// phaseEnsureVaultRuntimeDir ensures the Vault runtime directory exists with secure permissions.
+func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
+	log.Info("[3/6] Ensuring Vault runtime directory exists")
+
+	runtimeDir := EosRunDir // e.g., "/run/eos"
+
+	// Create directory if missing
+	if err := os.MkdirAll(runtimeDir, 0700); err != nil {
+		log.Error("❌ Failed to create Vault runtime directory", zap.String("path", runtimeDir), zap.Error(err))
+		return fmt.Errorf("could not create Vault runtime dir: %w", err)
+	}
+
+	// Set strict permissions
+	if err := os.Chmod(runtimeDir, 0700); err != nil {
+		log.Warn("⚠️ Failed to enforce 0700 permissions on runtime dir", zap.Error(err))
+	} else {
+		log.Info("✅ Vault runtime directory ready", zap.String("path", runtimeDir))
+	}
+
+	return nil
+}
+
+// phaseEnsureClientHealthy ensures that Vault is reachable and healthy.
+func phaseEnsureClientHealthy(log *zap.Logger) error {
+	log.Info("[4/6] Ensuring Vault client is available and healthy")
+
+	// Step 1: Set or validate VAULT_ADDR
+	if _, err := EnsureVaultAddr(log); err != nil {
+		log.Error("❌ Could not set or resolve VAULT_ADDR", zap.Error(err))
+		return fmt.Errorf("could not determine Vault address: %w", err)
+	}
+
+	// Step 2: Ensure vault binary is installed
+	if _, err := exec.LookPath("vault"); err != nil {
+		log.Error("❌ Vault binary not found in PATH", zap.Error(err))
+		return fmt.Errorf("vault binary not installed or not in PATH")
+	}
+
+	// Step 3: Check if Vault is responding
+	client, err := NewClient(log)
 	if err != nil {
-		log.Error("❌ Vault setup failed", zap.Error(err))
-		return fmt.Errorf("vault setup failed: %w", err)
+		log.Error("❌ Failed to create Vault client", zap.Error(err))
+		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	log.Info("[7/9] Getting privileged Vault client (via Vault Agent)")
-	privClient, err := GetPrivilegedVaultClient(log)
+	health, err := client.Sys().Health()
 	if err != nil {
-		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
-		return fmt.Errorf("privileged client failed: %w", err)
-	}
-	kv := privClient.KVv2("secret")
-
-	log.Info("[8/9] Checking if secret already exists", zap.String("path", path))
-	_, err = kv.Get(context.Background(), path)
-	if err == nil {
-		log.Warn("⚠️ Secret already exists", zap.String("path", path))
-		return fmt.Errorf("data already exists at path: %s", path)
+		log.Warn("⚠️ Vault health check failed", zap.Error(err))
+		return fmt.Errorf("vault not responding: %w", err)
 	}
 
-	log.Info("[9/9] Writing secret to Vault", zap.String("path", path))
-	data, err := toMap(value)
+	// Optional: Log sealed state
+	if health.Sealed {
+		log.Warn("🔒 Vault is sealed", zap.String("version", health.Version))
+	} else {
+		log.Info("✅ Vault is responding and unsealed", zap.String("version", health.Version))
+	}
+
+	return nil
+}
+
+func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
+	log.Info("[5/6] Initializing and unsealing Vault if necessary")
+
+	// Create a fresh Vault client
+	client, err := NewClient(log)
 	if err != nil {
-		log.Error("❌ Failed to marshal secret to Vault KV format", zap.Error(err))
-		return err
+		return nil, fmt.Errorf("could not create Vault client: %w", err)
 	}
 
-	if _, err := kv.Put(context.Background(), path, data); err != nil {
-		log.Error("❌ Failed to write secret to Vault", zap.Error(err))
-		return err
+	// Initialize Vault (or reuse fallback + unseal)
+	initRes, err := client.Sys().Init(&api.InitRequest{
+		SecretShares:    5,
+		SecretThreshold: 3,
+	})
+	if err != nil {
+		// Already initialized? Fallback to stored init result
+		if IsAlreadyInitialized(err, log) {
+			log.Info("✅ Vault already initialized — reusing stored init result")
+
+			initRes, err := LoadInitResultOrPrompt(client, log)
+			if err != nil {
+				return nil, fmt.Errorf("vault is already initialized but fallback failed: %w", err)
+			}
+			if err := UnsealVault(client, initRes, log); err != nil {
+				return nil, fmt.Errorf("failed to unseal vault: %w", err)
+			}
+			client.SetToken(initRes.RootToken)
+			return client, nil
+		}
+		return nil, fmt.Errorf("vault init error: %w", err)
 	}
 
-	log.Info("✅ Secret written to Vault successfully", zap.String("path", path))
+	// 🆕 Vault has just been initialized
+	log.Info("🎉 Vault initialized")
+	if err := UnsealVault(client, initRes, log); err != nil {
+		return nil, fmt.Errorf("failed to unseal new Vault: %w", err)
+	}
+	client.SetToken(initRes.RootToken)
+
+	// Persist init result for later reuse
+	if err := Write(client, "vault_init", initRes, log); err != nil {
+		log.Warn("Could not persist Vault init result", zap.Error(err))
+	} else {
+		log.Info("💾 Vault init result persisted to Vault")
+	}
+
+	return client, nil
+}
+
+func phaseApplyCoreSecrets(client *api.Client, kvPath string, kvData map[string]string, log *zap.Logger) error {
+	log.Info("[6/6] Applying core secrets to Vault", zap.String("path", kvPath))
+
+	kv := client.KVv2("secret")
+
+	// Sanity check: avoid nil maps
+	if kvData == nil {
+		log.Warn("No data provided for secret — initializing empty map")
+		kvData = make(map[string]string)
+	}
+
+	// Marshal as {"json": "..."}
+	data, err := json.Marshal(kvData)
+	if err != nil {
+		return fmt.Errorf("failed to marshal KV data: %w", err)
+	}
+	payload := map[string]interface{}{"json": string(data)}
+
+	// Write to Vault
+	if _, err := kv.Put(context.Background(), kvPath, payload); err != nil {
+		return fmt.Errorf("failed to write secret at %s: %w", kvPath, err)
+	}
+
+	log.Info("✅ Secret written to Vault", zap.String("path", kvPath), zap.Int("keys", len(kvData)))
 	return nil
 }
 
