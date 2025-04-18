@@ -4,11 +4,7 @@ package vault
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -18,6 +14,10 @@ import (
 func EnsureVaultClient(log *zap.Logger) {
 	log.Debug("🔐 Ensuring VAULT_ADDR is configured...")
 
+	var client *api.Client
+	var report *CheckReport
+	var checkedClient *api.Client
+
 	if _, err := EnsureVaultAddr(log); err != nil {
 		log.Warn("⚠️ Failed to set Vault environment", zap.Error(err))
 	}
@@ -25,17 +25,37 @@ func EnsureVaultClient(log *zap.Logger) {
 	if client, err := GetVaultClient(log); err == nil && client != nil {
 		log.Debug("✅ Vault client already initialized")
 		// ✅ Validate it works
-		if err := CheckVaultHealth(log); err != nil {
-			log.Error("❌ Vault client is initialized, but Vault is not healthy", zap.Error(err))
+		// 🔍 Run full Vault diagnostics
+		report, checkedClient := Check(client, log, nil, "")
+		if checkedClient != nil {
+			SetVaultClient(checkedClient, log)
+		}
+
+		if report == nil {
+			log.Warn("⚠️ Vault check returned nil — skipping further setup")
+			return
+		}
+
+		if len(report.Notes) > 0 {
+			for _, note := range report.Notes {
+				log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+			}
 		}
 		return
 	}
 
-	if err := CheckVaultHealth(log); err != nil {
-		log.Error("❌ Vault client initialized, but health check failed",
-			zap.String("VAULT_ADDR", os.Getenv("VAULT_ADDR")),
-			zap.Error(err),
-		)
+	report, checkedClient = Check(client, log, nil, "")
+	if checkedClient != nil {
+		SetVaultClient(checkedClient, log)
+	}
+	if report == nil {
+		log.Warn("⚠️ Vault check returned nil — skipping further setup")
+		return
+	}
+	if len(report.Notes) > 0 {
+		for _, note := range report.Notes {
+			log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+		}
 	}
 
 	log.Info("🔐 Attempting to initialize Vault client from environment (VAULT_TOKEN)...")
@@ -45,8 +65,18 @@ func EnsureVaultClient(log *zap.Logger) {
 		SetVaultClient(client, log)
 
 		// ✅ Validate health
-		if err := CheckVaultHealth(log); err != nil {
-			log.Error("❌ Vault created but health check failed", zap.Error(err))
+		report, checkedClient := Check(client, log, nil, "")
+		if checkedClient != nil {
+			SetVaultClient(checkedClient, log)
+		}
+		if report == nil {
+			log.Warn("⚠️ Vault check returned nil — skipping further setup")
+			return
+		}
+		if len(report.Notes) > 0 {
+			for _, note := range report.Notes {
+				log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+			}
 		}
 		return
 	}
@@ -67,33 +97,19 @@ func EnsureVaultClient(log *zap.Logger) {
 	SetVaultClient(client, log)
 
 	// ✅ Validate health
-	if err := CheckVaultHealth(log); err != nil {
-		log.Error("❌ Vault agent is running but health check failed", zap.Error(err))
+	report, checkedClient = Check(client, log, nil, "")
+	if checkedClient != nil {
+		SetVaultClient(checkedClient, log)
 	}
-}
-
-func CheckVaultHealth(log *zap.Logger) error {
-	addr := os.Getenv("VAULT_ADDR")
-	if addr == "" {
-		return fmt.Errorf("VAULT_ADDR not set")
+	if report == nil {
+		log.Warn("⚠️ Vault check returned nil — skipping further setup")
+		return
 	}
-
-	healthURL := strings.TrimRight(addr, "/") + "/v1/sys/health"
-	client := http.Client{
-		Timeout: 5 * time.Second,
+	if len(report.Notes) > 0 {
+		for _, note := range report.Notes {
+			log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+		}
 	}
-	resp, err := client.Get(healthURL)
-	if err != nil {
-		return fmt.Errorf("vault not responding at %s: %w", addr, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 500 {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("vault unhealthy: %s", string(body))
-	}
-	log.Info("✅ Vault responded to health check", zap.String("VAULT_ADDR", addr))
-	return nil
 }
 
 func NewClient(log *zap.Logger) (*api.Client, error) {

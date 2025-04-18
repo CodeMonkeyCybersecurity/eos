@@ -5,7 +5,12 @@ package vault
 import (
 	"context"
 	"fmt"
+	"io"
+	"net/http"
+	"os"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -16,14 +21,20 @@ import (
 func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoot string) (*CheckReport, *api.Client) {
 	report := &CheckReport{}
 
-	if client == nil {
-		var err error
-		client, err = NewClient(log)
-		if err != nil {
-			log.Warn("Vault client creation failed", zap.Error(err))
-			return &CheckReport{Notes: []string{"Vault client creation failed"}}, nil
-		}
+	// 0. Direct HTTP liveness check
+	addr, err := CheckVaultHealth(log)
+	if err != nil {
+		log.Warn("🔌 Vault health check failed (raw HTTP)",
+			zap.String("VAULT_ADDR", addr),
+			zap.String("hint", "Is Vault listening at this address? Does it use http vs https? Is port correct?"),
+			zap.Error(err),
+		)
+		report.Notes = append(report.Notes, fmt.Sprintf("Vault health check failed: %v", err))
+		return report, nil // no point continuing if Vault is unreachable
 	}
+	log.Info("✅ Raw Vault health check passed")
+
+	// ... the rest of your Check function
 
 	// 1. Binary check
 	report.Installed = isInstalled(log)
@@ -44,7 +55,6 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 	}
 
 	// 3. Init check
-	var err error
 	report.Initialized, err = isVaultInitialized(client, log)
 	if err != nil {
 		report.Notes = append(report.Notes, fmt.Sprintf("Vault health query failed: %v", err))
@@ -66,6 +76,9 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 	} else {
 		log.Warn("❌ KV test failed", zap.Error(err))
 		report.Notes = append(report.Notes, fmt.Sprintf("KV test failed: %v", err))
+	}
+	if !report.KVWorking || report.Sealed {
+		return report, nil
 	}
 
 	// 6. Secret verification (optional)
@@ -101,6 +114,17 @@ func isVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 	return status.Initialized, nil
 }
 
+// isVaultSealed checks if Vault is sealed and logs the result.
+func isVaultSealed(client *api.Client, log *zap.Logger) bool {
+	health, err := client.Sys().Health()
+	if err != nil {
+		log.Warn("Unable to determine Vault sealed state", zap.Error(err))
+		return false // fail-open assumption
+	}
+	log.Debug("Vault sealed check complete", zap.Bool("sealed", health.Sealed))
+	return health.Sealed
+}
+
 // TestKVSecret writes and reads a test secret from the KV engine.
 func testKVSecret(client *api.Client, log *zap.Logger) error {
 	log.Info("📝 Writing test secret to Vault...")
@@ -124,17 +148,6 @@ func testKVSecret(client *api.Client, log *zap.Logger) error {
 	value := secret.Data[testKey]
 	log.Info("✅ Test secret read successful", zap.String("path", testPath), zap.Any("value", value))
 	return nil
-}
-
-// isVaultSealed checks if Vault is sealed and logs the result.
-func isVaultSealed(client *api.Client, log *zap.Logger) bool {
-	health, err := client.Sys().Health()
-	if err != nil {
-		log.Warn("Unable to determine Vault sealed state", zap.Error(err))
-		return false // fail-open assumption
-	}
-	log.Debug("Vault sealed check complete", zap.Bool("sealed", health.Sealed))
-	return health.Sealed
 }
 
 // CheckVaultSecrets prompts the user for unseal keys + root token, validates them.
@@ -174,4 +187,28 @@ func CheckVaultSecrets(log *zap.Logger) {
 
 	log.Info("✅ Vault secrets verified successfully")
 	fmt.Println("✅ Unseal keys and root token verified.")
+}
+
+func CheckVaultHealth(log *zap.Logger) (string, error) {
+	addr := os.Getenv("VAULT_ADDR")
+	if addr == "" {
+		return "", fmt.Errorf("VAULT_ADDR not set")
+	}
+
+	healthURL := strings.TrimRight(addr, "/") + "/v1/sys/health"
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Get(healthURL)
+	if err != nil {
+		return addr, fmt.Errorf("vault not responding at %s: %w", addr, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 500 {
+		body, _ := io.ReadAll(resp.Body)
+		return addr, fmt.Errorf("vault unhealthy: %s", string(body))
+	}
+	log.Info("✅ Vault responded to health check", zap.String("VAULT_ADDR", addr))
+	return addr, nil
 }
