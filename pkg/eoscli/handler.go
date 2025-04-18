@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -15,6 +16,8 @@ import (
 
 func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		var err error
+
 		start := time.Now()
 		log := contextualLogger()
 		log.Info("🚀 EOS command execution started", zap.Time("start_time", start), zap.String("command", cmd.Name()))
@@ -24,7 +27,12 @@ func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error)
 			StartTime: start,
 		}
 
-		var err error
+		addr, addrErr := vault.EnsureVaultAddr(log)
+		if addrErr != nil {
+			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(err))
+		}
+		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
+
 		defer logger.LogCommandLifecycle(cmd.Name())(&err)
 
 		err = fn(ctx, cmd, args)
