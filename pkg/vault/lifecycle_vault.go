@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/hashicorp/vault/api"
@@ -143,48 +144,67 @@ func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
 func phaseEnsureClientHealthy(log *zap.Logger) error {
 	log.Info("[4/6] Ensuring Vault client is available and healthy")
 
-	// Check if port is already in use
+	portInUse := false
 	if output, err := exec.Command("ss", "-tuln").Output(); err == nil {
 		if strings.Contains(string(output), ":8179") {
-			log.Warn("⚠️ Port 8179 is already in use — Vault may not start correctly", zap.String("hint", "check if another Vault or process is running"))
+			portInUse = true
+			log.Warn("⚠️ Port 8179 is already in use — assuming Vault may already be running")
 		}
 	}
 
-	// Step 1: Set or validate VAULT_ADDR
+	// Ensure VAULT_ADDR
 	if _, err := EnsureVaultAddr(log); err != nil {
 		log.Error("❌ Could not set or resolve VAULT_ADDR", zap.Error(err))
 		return fmt.Errorf("could not determine Vault address: %w", err)
 	}
 
-	// Step 2: Ensure vault binary is installed
+	// Sanity check: Vault binary
 	if _, err := exec.LookPath("vault"); err != nil {
 		log.Error("❌ Vault binary not found in PATH", zap.Error(err))
 		return fmt.Errorf("vault binary not installed or not in PATH")
 	}
 
-	// Step 3: Check if Vault is responding
-	client, err := NewClient(log)
-	if err != nil {
-		log.Error("❌ Failed to create Vault client", zap.Error(err))
-		return fmt.Errorf("failed to create Vault client: %w", err)
+	// Try to connect if port is in use
+	if portInUse {
+		client, err := NewClient(log)
+		if err != nil {
+			log.Warn("⚠️ Failed to create Vault client despite port in use", zap.Error(err))
+			// fallback to health check anyway
+		} else {
+			health, err := client.Sys().Health()
+			if err == nil {
+				if health.Sealed {
+					log.Warn("🔒 Vault is sealed", zap.String("version", health.Version))
+				} else {
+					log.Info("✅ Vault is already running and unsealed", zap.String("version", health.Version))
+				}
+				return nil // ✅ We're done
+			} else {
+				log.Warn("⚠️ Vault client failed to respond, continuing to retry", zap.Error(err))
+			}
+		}
 	}
 
-	health, err := client.Sys().Health()
-	if err != nil {
-		log.Warn("⚠️ Vault health check failed", zap.Error(err))
-		return fmt.Errorf("vault not responding: %w", err)
+	// Retry connection 3 times if not successful
+	for i := 1; i <= 3; i++ {
+		log.Info("🔁 Vault health check attempt", zap.Int("attempt", i))
+		client, err := NewClient(log)
+		if err != nil {
+			log.Warn("Failed to create client", zap.Error(err))
+			time.Sleep(3 * time.Second)
+			continue
+		}
+		health, err := client.Sys().Health()
+		if err == nil {
+			log.Info("✅ Vault is responding", zap.String("version", health.Version))
+			return nil
+		}
+		log.Warn("Vault not yet responding", zap.Error(err))
+		time.Sleep(3 * time.Second)
 	}
 
-	// Optional: Log sealed state
-	if health.Sealed {
-		log.Warn("🔒 Vault is sealed", zap.String("version", health.Version))
-	} else {
-		log.Info("✅ Vault is responding and unsealed", zap.String("version", health.Version))
-	}
-
-	return nil
+	return fmt.Errorf("vault not responding after multiple attempts")
 }
-
 func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
 	log.Info("[5/6] Initializing and unsealing Vault if necessary")
 
