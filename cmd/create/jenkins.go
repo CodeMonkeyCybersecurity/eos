@@ -12,8 +12,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -125,7 +125,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Jenkins installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", utils.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", platform.GetInternalHostname())))
 
 		return nil
 	}),

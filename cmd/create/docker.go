@@ -51,8 +51,8 @@ var CreateDockerCmd = &cobra.Command{
 }
 
 func addDockerRepo(log *zap.Logger) {
-	arch := utils.GetArchitecture()
-	codename := utils.GetUbuntuCodename()
+	arch := platform.GetArchitecture()
+	codename := platform.GetUbuntuCodename()
 
 	repoLine := fmt.Sprintf(
 		"deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n",

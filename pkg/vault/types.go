@@ -63,6 +63,16 @@ var VaultPurgePaths = []string{
 
 const (
 
+
+	EosUser              = "eos"
+	EosGroup             = "eos"
+	VaultAgentUser       = EosUser
+	VaultAgentGroup      = EosGroup
+	VaultRuntimePerms    = 0750
+	SystemdUnitFilePerms = 0644
+	VaultAgentService    = "vault-agent-eos.service"
+
+	
 	// Config paths
 	VaultConfigDirDebian = "/etc/vault.d"
 	VaultConfigDirSnap   = "/var/snap/vault/common"

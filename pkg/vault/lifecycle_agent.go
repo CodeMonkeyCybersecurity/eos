@@ -7,9 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-	"syscall"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -47,10 +45,10 @@ func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppR
 	}
 	log.Info("✅ Vault Agent password file created")
 
-	// Step 4: Ensure /run/eos exists and owned correctly
-	log.Info("📁 Ensuring /run/eos runtime directory is ready...")
-	if err := EnsureRuntimeDir(log); err != nil {
-		log.Error("❌ Failed to prepare /run/eos directory", zap.Error(err))
+	// Step 4: Ensure runtime directory exists and owned correctly
+	log.Info("📁 Ensuring runtime directory is ready...")
+	if err := EnsureVaultDirs(log); err != nil {
+		log.Error("❌ Failed to prepare runtime directory", zap.Error(err))
 		return err
 	}
 	log.Info("✅ Runtime directory ready")
@@ -108,40 +106,11 @@ func writeAgentPassword(password string, log *zap.Logger) error {
 
 // ------------------------ ENVIRONMENT ------------------------
 
-func EnsureRuntimeDir(log *zap.Logger) error {
-	const dir = "/run/eos"
-
-	if err := os.MkdirAll(dir, 0750); err != nil {
-		return fmt.Errorf("failed to create runtime dir: %w", err)
-	}
-
-	info, err := os.Stat(dir)
-	if err != nil {
-		return fmt.Errorf("failed to stat %s: %w", dir, err)
-	}
-
-	uid, gid, err := system.LookupUser("eos")
-	if err != nil {
-		return fmt.Errorf("failed to lookup eos user: %w", err)
-	}
-
-	if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-		if int(stat.Uid) != uid || int(stat.Gid) != gid {
-			if err := os.Chown(dir, uid, gid); err != nil {
-				return fmt.Errorf("failed to chown %s to eos:eos: %w", dir, err)
-			}
-			log.Info("🔧 Updated ownership of runtime dir", zap.String("path", dir))
-		}
-	}
-
-	return nil
-}
-
-// PrepareVaultAgentEnvironment ensures /run/eos exists and port 8179 is free.
+// PrepareVaultAgentEnvironment ensures runtime dir exists and port 8179 is free.
 func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 	log.Info("🧼 Preparing Vault Agent environment")
 
-	if err := EnsureRuntimeDir(log); err != nil {
+	if err := EnsureVaultDirs(log); err != nil {
 		log.Error("Failed to prepare runtime dir", zap.Error(err))
 		return err
 	}
@@ -245,36 +214,45 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) error {
 }
 
 // ------------------------ SYSTEMD ------------------------
-
 func EnsureSystemdUnit(log *zap.Logger) error {
-	unit := `
+unit := fmt.Sprintf(`
 [Unit]
 Description=Vault Agent (Eos)
 After=network.target
 
 [Service]
-ExecStartPre=/usr/bin/mkdir -p /run/eos
-ExecStartPre=/usr/bin/chown eos:eos /run/eos
-User=eos
-Group=eos
-ExecStart=/usr/bin/vault agent -config=/etc/vault-agent-eos.hcl
+ExecStartPre=/usr/bin/mkdir -p %[1]s
+ExecStartPre=/usr/bin/chown %[2]s:%[3]s %[1]s
+User=%[2]s
+Group=%[3]s
+ExecStart=/usr/bin/vault agent -config=%[4]s
 Restart=on-failure
 RuntimeDirectory=eos
-RuntimeDirectoryMode=0750
+RuntimeDirectoryMode=%[5]d
 
 [Install]
-WantedBy=multi-user.target`
-	unitPath := "/etc/systemd/system/vault-agent-eos.service"
-	if err := os.WriteFile(unitPath, []byte(strings.TrimSpace(unit)+"\n"), 0644); err != nil {
+WantedBy=multi-user.target
+`,
+	EosRunDir, VaultAgentUser, VaultAgentGroup, VaultAgentConfigPath, VaultRuntimePerms,
+)
+
+if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), SystemdUnitFilePerms); err != nil {
 		log.Error("Failed to write Vault Agent systemd unit file",
-			zap.String("path", unitPath),
+			zap.String("path", VaultAgentServicePath),
 			zap.Error(err),
 		)
 		return err
 	}
-	log.Info("✅ Systemd unit file written", zap.String("path", unitPath))
+	log.Debug("Systemd unit constants",
+	zap.String("unit_path", VaultAgentServicePath),
+	zap.String("user", VaultAgentUser),
+	zap.Int("runtime_dir_mode", VaultRuntimePerms),
+	)
+	log.Info("✅ Systemd unit file written", zap.String("path", VaultAgentServicePath))
 	return nil
 }
+
+
 
 //
 // ========================== LIST ==========================

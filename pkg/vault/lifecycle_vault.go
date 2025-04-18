@@ -11,9 +11,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -122,7 +124,7 @@ func phasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
 	log.Info("[3/6] Ensuring Vault runtime directory exists")
 
-	runtimeDir := EosRunDir // e.g., "/run/eos"
+	runtimeDir := EosRunDir
 
 	// Create directory if missing
 	if err := os.MkdirAll(runtimeDir, 0700); err != nil {
@@ -181,23 +183,16 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req := client.NewRequest("GET", "/v1/sys/health")
-	resp, err := client.RawRequestWithContext(ctx, req)
+	health, err := client.Sys().HealthWithContext(ctx)
 	if err != nil {
 		log.Error("❌ Vault health check failed", zap.Error(err))
 		log.Warn("💡 Tip: Vault may not be running or is stuck")
 		return fmt.Errorf("vault not responding: %w", err)
 	}
-	defer resp.Body.Close()
 
-	var health map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
-		log.Warn("⚠️ Could not parse Vault health response", zap.Error(err))
-	} else {
-		log.Info("✅ Vault responded", zap.Any("health", health))
-		if sealed, ok := health["sealed"].(bool); ok && sealed {
-			log.Info("🔒 Vault is sealed", zap.Any("health", health))
-		}
+	log.Info("✅ Vault responded", zap.Any("health", health))
+	if health.Sealed {
+		log.Info("🔒 Vault is sealed", zap.String("version", health.Version))
 	}
 
 	return nil
@@ -206,47 +201,28 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
 	log.Info("[5/6] Initializing and unsealing Vault if necessary")
 
-	// Create a fresh Vault client
+	// Step 1: Ensure directory structure is ready
+	log.Debug("🔍 Verifying required Vault directories...")
+	if err := EnsureVaultDirs(log); err != nil {
+		log.Error("❌ Vault directory setup failed", zap.Error(err))
+		return nil, fmt.Errorf("vault directory setup failed: %w", err)
+	}
+
+	// Step 2: Create Vault client
+	log.Debug("🧪 Attempting to create Vault API client...")
 	client, err := NewClient(log)
 	if err != nil {
+		log.Error("❌ Could not create Vault client", zap.Error(err))
 		return nil, fmt.Errorf("could not create Vault client: %w", err)
 	}
+	log.Info("✅ Vault client created successfully", zap.String("address", client.Address()))
 
-	// Initialize Vault (or reuse fallback + unseal)
-	initRes, err := client.Sys().Init(&api.InitRequest{
-		SecretShares:    5,
-		SecretThreshold: 3,
-	})
+	// Step 3: Attempt initialization or reuse
+	log.Debug("⚙️ Checking Vault initialization status...")
+	client, _, err = SetupVault(client, log)
 	if err != nil {
-		// Already initialized? Fallback to stored init result
-		if IsAlreadyInitialized(err, log) {
-			log.Info("✅ Vault already initialized — reusing stored init result")
-
-			initRes, err := LoadInitResultOrPrompt(client, log)
-			if err != nil {
-				return nil, fmt.Errorf("vault is already initialized but fallback failed: %w", err)
-			}
-			if err := UnsealVault(client, initRes, log); err != nil {
-				return nil, fmt.Errorf("failed to unseal vault: %w", err)
-			}
-			client.SetToken(initRes.RootToken)
-			return client, nil
-		}
-		return nil, fmt.Errorf("vault init error: %w", err)
-	}
-
-	// 🆕 Vault has just been initialized
-	log.Info("🎉 Vault initialized")
-	if err := UnsealVault(client, initRes, log); err != nil {
-		return nil, fmt.Errorf("failed to unseal new Vault: %w", err)
-	}
-	client.SetToken(initRes.RootToken)
-
-	// Persist init result for later reuse
-	if err := Write(client, "vault_init", initRes, log); err != nil {
-		log.Warn("Could not persist Vault init result", zap.Error(err))
-	} else {
-		log.Info("💾 Vault init result persisted to Vault")
+		log.Error("❌ Vault initialization or reuse failed", zap.Error(err))
+		return nil, fmt.Errorf("vault init/unseal failed: %w", err)
 	}
 
 	return client, nil
@@ -364,7 +340,7 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
 	fmt.Println("\nInitializing Vault...")
 
-	if err := EnsureRuntimeDir(log); err != nil {
+	if err := EnsureVaultDirs(log); err != nil {
 		log.Error("Runtime dir missing or invalid", zap.Error(err))
 		return nil, nil, err
 	}
@@ -415,6 +391,46 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 	return client, initRes, nil
 }
 
+func EnsureVaultDirs(log *zap.Logger) error {
+	dirs := []string{
+		SecretsDir,
+		EosRunDir,
+	}
+
+	uid, gid, err := system.LookupUser("eos")
+	if err != nil {
+		log.Warn("⚠️ Could not resolve eos UID/GID", zap.Error(err))
+		uid, gid = 1001, 1001 // fallback, optionally make configurable
+	}
+
+	for _, dir := range dirs {
+		log.Debug("🔧 Ensuring Vault dir", zap.String("path", dir))
+
+		if err := os.MkdirAll(dir, 0750); err != nil {
+			log.Error("❌ Failed to create Vault dir", zap.String("path", dir), zap.Error(err))
+			return fmt.Errorf("failed to create dir %s: %w", dir, err)
+		}
+
+		info, err := os.Stat(dir)
+		if err != nil {
+			log.Warn("⚠️ Could not stat dir after creation", zap.String("path", dir), zap.Error(err))
+			continue
+		}
+
+		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
+			if int(stat.Uid) != uid || int(stat.Gid) != gid {
+				if err := os.Chown(dir, uid, gid); err != nil {
+					log.Warn("⚠️ Could not chown Vault dir", zap.String("path", dir), zap.Error(err))
+				} else {
+					log.Info("🔐 Ownership updated", zap.String("path", dir), zap.Int("uid", uid), zap.Int("gid", gid))
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
 //
 // ========================== LIST ==========================
 //
@@ -435,15 +451,6 @@ func ListVault(path string, log *zap.Logger) ([]string, error) {
 		keys[i] = fmt.Sprintf("%v", k)
 	}
 	return keys, nil
-}
-
-// Helper: Marshal to Vault KV payload format
-func toMap(v interface{}) (map[string]interface{}, error) {
-	data, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{"json": string(data)}, nil
 }
 
 //

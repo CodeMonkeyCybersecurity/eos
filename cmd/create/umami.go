@@ -11,8 +11,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -102,7 +102,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Umami installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", utils.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", platform.GetInternalHostname())))
 		return nil
 	}),
 }

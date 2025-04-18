@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"go.uber.org/zap"
 )
 
@@ -29,6 +29,6 @@ func EnsureVaultAddr(log *zap.Logger) (string, error) {
 
 // GetVaultAddr returns the canonical Vault address based on internal hostname
 func getVaultAddr() string {
-	hostname := utils.GetInternalHostname()
+	hostname := platform.GetInternalHostname()
 	return fmt.Sprintf("http://%s:8179", hostname)
 }

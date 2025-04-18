@@ -1,6 +1,6 @@
-// pkg/utils/system.go
+// pkg/platform/system.go
 
-package utils
+package platform
 
 import (
 	"bufio"
