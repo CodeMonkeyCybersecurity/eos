@@ -143,55 +143,65 @@ func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
 func phaseEnsureClientHealthy(log *zap.Logger) error {
 	log.Info("[4/6] Ensuring Vault client is available and healthy")
 
-	// Detect if port is in use
-	if output, err := exec.Command("ss", "-tuln").Output(); err == nil {
-		if strings.Contains(string(output), ":8179") {
-			log.Warn("⚠️ Port 8179 is already in use — assuming Vault may already be running", zap.String("hint", "check if another Vault or process is running"))
+	// Check for any process on 8179
+	output, err := exec.Command("lsof", "-i", ":8179").Output()
+	if err == nil && len(output) > 0 {
+		log.Info("📡 Detected process on port 8179", zap.String("output", string(output)))
+
+		// Check if it's Vault running as eos
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "vault") && strings.Contains(line, "eos") {
+				log.Info("✅ Detected Vault already running as 'eos' on port 8179 — skipping health check")
+				return nil
+			}
 		}
+
+		log.Info("ℹ️ Port 8179 in use but not by Vault/eos — continuing with health check")
 	}
 
+	// Vault address sanity check
 	if _, err := EnsureVaultAddr(log); err != nil {
 		return fmt.Errorf("could not determine Vault address: %w", err)
 	}
 
+	// Check if Vault binary exists
 	if _, err := exec.LookPath("vault"); err != nil {
 		return fmt.Errorf("vault binary not installed or not in PATH")
 	}
 
+	// Try to ping the Vault health endpoint via SDK
 	client, err := NewClient(log)
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	// Manual health check using /v1/sys/health
-	log.Info("📡 Checking Vault health via SDK raw endpoint")
+	log.Info("📡 Pinging Vault health endpoint")
 
-	req := client.NewRequest("GET", "/v1/sys/health")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	req := client.NewRequest("GET", "/v1/sys/health")
 	resp, err := client.RawRequestWithContext(ctx, req)
 	if err != nil {
-		log.Error("❌ Vault health request failed", zap.Error(err))
-		log.Warn("💡 Tip: Check if Vault is running or stuck")
+		log.Error("❌ Vault health check failed", zap.Error(err))
+		log.Warn("💡 Tip: Vault may not be running or is stuck")
 		return fmt.Errorf("vault not responding: %w", err)
 	}
 	defer resp.Body.Close()
 
-	// Parse and log JSON body
 	var health map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
 		log.Warn("⚠️ Could not parse Vault health response", zap.Error(err))
 	} else {
 		log.Info("✅ Vault responded", zap.Any("health", health))
 		if sealed, ok := health["sealed"].(bool); ok && sealed {
-			log.Warn("🔒 Vault is sealed", zap.Any("health", health))
+			log.Info("🔒 Vault is sealed", zap.Any("health", health))
 		}
 	}
 
 	return nil
 }
-
 
 func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
 	log.Info("[5/6] Initializing and unsealing Vault if necessary")
