@@ -31,6 +31,13 @@ func EnsureVaultClient(log *zap.Logger) {
 		return
 	}
 
+	if err := CheckVaultHealth(log); err != nil {
+		log.Error("❌ Vault client initialized, but health check failed",
+			zap.String("VAULT_ADDR", os.Getenv("VAULT_ADDR")),
+			zap.Error(err),
+		)
+	}
+
 	log.Info("🔐 Attempting to initialize Vault client from environment (VAULT_TOKEN)...")
 	client, err := NewClient(log)
 	if err == nil {
@@ -77,7 +84,6 @@ func CheckVaultHealth(log *zap.Logger) error {
 	}
 	resp, err := client.Get(healthURL)
 	if err != nil {
-		log.Warn("❌ Could not reach Vault at VAULT_ADDR", zap.String("VAULT_ADDR", addr), zap.Error(err))
 		return fmt.Errorf("vault not responding at %s: %w", addr, err)
 	}
 	defer resp.Body.Close()
