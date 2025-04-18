@@ -150,42 +150,49 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 		}
 	}
 
-	// Ensure VAULT_ADDR is set
 	if _, err := EnsureVaultAddr(log); err != nil {
 		return fmt.Errorf("could not determine Vault address: %w", err)
 	}
 
-	// Check Vault binary
 	if _, err := exec.LookPath("vault"); err != nil {
 		return fmt.Errorf("vault binary not installed or not in PATH")
 	}
-
-	// Attempt to create client and ping Vault once
-	log.Info("📡 Pinging Vault once to check health")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
 	client, err := NewClient(log)
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	health, err := client.Sys().HealthWithContext(ctx)
+	// Manual health check using /v1/sys/health
+	log.Info("📡 Checking Vault health via SDK raw endpoint")
+
+	req := client.NewRequest("GET", "/v1/sys/health")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	resp, err := client.RawRequestWithContext(ctx, req)
 	if err != nil {
-		log.Error("❌ Vault health check failed", zap.Error(err))
-		log.Warn("💡 Tip: Check if Vault is already running or stuck in a bad state")
-		log.Warn("💡 You can inspect logs with: journalctl -u vault -f")
+		log.Error("❌ Vault health request failed", zap.Error(err))
+		log.Warn("💡 Tip: Check if Vault is running or stuck")
 		return fmt.Errorf("vault not responding: %w", err)
 	}
+	defer resp.Body.Close()
 
-	if health.Sealed {
-		log.Warn("🔒 Vault is sealed", zap.String("version", health.Version))
+	// Parse and log JSON body
+	var health map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&health); err != nil {
+		log.Warn("⚠️ Could not parse Vault health response", zap.Error(err))
 	} else {
-		log.Info("✅ Vault is unsealed and responding", zap.String("version", health.Version))
+		log.Info("✅ Vault responded", zap.Any("health", health))
+		if sealed, ok := health["sealed"].(bool); ok && sealed {
+			log.Warn("🔒 Vault is sealed", zap.Any("health", health))
+		}
 	}
 
 	return nil
 }
+
+
 func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
 	log.Info("[5/6] Initializing and unsealing Vault if necessary")
 
