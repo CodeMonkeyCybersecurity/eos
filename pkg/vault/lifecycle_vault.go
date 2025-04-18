@@ -143,6 +143,13 @@ func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
 func phaseEnsureClientHealthy(log *zap.Logger) error {
 	log.Info("[4/6] Ensuring Vault client is available and healthy")
 
+	// Check if port is already in use
+	if output, err := exec.Command("ss", "-tuln").Output(); err == nil {
+		if strings.Contains(string(output), ":8179") {
+			log.Warn("⚠️ Port 8179 is already in use — Vault may not start correctly", zap.String("hint", "check if another Vault or process is running"))
+		}
+	}
+
 	// Step 1: Set or validate VAULT_ADDR
 	if _, err := EnsureVaultAddr(log); err != nil {
 		log.Error("❌ Could not set or resolve VAULT_ADDR", zap.Error(err))
