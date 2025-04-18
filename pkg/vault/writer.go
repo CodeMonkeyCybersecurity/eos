@@ -30,7 +30,7 @@ func Write(client *api.Client, name string, data any, log *zap.Logger) error {
 	}
 
 	SetVaultClient(client, log)
-	path := vaultPath(name, log)
+	path := VaultPath(name, log)
 
 	if err := WriteToVault(path, data, log); err == nil {
 		log.Info("✅ Vault secret written", zap.String("path", path))

@@ -78,7 +78,7 @@ listener "tcp" {
 
 cache {
   use_auto_auth_token = true
-}`, PIDfile, AppRoleIDPath, AppSecretIDPath, VaultAgentTokenPath, vaultAddr, ListenerAddr)
+}`, PIDfile, AppRoleIDPath, AppSecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
 
 	if err := os.WriteFile(VaultAgentConfigPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
 		return fmt.Errorf("failed to write Vault Agent config to %s: %w", VaultAgentConfigPath, err)
@@ -106,7 +106,7 @@ func ApplyAdminPolicy(creds UserpassCreds, client *api.Client, log *zap.Logger) 
 	log.Info("✅ Custom policy applied via API", zap.String("policy", policyName))
 
 	// Update the eos user with the policy.
-	_, err := client.Logical().Write("auth/userpass/users/eos", map[string]interface{}{
+	_, err := client.Logical().Write(EosVaultUserPath, map[string]interface{}{
 		"password": creds.Password,
 		"policies": policyName,
 	})

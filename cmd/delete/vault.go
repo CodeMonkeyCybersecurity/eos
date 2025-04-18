@@ -38,7 +38,7 @@ var DeleteVaultCmd = &cobra.Command{
 			log.Info("Stopped Vault process.")
 		}
 
-		osPlatform := platform.GetOSPlatform()
+		osPlatform := platform.GetOSPlatform(log)
 		distro := platform.DetectLinuxDistro(log)
 
 		switch {

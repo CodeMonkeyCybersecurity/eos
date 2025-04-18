@@ -18,7 +18,7 @@ import (
 //
 
 // GetOSPlatform returns a string representing the OS platform.
-func GetOSPlatform() string {
+func GetOSPlatform(log *zap.Logger) string {
 	switch runtime.GOOS {
 	case "darwin":
 		return "macos"
@@ -57,8 +57,8 @@ func DetectLinuxDistro(log *zap.Logger) string {
 }
 
 func RequireLinuxDistro(allowed []string, log *zap.Logger) error {
-	if GetOSPlatform() != "linux" {
-		return fmt.Errorf("unsupported platform: %s (only 'linux' is supported)", GetOSPlatform())
+	if GetOSPlatform(log) != "linux" {
+		return fmt.Errorf("unsupported platform: %s (only 'linux' is supported)", GetOSPlatform(log))
 	}
 
 	distro := DetectLinuxDistro(log)
@@ -71,12 +71,12 @@ func RequireLinuxDistro(allowed []string, log *zap.Logger) error {
 	return fmt.Errorf("unsupported Linux distribution: %s", distro)
 }
 
-func GetArch() string {
+func GetArch(log *zap.Logger) string {
 	return runtime.GOARCH
 }
 
 // IsCommandAvailable checks if a command exists in the system PATH.
-func IsCommandAvailable(name string) bool {
+func IsCommandAvailable(name string, log *zap.Logger) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
 }

@@ -12,7 +12,7 @@ import (
 )
 
 func PackageUpdate(cron bool, log *zap.Logger) error {
-	osPlatform := GetOSPlatform()
+	osPlatform := GetOSPlatform(log)
 	log.Info("Detected OS", zap.String("os", osPlatform))
 
 	if cron {

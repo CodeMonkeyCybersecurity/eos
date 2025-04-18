@@ -9,13 +9,13 @@ import (
 )
 
 func InstallKVM() error {
-	if platform.IsCommandAvailable("apt-get") {
+	if platform.IsCommandAvailable("aptt", log) {
 		return runInstall("apt-get update && apt-get install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virt-manager virt-viewer")
 	}
-	if platform.IsCommandAvailable("dnf") {
+	if platform.IsCommandAvailable("dnf", log) {
 		return runInstall("dnf install -y qemu-kvm libvirt libvirt-devel virt-install bridge-utils virt-viewer")
 	}
-	if platform.IsCommandAvailable("yum") {
+	if platform.IsCommandAvailable("yum", log) {
 		return runInstall("yum install -y qemu-kvm libvirt libvirt-devel virt-install bridge-utils virt-viewer")
 	}
 	return fmt.Errorf("no supported package manager found (apt, dnf, yum)")

@@ -4,6 +4,7 @@ package vault
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -12,20 +13,55 @@ import (
 	"go.uber.org/zap"
 )
 
+var Policies = map[string]string{
+	EosVaultPolicy: `
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+`,
+}
+
 var (
 	// Vault Secrets + Tokens
 	SecretsDir                = "/var/lib/eos/secrets"
 	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
 	AppRoleIDPath             = filepath.Join(SecretsDir, "vault_role_id")
 	AppSecretIDPath           = filepath.Join(SecretsDir, "vault_secret_id")
-	VaultAgentTokenPath       = "/run/eos/vault-agent-eos.token"
 	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
 	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass.json")
 	vaultClient               *api.Client
-	PIDfile                   = "/run/eos/vault-agent.pid"
+	EosRunDir                 = "/run/eos"
+	VaultAgentTokenPath       = filepath.Join(EosRunDir, "vault-agent-eos.token")
+	PIDfile                   = filepath.Join(EosRunDir, "vault-agent.pid")
+	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
 )
 
+//
+// ------------------------- CONSTANTS -------------------------
+//
+
 const (
+	// Config paths
+	VaultConfigDirDebian = "/etc/vault.d"
+	VaultConfigDirSnap   = "/var/snap/vault/common"
+	VaultDataPath        = "/opt/vault/data"
+	VaultDefaultPort     = "8179"
+	VaultDefaultAddr     = "http://127.0.0.1:8179"
+	VaultConfigFileName  = "config.hcl"
+
+	// Debian APT
+	AptKeyringPath = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
+	AptListPath    = "/etc/apt/sources.list.d/hashicorp.list"
+
+	// RHEL DNF
+	DnfRepoFilePath = "/etc/yum.repos.d/hashicorp.repo"
+	DnfRepoContent  = `[hashicorp]
+name=HashiCorp Stable - $basearch
+baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.releases.hashicorp.com/gpg`
+
 	// Vault Agent & Policy Paths
 	VaultAgentConfigPath = "/etc/vault-agent-eos.hcl"
 	VaultAgentPassPath   = "/etc/vault-agent-eos.pass"
@@ -44,14 +80,26 @@ const (
 	VaultServicePath      = "/etc/systemd/system/vault.service"
 	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
 
-	//test path
-	VaultTestPath = "bootstrap/test"
-	EosUserSecret = "bootstrap/eos_user"
+	// Vault paths
+	VaultTestPath      = "bootstrap/test"
+	EosVaultUsername   = "eos"
+	EosVaultUserPath   = "secret/users/eos"
+	UserpassPathPrefix = "auth/userpass/users/"
 
 	// client / listener paths
-	ListenerPort = "8179"
 	ListenerAddr = "127.0.0.1:8179"
+
+	VaultFieldUsername = "username" // shared across Vault, LDAP, UI
+	VaultFieldPassword = "password"
+	VaultFieldSSHKey   = "ssh_private_key"
+
+	KVNamespaceUsers   = "users/"
+	KVNamespaceSecrets = "secret/"
 )
+
+//
+// ------------------------- TYPES -------------------------
+//
 
 type CheckReport struct {
 	Installed   bool
@@ -84,6 +132,10 @@ type AppRoleOptions struct {
 	RefreshCreds  bool
 }
 
+//
+// ------------------------- HELPERS -------------------------
+//
+
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
 		RoleName:      "eos",
@@ -97,7 +149,7 @@ func DefaultAppRoleOptions() AppRoleOptions {
 }
 
 // VaultPath returns the full KV v2 path for data reads/writes.
-func vaultPath(name string, log *zap.Logger) string {
+func VaultPath(name string, log *zap.Logger) string {
 	if strings.Contains(name, "/") {
 		log.Warn("vaultPath should not receive slashes", zap.String("input", name))
 	}
@@ -116,4 +168,31 @@ func DiskPath(name string, log *zap.Logger) string {
 	}
 	log.Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
 	return final
+}
+
+func UserSecretPath(username string) string {
+	return fmt.Sprintf("users/%s", username)
+}
+
+// PrepareVaultDirsAndConfig returns the config dir path and config file path,
+// and ensures necessary directories are created.
+func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, string) {
+	var configDir string
+	if distro == "debian" || distro == "rhel" {
+		configDir = VaultConfigDirDebian
+	} else {
+		configDir = VaultConfigDirSnap
+	}
+
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		log.Warn("Failed to create Vault config dir", zap.String("path", configDir), zap.Error(err))
+	}
+	if err := os.MkdirAll(VaultDataPath, 0755); err != nil {
+		log.Warn("Failed to create Vault data dir", zap.String("path", VaultDataPath), zap.Error(err))
+	}
+
+	configFile := filepath.Join(configDir, VaultConfigFileName)
+	vaultAddr := GetVaultAddr()
+
+	return configDir, configFile, vaultAddr
 }

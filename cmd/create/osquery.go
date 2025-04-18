@@ -29,7 +29,7 @@ var createOsQueryCmd = &cobra.Command{
 		}
 
 		// Ensure the base platform is Linux
-		if platform.GetOSPlatform() != "linux" {
+		if platform.GetOSPlatform(log) != "linux" {
 			log.Fatal("osquery install only supported on Linux")
 		}
 
@@ -42,7 +42,7 @@ var createOsQueryCmd = &cobra.Command{
 		}
 
 		// Check architecture
-		arch := platform.GetArch()
+		arch := platform.GetArch(log)
 		log.Info("Detected architecture", zap.String("arch", arch))
 
 		if arch != "amd64" && arch != "arm64" {

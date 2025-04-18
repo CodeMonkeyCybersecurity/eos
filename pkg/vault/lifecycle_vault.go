@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -21,9 +22,33 @@ import (
 
 // VaultCreate creates a secret only if it doesn't already exist
 func EnsureVault(path string, value interface{}, log *zap.Logger) error {
+
+	if _, err := EnsureVaultAddr(log); err != nil {
+		log.Error("Unable to determine VAULT_ADDR", zap.Error(err))
+		return fmt.Errorf("could not set VAULT_ADDR: %w", err)
+	}
+
 	log.Info("[1/9] Ensuring Vault is installed")
-	if err := InstallVaultViaDnf(log); err != nil {
-		return fmt.Errorf("vault install failed: %w", err)
+
+	distro := platform.DetectLinuxDistro(log)
+	log.Info("Detected Linux distribution", zap.String("distro", distro))
+
+	switch distro {
+	case "debian":
+		log.Info("Using APT to install Vault", zap.String("installer", "apt-get"))
+		if err := InstallVaultViaApt(log); err != nil {
+			log.Error("❌ Vault installation via APT failed", zap.Error(err))
+			return fmt.Errorf("vault install via apt failed: %w", err)
+		}
+	case "rhel":
+		log.Info("Using DNF to install Vault", zap.String("installer", "dnf"))
+		if err := InstallVaultViaDnf(log); err != nil {
+			log.Error("❌ Vault installation via DNF failed", zap.Error(err))
+			return fmt.Errorf("vault install via dnf failed: %w", err)
+		}
+	default:
+		log.Error("❌ Unsupported Linux distro for Vault install", zap.String("distro", distro))
+		return fmt.Errorf("unsupported distro for Vault install: %s", distro)
 	}
 
 	log.Info("[2/9] Checking for port mismatch (8200 → 8179)")
@@ -83,24 +108,84 @@ func EnsureVault(path string, value interface{}, log *zap.Logger) error {
 	return nil
 }
 
-/* Install Vault via dnf if not already installed */
-func InstallVaultViaDnf(log *zap.Logger) error {
-	fmt.Println("Checking if Vault is installed...")
-	_, err := exec.LookPath("vault")
-	if err != nil {
-		fmt.Println("Vault binary not found. Installing via dnf...")
-
-		dnfCmd := exec.Command("dnf", "install", "-y", "vault")
-		dnfOut, err := dnfCmd.CombinedOutput()
-		if err != nil {
-			fmt.Println("❌ Failed to install Vault via dnf")
-			fmt.Println("Output:", string(dnfOut))
-			os.Exit(1)
-		}
-		fmt.Println("✅ Vault installed successfully via dnf.")
-	} else {
-		fmt.Println("Vault is already installed.")
+func InstallVaultViaApt(log *zap.Logger) error {
+	log.Info("🔍 Checking if Vault is already installed via apt")
+	if _, err := exec.LookPath("vault"); err == nil {
+		log.Info("✅ Vault is already installed")
+		return nil
 	}
+
+	log.Info("📦 Vault binary not found, proceeding with installation via apt")
+
+	// Step 1: Add the HashiCorp APT repo
+	log.Info("➕ Adding HashiCorp APT repo")
+	aptCmd := exec.Command("bash", "-c", `curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list`)
+	aptCmd.Stdout = os.Stdout
+	aptCmd.Stderr = os.Stderr
+	if err := aptCmd.Run(); err != nil {
+		return fmt.Errorf("failed to add APT repo: %w", err)
+	}
+
+	// Step 2: Refresh APT cache
+	log.Info("♻️ Updating APT package cache")
+	if err := exec.Command("apt-get", "update").Run(); err != nil {
+		log.Warn("APT update failed", zap.Error(err))
+	}
+
+	// Step 3: Install Vault
+	log.Info("📦 Installing Vault via apt")
+	installCmd := exec.Command("apt-get", "install", "-y", "vault")
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("❌ Failed to install Vault via apt: %w", err)
+	}
+
+	log.Info("✅ Vault installed successfully via apt")
+	return nil
+}
+
+func InstallVaultViaDnf(log *zap.Logger) error {
+	log.Info("🔍 Checking if Vault is already installed via dnf")
+	if _, err := exec.LookPath("vault"); err == nil {
+		log.Info("✅ Vault is already installed")
+		return nil
+	}
+
+	log.Info("📦 Vault binary not found, proceeding with installation via dnf")
+
+	// Step 1: Ensure the repo exists
+	repoFile := "/etc/yum.repos.d/hashicorp.repo"
+	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
+		log.Info("➕ Adding HashiCorp YUM repo")
+		repoContent := `[hashicorp]
+name=HashiCorp Stable - $basearch
+baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.releases.hashicorp.com/gpg`
+		if err := os.WriteFile(repoFile, []byte(repoContent), 0644); err != nil {
+			return fmt.Errorf("failed to write YUM repo file: %w", err)
+		}
+	} else {
+		log.Info("✅ HashiCorp YUM repo already present", zap.String("path", repoFile))
+	}
+
+	// Step 2: Refresh repo metadata
+	log.Info("♻️ Cleaning and refreshing DNF cache")
+	_ = exec.Command("dnf", "clean", "all").Run()
+	_ = exec.Command("dnf", "makecache").Run()
+
+	// Step 3: Install Vault
+	log.Info("📦 Installing Vault via dnf")
+	dnfCmd := exec.Command("dnf", "install", "-y", "vault")
+	dnfCmd.Stdout = os.Stdout
+	dnfCmd.Stderr = os.Stderr
+	if err := dnfCmd.Run(); err != nil {
+		return fmt.Errorf("❌ Failed to install Vault via dnf: %w", err)
+	}
+
+	log.Info("✅ Vault installed successfully via dnf")
 	return nil
 }
 

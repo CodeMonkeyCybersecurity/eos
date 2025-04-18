@@ -40,8 +40,12 @@ func StoreUserSecret(username, password, keyPath string, log *zap.Logger) error 
 	if err != nil {
 		return fmt.Errorf("failed to read SSH key from %s: %w", keyPath, err)
 	}
-	secret := UserSecret{Username: username, Password: password, SSHKey: string(keyData)}
-	return WriteToVaultAt("secret", fmt.Sprintf("users/%s", username), &secret, log)
+	secret := UserSecret{
+		Username: username,
+		Password: password,
+		SSHKey:   string(keyData),
+	}
+	return WriteToVaultAt("secret", UserSecretPath(username), &secret, log)
 }
 
 // LoadUserSecret retrieves and validates a user's secret from Vault.
@@ -61,9 +65,9 @@ func (s *UserSecret) IsValid() bool {
 	return s.Username != "" && s.Password != ""
 }
 
-// userVaultPath returns the Vault path for a given user.
+// userVaultPath returns the Vault path for eos .
 func userVaultPath(username string, log *zap.Logger) string {
-	path := fmt.Sprintf("secret/users/%s", username)
+	path := EosVaultUserPath
 	log.Debug("Resolved Vault path for user", zap.String("username", username), zap.String("path", path))
 	return path
 }
@@ -72,14 +76,14 @@ func EnsureEosUserpassAccount(client *api.Client, username, password string, log
 	log.Info("🔍 Checking for existing Vault userpass account", zap.String("username", username))
 
 	// Pre-check if the user already exists
-	if _, err := client.Logical().Read("auth/userpass/users/" + username); err == nil {
+	if _, err := client.Logical().Read(UserpassPathPrefix + username); err == nil {
 		log.Info("✅ Vault userpass account already exists — skipping creation", zap.String("username", username))
 		return nil
 	}
 
 	log.Info("👤 Creating Vault userpass account", zap.String("username", username))
 	_, err := client.Logical().Write(
-		"auth/userpass/users/"+username,
+		UserpassPathPrefix+username,
 		map[string]interface{}{
 			"password": password,
 			"policies": EosVaultPolicy,
@@ -98,7 +102,7 @@ func EnsureEosUserpassAccount(client *api.Client, username, password string, log
 func EnsureEosPassword(log *zap.Logger) (string, error) {
 	// 1. Try Vault
 	var data map[string]interface{} // 👈 this was missing
-	if err := ReadFromVaultAt(context.Background(), "secret", EosUserSecret, &data, log); err == nil {
+	if err := ReadFromVaultAt(context.Background(), "secret", EosVaultUserPath, &data, log); err == nil {
 		if pw, ok := data["password"].(string); ok && pw != "" {
 			log.Info("🔐 Loaded eos Vault password from Vault")
 			return pw, nil
@@ -152,7 +156,7 @@ func EnsureEosPassword(log *zap.Logger) (string, error) {
 		}
 
 		// Save to Vault KV
-		if err := WriteToVaultAt("secret", EosUserSecret, map[string]interface{}{
+		if err := WriteToVaultAt("secret", EosVaultUserPath, map[string]interface{}{
 			"username": "eos",
 			"password": pw1,
 		}, log); err != nil {
@@ -208,7 +212,7 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 	}
 
 	// Persist in Vault KV (e.g. for web UI consumption or bootstrap reuse)
-	if err := WriteToVaultAt("secret", EosUserSecret, map[string]interface{}{
+	if err := WriteToVaultAt("secret", EosVaultUserPath, map[string]interface{}{
 		"username": "eos",
 		"password": password,
 	}, log); err != nil {
