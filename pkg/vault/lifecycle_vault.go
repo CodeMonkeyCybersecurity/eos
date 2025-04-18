@@ -188,18 +188,29 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 	// Retry connection 3 times if not successful
 	for i := 1; i <= 3; i++ {
 		log.Info("🔁 Vault health check attempt", zap.Int("attempt", i))
+	
+		// Set up a short timeout context (e.g., 10s)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+	
 		client, err := NewClient(log)
 		if err != nil {
-			log.Warn("Failed to create client", zap.Error(err))
+			log.Warn("Failed to create Vault client", zap.Error(err))
 			time.Sleep(3 * time.Second)
 			continue
 		}
-		health, err := client.Sys().Health()
+	
+		// Add live progress feedback
+		log.Debug("⏳ Pinging Vault at", zap.String("VAULT_ADDR", client.Address()))
+	
+		// Use the short context for the health check
+		health, err := client.Sys().HealthWithContext(ctx)
 		if err == nil {
-			log.Info("✅ Vault is responding", zap.String("version", health.Version))
+			log.Info("✅ Vault responded", zap.String("version", health.Version))
 			return nil
 		}
-		log.Warn("Vault not yet responding", zap.Error(err))
+	
+		log.Warn("⚠️ Vault not responding yet", zap.Error(err))
 		time.Sleep(3 * time.Second)
 	}
 
