@@ -21,23 +21,66 @@ import (
 
 // VaultCreate creates a secret only if it doesn't already exist
 func EnsureVault(path string, value interface{}, log *zap.Logger) error {
-	client, err := GetPrivilegedVaultClient(log)
-	if err != nil {
-		return err
+	log.Info("[1/9] Ensuring Vault is installed")
+	if err := InstallVaultViaDnf(log); err != nil {
+		return fmt.Errorf("vault install failed: %w", err)
 	}
-	kv := client.KVv2("secret")
 
+	log.Info("[2/9] Checking for port mismatch (8200 → 8179)")
+	TryPatchVaultPortIfNeeded(log)
+
+	log.Info("[3/9] Ensuring Vault runtime directory exists")
+	if err := EnsureRuntimeDir(log); err != nil {
+		log.Error("❌ Failed to create Vault runtime directory", zap.Error(err))
+		return fmt.Errorf("runtime dir check failed: %w", err)
+	}
+
+	log.Info("[4/9] Ensuring Vault client is available and healthy")
+	EnsureVaultClient(log)
+
+	log.Info("[5/9] Getting Vault client for setup")
+	client, err := GetVaultClient(log)
+	if err != nil {
+		log.Error("❌ Failed to get Vault client", zap.Error(err))
+		return fmt.Errorf("could not get client: %w", err)
+	}
+
+	log.Info("[6/9] Initializing and unsealing Vault if necessary")
+	_, _, err = SetupVault(client, log)
+	if err != nil {
+		log.Error("❌ Vault setup failed", zap.Error(err))
+		return fmt.Errorf("vault setup failed: %w", err)
+	}
+
+	log.Info("[7/9] Getting privileged Vault client (via Vault Agent)")
+	privClient, err := GetPrivilegedVaultClient(log)
+	if err != nil {
+		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		return fmt.Errorf("privileged client failed: %w", err)
+	}
+	kv := privClient.KVv2("secret")
+
+	log.Info("[8/9] Checking if secret already exists", zap.String("path", path))
 	_, err = kv.Get(context.Background(), path)
 	if err == nil {
+		log.Warn("⚠️ Secret already exists", zap.String("path", path))
 		return fmt.Errorf("data already exists at path: %s", path)
 	}
 
+	log.Info("[9/9] Writing secret to Vault", zap.String("path", path))
 	data, err := toMap(value)
 	if err != nil {
+		log.Error("❌ Failed to marshal secret to Vault KV format", zap.Error(err))
 		return err
 	}
-	_, err = kv.Put(context.Background(), path, data)
-	return err
+
+	if _, err := kv.Put(context.Background(), path, data); err != nil {
+		log.Error("❌ Failed to write secret to Vault", zap.Error(err))
+		return err
+	}
+
+	log.Info("✅ Secret written to Vault successfully", zap.String("path", path))
+	return nil
 }
 
 /* Install Vault via dnf if not already installed */
@@ -59,6 +102,61 @@ func InstallVaultViaDnf(log *zap.Logger) error {
 		fmt.Println("Vault is already installed.")
 	}
 	return nil
+}
+
+/* Initialize Vault (if not already initialized) */
+func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
+	fmt.Println("\nInitializing Vault...")
+
+	if err := EnsureRuntimeDir(log); err != nil {
+		log.Error("Runtime dir missing or invalid", zap.Error(err))
+		return nil, nil, err
+	}
+
+	initRes, err := client.Sys().Init(&api.InitRequest{
+		SecretShares:    5,
+		SecretThreshold: 3,
+	})
+	if err != nil {
+		if IsAlreadyInitialized(err, log) {
+			fmt.Println("✅ Vault already initialized.")
+
+			// ✨ Reuse fallback or prompt logic
+			initRes, err := LoadInitResultOrPrompt(client, log)
+			if err != nil {
+				return nil, nil, fmt.Errorf("vault already initialized and fallback failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
+			}
+
+			// 🔓 Unseal and auth
+			if err := UnsealVault(client, initRes, log); err != nil {
+				return nil, nil, fmt.Errorf("failed to unseal already-initialized Vault: %w", err)
+			}
+			client.SetToken(initRes.RootToken)
+
+			// ✅ Re-store init result
+			if err := Write(client, "vault_init", initRes, log); err != nil {
+				log.Warn("Failed to persist Vault init result", zap.Error(err))
+			} else {
+				fmt.Println("✅ Vault init result persisted successfully")
+			}
+			return client, initRes, nil
+		}
+		return nil, nil, fmt.Errorf("init failed: %w", err)
+	}
+
+	// 🆕 Vault just initialized: unseal and persist
+	DumpInitResult(initRes, log)
+	if err := UnsealVault(client, initRes, log); err != nil {
+		return nil, nil, err
+	}
+	client.SetToken(initRes.RootToken)
+
+	if err := Write(client, "vault_init", initRes, log); err != nil {
+		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
+	}
+	fmt.Println("✅ Vault init result persisted successfully")
+
+	return client, initRes, nil
 }
 
 //
@@ -149,25 +247,40 @@ func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
 // ========================== UPDATE ==========================
 //
 
-// VaultUpdate reads existing secret and applies a patch map
-func UpdateVault(path string, update map[string]interface{}, log *zap.Logger) error {
-	client, err := GetPrivilegedVaultClient(log)
+func TryPatchVaultPortIfNeeded(log *zap.Logger) {
+	b, err := os.ReadFile(VaultConfigPath)
 	if err != nil {
-		return err
+		log.Warn("Could not read Vault config file", zap.String("path", VaultConfigPath), zap.Error(err))
+		return
 	}
-	kv := client.KVv2("secret")
+	content := string(b)
 
-	secret, err := kv.Get(context.Background(), path)
-	if err != nil {
-		return err
+	// Bail if already using 8179
+	if strings.Contains(content, "8179") {
+		log.Info("Vault config already uses port 8179 — no need to patch")
+		return
 	}
 
-	existing := secret.Data
-	for k, v := range update {
-		existing[k] = v
+	// Check if 8200 is hardcoded and replace
+	if strings.Contains(content, "8200") {
+		newContent := strings.ReplaceAll(content, "8200", "8179")
+		if err := os.WriteFile(VaultConfigPath, []byte(newContent), 0644); err != nil {
+			log.Error("Failed to patch Vault config file", zap.Error(err))
+			return
+		}
+		log.Info("✅ Vault port patched from 8200 → 8179 in config")
+
+		// Restart Vault
+		log.Info("🔁 Restarting Vault to apply new config...")
+		cmd := exec.Command("systemctl", "restart", "vault")
+		if err := cmd.Run(); err != nil {
+			log.Error("❌ Failed to restart Vault after patching", zap.Error(err))
+			return
+		}
+		log.Info("✅ Vault restarted successfully")
+	} else {
+		log.Info("No 8200 binding found in config — nothing to patch")
 	}
-	_, err = kv.Put(context.Background(), path, existing)
-	return err
 }
 
 //

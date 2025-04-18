@@ -98,7 +98,7 @@ func EnsureEosUserpassAccount(client *api.Client, username, password string, log
 func EnsureEosPassword(log *zap.Logger) (string, error) {
 	// 1. Try Vault
 	var data map[string]interface{} // 👈 this was missing
-	if err := ReadFromVaultAt(context.Background(), "secret", "bootstrap/eos-user", &data, log); err == nil {
+	if err := ReadFromVaultAt(context.Background(), "secret", EosUserSecret, &data, log); err == nil {
 		if pw, ok := data["password"].(string); ok && pw != "" {
 			log.Info("🔐 Loaded eos Vault password from Vault")
 			return pw, nil
@@ -152,7 +152,7 @@ func EnsureEosPassword(log *zap.Logger) (string, error) {
 		}
 
 		// Save to Vault KV
-		if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
+		if err := WriteToVaultAt("secret", EosUserSecret, map[string]interface{}{
 			"username": "eos",
 			"password": pw1,
 		}, log); err != nil {
@@ -208,7 +208,7 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 	}
 
 	// Persist in Vault KV (e.g. for web UI consumption or bootstrap reuse)
-	if err := WriteToVaultAt("secret", "bootstrap/eos-user", map[string]interface{}{
+	if err := WriteToVaultAt("secret", EosUserSecret, map[string]interface{}{
 		"username": "eos",
 		"password": password,
 	}, log); err != nil {

@@ -39,6 +39,13 @@ const (
 	// Audit
 	auditPath = "file/"
 	mountPath = "sys/audit/" + auditPath
+
+	// Systemd paths
+	VaultConfigPath = "/etc/vault.d/vault.hcl"
+
+	//test path
+	VaultTestPath = "bootstrap/test"
+	EosUserSecret = "bootstrap/eos_user"
 )
 
 type CheckReport struct {

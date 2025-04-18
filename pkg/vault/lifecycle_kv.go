@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -28,6 +29,27 @@ import (
 //
 // ========================== UPDATE ==========================
 //
+
+// VaultUpdate reads existing secret and applies a patch map
+func UpdateVault(path string, update map[string]interface{}, log *zap.Logger) error {
+	client, err := GetPrivilegedVaultClient(log)
+	if err != nil {
+		return err
+	}
+	kv := client.KVv2("secret")
+
+	secret, err := kv.Get(context.Background(), path)
+	if err != nil {
+		return err
+	}
+
+	existing := secret.Data
+	for k, v := range update {
+		existing[k] = v
+	}
+	_, err = kv.Put(context.Background(), path, existing)
+	return err
+}
 
 //
 // ========================== DELETE ==========================
@@ -85,61 +107,6 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 
 	fmt.Println("✅ Root token revoked.")
 	return nil
-}
-
-/* Initialize Vault (if not already initialized) */
-func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
-	fmt.Println("\nInitializing Vault...")
-
-	if err := EnsureRuntimeDir(log); err != nil {
-		log.Error("Runtime dir missing or invalid", zap.Error(err))
-		return nil, nil, err
-	}
-
-	initRes, err := client.Sys().Init(&api.InitRequest{
-		SecretShares:    5,
-		SecretThreshold: 3,
-	})
-	if err != nil {
-		if IsAlreadyInitialized(err, log) {
-			fmt.Println("✅ Vault already initialized.")
-
-			// ✨ Reuse fallback or prompt logic
-			initRes, err := LoadInitResultOrPrompt(client, log)
-			if err != nil {
-				return nil, nil, fmt.Errorf("vault already initialized and fallback failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
-			}
-
-			// 🔓 Unseal and auth
-			if err := UnsealVault(client, initRes, log); err != nil {
-				return nil, nil, fmt.Errorf("failed to unseal already-initialized Vault: %w", err)
-			}
-			client.SetToken(initRes.RootToken)
-
-			// ✅ Re-store init result
-			if err := Write(client, "vault_init", initRes, log); err != nil {
-				log.Warn("Failed to persist Vault init result", zap.Error(err))
-			} else {
-				fmt.Println("✅ Vault init result persisted successfully")
-			}
-			return client, initRes, nil
-		}
-		return nil, nil, fmt.Errorf("init failed: %w", err)
-	}
-
-	// 🆕 Vault just initialized: unseal and persist
-	DumpInitResult(initRes, log)
-	if err := UnsealVault(client, initRes, log); err != nil {
-		return nil, nil, err
-	}
-	client.SetToken(initRes.RootToken)
-
-	if err := Write(client, "vault_init", initRes, log); err != nil {
-		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
-	}
-	fmt.Println("✅ Vault init result persisted successfully")
-
-	return client, initRes, nil
 }
 
 func IsAlreadyInitialized(err error, log *zap.Logger) bool {

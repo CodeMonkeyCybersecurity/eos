@@ -27,9 +27,8 @@ AppRole, userpass, and creates an eos user with a random password.`,
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("[0/7] Starting Vault enable workflow")
 
-		// Ensure Vault is installed
-		if err := vault.InstallVaultViaDnf(log); err != nil {
-			log.Error("Failed to install Vault", zap.Error(err))
+		if err := vault.EnsureVault(vault.VaultTestPath, map[string]string{"status": "working"}, log); err != nil {
+			log.Error("Failed to initialize Vault lifecycle", zap.Error(err))
 			return err
 		}
 
