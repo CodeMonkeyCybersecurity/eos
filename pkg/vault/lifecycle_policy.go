@@ -1,4 +1,4 @@
-/* pkg/vault/agent_config.go */
+// pkg/vault/lifecycle_policy.go
 
 package vault
 
@@ -8,35 +8,28 @@ import (
 	"strings"
 
 	"github.com/hashicorp/vault/api"
-
 	"go.uber.org/zap"
 )
 
-func writeSystemdUnit() error {
-	unit := `
-[Unit]
-Description=Vault Agent (Eos)
-After=network.target
+//
+// ========================== ENSURE ==========================
+//
 
-[Service]
-ExecStartPre=/usr/bin/mkdir -p /run/eos
-ExecStartPre=/usr/bin/chown eos:eos /run/eos
-User=eos
-Group=eos
-ExecStart=/usr/bin/vault agent -config=/etc/vault-agent-eos.hcl
-Restart=on-failure
-RuntimeDirectory=eos
-RuntimeDirectoryMode=0750
+//
+// ========================== LIST ==========================
+//
 
-[Install]
-WantedBy=multi-user.target`
-	unitPath := "/etc/systemd/system/vault-agent-eos.service"
-	if err := os.WriteFile(unitPath, []byte(strings.TrimSpace(unit)+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write systemd unit file to %s: %w", unitPath, err)
-	}
-	fmt.Printf("✅ Systemd unit file written to %s\n", unitPath)
-	return nil
-}
+//
+// ========================== READ ==========================
+//
+
+//
+// ========================== UPDATE ==========================
+//
+
+//
+// ========================== DELETE ==========================
+//
 
 func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
 	const configPath = "/etc/vault-agent-eos.hcl"
@@ -93,17 +86,6 @@ cache {
 	}
 
 	log.Info("✅ Vault Agent config written successfully", zap.String("path", configPath))
-	return nil
-}
-
-// --- Helper Functions ---
-
-func writeAgentPassword(password string) error {
-	passPath := "/etc/vault-agent-eos.pass"
-	if err := os.WriteFile(passPath, []byte(password+"\n"), 0600); err != nil {
-		return fmt.Errorf("failed to write Vault Agent password to %s: %w", passPath, err)
-	}
-	fmt.Printf("✅ Vault Agent password file written to %s\n", passPath)
 	return nil
 }
 

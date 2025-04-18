@@ -14,12 +14,15 @@ import (
 
 var (
 	// Vault Secrets + Tokens
-	SecretsDir          = "/var/lib/eos/secrets"
-	VaultInitPath       = filepath.Join(SecretsDir, "vault_init.json")
-	VaultUserPath       = filepath.Join(SecretsDir, "vault_userpass.json")
-	AppRoleIDPath       = filepath.Join(SecretsDir, "vault_role_id")
-	AppSecretIDPath     = filepath.Join(SecretsDir, "vault_secret_id")
-	VaultAgentTokenPath = "/run/eos/vault-agent-eos.token"
+	SecretsDir                = "/var/lib/eos/secrets"
+	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
+	VaultUserPath             = filepath.Join(SecretsDir, "vault_userpass.json")
+	AppRoleIDPath             = filepath.Join(SecretsDir, "vault_role_id")
+	AppSecretIDPath           = filepath.Join(SecretsDir, "vault_secret_id")
+	VaultAgentTokenPath       = "/run/eos/vault-agent-eos.token"
+	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
+	EosUserFallbackFile       = filepath.Join(SecretsDir, "vault_userpass.json")
+	vaultClient               *api.Client
 )
 
 const (
@@ -38,11 +41,6 @@ const (
 	mountPath = "sys/audit/" + auditPath
 )
 
-var (
-	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
-	EosUserFallbackFile       = filepath.Join(SecretsDir, "vault_userpass.json")
-)
-
 type CheckReport struct {
 	Installed   bool
 	Initialized bool
@@ -50,6 +48,40 @@ type CheckReport struct {
 	TokenReady  bool
 	KVWorking   bool
 	Notes       []string
+}
+
+type UserpassCreds struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+// UserSecret holds login and SSH key material for a system user.
+type UserSecret struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	SSHKey   string `json:"ssh_private_key,omitempty"`
+}
+
+type AppRoleOptions struct {
+	RoleName      string
+	Policies      []string
+	TokenTTL      string
+	TokenMaxTTL   string
+	SecretIDTTL   string
+	ForceRecreate bool
+	RefreshCreds  bool
+}
+
+func DefaultAppRoleOptions() AppRoleOptions {
+	return AppRoleOptions{
+		RoleName:      "eos",
+		Policies:      []string{"eos-admin"},
+		TokenTTL:      "1h",
+		TokenMaxTTL:   "4h",
+		SecretIDTTL:   "24h",
+		ForceRecreate: false,
+		RefreshCreds:  false,
+	}
 }
 
 // VaultPath returns the full KV v2 path for data reads/writes.
@@ -73,17 +105,3 @@ func DiskPath(name string, log *zap.Logger) string {
 	log.Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
 	return final
 }
-
-type UserpassCreds struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// UserSecret holds login and SSH key material for a system user.
-type UserSecret struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	SSHKey   string `json:"ssh_private_key,omitempty"`
-}
-
-var vaultClient *api.Client

@@ -13,6 +13,8 @@ import (
 )
 
 var revokeRoot bool
+var forceRecreate bool
+var refreshCreds bool
 
 var EnableVaultCmd = &cobra.Command{
 	Use:     "vault",
@@ -98,9 +100,15 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		log.Info("✅ Loaded the stored initialization data and eos user credentials")
 
 		/* Run EnsureVaultAgent with known password (not just check) */
-		if err := vault.EnsureVaultAgent(client, rawCreds.Password, log); err != nil {
-			log.Error("Failed to set up Vault Agent", zap.Error(err))
-			return err
+		if err := vault.EnsureAgent(client, rawCreds.Password, log, vault.DefaultAppRoleOptions()); err != nil {
+			opts := vault.DefaultAppRoleOptions()
+			opts.ForceRecreate = forceRecreate
+			opts.RefreshCreds = refreshCreds
+
+			if err := vault.EnsureAgent(client, rawCreds.Password, log, opts); err != nil {
+				log.Error("Failed to set up Vault Agent", zap.Error(err))
+				return err
+			}
 		}
 		log.Info("✅ Vault Agent setup complete")
 
@@ -127,7 +135,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		log.Info("[4/7] Ensuring AppRole auth method")
-		if err := vault.EnsureAppRole(client, log); err != nil {
+		if err := vault.EnsureAppRole(client, log, vault.DefaultAppRoleOptions()); err != nil {
 			log.Error("AppRole setup failed", zap.Error(err))
 			return err
 		}
@@ -185,4 +193,6 @@ AppRole, userpass, and creates an eos user with a random password.`,
 func init() {
 	EnableCmd.AddCommand(EnableVaultCmd)
 	EnableCmd.Flags().BoolVar(&revokeRoot, "revoke-root", false, "Revoke the root token after securing Vault")
+	EnableVaultCmd.Flags().BoolVar(&forceRecreate, "force-recreate", false, "Force AppRole recreation even if credentials exist")
+	EnableVaultCmd.Flags().BoolVar(&refreshCreds, "refresh-creds", false, "Regenerate AppRole credentials if already present")
 }
