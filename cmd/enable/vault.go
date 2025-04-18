@@ -24,7 +24,7 @@ var EnableVaultCmd = &cobra.Command{
 It initializes and unseals Vault, sets up auditing, KV v2, 
 AppRole, userpass, and creates an eos user with a random password.`,
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("[0/7] Starting Vault enable workflow")
 
 		if err := vault.EnsureVault(vault.VaultTestPath, map[string]string{"status": "working"}, log); err != nil {

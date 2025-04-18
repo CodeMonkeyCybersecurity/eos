@@ -24,7 +24,7 @@ var InspectProcessCmd = &cobra.Command{
 	Short: "Retrieve detailed information about running processes",
 	Long: `This command retrieves detailed information about all running processes on the system
 by reading the /proc directory and outputs it in a table format.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Executing read process command", zap.Strings("args", args))
 

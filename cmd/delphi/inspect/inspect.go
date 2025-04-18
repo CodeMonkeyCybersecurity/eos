@@ -27,7 +27,7 @@ user permissions, versioning data, keepalive status, and other useful insights.
 
 Subcommands are required to specify which type of information to inspect.`,
 	Aliases: []string{"read", "get"},
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("'eos delphi inspect' was called without a subcommand")
 

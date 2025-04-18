@@ -21,7 +21,7 @@ var CreateDockerCmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Install Docker and configure it for non-root usage",
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Assume that 'log' is globally defined or available in context.
 		utils.RequireRoot(log)
 

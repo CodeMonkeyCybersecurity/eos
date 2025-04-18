@@ -17,7 +17,7 @@ var DeleteUmamiCmd = &cobra.Command{
 	Long: `Stops and removes Umami containers, backs up the data volumes,
 and deletes the installed images.
 The backup is stored in /srv/container-volume-backups/{timestamp}_umami_db_data.tar.gz`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("Starting Umami deletion process using Eos")
 
 		// Define the path to the docker-compose file used during installation.

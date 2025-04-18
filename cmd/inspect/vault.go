@@ -20,7 +20,7 @@ import (
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("inspect").With(zap.String("component", "vault"))
 
 		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos"))
@@ -47,7 +47,7 @@ var InspectVaultAgentCmd = &cobra.Command{
 	Short: "Check status of the Vault Agent running as eos",
 	Long: `Checks whether the Vault Agent systemd service is running,
 validates the token at /run/eos/.vault-token, and attempts a test query.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("vault-agent").With(zap.String("component", "vault-agent"))
 
 		fmt.Println("🔍 Checking Vault Agent (eos) service status...")

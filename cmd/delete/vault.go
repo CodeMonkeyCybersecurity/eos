@@ -20,7 +20,7 @@ var DeleteVaultCmd = &cobra.Command{
 	Short: "Deletes the Vault installation",
 	Long:  `Removes the Vault package (via snap, apt, or dnf) and optionally purges all configuration, data, and logs.`,
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Ensure the command is run as root.
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")

@@ -16,7 +16,7 @@ var UpdateHostnameCmd = &cobra.Command{
 	Use:   "hostname",
 	Short: "Update the system hostname",
 	Long:  `Update the system hostname by modifying /etc/hostname and /etc/hosts.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		UpdateHostname()
 		return nil
 	}),

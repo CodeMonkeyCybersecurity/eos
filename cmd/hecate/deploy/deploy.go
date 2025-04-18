@@ -42,7 +42,7 @@ Examples:
   hecate deploy nextcloud
   hecate deploy jenkins`,
 	Args: cobra.ExactArgs(1),
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		runDeploy(cmd, args) // Call the helper function with its parameters.
 		return nil
 	}),

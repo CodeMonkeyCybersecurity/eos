@@ -65,7 +65,7 @@ var appsCmd = &cobra.Command{
 	Use:   "apps",
 	Short: "Update enabled applications in the conf.d directory",
 	Long:  `Select and keep configuration files for enabled Eos backend web apps while removing others.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Running update apps command")
 

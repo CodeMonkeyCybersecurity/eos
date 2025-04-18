@@ -19,7 +19,7 @@ var UpdateAgentsCmd = &cobra.Command{
 	Use:   "agents",
 	Short: "Upgrade Wazuh agents via the Wazuh API",
 	Long:  "Upgrades one or more Wazuh agents using a remote package (WPK) via the API.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		cfg, err := delphi.ReadConfig(log)

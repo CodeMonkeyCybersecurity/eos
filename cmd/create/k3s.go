@@ -28,7 +28,7 @@ For worker nodes, you'll be prompted for the server URL and node token.
 Additional checks for IPv6 and Tailscale are performed.
 The generated install command is previewed and saved to a script file
 for safe, human-approved execution.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		deployK3s()
 		return nil
 	}),

@@ -29,7 +29,7 @@ If --timestamp is provided (e.g. --timestamp 20250325-101010), then restore will
   docker-compose.yml.<timestamp>.bak
 
 If no --timestamp is given, the command enters interactive mode to choose which resources to restore.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

@@ -20,7 +20,7 @@ var BackupCmd = &cobra.Command{
 	Use:   "backup",
 	Short: "Backup configuration and files",
 	Long:  `Backup important configuration directories and files.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

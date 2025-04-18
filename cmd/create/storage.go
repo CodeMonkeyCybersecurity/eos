@@ -13,7 +13,7 @@ var CreateStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Create new storage resources",
 	Long:  `This command allows you to create new storage resources in the system.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Fatal("Please specify the storage details to create.")
 		}

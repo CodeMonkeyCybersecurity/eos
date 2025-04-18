@@ -1,4 +1,3 @@
-// cmd/update/crontab.go
 package update
 
 import (
@@ -6,9 +5,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -28,45 +25,44 @@ func init() {
 	UpdateCmd.AddCommand(CrontabCmd)
 }
 
-func runCrontabUpdate(cmd *cobra.Command, args []string) error {
-	log := logger.L()
+func runCrontabUpdate(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := ctx.Log.Named("crontab")
 
-	// Prompt for email if not provided via flag.
+	// Trim and prompt if needed
 	email = strings.TrimSpace(email)
 	if email == "" {
-		email = interaction.PromptInput("Email address for cron failure alerts", "e.g., your@email.com", log)
+		email = interaction.PromptInput("📧 Email address for cron failure alerts", "e.g., your@email.com", log)
 	}
 	if email == "" {
-		log.Error("No email provided. Aborting.")
+		log.Error("No email address provided. Aborting update.")
 		return fmt.Errorf("email address is required")
 	}
 
-	// Retrieve the current crontab.
+	log.Info("🔍 Fetching current crontab...")
 	current, err := system.GetCrontab()
 	if err != nil {
-		log.Error("Could not retrieve crontab", zap.Error(err))
+		log.Error("❌ Failed to retrieve crontab", zap.Error(err))
 		return err
 	}
 
-	// Backup the current crontab.
+	log.Info("🛟 Creating backup of existing crontab...")
 	backupPath, err := system.BackupCrontab(current)
 	if err != nil {
-		log.Warn("Could not backup crontab", zap.Error(err))
+		log.Warn("⚠️ Could not create crontab backup", zap.Error(err))
 	} else {
-		log.Info("Crontab backup created", zap.String("path", backupPath))
+		log.Info("✅ Crontab backup saved", zap.String("path", backupPath))
 	}
 
-	// Patch the crontab with the MAILTO variable.
+	log.Info("✏️ Patching crontab with MAILTO directive", zap.String("mailto", email))
 	updated := system.PatchMailto(current, email)
 
-	// Apply the updated crontab.
+	log.Info("📤 Applying updated crontab...")
 	if err := system.SetCrontab(updated); err != nil {
-		log.Error("Failed to apply crontab changes", zap.Error(err))
+		log.Error("❌ Failed to apply updated crontab", zap.Error(err))
 		return err
 	}
 
-	// Display the updated crontab.
-	fmt.Println("✅ Crontab updated with MAILTO=", email)
+	log.Info("✅ Crontab updated successfully", zap.String("mailto", email))
 	fmt.Println("\n📜 New crontab:\n==============================")
 	fmt.Println(updated)
 	fmt.Println("==============================")

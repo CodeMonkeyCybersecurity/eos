@@ -13,7 +13,7 @@ var InspectLDAPCmd = &cobra.Command{
 	Aliases: []string{"directory"},
 	Short:   "Auto-discover and inspect LDAP",
 	Long:    "Attempts to auto-discover an LDAP server and show config, users, and groups.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("Launching interactive LDAP query tool")
 
 		return ldap.InteractiveLDAPQuery(log)

@@ -14,7 +14,7 @@ import (
 var CreateJWTCmd = &cobra.Command{
 	Use:   "jwt",
 	Short: "Generate and store a JWT token for Delphi (Wazuh) API access",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.ReadConfig(log)
 		if err != nil {
 			log.Warn("Config not found, prompting for values", zap.Error(err))

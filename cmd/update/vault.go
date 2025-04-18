@@ -17,7 +17,7 @@ var VaultUpdateCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Updates Vault using the system's package manager",
 	Long:  `Updates Vault using dnf or apt depending on the host's Linux distribution.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")
 		}

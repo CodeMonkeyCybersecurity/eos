@@ -24,7 +24,7 @@ func NewDeployJenkinsCmd() *cobra.Command {
 
 This command stops the Hecate container (if running) and then organizes assets by moving files 
 that are not relevant to Jenkins into the "other" directory at the project root.`,
-		RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 			log.Info("Starting Jenkins deployment")
 
 			// Stop the container if it's running.

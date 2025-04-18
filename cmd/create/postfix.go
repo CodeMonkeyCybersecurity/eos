@@ -25,7 +25,7 @@ var CreatePostfixCmd = &cobra.Command{
 	Use:   "postfix",
 	Short: "Install and configure Postfix as an SMTP relay",
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		utils.RequireRoot(log)
 

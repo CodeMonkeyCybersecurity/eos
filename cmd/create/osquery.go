@@ -21,7 +21,7 @@ var createOsQueryCmd = &cobra.Command{
 	Use:   "osquery",
 	Short: "Install osquery and configure its APT repository",
 	Long:  "Installs osquery on Debian/Ubuntu-based systems by configuring the GPG key and APT repository.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		if err := platform.RequireLinuxDistro([]string{"debian"}, log); err != nil {

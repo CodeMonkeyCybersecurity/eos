@@ -20,7 +20,7 @@ var InspectConfigCmd = &cobra.Command{
 	Short:   "Inspect the currently loaded Delphi configuration",
 	Long:    "Displays the contents of the delphi.json config file, with sensitive fields masked for safety.",
 	Aliases: []string{"cfg", "settings"},
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		cfg, err := delphi.ReadConfig(log)

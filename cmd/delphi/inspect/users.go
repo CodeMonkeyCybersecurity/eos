@@ -16,7 +16,7 @@ var UsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "List Wazuh users and their IDs",
 	Long:  "Fetches and displays all Wazuh users along with their associated user IDs from the Delphi (Wazuh) API.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		cfg, err := delphi.ReadConfig(log)

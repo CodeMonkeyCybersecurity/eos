@@ -15,7 +15,7 @@ import (
 var SyncUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Create user-specific groups from Keycloak registration events",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("delphi.sync.users")
 
 		realm, _ := interaction.PromptIfMissing(cmd, "realm", "Enter Keycloak realm", false, log)

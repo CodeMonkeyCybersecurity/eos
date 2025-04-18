@@ -23,7 +23,7 @@ var logLevel string
 var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "Inspect Eos logs (requires root or eos privileges)",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("inspect")
 
 		if !utils.IsPrivilegedUser() {

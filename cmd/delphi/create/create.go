@@ -24,7 +24,7 @@ var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create Delphi resources",
 	Long:  "Create or generate Delphi-related resources, configurations, and mappings.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("'eos delphi create' was called without a subcommand")
 		return nil
 	}),
@@ -33,7 +33,7 @@ var CreateCmd = &cobra.Command{
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		runMapping()
 		return nil
 	}),

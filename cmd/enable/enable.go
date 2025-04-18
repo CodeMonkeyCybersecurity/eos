@@ -15,7 +15,7 @@ var EnableCmd = &cobra.Command{
 	Short:   "Commands to enable or start services",
 	Long:    "Commands to enable or start services, such as initializing and unsealing Vault.",
 	Aliases: []string{"start", "init", "unseal"},
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

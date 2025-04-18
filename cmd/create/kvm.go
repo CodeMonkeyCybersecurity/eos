@@ -6,22 +6,19 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-var (
-	enableBridge bool
-)
+var enableBridge bool
 
-// CreateKvmCmd installs and configures KVM and libvirt.
 var CreateKvmCmd = &cobra.Command{
 	Use:   "kvm",
 	Short: "Install and configure KVM and libvirt",
-	Long:  "Installs KVM, ensures libvirtd is running, sets ACLs for an ISO directory, and optionally autostarts the default libvirt network.",
-	RunE:  eos.Wrap(runDeployKVM),
+	Long: `Installs KVM, ensures libvirtd is running, sets ACLs for an ISO directory,
+and optionally autostarts the default libvirt network.`,
+	RunE: eos.Wrap(runDeployKVM),
 }
 
 func init() {
@@ -29,47 +26,52 @@ func init() {
 	CreateKvmCmd.Flags().BoolVar(&enableBridge, "network-bridge", false, "Configure a bridge (br0) using the default network interface via Netplan")
 }
 
-func runDeployKVM(cmd *cobra.Command, args []string) error {
-	log := logger.L()
+func runDeployKVM(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := ctx.Log.Named("kvm")
 
-	// Ensure the command is run as root.
 	if os.Geteuid() != 0 {
+		log.Error("KVM setup must be run as root")
 		return fmt.Errorf("this command must be run as root")
 	}
 
-	// Install KVM.
+	log.Info("📦 Installing KVM and libvirt packages...")
 	if err := system.InstallKVM(); err != nil {
+		log.Error("Failed to install KVM", zap.Error(err))
 		return err
 	}
+	log.Info("✅ KVM installation complete")
 
-	// Configure network bridge if requested.
 	if enableBridge {
-		fmt.Println("🛠️  Configuring network bridge...")
+		log.Info("🛠️  Configuring network bridge...")
 		if err := system.ConfigureKVMBridge(); err != nil {
+			log.Error("Failed to configure network bridge", zap.Error(err))
 			return fmt.Errorf("failed to configure network bridge: %w", err)
 		}
+		log.Info("✅ Network bridge configured")
 	}
 
-	// Ensure that libvirtd is running.
+	log.Info("🔧 Ensuring libvirtd is running...")
 	if err := system.EnsureLibvirtd(); err != nil {
+		log.Error("libvirtd is not running", zap.Error(err))
 		return err
 	}
+	log.Info("✅ libvirtd is active")
 
-	// Prompt for ISO directory.
 	isoDir := interaction.PromptConfirmOrValue("The hypervisor needs access to an ISO directory", "/srv/iso")
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
+		log.Info("🔐 Setting ACL for ISO directory", zap.String("path", isoDir))
 		system.SetLibvirtACL(isoDir)
 	} else {
 		log.Warn("ISO directory not found or invalid", zap.String("path", isoDir))
 	}
 
-	// Ask if the user wants to autostart the default libvirt network.
 	if interaction.PromptYesNo("Would you like to autostart the default libvirt network?", false) {
+		log.Info("⚙️  Enabling autostart for default libvirt network")
 		system.SetLibvirtDefaultNetworkAutostart()
 	} else {
-		fmt.Println("Skipping network autostart. You can run 'virsh net-start default' later if needed.")
+		log.Info("Skipping autostart — you can run 'virsh net-start default' manually if needed.")
 	}
 
-	fmt.Println("✅ KVM setup completed.")
+	log.Info("✅ KVM setup completed successfully")
 	return nil
 }

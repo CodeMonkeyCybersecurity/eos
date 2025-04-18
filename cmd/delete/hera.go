@@ -16,7 +16,7 @@ var DeleteHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deletes the Hera (Authentik) installation files",
 	Long:  `Deletes all files and directories under /opt/hera, but leaves the /opt/hera directory itself.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run as root or with sudo.")
 		}

@@ -17,7 +17,7 @@ var InspectUsersCmd = &cobra.Command{
 	Short: "Retrieve information about system users",
 	Long: `This command retrieves a list of all system users on the current machine
 by reading the /etc/passwd file.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("Reading users...")
 		users, err := getSystemUsers()
 		if err != nil {

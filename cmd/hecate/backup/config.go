@@ -19,7 +19,7 @@ var BackupConfigCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Backup configuration and files",
 	Long:  `Backup important configuration directories and files.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Backup the conf.d directory.
 		srcInfo, err := os.Stat(hecate.ConfDir)
 

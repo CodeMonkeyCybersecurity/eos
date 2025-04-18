@@ -15,7 +15,7 @@ import (
 var CreateZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
 	Short: "Deploy Zabbix monitoring stack using Docker Compose",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("Starting Zabbix installation...")
 
 		if err := deployZabbix(); err != nil {

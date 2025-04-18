@@ -12,7 +12,7 @@ var DeleteProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Delete process",
 	Long:  `Delete a process by specifying the target process.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			log.Fatal("Please specify the process to delete.")
 		}

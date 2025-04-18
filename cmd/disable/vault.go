@@ -18,7 +18,7 @@ var StopVaultCmd = &cobra.Command{
 	Short: "Stops the Vault Agent and cleans up residual files",
 	Long: `Stops the vault-agent-eos.service, kills anything still bound to port 8179,
 and removes leftover files including config, runtime, and token sink artifacts.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("🛑 Stopping Vault Agent and cleaning up...")
 
 		// Step 1: Stop systemd service

@@ -16,7 +16,7 @@ import (
 var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",
 	Short: "Check disconnected agents from Wazuh API",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		cfg, err := delphi.ResolveConfig(log)
 		if err != nil {

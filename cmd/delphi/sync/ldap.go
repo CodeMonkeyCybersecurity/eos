@@ -22,7 +22,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - roles_mapping.yml updates
 - role sync
 - securityadmin reload`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.PromptLDAPDetails(log)
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)

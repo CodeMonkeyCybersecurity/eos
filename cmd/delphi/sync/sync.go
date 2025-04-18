@@ -14,7 +14,7 @@ var SyncCmd = &cobra.Command{
 	Short: "Sync Delphi components (e.g., LDAP backend)",
 	Long:  "Synchronize data or configuration from fallback or external sources.",
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

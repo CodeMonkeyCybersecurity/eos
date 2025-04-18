@@ -24,7 +24,7 @@ var CreateBackupCmd = &cobra.Command{
 	Short: "Create a new restic backup",
 	Long: `This command initializes a restic repository if not already initialized,
 then creates a backup of specified directories.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		// Step 1: Ensure Restic is Installed

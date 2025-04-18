@@ -19,7 +19,7 @@ import (
 var dockerComposeCmd = &cobra.Command{
 	Use:   "docker-compose",
 	Short: "Update the docker-compose file based on selected Eos apps",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		lastValues := hecate.LoadLastValues()
 		selectedApps := make(map[string]bool)

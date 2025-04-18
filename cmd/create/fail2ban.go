@@ -17,7 +17,7 @@ var CreateFail2banCmd = &cobra.Command{
 	Use:   "fail2ban",
 	Short: "Deploy and configure Fail2Ban",
 	Long:  "Install Fail2Ban, apply secure jail.local settings, and enable basic SSH protection.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Starting Fail2Ban setup...")
 

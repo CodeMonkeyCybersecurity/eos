@@ -15,7 +15,7 @@ var DisableCmd = &cobra.Command{
 	Use:   "disable",
 	Short: "Disable system features (e.g., suspension, hibernation)",
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.L()
 
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))

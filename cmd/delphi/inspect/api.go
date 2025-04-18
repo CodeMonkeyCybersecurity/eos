@@ -20,7 +20,7 @@ var (
 var InspectAPICmd = &cobra.Command{
 	Use:   "api",
 	Short: "Inspect API details from Delphi (Wazuh)",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		// ✅ Step 2: Toggle ShowSecrets and confirm config
 		delphi.ShowSecrets = showSecrets

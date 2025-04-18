@@ -12,7 +12,7 @@ import (
 var CreateVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Installs and initializes HashiCorp Vault in production mode",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L()
 
 		if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}, log); err != nil {

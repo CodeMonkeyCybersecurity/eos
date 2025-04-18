@@ -21,7 +21,7 @@ import (
 var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("Disabling system suspension and hibernation...")
 

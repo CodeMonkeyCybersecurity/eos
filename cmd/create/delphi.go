@@ -1,4 +1,3 @@
-// cmd/create/delphi.go
 package create
 
 import (
@@ -28,49 +27,18 @@ By default, this checks your system's hardware (4GB RAM, 2+ cores). Use --ignore
 	RunE: eos.Wrap(runDelphiInstall),
 }
 
-// FindAndExtractWazuhPasswords attempts to locate wazuh-install-files.tar and extract wazuh-passwords.txt
-func findAndExtractWazuhPasswords() error {
+func runDelphiInstall(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := ctx.Log.Named("delphi")
 
-	searchPaths := []string{
-		"/root",
-		"/tmp",
-		"/opt",
-		"/var/tmp",
-		".", // current working directory
+	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}, log); err != nil {
+		log.Fatal("Unsupported Linux distro", zap.Error(err))
 	}
 
-	found := false
-	var tarPath string
-	for _, dir := range searchPaths {
-		candidate := filepath.Join(dir, "wazuh-install-files.tar")
-		if system.Exists(candidate) {
-			tarPath = candidate
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("could not locate wazuh-install-files.tar in common paths")
-	}
-
-	log.Info("Found Wazuh tar file", zap.String("path", tarPath))
-	cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to extract passwords: %w", err)
-	}
-
-	return nil
-}
-
-func runDelphiInstall(cmd *cobra.Command, args []string) error {
 	tmpDir := "/tmp"
 	scriptURL := "https://packages.wazuh.com/4.11/wazuh-install.sh"
 	scriptPath := filepath.Join(tmpDir, "wazuh-install.sh")
 
-	log.Info("Downloading Wazuh installer", zap.String("url", scriptURL))
+	log.Info("⬇️ Downloading Wazuh installer", zap.String("url", scriptURL))
 	if err := utils.DownloadFile(scriptPath, scriptURL); err != nil {
 		return fmt.Errorf("failed to download installer: %w", err)
 	}
@@ -78,19 +46,17 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 
-	log.Info("Running Wazuh installer")
 	args = []string{"-a"}
-
 	if ignoreHardwareCheck {
-		log.Info("Ignoring hardware checks (passing -i to installer)")
+		log.Info("⚙️ Ignoring hardware checks (passing -i)")
 		args = append(args, "-i")
 	}
-
 	if overwriteInstall {
-		log.Info("Overwriting existing installation (passing -o to installer)")
+		log.Info("⚙️ Overwriting existing installation (passing -o)")
 		args = append(args, "-o")
 	}
 
+	log.Info("📦 Running Wazuh installer script")
 	cmdArgs := append([]string{scriptPath}, args...)
 	installCmd := exec.Command("bash", cmdArgs...)
 	installCmd.Stdout = os.Stdout
@@ -98,60 +64,69 @@ func runDelphiInstall(cmd *cobra.Command, args []string) error {
 	if err := installCmd.Run(); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
-	log.Info("Wazuh installation completed successfully")
-	log.Info("Extracting admin credentials from wazuh-passwords.txt")
-	if err := findAndExtractWazuhPasswords(); err != nil {
-		log.Warn("Could not extract Wazuh credentials", zap.Error(err))
+	log.Info("✅ Wazuh installation completed")
+
+	log.Info("🔐 Attempting to extract Wazuh admin credentials")
+	if err := extractWazuhPasswords(log); err != nil {
+		log.Warn("⚠️ Could not extract Wazuh credentials", zap.Error(err))
 	}
 
-	log.Info("Disabling Wazuh updates (repo disable)")
-
-	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}, log); err != nil {
-		log.Fatal("Unsupported Linux distro", zap.Error(err))
-	}
-
+	log.Info("🚫 Disabling Wazuh repo updates")
 	distro := platform.DetectLinuxDistro(log)
 	switch distro {
-	case "ubuntu", "debian":
-		disableCmd := exec.Command("sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
-		disableCmd.Stdout = os.Stdout
-		disableCmd.Stderr = os.Stderr
-		if err := disableCmd.Run(); err != nil {
+	case "debian", "ubuntu":
+		cmd := exec.Command("sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
 			log.Warn("Failed to comment out Wazuh APT repo", zap.Error(err))
 		} else {
-			log.Info("Commented out Wazuh APT repo successfully")
-			if err := exec.Command("apt", "update").Run(); err != nil {
-				log.Warn("APT update failed", zap.Error(err))
-			}
+			log.Info("✅ Wazuh APT repo commented out")
+			_ = exec.Command("apt", "update").Run()
 		}
-
 	default:
-		disableCmd := exec.Command("sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
-		disableCmd.Stdout = os.Stdout
-		disableCmd.Stderr = os.Stderr
-		if err := disableCmd.Run(); err != nil {
-			log.Warn("Could not disable Wazuh yum repo", zap.Error(err))
+		cmd := exec.Command("sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Warn("Failed to disable Wazuh yum repo", zap.Error(err))
 		} else {
-			log.Info("Wazuh yum repo disabled")
+			log.Info("✅ Wazuh yum repo disabled")
 		}
-
-		log.Info("Delphi (Wazuh) installation completed")
-
-		log.Info("To access the Wazuh Dashboard:")
-		log.Info("👉 Run this on your **local machine** (not over SSH):")
-		log.Info("    firefox https://$(hostname -I | awk '{print $1}')  # or use your preferred browser")
-
-		log.Info("Alternatively, forward the port over SSH and access via localhost:")
-		log.Info("    ssh -L 8443:localhost:443 user@your-server-ip")
-		log.Info("Then open: https://localhost:8443 in your browser.")
-		log.Info("To harden this installation, consider running the following commands: 'eos harden delphi'.")
-
 	}
+
+	log.Info("🎉 Delphi (Wazuh) setup complete")
+	log.Info("To access the Wazuh Dashboard:")
+	log.Info("👉 Run this on your **local machine** (not over SSH):")
+	log.Info("    firefox https://$(hostname -I | awk '{print $1}')")
+	log.Info("Or forward port with:")
+	log.Info("    ssh -L 8443:localhost:443 user@your-server")
+	log.Info("Then browse: https://localhost:8443")
+	log.Info("🔐 To harden this install, run: `eos harden delphi`")
+
 	return nil
+}
+
+func extractWazuhPasswords(log *zap.Logger) error {
+	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
+	for _, dir := range searchPaths {
+		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
+		if system.Exists(tarPath) {
+			log.Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
+			cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("failed to extract passwords: %w", err)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("wazuh-install-files.tar not found in expected paths")
 }
 
 func init() {
 	CreateCmd.AddCommand(CreateDelphiCmd)
-	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check (passes -i)")
-	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation (passes -o)")
+	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check")
+	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation")
 }

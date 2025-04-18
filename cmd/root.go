@@ -38,7 +38,7 @@ var RootCmd = &cobra.Command{
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
 		return cmd.Help()
 	}),
@@ -49,7 +49,7 @@ var HelpCmd = &cobra.Command{
 	Use:   "help",
 	Short: "Help about any command",
 	Long:  "Displays help for eos or a specific subcommand.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// If no arguments, show root help
 		if len(args) == 0 {
 			return RootCmd.Help()

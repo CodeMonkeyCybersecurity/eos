@@ -15,7 +15,7 @@ var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Update configuration files in conf.d",
 	Long:  `Recursively update configuration files in the conf.d directory by replacing placeholder variables.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("Running update config command")
 
 		// Display a header for the interactive update.

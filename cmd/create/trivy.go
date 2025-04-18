@@ -9,36 +9,43 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // installTrivy installs the Trivy vulnerability scanner.
-func installTrivy(cmd *cobra.Command, args []string) error {
-	// Example: install required packages, add Trivy repo, update package lists, install Trivy.
-	fmt.Println("Installing required packages...")
+func installTrivy(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := ctx.Log.Named("trivy-installer")
+	log.Info("📦 Starting Trivy installation")
+
+	log.Info("🔧 Installing required packages: wget, gnupg")
 	if err := exec.Command("apt-get", "install", "-y", "wget", "gnupg").Run(); err != nil {
+		log.Error("❌ Failed to install prerequisites", zap.Error(err))
 		return fmt.Errorf("failed to install required packages: %w", err)
 	}
 
-	fmt.Println("Adding Trivy public key and repository...")
-	// For example purposes, this is a placeholder command.
-	if err := exec.Command("bash", "-c", `
- wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - && 
- echo "deb https://aquasecurity.github.io/trivy-repo/deb stable main" > /etc/apt/sources.list.d/trivy.list
- `).Run(); err != nil {
+	log.Info("🔑 Adding Trivy GPG key and APT repository")
+	addRepoCmd := `
+	wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - && 
+	echo "deb https://aquasecurity.github.io/trivy-repo/deb stable main" > /etc/apt/sources.list.d/trivy.list
+	`
+	if err := exec.Command("bash", "-c", addRepoCmd).Run(); err != nil {
+		log.Error("❌ Failed to add Trivy APT repo", zap.Error(err))
 		return fmt.Errorf("failed to add Trivy repository: %w", err)
 	}
 
-	fmt.Println("Updating package lists...")
+	log.Info("🔄 Updating APT package lists")
 	if err := exec.Command("apt-get", "update").Run(); err != nil {
+		log.Error("❌ Failed to update package lists", zap.Error(err))
 		return fmt.Errorf("failed to update package lists: %w", err)
 	}
 
-	fmt.Println("Installing Trivy...")
+	log.Info("📦 Installing Trivy")
 	if err := exec.Command("apt-get", "install", "-y", "trivy").Run(); err != nil {
+		log.Error("❌ Failed to install Trivy", zap.Error(err))
 		return fmt.Errorf("failed to install Trivy: %w", err)
 	}
 
-	fmt.Println("Trivy installed successfully!")
+	log.Info("✅ Trivy installed successfully!")
 	return nil
 }
 

@@ -20,7 +20,7 @@ var UpdateCmd = &cobra.Command{
 	Short:   "Update resources (e.g., processes, users, storage)",
 	Long:    `The update command allows you to modify existing resources such as processes, users, or storage.`,
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

@@ -23,7 +23,7 @@ var TreecatCmd = &cobra.Command{
 	Use:   "treecat [path]",
 	Short: "Recursively show directory structure and preview file contents",
 	Args:  cobra.ExactArgs(1),
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		root := args[0]
 

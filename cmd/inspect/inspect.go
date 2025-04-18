@@ -23,7 +23,7 @@ var InspectCmd = &cobra.Command{
 	Short:   "Inspect resources (e.g., processes, users, storage)",
 	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
 	Aliases: []string{"read", "get", "list", "ls", "query"},
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

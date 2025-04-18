@@ -84,7 +84,7 @@ To confirm that your variable is set correctly, run:
    
 Then, run this command again.
      `,
-		RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+		RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 			// Basic validation
 			if domain == "" || ip == "" {
 				err := fmt.Errorf("domain and ip are required")

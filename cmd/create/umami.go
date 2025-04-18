@@ -29,7 +29,7 @@ var CreateUmamiCmd = &cobra.Command{
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
 - Informing the user to navigate to :8117 and log in with default credentials (admin/umami) and change the password immediately.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		log.Info("Starting Umami installation using Eos")
 

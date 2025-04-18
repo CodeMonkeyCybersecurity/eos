@@ -31,7 +31,7 @@ var CreateUserCmd = &cobra.Command{
 	Short: "Create a new Linux user",
 	Long: `Creates a new user account and optionally adds them to the admin group, 
 generates SSH keys, and sets a secure password.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return runCreateUser(cmd, args)
 	}),
 }

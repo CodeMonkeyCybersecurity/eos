@@ -17,7 +17,7 @@ import (
 var InspectCredentialsCmd = &cobra.Command{
 	Use:   "credentials",
 	Short: "List all Delphi (Wazuh) user credentials",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		cfg, err := delphi.ResolveConfig(log)
 		if err != nil {

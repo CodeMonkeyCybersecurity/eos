@@ -29,7 +29,7 @@ Supported OS uninstallers:
 - macOS: /Library/Ossec/uninstall.sh
 - Linux: apt-get, yum, or dnf depending on distribution
 - Windows: wmic + msiexec`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		if agentID == "" {
 			log.Error("Agent ID is required")

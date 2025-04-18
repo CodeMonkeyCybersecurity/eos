@@ -27,7 +27,7 @@ var CreateSSHCmd = &cobra.Command{
 	Short: "Create a FIPS-compliant SSH key and connect it to a remote host",
 	Long: `Generates a 2048-bit RSA key for FIPS compliance, installs it to a remote host using ssh-copy-id,
 and configures it in your ~/.ssh/config for easy reuse.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return runCreateSSH(cmd, args)
 	}),
 }

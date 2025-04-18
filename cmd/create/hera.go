@@ -31,7 +31,7 @@ var CreateHeraCmd = &cobra.Command{
 - Creating the external Docker network 'arachne-net'
 - Fixing directory ownership for proper volume permissions
 - Running docker compose up -d and displaying service status & access URL`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 		log.Info("🚀 Starting Hera (Authentik) deployment")
 

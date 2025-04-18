@@ -27,7 +27,7 @@ var PasswordCmd = &cobra.Command{
 	Short: "Update a Wazuh user's password",
 	Long: `Update the password of a Wazuh (Delphi) user using their username.
 Supports interactive confirmation and XDG-safe password storage if requested.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		if username == "" {

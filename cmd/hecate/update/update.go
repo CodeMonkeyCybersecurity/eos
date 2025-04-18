@@ -22,7 +22,7 @@ Examples:
   hecate update eos
   hecate update http
   hecate update docker-compose`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for update command.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
@@ -45,7 +45,7 @@ func init() {
 var runCertsCmd = &cobra.Command{
 	Use:   "certs",
 	Short: "Renew SSL certificates",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for certs command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()
 		return nil
@@ -56,7 +56,7 @@ var runCertsCmd = &cobra.Command{
 var runEosCmd = &cobra.Command{
 	Use:   "eos",
 	Short: "Update Eos system",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for eos command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()
 		return nil
@@ -67,7 +67,7 @@ var runEosCmd = &cobra.Command{
 var runHttpCmd = &cobra.Command{
 	Use:   "http",
 	Short: "Update HTTP configurations",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for http command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()
 		return nil

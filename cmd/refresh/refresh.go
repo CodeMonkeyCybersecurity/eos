@@ -14,7 +14,7 @@ var RefreshCmd = &cobra.Command{
 	Short:   "Refresh commands",
 	Long:    "Commands to refresh or reload components.",
 	Aliases: []string{"reload", "restart"},
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log = logger.L()
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

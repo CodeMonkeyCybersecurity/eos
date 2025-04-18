@@ -18,7 +18,7 @@ var DockerListenerCmd = &cobra.Command{
 	Use:   "docker-listener",
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",
 	Long:  `This command sets up a Python virtual environment and configures the Wazuh DockerListener to use it.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger, _ := zap.NewProduction()
 		defer logger.Sync()
 		sugar := logger.Sugar()

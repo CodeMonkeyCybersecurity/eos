@@ -24,7 +24,7 @@ var UpdateDelphiApiCmd = &cobra.Command{
 	Use:   "api",
 	Short: "Upgrade the Wazuh API configuration",
 	Long:  "Upgrade the Wazuh API configuration locally or across the cluster. Defaults to --local if no flag is set.",
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
 
 		// Default to --local if nothing is passed

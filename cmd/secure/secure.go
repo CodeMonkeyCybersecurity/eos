@@ -20,7 +20,7 @@ var SecureCmd = &cobra.Command{
 For example:
 	eos secure Trivy  - Secures the Trivy vulnerability scanner.`,
 
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil

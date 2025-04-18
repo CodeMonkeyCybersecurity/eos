@@ -17,7 +17,7 @@ var CreateCmd = &cobra.Command{
 	Short: "Create resources for Hecate",
 	Long: `The create command allows you to create specific resources
 needed for your Hecate deployment, such as certificates, proxy configurations, DNS records with Hetzner Cloud, etc.`,
-	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Instead of printing, use the centralized logger:
 		log.Info("Create command executed!",
 			zap.String("command", cmd.Name()),
