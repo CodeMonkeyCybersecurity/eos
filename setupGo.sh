@@ -19,7 +19,13 @@ fi
 
 # Download Go
 echo "⬇️  Downloading ${GO_URL}..."
-curl -O "$GO_URL"
+curl -LO "$GO_URL"
+
+# check download is valid
+file "$GO_TARBALL" | grep -q "gzip compressed data" || {
+  echo "❌ Error: Download failed or was not a valid tarball."
+  exit 1
+}
 
 # Extract
 echo "📦 Extracting ${GO_TARBALL}..."
