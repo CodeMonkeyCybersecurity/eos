@@ -46,9 +46,11 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		/* Create root client → SetupVault() */
-		client, err := vault.NewClient(log)
+		vault.EnsureVaultClient(log)
+
+		client, err := vault.GetVaultClient(log)
 		if err != nil {
-			log.Fatal("Failed to create Vault client", zap.Error(err))
+			log.Fatal("❌ Vault client could not be retrieved after EnsureVaultClient", zap.Error(err))
 		}
 
 		client, initRes, err := vault.SetupVault(client, log)
