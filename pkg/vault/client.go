@@ -4,7 +4,11 @@ package vault
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -18,9 +22,12 @@ func EnsureVaultClient(log *zap.Logger) {
 		log.Warn("⚠️ Failed to set Vault environment", zap.Error(err))
 	}
 
-	// Already initialized?
 	if client, err := GetVaultClient(log); err == nil && client != nil {
 		log.Debug("✅ Vault client already initialized")
+		// ✅ Validate it works
+		if err := CheckVaultHealth(log); err != nil {
+			log.Error("❌ Vault client is initialized, but Vault is not healthy", zap.Error(err))
+		}
 		return
 	}
 
@@ -29,6 +36,11 @@ func EnsureVaultClient(log *zap.Logger) {
 	if err == nil {
 		log.Info("✅ Vault client created from environment")
 		SetVaultClient(client, log)
+
+		// ✅ Validate health
+		if err := CheckVaultHealth(log); err != nil {
+			log.Error("❌ Vault created but health check failed", zap.Error(err))
+		}
 		return
 	}
 
@@ -46,6 +58,36 @@ func EnsureVaultClient(log *zap.Logger) {
 
 	log.Info("✅ Vault client initialized via privileged agent")
 	SetVaultClient(client, log)
+
+	// ✅ Validate health
+	if err := CheckVaultHealth(log); err != nil {
+		log.Error("❌ Vault agent is running but health check failed", zap.Error(err))
+	}
+}
+
+func CheckVaultHealth(log *zap.Logger) error {
+	addr := os.Getenv("VAULT_ADDR")
+	if addr == "" {
+		return fmt.Errorf("VAULT_ADDR not set")
+	}
+
+	healthURL := strings.TrimRight(addr, "/") + "/v1/sys/health"
+	client := http.Client{
+		Timeout: 5 * time.Second,
+	}
+	resp, err := client.Get(healthURL)
+	if err != nil {
+		log.Warn("❌ Could not reach Vault at VAULT_ADDR", zap.String("VAULT_ADDR", addr), zap.Error(err))
+		return fmt.Errorf("vault not responding at %s: %w", addr, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 500 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("vault unhealthy: %s", string(body))
+	}
+	log.Info("✅ Vault responded to health check", zap.String("VAULT_ADDR", addr))
+	return nil
 }
 
 func NewClient(log *zap.Logger) (*api.Client, error) {

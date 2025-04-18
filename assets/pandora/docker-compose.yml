@@ -7,9 +7,9 @@ services:
       - IPC_LOCK
     user: "100:100"  # Needed for permission to write /vault/data
     environment:
-      VAULT_ADDR: http://0.0.0.0:8200
+      VAULT_ADDR: http://0.0.0.0:8179
     ports:
-      - "127.0.0.1:8200:8200"
+      - "127.0.0.1:8179:8179"
     volumes:
       - vault-data:/vault/data
       - ./config:/vault/config

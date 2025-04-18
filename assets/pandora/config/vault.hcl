@@ -4,11 +4,11 @@ storage "raft" {
 }
 
 listener "tcp" {
-  address     = "0.0.0.0:8200"
+  address     = "0.0.0.0:8179"
   tls_disable = true
 }
 
-api_addr      = "http://vault:8200"
+api_addr      = "http://vault:8179"
 cluster_addr  = "http://vault:8201"
 disable_mlock = true
 ui            = true
