@@ -6,27 +6,32 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
+var revokeRoot bool
+
 var EnableVaultCmd = &cobra.Command{
-	Use:   "vault",
-	Short: "Enables Vault with sane and secure defaults",
+	Use:     "vault",
+	Aliases: []string{"Pandora"},
+	Short:   "Enables Vault with sane and secure defaults",
 	Long: `This command assumes "github.com/CodeMonkeyCybersecurity/eos install vault" has been run.
 It initializes and unseals Vault, sets up auditing, KV v2, 
 AppRole, userpass, and creates an eos user with a random password.`,
+
 	RunE: eos.Wrap(func(cmd *cobra.Command, args []string) error {
 		log.Info("[0/7] Starting Vault enable workflow")
 
-		// 0. Ensure Vault is installed
+		// Ensure Vault is installed
 		if err := vault.InstallVaultViaDnf(log); err != nil {
 			log.Error("Failed to install Vault", zap.Error(err))
 			return err
 		}
 
-		// 1. Set VAULT_ADDR
+		// Set VAULT_ADDR from hostname
 		addr, err := vault.EnsureVaultAddr(log)
 		if err != nil {
 			log.Error("Failed to set VAULT_ADDR", zap.Error(err))
@@ -34,12 +39,13 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 		log.Info("Set VAULT_ADDR from hostname", zap.String("VAULT_ADDR", addr))
 
-		// 2. Ensure Vault Agent is running (before attempting client connection)
-		if err := vault.EnsureVaultAgentRunning(log); err != nil {
-			log.Warn("Vault Agent not ready, some operations may fail", zap.Error(err))
+		/* Write agent config HCL only */
+		if err := vault.EnsureAgentConfig(addr, log); err != nil {
+			log.Error("Failed to write Vault Agent config", zap.Error(err))
+			return err
 		}
 
-		// 3. Get Vault client
+		/* Create root client → SetupVault() */
 		client, err := vault.NewClient(log)
 		if err != nil {
 			log.Fatal("Failed to create Vault client", zap.Error(err))
@@ -50,13 +56,57 @@ AppRole, userpass, and creates an eos user with a random password.`,
 			log.Error("Failed to initialize and unseal Vault", zap.Error(err))
 			return err
 		}
+
 		if initRes == nil {
-			log.Warn("Vault already initialized — skipping root-token workflows")
-			return fmt.Errorf("vault already initialized: no root token available")
+			log.Warn("Vault already initialized — attempting to load existing credentials")
+			initRes, _, _, _ = eos.ReadVaultSecureData(client, log)
 		}
 
-		// Remaining steps
-		log.Info("[1/7] Enabling file audit")
+		// Prompt the user (or reuse saved) unseal keys and root token
+		// Reuse secured Vault data (no prompt)
+		var (
+			storedHashes []string
+			hashedRoot   string
+		)
+
+		fallbackInitRes, rawCreds, storedHashes, hashedRoot := eos.ReadVaultSecureData(client, log)
+		if initRes == nil {
+			initRes = fallbackInitRes
+		}
+		client.SetToken(initRes.RootToken)
+
+		if rawCreds.Password == "" {
+			log.Warn("No stored credentials found — prompting for Vault eos password")
+			promptedCreds, err := vault.PromptForEosPassword(log)
+			if err != nil {
+				log.Error("Failed to get eos password from prompt", zap.Error(err))
+				return err
+			}
+			if promptedCreds != nil {
+				rawCreds = *promptedCreds
+			}
+		}
+
+		client.SetToken(initRes.RootToken)
+
+		log.Info("✅ Vault unsealed and authenticated as eos admin")
+
+		log.Info("Loading the stored initialization data and eos user credentials...")
+		vault.Check(client, log, storedHashes, hashedRoot)
+		log.Info("✅ Loaded the stored initialization data and eos user credentials")
+
+		/* Run EnsureVaultAgent with known password (not just check) */
+		if err := vault.EnsureVaultAgent(client, rawCreds.Password, log); err != nil {
+			log.Error("Failed to set up Vault Agent", zap.Error(err))
+			return err
+		}
+		log.Info("✅ Vault Agent setup complete")
+
+		/* Create client via agent token sink */
+		vault.SetVaultClient(client, log)
+
+		/* Apply audit, KV, AppRole, userpass, etc. */
+		log.Info("Enabling file audit")
 		if err := vault.EnableFileAudit(client, log); err != nil {
 			log.Error("Failed to enable file audit", zap.Error(err))
 			return err
@@ -94,10 +144,43 @@ AppRole, userpass, and creates an eos user with a random password.`,
 
 		log.Info("[7/7] Vault enable workflow complete")
 		fmt.Println("\n✅ Vault enable steps completed successfully!")
+
+		/* Apply admin policy */
+		log.Info("Applying permissive policy (eos-policy) via the API for eos system user...")
+		if err := vault.ApplyAdminPolicy(rawCreds, client, log); err != nil {
+			log.Error("Failed to apply admin policy", zap.Error(err))
+			return err
+		}
+		log.Info("✅ Policy applied")
+
+		/* Optionally revoke root token */
+		if revokeRoot {
+			log.Info("Revoking the root token now that the eos admin user has been configured...")
+			if err := vault.RevokeRootToken(client, initRes.RootToken, log); err != nil {
+				log.Error("Failed to revoke root token", zap.Error(err))
+				return err
+			}
+			log.Info("✅ Root token revoked")
+		} else {
+			log.Info("Skipping root token revocation — use --revoke-root to enable this step")
+			log.Info("🔐 Root token is still valid. Run `eos secure vault --revoke-root` when you're ready to revoke it.")
+		}
+
+		/*  Clean up vault_init file */
+		log.Info("Cleaning up the stored initialization file...")
+		system.Rm(vault.DiskPath("vault_init", log), "Vault init file", log)
+		log.Info("✅ Done")
+
+		/* Print next steps */
+		log.Info("Informing the user of the next steps...")
+		vault.PrintNextSteps()
+		log.Info("✅ Done")
+
 		return nil
 	}),
 }
 
 func init() {
 	EnableCmd.AddCommand(EnableVaultCmd)
+	EnableCmd.Flags().BoolVar(&revokeRoot, "revoke-root", false, "Revoke the root token after securing Vault")
 }

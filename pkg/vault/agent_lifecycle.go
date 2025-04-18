@@ -146,21 +146,6 @@ func EnsureRuntimeDir(log *zap.Logger) error {
 	return nil
 }
 
-func EnsureVaultAgentRunning(log *zap.Logger) error {
-	if err := EnsureAppRoleFiles(log); err != nil {
-		return err
-	}
-
-	cmd := exec.Command("systemctl", "is-active", "--quiet", "vault-agent-eos.service")
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("vault agent service is not active")
-	}
-	if _, err := os.Stat(VaultAgentTokenPath); err != nil {
-		return fmt.Errorf("vault token sink is missing")
-	}
-	return nil
-}
-
 func EnsureAppRoleFiles(log *zap.Logger) error {
 	paths := []string{"/etc/vault/role_id", "/etc/vault/secret_id"}
 	for _, path := range paths {
