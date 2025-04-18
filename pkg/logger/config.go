@@ -1,20 +1,25 @@
-/* pkg/logger/config.go */
+// pkg/logger/config.go
 
 package logger
 
 import (
 	"os"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-// DefaultConfig returns a sane default Zap config.
+// DefaultConfig returns a production-ready Zap config with sensible defaults.
 func DefaultConfig() zap.Config {
 	logPath := ResolveLogPath()
 	if logPath == "" {
 		logPath = "./eos.log"
 	}
+
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	encoderCfg.EncodeLevel = zapcore.CapitalLevelEncoder
 
 	return zap.Config{
 		Level:            zap.NewAtomicLevelAt(ParseLogLevel(os.Getenv("LOG_LEVEL"))),
@@ -22,11 +27,14 @@ func DefaultConfig() zap.Config {
 		Encoding:         "json",
 		OutputPaths:      []string{"stdout", logPath},
 		ErrorOutputPaths: []string{"stderr"},
-		EncoderConfig:    zap.NewDevelopmentEncoderConfig(),
+		EncoderConfig:    encoderCfg,
 	}
 }
 
+// ParseLogLevel maps string env input to zapcore.Level safely.
 func ParseLogLevel(level string) zapcore.Level {
+	level = strings.ToUpper(strings.TrimSpace(level))
+
 	switch level {
 	case "TRACE", "DEBUG":
 		return zapcore.DebugLevel

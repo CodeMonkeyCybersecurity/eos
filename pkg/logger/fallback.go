@@ -51,7 +51,10 @@ func InitializeWithFallback() {
 
 	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(log)
-	log.Info("Logger fallback initialized", zap.String("log_path", path))
+	log.Info("Logger fallback initialized",
+		zap.String("log_level", os.Getenv("LOG_LEVEL")),
+		zap.String("log_path", path),
+	)
 }
 
 func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {

@@ -12,17 +12,7 @@ import (
 
 var log *zap.Logger
 
-// InitFallback sets up an in-memory console logger and replaces globals.
-func InitFallback() {
-	log = NewFallbackLogger()
-	zap.ReplaceGlobals(log)
-}
-
-func L() *zap.Logger {
-	return GetLogger()
-}
-
-func InitializeWithConfig(cfg zap.Config) {
+func Initialize(cfg zap.Config) {
 	if log != nil {
 		return
 	}
@@ -44,6 +34,16 @@ func InitializeWithConfig(cfg zap.Config) {
 
 	zap.ReplaceGlobals(log)
 	log.Info("Logger initialized", zap.String("log_level", cfg.Level.String()))
+}
+
+// InitFallback sets up an in-memory console logger and replaces globals.
+func InitFallback() {
+	log = NewFallbackLogger()
+	zap.ReplaceGlobals(log)
+}
+
+func L() *zap.Logger {
+	return GetLogger()
 }
 
 func GetLogger() *zap.Logger {
