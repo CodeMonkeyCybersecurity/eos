@@ -65,7 +65,7 @@ func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse
 	initRes := *initResPtr
 
 	// Load eos user creds from fallback file
-	credsPtr, err := vault.ReadFallbackJSON[vault.UserpassCreds](vault.EosUserFallbackFile, log)
+	credsPtr, err := vault.ReadFallbackJSON[vault.UserpassCreds](vault.EosUserVaultFallback, log)
 	if err != nil {
 		log.Fatal("❌ Failed to read vault_userpass.json", zap.Error(err))
 	}

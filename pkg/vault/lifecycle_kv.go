@@ -149,7 +149,7 @@ func EnableFileAudit(client *api.Client, log *zap.Logger) error {
 		return fmt.Errorf("failed to list audit devices: %w", err)
 	}
 
-	if _, exists := audits[auditPath]; exists {
+	if _, exists := audits[auditID]; exists {
 		log.Info("Audit device already enabled at sys/audit/file. Skipping.")
 		return nil
 	}

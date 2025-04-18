@@ -107,7 +107,7 @@ func EnsureEosPassword(log *zap.Logger) (string, error) {
 
 	// 2. Try fallback file
 	var creds UserpassCreds
-	if err := ReadFallbackIntoJSON(EosUserFallbackFile, &creds, log); err == nil && creds.Password != "" {
+	if err := ReadFallbackIntoJSON(EosUserVaultFallback, &creds, log); err == nil && creds.Password != "" {
 		log.Info("🔐 Loaded eos Vault password from fallback file")
 		return creds.Password, nil
 	}
@@ -138,7 +138,7 @@ func EnsureEosPassword(log *zap.Logger) (string, error) {
 
 		// Save fallback
 		creds := UserpassCreds{Username: "eos", Password: pw1}
-		if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
+		if err := WriteFallbackJSON(EosUserVaultFallback, creds); err != nil {
 			log.Warn("⚠️ Failed to write eos fallback password", zap.Error(err))
 		} else {
 			log.Info("📦 eos Vault user password saved to fallback file")
@@ -201,10 +201,10 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 
 	// Persist fallback file locally
 	creds := UserpassCreds{Username: "eos", Password: password}
-	if err := WriteFallbackJSON(EosUserFallbackFile, creds); err != nil {
+	if err := WriteFallbackJSON(EosUserVaultFallback, creds); err != nil {
 		log.Warn("Failed to write fallback userpass secret", zap.Error(err))
 	} else {
-		log.Info("📦 eos Vault user fallback password saved", zap.String("path", EosUserFallbackFile))
+		log.Info("📦 eos Vault user fallback password saved", zap.String("path", EosUserVaultFallback))
 	}
 
 	// Persist in Vault KV (e.g. for web UI consumption or bootstrap reuse)

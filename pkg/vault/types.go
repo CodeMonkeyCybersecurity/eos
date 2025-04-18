@@ -16,20 +16,19 @@ var (
 	// Vault Secrets + Tokens
 	SecretsDir                = "/var/lib/eos/secrets"
 	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
-	VaultUserPath             = filepath.Join(SecretsDir, "vault_userpass.json")
 	AppRoleIDPath             = filepath.Join(SecretsDir, "vault_role_id")
 	AppSecretIDPath           = filepath.Join(SecretsDir, "vault_secret_id")
 	VaultAgentTokenPath       = "/run/eos/vault-agent-eos.token"
 	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
-	EosUserFallbackFile       = filepath.Join(SecretsDir, "vault_userpass.json")
+	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass.json")
 	vaultClient               *api.Client
+	PIDfile                   = "/run/eos/vault-agent.pid"
 )
 
 const (
 	// Vault Agent & Policy Paths
 	VaultAgentConfigPath = "/etc/vault-agent-eos.hcl"
 	VaultAgentPassPath   = "/etc/vault-agent-eos.pass"
-	VaultAgentUnitPath   = "/etc/systemd/system/vault-agent-eos.service"
 	EosVaultPolicy       = "eos-policy"
 
 	// AppRole-specific
@@ -37,15 +36,21 @@ const (
 	rolePath = "auth/approle/role/" + roleName
 
 	// Audit
-	auditPath = "file/"
-	mountPath = "sys/audit/" + auditPath
+	auditID   = "file/"
+	mountPath = "sys/audit/" + auditID
 
 	// Systemd paths
-	VaultConfigPath = "/etc/vault.d/vault.hcl"
+	VaultConfigPath       = "/etc/vault.d/vault.hcl"
+	VaultServicePath      = "/etc/systemd/system/vault.service"
+	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
 
 	//test path
 	VaultTestPath = "bootstrap/test"
 	EosUserSecret = "bootstrap/eos_user"
+
+	// client / listener paths
+	ListenerPort = "8179"
+	ListenerAddr = "127.0.0.1:8179"
 )
 
 type CheckReport struct {

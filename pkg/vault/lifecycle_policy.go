@@ -32,38 +32,37 @@ import (
 //
 
 func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
-	const configPath = "/etc/vault-agent-eos.hcl"
 
 	// ✅ Check for existing config first
-	if _, err := os.Stat(configPath); err == nil {
-		log.Info("✅ Vault Agent config already exists — skipping rewrite", zap.String("path", configPath))
+	if _, err := os.Stat(VaultAgentConfigPath); err == nil {
+		log.Info("✅ Vault Agent config already exists — skipping rewrite", zap.String("path", VaultAgentConfigPath))
 		return nil
 	}
 
 	// ✅ Check AppRole files exist
-	if _, err := os.Stat("/etc/vault/role_id"); err != nil {
+	if _, err := os.Stat(AppRoleIDPath); err != nil {
 		return fmt.Errorf("role_id not found: %w", err)
 	}
-	if _, err := os.Stat("/etc/vault/secret_id"); err != nil {
+	if _, err := os.Stat(AppSecretIDPath); err != nil {
 		return fmt.Errorf("secret_id not found: %w", err)
 	}
 
-	log.Info("✍️ Writing Vault Agent config file", zap.String("path", configPath))
+	log.Info("✍️ Writing Vault Agent config file", zap.String("path", VaultAgentConfigPath))
 
 	// Use dynamic Vault address and listener
 	content := fmt.Sprintf(`
-pid_file = "/run/eos/vault-agent.pid"
+pid_file = "%s"
 
 auto_auth {
   method "approle" {
     config = {
-      role_id_file_path   = "/etc/vault/role_id"
-      secret_id_file_path = "/etc/vault/secret_id"
+      role_id_file_path   = "%s"
+      secret_id_file_path = "%s"
     }
   }
   sink "file" {
     config = {
-      path = "/run/eos/vault-agent-eos.token"
+      path = "%s"
     }
   }
 }
@@ -73,19 +72,19 @@ vault {
 }
 
 listener "tcp" {
-  address     = "127.0.0.1:8179"
+  address     = "%s"
   tls_disable = true
 }
 
 cache {
   use_auto_auth_token = true
-}`, vaultAddr)
+}`, PIDfile, AppRoleIDPath, AppSecretIDPath, VaultAgentTokenPath, vaultAddr, ListenerAddr)
 
-	if err := os.WriteFile(configPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write Vault Agent config to %s: %w", configPath, err)
+	if err := os.WriteFile(VaultAgentConfigPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write Vault Agent config to %s: %w", VaultAgentConfigPath, err)
 	}
 
-	log.Info("✅ Vault Agent config written successfully", zap.String("path", configPath))
+	log.Info("✅ Vault Agent config written successfully", zap.String("path", VaultAgentConfigPath))
 	return nil
 }
 
