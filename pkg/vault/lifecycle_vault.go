@@ -140,7 +140,6 @@ func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
 	return nil
 }
 
-// phaseEnsureClientHealthy ensures that Vault is reachable and healthy.
 func phaseEnsureClientHealthy(log *zap.Logger) error {
 	log.Info("[4/6] Ensuring Vault client is available and healthy")
 
@@ -162,7 +161,7 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 		return fmt.Errorf("vault binary not installed or not in PATH")
 	}
 
-	// Optimistic probe if port is already open
+	// Fast optimistic probe if Vault is listening
 	if portInUse {
 		client, err := NewClient(log)
 		if err == nil {
@@ -174,13 +173,13 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 				}
 				return nil
 			}
-			log.Warn("⚠️ Vault client failed to respond, continuing to retry", zap.Error(err))
+			log.Warn("⚠️ Vault client failed to respond despite open port", zap.Error(err))
 		} else {
-			log.Warn("⚠️ Could not create Vault client despite port in use", zap.Error(err))
+			log.Warn("⚠️ Could not create Vault client despite open port", zap.Error(err))
 		}
 	}
 
-	// Retry connection 3 times with dot feedback
+	// Retry loop with loud cancellation
 	for i := 1; i <= 3; i++ {
 		log.Info("🔁 Vault health check attempt", zap.Int("attempt", i))
 
@@ -192,17 +191,17 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 		fmt.Println()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
 		client, err := NewClient(log)
 		if err != nil {
+			cancel()
 			log.Warn("Failed to create Vault client", zap.Error(err))
 			continue
 		}
 
 		log.Debug("📡 Pinging Vault", zap.String("VAULT_ADDR", client.Address()))
-
 		health, err := client.Sys().HealthWithContext(ctx)
+		cancel()
+
 		if err == nil {
 			log.Info("✅ Vault responded", zap.String("version", health.Version))
 			return nil
@@ -211,6 +210,7 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 		log.Warn("⚠️ Vault not responding yet", zap.Error(err))
 	}
 
+	log.Error("❌ Vault not responding after multiple attempts — giving up")
 	return fmt.Errorf("vault not responding after multiple attempts")
 }
 
