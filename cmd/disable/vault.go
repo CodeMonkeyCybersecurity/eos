@@ -1,78 +1,76 @@
-/* cmd/disable/disable.go */
-
+// cmd/disable/vault.go
 package disable
 
 import (
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
 var StopVaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Stops the Vault Agent and cleans up residual files",
-	Long: `Stops the vault-agent-eos.service, kills anything still bound to port 8179,
-and removes leftover files including config, runtime, and token sink artifacts.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("🛑 Stopping Vault Agent and cleaning up...")
-
-		// Step 1: Stop systemd service
-		if err := exec.Command("systemctl", "disable", "--now", "vault-agent-eos.service").Run(); err != nil {
-			log.Warn("Failed to disable vault-agent-eos.service", zap.Error(err))
-		} else {
-			log.Info("✅ Vault Agent service stopped and disabled")
-		}
-
-		// Step 2: Kill any process using port 8179
-		out, err := exec.Command("lsof", "-i", ":8179", "-t").Output()
-		if err == nil && len(out) > 0 {
-			for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-				if pid, err := strconv.Atoi(line); err == nil {
-					if killErr := exec.Command("kill", "-9", strconv.Itoa(pid)).Run(); killErr == nil {
-						log.Info("✅ Killed process using port 8179", zap.Int("pid", pid))
-					}
-				}
-			}
-		} else {
-			log.Info("ℹ️  No process found using port 8179")
-		}
-
-		// Step 3: Remove config and runtime artifacts
-		paths := []string{
-			"/etc/vault-agent-eos.hcl",
-			"/etc/vault-agent-eos.pass",
-			"/etc/systemd/system/vault-agent-eos.service",
-			"/etc/vault/role_id",
-			"/etc/vault/secret_id",
-			"/etc/vault",
-			"/run/eos",
-			"/var/lib/eos",
-		}
-
-		for _, path := range paths {
-			if err := os.RemoveAll(path); err == nil {
-				log.Info("🧹 Removed", zap.String("path", path))
-			}
-		}
-
-		// Step 4: Reload systemd
-		if err := exec.Command("systemctl", "daemon-reexec").Run(); err == nil {
-			log.Info("🔄 systemd reexec complete")
-		}
-		if err := exec.Command("systemctl", "daemon-reload").Run(); err == nil {
-			log.Info("🔄 systemd reload complete")
-		}
-
-		log.Info("✅ Vault Agent stopped and cleaned up.")
-		return nil
-	}),
+	Short: "Stops the Vault Agent and cleans residual files",
+	Long:  "Disables vault‑agent‑eos.service, kills anything on port 8179, then purges Vault runtime artefacts.",
+	RunE:  eos.Wrap(runStopVault),
 }
 
-func init() {
-	DisableCmd.AddCommand(StopVaultCmd)
+func init() { DisableCmd.AddCommand(StopVaultCmd) }
+
+// -----------------------------------------------------------------------------
+// implementation helpers
+// -----------------------------------------------------------------------------
+
+func runStopVault(ctx *eos.RuntimeContext, _ *cobra.Command, _ []string) error {
+	log := ctx.Log
+	log.Info("🛑 Stopping Vault Agent and cleaning up…")
+
+	// ① stop+disable the systemd unit
+	if err := systemctl("disable", "--now", vault.VaultAgentService); err != nil {
+		log.Warn("Failed to disable service", zap.String("unit", vault.VaultAgentService), zap.Error(err))
+	} else {
+		log.Info("✅ Service stopped & disabled", zap.String("unit", vault.VaultAgentService))
+	}
+
+	// ② kill anything still bound to VaultDefaultPort
+	if killed := killByPort(vault.VaultDefaultPort, log); killed == 0 {
+		log.Info("ℹ️  No process bound to "+vault.VaultDefaultPort, zap.String("port", vault.VaultDefaultPort))
+	}
+
+	// ③ purge runtime/config files via existing helper
+	removed, errs := vault.Purge("rhel", log) // distro param only matters for repo files
+	log.Info("🧹  File purge summary",
+		zap.Int("removed", len(removed)),
+		zap.Int("errors", len(errs)),
+	)
+
+	// ④ reload systemd once at the end
+	_ = systemctl("daemon-reexec")
+	_ = systemctl("daemon-reload")
+
+	log.Info("✅ Vault Agent stopped and cleaned")
+	return nil
+}
+
+// ------------------------ util helpers ---------------------------------------
+
+func systemctl(args ...string) error { return exec.Command("systemctl", args...).Run() }
+
+func killByPort(port string, log *zap.Logger) int {
+	out, err := exec.Command("lsof", "-i", ":"+port, "-t").Output()
+	if err != nil || len(out) == 0 {
+		return 0
+	}
+	pids := strings.Split(strings.TrimSpace(string(out)), "\n")
+	for _, p := range pids {
+		if pid, _ := strconv.Atoi(p); pid != 0 {
+			_ = exec.Command("kill", "-9", strconv.Itoa(pid)).Run()
+			log.Info("🔪 Killed process on port "+port, zap.Int("pid", pid))
+		}
+	}
+	return len(pids)
 }

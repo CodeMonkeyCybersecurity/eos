@@ -215,7 +215,7 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) error {
 
 // ------------------------ SYSTEMD ------------------------
 func EnsureSystemdUnit(log *zap.Logger) error {
-unit := fmt.Sprintf(`
+	unit := fmt.Sprintf(`
 [Unit]
 Description=Vault Agent (Eos)
 After=network.target
@@ -233,10 +233,10 @@ RuntimeDirectoryMode=%[5]d
 [Install]
 WantedBy=multi-user.target
 `,
-	EosRunDir, VaultAgentUser, VaultAgentGroup, VaultAgentConfigPath, VaultRuntimePerms,
-)
+		EosRunDir, VaultAgentUser, VaultAgentGroup, VaultAgentConfigPath, VaultRuntimePerms,
+	)
 
-if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), SystemdUnitFilePerms); err != nil {
+	if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), SystemdUnitFilePerms); err != nil {
 		log.Error("Failed to write Vault Agent systemd unit file",
 			zap.String("path", VaultAgentServicePath),
 			zap.Error(err),
@@ -244,15 +244,13 @@ if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n
 		return err
 	}
 	log.Debug("Systemd unit constants",
-	zap.String("unit_path", VaultAgentServicePath),
-	zap.String("user", VaultAgentUser),
-	zap.Int("runtime_dir_mode", VaultRuntimePerms),
+		zap.String("unit_path", VaultAgentServicePath),
+		zap.String("user", VaultAgentUser),
+		zap.Int("runtime_dir_mode", VaultRuntimePerms),
 	)
 	log.Info("✅ Systemd unit file written", zap.String("path", VaultAgentServicePath))
 	return nil
 }
-
-
 
 //
 // ========================== LIST ==========================
@@ -271,18 +269,17 @@ if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n
 //
 
 func killVaultAgentPort(log *zap.Logger) error {
-	const port = "8179"
-	log.Info("🔍 Checking for processes using Vault Agent port", zap.String("port", port))
+	log.Info("🔍 Checking for processes using Vault Agent port", zap.String("port", VaultDefaultPort))
 
-	out, err := exec.Command("lsof", "-i", ":"+port, "-t").Output()
+	out, err := exec.Command("lsof", "-i", ":"+VaultDefaultPort, "-t").Output()
 	if err != nil {
-		log.Info("✅ No process is using the Vault Agent port", zap.String("port", port))
+		log.Info("✅ No process is using the Vault Agent port", zap.String("port", VaultDefaultPort))
 		return nil
 	}
 
 	pids := strings.Split(strings.TrimSpace(string(out)), "\n")
 	if len(pids) == 0 || (len(pids) == 1 && pids[0] == "") {
-		log.Info("✅ Vault Agent port is already free", zap.String("port", port))
+		log.Info("✅ Vault Agent port is already free", zap.String("port", VaultDefaultPort))
 		return nil
 	}
 
@@ -295,7 +292,7 @@ func killVaultAgentPort(log *zap.Logger) error {
 		if err := exec.Command("kill", "-9", pid).Run(); err != nil {
 			log.Warn("❌ Failed to kill process", zap.String("pid", pid), zap.Error(err))
 		} else {
-			log.Info("✅ Killed process using port", zap.String("pid", pid), zap.String("port", port))
+			log.Info("✅ Killed process using port", zap.String("pid", pid), zap.String("port", VaultDefaultPort))
 		}
 	}
 

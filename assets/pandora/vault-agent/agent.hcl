@@ -17,5 +17,5 @@ auto_auth {
 }
 
 vault {
-  address = "http://vault:8179"
+  address = $VaultDefaultAddr
 }

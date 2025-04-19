@@ -62,8 +62,6 @@ var VaultPurgePaths = []string{
 //
 
 const (
-
-
 	EosUser              = "eos"
 	EosGroup             = "eos"
 	VaultAgentUser       = EosUser
@@ -72,14 +70,16 @@ const (
 	SystemdUnitFilePerms = 0644
 	VaultAgentService    = "vault-agent-eos.service"
 
-	
 	// Config paths
 	VaultConfigDirDebian = "/etc/vault.d"
 	VaultConfigDirSnap   = "/var/snap/vault/common"
 	VaultDataPath        = "/opt/vault/data"
-	VaultDefaultPort     = "8179"
-	VaultDefaultAddr     = "http://127.0.0.1:8179"
 	VaultConfigFileName  = "config.hcl"
+
+	// client / listener paths
+	ListenerAddr     = "127.0.0.1:8179"
+	VaultDefaultPort = "8179"
+	VaultDefaultAddr = "http://%s:8179"
 
 	binaryPath = "/usr/bin/vault"
 
@@ -119,9 +119,6 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 	EosVaultUsername   = "eos"
 	EosVaultUserPath   = "secret/users/eos"
 	UserpassPathPrefix = "auth/userpass/users/"
-
-	// client / listener paths
-	ListenerAddr = "127.0.0.1:8179"
 
 	VaultFieldUsername = "username" // shared across Vault, LDAP, UI
 	VaultFieldPassword = "password"

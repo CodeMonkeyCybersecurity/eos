@@ -91,7 +91,7 @@ func phasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 	content := string(data)
 
 	// Skip if already using the correct port
-	if strings.Contains(content, "8179") {
+	if strings.Contains(content, VaultDefaultPort) {
 		log.Info("✅ Vault config already uses port 8179 — no patch needed")
 		return nil
 	}
@@ -99,7 +99,7 @@ func phasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 	// Replace 8200 with 8179
 	if strings.Contains(content, "8200") {
 		log.Warn("🔧 Vault config uses port 8200 — patching to 8179")
-		newContent := strings.ReplaceAll(content, "8200", "8179")
+		newContent := strings.ReplaceAll(content, "8200", VaultDefaultPort)
 		if err := os.WriteFile(VaultConfigPath, []byte(newContent), 0644); err != nil {
 			return fmt.Errorf("failed to write patched Vault config: %w", err)
 		}
@@ -142,60 +142,92 @@ func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
 	return nil
 }
 
+// phaseEnsureClientHealthy makes sure we can reach a healthy Vault
+// instance, and if not, attempts init / unseal flows automatically.
 func phaseEnsureClientHealthy(log *zap.Logger) error {
 	log.Info("[4/6] Ensuring Vault client is available and healthy")
 
-	// Check for any process on 8179
-	output, err := exec.Command("lsof", "-i", ":8179").Output()
-	if err == nil && len(output) > 0 {
-		log.Info("📡 Detected process on port 8179", zap.String("output", string(output)))
+	//--------------------------------------------------------------------
+	// 0. Fast‑path: is something already listening on 8179 as eos/vault?
+	//--------------------------------------------------------------------
+	if out, _ := exec.Command("lsof", "-i", VaultDefaultPort).Output(); len(out) > 0 {
+		log.Info("📡 Detected process on port 8179",
+			zap.String("output", string(out)))
 
-		// Check if it's Vault running as eos
-		lines := strings.Split(string(output), "\n")
-		for _, line := range lines {
-			if strings.Contains(line, "vault") && strings.Contains(line, "eos") {
-				log.Info("✅ Detected Vault already running as 'eos' on port 8179 — skipping health check")
+		for _, line := range strings.Split(string(out), "\n") {
+			if strings.Contains(line, "vault") && strings.Contains(line, EosUser) {
+				log.Info("✅ Vault already running as 'eos' – skipping health loop")
 				return nil
 			}
 		}
-
-		log.Info("ℹ️ Port 8179 in use but not by Vault/eos — continuing with health check")
+		log.Info("ℹ️ Port 8179 is in use (but not vault:eos) – continuing with SDK check")
 	}
 
-	// Vault address sanity check
+	//--------------------------------------------------------------------
+	// 1.  Sanity: VAULT_ADDR and binary
+	//--------------------------------------------------------------------
 	if _, err := EnsureVaultAddr(log); err != nil {
 		return fmt.Errorf("could not determine Vault address: %w", err)
 	}
-
-	// Check if Vault binary exists
 	if _, err := exec.LookPath("vault"); err != nil {
-		return fmt.Errorf("vault binary not installed or not in PATH")
+		return fmt.Errorf("vault binary not installed or not in $PATH")
 	}
 
-	// Try to ping the Vault health endpoint via SDK
+	//--------------------------------------------------------------------
+	// 2.  Health‑check / bootstrap loop (max 5 attempts)
+	//--------------------------------------------------------------------
 	client, err := NewClient(log)
 	if err != nil {
 		return fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
-	log.Info("📡 Pinging Vault health endpoint")
+	for attempt := 1; attempt <= 5; attempt++ {
+		log.Info("🔁 Vault health probe",
+			zap.Int("attempt", attempt))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		resp, err := client.Sys().HealthWithContext(ctx)
+		cancel() // no defer inside the loop
 
-	health, err := client.Sys().HealthWithContext(ctx)
-	if err != nil {
-		log.Error("❌ Vault health check failed", zap.Error(err))
-		log.Warn("💡 Tip: Vault may not be running or is stuck")
-		return fmt.Errorf("vault not responding: %w", err)
+		if err != nil {
+			log.Warn("🔌 Health request failed – retrying",
+				zap.Error(err))
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		switch {
+		case resp.Initialized && !resp.Sealed && !resp.Standby: // healthy & unsealed
+			log.Info("✅ Vault is initialised and unsealed",
+				zap.String("version", resp.Version))
+			return nil
+
+		case !resp.Initialized: // not initialised
+			log.Info("ℹ️ Vault reports uninitialised (501) – running init flow")
+			if err := initAndUnseal(client, log); err != nil {
+				return fmt.Errorf("init/unseal failed: %w", err)
+			}
+			return nil
+
+		case resp.Initialized && resp.Sealed: // sealed
+			log.Info("🔒 Vault reports sealed (503) – attempting auto‑unseal")
+			if err := unsealFromStoredKeys(client, log); err != nil {
+				return fmt.Errorf("auto‑unseal failed: %w", err)
+			}
+			return nil
+
+		case resp.Standby: // standby
+			log.Info("🟡 Vault is in standby – treating as healthy for CLI")
+			return nil
+
+		default:
+			log.Warn("⚠️ Unexpected health state",
+				zap.Any("response", resp))
+			time.Sleep(2 * time.Second)
+		}
 	}
 
-	log.Info("✅ Vault responded", zap.Any("health", health))
-	if health.Sealed {
-		log.Info("🔒 Vault is sealed", zap.String("version", health.Version))
-	}
-
-	return nil
+	return fmt.Errorf("vault not healthy after multiple attempts")
 }
 
 func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
@@ -349,16 +381,18 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 
 	// Step 2: Attempt initialization with timeout
 	log.Debug("⏱️ Creating context for Vault init with 10s timeout")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	initReq := &api.InitRequest{
+	initRes, err := client.Sys().InitWithContext(ctx, &api.InitRequest{
 		SecretShares:    5,
 		SecretThreshold: 3,
+	})
+	if err != nil {
+		// handle 400 (already initialised) vs real errors here
 	}
 
 	log.Info("🧪 Attempting Vault initialization")
-	initRes, err := client.Sys().InitWithContext(ctx, initReq)
 	if err != nil {
 		// Already initialized — fallback to reuse
 		if IsAlreadyInitialized(err, log) {
@@ -471,6 +505,29 @@ func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.
 	log.Info("📦 Vault init result written to Vault backend")
 	return nil
 }
+
+// initAndUnseal is called when /sys/health returns 501 (not initialised).
+// It simply feeds the flow into your existing SetupVault helper.
+func initAndUnseal(c *api.Client, log *zap.Logger) error {
+	_, _, err := SetupVault(c, log) // returns (client, initRes, error)
+	return err
+}
+
+// unsealFromStoredKeys is called when /sys/health returns 503 (sealed).
+// We load the stored vault_init.json (or prompt) and unseal.
+func unsealFromStoredKeys(c *api.Client, log *zap.Logger) error {
+	initRes, err := LoadInitResultOrPrompt(c, log)
+	if err != nil {
+		return fmt.Errorf("could not load stored unseal keys: %w", err)
+	}
+	if err := UnsealVault(c, initRes, log); err != nil {
+		return fmt.Errorf("auto‑unseal failed: %w", err)
+	}
+	// give the client a token so later calls work
+	c.SetToken(initRes.RootToken)
+	return nil
+}
+
 //
 // ========================== LIST ==========================
 //
@@ -559,14 +616,14 @@ func TryPatchVaultPortIfNeeded(log *zap.Logger) {
 	content := string(b)
 
 	// Bail if already using 8179
-	if strings.Contains(content, "8179") {
+	if strings.Contains(content, VaultDefaultPort) {
 		log.Info("Vault config already uses port 8179 — no need to patch")
 		return
 	}
 
 	// Check if 8200 is hardcoded and replace
 	if strings.Contains(content, "8200") {
-		newContent := strings.ReplaceAll(content, "8200", "8179")
+		newContent := strings.ReplaceAll(content, "8200", VaultDefaultPort)
 		if err := os.WriteFile(VaultConfigPath, []byte(newContent), 0644); err != nil {
 			log.Error("Failed to patch Vault config file", zap.Error(err))
 			return
