@@ -33,9 +33,15 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error
 		return fmt.Errorf("tls-gen: %w", err)
 	}
 
+	// trust our self‑signed CA system‑wide
+	if err := TrustVaultCA(log); err != nil {
+		log.Warn("continuing despite CA‑trust install failure", zap.Error(err))
+	}
+
 	if err := phaseInstallVault(log); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
+
 	if err := phasePatchVaultConfigIfNeeded(log); err != nil {
 		return fmt.Errorf("patch-config: %w", err)
 	}
