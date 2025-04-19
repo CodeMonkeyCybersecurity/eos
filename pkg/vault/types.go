@@ -139,16 +139,17 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 //
 
 var Policies = map[string]string{
-	EosVaultPolicy: `
+    EosVaultPolicy: `
   # KV‑v2 data read/write
   path "secret/data/*"      { capabilities = ["create","read","update","delete"] }
   # KV‑v2 metadata (for list)
   path "secret/metadata/*"  { capabilities = ["list"] }
-  # Allow the CLI to discover mounts
-  path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
-  `,
-  }
 
+  # Allow the CLI/agent to discover mounts (one or two levels)
+  path "sys/internal/ui/mounts/*"    { capabilities = ["read"] }
+  path "sys/internal/ui/mounts/*/*"  { capabilities = ["read"] }
+  `,
+}
 var (
 	// Vault Secrets + Tokens
 	SecretsDir                = "/var/lib/eos/secrets"
