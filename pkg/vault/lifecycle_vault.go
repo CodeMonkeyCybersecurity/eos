@@ -340,12 +340,15 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 	log.Info("⚙️ Starting Vault setup")
 
 	// Step 1: Ensure required directories exist
+	log.Debug("🔍 Ensuring Vault support directories exist")
 	if err := EnsureVaultDirs(log); err != nil {
 		log.Error("❌ Vault directory setup failed", zap.Error(err))
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("vault directory setup failed: %w", err)
 	}
+	log.Info("📁 Vault directories verified")
 
-	// Step 2: Attempt initialization (with 10s timeout)
+	// Step 2: Attempt initialization with timeout
+	log.Debug("⏱️ Creating context for Vault init with 10s timeout")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -357,34 +360,47 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 	log.Info("🧪 Attempting Vault initialization")
 	initRes, err := client.Sys().InitWithContext(ctx, initReq)
 	if err != nil {
+		// Already initialized — fallback to reuse
 		if IsAlreadyInitialized(err, log) {
-			log.Info("ℹ️ Vault already initialized — attempting reuse")
+			log.Info("ℹ️ Vault already initialized — attempting reuse via fallback")
 
 			initRes, err := LoadInitResultOrPrompt(client, log)
 			if err != nil {
 				log.Error("❌ Failed to reuse init result", zap.Error(err))
+				log.Warn("💡 Run `eos enable vault` on a fresh Vault to regenerate fallback data")
 				return nil, nil, fmt.Errorf("vault already initialized and fallback failed: %w", err)
 			}
 
+			log.Debug("🔓 Reusing init result — attempting unseal + persist")
 			if err := finalizeVaultSetup(client, initRes, log); err != nil {
-				return nil, nil, err
+				log.Error("❌ Failed to finalize Vault setup from fallback", zap.Error(err))
+				return nil, nil, fmt.Errorf("failed to finalize reused Vault setup: %w", err)
 			}
 
+			log.Info("✅ Vault setup finalized from fallback")
 			return client, initRes, nil
 		}
 
+		// Unknown error: surface context-related issues clearly
 		log.Error("❌ Vault initialization failed", zap.Error(err))
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Warn("💡 Vault init timed out — ensure Vault server is responding and unsealed")
+		}
+		// log.Fatal("🔥 Vault unreachable — setup cannot continue") // optional if retry logic is elsewhere
 		return nil, nil, fmt.Errorf("vault init error: %w", err)
 	}
 
-	// Step 3: New Vault instance — unseal and store
+	// Step 3: New instance — unseal and persist
 	log.Info("🎉 Vault successfully initialized")
+	log.Debug("🔐 Dumping init result to memory")
 	DumpInitResult(initRes, log)
 
 	if err := finalizeVaultSetup(client, initRes, log); err != nil {
-		return nil, nil, err
+		log.Error("❌ Final Vault setup failed", zap.Error(err))
+		return nil, nil, fmt.Errorf("vault finalize setup error: %w", err)
 	}
 
+	log.Info("✅ Vault setup completed and ready")
 	return client, initRes, nil
 }
 
@@ -429,22 +445,32 @@ func EnsureVaultDirs(log *zap.Logger) error {
 }
 
 func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
+	log.Info("🔐 Finalizing Vault setup")
+
+	// Step 1: Attempt unseal
+	log.Debug("🔓 Attempting to unseal Vault using init result")
 	if err := UnsealVault(client, initRes, log); err != nil {
 		log.Error("❌ Failed to unseal Vault", zap.Error(err))
+		log.Warn("💡 Make sure Vault is running and the unseal keys are correct")
 		return fmt.Errorf("failed to unseal vault: %w", err)
 	}
+	log.Info("✅ Vault unsealed successfully")
 
+	// Step 2: Set root token
+	log.Debug("🔑 Setting root token on Vault client")
 	client.SetToken(initRes.RootToken)
 
+	// Step 3: Write init result for future reuse
+	log.Debug("💾 Persisting Vault init result")
 	if err := Write(client, "vault_init", initRes, log); err != nil {
-		log.Warn("⚠️ Failed to persist Vault init result", zap.Error(err))
-	} else {
-		log.Info("💾 Vault init result persisted")
+		log.Error("❌ Failed to persist Vault init result", zap.Error(err))
+		log.Warn("💡 This will require re-unsealing on next run if not stored")
+		return fmt.Errorf("failed to persist init result: %w", err)
 	}
 
+	log.Info("📦 Vault init result written to Vault backend")
 	return nil
 }
-
 //
 // ========================== LIST ==========================
 //
