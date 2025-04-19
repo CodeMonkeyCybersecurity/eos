@@ -144,8 +144,10 @@ var Policies = map[string]string{
   path "secret/data/*"      { capabilities = ["create","read","update","delete"] }
   # KV‑v2 metadata (for list)
   path "secret/metadata/*"  { capabilities = ["list"] }
+  # Allow the CLI to discover mounts
+  path "sys/internal/ui/mounts/*" { capabilities = ["read"] }
   `,
-}
+  }
 
 var (
 	// Vault Secrets + Tokens
