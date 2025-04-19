@@ -336,57 +336,54 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 	return nil
 }
 
-/* Initialize Vault (if not already initialized) */
 func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
-	fmt.Println("\nInitializing Vault...")
+	log.Info("⚙️ Starting Vault setup")
 
+	// Step 1: Ensure required directories exist
 	if err := EnsureVaultDirs(log); err != nil {
-		log.Error("Runtime dir missing or invalid", zap.Error(err))
+		log.Error("❌ Vault directory setup failed", zap.Error(err))
 		return nil, nil, err
 	}
 
-	initRes, err := client.Sys().Init(&api.InitRequest{
+	// Step 2: Attempt initialization (with 10s timeout)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	initReq := &api.InitRequest{
 		SecretShares:    5,
 		SecretThreshold: 3,
-	})
+	}
+
+	log.Info("🧪 Attempting Vault initialization")
+	initRes, err := client.Sys().InitWithContext(ctx, initReq)
 	if err != nil {
 		if IsAlreadyInitialized(err, log) {
-			fmt.Println("✅ Vault already initialized.")
+			log.Info("ℹ️ Vault already initialized — attempting reuse")
 
-			// ✨ Reuse fallback or prompt logic
 			initRes, err := LoadInitResultOrPrompt(client, log)
 			if err != nil {
-				return nil, nil, fmt.Errorf("vault already initialized and fallback failed: %w\n💡 Run `eos enable vault` on a fresh Vault to reinitialize and regenerate fallback data", err)
+				log.Error("❌ Failed to reuse init result", zap.Error(err))
+				return nil, nil, fmt.Errorf("vault already initialized and fallback failed: %w", err)
 			}
 
-			// 🔓 Unseal and auth
-			if err := UnsealVault(client, initRes, log); err != nil {
-				return nil, nil, fmt.Errorf("failed to unseal already-initialized Vault: %w", err)
+			if err := finalizeVaultSetup(client, initRes, log); err != nil {
+				return nil, nil, err
 			}
-			client.SetToken(initRes.RootToken)
 
-			// ✅ Re-store init result
-			if err := Write(client, "vault_init", initRes, log); err != nil {
-				log.Warn("Failed to persist Vault init result", zap.Error(err))
-			} else {
-				fmt.Println("✅ Vault init result persisted successfully")
-			}
 			return client, initRes, nil
 		}
-		return nil, nil, fmt.Errorf("init failed: %w", err)
+
+		log.Error("❌ Vault initialization failed", zap.Error(err))
+		return nil, nil, fmt.Errorf("vault init error: %w", err)
 	}
 
-	// 🆕 Vault just initialized: unseal and persist
+	// Step 3: New Vault instance — unseal and store
+	log.Info("🎉 Vault successfully initialized")
 	DumpInitResult(initRes, log)
-	if err := UnsealVault(client, initRes, log); err != nil {
+
+	if err := finalizeVaultSetup(client, initRes, log); err != nil {
 		return nil, nil, err
 	}
-	client.SetToken(initRes.RootToken)
-
-	if err := Write(client, "vault_init", initRes, log); err != nil {
-		return nil, nil, fmt.Errorf("failed to persist Vault init result: %w", err)
-	}
-	fmt.Println("✅ Vault init result persisted successfully")
 
 	return client, initRes, nil
 }
@@ -426,6 +423,23 @@ func EnsureVaultDirs(log *zap.Logger) error {
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
+	if err := UnsealVault(client, initRes, log); err != nil {
+		log.Error("❌ Failed to unseal Vault", zap.Error(err))
+		return fmt.Errorf("failed to unseal vault: %w", err)
+	}
+
+	client.SetToken(initRes.RootToken)
+
+	if err := Write(client, "vault_init", initRes, log); err != nil {
+		log.Warn("⚠️ Failed to persist Vault init result", zap.Error(err))
+	} else {
+		log.Info("💾 Vault init result persisted")
 	}
 
 	return nil
