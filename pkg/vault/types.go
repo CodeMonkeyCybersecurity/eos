@@ -18,7 +18,7 @@ import (
 //
 
 const (
-	TLSDir = "/opt/vault/tls"
+	TLSDir = "/opt/vault/tls/"
 	TLSKey = TLSDir + "tls.key"
 	TLSCrt = TLSDir + "tls.crt"
 
