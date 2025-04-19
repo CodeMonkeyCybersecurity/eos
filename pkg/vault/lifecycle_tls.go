@@ -1,4 +1,4 @@
-// lifecycle_tls.go
+// pkg/vault/lifecycle_tls.go
 
 package vault
 
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"go.uber.org/zap"
 )
@@ -48,10 +49,6 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 
 	log.Info("🔐 Generating Vault TLS certificate (simple mode)", zap.String("CN", hostname))
 
-	if err := os.MkdirAll(TLSDir, xdg.DirPermStandard); err != nil {
-		return fmt.Errorf("failed to create TLS dir: %w", err)
-	}
-
 	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096",
 		"-days", "825", "-nodes", "-x509",
 		"-subj", "/CN="+hostname,
@@ -68,17 +65,9 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 
 	// Permissions and ownership
 	log.Info("🔐 Securing Vault TLS certs...")
-	if err := os.Chown(TLSKey, 990, 990); err != nil { // assuming vault:vault = 990:990
-		log.Warn("could not chown tls.key", zap.Error(err))
-	}
-	if err := os.Chown(TLSCrt, 990, 990); err != nil {
-		log.Warn("could not chown tls.crt", zap.Error(err))
-	}
-	if err := os.Chmod(TLSKey, xdg.FilePermOwnerReadWrite); err != nil {
-		log.Warn("could not chmod tls.key", zap.Error(err))
-	}
-	if err := os.Chmod(TLSCrt, xdg.FilePermOwnerReadWrite); err != nil {
-		log.Warn("could not chmod tls.crt", zap.Error(err))
+
+	if err := secureVaultTLSOwnership(log); err != nil {
+		log.Warn("could not apply correct ownership to TLS certs", zap.Error(err))
 	}
 
 	log.Info("✅ Vault TLS cert generated and secured", zap.String("key", TLSKey), zap.String("crt", TLSCrt))
@@ -128,5 +117,37 @@ func fixTLSCertIfMissingSAN(log *zap.Logger) error {
 
 	resp.Body.Close()
 	log.Debug("✅ TLS cert appears valid – continuing")
+	return nil
+}
+
+func secureVaultTLSOwnership(log *zap.Logger) error {
+	uid, gid, err := system.LookupUser("vault")
+	if err != nil {
+		log.Warn("could not lookup vault user", zap.Error(err))
+		return err
+	}
+
+	// Set ownership
+	if err := os.Chown(TLSKey, uid, gid); err != nil {
+		log.Warn("failed to chown tls.key", zap.Error(err))
+	}
+	if err := os.Chown(TLSCrt, uid, gid); err != nil {
+		log.Warn("failed to chown tls.crt", zap.Error(err))
+	}
+	if err := os.Chown(TLSDir, uid, gid); err != nil {
+		log.Warn("failed to chown tls dir", zap.Error(err))
+	}
+
+	if err := os.Chmod(TLSKey, xdg.FilePermOwnerReadWrite); err != nil {
+		log.Warn("could not chmod tls.key", zap.Error(err))
+	}
+	if err := os.Chmod(TLSCrt, xdg.FilePermPublicCert); err != nil {
+		log.Warn("could not chmod tls.crt", zap.Error(err))
+	}
+
+	if err := os.Chmod(TLSDir, xdg.FilePermOwnerRWX); err != nil {
+		log.Warn("could not chmod tls.key", zap.Error(err))
+	}
+
 	return nil
 }

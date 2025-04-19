@@ -237,7 +237,7 @@ WantedBy=multi-user.target
 		EosRunDir, VaultAgentUser, VaultAgentGroup, VaultAgentConfigPath, xdg.VaultRuntimePerms,
 	)
 
-	if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), xdg.SystemdUnitFilePerms); err != nil {
+	if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), xdg.FilePermPublicCert); err != nil {
 		log.Error("Failed to write Vault Agent systemd unit file",
 			zap.String("path", VaultAgentServicePath),
 			zap.Error(err),
