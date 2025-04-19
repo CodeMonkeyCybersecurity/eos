@@ -14,21 +14,95 @@ import (
 	"go.uber.org/zap"
 )
 
-//
-// ========================== ENSURE ==========================
-//
+// EnsureKVv2Enabled makes sure the KV‑v2 secrets engine is mounted at mountPath.
+func EnsureKVv2Enabled(client *api.Client, mountPath string, log *zap.Logger) error {
+	log.Info("➕ Ensuring KV‑v2 secrets engine", zap.String("path", mountPath))
 
-//
-// ========================== LIST ==========================
-//
+	// Vault mounts always include a trailing slash in the map key
+	normalized := strings.TrimSuffix(mountPath, "/") + "/"
 
-//
-// ========================== READ ==========================
-//
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return fmt.Errorf("could not list mounts: %w", err)
+	}
+	if m, ok := mounts[normalized]; ok {
+		if m.Type == "kv" && m.Options["version"] == "2" {
+			log.Info("✅ KV‑v2 already enabled", zap.String("path", mountPath))
+			return nil
+		}
+		// if it’s kv v1, we’ll unmount then re‑enable v2
+		if m.Type == "kv" {
+			log.Warn("🔄 KV engine mounted as v1, unmounting to reconfigure v2", zap.String("path", mountPath))
+			if err := client.Sys().Unmount(mountPath); err != nil {
+				return fmt.Errorf("failed to unmount existing KV v1 at %s: %w", mountPath, err)
+			}
+		}
+	}
 
-//
-// ========================== UPDATE ==========================
-//
+	// enable KV v2
+	if err := client.Sys().Mount(mountPath, &api.MountInput{
+		Type:    "kv",
+		Options: map[string]string{"version": "2"},
+	}); err != nil {
+		return fmt.Errorf("failed to enable KV‑v2 at %s: %w", mountPath, err)
+	}
+	log.Info("✅ KV‑v2 enabled", zap.String("path", mountPath))
+	return nil
+}
+
+// BootstrapKV puts a little “ok” into secret/bootstrap/test.
+func BootstrapKV(client *api.Client, kvPath string, log *zap.Logger) error {
+	log.Info("🧪 Writing bootstrap secret", zap.String("path", kvPath))
+
+	// get a KV v2 client for the "secret/" mount
+	kvClient := client.KVv2(strings.TrimSuffix(KVNamespaceSecrets, "/"))
+
+	// debug: show exactly what we're about to write
+	payload := map[string]interface{}{"value": "ok"}
+	log.Debug("🔃 KV v2 put",
+		zap.String("mount", strings.TrimSuffix(KVNamespaceSecrets, "/")),
+		zap.String("path", kvPath),
+		zap.Any("data", payload),
+	)
+
+	// ignore the returned *KVSecret, just catch the error
+	if _, err := kvClient.Put(context.Background(), kvPath, payload); err != nil {
+		log.Error("❌ Failed to write bootstrap secret",
+			zap.String("path", kvPath),
+			zap.Error(err),
+		)
+		return fmt.Errorf("failed to write bootstrap secret at %s: %w", kvPath, err)
+	}
+
+	log.Info("✅ Bootstrap secret written", zap.String("path", kvPath))
+	return nil
+}
+
+// EnsureAppRoleAuth enables the AppRole auth method and provisions the eos‑role.
+func EnsureAppRoleAuth(client *api.Client, log *zap.Logger) error {
+	// 1) Enable the approle auth method if not already
+	log.Info("➕ Enabling AppRole auth method")
+	if err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"}); err != nil {
+		if !strings.Contains(err.Error(), "path is already in use") {
+			return fmt.Errorf("failed to enable approle auth: %w", err)
+		}
+	}
+	log.Info("✅ AppRole auth method is enabled")
+
+	// 2) Create the role
+	log.Info("🛠 Provisioning AppRole", zap.String("role", roleName))
+	_, err := client.Logical().Write(rolePath, map[string]interface{}{
+		"policies":      []string{EosVaultPolicy},
+		"token_ttl":     "4h",
+		"token_max_ttl": "24h",
+		"secret_id_ttl": "24h",
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create AppRole %s: %w", roleName, err)
+	}
+	log.Info("✅ AppRole provisioned", zap.String("role", roleName))
+	return nil
+}
 
 // VaultUpdate reads existing secret and applies a patch map
 func UpdateVault(path string, update map[string]interface{}, log *zap.Logger) error {

@@ -50,13 +50,26 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error
 		return fmt.Errorf("init-unseal: %w", err)
 	}
 
-	/* 🔽 Slot these *after* Vault is initialized
-	//if err := stepEnableKVAndPolicy(client, log); err != nil { ... }        // step 3
-	//if err := stepProvisionAppRole(client, log); err != nil { ... }        // step 4
-	if err := stepWriteAgentConfig(log); err != nil { ... }                // step 5 (agent hcl)
-	if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
-	if err := stepCopyCA(log); err != nil { ... }                           // step 6
-	if err := stepWaitForAgentToken(log); err != nil { ... }
+	// ─────────── BOOTSTRAP KV & POLICY ───────────
+	if err := EnsureKVv2Enabled(client, strings.TrimSuffix(KVNamespaceSecrets, "/"), log); err != nil {
+		return fmt.Errorf("kv-v2 enable failed: %w", err)
+	}
+	if err := BootstrapKV(client, "bootstrap/test", log); err != nil {
+		return fmt.Errorf("kv bootstrap failed: %w", err)
+	}
+	if err := EnsurePolicy(client, log); err != nil {
+		return fmt.Errorf("policy write failed: %w", err)
+	}
+	if err := EnsureAppRoleAuth(client, log); err != nil {
+		return fmt.Errorf("approle setup failed: %w", err)
+	}
+
+	/* ─────────── CONTINUE WITH AGENT SETUP ───────────
+	// if err := stepWriteAgentConfig(log); …
+
+	//if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
+	//if err := stepCopyCA(log); err != nil { ... }                           // step 6
+	//if err := stepWaitForAgentToken(log); err != nil { ... }
 	*/
 
 	if err := phaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {

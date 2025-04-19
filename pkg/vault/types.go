@@ -99,10 +99,11 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 
 var Policies = map[string]string{
 	EosVaultPolicy: `
-path "*" {
-  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-}
-`,
+  # KV‑v2 data read/write
+  path "secret/data/*"      { capabilities = ["create","read","update","delete"] }
+  # KV‑v2 metadata (for list)
+  path "secret/metadata/*"  { capabilities = ["list"] }
+  `,
 }
 
 var (
@@ -120,7 +121,6 @@ var (
 )
 
 var VaultHealthEndpoint = fmt.Sprintf("https://%s/v1/sys/health", strings.Split(ListenerAddr, ":")[0])
-
 
 //
 // ------------------------- TYPES -------------------------

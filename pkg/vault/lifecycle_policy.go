@@ -11,25 +11,19 @@ import (
 	"go.uber.org/zap"
 )
 
-//
-// ========================== ENSURE ==========================
-//
-
-//
-// ========================== LIST ==========================
-//
-
-//
-// ========================== READ ==========================
-//
-
-//
-// ========================== UPDATE ==========================
-//
-
-//
-// ========================== DELETE ==========================
-//
+// EnsurePolicy writes the eos‑policy defined in pkg/vault/types.go
+func EnsurePolicy(client *api.Client, log *zap.Logger) error {
+	log.Info("📝 Writing Vault policy", zap.String("name", EosVaultPolicy))
+	pol, ok := Policies[EosVaultPolicy]
+	if !ok {
+		return fmt.Errorf("internal error: policy %q not found in Policies map", EosVaultPolicy)
+	}
+	if err := client.Sys().PutPolicy(EosVaultPolicy, pol); err != nil {
+		return fmt.Errorf("failed to write policy %s: %w", EosVaultPolicy, err)
+	}
+	log.Info("✅ Policy written", zap.String("name", EosVaultPolicy))
+	return nil
+}
 
 func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
 

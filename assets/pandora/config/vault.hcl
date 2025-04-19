@@ -8,7 +8,7 @@ listener "tcp" {
   tls_disable = true
 }
 
-api_addr      = "http://vault:8179"
-cluster_addr  = "http://vault:8201"
+api_addr      = "https://vault:8179"
+cluster_addr  = "https://vault:8201"
 disable_mlock = true
 ui            = true
