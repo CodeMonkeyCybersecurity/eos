@@ -129,7 +129,6 @@ func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 	return nil
 }
 
-
 // func ensureEosVaultProfile(log *zap.Logger) error {
 // 	content := fmt.Sprintf("export VAULT_CACERT=%s\n", VaultAgentCACopyPath)
 // 	log.Info("🔧 Writing EOS vault CA env‑profile", zap.String("path", EosProfileD))
