@@ -62,6 +62,14 @@ var CreateVaultCmd = &cobra.Command{
 			log.Error("Vault setup failed", zap.Error(err))
 			return err
 		}
+
+		log.Info("🔐 Opening Vault Web UI port VaultDefaultPort/tcp in the firewall")
+		if err := platform.AllowPorts(log, []string{"VaultDefaultPort/tcp"}); err != nil {
+			return fmt.Errorf("failed to open Vault web UI port: %w", err)
+		}
+
+		log.Info("✅ Vault Web UI should now be reachable on port 8179")
+
 		log.Info("✅ Vault install & initialization complete")
 		return nil
 	}),
