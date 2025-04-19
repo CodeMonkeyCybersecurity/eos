@@ -63,8 +63,9 @@ var CreateVaultCmd = &cobra.Command{
 			return err
 		}
 
-		log.Info("🔐 Opening Vault Web UI port VaultDefaultPort/tcp in the firewall")
-		if err := platform.AllowPorts(log, []string{"VaultDefaultPort/tcp"}); err != nil {
+		port := vault.VaultDefaultPort + "/tcp"
+		if err := platform.AllowPorts(log, []string{port}); err != nil {
+			log.Error("Vault port allowing failed", zap.Error(err))
 			return fmt.Errorf("failed to open Vault web UI port: %w", err)
 		}
 
