@@ -128,9 +128,9 @@ func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 
 func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) error {
 	if !opts.ForceRecreate {
-		if _, err := os.Stat(AppRoleIDPath); err == nil {
+		if _, err := os.Stat(FallbackRoleIDPath); err == nil {
 			log.Info("🔐 AppRole credentials already present — skipping creation",
-				zap.String("role_id_path", AppRoleIDPath),
+				zap.String("role_id_path", FallbackRoleIDPath),
 				zap.Bool("refresh", opts.RefreshCreds),
 			)
 			if opts.RefreshCreds {
@@ -197,18 +197,18 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) error {
 
 	// Write to disk
 	log.Debug("💾 Writing AppRole credentials to disk...")
-	if err := os.WriteFile(AppRoleIDPath, []byte(rawRoleID+"\n"), 0640); err != nil {
-		log.Error("❌ Failed to write role_id to disk", zap.String("path", AppRoleIDPath), zap.Error(err))
+	if err := os.WriteFile(FallbackRoleIDPath, []byte(rawRoleID+"\n"), 0640); err != nil {
+		log.Error("❌ Failed to write role_id to disk", zap.String("path", FallbackRoleIDPath), zap.Error(err))
 		return fmt.Errorf("failed to write role_id: %w", err)
 	}
-	if err := os.WriteFile(AppSecretIDPath, []byte(rawSecretID+"\n"), 0640); err != nil {
-		log.Error("❌ Failed to write secret_id to disk", zap.String("path", AppSecretIDPath), zap.Error(err))
+	if err := os.WriteFile(FallbackSecretIDPath, []byte(rawSecretID+"\n"), 0640); err != nil {
+		log.Error("❌ Failed to write secret_id to disk", zap.String("path", FallbackSecretIDPath), zap.Error(err))
 		return fmt.Errorf("failed to write secret_id: %w", err)
 	}
 
 	log.Info("✅ AppRole credentials written to disk",
-		zap.String("role_id_path", AppRoleIDPath),
-		zap.String("secret_id_path", AppSecretIDPath),
+		zap.String("role_id_path", FallbackRoleIDPath),
+		zap.String("secret_id_path", FallbackSecretIDPath),
 	)
 	return nil
 }

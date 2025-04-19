@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -654,31 +653,6 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 
 	log.Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
 
-	// 1. Expand and remove all purge paths (supports wildcards like /etc/vault*)
-	log.Info("🔍 Purging Vault runtime, config, and data directories...")
-	seen := make(map[string]bool)
-
-	for _, pattern := range VaultPurgePaths {
-		expanded, _ := filepath.Glob(pattern)
-		if len(expanded) == 0 {
-			expanded = []string{pattern} // fallback
-		}
-		for _, actual := range expanded {
-			if seen[actual] {
-				continue // avoid duplicates
-			}
-			seen[actual] = true
-
-			if err := os.RemoveAll(actual); err != nil && !os.IsNotExist(err) {
-				log.Error("❌ Failed to remove purge path", zap.String("path", actual), zap.Error(err))
-				errs[actual] = err
-			} else {
-				log.Info("✅ Removed purge path", zap.String("path", actual))
-				removed = append(removed, actual)
-			}
-		}
-	}
-
 	// 2. Distro-specific package manager cleanup
 	switch distro {
 	case "debian":
@@ -706,13 +680,13 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	}
 
 	// 3. Optional binary cleanup
-	log.Info("🗑️ Attempting to remove Vault binary", zap.String("path", binaryPath))
-	if err := os.Remove(binaryPath); err != nil && !os.IsNotExist(err) {
-		log.Error("❌ Failed to remove Vault binary", zap.String("path", binaryPath), zap.Error(err))
-		errs[binaryPath] = fmt.Errorf("failed to remove %s: %w", binaryPath, err)
+	log.Info("🗑️ Attempting to remove Vault binary", zap.String("path", VaultBinaryPath))
+	if err := os.Remove(VaultBinaryPath); err != nil && !os.IsNotExist(err) {
+		log.Error("❌ Failed to remove Vault binary", zap.String("path", VaultBinaryPath), zap.Error(err))
+		errs[VaultBinaryPath] = fmt.Errorf("failed to remove %s: %w", VaultBinaryPath, err)
 	} else {
-		log.Info("✅ Removed Vault binary", zap.String("path", binaryPath))
-		removed = append(removed, binaryPath)
+		log.Info("✅ Removed Vault binary", zap.String("path", VaultBinaryPath))
+		removed = append(removed, VaultBinaryPath)
 	}
 
 	// 4. Reload systemd to clean up any dangling service definitions

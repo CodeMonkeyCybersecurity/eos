@@ -18,9 +18,9 @@ const testTimeout = 500 * time.Millisecond // one‑shot probe timeout
 
 // EnsureVaultAddr sets VAULT_ADDR if missing.
 //
-//   1.  Prefer an existing HTTPS listener on 127.0.0.1:<VaultDefaultPort>
-//   2.  Else try https://<internal‑hostname>:<VaultDefaultPort>
-//   3.  Else fall back to the hostname form so callers have *something*
+//  1. Prefer an existing HTTPS listener on 127.0.0.1:<VaultDefaultPort>
+//  2. Else try https://<internal‑hostname>:<VaultDefaultPort>
+//  3. Else fall back to the hostname form so callers have *something*
 func EnsureVaultAddr(log *zap.Logger) (string, error) {
 	if cur := os.Getenv("VAULT_ADDR"); cur != "" {
 		log.Debug("VAULT_ADDR already set", zap.String("VAULT_ADDR", cur))

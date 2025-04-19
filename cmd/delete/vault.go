@@ -1,4 +1,3 @@
-// cmd/delete/vault.go
 package delete
 
 import (
@@ -12,100 +11,78 @@ import (
 	"go.uber.org/zap"
 )
 
-var purge bool // <-- global flag for --purge
+var purge bool
 
-// vaultDeleteCmd represents the "delete vault" command.
 var DeleteVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Deletes the Vault installation",
 	Long:  `Removes the Vault package (via snap, apt, or dnf) and optionally purges all configuration, data, and logs.`,
 
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		// Ensure the command is run as root.
 		if os.Geteuid() != 0 {
 			log.Fatal("This command must be run with sudo or as root.")
 		}
 
-		log.Info("Deleting Vault installation...")
+		log.Info("🧨 Deleting Vault...")
 
-		// Kill any running Vault process.
-		killCmd := exec.Command("pkill", "-f", "vault server")
-		killCmd.Stdout = os.Stdout
-		killCmd.Stderr = os.Stderr
-		if err := killCmd.Run(); err != nil {
-			log.Warn("Could not kill Vault process (it might not be running)", zap.Error(err))
-		} else {
-			log.Info("Stopped Vault process.")
+		distro := platform.DetectLinuxDistro(log)
+		osPlatform := platform.GetOSPlatform(log)
+		if osPlatform != "linux" {
+			log.Fatal("Vault uninstallation only supported on Linux")
 		}
 
-		osPlatform := platform.GetOSPlatform(log)
-		distro := platform.DetectLinuxDistro(log)
+		// Kill Vault processes if any
+		run("pkill", "-f", "vault server")
 
-		switch {
-		case osPlatform != "linux":
-			log.Fatal("Vault uninstallation only supported on Linux")
-		case distro == "debian":
-			log.Info("Removing Vault via apt...")
-			removeCmd := exec.Command("apt-get", "remove", "-y", "vault")
-			removeCmd.Stdout = os.Stdout
-			removeCmd.Stderr = os.Stderr
-			if err := removeCmd.Run(); err != nil {
-				log.Fatal("Failed to remove Vault via apt", zap.Error(err))
-			}
-		case distro == "rhel":
-			log.Info("Removing Vault via dnf...")
-			removeCmd := exec.Command("dnf", "remove", "-y", "vault")
-			removeCmd.Stdout = os.Stdout
-			removeCmd.Stderr = os.Stderr
-			if err := removeCmd.Run(); err != nil {
-				log.Fatal("Failed to remove Vault via dnf", zap.Error(err))
-			}
+		// Remove Vault depending on platform
+		switch distro {
+		case "debian":
+			run("apt-get", "remove", "-y", "vault")
+		case "rhel":
+			run("dnf", "remove", "-y", "vault")
 		default:
-			log.Info("Attempting to remove Vault via snap...")
-			removeCmd := exec.Command("snap", "remove", "vault")
-			removeCmd.Stdout = os.Stdout
-			removeCmd.Stderr = os.Stderr
-			if err := removeCmd.Run(); err != nil {
-				log.Warn("Failed to remove Vault via snap", zap.Error(err))
-			}
+			run("snap", "remove", "vault")
 		}
 
 		if purge {
-			log.Info("🧨 Purging Vault config, data, and runtime paths...")
+			log.Info("🧹 Purging Vault files and directories...")
+
 			for _, path := range vault.GetVaultPurgePaths() {
 				if err := os.RemoveAll(path); err != nil {
-					log.Warn("Failed to remove path during purge", zap.String("path", path), zap.Error(err))
+					log.Warn("Failed to remove path", zap.String("path", path), zap.Error(err))
 				} else {
-					log.Info("🧹 Removed path", zap.String("path", path))
+					log.Info("Removed path", zap.String("path", path))
 				}
 			}
 
-			log.Info("🧼 Cleaning up Vault repo and keyring files...")
+			for _, wildcard := range vault.GetVaultWildcardPurgePaths() {
+				run("sh", "-c", "rm -rf "+wildcard)
+			}
+
+			log.Info("Cleaning up Vault repo and keyring...")
 			vault.Purge(distro, log)
 		} else {
-			log.Info("Skipping purge because --no-purge was specified.")
+			log.Info("Skipping purge (--no-purge provided)")
 		}
 
-		// Attempt a best-effort Vault client setup
-		client, err := vault.NewClient(log)
-		if err != nil {
-			log.Warn("Skipping Vault health check — client unavailable", zap.Error(err))
-		} else {
-			report, _ := vault.Check(client, log, nil, "") // no storedHashes or root token
-			if report == nil || !report.Installed {
-				log.Warn("Vault not detected after deletion")
-			} else {
-				log.Info("Post-delete Vault check complete", zap.Any("report", report))
-			}
-		}
-
-		log.Info("Vault deletion complete.")
+		log.Info("✅ Vault deletion complete.")
 		return nil
 	}),
 }
 
 func init() {
 	DeleteVaultCmd.Flags().BoolVar(&purge, "purge", true, "Remove Vault config, secrets, and logs (default: true)")
-	DeleteVaultCmd.Flags().Lookup("purge").NoOptDefVal = "true" // support --no-purge
+	DeleteVaultCmd.Flags().Lookup("purge").NoOptDefVal = "true"
 	DeleteCmd.AddCommand(DeleteVaultCmd)
+}
+
+func run(name string, args ...string) {
+	cmd := exec.Command(name, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Warn("Command failed", zap.String("cmd", name+" "+args[0]), zap.Error(err))
+	} else {
+		log.Info("Ran", zap.String("cmd", name+" "+args[0]))
+	}
 }

@@ -40,10 +40,10 @@ func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
 	}
 
 	// ✅ Check AppRole files exist
-	if _, err := os.Stat(AppRoleIDPath); err != nil {
+	if _, err := os.Stat(FallbackRoleIDPath); err != nil {
 		return fmt.Errorf("role_id not found: %w", err)
 	}
-	if _, err := os.Stat(AppSecretIDPath); err != nil {
+	if _, err := os.Stat(FallbackSecretIDPath); err != nil {
 		return fmt.Errorf("secret_id not found: %w", err)
 	}
 
@@ -78,7 +78,7 @@ listener "tcp" {
 
 cache {
   use_auto_auth_token = true
-}`, AgentPID, AppRoleIDPath, AppSecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
+}`, AgentPID, FallbackRoleIDPath, FallbackSecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
 
 	if err := os.WriteFile(VaultAgentConfigPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
 		return fmt.Errorf("failed to write Vault Agent config to %s: %w", VaultAgentConfigPath, err)

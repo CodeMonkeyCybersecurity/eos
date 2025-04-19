@@ -25,11 +25,9 @@ var (
 	// Vault Secrets + Tokens
 	SecretsDir                = "/var/lib/eos/secrets"
 	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
-	AppRoleIDPath             = filepath.Join(SecretsDir, "vault_role_id")
-	AppSecretIDPath           = filepath.Join(SecretsDir, "vault_secret_id")
 	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
 	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass.json")
-	vaultClient               *api.Client
+	VaultClient               *api.Client
 	EosRunDir                 = "/run/eos"
 	VaultAgentTokenPath       = filepath.Join(EosRunDir, "vault-agent-eos.token")
 	AgentPID                  = filepath.Join(EosRunDir, "vault-agent.pid")
@@ -37,31 +35,16 @@ var (
 	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
 )
 
-// VaultPurgePaths defines directories and files to remove when purging Vault
-var VaultPurgePaths = []string{
-	"/etc/vault*",         // Vault config
-	"/opt/vault",          // legacy data
-	"/var/lib/vault",      // Vault file storage
-	"/var/log/vault.log",  // Vault logs
-	"/var/snap/vault",     // Snap data
-	SecretsDir,            // eos secrets
-	EosRunDir,             // eos runtime (includes agent token, pid)
-	VaultAgentTokenPath,   // vault-agent-eos.token
-	VaultAgentPassPath,    // agent secret pass
-	VaultAgentConfigPath,  // agent config file
-	VaultTokenSinkPath,    // sink token file
-	VaultServicePath,      // systemd service
-	VaultAgentServicePath, // agent systemd service
-	VaultPID,
-	AgentPID,
-	binaryPath,
-}
-
 //
 // ------------------------- CONSTANTS -------------------------
 //
 
 const (
+	VaultAgentCACopyPath   = "/home/eos/.config/vault/ca.crt"
+	FallbackRoleIDPath     = "/etc/vault/role_id"
+	FallbackSecretIDPath   = "/etc/vault/secret_id"
+	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
+
 	EosUser              = "eos"
 	EosGroup             = "eos"
 	VaultAgentUser       = EosUser
@@ -79,9 +62,9 @@ const (
 	// client / listener paths
 	ListenerAddr     = "127.0.0.1:8179"
 	VaultDefaultPort = "8179"
-	VaultDefaultAddr  = "https://%s:" + VaultDefaultPort
+	VaultDefaultAddr = "https://%s:" + VaultDefaultPort
 
-	binaryPath = "/usr/bin/vault"
+	VaultBinaryPath = "/usr/bin/vault"
 
 	// Debian APT
 	AptKeyringPath = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
@@ -167,6 +150,33 @@ type AppRoleOptions struct {
 // ------------------------- HELPERS -------------------------
 //
 
+func GetVaultWildcardPurgePaths() []string {
+	return []string{
+		"/etc/vault*",      // wildcard for legacy configs
+		"/var/snap/vault*", // snap installs
+		"/var/log/vault*",  // log spill
+	}
+}
+
+func GetVaultPurgePaths() []string {
+	return []string{
+		VaultConfigPath,
+		VaultAgentConfigPath,
+		VaultAgentPassPath,
+		VaultServicePath,
+		VaultAgentServicePath,
+		VaultAgentTokenPath,
+		VaultTokenSinkPath,
+		SecretsDir,
+		EosRunDir,
+		VaultDataPath,
+		VaultBinaryPath,
+		VaultPID,
+		AgentPID,
+		VaultSystemCATrustPath,
+	}
+}
+
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
 		RoleName:      "eos",
@@ -226,8 +236,4 @@ func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, 
 	vaultAddr := GetVaultAddr()
 
 	return configDir, configFile, vaultAddr
-}
-
-func GetVaultPurgePaths() []string {
-	return VaultPurgePaths
 }

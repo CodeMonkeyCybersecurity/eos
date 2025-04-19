@@ -149,14 +149,14 @@ func NewClient(log *zap.Logger) (*api.Client, error) {
 }
 func SetVaultClient(client *api.Client, log *zap.Logger) {
 	log.Debug("📦 Vault client cached globally")
-	vaultClient = client
+	VaultClient = client
 }
 
 func GetVaultClient(log *zap.Logger) (*api.Client, error) {
-	if vaultClient == nil {
+	if VaultClient == nil {
 		log.Debug("❌ Vault client requested but not initialized")
 		return nil, fmt.Errorf("vault client is not initialized; call SetVaultClient first")
 	}
 	log.Debug("📦 Returning cached Vault client")
-	return vaultClient, nil
+	return VaultClient, nil
 }
