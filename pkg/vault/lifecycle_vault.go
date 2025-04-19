@@ -26,7 +26,10 @@ import (
 func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error {
 	log.Info("🔐 Vault setup starting")
 
+	log.Info("Generating Vault TLS Certificate")
 	if err := GenerateVaultTLSCert(log); err != nil {
+		log.Error("Failed to generate Vault TLS Certificate")
+
 		return fmt.Errorf("tls-gen: %w", err)
 	}
 
