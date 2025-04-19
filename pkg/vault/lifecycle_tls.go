@@ -32,37 +32,48 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 		log.Error("❌ Failed to create TLS directory", zap.Error(err))
 		return fmt.Errorf("failed to create TLS directory: %w", err)
 	}
+	// Skip if already present
+	if fileExists(TLSKey) && fileExists(TLSCrt) {
+		log.Info("✅ TLS certs already exist, skipping generation")
+		return nil
+	}
 
-	// Build openssl command
-	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096", "-days", "825", "-nodes", "-x509",
+	log.Info("🔐 Generating Vault TLS certificate (simple mode)", zap.String("CN", hostname))
+
+	if err := os.MkdirAll(TLSDir, xdg.DirPermStandard); err != nil {
+		return fmt.Errorf("failed to create TLS dir: %w", err)
+	}
+
+	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096",
+		"-days", "825", "-nodes", "-x509",
 		"-subj", "/CN="+hostname,
-		"-addext", "subjectAltName=DNS:"+hostname+",IP:127.0.0.1",
+		"-addext", fmt.Sprintf("subjectAltName=DNS:%s,IP:127.0.0.1", hostname),
 		"-keyout", TLSKey,
 		"-out", TLSCrt,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	log.Info("🔐 Running openssl to generate Vault TLS cert...",
-		zap.String("CN", hostname),
-		zap.String("key_path", TLSKey),
-		zap.String("crt_path", TLSCrt))
-
 	if err := cmd.Run(); err != nil {
-		log.Error("❌ OpenSSL failed to generate certificate", zap.Error(err))
-		return fmt.Errorf("failed to generate TLS cert: %w", err)
+		return fmt.Errorf("openssl failed: %w", err)
 	}
 
-	// Set strict file permissions
-	log.Debug("🔒 Setting permissions on TLS cert and key")
+	// Permissions and ownership
+	log.Info("🔐 Securing Vault TLS certs...")
+	if err := os.Chown(TLSKey, 990, 990); err != nil { // assuming vault:vault = 990:990
+		log.Warn("could not chown tls.key", zap.Error(err))
+	}
+	if err := os.Chown(TLSCrt, 990, 990); err != nil {
+		log.Warn("could not chown tls.crt", zap.Error(err))
+	}
 	if err := os.Chmod(TLSKey, xdg.FilePermOwnerReadWrite); err != nil {
-		log.Warn("⚠️ Could not set strict perms on TLS key", zap.Error(err))
+		log.Warn("could not chmod tls.key", zap.Error(err))
 	}
-	if err := os.Chmod(TLSCrt, xdg.SystemdUnitFilePerms); err != nil {
-		log.Warn("⚠️ Could not set perms on TLS cert", zap.Error(err))
+	if err := os.Chmod(TLSCrt, xdg.FilePermOwnerReadWrite); err != nil {
+		log.Warn("could not chmod tls.crt", zap.Error(err))
 	}
 
-	log.Info("✅ Vault TLS cert generated successfully")
+	log.Info("✅ Vault TLS cert generated and secured", zap.String("key", TLSKey), zap.String("crt", TLSCrt))
 	return nil
 }
 
