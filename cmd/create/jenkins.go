@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ var CreateJenkinsCmd = &cobra.Command{
 		// Ensure the installation directory exists
 		if _, err := os.Stat(types.JenkinsDir); os.IsNotExist(err) {
 			log.Warn("Installation directory does not exist; creating it", zap.String("path", types.JenkinsDir))
-			if err := os.MkdirAll(types.JenkinsDir, 0755); err != nil {
+			if err := os.MkdirAll(types.JenkinsDir, xdg.DirPermStandard); err != nil {
 				log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {

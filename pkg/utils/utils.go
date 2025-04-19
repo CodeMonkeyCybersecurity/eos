@@ -10,10 +10,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-)
 
-var (
-	GrepProcess = grepProcess
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
 //
@@ -47,7 +45,7 @@ func OrganizeAssetsForDeployment(app string) error {
 	otherDir := "other" // "other" is at the project root
 
 	// Ensure the "other" directory exists.
-	if err := os.MkdirAll(otherDir, 0755); err != nil {
+	if err := os.MkdirAll(otherDir, xdg.DirPermStandard); err != nil {
 		return fmt.Errorf("failed to create 'other' directory: %w", err)
 	}
 
@@ -87,7 +85,7 @@ func OrganizeAssetsForDeployment(app string) error {
 		dest := filepath.Join(otherDir, relPath)
 
 		// Ensure the destination directory exists.
-		if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(dest), xdg.DirPermStandard); err != nil {
 			return fmt.Errorf("failed to create destination directory %s: %w", filepath.Dir(dest), err)
 		}
 

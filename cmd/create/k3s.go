@@ -10,6 +10,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -152,7 +153,7 @@ func deployK3s() {
 func saveScript(cmdStr string) string {
 	// Ensure the log directory exists
 	logDir := "/var/log/eos"
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, xdg.DirPermStandard); err != nil {
 		fmt.Printf("Warning: Could not create log directory %s: %v\n", logDir, err)
 	}
 	homeDir, err := os.UserHomeDir()
@@ -160,7 +161,7 @@ func saveScript(cmdStr string) string {
 		homeDir = "."
 	}
 	dir := homeDir + "/.local/state/eos"
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, xdg.DirPermStandard); err != nil {
 		log.Warn("Failed to create directory for install script", zap.String("path", dir), zap.Error(err))
 	}
 	scriptPath := dir + "/k3s-install.sh"
@@ -170,7 +171,7 @@ set -x
 exec > >(tee -a %s/k3s-deploy.log) 2>&1
 %s
 `, logDir, cmdStr)
-	err = os.WriteFile(scriptPath, []byte(scriptContent), 0755)
+	err = os.WriteFile(scriptPath, []byte(scriptContent), xdg.DirPermStandard)
 	if err != nil {
 		fmt.Printf("Warning: Failed to write script file: %v\n", err)
 	}

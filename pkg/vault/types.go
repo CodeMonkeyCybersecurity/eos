@@ -40,18 +40,22 @@ var (
 //
 
 const (
+	TLSDir = "/opt/vault/tls"
+	TLSKey = TLSDir + "tls.key"
+	TLSCrt = TLSDir + "tls.crt"
+
 	VaultAgentCACopyPath   = "/home/eos/.config/vault/ca.crt"
 	FallbackRoleIDPath     = "/etc/vault/role_id"
 	FallbackSecretIDPath   = "/etc/vault/secret_id"
 	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
 
-	EosUser              = "eos"
-	EosGroup             = "eos"
-	VaultAgentUser       = EosUser
-	VaultAgentGroup      = EosGroup
-	VaultRuntimePerms    = 0750
-	SystemdUnitFilePerms = 0644
-	VaultAgentService    = "vault-agent-eos.service"
+	EosUser         = "eos"
+	EosGroup        = "eos"
+	VaultAgentUser  = EosUser
+	VaultAgentGroup = EosGroup
+
+	// Agent service
+	VaultAgentService = "vault-agent-eos.service"
 
 	// Config paths
 	VaultConfigDirDebian = "/etc/vault.d"
@@ -225,10 +229,10 @@ func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, 
 		configDir = VaultConfigDirSnap
 	}
 
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, xdg.DirPermStandard); err != nil {
 		log.Warn("Failed to create Vault config dir", zap.String("path", configDir), zap.Error(err))
 	}
-	if err := os.MkdirAll(VaultDataPath, 0755); err != nil {
+	if err := os.MkdirAll(VaultDataPath, xdg.DirPermStandard); err != nil {
 		log.Warn("Failed to create Vault data dir", zap.String("path", VaultDataPath), zap.Error(err))
 	}
 

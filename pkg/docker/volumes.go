@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
 // RemoveVolumes removes the specified Docker volumes.
@@ -45,7 +46,7 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 	backupResults := make(map[string]string)
 
 	// Ensure the backup directory exists.
-	if err := os.MkdirAll(backupDir, 0755); err != nil {
+	if err := os.MkdirAll(backupDir, xdg.DirPermStandard); err != nil {
 		return backupResults, fmt.Errorf("failed to create backup directory %s: %w", backupDir, err)
 	}
 

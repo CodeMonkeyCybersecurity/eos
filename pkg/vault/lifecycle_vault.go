@@ -26,6 +26,10 @@ import (
 func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error {
 	log.Info("🔐 Vault setup starting")
 
+	if err := GenerateVaultTLSCert(log); err != nil {
+		return fmt.Errorf("tls-gen: %w", err)
+	}
+
 	if err := phaseInstallVault(log); err != nil {
 		return fmt.Errorf("install: %w", err)
 	}
@@ -42,6 +46,16 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error
 	if err != nil {
 		return fmt.Errorf("init-unseal: %w", err)
 	}
+
+	/* 🔽 Slot these *after* Vault is initialized
+	//if err := stepEnableKVAndPolicy(client, log); err != nil { ... }        // step 3
+	//if err := stepProvisionAppRole(client, log); err != nil { ... }        // step 4
+	if err := stepWriteAgentConfig(log); err != nil { ... }                // step 5 (agent hcl)
+	if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
+	if err := stepCopyCA(log); err != nil { ... }                           // step 6
+	if err := stepWaitForAgentToken(log); err != nil { ... }
+	*/
+
 	if err := phaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {
 		return fmt.Errorf("apply-secrets: %w", err)
 	}

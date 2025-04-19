@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -233,10 +234,10 @@ RuntimeDirectoryMode=%[5]d
 [Install]
 WantedBy=multi-user.target
 `,
-		EosRunDir, VaultAgentUser, VaultAgentGroup, VaultAgentConfigPath, VaultRuntimePerms,
+		EosRunDir, VaultAgentUser, VaultAgentGroup, VaultAgentConfigPath, xdg.VaultRuntimePerms,
 	)
 
-	if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), SystemdUnitFilePerms); err != nil {
+	if err := os.WriteFile(VaultAgentServicePath, []byte(strings.TrimSpace(unit)+"\n"), xdg.SystemdUnitFilePerms); err != nil {
 		log.Error("Failed to write Vault Agent systemd unit file",
 			zap.String("path", VaultAgentServicePath),
 			zap.Error(err),
@@ -246,7 +247,7 @@ WantedBy=multi-user.target
 	log.Debug("Systemd unit constants",
 		zap.String("unit_path", VaultAgentServicePath),
 		zap.String("user", VaultAgentUser),
-		zap.Int("runtime_dir_mode", VaultRuntimePerms),
+		zap.Int("runtime_dir_mode", xdg.VaultRuntimePerms),
 	)
 	log.Info("✅ Systemd unit file written", zap.String("path", VaultAgentServicePath))
 	return nil

@@ -13,6 +13,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -38,7 +39,7 @@ var CreateHeraCmd = &cobra.Command{
 		// Ensure target directory exists
 		if _, err := os.Stat(types.HeraDir); os.IsNotExist(err) {
 			log.Warn("Hera directory does not exist; creating it", zap.String("path", types.HeraDir))
-			if err := os.MkdirAll(types.HeraDir, 0755); err != nil {
+			if err := os.MkdirAll(types.HeraDir, xdg.DirPermStandard); err != nil {
 				log.Fatal("Failed to create Hera directory", zap.Error(err))
 			}
 		}

@@ -45,5 +45,5 @@ func XDGRuntimePath(app, file string) (string, error) {
 
 // Optional utility for creating paths on demand
 func EnsureDir(path string) error {
-	return os.MkdirAll(filepath.Dir(path), 0755)
+	return os.MkdirAll(filepath.Dir(path), DirPermStandard)
 }

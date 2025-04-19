@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -43,7 +44,7 @@ func deployZabbix() error {
 	}
 
 	// Create target directory
-	if err := os.MkdirAll(types.ZabbixDir, 0755); err != nil {
+	if err := os.MkdirAll(types.ZabbixDir, xdg.DirPermStandard); err != nil {
 		return fmt.Errorf("failed to create %s: %w", types.ZabbixDir, err)
 	}
 

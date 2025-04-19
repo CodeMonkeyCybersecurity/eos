@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
 var log = logger.L()
@@ -32,7 +33,7 @@ func DeployCompose() error {
 
 	// Create the target directory under /opt (e.g., /opt/grafana).
 	targetDir := filepath.Join("/opt", appDir)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, xdg.DirPermStandard); err != nil {
 		return fmt.Errorf("error creating target directory %s: %v", targetDir, err)
 	}
 

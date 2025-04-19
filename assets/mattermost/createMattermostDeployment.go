@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"os/exec"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
 func main() {
@@ -38,7 +40,7 @@ func main() {
 	}
 	fmt.Println("Creating required directories with proper permissions...")
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, xdg.DirPermStandard); err != nil {
 			log.Fatalf("Error creating directory %s: %v", dir, err)
 		}
 	}

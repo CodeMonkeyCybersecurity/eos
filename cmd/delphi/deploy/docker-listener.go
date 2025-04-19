@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -66,7 +67,7 @@ var DockerListenerCmd = &cobra.Command{
 			newContent := shebang + strings.Join(strings.Split(string(content), "\n")[1:], "\n")
 
 			// Write back the modified file
-			if err := os.WriteFile(types.DockerListener, []byte(newContent), 0755); err != nil {
+			if err := os.WriteFile(types.DockerListener, []byte(newContent), xdg.DirPermStandard); err != nil {
 				sugar.Fatalf("❌ Failed to update DockerListener script: %v", err)
 			}
 			sugar.Infof("✅ DockerListener script updated successfully")

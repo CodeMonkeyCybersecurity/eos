@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -37,7 +38,7 @@ var CreateUmamiCmd = &cobra.Command{
 		if _, err := os.Stat(types.UmamiDir); os.IsNotExist(err) {
 			log.Warn("Installation directory does not exist; creating it",
 				zap.String("path", types.UmamiDir))
-			if err := os.MkdirAll(types.UmamiDir, 0755); err != nil {
+			if err := os.MkdirAll(types.UmamiDir, xdg.DirPermStandard); err != nil {
 				log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
