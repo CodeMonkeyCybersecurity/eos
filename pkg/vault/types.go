@@ -235,7 +235,7 @@ func GetVaultPurgePaths() []string {
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
 		RoleName:      "eos",
-		Policies:      []string{"eos-admin"},
+		Policies:      []string{"eos-policy"},
 		TokenTTL:      "1h",
 		TokenMaxTTL:   "4h",
 		SecretIDTTL:   "24h",
