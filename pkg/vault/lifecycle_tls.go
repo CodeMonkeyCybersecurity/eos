@@ -3,9 +3,13 @@
 package vault
 
 import (
+	"crypto/tls"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
@@ -16,6 +20,10 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 	log.Info("📁 Checking for existing Vault TLS certs",
 		zap.String("key", TLSKey),
 		zap.String("crt", TLSCrt))
+
+	if err := fixTLSCertIfMissingSAN(log); err != nil {
+		log.Warn("⚠️ Could not verify SAN TLS cert status", zap.Error(err))
+	}
 
 	if fileExists(TLSKey) && fileExists(TLSCrt) {
 		log.Info("✅ Existing Vault TLS cert found, skipping generation")
@@ -80,4 +88,45 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func fixTLSCertIfMissingSAN(log *zap.Logger) error {
+	url := VaultHealthEndpoint
+	client := &http.Client{
+		Timeout: 3 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: false, // we want the error to happen
+			},
+		},
+	}
+
+	log.Debug("🔍 Testing TLS connection for SAN validation", zap.String("url", url))
+	resp, err := client.Get(url)
+	if err != nil {
+		if os.IsTimeout(err) {
+			log.Warn("⏱️ TLS check timed out – assuming Vault not running")
+			return nil // not a cert issue
+		}
+		if strings.Contains(err.Error(), "x509: cannot validate certificate for 127.0.0.1 because it doesn't contain any IP SANs") {
+			log.Warn("❌ TLS cert is missing SAN for 127.0.0.1 – forcing regeneration")
+
+			// Delete cert + key
+			if err := os.Remove(TLSKey); err != nil && !os.IsNotExist(err) {
+				log.Error("failed to remove broken TLS key", zap.Error(err))
+			}
+			if err := os.Remove(TLSCrt); err != nil && !os.IsNotExist(err) {
+				log.Error("failed to remove broken TLS cert", zap.Error(err))
+			}
+
+			return nil
+		}
+
+		log.Debug("TLS connection failed, but not due to SAN issue", zap.Error(err))
+		return nil // different TLS failure — don't reset
+	}
+
+	resp.Body.Close()
+	log.Debug("✅ TLS cert appears valid – continuing")
+	return nil
 }

@@ -13,28 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var Policies = map[string]string{
-	EosVaultPolicy: `
-path "*" {
-  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
-}
-`,
-}
-
-var (
-	// Vault Secrets + Tokens
-	SecretsDir                = "/var/lib/eos/secrets"
-	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
-	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
-	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass.json")
-	VaultClient               *api.Client
-	EosRunDir                 = "/run/eos"
-	VaultAgentTokenPath       = filepath.Join(EosRunDir, "vault-agent-eos.token")
-	AgentPID                  = filepath.Join(EosRunDir, "vault-agent.pid")
-	VaultPID                  = filepath.Join(EosRunDir, "vault.pid")
-	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
-)
-
 //
 // ------------------------- CONSTANTS -------------------------
 //
@@ -114,6 +92,35 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 	KVNamespaceUsers   = "users/"
 	KVNamespaceSecrets = "secret/"
 )
+
+//
+// ------------------------- VARIABLES -------------------------
+//
+
+var Policies = map[string]string{
+	EosVaultPolicy: `
+path "*" {
+  capabilities = ["create", "read", "update", "delete", "list", "sudo"]
+}
+`,
+}
+
+var (
+	// Vault Secrets + Tokens
+	SecretsDir                = "/var/lib/eos/secrets"
+	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
+	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
+	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass.json")
+	VaultClient               *api.Client
+	EosRunDir                 = "/run/eos"
+	VaultAgentTokenPath       = filepath.Join(EosRunDir, "vault-agent-eos.token")
+	AgentPID                  = filepath.Join(EosRunDir, "vault-agent.pid")
+	VaultPID                  = filepath.Join(EosRunDir, "vault.pid")
+	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
+)
+
+var VaultHealthEndpoint = fmt.Sprintf("https://%s/v1/sys/health", strings.Split(ListenerAddr, ":")[0])
+
 
 //
 // ------------------------- TYPES -------------------------
