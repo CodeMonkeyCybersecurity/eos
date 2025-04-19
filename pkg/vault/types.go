@@ -143,12 +143,11 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 var Policies = map[string]string{
 	EosVaultPolicy: `
   # Give EOS full root‑style access
-  path "*" {
+  path "**" {
 	capabilities = ["create","read","update","delete","list","sudo"]
   }
   `,
-  }
-
+}
 
 var (
 	// Vault Secrets + Tokens
