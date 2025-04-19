@@ -57,6 +57,8 @@ WantedBy=multi-user.target
 `
 
 const (
+	EosProfileD = "/etc/profile.d/eos_vault.sh"
+
 	TLSDir = "/opt/vault/tls/"
 	TLSKey = TLSDir + "tls.key"
 	TLSCrt = TLSDir + "tls.crt"

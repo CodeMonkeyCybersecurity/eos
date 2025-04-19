@@ -72,6 +72,10 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 		log.Warn("could not apply correct ownership to TLS certs", zap.Error(err))
 	}
 
+	if err := ensureEosVaultProfile(log); err != nil {
+		log.Warn("could not install /etc/profile.d/eos_vault.sh", zap.Error(err))
+	}
+
 	log.Info("✅ Vault TLS cert generated and secured", zap.String("key", TLSKey), zap.String("crt", TLSCrt))
 	return nil
 }
