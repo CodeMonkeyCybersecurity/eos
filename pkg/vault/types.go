@@ -79,7 +79,7 @@ const (
 	// client / listener paths
 	ListenerAddr     = "127.0.0.1:8179"
 	VaultDefaultPort = "8179"
-	VaultDefaultAddr = "http://%s:8179"
+	VaultDefaultAddr  = "https://%s:" + VaultDefaultPort
 
 	binaryPath = "/usr/bin/vault"
 

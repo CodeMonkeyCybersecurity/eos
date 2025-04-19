@@ -112,34 +112,41 @@ func EnsureVaultClient(log *zap.Logger) {
 	}
 }
 
+// NewClient returns a Vault client that
+//   - uses EnsureVaultAddr() for the endpoint
+//   - trusts /opt/vault/tls/tls.crt unless the user already provided a CA.
 func NewClient(log *zap.Logger) (*api.Client, error) {
-	config := api.DefaultConfig()
+	addr, _ := EnsureVaultAddr(log)
 
-	// Step 1: Read from environment
-	if err := config.ReadEnvironment(); err != nil {
-		log.Warn("⚠️ Failed to read environment configuration for Vault", zap.Error(err))
-		return nil, fmt.Errorf("failed to read Vault env config: %w", err)
+	cfg := api.DefaultConfig()
+	cfg.Address = addr
+
+	// 1) merge VAULT_* environment variables (incl. VAULT_CACERT)
+	if err := cfg.ReadEnvironment(); err != nil {
+		log.Warn("⚠️ could not read Vault env config", zap.Error(err))
 	}
 
-	log.Debug("✅ Vault environment config loaded", zap.String("VAULT_ADDR", config.Address))
+	// 2) if the caller did NOT provide a CA path, inject our local one
+	if os.Getenv("VAULT_CACERT") == "" {
+		if err := cfg.ConfigureTLS(&api.TLSConfig{
+			CACert: "/opt/vault/tls/tls.crt",
+		}); err != nil {
+			return nil, fmt.Errorf("tls‑config: %w", err)
+		}
+	}
 
-	client, err := api.NewClient(config)
+	cli, err := api.NewClient(cfg)
 	if err != nil {
-		log.Error("❌ Failed to create Vault API client", zap.Error(err))
-		return nil, fmt.Errorf("failed to create Vault client: %w", err)
+		return nil, fmt.Errorf("new‑client: %w", err)
 	}
 
-	// Step 2: Try to set token
-	if token := os.Getenv("VAULT_TOKEN"); token != "" {
-		log.Debug("🔑 VAULT_TOKEN found in environment — assigning to client")
-		client.SetToken(token)
-	} else {
-		log.Debug("🕳️ No VAULT_TOKEN set — relying on fallback or agent token")
+	// 3) propagate VAULT_TOKEN if it exists
+	if tok := os.Getenv("VAULT_TOKEN"); tok != "" {
+		cli.SetToken(tok)
 	}
 
-	return client, nil
+	return cli, nil
 }
-
 func SetVaultClient(client *api.Client, log *zap.Logger) {
 	log.Debug("📦 Vault client cached globally")
 	vaultClient = client
