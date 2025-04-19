@@ -21,7 +21,7 @@ const testTimeout = 500 * time.Millisecond // one‑shot probe timeout
 //  1. Prefer an existing HTTPS listener on 127.0.0.1:<VaultDefaultPort>
 //  2. Else try https://<internal‑hostname>:<VaultDefaultPort>
 //  3. Else fall back to the hostname form so callers have *something*
-func EnsureVaultAddr(log *zap.Logger) (string, error) {
+func EnsureVaultEnv(log *zap.Logger) (string, error) {
 	if cur := os.Getenv("VAULT_ADDR"); cur != "" {
 		log.Debug("VAULT_ADDR already set", zap.String("VAULT_ADDR", cur))
 		return cur, nil
@@ -42,12 +42,19 @@ func EnsureVaultAddr(log *zap.Logger) (string, error) {
 		}
 	}
 
+	// ensure CA
+	if os.Getenv("VAULT_CACERT") == "" {
+		log.Debug("🔧 Auto‑setting VAULT_CACERT", zap.String("path", VaultAgentCACopyPath))
+		os.Setenv("VAULT_CACERT", VaultAgentCACopyPath)
+	}
+
 	// no live listener – just set to hostname form
 	fallback := candidates[1]
 	_ = os.Setenv("VAULT_ADDR", fallback)
 	log.Warn("⚠️ No Vault listener detected; using fallback VAULT_ADDR",
 		zap.String("VAULT_ADDR", fallback))
 	return fallback, nil
+
 }
 
 // ---------- helpers ----------

@@ -10,7 +10,7 @@ import (
 )
 
 func HandleFallbackOrStore(name string, secrets map[string]string, log *zap.Logger) error {
-	if _, err := EnsureVaultAddr(log); err != nil {
+	if _, err := EnsureVaultEnv(log); err != nil {
 		log.Warn("Failed to set VAULT_ADDR environment", zap.Error(err))
 	}
 

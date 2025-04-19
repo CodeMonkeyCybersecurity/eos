@@ -33,7 +33,7 @@ AppRole, userpass, and creates an eos user with a random password.`,
 		}
 
 		// Set VAULT_ADDR from hostname
-		addr, err := vault.EnsureVaultAddr(log)
+		addr, err := vault.EnsureVaultEnv(log)
 		if err != nil {
 			log.Error("Failed to set VAULT_ADDR", zap.Error(err))
 			return err

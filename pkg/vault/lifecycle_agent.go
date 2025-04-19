@@ -130,18 +130,18 @@ func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 }
 
 
-func ensureEosVaultProfile(log *zap.Logger) error {
-	content := fmt.Sprintf("export VAULT_CACERT=%s\n", VaultAgentCACopyPath)
-	log.Info("🔧 Writing EOS vault CA env‑profile", zap.String("path", EosProfileD))
-	if err := os.WriteFile(EosProfileD, []byte(content), 0o644); err != nil {
-	  return fmt.Errorf("writing %s: %w", EosProfileD, err)
-	}
-	// owned by root:root––that’s fine for /etc/profile.d
-	if err := os.Chown(EosProfileD, 0, 0); err != nil {
-	  log.Warn("could not chown profile.d file", zap.Error(err))
-	}
-	return nil
-  }
+// func ensureEosVaultProfile(log *zap.Logger) error {
+// 	content := fmt.Sprintf("export VAULT_CACERT=%s\n", VaultAgentCACopyPath)
+// 	log.Info("🔧 Writing EOS vault CA env‑profile", zap.String("path", EosProfileD))
+// 	if err := os.WriteFile(EosProfileD, []byte(content), 0o644); err != nil {
+// 	  return fmt.Errorf("writing %s: %w", EosProfileD, err)
+// 	}
+// 	// owned by root:root––that’s fine for /etc/profile.d
+// 	if err := os.Chown(EosProfileD, 0, 0); err != nil {
+// 	  log.Warn("could not chown profile.d file", zap.Error(err))
+// 	}
+// 	return nil
+//   }
 
 //
 // ========================= SYSTEMD =========================

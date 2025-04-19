@@ -200,7 +200,7 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 	//--------------------------------------------------------------------
 	// 1.  Sanity: VAULT_ADDR and binary
 	//--------------------------------------------------------------------
-	if _, err := EnsureVaultAddr(log); err != nil {
+	if _, err := EnsureVaultEnv(log); err != nil {
 		return fmt.Errorf("could not determine Vault address: %w", err)
 	}
 	if _, err := exec.LookPath("vault"); err != nil {

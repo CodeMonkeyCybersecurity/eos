@@ -27,7 +27,7 @@ func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error)
 			StartTime: start,
 		}
 
-		addr, addrErr := vault.EnsureVaultAddr(log)
+		addr, addrErr := vault.EnsureVaultEnv(log)
 		if addrErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(err))
 		}

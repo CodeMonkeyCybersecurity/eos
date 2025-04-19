@@ -18,7 +18,7 @@ func EnsureVaultClient(log *zap.Logger) {
 	var report *CheckReport
 	var checkedClient *api.Client
 
-	if _, err := EnsureVaultAddr(log); err != nil {
+	if _, err := EnsureVaultEnv(log); err != nil {
 		log.Warn("⚠️ Failed to set Vault environment", zap.Error(err))
 	}
 
@@ -113,10 +113,10 @@ func EnsureVaultClient(log *zap.Logger) {
 }
 
 // NewClient returns a Vault client that
-//   - uses EnsureVaultAddr() for the endpoint
+//   - uses EnsureVaultEnv() for the endpoint
 //   - trusts /opt/vault/tls/tls.crt unless the user already provided a CA.
 func NewClient(log *zap.Logger) (*api.Client, error) {
-	addr, _ := EnsureVaultAddr(log)
+	addr, _ := EnsureVaultEnv(log)
 
 	cfg := api.DefaultConfig()
 	cfg.Address = addr
