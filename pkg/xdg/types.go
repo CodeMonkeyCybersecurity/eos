@@ -8,6 +8,7 @@ const (
 	VaultRuntimePerms      = 0750
 	FilePermOwnerRWX       = 0700
 	FilePermPublicCert     = 0644
+	SystemdUnitFilePerms   = 0644
 	FilePermOwnerReadWrite = 0600
 	FilePermReadOnly       = 0444
 )

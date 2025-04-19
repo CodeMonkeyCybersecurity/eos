@@ -69,19 +69,19 @@ func canConnectTLS(raw string, d time.Duration) bool {
 	return false
 }
 
-// tcpUp kept for completeness (currently unused by EnsureVaultAddr).
-func tcpUp(raw string, d time.Duration) bool {
-	u, _ := url.Parse(raw)
-	c, err := net.DialTimeout("tcp", u.Host, d)
-	if err == nil {
-		_ = c.Close()
-		return true
-	}
-	return false
-}
+// // tcpUp kept for completeness (currently unused by EnsureVaultAddr).
+// func tcpUp(raw string, d time.Duration) bool {
+// 	u, _ := url.Parse(raw)
+// 	c, err := net.DialTimeout("tcp", u.Host, d)
+// 	if err == nil {
+// 		_ = c.Close()
+// 		return true
+// 	}
+// 	return false
+// }
 
-// GetVaultAddr returns the canonical HTTPS addr for internal hostname.
-func getVaultAddr() string {
-	host := platform.GetInternalHostname()
-	return fmt.Sprintf(VaultDefaultAddr, host) // VaultDefaultAddr is now "https://%s:8179"
-}
+// // GetVaultAddr returns the canonical HTTPS addr for internal hostname.
+// func getVaultAddr() string {
+// 	host := platform.GetInternalHostname()
+// 	return fmt.Sprintf(VaultDefaultAddr, host) // VaultDefaultAddr is now "https://%s:8179"
+// }

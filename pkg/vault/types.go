@@ -17,6 +17,45 @@ import (
 // ------------------------- CONSTANTS -------------------------
 //
 
+const agentConfigTmpl = `
+vault {
+  address     = "{{ .Addr }}"
+  tls_ca_file = "{{ .CACert }}"
+}
+#listener "tcp" {
+#  address = "127.0.0.1:8179"
+#}
+auto_auth {
+  method "approle" {
+    config = {
+      role_id_file_path   = "{{ .RoleFile }}"
+      secret_id_file_path = "{{ .SecretFile }}"
+    }
+  }
+  sink "file" { config = { path = "{{ .TokenSink }}" } }
+}
+#cache { use_auto_auth_token = true }
+`
+
+const agentSystemDUnit = `
+[Unit]
+Description=Vault Agent (Eos)
+After=network.target
+
+[Service]
+User=%s
+Group=%s
+# make /run/eos for the runtime directory
+RuntimeDirectory=eos
+RuntimeDirectoryMode=%o
+ExecStartPre=/usr/bin/install -d -o %s -g %s -m%o %s
+ExecStart=/usr/bin/vault agent -config=%s
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+`
+
 const (
 	TLSDir = "/opt/vault/tls/"
 	TLSKey = TLSDir + "tls.key"

@@ -7,32 +7,14 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
-
-//
-// ========================== ENSURE ==========================
-//
-
-//
-// ========================== LIST ==========================
-//
-
-//
-// ========================== READ ==========================
-//
-
-//
-// ========================== UPDATE ==========================
-//
-
-//
-// ========================== DELETE ==========================
-//
 
 // StoreUserSecret reads an SSH key and stores full user credentials in Vault.
 func StoreUserSecret(username, password, keyPath string, log *zap.Logger) error {
@@ -227,5 +209,151 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 	}
 
 	log.Info("✅ Vault user 'eos' fully ensured")
+	return nil
+}
+
+// WriteAppRoleFiles writes the role_id & secret_id into /etc/vault and
+// ensures the directory is 0700, owned by eos:eos.
+func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
+	dir := filepath.Dir(FallbackRoleIDPath)
+	log.Info("📁 Ensuring AppRole directory", zap.String("path", dir))
+	if err := ensureOwnedDir(dir, 0o700, EosUser); err != nil {
+		return err
+	}
+
+	pairs := map[string]string{
+		FallbackRoleIDPath:   roleID + "\n",
+		FallbackSecretIDPath: secretID + "\n",
+	}
+	for path, data := range pairs {
+		log.Debug("✏️  Writing AppRole file", zap.String("path", path))
+		if err := writeOwnedFile(path, []byte(data), 0o600, EosUser); err != nil {
+			return err
+		}
+	}
+
+	log.Info("✅ AppRole credentials written",
+		zap.String("role_file", FallbackRoleIDPath),
+		zap.String("secret_file", FallbackSecretIDPath))
+	return nil
+}
+
+// ------------------------ APP ROLE ------------------------
+
+func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) error {
+	if !opts.ForceRecreate {
+		if _, err := os.Stat(FallbackRoleIDPath); err == nil {
+			log.Info("🔐 AppRole credentials already present — skipping creation",
+				zap.String("role_id_path", FallbackRoleIDPath),
+				zap.Bool("refresh", opts.RefreshCreds),
+			)
+			if opts.RefreshCreds {
+				log.Info("🔄 Refreshing AppRole credentials...")
+				return refreshAppRoleCreds(client, log)
+			}
+			return nil
+		}
+	}
+
+	log.Info("🛠️ Creating or updating Vault AppRole",
+		zap.String("role_path", rolePath),
+		zap.Strings("policies", []string{EosVaultPolicy}),
+	)
+
+	// Enable auth method
+	log.Debug("📡 Enabling AppRole auth method if needed...")
+	if err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"}); err != nil {
+		log.Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
+	}
+
+	// Write role config
+	log.Debug("📦 Writing AppRole definition to Vault...")
+	if _, err := client.Logical().Write(rolePath, map[string]interface{}{
+		"policies":      []string{EosVaultPolicy},
+		"token_ttl":     "60m",
+		"token_max_ttl": "120m",
+	}); err != nil {
+		log.Error("❌ Failed to write AppRole definition", zap.String("path", rolePath), zap.Error(err))
+		return fmt.Errorf("failed to create AppRole %q: %w", rolePath, err)
+	}
+
+	log.Info("✅ AppRole written to Vault", zap.String("role_path", rolePath))
+	return refreshAppRoleCreds(client, log)
+}
+
+func refreshAppRoleCreds(client *api.Client, log *zap.Logger) error {
+	log.Debug("🔑 Requesting AppRole credentials from Vault...")
+
+	roleID, err := client.Logical().Read(rolePath + "/role-id")
+	if err != nil {
+		log.Error("❌ Failed to read AppRole role_id", zap.String("path", rolePath+"/role-id"), zap.Error(err))
+		return fmt.Errorf("failed to read role_id: %w", err)
+	}
+
+	secretID, err := client.Logical().Write(rolePath+"/secret-id", nil)
+	if err != nil {
+		log.Error("❌ Failed to generate AppRole secret_id", zap.String("path", rolePath+"/secret-id"), zap.Error(err))
+		return fmt.Errorf("failed to generate secret_id: %w", err)
+	}
+
+	// Extract safely with type assertion guard
+	rawRoleID, ok := roleID.Data["role_id"].(string)
+	if !ok {
+		log.Error("❌ Invalid or missing role_id in Vault response", zap.Any("data", roleID.Data))
+		return fmt.Errorf("unexpected Vault response format for role_id")
+	}
+
+	rawSecretID, ok := secretID.Data["secret_id"].(string)
+	if !ok {
+		log.Error("❌ Invalid or missing secret_id in Vault response", zap.Any("data", secretID.Data))
+		return fmt.Errorf("unexpected Vault response format for secret_id")
+	}
+
+	// Write to disk
+	// Write to disk
+	log.Debug("💾 Writing AppRole credentials to disk")
+	if err := writeOwnedFile(FallbackRoleIDPath, []byte(rawRoleID+"\n"), 0o640, EosUser); err != nil {
+		log.Error("❌ Failed to write role_id", zap.String("path", FallbackRoleIDPath), zap.Error(err))
+		return err
+	}
+	if err := writeOwnedFile(FallbackSecretIDPath, []byte(rawSecretID+"\n"), 0o640, EosUser); err != nil {
+		log.Error("❌ Failed to write secret_id", zap.String("path", FallbackSecretIDPath), zap.Error(err))
+		return err
+	}
+
+	log.Info("✅ AppRole credentials written to disk",
+		zap.String("role_id_path", FallbackRoleIDPath),
+		zap.String("secret_id_path", FallbackSecretIDPath),
+	)
+	return nil
+}
+
+// --- helper: ensure a dir exists with the right owner & perms ---
+func ensureOwnedDir(path string, perm os.FileMode, owner string) error {
+	if err := os.MkdirAll(path, perm); err != nil {
+		return fmt.Errorf("mkdir %s: %w", path, err)
+	}
+	uid, gid, err := system.LookupUser(owner)
+	if err != nil {
+		return fmt.Errorf("lookup %s: %w", owner, err)
+	}
+	if err := os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("chown %s: %w", path, err)
+	}
+	return nil
+}
+
+// --- helper: write a file and chown to owner ---
+func writeOwnedFile(path string, data []byte, perm os.FileMode, owner string) error {
+	if err := os.WriteFile(path, data, perm); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	uid, gid, err := system.LookupUser(owner)
+	if err != nil {
+		return fmt.Errorf("lookup %s: %w", owner, err)
+	}
+	if err := os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("chown %s: %w", path, err)
+	}
 	return nil
 }

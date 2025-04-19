@@ -5,9 +5,11 @@ package vault
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -149,5 +151,48 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 		log.Warn("could not chmod tls.key", zap.Error(err))
 	}
 
+	// Now copy the public cert into eos’s CA location so the agent can trust it:
+	log.Info("🔧 Copying Vault CA into eos user trust store",
+		zap.String("src", TLSCrt),
+		zap.String("dst", VaultAgentCACopyPath),
+		zap.String("perm", fmt.Sprintf("%#o", 0o644)),
+	)
+	if err := CopyFile(TLSCrt, VaultAgentCACopyPath, 0o644); err != nil {
+		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
+	} else {
+		// make sure eos can read it
+		if uid, gid, err := system.LookupUser(EosUser); err != nil {
+			log.Warn("could not lookup eos user for CA file ownership", zap.Error(err))
+		} else if err := os.Chown(VaultAgentCACopyPath, uid, gid); err != nil {
+			log.Warn("could not chown CA cert for eos user", zap.Error(err))
+		} else {
+			log.Info("✅ Vault CA copied and ownership set", zap.String("path", VaultAgentCACopyPath))
+		}
+	}
+
+	return nil
+}
+
+// CopyFile copies src → dst (creating parent dirs), setting dst to perm.
+func CopyFile(src, dst string, perm os.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", src, err)
+	}
+	defer in.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("mkdir %s: %w", filepath.Dir(dst), err)
+	}
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, perm)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", dst, err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, in); err != nil {
+		return fmt.Errorf("copy %s → %s: %w", src, dst, err)
+	}
 	return nil
 }

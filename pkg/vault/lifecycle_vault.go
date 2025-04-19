@@ -64,13 +64,18 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error
 		return fmt.Errorf("approle setup failed: %w", err)
 	}
 
+	// 5️⃣ Vault‑Agent install & launch (renders HCL, writes unit, reloads & enables)
+	if err := EnsureAgent(client, "", log, DefaultAppRoleOptions()); err != nil {
+		return fmt.Errorf("agent setup failed: %w", err)
+	}
+
 	/* ─────────── CONTINUE WITH AGENT SETUP ───────────
 	// if err := stepWriteAgentConfig(log); …
+	*/
 
 	//if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
 	//if err := stepCopyCA(log); err != nil { ... }                           // step 6
 	//if err := stepWaitForAgentToken(log); err != nil { ... }
-	*/
 
 	if err := phaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {
 		return fmt.Errorf("apply-secrets: %w", err)
