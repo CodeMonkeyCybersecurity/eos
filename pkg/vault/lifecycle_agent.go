@@ -27,9 +27,8 @@ func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppR
 
 	// 1) render agent HCL
 	addr := os.Getenv("VAULT_ADDR")
-	ca := VaultAgentCACopyPath
 	log.Info("📝 Rendering Vault Agent HCL", zap.String("path", VaultAgentConfigPath))
-	if err := RenderAgentConfig(addr, ca, FallbackRoleIDPath, FallbackSecretIDPath, VaultAgentTokenPath, log); err != nil {
+	if err := RenderAgentConfig(addr, log); err != nil {
 		return fmt.Errorf("render agent config: %w", err)
 	}
 
@@ -82,18 +81,18 @@ func writeAgentPassword(password string, log *zap.Logger) error {
 //
 
 // RenderAgentConfig fills in the `agentConfigTmpl` from types.go
-func RenderAgentConfig(addr, ca, roleFile, secretFile, tokenSink string, log *zap.Logger) error {
+func RenderAgentConfig(addr string, log *zap.Logger) error {
 	data := struct {
 		Addr, CACert, RoleFile, SecretFile, TokenSink string
 	}{
 		Addr:       addr,
-		CACert:     ca,
-		RoleFile:   roleFile,
-		SecretFile: secretFile,
-		TokenSink:  tokenSink,
+		CACert:     VaultAgentCACopyPath,
+		RoleFile:   RoleIDPath,
+		SecretFile: SecretIDPath,
+		TokenSink:  VaultAgentTokenPath,
 	}
 
-	tpl := template.Must(template.New("agent.hcl").Parse(agentConfigTmpl))
+	tpl := template.Must(template.New("agent.hcl").Parse(AgentConfigTmpl))
 	f, err := os.Create(VaultAgentConfigPath)
 	if err != nil {
 		return fmt.Errorf("create %s: %w", VaultAgentConfigPath, err)

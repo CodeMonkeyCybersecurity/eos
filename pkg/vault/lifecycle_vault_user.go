@@ -215,15 +215,15 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 // WriteAppRoleFiles writes the role_id & secret_id into /etc/vault and
 // ensures the directory is 0700, owned by eos:eos.
 func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
-	dir := filepath.Dir(FallbackRoleIDPath)
+	dir := filepath.Dir(RoleIDPath)
 	log.Info("📁 Ensuring AppRole directory", zap.String("path", dir))
 	if err := ensureOwnedDir(dir, 0o700, EosUser); err != nil {
 		return err
 	}
 
 	pairs := map[string]string{
-		FallbackRoleIDPath:   roleID + "\n",
-		FallbackSecretIDPath: secretID + "\n",
+		RoleIDPath:   roleID + "\n",
+		SecretIDPath: secretID + "\n",
 	}
 	for path, data := range pairs {
 		log.Debug("✏️  Writing AppRole file", zap.String("path", path))
@@ -233,8 +233,8 @@ func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 	}
 
 	log.Info("✅ AppRole credentials written",
-		zap.String("role_file", FallbackRoleIDPath),
-		zap.String("secret_file", FallbackSecretIDPath))
+		zap.String("role_file", RoleIDPath),
+		zap.String("secret_file", SecretIDPath))
 	return nil
 }
 
@@ -242,9 +242,9 @@ func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 
 func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) error {
 	if !opts.ForceRecreate {
-		if _, err := os.Stat(FallbackRoleIDPath); err == nil {
+		if _, err := os.Stat(RoleIDPath); err == nil {
 			log.Info("🔐 AppRole credentials already present — skipping creation",
-				zap.String("role_id_path", FallbackRoleIDPath),
+				zap.String("role_id_path", RoleIDPath),
 				zap.Bool("refresh", opts.RefreshCreds),
 			)
 			if opts.RefreshCreds {
@@ -312,18 +312,18 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) error {
 	// Write to disk
 	// Write to disk
 	log.Debug("💾 Writing AppRole credentials to disk")
-	if err := writeOwnedFile(FallbackRoleIDPath, []byte(rawRoleID+"\n"), 0o640, EosUser); err != nil {
-		log.Error("❌ Failed to write role_id", zap.String("path", FallbackRoleIDPath), zap.Error(err))
+	if err := writeOwnedFile(RoleIDPath, []byte(rawRoleID+"\n"), 0o640, EosUser); err != nil {
+		log.Error("❌ Failed to write role_id", zap.String("path", RoleIDPath), zap.Error(err))
 		return err
 	}
-	if err := writeOwnedFile(FallbackSecretIDPath, []byte(rawSecretID+"\n"), 0o640, EosUser); err != nil {
-		log.Error("❌ Failed to write secret_id", zap.String("path", FallbackSecretIDPath), zap.Error(err))
+	if err := writeOwnedFile(SecretIDPath, []byte(rawSecretID+"\n"), 0o640, EosUser); err != nil {
+		log.Error("❌ Failed to write secret_id", zap.String("path", SecretIDPath), zap.Error(err))
 		return err
 	}
 
 	log.Info("✅ AppRole credentials written to disk",
-		zap.String("role_id_path", FallbackRoleIDPath),
-		zap.String("secret_id_path", FallbackSecretIDPath),
+		zap.String("role_id_path", RoleIDPath),
+		zap.String("secret_id_path", SecretIDPath),
 	)
 	return nil
 }

@@ -17,7 +17,7 @@ import (
 // ------------------------- CONSTANTS -------------------------
 //
 
-const agentConfigTmpl = `
+const AgentConfigTmpl = `
 vault {
   address     = "{{ .Addr }}"
   tls_ca_file = "{{ .CACert }}"
@@ -64,8 +64,6 @@ const (
 	TLSCrt = TLSDir + "tls.crt"
 
 	VaultAgentCACopyPath   = "/home/eos/.config/vault/ca.crt"
-	FallbackRoleIDPath     = "/etc/vault/role_id"
-	FallbackSecretIDPath   = "/etc/vault/secret_id"
 	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
 
 	EosUser         = "eos"
@@ -155,12 +153,16 @@ var (
 	VaultInitPath             = filepath.Join(SecretsDir, "vault_init.json")
 	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback.json")
 	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass.json")
+	RoleIDPath                = filepath.Join(SecretsDir, "role_id")
+	SecretIDPath              = filepath.Join(SecretsDir, "secret_id")
 	VaultClient               *api.Client
-	EosRunDir                 = "/run/eos"
-	VaultAgentTokenPath       = filepath.Join(EosRunDir, "vault-agent-eos.token")
-	AgentPID                  = filepath.Join(EosRunDir, "vault-agent.pid")
-	VaultPID                  = filepath.Join(EosRunDir, "vault.pid")
-	VaultTokenSinkPath        = filepath.Join(EosRunDir, ".vault-token")
+
+	// Runtime dirs
+	EosRunDir           = "/run/eos"
+	VaultAgentTokenPath = filepath.Join(EosRunDir, "vault_agent_eos.token")
+	AgentPID            = filepath.Join(EosRunDir, "vault_agent.pid")
+	VaultPID            = filepath.Join(EosRunDir, "vault.pid")
+	VaultTokenSinkPath  = filepath.Join(EosRunDir, ".vault-token")
 )
 
 var VaultHealthEndpoint = fmt.Sprintf("https://%s/v1/sys/health", strings.Split(ListenerAddr, ":")[0])
