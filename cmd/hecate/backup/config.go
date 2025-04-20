@@ -68,7 +68,7 @@ var BackupConfigCmd = &cobra.Command{
 			log.Error("Failed to remove existing backup", zap.String("path", hecate.BackupCompose), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.CopyFile(hecate.DockerComposeFile, hecate.BackupCompose, log); err != nil {
+		if err := system.CopyFile(hecate.DockerComposeFile, hecate.BackupCompose, 0, log); err != nil {
 			log.Error("Backup failed", zap.String("src", types.DefaultComposeYML), zap.Error(err))
 			os.Exit(1)
 		}

@@ -8,6 +8,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
@@ -21,7 +22,7 @@ func TrustVaultCA(log *zap.Logger) error {
 	)
 
 	// copy the file (overwrite if needed)
-	if err := CopyFile(src, dest, xdg.FilePermPublicCert); err != nil {
+	if err := system.CopyFile(src, dest, xdg.FilePermStandard, log); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	// ensure root owns it
@@ -49,7 +50,7 @@ func TrustVaultCADebian(log *zap.Logger) error {
 	log.Info("📥 Installing Vault CA into Debian trust store",
 		zap.String("src", src), zap.String("dest", dest))
 
-	if err := CopyFile(src, dest, xdg.FilePermPublicCert); err != nil {
+	if err := system.CopyFile(src, dest, xdg.FilePermStandard, log); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	if err := os.Chown(dest, 0, 0); err != nil {

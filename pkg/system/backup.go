@@ -18,7 +18,7 @@ var log = logger.L()
 func RestoreFile(src, dst string) {
 	log.Info("Restoring file", zap.String("source", src), zap.String("destination", dst))
 
-	if err := CopyFile(src, dst, log); err != nil {
+	if err := CopyFile(src, dst, 0, log); err != nil {
 		log.Error("Failed to restore file", zap.Error(err))
 	} else {
 		log.Info("File restored successfully", zap.String("destination", dst))

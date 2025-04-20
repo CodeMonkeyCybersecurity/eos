@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"text/template"
 
@@ -22,43 +23,71 @@ import (
 // EnsureAgent configures & launches the Vault Agent under the eos system‑user.
 // `password` is only used by the userpass method; for AppRole you can pass ""
 // and `opts` comes from DefaultAppRoleOptions().
+// EnsureAgent configures & launches the Vault Agent under the eos system‑user.
+// `password` is only used by the userpass method; for AppRole you can pass ""
+// and `opts` comes from DefaultAppRoleOptions().
 func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppRoleOptions) error {
-	log.Info("🔧 Starting Vault Agent setup for user 'eos'")
+	log.Info("🔧 Starting Vault Agent setup for user 'eos'",
+		zap.Bool("userpass", password != ""),
+		zap.Bool("force_recreate", opts.ForceRecreate),
+		zap.Bool("refresh_creds", opts.RefreshCreds),
+	)
 
-	// 1) render agent HCL
-	addr := os.Getenv("VAULT_ADDR")
-	log.Info("📝 Rendering Vault Agent HCL", zap.String("path", VaultAgentConfigPath))
-	if err := RenderAgentConfig(addr, log); err != nil {
-		return fmt.Errorf("render agent config: %w", err)
-	}
-
-	// 2) write password (if any)
-	if password != "" {
-		log.Info("🔑 Writing Agent password file")
-		if err := writeAgentPassword(password, log); err != nil {
-			return err
-		}
-	}
-
-	// 3) ensure AppRole (drops role_id & secret_id into /etc/vault)
-	log.Info("🔐 Provisioning AppRole for Agent")
-	if err := EnsureAppRole(client, log, opts); err != nil {
+	// Step 1: Provision AppRole
+	log.Info("🔐 Provisioning AppRole credentials",
+		zap.String("role_id_path", RoleIDPath),
+		zap.String("secret_id_path", SecretIDPath),
+	)
+	roleID, secretID, err := EnsureAppRole(client, log, opts)
+	if err != nil {
+		log.Error("❌ Failed to ensure AppRole", zap.Error(err))
 		return fmt.Errorf("ensure approle: %w", err)
 	}
+	log.Info("✅ AppRole credentials provisioned")
 
-	// 4) write systemd unit
-	log.Info("⚙️ Writing Vault Agent systemd unit")
-	if err := WriteSystemdUnit(log); err != nil {
-		return fmt.Errorf("write systemd unit: %w", err)
+	// Step 2: Render Vault Agent HCL
+	addr := os.Getenv("VAULT_ADDR")
+	if addr == "" {
+		log.Warn("⚠️ VAULT_ADDR is empty — expected it to be set before agent setup")
+	}
+	log.Info("📝 Rendering Vault Agent HCL",
+		zap.String("VAULT_ADDR", addr),
+		zap.String("agent_config_path", VaultAgentConfigPath),
+	)
+	if err := RenderAgentConfig(addr, roleID, secretID, log); err != nil {
+		log.Error("❌ Failed to render Vault Agent config", zap.Error(err))
+		return fmt.Errorf("render agent config: %w", err)
+	}
+	log.Info("✅ Vault Agent config rendered")
+
+	// Step 3: Write optional userpass password (if provided)
+	if password != "" {
+		log.Info("🔑 Writing Vault Agent userpass password",
+			zap.String("path", VaultAgentPassPath),
+		)
+		if err := writeAgentPassword(password, log); err != nil {
+			log.Error("❌ Failed to write agent password", zap.Error(err))
+			return fmt.Errorf("write agent password: %w", err)
+		}
+		log.Info("✅ Agent password file written")
 	}
 
-	// 5) reload & enable
-	log.Info("🚀 Enabling & starting Vault Agent service")
+	// Step 4: Write systemd unit
+	log.Info("⚙️ Writing systemd unit for Vault Agent", zap.String("unit_path", VaultAgentServicePath))
+	if err := WriteSystemdUnit(log); err != nil {
+		log.Error("❌ Failed to write systemd unit", zap.Error(err))
+		return fmt.Errorf("write systemd unit: %w", err)
+	}
+	log.Info("✅ Vault Agent systemd unit written")
+
+	// Step 5: Enable & start agent service
+	log.Info("🚀 Enabling and starting Vault Agent systemd service")
 	if err := system.ReloadDaemonAndEnable(log, VaultAgentService); err != nil {
+		log.Error("❌ Failed to enable/start Vault Agent service", zap.Error(err))
 		return fmt.Errorf("enable agent service: %w", err)
 	}
 
-	log.Info("✅ Vault Agent for eos is running and ready")
+	log.Info("✅ Vault Agent is now running as systemd service", zap.String("service", VaultAgentService))
 	return nil
 }
 
@@ -80,8 +109,46 @@ func writeAgentPassword(password string, log *zap.Logger) error {
 // ========================= RENDERING =========================
 //
 
-// RenderAgentConfig fills in the `agentConfigTmpl` from types.go
-func RenderAgentConfig(addr string, log *zap.Logger) error {
+func RenderAgentConfig(addr, roleID, secretID string, log *zap.Logger) error {
+	log.Info("🧩 Rendering Vault Agent HCL template",
+		zap.String("VAULT_ADDR", addr),
+		zap.String("role_id_path", RoleIDPath),
+		zap.String("secret_id_path", SecretIDPath),
+		zap.String("config_path", VaultAgentConfigPath),
+	)
+
+	// Ensure secrets directory exists
+	if err := os.MkdirAll(filepath.Dir(RoleIDPath), xdg.FilePermOwnerRWX); err != nil {
+		log.Error("❌ Failed to create secrets directory", zap.String("dir", filepath.Dir(RoleIDPath)), zap.Error(err))
+		return err
+	}
+	log.Info("✅ Ensured secrets directory exists", zap.String("dir", filepath.Dir(RoleIDPath)))
+
+	// Ensure role_id exists or re-write it
+	if _, err := os.Stat(RoleIDPath); os.IsNotExist(err) {
+		log.Warn("🔧 role_id file missing — re-creating", zap.String("path", RoleIDPath))
+		if err := os.WriteFile(RoleIDPath, []byte(roleID), xdg.OwnerReadOnly); err != nil {
+			log.Error("❌ Failed to write role_id", zap.String("path", RoleIDPath), zap.Error(err))
+			return err
+		}
+		log.Info("✅ Wrote role_id", zap.String("path", RoleIDPath), zap.String("perm", "0400"))
+	} else {
+		log.Info("📄 role_id file already exists", zap.String("path", RoleIDPath))
+	}
+
+	// Ensure secret_id exists or re-write it
+	if _, err := os.Stat(SecretIDPath); os.IsNotExist(err) {
+		log.Warn("🔧 secret_id file missing — re-creating", zap.String("path", SecretIDPath))
+		if err := os.WriteFile(SecretIDPath, []byte(secretID), xdg.OwnerReadOnly); err != nil {
+			log.Error("❌ Failed to write secret_id", zap.String("path", SecretIDPath), zap.Error(err))
+			return err
+		}
+		log.Info("✅ Wrote secret_id", zap.String("path", SecretIDPath), zap.String("perm", "0400"))
+	} else {
+		log.Info("📄 secret_id file already exists", zap.String("path", SecretIDPath))
+	}
+
+	// Build template data
 	data := struct {
 		Addr, CACert, RoleFile, SecretFile, TokenSink string
 	}{
@@ -92,19 +159,32 @@ func RenderAgentConfig(addr string, log *zap.Logger) error {
 		TokenSink:  VaultAgentTokenPath,
 	}
 
+	// Write HCL config to disk
+	log.Info("📄 Writing Vault Agent config file", zap.String("path", VaultAgentConfigPath))
 	tpl := template.Must(template.New("agent.hcl").Parse(AgentConfigTmpl))
 	f, err := os.Create(VaultAgentConfigPath)
 	if err != nil {
+		log.Error("❌ Failed to create Vault Agent config file", zap.String("path", VaultAgentConfigPath), zap.Error(err))
 		return fmt.Errorf("create %s: %w", VaultAgentConfigPath, err)
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			log.Warn("⚠️ Failed to close Vault Agent config file", zap.String("path", VaultAgentConfigPath), zap.Error(cerr))
+		}
+	}()
 
 	if err := tpl.Execute(f, data); err != nil {
+		log.Error("❌ Failed to render Vault Agent template", zap.Error(err))
 		return fmt.Errorf("execute template: %w", err)
 	}
-	if err := os.Chmod(VaultAgentConfigPath, 0o640); err != nil {
-		log.Warn("chmod agent HCL", zap.Error(err))
+
+	if err := os.Chmod(VaultAgentConfigPath, xdg.FilePermStandard); err != nil {
+		log.Warn("⚠️ Failed to set permissions on Vault Agent config", zap.String("path", VaultAgentConfigPath), zap.Error(err))
+	} else {
+		log.Info("✅ Set permissions on Vault Agent config", zap.String("perm", fmt.Sprintf("%#o", xdg.FilePermStandard)))
 	}
+
+	log.Info("✅ Vault Agent HCL successfully rendered", zap.String("output", VaultAgentConfigPath))
 	return nil
 }
 
@@ -170,7 +250,7 @@ func WriteSystemdUnit(log *zap.Logger) error {
 	log.Debug("✍️  Writing systemd unit", zap.String("path", VaultAgentServicePath))
 	if err := os.WriteFile(VaultAgentServicePath,
 		[]byte(strings.TrimSpace(unit)+"\n"),
-		xdg.SystemdUnitFilePerms,
+		xdg.FilePermStandard,
 	); err != nil {
 		return fmt.Errorf("write unit file: %w", err)
 	}

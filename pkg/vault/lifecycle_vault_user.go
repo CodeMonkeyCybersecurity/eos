@@ -180,7 +180,8 @@ func EnsureEosVaultUser(client *api.Client, log *zap.Logger) error {
 	}
 
 	// Ensure AppRole and write credentials
-	if err := EnsureAppRole(client, log, DefaultAppRoleOptions()); err != nil {
+	_, _, err = EnsureAppRole(client, log, DefaultAppRoleOptions())
+	if err != nil {
 		log.Error("Failed to ensure eos AppRole", zap.Error(err))
 		return err
 	}
@@ -240,7 +241,8 @@ func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 
 // ------------------------ APP ROLE ------------------------
 
-func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) error {
+func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) (roleID string, secretID string, err error) {
+	// Skip if credentials already exist and ForceRecreate is false
 	if !opts.ForceRecreate {
 		if _, err := os.Stat(RoleIDPath); err == nil {
 			log.Info("🔐 AppRole credentials already present — skipping creation",
@@ -249,9 +251,10 @@ func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) err
 			)
 			if opts.RefreshCreds {
 				log.Info("🔄 Refreshing AppRole credentials...")
-				return refreshAppRoleCreds(client, log)
+				roleID, secretID, err := refreshAppRoleCreds(client, log)
+				return roleID, secretID, err
 			}
-			return nil
+			return readAppRoleCredsFromDisk(log)
 		}
 	}
 
@@ -274,58 +277,136 @@ func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) err
 		"token_max_ttl": "120m",
 	}); err != nil {
 		log.Error("❌ Failed to write AppRole definition", zap.String("path", rolePath), zap.Error(err))
-		return fmt.Errorf("failed to create AppRole %q: %w", rolePath, err)
+		return "", "", fmt.Errorf("failed to create AppRole %q: %w", rolePath, err)
 	}
-
 	log.Info("✅ AppRole written to Vault", zap.String("role_path", rolePath))
-	return refreshAppRoleCreds(client, log)
-}
 
-func refreshAppRoleCreds(client *api.Client, log *zap.Logger) error {
-	log.Debug("🔑 Requesting AppRole credentials from Vault...")
-
-	roleID, err := client.Logical().Read(rolePath + "/role-id")
+	// Read credentials from Vault
+	log.Debug("🔑 Fetching AppRole credentials from Vault...")
+	roleResp, err := client.Logical().Read(rolePath + "/role-id")
 	if err != nil {
 		log.Error("❌ Failed to read AppRole role_id", zap.String("path", rolePath+"/role-id"), zap.Error(err))
-		return fmt.Errorf("failed to read role_id: %w", err)
+		return "", "", fmt.Errorf("failed to read role_id: %w", err)
 	}
 
-	secretID, err := client.Logical().Write(rolePath+"/secret-id", nil)
+	secretResp, err := client.Logical().Write(rolePath+"/secret-id", nil)
 	if err != nil {
 		log.Error("❌ Failed to generate AppRole secret_id", zap.String("path", rolePath+"/secret-id"), zap.Error(err))
-		return fmt.Errorf("failed to generate secret_id: %w", err)
+		return "", "", fmt.Errorf("failed to generate secret_id: %w", err)
 	}
 
-	// Extract safely with type assertion guard
+	rawRoleID, ok := roleResp.Data["role_id"].(string)
+	if !ok || rawRoleID == "" {
+		log.Error("❌ Invalid or missing role_id in Vault response", zap.Any("data", roleResp.Data))
+		return "", "", fmt.Errorf("invalid role_id in Vault response")
+	}
+
+	rawSecretID, ok := secretResp.Data["secret_id"].(string)
+	if !ok || rawSecretID == "" {
+		log.Error("❌ Invalid or missing secret_id in Vault response", zap.Any("data", secretResp.Data))
+		return "", "", fmt.Errorf("invalid secret_id in Vault response")
+	}
+
+	// Persist them to disk for the agent
+	if err := WriteAppRoleFiles(rawRoleID, rawSecretID, log); err != nil {
+		log.Error("❌ Failed to write AppRole credentials to disk", zap.Error(err))
+		return "", "", err
+	}
+
+	log.Info("✅ AppRole provisioning complete",
+		zap.String("role_id", rawRoleID),
+		zap.String("secret_id", "[redacted]"),
+	)
+
+	return rawRoleID, rawSecretID, nil
+}
+
+func readAppRoleCredsFromDisk(log *zap.Logger) (string, string, error) {
+	roleIDBytes, err := os.ReadFile(RoleIDPath)
+	if err != nil {
+		return "", "", fmt.Errorf("read role_id from disk: %w", err)
+	}
+	secretIDBytes, err := os.ReadFile(SecretIDPath)
+	if err != nil {
+		return "", "", fmt.Errorf("read secret_id from disk: %w", err)
+	}
+	roleID := strings.TrimSpace(string(roleIDBytes))
+	secretID := strings.TrimSpace(string(secretIDBytes))
+
+	log.Info("📄 Loaded AppRole credentials from disk",
+		zap.String("role_id_path", RoleIDPath),
+		zap.String("secret_id_path", SecretIDPath),
+	)
+	return roleID, secretID, nil
+}
+
+func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, error) {
+	log.Debug("🔑 Requesting AppRole credentials from Vault...")
+
+	// Read role_id from Vault
+	roleID, err := client.Logical().Read(rolePath + "/role-id")
+	if err != nil {
+		log.Error("❌ Failed to read AppRole role_id",
+			zap.String("path", rolePath+"/role-id"),
+			zap.Error(err),
+		)
+		return "", "", err
+	}
+
+	// Generate secret_id
+	secretID, err := client.Logical().Write(rolePath+"/secret-id", nil)
+	if err != nil {
+		log.Error("❌ Failed to generate AppRole secret_id",
+			zap.String("path", rolePath+"/secret-id"),
+			zap.Error(err),
+		)
+		return "", "", err
+	}
+
+	// Safely extract role_id
 	rawRoleID, ok := roleID.Data["role_id"].(string)
-	if !ok {
-		log.Error("❌ Invalid or missing role_id in Vault response", zap.Any("data", roleID.Data))
-		return fmt.Errorf("unexpected Vault response format for role_id")
+	if !ok || rawRoleID == "" {
+		log.Error("❌ Invalid or missing role_id in Vault response",
+			zap.Any("data", roleID.Data),
+		)
+		return "", "", fmt.Errorf("invalid role_id in Vault response")
 	}
 
+	// Safely extract secret_id
 	rawSecretID, ok := secretID.Data["secret_id"].(string)
-	if !ok {
-		log.Error("❌ Invalid or missing secret_id in Vault response", zap.Any("data", secretID.Data))
-		return fmt.Errorf("unexpected Vault response format for secret_id")
+	if !ok || rawSecretID == "" {
+		log.Error("❌ Invalid or missing secret_id in Vault response",
+			zap.Any("data", secretID.Data),
+		)
+		return "", "", fmt.Errorf("invalid secret_id in Vault response")
 	}
 
-	// Write to disk
-	// Write to disk
+	// Ensure directory exists (logged elsewhere if needed)
 	log.Debug("💾 Writing AppRole credentials to disk")
+
+	// Write role_id
 	if err := writeOwnedFile(RoleIDPath, []byte(rawRoleID+"\n"), 0o640, EosUser); err != nil {
-		log.Error("❌ Failed to write role_id", zap.String("path", RoleIDPath), zap.Error(err))
-		return err
+		log.Error("❌ Failed to write role_id",
+			zap.String("path", RoleIDPath),
+			zap.Error(err),
+		)
+		return "", "", err
 	}
+
+	// Write secret_id
 	if err := writeOwnedFile(SecretIDPath, []byte(rawSecretID+"\n"), 0o640, EosUser); err != nil {
-		log.Error("❌ Failed to write secret_id", zap.String("path", SecretIDPath), zap.Error(err))
-		return err
+		log.Error("❌ Failed to write secret_id",
+			zap.String("path", SecretIDPath),
+			zap.Error(err),
+		)
+		return "", "", err
 	}
 
 	log.Info("✅ AppRole credentials written to disk",
 		zap.String("role_id_path", RoleIDPath),
 		zap.String("secret_id_path", SecretIDPath),
 	)
-	return nil
+	return rawRoleID, rawSecretID, nil
 }
 
 // --- helper: ensure a dir exists with the right owner & perms ---

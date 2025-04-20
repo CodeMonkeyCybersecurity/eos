@@ -51,7 +51,7 @@ func main() {
 		fmt.Printf("Error removing file '%s': %v\n", hecate.DstCompose, err)
 		os.Exit(1)
 	}
-	if err := system.CopyFile(hecate.BackupCompose, hecate.DstCompose, log); err != nil {
+	if err := system.CopyFile(hecate.BackupCompose, hecate.DstCompose, 0, log); err != nil {
 		fmt.Printf("Error during restore of %s: %v\n", hecate.BackupCompose, err)
 		os.Exit(1)
 	}

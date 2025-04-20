@@ -32,14 +32,14 @@ func DeployApp(app string, cmd *cobra.Command) error {
 	}
 
 	// Copy HTTP config
-	if err := system.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf"), log); err != nil {
+	if err := system.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf"), 0, log); err != nil {
 		return fmt.Errorf("failed to copy HTTP config: %w", err)
 	}
 
 	// Copy Stream config if available
 	streamConfig := filepath.Join(AssetsPath, "stream", app+".conf")
 	if system.Exists(streamConfig) {
-		if err := system.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf"), log); err != nil {
+		if err := system.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf"), 0, log); err != nil {
 			return fmt.Errorf("failed to copy Stream config: %w", err)
 		}
 	}

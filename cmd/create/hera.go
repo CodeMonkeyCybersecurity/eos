@@ -62,7 +62,7 @@ var CreateHeraCmd = &cobra.Command{
 			for _, file := range composeFiles {
 				destFile := filepath.Join(types.HeraDir, filepath.Base(file))
 				log.Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
-				if err := system.CopyFile(file, destFile, log); err != nil {
+				if err := system.CopyFile(file, destFile, 0, log); err != nil {
 					log.Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}
 			}

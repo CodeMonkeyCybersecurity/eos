@@ -57,7 +57,7 @@ func DeployCompose() error {
 	for _, file := range composeFiles {
 		destFile := filepath.Join(targetDir, filepath.Base(file))
 		fmt.Printf("Copying %s to %s\n", file, destFile)
-		if err := system.CopyFile(file, destFile, log); err != nil {
+		if err := system.CopyFile(file, destFile, 0, log); err != nil {
 			return fmt.Errorf("error copying file %s: %v", file, err)
 		}
 	}

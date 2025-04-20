@@ -51,46 +51,82 @@ func Rm(path, label string, log *zap.Logger) error {
 	return nil
 }
 
-/* CopyFile copies a file from src to dst while preserving file permissions. */
-func CopyFile(src, dst string, log *zap.Logger) error {
+// CopyFile copies a file from src to dst and optionally overrides permissions.
+// Pass permOverride = 0 to preserve the original file's permissions.
+func CopyFile(src, dst string, permOverride os.FileMode, log *zap.Logger) error {
+	log.Info("📂 Starting file copy",
+		zap.String("source", src),
+		zap.String("destination", dst),
+		zap.String("perm_override", fmt.Sprintf("%#o", permOverride)),
+	)
+
+	// Step 1: Stat the source
 	sourceFileStat, err := os.Stat(src)
 	if err != nil {
+		log.Error("❌ Failed to stat source file", zap.String("path", src), zap.Error(err))
 		return err
 	}
 
-	// Ensure that the source is a regular file.
 	if !sourceFileStat.Mode().IsRegular() {
+		log.Error("❌ Source is not a regular file", zap.String("path", src), zap.String("mode", sourceFileStat.Mode().String()))
 		return fmt.Errorf("%s is not a regular file", src)
 	}
 
+	log.Info("📄 Source file is valid",
+		zap.String("path", src),
+		zap.String("size", fmt.Sprintf("%d bytes", sourceFileStat.Size())),
+		zap.String("mode", sourceFileStat.Mode().String()),
+	)
+
+	// Step 2: Open the source
 	source, err := os.Open(src)
 	if err != nil {
+		log.Error("❌ Failed to open source file", zap.String("path", src), zap.Error(err))
 		return err
 	}
 	defer func() {
 		if cerr := source.Close(); cerr != nil {
-			log.Warn("Failed to close source file", zap.Error(cerr))
+			log.Warn("⚠️ Failed to close source file", zap.String("path", src), zap.Error(cerr))
 		}
 	}()
 
+	// Step 3: Create the destination
 	destination, err := os.Create(dst)
 	if err != nil {
+		log.Error("❌ Failed to create destination file", zap.String("path", dst), zap.Error(err))
 		return err
 	}
 	defer func() {
 		if cerr := destination.Close(); cerr != nil {
-			log.Warn("Failed to close destination file", zap.Error(cerr))
+			log.Warn("⚠️ Failed to close destination file", zap.String("path", dst), zap.Error(cerr))
 		}
 	}()
 
+	log.Info("✍️ Writing file contents", zap.String("from", src), zap.String("to", dst))
 	if _, err := io.Copy(destination, source); err != nil {
+		log.Error("❌ Failed to copy data", zap.String("from", src), zap.String("to", dst), zap.Error(err))
 		return err
 	}
 
-	// Copy the file permissions from source to destination.
-	if err := os.Chmod(dst, sourceFileStat.Mode()); err != nil {
+	// Step 4: Apply final permissions
+	finalMode := permOverride
+	if permOverride == 0 {
+		finalMode = sourceFileStat.Mode()
+		log.Info("🔐 Preserving source permissions", zap.String("mode", fmt.Sprintf("%#o", finalMode)))
+	} else {
+		log.Info("🔐 Overriding permissions", zap.String("new_mode", fmt.Sprintf("%#o", finalMode)))
+	}
+
+	if err := os.Chmod(dst, finalMode); err != nil {
+		log.Warn("❌ Failed to set permissions on destination", zap.String("path", dst), zap.Error(err))
 		return err
 	}
+
+	log.Info("✅ File copy complete",
+		zap.String("src", src),
+		zap.String("dst", dst),
+		zap.String("mode_applied", fmt.Sprintf("%#o", finalMode)),
+	)
 
 	return nil
 }
@@ -123,7 +159,7 @@ func CopyDir(src, dst string, log *zap.Logger) error {
 				return err
 			}
 		} else {
-			if err := CopyFile(srcPath, dstPath, zap.L()); err != nil {
+			if err := CopyFile(srcPath, dstPath, 0, zap.L()); err != nil {
 				return err
 			}
 		}
