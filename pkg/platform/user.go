@@ -14,9 +14,7 @@ func UserExists(name string) bool {
 	return err == nil
 }
 
-//
 // EnsureUserExists checks for a system user and creates it if missing.
-//
 func EnsureSystemUser(name string) error {
 	if UserExists(name) {
 		return nil

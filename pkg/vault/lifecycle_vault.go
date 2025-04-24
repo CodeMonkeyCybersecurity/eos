@@ -29,8 +29,6 @@ import (
 // - `MaybeWriteVaultInitFallback(init VaultInitResponse) error`
 // ---
 
-
-
 func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api.Client, error) {
 	log.Info("🔐 Vault setup starting")
 
@@ -759,7 +757,6 @@ func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
 	return client, nil
 }
 
-
 func TryPatchVaultPortIfNeeded(log *zap.Logger) {
 	b, err := os.ReadFile(VaultConfigPath)
 	if err != nil {
@@ -795,7 +792,6 @@ func TryPatchVaultPortIfNeeded(log *zap.Logger) {
 		log.Info("No 8200 binding found in config — nothing to patch")
 	}
 }
-
 
 // Purge removes Vault repo artifacts and paths based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.

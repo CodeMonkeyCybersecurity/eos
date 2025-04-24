@@ -10,13 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // ## 9. Upload EOS Vault Policy
 
 // - `EnsureEosPolicy(client *api.Client, log *zap.Logger) error`
 
 // ---
-
 
 //
 // ------------------------ POLICY ------------------------

@@ -16,15 +16,12 @@ import (
 	"go.uber.org/zap"
 )
 
-
 // ## 11. Render Vault Agent Config
 
 // - `RenderVaultAgentConfig(roleID, secretID string) ([]byte, error)`
 // - `WriteVaultAgentConfig(config []byte) error`
 
 // ---
-
-
 
 // StoreUserSecret reads an SSH key and stores full user credentials in Vault.
 func StoreUserSecret(username, password, keyPath string, log *zap.Logger) error {

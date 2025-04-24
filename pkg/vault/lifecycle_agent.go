@@ -24,9 +24,6 @@ import (
 
 // ---
 
-
-
-
 //
 // ========================== ENSURE ==========================
 //
@@ -38,7 +35,6 @@ import (
 // `password` is only used by the userpass method; for AppRole you can pass ""
 // and `opts` comes from DefaultAppRoleOptions().
 
-
 // TODO
 // PLACEHOLDER TO ENSURE THIS IS IMPLEMENTED
 // ## 5. Install and Start vault.service
@@ -46,8 +42,6 @@ import (
 // - `RenderVaultServiceUnit() ([]byte, error)`
 // - `InstallSystemdUnit(name string, content []byte) error`
 // - `StartAndEnableService(name string) error`
-
-
 
 // ### Decision: Systemd Services for Vault and Vault Agent
 
@@ -62,20 +56,16 @@ import (
 //   - Vault Agent is essential to EOS’s secrets flow: it logs in via AppRole and provides sink token access to the CLI.
 //   - Including it aligns with the goal of making secrets access secure and invisible.
 
-
 // - `vault-agent-eos.service` should use `After=vault.service` and `Requires=vault.service`
 // - This ensures the Vault service is active before the agent attempts to fetch a token.
 // ---
-
-
-
 
 func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppRoleOptions) error {
 	// ─────────── REMINDERS WITH AGENT SETUP ───────────
 	// if err := stepWriteAgentConfig(log); …
 	//if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
 	//if err := stepWaitForAgentToken(log); err != nil { ... }
-	
+
 	log.Info("🔧 Starting Vault Agent setup for user 'eos'",
 		zap.Bool("userpass", password != ""),
 		zap.Bool("force_recreate", opts.ForceRecreate),
@@ -140,7 +130,6 @@ func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppR
 	return nil
 }
 
-
 func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
 
 	// ✅ Check for existing config first
@@ -197,8 +186,6 @@ cache {
 	log.Info("✅ Vault Agent config written successfully", zap.String("path", VaultAgentConfigPath))
 	return nil
 }
-
-
 
 // --- Helper Functions ---
 
