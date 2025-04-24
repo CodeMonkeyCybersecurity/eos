@@ -30,3 +30,11 @@ func LookupUser(name string) (int, int, error) {
 	}
 	return uid, gid, nil
 }
+
+
+/**/
+func FileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+/**/

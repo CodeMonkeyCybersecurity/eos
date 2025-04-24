@@ -16,6 +16,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// ## 12. Install and Start vault-agent-eos.service
+
+// - `RenderVaultAgentServiceUnit() ([]byte, error)`
+// - `InstallSystemdUnit(name string, content []byte) error`
+// - `StartAndEnableService(name string) error`
+
+// ---
+
+
+
+
 //
 // ========================== ENSURE ==========================
 //
@@ -26,7 +37,45 @@ import (
 // EnsureAgent configures & launches the Vault Agent under the eos system‑user.
 // `password` is only used by the userpass method; for AppRole you can pass ""
 // and `opts` comes from DefaultAppRoleOptions().
+
+
+// TODO
+// PLACEHOLDER TO ENSURE THIS IS IMPLEMENTED
+// ## 5. Install and Start vault.service
+
+// - `RenderVaultServiceUnit() ([]byte, error)`
+// - `InstallSystemdUnit(name string, content []byte) error`
+// - `StartAndEnableService(name string) error`
+
+
+
+// ### Decision: Systemd Services for Vault and Vault Agent
+
+// - **Always install** both `vault.service` and `vault-agent-eos.service` systemd units.
+// - **Enable and start immediately** to ensure a seamless, minimal-friction install experience.
+//   - Removes ambiguity around install vs runtime status.
+// - **Run both services as the `eos` system user**:
+//   - Ensures all privileged EOS-managed processes run through a consistent, auditable identity.
+//   - Simplifies security hardening by centralizing control under one trusted user.
+//   - All escalated privileges will be gated through `sudo -u eos`.
+// - **vault-agent-eos.service should be included by default**.
+//   - Vault Agent is essential to EOS’s secrets flow: it logs in via AppRole and provides sink token access to the CLI.
+//   - Including it aligns with the goal of making secrets access secure and invisible.
+
+
+// - `vault-agent-eos.service` should use `After=vault.service` and `Requires=vault.service`
+// - This ensures the Vault service is active before the agent attempts to fetch a token.
+// ---
+
+
+
+
 func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppRoleOptions) error {
+	// ─────────── REMINDERS WITH AGENT SETUP ───────────
+	// if err := stepWriteAgentConfig(log); …
+	//if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
+	//if err := stepWaitForAgentToken(log); err != nil { ... }
+	
 	log.Info("🔧 Starting Vault Agent setup for user 'eos'",
 		zap.Bool("userpass", password != ""),
 		zap.Bool("force_recreate", opts.ForceRecreate),
@@ -90,6 +139,66 @@ func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppR
 	log.Info("✅ Vault Agent is now running as systemd service", zap.String("service", VaultAgentService))
 	return nil
 }
+
+
+func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
+
+	// ✅ Check for existing config first
+	if _, err := os.Stat(VaultAgentConfigPath); err == nil {
+		log.Info("✅ Vault Agent config already exists — skipping rewrite", zap.String("path", VaultAgentConfigPath))
+		return nil
+	}
+
+	// ✅ Check AppRole files exist
+	if _, err := os.Stat(RoleIDPath); err != nil {
+		return fmt.Errorf("role_id not found: %w", err)
+	}
+	if _, err := os.Stat(SecretIDPath); err != nil {
+		return fmt.Errorf("secret_id not found: %w", err)
+	}
+
+	log.Info("✍️ Writing Vault Agent config file", zap.String("path", VaultAgentConfigPath))
+
+	// Use dynamic Vault address and listener
+	content := fmt.Sprintf(`
+pid_file = "%s"
+
+auto_auth {
+  method "approle" {
+    config = {
+      role_id_file_path   = "%s"
+      secret_id_file_path = "%s"
+    }
+  }
+  sink "file" {
+    config = {
+      path = "%s"
+    }
+  }
+}
+
+vault {
+  address = "%s"
+}
+
+listener "tcp" {
+  address     = "%s"
+  tls_disable = true
+}
+
+cache {
+  use_auto_auth_token = true
+}`, AgentPID, RoleIDPath, SecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
+
+	if err := os.WriteFile(VaultAgentConfigPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write Vault Agent config to %s: %w", VaultAgentConfigPath, err)
+	}
+
+	log.Info("✅ Vault Agent config written successfully", zap.String("path", VaultAgentConfigPath))
+	return nil
+}
+
+
 
 // --- Helper Functions ---
 
@@ -189,24 +298,6 @@ func RenderAgentConfig(addr, roleID, secretID string, log *zap.Logger) error {
 }
 
 // ------------------------ ENVIRONMENT ------------------------
-
-// PrepareVaultAgentEnvironment ensures runtime dir exists and port 8179 is free.
-func PrepareVaultAgentEnvironment(log *zap.Logger) error {
-	log.Info("🧼 Preparing Vault Agent environment")
-
-	if err := EnsureVaultDirs(log); err != nil {
-		log.Error("Failed to prepare runtime dir", zap.Error(err))
-		return err
-	}
-
-	if err := killVaultAgentPort(log); err != nil {
-		log.Warn("Failed to kill Vault Agent port", zap.Error(err))
-		return err
-	}
-
-	log.Info("✅ Vault Agent environment ready")
-	return nil
-}
 
 // func ensureEosVaultProfile(log *zap.Logger) error {
 // 	content := fmt.Sprintf("export VAULT_CACERT=%s\n", VaultAgentCACopyPath)

@@ -9,85 +9,111 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
-//
-// ========================== CREATE ==========================
-//
+// ## 6. Initialize Vault
+// - `IsVaultInitialized(client *api.Client) (bool, error)`
+// - `InitializeVault(client *api.Client) (VaultInitResponse, error)`
+// - `PromptToSaveVaultInitData(init VaultInitResponse) error`
+// - `ConfirmUnsealMaterialSaved(init VaultInitResponse) error`
+// - `MaybeWriteVaultInitFallback(init VaultInitResponse) error`
+// ---
 
-func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) error {
+
+
+func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api.Client, error) {
 	log.Info("🔐 Vault setup starting")
 
-	log.Info("Generating Vault TLS Certificate")
+	log.Info("[1/11] Generating Vault TLS Certificate")
 	if err := GenerateVaultTLSCert(log); err != nil {
-		log.Error("Failed to generate Vault TLS Certificate")
-
-		return fmt.Errorf("tls-gen: %w", err)
+		log.Error("❌ Failed to generate Vault TLS Certificate", zap.Error(err))
+		return nil, fmt.Errorf("tls-gen: %w", err)
 	}
+	log.Info("✅ TLS Certificate generated")
 
-	// trust our self‑signed CA system‑wide
+	log.Info("[2/11] Trusting self-signed CA system-wide")
 	if err := TrustVaultCA(log); err != nil {
-		log.Warn("continuing despite CA‑trust install failure", zap.Error(err))
+		log.Error("❌ Failed to trust Vault CA", zap.Error(err))
+		return nil, err
 	}
+	log.Info("✅ Vault CA trusted")
 
+	log.Info("[3/11] Installing Vault binaries and systemd service")
 	if err := phaseInstallVault(log); err != nil {
-		return fmt.Errorf("install: %w", err)
+		log.Error("❌ Vault installation failed", zap.Error(err))
+		return nil, fmt.Errorf("install: %w", err)
 	}
+	log.Info("✅ Vault installed")
 
+	log.Info("[4/11] Patching vault.hcl config if needed")
 	if err := phasePatchVaultConfigIfNeeded(log); err != nil {
-		return fmt.Errorf("patch-config: %w", err)
+		log.Error("❌ Failed to patch Vault config", zap.Error(err))
+		return nil, fmt.Errorf("patch-config: %w", err)
 	}
-	if err := phaseEnsureVaultRuntimeDir(log); err != nil {
-		return fmt.Errorf("runtime-dir: %w", err)
-	}
+	log.Info("✅ Vault config verified")
+
+	log.Info("[5/11] Waiting for healthy Vault client")
 	if err := phaseEnsureClientHealthy(log); err != nil {
-		return fmt.Errorf("client-health: %w", err)
+		log.Error("❌ Vault client not healthy", zap.Error(err))
+		return nil, fmt.Errorf("client-health: %w", err)
 	}
+	log.Info("✅ Vault client healthy")
+
+	log.Info("[6/11] Initializing and unsealing Vault")
 	client, err := phaseInitAndUnsealVault(log)
 	if err != nil {
-		return fmt.Errorf("init-unseal: %w", err)
+		log.Error("❌ Failed to initialize/unseal Vault", zap.Error(err))
+		return nil, fmt.Errorf("init-unseal: %w", err)
 	}
+	log.Info("✅ Vault initialized and unsealed")
 
-	// ─────────── BOOTSTRAP KV & POLICY ───────────
+	log.Info("[7/11] Enabling KV v2 at secrets mount")
 	if err := EnsureKVv2Enabled(client, strings.TrimSuffix(KVNamespaceSecrets, "/"), log); err != nil {
-		return fmt.Errorf("kv-v2 enable failed: %w", err)
+		log.Error("❌ Failed to enable KV v2", zap.Error(err))
+		return nil, fmt.Errorf("kv-v2 enable failed: %w", err)
 	}
+	log.Info("✅ KV v2 enabled")
+
+	log.Info("[8/11] Bootstrapping test secret")
 	if err := BootstrapKV(client, "bootstrap/test", log); err != nil {
-		return fmt.Errorf("kv bootstrap failed: %w", err)
+		log.Error("❌ Failed to bootstrap KV", zap.Error(err))
+		return nil, fmt.Errorf("kv bootstrap failed: %w", err)
 	}
+	log.Info("✅ KV test secret bootstrapped")
+
+	log.Info("[9/11] Writing Vault policies")
 	if err := EnsurePolicy(client, log); err != nil {
-		return fmt.Errorf("policy write failed: %w", err)
+		log.Error("❌ Failed to write policy", zap.Error(err))
+		return nil, fmt.Errorf("policy write failed: %w", err)
 	}
+	log.Info("✅ Policy written")
+
+	log.Info("[10/11] Configuring AppRole auth method")
 	if err := EnsureAppRoleAuth(client, log); err != nil {
-		return fmt.Errorf("approle setup failed: %w", err)
+		log.Error("❌ Failed to configure AppRole", zap.Error(err))
+		return nil, fmt.Errorf("approle setup failed: %w", err)
 	}
+	log.Info("✅ AppRole configured")
 
-	// 5️⃣ Vault‑Agent install & launch (renders HCL, writes unit, reloads & enables)
-	if err := EnsureAgent(client, "", log, DefaultAppRoleOptions()); err != nil {
-		return fmt.Errorf("agent setup failed: %w", err)
-	}
-
-	/* ─────────── CONTINUE WITH AGENT SETUP ───────────
-	// if err := stepWriteAgentConfig(log); …
-	*/
-
-	//if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
-	//if err := stepCopyCA(log); err != nil { ... }                           // step 6
-	//if err := stepWaitForAgentToken(log); err != nil { ... }
-
+	log.Info("[11/11] Applying core secrets to Vault")
 	if err := phaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {
-		return fmt.Errorf("apply-secrets: %w", err)
+		log.Error("❌ Failed to apply core secrets", zap.Error(err))
+		return nil, fmt.Errorf("apply-secrets: %w", err)
 	}
-	log.Info("✅ Vault setup complete")
-	return nil
+	log.Info("✅ Core secrets applied")
+
+	log.Info("🎉 Vault setup complete")
+	return client, nil
 }
 
 // phaseInstallVault ensures Vault is installed using the appropriate package manager.
@@ -157,28 +183,6 @@ func phasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 	}
 
 	log.Info("ℹ️ No 8200 port found in Vault config — no changes applied")
-	return nil
-}
-
-// phaseEnsureVaultRuntimeDir ensures the Vault runtime directory exists with secure permissions.
-func phaseEnsureVaultRuntimeDir(log *zap.Logger) error {
-	log.Info("[3/6] Ensuring Vault runtime directory exists")
-
-	runtimeDir := EosRunDir
-
-	// Create directory if missing
-	if err := os.MkdirAll(runtimeDir, 0700); err != nil {
-		log.Error("❌ Failed to create Vault runtime directory", zap.String("path", runtimeDir), zap.Error(err))
-		return fmt.Errorf("could not create Vault runtime dir: %w", err)
-	}
-
-	// Set strict permissions
-	if err := os.Chmod(runtimeDir, 0700); err != nil {
-		log.Warn("⚠️ Failed to enforce 0700 permissions on runtime dir", zap.Error(err))
-	} else {
-		log.Info("✅ Vault runtime directory ready", zap.String("path", runtimeDir))
-	}
-
 	return nil
 }
 
@@ -272,22 +276,6 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 
 func phaseInitAndUnsealVault(log *zap.Logger) (*api.Client, error) {
 	log.Info("[5/6] Initializing and unsealing Vault if necessary")
-
-	// Step 1: Ensure directory structure is ready
-	log.Debug("🔍 Verifying required Vault directories...")
-	if err := EnsureVaultDirs(log); err != nil {
-		log.Error("❌ Vault directory setup failed", zap.Error(err))
-		return nil, fmt.Errorf("vault directory setup failed: %w", err)
-	}
-
-	// Step 2: Create Vault client
-	log.Debug("🧪 Attempting to create Vault API client...")
-	client, err := NewClient(log)
-	if err != nil {
-		log.Error("❌ Could not create Vault client", zap.Error(err))
-		return nil, fmt.Errorf("could not create Vault client: %w", err)
-	}
-	log.Info("✅ Vault client created successfully", zap.String("address", client.Address()))
 
 	// Step 3: Attempt initialization or reuse
 	log.Debug("⚙️ Checking Vault initialization status...")
@@ -411,30 +399,18 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResponse, error) {
 	log.Info("⚙️ Starting Vault setup")
 
-	// Step 1: Ensure required directories exist
-	log.Debug("🔍 Ensuring Vault support directories exist")
-	if err := EnsureVaultDirs(log); err != nil {
-		log.Error("❌ Vault directory setup failed", zap.Error(err))
-		return nil, nil, fmt.Errorf("vault directory setup failed: %w", err)
-	}
-	log.Info("📁 Vault directories verified")
-
-	// Step 2: Attempt initialization with timeout
-	log.Debug("⏱️ Creating context for Vault init with 10s timeout")
+	// Step 1: Attempt initialization with timeout
+	log.Debug("⏱️ Creating context for Vault init with 30s timeout")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	log.Info("🧪 Attempting Vault initialization")
 	initRes, err := client.Sys().InitWithContext(ctx, &api.InitRequest{
 		SecretShares:    5,
 		SecretThreshold: 3,
 	})
 	if err != nil {
-		// handle 400 (already initialised) vs real errors here
-	}
-
-	log.Info("🧪 Attempting Vault initialization")
-	if err != nil {
-		// Already initialized — fallback to reuse
+		// Step 2: Handle already-initialized fallback
 		if IsAlreadyInitialized(err, log) {
 			log.Info("ℹ️ Vault already initialized — attempting reuse via fallback")
 
@@ -458,16 +434,22 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 		// Unknown error: surface context-related issues clearly
 		log.Error("❌ Vault initialization failed", zap.Error(err))
 		if errors.Is(err, context.DeadlineExceeded) {
-			log.Warn("💡 Vault init timed out — ensure Vault server is responding and unsealed")
+			log.Warn("💡 Vault init timed out — is the Vault API responding on the correct port?")
+		} else if strings.Contains(err.Error(), "connection refused") {
+			log.Warn("💡 Vault appears down — check systemd status or port binding")
 		}
-		// log.Fatal("🔥 Vault unreachable — setup cannot continue") // optional if retry logic is elsewhere
 		return nil, nil, fmt.Errorf("vault init error: %w", err)
 	}
 
-	// Step 3: New instance — unseal and persist
+	// Step 3: Successful init
 	log.Info("🎉 Vault successfully initialized")
 	log.Debug("🔐 Dumping init result to memory")
 	DumpInitResult(initRes, log)
+
+	if len(initRes.Keys) == 0 || initRes.RootToken == "" {
+		log.Error("❌ Init result missing unseal keys or root token")
+		return nil, nil, fmt.Errorf("invalid init result returned by Vault")
+	}
 
 	if err := finalizeVaultSetup(client, initRes, log); err != nil {
 		log.Error("❌ Final Vault setup failed", zap.Error(err))
@@ -475,44 +457,173 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 	}
 
 	log.Info("✅ Vault setup completed and ready")
+	log.Info("📁 Vault unseal keys and root token stored to fallback file and Vault KV")
 	return client, initRes, nil
 }
 
 func EnsureVaultDirs(log *zap.Logger) error {
-	dirs := []string{
-		SecretsDir,
-		EosRunDir,
+	// Directories to create + who should own them
+	dirs := []struct {
+		path  string
+		owner string // system.LookupUser key
+		perm  os.FileMode
+	}{
+		{SecretsDir, EosUser, xdg.FilePermOwnerRWX},                         // /var/lib/eos/secrets
+		{EosRunDir, EosUser, xdg.FilePermOwnerRWX},                          // /run/eos
+		{TLSDir, "vault", xdg.FilePermOwnerRWX},                             // where tls.key/.crt live
+		{filepath.Dir(VaultAgentCACopyPath), EosUser, xdg.FilePermOwnerRWX}, // parent of agent CA copy
 	}
 
-	uid, gid, err := system.LookupUser("eos")
+	// Resolve UIDs/GIDs
+	eosUID, eosGID, err := system.LookupUser(EosUser)
 	if err != nil {
-		log.Warn("⚠️ Could not resolve eos UID/GID", zap.Error(err))
-		uid, gid = 1001, 1001 // fallback, optionally make configurable
+		log.Warn("⚠️ Could not resolve eos UID/GID, falling back to 1001:1001", zap.Error(err))
+		eosUID, eosGID = 1001, 1001
+	}
+	vaultUID, vaultGID, err := system.LookupUser("vault")
+	if err != nil {
+		log.Warn("⚠️ Could not resolve vault UID/GID, vault‑owned files may be wrong", zap.Error(err))
+		vaultUID, vaultGID = 0, 0
 	}
 
-	for _, dir := range dirs {
-		log.Debug("🔧 Ensuring Vault dir", zap.String("path", dir))
-
-		if err := os.MkdirAll(dir, 0750); err != nil {
-			log.Error("❌ Failed to create Vault dir", zap.String("path", dir), zap.Error(err))
-			return fmt.Errorf("failed to create dir %s: %w", dir, err)
+	// 1) Create & fix ownership/perms on each directory
+	for _, d := range dirs {
+		log.Debug("🔧 Ensuring directory exists", zap.String("path", d.path))
+		if err := os.MkdirAll(d.path, d.perm); err != nil {
+			log.Error("❌ Failed to create directory", zap.String("path", d.path), zap.Error(err))
+			return fmt.Errorf("mkdir %s: %w", d.path, err)
 		}
+		log.Info("✅ Directory created/exists", zap.String("path", d.path), zap.String("perm", fmt.Sprintf("%#o", d.perm)))
 
-		info, err := os.Stat(dir)
+		info, err := os.Stat(d.path)
 		if err != nil {
-			log.Warn("⚠️ Could not stat dir after creation", zap.String("path", dir), zap.Error(err))
+			log.Warn("⚠️ Could not stat directory after creation", zap.String("path", d.path), zap.Error(err))
 			continue
 		}
+		st := info.Sys().(*syscall.Stat_t)
 
-		if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-			if int(stat.Uid) != uid || int(stat.Gid) != gid {
-				if err := os.Chown(dir, uid, gid); err != nil {
-					log.Warn("⚠️ Could not chown Vault dir", zap.String("path", dir), zap.Error(err))
-				} else {
-					log.Info("🔐 Ownership updated", zap.String("path", dir), zap.Int("uid", uid), zap.Int("gid", gid))
-				}
+		// Decide which owner to apply
+		var uid, gid int
+		if d.owner == EosUser {
+			uid, gid = eosUID, eosGID
+		} else {
+			uid, gid = vaultUID, vaultGID
+		}
+		if int(st.Uid) != uid || int(st.Gid) != gid {
+			if err := os.Chown(d.path, uid, gid); err != nil {
+				log.Warn("⚠️ Could not chown directory", zap.String("path", d.path), zap.Int("uid", uid), zap.Int("gid", gid), zap.Error(err))
+			} else {
+				log.Info("🔐 Set directory ownership", zap.String("path", d.path), zap.Int("uid", uid), zap.Int("gid", gid))
 			}
 		}
+	}
+
+	// 2) Secure TLS files (key, cert) under TLSDir as vault:vault
+	tlsFiles := []struct {
+		path string
+		perm os.FileMode
+	}{
+		{TLSKey, xdg.FilePermOwnerReadWrite},
+		{TLSCrt, xdg.FilePermStandard},
+	}
+	for _, tf := range tlsFiles {
+		log.Debug("🔧 Securing TLS file", zap.String("path", tf.path))
+		if err := os.Chown(tf.path, vaultUID, vaultGID); err != nil {
+			log.Warn("⚠️ Chown TLS file failed", zap.String("path", tf.path), zap.Error(err))
+		} else {
+			log.Info("✅ TLS file ownership set", zap.String("path", tf.path), zap.Int("uid", vaultUID), zap.Int("gid", vaultGID))
+		}
+		if err := os.Chmod(tf.path, tf.perm); err != nil {
+			log.Warn("⚠️ Chmod TLS file failed", zap.String("path", tf.path), zap.Error(err))
+		} else {
+			log.Info("✅ TLS file permissions set", zap.String("path", tf.path), zap.String("perm", fmt.Sprintf("%#o", tf.perm)))
+		}
+	}
+
+	// 3) Copy the public CA into eos’s trust store and secure it
+	log.Info("🔧 Copying Vault CA into eos trust store",
+		zap.String("src", TLSCrt),
+		zap.String("dst", VaultAgentCACopyPath),
+	)
+	if err := system.CopyFile(TLSCrt, VaultAgentCACopyPath, 0, log); err != nil {
+		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
+		return err
+	}
+	if err := os.Chown(VaultAgentCACopyPath, eosUID, eosGID); err != nil {
+		log.Warn("⚠️ Could not chown CA cert for eos user", zap.String("path", VaultAgentCACopyPath), zap.Error(err))
+	} else {
+		log.Info("✅ CA cert ownership set", zap.String("path", VaultAgentCACopyPath), zap.Int("uid", eosUID), zap.Int("gid", eosGID))
+	}
+
+	return nil
+}
+
+func PrepareVaultAgentEnvironment(log *zap.Logger) error {
+	// existing: create /run/eos
+	if err := os.MkdirAll(EosRunDir, xdg.FilePermOwnerRWX); err != nil {
+		log.Error("Failed to create run directory", zap.String("path", EosRunDir), zap.Error(err))
+		return err
+	}
+	log.Info("Ensured run directory", zap.String("path", EosRunDir))
+
+	// NEW: create /var/lib/eos/secrets
+	if err := os.MkdirAll(SecretsDir, xdg.FilePermOwnerRWX); err != nil {
+		log.Error("Failed to create secrets directory", zap.String("path", SecretsDir), zap.Error(err))
+		return err
+	}
+	log.Info("Ensured secrets directory", zap.String("path", SecretsDir))
+	return nil
+}
+
+func secureVaultTLSOwnership(log *zap.Logger) error {
+	uid, gid, err := system.LookupUser("vault")
+	if err != nil {
+		log.Warn("could not lookup vault user", zap.Error(err))
+		return err
+	}
+
+	// Chown and chmod each file with logging
+	for _, file := range []struct {
+		path string
+		perm os.FileMode
+	}{
+		{TLSKey, xdg.FilePermOwnerReadWrite},
+		{TLSCrt, xdg.FilePermStandard},
+		{TLSDir, xdg.FilePermOwnerRWX},
+	} {
+		if err := os.Chown(file.path, uid, gid); err != nil {
+			log.Warn("⚠️ Failed to chown", zap.String("path", file.path), zap.Error(err))
+		} else {
+			log.Info("✅ Set ownership", zap.String("path", file.path), zap.Int("uid", uid), zap.Int("gid", gid))
+		}
+
+		if err := os.Chmod(file.path, file.perm); err != nil {
+			log.Warn("⚠️ Failed to chmod", zap.String("path", file.path), zap.Error(err))
+		} else {
+			log.Info("✅ Set permissions", zap.String("path", file.path), zap.String("perm", fmt.Sprintf("%#o", file.perm)))
+		}
+	}
+
+	// Copy CA to eos trust path
+	log.Info("🔧 Copying Vault CA into eos trust store",
+		zap.String("src", TLSCrt),
+		zap.String("dst", VaultAgentCACopyPath),
+	)
+
+	if err := system.CopyFile(TLSCrt, VaultAgentCACopyPath, xdg.FilePermStandard, log); err != nil {
+		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
+		return err
+	} else {
+		log.Info("✅ CA cert copied", zap.String("dst", VaultAgentCACopyPath))
+	}
+
+	if uid, gid, err := system.LookupUser(EosUser); err != nil {
+		log.Warn("could not lookup eos user for CA file ownership", zap.Error(err))
+	} else if err := os.Chown(VaultAgentCACopyPath, uid, gid); err != nil {
+		log.Warn("could not chown CA cert for eos user", zap.Error(err))
+	} else {
+		log.Info("✅ CA cert ownership set", zap.String("path", VaultAgentCACopyPath),
+			zap.Int("uid", uid), zap.Int("gid", gid))
 	}
 
 	return nil
@@ -520,6 +631,12 @@ func EnsureVaultDirs(log *zap.Logger) error {
 
 func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
 	log.Info("🔐 Finalizing Vault setup")
+
+	// Step 0: Defensive validation of initRes
+	if len(initRes.Keys) == 0 || initRes.RootToken == "" {
+		log.Error("❌ Invalid init result: missing keys or root token")
+		return fmt.Errorf("invalid init result: missing keys or token")
+	}
 
 	// Step 1: Attempt unseal
 	log.Debug("🔓 Attempting to unseal Vault using init result")
@@ -529,6 +646,15 @@ func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.
 		return fmt.Errorf("failed to unseal vault: %w", err)
 	}
 	log.Info("✅ Vault unsealed successfully")
+
+	// (Optional) Verify unseal status
+	sealStatus, err := client.Sys().SealStatus()
+	if err != nil {
+		log.Warn("⚠️ Failed to verify seal status after unsealing", zap.Error(err))
+	} else if sealStatus.Sealed {
+		log.Error("❌ Vault reports still sealed after unseal attempt")
+		return fmt.Errorf("vault still sealed after unseal")
+	}
 
 	// Step 2: Set root token
 	log.Debug("🔑 Setting root token on Vault client")
@@ -542,19 +668,17 @@ func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.
 		return fmt.Errorf("failed to persist init result: %w", err)
 	}
 
-	log.Info("📦 Vault init result written to Vault backend")
+	log.Info("📦 Vault init result written to Vault backend or fallback")
 	return nil
 }
 
-// initAndUnseal is called when /sys/health returns 501 (not initialised).
-// It simply feeds the flow into your existing SetupVault helper.
+// initAndUnseal is called when /sys/health returns 501 (not initialised). It simply feeds the flow into your existing SetupVault helper.
 func initAndUnseal(c *api.Client, log *zap.Logger) error {
 	_, _, err := SetupVault(c, log) // returns (client, initRes, error)
 	return err
 }
 
-// unsealFromStoredKeys is called when /sys/health returns 503 (sealed).
-// We load the stored vault_init.json (or prompt) and unseal.
+// unsealFromStoredKeys is called when /sys/health returns 503 (sealed). We load the stored vault_init.json (or prompt) and unseal.
 func unsealFromStoredKeys(c *api.Client, log *zap.Logger) error {
 	initRes, err := LoadInitResultOrPrompt(c, log)
 	if err != nil {
@@ -567,10 +691,6 @@ func unsealFromStoredKeys(c *api.Client, log *zap.Logger) error {
 	c.SetToken(initRes.RootToken)
 	return nil
 }
-
-//
-// ========================== LIST ==========================
-//
 
 // VaultList returns keys under a path
 func ListVault(path string, log *zap.Logger) ([]string, error) {
@@ -589,10 +709,6 @@ func ListVault(path string, log *zap.Logger) ([]string, error) {
 	}
 	return keys, nil
 }
-
-//
-// ========================== READ ==========================
-//
 
 // VaultRead reads and decodes a secret struct from Vault
 func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
@@ -643,9 +759,6 @@ func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
 	return client, nil
 }
 
-//
-// ========================== UPDATE ==========================
-//
 
 func TryPatchVaultPortIfNeeded(log *zap.Logger) {
 	b, err := os.ReadFile(VaultConfigPath)
@@ -683,9 +796,6 @@ func TryPatchVaultPortIfNeeded(log *zap.Logger) {
 	}
 }
 
-//
-// ========================== DELETE ==========================
-//
 
 // Purge removes Vault repo artifacts and paths based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.

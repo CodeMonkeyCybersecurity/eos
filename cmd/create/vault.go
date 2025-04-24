@@ -30,38 +30,33 @@ var CreateVaultCmd = &cobra.Command{
 		}
 		log.Info("✅ VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
-		// 2️⃣  Write the agent HCL template
-		log.Info("📝 Writing Vault Agent configuration", zap.String("templateAddr", addr))
-		if err := vault.EnsureAgentConfig(addr, log); err != nil {
-			log.Error("Failed to write Vault Agent config", zap.Error(err))
-			return err
+		log.Info("👤 Ensuring system user ‘eos’ exists")
+		if err := platform.EnsureSystemUser("eos" /*noLogin=*/, true, log); err != nil {
+			return fmt.Errorf("ensure eos user: %w", err)
 		}
 
-		// 3️⃣  Trust our self‑signed CA system‑wide
-		distro := platform.DetectLinuxDistro(log)
-		log.Info("🔐 Adding Vault CA to system trust", zap.String("distro", distro))
-		switch distro {
-		case "debian", "ubuntu":
-			log.Debug("📥 Invoking Debian CA trust helper")
-			if err := vault.TrustVaultCADebian(log); err != nil {
-				log.Error("Could not trust Vault CA on Debian/Ubuntu", zap.Error(err))
-				return fmt.Errorf("debian CA trust: %w", err)
-			}
-		default:
-			log.Debug("📥 Invoking RHEL CA trust helper")
-			if err := vault.TrustVaultCA(log); err != nil {
-				log.Error("Could not trust Vault CA on RHEL‑family", zap.Error(err))
-				return fmt.Errorf("rhel CA trust: %w", err)
-			}
+		log.Info("🧼 Preparing all Vault directories, files, and ownership")
+		if err := vault.EnsureVaultDirs(log); err != nil {
+			return fmt.Errorf("prepare vault dirs: %w", err)
 		}
-		log.Info("✅ Vault CA is now trusted system‑wide")
 
 		// 4️⃣  Fire off the full Vault installation+init
-		log.Info("🔐 Running full Vault setup via EnsureVault(...)")
-		if err := vault.EnsureVault("bootstrap/test", map[string]string{"status": "ok"}, log); err != nil {
+		// Includes now   GenerateVaultTLSCert(log) TrustVaultCA(log) as first and second calls
+		//
+
+		// 5️⃣ Provision & start Vault Agent (AppRole, creds, HCL, systemd)
+		client, err := vault.EnsureVault("bootstrap/test", map[string]string{"status": "ok"}, log)
+		if err != nil {
 			log.Error("Vault setup failed", zap.Error(err))
 			return err
 		}
+
+		log.Info("🚀 Setting up Vault Agent (AppRole, systemd, token sink)")
+		if err := vault.EnsureAgent(client, "", log, vault.DefaultAppRoleOptions()); err != nil {
+			log.Error("❌ Vault Agent provisioning failed", zap.Error(err))
+			return err
+		}
+		log.Info("🔑 Vault Agent token will be available at", zap.String("sink", vault.VaultTokenSinkPath))
 
 		port := vault.VaultDefaultPort + "/tcp"
 		if err := platform.AllowPorts(log, []string{port}); err != nil {

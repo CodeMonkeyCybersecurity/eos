@@ -4,82 +4,71 @@ package vault
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
-// EnsurePolicy writes the eos‑policy defined in pkg/vault/types.go
+
+// ## 9. Upload EOS Vault Policy
+
+// - `EnsureEosPolicy(client *api.Client, log *zap.Logger) error`
+
+// ---
+
+
+//
+// ------------------------ POLICY ------------------------
+//
+
+// EnsurePolicy writes the eos-policy defined in pkg/vault/types.go
 func EnsurePolicy(client *api.Client, log *zap.Logger) error {
-	log.Info("📝 Writing Vault policy", zap.String("name", EosVaultPolicy))
+	log.Info("📝 Preparing to write Vault policy", zap.String("policy", EosVaultPolicy))
+
+	// 1️⃣ Retrieve the policy from internal map
 	pol, ok := Policies[EosVaultPolicy]
 	if !ok {
+		log.Error("❌ Policy not found in internal map", zap.String("policy", EosVaultPolicy))
 		return fmt.Errorf("internal error: policy %q not found in Policies map", EosVaultPolicy)
 	}
+
+	// 2️⃣ Log metadata about the policy string
+	log.Debug("📄 Policy loaded", zap.String("preview", truncatePolicy(pol)), zap.Int("length", len(pol)))
+
+	// 3️⃣ Write policy to Vault
+	log.Info("📡 Writing policy to Vault")
 	if err := client.Sys().PutPolicy(EosVaultPolicy, pol); err != nil {
+		log.Error("❌ Failed to write policy", zap.String("policy", EosVaultPolicy), zap.Error(err))
 		return fmt.Errorf("failed to write policy %s: %w", EosVaultPolicy, err)
 	}
-	log.Info("✅ Policy written", zap.String("name", EosVaultPolicy))
+
+	// 4️⃣ Validate policy by re-fetching it from Vault
+	log.Info("🔍 Verifying policy write")
+	storedPol, err := client.Sys().GetPolicy(EosVaultPolicy)
+	if err != nil {
+		log.Error("❌ Failed to retrieve policy for verification", zap.Error(err))
+		return fmt.Errorf("failed to verify written policy: %w", err)
+	}
+
+	if strings.TrimSpace(storedPol) != strings.TrimSpace(pol) {
+		log.Warn("⚠️ Policy mismatch detected after write",
+			zap.String("expected_preview", truncatePolicy(pol)),
+			zap.String("stored_preview", truncatePolicy(storedPol)))
+		return fmt.Errorf("written policy does not match expected content")
+	}
+
+	log.Info("✅ Policy successfully written and verified", zap.String("policy", EosVaultPolicy))
 	return nil
 }
 
-func EnsureAgentConfig(vaultAddr string, log *zap.Logger) error {
-
-	// ✅ Check for existing config first
-	if _, err := os.Stat(VaultAgentConfigPath); err == nil {
-		log.Info("✅ Vault Agent config already exists — skipping rewrite", zap.String("path", VaultAgentConfigPath))
-		return nil
+// truncatePolicy returns a trimmed preview for debug logging
+func truncatePolicy(policy string) string {
+	policy = strings.TrimSpace(policy)
+	if len(policy) > 100 {
+		return policy[:100] + "..."
 	}
-
-	// ✅ Check AppRole files exist
-	if _, err := os.Stat(RoleIDPath); err != nil {
-		return fmt.Errorf("role_id not found: %w", err)
-	}
-	if _, err := os.Stat(SecretIDPath); err != nil {
-		return fmt.Errorf("secret_id not found: %w", err)
-	}
-
-	log.Info("✍️ Writing Vault Agent config file", zap.String("path", VaultAgentConfigPath))
-
-	// Use dynamic Vault address and listener
-	content := fmt.Sprintf(`
-pid_file = "%s"
-
-auto_auth {
-  method "approle" {
-    config = {
-      role_id_file_path   = "%s"
-      secret_id_file_path = "%s"
-    }
-  }
-  sink "file" {
-    config = {
-      path = "%s"
-    }
-  }
-}
-
-vault {
-  address = "%s"
-}
-
-listener "tcp" {
-  address     = "%s"
-  tls_disable = true
-}
-
-cache {
-  use_auto_auth_token = true
-}`, AgentPID, RoleIDPath, SecretIDPath, VaultAgentTokenPath, vaultAddr, VaultDefaultPort)
-
-	if err := os.WriteFile(VaultAgentConfigPath, []byte(strings.TrimSpace(content)+"\n"), 0644); err != nil {
-		return fmt.Errorf("failed to write Vault Agent config to %s: %w", VaultAgentConfigPath, err)
-	}
-
-	log.Info("✅ Vault Agent config written successfully", zap.String("path", VaultAgentConfigPath))
-	return nil
+	return policy
 }
 
 // ApplyAdminPolicy applies a full-access policy from the Policies map to the eos user.

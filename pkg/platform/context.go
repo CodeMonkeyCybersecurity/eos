@@ -71,6 +71,7 @@ func RequireLinuxDistro(allowed []string, log *zap.Logger) error {
 	return fmt.Errorf("unsupported Linux distribution: %s", distro)
 }
 
+
 func GetArch(log *zap.Logger) string {
 	return runtime.GOARCH
 }

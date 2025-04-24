@@ -147,6 +147,8 @@ func NewClient(log *zap.Logger) (*api.Client, error) {
 
 	return cli, nil
 }
+
+
 func SetVaultClient(client *api.Client, log *zap.Logger) {
 	log.Debug("📦 Vault client cached globally")
 	VaultClient = client
