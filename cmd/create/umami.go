@@ -69,7 +69,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Replace all occurrences of "changeme" with the generated password
 		newData := strings.ReplaceAll(string(data), "changeme", password)
-		log.Info("Replaced 'changeme' with generated password", zap.String("password", password))
+		log.Info("Replaced 'changeme' with a generated password")
 
 		// Write the processed Docker Compose file to the destination directory
 		if err := os.WriteFile(destComposeFile, []byte(newData), 0644); err != nil {
