@@ -74,3 +74,8 @@ func IsIgnorableSyncError(err error) bool {
 func StrictEnabled(flags []bool) bool {
 	return len(flags) > 0 && flags[0]
 }
+
+func LogErrAndWrap(log *zap.Logger, msg string, err error) error {
+	log.Error(msg, zap.Error(err))
+	return fmt.Errorf("%s: %w", msg, err)
+}

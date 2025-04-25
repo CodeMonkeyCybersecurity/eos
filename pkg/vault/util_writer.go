@@ -15,10 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-//
-// === Vault Write Helpers ===
-//
-
 // Write stores a struct in Vault using the API or falls back to disk if Vault is unavailable.
 // If client is nil, it initializes one automatically.
 func Write(client *api.Client, name string, data any, log *zap.Logger) error {

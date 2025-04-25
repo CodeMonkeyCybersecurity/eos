@@ -156,26 +156,6 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 	return nil
 }
 
-func UnsealVault(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
-	if len(initRes.KeysB64) < 3 {
-		return fmt.Errorf("not enough unseal keys")
-	}
-
-	fmt.Println("\nUnsealing Vault...")
-	for i, key := range initRes.KeysB64[:3] {
-		resp, err := client.Sys().Unseal(key)
-		if err != nil {
-			return fmt.Errorf("unseal failed: %w", err)
-		}
-		if !resp.Sealed {
-			fmt.Printf("✅ Vault unsealed after key %d\n", i+1)
-			break
-		}
-	}
-	fmt.Println("🔓 Unseal completed.")
-	return nil
-}
-
 /* Enable file audit at "/var/snap/vault/common/vault_audit.log" */
 func EnableFileAudit(client *api.Client, log *zap.Logger) error {
 
@@ -222,11 +202,6 @@ func EnableKV2(client *api.Client, log *zap.Logger) error {
 		return nil
 	}
 	return enableMount(client, "secret", "kv", map[string]string{"version": "2"}, "✅ KV v2 enabled at path=secret.")
-}
-
-/* Enable UserPass */
-func EnableUserPass(client *api.Client) error {
-	return enableAuth(client, "userpass")
 }
 
 func EnsureVaultAuthMethods(client *api.Client, log *zap.Logger) error {

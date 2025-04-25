@@ -348,21 +348,6 @@ func WriteSystemdUnit(log *zap.Logger) error {
 /**/
 
 /**/
-// readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
-func readTokenFromSink(path string) (string, error) {
-	if path == "" {
-		path = shared.VaultAgentTokenPath
-	}
-	out, err := exec.Command("sudo", "-u", shared.EosIdentity, "cat", path).Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-/**/
-
-/**/
 // GetPrivilegedVaultClient returns a Vault client authenticated as 'eos' system user
 func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
 	token, err := readTokenFromSink(shared.VaultAgentTokenPath)
@@ -460,3 +445,29 @@ func RenderAgentConfig(addr, roleID, secretID string, log *zap.Logger) error {
 }
 
 /**/
+
+// WriteAppRoleFiles writes the role_id & secret_id into /etc/vault and
+// ensures the directory is 0700, owned by eos:eos.
+func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
+	dir := filepath.Dir(shared.RoleIDPath)
+	log.Info("📁 Ensuring AppRole directory", zap.String("path", dir))
+	if err := system.EnsureOwnedDir(dir, 0o700, shared.EosUser); err != nil {
+		return err
+	}
+
+	pairs := map[string]string{
+		shared.RoleIDPath:   roleID + "\n",
+		shared.SecretIDPath: secretID + "\n",
+	}
+	for path, data := range pairs {
+		log.Debug("✏️  Writing AppRole file", zap.String("path", path))
+		if err := system.WriteOwnedFile(path, []byte(data), 0o600, shared.EosUser); err != nil {
+			return err
+		}
+	}
+
+	log.Info("✅ AppRole credentials written",
+		zap.String("role_file", shared.RoleIDPath),
+		zap.String("secret_file", shared.SecretIDPath))
+	return nil
+}

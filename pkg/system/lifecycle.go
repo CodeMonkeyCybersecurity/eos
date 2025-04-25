@@ -28,6 +28,7 @@ func EnsureOwnedDir(path string, perm os.FileMode, owner string) error {
 	}
 	return nil
 }
+
 /**/
 
 /**/
@@ -46,8 +47,8 @@ func WriteOwnedFile(path string, data []byte, perm os.FileMode, owner string) er
 	}
 	return nil
 }
-/**/
 
+/**/
 
 // RemoveWithLog deletes a file or directory if it exists, with descriptive logging.
 func Rm(path, label string, log *zap.Logger) error {

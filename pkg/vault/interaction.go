@@ -23,7 +23,6 @@ func PromptForUnsealAndRoot(log *zap.Logger) api.InitResponse {
 	}
 }
 
-
 func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 	fmt.Println("🔐 Please enter 3 unseal keys and the root token")
 	keys, err := crypto.PromptSecrets("Unseal Key", 3, log)

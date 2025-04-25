@@ -64,14 +64,14 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 	}
 
 	// 3. Init check
-	report.Initialized, err = isVaultInitialized(client, log)
+	report.Initialized, err = IsVaultInitialized(client, log)
 	if err != nil {
 		report.Notes = append(report.Notes, fmt.Sprintf("Vault health query failed: %v", err))
 		return report, client
 	}
 
 	// 4. Seal check
-	report.Sealed = isVaultSealed(client, log)
+	report.Sealed = IsVaultSealed(client, log)
 	if report.Sealed {
 		report.Notes = append(report.Notes, "Vault is sealed")
 	} else {
@@ -113,12 +113,10 @@ func isInstalled(log *zap.Logger) bool {
 
 /**/
 
-
-
 /**/
 // TODO: ensure functionality
 // -> InitializeVault(client *api.Client) (VaultInitResponse, error)
-func isVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
+func IsVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 	if client == nil {
 		return false, fmt.Errorf("vault client is nil")
 	}
@@ -134,7 +132,7 @@ func isVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 /**/
 
 // isVaultSealed checks if Vault is sealed and logs the result.
-func isVaultSealed(client *api.Client, log *zap.Logger) bool {
+func IsVaultSealed(client *api.Client, log *zap.Logger) bool {
 	health, err := client.Sys().Health()
 	if err != nil {
 		log.Warn("Unable to determine Vault sealed state", zap.Error(err))
@@ -238,6 +236,26 @@ func CheckVaultHealth(log *zap.Logger) (string, error) {
 /**/
 func IsAlreadyInitialized(err error, log *zap.Logger) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
+}
+
+/**/
+/**/
+// VaultList returns keys under a path
+func ListVault(path string, log *zap.Logger) ([]string, error) {
+	client, err := GetPrivilegedVaultClient(log)
+	if err != nil {
+		return nil, err
+	}
+	list, err := client.Logical().List("secret/metadata/" + path)
+	if err != nil || list == nil {
+		return nil, err
+	}
+	raw := list.Data["keys"].([]interface{})
+	keys := make([]string, len(raw))
+	for i, k := range raw {
+		keys[i] = fmt.Sprintf("%v", k)
+	}
+	return keys, nil
 }
 
 /**/

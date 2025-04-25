@@ -13,7 +13,7 @@ vault {
   tls_ca_file = "{{ .CACert }}"
 }
 #listener "tcp" {
-#  address = "127.0.0.1:8179"
+#  address = "127.0.0.1:"
 #}
 auto_auth {
   method "approle" {
@@ -88,6 +88,7 @@ const (
 	// client / listener paths
 	ListenerAddr     = "127.0.0.1:8179"
 	VaultDefaultPort = "8179"
+	VaultWebPortTCP  = "8179/tcp"
 	VaultDefaultAddr = "https://%s:" + VaultDefaultPort
 
 	VaultBinaryPath = "/usr/bin/vault"

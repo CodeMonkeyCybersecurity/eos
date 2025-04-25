@@ -3,9 +3,12 @@ package vault
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -13,6 +16,47 @@ import (
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
+
+/**/
+// VaultRead reads and decodes a secret struct from Vault
+func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
+	client, err := GetPrivilegedVaultClient(log)
+	if err != nil {
+		return nil, err
+	}
+	kv := client.KVv2("secret")
+
+	secret, err := kv.Get(context.Background(), path)
+	if err != nil {
+		return nil, err
+	}
+	raw, ok := secret.Data["json"].(string)
+	if !ok {
+		return nil, errors.New("missing or invalid 'json' field in secret")
+	}
+	var result T
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal secret JSON: %w", err)
+	}
+	return &result, nil
+}
+
+/**/
+
+/**/
+// readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
+func readTokenFromSink(path string) (string, error) {
+	if path == "" {
+		path = shared.VaultAgentTokenPath
+	}
+	out, err := exec.Command("sudo", "-u", shared.EosIdentity, "cat", path).Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+/**/
 
 // Read attempts to retrieve a config object from Vault. If Vault is unavailable or the read fails,
 // it falls back to reading the config from disk (typically under ~/.config/eos/).
