@@ -1,4 +1,4 @@
-// pkg/vault/vault_vars.go
+// pkg/shared/vault_vars.go
 
 package shared
 
@@ -9,10 +9,6 @@ import (
 
 	"github.com/hashicorp/vault/api"
 )
-
-//
-// ------------------------- VARIABLES -------------------------
-//
 
 var Policies = map[string]string{
 	EosVaultPolicy: `

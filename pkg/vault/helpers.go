@@ -12,10 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
-//
-// ------------------------- HELPERS -------------------------
-//
-
+// GetVaultWildcardPurgePaths returns filesystem wildcards that match legacy or snap Vault installations
+// for cleanup during reinstallation or reset.
 func GetVaultWildcardPurgePaths() []string {
 	return []string{
 		"/etc/vault*",      // wildcard for legacy configs
@@ -24,6 +22,7 @@ func GetVaultWildcardPurgePaths() []string {
 	}
 }
 
+// GetVaultPurgePaths returns wildcard purge paths for Vault cleanup.
 func GetVaultPurgePaths() []string {
 	return []string{
 		shared.VaultConfigPath,
@@ -43,10 +42,11 @@ func GetVaultPurgePaths() []string {
 	}
 }
 
+// DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
 func DefaultAppRoleOptions() shared.AppRoleOptions {
 	return shared.AppRoleOptions{
 		RoleName:      shared.EosIdentity,
-		Policies:      []string{"eos-policy"},
+		Policies:      []string{shared.EosVaultPolicy},
 		TokenTTL:      "1h",
 		TokenMaxTTL:   "4h",
 		SecretIDTTL:   "24h",
@@ -55,12 +55,12 @@ func DefaultAppRoleOptions() shared.AppRoleOptions {
 	}
 }
 
-// VaultPath returns the full KV v2 path for data reads/writes.
+// VaultPath returns the full Vault path for a logical entry name.
 func VaultPath(name string, log *zap.Logger) string {
 	if strings.Contains(name, "/") {
-		log.Warn("vaultPath should not receive slashes", zap.String("input", name))
+		log.Warn("VaultPath should not receive slashes", zap.String("input", name))
 	}
-	final := fmt.Sprintf("eos/%s", name)
+	final := fmt.Sprintf("%s/%s", shared.DefaultNamespace, name)
 	log.Debug("Resolved Vault path", zap.String("input", name), zap.String("result", final))
 	return final
 }
@@ -68,38 +68,55 @@ func VaultPath(name string, log *zap.Logger) string {
 // DiskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
 func DiskPath(name string, log *zap.Logger) string {
 	var final string
-	if name == "vault_init" {
-		final = filepath.Join(shared.SecretsDir, "vault_init.json")
-	} else {
-		final = filepath.Join(shared.VaultConfigDirDebian, name, "DefaultConfigFilename")
+	switch name {
+	case shared.VaultInitPath:
+		final = shared.VaultInitPath
+	default:
+		final = filepath.Join(shared.VaultConfigDirDebian, name, shared.DefaultConfigFilename)
 	}
 	log.Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
 	return final
 }
 
+// UserSecretPath returns the Vault KV path for a user's secret material.
+// NOTE: Do not log paths directly if they may include sensitive usernames.
 func UserSecretPath(username string) string {
-	return fmt.Sprintf("users/%s", username)
+	path := fmt.Sprintf("users/%s", username)
+	zap.L().Debug("Resolved user secret Vault path", zap.String("username", username), zap.String("path", path))
+	return path
 }
 
-// PrepareVaultDirsAndConfig returns the config dir path and config file path,
-// and ensures necessary directories are created.
-func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, string) {
+// GetVaultHealthEndpoint constructs the Vault health check URL based on the configured listener address.
+// It defaults to localhost if no explicit environment address is provided.
+func GetVaultHealthEndpoint(log *zap.Logger) string {
+	host := strings.Split(shared.ListenerAddr, ":")[0]
+	endpoint := fmt.Sprintf("https://%s/v1/sys/health", host)
+	log.Debug("Resolved Vault health endpoint", zap.String("endpoint", endpoint))
+	return endpoint
+}
+
+// PrepareVaultDirsAndConfig returns the config dir, config file path, and Vault address,
+// and ensures necessary directories are created. Returns an error if critical preparation fails.
+func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, string, error) {
 	var configDir string
-	if distro == "debian" || distro == "rhel" {
+	switch distro {
+	case "debian", "rhel":
 		configDir = shared.VaultConfigDirDebian
-	} else {
+	default:
 		configDir = shared.VaultConfigDirSnap
 	}
 
 	if err := os.MkdirAll(configDir, shared.DirPermStandard); err != nil {
 		log.Warn("Failed to create Vault config dir", zap.String("path", configDir), zap.Error(err))
+		return "", "", "", fmt.Errorf("create config dir: %w", err)
 	}
 	if err := os.MkdirAll(shared.VaultDataPath, shared.DirPermStandard); err != nil {
 		log.Warn("Failed to create Vault data dir", zap.String("path", shared.VaultDataPath), zap.Error(err))
+		return "", "", "", fmt.Errorf("create data dir: %w", err)
 	}
 
-	configFile := filepath.Join(configDir, shared.VaultConfigFileName)
+	configFile := filepath.Join(configDir, shared.DefaultConfigFilename)
 	vaultAddr := shared.GetVaultAddr(log)
 
-	return configDir, configFile, vaultAddr
+	return configDir, configFile, vaultAddr, nil
 }

@@ -12,13 +12,13 @@ type FallbackCode string
 
 // CheckReport represents the current state of a Vault instance during a health check.
 type CheckReport struct {
-	Installed   bool     // Vault binary is installed
-	Initialized bool     // Vault has been initialized
-	Sealed      bool     // Vault is currently sealed
-	TokenReady  bool     // A token is available and usable
-	KVWorking   bool     // The KV engine is accessible
-	Notes       []string // Additional context or warnings
-	SecretsVerified bool // Unseal keys + root token matched trusted reference
+	Installed       bool     // Vault binary is installed
+	Initialized     bool     // Vault has been initialized
+	Sealed          bool     // Vault is currently sealed
+	TokenReady      bool     // A token is available and usable
+	KVWorking       bool     // The KV engine is accessible
+	Notes           []string // Additional context or warnings
+	SecretsVerified bool     // Unseal keys + root token matched trusted reference
 }
 
 type UserpassCreds struct {

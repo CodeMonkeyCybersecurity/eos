@@ -91,3 +91,9 @@ const (
 const (
 	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
 )
+
+const (
+	VaultLegacyConfigWildcard = "/etc/vault*"
+	VaultSnapWildcard         = "/var/snap/vault*"
+	VaultLogWildcard          = "/var/log/vault*"
+)

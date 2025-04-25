@@ -262,7 +262,6 @@ func tlsCertsExist() bool {
 	return system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt)
 }
 
-
 // - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
 // - Avoids brittle reliance on external ACME or CA automation in early stages.
 // - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
