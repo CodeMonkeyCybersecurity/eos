@@ -27,9 +27,9 @@ func ResolveVaultConfigDir(distro string) string {
 func WriteVaultHCL(log *zap.Logger) error {
 	vaultAddr := shared.GetVaultAddr(log)
 	hcl := shared.RenderVaultConfig(vaultAddr, log)
-	configPath := shared.VaultConfigPath
+	configPath := shared.VaultConfigPath // should be: /etc/vault.d/vault.hcl
 
-	// 1. Ensure the parent directory exists
+	// Guarantee the parent directory exists
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		log.Error("failed to create Vault config directory", zap.String("path", dir), zap.Error(err))
@@ -37,8 +37,8 @@ func WriteVaultHCL(log *zap.Logger) error {
 	}
 	log.Debug("✅ Vault config directory ready", zap.String("path", dir))
 
-	// 2. Write the config file
-	if err := WriteToDisk(configPath, []byte(hcl), log); err != nil {
+	// Now safely write the Vault config
+	if err := os.WriteFile(configPath, []byte(hcl), 0644); err != nil {
 		log.Error("failed to write Vault HCL config", zap.Error(err))
 		return fmt.Errorf("write vault hcl: %w", err)
 	}
