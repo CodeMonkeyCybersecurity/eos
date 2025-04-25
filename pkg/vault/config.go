@@ -3,12 +3,11 @@
 package vault
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"go.uber.org/zap"
 )
 
+// ResolveVaultConfigDir returns the Vault config directory based on Linux distro.
 func ResolveVaultConfigDir(distro string) string {
 	switch distro {
 	case "debian", "rhel":
@@ -18,24 +17,18 @@ func ResolveVaultConfigDir(distro string) string {
 	}
 }
 
-func GetVaultAddr() string {
-	if addr := os.Getenv("VAULT_ADDR"); addr != "" {
-		return addr
-	}
-	return shared.VaultDefaultAddr
-}
+// WriteVaultHCL renders and writes the Vault configuration file.
+func WriteVaultHCL(log *zap.Logger) error {
+	vaultAddr := shared.GetVaultAddr(log)
 
-func RenderVaultConfig(addr string) string {
-	return fmt.Sprintf(`
-listener "tcp" {
-  address     = "0.0.0.0:%s"
-  tls_disable = 1
-}
-storage "file" {
-  path = "%s"
-}
-disable_mlock = true
-api_addr = "%s"
-ui = true
-`, shared.VaultDefaultPort, shared.VaultDataPath, addr)
+	hcl := shared.RenderVaultConfig(vaultAddr, log)
+	configPath := shared.VaultConfigPath
+
+	if err := WriteToDisk(configPath, []byte(hcl), log); err != nil {
+		log.Error("failed to write Vault HCL config", zap.Error(err))
+		return err
+	}
+
+	log.Info("✅ Vault configuration written", zap.String("path", configPath))
+	return nil
 }

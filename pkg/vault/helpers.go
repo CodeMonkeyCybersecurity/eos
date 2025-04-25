@@ -99,7 +99,7 @@ func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, 
 	}
 
 	configFile := filepath.Join(configDir, shared.VaultConfigFileName)
-	vaultAddr := GetVaultAddr()
+	vaultAddr := shared.GetVaultAddr(log)
 
 	return configDir, configFile, vaultAddr
 }

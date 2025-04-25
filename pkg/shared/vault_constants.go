@@ -2,81 +2,13 @@
 
 package shared
 
-//
-// ------------------------- CONSTANTS -------------------------
-//
-
-const LocalhostSAN = "127.0.0.1"
-
-// Vault Agent configuration template used to render agent config file at runtime.
-const AgentConfigTmpl = `
-vault {
-  address     = "{{ .Addr }}"
-  tls_ca_file = "{{ .CACert }}"
-}
-#listener "tcp" {
-#  address = "127.0.0.1:"
-#}
-auto_auth {
-  method "approle" {
-    config = {
-      role_id_file_path   = "{{ .RoleFile }}"
-      secret_id_file_path = "{{ .SecretFile }}"
-    }
-  }
-  sink "file" { config = { path = "{{ .TokenSink }}" } }
-}
-#cache { use_auto_auth_token = true }
-`
-
-// AgentSystemDUnit is the systemd unit template for running Vault Agent under eos.
-const AgentSystemDUnit = `
-[Unit]
-Description=Vault Agent (Eos)
-After=network.target
-
-[Service]
-User=%s
-Group=%s
-# make /run/eos for the runtime directory
-RuntimeDirectory=eos
-RuntimeDirectoryMode=%o
-ExecStartPre=/usr/bin/install -d -o %s -g %s -m%o %s
-ExecStart=/usr/bin/vault agent -config=%s
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-`
-
 const (
 	SecretsExt = ".json"
 )
 
-// TLSDir is the directory for Vault TLS certificate files.
-// TLSKey and TLSCrt represent the file paths to the private key and certificate.
-const (
-	TLSDir = "/opt/vault/tls/"
-	TLSKey = TLSDir + "tls.key"
-	TLSCrt = TLSDir + "tls.crt"
-)
-
 // RoleName is the Vault AppRole used by the eos agent.
 // RolePath is the full path used when creating or querying the role.
-
 // Common host filesystem and configuration paths for Vault integration.
-const (
-	// EosProfileD is the path to the shell profile that exports VAULT_ADDR.
-
-	// Config paths
-
-	// client / listener paths
-	VaultDefaultPort = "8179"
-	VaultWebPortTCP  = VaultDefaultPort + "/tcp"
-	ListenerAddr     = "127.0.0.1:" + VaultDefaultPort
-	VaultDefaultAddr = "https://%s:" + VaultDefaultPort
-)
-
 // policy specific paths
 
 // Vault internal paths
@@ -132,10 +64,7 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 
 // Config and data paths
 const (
-	VaultConfigDirDebian = "/etc/vault.d"
-	VaultConfigDirSnap   = "/var/snap/vault/common"
-	VaultDataPath        = "/opt/vault/data"
-	VaultConfigFileName  = "config.hcl"
+	VaultConfigFileName = "config.hcl"
 
 	EosProfileD = "/etc/profile.d/eos_vault.sh"
 )
@@ -160,9 +89,5 @@ const (
 
 // System paths
 const (
-	VaultConfigPath       = "/etc/vault.d/vault.hcl"
-	VaultServicePath      = "/etc/systemd/system/vault.service"
 	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
-
-	VaultBinaryPath = "/usr/bin/vault"
 )

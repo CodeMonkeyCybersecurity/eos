@@ -23,7 +23,7 @@ func Write(client *api.Client, name string, data any, log *zap.Logger) error {
 		client, err = NewClient(log)
 		if err != nil {
 			log.Warn("Vault client creation failed", zap.Error(err))
-			return writeToDisk(name, data, log)
+			return WriteToDisk(name, data, log)
 		}
 	}
 
@@ -32,7 +32,7 @@ func Write(client *api.Client, name string, data any, log *zap.Logger) error {
 
 	if err := WriteToVault(path, data, log); err != nil {
 		log.Warn("⚠️ Vault write failed — falling back to disk", zap.String("path", path), zap.Error(err))
-		return writeToDisk(name, data, log)
+		return WriteToDisk(name, data, log)
 	}
 
 	log.Info("✅ Vault secret written", zap.String("path", path))
@@ -111,8 +111,8 @@ func WriteFallbackJSON(path string, data any, log *zap.Logger) error {
 	return nil
 }
 
-// writeToDisk is used as a fallback if Vault is unavailable. It saves structured data to a JSON file on disk.
-func writeToDisk(name string, data any, log *zap.Logger) error {
+// is used as a fallback if Vault is unavailable. It saves structured data to a JSON file on disk.
+func WriteToDisk(name string, data any, log *zap.Logger) error {
 	fallbackPath := DiskPath(name, log)
 	log.Info("💾 Falling back to local disk", zap.String("path", fallbackPath))
 	return WriteFallbackJSON(fallbackPath, data, log)

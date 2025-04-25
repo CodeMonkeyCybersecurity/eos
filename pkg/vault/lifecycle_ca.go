@@ -262,20 +262,7 @@ func tlsCertsExist() bool {
 	return system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt)
 }
 
-//     - Prompt for self-signed cert confirmation
-//     - Generate cert with CN = internal hostname
-//     - Save to `/etc/vault.d/vault.crt` and `.key`
-//     - EOS will ensure required directories (e.g. `/etc/vault.d`, `/var/lib/eos/secrets`, `/opt/pandora/data`) exist with appropriate ownership and permissions before writing any files.
-//     - If any directory creation fails, EOS will abort and suggest running as root or fixing permissions.
 
-// ### Decision: Self-Signed TLS with Interactive Prompting
-
-// - Use self-signed certs by default to secure Vault listener.
-// - Allow user override via `--cert` and `--key` flags.
-// - If no flags are provided, prompt the user to confirm generating self-signed certs interactively.
-// - Certificates will be written to:
-//   - `/etc/vault.d/vault.crt`
-//   - `/etc/vault.d/vault.key`
 // - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
 // - Avoids brittle reliance on external ACME or CA automation in early stages.
 // - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
