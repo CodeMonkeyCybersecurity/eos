@@ -29,7 +29,6 @@ func RenderVaultConfig(addr string, log *zap.Logger) string {
 	return fmt.Sprintf(`
 listener "tcp" {
   address     = "0.0.0.0:%s"
-  tls_disable = 1
 }
 storage "file" {
   path = "%s"

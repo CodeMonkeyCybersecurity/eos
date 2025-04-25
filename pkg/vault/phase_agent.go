@@ -257,7 +257,6 @@ vault {
 
 listener "tcp" {
   address     = "%s"
-  tls_disable = true
 }
 
 cache {

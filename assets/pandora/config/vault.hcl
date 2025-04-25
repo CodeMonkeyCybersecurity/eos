@@ -5,7 +5,6 @@ storage "raft" {
 
 listener "tcp" {
   address     = "0.0.0.0:8179"
-  tls_disable = true
 }
 
 api_addr      = "https://vault:8179"
