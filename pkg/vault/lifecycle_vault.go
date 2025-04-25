@@ -36,7 +36,7 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api
 	log.Info("✅ Vault CA trusted")
 
 	log.Info("[3/11] Installing Vault binaries and systemd service")
-	if err := phaseInstallVault(log); err != nil {
+	if err := PhaseInstallVault(log); err != nil {
 		log.Error("❌ Vault installation failed", zap.Error(err))
 		return nil, fmt.Errorf("install: %w", err)
 	}
@@ -109,8 +109,9 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api
 	return client, nil
 }
 
-// phaseInstallVault ensures Vault is installed using the appropriate package manager.
-func phaseInstallVault(log *zap.Logger) error {
+// phaseInstallVault ensures Vault binary is installed via APT or DNF,
+// depending on detected Linux distribution. No-op if already installed.
+func PhaseInstallVault(log *zap.Logger) error {
 	log.Info("[1/6] Ensuring Vault is installed")
 
 	distro := platform.DetectLinuxDistro(log)
@@ -305,7 +306,10 @@ func InstallVaultViaApt(log *zap.Logger) error {
 
 	// Step 1: Add the HashiCorp APT repo
 	log.Info("➕ Adding HashiCorp APT repo")
-	aptCmd := exec.Command("bash", "-c", `curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list`)
+	aptCmd := exec.Command("bash", "-c", `
+		curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
+		echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list
+	`)
 	aptCmd.Stdout = os.Stdout
 	aptCmd.Stderr = os.Stderr
 	if err := aptCmd.Run(); err != nil {
@@ -318,9 +322,11 @@ func InstallVaultViaApt(log *zap.Logger) error {
 		log.Warn("APT update failed", zap.Error(err))
 	}
 
-	// Step 3: Install Vault
-	log.Info("📦 Installing Vault via apt")
-	installCmd := exec.Command("apt-get", "install", "-y", "vault")
+	// Step 3: Install Vault — Pinned install
+	log.Info("📦 Installing Vault from HashiCorp repo via apt")
+	installCmd := exec.Command("bash", "-c", `
+		apt-get install -y --allow-downgrades --allow-change-held-packages vault
+	`)
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
 	if err := installCmd.Run(); err != nil {

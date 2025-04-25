@@ -6,7 +6,6 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -22,9 +21,9 @@ var CreateVaultCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L()
 
-		log.Info("🚀 [1/6] Verifying platform requirements")
-		if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}, log); err != nil {
-			log.Fatal("Unsupported OS/distro", zap.Error(err))
+		log.Info("📦 [1/6] Ensuring Vault binary is installed")
+		if err := vault.PhaseInstallVault(log); err != nil {
+			return logger.LogErrAndWrap(log, "create vault: install vault", err)
 		}
 
 		log.Info("🌍 Resolving Vault environment address")
