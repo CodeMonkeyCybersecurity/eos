@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -40,7 +41,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 		}
 
 		// Prompt for current password
-		currentPassword, err := interaction.PromptPassword("Current password", log)
+		currentPassword, err := crypto.PromptPassword("Current password", log)
 		if err != nil {
 			return fmt.Errorf("failed to read current password: %w", err)
 		}
@@ -65,11 +66,11 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 
 		// Prompt for password (if not provided via flag)
 		if password == "" {
-			pw1, err := interaction.PromptPassword("New password", log)
+			pw1, err := crypto.PromptPassword("New password", log)
 			if err != nil {
 				return err
 			}
-			pw2, err := interaction.PromptPassword("Confirm password", log)
+			pw2, err := crypto.PromptPassword("Confirm password", log)
 			if err != nil {
 				return err
 			}

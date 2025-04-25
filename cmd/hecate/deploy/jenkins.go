@@ -8,7 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -81,7 +81,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			log.Info("Successfully uncommented Jenkins lines")
 
 			// Now use the compose file for starting the services.
-			if err := docker.RunDockerComposeAllServices(types.DefaultComposeYML, "jenkins"); err != nil {
+			if err := docker.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
 				log.Error("Failed to start Docker services", zap.Error(err))
 				fmt.Printf("Failed to run docker-compose up: %v\n", err)
 				return err

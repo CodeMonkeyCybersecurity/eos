@@ -11,9 +11,9 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
 var ignoreHardwareCheck bool
@@ -43,7 +43,7 @@ func runDelphiInstall(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string
 	if err := utils.DownloadFile(scriptPath, scriptURL); err != nil {
 		return fmt.Errorf("failed to download installer: %w", err)
 	}
-	if err := os.Chmod(scriptPath, xdg.DirPermStandard); err != nil {
+	if err := os.Chmod(scriptPath, shared.DirPermStandard); err != nil {
 		return fmt.Errorf("failed to make script executable: %w", err)
 	}
 

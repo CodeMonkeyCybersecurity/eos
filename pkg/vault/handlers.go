@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -68,47 +66,6 @@ func EnsureVaultReady(log *zap.Logger) (*api.Client, error) {
 //
 // === Secure Vault Loaders ===
 //
-
-// ReadVaultSecureData loads bootstrap Vault secrets (vault_init, userpass creds).
-func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse, UserpassCreds, []string, string) {
-	log.Info("🔐 Starting secure Vault bootstrap sequence")
-
-	if err := system.EnsureEosUser(true, false, log); err != nil {
-		log.Fatal("❌ Failed to ensure eos system user", zap.Error(err))
-	}
-
-	vaultInitPath := DiskPath("vault_init", log)
-	log.Info("📄 Reading vault_init.json from fallback", zap.String("path", vaultInitPath))
-	initResPtr, err := ReadFallbackJSON[api.InitResponse](vaultInitPath, log)
-	if err != nil {
-		log.Fatal("❌ Failed to read vault_init.json", zap.Error(err))
-	}
-	initRes := *initResPtr
-	log.Info("✅ Loaded vault_init.json", zap.Int("num_keys", len(initRes.KeysB64)))
-
-	log.Info("📄 Reading eos userpass fallback file", zap.String("path", EosUserVaultFallback))
-	credsPtr, err := ReadFallbackJSON[UserpassCreds](EosUserVaultFallback, log)
-	if err != nil {
-		log.Fatal("❌ Failed to read vault_userpass.json", zap.Error(err))
-	}
-	creds := *credsPtr
-
-	if creds.Password == "" {
-		log.Fatal("❌ Loaded Vault credentials but password is empty — aborting.")
-	}
-	log.Info("✅ Loaded eos Vault credentials")
-
-	hashedKeys := crypto.HashStrings(initRes.KeysB64)
-	hashedRoot := crypto.HashString(initRes.RootToken)
-
-	log.Info("🔑 Derived Vault hash summaries",
-		zap.Int("key_count", len(hashedKeys)),
-		zap.String("root_token_hash", hashedRoot),
-	)
-
-	log.Info("🔒 Vault bootstrap sequence complete")
-	return initResPtr, creds, hashedKeys, hashedRoot
-}
 
 func RequireVault(client *api.Client, log *zap.Logger) error {
 	if client == nil {

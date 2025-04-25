@@ -5,7 +5,7 @@ package hecate
 import (
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // Constants for file locations.
@@ -31,9 +31,9 @@ const (
 // Dynamic values computed at runtime.
 var (
 	Timestamp     = time.Now().Format("20060102-150405")
-	BackupConf    = types.DefaultConfDir + "." + Timestamp + ".bak"
-	BackupCerts   = types.DefaultCertsDir + "." + Timestamp + ".bak"
-	BackupCompose = types.DefaultComposeYML + "." + Timestamp + ".bak"
+	BackupConf    = shared.DefaultConfDir + "." + Timestamp + ".bak"
+	BackupCerts   = shared.DefaultCertsDir + "." + Timestamp + ".bak"
+	BackupCompose = shared.DefaultComposeYML + "." + Timestamp + ".bak"
 )
 
 // AppSelection holds an app name and its configuration file.

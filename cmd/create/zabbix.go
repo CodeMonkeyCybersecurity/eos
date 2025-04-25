@@ -6,8 +6,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -44,13 +43,13 @@ func deployZabbix() error {
 	}
 
 	// Create target directory
-	if err := os.MkdirAll(types.ZabbixDir, xdg.DirPermStandard); err != nil {
-		return fmt.Errorf("failed to create %s: %w", types.ZabbixDir, err)
+	if err := os.MkdirAll(shared.ZabbixDir, shared.DirPermStandard); err != nil {
+		return fmt.Errorf("failed to create %s: %w", shared.ZabbixDir, err)
 	}
 
 	// Start the stack
 	log.Info("Running docker compose up...")
-	if err := docker.RunCommand("docker", "compose", "-f", types.ZabbixComposeYML, "up", "-d"); err != nil {
+	if err := docker.RunCommand("docker", "compose", "-f", shared.ZabbixComposeYML, "up", "-d"); err != nil {
 		return fmt.Errorf("failed to run docker compose: %w", err)
 	}
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -30,15 +31,15 @@ func runStopVault(ctx *eos.RuntimeContext, _ *cobra.Command, _ []string) error {
 	log.Info("🛑 Stopping Vault Agent and cleaning up…")
 
 	// ① stop+disable the systemd unit
-	if err := systemctl("disable", "--now", vault.VaultAgentService); err != nil {
-		log.Warn("Failed to disable service", zap.String("unit", vault.VaultAgentService), zap.Error(err))
+	if err := systemctl("disable", "--now", shared.VaultAgentService); err != nil {
+		log.Warn("Failed to disable service", zap.String("unit", shared.VaultAgentService), zap.Error(err))
 	} else {
-		log.Info("✅ Service stopped & disabled", zap.String("unit", vault.VaultAgentService))
+		log.Info("✅ Service stopped & disabled", zap.String("unit", shared.VaultAgentService))
 	}
 
 	// ② kill anything still bound to VaultDefaultPort
-	if killed := killByPort(vault.VaultDefaultPort, log); killed == 0 {
-		log.Info("ℹ️  No process bound to "+vault.VaultDefaultPort, zap.String("port", vault.VaultDefaultPort))
+	if killed := killByPort(shared.VaultDefaultPort, log); killed == 0 {
+		log.Info("ℹ️  No process bound to "+shared.VaultDefaultPort, zap.String("port", shared.VaultDefaultPort))
 	}
 
 	// ③ purge runtime/config files via existing helper

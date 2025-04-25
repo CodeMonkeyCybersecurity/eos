@@ -9,7 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // runCommand executes a command represented as a slice of strings.
@@ -167,7 +167,7 @@ func main() {
 		fmt.Printf("Error changing directory to %s: %v\n", hecateDir, err)
 		os.Exit(1)
 	}
-	if err := os.MkdirAll("certs", xdg.DirPermStandard); err != nil {
+	if err := os.MkdirAll("certs", shared.DirPermStandard); err != nil {
 		fmt.Printf("Error creating certs directory: %v\n", err)
 		os.Exit(1)
 	}

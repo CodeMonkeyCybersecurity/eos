@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -91,7 +91,7 @@ var CreatePostfixCmd = &cobra.Command{
 		}
 		email = strings.TrimSpace(email)
 
-		password, err := interaction.PromptPassword("Enter your app password: ", log)
+		password, err := crypto.PromptPassword("Enter your app password: ", log)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "❌ Failed to read password:", err)
 			os.Exit(1)

@@ -57,7 +57,7 @@ func runDeployKVM(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 	}
 	log.Info("✅ libvirtd is active")
 
-	isoDir := interaction.PromptConfirmOrValue("The hypervisor needs access to an ISO directory", "/srv/iso")
+	isoDir := interaction.PromptConfirmOrValue("The hypervisor needs access to an ISO directory", "/srv/iso", log)
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
 		log.Info("🔐 Setting ACL for ISO directory", zap.String("path", isoDir))
 		system.SetLibvirtACL(isoDir)
@@ -65,7 +65,7 @@ func runDeployKVM(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 		log.Warn("ISO directory not found or invalid", zap.String("path", isoDir))
 	}
 
-	if interaction.PromptYesNo("Would you like to autostart the default libvirt network?", false) {
+	if interaction.PromptYesNo("Would you like to autostart the default libvirt network?", false, log) {
 		log.Info("⚙️  Enabling autostart for default libvirt network")
 		system.SetLibvirtDefaultNetworkAutostart()
 	} else {

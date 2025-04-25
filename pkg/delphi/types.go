@@ -2,7 +2,10 @@
 
 package delphi
 
-import "github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+)
 
 // DefaultPorts holds the standard Wazuh ports used by the CLI.
 var DefaultPorts = []string{
@@ -13,7 +16,7 @@ var DefaultPorts = []string{
 }
 
 var (
-	DelphiConfigPath = xdg.XDGConfigPath("eos", "delphi.json")
+	DelphiConfigPath = xdg.XDGConfigPath(shared.EosIdentity, "delphi.json")
 	ShowSecrets      bool // toggle to display password in ConfirmDelphiConfig
 )
 

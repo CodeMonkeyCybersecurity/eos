@@ -11,9 +11,8 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -37,9 +36,9 @@ var CreateHeraCmd = &cobra.Command{
 		log.Info("🚀 Starting Hera (Authentik) deployment")
 
 		// Ensure target directory exists
-		if _, err := os.Stat(types.HeraDir); os.IsNotExist(err) {
-			log.Warn("Hera directory does not exist; creating it", zap.String("path", types.HeraDir))
-			if err := os.MkdirAll(types.HeraDir, xdg.DirPermStandard); err != nil {
+		if _, err := os.Stat(shared.HeraDir); os.IsNotExist(err) {
+			log.Warn("Hera directory does not exist; creating it", zap.String("path", shared.HeraDir))
+			if err := os.MkdirAll(shared.HeraDir, shared.DirPermStandard); err != nil {
 				log.Fatal("Failed to create Hera directory", zap.Error(err))
 			}
 		}
@@ -60,7 +59,7 @@ var CreateHeraCmd = &cobra.Command{
 		if len(composeFiles) > 0 {
 			// Use local docker-compose file(s)
 			for _, file := range composeFiles {
-				destFile := filepath.Join(types.HeraDir, filepath.Base(file))
+				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
 				log.Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
 				if err := system.CopyFile(file, destFile, 0, log); err != nil {
 					log.Fatal("Failed to copy docker-compose file", zap.Error(err))
@@ -69,7 +68,7 @@ var CreateHeraCmd = &cobra.Command{
 		} else {
 			// Download the latest docker-compose.yml from the remote URL
 			log.Info("📦 Downloading latest docker-compose.yml")
-			if err := execute.ExecuteInDir(types.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
+			if err := execute.ExecuteInDir(shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
 				log.Fatal("Failed to download docker-compose.yml", zap.Error(err))
 			}
 		}
@@ -107,15 +106,15 @@ var CreateHeraCmd = &cobra.Command{
 			"AUTHENTIK_EMAIL__FROM=authentik@localhost",
 		}
 
-		envPath := filepath.Join(types.HeraDir, ".env")
+		envPath := filepath.Join(shared.HeraDir, ".env")
 		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
 			log.Fatal("Failed to write .env file", zap.Error(err))
 		}
 		log.Info("✅ .env file created", zap.String("path", envPath))
 
 		// Fix directory ownership so the container can write as needed.
-		log.Info("🔧 Fixing ownership of directory", zap.String("path", types.HeraDir))
-		chownCmd := exec.Command("chown", "-R", "472:472", types.HeraDir)
+		log.Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
+		chownCmd := exec.Command("chown", "-R", "472:472", shared.HeraDir)
 		chownCmd.Stdout = os.Stdout
 		chownCmd.Stderr = os.Stderr
 		if err := chownCmd.Run(); err != nil {
@@ -129,12 +128,12 @@ var CreateHeraCmd = &cobra.Command{
 
 		// Pull images and deploy
 		log.Info("🐳 Pulling docker images")
-		if err := execute.ExecuteInDir(types.HeraDir, "docker", "compose", "pull"); err != nil {
+		if err := execute.ExecuteInDir(shared.HeraDir, "docker", "compose", "pull"); err != nil {
 			log.Fatal("Failed to pull docker images", zap.Error(err))
 		}
 
 		log.Info("🚀 Launching Hera via docker compose")
-		if err := execute.ExecuteInDir(types.HeraDir, "docker", "compose", "up", "-d"); err != nil {
+		if err := execute.ExecuteInDir(shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
 			log.Fatal("Failed to run docker compose", zap.Error(err))
 		}
 

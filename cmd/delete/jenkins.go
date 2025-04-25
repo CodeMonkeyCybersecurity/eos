@@ -3,7 +3,7 @@ package delete
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -21,7 +21,7 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 		log.Info("Starting Jenkins deletion process using Eos")
 
 		// Define the path to the docker-compose file used during installation.
-		composePath := types.JenkinsComposeYML
+		composePath := shared.JenkinsComposeYML
 
 		// Parse the compose file to retrieve container names, images, and volumes.
 		data, err := docker.ParseComposeFile(composePath)

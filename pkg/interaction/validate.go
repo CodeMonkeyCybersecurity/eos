@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-	"unicode"
 
 	"go.uber.org/zap"
 )
@@ -76,36 +75,5 @@ func ValidateNoShellMeta(input string, log *zap.Logger) error {
 	if strings.ContainsAny(input, "`$&|;<>(){}") {
 		return errors.New("input contains unsafe shell characters")
 	}
-	return nil
-}
-
-// ValidateStrongPassword ensures min length and mixed char types.
-func ValidateStrongPassword(input string, log *zap.Logger) error {
-	if len(input) < 12 {
-		return errors.New("password must be at least 12 characters long")
-	}
-
-	hasUpper := false
-	hasLower := false
-	hasDigit := false
-	hasSymbol := false
-
-	for _, r := range input {
-		switch {
-		case unicode.IsUpper(r):
-			hasUpper = true
-		case unicode.IsLower(r):
-			hasLower = true
-		case unicode.IsDigit(r):
-			hasDigit = true
-		case unicode.IsPunct(r) || unicode.IsSymbol(r):
-			hasSymbol = true
-		}
-	}
-
-	if !hasUpper || !hasLower || !hasDigit || !hasSymbol {
-		return errors.New("password must include upper/lower case letters, numbers, and symbols")
-	}
-
 	return nil
 }

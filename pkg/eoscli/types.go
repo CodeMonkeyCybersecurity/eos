@@ -12,6 +12,6 @@ type RuntimeContext struct {
 	Log       *zap.Logger
 	StartTime time.Time
 	// Add others as needed:
-	// VaultClient *api.Client
+	// shared.VaultClient *api.Client
 	// Config      *Config
 }

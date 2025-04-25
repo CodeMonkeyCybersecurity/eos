@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"go.uber.org/zap"
@@ -51,7 +53,7 @@ func GetDelphiAPICredsOrPrompt(log *zap.Logger) (string, string, error) {
 // promptDelphiAPICreds prompts interactively, then optionally writes back to Vault
 func promptDelphiAPICreds(log *zap.Logger) (string, string, error) {
 	user := interaction.PromptInput("Enter the API username (e.g. wazuh-wui): ", "", log)
-	pass, err := interaction.PromptPassword("Enter the API password", log)
+	pass, err := crypto.PromptPassword("Enter the API password", log)
 	if err != nil {
 		log.Error("Failed to read password", zap.Error(err))
 		return "", "", err
@@ -84,7 +86,7 @@ func ReadConfig(log *zap.Logger) (*Config, error) {
 	log.Warn("⚠️  Delphi config not found or incomplete in Vault. Trying disk fallback...")
 
 	// Try disk fallback
-	diskPath := xdg.XDGConfigPath("eos", "delphi.json")
+	diskPath := xdg.XDGConfigPath(shared.EosIdentity, "delphi.json")
 	data, err := os.ReadFile(diskPath)
 	if err == nil {
 		if err := json.Unmarshal(data, &cfg); err == nil && cfg.FQDN != "" {
@@ -94,7 +96,7 @@ func ReadConfig(log *zap.Logger) (*Config, error) {
 		log.Warn("❌ Failed to parse disk config or it was incomplete", zap.Error(err))
 	}
 
-	pw, err := interaction.PromptPassword("Enter the API password", log)
+	pw, err := crypto.PromptPassword("Enter the API password", log)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read password: %w", err)
 	}

@@ -18,6 +18,15 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 )
 
+/**/
+// a logic wrapper for:
+// CheckVaultHealth
+// isInstalled
+// NewClient
+// isVaultInitialized
+// isVaultSealed
+// testKVSecret
+// CheckVaultSecrets
 func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoot string) (*CheckReport, *api.Client) {
 	report := &CheckReport{}
 
@@ -91,6 +100,7 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 	return report, client
 }
 
+/**/
 func isInstalled(log *zap.Logger) bool {
 	_, err := exec.LookPath("vault")
 	if err != nil {
@@ -101,6 +111,13 @@ func isInstalled(log *zap.Logger) bool {
 	return true
 }
 
+/**/
+
+
+
+/**/
+// TODO: ensure functionality
+// -> InitializeVault(client *api.Client) (VaultInitResponse, error)
 func isVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 	if client == nil {
 		return false, fmt.Errorf("vault client is nil")
@@ -113,6 +130,8 @@ func isVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 	log.Info("Vault health check complete", zap.Bool("initialized", status.Initialized), zap.Bool("sealed", status.Sealed))
 	return status.Initialized, nil
 }
+
+/**/
 
 // isVaultSealed checks if Vault is sealed and logs the result.
 func isVaultSealed(client *api.Client, log *zap.Logger) bool {
@@ -189,6 +208,7 @@ func CheckVaultSecrets(log *zap.Logger) {
 	fmt.Println("✅ Unseal keys and root token verified.")
 }
 
+/**/
 func CheckVaultHealth(log *zap.Logger) (string, error) {
 	addr := os.Getenv("VAULT_ADDR")
 	if addr == "" {
@@ -212,3 +232,12 @@ func CheckVaultHealth(log *zap.Logger) (string, error) {
 	log.Info("✅ Vault responded to health check", zap.String("VAULT_ADDR", addr))
 	return addr, nil
 }
+
+/**/
+
+/**/
+func IsAlreadyInitialized(err error, log *zap.Logger) bool {
+	return strings.Contains(err.Error(), "Vault is already initialized")
+}
+
+/**/

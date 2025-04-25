@@ -1,6 +1,6 @@
-// pkg/vault/types.go
+// pkg/shared/vault_types.go
 
-package vault
+package shared
 
 //
 // ------------------------- TYPES -------------------------

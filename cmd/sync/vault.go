@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -36,7 +37,7 @@ into Vault, then removes them from disk if the sync is successful.`,
 			return fmt.Errorf("vault is not ready")
 		}
 
-		secretsDir := "/var/lib/eos/secrets"
+		secretsDir := shared.SecretsDir
 		files, err := os.ReadDir(secretsDir)
 		if err != nil {
 			return fmt.Errorf("failed to read fallback secrets dir: %w", err)

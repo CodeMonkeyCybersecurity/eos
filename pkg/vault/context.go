@@ -10,7 +10,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -27,11 +28,11 @@ func EnsureVaultEnv(log *zap.Logger) (string, error) {
 		return cur, nil
 	}
 
-	host := platform.GetInternalHostname()
+	host := system.GetInternalHostname()
 
 	candidates := []string{
-		fmt.Sprintf("https://127.0.0.1:%s", VaultDefaultPort),
-		fmt.Sprintf(VaultDefaultAddr, host), // e.g. https://myhost:8179
+		fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort),
+		fmt.Sprintf(shared.VaultDefaultAddr, host), // e.g. https://myhost:8179
 	}
 
 	for _, addr := range candidates {
@@ -44,8 +45,8 @@ func EnsureVaultEnv(log *zap.Logger) (string, error) {
 
 	// ensure CA
 	if os.Getenv("VAULT_CACERT") == "" {
-		log.Debug("🔧 Auto‑setting VAULT_CACERT", zap.String("path", VaultAgentCACopyPath))
-		os.Setenv("VAULT_CACERT", VaultAgentCACopyPath)
+		log.Debug("🔧 Auto‑setting VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
+		os.Setenv("VAULT_CACERT", shared.VaultAgentCACopyPath)
 	}
 
 	// no live listener – just set to hostname form

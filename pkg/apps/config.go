@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 //
@@ -25,19 +25,19 @@ type App struct {
 }
 
 var Apps = []App{
-	{"1", "Static website", "base.conf", types.DefaultMarkers},
-	{"2", "Wazuh", "delphi.conf", types.CombineMarkers("1515", "1514", "55000")},
-	{"3", "Mattermost", "collaborate.conf", types.DefaultMarkers},
-	{"4", "Nextcloud", "cloud.conf", types.CombineMarkers("3478", "coturn:")},
-	{"5", "Mailcow", "mailcow.conf", types.CombineMarkers("25", "587", "465", "110", "995", "143", "993")},
-	{"6", "Jenkins", "jenkins.conf", types.DefaultMarkers},
-	{"7", "Grafana", "observe.conf", types.DefaultMarkers},
-	{"8", "Umami", "analytics.conf", types.DefaultMarkers},
-	{"9", "MinIO", "s3.conf", types.DefaultMarkers},
-	{"10", "Wiki.js", "wiki.conf", types.DefaultMarkers},
-	{"11", "ERPNext", "erp.conf", types.DefaultMarkers},
-	{"12", "Jellyfin", "jellyfin.conf", types.DefaultMarkers},
-	{"13", "Persephone", "persephone.conf", types.DefaultMarkers},
+	{"1", "Static website", "base.conf", shared.DefaultMarkers},
+	{"2", "Wazuh", "delphi.conf", shared.CombineMarkers("1515", "1514", "55000")},
+	{"3", "Mattermost", "collaborate.conf", shared.DefaultMarkers},
+	{"4", "Nextcloud", "cloud.conf", shared.CombineMarkers("3478", "coturn:")},
+	{"5", "Mailcow", "mailcow.conf", shared.CombineMarkers("25", "587", "465", "110", "995", "143", "993")},
+	{"6", "Jenkins", "jenkins.conf", shared.DefaultMarkers},
+	{"7", "Grafana", "observe.conf", shared.DefaultMarkers},
+	{"8", "Umami", "analytics.conf", shared.DefaultMarkers},
+	{"9", "MinIO", "s3.conf", shared.DefaultMarkers},
+	{"10", "Wiki.js", "wiki.conf", shared.DefaultMarkers},
+	{"11", "ERPNext", "erp.conf", shared.DefaultMarkers},
+	{"12", "Jellyfin", "jellyfin.conf", shared.DefaultMarkers},
+	{"13", "Persephone", "persephone.conf", shared.DefaultMarkers},
 }
 
 func GetSupportedAppNames() []string {

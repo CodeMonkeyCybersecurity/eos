@@ -14,7 +14,7 @@ import (
 // It returns the chosen value.
 func Remember(field, prompt, defaultValue, currentValue string, log *zap.Logger) string {
 	if currentValue != "" {
-		choice := promptSelect(fmt.Sprintf("Use stored value for %s (%s)?", field, currentValue), []string{"Yes", "No"})
+		choice := PromptSelect(fmt.Sprintf("Use stored value for %s (%s)?", field, currentValue), []string{"Yes", "No"}, log)
 		if choice == "Yes" {
 			return currentValue
 		}

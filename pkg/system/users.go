@@ -15,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -25,10 +26,8 @@ func SetPassword(username, password string) error {
 	return cmd.Run()
 }
 
-func UserExists(name string) bool {
-	return exec.Command("id", name).Run() == nil
-}
-
+/**/
+// system.EnsureEosUser
 func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	const defaultUsername = "eos"
 	username := defaultUsername
@@ -41,7 +40,7 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 		if err != nil {
 			return fmt.Errorf("failed to lookup user '%s': %w", username, err)
 		}
-		shell, err := getUserShell(username)
+		shell, err := GetUserShell(username)
 		if err != nil {
 			return err
 		}
@@ -91,8 +90,8 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 			pw1, _ := reader.ReadString('\n')
 			pw1 = strings.TrimSpace(pw1)
 
-			if !crypto.IsPasswordStrong(pw1) {
-				fmt.Println("❌ Password is too weak. Please use at least 12 characters, with mixed case, numbers, and symbols.")
+			if err := crypto.ValidateStrongPassword(pw1, log); err != nil {
+				fmt.Println("❌", err.Error())
 				continue
 			}
 
@@ -110,7 +109,7 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	}
 
 	if err := SetPassword(username, password); err != nil {
-		return err
+		return fmt.Errorf("failed to set password for user %q: %w", username, err)
 	}
 
 	// Handle sudo group
@@ -130,7 +129,7 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	}
 
 	// Save password to secrets dir
-	secretsPath := "/var/lib/eos/secrets"
+	secretsPath := shared.SecretsDir
 	if err := os.MkdirAll(secretsPath, 0700); err != nil {
 		fmt.Printf("⚠️ Could not create secrets directory: %v\n", err)
 	} else {
@@ -153,7 +152,18 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	return nil
 }
 
-func getUserShell(username string) (string, error) {
+/**/
+
+/**/
+// system.UserExists
+func UserExists(name string) bool {
+	return exec.Command("id", name).Run() == nil
+}
+
+/**/
+
+/**/
+func GetUserShell(username string) (string, error) {
 	cmd := exec.Command("getent", "passwd", username)
 	out, err := cmd.Output()
 	if err != nil {
@@ -165,3 +175,5 @@ func getUserShell(username string) (string, error) {
 	}
 	return strings.TrimSpace(parts[6]), nil
 }
+
+/**/

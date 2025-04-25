@@ -65,7 +65,7 @@ var InspectLogsCmd = &cobra.Command{
 }
 
 func tryJournalctl() error {
-	out, err := exec.Command("journalctl", "-u", "eos", "--no-pager", "--since", "today").CombinedOutput()
+	out, err := exec.Command("journalctl", "-u", shared.shared.EosIdentity, "--no-pager", "--since", "today").CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("could not query logs via journalctl: %w", err)
 	}

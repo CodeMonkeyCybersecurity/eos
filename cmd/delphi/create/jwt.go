@@ -3,6 +3,7 @@
 package create
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
@@ -20,7 +21,7 @@ var CreateJWTCmd = &cobra.Command{
 			log.Warn("Config not found, prompting for values", zap.Error(err))
 			cfg.FQDN = interaction.PromptInput("Enter the Wazuh domain (eg. delphi.domain.com)", "", log)
 			cfg.APIUser = interaction.PromptInput("Enter the API username (eg. wazuh-wui)", "", log)
-			pw, err := interaction.PromptPassword("Enter the API password", log)
+			pw, err := crypto.PromptPassword("Enter the API password", log)
 			if err != nil {
 				log.Fatal("Failed to read password", zap.Error(err))
 			}

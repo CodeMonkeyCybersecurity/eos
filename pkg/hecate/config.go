@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -26,11 +26,11 @@ type HecateConfig struct {
 func LoadConfig(defaultSubdomain string, log *zap.Logger) (*HecateConfig, error) {
 	cfg := &HecateConfig{}
 
-	if _, err := os.Stat(types.HecateLastValuesFile); err == nil {
-		file, err := os.Open(types.HecateLastValuesFile)
+	if _, err := os.Stat(shared.HecateLastValuesFile); err == nil {
+		file, err := os.Open(shared.HecateLastValuesFile)
 		if err != nil {
 
-			return nil, fmt.Errorf("unable to open %s: %w", types.HecateLastValuesFile, err)
+			return nil, fmt.Errorf("unable to open %s: %w", shared.HecateLastValuesFile, err)
 		}
 		defer func() {
 			if err := file.Close(); err != nil {
@@ -58,7 +58,7 @@ func LoadConfig(defaultSubdomain string, log *zap.Logger) (*HecateConfig, error)
 		}
 		if err := scanner.Err(); err != nil {
 
-			return nil, fmt.Errorf("error reading %s: %w", types.HecateLastValuesFile, err)
+			return nil, fmt.Errorf("error reading %s: %w", shared.HecateLastValuesFile, err)
 		}
 	}
 
@@ -96,9 +96,9 @@ func LoadConfig(defaultSubdomain string, log *zap.Logger) (*HecateConfig, error)
 	// Log when configuration is written
 	content := fmt.Sprintf("BASE_DOMAIN=%s\nbackendIP=%s\nSUBDOMAIN=%s\nEMAIL=%s\n",
 		cfg.BaseDomain, cfg.BackendIP, cfg.Subdomain, cfg.Email)
-	if err := os.WriteFile(types.HecateLastValuesFile, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(shared.HecateLastValuesFile, []byte(content), 0644); err != nil {
 
-		return nil, fmt.Errorf("failed to write %s: %w", types.HecateLastValuesFile, err)
+		return nil, fmt.Errorf("failed to write %s: %w", shared.HecateLastValuesFile, err)
 	}
 
 	return cfg, nil

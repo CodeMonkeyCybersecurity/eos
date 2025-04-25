@@ -11,7 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -25,7 +25,7 @@ var InspectVaultCmd = &cobra.Command{
 
 		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos"))
 
-		entries, err := vault.ListUnder("eos", log)
+		entries, err := vault.ListUnder(shared.EosIdentity, log)
 		if err != nil {
 			log.Error("Vault list failed", zap.String("action", "list"), zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
@@ -76,7 +76,7 @@ validates the token at /run/eos/.vault-token, and attempts a test query.`,
 		fmt.Println("📦 Running vault kv get secret/hello as eos...")
 		log.Info("Attempting test query", zap.String("action", "query"))
 
-		cmdTest := exec.Command("sudo", "-u", "eos", "vault", "kv", "get", "-format=json", "secret/hello")
+		cmdTest := exec.Command("sudo", "-u", shared.EosIdentity "vault", "kv", "get", "-format=json", "secret/hello")
 		cmdTest.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+tokenPath)
 		out, err := cmdTest.CombinedOutput()
 		if err != nil {
@@ -98,7 +98,7 @@ var InspectVaultLDAPCmd = &cobra.Command{
 	Short: "View stored LDAP config in Vault",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := &ldap.LDAPConfig{}
-		err := vault.ReadFromVaultAt(context.Background(), types.LDAPVaultMount, types.LDAPVaultPath, cfg, log)
+		err := vault.ReadFromVaultAt(context.Background(), shared.LDAPVaultMount, shared.LDAPVaultPath, cfg, log)
 		if err != nil {
 			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
 		}

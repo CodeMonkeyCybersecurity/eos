@@ -8,7 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"go.uber.org/zap"
 
@@ -20,7 +21,7 @@ import (
 
 func ReadLDAPConfig(log *zap.Logger) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := vault.ReadFromVault(types.LDAPVaultPath, &cfg, log)
+	err := vault.ReadFromVault(shared.LDAPVaultPath, &cfg, log)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +45,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	}
 	if cfg.Password == "" {
 		var err error
-		cfg.Password, err = interaction.PromptPassword("Bind password", log)
+		cfg.Password, err = crypto.PromptPassword("Bind password", log)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +62,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	}
 
 	// 🔐 Save to Vault
-	if err := vault.WriteToVault(types.LDAPVaultPath, cfg, log); err != nil {
+	if err := vault.WriteToVault(shared.LDAPVaultPath, cfg, log); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

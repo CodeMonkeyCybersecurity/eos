@@ -11,9 +11,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -35,20 +34,20 @@ var CreateUmamiCmd = &cobra.Command{
 		log.Info("Starting Umami installation using Eos")
 
 		// Ensure the installation directory exists
-		if _, err := os.Stat(types.UmamiDir); os.IsNotExist(err) {
+		if _, err := os.Stat(shared.UmamiDir); os.IsNotExist(err) {
 			log.Warn("Installation directory does not exist; creating it",
-				zap.String("path", types.UmamiDir))
-			if err := os.MkdirAll(types.UmamiDir, xdg.DirPermStandard); err != nil {
+				zap.String("path", shared.UmamiDir))
+			if err := os.MkdirAll(shared.UmamiDir, shared.DirPermStandard); err != nil {
 				log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
 			log.Info("Installation directory exists",
-				zap.String("path", types.UmamiDir))
+				zap.String("path", shared.UmamiDir))
 		}
 
 		// Prepare the Docker Compose file paths
 		sourceComposeFile := "assets/umami-docker-compose.yml"
-		destComposeFile := filepath.Join(types.UmamiDir, "umami-docker-compose.yml")
+		destComposeFile := filepath.Join(shared.UmamiDir, "umami-docker-compose.yml")
 
 		log.Info("Copying and processing Docker Compose file",
 			zap.String("source", sourceComposeFile),
@@ -87,8 +86,8 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Deploy Umami with Docker Compose using the processed file
 		log.Info("Deploying Umami with Docker Compose",
-			zap.String("directory", types.UmamiDir))
-		if err := execute.ExecuteInDir(types.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+			zap.String("directory", shared.UmamiDir))
+		if err := execute.ExecuteInDir(shared.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
@@ -103,7 +102,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Umami installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", platform.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", system.GetInternalHostname())))
 		return nil
 	}),
 }

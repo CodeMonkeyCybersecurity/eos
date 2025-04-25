@@ -12,6 +12,43 @@ import (
 	"go.uber.org/zap"
 )
 
+/**/
+// should probs move these into system.EnsureOwnedDir
+// --- helper: ensure a dir exists with the right owner & perms ---
+func EnsureOwnedDir(path string, perm os.FileMode, owner string) error {
+	if err := os.MkdirAll(path, perm); err != nil {
+		return fmt.Errorf("mkdir %s: %w", path, err)
+	}
+	uid, gid, err := LookupUser(owner)
+	if err != nil {
+		return fmt.Errorf("lookup %s: %w", owner, err)
+	}
+	if err := os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("chown %s: %w", path, err)
+	}
+	return nil
+}
+/**/
+
+/**/
+// should probs move these into system.WriteOwnedFile
+// --- helper: write a file and chown to owner ---
+func WriteOwnedFile(path string, data []byte, perm os.FileMode, owner string) error {
+	if err := os.WriteFile(path, data, perm); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	uid, gid, err := LookupUser(owner)
+	if err != nil {
+		return fmt.Errorf("lookup %s: %w", owner, err)
+	}
+	if err := os.Chown(path, uid, gid); err != nil {
+		return fmt.Errorf("chown %s: %w", path, err)
+	}
+	return nil
+}
+/**/
+
+
 // RemoveWithLog deletes a file or directory if it exists, with descriptive logging.
 func Rm(path, label string, log *zap.Logger) error {
 	info, err := os.Stat(path)

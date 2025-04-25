@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -46,14 +46,14 @@ func init() {
 
 // runAutoRestore automatically restores resources using the provided timestamp.
 func RunAutoRestore(ts string) {
-	backupConf := fmt.Sprintf("%s.%s.bak", types.DefaultConfDir, ts)
-	backupCerts := fmt.Sprintf("%s.%s.bak", types.DefaultCertsDir, ts)
-	backupCompose := fmt.Sprintf("%s.%s.bak", types.DefaultComposeYML, ts)
+	backupConf := fmt.Sprintf("%s.%s.bak", shared.DefaultConfDir, ts)
+	backupCerts := fmt.Sprintf("%s.%s.bak", shared.DefaultCertsDir, ts)
+	backupCompose := fmt.Sprintf("%s.%s.bak", shared.DefaultComposeYML, ts)
 
 	fmt.Printf("Restoring backups with timestamp %s...\n", ts)
-	system.RestoreDir(backupConf, types.DefaultConfDir)
-	system.RestoreDir(backupCerts, types.DefaultCertsDir)
-	system.RestoreFile(backupCompose, types.DefaultComposeYML)
+	system.RestoreDir(backupConf, shared.DefaultConfDir)
+	system.RestoreDir(backupCerts, shared.DefaultCertsDir)
+	system.RestoreFile(backupCompose, shared.DefaultComposeYML)
 }
 
 // runInteractiveRestore presents a menu to choose which resource(s) to restore.
@@ -87,33 +87,33 @@ func RunInteractiveRestore() {
 }
 
 func RestoreConf() {
-	backupConf, err := system.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultConfDir))
+	backupConf, err := system.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultConfDir))
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultConfDir, err)
+		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultConfDir, err)
 		return
 	}
 	fmt.Printf("Restoring configuration from backup: %s\n", backupConf)
-	system.RestoreDir(backupConf, types.DefaultConfDir)
+	system.RestoreDir(backupConf, shared.DefaultConfDir)
 }
 
 func RestoreCerts() {
-	backupCerts, err := system.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultCertsDir))
+	backupCerts, err := system.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultCertsDir))
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultCertsDir, err)
+		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultCertsDir, err)
 		return
 	}
 	fmt.Printf("Restoring certificates from backup: %s\n", backupCerts)
-	system.RestoreDir(backupCerts, types.DefaultCertsDir)
+	system.RestoreDir(backupCerts, shared.DefaultCertsDir)
 }
 
 func RestoreCompose() {
-	backupCompose, err := system.FindLatestBackup(fmt.Sprintf("%s.", types.DefaultComposeYML))
+	backupCompose, err := system.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultComposeYML))
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", types.DefaultComposeYML, err)
+		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultComposeYML, err)
 		return
 	}
 	fmt.Printf("Restoring docker-compose file from backup: %s\n", backupCompose)
-	system.RestoreFile(backupCompose, types.DefaultComposeYML)
+	system.RestoreFile(backupCompose, shared.DefaultComposeYML)
 }
 
 // log is a package-level variable for the Zap logger.

@@ -6,29 +6,25 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
+/**/
 // ## 9. Upload EOS Vault Policy
-
+// EnsurePolicy writes the eos-policy defined in pkg/vault/types.go
 // - `EnsureEosPolicy(client *api.Client, log *zap.Logger) error`
-
-// ---
-
-//
-// ------------------------ POLICY ------------------------
-//
 
 // EnsurePolicy writes the eos-policy defined in pkg/vault/types.go
 func EnsurePolicy(client *api.Client, log *zap.Logger) error {
-	log.Info("📝 Preparing to write Vault policy", zap.String("policy", EosVaultPolicy))
+	log.Info("📝 Preparing to write Vault policy", zap.String("policy", shared.EosVaultPolicy))
 
 	// 1️⃣ Retrieve the policy from internal map
-	pol, ok := Policies[EosVaultPolicy]
+	pol, ok := shared.Policies[shared.EosVaultPolicy]
 	if !ok {
-		log.Error("❌ Policy not found in internal map", zap.String("policy", EosVaultPolicy))
-		return fmt.Errorf("internal error: policy %q not found in Policies map", EosVaultPolicy)
+		log.Error("❌ Policy not found in internal map", zap.String("policy", shared.EosVaultPolicy))
+		return fmt.Errorf("internal error: policy %q not found in shared.Policies map", shared.EosVaultPolicy)
 	}
 
 	// 2️⃣ Log metadata about the policy string
@@ -36,14 +32,14 @@ func EnsurePolicy(client *api.Client, log *zap.Logger) error {
 
 	// 3️⃣ Write policy to Vault
 	log.Info("📡 Writing policy to Vault")
-	if err := client.Sys().PutPolicy(EosVaultPolicy, pol); err != nil {
-		log.Error("❌ Failed to write policy", zap.String("policy", EosVaultPolicy), zap.Error(err))
-		return fmt.Errorf("failed to write policy %s: %w", EosVaultPolicy, err)
+	if err := client.Sys().PutPolicy(shared.EosVaultPolicy, pol); err != nil {
+		log.Error("❌ Failed to write policy", zap.String("policy", shared.EosVaultPolicy), zap.Error(err))
+		return fmt.Errorf("failed to write policy %s: %w", shared.EosVaultPolicy, err)
 	}
 
 	// 4️⃣ Validate policy by re-fetching it from Vault
 	log.Info("🔍 Verifying policy write")
-	storedPol, err := client.Sys().GetPolicy(EosVaultPolicy)
+	storedPol, err := client.Sys().GetPolicy(shared.EosVaultPolicy)
 	if err != nil {
 		log.Error("❌ Failed to retrieve policy for verification", zap.Error(err))
 		return fmt.Errorf("failed to verify written policy: %w", err)
@@ -56,7 +52,7 @@ func EnsurePolicy(client *api.Client, log *zap.Logger) error {
 		return fmt.Errorf("written policy does not match expected content")
 	}
 
-	log.Info("✅ Policy successfully written and verified", zap.String("policy", EosVaultPolicy))
+	log.Info("✅ Policy successfully written and verified", zap.String("policy", shared.EosVaultPolicy))
 	return nil
 }
 
@@ -73,8 +69,8 @@ func truncatePolicy(policy string) string {
 func ApplyAdminPolicy(creds UserpassCreds, client *api.Client, log *zap.Logger) error {
 	fmt.Println("Creating full-access policy for eos.")
 
-	policyName := EosVaultPolicy
-	policy, ok := Policies[policyName]
+	policyName := shared.EosVaultPolicy
+	policy, ok := shared.Policies[policyName]
 	if !ok {
 		return fmt.Errorf("policy %q not found in Policies map", policyName)
 	}
@@ -87,7 +83,7 @@ func ApplyAdminPolicy(creds UserpassCreds, client *api.Client, log *zap.Logger) 
 	log.Info("✅ Custom policy applied via API", zap.String("policy", policyName))
 
 	// Update the eos user with the policy.
-	_, err := client.Logical().Write(EosVaultUserPath, map[string]interface{}{
+	_, err := client.Logical().Write(shared.EosVaultUserPath, map[string]interface{}{
 		"password": creds.Password,
 		"policies": policyName,
 	})
@@ -98,3 +94,4 @@ func ApplyAdminPolicy(creds UserpassCreds, client *api.Client, log *zap.Logger) 
 	log.Info("✅ eos user updated with full privileges", zap.String("policy", policyName))
 	return nil
 }
+

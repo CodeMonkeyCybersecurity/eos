@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -150,14 +151,14 @@ func NewClient(log *zap.Logger) (*api.Client, error) {
 
 func SetVaultClient(client *api.Client, log *zap.Logger) {
 	log.Debug("📦 Vault client cached globally")
-	VaultClient = client
+	shared.VaultClient = client
 }
 
 func GetVaultClient(log *zap.Logger) (*api.Client, error) {
-	if VaultClient == nil {
+	if shared.VaultClient == nil {
 		log.Debug("❌ Vault client requested but not initialized")
 		return nil, fmt.Errorf("vault client is not initialized; call SetVaultClient first")
 	}
 	log.Debug("📦 Returning cached Vault client")
-	return VaultClient, nil
+	return shared.VaultClient, nil
 }

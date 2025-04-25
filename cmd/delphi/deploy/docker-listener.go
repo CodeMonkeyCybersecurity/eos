@@ -6,8 +6,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -37,37 +36,37 @@ var DockerListenerCmd = &cobra.Command{
 		}
 
 		// Step 2: Create virtual environment
-		sugar.Infof("📂 Creating virtual environment at %s", types.VenvPath)
-		if err := execute.Execute("sudo", "mkdir", "-p", types.VenvPath); err != nil {
+		sugar.Infof("📂 Creating virtual environment at %s", shared.VenvPath)
+		if err := execute.Execute("sudo", "mkdir", "-p", shared.VenvPath); err != nil {
 			sugar.Fatalf("❌ Failed to create virtual environment directory: %v", err)
 		}
 
-		if err := execute.Execute("sudo", "python3", "-m", "venv", types.VenvPath); err != nil {
+		if err := execute.Execute("sudo", "python3", "-m", "venv", shared.VenvPath); err != nil {
 			sugar.Fatalf("❌ Failed to create virtual environment: %v", err)
 		}
 
 		// Step 3: Install required Python packages
 		sugar.Infof("📦 Installing Python dependencies in virtual environment...")
-		if err := execute.Execute(types.VenvPath+"/bin/pip", "install", "docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2"); err != nil {
+		if err := execute.Execute(shared.VenvPath+"/bin/pip", "install", "docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2"); err != nil {
 			sugar.Fatalf("❌ Failed to install Python dependencies: %v", err)
 		}
 
 		// Step 4: Update Wazuh DockerListener script
 		sugar.Infof("✏️  Updating DockerListener shebang...")
-		if _, err := os.Stat(types.DockerListener); os.IsNotExist(err) {
-			sugar.Warn("⚠️  Warning: DockerListener script not found at %s", types.DockerListener)
+		if _, err := os.Stat(shared.DockerListener); os.IsNotExist(err) {
+			sugar.Warn("⚠️  Warning: DockerListener script not found at %s", shared.DockerListener)
 		} else {
 			// Backup the original script
-			backupPath := types.DockerListener + ".bak"
-			execute.Execute("sudo", "cp", types.DockerListener, backupPath)
+			backupPath := shared.DockerListener + ".bak"
+			execute.Execute("sudo", "cp", shared.DockerListener, backupPath)
 
 			// Modify shebang
-			shebang := "#!" + types.VenvPath + "/bin/python3\n"
-			content, _ := os.ReadFile(types.DockerListener)
+			shebang := "#!" + shared.VenvPath + "/bin/python3\n"
+			content, _ := os.ReadFile(shared.DockerListener)
 			newContent := shebang + strings.Join(strings.Split(string(content), "\n")[1:], "\n")
 
 			// Write back the modified file
-			if err := os.WriteFile(types.DockerListener, []byte(newContent), xdg.DirPermStandard); err != nil {
+			if err := os.WriteFile(shared.DockerListener, []byte(newContent), shared.DirPermStandard); err != nil {
 				sugar.Fatalf("❌ Failed to update DockerListener script: %v", err)
 			}
 			sugar.Infof("✅ DockerListener script updated successfully")

@@ -1,4 +1,4 @@
-/* pkg/interaction/reader.go */
+// pkg/interaction/reader.go
 
 package interaction
 
@@ -6,18 +6,28 @@ import (
 	"bufio"
 	"fmt"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
-func readLine(reader *bufio.Reader, label string) (string, error) {
+// ReadLine prompts the user with a label and returns a trimmed line of input.
+func ReadLine(reader *bufio.Reader, label string, log *zap.Logger) (string, error) {
+	log.Debug("📝 Prompting user for input", zap.String("label", label))
 	fmt.Print(label + ": ")
+
 	text, err := reader.ReadString('\n')
 	if err != nil {
+		log.Error("❌ Failed to read user input", zap.Error(err))
 		return "", err
 	}
-	return strings.TrimSpace(text), nil
+
+	value := strings.TrimSpace(text)
+	log.Debug("📥 User input received", zap.String("value", value))
+	return value, nil
 }
 
-func readLines(reader *bufio.Reader, label string, count int) ([]string, error) {
+// ReadLines prompts for multiple labeled inputs.
+func ReadLines(reader *bufio.Reader, label string, count int, log *zap.Logger) ([]string, error) {
 	if count <= 0 {
 		return nil, fmt.Errorf("invalid input count: %d", count)
 	}
@@ -27,7 +37,7 @@ func readLines(reader *bufio.Reader, label string, count int) ([]string, error) 
 		if count > 1 {
 			prompt = fmt.Sprintf("%s %d", label, i+1)
 		}
-		val, err := readLine(reader, prompt)
+		val, err := ReadLine(reader, prompt, log)
 		if err != nil {
 			return values[:i], fmt.Errorf("error reading '%s': %w", prompt, err)
 		}

@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -68,7 +68,7 @@ func previewFile(path string) (string, error) {
 	}
 	defer f.Close()
 
-	buf := make([]byte, types.MaxPreviewSize)
+	buf := make([]byte, shared.MaxPreviewSize)
 	n, err := f.Read(buf)
 	if err != nil && err != io.EOF {
 		return "", err
@@ -83,7 +83,7 @@ func previewFile(path string) (string, error) {
 	_, _ = f.Seek(0, 0)
 	scanner := bufio.NewScanner(f)
 	var lines []string
-	for i := 0; scanner.Scan() && i < types.MaxPreviewLines; i++ {
+	for i := 0; scanner.Scan() && i < shared.MaxPreviewLines; i++ {
 		lines = append(lines, scanner.Text())
 	}
 

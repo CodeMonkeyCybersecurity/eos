@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"go.uber.org/zap"
 )
@@ -26,7 +27,7 @@ func (c *Config) IsValid() bool {
 }
 
 func PromptDelphiConfig(log *zap.Logger) *Config {
-	password, err := interaction.PromptPassword("Enter the API password", log)
+	password, err := crypto.PromptPassword("Enter the API password", log)
 	if err != nil {
 		log.Error("❌ Failed to read password: %v\n")
 		os.Exit(1)

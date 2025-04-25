@@ -10,8 +10,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"go.uber.org/zap"
 )
@@ -20,7 +21,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 	cfg := &LDAPConfig{}
 
 	// Try to load existing config from Vault to prefill
-	if err := vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg, log); err == nil {
+	if err := vault.ReadFromVaultAt(context.Background(), "secret", shared.LDAPVaultPath, cfg, log); err == nil {
 		fmt.Println("✅ LDAP config prefilled from Vault")
 	} else {
 		fmt.Printf("⚠️  Vault fallback: could not load LDAP config: %v\n", err)
@@ -35,7 +36,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 		bindDN = "cn=anonymous"
 	}
 
-	password, err := interaction.PromptPasswordWithDefault("LDAP password [press Enter to keep existing]", cfg.Password, log)
+	password, err := crypto.PromptPasswordWithDefault("LDAP password [press Enter to keep existing]", cfg.Password, log)
 	if err != nil {
 		fmt.Println("⚠️  No Password provided.")
 		return err
@@ -64,7 +65,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 	cfg.UserBase = baseDN
 
 	// Save config to Vault
-	if err := vault.WriteToVault(types.LDAPVaultPath, cfg, log); err != nil {
+	if err := vault.WriteToVault(shared.LDAPVaultPath, cfg, log); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
@@ -151,7 +152,7 @@ func loadFromPrompt(log *zap.Logger) (*LDAPConfig, error) {
 func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 	cfg := &LDAPConfig{}
 	if _, err := vault.GetVaultClient(log); err == nil {
-		_ = vault.ReadFromVaultAt(context.Background(), "secret", types.LDAPVaultPath, cfg, log)
+		_ = vault.ReadFromVaultAt(context.Background(), "secret", shared.LDAPVaultPath, cfg, log)
 	}
 
 	for fieldName, meta := range LDAPFieldMeta {
@@ -159,7 +160,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 
 		if val == "" || meta.Required {
 			if meta.Sensitive {
-				secret, err := interaction.PromptPassword(meta.Label, log)
+				secret, err := crypto.PromptPassword(meta.Label, log)
 				if err != nil {
 					return nil, err
 				}
@@ -171,7 +172,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 		}
 	}
 
-	if err := vault.WriteToVault(types.LDAPVaultPath, cfg, log); err != nil {
+	if err := vault.WriteToVault(shared.LDAPVaultPath, cfg, log); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 

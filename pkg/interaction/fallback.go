@@ -1,95 +1,54 @@
-/* pkg/interaction/fallback.go */
-
 package interaction
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"go.uber.org/zap"
 )
 
+// FallbackPrompter displays a list of fallback options and returns the selected option code.
+// Returns an empty string if no selection was made or input was invalid.
 func FallbackPrompter(title string, options []FallbackOption, log *zap.Logger) string {
 	var labels []string
+	log.Info("Prompting fallback options", zap.String("title", title))
 	for _, opt := range options {
 		labels = append(labels, opt.Label)
 	}
 
-	choice := promptSelect(title, labels)
+	choice := PromptSelect(title, labels, log)
+	if choice == "" {
+		log.Warn("No valid fallback option selected")
+		return ""
+	}
+
 	for _, opt := range options {
 		if opt.Label == choice {
+			log.Info("User selected fallback option",
+				zap.String("label", opt.Label),
+				zap.String("code", opt.Code),
+			)
 			return opt.Code
 		}
 	}
+
+	log.Warn("Selected label not recognized", zap.String("label", choice))
 	return ""
 }
 
-func HandleFallbackChoice(choice string, handlers map[string]func() error) error {
+// HandleFallbackChoice executes the appropriate handler for the user's fallback choice.
+func HandleFallbackChoice(choice string, handlers map[string]func() error, log *zap.Logger) error {
 	if handler, ok := handlers[choice]; ok {
 		return handler()
 	}
-	return fmt.Errorf("unexpected fallback choice: %s", choice)
+	log.Error("Unexpected fallback choice", zap.String("choice", choice))
+	return fmt.Errorf("invalid fallback choice: %s", choice)
 }
 
-func WriteFallbackSecrets(name string, secrets map[string]string) error {
-	path := xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
-
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-	data, err := json.MarshalIndent(secrets, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal fallback secrets: %w", err)
-	}
-	if err := os.WriteFile(path, data, 0600); err != nil {
-		return fmt.Errorf("write fallback secrets: %w", err)
-	}
-	return nil
-}
-
-// ReadFallbackSecrets loads secrets from ~/.config/eos/<name>/config.json
-func ReadFallbackSecrets(name string) (map[string]string, error) {
-	path := xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read fallback secrets: %w", err)
-	}
-
-	var secrets map[string]string
-	if err := json.Unmarshal(data, &secrets); err != nil {
-		return nil, fmt.Errorf("unmarshal fallback secrets: %w", err)
-	}
-	return secrets, nil
-}
-
-func ReadFallbackJSON[T any](path string, log *zap.Logger) (*T, error) {
-	log.Debug("Reading fallback config", zap.String("path", path))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read: %w", err)
-	}
-	var out T
-	if err := json.Unmarshal(data, &out); err != nil {
-		return nil, fmt.Errorf("unmarshal: %w", err)
-	}
-	return &out, nil
-}
-
-func WriteFallbackJSON[T any](path string, data *T, log *zap.Logger) error {
-	log.Debug("Writing fallback config", zap.String("path", path))
-	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
-		return fmt.Errorf("create config dir: %w", err)
-	}
-	b, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal: %w", err)
-	}
-	return os.WriteFile(path, b, 0600)
-}
-
-func FallbackPath(name string) string {
-	return xdg.XDGConfigPath("eos", filepath.Join(name, "config.json"))
+// FallbackPath returns the expected location of a fallback config file for a given name.
+func FallbackPath(name string, log *zap.Logger) string {
+	fallbackPath := filepath.Join(name, shared.DefaultConfigFilename)
+	return xdg.XDGConfigPath(shared.DefaultNamespace, fallbackPath)
 }

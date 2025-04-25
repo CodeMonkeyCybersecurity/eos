@@ -14,8 +14,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -38,7 +38,7 @@ generates SSH keys, and sets a secure password.`,
 
 func init() {
 	CreateCmd.AddCommand(CreateUserCmd)
-	CreateUserCmd.Flags().StringVar(&username, "username", "eos", "Username for the new account")
+	CreateUserCmd.Flags().StringVar(&username, "username", shared.EosIdentity, "Username for the new account")
 	CreateUserCmd.Flags().BoolVar(&auto, "auto", false, "Enable non-interactive auto mode with secure random password")
 	CreateUserCmd.Flags().BoolVar(&loginShell, "login", false, "Allow login shell for this user (default is no shell)")
 }
@@ -144,14 +144,14 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 	fmt.Println("📁 SSH key:", "/home/"+username+"/.ssh/id_rsa")
 
 	// Attempt to store the credentials in Vault.
-	if err := vault.StoreUserSecret(username, password, "/home/"+username+"/.ssh/id_rsa", log); err != nil {
-		log.Warn("Vault is not available or write failed", zap.Error(err))
-		fmt.Println("⚠️ Vault write failed. Save these credentials manually:")
-		fmt.Printf("🔐 Password for %s: %s\n", username, password)
-	} else {
-		log.Info("User credentials securely stored in Vault")
-		fmt.Println("🔐 Credentials stored in Vault for user:", username)
-	}
+	// if err := vault.StoreUserSecret(username, password, "/home/"+username+"/.ssh/id_rsa", log); err != nil {
+	// 	log.Warn("Vault is not available or write failed", zap.Error(err))
+	// 	fmt.Println("⚠️ Vault write failed. Save these credentials manually:")
+	// 	fmt.Printf("🔐 Password for %s: %s\n", username, password)
+	// } else {
+	// 	log.Info("User credentials securely stored in Vault")
+	// 	fmt.Println("🔐 Credentials stored in Vault for user:", username)
+	// }
 
 	return nil
 }

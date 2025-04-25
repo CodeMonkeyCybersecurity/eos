@@ -7,6 +7,7 @@ import (
 	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -51,8 +52,8 @@ var CreateDockerCmd = &cobra.Command{
 }
 
 func addDockerRepo(log *zap.Logger) {
-	arch := platform.GetArchitecture()
-	codename := platform.GetUbuntuCodename()
+	arch := system.GetArchitecture()
+	codename := system.GetUbuntuCodename()
 
 	repoLine := fmt.Sprintf(
 		"deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n",

@@ -12,9 +12,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/types"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -36,18 +35,18 @@ var CreateJenkinsCmd = &cobra.Command{
 		log.Info("Starting Jenkins installation using Eos")
 
 		// Ensure the installation directory exists
-		if _, err := os.Stat(types.JenkinsDir); os.IsNotExist(err) {
-			log.Warn("Installation directory does not exist; creating it", zap.String("path", types.JenkinsDir))
-			if err := os.MkdirAll(types.JenkinsDir, xdg.DirPermStandard); err != nil {
+		if _, err := os.Stat(shared.JenkinsDir); os.IsNotExist(err) {
+			log.Warn("Installation directory does not exist; creating it", zap.String("path", shared.JenkinsDir))
+			if err := os.MkdirAll(shared.JenkinsDir, shared.DirPermStandard); err != nil {
 				log.Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
-			log.Info("Installation directory exists", zap.String("path", types.JenkinsDir))
+			log.Info("Installation directory exists", zap.String("path", shared.JenkinsDir))
 		}
 
 		// Prepare the Docker Compose file paths
 		sourceComposeFile := "assets/jenkins-docker-compose.yml"
-		destComposeFile := filepath.Join(types.JenkinsDir, "jenkins-docker-compose.yml")
+		destComposeFile := filepath.Join(shared.JenkinsDir, "jenkins-docker-compose.yml")
 
 		log.Info("Copying and processing Docker Compose file",
 			zap.String("source", sourceComposeFile),
@@ -84,8 +83,8 @@ var CreateJenkinsCmd = &cobra.Command{
 		}
 
 		// Deploy Jenkins with Docker Compose using the processed file
-		log.Info("Deploying Jenkins with Docker Compose", zap.String("directory", types.JenkinsDir))
-		if err := execute.ExecuteInDir(types.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+		log.Info("Deploying Jenkins with Docker Compose", zap.String("directory", shared.JenkinsDir))
+		if err := execute.ExecuteInDir(shared.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			log.Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
@@ -126,7 +125,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		log.Info("Jenkins installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", platform.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", system.GetInternalHostname())))
 
 		return nil
 	}),

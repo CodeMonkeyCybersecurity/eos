@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func GetEnvOrDefault(envVar, fallback string) string {
@@ -45,5 +47,5 @@ func XDGRuntimePath(app, file string) (string, error) {
 
 // Optional utility for creating paths on demand
 func EnsureDir(path string) error {
-	return os.MkdirAll(filepath.Dir(path), DirPermStandard)
+	return os.MkdirAll(filepath.Dir(path), shared.DirPermStandard)
 }

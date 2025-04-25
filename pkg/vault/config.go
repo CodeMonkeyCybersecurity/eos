@@ -5,14 +5,16 @@ package vault
 import (
 	"fmt"
 	"os"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func ResolveVaultConfigDir(distro string) string {
 	switch distro {
 	case "debian", "rhel":
-		return VaultConfigDirDebian
+		return shared.VaultConfigDirDebian
 	default:
-		return VaultConfigDirSnap
+		return shared.VaultConfigDirSnap
 	}
 }
 
@@ -20,7 +22,7 @@ func GetVaultAddr() string {
 	if addr := os.Getenv("VAULT_ADDR"); addr != "" {
 		return addr
 	}
-	return VaultDefaultAddr
+	return shared.VaultDefaultAddr
 }
 
 func RenderVaultConfig(addr string) string {
@@ -35,5 +37,5 @@ storage "file" {
 disable_mlock = true
 api_addr = "%s"
 ui = true
-`, VaultDefaultPort, VaultDataPath, addr)
+`, shared.VaultDefaultPort, shared.VaultDataPath, addr)
 }

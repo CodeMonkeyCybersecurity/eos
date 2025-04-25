@@ -9,6 +9,13 @@ import (
 	"go.uber.org/zap"
 )
 
+//
+// ========================== REMEMBER ==========================
+//
+
+// pkg/vault/remember.go or a new pkg/vault/bootstrap.go
+
+/**/
 // Remember prompts the user for a Vault config field and persists it using fallback logic.
 func Remember(name, key, prompt, def string, log *zap.Logger) (string, error) {
 	// Attempt to load previously stored secrets.
@@ -32,6 +39,9 @@ func Remember(name, key, prompt, def string, log *zap.Logger) (string, error) {
 	return val, nil
 }
 
+/**/
+
+/**/
 func PromptOrRecallUnsealKeys(log *zap.Logger) ([]string, string, error) {
 	keys := make([]string, 0, 3)
 
@@ -51,8 +61,9 @@ func PromptOrRecallUnsealKeys(log *zap.Logger) ([]string, string, error) {
 	return keys, root, nil
 }
 
-// pkg/vault/remember.go or a new pkg/vault/bootstrap.go
+/**/
 
+/**/
 func rememberBootstrapHashes(log *zap.Logger) ([]string, string, error) {
 	secrets, err := ReadFallbackSecrets(log)
 	if err != nil {
@@ -68,3 +79,5 @@ func rememberBootstrapHashes(log *zap.Logger) ([]string, string, error) {
 
 	return hashes, root, nil
 }
+
+/**/

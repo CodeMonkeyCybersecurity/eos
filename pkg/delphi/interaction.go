@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"go.uber.org/zap"
 )
@@ -29,7 +30,7 @@ func ConfirmConfig(cfg *Config, log *zap.Logger) *Config {
 		cfg.FQDN = interaction.PromptInput("FQDN", cfg.FQDN, log)
 		cfg.APIUser = interaction.PromptInput("API Username", cfg.APIUser, log)
 
-		pw, err := interaction.PromptPassword("API Password", log)
+		pw, err := crypto.PromptPassword("API Password", log)
 		if err != nil {
 			fmt.Printf("❌ Failed to read password: %v\n", err)
 			os.Exit(1)

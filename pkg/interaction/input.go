@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"syscall"
 
 	"go.uber.org/zap"
-	"golang.org/x/term"
 )
 
 // PromptWithDefault prompts the user and returns their response or a default value if empty.
@@ -35,47 +33,4 @@ func PromptRequired(label string, log *zap.Logger) string {
 		}
 		fmt.Println("Input cannot be empty.")
 	}
-}
-
-// PromptPassword hides user input and returns the entered password.
-func PromptPassword(label string, log *zap.Logger) (string, error) {
-	fmt.Printf("%s: ", label)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println("")
-	if err != nil {
-		return "", fmt.Errorf("error reading password: %w", err)
-	}
-	return strings.TrimSpace(string(bytePassword)), nil
-}
-
-// PromptPasswordWithDefault hides user input and returns password or default if blank.
-func PromptPasswordWithDefault(label, defaultValue string, log *zap.Logger) (string, error) {
-	fmt.Printf("%s [%s]: ", label, "********")
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println("")
-	if err != nil {
-		return "", fmt.Errorf("error reading password: %w", err)
-	}
-	pass := strings.TrimSpace(string(bytePassword))
-	if pass == "" {
-		return defaultValue, nil
-	}
-	return pass, nil
-}
-
-// PromptSecrets prompts the user for n secret values (like unseal keys), hiding input.
-// It returns a slice of strings (one per secret).
-func PromptSecrets(prompt string, count int, log *zap.Logger) ([]string, error) {
-	secrets := make([]string, 0, count)
-	for i := 1; i <= count; i++ {
-		label := fmt.Sprintf("%s %d", prompt, i)
-		fmt.Printf("%s: ", label)
-		secret, err := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println("")
-		if err != nil {
-			return nil, fmt.Errorf("error reading %s: %w", label, err)
-		}
-		secrets = append(secrets, strings.TrimSpace(string(secret)))
-	}
-	return secrets, nil
 }

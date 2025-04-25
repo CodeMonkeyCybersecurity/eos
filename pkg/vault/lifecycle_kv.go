@@ -4,12 +4,11 @@ package vault
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -55,12 +54,12 @@ func BootstrapKV(client *api.Client, kvPath string, log *zap.Logger) error {
 	log.Info("🧪 Writing bootstrap secret", zap.String("path", kvPath))
 
 	// get a KV v2 client for the "secret/" mount
-	kvClient := client.KVv2(strings.TrimSuffix(KVNamespaceSecrets, "/"))
+	kvClient := client.KVv2(strings.TrimSuffix(shared.KVNamespaceSecrets, "/"))
 
 	// debug: show exactly what we're about to write
 	payload := map[string]interface{}{"value": "ok"}
 	log.Debug("🔃 KV v2 put",
-		zap.String("mount", strings.TrimSuffix(KVNamespaceSecrets, "/")),
+		zap.String("mount", strings.TrimSuffix(shared.KVNamespaceSecrets, "/")),
 		zap.String("path", kvPath),
 		zap.Any("data", payload),
 	)
@@ -75,32 +74,6 @@ func BootstrapKV(client *api.Client, kvPath string, log *zap.Logger) error {
 	}
 
 	log.Info("✅ Bootstrap secret written", zap.String("path", kvPath))
-	return nil
-}
-
-// EnsureAppRoleAuth enables the AppRole auth method and provisions the eos‑role.
-func EnsureAppRoleAuth(client *api.Client, log *zap.Logger) error {
-	// 1) Enable the approle auth method if not already
-	log.Info("➕ Enabling AppRole auth method")
-	if err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"}); err != nil {
-		if !strings.Contains(err.Error(), "path is already in use") {
-			return fmt.Errorf("failed to enable approle auth: %w", err)
-		}
-	}
-	log.Info("✅ AppRole auth method is enabled")
-
-	// 2) Create the role
-	log.Info("🛠 Provisioning AppRole", zap.String("role", roleName))
-	_, err := client.Logical().Write(rolePath, map[string]interface{}{
-		"policies":      []string{EosVaultPolicy},
-		"token_ttl":     "4h",
-		"token_max_ttl": "24h",
-		"secret_id_ttl": "24h",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create AppRole %s: %w", roleName, err)
-	}
-	log.Info("✅ AppRole provisioned", zap.String("role", roleName))
 	return nil
 }
 
@@ -133,17 +106,17 @@ func UpdateVault(path string, update map[string]interface{}, log *zap.Logger) er
 func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]string, log *zap.Logger) error {
 	log.Info("🚀 Starting Vault deployment")
 
-	if err := execute.ExecuteAndLog("eos", "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
+	if err := execute.ExecuteAndLog(shared.EosIdentity, "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
 		log.Error("Vault deploy failed", zap.Error(err))
 		return fmt.Errorf("vault deploy failed: %w", err)
 	}
 
-	if err := execute.ExecuteAndLog("eos", "enable", "vault"); err != nil {
+	if err := execute.ExecuteAndLog(shared.EosIdentity, "enable", "vault"); err != nil {
 		log.Warn("Vault enable failed — manual unseal may be required", zap.Error(err))
 		return fmt.Errorf("vault enable failed: %w", err)
 	}
 
-	if err := execute.ExecuteAndLog("eos", "secure", "vault"); err != nil {
+	if err := execute.ExecuteAndLog(shared.EosIdentity, "secure", "vault"); err != nil {
 		log.Error("Vault secure failed", zap.Error(err))
 		return fmt.Errorf("vault secure failed: %w", err)
 	}
@@ -183,17 +156,6 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 	return nil
 }
 
-func IsAlreadyInitialized(err error, log *zap.Logger) bool {
-	return strings.Contains(err.Error(), "Vault is already initialized")
-}
-
-func DumpInitResult(initRes *api.InitResponse, log *zap.Logger) {
-	b, _ := json.MarshalIndent(initRes, "", "  ")
-	_ = os.WriteFile("/tmp/vault_init.json", b, 0600)
-	_ = os.WriteFile(DiskPath("vault_init", log), b, 0600)
-	fmt.Printf("✅ Vault initialized with %d unseal keys.\n", len(initRes.KeysB64))
-}
-
 func UnsealVault(client *api.Client, initRes *api.InitResponse, log *zap.Logger) error {
 	if len(initRes.KeysB64) < 3 {
 		return fmt.Errorf("not enough unseal keys")
@@ -223,13 +185,13 @@ func EnableFileAudit(client *api.Client, log *zap.Logger) error {
 		return fmt.Errorf("failed to list audit devices: %w", err)
 	}
 
-	if _, exists := audits[auditID]; exists {
+	if _, exists := audits[shared.AuditID]; exists {
 		log.Info("Audit device already enabled at sys/audit/file. Skipping.")
 		return nil
 	}
 
 	// Enable the audit device
-	return enableFeature(client, mountPath,
+	return enableFeature(client, shared.MountPath,
 		map[string]interface{}{
 			"type": "file",
 			"options": map[string]string{

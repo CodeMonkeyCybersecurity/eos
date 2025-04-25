@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func ConfigureKVMBridge() error {
@@ -81,7 +81,7 @@ func backupNetplanConfigs() error {
 	timestamp := time.Now().Format("20060102-150405")
 	backupDir := fmt.Sprintf("/etc/netplan_backup_%s", timestamp)
 
-	if err := os.Mkdir(backupDir, xdg.DirPermStandard); err != nil {
+	if err := os.Mkdir(backupDir, shared.DirPermStandard); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
