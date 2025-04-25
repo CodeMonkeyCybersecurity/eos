@@ -16,7 +16,7 @@ func EnsureVaultClient(log *zap.Logger) {
 	log.Debug("🔐 Ensuring VAULT_ADDR is configured...")
 
 	var client *api.Client
-	var report *CheckReport
+	var report *shared.CheckReport
 	var checkedClient *api.Client
 
 	if _, err := EnsureVaultEnv(log); err != nil {

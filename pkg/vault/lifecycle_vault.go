@@ -57,7 +57,13 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api
 	log.Info("✅ Vault client healthy")
 
 	log.Info("[6/11] Initializing and unsealing Vault")
-	client, err := phaseInitAndUnsealVault(log)
+	client, err := NewClient(log)
+	if err != nil {
+		log.Error("❌ Failed to create Vault client", zap.Error(err))
+		return nil, fmt.Errorf("create client: %w", err)
+	}
+
+	client, err = phaseInitAndUnsealVault(client, log)
 	if err != nil {
 		log.Error("❌ Failed to initialize/unseal Vault", zap.Error(err))
 		return nil, fmt.Errorf("init-unseal: %w", err)
@@ -65,7 +71,7 @@ func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api
 	log.Info("✅ Vault initialized and unsealed")
 
 	log.Info("[7/11] Enabling KV v2 at secrets mount")
-	if err := EnsureKVv2Enabled(client, strings.TrimSuffix(KVNamespaceSecrets, "/"), log); err != nil {
+	if err := EnsureKVv2Enabled(client, strings.TrimSuffix(shared.KVNamespaceSecrets, "/"), log); err != nil {
 		log.Error("❌ Failed to enable KV v2", zap.Error(err))
 		return nil, fmt.Errorf("kv-v2 enable failed: %w", err)
 	}
@@ -416,8 +422,6 @@ func SetupVault(client *api.Client, log *zap.Logger) (*api.Client, *api.InitResp
 
 	// Step 3: Successful init
 	log.Info("🎉 Vault successfully initialized")
-	log.Debug("🔐 Dumping init result to memory")
-	DumpInitResult(initRes, log)
 
 	if len(initRes.Keys) == 0 || initRes.RootToken == "" {
 		log.Error("❌ Init result missing unseal keys or root token")
@@ -541,7 +545,7 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	switch distro {
 	case "debian":
 		log.Info("🔧 Removing APT keyring and source list")
-		for _, path := range []string{AptKeyringPath, AptListPath} {
+		for _, path := range []string{shared.AptKeyringPath, shared.AptListPath} {
 			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 				log.Error("❌ Failed to remove APT file", zap.String("path", path), zap.Error(err))
 				errs[path] = fmt.Errorf("failed to remove %s: %w", path, err)

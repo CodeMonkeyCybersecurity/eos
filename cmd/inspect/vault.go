@@ -76,7 +76,7 @@ validates the token at /run/eos/.vault-token, and attempts a test query.`,
 		fmt.Println("📦 Running vault kv get secret/hello as eos...")
 		log.Info("Attempting test query", zap.String("action", "query"))
 
-		cmdTest := exec.Command("sudo", "-u", shared.EosIdentity "vault", "kv", "get", "-format=json", "secret/hello")
+		cmdTest := exec.Command("sudo", "-u", shared.EosIdentity, "vault", "kv", "get", "-format=json", "secret/hello")
 		cmdTest.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+tokenPath)
 		out, err := cmdTest.CombinedOutput()
 		if err != nil {

@@ -59,6 +59,7 @@ func promptSecret(prompt string, log *zap.Logger) string {
 }
 
 // PromptSelect displays numbered options and returns the selected value by index.
+
 func PromptSelect(prompt string, options []string, log *zap.Logger) string {
 	log.Info("📋 Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
 

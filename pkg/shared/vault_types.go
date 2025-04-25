@@ -18,6 +18,7 @@ type CheckReport struct {
 	TokenReady  bool     // A token is available and usable
 	KVWorking   bool     // The KV engine is accessible
 	Notes       []string // Additional context or warnings
+	SecretsVerified bool // Unseal keys + root token matched trusted reference
 }
 
 type UserpassCreds struct {
@@ -32,13 +33,13 @@ type UserSecret struct {
 	SSHKey   string `json:"ssh_private_key,omitempty"`
 }
 
-// AppRoleOptions defines options for provisioning or refreshing a Vault AppRole.
+// AppRoleOptions defines how EOS provisions or refreshes a Vault AppRole.
 type AppRoleOptions struct {
-	RoleName      string   // Vault AppRole name
-	Policies      []string // List of Vault policies to attach
-	TokenTTL      string   // TTL for generated tokens
-	TokenMaxTTL   string   // Maximum TTL allowed for tokens
-	SecretIDTTL   string   // TTL for generated Secret IDs
-	ForceRecreate bool     // Whether to forcibly recreate the AppRole
-	RefreshCreds  bool     // Whether to refresh AppRole credentials if already on disk
+	RoleName      string   `json:"role_name,omitempty"`
+	Policies      []string `json:"policies,omitempty"`
+	TokenTTL      string   `json:"token_ttl,omitempty"`
+	TokenMaxTTL   string   `json:"token_max_ttl,omitempty"`
+	SecretIDTTL   string   `json:"secret_id_ttl,omitempty"`
+	ForceRecreate bool     `json:"force_recreate,omitempty"`
+	RefreshCreds  bool     `json:"refresh_creds,omitempty"`
 }

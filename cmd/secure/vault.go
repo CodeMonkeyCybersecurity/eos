@@ -27,7 +27,7 @@ var SecureVaultCmd = &cobra.Command{
 		}
 
 		if vault.IsVaultSealed(client, log) {
-			return fmt.Errorf("Vault is sealed — please run `eos enable vault` before `secure vault`")
+			return fmt.Errorf("vault is sealed — please run `eos enable vault` before `secure vault`")
 		}
 
 		// 1️⃣ Ensure EOS Policy
@@ -64,24 +64,32 @@ var SecureVaultCmd = &cobra.Command{
 			log.Warn("🚨 Token retrieved, but failed Vault authentication", zap.Error(err))
 			return fmt.Errorf("invalid agent token: %w", err)
 		}
-		vault.SetVaultToken(token)
+
+		// ❌ FIXED: pass both args
+		vault.SetVaultToken(client, token)
 
 		// 5️⃣ Optionally revoke root token
-		if ctx.Flags.ShouldRevokeRoot {
+		// ❌ FIXED: replace ctx.Flags with proper flag read
+		shouldRevoke, err := cmd.Flags().GetBool("revoke-root")
+		if err != nil {
+			return fmt.Errorf("could not read --revoke-root flag: %w", err)
+		}
+		if shouldRevoke {
 			log.Warn("🚨 Revoking root token (irreversible)")
 			if err := vault.RevokeRootToken(client, "", log); err != nil {
 				return logger.LogErrAndWrap(log, "secure vault: revoke root", err)
 			}
 		}
 
-		// 6️⃣ Done!
 		log.Info("🔒 Vault is now fully hardened and ready for production")
-		// TODO: Add eos.PrintNextSteps("vault") or eos.InspectVaultSummary(client)
+		// TODO: eos.PrintNextSteps("vault") or eos.InspectVaultSummary(client)
 
 		return nil
 	}),
 }
 
+// Register flag
 func init() {
+	SecureVaultCmd.Flags().Bool("revoke-root", false, "Revoke the root token after agent token is validated")
 	SecureCmd.AddCommand(SecureVaultCmd)
 }

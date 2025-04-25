@@ -130,7 +130,7 @@ func truncatePolicy(policy string) string {
 }
 
 // ApplyAdminPolicy applies a full-access policy from the Policies map to the eos user.
-func ApplyAdminPolicy(creds UserpassCreds, client *api.Client, log *zap.Logger) error {
+func ApplyAdminPolicy(creds shared.UserpassCreds, client *api.Client, log *zap.Logger) error {
 	fmt.Println("Creating full-access policy for eos.")
 
 	policyName := shared.EosVaultPolicy
@@ -194,7 +194,7 @@ func EnsureVaultUserLifecycle(log *zap.Logger, client *api.Client) error {
 
 /**/
 // -> EnsureEosAppRole
-func EnsureAppRole(client *api.Client, log *zap.Logger, opts AppRoleOptions) (roleID string, secretID string, err error) {
+func EnsureAppRole(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (roleID string, secretID string, err error) {
 	// Skip if credentials already exist and ForceRecreate is false
 	if !opts.ForceRecreate {
 		if _, err := os.Stat(shared.RoleIDPath); err == nil {

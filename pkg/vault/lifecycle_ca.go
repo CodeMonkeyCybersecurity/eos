@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"go.uber.org/zap"
 )
 
 // TrustVaultCA dispatches to the correct CA‐trust helper based on the distro.
@@ -98,12 +98,17 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 		zap.String("key", shared.TLSKey),
 		zap.String("crt", shared.TLSCrt))
 
+	if tlsCertsExist() {
+		log.Info("✅ TLS certs already exist, skipping generation")
+		return nil
+	}
+
 	if err := fixTLSCertIfMissingSAN(log); err != nil {
 		log.Warn("⚠️ Could not verify SAN TLS cert status", zap.Error(err))
 	}
 
 	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
-		log.Info("✅ Existing Vault TLS cert found, skipping generation")
+		log.Info("Skipping TLS cert generation", zap.Bool("keyExists", system.FileExists(shared.TLSKey)), zap.Bool("crtExists", system.FileExists(shared.TLSCrt)))
 		return nil
 	}
 
@@ -123,12 +128,17 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 		return nil
 	}
 
+	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true, log)
+	if !ok {
+		return fmt.Errorf("user declined TLS certificate generation")
+	}
+
 	log.Info("🔐 Generating Vault TLS certificate (simple mode)", zap.String("CN", hostname))
 
 	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096",
 		"-days", "825", "-nodes", "-x509",
 		"-subj", "/CN="+hostname,
-		"-addext", fmt.Sprintf("subjectAltName=DNS:%s,IP:127.0.0.1", hostname),
+		"-addext", fmt.Sprintf("subjectAltName=DNS:%s,IP:%s", hostname, shared.LocalhostSAN),
 		"-keyout", shared.TLSKey,
 		"-out", shared.TLSCrt,
 	)
@@ -142,7 +152,7 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 	// Permissions and ownership
 	log.Info("🔐 Securing Vault TLS certs...")
 
-	if err := secureVault(TLSOwnership(log); err != nil {
+	if err := secureVaultTLSOwnership(log); err != nil {
 		log.Warn("could not apply correct ownership to TLS certs", zap.Error(err))
 	}
 
@@ -195,63 +205,85 @@ func fixTLSCertIfMissingSAN(log *zap.Logger) error {
 	return nil
 }
 
-
-
-
 //
 // ========================== LIFECYCLE_CA ==========================
 //
 
 /**/
 // ## 3. Ensure TLS Certificates Exist
-	// 	- Prompt for self-signed cert confirmation
-	// 	- Generate cert with CN = internal hostname
-	// 	- Save to `/etc/vault.d/vault.crt` and `.key`
-	// 	- EOS will ensure required directories (e.g. `/etc/vault.d`, `/var/lib/eos/secrets`, `/opt/pandora/data`) exist with appropriate ownership and permissions before writing any files.
-	// 	- If any directory creation fails, EOS will abort and suggest running as root or fixing permissions.
-	// ### Decision: Self-Signed TLS with Interactive Prompting
-	// - Use self-signed certs by default to secure Vault listener.
-	// - Allow user override via `--cert` and `--key` flags.
-	// - If no flags are provided, prompt the user to confirm generating self-signed certs interactively.
-	// - Certificates will be written to:
-	//   - `/etc/vault.d/vault.crt`
-	//   - `/etc/vault.d/vault.key`
-	// - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
-	// - Avoids brittle reliance on external ACME or CA automation in early stages.
-	// - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
-	// - EOS will generate SANs by default, but warns if `--cert` is provided and lacks expected hostnames.
-	// - Self-signed certs are valid for 1 year and trusted only on localhost connections.
-	// - If users wish to use these certs across machines or in CI, EOS provides an option to export the root CA via `eos vault export-ca`.
-	// ---
+// 	- Prompt for self-signed cert confirmation
+// 	- Generate cert with CN = internal hostname
+// 	- Save to `/etc/vault.d/vault.crt` and `.key`
+// 	- EOS will ensure required directories (e.g. `/etc/vault.d`, `/var/lib/eos/secrets`, `/opt/pandora/data`) exist with appropriate ownership and permissions before writing any files.
+// 	- If any directory creation fails, EOS will abort and suggest running as root or fixing permissions.
+// ### Decision: Self-Signed TLS with Interactive Prompting
+// - Use self-signed certs by default to secure Vault listener.
+// - Allow user override via `--cert` and `--key` flags.
+// - If no flags are provided, prompt the user to confirm generating self-signed certs interactively.
+// - Certificates will be written to:
+//   - `/etc/vault.d/vault.crt`
+//   - `/etc/vault.d/vault.key`
+// - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
+// - Avoids brittle reliance on external ACME or CA automation in early stages.
+// - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
+// - EOS will generate SANs by default, but warns if `--cert` is provided and lacks expected hostnames.
+// - Self-signed certs are valid for 1 year and trusted only on localhost connections.
+// - If users wish to use these certs across machines or in CI, EOS provides an option to export the root CA via `eos vault export-ca`.
+// ---
 /**/
 
 /**/
-// TODO
-func EnsureVaultTLS(log *zap.Logger) (certPath, keyPath string, err error)
-	//     - Prompt for self-signed cert confirmation
-	//     - Generate cert with CN = internal hostname
-	//     - Save to `/etc/vault.d/vault.crt` and `.key`
-	//     - EOS will ensure required directories (e.g. `/etc/vault.d`, `/var/lib/eos/secrets`, `/opt/pandora/data`) exist with appropriate ownership and permissions before writing any files.
-	//     - If any directory creation fails, EOS will abort and suggest running as root or fixing permissions.
+// EnsureVaultTLS ensures that TLS certificates for Vault exist, generating self-signed ones if needed.
+// It verifies SAN coverage and system trust, aborting if directory setup or permissions fail.
+// EnsureVaultTLS ensures Vault TLS certs are present and valid.
+// If no certs exist, it interactively prompts to generate a new self-signed cert.
+func EnsureVaultTLS(log *zap.Logger) (string, string, error) {
+	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
+		log.Info("✅ Vault TLS certs already exist, skipping generation",
+			zap.String("key", shared.TLSKey), zap.String("crt", shared.TLSCrt))
+		return shared.TLSCrt, shared.TLSKey, nil
+	}
 
+	log.Warn("🔐 No Vault TLS certs found — secure communication will fail unless generated")
 
-	// ### Decision: Self-Signed TLS with Interactive Prompting
+	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true, log)
+	if !ok {
+		return "", "", fmt.Errorf("user declined TLS cert generation")
+	}
 
-	// - Use self-signed certs by default to secure Vault listener.
-	// - Allow user override via `--cert` and `--key` flags.
-	// - If no flags are provided, prompt the user to confirm generating self-signed certs interactively.
-	// - Certificates will be written to:
-	//   - `/etc/vault.d/vault.crt`
-	//   - `/etc/vault.d/vault.key`
-	// - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
-	// - Avoids brittle reliance on external ACME or CA automation in early stages.
-	// - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
-	// - EOS will generate SANs by default, but warns if `--cert` is provided and lacks expected hostnames.
-	// - Self-signed certs are valid for 1 year and trusted only on localhost connections.
-	// - If users wish to use these certs across machines or in CI, EOS provides an option to export the root CA via `eos vault export-ca`.
+	if err := GenerateVaultTLSCert(log); err != nil {
+		return "", "", fmt.Errorf("failed to generate Vault TLS cert: %w", err)
+	}
 
-	// ---
+	return shared.TLSCrt, shared.TLSKey, nil
+}
 
+func tlsCertsExist() bool {
+	return system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt)
+}
+
+//     - Prompt for self-signed cert confirmation
+//     - Generate cert with CN = internal hostname
+//     - Save to `/etc/vault.d/vault.crt` and `.key`
+//     - EOS will ensure required directories (e.g. `/etc/vault.d`, `/var/lib/eos/secrets`, `/opt/pandora/data`) exist with appropriate ownership and permissions before writing any files.
+//     - If any directory creation fails, EOS will abort and suggest running as root or fixing permissions.
+
+// ### Decision: Self-Signed TLS with Interactive Prompting
+
+// - Use self-signed certs by default to secure Vault listener.
+// - Allow user override via `--cert` and `--key` flags.
+// - If no flags are provided, prompt the user to confirm generating self-signed certs interactively.
+// - Certificates will be written to:
+//   - `/etc/vault.d/vault.crt`
+//   - `/etc/vault.d/vault.key`
+// - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
+// - Avoids brittle reliance on external ACME or CA automation in early stages.
+// - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
+// - EOS will generate SANs by default, but warns if `--cert` is provided and lacks expected hostnames.
+// - Self-signed certs are valid for 1 year and trusted only on localhost connections.
+// - If users wish to use these certs across machines or in CI, EOS provides an option to export the root CA via `eos vault export-ca`.
+
+// ---
 
 /**/
 
@@ -268,9 +300,9 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 		path string
 		perm os.FileMode
 	}{
-		{TLSKey, xdg.FilePermOwnerReadWrite},
-		{TLSCrt, xdg.FilePermStandard},
-		{TLSDir, xdg.FilePermOwnerRWX},
+		{shared.TLSKey, shared.FilePermOwnerReadWrite},
+		{shared.TLSCrt, shared.FilePermStandard},
+		{shared.TLSDir, shared.FilePermOwnerRWX},
 	} {
 		if err := os.Chown(file.path, uid, gid); err != nil {
 			log.Warn("⚠️ Failed to chown", zap.String("path", file.path), zap.Error(err))
@@ -287,26 +319,27 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 
 	// Copy CA to eos trust path
 	log.Info("🔧 Copying Vault CA into eos trust store",
-		zap.String("src", TLSCrt),
-		zap.String("dst", VaultAgentCACopyPath),
+		zap.String("src", shared.TLSCrt),
+		zap.String("dst", shared.VaultAgentCACopyPath),
 	)
 
-	if err := system.CopyFile(TLSCrt, VaultAgentCACopyPath, xdg.FilePermStandard, log); err != nil {
+	if err := system.CopyFile(shared.TLSCrt, shared.VaultAgentCACopyPath, shared.FilePermStandard, log); err != nil {
 		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
 		return err
 	} else {
-		log.Info("✅ CA cert copied", zap.String("dst", VaultAgentCACopyPath))
+		log.Info("✅ CA cert copied", zap.String("dst", shared.VaultAgentCACopyPath))
 	}
 
-	if uid, gid, err := system.LookupUser(EosUser); err != nil {
+	if uid, gid, err := system.LookupUser(shared.EosUser); err != nil {
 		log.Warn("could not lookup eos user for CA file ownership", zap.Error(err))
-	} else if err := os.Chown(VaultAgentCACopyPath, uid, gid); err != nil {
+	} else if err := os.Chown(shared.VaultAgentCACopyPath, uid, gid); err != nil {
 		log.Warn("could not chown CA cert for eos user", zap.Error(err))
 	} else {
-		log.Info("✅ CA cert ownership set", zap.String("path", VaultAgentCACopyPath),
+		log.Info("✅ CA cert ownership set", zap.String("path", shared.VaultAgentCACopyPath),
 			zap.Int("uid", uid), zap.Int("gid", gid))
 	}
 
 	return nil
 }
+
 /**/

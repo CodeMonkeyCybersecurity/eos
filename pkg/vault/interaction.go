@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared" // <-- Add this
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -39,7 +40,7 @@ func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 	}, nil
 }
 
-func PromptForEosPassword(log *zap.Logger) (*UserpassCreds, error) {
+func PromptForEosPassword(log *zap.Logger) (*shared.UserpassCreds, error) {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("🔐 Enter eos Vault password: ")
 	password, err := readPassword(reader)
@@ -57,7 +58,7 @@ func PromptForEosPassword(log *zap.Logger) (*UserpassCreds, error) {
 		return nil, fmt.Errorf("passwords do not match")
 	}
 
-	return &UserpassCreds{Password: password}, nil
+	return &shared.UserpassCreds{Password: password}, nil
 }
 
 func readPassword(reader *bufio.Reader) (string, error) {

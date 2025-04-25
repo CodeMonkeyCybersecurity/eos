@@ -142,7 +142,7 @@ func ReloadDaemonAndEnable(log *zap.Logger, unit string) error {
 /**/
 
 /**/
-func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts AppRoleOptions) error {
+func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts shared.AppRoleOptions) error {
 	// ─────────── REMINDERS WITH AGENT SETUP ───────────
 	// if err := stepWriteAgentConfig(log); …
 	//if err := stepInstallVaultAgentSystemd(log); err != nil { ... }        // step 5 cont.
@@ -315,15 +315,7 @@ func writeAgentPassword(password string, log *zap.Logger) error {
 
 /**/
 func WriteSystemdUnit(log *zap.Logger) error {
-	unit := fmt.Sprintf(agentSystemDUnit,
-		// %s User,   VaultAgentUser
-		// %s Group,  VaultAgentGroup
-		// %o RuntimeDirectoryMode, xdg.VaultRuntimePerms
-		// %s ExecStartPre owner, VaultAgentUser
-		// %s ExecStartPre group, VaultAgentGroup
-		// %o ExecStartPre mode,  xdg.VaultRuntimePerms
-		// %s ExecStartPre path,  EosRunDir
-		// %s ExecStart   config,  shared.VaultAgentConfigPath
+	unit := fmt.Sprintf(shared.AgentSystemDUnit,
 		shared.VaultAgentUser,
 		shared.VaultAgentGroup,
 		shared.VaultRuntimePerms,

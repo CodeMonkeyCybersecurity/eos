@@ -33,7 +33,7 @@ func phaseInitAndUnsealVault(client *api.Client, log *zap.Logger) (*api.Client, 
 	}
 
 	log.Info("⚙️ Vault not initialized — starting initialization sequence")
-	initRes, err := initVault(client, log)
+	initRes, err := InitVault(client, log)
 	if err != nil {
 		return nil, err
 	}
@@ -46,11 +46,11 @@ func phaseInitAndUnsealVault(client *api.Client, log *zap.Logger) (*api.Client, 
 		return nil, err
 	}
 
-	if err := saveVaultInitResult(initRes, log); err != nil {
+	if err := SaveInitResult(initRes, log); err != nil {
 		return nil, err
 	}
 
-	if err := UnsealVault(client, api.InitResponse.KeysB64, log); err != nil {
+	if err := UnsealVault(client, initRes, log); err != nil {
 		return nil, err
 	}
 
@@ -98,7 +98,7 @@ func LoadInitResultOrPrompt(client *api.Client, log *zap.Logger) (*api.InitRespo
 	initRes := new(api.InitResponse)
 	if err := ReadFallbackJSON(DiskPath("vault_init", log), initRes, log); err != nil {
 		log.Warn("⚠️ Fallback file missing or unreadable — prompting user", zap.Error(err))
-		return promptForInitResult(log)
+		return PromptForInitResult(log)
 	}
 	log.Info("✅ Vault init result loaded from fallback")
 	return initRes, nil
@@ -161,7 +161,7 @@ func MaybeWriteVaultInitFallback(init *api.InitResponse, log *zap.Logger) error 
 		log.Warn("❌ Skipping fallback write at user request")
 		return nil
 	}
-	return saveVaultInitResult(init, log)
+	return SaveInitResult(init, log)
 }
 
 // initAndUnseal is called when /sys/health returns 501 (uninitialized).

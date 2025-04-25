@@ -6,6 +6,8 @@ package shared
 // ------------------------- CONSTANTS -------------------------
 //
 
+const LocalhostSAN = "127.0.0.1"
+
 // Vault Agent configuration template used to render agent config file at runtime.
 const AgentConfigTmpl = `
 vault {
@@ -27,8 +29,8 @@ auto_auth {
 #cache { use_auto_auth_token = true }
 `
 
-// agentSystemDUnit is the systemd unit template for running Vault Agent under eos.
-const agentSystemDUnit = `
+// AgentSystemDUnit is the systemd unit template for running Vault Agent under eos.
+const AgentSystemDUnit = `
 [Unit]
 Description=Vault Agent (Eos)
 After=network.target
@@ -59,73 +61,29 @@ const (
 	TLSCrt = TLSDir + "tls.crt"
 )
 
-// Systemd service paths
-const (
-	// Systemd paths
-	VaultConfigPath       = "/etc/vault.d/vault.hcl"
-	VaultServicePath      = "/etc/systemd/system/vault.service"
-	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
-)
-
 // RoleName is the Vault AppRole used by the eos agent.
 // RolePath is the full path used when creating or querying the role.
-const (
-	RoleName = "eos-approle"
-	RolePath = "auth/approle/role/" + RoleName
-)
 
 // Common host filesystem and configuration paths for Vault integration.
 const (
 	// EosProfileD is the path to the shell profile that exports VAULT_ADDR.
-	EosProfileD = "/etc/profile.d/eos_vault.sh"
 
 	// Config paths
-	VaultConfigDirDebian = "/etc/vault.d" // VaultConfigDirDebian is the default config directory for Vault on Debian-based systems.
-	VaultConfigDirSnap   = "/var/snap/vault/common"
-	VaultDataPath        = "/opt/vault/data"
-	VaultConfigFileName  = "config.hcl"
 
 	// client / listener paths
-	ListenerAddr     = "127.0.0.1:8179"
 	VaultDefaultPort = "8179"
-	VaultWebPortTCP  = "8179/tcp"
+	VaultWebPortTCP  = VaultDefaultPort + "/tcp"
+	ListenerAddr     = "127.0.0.1:" + VaultDefaultPort
 	VaultDefaultAddr = "https://%s:" + VaultDefaultPort
-
-	VaultBinaryPath = "/usr/bin/vault"
-
-	// Debian APT
-	AptKeyringPath = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
-	AptListPath    = "/etc/apt/sources.list.d/hashicorp.list"
-
-	// RHEL DNF
-	DnfRepoFilePath = "/etc/yum.repos.d/hashicorp.repo"
-	DnfRepoContent  = `[hashicorp]
-name=HashiCorp Stable - $basearch
-baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
-enabled=1
-gpgcheck=1
-gpgkey=https://rpm.releases.hashicorp.com/gpg`
 )
 
 // policy specific paths
-const (
-	EosVaultPolicy = "eos-policy"
-)
 
 // Vault internal paths
 const (
 	// Audit
 	AuditID   = "file/"
 	MountPath = "sys/audit/" + AuditID
-
-	// Vault paths
-	VaultTestPath      = "bootstrap/test"
-	EosVaultUserPath   = "secret/users/eos"
-	UserpassPathPrefix = "auth/userpass/users/"
-
-	KVNamespaceUsers   = "users/"
-	KVNamespaceSecrets = "secret/"
-	VaultMountKV       = "secret"
 )
 
 // Vault agent service and config
@@ -157,4 +115,54 @@ const (
 
 	// FallbackAbort aborts the operation when Vault is unavailable and disk fallback is declined.
 	FallbackAbort FallbackCode = "abort"
+)
+
+// Debian and RHEL-specific paths
+const (
+	AptKeyringPath  = "/usr/share/keyrings/hashicorp-archive-keyring.gpg"
+	AptListPath     = "/etc/apt/sources.list.d/hashicorp.list"
+	DnfRepoFilePath = "/etc/yum.repos.d/hashicorp.repo"
+	DnfRepoContent  = `[hashicorp]
+name=HashiCorp Stable - $basearch
+baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
+enabled=1
+gpgcheck=1
+gpgkey=https://rpm.releases.hashicorp.com/gpg`
+)
+
+// Config and data paths
+const (
+	VaultConfigDirDebian = "/etc/vault.d"
+	VaultConfigDirSnap   = "/var/snap/vault/common"
+	VaultDataPath        = "/opt/vault/data"
+	VaultConfigFileName  = "config.hcl"
+
+	EosProfileD = "/etc/profile.d/eos_vault.sh"
+)
+
+// Vault key-value (KV) namespaces
+const (
+	VaultMountKV       = "secret"
+	KVNamespaceSecrets = VaultMountKV + "/"
+	KVNamespaceUsers   = "users/"
+	EosVaultUserPath   = KVNamespaceSecrets + "users/eos"
+	VaultTestPath      = "bootstrap/test" // Used to verify KV functionality
+)
+
+// AppRole and auth
+const (
+	RoleName = "eos-approle"
+	RolePath = "auth/approle/role/" + RoleName
+
+	UserpassPathPrefix = "auth/userpass/users/"
+	EosVaultPolicy     = "eos-policy"
+)
+
+// System paths
+const (
+	VaultConfigPath       = "/etc/vault.d/vault.hcl"
+	VaultServicePath      = "/etc/systemd/system/vault.service"
+	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
+
+	VaultBinaryPath = "/usr/bin/vault"
 )

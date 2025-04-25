@@ -43,8 +43,8 @@ func GetVaultPurgePaths() []string {
 	}
 }
 
-func DefaultAppRoleOptions() AppRoleOptions {
-	return AppRoleOptions{
+func DefaultAppRoleOptions() shared.AppRoleOptions {
+	return shared.AppRoleOptions{
 		RoleName:      shared.EosIdentity,
 		Policies:      []string{"eos-policy"},
 		TokenTTL:      "1h",
@@ -71,7 +71,7 @@ func DiskPath(name string, log *zap.Logger) string {
 	if name == "vault_init" {
 		final = filepath.Join(shared.SecretsDir, "vault_init.json")
 	} else {
-		final = shared.VaultConfigPath(shared.EosIdentity, filepath.Join(name, "DefaultConfigFilename"))
+		final = filepath.Join(shared.VaultConfigDirDebian, name, "DefaultConfigFilename")
 	}
 	log.Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
 	return final

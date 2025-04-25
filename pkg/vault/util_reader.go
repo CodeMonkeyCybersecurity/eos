@@ -66,9 +66,6 @@ func Read(client *api.Client, name string, out any, log *zap.Logger) error {
 		log.Error("Vault client returned from Check is nil")
 		return fmt.Errorf("vault client is not ready")
 	}
-	if checkedClient == nil {
-		return fmt.Errorf("vault client is not ready")
-	}
 	if report.Initialized && !report.Sealed {
 		err := ReadFromVaultAt(context.Background(), shared.VaultMountKV, name, out, log)
 		if err == nil {
@@ -142,7 +139,7 @@ func ReadFallbackJSON[T any](path string, target *T, log *zap.Logger) error {
 }
 
 // ReadVaultSecureData loads bootstrap Vault secrets (vault_init, userpass creds).
-func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse, UserpassCreds, []string, string) {
+func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse, shared.UserpassCreds, []string, string) {
 	log.Info("🔐 Starting secure Vault bootstrap sequence")
 
 	if err := system.EnsureEosUser(true, false, log); err != nil {
@@ -157,7 +154,7 @@ func ReadVaultSecureData(client *api.Client, log *zap.Logger) (*api.InitResponse
 	}
 	log.Info("✅ Loaded vault_init.json", zap.Int("num_keys", len(initRes.KeysB64)))
 
-	var creds UserpassCreds
+	var creds shared.UserpassCreds
 	log.Info("📄 Reading eos userpass fallback file", zap.String("path", shared.EosUserVaultFallback))
 	if err := ReadFallbackJSON(shared.EosUserVaultFallback, &creds, log); err != nil {
 		log.Fatal("❌ Failed to read vault_userpass.json", zap.Error(err))

@@ -39,7 +39,8 @@ var EnableVaultCmd = &cobra.Command{
 			if err := vault.SaveInitResult(initRes, log); err != nil {
 				return logger.LogErrAndWrap(log, "enable vault: save init result", err)
 			}
-			if !ctx.Flags.NonInteractive {
+			nonInteractive, _ := cmd.Flags().GetBool("non-interactive")
+			if !nonInteractive {
 				if err := vault.ConfirmUnsealMaterialSaved(initRes, log); err != nil {
 					return logger.LogErrAndWrap(log, "enable vault: confirm save", err)
 				}
@@ -70,7 +71,7 @@ var EnableVaultCmd = &cobra.Command{
 		if err := vault.ValidateRootToken(client, token); err != nil {
 			return logger.LogErrAndWrap(log, "enable vault: invalid token", err)
 		}
-		vault.SetVaultToken(token)
+		vault.SetVaultToken(client, token)
 
 		// 4️⃣ Enable auth methods and upload policy
 		log.Info("📜 Enabling userpass & uploading eos-policy")
@@ -115,7 +116,7 @@ var EnableVaultCmd = &cobra.Command{
 			log.Warn("Agent token appeared but failed validation", zap.Error(err))
 			return fmt.Errorf("agent token invalid: %w", err)
 		}
-		vault.SetVaultToken(tokenOut)
+		vault.SetVaultToken(client, tokenOut)
 
 		log.Info("✅ Vault is fully initialized, unsealed, and ready for secure use")
 		log.Info("ℹ️ Next: run `eos secure vault` to revoke root token and lock down secrets access")
@@ -124,5 +125,6 @@ var EnableVaultCmd = &cobra.Command{
 }
 
 func init() {
+	EnableVaultCmd.Flags().Bool("non-interactive", false, "Run without interactive prompts")
 	EnableCmd.AddCommand(EnableVaultCmd)
 }

@@ -1,4 +1,4 @@
-/* pkg/vault/check.go */
+// pkg/vault/util_checker.go
 
 package vault
 
@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 /**/
@@ -27,8 +28,8 @@ import (
 // isVaultSealed
 // testKVSecret
 // CheckVaultSecrets
-func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoot string) (*CheckReport, *api.Client) {
-	report := &CheckReport{}
+func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
+	report := &shared.CheckReport{}
 
 	// 0. Direct HTTP liveness check
 	addr, err := CheckVaultHealth(log)

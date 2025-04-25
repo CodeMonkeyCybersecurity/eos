@@ -104,14 +104,14 @@ func EnsureVaultDirs(log *zap.Logger) error {
 		owner string // system.LookupUser key
 		perm  os.FileMode
 	}{
-		{SecretsDir, EosUser, xdg.FilePermOwnerRWX},                         // /var/lib/eos/secrets
-		{EosRunDir, EosUser, xdg.FilePermOwnerRWX},                          // /run/eos
-		{TLSDir, "vault", xdg.FilePermOwnerRWX},                             // where tls.key/.crt live
-		{filepath.Dir(VaultAgentCACopyPath), EosUser, xdg.FilePermOwnerRWX}, // parent of agent CA copy
+		{shared.SecretsDir, shared.EosUser, shared.FilePermOwnerRWX},                         // /var/lib/eos/secrets
+		{shared.EosRunDir, shared.EosUser, shared.FilePermOwnerRWX},                          // /run/eos
+		{shared.TLSDir, "vault", shared.FilePermOwnerRWX},                                    // where tls.key/.crt live
+		{filepath.Dir(shared.VaultAgentCACopyPath), shared.EosUser, shared.FilePermOwnerRWX}, // parent of agent CA copy
 	}
 
 	// Resolve UIDs/GIDs
-	eosUID, eosGID, err := system.LookupUser(EosUser)
+	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
 		log.Warn("⚠️ Could not resolve eos UID/GID, falling back to 1001:1001", zap.Error(err))
 		eosUID, eosGID = 1001, 1001
@@ -140,7 +140,7 @@ func EnsureVaultDirs(log *zap.Logger) error {
 
 		// Decide which owner to apply
 		var uid, gid int
-		if d.owner == EosUser {
+		if d.owner == shared.EosUser {
 			uid, gid = eosUID, eosGID
 		} else {
 			uid, gid = vaultUID, vaultGID
@@ -159,8 +159,8 @@ func EnsureVaultDirs(log *zap.Logger) error {
 		path string
 		perm os.FileMode
 	}{
-		{TLSKey, xdg.FilePermOwnerReadWrite},
-		{TLSCrt, xdg.FilePermStandard},
+		{shared.TLSKey, shared.FilePermOwnerReadWrite},
+		{shared.TLSCrt, shared.FilePermStandard},
 	}
 	for _, tf := range tlsFiles {
 		log.Debug("🔧 Securing TLS file", zap.String("path", tf.path))
@@ -178,17 +178,17 @@ func EnsureVaultDirs(log *zap.Logger) error {
 
 	// 3) Copy the public CA into eos’s trust store and secure it
 	log.Info("🔧 Copying Vault CA into eos trust store",
-		zap.String("src", TLSCrt),
-		zap.String("dst", VaultAgentCACopyPath),
+		zap.String("src", shared.TLSCrt),
+		zap.String("dst", shared.VaultAgentCACopyPath),
 	)
-	if err := system.CopyFile(TLSCrt, VaultAgentCACopyPath, 0, log); err != nil {
+	if err := system.CopyFile(shared.TLSCrt, shared.VaultAgentCACopyPath, 0, log); err != nil {
 		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
 		return err
 	}
-	if err := os.Chown(VaultAgentCACopyPath, eosUID, eosGID); err != nil {
-		log.Warn("⚠️ Could not chown CA cert for eos user", zap.String("path", VaultAgentCACopyPath), zap.Error(err))
+	if err := os.Chown(shared.VaultAgentCACopyPath, eosUID, eosGID); err != nil {
+		log.Warn("⚠️ Could not chown CA cert for eos user", zap.String("path", shared.VaultAgentCACopyPath), zap.Error(err))
 	} else {
-		log.Info("✅ CA cert ownership set", zap.String("path", VaultAgentCACopyPath), zap.Int("uid", eosUID), zap.Int("gid", eosGID))
+		log.Info("✅ CA cert ownership set", zap.String("path", shared.VaultAgentCACopyPath), zap.Int("uid", eosUID), zap.Int("gid", eosGID))
 	}
 
 	return nil
