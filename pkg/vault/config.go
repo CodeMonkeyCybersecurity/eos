@@ -13,7 +13,7 @@ func ResolveVaultConfigDir(distro string) string {
 	case "debian", "rhel":
 		return shared.VaultConfigDirDebian
 	default:
-		return shared.VaultConfigDirSnap
+		return shared.VaultConfigDirDebian
 	}
 }
 

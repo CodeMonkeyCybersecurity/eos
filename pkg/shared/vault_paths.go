@@ -20,7 +20,6 @@ const (
 	// Storage
 	VaultDataPath        = "/opt/vault/data"
 	VaultConfigDirDebian = "/etc/vault.d"
-	VaultConfigDirSnap   = "/var/snap/vault/common"
 	VaultConfigPath      = "/etc/vault.d/vault.hcl"
 
 	// System

@@ -103,7 +103,7 @@ func PrepareVaultDirsAndConfig(distro string, log *zap.Logger) (string, string, 
 	case "debian", "rhel":
 		configDir = shared.VaultConfigDirDebian
 	default:
-		configDir = shared.VaultConfigDirSnap
+		configDir = shared.VaultConfigDirDebian
 	}
 
 	if err := os.MkdirAll(configDir, shared.DirPermStandard); err != nil {

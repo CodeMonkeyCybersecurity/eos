@@ -40,8 +40,6 @@ var DeleteVaultCmd = &cobra.Command{
 			run("apt-get", "remove", "-y", "vault")
 		case "rhel":
 			run("dnf", "remove", "-y", "vault")
-		default:
-			run("snap", "remove", "vault")
 		}
 
 		if purge {

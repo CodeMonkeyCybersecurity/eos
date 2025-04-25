@@ -1,70 +1,53 @@
 package refresh
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
-
 	"go.uber.org/zap"
 )
 
-// vaultRefreshCmd represents the "refresh vault" command.
+// VaultRefreshCmd restarts the Vault systemd service safely.
 var VaultRefreshCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Refreshes (restarts) the Vault service",
-	Long:  `Stops the running Vault server and restarts it using the configured settings.`,
+	Long:  `Stops and restarts the Vault service cleanly through systemd.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		// Check for root privileges.
+		log := zap.L().Named("refresh-vault")
+
 		if os.Geteuid() != 0 {
-			log.Fatal("This command must be run with sudo or as root.")
+			log.Fatal("Root privileges are required to refresh Vault.")
 		}
 
-		fmt.Println("Refreshing Vault...")
+		log.Info("🔄 Refreshing Vault service...")
 
-		// Kill any running Vault process.
-		killCmd := exec.Command("pkill", "-f", "vault server")
-		killCmd.Stdout = os.Stdout
-		killCmd.Stderr = os.Stderr
-		if err := killCmd.Run(); err != nil {
-			log.Warn("Warning: unable to kill Vault process (it might not be running): %v", zap.Error(err))
+		// Stop Vault cleanly using systemd
+		stopCmd := exec.Command("systemctl", "stop", "vault")
+		if err := stopCmd.Run(); err != nil {
+			log.Warn("⚠️ Failed to stop Vault via systemctl", zap.Error(err))
 		} else {
-			fmt.Println("Stopped Vault process.")
+			log.Info("✅ Vault service stopped")
 		}
 
-		// Wait a bit for processes to exit.
-		time.Sleep(3 * time.Second)
+		time.Sleep(2 * time.Second)
 
-		// Start Vault using the production config file.
-		configFile := "/var/snap/vault/common/config.hcl"
-		logFilePath := "/var/log/vault.log"
-
-		// Open (or create) the log file.
-		logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-		if err != nil {
-			log.Fatal("Failed to open log file: %v", zap.Error(err))
-		}
-		defer logFile.Close()
-
-		// Start Vault.
-		vaultCmd := exec.Command("vault", "server", "-config="+configFile)
-		vaultCmd.Stdout = logFile
-		vaultCmd.Stderr = logFile
-
-		if err := vaultCmd.Start(); err != nil {
-			log.Fatal("Failed to start Vault: %v", zap.Error(err))
+		// Start Vault again
+		startCmd := exec.Command("systemctl", "start", "vault")
+		if err := startCmd.Run(); err != nil {
+			log.Error("❌ Failed to start Vault via systemctl", zap.Error(err))
+			return err
 		}
 
-		fmt.Printf("Vault process restarted with PID %d\n", vaultCmd.Process.Pid)
-		fmt.Println("Vault refresh complete. Check logs at", logFilePath)
+		log.Info("✅ Vault service restarted successfully")
+		log.Info("ℹ️ You can check Vault health at https://127.0.0.1:8179/v1/sys/health")
+
 		return nil
 	}),
 }
 
 func init() {
-	// Assuming you have a parent "refresh" command.
 	RefreshCmd.AddCommand(VaultRefreshCmd)
 }

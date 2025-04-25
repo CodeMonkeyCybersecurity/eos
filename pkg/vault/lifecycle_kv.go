@@ -156,9 +156,8 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 	return nil
 }
 
-/* Enable file audit at "/var/snap/vault/common/vault_audit.log" */
+// EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.log.
 func EnableFileAudit(client *api.Client, log *zap.Logger) error {
-
 	// Check if the audit device is already enabled
 	audits, err := client.Sys().ListAudit()
 	if err != nil {
@@ -170,12 +169,12 @@ func EnableFileAudit(client *api.Client, log *zap.Logger) error {
 		return nil
 	}
 
-	// Enable the audit device
+	// Enable the audit device at the correct location
 	return enableFeature(client, shared.MountPath,
 		map[string]interface{}{
 			"type": "file",
 			"options": map[string]string{
-				"file_path": "/var/snap/vault/common/vault_audit.log",
+				"file_path": "/opt/vault/logs/vault_audit.log",
 			},
 		},
 		"✅ File audit enabled.",
