@@ -612,10 +612,6 @@ func VaultPurge(path string, log *zap.Logger) error {
 	return kv.Destroy(context.Background(), path, []int{1}) // TODO To truly destroy all versions, we can add a version-walk helper
 }
 
-//
-// ========================== LIFECYCLE_VAULT ==========================
-//
-
 /**/
 // ✅ This ensures that **every elevation boundary is explicit and auditable**, and EOS remains thin and Unix-idiomatic.
 // ---
