@@ -5,12 +5,8 @@ package vault
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -208,29 +204,6 @@ func CheckVaultSecrets(log *zap.Logger) {
 }
 
 /**/
-func CheckVaultHealth(log *zap.Logger) (string, error) {
-	addr := os.Getenv("VAULT_ADDR")
-	if addr == "" {
-		return "", fmt.Errorf("VAULT_ADDR not set")
-	}
-
-	healthURL := strings.TrimRight(addr, "/") + "/v1/sys/health"
-	client := http.Client{
-		Timeout: 5 * time.Second,
-	}
-	resp, err := client.Get(healthURL)
-	if err != nil {
-		return addr, fmt.Errorf("vault not responding at %s: %w", addr, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 500 {
-		body, _ := io.ReadAll(resp.Body)
-		return addr, fmt.Errorf("vault unhealthy: %s", string(body))
-	}
-	log.Info("✅ Vault responded to health check", zap.String("VAULT_ADDR", addr))
-	return addr, nil
-}
 
 /**/
 

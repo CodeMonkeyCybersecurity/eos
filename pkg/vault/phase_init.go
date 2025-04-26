@@ -5,7 +5,6 @@ package vault
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -15,48 +14,6 @@ import (
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
-
-// PhaseInitAndUnsealVault is the entry point when Vault is uninitialized.
-// It initializes Vault if necessary, confirms safe backup of init materials,
-// unseals Vault, and stores a fallback copy of the init result.
-func PhaseInitAndUnsealVault(client *api.Client, log *zap.Logger) (*api.Client, error) {
-	log.Info("[5/6] Initializing and unsealing Vault if necessary")
-
-	status, err := client.Sys().InitStatus()
-	if err != nil {
-		log.Error("❌ Failed to check Vault init status", zap.Error(err))
-		return nil, err
-	}
-	if status {
-		log.Info("🔓 Vault is already initialized — skipping")
-		return client, nil
-	}
-
-	log.Info("⚙️ Vault not initialized — starting initialization sequence")
-	initRes, err := InitVault(client, log)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := PromptToSaveVaultInitData(initRes, log); err != nil {
-		return nil, err
-	}
-
-	if err := ConfirmUnsealMaterialSaved(initRes, log); err != nil {
-		return nil, err
-	}
-
-	if err := SaveInitResult(initRes, log); err != nil {
-		return nil, err
-	}
-
-	if err := UnsealVault(client, initRes, log); err != nil {
-		return nil, err
-	}
-
-	log.Info("✅ Vault initialization and unsealing complete")
-	return client, nil
-}
 
 // initVault initializes Vault with default settings (5 keys, 3 threshold).
 func InitVault(client *api.Client, log *zap.Logger) (*api.InitResponse, error) {
@@ -162,30 +119,6 @@ func MaybeWriteVaultInitFallback(init *api.InitResponse, log *zap.Logger) error 
 		return nil
 	}
 	return SaveInitResult(init, log)
-}
-
-// initAndUnseal is called when /sys/health returns 501 (uninitialized).
-func initAndUnseal(c *api.Client, log *zap.Logger) error {
-	_, _, err := SetupVault(c, log)
-	return err
-}
-
-// UnsealVault attempts to unseal Vault using either fallback file or interactive prompts.
-func UnsealVault(client *api.Client, init *api.InitResponse, log *zap.Logger) error {
-	// Submit 3 of 5 keys interactively
-	log.Info("🔐 Submitting unseal keys to Vault")
-	for i := 0; i < 3; i++ {
-		resp, err := client.Sys().Unseal(init.KeysB64[i])
-		if err != nil {
-			return fmt.Errorf("failed to submit unseal key %d: %w", i+1, err)
-		}
-		log.Info("🔑 Unseal key accepted", zap.Int("submitted", i+1), zap.Bool("sealed", resp.Sealed))
-		if !resp.Sealed {
-			log.Info("✅ Vault is now unsealed")
-			return nil
-		}
-	}
-	return errors.New("vault remains sealed after submitting 3 unseal keys")
 }
 
 // TryLoadUnsealKeysFromFallback attempts to load the vault-init.json file and parse the keys.

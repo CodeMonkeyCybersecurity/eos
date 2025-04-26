@@ -2,8 +2,6 @@
 package create
 
 import (
-	"fmt"
-
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
@@ -18,89 +16,69 @@ var CreateVaultCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("create-vault")
 
-		log.Info("📦 [1/6] Ensuring Vault binary is installed")
+		// 1️⃣ Install Vault
 		if err := vault.PhaseInstallVault(log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: install vault", err)
+			return logger.LogErrAndWrap(log, "create vault: install", err)
 		}
 
-		log.Info("Configuring Vault server")
-		if err := vault.PhasePatchVaultConfigIfNeeded(log); err != nil {
-			return fmt.Errorf("configure vault: %w", err)
-		}
-
-		log.Info("🌍 Resolving Vault environment address")
-		addr, err := vault.EnsureVaultEnv(log)
-		if err != nil {
-			return logger.LogErrAndWrap(log, "create vault: set VAULT_ADDR", err)
-		}
-
-		log.Info("Initializing Vault")
-		client, err := vault.NewClient(log)
-		if err != nil {
-			return fmt.Errorf("create client: %w", err)
-		}
-
-		client, err = vault.PhaseInitAndUnsealVault(client, log)
-		if err != nil {
-			log.Error("init and unseal vault failed", zap.Error(err))
-			return fmt.Errorf("init and unseal vault: %w", err)
-		}
-
-		// Placeholder values - these need to be set properly
-		kvPath := "secret/config"
-		kvData := map[string]string{"example_key": "example_value"}
-
-		log.Info("Bootstrapping Vault secrets")
-		if err := vault.PhaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {
-			return fmt.Errorf("bootstrap vault secrets: %w", err)
-		}
-
-		log.Info("✅ VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
-
-		log.Info("👤 [2/6] Ensuring eos system user")
+		// 2️⃣ Prepare environment
 		if err := system.EnsureEosUser(true, false, log); err != nil {
 			return logger.LogErrAndWrap(log, "create vault: ensure eos user", err)
 		}
-
-		log.Info("📁 [3/6] Preparing Vault filesystem")
 		if err := vault.EnsureVaultDirs(log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: ensure dirs", err)
+			return logger.LogErrAndWrap(log, "create vault: ensure vault dirs", err)
+		}
+		if err := vault.PrepareVaultAgentEnvironment(log); err != nil {
+			return logger.LogErrAndWrap(log, "create vault: prepare agent env", err)
 		}
 
-		log.Info("🔐 [4/6] Generating TLS certificates")
-		log.Warn("⚠️ Vault TLS cert will be self-signed. Use --cert/--key to override.")
-		log.Warn("⚠️ This certificate is valid only for local development. Do not use in production.")
+		// 3️⃣ Generate TLS
 		if err := vault.GenerateVaultTLSCert(log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: generate TLS", err)
+			return logger.LogErrAndWrap(log, "create vault: generate TLS certs", err)
 		}
 		if err := vault.TrustVaultCA(log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: trust CA", err)
+			return logger.LogErrAndWrap(log, "create vault: trust CA cert", err)
 		}
 
-		log.Info("📋 Ensuring Vault config is present")
+		// 4️⃣ Write and Validate Config
 		if err := vault.PhaseEnsureVaultConfigExists(log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: ensure config exists", err)
+			return logger.LogErrAndWrap(log, "create vault: ensure config", err)
 		}
-
-		log.Info("🧱 Validating Vault service configuration")
+		if err := vault.PhasePatchVaultConfigIfNeeded(log); err != nil {
+			return logger.LogErrAndWrap(log, "create vault: patch config", err)
+		}
 		if err := vault.ValidateVaultConfig(log); err != nil {
 			return logger.LogErrAndWrap(log, "create vault: validate config", err)
 		}
 
-		log.Info("🧱 [6/6] Starting Vault systemd service")
+		// 5️⃣ Start vault.service
 		if err := vault.StartVaultService(log); err != nil {
 			return logger.LogErrAndWrap(log, "create vault: start service", err)
 		}
 
-		log.Info("🩺 Verifying Vault health after service start")
-		if status, err := vault.CheckVaultHealth(log); err != nil {
-			log.Error("🚨 Vault service started but health check failed", zap.String("status", status), zap.Error(err))
-			return fmt.Errorf("vault health check: %w", err)
+		// 6️⃣ Initialize and Unseal
+		addr, err := vault.EnsureVaultEnv(log)
+		if err != nil {
+			return logger.LogErrAndWrap(log, "create vault: resolve VAULT_ADDR", err)
+		}
+		client, err := vault.NewClient(log)
+		if err != nil {
+			return logger.LogErrAndWrap(log, "create vault: new client", err)
+		}
+		client, err = vault.PhaseInitAndUnsealVault(client, log)
+		if err != nil {
+			return logger.LogErrAndWrap(log, "create vault: init/unseal", err)
 		}
 
-		log.Info("ℹ️ Vault is running, but may still need manual initialization/unsealing if required.")
+		// 7️⃣ Apply core secrets and health-check
+		if err := vault.PhaseApplyCoreSecrets(client, "secret/config", map[string]string{"example_key": "example_value"}, log); err != nil {
+			return logger.LogErrAndWrap(log, "create vault: apply core secrets", err)
+		}
+		if _, err := vault.CheckVaultHealth(log); err != nil {
+			return logger.LogErrAndWrap(log, "create vault: health check", err)
+		}
 
-		log.Info("✅ Vault installation complete — ready for secure provisioning.")
+		log.Info("✅ Vault is fully installed, initialized, unsealed, and ready for use!", zap.String("VAULT_ADDR", addr))
 		return nil
 	}),
 }

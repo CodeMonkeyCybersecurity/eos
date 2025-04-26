@@ -17,6 +17,12 @@ import (
 	"go.uber.org/zap"
 )
 
+//--------------------------------------------------------------------
+// 3.  Generate TLS Certificates
+//--------------------------------------------------------------------
+
+// PHASE 3 — GenerateVaultTLSCert() + TrustVaultCA()
+
 // TrustVaultCA dispatches to the correct CA‐trust helper based on the distro.
 func TrustVaultCA(log *zap.Logger) error {
 	distro := platform.DetectLinuxDistro(log)

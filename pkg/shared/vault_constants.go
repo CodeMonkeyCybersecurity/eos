@@ -13,11 +13,16 @@ const (
 // Common host filesystem and configuration paths for Vault integration.
 // policy specific paths
 
-// Vault internal paths
+// Vault Audit Paths
 const (
-	// Audit
 	AuditID   = "file/"
 	MountPath = "sys/audit/" + AuditID
+)
+
+const (
+	VaultAddrEnv       = "VAULT_ADDR"
+	VaultHealthPath    = "/v1/sys/health"
+	VaultHealthTimeout = 5 * time.Second
 )
 
 // Vault agent service and config
@@ -36,6 +41,8 @@ const (
 
 	// VaultSystemCATrustPath is the path for system-wide CA trust for Vault TLS.
 	VaultSystemCATrustPath = "/etc/pki/ca-trust/source/anchors/vault-local-ca.crt"
+
+	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
 )
 
 // Fallback strategy codes
@@ -67,8 +74,7 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 // Config and data paths
 const (
 	VaultConfigFileName = "config.hcl"
-
-	EosProfileD = "/etc/profile.d/eos_vault.sh"
+	EosVaultProfilePath = "/etc/profile.d/eos_vault.sh"
 )
 
 // Vault key-value (KV) namespaces
@@ -87,11 +93,6 @@ const (
 
 	UserpassPathPrefix = "auth/userpass/users/"
 	EosVaultPolicy     = "eos-policy"
-)
-
-// System paths
-const (
-	VaultAgentServicePath = "/etc/systemd/system/vault-agent-eos.service"
 )
 
 const (
