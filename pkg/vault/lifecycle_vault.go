@@ -650,7 +650,7 @@ func VaultPurge(path string, log *zap.Logger) error {
 // ## 2. Detect and Set Vault Environment
 // Just resolves VAULT_ADDR
 //     - Tries VAULT_ADDR env var
-//     - Falls back to 127.0.0.1:8179
+//     - Falls back to shared.ListenerAddr
 //     - Falls back to internal hostname
 //  1. Prefer an existing HTTPS listener on 127.0.0.1:<VaultDefaultPort>
 //  2. Else try https://<internal‑hostname>:<VaultDefaultPort>
@@ -682,7 +682,7 @@ func VaultPurge(path string, log *zap.Logger) error {
 /**/
 
 // StartVaultService ensures the Vault systemd service is enabled and running,
-// and verifies that Vault is listening on the expected port (8179) before returning.
+// and verifies that Vault is listening on the expected port (shared.VaultDefaultPort) before returning.
 // It retries port probing to handle delayed service startups.
 func StartVaultService(log *zap.Logger) error {
 	log.Info("🛠️ Writing Vault systemd unit file")
@@ -692,13 +692,20 @@ func StartVaultService(log *zap.Logger) error {
 	}
 
 	log.Info("🔄 Reloading systemd daemon and enabling vault.service")
-	if err := ReloadDaemonAndEnable(log, "vault.service"); err != nil {
+	if err := ReloadDaemonAndEnable(log, shared.VaultServiceName); err != nil {
 		log.Error("❌ Failed to reload or enable vault.service", zap.Error(err))
 		return fmt.Errorf("reload/enable systemd vault.service: %w", err)
 	}
 
+	dataPath := shared.VaultDataPath
+	if err := os.MkdirAll(dataPath, 0700); err != nil {
+		log.Error("❌ Failed to create Vault data dir", zap.String("path", dataPath), zap.Error(err))
+		return fmt.Errorf("failed to create Vault data dir: %w", err)
+	}
+	log.Info("✅ Vault data directory ready", zap.String("path", dataPath))
+
 	log.Info("🚀 Starting Vault systemd service")
-	startCmd := exec.Command("systemctl", "start", "vault.service")
+	startCmd := exec.Command("systemctl", "start", shared.VaultServiceName)
 	startCmd.Stdout = os.Stdout
 	startCmd.Stderr = os.Stderr
 	if err := startCmd.Run(); err != nil {
@@ -706,18 +713,65 @@ func StartVaultService(log *zap.Logger) error {
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 
-	log.Info("🩺 Checking if Vault is listening on 127.0.0.1:8179")
+	log.Info("🩺 Checking if Vault is listening on shared.ListenerAddr")
 	for i := 1; i <= 5; i++ {
-		conn, err := net.DialTimeout("tcp", "127.0.0.1:8179", 2*time.Second)
+		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, 2*time.Second)
 		if err == nil {
 			conn.Close()
-			log.Info("✅ Vault is now listening on 127.0.0.1:8179")
+			log.Info("✅ Vault is now listening on shared.ListenerAddr")
 			return nil
 		}
 		log.Warn("🔁 Vault not listening yet, retrying...", zap.Int("attempt", i))
 		time.Sleep(2 * time.Second)
 	}
 
-	log.Error("❌ Vault failed to start and bind to 127.0.0.1:8179")
-	return fmt.Errorf("vault failed to start and listen on port 8179")
+	log.Warn("🔁 Vault still not listening after retries, attempting second start...")
+	if err := startVaultService(log); err != nil {
+		captureVaultLogsOnFailure(log)
+		return err
+	}
+
+	return waitForVaultHealth(log, 10*time.Second)
+}
+
+func startVaultService(log *zap.Logger) error {
+	cmd := exec.Command("systemctl", "start", shared.VaultServiceName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		log.Error("❌ Failed to start vault.service", zap.Error(err))
+		return fmt.Errorf("failed to start vault.service: %w", err)
+	}
+	return nil
+}
+
+// waitForVaultHealth repeatedly probes Vault's TCP port to ensure it becomes reachable within a given timeout.
+func waitForVaultHealth(log *zap.Logger, maxWait time.Duration) error {
+	log.Error("❌ Vault failed to start and listen on port", zap.Int("port", shared.VaultDefaultPortInt))
+	start := time.Now()
+	for {
+		if time.Since(start) > maxWait {
+			captureVaultLogsOnFailure(log)
+			return fmt.Errorf("vault did not become healthy within %s", maxWait)
+		}
+		conn, err := net.DialTimeout("tcp", "shared.ListenerAddr", 1*time.Second)
+		if err == nil {
+			conn.Close()
+			log.Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
+			return nil
+		}
+		log.Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
+		time.Sleep(2 * time.Second)
+	}
+}
+
+// captureVaultLogsOnFailure captures the last 20 lines of Vault's systemd journal logs for debugging purposes.
+func captureVaultLogsOnFailure(log *zap.Logger) {
+	log.Warn("💡 Hint: Run 'systemctl status vault' or 'journalctl -u vault' to diagnose Vault startup issues")
+	out, err := exec.Command("journalctl", "-u", "vault", "-n", "20", "--no-pager").CombinedOutput()
+	if err != nil {
+		log.Warn("⚠️ Failed to capture Vault journal logs", zap.Error(err))
+		return
+	}
+	log.Error("🚨 Vault systemd logs", zap.String("logs", string(out)))
 }
