@@ -430,8 +430,6 @@ func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.
 	return nil
 }
 
-
-
 // Purge removes Vault repo artifacts and paths based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.
 func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]error) {
@@ -642,13 +640,13 @@ func captureVaultLogsOnFailure(log *zap.Logger) {
 // It returns an error if validation fails, and logs the vault output for diagnosis.
 // This must be called before attempting to start Vault.
 func ValidateVaultConfig(log *zap.Logger) error {
-    log.Info("🧪 Validating Vault configuration syntax")
-    cmd := exec.Command("vault", "server", "-config", shared.VaultConfigPath, "-check")
-    out, err := cmd.CombinedOutput()
-    if err != nil {
-        log.Error("Vault config validation failed", zap.Error(err), zap.String("output", string(out)))
-        return fmt.Errorf("vault config validation error: %w", err)
-    }
-    log.Info("✅ Vault config validation successful", zap.String("output", string(out)))
-    return nil
+	log.Info("🧪 Validating Vault configuration syntax")
+	cmd := exec.Command("vault", "server", "-config", shared.VaultConfigPath, "-check")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Error("Vault config validation failed", zap.Error(err), zap.String("output", string(out)))
+		return fmt.Errorf("vault config validation error: %w", err)
+	}
+	log.Info("✅ Vault config validation successful", zap.String("output", string(out)))
+	return nil
 }
