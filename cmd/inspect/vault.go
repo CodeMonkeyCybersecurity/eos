@@ -33,9 +33,18 @@ var InspectVaultInitCmd = &cobra.Command{
 		log.Info("Vault Initialization Result Retrieved")
 		log.Info("Root Token", zap.String("root_token", crypto.Redact(initResult.RootToken)))
 
+		fmt.Println("\n🔑 Vault Initialization Result")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("Root Token:  %s\n", initResult.RootToken)                                        // <-- real value printed to user
+		log.Info("Root Token loaded", zap.String("root_token", crypto.Redact(initResult.RootToken))) // <-- redacted for logs
+
 		for i, key := range initResult.KeysB64 {
-			log.Info("Unseal Key", zap.Int("key_number", i+1), zap.String("key_value", crypto.Redact(key)))
+			fmt.Printf("Unseal Key %d: %s\n", i+1, key)               // <-- real key printed to user
+			log.Info("Unseal Key loaded", zap.Int("key_number", i+1)) // don't log key_value at all
 		}
+
+		fmt.Println("\n⚡ Please back up these credentials securely.")
+		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.")
 
 		log.Warn("⚡ Please back up your Vault credentials securely")
 		log.Info("👉 Next step: run 'eos enable vault' to unseal")
