@@ -77,9 +77,9 @@ var CreateVaultCmd = &cobra.Command{
 			return logger.LogErrAndWrap(log, "create vault: trust CA", err)
 		}
 
-		log.Info("⚙️ [5/6] Writing vault.hcl config")
-		if err := vault.WriteVaultHCL(log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: write config", err)
+		log.Info("📋 Ensuring Vault config is present")
+		if err := vault.PhaseEnsureVaultConfigExists(log); err != nil {
+			return logger.LogErrAndWrap(log, "create vault: ensure config exists", err)
 		}
 
 		log.Info("🧱 Validating Vault service configuration")

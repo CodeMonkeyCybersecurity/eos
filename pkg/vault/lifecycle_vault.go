@@ -687,3 +687,24 @@ func ValidateVaultConfig(log *zap.Logger) error {
 	log.Info("✅ Vault config validation successful", zap.String("output", string(out)))
 	return nil
 }
+
+
+
+// PhaseEnsureVaultConfigExists ensures that Vault's server config exists, or writes a default one if missing.
+func PhaseEnsureVaultConfigExists(log *zap.Logger) error {
+	log.Info("📋 Checking if Vault config exists", zap.String("path", shared.VaultConfigPath))
+	if _, err := os.Stat(shared.VaultConfigPath); os.IsNotExist(err) {
+		log.Warn("⚠️ Vault config missing — generating default vault.hcl", zap.String("path", shared.VaultConfigPath))
+		if err := WriteVaultHCL(log); err != nil {
+			log.Error("❌ Failed to write default vault.hcl", zap.Error(err))
+			return fmt.Errorf("write default vault.hcl: %w", err)
+		}
+		log.Info("✅ Default Vault config written", zap.String("path", shared.VaultConfigPath))
+	} else if err != nil {
+		log.Error("❌ Error checking Vault config file", zap.Error(err))
+		return fmt.Errorf("check vault config existence: %w", err)
+	} else {
+		log.Info("✅ Vault config already present")
+	}
+	return nil
+}
