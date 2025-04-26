@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -127,11 +128,14 @@ func InstallVaultViaApt(log *zap.Logger) error {
 		return fmt.Errorf("vault installation via apt-get failed: %w", err)
 	}
 
-	vaultPath, err := exec.LookPath("vault")
+	info, err := os.Stat(shared.VaultBinaryPath)
 	if err != nil {
-		return fmt.Errorf("vault binary not found after install: %w", err)
+		return fmt.Errorf("vault binary missing after install: %w", err)
 	}
-	log.Info("✅ Vault binary found", zap.String("path", vaultPath))
+	if info.Mode()&0111 == 0 {
+		return fmt.Errorf("vault binary is not executable (permissions issue)")
+	}
+	log.Info("✅ Vault binary found", zap.String("path", shared.VaultBinaryPath))
 	return nil
 }
 
