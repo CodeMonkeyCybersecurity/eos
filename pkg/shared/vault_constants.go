@@ -2,6 +2,8 @@
 
 package shared
 
+import "time"
+
 const (
 	SecretsExt = ".json"
 )
@@ -95,4 +97,10 @@ const (
 const (
 	VaultLegacyConfigWildcard = "/etc/vault*"
 	VaultLogWildcard          = "/var/log/vault*"
+)
+
+const (
+	VaultRetryCount    = 5
+	VaultRetryDelay    = 2 * time.Second
+	VaultMaxHealthWait = 10 * time.Second
 )

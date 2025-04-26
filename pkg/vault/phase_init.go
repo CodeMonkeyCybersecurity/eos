@@ -16,10 +16,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// phaseInitAndUnsealVault is the entry point when Vault is uninitialized.
+// PhaseInitAndUnsealVault is the entry point when Vault is uninitialized.
 // It initializes Vault if necessary, confirms safe backup of init materials,
 // unseals Vault, and stores a fallback copy of the init result.
-func phaseInitAndUnsealVault(client *api.Client, log *zap.Logger) (*api.Client, error) {
+func PhaseInitAndUnsealVault(client *api.Client, log *zap.Logger) (*api.Client, error) {
 	log.Info("[5/6] Initializing and unsealing Vault if necessary")
 
 	status, err := client.Sys().InitStatus()

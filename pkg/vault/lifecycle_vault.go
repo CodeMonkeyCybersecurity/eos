@@ -19,98 +19,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func EnsureVault(kvPath string, kvData map[string]string, log *zap.Logger) (*api.Client, error) {
-	log.Info("🔐 Vault setup starting")
-
-	log.Info("[1/11] Generating Vault TLS Certificate")
-	if err := GenerateVaultTLSCert(log); err != nil {
-		log.Error("❌ Failed to generate Vault TLS Certificate", zap.Error(err))
-		return nil, fmt.Errorf("tls-gen: %w", err)
-	}
-	log.Info("✅ TLS Certificate generated")
-
-	log.Info("[2/11] Trusting self-signed CA system-wide")
-	if err := TrustVaultCA(log); err != nil {
-		log.Error("❌ Failed to trust Vault CA", zap.Error(err))
-		return nil, err
-	}
-	log.Info("✅ Vault CA trusted")
-
-	log.Info("[3/11] Installing Vault binaries and systemd service")
-	if err := PhaseInstallVault(log); err != nil {
-		log.Error("❌ Vault installation failed", zap.Error(err))
-		return nil, fmt.Errorf("install: %w", err)
-	}
-	log.Info("✅ Vault installed")
-
-	log.Info("[4/11] Patching vault.hcl config if needed")
-	if err := phasePatchVaultConfigIfNeeded(log); err != nil {
-		log.Error("❌ Failed to patch Vault config", zap.Error(err))
-		return nil, fmt.Errorf("patch-config: %w", err)
-	}
-	log.Info("✅ Vault config verified")
-
-	log.Info("[5/11] Waiting for healthy Vault client")
-	if err := phaseEnsureClientHealthy(log); err != nil {
-		log.Error("❌ Vault client not healthy", zap.Error(err))
-		return nil, fmt.Errorf("client-health: %w", err)
-	}
-	log.Info("✅ Vault client healthy")
-
-	log.Info("[6/11] Initializing and unsealing Vault")
-	client, err := NewClient(log)
-	if err != nil {
-		log.Error("❌ Failed to create Vault client", zap.Error(err))
-		return nil, fmt.Errorf("create client: %w", err)
-	}
-
-	client, err = phaseInitAndUnsealVault(client, log)
-	if err != nil {
-		log.Error("❌ Failed to initialize/unseal Vault", zap.Error(err))
-		return nil, fmt.Errorf("init-unseal: %w", err)
-	}
-	log.Info("✅ Vault initialized and unsealed")
-
-	log.Info("[7/11] Enabling KV v2 at secrets mount")
-	if err := EnsureKVv2Enabled(client, strings.TrimSuffix(shared.KVNamespaceSecrets, "/"), log); err != nil {
-		log.Error("❌ Failed to enable KV v2", zap.Error(err))
-		return nil, fmt.Errorf("kv-v2 enable failed: %w", err)
-	}
-	log.Info("✅ KV v2 enabled")
-
-	log.Info("[8/11] Bootstrapping test secret")
-	if err := BootstrapKV(client, "bootstrap/test", log); err != nil {
-		log.Error("❌ Failed to bootstrap KV", zap.Error(err))
-		return nil, fmt.Errorf("kv bootstrap failed: %w", err)
-	}
-	log.Info("✅ KV test secret bootstrapped")
-
-	log.Info("[9/11] Writing Vault policies")
-	if err := EnsurePolicy(client, log); err != nil {
-		log.Error("❌ Failed to write policy", zap.Error(err))
-		return nil, fmt.Errorf("policy write failed: %w", err)
-	}
-	log.Info("✅ Policy written")
-
-	log.Info("[10/11] Configuring AppRole auth method")
-	if err := EnsureAppRoleAuth(client, log); err != nil {
-		log.Error("❌ Failed to configure AppRole", zap.Error(err))
-		return nil, fmt.Errorf("approle setup failed: %w", err)
-	}
-	log.Info("✅ AppRole configured")
-
-	log.Info("[11/11] Applying core secrets to Vault")
-	if err := phaseApplyCoreSecrets(client, kvPath, kvData, log); err != nil {
-		log.Error("❌ Failed to apply core secrets", zap.Error(err))
-		return nil, fmt.Errorf("apply-secrets: %w", err)
-	}
-	log.Info("✅ Core secrets applied")
-
-	log.Info("🎉 Vault setup complete")
-	return client, nil
-}
-
-// phaseInstallVault ensures Vault binary is installed via APT or DNF,
+// PhaseInstallVault ensures Vault binary is installed via APT or DNF,
 // depending on detected Linux distribution. No-op if already installed.
 func PhaseInstallVault(log *zap.Logger) error {
 	log.Info("[1/6] Ensuring Vault is installed")
@@ -140,50 +49,56 @@ func PhaseInstallVault(log *zap.Logger) error {
 	return nil
 }
 
-// phasePatchVaultConfigIfNeeded ensures Vault is configured to use the expected port (8179).
-func phasePatchVaultConfigIfNeeded(log *zap.Logger) error {
+// PhasePatchVaultConfigIfNeeded ensures Vault is configured to use the expected port (8179).
+func PhasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 	log.Info("[2/6] Checking for Vault port mismatch (8200 → 8179)")
 
 	data, err := os.ReadFile(shared.VaultConfigPath)
 	if err != nil {
 		log.Warn("Could not read Vault config file", zap.String("path", shared.VaultConfigPath), zap.Error(err))
-		return nil // Not fatal, just warn
+		return nil // Not fatal, continue without patching
 	}
 	content := string(data)
 
-	// Skip if already using the correct port
 	if strings.Contains(content, shared.VaultDefaultPort) {
 		log.Info("✅ Vault config already uses port 8179 — no patch needed")
 		return nil
 	}
 
-	// Replace 8200 with 8179
-	if strings.Contains(content, "8200") {
-		log.Warn("🔧 Vault config uses port 8200 — patching to 8179")
-		newContent := strings.ReplaceAll(content, "8200", shared.VaultDefaultPort)
-		if err := os.WriteFile(shared.VaultConfigPath, []byte(newContent), 0644); err != nil {
-			return fmt.Errorf("failed to write patched Vault config: %w", err)
-		}
-
-		// Restart Vault service to apply change
-		log.Info("🔁 Restarting Vault service to apply config changes...")
-		cmd := exec.Command("systemctl", "restart", "vault")
-		if err := cmd.Run(); err != nil {
-			log.Error("❌ Failed to restart Vault service", zap.Error(err))
-			return fmt.Errorf("vault restart failed after patch: %w", err)
-		}
-
-		log.Info("✅ Vault config patched and service restarted successfully")
+	if !strings.Contains(content, "8200") {
+		log.Info("ℹ️ No 8200 port found in Vault config — no changes applied")
 		return nil
 	}
 
-	log.Info("ℹ️ No 8200 port found in Vault config — no changes applied")
+	// Patch config: replace 8200 with 8179
+	log.Warn("🔧 Vault config uses port 8200 — patching to 8179")
+	newContent := strings.ReplaceAll(content, "8200", shared.VaultDefaultPort)
+	if err := os.WriteFile(shared.VaultConfigPath, []byte(newContent), 0644); err != nil {
+		log.Error("❌ Failed to write patched Vault config", zap.Error(err))
+		return fmt.Errorf("failed to write patched Vault config: %w", err)
+	}
+
+	log.Info("✅ Vault config patched successfully — restarting Vault service...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "systemctl", "restart", "vault")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Error("❌ Failed to restart Vault service after patch", zap.Error(err))
+		return fmt.Errorf("vault restart failed after config patch: %w", err)
+	}
+
+	log.Info("✅ Vault service restarted successfully after config patch")
 	return nil
 }
 
-// phaseEnsureClientHealthy makes sure we can reach a healthy Vault
+// PhaseEnsureClientHealthy makes sure we can reach a healthy Vault
 // instance, and if not, attempts init / unseal flows automatically.
-func phaseEnsureClientHealthy(log *zap.Logger) error {
+func PhaseEnsureClientHealthy(log *zap.Logger) error {
 	log.Info("[4/6] Ensuring Vault client is available and healthy")
 
 	//--------------------------------------------------------------------
@@ -231,7 +146,7 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 		if err != nil {
 			log.Warn("🔌 Health request failed – retrying",
 				zap.Error(err))
-			time.Sleep(2 * time.Second)
+			time.Sleep(shared.VaultRetryDelay)
 			continue
 		}
 
@@ -262,14 +177,14 @@ func phaseEnsureClientHealthy(log *zap.Logger) error {
 		default:
 			log.Warn("⚠️ Unexpected health state",
 				zap.Any("response", resp))
-			time.Sleep(2 * time.Second)
+			time.Sleep(shared.VaultRetryDelay)
 			return err
 		}
 	}
 	return fmt.Errorf("vault not healthy after multiple attempts")
 }
 
-func phaseApplyCoreSecrets(client *api.Client, kvPath string, kvData map[string]string, log *zap.Logger) error {
+func PhaseApplyCoreSecrets(client *api.Client, kvPath string, kvData map[string]string, log *zap.Logger) error {
 	log.Info("[6/6] Applying core secrets to Vault", zap.String("path", kvPath))
 
 	kv := client.KVv2("secret")
@@ -309,10 +224,8 @@ func InstallVaultViaApt(log *zap.Logger) error {
 
 	// Step 1: Add the HashiCorp APT repo
 	log.Info("➕ Adding HashiCorp APT repo")
-	aptCmd := exec.Command("bash", "-c", `
-		curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg && \
-		echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" > /etc/apt/sources.list.d/hashicorp.list
-	`)
+	aptCmd := exec.Command("curl", "-fsSL", "https://apt.releases.hashicorp.com/gpg", "|", "gpg", "--dearmor", "-o", "/usr/share/keyrings/hashicorp-archive-keyring.gpg", "&&",
+		"echo", "deb", "[signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg]", "https://apt.releases.hashicorp.com", "$(lsb_release -cs)", "main", ">", "/apt/sources.list.d/hashicorp.list")
 	aptCmd.Stdout = os.Stdout
 	aptCmd.Stderr = os.Stderr
 	if err := aptCmd.Run(); err != nil {
@@ -321,16 +234,15 @@ func InstallVaultViaApt(log *zap.Logger) error {
 
 	// Step 2: Refresh APT cache
 	log.Info("♻️ Updating APT package cache")
-	if err := exec.Command("apt-get", "update").Run(); err != nil {
+	if err := exec.Command("apt", "update").Run(); err != nil {
 		log.Error("❌ Failed to update APT cache", zap.Error(err))
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
 
 	// Step 3: Install Vault — Pinned install
 	log.Info("📦 Installing Vault from HashiCorp repo via apt")
-	installCmd := exec.Command("bash", "-c", `
-		apt-get install -y --allow-downgrades --allow-change-held-packages vault
-	`)
+	installCmd := exec.Command(
+		"apt", "install", "-y", "--allow-downgrades", "--allow-change-held-packages", "vault")
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
 	if err := installCmd.Run(); err != nil {
@@ -339,11 +251,12 @@ func InstallVaultViaApt(log *zap.Logger) error {
 
 	vaultPath, err := exec.LookPath("vault")
 	if err != nil {
-		log.Fatal("❌ Vault binary not found after apt install", zap.Error(err))
+		log.Error("❌ Vault binary not found after apt install", zap.Error(err))
 		return fmt.Errorf("vault binary not found")
 	}
 	if !strings.HasPrefix(vaultPath, "/usr") {
-		log.Fatal("❌ Vault binary installed to unexpected path", zap.String("found_path", vaultPath))
+		log.Warn("Vault binary installed to unexpected path", zap.String("found_path", vaultPath))
+		return fmt.Errorf("vault installed at unexpected path: %s", vaultPath)
 	}
 	log.Info("✅ Vault binary verified at correct path", zap.String("path", vaultPath))
 	log.Info("✅ Vault installed successfully via apt")
@@ -517,89 +430,51 @@ func finalizeVaultSetup(client *api.Client, initRes *api.InitResponse, log *zap.
 	return nil
 }
 
-func TryPatchVaultPortIfNeeded(log *zap.Logger) {
-	b, err := os.ReadFile(shared.VaultConfigPath)
-	if err != nil {
-		log.Warn("Could not read Vault config file", zap.String("path", shared.VaultConfigPath), zap.Error(err))
-		return
-	}
-	content := string(b)
 
-	// Bail if already using 8179
-	if strings.Contains(content, shared.VaultDefaultPort) {
-		log.Info("Vault config already uses port 8179 — no need to patch")
-		return
-	}
-
-	// Check if 8200 is hardcoded and replace
-	if strings.Contains(content, "8200") {
-		newContent := strings.ReplaceAll(content, "8200", shared.VaultDefaultPort)
-		if err := os.WriteFile(shared.VaultConfigPath, []byte(newContent), 0644); err != nil {
-			log.Error("Failed to patch Vault config file", zap.Error(err))
-			return
-		}
-		log.Info("✅ Vault port patched from 8200 → 8179 in config")
-
-		// Restart Vault
-		log.Info("🔁 Restarting Vault to apply new config...")
-		cmd := exec.Command("systemctl", "restart", "vault")
-		if err := cmd.Run(); err != nil {
-			log.Error("❌ Failed to restart Vault after patching", zap.Error(err))
-			return
-		}
-		log.Info("✅ Vault restarted successfully")
-	} else {
-		log.Info("No 8200 binding found in config — nothing to patch")
-	}
-}
 
 // Purge removes Vault repo artifacts and paths based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.
 func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]error) {
 	errs = make(map[string]error)
-
 	log.Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
 
-	// 2. Distro-specific package manager cleanup
+	pathsToRemove := []string{}
+
 	switch distro {
 	case "debian":
-		log.Info("🔧 Removing APT keyring and source list")
-		for _, path := range []string{shared.AptKeyringPath, shared.AptListPath} {
-			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-				log.Error("❌ Failed to remove APT file", zap.String("path", path), zap.Error(err))
-				errs[path] = fmt.Errorf("failed to remove %s: %w", path, err)
-			} else {
-				log.Info("✅ Removed APT file", zap.String("path", path))
-				removed = append(removed, path)
-			}
-		}
+		pathsToRemove = append(pathsToRemove, shared.AptKeyringPath, shared.AptListPath)
 	case "rhel":
-		log.Info("🔧 Removing DNF repo file", zap.String("path", shared.DnfRepoFilePath))
-		if err := os.Remove(shared.DnfRepoFilePath); err != nil && !os.IsNotExist(err) {
-			log.Error("❌ Failed to remove DNF repo file", zap.String("path", shared.DnfRepoFilePath), zap.Error(err))
-			errs[shared.DnfRepoFilePath] = fmt.Errorf("failed to remove %s: %w", shared.DnfRepoFilePath, err)
-		} else {
-			log.Info("✅ Removed DNF repo file", zap.String("path", shared.DnfRepoFilePath))
-			removed = append(removed, shared.DnfRepoFilePath)
-		}
+		pathsToRemove = append(pathsToRemove, shared.DnfRepoFilePath)
 	default:
 		log.Warn("⚠️ No package manager cleanup defined for distro", zap.String("distro", distro))
 	}
 
-	// 3. Optional binary cleanup
-	log.Info("🗑️ Attempting to remove Vault binary", zap.String("path", shared.VaultBinaryPath))
-	if err := os.Remove(shared.VaultBinaryPath); err != nil && !os.IsNotExist(err) {
-		log.Error("❌ Failed to remove Vault binary", zap.String("path", shared.VaultBinaryPath), zap.Error(err))
-		errs[shared.VaultBinaryPath] = fmt.Errorf("failed to remove %s: %w", shared.VaultBinaryPath, err)
-	} else {
-		log.Info("✅ Removed Vault binary", zap.String("path", shared.VaultBinaryPath))
-		removed = append(removed, shared.VaultBinaryPath)
+	pathsToRemove = append(pathsToRemove, shared.VaultBinaryPath)
+
+	for _, path := range pathsToRemove {
+		if err := os.Remove(path); err != nil {
+			if os.IsNotExist(err) {
+				log.Info("ℹ️ File already absent", zap.String("path", path))
+				continue
+			}
+			log.Error("❌ Failed to remove file", zap.String("path", path), zap.Error(err))
+			errs[path] = fmt.Errorf("failed to remove %s: %w", path, err)
+		} else {
+			log.Info("✅ Removed file", zap.String("path", path))
+			removed = append(removed, path)
+		}
 	}
 
-	// 4. Reload systemd to clean up any dangling service definitions
-	log.Info("🔁 Reloading systemd daemon to unregister removed Vault services...")
-	_ = exec.Command("systemctl", "daemon-reexec").Run()
-	_ = exec.Command("systemctl", "daemon-reload").Run()
+	// Safe systemd reload with timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	if err := exec.CommandContext(ctx, "systemctl", "daemon-reexec").Run(); err != nil {
+		log.Warn("⚠️ Failed daemon-reexec", zap.Error(err))
+	}
+	if err := exec.CommandContext(ctx, "systemctl", "daemon-reload").Run(); err != nil {
+		log.Warn("⚠️ Failed daemon-reload", zap.Error(err))
+	}
 
 	log.Info("✅ Vault purge complete", zap.Int("paths_removed", len(removed)), zap.Int("errors", len(errs)))
 	return removed, errs
@@ -633,7 +508,7 @@ func VaultPurge(path string, log *zap.Logger) error {
 //   - Reason: Avoid conflicts with default `8200`, fits into a prime-number port scheme.
 // - **Listener Address**: Bind to `0.0.0.0`, but firewall access by default.
 //   - Allows LAN/local trust zone use while maintaining sensible defaults.
-// - **Storage Backend**: Use file backend, stored under `/opt/pandora/data` (EOS Vault home).
+// - **Storage Backend**: Use file backend, stored under `/opt/vault/data` (EOS Vault home).
 // - **Log Level**: Use `debug` logging by default for now.
 //   - Intentional for early-stage troubleshooting across EOS CLI.
 //   - Will disable/override in future `eos bootstrap` or packaging command.
@@ -674,70 +549,57 @@ func VaultPurge(path string, log *zap.Logger) error {
 // - Enables user overrides via flags and makes the config more testable and composable.
 // - Maintains alignment with Unix philosophy and Go idioms (text as interface).
 //if err := stepCopyCA(log); err != nil { ... }                           // step 6
-// Agent creation logic now called after phaseApplycoreSecrets is this appropriate??
+// Agent creation logic now called after PhaseApplycoreSecrets is this appropriate??
 // ---
 
 /**/
 // TODO: RenderVaultServiceUnit() ([]byte, error)
 /**/
 
-// StartVaultService ensures the Vault systemd service is enabled and running,
-// and verifies that Vault is listening on the expected port (shared.VaultDefaultPort) before returning.
-// It retries port probing to handle delayed service startups.
+// StartVaultService ensures Vault systemd unit is enabled, started, and healthy.
 func StartVaultService(log *zap.Logger) error {
 	log.Info("🛠️ Writing Vault systemd unit file")
 	if err := WriteSystemdUnit(log); err != nil {
-		log.Error("❌ Failed to write systemd unit", zap.Error(err))
 		return fmt.Errorf("write systemd unit: %w", err)
 	}
 
 	log.Info("🔄 Reloading systemd daemon and enabling vault.service")
 	if err := ReloadDaemonAndEnable(log, shared.VaultServiceName); err != nil {
-		log.Error("❌ Failed to reload or enable vault.service", zap.Error(err))
-		return fmt.Errorf("reload/enable systemd vault.service: %w", err)
+		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
 
+	if err := ensureVaultDataDir(log); err != nil {
+		return err
+	}
+
+	log.Info("🚀 Starting Vault systemd service")
+	if err := startVaultSystemdService(log); err != nil {
+		return err
+	}
+
+	return waitForVaultHealth(log, shared.VaultMaxHealthWait)
+}
+
+// ensureVaultDataDir ensures the Vault data directory exists.
+func ensureVaultDataDir(log *zap.Logger) error {
 	dataPath := shared.VaultDataPath
 	if err := os.MkdirAll(dataPath, 0700); err != nil {
 		log.Error("❌ Failed to create Vault data dir", zap.String("path", dataPath), zap.Error(err))
 		return fmt.Errorf("failed to create Vault data dir: %w", err)
 	}
 	log.Info("✅ Vault data directory ready", zap.String("path", dataPath))
-
-	log.Info("🚀 Starting Vault systemd service")
-	startCmd := exec.Command("systemctl", "start", shared.VaultServiceName)
-	startCmd.Stdout = os.Stdout
-	startCmd.Stderr = os.Stderr
-	if err := startCmd.Run(); err != nil {
-		log.Error("❌ Failed to start vault.service", zap.Error(err))
-		return fmt.Errorf("failed to start vault.service: %w", err)
-	}
-
-	log.Info("🩺 Checking if Vault is listening on shared.ListenerAddr")
-	for i := 1; i <= 5; i++ {
-		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, 2*time.Second)
-		if err == nil {
-			conn.Close()
-			log.Info("✅ Vault is now listening on shared.ListenerAddr")
-			return nil
-		}
-		log.Warn("🔁 Vault not listening yet, retrying...", zap.Int("attempt", i))
-		time.Sleep(2 * time.Second)
-	}
-
-	log.Warn("🔁 Vault still not listening after retries, attempting second start...")
-	if err := startVaultService(log); err != nil {
-		captureVaultLogsOnFailure(log)
-		return err
-	}
-
-	return waitForVaultHealth(log, 10*time.Second)
+	return nil
 }
 
-func startVaultService(log *zap.Logger) error {
-	cmd := exec.Command("systemctl", "start", shared.VaultServiceName)
+// startVaultSystemdService starts Vault using systemctl safely.
+func startVaultSystemdService(log *zap.Logger) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "systemctl", "start", shared.VaultServiceName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+
 	if err := cmd.Run(); err != nil {
 		log.Error("❌ Failed to start vault.service", zap.Error(err))
 		return fmt.Errorf("failed to start vault.service: %w", err)
@@ -754,14 +616,14 @@ func waitForVaultHealth(log *zap.Logger, maxWait time.Duration) error {
 			captureVaultLogsOnFailure(log)
 			return fmt.Errorf("vault did not become healthy within %s", maxWait)
 		}
-		conn, err := net.DialTimeout("tcp", "shared.ListenerAddr", 1*time.Second)
+		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, shared.VaultRetryDelay)
 		if err == nil {
 			conn.Close()
 			log.Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
 			return nil
 		}
 		log.Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
-		time.Sleep(2 * time.Second)
+		time.Sleep(shared.VaultRetryDelay)
 	}
 }
 
@@ -774,4 +636,19 @@ func captureVaultLogsOnFailure(log *zap.Logger) {
 		return
 	}
 	log.Error("🚨 Vault systemd logs", zap.String("logs", string(out)))
+}
+
+// ValidateVaultConfig runs Vault's built-in configuration validation.
+// It returns an error if validation fails, and logs the vault output for diagnosis.
+// This must be called before attempting to start Vault.
+func ValidateVaultConfig(log *zap.Logger) error {
+    log.Info("🧪 Validating Vault configuration syntax")
+    cmd := exec.Command("vault", "server", "-config", shared.VaultConfigPath, "-check")
+    out, err := cmd.CombinedOutput()
+    if err != nil {
+        log.Error("Vault config validation failed", zap.Error(err), zap.String("output", string(out)))
+        return fmt.Errorf("vault config validation error: %w", err)
+    }
+    log.Info("✅ Vault config validation successful", zap.String("output", string(out)))
+    return nil
 }
