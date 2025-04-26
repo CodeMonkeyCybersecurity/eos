@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -72,7 +73,7 @@ func SaveInitResult(initRes *api.InitResponse, log *zap.Logger) error {
 		return err
 	}
 
-	path := DiskPath("vault_init", log)
+	path := shared.VaultInitPath
 	dir := filepath.Dir(path)
 
 	// ✨ Ensure parent dir exists
