@@ -36,10 +36,6 @@ func PhaseInitVaultOnly(client *api.Client, log *zap.Logger) (*api.Client, error
 		return nil, err
 	}
 
-	if err := PromptToSaveVaultInitData(initRes, log); err != nil {
-		return nil, err
-	}
-
 	if err := SaveInitResult(initRes, log); err != nil {
 		return nil, err
 	}
