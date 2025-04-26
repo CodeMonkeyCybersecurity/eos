@@ -11,11 +11,37 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
+
+var InspectVaultInitCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Inspect Vault initialization keys and root token",
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log.Named("inspect-vault-init")
+
+		initResult, err := vault.LoadVaultInitResult(log)
+		if err != nil {
+			return logger.LogErrAndWrap(log, "inspect vault-init: load init result", err)
+		}
+
+		fmt.Println("\n🔑 Vault Initialization Result")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("Root Token:  %s\n", initResult.RootToken)
+		fmt.Println("")
+		for i, key := range initResult.KeysB64 {
+			fmt.Printf("Unseal Key %d: %s\n", i+1, key)
+		}
+		fmt.Println("\n⚡ Please back up these credentials securely.\n")
+		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.\n")
+
+		return nil
+	}),
+}
 
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
@@ -118,4 +144,5 @@ func init() {
 	InspectVaultCmd.AddCommand(InspectVaultAgentCmd) // nested command
 	InspectCmd.AddCommand(InspectVaultCmd)           // top-level command
 	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
+	InspectCmd.AddCommand(InspectVaultInitCmd)
 }
