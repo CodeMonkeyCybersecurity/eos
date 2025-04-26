@@ -1,4 +1,4 @@
-/* cmd/inspect/vault.go */
+// cmd/inspect/vault.go
 package inspect
 
 import (
@@ -18,8 +18,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// InspectVaultInitCmd displays Vault initialization keys and root token
 var InspectVaultInitCmd = &cobra.Command{
-	Use:   "init",
+	Use:   "vault-init",
 	Short: "Inspect Vault initialization keys and root token",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-init")
@@ -29,120 +30,136 @@ var InspectVaultInitCmd = &cobra.Command{
 			return logger.LogErrAndWrap(log, "inspect vault-init: load init result", err)
 		}
 
-		fmt.Println("\n🔑 Vault Initialization Result")
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		fmt.Printf("Root Token:  %s\n", initResult.RootToken)
-		fmt.Println("")
+		log.Info("Vault Initialization Result Retrieved")
+		log.Info("Root Token", zap.String("root_token", crypto.Redact(initResult.RootToken)))
+
 		for i, key := range initResult.KeysB64 {
-			fmt.Printf("Unseal Key %d: %s\n", i+1, key)
+			log.Info("Unseal Key", zap.Int("key_number", i+1), zap.String("key_value", crypto.Redact(key)))
 		}
-		fmt.Println("\n⚡ Please back up these credentials securely.")
-		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.")
+
+		log.Warn("⚡ Please back up your Vault credentials securely")
+		log.Info("👉 Next step: run 'eos enable vault' to unseal")
 
 		return nil
 	}),
 }
 
+// InspectVaultCmd lists secrets stored in Vault
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("inspect").With(zap.String("component", "vault"))
+		log := ctx.Log.Named("inspect-vault")
 
-		log.Info("Listing secrets in Vault", zap.String("action", "list"), zap.String("path", "secret/eos"))
-
+		log.Info("Listing secrets under secret/eos")
 		entries, err := vault.ListUnder(shared.EosIdentity, log)
 		if err != nil {
-			log.Error("Vault list failed", zap.String("action", "list"), zap.Error(err))
+			log.Error("Failed to list Vault secrets", zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
 		}
 
 		for _, entry := range entries {
-			fullPath := "secret/eos/" + strings.TrimSuffix(entry, "/")
-			log.Info("Found Vault entry", zap.String("path", fullPath))
-			fmt.Printf(" - %s\n", fullPath)
+			log.Info("Found Vault entry", zap.String("entry", "secret/eos/"+strings.TrimSuffix(entry, "/")))
 		}
 
-		fmt.Printf("\n✅ %d entries found.\n", len(entries))
+		log.Info("Vault entries inspection complete", zap.Int("count", len(entries)))
 		return nil
 	}),
 }
 
+// InspectVaultAgentCmd checks Vault Agent service and token
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
-	Short: "Check status of the Vault Agent running as eos",
-	Long: `Checks whether the Vault Agent systemd service is running,
-validates the token at /run/eos/.vault-token, and attempts a test query.`,
+	Short: "Check Vault Agent status and basic functionality",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("vault-agent").With(zap.String("component", "vault-agent"))
+		log := ctx.Log.Named("inspect-vault-agent")
 
-		fmt.Println("🔍 Checking Vault Agent (eos) service status...")
-		log.Info("Checking systemd service", zap.String("action", "check-systemd"))
-
-		status := exec.Command("systemctl", "is-active", "--quiet", "vault-agent-eos.service")
-		if err := status.Run(); err != nil {
-			fmt.Println("❌ Vault Agent service is NOT running.")
-			log.Warn("Vault Agent service inactive", zap.String("status", "inactive"))
-		} else {
-			fmt.Println("✅ Vault Agent service is active.")
-			log.Info("Vault Agent service is running", zap.String("status", "active"))
+		if err := checkVaultAgentService(log); err != nil {
+			return err
+		}
+		if err := checkVaultTokenFile(log); err != nil {
+			return err
+		}
+		if err := runVaultTestQuery(log); err != nil {
+			return err
 		}
 
-		tokenPath := "/run/eos/.vault-token"
-		log.Info("Checking for Vault token file", zap.String("action", "check-token"), zap.String("path", tokenPath))
-
-		if _, err := os.Stat(tokenPath); os.IsNotExist(err) {
-			fmt.Println("❌ Vault token file not found:", tokenPath)
-			log.Error("Vault token missing", zap.String("status", "missing"))
-			return nil
-		}
-		fmt.Println("✅ Vault token file exists at", tokenPath)
-		log.Info("Vault token found", zap.String("status", "exists"))
-
-		fmt.Println("📦 Running vault kv get secret/hello as eos...")
-		log.Info("Attempting test query", zap.String("action", "query"))
-
-		cmdTest := exec.Command("sudo", "-u", shared.EosIdentity, "vault", "kv", "get", "-format=json", "secret/hello")
-		cmdTest.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+tokenPath)
-		out, err := cmdTest.CombinedOutput()
-		if err != nil {
-			fmt.Println("❌ Vault test query failed:", err)
-			fmt.Println(string(out))
-			log.Error("Vault test query failed", zap.String("output", string(out)), zap.Error(err))
-		} else {
-			fmt.Println("✅ Vault responded successfully:")
-			fmt.Println(string(out))
-			log.Info("Vault test query succeeded", zap.String("status", "success"))
-		}
-
+		log.Info("Vault Agent inspection complete and healthy")
 		return nil
 	}),
 }
 
+// InspectVaultLDAPCmd views LDAP config stored in Vault
 var InspectVaultLDAPCmd = &cobra.Command{
 	Use:   "ldap",
 	Short: "View stored LDAP config in Vault",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		log := zap.L().Named("inspect-vault-ldap")
 		cfg := &ldap.LDAPConfig{}
+
 		err := vault.ReadFromVaultAt(context.Background(), shared.LDAPVaultMount, shared.LDAPVaultPath, cfg, log)
 		if err != nil {
+			log.Error("Failed to load LDAP config from Vault", zap.Error(err))
 			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
 		}
-		fmt.Println("✅ LDAP config from Vault:")
-		fmt.Printf("  FQDN:         %s\n", cfg.FQDN)
-		fmt.Printf("  BindDN:       %s\n", cfg.BindDN)
-		fmt.Printf("  UserBase:     %s\n", cfg.UserBase)
-		fmt.Printf("  RoleBase:     %s\n", cfg.RoleBase)
-		fmt.Printf("  AdminRole:    %s\n", cfg.AdminRole)
-		fmt.Printf("  ReadonlyRole: %s\n", cfg.ReadonlyRole)
-		fmt.Printf("  Password:     %s\n", crypto.Redact(cfg.Password))
+
+		log.Info("LDAP Config Retrieved",
+			zap.String("fqdn", cfg.FQDN),
+			zap.String("bind_dn", cfg.BindDN),
+			zap.String("user_base", cfg.UserBase),
+			zap.String("role_base", cfg.RoleBase),
+			zap.String("admin_role", cfg.AdminRole),
+			zap.String("readonly_role", cfg.ReadonlyRole),
+			zap.String("password", crypto.Redact(cfg.Password)),
+		)
 		return nil
 	},
 }
 
+func checkVaultAgentService(log *zap.Logger) error {
+	log.Info("Checking Vault Agent systemd service", zap.String("service", shared.VaultAgentService))
+
+	cmd := exec.Command("systemctl", "is-active", "--quiet", shared.VaultAgentService)
+	if err := cmd.Run(); err != nil {
+		log.Error("Vault Agent service inactive", zap.Error(err))
+		return fmt.Errorf("vault agent service is not running")
+	}
+
+	log.Info("Vault Agent service is active")
+	return nil
+}
+
+func checkVaultTokenFile(log *zap.Logger) error {
+	log.Info("Checking Vault Agent token file", zap.String("path", shared.VaultAgentTokenPath))
+
+	if _, err := os.Stat(shared.VaultAgentTokenPath); os.IsNotExist(err) {
+		log.Error("Vault token file missing", zap.String("path", shared.VaultAgentTokenPath))
+		return fmt.Errorf("vault token file not found at %s", shared.VaultAgentTokenPath)
+	}
+
+	log.Info("Vault token file exists", zap.String("path", shared.VaultAgentTokenPath))
+	return nil
+}
+
+func runVaultTestQuery(log *zap.Logger) error {
+	log.Info("Running test query using Vault Agent token", zap.String("path", shared.TestKVPath))
+
+	cmd := exec.Command("sudo", "-u", shared.EosIdentity, "vault", "kv", "get", "-format=json", shared.TestKVPath)
+	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Error("Vault test query failed", zap.ByteString("output", output), zap.Error(err))
+		return fmt.Errorf("vault test query failed: %w", err)
+	}
+
+	log.Info("Vault test query succeeded", zap.ByteString("response", output))
+	return nil
+}
+
 func init() {
-	InspectVaultCmd.AddCommand(InspectVaultAgentCmd) // nested command
-	InspectCmd.AddCommand(InspectVaultCmd)           // top-level command
+	InspectVaultCmd.AddCommand(InspectVaultAgentCmd)
 	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
+	InspectCmd.AddCommand(InspectVaultCmd)
 	InspectCmd.AddCommand(InspectVaultInitCmd)
 }
