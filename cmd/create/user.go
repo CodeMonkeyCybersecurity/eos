@@ -38,7 +38,7 @@ generates SSH keys, and sets a secure password.`,
 
 func init() {
 	CreateCmd.AddCommand(CreateUserCmd)
-	CreateUserCmd.Flags().StringVar(&username, "username", shared.EosIdentity, "Username for the new account")
+	CreateUserCmd.Flags().StringVar(&username, "username", shared.EosID, "Username for the new account")
 	CreateUserCmd.Flags().BoolVar(&auto, "auto", false, "Enable non-interactive auto mode with secure random password")
 	CreateUserCmd.Flags().BoolVar(&loginShell, "login", false, "Allow login shell for this user (default is no shell)")
 }

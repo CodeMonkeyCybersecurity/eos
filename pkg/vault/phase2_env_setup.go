@@ -1,4 +1,4 @@
-// pkg/vault/vault_lifecycle.go
+// pkg/vault/phase2_env_setup.go
 
 package vault
 

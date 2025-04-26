@@ -16,7 +16,7 @@ func PlatformLogPaths() []string {
 	switch runtime.GOOS {
 	case "darwin":
 		return []string{
-			xdg.XDGStatePath(shared.EosIdentity, "eos.log"),
+			xdg.XDGStatePath(shared.EosID, "eos.log"),
 			"/tmp/eos/eos.log",
 			"./eos.log",
 		}
@@ -24,14 +24,14 @@ func PlatformLogPaths() []string {
 		return []string{
 			"/var/log/eos/eos.log",
 			"/run/eos/eos.log",
-			xdg.XDGStatePath(shared.EosIdentity, "eos.log"),
+			xdg.XDGStatePath(shared.EosID, "eos.log"),
 			"/tmp/eos/eos.log",
 			"./eos.log",
 		}
 	case "windows":
 		return []string{
-			filepath.Join(os.Getenv("ProgramData"), shared.EosIdentity, "eos.log"),
-			filepath.Join(os.Getenv("LOCALAPPDATA"), shared.EosIdentity, "eos.log"),
+			filepath.Join(os.Getenv("ProgramData"), shared.EosID, "eos.log"),
+			filepath.Join(os.Getenv("LOCALAPPDATA"), shared.EosID, "eos.log"),
 			".\\eos.log",
 		}
 	default:

@@ -106,17 +106,17 @@ func UpdateVault(path string, update map[string]interface{}, log *zap.Logger) er
 func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]string, log *zap.Logger) error {
 	log.Info("🚀 Starting Vault deployment")
 
-	if err := execute.ExecuteAndLog(shared.EosIdentity, "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
+	if err := execute.ExecuteAndLog(shared.EosID, "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
 		log.Error("Vault deploy failed", zap.Error(err))
 		return fmt.Errorf("vault deploy failed: %w", err)
 	}
 
-	if err := execute.ExecuteAndLog(shared.EosIdentity, "enable", "vault"); err != nil {
+	if err := execute.ExecuteAndLog(shared.EosID, "enable", "vault"); err != nil {
 		log.Warn("Vault enable failed — manual unseal may be required", zap.Error(err))
 		return fmt.Errorf("vault enable failed: %w", err)
 	}
 
-	if err := execute.ExecuteAndLog(shared.EosIdentity, "secure", "vault"); err != nil {
+	if err := execute.ExecuteAndLog(shared.EosID, "secure", "vault"); err != nil {
 		log.Error("Vault secure failed", zap.Error(err))
 		return fmt.Errorf("vault secure failed: %w", err)
 	}

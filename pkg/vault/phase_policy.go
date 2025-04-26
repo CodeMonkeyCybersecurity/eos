@@ -372,7 +372,7 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, e
 
 /**/
 func TestSudoAccess(log *zap.Logger) error {
-	cmd := exec.Command("sudo", "-u", shared.EosIdentity, "cat", shared.VaultAgentTokenPath)
+	cmd := exec.Command("sudo", "-u", shared.EosID, "cat", shared.VaultAgentTokenPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))

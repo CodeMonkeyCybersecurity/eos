@@ -49,7 +49,7 @@ func readTokenFromSink(path string) (string, error) {
 	if path == "" {
 		path = shared.VaultAgentTokenPath
 	}
-	out, err := exec.Command("sudo", "-u", shared.EosIdentity, "cat", path).Output()
+	out, err := exec.Command("sudo", "-u", shared.EosID, "cat", path).Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}

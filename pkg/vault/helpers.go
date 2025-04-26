@@ -50,7 +50,7 @@ func GetVaultPurgePaths() []string {
 // DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
 func DefaultAppRoleOptions() shared.AppRoleOptions {
 	return shared.AppRoleOptions{
-		RoleName:      shared.EosIdentity,
+		RoleName:      shared.EosID,
 		Policies:      []string{shared.EosVaultPolicy},
 		TokenTTL:      "1h",
 		TokenMaxTTL:   "4h",

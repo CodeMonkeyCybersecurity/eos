@@ -65,7 +65,7 @@ func WriteToVaultAt(mount, path string, v interface{}, log *zap.Logger) error {
 
 // WriteFallbackSecrets securely stores secrets as JSON in the XDG config directory for later retrieval.
 func WriteFallbackSecrets(name string, secrets map[string]string, log *zap.Logger) error {
-	path := xdg.XDGConfigPath(shared.EosIdentity, filepath.Join(name, "config.json"))
+	path := xdg.XDGConfigPath(shared.EosID, filepath.Join(name, "config.json"))
 	log.Debug("Writing fallback secrets", zap.String("path", path))
 
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {

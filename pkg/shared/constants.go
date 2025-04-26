@@ -33,14 +33,14 @@ const (
 )
 
 const (
-	EosIdentity      = "eos"
-	EosUser          = EosIdentity
-	EosGroup         = EosIdentity
-	VaultAgentUser   = EosIdentity
-	VaultAgentGroup  = EosIdentity
-	DefaultConfigDir = EosIdentity
-	EosVaultUsername = EosIdentity
-	DefaultNamespace = EosIdentity
+	EosID      = "eos"
+	EosUser          = EosID
+	EosGroup         = EosID
+	VaultAgentUser   = EosID
+	VaultAgentGroup  = EosID
+	DefaultConfigDir = EosID
+	EosVaultUsername = EosID
+	DefaultNamespace = EosID
 )
 
 const (

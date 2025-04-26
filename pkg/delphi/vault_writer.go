@@ -18,7 +18,7 @@ func WriteConfig(cfg *Config, log *zap.Logger) error {
 	}
 
 	// Always write to disk
-	diskPath := xdg.XDGConfigPath(shared.EosIdentity, "delphi.json")
+	diskPath := xdg.XDGConfigPath(shared.EosID, "delphi.json")
 	if err := xdg.EnsureDir(diskPath); err != nil {
 		log.Warn("❌ Failed to ensure disk config directory", zap.Error(err))
 		return fmt.Errorf("unable to create config path: %w", err)

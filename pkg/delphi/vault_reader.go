@@ -86,7 +86,7 @@ func ReadConfig(log *zap.Logger) (*Config, error) {
 	log.Warn("⚠️  Delphi config not found or incomplete in Vault. Trying disk fallback...")
 
 	// Try disk fallback
-	diskPath := xdg.XDGConfigPath(shared.EosIdentity, "delphi.json")
+	diskPath := xdg.XDGConfigPath(shared.EosID, "delphi.json")
 	data, err := os.ReadFile(diskPath)
 	if err == nil {
 		if err := json.Unmarshal(data, &cfg); err == nil && cfg.FQDN != "" {

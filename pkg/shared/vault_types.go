@@ -21,18 +21,6 @@ type CheckReport struct {
 	SecretsVerified bool     // Unseal keys + root token matched trusted reference
 }
 
-type UserpassCreds struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-// UserSecret holds login and SSH key material for a system user.
-type UserSecret struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-	SSHKey   string `json:"ssh_private_key,omitempty"`
-}
-
 // AppRoleOptions defines how EOS provisions or refreshes a Vault AppRole.
 type AppRoleOptions struct {
 	RoleName      string   `json:"role_name,omitempty"`

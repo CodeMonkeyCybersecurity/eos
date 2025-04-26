@@ -4,8 +4,6 @@ package inspect
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
@@ -13,38 +11,68 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-// InspectVaultInitCmd displays Vault initialization keys and root token
+// InspectVaultInitCmd displays Vault initialization keys, root token, and eos user credentials.
 var InspectVaultInitCmd = &cobra.Command{
 	Use:   "vault-init",
-	Short: "Inspect Vault initialization keys and root token",
+	Short: "Inspect Vault initialization keys, root token, and eos credentials",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-init")
 
+		// Load Vault Init Result
 		initResult, err := vault.LoadVaultInitResult(log)
 		if err != nil {
 			return logger.LogErrAndWrap(log, "inspect vault-init: load init result", err)
 		}
 
-		log.Info("Vault Initialization Result Retrieved")
-		log.Info("Root Token", zap.String("root_token", crypto.Redact(initResult.RootToken)))
-
-		fmt.Println("\n🔑 Vault Initialization Result")
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		fmt.Printf("Root Token:  %s\n", initResult.RootToken)                                        // <-- real value printed to user
-		log.Info("Root Token loaded", zap.String("root_token", crypto.Redact(initResult.RootToken))) // <-- redacted for logs
-
-		for i, key := range initResult.KeysB64 {
-			fmt.Printf("Unseal Key %d: %s\n", i+1, key)               // <-- real key printed to user
-			log.Info("Unseal Key loaded", zap.Int("key_number", i+1)) // don't log key_value at all
+		// Load eos password credentials
+		eosCreds, err := system.LoadPasswordFromSecrets(log)
+		if err != nil {
+			log.Warn("⚠️ Could not load eos password file", zap.Error(err))
 		}
 
+		// ---------------------------------------
+		// Print Vault Initialization Data
+		// ---------------------------------------
+		fmt.Println("\n🔑 Vault Initialization Result")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		fmt.Printf("Root Token:  %s\n", initResult.RootToken)
+		for i, key := range initResult.KeysB64 {
+			fmt.Printf("Unseal Key %d: %s\n", i+1, key)
+		}
+
+		// ---------------------------------------
+		// Print EOS Credentials
+		// ---------------------------------------
+		if eosCreds != nil {
+			fmt.Println("\n👤 EOS User Credentials")
+			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+			fmt.Printf("Username: %s\n", eosCreds.Username)
+			fmt.Printf("Password: %s\n", eosCreds.Password)
+		} else {
+			fmt.Println("\n⚠️  EOS credentials not found. (expected in secrets dir)")
+		}
+
+		// ---------------------------------------
+		// Reminders
+		// ---------------------------------------
 		fmt.Println("\n⚡ Please back up these credentials securely.")
 		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.")
+
+		// Structured logs
+		log.Info("Vault Initialization Result Retrieved")
+		log.Info("Root Token", zap.String("root_token", crypto.Redact(initResult.RootToken)))
+		for i := range initResult.KeysB64 {
+			log.Info("Unseal Key loaded", zap.Int("key_number", i+1))
+		}
+		if eosCreds != nil {
+			log.Info("EOS credentials loaded", zap.String("username", eosCreds.Username))
+		}
 
 		log.Warn("⚡ Please back up your Vault credentials securely")
 		log.Info("👉 Next step: run 'eos enable vault' to unseal")
@@ -61,7 +89,7 @@ var InspectVaultCmd = &cobra.Command{
 		log := ctx.Log.Named("inspect-vault")
 
 		log.Info("Listing secrets under secret/eos")
-		entries, err := vault.ListUnder(shared.EosIdentity, log)
+		entries, err := vault.ListUnder(shared.EosID, log)
 		if err != nil {
 			log.Error("Failed to list Vault secrets", zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
@@ -83,13 +111,13 @@ var InspectVaultAgentCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-agent")
 
-		if err := checkVaultAgentService(log); err != nil {
+		if err := vault.CheckVaultAgentService(log); err != nil {
 			return err
 		}
-		if err := checkVaultTokenFile(log); err != nil {
+		if err := vault.CheckVaultTokenFile(log); err != nil {
 			return err
 		}
-		if err := runVaultTestQuery(log); err != nil {
+		if err := vault.RunVaultTestQuery(log); err != nil {
 			return err
 		}
 
@@ -123,47 +151,6 @@ var InspectVaultLDAPCmd = &cobra.Command{
 		)
 		return nil
 	},
-}
-
-func checkVaultAgentService(log *zap.Logger) error {
-	log.Info("Checking Vault Agent systemd service", zap.String("service", shared.VaultAgentService))
-
-	cmd := exec.Command("systemctl", "is-active", "--quiet", shared.VaultAgentService)
-	if err := cmd.Run(); err != nil {
-		log.Error("Vault Agent service inactive", zap.Error(err))
-		return fmt.Errorf("vault agent service is not running")
-	}
-
-	log.Info("Vault Agent service is active")
-	return nil
-}
-
-func checkVaultTokenFile(log *zap.Logger) error {
-	log.Info("Checking Vault Agent token file", zap.String("path", shared.VaultAgentTokenPath))
-
-	if _, err := os.Stat(shared.VaultAgentTokenPath); os.IsNotExist(err) {
-		log.Error("Vault token file missing", zap.String("path", shared.VaultAgentTokenPath))
-		return fmt.Errorf("vault token file not found at %s", shared.VaultAgentTokenPath)
-	}
-
-	log.Info("Vault token file exists", zap.String("path", shared.VaultAgentTokenPath))
-	return nil
-}
-
-func runVaultTestQuery(log *zap.Logger) error {
-	log.Info("Running test query using Vault Agent token", zap.String("path", shared.TestKVPath))
-
-	cmd := exec.Command("sudo", "-u", shared.EosIdentity, "vault", "kv", "get", "-format=json", shared.TestKVPath)
-	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log.Error("Vault test query failed", zap.ByteString("output", output), zap.Error(err))
-		return fmt.Errorf("vault test query failed: %w", err)
-	}
-
-	log.Info("Vault test query succeeded", zap.ByteString("response", output))
-	return nil
 }
 
 func init() {

@@ -1,20 +1,18 @@
-/* pkg/system/user.go */
-
 package system
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 
-	"os/user"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
@@ -26,15 +24,13 @@ func SetPassword(username, password string) error {
 	return cmd.Run()
 }
 
-/**/
-// system.EnsureEosUser
+// EnsureEosUser creates or validates the eos system user.
 func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
-	const defaultUsername = "eos"
-	username := defaultUsername
+	username := shared.EosID
 
 	// Check if user already exists
 	if UserExists(username) {
-		log.Info("✅ eos user exists")
+		log.Info("✅ eos user exists", zap.String("user", username))
 
 		_, err := user.Lookup(username)
 		if err != nil {
@@ -57,12 +53,7 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 
 	// Interactive username override (optional)
 	if !auto {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Enter username (default: eos): ")
-		input, _ := reader.ReadString('\n')
-		if trimmed := strings.TrimSpace(input); trimmed != "" {
-			username = trimmed
-		}
+		username = promptUsername()
 	}
 
 	// Determine login shell
@@ -75,94 +66,36 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Set password
-	var password string
-	if auto {
-		pw, err := crypto.GeneratePassword(20)
-		if err != nil {
-			return err
-		}
-		password = pw
-	} else {
-		reader := bufio.NewReader(os.Stdin)
-		for {
-			fmt.Print("Enter password: ")
-			pw1, _ := reader.ReadString('\n')
-			pw1 = strings.TrimSpace(pw1)
-
-			if err := crypto.ValidateStrongPassword(pw1, log); err != nil {
-				fmt.Println("❌", err.Error())
-				continue
-			}
-
-			fmt.Print("Confirm password: ")
-			pw2, _ := reader.ReadString('\n')
-			pw2 = strings.TrimSpace(pw2)
-
-			if pw1 != pw2 {
-				fmt.Println("❌ Passwords do not match. Try again.")
-				continue
-			}
-			password = pw1
-			break
-		}
+	password, err := generateOrPromptPassword(auto, log)
+	if err != nil {
+		return fmt.Errorf("password generation failed: %w", err)
 	}
 
 	if err := SetPassword(username, password); err != nil {
-		return fmt.Errorf("failed to set password for user %q: %w", username, err)
+		return fmt.Errorf("failed to set password for user '%s': %w", username, err)
 	}
 
-	// Handle sudo group
-	adminGroup := platform.GuessAdminGroup(log)
-	if !auto {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Should this user have sudo privileges? (yes/no): ")
-		input, _ := reader.ReadString('\n')
-		if strings.TrimSpace(strings.ToLower(input)) == "no" {
-			adminGroup = ""
-		}
-	}
-	if adminGroup != "" {
-		if err := execute.Execute("usermod", "-aG", adminGroup, username); err != nil {
-			return fmt.Errorf("failed to add user to group: %w", err)
-		}
+	if err := EnsureSudoersEntryForEos(log, auto); err != nil {
+		return fmt.Errorf("failed to configure sudo access: %w", err)
 	}
 
-	// Save password to secrets dir
-	secretsPath := shared.SecretsDir
-	if err := os.MkdirAll(secretsPath, 0700); err != nil {
-		fmt.Printf("⚠️ Could not create secrets directory: %v\n", err)
-	} else {
-		outFile := filepath.Join(secretsPath, "eos-password.txt")
-		f, err := os.Create(outFile)
-		if err != nil {
-			fmt.Println("⚠️ Could not save password to disk.")
-		} else {
-			defer f.Close()
-			if _, err := fmt.Fprintf(f, "eos:%s\n", password); err != nil {
-				fmt.Printf("⚠️ Failed to write password: %v\n", err)
-			} else {
-				fmt.Printf("🔐 eos password saved to: %s\n", outFile)
-				fmt.Println("💡 Please store this password in a secure password manager.")
-			}
-		}
+	if err := SavePasswordToSecrets(username, password, log); err != nil {
+		log.Warn("⚠️ Could not save password to disk", zap.Error(err))
 	}
 
-	log.Info("✅ eos user created and configured")
+	// Memory hygiene (zero password string)
+	password = ""
+
+	log.Info("✅ eos user created and configured", zap.String("username", username))
 	return nil
 }
 
-/**/
-
-/**/
-// system.UserExists
+// UserExists checks if a Linux user exists.
 func UserExists(name string) bool {
 	return exec.Command("id", name).Run() == nil
 }
 
-/**/
-
-/**/
+// GetUserShell returns the shell configured for the given user.
 func GetUserShell(username string) (string, error) {
 	cmd := exec.Command("getent", "passwd", username)
 	out, err := cmd.Output()
@@ -176,4 +109,141 @@ func GetUserShell(username string) (string, error) {
 	return strings.TrimSpace(parts[6]), nil
 }
 
-/**/
+// generateOrPromptPassword generates a password automatically or securely prompts the user.
+func generateOrPromptPassword(auto bool, log *zap.Logger) (string, error) {
+	if auto {
+		return crypto.GeneratePassword(20)
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print(shared.PromptEnterPassword)
+		pw1, err := crypto.ReadPassword(reader)
+		if err != nil {
+			return "", fmt.Errorf("failed to read password: %w", err)
+		}
+
+		if err := crypto.ValidateStrongPassword(pw1, log); err != nil {
+			log.Warn("❌ Password too weak", zap.Error(err))
+			continue
+		}
+
+		fmt.Print(shared.PromptConfirmPassword)
+		pw2, err := crypto.ReadPassword(reader)
+		if err != nil {
+			return "", fmt.Errorf("failed to read confirmation password: %w", err)
+		}
+
+		if pw1 != pw2 {
+			log.Warn("❌ Passwords do not match")
+			continue
+		}
+
+		return pw1, nil
+	}
+}
+
+// EnsureSudoersEntryForEos ensures a sudoers entry exists for the eos user.
+func EnsureSudoersEntryForEos(log *zap.Logger, auto bool) error {
+	const path = shared.SudoersEosPath
+	const entry = shared.SudoersEosEntry
+
+	log.Info("🔍 Checking for existing sudoers entry", zap.String("path", path))
+	if _, err := os.Stat(path); err == nil {
+		log.Info("✅ Sudoers file for eos already exists", zap.String("path", path))
+		return nil
+	}
+
+	if !auto {
+		reader := bufio.NewReader(os.Stdin)
+		resp, err := interaction.ReadLine(reader, "Create sudoers entry for eos? (y/N)", log)
+		if err != nil {
+			log.Warn("❌ Failed to read sudoers prompt", zap.Error(err))
+			return err
+		}
+		if strings.ToLower(resp) != "y" {
+			log.Warn("⚠️ User declined to write sudoers file")
+			return nil
+		}
+	}
+
+	log.Info("✍️  Writing sudoers entry", zap.String("path", path))
+	if err := os.WriteFile(path, []byte(entry+"\n"), 0440); err != nil {
+		return fmt.Errorf("write sudoers entry: %w", err)
+	}
+
+	log.Info("✅ Sudoers entry written successfully", zap.String("path", path))
+
+	log.Info("🧪 Validating sudoers file with visudo -c")
+	if err := exec.Command("visudo", "-c").Run(); err != nil {
+		log.Warn("❌ Sudoers file validation failed", zap.Error(err))
+		return fmt.Errorf("sudoers validation failed")
+	}
+
+	log.Info("✅ Sudoers file is valid")
+	return nil
+}
+
+// promptUsername safely prompts the user to enter a username, defaulting to eos.
+func promptUsername() string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print(shared.PromptUsernameInput)
+	input, _ := reader.ReadString('\n')
+	if trimmed := strings.TrimSpace(input); trimmed != "" {
+		return trimmed
+	}
+	return shared.EosID
+}
+
+// LoadPasswordFromSecrets loads the eos user credentials from JSON using shared.UserpassCreds.
+// LoadPasswordFromSecrets loads the eos user credentials from eos-passwd.json.
+func LoadPasswordFromSecrets(log *zap.Logger) (*shared.UserpassCreds, error) {
+	secretsPath := filepath.Join(shared.SecretsDir, shared.SecretsFilename)
+
+	data, err := os.ReadFile(secretsPath)
+	if err != nil {
+		log.Warn("❌ Failed to read eos password file", zap.String("path", secretsPath), zap.Error(err))
+		return nil, fmt.Errorf("read secrets file: %w", err)
+	}
+
+	var creds shared.UserpassCreds
+	if err := json.Unmarshal(data, &creds); err != nil {
+		log.Warn("❌ Failed to parse eos password JSON", zap.String("path", secretsPath), zap.Error(err))
+		return nil, fmt.Errorf("unmarshal secrets: %w", err)
+	}
+
+	if creds.Username == "" || creds.Password == "" {
+		log.Warn("❌ Loaded eos credentials are incomplete", zap.Any("creds", creds))
+		return nil, fmt.Errorf("incomplete credentials loaded from %s", secretsPath)
+	}
+
+	log.Info("✅ Loaded eos credentials successfully", zap.String("username", creds.Username))
+	return &creds, nil
+}
+
+// SavePasswordToSecrets saves the eos user credentials as JSON using shared.UserpassCreds.
+func SavePasswordToSecrets(username, password string, log *zap.Logger) error {
+	secretsPath := filepath.Join(shared.SecretsDir, shared.SecretsFilename)
+
+	creds := shared.UserpassCreds{
+		Username: username,
+		Password: password,
+	}
+
+	data, err := json.MarshalIndent(creds, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal credentials: %w", err)
+	}
+
+	if err := os.MkdirAll(shared.SecretsDir, 0700); err != nil {
+		return fmt.Errorf("could not create secrets directory: %w", err)
+	}
+
+	if err := os.WriteFile(secretsPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write credentials to file: %w", err)
+	}
+
+	log.Info("🔐 eos credentials saved", zap.String("path", secretsPath))
+	return nil
+}

@@ -245,3 +245,44 @@ func ListVault(path string, log *zap.Logger) ([]string, error) {
 	}
 	return keys, nil
 }
+
+func CheckVaultAgentService(log *zap.Logger) error {
+	log.Info("Checking Vault Agent systemd service", zap.String("service", shared.VaultAgentService))
+
+	cmd := exec.Command("systemctl", "is-active", "--quiet", shared.VaultAgentService)
+	if err := cmd.Run(); err != nil {
+		log.Error("Vault Agent service inactive", zap.Error(err))
+		return fmt.Errorf("vault agent service is not running")
+	}
+
+	log.Info("Vault Agent service is active")
+	return nil
+}
+
+func CheckVaultTokenFile(log *zap.Logger) error {
+	log.Info("Checking Vault Agent token file", zap.String("path", shared.VaultAgentTokenPath))
+
+	if _, err := os.Stat(shared.VaultAgentTokenPath); os.IsNotExist(err) {
+		log.Error("Vault token file missing", zap.String("path", shared.VaultAgentTokenPath))
+		return fmt.Errorf("vault token file not found at %s", shared.VaultAgentTokenPath)
+	}
+
+	log.Info("Vault token file exists", zap.String("path", shared.VaultAgentTokenPath))
+	return nil
+}
+
+func RunVaultTestQuery(log *zap.Logger) error {
+	log.Info("Running test query using Vault Agent token", zap.String("path", shared.TestKVPath))
+
+	cmd := exec.Command("sudo", "-u", shared.EosID, "vault", "kv", "get", "-format=json", shared.TestKVPath)
+	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Error("Vault test query failed", zap.ByteString("output", output), zap.Error(err))
+		return fmt.Errorf("vault test query failed: %w", err)
+	}
+
+	log.Info("Vault test query succeeded", zap.ByteString("response", output))
+	return nil
+}

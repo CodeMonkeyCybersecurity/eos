@@ -16,7 +16,7 @@ var DefaultPorts = []string{
 }
 
 var (
-	DelphiConfigPath = xdg.XDGConfigPath(shared.EosIdentity, "delphi.json")
+	DelphiConfigPath = xdg.XDGConfigPath(shared.EosID, "delphi.json")
 	ShowSecrets      bool // toggle to display password in ConfirmDelphiConfig
 )
 
