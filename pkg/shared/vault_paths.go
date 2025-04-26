@@ -20,7 +20,7 @@ const (
 	TLSCrt = TLSDir + "tls.crt"
 
 	// Storage
-	VaultDir             = "/opt/vault"
+	VaultDir             = "/opt/vault/"
 	VaultDataPath        = VaultDir + "data"
 	VaultConfigDirDebian = "/etc/vault.d"
 	VaultConfigPath      = "/etc/vault.d/vault.hcl"
