@@ -205,3 +205,16 @@ func CopyDir(src, dst string, log *zap.Logger) error {
 
 	return nil
 }
+
+func ChownRecursive(path string, uid, gid int, log *zap.Logger) error {
+	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Warn("⚠️ Walk error during chown", zap.String("path", p), zap.Error(err))
+			return err
+		}
+		if err := os.Chown(p, uid, gid); err != nil {
+			log.Warn("⚠️ Failed to chown", zap.String("path", p), zap.Error(err))
+		}
+		return nil
+	})
+}

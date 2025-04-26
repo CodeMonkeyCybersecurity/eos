@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -31,6 +30,11 @@ import (
 //  3. Else fall back to the hostname form so callers have *something*
 
 // EnsureVaultEnv sets VAULT_ADDR and VAULT_CACERT if missing, using available network probes and fallbacks.
+
+//--------------------------------------------------------------------
+// Phase 2: Ensure Vault Environment and Directories
+//--------------------------------------------------------------------
+
 func EnsureVaultEnv(log *zap.Logger) (string, error) {
 	const testTimeout = 500 * time.Millisecond
 
@@ -47,33 +51,23 @@ func EnsureVaultEnv(log *zap.Logger) (string, error) {
 
 	for _, addr := range candidates {
 		if canConnectTLS(addr, testTimeout, log) {
-			if err := os.Setenv(shared.VaultAddrEnv, addr); err != nil {
-				log.Warn("Failed to set VAULT_ADDR", zap.Error(err))
-			}
-			log.Info("🔐 VAULT_ADDR auto‑detected", zap.String(shared.VaultAddrEnv, addr))
+			_ = os.Setenv(shared.VaultAddrEnv, addr)
+			log.Info("🔐 VAULT_ADDR auto-detected", zap.String(shared.VaultAddrEnv, addr))
 			return addr, nil
 		}
 	}
 
-	// No live listener found
-	log.Warn("⚠️ No Vault listener detected on standard ports — falling back to internal hostname")
+	log.Warn("⚠️ No Vault listener detected — falling back to internal hostname")
 
+	_ = os.Setenv(shared.VaultAddrEnv, candidates[1])
 	if os.Getenv(shared.VaultCA) == "" {
-		if err := os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath); err != nil {
-			log.Warn("Failed to set VAULT_CACERT", zap.Error(err))
-		} else {
-			log.Debug("🔧 Auto‑setting VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
-		}
+		_ = os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath)
+		log.Debug("🔧 Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
 	}
 
-	fallback := candidates[1]
-	if err := os.Setenv(shared.VaultAddrEnv, fallback); err != nil {
-		log.Warn("Failed to set fallback VAULT_ADDR", zap.Error(err))
-	}
-	return fallback, nil
+	return candidates[1], nil
 }
 
-// canConnectTLS tries to open a probe TLS socket to verify Vault is reachable.
 func canConnectTLS(raw string, d time.Duration, log *zap.Logger) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -91,63 +85,56 @@ func canConnectTLS(raw string, d time.Duration, log *zap.Logger) bool {
 }
 
 func EnsureVaultDirs(log *zap.Logger) error {
-	// Directories to create + who should own them
-	dirs := []struct {
-		path  string
-		owner string // system.LookupUser key
-		perm  os.FileMode
-	}{
-		{shared.SecretsDir, shared.EosUser, shared.FilePermOwnerRWX},                         // /var/lib/eos/secrets
-		{shared.EosRunDir, shared.EosUser, shared.FilePermOwnerRWX},                          // /run/eos
-		{shared.TLSDir, shared.EosUser, shared.FilePermOwnerRWX},                             // where tls.key/.crt live
-		{filepath.Dir(shared.VaultAgentCACopyPath), shared.EosUser, shared.FilePermOwnerRWX}, // parent of agent CA copy
+	log.Info("🔧 Ensuring Vault directories and ownerships")
+
+	if err := ensureBaseDirs(log); err != nil {
+		return err
+	}
+	if err := fixVaultTLSFiles(log); err != nil {
+		return err
+	}
+	if err := fixVaultDataOwnership(log); err != nil {
+		return err
 	}
 
-	// Resolve UIDs/GIDs
+	return nil
+}
+
+// ensureBaseDirs creates core directories needed by eos and vault.
+func ensureBaseDirs(log *zap.Logger) error {
 	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("⚠️ Could not resolve eos UID/GID, falling back to 1001:1001", zap.Error(err))
+		log.Warn("Could not resolve eos UID/GID, using fallback", zap.Error(err))
 		eosUID, eosGID = 1001, 1001
 	}
-	vaultUID, vaultGID, err := system.LookupUser("vault")
+
+	dirs := []string{
+		shared.SecretsDir,
+		shared.EosRunDir,
+		shared.TLSDir,
+		filepath.Dir(shared.VaultAgentCACopyPath),
+	}
+
+	for _, path := range dirs {
+		log.Debug("🔧 Creating directory", zap.String("path", path))
+		if err := os.MkdirAll(path, shared.FilePermOwnerRWX); err != nil {
+			return fmt.Errorf("mkdir %s: %w", path, err)
+		}
+		if err := os.Chown(path, eosUID, eosGID); err != nil {
+			log.Warn("⚠️ Failed to chown directory", zap.String("path", path), zap.Error(err))
+		}
+	}
+	return nil
+}
+
+// fixVaultTLSFiles ensures correct permissions on TLS key/cert files.
+func fixVaultTLSFiles(log *zap.Logger) error {
+	vaultUID, vaultGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("⚠️ Could not resolve vault UID/GID, vault‑owned files may be wrong", zap.Error(err))
-		vaultUID, vaultGID = 0, 0
+		log.Warn("Could not resolve eos UID/GID for TLS files", zap.Error(err))
+		vaultUID, vaultGID = 1001, 1001
 	}
 
-	// 1) Create & fix ownership/perms on each directory
-	for _, d := range dirs {
-		log.Debug("🔧 Ensuring directory exists", zap.String("path", d.path))
-		if err := os.MkdirAll(d.path, d.perm); err != nil {
-			log.Error("❌ Failed to create directory", zap.String("path", d.path), zap.Error(err))
-			return fmt.Errorf("mkdir %s: %w", d.path, err)
-		}
-		log.Info("✅ Directory created/exists", zap.String("path", d.path), zap.String("perm", fmt.Sprintf("%#o", d.perm)))
-
-		info, err := os.Stat(d.path)
-		if err != nil {
-			log.Warn("⚠️ Could not stat directory after creation", zap.String("path", d.path), zap.Error(err))
-			continue
-		}
-		st := info.Sys().(*syscall.Stat_t)
-
-		// Decide which owner to apply
-		var uid, gid int
-		if d.owner == shared.EosUser {
-			uid, gid = eosUID, eosGID
-		} else {
-			uid, gid = vaultUID, vaultGID
-		}
-		if int(st.Uid) != uid || int(st.Gid) != gid {
-			if err := os.Chown(d.path, uid, gid); err != nil {
-				log.Warn("⚠️ Could not chown directory", zap.String("path", d.path), zap.Int("uid", uid), zap.Int("gid", gid), zap.Error(err))
-			} else {
-				log.Info("🔐 Set directory ownership", zap.String("path", d.path), zap.Int("uid", uid), zap.Int("gid", gid))
-			}
-		}
-	}
-
-	// 2) Secure TLS files (key, cert) under TLSDir as vault:vault
 	tlsFiles := []struct {
 		path string
 		perm os.FileMode
@@ -155,47 +142,46 @@ func EnsureVaultDirs(log *zap.Logger) error {
 		{shared.TLSKey, shared.FilePermOwnerReadWrite},
 		{shared.TLSCrt, shared.FilePermStandard},
 	}
+
 	for _, tf := range tlsFiles {
 		log.Debug("🔧 Securing TLS file", zap.String("path", tf.path))
-		if err := os.Chown(tf.path, eosUID, eosGID); err != nil {
-			log.Warn("⚠️ Chown TLS file failed", zap.String("path", tf.path), zap.Error(err))
-		} else {
-			log.Info("✅ TLS file ownership set", zap.String("path", tf.path), zap.Int("uid", vaultUID), zap.Int("gid", vaultGID))
+		if err := os.Chown(tf.path, vaultUID, vaultGID); err != nil {
+			log.Warn("Failed to chown TLS file", zap.String("path", tf.path), zap.Error(err))
 		}
 		if err := os.Chmod(tf.path, tf.perm); err != nil {
-			log.Warn("⚠️ Chmod TLS file failed", zap.String("path", tf.path), zap.Error(err))
-		} else {
-			log.Info("✅ TLS file permissions set", zap.String("path", tf.path), zap.String("perm", fmt.Sprintf("%#o", tf.perm)))
+			log.Warn("Failed to chmod TLS file", zap.String("path", tf.path), zap.Error(err))
 		}
-	}
-
-	// 3) Copy the public CA into eos’s trust store and secure it
-	log.Info("🔧 Copying Vault CA into eos trust store",
-		zap.String("src", shared.TLSCrt),
-		zap.String("dst", shared.VaultAgentCACopyPath),
-	)
-	if err := system.CopyFile(shared.TLSCrt, shared.VaultAgentCACopyPath, 0, log); err != nil {
-		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
-		return err
-	}
-	if err := os.Chown(shared.VaultAgentCACopyPath, eosUID, eosGID); err != nil {
-		log.Warn("⚠️ Could not chown CA cert for eos user", zap.String("path", shared.VaultAgentCACopyPath), zap.Error(err))
-	} else {
-		log.Info("✅ CA cert ownership set", zap.String("path", shared.VaultAgentCACopyPath), zap.Int("uid", eosUID), zap.Int("gid", eosGID))
 	}
 
 	return nil
 }
 
+// fixVaultDataOwnership ensures /opt/vault and /opt/vault/data are owned properly.
+func fixVaultDataOwnership(log *zap.Logger) error {
+	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	if err != nil {
+		log.Warn("Could not resolve eos UID/GID for vault data", zap.Error(err))
+		eosUID, eosGID = 1001, 1001
+	}
+
+	dataPath := filepath.Join(shared.VaultDir, "data")
+	log.Debug("🔧 Fixing vault data directory ownership", zap.String("path", dataPath))
+
+	if _, err := os.Stat(dataPath); os.IsNotExist(err) {
+		log.Warn("Vault data directory missing", zap.String("path", dataPath))
+		return nil
+	}
+
+	return system.ChownRecursive(dataPath, eosUID, eosGID, log)
+}
+
 func PrepareVaultAgentEnvironment(log *zap.Logger) error {
-	// existing: create /run/eos
 	if err := os.MkdirAll(shared.EosRunDir, shared.FilePermOwnerRWX); err != nil {
-		log.Error("Failed to create run directory", zap.String("path", shared.EosRunDir), zap.Error(err))
+		log.Error("Failed to create runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
 		return err
 	}
-	log.Info("Ensured run directory", zap.String("path", shared.EosRunDir))
+	log.Info("Ensured runtime directory", zap.String("path", shared.EosRunDir))
 
-	// NEW: create /var/lib/eos/secrets
 	if err := os.MkdirAll(shared.SecretsDir, shared.FilePermOwnerRWX); err != nil {
 		log.Error("Failed to create secrets directory", zap.String("path", shared.SecretsDir), zap.Error(err))
 		return err
