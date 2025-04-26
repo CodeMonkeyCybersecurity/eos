@@ -10,17 +10,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// LoadInitResultOrPrompt tries loading the init result from disk; otherwise prompts the user.
-func LoadInitResultOrPrompt(client *api.Client, log *zap.Logger) (*api.InitResponse, error) {
-	initRes := new(api.InitResponse)
-	if err := ReadFallbackJSON(DiskPath("vault_init", log), initRes, log); err != nil {
-		log.Warn("⚠️ Fallback file missing or unreadable — prompting user", zap.Error(err))
-		return PromptForInitResult(log)
-	}
-	log.Info("✅ Vault init result loaded from fallback")
-	return initRes, nil
-}
-
 func MaybeWriteVaultInitFallback(init *api.InitResponse, log *zap.Logger) error {
 	fmt.Print("💾 Save Vault init material to fallback file? (y/N): ")
 	var resp string

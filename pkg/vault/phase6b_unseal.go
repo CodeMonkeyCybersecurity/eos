@@ -1,4 +1,4 @@
-// pkg/vault/vault_lifecycle.go
+// pkg/vault/phase6b_unseal.go
 
 package vault
 
@@ -14,7 +14,7 @@ import (
 )
 
 //--------------------------------------------------------------------
-// 6.  Initialize and Unseal Vault
+// 6b.  Unseal Vault
 //--------------------------------------------------------------------
 
 // PHASE 6 — PhaseInitAndUnsealVault()
@@ -194,4 +194,15 @@ func UnsealVault(client *api.Client, init *api.InitResponse, log *zap.Logger) er
 		}
 	}
 	return errors.New("vault remains sealed after submitting 3 unseal keys")
+}
+
+// LoadInitResultOrPrompt tries loading the init result from disk; otherwise prompts the user.
+func LoadInitResultOrPrompt(client *api.Client, log *zap.Logger) (*api.InitResponse, error) {
+	initRes := new(api.InitResponse)
+	if err := ReadFallbackJSON(DiskPath("vault_init", log), initRes, log); err != nil {
+		log.Warn("⚠️ Fallback file missing or unreadable — prompting user", zap.Error(err))
+		return PromptForInitResult(log)
+	}
+	log.Info("✅ Vault init result loaded from fallback")
+	return initRes, nil
 }

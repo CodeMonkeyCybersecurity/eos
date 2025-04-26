@@ -39,16 +39,21 @@ var CreateVaultCmd = &cobra.Command{
 			return logger.LogErrAndWrap(log, "create vault: start service", err)
 		}
 
-		addr, client, err := vault.InitializeAndUnsealVault(log)
+		addr, err := vault.InitializeVaultOnly(log)
 		if err != nil {
-			return logger.LogErrAndWrap(log, "create vault: initialize and unseal", err)
+			return logger.LogErrAndWrap(log, "create vault: initialize", err)
 		}
 
-		if err := vault.ApplyCoreSecretsAndHealthCheck(client, log); err != nil {
-			return logger.LogErrAndWrap(log, "create vault: bootstrap secrets and health check", err)
-		}
+		log.Info("✅ Vault initialized", zap.String("VAULT_ADDR", addr))
 
-		log.Info("✅ Vault fully installed, initialized, unsealed, and healthy", zap.String("VAULT_ADDR", addr))
+		// 🛎️ New hint to user: guide next steps!
+		fmt.Println("")
+		fmt.Println("🔔 Vault has been initialized, but is not yet unsealed.")
+		fmt.Println("👉 Next steps:")
+		fmt.Println("   1. Run: eos inspect vault-init   (to view and save your init keys)")
+		fmt.Println("   2. Run: eos enable vault         (to unseal and fully enable Vault)")
+		fmt.Println("")
+
 		return nil
 	}),
 }

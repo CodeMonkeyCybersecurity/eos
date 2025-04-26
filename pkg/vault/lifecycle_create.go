@@ -77,20 +77,24 @@ func StartVault(log *zap.Logger) error {
 	return StartVaultService(log)
 }
 
-func InitializeAndUnsealVault(log *zap.Logger) (string, *api.Client, error) {
+func InitializeVaultOnly(log *zap.Logger) (string, error) {
 	if _, err := EnsureVaultEnv(log); err != nil {
-		return "", nil, err
+		return "", fmt.Errorf("ensure Vault environment: %w", err)
 	}
-	client, err := NewClient(log)
+
+	_, err := NewClient(log) // no need to save it yet
 	if err != nil {
-		return "", nil, err
+		return "", fmt.Errorf("create Vault client: %w", err)
 	}
-	client, err = PhaseInitAndUnsealVault(client, log)
-	if err != nil {
-		return "", nil, err
+
+	if _, err := PhaseInitVaultOnly(nil, log); err != nil {
+		return "", fmt.Errorf("initialize Vault only: %w", err)
 	}
+
 	addr := os.Getenv(shared.VaultAddrEnv)
-	return addr, client, nil
+	log.Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String("VAULT_ADDR", addr))
+
+	return addr, nil
 }
 
 func ApplyCoreSecretsAndHealthCheck(client *api.Client, log *zap.Logger) error {
