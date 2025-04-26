@@ -5,6 +5,7 @@ package vault
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -15,89 +16,114 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
-/**/
-// a logic wrapper for:
-// CheckVaultHealth
-// isInstalled
-// NewClient
-// isVaultInitialized
-// isVaultSealed
-// testKVSecret
-// CheckVaultSecrets
+// Check performs a full sanity check on Vault health, binary installation,
+// initialization status, seal status, and KV functionality.
+// It returns a CheckReport summarizing the findings.
 func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
 	report := &shared.CheckReport{}
 
-	// 0. Direct HTTP liveness check
-	addr, err := CheckVaultHealth(log)
-	if err != nil {
-		log.Warn("🔌 Vault health check failed (raw HTTP)",
-			zap.String("VAULT_ADDR", addr),
-			zap.String("hint", "Is Vault listening at this address? Does it use http vs https? Is port correct?"),
-			zap.Error(err),
-		)
-		report.Notes = append(report.Notes, fmt.Sprintf("Vault health check failed: %v", err))
-		return report, nil // no point continuing if Vault is unreachable
-	}
-	log.Info("✅ Raw Vault health check passed")
-
-	// ... the rest of your Check function
-
-	// 1. Binary check
-	report.Installed = isInstalled(log)
-	if !report.Installed {
-		report.Notes = append(report.Notes, "Vault binary not found in PATH")
+	// 1️⃣ Environment sanity
+	addr := os.Getenv(shared.VaultAddrEnv)
+	if addr == "" {
+		log.Error("❌ VAULT_ADDR not set")
+		report.Notes = append(report.Notes, "VAULT_ADDR environment variable not set")
 		return report, nil
 	}
 
-	// 2. Attempt to recover nil client
+	// 2️⃣ HTTP liveness probe
+	healthy, err := CheckVaultHealth(log)
+	if err != nil || !healthy {
+		log.Warn("🔌 Vault health check failed",
+			zap.String("VAULT_ADDR", addr),
+			zap.Error(err))
+		report.Notes = append(report.Notes, fmt.Sprintf("Vault health check failed: %v", err))
+		return report, nil
+	}
+	log.Info("✅ Vault HTTP health probe passed")
+
+	// 3️⃣ Vault binary check
+	if !isInstalled(log) {
+		log.Warn("Vault binary not found in PATH")
+		report.Notes = append(report.Notes, "Vault binary not installed or not found in $PATH")
+		return report, nil
+	}
+	report.Installed = true
+
+	// 4️⃣ Recover Vault client if nil
 	if client == nil {
-		var err error
-		client, err = NewClient(log)
+		log.Info("ℹ️ Vault client was nil, creating new client")
+		newClient, err := NewClient(log)
 		if err != nil {
-			log.Warn("Vault client creation failed", zap.Error(err))
+			log.Warn("Failed to create Vault client", zap.Error(err))
 			report.Notes = append(report.Notes, "Could not initialize Vault client")
 			return report, nil
 		}
+		client = newClient
 	}
 
-	// 3. Init check
+	// 5️⃣ Initialization check
 	report.Initialized, err = IsVaultInitialized(client, log)
 	if err != nil {
-		report.Notes = append(report.Notes, fmt.Sprintf("Vault health query failed: %v", err))
+		log.Warn("Vault initialization status check failed", zap.Error(err))
+		report.Notes = append(report.Notes, fmt.Sprintf("Vault init check failed: %v", err))
 		return report, client
 	}
 
-	// 4. Seal check
+	// 6️⃣ Seal check
 	report.Sealed = IsVaultSealed(client, log)
 	if report.Sealed {
+		log.Warn("🔒 Vault is currently sealed")
 		report.Notes = append(report.Notes, "Vault is sealed")
 	} else {
 		log.Info("✅ Vault is unsealed and accessible")
 	}
 
-	// 5. KV test
-	if err := testKVSecret(client, log); err == nil {
+	// 7️⃣ KV test
+	if err := testKVSecret(client, log); err != nil {
+		log.Warn("❌ KV secret test failed", zap.Error(err))
+		report.Notes = append(report.Notes, fmt.Sprintf("KV test failed: %v", err))
+	} else {
 		report.KVWorking = true
 		log.Info("✅ KV secret test passed")
-	} else {
-		log.Warn("❌ KV test failed", zap.Error(err))
-		report.Notes = append(report.Notes, fmt.Sprintf("KV test failed: %v", err))
-	}
-	if !report.KVWorking || report.Sealed {
-		return report, nil
 	}
 
-	// 6. Secret verification (optional)
+	// 8️⃣ (Optional) Vault secrets verification
 	if len(storedHashes) > 0 && hashedRoot != "" {
-		log.Info("🔐 Performing unseal key + root token check")
-		CheckVaultSecrets(log)
+		log.Info("🔐 Checking unseal keys and root token against stored hashes")
+		if verifyVaultSecrets(log, storedHashes, hashedRoot) {
+			log.Info("✅ Vault secret verification succeeded")
+		} else {
+			log.Warn("❌ Vault secret verification failed")
+			report.Notes = append(report.Notes, "Vault secret mismatch or verification failed")
+		}
 	}
 
-	// ✅ Done
+	// ✅ Final report
 	return report, client
 }
 
-/**/
+func verifyVaultSecrets(log *zap.Logger, storedHashes []string, hashedRoot string) bool {
+	keys, root, err := PromptOrRecallUnsealKeys(log)
+	if err != nil {
+		log.Warn("Failed to prompt for unseal keys and root", zap.Error(err))
+		return false
+	}
+	if !crypto.AllUnique(keys) {
+		log.Warn("Duplicate unseal keys detected")
+		return false
+	}
+	hashedInputs := crypto.HashStrings(keys)
+	if !crypto.AllHashesPresent(hashedInputs, storedHashes) {
+		log.Warn("Unseal keys mismatch")
+		return false
+	}
+	if crypto.HashString(root) != hashedRoot {
+		log.Warn("Root token mismatch")
+		return false
+	}
+	return true
+}
+
 func isInstalled(log *zap.Logger) bool {
 	_, err := exec.LookPath("vault")
 	if err != nil {
@@ -108,11 +134,7 @@ func isInstalled(log *zap.Logger) bool {
 	return true
 }
 
-/**/
-
-/**/
-// TODO: ensure functionality
-// -> InitializeVault(client *api.Client) (VaultInitResponse, error)
+// InitializeVault(client *api.Client) (VaultInitResponse, error)
 func IsVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 	if client == nil {
 		return false, fmt.Errorf("vault client is nil")
@@ -125,8 +147,6 @@ func IsVaultInitialized(client *api.Client, log *zap.Logger) (bool, error) {
 	log.Info("Vault health check complete", zap.Bool("initialized", status.Initialized), zap.Bool("sealed", status.Sealed))
 	return status.Initialized, nil
 }
-
-/**/
 
 // isVaultSealed checks if Vault is sealed and logs the result.
 func IsVaultSealed(client *api.Client, log *zap.Logger) bool {
@@ -144,23 +164,20 @@ func testKVSecret(client *api.Client, log *zap.Logger) error {
 	log.Info("📝 Writing test secret to Vault...")
 
 	kv := client.KVv2("secret")
-	testPath := "hello"
-	testKey := "value"
-	testValue := "world"
 
-	if _, err := kv.Put(context.Background(), testPath, map[string]interface{}{testKey: testValue}); err != nil {
-		log.Error("Failed to write test secret", zap.String("path", testPath), zap.Error(err))
+	if _, err := kv.Put(context.Background(), shared.TestKVPath, map[string]interface{}{shared.TestKVKey: shared.TestKVValue}); err != nil {
+		log.Error("Failed to write test secret", zap.String("path", shared.TestKVPath), zap.Error(err))
 		return fmt.Errorf("failed to write test secret: %w", err)
 	}
 
-	secret, err := kv.Get(context.Background(), testPath)
+	secret, err := kv.Get(context.Background(), shared.TestKVPath)
 	if err != nil {
-		log.Error("Failed to read test secret", zap.String("path", testPath), zap.Error(err))
+		log.Error("Failed to read test secret", zap.String("path", shared.TestKVPath), zap.Error(err))
 		return fmt.Errorf("failed to read test secret: %w", err)
 	}
 
-	value := secret.Data[testKey]
-	log.Info("✅ Test secret read successful", zap.String("path", testPath), zap.Any("value", value))
+	value := secret.Data[shared.TestKVKey]
+	log.Info("✅ Test secret read successful", zap.String("path", shared.TestKVPath), zap.Any("value", value))
 	return nil
 }
 
@@ -203,18 +220,12 @@ func CheckVaultSecrets(log *zap.Logger) {
 	fmt.Println("✅ Unseal keys and root token verified.")
 }
 
-/**/
-
-/**/
-
-/**/
+// IsAlreadyInitialized returns true if the error indicates Vault is already initialized.
 func IsAlreadyInitialized(err error, log *zap.Logger) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }
 
-/**/
-/**/
-// VaultList returns keys under a path
+// ListVault returns keys under a path in Vault's secret KV engine.
 func ListVault(path string, log *zap.Logger) ([]string, error) {
 	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
@@ -224,12 +235,13 @@ func ListVault(path string, log *zap.Logger) ([]string, error) {
 	if err != nil || list == nil {
 		return nil, err
 	}
-	raw := list.Data["keys"].([]interface{})
-	keys := make([]string, len(raw))
-	for i, k := range raw {
+	rawKeys, ok := list.Data["keys"].([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("unexpected format for Vault list keys")
+	}
+	keys := make([]string, len(rawKeys))
+	for i, k := range rawKeys {
 		keys[i] = fmt.Sprintf("%v", k)
 	}
 	return keys, nil
 }
-
-/**/

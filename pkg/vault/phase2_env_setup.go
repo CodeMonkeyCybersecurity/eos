@@ -30,57 +30,64 @@ import (
 //  2. Else try https://<internal‑hostname>:<VaultDefaultPort>
 //  3. Else fall back to the hostname form so callers have *something*
 
+// EnsureVaultEnv sets VAULT_ADDR and VAULT_CACERT if missing, using available network probes and fallbacks.
 func EnsureVaultEnv(log *zap.Logger) (string, error) {
-	if cur := os.Getenv("VAULT_ADDR"); cur != "" {
-		log.Debug("VAULT_ADDR already set", zap.String("VAULT_ADDR", cur))
+	const testTimeout = 500 * time.Millisecond
+
+	if cur := os.Getenv(shared.VaultAddrEnv); cur != "" {
+		log.Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
 		return cur, nil
 	}
 
 	host := system.GetInternalHostname()
-
 	candidates := []string{
 		fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort),
-		fmt.Sprintf(shared.VaultDefaultAddr, host), // e.g. https://myhost:8179
+		fmt.Sprintf(shared.VaultDefaultAddr, host),
 	}
 
 	for _, addr := range candidates {
-		if canConnectTLS(addr, testTimeout) {
-			_ = os.Setenv("VAULT_ADDR", addr)
-			log.Info("🔐 VAULT_ADDR auto‑detected", zap.String("VAULT_ADDR", addr))
+		if canConnectTLS(addr, testTimeout, log) {
+			if err := os.Setenv(shared.VaultAddrEnv, addr); err != nil {
+				log.Warn("Failed to set VAULT_ADDR", zap.Error(err))
+			}
+			log.Info("🔐 VAULT_ADDR auto‑detected", zap.String(shared.VaultAddrEnv, addr))
 			return addr, nil
 		}
 	}
 
-	// ensure CA
-	if os.Getenv("VAULT_CACERT") == "" {
-		log.Debug("🔧 Auto‑setting VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
-		os.Setenv("VAULT_CACERT", shared.VaultAgentCACopyPath)
+	// No live listener found
+	log.Warn("⚠️ No Vault listener detected on standard ports — falling back to internal hostname")
+
+	if os.Getenv(shared.VaultCA) == "" {
+		if err := os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath); err != nil {
+			log.Warn("Failed to set VAULT_CACERT", zap.Error(err))
+		} else {
+			log.Debug("🔧 Auto‑setting VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
+		}
 	}
 
-	// no live listener – just set to hostname form
 	fallback := candidates[1]
-	_ = os.Setenv("VAULT_ADDR", fallback)
-	log.Warn("⚠️ No Vault listener detected; using fallback VAULT_ADDR",
-		zap.String("VAULT_ADDR", fallback))
+	if err := os.Setenv(shared.VaultAddrEnv, fallback); err != nil {
+		log.Warn("Failed to set fallback VAULT_ADDR", zap.Error(err))
+	}
 	return fallback, nil
-
 }
 
-// canConnectTLS opens a TLS socket (with InsecureSkipVerify=true **only for probe**).
-func canConnectTLS(raw string, d time.Duration) bool {
+// canConnectTLS tries to open a probe TLS socket to verify Vault is reachable.
+func canConnectTLS(raw string, d time.Duration, log *zap.Logger) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
+		log.Debug("Invalid URL for TLS check", zap.String("raw", raw), zap.Error(err))
 		return false
 	}
 	dialer := &net.Dialer{Timeout: d}
-	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, &tls.Config{
-		InsecureSkipVerify: true, // probe only – we’re not sending secrets
-	})
-	if err == nil {
-		_ = conn.Close()
-		return true
+	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, &tls.Config{InsecureSkipVerify: true})
+	if err != nil {
+		log.Debug("TLS probe failed", zap.String("host", u.Host), zap.Error(err))
+		return false
 	}
-	return false
+	_ = conn.Close()
+	return true
 }
 
 func EnsureVaultDirs(log *zap.Logger) error {

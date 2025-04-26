@@ -23,6 +23,13 @@ const (
 	VaultAddrEnv       = "VAULT_ADDR"
 	VaultHealthPath    = "/v1/sys/health"
 	VaultHealthTimeout = 5 * time.Second
+	VaultCA            = "VAULT_CACERT"
+)
+
+const (
+	TestKVPath  = "hello"
+	TestKVKey   = "value"
+	TestKVValue = "world"
 )
 
 // Vault agent service and config
@@ -101,6 +108,7 @@ const (
 )
 
 const (
+	TestTimeout        = 500 * time.Millisecond
 	VaultRetryCount    = 5
 	VaultRetryDelay    = 2 * time.Second
 	VaultMaxHealthWait = 10 * time.Second
