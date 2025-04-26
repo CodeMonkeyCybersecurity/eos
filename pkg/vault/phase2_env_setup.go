@@ -93,7 +93,7 @@ func EnsureVaultDirs(log *zap.Logger) error {
 	if err := fixVaultTLSFiles(log); err != nil {
 		return err
 	}
-	if err := fixVaultDataOwnership(log); err != nil {
+	if err := fixVaultOwnership(log); err != nil {
 		return err
 	}
 
@@ -129,10 +129,10 @@ func ensureBaseDirs(log *zap.Logger) error {
 
 // fixVaultTLSFiles ensures correct permissions on TLS key/cert files.
 func fixVaultTLSFiles(log *zap.Logger) error {
-	vaultUID, vaultGID, err := system.LookupUser(shared.EosUser)
+	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
 		log.Warn("Could not resolve eos UID/GID for TLS files", zap.Error(err))
-		vaultUID, vaultGID = 1001, 1001
+		eosUID, eosGID = 1001, 1001
 	}
 
 	tlsFiles := []struct {
@@ -145,34 +145,31 @@ func fixVaultTLSFiles(log *zap.Logger) error {
 
 	for _, tf := range tlsFiles {
 		log.Debug("🔧 Securing TLS file", zap.String("path", tf.path))
-		if err := os.Chown(tf.path, vaultUID, vaultGID); err != nil {
+		if err := os.Chown(tf.path, eosUID, eosGID); err != nil {
 			log.Warn("Failed to chown TLS file", zap.String("path", tf.path), zap.Error(err))
 		}
 		if err := os.Chmod(tf.path, tf.perm); err != nil {
 			log.Warn("Failed to chmod TLS file", zap.String("path", tf.path), zap.Error(err))
 		}
 	}
-
 	return nil
 }
 
-// fixVaultDataOwnership ensures /opt/vault and /opt/vault/data are owned properly.
-func fixVaultDataOwnership(log *zap.Logger) error {
+// fixVaultOwnership ensures /opt/vault and its contents are eos:eos
+func fixVaultOwnership(log *zap.Logger) error {
 	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("Could not resolve eos UID/GID for vault data", zap.Error(err))
+		log.Warn("Could not resolve eos UID/GID for vault directories", zap.Error(err))
 		eosUID, eosGID = 1001, 1001
 	}
 
-	dataPath := filepath.Join(shared.VaultDir, "data")
-	log.Debug("🔧 Fixing vault data directory ownership", zap.String("path", dataPath))
-
-	if _, err := os.Stat(dataPath); os.IsNotExist(err) {
-		log.Warn("Vault data directory missing", zap.String("path", dataPath))
-		return nil
+	log.Info("🔧 Fixing Vault base directory ownership", zap.String("path", shared.VaultDir))
+	if err := os.Chown(shared.VaultDir, eosUID, eosGID); err != nil {
+		log.Warn("⚠️ Could not chown Vault base directory", zap.String("path", shared.VaultDir), zap.Error(err))
 	}
 
-	return system.ChownRecursive(dataPath, eosUID, eosGID, log)
+	log.Info("🔧 Recursively fixing ownership inside Vault base directory", zap.String("path", shared.VaultDir))
+	return system.ChownRecursive(shared.VaultDir, eosUID, eosGID, log)
 }
 
 func PrepareVaultAgentEnvironment(log *zap.Logger) error {

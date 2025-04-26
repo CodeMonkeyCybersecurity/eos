@@ -2,6 +2,8 @@
 package create
 
 import (
+	"fmt"
+
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -27,6 +29,12 @@ var CreateVaultCmd = &cobra.Command{
 		if err := vault.WriteAndValidateConfig(log); err != nil {
 			return logger.LogErrAndWrap(log, "create vault: write config", err)
 		}
+
+		if err := vault.ValidateCriticalPaths(log); err != nil {
+			log.Error("❌ Vault critical paths validation failed", zap.Error(err))
+			return fmt.Errorf("vault critical path validation failed: %w", err)
+		}
+
 		if err := vault.StartVault(log); err != nil {
 			return logger.LogErrAndWrap(log, "create vault: start service", err)
 		}

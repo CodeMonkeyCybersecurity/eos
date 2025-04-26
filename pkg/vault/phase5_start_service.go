@@ -9,9 +9,11 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -157,4 +159,42 @@ func waitForVaultHealth(log *zap.Logger, maxWait time.Duration) error {
 		log.Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
 		time.Sleep(shared.VaultRetryDelay)
 	}
+}
+
+// ValidateCriticalPaths checks that Vault critical directories are owned and writable by the service user.
+func ValidateCriticalPaths(log *zap.Logger) error {
+	criticalPaths := []string{
+		shared.VaultDataPath, // /opt/vault/data
+	}
+
+	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	if err != nil {
+		return fmt.Errorf("failed to resolve eos user UID/GID: %w", err)
+	}
+
+	for _, path := range criticalPaths {
+		info, err := os.Stat(path)
+		if err != nil {
+			return fmt.Errorf("failed to stat critical path %s: %w", path, err)
+		}
+
+		st, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			return fmt.Errorf("unexpected stat type for path %s", path)
+		}
+
+		if int(st.Uid) != eosUID || int(st.Gid) != eosGID {
+			return fmt.Errorf("ownership mismatch on %s: want uid=%d gid=%d, got uid=%d gid=%d",
+				path, eosUID, eosGID, st.Uid, st.Gid)
+		}
+
+		// Check writable bit
+		if info.Mode().Perm()&0200 == 0 {
+			return fmt.Errorf("critical path %s is not writable (permissions %#o)", path, info.Mode().Perm())
+		}
+
+		log.Info("✅ Critical path validated", zap.String("path", path))
+	}
+
+	return nil
 }
