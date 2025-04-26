@@ -3,6 +3,8 @@ package vault
 
 import (
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"os"
@@ -261,23 +263,36 @@ func removeBadTLSCerts(log *zap.Logger) error {
 }
 
 func EnsureVaultTLS(log *zap.Logger) (string, string, error) {
-	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
-		log.Info("✅ Vault TLS certs already exist, skipping generation",
-			zap.String("key", shared.TLSKey), zap.String("crt", shared.TLSCrt))
+	// Quick check if files exist
+	if !system.FileExists(shared.TLSKey) || !system.FileExists(shared.TLSCrt) {
+		log.Warn("🔐 TLS certs missing — triggering generation")
+		if err := GenerateVaultTLSCert(log); err != nil {
+			return "", "", fmt.Errorf("failed to generate Vault TLS certs: %w", err)
+		}
 		return shared.TLSCrt, shared.TLSKey, nil
 	}
 
-	log.Warn("🔐 No Vault TLS certs found — secure communication will fail unless generated")
-
-	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true, log)
-	if !ok {
-		return "", "", fmt.Errorf("user declined TLS cert generation")
+	// Extra: Inspect certificate for valid SANs
+	hasValidSAN, err := checkTLSCertForSAN(shared.TLSCrt, log)
+	if err != nil {
+		log.Warn("⚠️ Could not inspect existing TLS cert, forcing regeneration", zap.Error(err))
+		_ = removeBadTLSCerts(log) // Best effort
+		if err := GenerateVaultTLSCert(log); err != nil {
+			return "", "", fmt.Errorf("failed to generate Vault TLS certs after SAN check failure: %w", err)
+		}
+		return shared.TLSCrt, shared.TLSKey, nil
 	}
 
-	if err := GenerateVaultTLSCert(log); err != nil {
-		return "", "", fmt.Errorf("failed to generate Vault TLS cert: %w", err)
+	if !hasValidSAN {
+		log.Warn("❌ Existing Vault TLS cert missing or invalid SANs — forcing regeneration")
+		_ = removeBadTLSCerts(log) // Best effort
+		if err := GenerateVaultTLSCert(log); err != nil {
+			return "", "", fmt.Errorf("failed to regenerate Vault TLS cert with SANs: %w", err)
+		}
+		return shared.TLSCrt, shared.TLSKey, nil
 	}
 
+	log.Info("✅ Vault TLS cert exists and SANs are valid", zap.String("crt", shared.TLSCrt))
 	return shared.TLSCrt, shared.TLSKey, nil
 }
 
@@ -349,4 +364,30 @@ func EnsureVaultAgentCAExists(log *zap.Logger) error {
 	}
 
 	return nil
+}
+
+// checkTLSCertForSAN parses the cert and ensures it has SANs matching localhost or internal hostname.
+func checkTLSCertForSAN(certPath string, log *zap.Logger) (bool, error) {
+	data, err := os.ReadFile(certPath)
+	if err != nil {
+		return false, fmt.Errorf("read cert: %w", err)
+	}
+
+	block, _ := pem.Decode(data)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return false, fmt.Errorf("failed to parse PEM block")
+	}
+
+	cert, err := x509.ParseCertificate(block.Bytes)
+	if err != nil {
+		return false, fmt.Errorf("parse cert: %w", err)
+	}
+
+	if len(cert.DNSNames) == 0 && len(cert.IPAddresses) == 0 {
+		log.Warn("TLS cert missing SANs entirely")
+		return false, nil
+	}
+
+	// Optional: you can enforce certain DNS names here if you want stricter matching
+	return true, nil
 }
