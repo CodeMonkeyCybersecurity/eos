@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -205,4 +206,38 @@ func LoadInitResultOrPrompt(client *api.Client, log *zap.Logger) (*api.InitRespo
 	}
 	log.Info("✅ Vault init result loaded from fallback")
 	return initRes, nil
+}
+
+func ConfirmUnsealMaterialSaved(init *api.InitResponse, log *zap.Logger) error {
+	fmt.Println("\n🔐 Please re-enter 3 of your unseal keys and the root token to confirm you've saved them.")
+
+	keys, err := crypto.PromptSecrets("Unseal Key", 3, log)
+	if err != nil {
+		return fmt.Errorf("failed to read unseal keys: %w", err)
+	}
+	root, err := crypto.PromptSecrets("Root Token", 1, log)
+	if err != nil {
+		return fmt.Errorf("failed to read root token: %w", err)
+	}
+
+	if crypto.HashString(root[0]) != crypto.HashString(init.RootToken) {
+		return fmt.Errorf("root token did not match original")
+	}
+
+	matchCount := 0
+	for _, entered := range keys {
+		for _, known := range init.KeysB64 {
+			if crypto.HashString(entered) == crypto.HashString(known) {
+				matchCount++
+				break
+			}
+		}
+	}
+
+	if matchCount < 3 {
+		return fmt.Errorf("less than 3 unseal keys matched")
+	}
+
+	log.Info("✅ User successfully confirmed unseal material")
+	return nil
 }
