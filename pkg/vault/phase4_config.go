@@ -1,4 +1,4 @@
-// pkg/vault/vault_lifecycle.go
+// pkg/vault/phase4_config.go
 
 package vault
 
@@ -78,7 +78,9 @@ func PhasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Error("❌ Failed to restart Vault service after patch", zap.Error(err))
+		log.Error("❌ Failed to restart Vault service after patch",
+			zap.Error(err),
+			zap.String("cmd", "systemctl restart vault"))
 		return fmt.Errorf("vault restart failed after config patch: %w", err)
 	}
 
@@ -90,6 +92,33 @@ func PhasePatchVaultConfigIfNeeded(log *zap.Logger) error {
 // It returns an error if validation fails, and logs the vault output for diagnosis.
 // This must be called before attempting to start Vault.
 func ValidateVaultConfig(log *zap.Logger) error {
-	log.Info("Skipping Vault config syntax check (no supported -check flag)")
+	log.Info("🧪 Lightly validating Vault configuration file", zap.String("path", shared.VaultConfigPath))
+
+	info, err := os.Stat(shared.VaultConfigPath)
+	if err != nil {
+		log.Error("Vault config file not found", zap.Error(err))
+		return fmt.Errorf("vault config file not found: %w", err)
+	}
+	if info.Size() == 0 {
+		log.Error("Vault config file is empty")
+		return fmt.Errorf("vault config file is empty")
+	}
+
+	data, err := os.ReadFile(shared.VaultConfigPath)
+	if err != nil {
+		log.Error("Failed to read Vault config file", zap.Error(err))
+		return fmt.Errorf("read vault config file failed: %w", err)
+	}
+	content := string(data)
+
+	// Optional basic HCL structure check
+	expected := []string{"listener", "storage", "api_addr"}
+	for _, keyword := range expected {
+		if !strings.Contains(content, keyword) {
+			log.Warn("Vault config missing expected keyword", zap.String("keyword", keyword), zap.String("path", shared.VaultConfigPath))
+		}
+	}
+
+	log.Info("✅ Vault config file exists, readable, and has basic structure")
 	return nil
 }
