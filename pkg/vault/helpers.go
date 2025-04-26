@@ -19,6 +19,8 @@ func GetVaultWildcardPurgePaths() []string {
 		"/etc/vault*",      // wildcard for legacy configs
 		"/var/snap/vault*", // snap installs
 		"/var/log/vault*",  // log spill
+		"/opt/vault*",
+		"/run/eos*",
 	}
 }
 
@@ -39,6 +41,9 @@ func GetVaultPurgePaths() []string {
 		shared.VaultPID,
 		shared.AgentPID,
 		shared.VaultSystemCATrustPath,
+		shared.TLSDir,
+		shared.VaultAgentCACopyPath,
+		shared.EosVaultProfilePath,
 	}
 }
 
