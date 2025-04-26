@@ -11,9 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-/* Wrap adds automatic logger injection and scoped metadata based on calling package. */
-// pkg/eoscli/handler.go
-
+// Wrap decorates a cobra command handler to inject EOS runtime context (logger, start time),
+// resolves Vault environment configuration, and automatically logs command start/end lifecycle events.
 func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		var err error
@@ -29,7 +28,7 @@ func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error)
 
 		addr, addrErr := vault.EnsureVaultEnv(log)
 		if addrErr != nil {
-			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(err))
+			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
 		}
 		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
@@ -37,7 +36,11 @@ func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error)
 
 		err = fn(ctx, cmd, args)
 
-		log.Info("✅ EOS command finished", zap.Duration("duration", time.Since(start)), zap.String("command", cmd.Name()))
-		return err
+		if err != nil {
+			log.Error("⚠️ EOS command failed", zap.Duration("duration", time.Since(start)), zap.String("command", cmd.Name()))
+			return err
+		}
+		log.Info("✅ EOS command finished successfully", zap.Duration("duration", time.Since(start)), zap.String("command", cmd.Name()))
+		return nil
 	}
 }

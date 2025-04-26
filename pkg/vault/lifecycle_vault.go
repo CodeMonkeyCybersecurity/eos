@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -295,6 +296,8 @@ func phaseApplyCoreSecrets(client *api.Client, kvPath string, kvData map[string]
 	return nil
 }
 
+// InstallVaultViaApt ensures the Vault binary is installed on Debian-based systems via APT.
+// It adds the official HashiCorp repository if needed, installs Vault, and verifies the binary path.
 func InstallVaultViaApt(log *zap.Logger) error {
 	log.Info("🔍 Checking if Vault is already installed via apt")
 	if _, err := exec.LookPath("vault"); err == nil {
@@ -319,7 +322,8 @@ func InstallVaultViaApt(log *zap.Logger) error {
 	// Step 2: Refresh APT cache
 	log.Info("♻️ Updating APT package cache")
 	if err := exec.Command("apt-get", "update").Run(); err != nil {
-		log.Warn("APT update failed", zap.Error(err))
+		log.Error("❌ Failed to update APT cache", zap.Error(err))
+		return fmt.Errorf("apt-get update failed: %w", err)
 	}
 
 	// Step 3: Install Vault — Pinned install
@@ -333,6 +337,15 @@ func InstallVaultViaApt(log *zap.Logger) error {
 		return fmt.Errorf("❌ Failed to install Vault via apt: %w", err)
 	}
 
+	vaultPath, err := exec.LookPath("vault")
+	if err != nil {
+		log.Fatal("❌ Vault binary not found after apt install", zap.Error(err))
+		return fmt.Errorf("vault binary not found")
+	}
+	if !strings.HasPrefix(vaultPath, "/usr") {
+		log.Fatal("❌ Vault binary installed to unexpected path", zap.String("found_path", vaultPath))
+	}
+	log.Info("✅ Vault binary verified at correct path", zap.String("path", vaultPath))
 	log.Info("✅ Vault installed successfully via apt")
 	return nil
 }
@@ -668,14 +681,43 @@ func VaultPurge(path string, log *zap.Logger) error {
 // TODO: RenderVaultServiceUnit() ([]byte, error)
 /**/
 
-/**/
-// vault-agent-eos.service // should use `After=vault.service` and `Requires=vault.service`
-// - This ensures the Vault service is active before the agent attempts to fetch a token.
-/**/
-
+// StartVaultService ensures the Vault systemd service is enabled and running,
+// and verifies that Vault is listening on the expected port (8179) before returning.
+// It retries port probing to handle delayed service startups.
 func StartVaultService(log *zap.Logger) error {
+	log.Info("🛠️ Writing Vault systemd unit file")
 	if err := WriteSystemdUnit(log); err != nil {
-		return err
+		log.Error("❌ Failed to write systemd unit", zap.Error(err))
+		return fmt.Errorf("write systemd unit: %w", err)
 	}
-	return ReloadDaemonAndEnable(log, "vault.service")
+
+	log.Info("🔄 Reloading systemd daemon and enabling vault.service")
+	if err := ReloadDaemonAndEnable(log, "vault.service"); err != nil {
+		log.Error("❌ Failed to reload or enable vault.service", zap.Error(err))
+		return fmt.Errorf("reload/enable systemd vault.service: %w", err)
+	}
+
+	log.Info("🚀 Starting Vault systemd service")
+	startCmd := exec.Command("systemctl", "start", "vault.service")
+	startCmd.Stdout = os.Stdout
+	startCmd.Stderr = os.Stderr
+	if err := startCmd.Run(); err != nil {
+		log.Error("❌ Failed to start vault.service", zap.Error(err))
+		return fmt.Errorf("failed to start vault.service: %w", err)
+	}
+
+	log.Info("🩺 Checking if Vault is listening on 127.0.0.1:8179")
+	for i := 1; i <= 5; i++ {
+		conn, err := net.DialTimeout("tcp", "127.0.0.1:8179", 2*time.Second)
+		if err == nil {
+			conn.Close()
+			log.Info("✅ Vault is now listening on 127.0.0.1:8179")
+			return nil
+		}
+		log.Warn("🔁 Vault not listening yet, retrying...", zap.Int("attempt", i))
+		time.Sleep(2 * time.Second)
+	}
+
+	log.Error("❌ Vault failed to start and bind to 127.0.0.1:8179")
+	return fmt.Errorf("vault failed to start and listen on port 8179")
 }
