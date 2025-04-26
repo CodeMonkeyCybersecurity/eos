@@ -113,6 +113,8 @@ func ensureBaseDirs(log *zap.Logger) error {
 		shared.EosRunDir,
 		shared.TLSDir,
 		filepath.Dir(shared.VaultAgentCACopyPath),
+		shared.VaultDir,                      // <--- NEW
+		filepath.Join(shared.VaultDir, "data"), // <--- NEW
 	}
 
 	for _, path := range dirs {
