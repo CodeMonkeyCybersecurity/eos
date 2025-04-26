@@ -25,10 +25,21 @@ func RenderVaultConfig(addr string, log *zap.Logger) string {
 		log.Warn("⚠️ Blank address provided to RenderVaultConfig — using localhost fallback")
 		addr = fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
 	}
+
+	// Warn if TLS files don't exist
+	if _, err := os.Stat(TLSKey); err != nil {
+		log.Warn("⚠️ TLS key missing when rendering Vault config", zap.String("TLSKey", TLSKey), zap.Error(err))
+	}
+	if _, err := os.Stat(TLSCrt); err != nil {
+		log.Warn("⚠️ TLS cert missing when rendering Vault config", zap.String("TLSCrt", TLSCrt), zap.Error(err))
+	}
+
 	log.Info("📜 Rendering Vault server HCL config", zap.String("api_addr", addr))
 	return fmt.Sprintf(`
 listener "tcp" {
-  address     = "0.0.0.0:%s"
+  address         = "0.0.0.0:%s"
+  tls_cert_file   = "%s"
+  tls_key_file    = "%s"
 }
 storage "file" {
   path = "%s"
@@ -36,5 +47,5 @@ storage "file" {
 disable_mlock = true
 api_addr = "%s"
 ui = true
-`, VaultDefaultPort, VaultDataPath, addr)
+`, VaultDefaultPort, TLSCrt, TLSKey, VaultDataPath, addr)
 }
