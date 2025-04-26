@@ -599,9 +599,17 @@ func StartVaultService(log *zap.Logger) error {
 		return err
 	}
 
+	// validate config before touching systemd
+	if err := ValidateVaultConfig(log); err != nil {
+		log.Error("❌ Vault config validation failed — not starting service", zap.Error(err))
+		return fmt.Errorf("vault config validation failed: %w", err)
+	}
+
 	log.Info("🚀 Starting Vault systemd service")
 	if err := startVaultSystemdService(log); err != nil {
-		return err
+		log.Error("❌ Failed to start vault.service", zap.Error(err))
+		captureVaultLogsOnFailure(log) // 👈 ADD THIS: show journal if start fails
+		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 
 	return waitForVaultHealth(log, shared.VaultMaxHealthWait)
