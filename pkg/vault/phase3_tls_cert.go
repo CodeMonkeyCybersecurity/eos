@@ -137,6 +137,8 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 	}
 
 	// Create temporary OpenSSL config with SANs
+	publicHostname, _ := os.Hostname() // Add actual system hostname
+
 	configContent := fmt.Sprintf(`
 [req]
 distinguished_name = req
@@ -146,8 +148,9 @@ req_extensions = v3_req
 subjectAltName = @alt_names
 [alt_names]
 DNS.1 = %s
+DNS.2 = %s
 IP.1 = %s
-`, hostname, shared.LocalhostSAN)
+`, hostname, publicHostname, shared.LocalhostSAN)
 
 	tmpFile, err := os.CreateTemp("", "vault_openssl_*.cnf")
 	if err != nil {
@@ -289,7 +292,6 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 		return err
 	}
 
-	// Chown and chmod each file with logging
 	for _, file := range []struct {
 		path string
 		perm os.FileMode
@@ -311,25 +313,38 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 		}
 	}
 
-	// Copy CA to eos trust path
-	log.Info("🔧 Copying Vault CA into eos trust store",
-		zap.String("src", shared.TLSCrt),
-		zap.String("dst", shared.VaultAgentCACopyPath),
-	)
+	// Now ensure CA is available for the Vault Agent
+	return EnsureVaultAgentCAExists(log)
+}
 
-	if err := system.CopyFile(shared.TLSCrt, shared.VaultAgentCACopyPath, shared.FilePermStandard, log); err != nil {
-		log.Warn("❌ Failed to copy CA cert for Vault Agent", zap.Error(err))
-		return err
-	} else {
-		log.Info("✅ CA cert copied", zap.String("dst", shared.VaultAgentCACopyPath))
+// EnsureVaultAgentCAExists ensures that the Vault Agent CA cert is present.
+// If missing, it re-copies it from the Vault server TLS cert.
+func EnsureVaultAgentCAExists(log *zap.Logger) error {
+	src := shared.TLSCrt
+	dst := shared.VaultAgentCACopyPath
+
+	if system.FileExists(dst) {
+		log.Debug("✅ Vault Agent CA cert already exists", zap.String("path", dst))
+		return nil
 	}
 
-	if uid, gid, err := system.LookupUser(shared.EosUser); err != nil {
-		log.Warn("could not lookup eos user for CA file ownership", zap.Error(err))
-	} else if err := os.Chown(shared.VaultAgentCACopyPath, uid, gid); err != nil {
-		log.Warn("could not chown CA cert for eos user", zap.Error(err))
+	log.Warn("⚠️ Vault Agent CA cert missing, attempting to re-copy",
+		zap.String("src", src), zap.String("dst", dst))
+
+	if err := system.CopyFile(src, dst, shared.FilePermStandard, log); err != nil {
+		return fmt.Errorf("failed to copy Vault Agent CA cert: %w", err)
+	}
+
+	uid, gid, err := system.LookupUser(shared.EosUser)
+	if err != nil {
+		log.Warn("could not lookup eos user for CA cert ownership", zap.Error(err))
+		return err
+	}
+
+	if err := os.Chown(dst, uid, gid); err != nil {
+		log.Warn("could not chown Vault Agent CA cert", zap.Error(err))
 	} else {
-		log.Info("✅ CA cert ownership set", zap.String("path", shared.VaultAgentCACopyPath),
+		log.Info("✅ Vault Agent CA cert ownership corrected", zap.String("path", dst),
 			zap.Int("uid", uid), zap.Int("gid", gid))
 	}
 

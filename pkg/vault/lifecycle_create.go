@@ -32,13 +32,31 @@ func PrepareEnvironment(log *zap.Logger) error {
 	return nil
 }
 
+// GenerateTLS ensures Vault TLS certificates are generated, trusted system-wide, and ready for Vault Agent use.
 func GenerateTLS(log *zap.Logger) error {
-	if err := GenerateVaultTLSCert(log); err != nil {
-		return err
+	log.Info("📁 Starting full Vault TLS generation and trust setup")
+
+	// Step 1: Ensure certs are present and valid
+	crt, key, err := EnsureVaultTLS(log)
+	if err != nil {
+		return fmt.Errorf("ensure vault TLS certs: %w", err)
 	}
+	log.Info("✅ Vault TLS certs ensured", zap.String("key", key), zap.String("crt", crt))
+
+	// Step 2: Trust the Vault CA system-wide
 	if err := TrustVaultCA(log); err != nil {
-		return err
+		return fmt.Errorf("trust vault CA system-wide: %w", err)
 	}
+	log.Info("✅ Vault CA trusted system-wide")
+
+	// Step 3: Secure ownership and re-copy CA for agent
+	if err := secureVaultTLSOwnership(log); err != nil {
+		return fmt.Errorf("generateTLS: secure TLS ownership and agent CA copy: %w", err)
+	}
+
+	log.Info("✅ Vault Agent CA cert ensured")
+
+	log.Info("✅ Vault TLS generation and trust setup complete")
 	return nil
 }
 
