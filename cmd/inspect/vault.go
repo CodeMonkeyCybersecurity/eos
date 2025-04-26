@@ -36,8 +36,8 @@ var InspectVaultInitCmd = &cobra.Command{
 		for i, key := range initResult.KeysB64 {
 			fmt.Printf("Unseal Key %d: %s\n", i+1, key)
 		}
-		fmt.Println("\n⚡ Please back up these credentials securely.\n")
-		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.\n")
+		fmt.Println("\n⚡ Please back up these credentials securely.")
+		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.")
 
 		return nil
 	}),
