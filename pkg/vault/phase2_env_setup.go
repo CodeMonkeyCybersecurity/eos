@@ -99,7 +99,7 @@ func EnsureVaultDirs(log *zap.Logger) error {
 	}{
 		{shared.SecretsDir, shared.EosUser, shared.FilePermOwnerRWX},                         // /var/lib/eos/secrets
 		{shared.EosRunDir, shared.EosUser, shared.FilePermOwnerRWX},                          // /run/eos
-		{shared.TLSDir, "vault", shared.FilePermOwnerRWX},                                    // where tls.key/.crt live
+		{shared.TLSDir, shared.EosUser, shared.FilePermOwnerRWX},                             // where tls.key/.crt live
 		{filepath.Dir(shared.VaultAgentCACopyPath), shared.EosUser, shared.FilePermOwnerRWX}, // parent of agent CA copy
 	}
 
@@ -157,7 +157,7 @@ func EnsureVaultDirs(log *zap.Logger) error {
 	}
 	for _, tf := range tlsFiles {
 		log.Debug("🔧 Securing TLS file", zap.String("path", tf.path))
-		if err := os.Chown(tf.path, vaultUID, vaultGID); err != nil {
+		if err := os.Chown(tf.path, eosUID, eosGID); err != nil {
 			log.Warn("⚠️ Chown TLS file failed", zap.String("path", tf.path), zap.Error(err))
 		} else {
 			log.Info("✅ TLS file ownership set", zap.String("path", tf.path), zap.Int("uid", vaultUID), zap.Int("gid", vaultGID))
