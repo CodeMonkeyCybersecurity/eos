@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
@@ -64,7 +65,6 @@ func InitVault(client *api.Client, log *zap.Logger) (*api.InitResponse, error) {
 	return initRes, nil
 }
 
-// SaveInitResult stores the init result in fallback path.
 func SaveInitResult(initRes *api.InitResponse, log *zap.Logger) error {
 	b, err := json.MarshalIndent(initRes, "", "  ")
 	if err != nil {
@@ -73,6 +73,14 @@ func SaveInitResult(initRes *api.InitResponse, log *zap.Logger) error {
 	}
 
 	path := DiskPath("vault_init", log)
+	dir := filepath.Dir(path)
+
+	// ✨ Ensure parent dir exists
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		log.Error("❌ Failed to create vault init directory", zap.String("dir", dir), zap.Error(err))
+		return err
+	}
+
 	if err := os.WriteFile(path, b, 0600); err != nil {
 		log.Error("❌ Failed to write vault init file", zap.String("path", path), zap.Error(err))
 		return err
