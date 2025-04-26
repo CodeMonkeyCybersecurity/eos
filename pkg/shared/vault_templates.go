@@ -1,4 +1,4 @@
-// pkg/shared/vault_consts.go
+// pkg/shared/vault_templates.go
 
 package shared
 
@@ -38,6 +38,23 @@ RuntimeDirectoryMode=%o
 ExecStartPre=/usr/bin/install -d -o %s -g %s -m%o %s
 ExecStart=/usr/bin/vault agent -config=%s
 Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+`
+
+// Vault Server systemd unit template (vault.service)
+const ServerSystemDUnit = `
+[Unit]
+Description=Vault Server (Eos)
+After=network.target
+
+[Service]
+User=vault
+Group=vault
+ExecStart=/usr/bin/vault server -config=/etc/vault.d/vault.hcl
+Restart=on-failure
+LimitNOFILE=65536
 
 [Install]
 WantedBy=multi-user.target

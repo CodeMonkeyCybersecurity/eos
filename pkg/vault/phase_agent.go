@@ -166,7 +166,7 @@ func EnsureAgent(client *api.Client, password string, log *zap.Logger, opts shar
 
 	// Step 4: Write systemd unit
 	log.Info("⚙️ Writing systemd unit for Vault Agent", zap.String("unit_path", shared.VaultAgentServicePath))
-	if err := WriteSystemdUnit(log); err != nil {
+	if err := WriteAgentSystemdUnit(log); err != nil {
 		log.Error("❌ Failed to write systemd unit", zap.Error(err))
 		return fmt.Errorf("write systemd unit: %w", err)
 	}
