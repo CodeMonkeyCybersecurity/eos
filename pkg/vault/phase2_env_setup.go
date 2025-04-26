@@ -87,53 +87,54 @@ func canConnectTLS(raw string, d time.Duration, log *zap.Logger) bool {
 func EnsureVaultDirs(log *zap.Logger) error {
 	log.Info("🔧 Ensuring Vault directories and ownerships")
 
-	if err := ensureBaseDirs(log); err != nil {
+	if err := createBaseDirs(log); err != nil {
 		return err
 	}
-	if err := fixVaultTLSFiles(log); err != nil {
+	if err := secureTLSFiles(log); err != nil {
 		return err
 	}
-	if err := fixVaultOwnership(log); err != nil {
+	if err := secureVaultDirOwnership(log); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// ensureBaseDirs creates core directories needed by eos and vault.
-func ensureBaseDirs(log *zap.Logger) error {
+func createBaseDirs(log *zap.Logger) error {
 	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("Could not resolve eos UID/GID, using fallback", zap.Error(err))
+		log.Warn("⚠️ Could not resolve eos UID/GID, fallback to 1001", zap.Error(err))
 		eosUID, eosGID = 1001, 1001
 	}
 
-	dirs := []string{
-		shared.SecretsDir,
-		shared.EosRunDir,
-		shared.TLSDir,
-		filepath.Dir(shared.VaultAgentCACopyPath),
-		shared.VaultDir,                      // <--- NEW
-		filepath.Join(shared.VaultDir, "data"), // <--- NEW
+	dirs := []struct {
+		path string
+		perm os.FileMode
+	}{
+		{path: shared.VaultDir, perm: shared.FilePermOwnerRWX},
+		{path: filepath.Join(shared.VaultDir, "data"), perm: shared.FilePermOwnerRWX},
+		{path: shared.TLSDir, perm: 0750},
+		{path: shared.SecretsDir, perm: shared.FilePermOwnerRWX},
+		{path: shared.EosRunDir, perm: shared.FilePermOwnerRWX},
+		{path: filepath.Dir(shared.VaultAgentCACopyPath), perm: shared.FilePermOwnerRWX}, // ✅ Fixed!
 	}
 
-	for _, path := range dirs {
-		log.Debug("🔧 Creating directory", zap.String("path", path))
-		if err := os.MkdirAll(path, shared.FilePermOwnerRWX); err != nil {
-			return fmt.Errorf("mkdir %s: %w", path, err)
+	for _, d := range dirs {
+		log.Debug("🔧 Creating directory", zap.String("path", d.path))
+		if err := os.MkdirAll(d.path, d.perm); err != nil {
+			return fmt.Errorf("mkdir %s: %w", d.path, err)
 		}
-		if err := os.Chown(path, eosUID, eosGID); err != nil {
-			log.Warn("⚠️ Failed to chown directory", zap.String("path", path), zap.Error(err))
+		if err := os.Chown(d.path, eosUID, eosGID); err != nil {
+			log.Warn("⚠️ Failed to chown directory", zap.String("path", d.path), zap.Error(err))
 		}
 	}
 	return nil
 }
 
-// fixVaultTLSFiles ensures correct permissions on TLS key/cert files.
-func fixVaultTLSFiles(log *zap.Logger) error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+func secureTLSFiles(log *zap.Logger) error {
+	eosUID, eosGID, err := system.LookupUser(shared.EosUser) // 🔥 Change back to eos
 	if err != nil {
-		log.Warn("Could not resolve eos UID/GID for TLS files", zap.Error(err))
+		log.Warn("⚠️ Could not resolve eos UID/GID for TLS files", zap.Error(err))
 		eosUID, eosGID = 1001, 1001
 	}
 
@@ -141,36 +142,32 @@ func fixVaultTLSFiles(log *zap.Logger) error {
 		path string
 		perm os.FileMode
 	}{
-		{shared.TLSKey, shared.FilePermOwnerReadWrite},
-		{shared.TLSCrt, shared.FilePermStandard},
+		{shared.TLSKey, 0600},
+		{shared.TLSCrt, 0644},
 	}
 
 	for _, tf := range tlsFiles {
 		log.Debug("🔧 Securing TLS file", zap.String("path", tf.path))
 		if err := os.Chown(tf.path, eosUID, eosGID); err != nil {
-			log.Warn("Failed to chown TLS file", zap.String("path", tf.path), zap.Error(err))
+			log.Error("❌ Failed to chown TLS file", zap.String("path", tf.path), zap.Error(err))
+			return fmt.Errorf("failed to secure %s: %w", tf.path, err)
 		}
 		if err := os.Chmod(tf.path, tf.perm); err != nil {
-			log.Warn("Failed to chmod TLS file", zap.String("path", tf.path), zap.Error(err))
+			log.Error("❌ Failed to chmod TLS file", zap.String("path", tf.path), zap.Error(err))
+			return fmt.Errorf("failed to secure %s: %w", tf.path, err)
 		}
 	}
 	return nil
 }
 
-// fixVaultOwnership ensures /opt/vault and its contents are eos:eos
-func fixVaultOwnership(log *zap.Logger) error {
+func secureVaultDirOwnership(log *zap.Logger) error {
 	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("Could not resolve eos UID/GID for vault directories", zap.Error(err))
+		log.Warn("⚠️ Could not resolve eos UID/GID for Vault base", zap.Error(err))
 		eosUID, eosGID = 1001, 1001
 	}
 
-	log.Info("🔧 Fixing Vault base directory ownership", zap.String("path", shared.VaultDir))
-	if err := os.Chown(shared.VaultDir, eosUID, eosGID); err != nil {
-		log.Warn("⚠️ Could not chown Vault base directory", zap.String("path", shared.VaultDir), zap.Error(err))
-	}
-
-	log.Info("🔧 Recursively fixing ownership inside Vault base directory", zap.String("path", shared.VaultDir))
+	log.Info("🔧 Recursively fixing Vault directory ownership", zap.String("path", shared.VaultDir))
 	return system.ChownRecursive(shared.VaultDir, eosUID, eosGID, log)
 }
 
