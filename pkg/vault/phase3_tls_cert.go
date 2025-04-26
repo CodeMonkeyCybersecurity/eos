@@ -1,4 +1,4 @@
-// pkg/vault/lifecycle_ca.go
+// pkg/vault/phase3_tls_cert.go
 package vault
 
 import (
@@ -66,6 +66,7 @@ func TrustVaultCA_RHEL(log *zap.Logger) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		log.Error("❌ Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
@@ -92,13 +93,16 @@ func TrustVaultCA_Debian(log *zap.Logger) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to update Debian CA trust: %w", err)
+		log.Error("❌ Failed to update system CA trust", zap.Error(err))
+		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
 	log.Info("✅ Vault CA trusted system-wide on Debian/Ubuntu")
 	return nil
 }
 
+// GenerateVaultTLSCert generates a self-signed TLS certificate for Vault,
+// including SANs for internal hostname and 127.0.0.1, and stores them securely.
 func GenerateVaultTLSCert(log *zap.Logger) error {
 	log.Info("📁 Checking for existing Vault TLS certs",
 		zap.String("key", shared.TLSKey),
@@ -114,24 +118,17 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 	}
 
 	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
-		log.Info("Skipping TLS cert generation", zap.Bool("keyExists", system.FileExists(shared.TLSKey)), zap.Bool("crtExists", system.FileExists(shared.TLSCrt)))
+		log.Info("✅ TLS certs already exist after SAN check, skipping")
 		return nil
 	}
 
-	// Get hostname (FQDN)
 	hostname := system.GetInternalHostname()
 	log.Debug("🔎 Got internal hostname for SAN", zap.String("hostname", hostname))
 
 	// Create TLS directory
-	log.Debug("📂 Ensuring TLS directory exists", zap.String("path", shared.TLSDir))
 	if err := os.MkdirAll(shared.TLSDir, shared.DirPermStandard); err != nil {
 		log.Error("❌ Failed to create TLS directory", zap.Error(err))
 		return fmt.Errorf("failed to create TLS directory: %w", err)
-	}
-	// Skip if already present
-	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
-		log.Info("✅ TLS certs already exist, skipping generation")
-		return nil
 	}
 
 	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true, log)
@@ -139,14 +136,43 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 		return fmt.Errorf("user declined TLS certificate generation")
 	}
 
-	log.Info("🔐 Generating Vault TLS certificate (simple mode)", zap.String("CN", hostname))
+	// Create temporary OpenSSL config with SANs
+	configContent := fmt.Sprintf(`
+[req]
+distinguished_name = req
+req_extensions = v3_req
+[req_distinguished_name]
+[v3_req]
+subjectAltName = @alt_names
+[alt_names]
+DNS.1 = %s
+IP.1 = %s
+`, hostname, shared.LocalhostSAN)
+
+	tmpFile, err := os.CreateTemp("", "vault_openssl_*.cnf")
+	if err != nil {
+		return fmt.Errorf("failed to create temp openssl config: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpConfigPath := tmpFile.Name()
+
+	if _, err := tmpFile.Write([]byte(configContent)); err != nil {
+		return fmt.Errorf("failed to write temp openssl config: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp openssl config: %w", err)
+	}
+
+	log.Info("🔐 Generating Vault TLS certificate with SANs",
+		zap.String("hostname", hostname), zap.String("config", tmpConfigPath))
 
 	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096",
 		"-days", "825", "-nodes", "-x509",
 		"-subj", "/CN="+hostname,
-		"-addext", fmt.Sprintf("subjectAltName=DNS:%s,IP:%s", hostname, shared.LocalhostSAN),
 		"-keyout", shared.TLSKey,
 		"-out", shared.TLSCrt,
+		"-extensions", "v3_req",
+		"-config", tmpConfigPath,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -155,18 +181,15 @@ func GenerateVaultTLSCert(log *zap.Logger) error {
 		return fmt.Errorf("openssl failed: %w", err)
 	}
 
-	// Permissions and ownership
 	log.Info("🔐 Securing Vault TLS certs...")
-
 	if err := secureVaultTLSOwnership(log); err != nil {
 		log.Warn("could not apply correct ownership to TLS certs", zap.Error(err))
 	}
 
-	// if err := ensureEosVaultProfile(log); err != nil {
-	// 	log.Warn("could not install /etc/profile.d/eos_vault.sh", zap.Error(err))
-	// }
+	log.Info("✅ Vault TLS cert generated and secured",
+		zap.String("key", shared.TLSKey),
+		zap.String("crt", shared.TLSCrt))
 
-	log.Info("✅ Vault TLS cert generated and secured", zap.String("key", shared.TLSKey), zap.String("crt", shared.TLSCrt))
 	return nil
 }
 
@@ -176,73 +199,64 @@ func fixTLSCertIfMissingSAN(log *zap.Logger) error {
 		Timeout: 3 * time.Second,
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: false, // we want the error to happen
+				InsecureSkipVerify: false, // Intentionally strict: want to catch validation failures
 			},
 		},
 	}
 
 	log.Debug("🔍 Testing TLS connection for SAN validation", zap.String("url", url))
+
 	resp, err := client.Get(url)
 	if err != nil {
+		errStr := err.Error()
+
 		if os.IsTimeout(err) {
 			log.Warn("⏱️ TLS check timed out – assuming Vault not running")
-			return nil // not a cert issue
+			return nil // Not a cert issue
 		}
-		if strings.Contains(err.Error(), "x509: cannot validate certificate for 127.0.0.1 because it doesn't contain any IP SANs") {
-			log.Warn("❌ TLS cert is missing SAN for 127.0.0.1 – forcing regeneration")
 
-			// Delete cert + key
-			if err := os.Remove(shared.TLSKey); err != nil && !os.IsNotExist(err) {
-				log.Error("failed to remove broken TLS key", zap.Error(err))
-			}
-			if err := os.Remove(shared.TLSCrt); err != nil && !os.IsNotExist(err) {
-				log.Error("failed to remove broken TLS cert", zap.Error(err))
-			}
+		if strings.Contains(errStr, "x509: cannot validate certificate for 127.0.0.1") &&
+			strings.Contains(errStr, "doesn't contain any IP SANs") {
+			log.Warn("❌ Detected TLS cert missing SAN for 127.0.0.1 — forcing regeneration")
 
+			if err := removeBadTLSCerts(log); err != nil {
+				return fmt.Errorf("failed to remove broken certs after SAN check: %w", err)
+			}
+			return nil
+		}
+
+		// 🔥 NEW: Catch other related SAN errors
+		if strings.Contains(errStr, "x509: certificate is not valid for") {
+			log.Warn("❌ Detected certificate hostname mismatch — forcing TLS cert regeneration",
+				zap.String("error", errStr))
+
+			if err := removeBadTLSCerts(log); err != nil {
+				return fmt.Errorf("failed to remove broken certs after hostname mismatch: %w", err)
+			}
 			return nil
 		}
 
 		log.Debug("TLS connection failed, but not due to SAN issue", zap.Error(err))
-		return nil // different TLS failure — don't reset
+		return nil // Different TLS failure — do not delete
 	}
 
-	resp.Body.Close()
+	defer resp.Body.Close()
 	log.Debug("✅ TLS cert appears valid – continuing")
 	return nil
 }
 
-//
-// ========================== LIFECYCLE_CA ==========================
-//
+// Helper
+func removeBadTLSCerts(log *zap.Logger) error {
+	for _, path := range []string{shared.TLSKey, shared.TLSCrt} {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			log.Error("❌ Failed to remove broken TLS cert file", zap.String("path", path), zap.Error(err))
+			return err
+		}
+		log.Info("✅ Removed broken TLS cert file", zap.String("path", path))
+	}
+	return nil
+}
 
-/**/
-// ## 3. Ensure TLS Certificates Exist
-// 	- Prompt for self-signed cert confirmation
-// 	- Generate cert with CN = internal hostname
-// 	- Save to `/etc/vault.d/vault.crt` and `.key`
-// 	- EOS will ensure required directories (e.g. `/etc/vault.d`, `/var/lib/eos/secrets`, `/opt/pandora/data`) exist with appropriate ownership and permissions before writing any files.
-// 	- If any directory creation fails, EOS will abort and suggest running as root or fixing permissions.
-// ### Decision: Self-Signed TLS with Interactive Prompting
-// - Use self-signed certs by default to secure Vault listener.
-// - Allow user override via `--cert` and `--key` flags.
-// - If no flags are provided, prompt the user to confirm generating self-signed certs interactively.
-// - Certificates will be written to:
-//   - `/etc/vault.d/vault.crt`
-//   - `/etc/vault.d/vault.key`
-// - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
-// - Avoids brittle reliance on external ACME or CA automation in early stages.
-// - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
-// - EOS will generate SANs by default, but warns if `--cert` is provided and lacks expected hostnames.
-// - Self-signed certs are valid for 1 year and trusted only on localhost connections.
-// - If users wish to use these certs across machines or in CI, EOS provides an option to export the root CA via `eos vault export-ca`.
-// ---
-/**/
-
-/**/
-// EnsureVaultTLS ensures that TLS certificates for Vault exist, generating self-signed ones if needed.
-// It verifies SAN coverage and system trust, aborting if directory setup or permissions fail.
-// EnsureVaultTLS ensures Vault TLS certs are present and valid.
-// If no certs exist, it interactively prompts to generate a new self-signed cert.
 func EnsureVaultTLS(log *zap.Logger) (string, string, error) {
 	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
 		log.Info("✅ Vault TLS certs already exist, skipping generation",
@@ -268,22 +282,10 @@ func tlsCertsExist() bool {
 	return system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt)
 }
 
-// - Designed to bootstrap secure vault health, unattended agent-to-host workflows, and future PKI.
-// - Avoids brittle reliance on external ACME or CA automation in early stages.
-// - Cert SANs must include both internal hostname and `127.0.0.1` to support local Vault Agent auth.
-// - EOS will generate SANs by default, but warns if `--cert` is provided and lacks expected hostnames.
-// - Self-signed certs are valid for 1 year and trusted only on localhost connections.
-// - If users wish to use these certs across machines or in CI, EOS provides an option to export the root CA via `eos vault export-ca`.
-
-// ---
-
-/**/
-
-/**/
 func secureVaultTLSOwnership(log *zap.Logger) error {
-	uid, gid, err := system.LookupUser("vault")
+	uid, gid, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("could not lookup vault user", zap.Error(err))
+		log.Warn("could not lookup eos user", zap.Error(err))
 		return err
 	}
 
@@ -333,5 +335,3 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 
 	return nil
 }
-
-/**/
