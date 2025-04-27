@@ -12,20 +12,19 @@ import (
 var RefreshCmd = &cobra.Command{
 	Use:     "refresh",
 	Short:   "Refresh EOS system components (e.g., passwords, tokens)",
-	Long:    "Commands to refresh or reload components.",
+	Long:    "Commands to refresh or reload EOS components safely and securely.",
 	Aliases: []string{"reload", "restart"},
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log = logger.L()
-		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
-		_ = cmd.Help() // Display help if no subcommand is provided
+		log.Info("No subcommand provided for refresh command", zap.String("command", cmd.Use))
+		_ = cmd.Help() // fallback to displaying help if no subcommand
 		return nil
 	}),
 }
 
-// log is a package-level variable for the Zap logger.
+// logger instance shared for refresh package
 var log *zap.Logger
 
 func init() {
-	// Initialize the shared logger for the entire install package
 	log = logger.L()
 }

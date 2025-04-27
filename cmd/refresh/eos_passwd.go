@@ -1,4 +1,4 @@
-// cmd/refresh/passwd.go
+// cmd/refresh/eos_passwd.go
 
 package refresh
 
@@ -14,8 +14,8 @@ import (
 var RefreshEosPasswdCmd = &cobra.Command{
 	Use:   "eos-passwd",
 	Short: "Refresh the EOS user password and update secrets safely",
-	Long: `This command regenerates a strong EOS password,
-updates the system user, and saves the credentials securely.`,
+	Long: `Regenerates a strong EOS password,
+updates the system account password, and saves new credentials to disk.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("refresh-eos-passwd")
 

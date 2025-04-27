@@ -109,11 +109,13 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	return nil
 }
 
+// SecretsExist returns true if the eos-passwd.json file exists
 func SecretsExist() bool {
 	_, err := os.Stat(filepath.Join(shared.SecretsDir, shared.SecretsFilename))
 	return err == nil
 }
 
+// RepairEosSecrets generates a new strong password and saves it securely.
 func RepairEosSecrets(log *zap.Logger) error {
 	password, err := crypto.GeneratePassword(20)
 	if err != nil {
