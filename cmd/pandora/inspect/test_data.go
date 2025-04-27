@@ -15,6 +15,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	testDataFilename  = "test-data.json"
+	testDataVaultPath = "eos/test-data"
+)
+
 // InspectTestDataCmd attempts to read test data from Vault,
 // falling back to disk if Vault is unavailable.
 var InspectTestDataCmd = &cobra.Command{
@@ -24,14 +29,12 @@ var InspectTestDataCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-inspect-test-data")
 
-		// Try to create a privileged Vault client first
 		client, err := vault.EnsurePrivilegedVaultClient(log)
 		if err != nil {
 			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
 			return inspectTestDataFromDisk(log)
 		}
 
-		// 🛠 Properly cache the Vault client immediately
 		vault.SetVaultClient(client, log)
 		validateAndCache(client, log)
 
@@ -48,15 +51,11 @@ var InspectTestDataCmd = &cobra.Command{
 
 		pretty, _ := json.MarshalIndent(out, "", "  ")
 		printTestData(pretty)
+		printInspectSummary("Vault", "secret/data/"+testDataVaultPath)
 		log.Info("✅ Test-data displayed successfully (Vault)")
 		return nil
 	}),
 }
-
-const (
-	testDataFilename  = "test-data.json"
-	testDataVaultPath = "eos/test-data"
-)
 
 func inspectTestDataFromDisk(log *zap.Logger) error {
 	log.Info("🔍 Attempting to read test-data from disk fallback...")
@@ -77,6 +76,21 @@ func printTestData(data []byte) {
 	fmt.Println()
 	fmt.Println("🔒 Test Data Contents:")
 	fmt.Println(string(data))
+	fmt.Println()
+}
+
+func printInspectSummary(source, path string) {
+	fmt.Println()
+	fmt.Println("🔎 Test Data Inspection Summary")
+	switch source {
+	case "Vault":
+		fmt.Printf("  🔐 Source: %s\n", source)
+	case "Disk":
+		fmt.Printf("  💾 Source: %s\n", source)
+	default:
+		fmt.Printf("  ❓ Source: %s\n", source)
+	}
+	fmt.Printf("  📂 Path: %s\n", path)
 	fmt.Println()
 }
 
