@@ -3,7 +3,10 @@ package inspect
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
@@ -16,6 +19,13 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
+
+func init() {
+	InspectVaultCmd.AddCommand(InspectVaultAgentCmd)
+	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
+	InspectCmd.AddCommand(InspectVaultCmd)
+	InspectCmd.AddCommand(InspectVaultInitCmd)
+}
 
 // InspectVaultInitCmd displays Vault initialization keys, root token, and eos user credentials.
 var InspectVaultInitCmd = &cobra.Command{
@@ -153,9 +163,52 @@ var InspectVaultLDAPCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	InspectVaultCmd.AddCommand(InspectVaultAgentCmd)
-	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
-	InspectCmd.AddCommand(InspectVaultCmd)
-	InspectCmd.AddCommand(InspectVaultInitCmd)
+var InspectSecretsCmd = &cobra.Command{
+	Use:   "secrets",
+	Short: "List and view EOS secrets (redacted)",
+	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log.Named("inspect-secrets")
+
+		files, err := os.ReadDir(shared.SecretsDir)
+		if err != nil {
+			return logger.LogErrAndWrap(log, "inspect secrets: read secrets dir", err)
+		}
+
+		if len(files) == 0 {
+			fmt.Println("❌ No secrets found in", shared.SecretsDir)
+			return nil
+		}
+
+		fmt.Println("\n🔐 EOS Secrets Directory")
+		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+		for _, file := range files {
+			path := filepath.Join(shared.SecretsDir, file.Name())
+
+			data, err := os.ReadFile(path)
+			if err != nil {
+				log.Warn("❌ Failed to read secret file", zap.String("path", path), zap.Error(err))
+				continue
+			}
+
+			var content map[string]interface{}
+			if err := json.Unmarshal(data, &content); err != nil {
+				log.Warn("❌ Failed to parse JSON secret", zap.String("path", path), zap.Error(err))
+				fmt.Printf("- %s (Unreadable JSON)\n", file.Name())
+				continue
+			}
+
+			fmt.Printf("\n📄 File: %s\n", file.Name())
+			for k, v := range content {
+				valStr := fmt.Sprintf("%v", v)
+				if strings.Contains(strings.ToLower(k), "password") || strings.Contains(strings.ToLower(k), "token") || strings.Contains(strings.ToLower(k), "key") {
+					valStr = crypto.Redact(valStr)
+				}
+				fmt.Printf("    %s: %s\n", k, valStr)
+			}
+		}
+
+		fmt.Println("\n✅ Secrets inspection complete.")
+		return nil
+	}),
 }

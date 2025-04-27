@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -13,7 +14,7 @@ import (
 // LoadVaultInitResult tries to load the saved Vault initialization result
 func LoadVaultInitResult(log *zap.Logger) (*api.InitResponse, error) {
 	initRes := new(api.InitResponse)
-	path := DiskPath("vault_init", log)
+	path := shared.VaultInitPath
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("read vault init result file: %w", err)
