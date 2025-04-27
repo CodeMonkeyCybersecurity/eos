@@ -44,7 +44,7 @@ var dockerComposeCmd = &cobra.Command{
 			lastValues["APPS_SELECTION"] = strings.Join(keys, ", ")
 		} else {
 			// Interactive mode.
-			hecate.DisplayOptions()
+			hecate.DisplayOptions(log)
 			defaultSelection := lastValues["APPS_SELECTION"]
 
 			// Create a reader for input.
@@ -53,7 +53,7 @@ var dockerComposeCmd = &cobra.Command{
 			var sel string
 			selectedApps, sel = hecate.GetUserSelection(defaultSelection, reader)
 			lastValues["APPS_SELECTION"] = sel
-			hecate.SaveLastValues(lastValues)
+			hecate.SaveLastValues(lastValues, log)
 		}
 		if err := hecate.UpdateComposeFile(selectedApps); err != nil {
 			log.Error("Error updating docker-compose file.", zap.Error(err))

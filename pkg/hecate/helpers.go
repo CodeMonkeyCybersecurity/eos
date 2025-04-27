@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -75,7 +76,7 @@ func PromptInput(varName, promptMessage, defaultVal string, reader *bufio.Reader
 }
 
 // saveLastValues writes the provided map to LastValuesFile in key="value" format.
-func SaveLastValues(values map[string]string) {
+func SaveLastValues(values map[string]string, log *zap.Logger) {
 	file, err := os.Create(LastValuesFile)
 	if err != nil {
 		logger.GetLogger().Fatal("Unable to save values", zap.Error(err))
@@ -94,7 +95,7 @@ func SaveLastValues(values map[string]string) {
 			logger.GetLogger().Fatal("Error writing to file", zap.Error(err))
 		}
 	}
-	writer.Flush()
+	shared.SafeFlush(writer, log)
 }
 
 // backupFile creates a backup of the provided file by copying it to a new file with a timestamp.
@@ -142,14 +143,14 @@ func BackupFile(filepathStr string) error {
 }
 
 // displayOptions prints the available Eos backend web apps.
-func DisplayOptions() {
+func DisplayOptions(log *zap.Logger) {
 	fmt.Println("Available Eos backend web apps:")
 	// To display options in order, first sort the keys numerically.
 	var keys []int
 	keyMap := make(map[int]string)
 	for keyStr := range AppsSelection {
 		var num int
-		fmt.Sscanf(keyStr, "%d", &num)
+		shared.SafeSscanf(keyStr, "%d", &num, log)
 		keys = append(keys, num)
 		keyMap[num] = keyStr
 	}

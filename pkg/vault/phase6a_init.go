@@ -108,7 +108,9 @@ func PromptToSaveVaultInitData(init *api.InitResponse, log *zap.Logger) error {
 	fmt.Print("\nType 'yes' to confirm you have saved the keys somewhere safe: ")
 
 	var response string
-	fmt.Scanln(&response)
+	if _, err := fmt.Scanln(&response); err != nil {
+		log.Warn("Failed to read user input", zap.Error(err))
+	}
 	if strings.ToLower(strings.TrimSpace(response)) != "yes" {
 		return fmt.Errorf("user did not confirm secure storage of unseal material")
 	}

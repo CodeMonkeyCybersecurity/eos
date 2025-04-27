@@ -42,7 +42,7 @@ var configCmd = &cobra.Command{
 			"BASE_DOMAIN":       baseDomain,
 		}
 		// SaveLastValues does not return a value, so simply call it:
-		hecate.SaveLastValues(newValues)
+		hecate.SaveLastValues(newValues, log)
 
 		// Ensure the conf.d directory exists.
 		if info, err := os.Stat(hecate.ConfDir); err != nil || !info.IsDir() {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -13,7 +14,7 @@ import (
 func MaybeWriteVaultInitFallback(init *api.InitResponse, log *zap.Logger) error {
 	fmt.Print("💾 Save Vault init material to fallback file? (y/N): ")
 	var resp string
-	fmt.Scanln(&resp)
+	shared.SafeScanln(&resp, log)
 	if strings.ToLower(resp) != "y" {
 		log.Warn("❌ Skipping fallback write at user request")
 		return nil

@@ -8,16 +8,19 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"go.uber.org/zap"
 )
 
 // Authenticate logs in to the Wazuh API using the current Delphi config
 // and returns a JWT token.
-func Authenticate(cfg *Config) (string, error) {
+func Authenticate(cfg *Config, log *zap.Logger) (string, error) {
 	authURL := fmt.Sprintf("%s/security/user/authenticate?raw=true", strings.TrimRight(cfg.Endpoint, "/"))
 
 	req, err := http.NewRequest("POST", authURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return "", fmt.Errorf("failed to create auth request: %w", err)
 	}
 	req.SetBasicAuth(cfg.APIUser, cfg.APIPassword)
 
@@ -33,7 +36,7 @@ func Authenticate(cfg *Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("auth request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -46,7 +49,7 @@ func Authenticate(cfg *Config) (string, error) {
 
 	token := strings.TrimSpace(string(body))
 	if token == "" {
-		return "", fmt.Errorf("no token received")
+		return "", fmt.Errorf("authentication succeeded but no token received")
 	}
 
 	return token, nil
@@ -54,13 +57,13 @@ func Authenticate(cfg *Config) (string, error) {
 
 // AuthenticatedGetJSON performs a GET request using the stored JWT token
 // and returns the response body and HTTP status code.
-func AuthenticatedGetJSON(cfg *Config, path string) (string, int) {
+func AuthenticatedGetJSON(cfg *Config, path string, log *zap.Logger) (string, int) {
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	body, _ := io.ReadAll(resp.Body)
 	return string(body), resp.StatusCode
@@ -68,7 +71,7 @@ func AuthenticatedGetJSON(cfg *Config, path string) (string, int) {
 
 // AuthenticateUser tries to log in using an arbitrary username/password pair.
 // Useful for testing or rotating credentials.
-func AuthenticateUser(cfg *Config, username, password string) (string, error) {
+func AuthenticateUser(cfg *Config, username, password string, log *zap.Logger) (string, error) {
 	url := fmt.Sprintf("%s://%s:%s/security/user/authenticate?raw=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port)
 
@@ -90,7 +93,7 @@ func AuthenticateUser(cfg *Config, username, password string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("auth request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

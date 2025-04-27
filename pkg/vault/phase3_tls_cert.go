@@ -158,7 +158,9 @@ IP.1 = %s
 	if err != nil {
 		return fmt.Errorf("failed to create temp openssl config: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
+	if err := os.Remove(tmpFile.Name()); err != nil {
+		log.Warn("Failed to remove temp file", zap.Error(err))
+	}
 	tmpConfigPath := tmpFile.Name()
 
 	if _, err := tmpFile.Write([]byte(configContent)); err != nil {
@@ -230,7 +232,6 @@ func fixTLSCertIfMissingSAN(log *zap.Logger) error {
 			return nil
 		}
 
-		// 🔥 NEW: Catch other related SAN errors
 		if strings.Contains(errStr, "x509: certificate is not valid for") {
 			log.Warn("❌ Detected certificate hostname mismatch — forcing TLS cert regeneration",
 				zap.String("error", errStr))
@@ -245,7 +246,7 @@ func fixTLSCertIfMissingSAN(log *zap.Logger) error {
 		return nil // Different TLS failure — do not delete
 	}
 
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 	log.Debug("✅ TLS cert appears valid – continuing")
 	return nil
 }

@@ -6,6 +6,8 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // GenerateFIPSKey generates a FIPS-compliant RSA SSH key (2048 bits, no passphrase)
@@ -38,7 +40,7 @@ Host %s
 	if err != nil {
 		return fmt.Errorf("failed to open SSH config: %w", err)
 	}
-	defer f.Close()
+	defer shared.SafeClose(f, log)
 
 	// Only add entry if not already present
 	data, err := os.ReadFile(configPath)

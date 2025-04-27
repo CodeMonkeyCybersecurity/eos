@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +20,8 @@ var ParseCmd = &cobra.Command{
 	Use:   "parse",
 	Short: "Split a ChatGPT-style conversations.json into individual files",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log.Named("parse")
+
 		if !jsonMode {
 			return fmt.Errorf("only --json mode is currently supported")
 		}
@@ -28,7 +31,7 @@ var ParseCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open input file: %w", err)
 		}
-		defer file.Close()
+		defer shared.SafeClose(file, log)
 
 		var conversations []map[string]interface{}
 		if err := json.NewDecoder(file).Decode(&conversations); err != nil {
@@ -48,15 +51,15 @@ var ParseCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to create output file: %w", err)
 			}
+			defer shared.SafeClose(outFile, log) // Safe close each file
 
 			enc := json.NewEncoder(outFile)
 			enc.SetIndent("", "  ")
 			if err := enc.Encode(conv); err != nil {
-				outFile.Close()
 				return fmt.Errorf("failed to write JSON: %w", err)
 			}
-			outFile.Close()
 		}
+
 		fmt.Printf("✅ Parsed %d conversations into ./%s/\n", len(conversations), outDir)
 		return nil
 	}),
@@ -65,5 +68,5 @@ var ParseCmd = &cobra.Command{
 func init() {
 	ParseCmd.Flags().StringVar(&inputFile, "filename", "", "Path to conversations.json")
 	ParseCmd.Flags().BoolVar(&jsonMode, "json", false, "Enable JSON parse mode")
-	ParseCmd.MarkFlagRequired("filename")
+	_ = ParseCmd.MarkFlagRequired("filename")
 }

@@ -17,7 +17,7 @@ import (
 func EnsureVaultClient(log *zap.Logger) {
 	log.Debug("🔐 Ensuring VAULT_ADDR is configured...")
 
-	var client *api.Client
+	var Client *api.Client
 	var report *shared.CheckReport
 	var checkedClient *api.Client
 
@@ -47,7 +47,7 @@ func EnsureVaultClient(log *zap.Logger) {
 		return
 	}
 
-	report, checkedClient = Check(client, log, nil, "")
+	report, checkedClient = Check(Client, log, nil, "")
 	if checkedClient != nil {
 		SetVaultClient(checkedClient, log)
 	}
@@ -65,7 +65,7 @@ func EnsureVaultClient(log *zap.Logger) {
 	client, err := NewClient(log)
 	if err == nil {
 		log.Info("✅ Vault client created from environment")
-		SetVaultClient(client, log)
+		SetVaultClient(Client, log)
 
 		// ✅ Validate health
 		report, checkedClient := Check(client, log, nil, "")

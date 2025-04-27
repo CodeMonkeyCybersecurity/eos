@@ -40,7 +40,7 @@ var TreecatCmd = &cobra.Command{
 			fmt.Printf("%s- %s\n", indent, d.Name())
 
 			if d.Type().IsRegular() {
-				preview, err := previewFile(path)
+				preview, err := previewFile(path, log)
 				if err != nil {
 					log.Warn("Could not preview file", zap.String("file", path), zap.Error(err))
 					return nil
@@ -61,12 +61,12 @@ var TreecatCmd = &cobra.Command{
 	}),
 }
 
-func previewFile(path string) (string, error) {
+func previewFile(path string, log *zap.Logger) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer shared.SafeClose(f, log)
 
 	buf := make([]byte, shared.MaxPreviewSize)
 	n, err := f.Read(buf)

@@ -39,7 +39,9 @@ const (
 	DelphiPasswdToolPath = "/usr/local/bin/wazuh-passwords-tool.sh"
 )
 
-// DelphiConfig represents the configuration stored in delphi.json
+const configFile = ".delphi.json"
+
+// Config represents the configuration stored in delphi.json
 type Config struct {
 	APIUser            string `json:"API_User"`
 	APIPassword        string `json:"API_Password"`

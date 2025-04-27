@@ -120,7 +120,7 @@ func waitForVaultHealth(log *zap.Logger, maxWait time.Duration) error {
 		}
 		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, shared.VaultRetryDelay)
 		if err == nil {
-			conn.Close()
+			defer shared.SafeClose(conn, log)
 			log.Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
 			return nil
 		}

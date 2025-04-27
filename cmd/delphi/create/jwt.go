@@ -44,10 +44,12 @@ var CreateJWTCmd = &cobra.Command{
 			cfg.Port = "55000"
 		}
 
-		delphi.WriteConfig(cfg, log)
+		if err := delphi.WriteConfig(cfg, log); err != nil {
+			log.Warn("Failed to write config", zap.Error(err))
+		}
 
 		log.Info("Retrieving JWT token...")
-		token, err := delphi.Authenticate(cfg)
+		token, err := delphi.Authenticate(cfg, log)
 		if err != nil {
 			log.Fatal("Authentication failed", zap.Error(err))
 		}

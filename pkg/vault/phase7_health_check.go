@@ -1,3 +1,5 @@
+// pkg/vault/phase7_health_check.go
+
 package vault
 
 import (
@@ -46,7 +48,7 @@ func CheckVaultHealth(log *zap.Logger) (bool, error) {
 		log.Error("❌ Vault health check request failed", zap.String("url", healthURL), zap.Error(err))
 		return false, fmt.Errorf("vault not responding at %s: %w", addr, err)
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	switch resp.StatusCode {
 	case 200:

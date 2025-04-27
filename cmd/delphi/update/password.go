@@ -48,11 +48,11 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 
 		log.Info("Authenticating with current password...")
 
-		if _, err := delphi.AuthenticateUser(cfg, username, currentPassword); err != nil {
+		if _, err := delphi.AuthenticateUser(cfg, username, currentPassword, log); err != nil {
 			return fmt.Errorf("authentication failed: %w", err)
 		}
 
-		userID, err := delphi.GetUserIDByUsername(cfg, username)
+		userID, err := delphi.GetUserIDByUsername(cfg, username, log)
 		if err != nil {
 			return fmt.Errorf("unable to resolve user ID for username %s: %w", username, err)
 		}
@@ -80,7 +80,7 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			password = pw1
 		}
 
-		if err := delphi.UpdateUserPassword(cfg, userID, password); err != nil {
+		if err := delphi.UpdateUserPassword(cfg, userID, password, log); err != nil {
 			return fmt.Errorf("failed to update password: %w", err)
 		}
 
@@ -103,7 +103,7 @@ func init() {
 	PasswordCmd.Flags().StringVar(&username, "username", "", "Wazuh username to update (required)")
 	PasswordCmd.Flags().StringVar(&password, "password", "", "New password to set (optional; will prompt if omitted)")
 	PasswordCmd.Flags().BoolVar(&storePassword, "store", false, "Store new password securely via XDG")
-	PasswordCmd.MarkFlagRequired("username")
+	_ = PasswordCmd.MarkFlagRequired("username")
 
 	UpdateCmd.AddCommand(PasswordCmd)
 }

@@ -40,7 +40,7 @@ var KeepAliveCmd = &cobra.Command{
 			"Content-Type":  "application/json",
 		}
 
-		response, err := delphi.GetJSON(baseURL, headers)
+		response, err := delphi.GetJSON(baseURL, headers, log)
 		if err != nil {
 			log.Fatal("Failed to fetch keepalive data", zap.Error(err))
 		}

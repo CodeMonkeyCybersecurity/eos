@@ -91,7 +91,9 @@ func InstallVaultViaApt(log *zap.Logger) error {
 	if err := curlCmd.Wait(); err != nil {
 		return fmt.Errorf("curl command failed: %w", err)
 	}
-	pipeWriter.Close()
+	if err := pipeWriter.Close(); err != nil {
+		log.Warn("Failed to close pipeWriter", zap.Error(err))
+	}
 
 	if err := gpgCmd.Wait(); err != nil {
 		return fmt.Errorf("gpg command failed: %w", err)

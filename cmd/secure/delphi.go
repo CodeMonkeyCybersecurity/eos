@@ -79,21 +79,21 @@ func runFallbackPasswordRotation(ctx *eos.RuntimeContext) (string, error) {
 		VerifyCertificates: false,
 	}
 
-	token, err := delphi.AuthenticateUser(&cfg, "wazuh-wui", extracted)
+	token, err := delphi.AuthenticateUser(&cfg, "wazuh-wui", extracted, log)
 	if err != nil {
 		return "", fmt.Errorf("fallback: auth failed: %w", err)
 	}
 	cfg.Token = token
 	ctx.Log.Info("✅ Authenticated with wazuh-wui")
 
-	userID, err := delphi.GetUserIDByUsername(&cfg, "wazuh")
+	userID, err := delphi.GetUserIDByUsername(&cfg, "wazuh", log)
 	if err != nil {
 		return "", fmt.Errorf("fallback: could not get user ID: %w", err)
 	}
 	ctx.Log.Info("🔍 Found wazuh user ID", zap.String("userID", userID))
 
 	newPass, _ := crypto.GeneratePassword(20)
-	if err := delphi.UpdateUserPassword(&cfg, userID, newPass); err != nil {
+	if err := delphi.UpdateUserPassword(&cfg, userID, newPass, log); err != nil {
 		return "", fmt.Errorf("fallback: could not update user password: %w", err)
 	}
 	ctx.Log.Info("✅ Updated password for wazuh")
@@ -151,7 +151,7 @@ func runDelphiHardening(ctx *eos.RuntimeContext) error {
 	}
 
 	ctx.Log.Info("🔍 Extracting current Wazuh API password")
-	apiPass, err := delphi.ExtractWazuhUserPassword()
+	apiPass, err := delphi.ExtractWazuhUserPassword(log)
 	if err != nil {
 		ctx.Log.Error("Failed to extract API password", zap.Error(err))
 		return err

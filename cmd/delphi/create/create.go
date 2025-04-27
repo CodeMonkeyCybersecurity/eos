@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -93,7 +94,7 @@ func runMapping() {
 	apiURL = strings.TrimRight(apiURL, "/")
 
 	log.Info("Authenticating to Wazuh API", zap.String("url", apiURL))
-	token, err := delphi.Authenticate(cfg)
+	token, err := delphi.Authenticate(cfg, log)
 	if err != nil {
 		log.Fatal("Authentication failed", zap.Error(err))
 	}
@@ -111,7 +112,7 @@ func runMapping() {
 	if err != nil {
 		log.Fatal("Error making request", zap.Error(err))
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	var agentsResp AgentsResponse
 	decoder := json.NewDecoder(resp.Body)

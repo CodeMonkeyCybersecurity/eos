@@ -11,6 +11,8 @@ import (
 
 	"os/exec"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -22,13 +24,13 @@ type WazuhConfig struct {
 }
 
 // ExtractWazuhUserPassword reads the wazuh-wui password from wazuh.yml
-func ExtractWazuhUserPassword() (string, error) {
+func ExtractWazuhUserPassword(log *zap.Logger) (string, error) {
 	configPath := "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
 	file, err := os.Open(configPath)
 	if err != nil {
 		return "", fmt.Errorf("unable to open wazuh.yml: %w", err)
 	}
-	defer file.Close()
+	defer shared.SafeClose(file, log)
 
 	data, err := io.ReadAll(file)
 	if err != nil {

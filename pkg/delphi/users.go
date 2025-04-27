@@ -8,29 +8,32 @@ import (
 	"io"
 	"net/http"
 	"os"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"go.uber.org/zap"
 )
 
 // GetUserDetails queries Wazuh API for user info using a valid token.
-func GetUserDetails(cfg *Config) (string, int) {
+func GetUserDetails(cfg *Config, log *zap.Logger) (string, int) {
 	resp, err := AuthenticatedGet(cfg, fmt.Sprintf("/security/users/%s", cfg.APIUser))
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	body, _ := io.ReadAll(resp.Body)
 	return string(body), resp.StatusCode
 }
 
 // GetAllUsers returns all users
-func GetAllUsers(cfg *Config) ([]User, error) {
+func GetAllUsers(cfg *Config, log *zap.Logger) ([]User, error) {
 	path := "/security/users?pretty=true"
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	var result struct {
 		Data struct {
@@ -44,13 +47,13 @@ func GetAllUsers(cfg *Config) ([]User, error) {
 }
 
 // GetUserIDByUsername fetches the user ID given a username and prints the raw JSON response.
-func GetUserIDByUsername(cfg *Config, username string) (string, error) {
+func GetUserIDByUsername(cfg *Config, username string, log *zap.Logger) (string, error) {
 	path := "/security/users?pretty=true"
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -79,7 +82,7 @@ func GetUserIDByUsername(cfg *Config, username string) (string, error) {
 }
 
 // UpdateUserPassword changes a user's password
-func UpdateUserPassword(cfg *Config, userID string, newPassword string) error {
+func UpdateUserPassword(cfg *Config, userID string, newPassword string, log *zap.Logger) error {
 	path := fmt.Sprintf("/security/users/%s", userID)
 	payload := map[string]string{"password": newPassword}
 
@@ -87,7 +90,7 @@ func UpdateUserPassword(cfg *Config, userID string, newPassword string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

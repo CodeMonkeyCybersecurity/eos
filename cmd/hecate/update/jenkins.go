@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -58,7 +59,7 @@ Usage:
 			return err
 		}
 		fmt.Println("Hecate redeployed successfully with new Jenkins backend IP.")
-		cmd.Help()
+		shared.SafeHelp(cmd, log)
 		return nil
 	}),
 }

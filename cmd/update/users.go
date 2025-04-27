@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,7 @@ var UpdateUsersCmd = &cobra.Command{
 		user := args[0]
 		fmt.Printf("Updating user: %s\n", user)
 		// Add your logic here
-		cmd.Help()
+		shared.SafeHelp(cmd, log)
 		return nil
 	}),
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -21,7 +22,7 @@ func CheckConnection(cfg *LDAPConfig, log *zap.Logger) error {
 	if err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
-	defer conn.Close()
+	defer shared.SafeClose(conn, log)
 
 	return nil
 }

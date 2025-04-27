@@ -31,13 +31,15 @@ var InspectAPICmd = &cobra.Command{
 
 		// ✅ Step 3: Authenticate if needed
 		if cfg.Token == "" {
-			token, err := delphi.Authenticate(cfg)
+			token, err := delphi.Authenticate(cfg, log)
 			if err != nil {
 				fmt.Printf("❌ Authentication failed: %v\n", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
-			_ = delphi.WriteConfig(cfg, log)
+			if err := delphi.WriteConfig(cfg, log); err != nil {
+				log.Warn("Failed to write config", zap.Error(err))
+			}
 		}
 
 		// ✅ Step 4: Secret access control
@@ -47,10 +49,10 @@ var InspectAPICmd = &cobra.Command{
 
 		// ✅ Step 5: Execute inspection
 		if showPermissions {
-			body, code := delphi.GetUserDetails(cfg)
+			body, code := delphi.GetUserDetails(cfg, log)
 			delphi.HandleAPIResponse("API User Permissions", []byte(body), code)
 		} else if showVersion {
-			body, code := delphi.AuthenticatedGetJSON(cfg, "/manager/status")
+			body, code := delphi.AuthenticatedGetJSON(cfg, "/manager/status", log)
 			delphi.HandleAPIResponse("Wazuh Manager Version", []byte(body), code)
 		} else {
 			fmt.Println("⚠️  No flags provided. Use --permissions or --version to query specific information.")

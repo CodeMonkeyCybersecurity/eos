@@ -24,7 +24,7 @@ var UsersCmd = &cobra.Command{
 			log.Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
-		users, err := delphi.GetAllUsers(cfg)
+		users, err := delphi.GetAllUsers(cfg, log)
 		if err != nil {
 			log.Fatal("Failed to fetch users", zap.Error(err))
 		}

@@ -9,6 +9,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -104,22 +105,18 @@ func RegisterCommands() {
 
 // Execute initializes and runs the root command.
 func Execute() {
-	defer func() {
-		if err := logger.Sync(); err != nil {
-			fmt.Fprintf(os.Stderr, "⚠️  Failed to flush logs: %v\n", err)
-		}
-	}()
+	defer shared.SafeSync(zap.L())
 
-	logger.L().Info("Eos CLI starting")
+	zap.L().Info("Eos CLI starting")
 
 	RegisterCommands()
 
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
-			logger.L().Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(0) // <-- gracefully allow 0 exit code for user errors
+			zap.L().Warn("CLI completed with user error", zap.Error(err))
+			os.Exit(0) // graceful exit for user mistakes
 		} else {
-			logger.L().Error("CLI execution error", zap.Error(err))
+			zap.L().Error("CLI execution error", zap.Error(err))
 			os.Exit(1)
 		}
 	}

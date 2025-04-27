@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -227,7 +228,7 @@ smtp_use_tls = yes
 	if err != nil {
 		return fmt.Errorf("failed to open /etc/postfix/main.cf: %w", err)
 	}
-	defer f.Close()
+	defer shared.SafeClose(f, log)
 
 	if _, err := f.WriteString(config); err != nil {
 		return fmt.Errorf("failed to write config to /etc/postfix/main.cf: %w", err)

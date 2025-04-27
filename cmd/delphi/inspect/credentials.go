@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -29,13 +30,15 @@ var InspectCredentialsCmd = &cobra.Command{
 		}
 
 		if cfg.Token == "" {
-			token, err := delphi.Authenticate(cfg)
+			token, err := delphi.Authenticate(cfg, log)
 			if err != nil {
 				fmt.Printf("❌ Authentication failed: %v\n", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
-			_ = delphi.WriteConfig(cfg, log)
+			if err := delphi.WriteConfig(cfg, log); err != nil {
+				log.Warn("Failed to write config", zap.Error(err))
+			}
 		}
 
 		resp, err := delphi.AuthenticatedGet(cfg, "/security/users")
@@ -43,7 +46,7 @@ var InspectCredentialsCmd = &cobra.Command{
 			fmt.Printf("❌ Failed to fetch users: %v\n", err)
 			os.Exit(1)
 		}
-		defer resp.Body.Close()
+		defer shared.SafeClose(resp.Body, log)
 
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("❌ Failed with status code: %d\n", resp.StatusCode)

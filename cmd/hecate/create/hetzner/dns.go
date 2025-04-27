@@ -12,6 +12,7 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -185,7 +186,7 @@ func getZoneIDForDomain(token, domain string) (string, error) {
 		log.Error("Failed to execute HTTP request for fetching zones", zap.Error(err))
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	if resp.StatusCode != http.StatusOK {
 		log.Error("Unexpected status from zones list",
@@ -242,7 +243,7 @@ func createRecord(token, zoneID, name, ip string) error {
 		log.Error("Failed to execute HTTP request for creating record", zap.Error(err))
 		return err
 	}
-	defer resp.Body.Close()
+	defer shared.SafeClose(resp.Body, log)
 
 	if resp.StatusCode != http.StatusCreated {
 		var responseBody bytes.Buffer

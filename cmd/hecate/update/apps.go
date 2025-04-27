@@ -77,7 +77,7 @@ var appsCmd = &cobra.Command{
 		defaultApps := lastValues["APPS_SELECTION"]
 
 		// Display available apps.
-		hecate.DisplayOptions()
+		hecate.DisplayOptions(log)
 
 		// Prompt for a selection.
 		allowedFiles, selectionStr := hecate.GetUserSelection(defaultApps, reader)
@@ -112,7 +112,7 @@ var appsCmd = &cobra.Command{
 
 		// Save the selection back to the last values file.
 		lastValues["APPS_SELECTION"] = selectionStr
-		hecate.SaveLastValues(lastValues)
+		hecate.SaveLastValues(lastValues, log)
 
 		fmt.Println("\nUpdate complete.")
 		return nil

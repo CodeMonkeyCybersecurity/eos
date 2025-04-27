@@ -28,7 +28,7 @@ var UpdateAgentsCmd = &cobra.Command{
 			return err
 		}
 
-		token, err := delphi.Authenticate(cfg)
+		token, err := delphi.Authenticate(cfg, log)
 		if err != nil {
 			log.Error("Authentication failed", zap.Error(err))
 			return fmt.Errorf("authentication failed: %w", err)
@@ -56,7 +56,7 @@ var UpdateAgentsCmd = &cobra.Command{
 			},
 		}
 
-		if err := delphi.UpgradeAgents(cfg, token, agentIDs, payload); err != nil {
+		if err := delphi.UpgradeAgents(cfg, token, agentIDs, payload, log); err != nil {
 			log.Error("Upgrade failed", zap.Error(err))
 			return fmt.Errorf("upgrade failed: %w", err)
 		}

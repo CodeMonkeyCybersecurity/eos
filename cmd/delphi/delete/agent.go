@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/spf13/cobra"
@@ -44,14 +45,14 @@ Supported OS uninstallers:
 			os.Exit(1)
 		}
 
-		token, err := delphi.Authenticate(config)
+		token, err := delphi.Authenticate(config, log)
 		if err != nil {
 			log.Error("Authentication failed", zap.Error(err))
 			os.Exit(1)
 		}
 
 		log.Info("🗑️  Deleting Wazuh agent via API", zap.String("agentID", agentID))
-		resp, err := delphi.DeleteAgent(agentID, token, config)
+		resp, err := delphi.DeleteAgent(agentID, token, config, log)
 		if err != nil {
 			log.Error("Failed to delete agent via API", zap.Error(err))
 			os.Exit(1)
@@ -71,7 +72,7 @@ Supported OS uninstallers:
 		default:
 			log.Warn("Unsupported OS for local uninstall", zap.String("os", runtime.GOOS))
 		}
-		cmd.Help()
+		shared.SafeHelp(cmd, log)
 		return nil
 	}),
 }

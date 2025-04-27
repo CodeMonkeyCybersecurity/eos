@@ -10,6 +10,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/hashicorp/vault/api"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -17,23 +18,31 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const VaultEosSecretPrefix = "secret/eos/"
+
 var SyncVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Syncs fallback secrets into Vault",
 	Long: `Syncs all fallback secrets stored locally (e.g. from /var/lib/eos/secrets)
 into Vault, then removes them from disk if the sync is successful.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		vault.EnsureVaultEnv(log)
+		log := ctx.Log.Named("sync-vault")
+
+		_, err := vault.EnsureVaultEnv(log)
+		if err != nil {
+			log.Error("Vault environment preparation failed", zap.Error(err))
+			return err
+		}
 
 		client, err := vault.NewClient(log)
 		if err != nil {
-			fmt.Println("❌ Failed to create Vault client:", err)
-			return nil
+			log.Error("Failed to create Vault client", zap.Error(err))
+			return err
 		}
 
 		report, client := vault.Check(client, log, nil, "")
 		if !report.Initialized || report.Sealed {
-			log.Warn("Vault is not ready")
+			log.Warn("Vault is not ready", zap.Bool("initialized", report.Initialized), zap.Bool("sealed", report.Sealed))
 			return fmt.Errorf("vault is not ready")
 		}
 
@@ -50,38 +59,42 @@ into Vault, then removes them from disk if the sync is successful.`,
 
 			fullPath := filepath.Join(secretsDir, f.Name())
 			base := strings.TrimSuffix(f.Name(), "-fallback.yaml")
+			vaultPath := fmt.Sprintf("%s%s/config", VaultEosSecretPrefix, base)
 
-			fmt.Printf("📁 Syncing %s -> Vault path: secret/eos/%s/config\n", fullPath, base)
-
-			data := make(map[string]string)
-			raw, err := os.ReadFile(fullPath)
-			if err != nil {
-				log.Warn("Failed to read fallback file", zap.Error(err))
+			if err := syncFallbackFile(fullPath, base, vaultPath, client, log); err != nil {
+				log.Warn("Failed to sync fallback file", zap.String("file", fullPath), zap.Error(err))
 				continue
-			}
-
-			if err := yaml.Unmarshal(raw, &data); err != nil {
-				log.Warn("Failed to parse fallback YAML", zap.Error(err))
-				continue
-			}
-
-			if err := vault.Write(client, base, data, log); err != nil {
-				log.Warn("Failed to store fallback data to Vault", zap.Error(err))
-				continue
-			}
-
-			if err := os.Remove(fullPath); err != nil {
-				log.Warn("Synced but could not delete fallback file", zap.String("file", fullPath), zap.Error(err))
-			} else {
-				fmt.Printf("🗑️  Removed local fallback: %s\n", fullPath)
 			}
 		}
 
-		fmt.Println("✅ Fallback secrets synced to Vault (if any were found).")
+		log.Info("Completed Vault fallback secrets sync.")
 		return nil
 	}),
 }
 
 func init() {
 	SyncCmd.AddCommand(SyncVaultCmd)
+}
+
+func syncFallbackFile(fullPath, base, vaultPath string, client *api.Client, log *zap.Logger) error {
+	raw, err := os.ReadFile(fullPath)
+	if err != nil {
+		return fmt.Errorf("read file failed: %w", err)
+	}
+
+	data := make(map[string]string)
+	if err := yaml.Unmarshal(raw, &data); err != nil {
+		return fmt.Errorf("unmarshal YAML failed: %w", err)
+	}
+
+	if err := vault.Write(client, base, data, log); err != nil {
+		return fmt.Errorf("vault write failed: %w", err)
+	}
+
+	if err := os.Remove(fullPath); err != nil {
+		return fmt.Errorf("delete fallback file failed: %w", err)
+	}
+
+	log.Info("Synced and removed fallback file", zap.String("file", fullPath), zap.String("vault_path", vaultPath))
+	return nil
 }

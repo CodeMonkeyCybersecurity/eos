@@ -5,6 +5,7 @@ package ldap
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/go-ldap/ldap/v3"
 	"go.uber.org/zap"
 )
@@ -40,7 +41,7 @@ func createGroup(config *LDAPConfig, group LDAPGroup, log *zap.Logger) error {
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
+	defer shared.SafeClose(conn, log)
 
 	req := ldap.NewAddRequest(group.DN, nil)
 	req.Attribute("objectClass", []string{"groupOfNames", "top"})

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +40,7 @@ func getSystemUsers() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open /etc/passwd: %w", err)
 	}
-	defer file.Close()
+	defer shared.SafeClose(file, log)
 
 	var users []string
 	scanner := bufio.NewScanner(file)

@@ -4,7 +4,9 @@ package deploy
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // InstallCmd is the root command for Delphi installation actions
@@ -17,6 +19,14 @@ For example:
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return nil
 	}),
+}
+
+// log is a package-level variable for the Zap logger.
+var log *zap.Logger
+
+func init() {
+	// Initialize the shared logger for the entire deploy package
+	log = logger.L()
 }
 
 // In the init function, attach subcommands (for example, the Trivy installer).
