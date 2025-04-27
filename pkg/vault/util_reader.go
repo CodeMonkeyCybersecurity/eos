@@ -39,11 +39,28 @@ func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
 	return &result, nil
 }
 
-/**/
+// ReadSecret attempts to read a secret at a given path using the current Vault client.
+func ReadSecret(log *zap.Logger, path string) (*api.Secret, error) {
+	client, err := GetVaultClient(log)
+	if err != nil {
+		return nil, fmt.Errorf("vault client not ready: %w", err)
+	}
 
-/**/
+	secret, err := client.Logical().ReadWithContext(context.Background(), path)
+	if err != nil {
+		log.Warn("Vault read failed", zap.String("path", path), zap.Error(err))
+		return nil, err
+	}
+	if secret == nil {
+		return nil, ErrSecretNotFound
+	}
+	return secret, nil
+}
 
-/**/
+// IsNotFoundError returns true if the error indicates a missing secret.
+func IsNotFoundError(err error) bool {
+	return errors.Is(err, ErrSecretNotFound)
+}
 
 // Read attempts to retrieve a config object from Vault. If Vault is unavailable or the read fails,
 // it falls back to reading the config from disk (typically under ~/.config/eos/).

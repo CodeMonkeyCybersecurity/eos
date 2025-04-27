@@ -11,7 +11,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,62 +20,41 @@ const (
 	testDataVaultPath = "eos/test-data"
 )
 
-// InspectTestDataCmd attempts to read test data from Vault,
-// falling back to disk if Vault is unavailable.
-var InspectTestDataCmd = &cobra.Command{
+// TestDataCmd is 'eos pandora inspect test-data'
+var TestDataCmd = &cobra.Command{
 	Use:   "test-data",
-	Short: "Inspect test-data from Vault (fallback to disk)",
-	Long:  `Reads and displays the test-data stored in Vault, or falls back to local disk.`,
+	Short: "Inspect test data stored in Pandora (Vault)",
+	Long:  "Attempts to read a known test secret (eos/test-data) from Vault or fallback.",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-inspect-test-data")
+		vaultPath := "eos/test-data"
 
-		var client *api.Client
-		var out map[string]interface{}
-		var vaultReadErr error
+		log.Info("🔍 Attempting to read test-data from Vault...",
+			zap.String("vault_path", vaultPath))
 
-		client, err := vault.EnsurePrivilegedVaultClient(log)
+		secret, err := vault.ReadSecret(log, vaultPath)
 		if err != nil {
-			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
-			return inspectFromDisk(log)
-		}
-
-		vault.SetVaultClient(client, log)
-		validateAndCache(client, log)
-
-		log.Info("🔍 Attempting to read test-data from Vault...")
-		if err := vault.Read(client, testDataVaultPath, &out, log); err != nil {
-			vaultReadErr = err
-			if vault.IsSecretNotFound(err) {
-				log.Warn("⚠️ Test-data not found in Vault, attempting disk fallback...", zap.Error(err))
-			} else {
-				log.Error("❌ Vault read error", zap.String("vault_path", testDataVaultPath), zap.Error(err))
-				return fmt.Errorf("vault read failed at '%s': %w", testDataVaultPath, err)
+			// Check if it's a missing/not found error
+			if vault.IsNotFoundError(err) || os.IsNotExist(err) {
+				log.Warn("No secret found at path",
+					zap.String("vault_path", vaultPath))
+				return inspectFromDisk(log)
 			}
+
+			// Unexpected error — escalate
+			log.Error("Vault read error",
+				zap.String("vault_path", vaultPath),
+				zap.Error(err))
+			return fmt.Errorf("vault read failed at '%s': %w", vaultPath, err)
 		}
 
-		// If Vault read succeeded
-		if vaultReadErr == nil {
-			printData(out, "Vault", "secret/data/"+testDataVaultPath)
-			log.Info("✅ Test-data read successfully from Vault")
-			return nil
+		// Successfully read
+		data := secret.Data
+		fmt.Println("✅ Secret data retrieved:")
+		for k, v := range data {
+			fmt.Printf("  %s: %v\n", k, v)
 		}
 
-		// Otherwise fallback
-		log.Info("🔍 Attempting fallback to disk...")
-
-		if fallbackErr := inspectFromDisk(log); fallbackErr != nil {
-			log.Error("❌ Both Vault and disk fallback failed",
-				zap.String("vault_path", testDataVaultPath),
-				zap.Error(vaultReadErr),
-				zap.Error(fallbackErr),
-			)
-			return fmt.Errorf(
-				"vault read failed at '%s' (%v); disk fallback also failed (%v)",
-				testDataVaultPath, vaultReadErr, fallbackErr,
-			)
-		}
-
-		log.Info("✅ Test-data read successfully from fallback")
 		return nil
 	}),
 }
@@ -131,20 +109,6 @@ func printInspectSummary(source, path string) {
 	fmt.Println()
 }
 
-func validateAndCache(client *api.Client, log *zap.Logger) {
-	report, checked := vault.Check(client, log, nil, "")
-	if checked != nil {
-		vault.SetVaultClient(checked, log)
-	}
-	if report == nil {
-		log.Warn("⚠️ Vault check returned nil — skipping further setup")
-		return
-	}
-	for _, note := range report.Notes {
-		log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
-	}
-}
-
 func init() {
-	InspectCmd.AddCommand(InspectTestDataCmd)
+	InspectCmd.AddCommand(TestDataCmd)
 }
