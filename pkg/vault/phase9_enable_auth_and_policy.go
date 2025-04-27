@@ -25,6 +25,20 @@ import (
 func PhaseEnableAuthMethodsAndPolicies(client *api.Client, log *zap.Logger) error {
 	log.Info("🛡️ [Phase 9] Enabling auth methods and policies")
 
+	// PRECHECK for KV
+	exists, err := IsMountEnabled(client, shared.VaultMountKV)
+	if err != nil {
+		return fmt.Errorf("precheck mount failed: %w", err)
+	}
+	if !exists {
+		log.Warn("⚠️ KV engine missing — attempting to enable KVv2 at mount=secret/")
+		if err := enableMount(client, shared.VaultMountKV, "kv", map[string]string{"version": "2"}, "✅ KVv2 enabled at secret/"); err != nil {
+			return fmt.Errorf("failed to enable KVv2 at secret/: %w", err)
+		}
+	}
+	log.Info("✅ KVv2 mount successfully enabled", zap.String("mount", shared.VaultMountKV))
+
+	// Proceed with auth enablement and policies
 	if err := EnableUserPass(client); err != nil {
 		return fmt.Errorf("enable userpass auth method: %w", err)
 	}
@@ -46,6 +60,12 @@ func PhaseEnableAuthMethodsAndPolicies(client *api.Client, log *zap.Logger) erro
 		return fmt.Errorf("prompt eos password: %w", err)
 	}
 
+	if len(eosCreds.Password) < 8 {
+		log.Error("eos user password too short", zap.Int("length", len(eosCreds.Password)))
+		return fmt.Errorf("eos password must be at least 8 characters")
+	}
+
+	// This is safe because the mount exists
 	if err := ApplyAdminPolicy(*eosCreds, client, log); err != nil {
 		return fmt.Errorf("apply admin policy: %w", err)
 	}
@@ -88,7 +108,7 @@ func EnsurePolicy(client *api.Client, log *zap.Logger) error {
 	log.Info("📡 Writing policy to Vault")
 	if err := client.Sys().PutPolicy(shared.EosVaultPolicy, pol); err != nil {
 		log.Error("❌ Failed to write policy", zap.String("policy", shared.EosVaultPolicy), zap.Error(err))
-		return fmt.Errorf("failed to write policy %s: %w", shared.EosVaultPolicy, err)
+		return fmt.Errorf("failed to write eos-policy to Vault during Phase 9: %w", err)
 	}
 
 	// 4️⃣ Validate policy by re-fetching it from Vault
@@ -98,12 +118,11 @@ func EnsurePolicy(client *api.Client, log *zap.Logger) error {
 		log.Error("❌ Failed to retrieve policy for verification", zap.Error(err))
 		return fmt.Errorf("failed to verify written policy: %w", err)
 	}
-
 	if strings.TrimSpace(storedPol) != strings.TrimSpace(pol) {
-		log.Warn("⚠️ Policy mismatch detected after write",
+		log.Error("🚨 Policy mismatch after write",
 			zap.String("expected_preview", truncatePolicy(pol)),
 			zap.String("stored_preview", truncatePolicy(storedPol)))
-		return fmt.Errorf("written policy does not match expected content")
+		return fmt.Errorf("policy mismatch after write — vault contents are inconsistent")
 	}
 
 	log.Info("✅ Policy successfully written and verified", zap.String("policy", shared.EosVaultPolicy))
@@ -148,4 +167,20 @@ func truncatePolicy(policy string) string {
 		return policy[:100] + "..."
 	}
 	return policy
+}
+
+// IsMountEnabled checks whether a Vault mount exists at the given path.
+func IsMountEnabled(client *api.Client, mount string) (bool, error) {
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return false, err
+	}
+	_, exists := mounts[mount]
+	return exists, nil
+}
+
+// Enable KV v2
+func EnableKV2(client *api.Client, log *zap.Logger) error {
+	log.Info("⚙️ Enabling KVv2 engine at mount=secret/")
+	return enableMount(client, shared.VaultMountKV, "kv", map[string]string{"version": "2"}, "✅ KVv2 enabled at path=secret/")
 }

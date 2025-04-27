@@ -181,28 +181,6 @@ func EnableFileAudit(client *api.Client, log *zap.Logger) error {
 	)
 }
 
-func IsMountEnabled(client *api.Client, mount string) (bool, error) {
-	mounts, err := client.Sys().ListMounts()
-	if err != nil {
-		return false, err
-	}
-	_, exists := mounts[mount]
-	return exists, nil
-}
-
-/* Enable KV v2 */
-func EnableKV2(client *api.Client, log *zap.Logger) error {
-	ok, err := IsMountEnabled(client, "secret/")
-	if err != nil {
-		return fmt.Errorf("failed to check if KV is mounted: %w", err)
-	}
-	if ok {
-		log.Info("KV v2 already mounted at path=secret/. Skipping.")
-		return nil
-	}
-	return enableMount(client, "secret", "kv", map[string]string{"version": "2"}, "✅ KV v2 enabled at path=secret.")
-}
-
 func EnsureVaultAuthMethods(client *api.Client, log *zap.Logger) error {
 	if err := EnsureAuthMethod(client, "userpass", "userpass/", log); err != nil {
 		return err
