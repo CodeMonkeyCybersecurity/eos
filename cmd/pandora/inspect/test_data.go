@@ -30,44 +30,29 @@ var TestDataCmd = &cobra.Command{
 		log := ctx.Log.Named("pandora-inspect-test-data")
 		vaultPath := "eos/test-data"
 
+		// Ensure Vault is ready
 		if !EnsureVaultReadyOrWarn(log) {
 			eoserr.PrintError(log, "Vault not ready — skipping Vault reads", eoserr.NewExpectedError(fmt.Errorf("vault unavailable")))
-			return nil // <- EOS CLI exits cleanly, no crash
-		}
-
-		log.Info("🔍 Attempting to read test-data from Vault...",
-			zap.String("vault_path", vaultPath))
-
-		secret, err := vault.ReadSecret(log, vaultPath)
-		if err != nil {
-			if vault.IsNotFoundError(err) {
-				log.Warn("⚠️ No secret found at path", zap.String("vault_path", vaultPath))
-
-				if diskErr := inspectFromDisk(log); diskErr != nil {
-					eoserr.PrintError(log, "No test data found anywhere", diskErr)
-				}
-
-				return nil // ← Reassures Cobra no crash
-			}
-
-			log.Error("❌ Vault read error",
-				zap.String("vault_path", vaultPath),
-				zap.Error(err))
-			return fmt.Errorf("vault read failed at '%s': %w", vaultPath, err)
-		}
-
-		if eoserr.IsExpectedUserError(err) {
-			eoserr.PrintError(log, "Skipping because Vault unavailable", err)
 			return nil
 		}
 
-		// Successfully read
+		log.Info("🔍 Attempting to read test-data from Vault...", zap.String("vault_path", vaultPath))
+
+		secret, ok := vault.SafeReadSecret(log, vaultPath)
+		if !ok {
+			log.Warn("⚠️ Vault secret missing or unreadable, falling back to disk", zap.String("vault_path", vaultPath))
+			if err := inspectFromDisk(log); err != nil {
+				eoserr.PrintError(log, "No test data found anywhere", err)
+			}
+			return nil
+		}
+
+		// Successfully read secret
 		data := secret.Data
-		fmt.Println("✅ Secret data retrieved:")
+		fmt.Println("✅ Secret data retrieved from Vault:")
 		for k, v := range data {
 			fmt.Printf("  %s: %v\n", k, v)
 		}
-
 		return nil
 	}),
 }

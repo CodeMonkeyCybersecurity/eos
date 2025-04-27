@@ -44,6 +44,33 @@ func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
 	return &result, nil
 }
 
+// SafeReadSecret tries to read a Vault secret without returning hard errors.
+// It logs problems as warnings and returns (nil, false) if anything goes wrong.
+func SafeReadSecret(log *zap.Logger, path string) (*api.Secret, bool) {
+	client, err := GetVaultClient(log)
+	if err != nil {
+		log.Warn("Vault client lookup failed", zap.Error(err))
+		return nil, false
+	}
+	if client == nil {
+		log.Warn("Vault client is nil during SafeReadSecret", zap.String("path", path))
+		return nil, false
+	}
+
+	secret, err := client.Logical().ReadWithContext(context.Background(), path)
+	if err != nil {
+		log.Warn("Vault read failed in SafeReadSecret", zap.String("path", path), zap.Error(err))
+		return nil, false
+	}
+	if secret == nil {
+		log.Warn("Vault secret not found in SafeReadSecret", zap.String("path", path))
+		return nil, false
+	}
+
+	log.Info("✅ Vault secret successfully read in SafeReadSecret", zap.String("path", path))
+	return secret, true
+}
+
 // ReadSecret attempts to read a secret at a given path using the current Vault client.
 func ReadSecret(log *zap.Logger, path string) (*api.Secret, error) {
 	client, err := GetVaultClient(log)
