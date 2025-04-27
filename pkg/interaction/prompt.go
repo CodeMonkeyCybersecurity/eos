@@ -17,7 +17,7 @@ import (
 func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool, log *zap.Logger) (string, error) {
 	val, err := cmd.Flags().GetString(flagName)
 	if err != nil {
-		log.Error("failed to get CLI flag", zap.String("flag", flagName), zap.Error(err))
+		log.Error("Failed to get CLI flag", zap.String("flag", flagName), zap.Error(err))
 		return "", err
 	}
 	if val != "" {
@@ -28,7 +28,11 @@ func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool,
 	log.Info("📝 Prompting for missing flag", zap.String("flag", flagName), zap.Bool("is_secret", isSecret))
 
 	if isSecret {
-		secret := promptSecret(prompt, log)
+		secret, err := PromptSecret(prompt, log) // <-- capture both values
+		if err != nil {
+			log.Error("❌ Failed to read secret input", zap.Error(err))
+			return "", err
+		}
 		if secret == "" {
 			log.Warn("⚠️ Empty input received for secret prompt")
 		}
@@ -42,24 +46,39 @@ func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool,
 	return input, nil
 }
 
-// promptSecret reads a sensitive string from the terminal with input hidden (e.g., passwords).
-func promptSecret(prompt string, log *zap.Logger) string {
+// PromptSecret asks the user for a hidden input (no terminal echo).
+// Logs an error if reading fails, returns empty string on failure.
+// Returns trimmed input or warns if no input is provided.
+func PromptSecret(prompt string, log *zap.Logger) (string, error) {
 	fmt.Print(prompt + ": ")
 	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
 		log.Error("❌ Failed to read secret input", zap.Error(err))
-		return ""
+		return "", err
 	}
 	secret := strings.TrimSpace(string(bytePassword))
 	if secret == "" {
-		log.Warn("⚠️ No input received for secret")
+		log.Warn("⚠️ No input received for secret", zap.String("prompt", prompt))
 	}
-	return secret
+	return secret, nil
+}
+
+// PromptSecrets prompts the user for multiple hidden inputs (e.g., unseal keys).
+func PromptSecrets(promptBase string, count int, log *zap.Logger) ([]string, error) {
+	secrets := make([]string, 0, count)
+	for i := 1; i <= count; i++ {
+		prompt := fmt.Sprintf("%s %d", promptBase, i)
+		secret, err := PromptSecret(prompt, log)
+		if err != nil {
+			return nil, fmt.Errorf("error reading %s: %w", prompt, err)
+		}
+		secrets = append(secrets, secret)
+	}
+	return secrets, nil
 }
 
 // PromptSelect displays numbered options and returns the selected value by index.
-
 func PromptSelect(prompt string, options []string, log *zap.Logger) string {
 	log.Info("📋 Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
 
@@ -70,9 +89,11 @@ func PromptSelect(prompt string, options []string, log *zap.Logger) string {
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Print("Enter choice number: ")
-		choice, _ := reader.ReadString('\n')
-		choice = strings.TrimSpace(choice)
+		choice, err := ReadLine(reader, EnterChoicePrompt, log)
+		if err != nil {
+			log.Error("Failed to read choice", zap.Error(err))
+			continue
+		}
 
 		idx, err := strconv.Atoi(choice)
 		if err == nil && idx >= 1 && idx <= len(options) {
@@ -88,16 +109,20 @@ func PromptSelect(prompt string, options []string, log *zap.Logger) string {
 // PromptYesNo asks a yes/no question and returns true/false.
 // If input is blank, it returns the `defaultYes` fallback.
 func PromptYesNo(prompt string, defaultYes bool, log *zap.Logger) bool {
-	def := "Y/n"
+	defPrompt := DefaultYesPrompt
 	if !defaultYes {
-		def = "y/N"
+		defPrompt = DefaultNoPrompt
 	}
-	fmt.Printf("%s [%s]: ", prompt, def)
+	label := fmt.Sprintf("%s [%s]", prompt, defPrompt)
 
 	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
+	input, err := ReadLine(reader, label, log)
+	if err != nil {
+		log.Error("Failed to read yes/no input", zap.Error(err))
+		return defaultYes
+	}
 
+	input = strings.ToLower(input)
 	switch input {
 	case "y", "yes":
 		log.Info("✅ User confirmed yes", zap.String("prompt", prompt))
@@ -117,28 +142,29 @@ func PromptConfirmOrValue(prompt, defaultValue string, log *zap.Logger) string {
 		log.Info("✅ Default value confirmed", zap.String("value", defaultValue))
 		return defaultValue
 	}
-	fmt.Print("Enter value: ")
+
 	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	result := strings.TrimSpace(input)
-	log.Info("✏️ Custom value entered", zap.String("value", result))
-	return result
+	input, err := ReadLine(reader, "Enter value", log)
+	if err != nil {
+		log.Error("Failed to read custom value", zap.Error(err))
+		return defaultValue
+	}
+	log.Info("✏️ Custom value entered", zap.String("value", input))
+	return input
 }
 
 // PromptInput asks for user input with an optional default fallback.
+// Logs input events; falls back to default value if input is empty.
 func PromptInput(prompt, defaultVal string, log *zap.Logger) string {
 	reader := bufio.NewReader(os.Stdin)
-	if defaultVal != "" {
-		fmt.Printf("%s [%s]: ", prompt, defaultVal)
-	} else {
-		fmt.Printf("%s: ", prompt)
+	input, err := ReadLine(reader, prompt, log)
+	if err != nil {
+		log.Error("Failed to read user input", zap.Error(err))
+		return defaultVal
 	}
-	input, _ := reader.ReadString('\n')
-	result := strings.TrimSpace(input)
-	if result == "" {
+	if input == "" {
 		log.Debug("ℹ️ Using default value", zap.String("default", defaultVal))
 		return defaultVal
 	}
-	log.Debug("✏️ User entered input", zap.String("input", result))
-	return result
+	return input
 }

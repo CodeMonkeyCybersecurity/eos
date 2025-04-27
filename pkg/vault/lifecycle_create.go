@@ -32,7 +32,6 @@ func PrepareEnvironment(log *zap.Logger) error {
 	return nil
 }
 
-
 func GenerateTLS(log *zap.Logger) error {
 	log.Info("📁 Starting full Vault TLS generation and trust setup")
 

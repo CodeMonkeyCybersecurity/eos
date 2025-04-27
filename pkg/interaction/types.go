@@ -10,3 +10,9 @@ type FallbackOption struct {
 type Confirmable interface {
 	Summary() string
 }
+
+const (
+	DefaultYesPrompt  = "Y/n"
+	DefaultNoPrompt   = "y/N"
+	EnterChoicePrompt = "Enter choice number: "
+)

@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -200,7 +203,7 @@ func UnsealVault(client *api.Client, init *api.InitResponse, log *zap.Logger) er
 // LoadInitResultOrPrompt tries loading the init result from disk; otherwise prompts the user.
 func LoadInitResultOrPrompt(client *api.Client, log *zap.Logger) (*api.InitResponse, error) {
 	initRes := new(api.InitResponse)
-	if err := ReadFallbackJSON(DiskPath("vault_init", log), initRes, log); err != nil {
+	if err := ReadFallbackJSON(shared.VaultInitPath, initRes, log); err != nil {
 		log.Warn("⚠️ Fallback file missing or unreadable — prompting user", zap.Error(err))
 		return PromptForInitResult(log)
 	}
@@ -211,11 +214,11 @@ func LoadInitResultOrPrompt(client *api.Client, log *zap.Logger) (*api.InitRespo
 func ConfirmUnsealMaterialSaved(init *api.InitResponse, log *zap.Logger) error {
 	fmt.Println("\n🔐 Please re-enter 3 of your unseal keys and the root token to confirm you've saved them.")
 
-	keys, err := crypto.PromptSecrets("Unseal Key", 3, log)
+	keys, err := interaction.PromptSecrets("Unseal Key", 3, log)
 	if err != nil {
 		return fmt.Errorf("failed to read unseal keys: %w", err)
 	}
-	root, err := crypto.PromptSecrets("Root Token", 1, log)
+	root, err := interaction.PromptSecrets("Root Token", 1, log)
 	if err != nil {
 		return fmt.Errorf("failed to read root token: %w", err)
 	}

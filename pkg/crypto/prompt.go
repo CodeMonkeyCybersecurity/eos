@@ -64,19 +64,3 @@ func PromptPasswordWithDefault(label, defaultValue string, log *zap.Logger) (str
 	return pass, nil
 }
 
-// PromptSecrets prompts the user for n secret values (like unseal keys), hiding input.
-// It returns a slice of strings (one per secret).
-func PromptSecrets(prompt string, count int, log *zap.Logger) ([]string, error) {
-	secrets := make([]string, 0, count)
-	for i := 1; i <= count; i++ {
-		label := fmt.Sprintf("%s %d", prompt, i)
-		fmt.Printf("%s: ", label)
-		secret, err := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println("")
-		if err != nil {
-			return nil, fmt.Errorf("error reading %s: %w", label, err)
-		}
-		secrets = append(secrets, strings.TrimSpace(string(secret)))
-	}
-	return secrets, nil
-}

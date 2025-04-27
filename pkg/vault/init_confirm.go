@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -14,11 +15,11 @@ import (
 func ConfirmSecureStorage(original *api.InitResponse, log *zap.Logger) error {
 	fmt.Println("🔒 Please re-enter 3 unseal keys and the root token to confirm you've saved them.")
 
-	rekeys, err := crypto.PromptSecrets("Unseal Key", 3, log)
+	rekeys, err := interaction.PromptSecrets("Unseal Key", 3, log)
 	if err != nil {
 		return err
 	}
-	reroot, err := crypto.PromptSecrets("Root Token", 1, log)
+	reroot, err := interaction.PromptSecrets("Root Token", 1, log)
 	if err != nil {
 		return err
 	}
