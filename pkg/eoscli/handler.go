@@ -7,6 +7,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -17,10 +18,13 @@ import (
 func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		var err error
-
 		start := time.Now()
-		log := contextualLogger()
-		log.Info("🚀 EOS command execution started", zap.Time("start_time", start), zap.String("command", cmd.Name()))
+
+		log := contextualLogger().
+			Named(cmd.Name()).
+			With(zap.String("component", "eoscli")) // 🔥 Add structured "component"
+
+		log.Info("🚀 Command execution started", zap.Time("start_time", start))
 
 		ctx := &RuntimeContext{
 			Log:       log,
@@ -33,19 +37,23 @@ func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error)
 		}
 		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
-		defer logger.LogCommandLifecycle(cmd.Name())(&err)
+
+		defer func() {
+			duration := time.Since(start)
+			logger.LogCommandLifecycle(cmd.Name())(&err)
+			if err != nil {
+				if eoserr.IsExpectedUserError(err) {
+					log.Warn("⚠️ EOS user error", zap.Error(err), zap.Duration("duration", duration))
+				} else {
+					log.Error("❌ EOS command failed", zap.Error(err), zap.Duration("duration", duration))
+				}
+			} else {
+				log.Info("✅ EOS command finished successfully", zap.Duration("duration", duration))
+			}
+			shared.SafeSync(log)
+		}()
 
 		err = fn(ctx, cmd, args)
-
-		if err != nil {
-			if eoserr.IsExpectedUserError(err) {
-				log.Warn("⚠️ EOS user error", zap.Error(err), zap.String("command", cmd.Name()), zap.Duration("duration", time.Since(start)))
-			} else {
-				log.Error("❌ EOS command failed", zap.Error(err), zap.String("command", cmd.Name()), zap.Duration("duration", time.Since(start)))
-			}
-			return err
-		}
-		log.Info("✅ EOS command finished successfully", zap.Duration("duration", time.Since(start)), zap.String("command", cmd.Name()))
-		return nil
+		return err
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -20,13 +21,6 @@ func CombineMarkers(additional ...string) []string {
 func SafeClose(c io.Closer, log *zap.Logger) {
 	if err := c.Close(); err != nil {
 		log.Warn("Error closing resource", zap.Error(err))
-	}
-}
-
-// SafeSync syncs a zap logger and logs a warning if it fails.
-func SafeSync(log *zap.Logger) {
-	if err := log.Sync(); err != nil {
-		log.Warn("Error syncing logger", zap.Error(err))
 	}
 }
 
@@ -62,5 +56,16 @@ func SafeHelp(cmd *cobra.Command, log *zap.Logger) {
 func SafeRemove(name string, log *zap.Logger) {
 	if err := os.Remove(name); err != nil {
 		log.Warn("Error removing file", zap.String("path", name), zap.Error(err))
+	}
+}
+
+// SafeSync syncs a zap logger and suppresses known harmless errors like "sync /dev/stdout".
+func SafeSync(log *zap.Logger) {
+	if err := log.Sync(); err != nil {
+		if strings.Contains(err.Error(), "invalid argument") {
+			// Safe to ignore "sync /dev/stdout" errors
+			return
+		}
+		log.Warn("Error syncing logger", zap.Error(err))
 	}
 }
