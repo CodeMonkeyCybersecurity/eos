@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -16,59 +17,63 @@ import (
 //--------------------------------------------------------------------
 
 // PHASE 9 — PhaseEnableAuthMethodsAndPolicies()
-//           └── EnableUserPass()
-//           └── EnsureVaultAuthEnabled()
+//           └── EnsureKVv2Enabled()
+//           └── BootstrapKV()
+//           └── EnsureVaultAuthMethods()
+//               └── EnsureAuthMethod()
 //           └── EnsurePolicy()
+//           └── PromptForEosPassword()
 //           └── ApplyAdminPolicy()
+//               └── WriteKVv2()
+//           └── EnableFileAudit()
 
 // PhaseEnableAuthMethodsAndPolicies enables Vault auth methods and applies the EOS policy.
 func PhaseEnableAuthMethodsAndPolicies(client *api.Client, log *zap.Logger) error {
-	log.Info("🛡️ [Phase 9] Enabling auth methods and policies")
+	log.Info("🚀 Phase [9/12]: Enable Vault Authentication + Policies")
 
-	// PRECHECK for KV
-	exists, err := IsMountEnabled(client, shared.VaultMountKV)
-	if err != nil {
-		return fmt.Errorf("precheck mount failed: %w", err)
-	}
-	if !exists {
-		log.Warn("⚠️ KV engine missing — attempting to enable KVv2 at mount=secret/")
-		if err := enableMount(client, shared.VaultMountKV, "kv", map[string]string{"version": "2"}, "✅ KVv2 enabled at secret/"); err != nil {
-			return fmt.Errorf("failed to enable KVv2 at secret/: %w", err)
-		}
-	}
-	log.Info("✅ KVv2 mount successfully enabled", zap.String("mount", shared.VaultMountKV))
-
-	// Proceed with auth enablement and policies
-	if err := EnsureVaultAuthEnabled(client, "approle", "auth/approle", log); err != nil {
-		return fmt.Errorf("ensure approle auth enabled: %w", err)
+	// 1️⃣ Ensure KVv2 is enabled
+	if err := EnsureKVv2Enabled(client, shared.VaultMountKV, log); err != nil {
+		return fmt.Errorf("kvv2 enable failed: %w", err)
 	}
 
+	// 2️⃣ Bootstrap test secret to validate KV is working
+	if err := BootstrapKV(client, "bootstrap/test", log); err != nil {
+		return fmt.Errorf("bootstrap KV failed: %w", err)
+	}
+
+	// 3️⃣ Enable userpass/approle auth methods
+	if err := EnsureVaultAuthMethods(client, log); err != nil {
+		return fmt.Errorf("enable auth methods: %w", err)
+	}
+
+	// 4️⃣ Upload eos-policy
 	if err := EnsurePolicy(client, log); err != nil {
 		return fmt.Errorf("apply EOS policy: %w", err)
 	}
 
+	// 5️⃣ Prompt for EOS admin password
 	eosCreds, err := PromptForEosPassword(log)
 	if err != nil {
 		return fmt.Errorf("prompt eos password: %w", err)
 	}
-
 	if len(eosCreds.Password) < 8 {
 		log.Error("eos user password too short", zap.Int("length", len(eosCreds.Password)))
 		return fmt.Errorf("eos password must be at least 8 characters")
 	}
 
-	// This is safe because the mount exists
+	// 6️⃣ Create the eos user with full policy
 	if err := ApplyAdminPolicy(*eosCreds, client, log); err != nil {
 		return fmt.Errorf("apply admin policy: %w", err)
 	}
 
-	log.Info("✅ Auth methods and policies enabled successfully")
-	return nil
-}
+	// 7️⃣ Enable file audit logging (mandatory)
+	if err := EnableFileAudit(client, log); err != nil {
+		log.Error("❌ Failed to enable file audit logging", zap.Error(err))
+		return fmt.Errorf("enable file audit failed: %w", err)
+	}
 
-// Enable UserPass
-func EnableUserPass(client *api.Client) error {
-	return enableAuth(client, "userpass")
+	log.Info("✅ Auth methods, policy, eos user, and auditing successfully configured")
+	return nil
 }
 
 func EnsureVaultAuthEnabled(client *api.Client, method, path string, log *zap.Logger) error {
@@ -142,21 +147,16 @@ func ApplyAdminPolicy(creds shared.UserpassCreds, client *api.Client, log *zap.L
 
 	// Step 2: Create eos user with userpass auth, targeting KVv2
 	log.Info("🔑 Creating eos user in KVv2")
-	userPath := "secret/data/users/eos" // KVv2 requires /data/ prefix
-	payload := map[string]interface{}{
-		"data": map[string]interface{}{
-			"password": creds.Password,
-			"policies": policyName,
-		},
+	data := map[string]interface{}{
+		"password": creds.Password,
+		"policies": policyName,
+	}
+	if err := WriteKVv2(client, "secret", "users/eos", data, log); err != nil {
+		log.Error("❌ Failed to create eos user in Vault", zap.Error(err))
+		return fmt.Errorf("failed to write eos user credentials: %w", err)
 	}
 
-	_, err := client.Logical().Write(userPath, payload)
-	if err != nil {
-		log.Error("❌ Failed to create eos user in Vault", zap.String("path", userPath), zap.Error(err))
-		return fmt.Errorf("failed to write eos user credentials to Vault: %w", err)
-	}
-
-	log.Info("✅ eos user created with full privileges", zap.String("path", userPath), zap.String("policy", policyName))
+	log.Info("✅ eos user created with full privileges", zap.String("user", "eos"), zap.String("policy", policyName))
 	return nil
 }
 
@@ -179,8 +179,138 @@ func IsMountEnabled(client *api.Client, mount string) (bool, error) {
 	return exists, nil
 }
 
-// Enable KV v2
-func EnableKV2(client *api.Client, log *zap.Logger) error {
-	log.Info("⚙️ Enabling KVv2 engine at mount=secret/")
-	return enableMount(client, shared.VaultMountKV, "kv", map[string]string{"version": "2"}, "✅ KVv2 enabled at path=secret/")
+// VaultUpdate reads existing secret and applies a patch map
+func UpdateVault(path string, update map[string]interface{}, log *zap.Logger) error {
+	client, err := GetPrivilegedVaultClient(log)
+	if err != nil {
+		return err
+	}
+	kv := client.KVv2("secret")
+
+	secret, err := kv.Get(context.Background(), path)
+	if err != nil {
+		return err
+	}
+
+	existing := secret.Data
+	for k, v := range update {
+		existing[k] = v
+	}
+	_, err = kv.Put(context.Background(), path, existing)
+	return err
+}
+
+// EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.log.
+func EnableFileAudit(client *api.Client, log *zap.Logger) error {
+	// Check if the audit device is already enabled
+	audits, err := client.Sys().ListAudit()
+	if err != nil {
+		return fmt.Errorf("failed to list audit devices: %w", err)
+	}
+
+	if _, exists := audits[shared.AuditID]; exists {
+		log.Info("Audit device already enabled at sys/audit/file. Skipping.")
+		return nil
+	}
+
+	// Enable the audit device at the correct location
+	return enableFeature(client, shared.MountPath,
+		map[string]interface{}{
+			"type": "file",
+			"options": map[string]string{
+				"file_path": "/opt/vault/logs/vault_audit.log",
+			},
+		},
+		"✅ File audit enabled.",
+	)
+}
+
+func EnsureVaultAuthMethods(client *api.Client, log *zap.Logger) error {
+	if err := EnsureAuthMethod(client, "userpass", "userpass/", log); err != nil {
+		return err
+	}
+	if err := EnsureAuthMethod(client, "approle", "approle/", log); err != nil {
+		return err
+	}
+	return nil
+}
+
+func EnsureAuthMethod(client *api.Client, methodType, mountPath string, log *zap.Logger) error {
+	existing, err := client.Sys().ListAuth()
+	if err != nil {
+		return fmt.Errorf("failed to list Vault auth methods: %w", err)
+	}
+
+	if _, ok := existing[mountPath]; ok {
+		return nil // Already enabled
+	}
+
+	return client.Sys().EnableAuthWithOptions(
+		strings.TrimSuffix(mountPath, "/"),
+		&api.EnableAuthOptions{Type: methodType},
+	)
+}
+
+// EnsureKVv2Enabled makes sure the KV‑v2 secrets engine is mounted at mountPath.
+func EnsureKVv2Enabled(client *api.Client, mountPath string, log *zap.Logger) error {
+	log.Info("➕ Ensuring KV‑v2 secrets engine", zap.String("path", mountPath))
+
+	// Vault mounts always include a trailing slash in the map key
+	normalized := strings.TrimSuffix(mountPath, "/") + "/"
+
+	mounts, err := client.Sys().ListMounts()
+	if err != nil {
+		return fmt.Errorf("could not list mounts: %w", err)
+	}
+	if m, ok := mounts[normalized]; ok {
+		if m.Type == "kv" && m.Options["version"] == "2" {
+			log.Info("✅ KV‑v2 already enabled", zap.String("path", mountPath))
+			return nil
+		}
+		// if it’s kv v1, we’ll unmount then re‑enable v2
+		if m.Type == "kv" {
+			log.Warn("🔄 KV engine mounted as v1, unmounting to reconfigure v2", zap.String("path", mountPath))
+			if err := client.Sys().Unmount(mountPath); err != nil {
+				return fmt.Errorf("failed to unmount existing KV v1 at %s: %w", mountPath, err)
+			}
+		}
+	}
+
+	// enable KV v2
+	if err := client.Sys().Mount(mountPath, &api.MountInput{
+		Type:    "kv",
+		Options: map[string]string{"version": "2"},
+	}); err != nil {
+		return fmt.Errorf("failed to enable KV‑v2 at %s: %w", mountPath, err)
+	}
+	log.Info("✅ KV‑v2 enabled", zap.String("path", mountPath))
+	return nil
+}
+
+// BootstrapKV puts a little “ok” into secret/bootstrap/test.
+func BootstrapKV(client *api.Client, kvPath string, log *zap.Logger) error {
+	log.Info("🧪 Writing bootstrap secret", zap.String("path", kvPath))
+
+	// get a KV v2 client for the "secret/" mount
+	kvClient := client.KVv2(strings.TrimSuffix(shared.KVNamespaceSecrets, "/"))
+
+	// debug: show exactly what we're about to write
+	payload := map[string]interface{}{"value": "ok"}
+	log.Debug("🔃 KV v2 put",
+		zap.String("mount", strings.TrimSuffix(shared.KVNamespaceSecrets, "/")),
+		zap.String("path", kvPath),
+		zap.Any("data", payload),
+	)
+
+	// ignore the returned *KVSecret, just catch the error
+	if _, err := kvClient.Put(context.Background(), kvPath, payload); err != nil {
+		log.Error("❌ Failed to write bootstrap secret",
+			zap.String("path", kvPath),
+			zap.Error(err),
+		)
+		return fmt.Errorf("failed to write bootstrap secret at %s: %w", kvPath, err)
+	}
+
+	log.Info("✅ Bootstrap secret written", zap.String("path", kvPath))
+	return nil
 }

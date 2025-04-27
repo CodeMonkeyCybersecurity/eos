@@ -161,3 +161,17 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, e
 	)
 	return rawRoleID, rawSecretID, nil
 }
+
+
+
+func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
+	client.SetToken(token)
+
+	err := client.Auth().Token().RevokeSelf("")
+	if err != nil {
+		return fmt.Errorf("failed to revoke root token: %w", err)
+	}
+
+	fmt.Println("✅ Root token revoked.")
+	return nil
+}

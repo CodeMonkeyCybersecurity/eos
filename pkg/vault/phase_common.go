@@ -27,28 +27,6 @@ func enableFeature(client *api.Client, path string, payload map[string]interface
 	return nil
 }
 
-/* Enable AppRole auth, create a role, read the role ID */
-func enableAuth(client *api.Client, method string) error {
-	err := client.Sys().EnableAuthWithOptions(method, &api.EnableAuthOptions{Type: method})
-	if err != nil && !strings.Contains(err.Error(), "already in use") {
-		return fmt.Errorf("failed to enable auth method %s: %w", method, err)
-	}
-	fmt.Printf("✅ %s auth enabled.\n", method)
-	return nil
-}
-
-func enableMount(client *api.Client, path, engineType string, options map[string]string, msg string) error {
-	err := client.Sys().Mount(path, &api.MountInput{
-		Type:    engineType,
-		Options: options,
-	})
-	if err != nil && !strings.Contains(err.Error(), "existing mount at") {
-		return fmt.Errorf("failed to mount %s: %w", engineType, err)
-	}
-	fmt.Println(msg)
-	return nil
-}
-
 func EnsureVaultReady(log *zap.Logger) (*api.Client, error) {
 	client, err := NewClient(log)
 	if err != nil {

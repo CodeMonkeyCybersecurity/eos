@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
@@ -116,4 +117,39 @@ func WriteToDisk(name string, data any, log *zap.Logger) error {
 	fallbackPath := DiskPath(name, log)
 	log.Info("💾 Falling back to local disk", zap.String("path", fallbackPath))
 	return WriteFallbackJSON(fallbackPath, data, log)
+}
+
+// WriteKVv2 writes a payload to a Vault KV v2 mount at the given logical path.
+// It handles the /data/ prefix required by KVv2 automatically.
+func WriteKVv2(client *api.Client, mount string, path string, data map[string]interface{}, log *zap.Logger) error {
+	log.Info("🔃 Writing KVv2 secret",
+		zap.String("mount", mount),
+		zap.String("path", path),
+		zap.Any("data_keys", keysOf(data)),
+	)
+
+	kv := client.KVv2(strings.TrimSuffix(mount, "/"))
+	if _, err := kv.Put(context.Background(), path, data); err != nil {
+		log.Error("❌ Failed to write KVv2 secret",
+			zap.String("mount", mount),
+			zap.String("path", path),
+			zap.Error(err),
+		)
+		return fmt.Errorf("failed to write KVv2 secret at %s/%s: %w", mount, path, err)
+	}
+
+	log.Info("✅ KVv2 secret written successfully",
+		zap.String("mount", mount),
+		zap.String("path", path),
+	)
+	return nil
+}
+
+// helper for debugging: list keys in a map
+func keysOf(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
