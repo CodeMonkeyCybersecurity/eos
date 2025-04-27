@@ -31,3 +31,9 @@ type AppRoleOptions struct {
 	ForceRecreate bool     `json:"force_recreate,omitempty"`
 	RefreshCreds  bool     `json:"refresh_creds,omitempty"`
 }
+
+// VaultInitResponse mirrors the vault_init.json structure.
+type VaultInitResponse struct {
+	KeysB64   []string `json:"unseal_keys_b64"`
+	RootToken string   `json:"root_token"`
+}

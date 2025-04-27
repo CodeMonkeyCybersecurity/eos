@@ -3,8 +3,10 @@
 package vault
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
@@ -161,4 +163,44 @@ func GetVaultClient(log *zap.Logger) (*api.Client, error) {
 	}
 	log.Debug("📦 Returning cached Vault client")
 	return shared.VaultClient, nil
+}
+
+// EnsurePrivilegedVaultClient tries to get a working Vault client
+// 1. Prefer Vault Agent sink token
+// 2. Fall back to vault_init.json root token from SecretsDir
+func EnsurePrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
+	log.Debug("🔐 Attempting privileged Vault client setup")
+
+	// 1. Try to read Vault Agent token first
+	token, err := readTokenFromSink(shared.VaultAgentTokenPath)
+	if err != nil {
+		log.Warn("⚠️ Vault Agent token not found, falling back to vault_init.json", zap.Error(err))
+
+		// 2. Fallback: read root token from vault_init.json
+		var initRes shared.VaultInitResponse
+		vaultInitPath := filepath.Join(shared.SecretsDir, "vault_init.json")
+		raw, err := os.ReadFile(vaultInitPath)
+		if err != nil {
+			log.Error("❌ Failed to read vault_init.json fallback", zap.String("path", vaultInitPath), zap.Error(err))
+			return nil, fmt.Errorf("failed to read vault_init.json: %w", err)
+		}
+		if err := json.Unmarshal(raw, &initRes); err != nil {
+			log.Error("❌ Failed to unmarshal vault_init.json", zap.Error(err))
+			return nil, fmt.Errorf("failed to unmarshal vault_init.json: %w", err)
+		}
+		token = initRes.RootToken
+		if token == "" {
+			return nil, fmt.Errorf("vault_init.json contains empty root token")
+		}
+	}
+
+	client, err := NewClient(log)
+	if err != nil {
+		log.Error("❌ Failed to create Vault client", zap.Error(err))
+		return nil, err
+	}
+
+	client.SetToken(token)
+	log.Info("✅ Privileged Vault client ready")
+	return client, nil
 }
