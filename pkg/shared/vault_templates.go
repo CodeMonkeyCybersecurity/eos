@@ -30,6 +30,7 @@ Description=Vault Agent (Eos)
 After=network.target
 
 [Service]
+Environment=HCP_VAULT_SKIP_AUTO_PROVISION=1
 User=%s
 Group=%s
 # make /run/eos for the runtime directory

@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -184,5 +186,48 @@ func PrepareVaultAgentEnvironment(log *zap.Logger) error {
 		return err
 	}
 	log.Info("Ensured secrets directory", zap.String("path", shared.SecretsDir))
+
+	// ✨ NEW: Validate runtime readiness
+	if err := ValidateVaultAgentRuntimeEnvironment(log); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func ValidateVaultAgentRuntimeEnvironment(log *zap.Logger) error {
+	log.Info("🔍 Validating Vault Agent runtime environment")
+
+	// 1. Check if /run/eos exists and is owned by eos
+	info, err := os.Stat(shared.EosRunDir)
+	if os.IsNotExist(err) {
+		log.Error("❌ Missing runtime directory", zap.String("path", shared.EosRunDir))
+		return fmt.Errorf("missing runtime directory: %s", shared.EosRunDir)
+	}
+	if err != nil {
+		log.Error("❌ Failed to stat runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
+		return fmt.Errorf("failed to stat runtime directory: %w", err)
+	}
+	if !info.IsDir() {
+		log.Error("❌ Runtime path is not a directory", zap.String("path", shared.EosRunDir))
+		return fmt.Errorf("runtime path is not a directory: %s", shared.EosRunDir)
+	}
+	stat := info.Sys()
+	if stat == nil {
+		log.Warn("⚠️ Unable to get ownership info of runtime directory")
+	} else {
+		if stat.(*syscall.Stat_t).Uid != 1001 { // 🔥 Assume eos UID 1001 or resolve dynamically
+			log.Warn("⚠️ Runtime directory not owned by eos user", zap.String("path", shared.EosRunDir))
+		}
+	}
+
+	// 2. Check if Vault binary exists
+	vaultPath, err := exec.LookPath("vault")
+	if err != nil {
+		log.Error("❌ Vault binary not found in PATH", zap.Error(err))
+		return fmt.Errorf("vault binary not found in PATH: %w", err)
+	}
+	log.Info("✅ Vault binary found", zap.String("vault_path", vaultPath))
+
 	return nil
 }
