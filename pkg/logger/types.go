@@ -8,3 +8,5 @@ var DefaultLogPaths = PlatformLogPaths()
 type ctxKey string
 
 const traceIDKey ctxKey = "trace_id"
+
+const JournalSinceDefault = "today"
