@@ -55,7 +55,7 @@ var InspectTestDataCmd = &cobra.Command{
 
 const (
 	testDataFilename  = "test-data.json"
-	testDataVaultPath = "test-data"
+	testDataVaultPath = "eos/test-data"
 )
 
 func inspectTestDataFromDisk(log *zap.Logger) error {
