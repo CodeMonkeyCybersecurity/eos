@@ -3,6 +3,7 @@ package inspect
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,11 +64,16 @@ func inspectTestDataFromDisk(log *zap.Logger) error {
 	fallbackPath := filepath.Join(shared.SecretsDir, testDataFilename)
 	data, err := os.ReadFile(fallbackPath)
 	if err != nil {
-		log.Error("❌ Failed to read test-data from fallback disk", zap.String("path", fallbackPath), zap.Error(err))
-		return fmt.Errorf("failed to read test-data from fallback: %w", err)
+		if errors.Is(err, os.ErrNotExist) {
+			log.Warn("⚠️ Test-data not found in fallback disk", zap.String("path", fallbackPath))
+			return fmt.Errorf("test-data not found in Vault or fallback disk")
+		}
+		log.Error("❌ Failed to read fallback test-data", zap.String("path", fallbackPath), zap.Error(err))
+		return fmt.Errorf("failed to read fallback test-data: %w", err)
 	}
 
 	printTestData(data)
+	printInspectSummary("Disk", fallbackPath)
 	log.Info("✅ Test-data displayed successfully (fallback)", zap.String("path", fallbackPath))
 	return nil
 }
@@ -94,7 +100,6 @@ func printInspectSummary(source, path string) {
 	fmt.Println()
 }
 
-// validateAndCache ensures Vault client health check and cache
 func validateAndCache(client *api.Client, log *zap.Logger) {
 	report, checked := vault.Check(client, log, nil, "")
 	if checked != nil {
