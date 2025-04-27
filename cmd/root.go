@@ -117,7 +117,7 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
 			logger.L().Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(0)
+			os.Exit(0) // <-- gracefully allow 0 exit code for user errors
 		} else {
 			logger.L().Error("CLI execution error", zap.Error(err))
 			os.Exit(1)

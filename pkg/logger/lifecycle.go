@@ -43,7 +43,11 @@ func WithCommandLogging(ctx context.Context, name string, fn func(context.Contex
 		if eoserr.IsExpectedUserError(err) {
 			log.Warn("Command completed with user error", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
 		} else {
-			log.Error("Command failed", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
+			if eoserr.IsExpectedUserError(err) {
+				log.Warn("Command completed with user error", zap.Error(err))
+			} else {
+				log.Error("Command failed", zap.Error(err))
+			}
 		}
 	} else {
 		log.Info("Command completed", zap.String("command", name), zap.Duration("duration", duration))

@@ -1,13 +1,11 @@
-/* pkg/eoserr/reader.go */
-
 package eoserr
 
-import "strings"
+import (
+	"errors"
+	"strings"
+)
 
 // ExtractSummary extracts a concise summary from the full command output.
-// It looks for lines containing keywords like "error", "failed", or "cannot".
-// If such lines are found, it returns a combination (up to two) as the summary.
-// Otherwise, it falls back to returning the first non-empty line.
 func ExtractSummary(output string) string {
 	trimmed := strings.TrimSpace(output)
 	if trimmed == "" {
@@ -47,14 +45,29 @@ func ExtractSummary(output string) string {
 	return "Unknown error."
 }
 
-// IsExpectedUserError determines if an error is a recoverable, non-fatal user error.
-func IsExpectedUserError(err error) bool {
+// expectedError is a lightweight wrapper to mark expected, user-recoverable errors.
+type expectedError struct {
+	cause error
+}
+
+func (e *expectedError) Error() string {
+	return e.cause.Error()
+}
+
+func (e *expectedError) Unwrap() error {
+	return e.cause
+}
+
+// NewExpectedError wraps an error as an expected user error.
+func NewExpectedError(err error) error {
 	if err == nil {
-		return false
+		return nil
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "not found") ||
-		strings.Contains(msg, "no test-data found") ||
-		strings.Contains(msg, "vault read failed at") ||
-		strings.Contains(msg, "disk fallback read failed")
+	return &expectedError{cause: err}
+}
+
+// IsExpectedUserError returns true if an error is a wrapped expected error.
+func IsExpectedUserError(err error) bool {
+	var e *expectedError
+	return errors.As(err, &e)
 }
