@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -44,17 +42,6 @@ func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
 /**/
 
 /**/
-// readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
-func readTokenFromSink(path string) (string, error) {
-	if path == "" {
-		path = shared.VaultAgentTokenPath
-	}
-	out, err := exec.Command("sudo", "-u", shared.EosID, "cat", path).Output()
-	if err != nil {
-		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
-	}
-	return strings.TrimSpace(string(out)), nil
-}
 
 /**/
 

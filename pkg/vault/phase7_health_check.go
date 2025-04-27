@@ -15,8 +15,18 @@ import (
 )
 
 //--------------------------------------------------------------------
-// 7. Final Vault Health Check and Recovery
+// 7. Vault Health Check and Recovery
 //--------------------------------------------------------------------
+
+// PHASE 7 — PhaseEnsureVaultReady()
+//          └── isVaultProcessRunning()
+//          └── EnsureVaultEnv()
+//          └── NewClient()
+//          └── probeVaultHealthUntilReady()
+//               └── CheckVaultHealth()
+//          └── recoverVaultHealth()
+//               └── initAndUnseal()
+//               └── unsealFromStoredKeys()
 
 // CheckVaultHealth probes Vault's /v1/sys/health and returns whether Vault is healthy.
 func CheckVaultHealth(log *zap.Logger) (bool, error) {

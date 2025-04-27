@@ -41,7 +41,7 @@ func StartVaultService(log *zap.Logger) error {
 	}
 
 	log.Info("🔄 Reloading systemd daemon and enabling vault.service")
-	if err := ReloadDaemonAndEnable(log, shared.VaultServiceName); err != nil {
+	if err := system.ReloadDaemonAndEnable(log, shared.VaultServiceName); err != nil {
 		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
 
@@ -58,22 +58,6 @@ func StartVaultService(log *zap.Logger) error {
 
 	log.Info("✅ Vault systemd service started, checking health...")
 	return waitForVaultHealth(log, shared.VaultMaxHealthWait)
-}
-
-// StartVaultAgentService installs, enables, and starts the Vault AGENT (vault-agent-eos.service).
-func StartVaultAgentService(log *zap.Logger) error {
-	log.Info("🛠️ Writing Vault AGENT systemd unit file")
-	if err := WriteAgentSystemdUnit(log); err != nil {
-		return fmt.Errorf("write agent systemd unit: %w", err)
-	}
-
-	log.Info("🔄 Reloading systemd daemon and enabling vault-agent-eos.service")
-	if err := ReloadDaemonAndEnable(log, shared.VaultAgentService); err != nil {
-		return fmt.Errorf("reload/enable vault-agent-eos.service: %w", err)
-	}
-
-	log.Info("✅ Vault agent systemd service installed and started")
-	return nil
 }
 
 func WriteAgentSystemdUnit(log *zap.Logger) error {
@@ -106,22 +90,6 @@ func WriteVaultServerSystemdUnit(log *zap.Logger) error {
 		return fmt.Errorf("write vault server unit: %w", err)
 	}
 	log.Info("✅ Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
-	return nil
-}
-
-// ReloadDaemonAndEnable reloads systemd, enables, and starts the given unit.
-func ReloadDaemonAndEnable(log *zap.Logger, unit string) error {
-	if out, err := exec.Command("systemctl", "daemon-reload").CombinedOutput(); err != nil {
-		log.Warn("systemd daemon-reload failed", zap.Error(err), zap.ByteString("output", out))
-		return fmt.Errorf("daemon-reload: %w", err)
-	}
-
-	if out, err := exec.Command("systemctl", "enable", "--now", unit).CombinedOutput(); err != nil {
-		log.Warn("failed to enable/start service", zap.String("unit", unit), zap.Error(err), zap.ByteString("output", out))
-		return fmt.Errorf("enable --now %s: %w", unit, err)
-	}
-
-	log.Info("✅ systemd unit enabled & started", zap.String("unit", unit))
 	return nil
 }
 

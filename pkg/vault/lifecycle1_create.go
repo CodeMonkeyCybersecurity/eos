@@ -1,4 +1,4 @@
-// pkg/vault/lifecycle_create.go
+// pkg/vault/lifecycle1_create.go
 
 package vault
 
@@ -102,16 +102,4 @@ func CreateVaultClient(log *zap.Logger) (*api.Client, error) {
 
 func VaultAddress() string {
 	return os.Getenv(shared.VaultAddrEnv)
-}
-
-func ApplyCoreSecretsAndHealthCheck(client *api.Client, log *zap.Logger) error {
-	if err := PhaseApplyCoreSecrets(client, shared.VaultTestPath, map[string]string{"example_key": "example_value"}, log); err != nil {
-		return err
-	}
-
-	healthy, err := CheckVaultHealth(log)
-	if err != nil || !healthy {
-		return fmt.Errorf("vault unhealthy after setup: %w", err)
-	}
-	return nil
 }
