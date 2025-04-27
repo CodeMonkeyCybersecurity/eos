@@ -103,8 +103,8 @@ func EnsureVaultDirs(log *zap.Logger) error {
 func createBaseDirs(log *zap.Logger) error {
 	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("⚠️ Could not resolve eos UID/GID, fallback to 1001", zap.Error(err))
-		eosUID, eosGID = 1001, 1001
+		log.Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
+		return fmt.Errorf("critical: eos system user not found: %w", err)
 	}
 
 	dirs := []struct {
@@ -116,7 +116,8 @@ func createBaseDirs(log *zap.Logger) error {
 		{path: shared.TLSDir, perm: 0750},
 		{path: shared.SecretsDir, perm: shared.FilePermOwnerRWX},
 		{path: shared.EosRunDir, perm: shared.FilePermOwnerRWX},
-		{path: filepath.Dir(shared.VaultAgentCACopyPath), perm: shared.FilePermOwnerRWX}, // ✅ Fixed!
+		{path: filepath.Dir(shared.VaultAgentCACopyPath), perm: shared.FilePermOwnerRWX},
+		{path: filepath.Join(shared.VaultDir, "logs"), perm: 0700},
 	}
 
 	for _, d := range dirs {
