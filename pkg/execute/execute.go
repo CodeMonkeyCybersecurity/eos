@@ -1,13 +1,14 @@
-/* pkg/execute/execute.go */
-
 package execute
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 )
@@ -23,14 +24,16 @@ func Execute(command string, args ...string) error {
 
 	cmd := exec.Command(command, args...)
 	output, err := cmd.CombinedOutput()
-	fmt.Print(string(output)) // Always print combined stdout+stderr
+	fmt.Print(string(output))
 
 	if err != nil {
-		return fmt.Errorf("❌ command failed: %s\n%s", cmdStr, string(output))
+		return fmt.Errorf("❌ Command failed: %s\n%s", cmdStr, string(output))
 	}
+	fmt.Printf("✅ Command completed: %s\n", cmdStr)
 	return nil
 }
 
+// ExecuteShell runs a shell command string through Bash.
 func ExecuteShell(command string) error {
 	fmt.Printf("➡ Executing shell command: %s\n", command)
 	cmd := exec.Command("bash", "-c", command)
@@ -38,11 +41,13 @@ func ExecuteShell(command string) error {
 	fmt.Print(string(output))
 
 	if err != nil {
-		return fmt.Errorf("shell command failed: %s\noutput:\n%s", err, string(output))
+		return fmt.Errorf("❌ Shell command failed: %w\noutput:\n%s", err, string(output))
 	}
+	fmt.Printf("✅ Shell command completed: %s\n", command)
 	return nil
 }
 
+// ExecuteInDir runs a command from a specific working directory.
 func ExecuteInDir(dir, command string, args ...string) error {
 	fmt.Printf("➡ Executing in %s: %s %s\n", dir, command, strings.Join(args, " "))
 	cmd := exec.Command(command, args...)
@@ -51,47 +56,50 @@ func ExecuteInDir(dir, command string, args ...string) error {
 	fmt.Print(string(output))
 
 	if err != nil {
-		return fmt.Errorf("command in directory failed: %s\noutput:\n%s", err, string(output))
+		return fmt.Errorf("❌ Command in directory failed: %w\noutput:\n%s", err, string(output))
 	}
+	fmt.Printf("✅ Directory command completed: %s\n", command)
 	return nil
 }
 
+// ExecuteRaw returns an *exec.Cmd for manual execution and handling.
 func ExecuteRaw(command string, args ...string) *exec.Cmd {
-	fmt.Printf("➡ Executing (raw): %s %s\n", command, strings.Join(args, " "))
 	return exec.Command(command, args...)
 }
 
-// ExecuteAndLog runs a command and streams stdout/stderr directly.
-// It returns an error if the command fails.
+// ExecuteAndLog runs a command and streams stdout/stderr live.
 func ExecuteAndLog(name string, args ...string) error {
 	fmt.Printf("🚀 Running: %s %s\n", name, joinArgs(args))
 
-	cmd := exec.Command(name, args...)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, name, args...)
+
 	var outputBuf bytes.Buffer
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
 
 	if err := cmd.Run(); err != nil {
 		fullOutput := outputBuf.String()
-		// Extract a concise error message—e.g., the first error line
-		summary := eoserr.ExtractSummary(fullOutput)
-		return fmt.Errorf("command failed: %s %s: %w - %s", name, joinArgs(args), err, summary)
+		summary := eoserr.ExtractSummary(fullOutput, 2)
+		return fmt.Errorf("❌ Command failed: %s %s: %w - %s", name, joinArgs(args), err, summary)
 	}
 
 	fmt.Printf("✅ Completed: %s %s\n", name, joinArgs(args))
 	return nil
 }
 
-// joinArgs formats arguments for display
+// joinArgs formats arguments for display.
 func joinArgs(args []string) string {
 	return shellQuote(args)
 }
 
-// shellQuote ensures args are properly quoted for visibility
+// shellQuote ensures args are properly quoted for visibility.
 func shellQuote(args []string) string {
-	quoted := ""
+	var quoted []string
 	for _, arg := range args {
-		quoted += fmt.Sprintf("'%s' ", arg)
+		quoted = append(quoted, fmt.Sprintf("'%s'", arg))
 	}
-	return quoted
+	return strings.Join(quoted, " ")
 }

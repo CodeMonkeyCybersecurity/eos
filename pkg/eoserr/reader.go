@@ -1,12 +1,28 @@
+// pkg/eoserr/reader.go
+
 package eoserr
 
 import (
 	"errors"
+	"fmt"
+	"os"
 	"strings"
+
+	"go.uber.org/zap"
 )
 
-// ExtractSummary extracts a concise summary from the full command output.
-func ExtractSummary(output string) string {
+var debugMode bool
+
+func SetDebugMode(enabled bool) {
+	debugMode = enabled
+}
+
+func DebugEnabled() bool {
+	return debugMode
+}
+
+// ExtractSummary extracts a concise error summary from full output.
+func ExtractSummary(output string, maxCandidates int) string {
 	trimmed := strings.TrimSpace(output)
 	if trimmed == "" {
 		return "No output provided."
@@ -23,14 +39,17 @@ func ExtractSummary(output string) string {
 		lowerLine := strings.ToLower(line)
 		if strings.Contains(lowerLine, "error") ||
 			strings.Contains(lowerLine, "failed") ||
-			strings.Contains(lowerLine, "cannot") {
+			strings.Contains(lowerLine, "cannot") ||
+			strings.Contains(lowerLine, "panic") ||
+			strings.Contains(lowerLine, "fatal") ||
+			strings.Contains(lowerLine, "timeout") {
 			candidates = append(candidates, line)
 		}
 	}
 
 	if len(candidates) > 0 {
-		if len(candidates) > 2 {
-			candidates = candidates[:2]
+		if len(candidates) > maxCandidates {
+			candidates = candidates[:maxCandidates]
 		}
 		return strings.Join(candidates, " - ")
 	}
@@ -45,7 +64,7 @@ func ExtractSummary(output string) string {
 	return "Unknown error."
 }
 
-// expectedError is a lightweight wrapper to mark expected, user-recoverable errors.
+// expectedError marks an error as expected and recoverable by the user.
 type expectedError struct {
 	cause error
 }
@@ -58,7 +77,7 @@ func (e *expectedError) Unwrap() error {
 	return e.cause
 }
 
-// NewExpectedError wraps an error as an expected user error.
+// NewExpectedError wraps an error for softer UX handling.
 func NewExpectedError(err error) error {
 	if err == nil {
 		return nil
@@ -66,8 +85,33 @@ func NewExpectedError(err error) error {
 	return &expectedError{cause: err}
 }
 
-// IsExpectedUserError returns true if an error is a wrapped expected error.
+// IsExpectedUserError checks if the error is marked as expected.
 func IsExpectedUserError(err error) bool {
 	var e *expectedError
 	return errors.As(err, &e)
+}
+
+// PrintError prints a human-readable error message without exiting.
+func PrintError(log *zap.Logger, userMessage string, err error) {
+	if DebugEnabled() {
+		log.Fatal(userMessage, zap.Error(err)) // Full structured fatal if debugging
+		return
+	}
+
+	if err != nil {
+		if IsExpectedUserError(err) {
+			log.Warn(userMessage, zap.Error(err))
+			fmt.Fprintf(os.Stderr, "⚠️  Notice: %s: %v\n", userMessage, err)
+		} else {
+			log.Error(userMessage, zap.Error(err))
+			fmt.Fprintf(os.Stderr, "❌ Error: %s: %v\n", userMessage, err)
+		}
+	}
+}
+
+// ExitWithError prints the error and exits with status 1.
+func ExitWithError(log *zap.Logger, userMessage string, err error) {
+	PrintError(log, userMessage, err)
+	fmt.Fprintln(os.Stderr, "👉 Tip: rerun with --debug for more details.")
+	os.Exit(1)
 }

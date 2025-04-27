@@ -1,28 +1,26 @@
-/* pkg/eoscli/context.go */
-
 package eoscli
 
 import (
+	"fmt"
 	"runtime"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-// resolveContext extracts the calling package (as "component") and
-// function name (as "action") to enrich log context.
-func resolveContext() (component string, action string) {
-	pc, file, _, ok := runtime.Caller(2) // 2 frames up to get caller of Wrap(...)
+// resolveContext extracts caller's package and function names.
+func resolveContext(skip int) (component, action string, err error) {
+	pc, file, _, ok := runtime.Caller(skip)
+	if !ok {
+		return "", "", fmt.Errorf("runtime.Caller failed")
+	}
+
+	// Extract component from file path
 	component = "unknown"
 	action = "unknown"
 
-	if !ok {
-		zap.L().Warn("Unable to resolve caller context: runtime.Caller failed")
-		return
-	}
-
-	// Extract last two parts of file path to infer component (e.g., "pkg/ldap/handler.go" → "ldap")
 	parts := strings.Split(file, "/")
 	if len(parts) >= 2 {
 		component = parts[len(parts)-2]
@@ -30,39 +28,59 @@ func resolveContext() (component string, action string) {
 		component = strings.TrimSuffix(parts[0], ".go")
 	}
 
-	// Resolve full function name
 	funcObj := runtime.FuncForPC(pc)
 	if funcObj == nil {
-		zap.L().Warn("Unable to resolve function name from program counter", zap.Uintptr("pc", pc))
-		return
+		return component, action, fmt.Errorf("runtime.FuncForPC failed")
 	}
+
 	funcName := funcObj.Name()
 	funcParts := strings.Split(funcName, ".")
 	if len(funcParts) > 0 {
 		action = funcParts[len(funcParts)-1]
 	}
 
-	zap.L().Debug("Resolved logger context",
-		zap.String("component", component),
-		zap.String("action", action),
-		zap.String("file", file),
-		zap.String("func", funcName),
-	)
-
-	return component, action
+	return component, action, nil
 }
 
 // contextualLogger creates a scoped logger enriched with package/function context.
-func contextualLogger() *zap.Logger {
-	component, action := resolveContext()
+// skipFrames is optional (default=2).
+func contextualLogger(skipFrames int) *zap.Logger {
+	if skipFrames <= 0 {
+		skipFrames = 2
+	}
 
-	logger := logger.L().Named(component).With(
+	baseLogger := logger.L()
+	component, action, err := resolveContext(skipFrames)
+	if err != nil {
+		baseLogger.Warn("Failed to resolve caller context", zap.Error(err))
+	}
+
+	if component == "" {
+		component = "unknown"
+	}
+	if action == "" {
+		action = "unknown"
+	}
+
+	l := baseLogger.With(
+		zap.String("component", component),
+		zap.String("action", action),
+	).Named(component)
+
+	l.Debug("🧭 Contextual logger initialized",
 		zap.String("component", component),
 		zap.String("action", action),
 	)
 
-	// Optional: Emit once per command for traceability
-	logger.Debug("🧭 Contextual logger initialized", zap.String("component", component), zap.String("action", action))
+	return l
+}
 
-	return logger
+// GetRuntimeContext safely extracts RuntimeContext from a Cobra command.
+func GetRuntimeContext(cmd *cobra.Command) *RuntimeContext {
+	val := cmd.Context().Value(runtimeContextKey)
+	ctx, ok := val.(*RuntimeContext)
+	if !ok || ctx == nil {
+		panic(fmt.Sprintf("RuntimeContext missing in command [%s] — was PreRunWrapper applied?", cmd.Name()))
+	}
+	return ctx
 }

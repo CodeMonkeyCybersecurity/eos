@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -110,6 +111,9 @@ func Execute() {
 	zap.L().Info("Eos CLI starting")
 
 	RegisterCommands()
+
+	log := logger.GetLogger()
+	eoscli.SetLogger(log)
 
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
