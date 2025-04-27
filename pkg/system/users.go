@@ -83,10 +83,50 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 		log.Warn("⚠️ Could not save password to disk", zap.Error(err))
 	}
 
+	if !SecretsExist() && UserExists(shared.EosID) {
+		log.Warn("EOS password file missing — generating replacement password")
+
+		newPass, err := crypto.GeneratePassword(20)
+		if err != nil {
+			return fmt.Errorf("failed to generate replacement password: %w", err)
+		}
+
+		if err := SetPassword(shared.EosID, newPass); err != nil {
+			return fmt.Errorf("failed to set replacement password for eos user: %w", err)
+		}
+
+		if err := SavePasswordToSecrets(shared.EosID, newPass, log); err != nil {
+			return fmt.Errorf("failed to save replacement password: %w", err)
+		}
+
+		log.Info("✅ Replacement eos credentials generated and saved")
+	}
+
 	// Memory hygiene (zero password string)
 	password = ""
 
 	log.Info("✅ eos user created and configured", zap.String("username", username))
+	return nil
+}
+
+func SecretsExist() bool {
+	_, err := os.Stat(filepath.Join(shared.SecretsDir, shared.SecretsFilename))
+	return err == nil
+}
+
+func RepairEosSecrets(log *zap.Logger) error {
+	password, err := crypto.GeneratePassword(20)
+	if err != nil {
+		return fmt.Errorf("generate password: %w", err)
+	}
+	if err := SetPassword(shared.EosID, password); err != nil {
+		return fmt.Errorf("set password: %w", err)
+	}
+	if err := SavePasswordToSecrets(shared.EosID, password, log); err != nil {
+		return fmt.Errorf("save password: %w", err)
+	}
+
+	log.Info("✅ Regenerated eos credentials successfully", zap.String("user", shared.EosID))
 	return nil
 }
 

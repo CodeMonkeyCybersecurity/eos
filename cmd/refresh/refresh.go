@@ -11,7 +11,7 @@ import (
 // RefreshCmd represents the refresh parent command.
 var RefreshCmd = &cobra.Command{
 	Use:     "refresh",
-	Short:   "Refresh commands",
+	Short:   "Refresh EOS system components (e.g., passwords, tokens)",
 	Long:    "Commands to refresh or reload components.",
 	Aliases: []string{"reload", "restart"},
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {

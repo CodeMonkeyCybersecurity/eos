@@ -65,7 +65,10 @@ var InspectVaultInitCmd = &cobra.Command{
 			fmt.Printf("Username: %s\n", eosCreds.Username)
 			fmt.Printf("Password: %s\n", eosCreds.Password)
 		} else {
-			fmt.Println("\n⚠️  EOS credentials not found. (expected in secrets dir)")
+			fmt.Println("\n⚠️  EOS credentials not found (expected in secrets dir)")
+			fmt.Println("👉  You can refresh EOS credentials safely by running:")
+			fmt.Println("    eos refresh eos-passwd")
+			fmt.Println("   (This will regenerate a strong password and save it securely.)")
 		}
 
 		// ---------------------------------------
