@@ -188,3 +188,13 @@ cache {
 	log.Info("✅ Vault Agent config written successfully", zap.String("path", shared.VaultAgentConfigPath))
 	return nil
 }
+
+// func fallbackVaultAddr(log *zap.Logger) string {
+// 	addr := os.Getenv(shared.VaultAddrEnv)
+// 	if addr == "" {
+// 		fallback := "https://127.0.0.1:" + shared.VaultDefaultPort
+// 		log.Warn("⚠️ VAULT_ADDR was empty — falling back", zap.String("fallback_addr", fallback))
+// 		return fallback
+// 	}
+// 	return addr
+// }

@@ -27,7 +27,9 @@ var (
 	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass"+SecretsExt)
 	RoleIDPath                = filepath.Join(SecretsDir, "role_id")
 	SecretIDPath              = filepath.Join(SecretsDir, "secret_id")
-	VaultClient               *api.Client
+	VaultAgentPassPath        = filepath.Join(SecretsDir, "agent_pass")
+
+	VaultClient *api.Client
 
 	// Runtime dirs
 	EosRunDir           = "/run/eos"

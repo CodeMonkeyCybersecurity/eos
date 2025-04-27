@@ -40,9 +40,6 @@ const (
 	// VaultAgentConfigPath is the path to the Vault Agent HCL configuration file.
 	VaultAgentConfigPath = "/etc/vault-agent-eos.hcl"
 
-	// VaultAgentPassPath stores the encrypted Vault Agent password.
-	VaultAgentPassPath = "/etc/vault-agent-eos.pass"
-
 	// VaultAgentCACopyPath is where EOS copies the local CA for Vault Agent to trust Vault's TLS.
 	VaultAgentCACopyPath = "/home/eos/.config/vault/ca.crt"
 
@@ -108,8 +105,11 @@ const (
 )
 
 const (
-	TestTimeout        = 500 * time.Millisecond
-	VaultRetryCount    = 5
-	VaultRetryDelay    = 2 * time.Second
-	VaultMaxHealthWait = 10 * time.Second
+	TestTimeout             = 500 * time.Millisecond
+	VaultRetryCount         = 5
+	VaultRetryDelay         = 2 * time.Second
+	VaultMaxHealthWait      = 10 * time.Second
+	VaultDefaultTokenTTL    = "4h"
+	VaultDefaultTokenMaxTTL = "24h"
+	VaultDefaultSecretIDTTL = "24h"
 )

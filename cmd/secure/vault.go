@@ -38,8 +38,9 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 2️⃣ Ensure AppRole method is mounted
 		log.Info("🪪 Ensuring approle auth method is enabled")
-		if err := vault.EnsureAppRoleAuth(client, log); err != nil {
-			return logger.LogErrAndWrap(log, "secure vault: enable approle", err)
+		password := "" // Placeholder — fetch or wire properly later
+		if err := vault.EnableVault(client, log, password); err != nil {
+			return logger.LogErrAndWrap(log, "enable vault", err)
 		}
 
 		// 3️⃣ Re-provision AppRole (idempotent)

@@ -22,7 +22,8 @@ var EnableVaultCmd = &cobra.Command{
 		}
 
 		log.Info("🚀 Starting Vault enable lifecycle")
-		if err := vault.EnableVault(client, log); err != nil {
+		password := ""
+		if err := vault.EnableVault(client, log, password); err != nil {
 			return logger.LogErrAndWrap(log, "enable vault", err)
 		}
 

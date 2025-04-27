@@ -33,7 +33,7 @@ const (
 )
 
 const (
-	EosID      = "eos"
+	EosID            = "eos"
 	EosUser          = EosID
 	EosGroup         = EosID
 	VaultAgentUser   = EosID

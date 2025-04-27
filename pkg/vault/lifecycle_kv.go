@@ -57,4 +57,3 @@ func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]s
 	log.Info("✅ Secrets written to Vault successfully", zap.String("path", path))
 	return nil
 }
-

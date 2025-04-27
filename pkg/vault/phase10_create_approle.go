@@ -4,6 +4,7 @@ package vault
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -17,58 +18,90 @@ import (
 // 10. Create AppRole for EOS
 //--------------------------------------------------------------------
 
-// PHASE 10 — PhaseCreateAppRole()
-//            └── EnsureAppRole()
-//            └── WriteAppRoleFiles()
-//            └── refreshAppRoleCreds()
+// PhaseCreateAppRole(client, log, password)
+// ├── DefaultAppRoleOptions()                    (setup options)
+// ├── EnsureAppRole(client, log, opts)
+// │   ├── os.Stat(shared.RoleIDPath)              (check if role_id file exists)
+// │   ├── refreshAppRoleCreds(client, log)        (only if RefreshCreds=true)
+// │   ├── EnableAppRoleAuth(client, log)          (if not enabled)
+// │   │   ├── client.Sys().EnableAuthWithOptions() (vault API call to enable approle)
+// │   ├── client.Logical().Write(shared.RolePath) (create/update role definition)
+// │   ├── refreshAppRoleCreds(client, log)        (fetch fresh role_id, secret_id)
+// │   │   ├── client.Logical().Read(role-id)
+// │   │   ├── client.Logical().Write(secret-id)
+// │   ├── WriteAppRoleFiles(roleID, secretID, log)
+// │       ├── system.EnsureOwnedDir(path, 0700, eos)
+// │       ├── system.WriteOwnedFile(role_id file, 0600, eos)
+// │       ├── system.WriteOwnedFile(secret_id file, 0600, eos)
+// ├── writeAgentPassword(password, log)            (only if password != "")
+// │   ├── os.WriteFile(shared.VaultAgentPassPath, 0600)
+// ├── WriteAgentSystemdUnit(log)                   (generate vault-agent-eos.service)
+// ├── EnsureAgentServiceReady(log)
+// │   ├── EnsureVaultAgentUnitExists(log)
+// │   │   ├── os.Stat(shared.VaultAgentServicePath)
+// │   │   ├── WriteAgentSystemdUnit(log) (if missing)
+// │   ├── system.ReloadDaemonAndEnable(log, vault-agent-eos.service)
+// └── log.Info("✅ AppRole provisioning complete")
 
 // PhaseCreateAppRole creates the EOS AppRole and saves credentials.
-func PhaseCreateAppRole(client *api.Client, log *zap.Logger) error {
+func PhaseCreateAppRole(client *api.Client, log *zap.Logger, password string) (string, string, error) {
 	log.Info("🔑 [Phase 10] Creating AppRole for EOS")
 
+	// 1️⃣ Create or refresh AppRole credentials
 	opts := DefaultAppRoleOptions()
-
 	roleID, secretID, err := EnsureAppRole(client, log, opts)
 	if err != nil {
-		return fmt.Errorf("ensure AppRole: %w", err)
+		log.Error("❌ Failed to ensure AppRole", zap.Error(err))
+		return "", "", fmt.Errorf("ensure AppRole: %w", err)
 	}
 
-	if err := WriteAppRoleFiles(roleID, secretID, log); err != nil {
-		return fmt.Errorf("write AppRole files: %w", err)
-	}
+	// 2️⃣ Write agent password (if provided) *before* systemd operations
+	if password != "" {
+		log.Info("🔏 Writing Vault Agent authentication secret",
+			zap.String("path", shared.VaultAgentPassPath))
 
-	log.Info("✅ AppRole credentials created and saved")
-	return nil
-}
-
-// Enables the AppRole auth method and provisions the eos‑role.
-func EnsureAppRoleAuth(client *api.Client, log *zap.Logger) error {
-	// 1) Enable the approle auth method if not already
-	log.Info("➕ Enabling AppRole auth method")
-	if err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"}); err != nil {
-		if !strings.Contains(err.Error(), "path is already in use") {
-			return fmt.Errorf("failed to enable approle auth: %w", err)
+		if err := writeAgentPassword(password, log); err != nil {
+			log.Error("❌ Failed to write Vault Agent password", zap.Error(err))
+			return "", "", fmt.Errorf("write agent password: %w", err)
 		}
+		log.Info("✅ Vault Agent password written",
+			zap.String("path", shared.VaultAgentPassPath))
+	} else {
+		log.Info("ℹ️ No agent password provided — skipping password file write")
 	}
-	log.Info("✅ AppRole auth method is enabled")
 
-	// 2) Create the role
-	log.Info("🛠 Provisioning AppRole", zap.String("role", shared.RoleName))
-	_, err := client.Logical().Write(shared.RolePath, map[string]interface{}{
-		"policies":      []string{shared.EosVaultPolicy},
-		"token_ttl":     "4h",
-		"token_max_ttl": "24h",
-		"secret_id_ttl": "24h",
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create AppRole %s: %w", shared.RoleName, err)
+	// 3️⃣ Write Vault Agent systemd unit file
+	if err := WriteAgentSystemdUnit(log); err != nil {
+		log.Error("❌ Failed to write Vault Agent systemd unit", zap.Error(err))
+		return "", "", fmt.Errorf("write agent systemd unit: %w", err)
 	}
-	log.Info("✅ AppRole provisioned", zap.String("role", shared.RoleName))
+	log.Info("✅ Vault Agent systemd unit written")
+
+	// 4️⃣ Reload systemd daemon and enable agent service
+	if err := EnsureAgentServiceReady(log); err != nil {
+		log.Error("❌ Failed to reload daemon and enable agent service", zap.Error(err))
+		return "", "", fmt.Errorf("enable agent service: %w", err)
+	}
+	log.Info("✅ Vault Agent service ready and enabled")
+
+	// 5️⃣ Done
+	log.Info("✅ AppRole provisioning complete 🎉")
+	return roleID, secretID, nil
+}
+
+func EnsureVaultAgentUnitExists(log *zap.Logger) error {
+	if _, err := os.Stat(shared.VaultAgentServicePath); os.IsNotExist(err) {
+		log.Warn("⚙️ Vault Agent systemd unit missing — creating", zap.String("path", shared.VaultAgentServicePath))
+		if err := WriteAgentSystemdUnit(log); err != nil {
+			log.Error("❌ Failed to write Vault Agent systemd unit", zap.Error(err))
+			return fmt.Errorf("write Vault Agent unit: %w", err)
+		}
+		log.Info("✅ Vault Agent systemd unit ensured", zap.String("path", shared.VaultAgentServicePath))
+	}
 	return nil
 }
 
-// WriteAppRoleFiles writes the role_id & secret_id into /etc/vault and
-// ensures the directory is 0700, owned by eos:eos.
+// WriteAppRoleFiles writes the Vault AppRole role_id and secret_id to disk with secure permissions.
 func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 	dir := filepath.Dir(shared.RoleIDPath)
 	log.Info("📁 Ensuring AppRole directory", zap.String("path", dir))
@@ -93,76 +126,30 @@ func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 	return nil
 }
 
+// refreshAppRoleCreds retrieves fresh credentials but does NOT write files.
 func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, error) {
-	log.Debug("🔑 Requesting AppRole credentials from Vault...")
+	log.Debug("🔑 Requesting fresh AppRole credentials")
 
-	// Read role_id from Vault
-	roleID, err := client.Logical().Read(shared.RolePath + "/role-id")
+	roleResp, err := client.Logical().Read(shared.RolePath + "/role-id")
 	if err != nil {
-		log.Error("❌ Failed to read AppRole role_id",
-			zap.String("path", shared.RolePath+"/role-id"),
-			zap.Error(err),
-		)
-		return "", "", err
+		return "", "", fmt.Errorf("read role_id: %w", err)
 	}
-
-	// Generate secret_id
-	secretID, err := client.Logical().Write(shared.RolePath+"/secret-id", nil)
-	if err != nil {
-		log.Error("❌ Failed to generate AppRole secret_id",
-			zap.String("path", shared.RolePath+"/secret-id"),
-			zap.Error(err),
-		)
-		return "", "", err
-	}
-
-	// Safely extract role_id
-	rawRoleID, ok := roleID.Data["role_id"].(string)
-	if !ok || rawRoleID == "" {
-		log.Error("❌ Invalid or missing role_id in Vault response",
-			zap.Any("data", roleID.Data),
-		)
+	roleID, ok := roleResp.Data["role_id"].(string)
+	if !ok || roleID == "" {
 		return "", "", fmt.Errorf("invalid role_id in Vault response")
 	}
 
-	// Safely extract secret_id
-	rawSecretID, ok := secretID.Data["secret_id"].(string)
-	if !ok || rawSecretID == "" {
-		log.Error("❌ Invalid or missing secret_id in Vault response",
-			zap.Any("data", secretID.Data),
-		)
+	secretResp, err := client.Logical().Write(shared.RolePath+"/secret-id", nil)
+	if err != nil {
+		return "", "", fmt.Errorf("generate secret_id: %w", err)
+	}
+	secretID, ok := secretResp.Data["secret_id"].(string)
+	if !ok || secretID == "" {
 		return "", "", fmt.Errorf("invalid secret_id in Vault response")
 	}
 
-	// Ensure directory exists (logged elsewhere if needed)
-	log.Debug("💾 Writing AppRole credentials to disk")
-
-	// Write role_id
-	if err := system.WriteOwnedFile(shared.RoleIDPath, []byte(rawRoleID+"\n"), 0o640, shared.EosUser); err != nil {
-		log.Error("❌ Failed to write role_id",
-			zap.String("path", shared.RoleIDPath),
-			zap.Error(err),
-		)
-		return "", "", err
-	}
-
-	// Write secret_id
-	if err := system.WriteOwnedFile(shared.SecretIDPath, []byte(rawSecretID+"\n"), 0o640, shared.EosUser); err != nil {
-		log.Error("❌ Failed to write secret_id",
-			zap.String("path", shared.SecretIDPath),
-			zap.Error(err),
-		)
-		return "", "", err
-	}
-
-	log.Info("✅ AppRole credentials written to disk",
-		zap.String("role_id_path", shared.RoleIDPath),
-		zap.String("secret_id_path", shared.SecretIDPath),
-	)
-	return rawRoleID, rawSecretID, nil
+	return roleID, secretID, nil
 }
-
-
 
 func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 	client.SetToken(token)
@@ -172,6 +159,104 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 		return fmt.Errorf("failed to revoke root token: %w", err)
 	}
 
-	fmt.Println("✅ Root token revoked.")
+	log.Info("✅ Root token revoked")
+	return nil
+}
+
+func writeAgentPassword(password string, log *zap.Logger) error {
+	log.Debug("🔏 Writing Vault Agent password to file", zap.String("path", shared.VaultAgentPassPath))
+
+	data := []byte(password + "\n")
+	if err := os.WriteFile(shared.VaultAgentPassPath, data, 0600); err != nil {
+		log.Error("❌ Failed to write password file", zap.String("path", shared.VaultAgentPassPath), zap.Error(err))
+		return fmt.Errorf("failed to write Vault Agent password to %s: %w", shared.VaultAgentPassPath, err)
+	}
+
+	log.Info("✅ Vault Agent password file written",
+		zap.String("path", shared.VaultAgentPassPath),
+		zap.Int("bytes_written", len(data)))
+
+	return nil
+}
+
+// GetPrivilegedVaultClient returns a Vault client authenticated as 'eos' system user
+func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
+	token, err := readTokenFromSink(shared.VaultAgentTokenPath)
+	if err != nil {
+		return nil, err
+	}
+	client, err := NewClient(log)
+	if err != nil {
+		return nil, err
+	}
+	client.SetToken(token)
+	return client, nil
+}
+
+// EnsureAppRole provisions the AppRole if missing or refreshes credentials if needed.
+func EnsureAppRole(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
+	if !opts.ForceRecreate {
+		if _, err := os.Stat(shared.RoleIDPath); err == nil {
+			log.Info("🔐 AppRole credentials already exist", zap.String("path", shared.RoleIDPath))
+			if opts.RefreshCreds {
+				return refreshAppRoleCreds(client, log)
+			}
+			return readAppRoleCredsFromDisk(log)
+		}
+	}
+
+	log.Info("🛠 Creating Vault AppRole", zap.String("role", shared.RoleName))
+
+	if err := EnableAppRoleAuth(client, log); err != nil {
+		return "", "", fmt.Errorf("enable AppRole auth: %w", err)
+	}
+
+	roleData := map[string]interface{}{
+		"policies":      []string{shared.EosVaultPolicy},
+		"token_ttl":     shared.VaultDefaultTokenTTL,
+		"token_max_ttl": shared.VaultDefaultTokenMaxTTL,
+		"secret_id_ttl": shared.VaultDefaultSecretIDTTL,
+	}
+	if _, err := client.Logical().Write(shared.RolePath, roleData); err != nil {
+		return "", "", fmt.Errorf("write AppRole: %w", err)
+	}
+	log.Info("✅ AppRole written")
+
+	roleID, secretID, err := refreshAppRoleCreds(client, log)
+	if err != nil {
+		return "", "", fmt.Errorf("fetch AppRole creds: %w", err)
+	}
+
+	if err := WriteAppRoleFiles(roleID, secretID, log); err != nil {
+		return "", "", fmt.Errorf("write AppRole files: %w", err)
+	}
+
+	return roleID, secretID, nil
+}
+
+func EnableAppRoleAuth(client *api.Client, log *zap.Logger) error {
+	log.Info("📡 Enabling AppRole auth method if needed...")
+
+	err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"})
+	if err == nil {
+		return nil
+	}
+	if strings.Contains(err.Error(), "path is already in use") {
+		log.Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
+		return nil
+	}
+	log.Error("❌ Failed to enable AppRole auth method", zap.Error(err))
+	return fmt.Errorf("enable approle auth: %w", err)
+}
+
+func EnsureAgentServiceReady(log *zap.Logger) error {
+	if err := EnsureVaultAgentUnitExists(log); err != nil {
+		return err
+	}
+	log.Info("🚀 Reloading daemon and enabling Vault Agent service")
+	if err := system.ReloadDaemonAndEnable(log, shared.VaultAgentService); err != nil {
+		log.Error("❌ Failed to enable/start Vault Agent service", zap.Error(err))
+		return fmt.Errorf("enable/start Vault Agent service: %w", err)
+	}
 	return nil
 }

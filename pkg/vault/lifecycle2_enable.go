@@ -4,6 +4,7 @@ package vault
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -18,8 +19,45 @@ import (
 // 12. Start Vault Agent and Validate
 //--------------------------------------------------------------------
 
+// EnableVault
+// ├── [7/12] CheckVaultHealth()
+// │   └── (checks Vault server health)
+// ├── [8/12] PhasePromptAndValidateRootToken(client, log)
+// │   └── (prompts or loads root token, validates it)
+// ├── [9/12] PhaseEnableAuthMethodsAndPolicies(client, log)
+// │   └── (enables auth backends, policies, admin user, audit logs)
+// ├── [10/12] PhaseCreateAppRole(client, log, password)
+// │   ├── DefaultAppRoleOptions()
+// │   ├── EnsureAppRole(client, log, opts)
+// │   │   ├── os.Stat(role_id path) (check if AppRole files exist)
+// │   │   ├── refreshAppRoleCreds(client, log) (if RefreshCreds true)
+// │   │   ├── EnableAppRoleAuth(client, log) (if approle auth not mounted)
+// │   │   ├── client.Logical().Write(role definition)
+// │   │   ├── refreshAppRoleCreds(client, log) (fetch role_id/secret_id)
+// │   │   └── WriteAppRoleFiles(roleID, secretID, log)
+// │   │       ├── system.EnsureOwnedDir()
+// │   │       └── system.WriteOwnedFile()
+// │   ├── writeAgentPassword(password, log) (only if password != "")
+// │   ├── WriteAgentSystemdUnit(log)
+// │   └── EnsureAgentServiceReady(log)
+// │       ├── EnsureVaultAgentUnitExists(log)
+// │       └── system.ReloadDaemonAndEnable()
+// ├── [11/12] PhaseRenderVaultAgentConfig(client, log)
+// │   └── (renders /etc/vault-agent-eos.hcl from template)
+// ├── [12/12] PhaseStartVaultAgentAndValidate(client, log)
+// │   ├── StartVaultAgentService(log)
+// │   ├── WaitForAgentToken(path, log)
+// │   ├── readTokenFromSink(path)
+// │   └── SetVaultToken(client, token)
+// ├── Final Validation: ApplyCoreSecretsAndHealthCheck(client, log)
+// │   ├── PhaseApplyCoreSecrets(client, mountPath, dataMap, log)
+// │   │   └── (writes example_key=example_value to Vault KVv2)
+// │   └── CheckVaultHealth()
+// │       └── (confirms Vault is still healthy)
+// └── Final: "Vault passed final readiness check — installation complete 🎉"
+
 // EnableVault orchestrates enabling an initialized Vault instance.
-func EnableVault(client *api.Client, log *zap.Logger) error {
+func EnableVault(client *api.Client, log *zap.Logger, password string) error {
 	log.Info("[7/12] Checking Vault health status")
 	healthy, err := CheckVaultHealth(log)
 	if err != nil {
@@ -40,7 +78,7 @@ func EnableVault(client *api.Client, log *zap.Logger) error {
 	}
 
 	log.Info("[10/12] Creating AppRole for EOS")
-	if err := PhaseCreateAppRole(client, log); err != nil {
+	if _, _, err := PhaseCreateAppRole(client, log, password); err != nil {
 		return fmt.Errorf("phase 10 (create AppRole): %w", err)
 	}
 
@@ -54,6 +92,12 @@ func EnableVault(client *api.Client, log *zap.Logger) error {
 		return fmt.Errorf("phase 12 (start agent and validate): %w", err)
 	}
 
+	log.Info("🔎 Verifying Vault readiness with test secret")
+	if err := ApplyCoreSecretsAndHealthCheck(client, log); err != nil {
+		log.Warn("⚠️ Vault health recheck failed after enable", zap.Error(err))
+		return logger.LogErrAndWrap(log, "post-enable vault healthcheck", err)
+	}
+	log.Info("✅ Vault passed final readiness check — installation complete 🎉")
 	log.Info("✅ Vault enable sequence complete 🎉 — Vault is operational")
 	return nil
 }
