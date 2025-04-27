@@ -19,6 +19,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
@@ -94,6 +95,7 @@ func RegisterCommands() {
 		sync.SyncCmd,
 		hecate.HecateCmd,
 		delphi.DelphiCmd,
+		pandora.PandoraCmd,
 	} {
 		RootCmd.AddCommand(subCmd)
 	}
