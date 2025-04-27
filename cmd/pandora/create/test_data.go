@@ -34,7 +34,7 @@ attempts to upload it into Vault, and falls back to saving locally if Vault is u
 			validateAndCache(client, log)
 		}
 
-		return writeTestDataToVaultOrFallback(client, data, log)
+		return writeTestDataToVaultOrFallback(data, log)
 	}),
 }
 
@@ -89,56 +89,58 @@ func validateAndCache(client *api.Client, log *zap.Logger) {
 }
 
 // writeTestDataToVaultOrFallback writes test data into Vault or falls back to disk storage if Vault is unavailable.
-func writeTestDataToVaultOrFallback(client *api.Client, data map[string]interface{}, log *zap.Logger) error {
+func writeTestDataToVaultOrFallback(data map[string]interface{}, log *zap.Logger) error {
 	log.Info("🔐 Attempting to write test data into Vault...")
 
-	vaultErr := vault.Write(client, TestDataVaultPath, data, log)
-	var vaultStatus string
+	vaultErr := vault.Write(nil, TestDataVaultPath, data, log)
 	if vaultErr == nil {
-		vaultStatus = "SUCCESS"
-		log.Info("✅ Test data written into Vault successfully", zap.String("path", TestDataVaultPath))
-	} else {
-		vaultStatus = "FAILED"
-		log.Warn("⚠️ Vault write failed — falling back to disk", zap.Error(vaultErr))
+		log.Info("✅ Vault write succeeded", zap.String("vault_path", TestDataVaultPath))
+		printStorageSummary("Vault", TestDataVaultPath, "SUCCESS", "N/A", "")
+		return nil
 	}
+
+	// Vault failed — log and fallback to disk
+	log.Warn("⚠️ Vault write failed, falling back to disk", zap.Error(vaultErr))
 
 	outputPath := diskFallbackPath()
-	diskErr := error(nil)
-
-	if vaultErr != nil {
-		if err := os.MkdirAll(filepath.Dir(outputPath), DirPerm); err != nil {
-			log.Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(err))
-			diskErr = fmt.Errorf("create output dir: %w", err)
-		} else {
-			raw, err := json.MarshalIndent(data, "", "  ")
-			if err != nil {
-				log.Error("❌ Failed to marshal test data", zap.Error(err))
-				diskErr = fmt.Errorf("marshal test data: %w", err)
-			} else if err := os.WriteFile(outputPath, raw, FilePerm); err != nil {
-				log.Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(err))
-				diskErr = fmt.Errorf("vault write failed: %w; fallback disk write failed: %v", vaultErr, err)
-			}
-		}
+	if err := os.MkdirAll(filepath.Dir(outputPath), DirPerm); err != nil {
+		log.Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(err))
+		printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "FAILED")
+		return fmt.Errorf("vault write failed: %w; fallback mkdir failed: %v", vaultErr, err)
 	}
 
-	log.Info("🔒 Test data storage result",
-		zap.String("vault_write", vaultStatus),
-		zap.String("disk_fallback", fallbackStatus(diskErr)),
-		zap.String("output_path", outputPath),
-	)
-
-	if vaultErr != nil && diskErr != nil {
-		return fmt.Errorf("both Vault and fallback disk writes failed: vault error: %w; disk error: %v", vaultErr, diskErr)
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		log.Error("❌ Failed to marshal test data", zap.Error(err))
+		printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "FAILED")
+		return fmt.Errorf("vault write failed: %w; fallback marshal failed: %v", vaultErr, err)
 	}
 
+	if err := os.WriteFile(outputPath, raw, FilePerm); err != nil {
+		log.Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(err))
+		printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "FAILED")
+		return fmt.Errorf("vault write failed: %w; fallback disk write failed: %v", vaultErr, err)
+	}
+
+	log.Info("💾 Fallback to disk succeeded", zap.String("disk_path", outputPath))
+	printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "SUCCESS")
 	return nil
 }
 
-func fallbackStatus(err error) string {
-	if err == nil {
-		return "SUCCESS"
+func printStorageSummary(primary string, primaryPath string, primaryResult string, fallback string, fallbackResult string) {
+	fmt.Println()
+	fmt.Println("🔒 Test Data Storage Summary")
+	fmt.Printf("  %s: %s\n", primary, primaryResult)
+	if primaryResult == "SUCCESS" {
+		fmt.Printf("    📂 Path: %s\n", primaryPath)
 	}
-	return "FAILED"
+	if fallback != "N/A" {
+		fmt.Printf("  %s: %s\n", fallback, fallbackResult)
+		if fallbackResult == "SUCCESS" {
+			fmt.Printf("    📂 Path: %s\n", diskFallbackPath())
+		}
+	}
+	fmt.Println()
 }
 
 func diskFallbackPath() string {
