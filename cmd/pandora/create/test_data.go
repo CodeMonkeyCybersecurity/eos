@@ -92,34 +92,33 @@ func validateAndCache(client *api.Client, log *zap.Logger) {
 func writeTestDataToVaultOrFallback(data map[string]interface{}, log *zap.Logger) error {
 	log.Info("🔐 Attempting to write test data into Vault...")
 
-	vaultErr := vault.Write(nil, TestDataVaultPath, data, log)
-	if vaultErr == nil {
+	err := vault.Write(nil, TestDataVaultPath, data, log)
+	if err == nil {
 		log.Info("✅ Vault write succeeded", zap.String("vault_path", TestDataVaultPath))
 		printStorageSummary("Vault", TestDataVaultPath, "SUCCESS", "N/A", "")
 		return nil
 	}
 
-	// Vault failed — log and fallback to disk
-	log.Warn("⚠️ Vault write failed, falling back to disk", zap.Error(vaultErr))
+	log.Warn("⚠️ Vault write failed, falling back to disk", zap.Error(err))
 
 	outputPath := diskFallbackPath()
-	if err := os.MkdirAll(filepath.Dir(outputPath), DirPerm); err != nil {
-		log.Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(err))
+	if mkdirErr := os.MkdirAll(filepath.Dir(outputPath), DirPerm); mkdirErr != nil {
+		log.Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(mkdirErr))
 		printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "FAILED")
-		return fmt.Errorf("vault write failed: %w; fallback mkdir failed: %v", vaultErr, err)
+		return fmt.Errorf("vault write failed: %w; fallback mkdir failed: %v", err, mkdirErr)
 	}
 
-	raw, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		log.Error("❌ Failed to marshal test data", zap.Error(err))
+	raw, marshalErr := json.MarshalIndent(data, "", "  ")
+	if marshalErr != nil {
+		log.Error("❌ Failed to marshal test data", zap.Error(marshalErr))
 		printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "FAILED")
-		return fmt.Errorf("vault write failed: %w; fallback marshal failed: %v", vaultErr, err)
+		return fmt.Errorf("vault write failed: %w; fallback marshal failed: %v", err, marshalErr)
 	}
 
-	if err := os.WriteFile(outputPath, raw, FilePerm); err != nil {
-		log.Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(err))
+	if writeErr := os.WriteFile(outputPath, raw, FilePerm); writeErr != nil {
+		log.Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(writeErr))
 		printStorageSummary("Vault", TestDataVaultPath, "FAILED", "Disk", "FAILED")
-		return fmt.Errorf("vault write failed: %w; fallback disk write failed: %v", vaultErr, err)
+		return fmt.Errorf("vault write failed: %w; fallback disk write failed: %v", err, writeErr)
 	}
 
 	log.Info("💾 Fallback to disk succeeded", zap.String("disk_path", outputPath))
