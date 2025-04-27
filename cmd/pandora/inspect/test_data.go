@@ -30,7 +30,10 @@ var InspectTestDataCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-inspect-test-data")
 
-		// Try Vault first
+		var client *api.Client
+		var out map[string]interface{}
+		var vaultReadErr error
+
 		client, err := vault.EnsurePrivilegedVaultClient(log)
 		if err != nil {
 			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
@@ -41,18 +44,39 @@ var InspectTestDataCmd = &cobra.Command{
 		validateAndCache(client, log)
 
 		log.Info("🔍 Attempting to read test-data from Vault...")
-		var out map[string]interface{}
 		if err := vault.Read(client, testDataVaultPath, &out, log); err != nil {
+			vaultReadErr = err
 			if vault.IsSecretNotFound(err) {
-				log.Warn("⚠️ Test-data not found in Vault, falling back to disk", zap.Error(err))
-				return inspectFromDisk(log)
+				log.Warn("⚠️ Test-data not found in Vault, attempting disk fallback...", zap.Error(err))
+			} else {
+				log.Error("❌ Vault read error", zap.String("vault_path", testDataVaultPath), zap.Error(err))
+				return fmt.Errorf("vault read failed at '%s': %w", testDataVaultPath, err)
 			}
-			log.Error("❌ Unexpected Vault error", zap.Error(err))
-			return fmt.Errorf("vault read failed: %w", err)
 		}
 
-		printData(out, "Vault", "secret/data/"+testDataVaultPath)
-		log.Info("✅ Test-data read successfully from Vault")
+		// If Vault read succeeded
+		if vaultReadErr == nil {
+			printData(out, "Vault", "secret/data/"+testDataVaultPath)
+			log.Info("✅ Test-data read successfully from Vault")
+			return nil
+		}
+
+		// Otherwise fallback
+		log.Info("🔍 Attempting fallback to disk...")
+
+		if fallbackErr := inspectFromDisk(log); fallbackErr != nil {
+			log.Error("❌ Both Vault and disk fallback failed",
+				zap.String("vault_path", testDataVaultPath),
+				zap.Error(vaultReadErr),
+				zap.Error(fallbackErr),
+			)
+			return fmt.Errorf(
+				"vault read failed at '%s' (%v); disk fallback also failed (%v)",
+				testDataVaultPath, vaultReadErr, fallbackErr,
+			)
+		}
+
+		log.Info("✅ Test-data read successfully from fallback")
 		return nil
 	}),
 }
