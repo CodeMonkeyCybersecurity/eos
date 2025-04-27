@@ -153,3 +153,25 @@ func keysOf(m map[string]interface{}) []string {
 	}
 	return keys
 }
+
+// Delete removes a secret at the given path in Vault KV v2.
+// It expects a valid client, and a path relative to the KV mount.
+func Delete(client *api.Client, path string, log *zap.Logger) error {
+	if client == nil {
+		return fmt.Errorf("vault client is nil")
+	}
+
+	log.Info("🗑️ Deleting secret from Vault", zap.String("path", path))
+
+	kv := client.KVv2("secret") // Assuming your KV mount is "secret/"
+
+	// ❗ Correct: manually provide context.Background()
+	err := kv.Delete(context.Background(), path)
+	if err != nil {
+		log.Error("❌ Failed to delete Vault secret", zap.String("path", path), zap.Error(err))
+		return fmt.Errorf("vault delete failed: %w", err)
+	}
+
+	log.Info("✅ Vault secret deleted", zap.String("path", path))
+	return nil
+}
