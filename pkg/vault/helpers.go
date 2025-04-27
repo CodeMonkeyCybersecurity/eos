@@ -70,15 +70,23 @@ func VaultPath(name string, log *zap.Logger) string {
 	return final
 }
 
-// DiskPath constructs a fallback config path like: ~/.config/eos/<name>/config.json
+// DiskPath constructs a fallback config path like: /var/lib/eos/secrets/<name>.json
 func DiskPath(name string, log *zap.Logger) string {
 	var final string
+
+	// Always prefer storing fallback disk files in SecretsDir
 	switch name {
-	case shared.VaultInitPath:
-		final = shared.VaultInitPath
+	case "vault_init":
+		final = filepath.Join(shared.SecretsDir, "vault_init.json")
+	case "delphi_fallback":
+		final = filepath.Join(shared.SecretsDir, "delphi_fallback.json")
+	case "vault_userpass":
+		final = filepath.Join(shared.SecretsDir, "vault_userpass.json")
 	default:
-		final = filepath.Join(shared.VaultConfigDirDebian, name, shared.DefaultConfigFilename)
+		final = filepath.Join(shared.SecretsDir, name+".json")
+		log.Warn("DiskPath fallback: unknown name, using default layout", zap.String("name", name))
 	}
+
 	log.Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
 	return final
 }
