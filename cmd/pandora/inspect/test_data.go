@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -34,15 +35,17 @@ var TestDataCmd = &cobra.Command{
 
 		secret, err := vault.ReadSecret(log, vaultPath)
 		if err != nil {
-			// Check if it's a missing/not found error
-			if vault.IsNotFoundError(err) || os.IsNotExist(err) {
-				log.Warn("No secret found at path",
-					zap.String("vault_path", vaultPath))
-				return inspectFromDisk(log)
+			if vault.IsNotFoundError(err) {
+				log.Warn("⚠️ No secret found at path", zap.String("vault_path", vaultPath))
+
+				if diskErr := inspectFromDisk(log); diskErr != nil {
+					eoserr.PrintError(log, "No test data found anywhere", diskErr)
+				}
+
+				return nil // ← Reassures Cobra no crash
 			}
 
-			// Unexpected error — escalate
-			log.Error("Vault read error",
+			log.Error("❌ Vault read error",
 				zap.String("vault_path", vaultPath),
 				zap.Error(err))
 			return fmt.Errorf("vault read failed at '%s': %w", vaultPath, err)
@@ -67,7 +70,7 @@ func inspectFromDisk(log *zap.Logger) error {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			log.Warn("⚠️ Fallback test-data file not found", zap.String("path", path))
-			return fmt.Errorf("no test-data found in Vault or disk")
+			return eoserr.NewExpectedError(fmt.Errorf("no fallback test-data found at %s", path))
 		}
 		log.Error("❌ Failed to read fallback test-data", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("disk fallback read failed: %w", err)
@@ -79,8 +82,15 @@ func inspectFromDisk(log *zap.Logger) error {
 		return fmt.Errorf("invalid fallback data format: %w", err)
 	}
 
+	if len(out) == 0 {
+		log.Warn("⚠️ Fallback file loaded but contains no data", zap.String("path", path))
+		return eoserr.NewExpectedError(fmt.Errorf("fallback file at %s is empty", path))
+	}
+
 	printData(out, "Disk", path)
-	log.Info("✅ Test-data read successfully from fallback")
+	log.Info("✅ Test-data read successfully from fallback",
+		zap.Int("entries", len(out)),
+		zap.String("path", path))
 	return nil
 }
 
