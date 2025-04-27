@@ -30,6 +30,11 @@ var TestDataCmd = &cobra.Command{
 		log := ctx.Log.Named("pandora-inspect-test-data")
 		vaultPath := "eos/test-data"
 
+		if !EnsureVaultReadyOrWarn(log) {
+			eoserr.PrintError(log, "Vault not ready — skipping Vault reads", eoserr.NewExpectedError(fmt.Errorf("vault unavailable")))
+			return nil // <- EOS CLI exits cleanly, no crash
+		}
+
 		log.Info("🔍 Attempting to read test-data from Vault...",
 			zap.String("vault_path", vaultPath))
 
@@ -49,6 +54,11 @@ var TestDataCmd = &cobra.Command{
 				zap.String("vault_path", vaultPath),
 				zap.Error(err))
 			return fmt.Errorf("vault read failed at '%s': %w", vaultPath, err)
+		}
+
+		if eoserr.IsExpectedUserError(err) {
+			eoserr.PrintError(log, "Skipping because Vault unavailable", err)
+			return nil
 		}
 
 		// Successfully read
@@ -117,6 +127,19 @@ func printInspectSummary(source, path string) {
 	}
 	fmt.Printf("  📂 Path: %s\n", path)
 	fmt.Println()
+}
+
+func EnsureVaultReadyOrWarn(log *zap.Logger) bool {
+	client, err := vault.GetVaultClient(log)
+	if err != nil {
+		log.Warn("Vault client lookup error", zap.Error(err))
+		return false
+	}
+	if client == nil {
+		log.Warn("Vault client not ready — client is nil")
+		return false
+	}
+	return true
 }
 
 func init() {

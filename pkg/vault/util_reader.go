@@ -9,32 +9,37 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
-/**/
-// VaultRead reads and decodes a secret struct from Vault
+// ReadVault reads and decodes a secret struct from Vault.
 func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
 	client, err := GetPrivilegedVaultClient(log)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get privileged Vault client: %w", err)
 	}
-	kv := client.KVv2("secret")
 
+	kv := client.KVv2("secret")
 	secret, err := kv.Get(context.Background(), path)
 	if err != nil {
+		log.Warn("Vault KV read failed", zap.String("path", path), zap.Error(err))
 		return nil, err
 	}
+
 	raw, ok := secret.Data["json"].(string)
 	if !ok {
-		return nil, errors.New("missing or invalid 'json' field in secret")
+		log.Error("Secret missing 'json' field or wrong format", zap.String("path", path))
+		return nil, errors.New("missing or invalid 'json' field in Vault secret")
 	}
+
 	var result T
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal secret JSON: %w", err)
+		log.Error("Failed to unmarshal Vault secret JSON", zap.String("path", path), zap.Error(err))
+		return nil, fmt.Errorf("failed to unmarshal Vault secret: %w", err)
 	}
 	return &result, nil
 }
@@ -43,7 +48,12 @@ func ReadVault[T any](path string, log *zap.Logger) (*T, error) {
 func ReadSecret(log *zap.Logger, path string) (*api.Secret, error) {
 	client, err := GetVaultClient(log)
 	if err != nil {
-		return nil, fmt.Errorf("vault client not ready: %w", err)
+		log.Warn("Vault client lookup failed", zap.Error(err))
+		return nil, eoserr.NewExpectedError(fmt.Errorf("vault client lookup failed: %w", err))
+	}
+	if client == nil {
+		log.Warn("Vault client is nil during ReadSecret", zap.String("path", path))
+		return nil, eoserr.NewExpectedError(fmt.Errorf("vault client is not ready"))
 	}
 
 	secret, err := client.Logical().ReadWithContext(context.Background(), path)
