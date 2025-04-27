@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -114,7 +115,12 @@ func Execute() {
 	RegisterCommands()
 
 	if err := RootCmd.Execute(); err != nil {
-		logger.L().Error("CLI execution error", zap.Error(err))
-		os.Exit(1)
+		if eoserr.IsExpectedUserError(err) {
+			logger.L().Warn("CLI completed with user error", zap.Error(err))
+			os.Exit(0)
+		} else {
+			logger.L().Error("CLI execution error", zap.Error(err))
+			os.Exit(1)
+		}
 	}
 }

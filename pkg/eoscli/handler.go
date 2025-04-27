@@ -5,6 +5,7 @@ package eoscli
 import (
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -37,7 +38,11 @@ func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error)
 		err = fn(ctx, cmd, args)
 
 		if err != nil {
-			log.Error("⚠️ EOS command failed", zap.Duration("duration", time.Since(start)), zap.String("command", cmd.Name()))
+			if eoserr.IsExpectedUserError(err) {
+				log.Warn("⚠️ EOS user error", zap.Error(err), zap.String("command", cmd.Name()), zap.Duration("duration", time.Since(start)))
+			} else {
+				log.Error("❌ EOS command failed", zap.Error(err), zap.String("command", cmd.Name()), zap.Duration("duration", time.Since(start)))
+			}
 			return err
 		}
 		log.Info("✅ EOS command finished successfully", zap.Duration("duration", time.Since(start)), zap.String("command", cmd.Name()))
