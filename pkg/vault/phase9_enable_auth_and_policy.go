@@ -39,14 +39,6 @@ func PhaseEnableAuthMethodsAndPolicies(client *api.Client, log *zap.Logger) erro
 	log.Info("✅ KVv2 mount successfully enabled", zap.String("mount", shared.VaultMountKV))
 
 	// Proceed with auth enablement and policies
-	if err := EnableUserPass(client); err != nil {
-		return fmt.Errorf("enable userpass auth method: %w", err)
-	}
-
-	if err := EnsureVaultAuthEnabled(client, "userpass", "auth/userpass", log); err != nil {
-		return fmt.Errorf("ensure userpass auth enabled: %w", err)
-	}
-
 	if err := EnsureVaultAuthEnabled(client, "approle", "auth/approle", log); err != nil {
 		return fmt.Errorf("ensure approle auth enabled: %w", err)
 	}
@@ -132,7 +124,7 @@ func EnsurePolicy(client *api.Client, log *zap.Logger) error {
 // ApplyAdminPolicy applies a full-access policy from the Policies map to the eos user.
 func ApplyAdminPolicy(creds shared.UserpassCreds, client *api.Client, log *zap.Logger) error {
 	log.Info("🔐 Creating full-access policy for eos user")
-	log.Debug("Applying admin policy to eos user (password length verified)", zap.Int("password_len", len(creds.Password)))
+	log.Debug("Applying admin policy to eos user", zap.Int("password_len", len(creds.Password)))
 
 	policyName := shared.EosVaultPolicy
 	policy, ok := shared.Policies[policyName]
@@ -140,23 +132,31 @@ func ApplyAdminPolicy(creds shared.UserpassCreds, client *api.Client, log *zap.L
 		return fmt.Errorf("policy %q not found in Policies map", policyName)
 	}
 
-	// Apply policy using the Vault API.
+	// Step 1: Apply eos-policy itself
+	log.Info("📜 Uploading custom policy to Vault", zap.String("policy", policyName))
 	if err := client.Sys().PutPolicy(policyName, policy); err != nil {
-		log.Error("Failed to apply policy via API", zap.Error(err))
-		return err
+		log.Error("❌ Failed to apply policy via API", zap.Error(err))
+		return fmt.Errorf("failed to upload policy %q: %w", policyName, err)
 	}
-	log.Info("✅ Custom policy applied via API", zap.String("policy", policyName))
+	log.Info("✅ Policy applied to Vault", zap.String("policy", policyName))
 
-	// Update the eos user with the policy.
-	_, err := client.Logical().Write(shared.EosVaultUserPath, map[string]interface{}{
-		"password": creds.Password,
-		"policies": policyName,
-	})
-	if err != nil {
-		log.Error("Failed to update eos user with policy", zap.Error(err))
-		return err
+	// Step 2: Create eos user with userpass auth, targeting KVv2
+	log.Info("🔑 Creating eos user in KVv2")
+	userPath := "secret/data/users/eos" // KVv2 requires /data/ prefix
+	payload := map[string]interface{}{
+		"data": map[string]interface{}{
+			"password": creds.Password,
+			"policies": policyName,
+		},
 	}
-	log.Info("✅ eos user updated with full privileges", zap.String("policy", policyName))
+
+	_, err := client.Logical().Write(userPath, payload)
+	if err != nil {
+		log.Error("❌ Failed to create eos user in Vault", zap.String("path", userPath), zap.Error(err))
+		return fmt.Errorf("failed to write eos user credentials to Vault: %w", err)
+	}
+
+	log.Info("✅ eos user created with full privileges", zap.String("path", userPath), zap.String("policy", policyName))
 	return nil
 }
 
