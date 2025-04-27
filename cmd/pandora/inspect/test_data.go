@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,38 +21,62 @@ const (
 	testDataVaultPath = "eos/test-data"
 )
 
-// TestDataCmd is 'eos pandora inspect test-data'
-var TestDataCmd = &cobra.Command{
+// InspectTestDataCmd attempts to read test data from Vault,
+// falling back to disk if Vault is unavailable.
+var InspectTestDataCmd = &cobra.Command{
 	Use:   "test-data",
-	Short: "Inspect test data stored in Pandora (Vault)",
-	Long:  "Attempts to read a known test secret (eos/test-data) from Vault or fallback.",
+	Short: "Inspect test-data from Vault (fallback to disk)",
+	Long:  `Reads and displays the test-data stored in Vault, or falls back to local disk.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-inspect-test-data")
-		vaultPath := "eos/test-data"
 
-		// Ensure Vault is ready
-		if !EnsureVaultReadyOrWarn(log) {
-			eoserr.PrintError(log, "Vault not ready — skipping Vault reads", eoserr.NewExpectedError(fmt.Errorf("vault unavailable")))
-			return nil
+		var client *api.Client
+		var out map[string]interface{}
+		var vaultReadErr error
+
+		client, err := vault.EnsurePrivilegedVaultClient(log)
+		if err != nil {
+			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
+			return inspectFromDisk(log)
 		}
 
-		log.Info("🔍 Attempting to read test-data from Vault...", zap.String("vault_path", vaultPath))
+		vault.SetVaultClient(client, log)
+		validateAndCache(client, log)
 
-		secret, ok := vault.SafeReadSecret(log, vaultPath)
-		if !ok {
-			log.Warn("⚠️ Vault secret missing or unreadable, falling back to disk", zap.String("vault_path", vaultPath))
-			if err := inspectFromDisk(log); err != nil {
-				eoserr.PrintError(log, "No test data found anywhere", err)
+		log.Info("🔍 Attempting to read test-data from Vault...")
+		if err := vault.Read(client, testDataVaultPath, &out, log); err != nil {
+			vaultReadErr = err
+			if vault.IsSecretNotFound(err) {
+				log.Warn("⚠️ Test-data not found in Vault, attempting disk fallback...", zap.Error(err))
+			} else {
+				log.Error("❌ Vault read error", zap.String("vault_path", testDataVaultPath), zap.Error(err))
+				return fmt.Errorf("vault read failed at '%s': %w", testDataVaultPath, err)
 			}
+		}
+
+		// If Vault read succeeded
+		if vaultReadErr == nil {
+			printData(out, "Vault", "secret/data/"+testDataVaultPath)
+			log.Info("✅ Test-data read successfully from Vault")
 			return nil
 		}
 
-		// Successfully read secret
-		data := secret.Data
-		fmt.Println("✅ Secret data retrieved from Vault:")
-		for k, v := range data {
-			fmt.Printf("  %s: %v\n", k, v)
+		// Otherwise fallback
+		log.Info("🔍 Attempting fallback to disk...")
+
+		if fallbackErr := inspectFromDisk(log); fallbackErr != nil {
+			log.Error("❌ Both Vault and disk fallback failed",
+				zap.String("vault_path", testDataVaultPath),
+				zap.Error(vaultReadErr),
+				zap.Error(fallbackErr),
+			)
+			return fmt.Errorf(
+				"vault read failed at '%s' (%v); disk fallback also failed (%v)",
+				testDataVaultPath, vaultReadErr, fallbackErr,
+			)
 		}
+
+		log.Info("✅ Test-data read successfully from fallback")
 		return nil
 	}),
 }
@@ -65,7 +89,7 @@ func inspectFromDisk(log *zap.Logger) error {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			log.Warn("⚠️ Fallback test-data file not found", zap.String("path", path))
-			return eoserr.NewExpectedError(fmt.Errorf("no fallback test-data found at %s", path))
+			return fmt.Errorf("no test-data found in Vault or disk")
 		}
 		log.Error("❌ Failed to read fallback test-data", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("disk fallback read failed: %w", err)
@@ -77,15 +101,8 @@ func inspectFromDisk(log *zap.Logger) error {
 		return fmt.Errorf("invalid fallback data format: %w", err)
 	}
 
-	if len(out) == 0 {
-		log.Warn("⚠️ Fallback file loaded but contains no data", zap.String("path", path))
-		return eoserr.NewExpectedError(fmt.Errorf("fallback file at %s is empty", path))
-	}
-
 	printData(out, "Disk", path)
-	log.Info("✅ Test-data read successfully from fallback",
-		zap.Int("entries", len(out)),
-		zap.String("path", path))
+	log.Info("✅ Test-data read successfully from fallback")
 	return nil
 }
 
@@ -114,19 +131,20 @@ func printInspectSummary(source, path string) {
 	fmt.Println()
 }
 
-func EnsureVaultReadyOrWarn(log *zap.Logger) bool {
-	client, err := vault.GetVaultClient(log)
-	if err != nil {
-		log.Warn("Vault client lookup error", zap.Error(err))
-		return false
+func validateAndCache(client *api.Client, log *zap.Logger) {
+	report, checked := vault.Check(client, log, nil, "")
+	if checked != nil {
+		vault.SetVaultClient(checked, log)
 	}
-	if client == nil {
-		log.Warn("Vault client not ready — client is nil")
-		return false
+	if report == nil {
+		log.Warn("⚠️ Vault check returned nil — skipping further setup")
+		return
 	}
-	return true
+	for _, note := range report.Notes {
+		log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+	}
 }
 
 func init() {
-	InspectCmd.AddCommand(TestDataCmd)
+	InspectCmd.AddCommand(InspectTestDataCmd)
 }
