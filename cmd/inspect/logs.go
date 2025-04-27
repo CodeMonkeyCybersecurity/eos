@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -17,7 +16,7 @@ import (
 var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
 	Short: "Inspect EOS logs (requires root or eos privileges)",
-	Long: `Displays recent EOS logs.
+	Long: `Displays the last 100 lines of recent EOS logs.
 Tries known log file locations first. If none found, falls back to journalctl.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-logs")
@@ -39,20 +38,22 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 					prefix = "⭐"
 				}
 				fmt.Printf("\n%s %s\n", prefix, path)
-				fmt.Println(strings.TrimSpace(content))
+
+				logger.PrintLastNLines(content, 100) // <--- Only last 100 lines printed
 				found = true
 			}
 		}
 
 		if !found {
 			log.Warn("No log files found; attempting journalctl fallback")
-			log.Warn("No log files found. Trying journalctl fallback...")
+			fmt.Println("\n⚠️")
+			fmt.Println("No log files found. Trying journalctl fallback...")
+			fmt.Println("\n⚠️")
 			out, err := logger.TryJournalctl(log)
 			if err != nil {
 				return fmt.Errorf("journalctl fallback failed: %w", err)
 			}
-			fmt.Println(out)
-			return nil
+			logger.PrintLastNLines(out, 100)
 		}
 
 		log.Info("Log search complete")
