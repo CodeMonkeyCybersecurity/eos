@@ -126,3 +126,10 @@ func Redact(s string) string {
 	}
 	return strings.Repeat("*", 8)
 }
+
+// SecureZero overwrites a byte slice to reduce the chance of sensitive data lingering in memory.
+func SecureZero(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}

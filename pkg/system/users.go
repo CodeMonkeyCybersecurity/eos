@@ -103,7 +103,8 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 	}
 
 	// Memory hygiene (zero password string)
-	password = ""
+	passwordBytes := []byte(password)
+	crypto.SecureZero(passwordBytes)
 
 	log.Info("✅ eos user created and configured", zap.String("username", username))
 	return nil
