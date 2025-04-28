@@ -248,7 +248,6 @@ func PhaseEnsureClientHealthy(log *zap.Logger) error {
 	return fmt.Errorf("vault not healthy after multiple attempts")
 }
 
-
 func EnsureVaultAuthEnabled(client *api.Client, method, path string, log *zap.Logger) error {
 	existing, err := client.Sys().ListAuth()
 	if err != nil {

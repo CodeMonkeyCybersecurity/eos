@@ -38,7 +38,6 @@ func PhasePrepareVaultAgent(log *zap.Logger, password string) error {
 	return nil
 }
 
-
 func EnsureAgentServiceReady(log *zap.Logger) error {
 	if err := EnsureVaultAgentUnitExists(log); err != nil {
 		return err

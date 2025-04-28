@@ -43,5 +43,6 @@ func init() {
 	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAPI, "api", false, "Verify Vault API client connectivity")
 	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.NonInteractive, "non-interactive", false, "Run without interactive prompts")
 	EnableVaultCmd.Flags().StringVar(&vault.EnableOpts.Password, "password", "", "EOS Vault user password (optional; fallback to prompt)")
+	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableUserpass, "userpass", false, "Enable Userpass authentication method")
 	EnableCmd.AddCommand(EnableVaultCmd)
 }

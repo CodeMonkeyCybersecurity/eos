@@ -25,7 +25,6 @@ import (
 //         └── client.Auth().Token().LookupSelf()
 //             └── (Vault server confirms token validity)
 
-
 // SetVaultToken sets the Vault token on the provided client.
 func SetVaultToken(client *api.Client, token string) {
 	client.SetToken(token)

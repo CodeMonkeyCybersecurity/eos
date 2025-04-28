@@ -10,12 +10,12 @@ var (
 
 // EnableOptions controls which parts of the Vault enable sequence to run.
 type EnableOptions struct {
-	EnableAppRole  bool
-	EnableUserpass bool
 	EnableAgent    bool
 	EnableAPI      bool
-	NonInteractive bool
+	EnableAppRole  bool
+	EnableUserpass bool // ← this must exist
 	Password       string
+	NonInteractive bool
 	AppRoleOptions shared.AppRoleOptions
 }
 

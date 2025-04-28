@@ -39,7 +39,7 @@ var SecureVaultCmd = &cobra.Command{
 		// 2️⃣ Enable auth methods if needed
 		log.Info("🪪 Ensuring AppRole auth method is enabled")
 		opts := vault.EnableOptions{
-			Password:  "",   // TODO: replace with real password fallback
+			Password: "", // TODO: replace with real password fallback
 		}
 		if err := vault.EnableVault(client, log, opts); err != nil {
 			return logger.LogErrAndWrap(log, "secure vault: enable auth methods", err)

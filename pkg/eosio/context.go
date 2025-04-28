@@ -8,8 +8,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
-
 // NewRuntimeContextWithTimeout initializes RuntimeContext with a timeout.
 func NewRuntimeContextWithTimeout(log *zap.Logger, timeout time.Duration) (*RuntimeContext, context.CancelFunc) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)

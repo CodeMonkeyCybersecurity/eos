@@ -84,7 +84,6 @@ func ApplyAdminPolicy(creds shared.UserpassCreds, client *api.Client, log *zap.L
 	return nil
 }
 
-
 // truncatePolicy returns a trimmed preview for debug logging
 func truncatePolicy(policy string) string {
 	policy = strings.TrimSpace(policy)
