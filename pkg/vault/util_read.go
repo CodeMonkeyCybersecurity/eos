@@ -260,3 +260,18 @@ func ListUnder(path string, log *zap.Logger) ([]string, error) {
 	}
 	return keys, nil
 }
+
+// ReadVaultInitResult tries to load the saved Vault initialization result
+func ReadVaultInitResult(log *zap.Logger) (*api.InitResponse, error) {
+	initRes := new(api.InitResponse)
+	path := shared.VaultInitPath
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read vault init result file: %w", err)
+	}
+	if err := json.Unmarshal(b, initRes); err != nil {
+		return nil, fmt.Errorf("unmarshal vault init result: %w", err)
+	}
+	log.Info("Vault init result loaded from disk", zap.String("path", path))
+	return initRes, nil
+}

@@ -1,5 +1,5 @@
 // cmd/inspect/vault.go
-package inspect
+package read
 
 import (
 	"context"
@@ -23,8 +23,8 @@ import (
 func init() {
 	InspectVaultCmd.AddCommand(InspectVaultAgentCmd)
 	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
-	InspectCmd.AddCommand(InspectVaultCmd)
-	InspectCmd.AddCommand(InspectVaultInitCmd)
+	ReadCmd.AddCommand(InspectVaultCmd)
+	ReadCmd.AddCommand(InspectVaultInitCmd)
 }
 
 // InspectVaultInitCmd displays Vault initialization keys, root token, and eos user credentials.
@@ -35,7 +35,7 @@ var InspectVaultInitCmd = &cobra.Command{
 		log := ctx.Log.Named("inspect-vault-init")
 
 		// Load Vault Init Result
-		initResult, err := vault.LoadVaultInitResult(log)
+		initResult, err := vault.ReadVaultInitResult(log)
 		if err != nil {
 			return logger.LogErrAndWrap(log, "inspect vault-init: load init result", err)
 		}

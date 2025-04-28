@@ -1,5 +1,5 @@
 // cmd/inspect/process.go
-package inspect
+package read
 
 import (
 	"fmt"
@@ -276,5 +276,5 @@ func printProcessTable(process []ProcessInfo) {
 
 /* init registers subcommands for the read command */
 func init() {
-	InspectCmd.AddCommand(InspectProcessCmd)
+	ReadCmd.AddCommand(InspectProcessCmd)
 }

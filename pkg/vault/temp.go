@@ -1,4 +1,4 @@
-// pkg/vault/init_confirm.go
+// pkg/vault/temp.go
 
 package vault
 
@@ -7,6 +7,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -40,4 +42,37 @@ func ConfirmSecureStorage(original *api.InitResponse, log *zap.Logger) error {
 
 	log.Info("✅ Reconfirmation of unseal material passed")
 	return nil
+}
+
+// ResolveVaultConfigDir returns the Vault config directory based on Linux distro.
+func ResolveVaultConfigDir(distro string) string {
+	switch distro {
+	case "debian", "rhel":
+		return shared.VaultConfigDirDebian
+	default:
+		return shared.VaultConfigDirDebian // future: handle other distros here
+	}
+}
+
+// Make this the go-to for Step 2. Keep EnsureVault(...) clean by calling this inline.
+func EnsureVaultUserLifecycle(log *zap.Logger, client *api.Client) error {
+	if err := system.EnsureEosUser(true, false, log); err != nil {
+		return err
+	}
+	if err := EnsureVaultDirs(log); err != nil {
+		return err
+	}
+	if err := system.EnsureSudoersEntryForEos(log, true); err != nil {
+		return err
+	}
+	if err := EnsureVaultAuthMethods(client, log); err != nil {
+		return err
+	}
+
+	if err := system.ValidateSudoAccess(log); err != nil {
+		return err
+
+	}
+	_, _, err := EnsureAppRole(client, log, DefaultAppRoleOptions())
+	return err
 }

@@ -1,6 +1,6 @@
 // cmd/inspect/config.go
 
-package inspect
+package read
 
 import (
 	"bufio"

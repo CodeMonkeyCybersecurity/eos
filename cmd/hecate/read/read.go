@@ -1,6 +1,6 @@
-// cmd/inspect/inspect.go
+// cmd/read/read.go
 
-package inspect
+package read
 
 import (
 	"fmt"
@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// InspectCmd is the top-level `inspect` command
-var InspectCmd = &cobra.Command{
-	Use:   "inspect",
+// ReadCmd is the top-level `inspect` command
+var ReadCmd = &cobra.Command{
+	Use:   "read",
 	Short: "Inspect the current state of Hecate-managed services",
 	Long: `Use this command to inspect the status, configuration, and health of 
 reverse proxy applications deployed via Hecate.
@@ -28,5 +28,5 @@ Examples:
 
 // Register subcommands when the package is loaded
 func init() {
-	InspectCmd.AddCommand(inspectConfigCmd)
+	ReadCmd.AddCommand(inspectConfigCmd)
 }

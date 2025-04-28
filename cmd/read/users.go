@@ -1,5 +1,5 @@
 // cmd/inspect/users.go
-package inspect
+package read
 
 import (
 	"bufio"
@@ -64,5 +64,5 @@ func getSystemUsers() ([]string, error) {
 
 // init registers subcommands for the read command
 func init() {
-	InspectCmd.AddCommand(InspectUsersCmd)
+	ReadCmd.AddCommand(InspectUsersCmd)
 }

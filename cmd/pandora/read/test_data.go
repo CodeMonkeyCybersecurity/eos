@@ -1,5 +1,5 @@
 // cmd/pandora/inspect/test_data.go
-package inspect
+package read
 
 import (
 	"encoding/json"
@@ -146,5 +146,5 @@ func validateAndCache(client *api.Client, log *zap.Logger) {
 }
 
 func init() {
-	InspectCmd.AddCommand(InspectTestDataCmd)
+	ReadCmd.AddCommand(InspectTestDataCmd)
 }

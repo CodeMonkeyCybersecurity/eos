@@ -1,5 +1,5 @@
 // cmd/delphi/inspect/credentials.go
-package inspect
+package read
 
 import (
 	"encoding/json"
@@ -80,6 +80,6 @@ var InspectCredentialsCmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(InspectCredentialsCmd)
+	ReadCmd.AddCommand(InspectCredentialsCmd)
 	InspectCredentialsCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }

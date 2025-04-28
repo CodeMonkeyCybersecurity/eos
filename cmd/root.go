@@ -21,8 +21,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
@@ -88,7 +88,7 @@ func RegisterCommands() {
 	// Group subcommands for cleanliness
 	for _, subCmd := range []*cobra.Command{
 		create.CreateCmd,
-		inspect.InspectCmd,
+		read.ReadCmd,
 		update.UpdateCmd,
 		delete.DeleteCmd,
 		refresh.RefreshCmd,

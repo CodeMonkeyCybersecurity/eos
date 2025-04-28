@@ -1,5 +1,5 @@
 /* cmd/inspect/ldap.go */
-package inspect
+package read
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -24,6 +24,6 @@ func init() {
 	log = logger.L()
 
 	// Core LDAP command
-	InspectCmd.AddCommand(InspectLDAPCmd)
+	ReadCmd.AddCommand(InspectLDAPCmd)
 	ldap.InitFlags(InspectLDAPCmd)
 }

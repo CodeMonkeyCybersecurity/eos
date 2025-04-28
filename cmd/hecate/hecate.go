@@ -10,7 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/deploy"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/inspect"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/restore"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/update"
 	"go.uber.org/zap"
@@ -43,7 +43,7 @@ func init() {
 	HecateCmd.AddCommand(create.CreateCmd)
 	HecateCmd.AddCommand(delete.DeleteCmd)
 	HecateCmd.AddCommand(deploy.DeployCmd)
-	HecateCmd.AddCommand(inspect.InspectCmd)
+	HecateCmd.AddCommand(read.ReadCmd)
 	HecateCmd.AddCommand(backup.BackupCmd)
 	HecateCmd.AddCommand(restore.RestoreCmd)
 	HecateCmd.AddCommand(update.UpdateCmd)

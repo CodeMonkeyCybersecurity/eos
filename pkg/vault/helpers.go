@@ -12,54 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// GetVaultWildcardPurgePaths returns filesystem wildcards that match legacy or snap Vault installations
-// for cleanup during reinstallation or reset.
-func GetVaultWildcardPurgePaths() []string {
-	return []string{
-		"/etc/vault*",      // wildcard for legacy configs
-		"/var/snap/vault*", // snap installs
-		"/var/log/vault*",  // log spill
-		"/opt/vault*",
-		"/run/eos*",
-	}
-}
-
-// GetVaultPurgePaths returns wildcard purge paths for Vault cleanup.
-func GetVaultPurgePaths() []string {
-	return []string{
-		shared.VaultConfigPath,
-		shared.VaultAgentConfigPath,
-		shared.VaultAgentPassPath,
-		shared.VaultServicePath,
-		shared.VaultAgentServicePath,
-		shared.VaultAgentTokenPath,
-		shared.VaultTokenSinkPath,
-		shared.SecretsDir,
-		shared.EosRunDir,
-		shared.VaultDataPath,
-		shared.VaultBinaryPath,
-		shared.VaultPID,
-		shared.AgentPID,
-		shared.VaultSystemCATrustPath,
-		shared.TLSDir,
-		shared.VaultAgentCACopyPath,
-		shared.EosVaultProfilePath,
-	}
-}
-
-// DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
-func DefaultAppRoleOptions() shared.AppRoleOptions {
-	return shared.AppRoleOptions{
-		RoleName:      shared.EosID,
-		Policies:      []string{shared.EosVaultPolicy},
-		TokenTTL:      "1h",
-		TokenMaxTTL:   "4h",
-		SecretIDTTL:   "24h",
-		ForceRecreate: false,
-		RefreshCreds:  false,
-	}
-}
-
 // VaultPath returns the full Vault path for a logical entry name.
 func VaultPath(name string, log *zap.Logger) string {
 	if strings.Contains(name, "/") {

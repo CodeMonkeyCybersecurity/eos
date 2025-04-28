@@ -290,3 +290,14 @@ func SavePasswordToSecrets(username, password string, log *zap.Logger) error {
 	log.Info("🔐 eos credentials saved", zap.String("path", secretsPath))
 	return nil
 }
+
+func ValidateSudoAccess(log *zap.Logger) error {
+	cmd := exec.Command("sudo", "-u", shared.EosID, "cat", shared.VaultAgentTokenPath)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
+		return fmt.Errorf("sudo check failed")
+	}
+	log.Info("✅ sudo test succeeded")
+	return nil
+}

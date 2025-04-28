@@ -6,7 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/deploy"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
+	read "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
@@ -33,7 +33,7 @@ func init() {
 	// Register subcommands
 	DelphiCmd.AddCommand(create.CreateCmd)
 	DelphiCmd.AddCommand(deploy.DeployCmd)
-	DelphiCmd.AddCommand(inspect.InspectCmd)
+	DelphiCmd.AddCommand(read.ReadCmd)
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(sync.SyncCmd)

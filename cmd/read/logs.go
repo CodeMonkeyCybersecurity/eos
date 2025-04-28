@@ -1,4 +1,4 @@
-package inspect
+package read
 
 import (
 	"errors"
@@ -62,5 +62,5 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 }
 
 func init() {
-	InspectCmd.AddCommand(InspectLogsCmd)
+	ReadCmd.AddCommand(InspectLogsCmd)
 }

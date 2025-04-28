@@ -1,5 +1,5 @@
 // cmd/inspect/storage.go
-package inspect
+package read
 
 import (
 	"fmt"
@@ -49,5 +49,5 @@ func runCommand(command string, args ...string) error {
 // init registers subcommands for the read command
 func init() {
 
-	InspectCmd.AddCommand(InspectStorageCmd)
+	ReadCmd.AddCommand(InspectStorageCmd)
 }

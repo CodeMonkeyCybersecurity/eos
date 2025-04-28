@@ -1,6 +1,6 @@
 // cmd/delphi/inspect/keepalive.go
 
-package inspect
+package read
 
 import (
 	"encoding/json"
@@ -56,5 +56,5 @@ var KeepAliveCmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(KeepAliveCmd)
+	ReadCmd.AddCommand(KeepAliveCmd)
 }

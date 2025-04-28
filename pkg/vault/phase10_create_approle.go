@@ -89,18 +89,6 @@ func PhaseCreateAppRole(client *api.Client, log *zap.Logger, password string) (s
 	return roleID, secretID, nil
 }
 
-func EnsureVaultAgentUnitExists(log *zap.Logger) error {
-	if _, err := os.Stat(shared.VaultAgentServicePath); os.IsNotExist(err) {
-		log.Warn("⚙️ Vault Agent systemd unit missing — creating", zap.String("path", shared.VaultAgentServicePath))
-		if err := WriteAgentSystemdUnit(log); err != nil {
-			log.Error("❌ Failed to write Vault Agent systemd unit", zap.Error(err))
-			return fmt.Errorf("write Vault Agent unit: %w", err)
-		}
-		log.Info("✅ Vault Agent systemd unit ensured", zap.String("path", shared.VaultAgentServicePath))
-	}
-	return nil
-}
-
 // WriteAppRoleFiles writes the Vault AppRole role_id and secret_id to disk with secure permissions.
 func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 	dir := filepath.Dir(shared.RoleIDPath)
@@ -160,22 +148,6 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 	}
 
 	log.Info("✅ Root token revoked")
-	return nil
-}
-
-func writeAgentPassword(password string, log *zap.Logger) error {
-	log.Debug("🔏 Writing Vault Agent password to file", zap.String("path", shared.VaultAgentPassPath))
-
-	data := []byte(password + "\n")
-	if err := os.WriteFile(shared.VaultAgentPassPath, data, 0600); err != nil {
-		log.Error("❌ Failed to write password file", zap.String("path", shared.VaultAgentPassPath), zap.Error(err))
-		return fmt.Errorf("failed to write Vault Agent password to %s: %w", shared.VaultAgentPassPath, err)
-	}
-
-	log.Info("✅ Vault Agent password file written",
-		zap.String("path", shared.VaultAgentPassPath),
-		zap.Int("bytes_written", len(data)))
-
 	return nil
 }
 
@@ -249,14 +221,15 @@ func EnableAppRoleAuth(client *api.Client, log *zap.Logger) error {
 	return fmt.Errorf("enable approle auth: %w", err)
 }
 
-func EnsureAgentServiceReady(log *zap.Logger) error {
-	if err := EnsureVaultAgentUnitExists(log); err != nil {
-		return err
+// DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
+func DefaultAppRoleOptions() shared.AppRoleOptions {
+	return shared.AppRoleOptions{
+		RoleName:      shared.EosID,
+		Policies:      []string{shared.EosVaultPolicy},
+		TokenTTL:      "1h",
+		TokenMaxTTL:   "4h",
+		SecretIDTTL:   "24h",
+		ForceRecreate: false,
+		RefreshCreds:  false,
 	}
-	log.Info("🚀 Reloading daemon and enabling Vault Agent service")
-	if err := system.ReloadDaemonAndEnable(log, shared.VaultAgentService); err != nil {
-		log.Error("❌ Failed to enable/start Vault Agent service", zap.Error(err))
-		return fmt.Errorf("enable/start Vault Agent service: %w", err)
-	}
-	return nil
 }

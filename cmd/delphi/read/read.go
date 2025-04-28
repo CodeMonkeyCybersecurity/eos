@@ -1,6 +1,6 @@
-// cmd/delphi/inspect/inspect.go
+// cmd/delphi/read/read.go
 
-package inspect
+package read
 
 import (
 	"fmt"
@@ -17,8 +17,8 @@ var (
 	showSecrets bool
 )
 
-var InspectCmd = &cobra.Command{
-	Use:   "inspect",
+var ReadCmd = &cobra.Command{
+	Use:   "read",
 	Short: "Inspect Delphi (Wazuh) data",
 	Long: `The 'inspect' command provides diagnostic and introspection tools for your Delphi (Wazuh) instance.
 

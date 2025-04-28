@@ -1,4 +1,4 @@
-// pkg/utils/inspect.go
+// pkg/utils/read.go
 
 package utils
 
@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 )
-
 
 func InspectCertificates() {
 	certsDir := "certs"

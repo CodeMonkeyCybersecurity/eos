@@ -5,7 +5,7 @@ package pandora
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/inspect"
+	read "github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/update"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
@@ -30,7 +30,7 @@ var PandoraCmd = &cobra.Command{
 func init() {
 	PandoraCmd.AddCommand(create.CreateCmd)
 	PandoraCmd.AddCommand(delete.DeleteCmd)
-	PandoraCmd.AddCommand(inspect.InspectCmd)
+	PandoraCmd.AddCommand(read.ReadCmd)
 	PandoraCmd.AddCommand(update.UpdateCmd)
 }
 
