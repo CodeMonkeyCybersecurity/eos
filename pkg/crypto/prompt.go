@@ -3,7 +3,9 @@
 package crypto
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"syscall"
 
@@ -11,56 +13,62 @@ import (
 	"golang.org/x/term"
 )
 
-// PromptStrongPassword prompts and validates a strong password with confirmation.
-func PromptStrongPassword(label string, log *zap.Logger) (string, error) {
-	for {
-		pass, err := PromptPassword(label, log)
-		if err != nil {
-			return "", err
-		}
+// PromptPassword securely prompts for a password twice, validates strength, and ensures match.
+func PromptPassword(prompt string, log *zap.Logger) (string, error) {
+	for attempts := 1; attempts <= MaxPasswordAttempts; attempts++ {
+		log.Info("🔐 Prompting for password", zap.Int("attempt", attempts))
 
-		if err := ValidateStrongPassword(pass, log); err != nil {
-			fmt.Printf("❌ %s\n", err.Error())
+		fmt.Print(prompt)
+		pw1Bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
+		if err != nil {
+			log.Error("❌ Failed to read password input", zap.Error(err))
+			return "", fmt.Errorf("failed to read password input: %w", err)
+		}
+		pw1 := strings.TrimSpace(string(pw1Bytes))
+
+		if err := ValidateStrongPassword(pw1, log); err != nil {
+			log.Warn("❌ Password strength validation failed", zap.Error(err))
+			fmt.Println("❌ Password does not meet strength requirements. Please try again.")
 			continue
 		}
 
-		confirm, err := PromptPassword("Confirm "+label, log)
+		fmt.Print("Confirm password: ")
+		pw2Bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Println()
 		if err != nil {
-			return "", err
+			log.Error("❌ Failed to read confirmation input", zap.Error(err))
+			return "", fmt.Errorf("failed to read password confirmation: %w", err)
 		}
+		pw2 := strings.TrimSpace(string(pw2Bytes))
 
-		if pass != confirm {
-			fmt.Println("❌ Passwords do not match.")
+		if pw1 != pw2 {
+			log.Warn("❌ Passwords do not match", zap.Int("attempt", attempts))
+			fmt.Println("❌ Passwords do not match. Please try again.")
 			continue
 		}
 
-		return pass, nil
+		log.Info("✅ Password accepted", zap.Int("attempt", attempts))
+		return pw1, nil
 	}
+
+	log.Error("⛔ Maximum password attempts exceeded")
+	return "", errors.New("maximum password attempts exceeded")
 }
 
-// PromptPassword hides user input and returns the entered password.
-func PromptPassword(label string, log *zap.Logger) (string, error) {
-	fmt.Printf("%s: ", label)
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+// PromptPasswordOrDefault prompts for a password and returns default if blank.
+func PromptPasswordOrDefault(prompt string, defaultValue string, log *zap.Logger) (string, error) {
+	fmt.Printf("%s [%s]: ", prompt, "********")
+	pwBytes, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println("")
 	if err != nil {
-		return "", fmt.Errorf("error reading password: %w", err)
+		log.Error("❌ Failed to read password input", zap.Error(err))
+		return "", fmt.Errorf("error reading password input: %w", err)
 	}
-	return strings.TrimSpace(string(bytePassword)), nil
-}
-
-// PromptPasswordWithDefault hides user input and returns password or default if blank.
-func PromptPasswordWithDefault(label, defaultValue string, log *zap.Logger) (string, error) {
-	fmt.Printf("%s [%s]: ", label, "********")
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
-	fmt.Println("")
-	if err != nil {
-		return "", fmt.Errorf("error reading password: %w", err)
-	}
-	pass := strings.TrimSpace(string(bytePassword))
+	pass := strings.TrimSpace(string(pwBytes))
 	if pass == "" {
+		log.Info("ℹ️  Using default password value")
 		return defaultValue, nil
 	}
 	return pass, nil
 }
-

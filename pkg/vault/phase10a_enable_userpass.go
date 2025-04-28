@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
@@ -19,6 +20,21 @@ import (
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
 func PhaseEnableUserpass(client *api.Client, log *zap.Logger, password string) error {
 	log.Info("🧑‍💻 [Phase 10] Enabling userpass auth method and EOS user")
+
+	// Validate password
+	if password == "" {
+		log.Warn("⚠️ No password provided, prompting user interactively...")
+		var err error
+		password, err = crypto.PromptPassword("Enter password for EOS Vault user: ", log)
+		if err != nil {
+			return fmt.Errorf("failed to read password interactively: %w", err)
+		}
+	} else {
+		// Validate CLI-passed password as well!
+		if err := crypto.ValidateStrongPassword(password, log); err != nil {
+			return fmt.Errorf("provided password failed validation: %w", err)
+		}
+	}
 
 	if err := EnableUserpassAuth(client, log); err != nil {
 		return fmt.Errorf("enable userpass auth: %w", err)

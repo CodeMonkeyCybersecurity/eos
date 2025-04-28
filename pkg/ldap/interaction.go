@@ -36,7 +36,7 @@ func InteractiveLDAPQuery(log *zap.Logger) error {
 		bindDN = "cn=anonymous"
 	}
 
-	password, err := crypto.PromptPasswordWithDefault("LDAP password [press Enter to keep existing]", cfg.Password, log)
+	password, err := crypto.PromptPasswordOrDefault("LDAP password [press Enter to keep existing]", cfg.Password, log)
 	if err != nil {
 		fmt.Println("⚠️  No Password provided.")
 		return err

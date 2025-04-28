@@ -104,7 +104,6 @@ func shuffle(b []byte) error {
 }
 
 // ValidateStrongPassword ensures min length and mixed char types.
-
 func ValidateStrongPassword(input string, log *zap.Logger) error {
 	if len(input) < 12 {
 		log.Warn("password too short", zap.Int("length", len(input)))
@@ -133,7 +132,7 @@ func ValidateStrongPassword(input string, log *zap.Logger) error {
 	return nil
 }
 
-// ReadPassword reads a password securely from a buffered reader.
+// ReadPassword reads a password from a bufio.Reader (for tests or non-interactive cases).
 func ReadPassword(reader *bufio.Reader) (string, error) {
 	pw, err := reader.ReadString('\n')
 	if err != nil {
