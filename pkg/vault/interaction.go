@@ -63,3 +63,9 @@ func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 		RootToken: rootToken,
 	}, nil
 }
+
+// PromptUnsealKeys requests 3 unseal keys interactively with hidden input.
+func PromptUnsealKeys(log *zap.Logger) ([]string, error) {
+	log.Info("🔐 Please enter 3 base64-encoded unseal keys")
+	return interaction.PromptSecrets("Unseal Key", 3, log)
+}

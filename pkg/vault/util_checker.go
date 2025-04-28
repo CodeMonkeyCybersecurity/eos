@@ -286,3 +286,17 @@ func RunVaultTestQuery(log *zap.Logger) error {
 	log.Info("Vault test query succeeded", zap.ByteString("response", output))
 	return nil
 }
+
+func EnsureVaultReady(log *zap.Logger) (*api.Client, error) {
+	client, err := NewClient(log)
+	if err != nil {
+		return nil, fmt.Errorf("vault client error: %w", err)
+	}
+
+	// Call SetupVault to initialize/unseal Vault.
+	client, _, err = SetupVault(client, log)
+	if err != nil {
+		return nil, fmt.Errorf("vault not ready: %w", err)
+	}
+	return client, nil
+}

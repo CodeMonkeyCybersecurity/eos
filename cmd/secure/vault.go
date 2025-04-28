@@ -61,7 +61,7 @@ var SecureVaultCmd = &cobra.Command{
 			log.Warn("🚨 Vault Agent token is missing or unreadable. Check ownership/permissions", zap.Error(err))
 			return fmt.Errorf("vault-agent token check failed: %w", err)
 		}
-		if err := vault.ValidateRootToken(client, token); err != nil {
+		if err := vault.VerRootToken(client, token); err != nil {
 			log.Warn("🚨 Token retrieved, but failed Vault authentication", zap.Error(err))
 			return fmt.Errorf("invalid agent token: %w", err)
 		}

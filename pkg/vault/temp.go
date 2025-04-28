@@ -19,6 +19,16 @@ import (
 	"go.uber.org/zap"
 )
 
+func RequireVault(client *api.Client, log *zap.Logger) error {
+	if client == nil {
+		log.Error("❌ Vault client is nil", zap.String("reason", "Vault is required but not initialized"))
+		return fmt.Errorf("vault is required for this command, but not available")
+	}
+
+	log.Debug("✅ Vault client is present and usable")
+	return nil
+}
+
 // ConfirmSecureStorage prompts user to re-enter keys to confirm they've been saved.
 func ConfirmSecureStorage(original *api.InitResponse, log *zap.Logger) error {
 	fmt.Println("🔒 Please re-enter 3 unseal keys and the root token to confirm you've saved them.")

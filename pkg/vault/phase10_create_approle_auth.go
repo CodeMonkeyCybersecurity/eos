@@ -1,4 +1,4 @@
-// pkg/vault/phase10_create_approle.go
+// pkg/vault/phase10_create_approle_auth.go
 
 package vault
 
@@ -137,32 +137,6 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, e
 	}
 
 	return roleID, secretID, nil
-}
-
-func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
-	client.SetToken(token)
-
-	err := client.Auth().Token().RevokeSelf("")
-	if err != nil {
-		return fmt.Errorf("failed to revoke root token: %w", err)
-	}
-
-	log.Info("✅ Root token revoked")
-	return nil
-}
-
-// GetPrivilegedVaultClient returns a Vault client authenticated as 'eos' system user
-func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
-	token, err := readTokenFromSink(shared.VaultAgentTokenPath)
-	if err != nil {
-		return nil, err
-	}
-	client, err := NewClient(log)
-	if err != nil {
-		return nil, err
-	}
-	client.SetToken(token)
-	return client, nil
 }
 
 // EnsureAppRole provisions the AppRole if missing or refreshes credentials if needed.

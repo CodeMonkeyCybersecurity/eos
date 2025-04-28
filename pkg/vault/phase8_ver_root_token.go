@@ -14,13 +14,13 @@ import (
 // 8. Prompt and Validate Root Token
 //--------------------------------------------------------------------
 
-// PHASE 8 — PhasePromptAndValidateRootToken()
+// PHASE 8 — PhasePromptAndVerRootToken()
 //          └── PromptRootToken()
-//          └── ValidateRootToken()
+//          └── VerRootToken()
 //          └── SetVaultToken()
 
-// PhasePromptAndValidateRootToken prompts for root token, validates it, and sets it on client.
-func PhasePromptAndValidateRootToken(client *api.Client, log *zap.Logger) error {
+// PhasePromptAndVerRootToken prompts for root token, validates it, and sets it on client.
+func PhasePromptAndVerRootToken(client *api.Client, log *zap.Logger) error {
 	log.Info("🔑 [Phase 8] Prompting and validating Vault root token")
 
 	token, err := PromptRootToken(log)
@@ -28,7 +28,7 @@ func PhasePromptAndValidateRootToken(client *api.Client, log *zap.Logger) error 
 		return fmt.Errorf("prompt root token: %w", err)
 	}
 
-	if err := ValidateRootToken(client, token); err != nil {
+	if err := VerRootToken(client, token); err != nil {
 		return fmt.Errorf("validate root token: %w", err)
 	}
 
@@ -47,17 +47,12 @@ func PromptRootToken(log *zap.Logger) (string, error) {
 	return tokens[0], nil
 }
 
-// ValidateRootToken checks if the root token is valid via a simple self-lookup.
-func ValidateRootToken(client *api.Client, token string) error {
+// VerRootToken checks if the root token is valid via a simple self-lookup.
+func VerRootToken(client *api.Client, token string) error {
 	client.SetToken(token)
 	secret, err := client.Auth().Token().LookupSelf()
 	if err != nil || secret == nil {
 		return fmt.Errorf("token validation failed: %w", err)
 	}
 	return nil
-}
-
-// SetVaultToken configures the Vault client to use a provided token.
-func SetVaultToken(client *api.Client, token string) {
-	client.SetToken(token)
 }
