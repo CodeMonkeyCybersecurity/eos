@@ -4,6 +4,8 @@ package vault
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
@@ -103,15 +105,33 @@ func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) er
 func WriteUserpassCredentialsFallback(password string, log *zap.Logger) error {
 	log.Info("💾 Saving EOS userpass password to fallback and Vault")
 
+	fallbackFile := shared.EosUserVaultFallback + "/userpass-password"
+	fallbackDir := filepath.Dir(fallbackFile)
+
+	// Ensure fallback directory exists
+	if err := os.MkdirAll(fallbackDir, 0o700); err != nil {
+		return fmt.Errorf("create fallback directory: %w", err)
+	}
+
 	// Write to fallback file
-	if err := system.WriteOwnedFile(shared.EosUserVaultFallback+"/userpass-password", []byte(password+"\n"), 0o600, shared.EosUser); err != nil {
+	if err := system.WriteOwnedFile(fallbackFile, []byte(password+"\n"), 0o600, shared.EosUser); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
-	log.Info("✅ Userpass password written to fallback file", zap.String("path", shared.EosUserVaultFallback+"/userpass-password"))
+	log.Info("✅ Userpass password written to fallback file", zap.String("path", fallbackFile))
 
 	// Prepare KV payload
 	secrets := map[string]interface{}{
 		"eos-userpass-password": password,
+	}
+
+	uid, gid, err := system.LookupUser(shared.EosID)
+	if err != nil {
+		return fmt.Errorf("lookup eos uid/gid: %w", err)
+	}
+
+	// After writing the fallback file successfully:
+	if err := system.ChownRecursive("/var/lib/eos/secrets", uid, gid, log); err != nil {
+		log.Warn("⚠️ Failed to enforce EOS ownership after writing userpass fallback", zap.Error(err))
 	}
 
 	// Write to Vault KV

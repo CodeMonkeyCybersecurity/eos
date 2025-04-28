@@ -206,15 +206,27 @@ func CopyDir(src, dst string, log *zap.Logger) error {
 	return nil
 }
 
+// ChownRecursive changes ownership of a directory and all files within to uid:gid.
 func ChownRecursive(path string, uid, gid int, log *zap.Logger) error {
-	return filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
+	var firstErr error
+	err := filepath.Walk(path, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Warn("⚠️ Walk error during chown", zap.String("path", p), zap.Error(err))
-			return err
+			if firstErr == nil {
+				firstErr = err
+			}
+			return nil // Keep walking
 		}
 		if err := os.Chown(p, uid, gid); err != nil {
 			log.Warn("⚠️ Failed to chown", zap.String("path", p), zap.Error(err))
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
-		return nil
+		return nil // Keep walking
 	})
+	if err != nil && firstErr == nil {
+		firstErr = err
+	}
+	return firstErr
 }
