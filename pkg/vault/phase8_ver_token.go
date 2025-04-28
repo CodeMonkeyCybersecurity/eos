@@ -56,3 +56,5 @@ func VerRootToken(client *api.Client, token string) error {
 	}
 	return nil
 }
+
+

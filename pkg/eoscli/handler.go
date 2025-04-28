@@ -17,14 +17,15 @@ import (
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		var err error
-		const timeout = 1 * time.Minute // ⏰ Global timeout for EOS CLI commands
+		const timeout = 1 * time.Minute // ⏰ Add default timeout here
 		start := time.Now()
 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
-		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
+
+		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout) // ⏰ Set timeout context
 		defer cancel()
 
-		ctx := &eosio.RuntimeContext{
+		ctx := &eosio.RuntimeContext{ // ⏰ Manual RuntimeContext to inject timeout
 			Log:       log,
 			Ctx:       ctxWithTimeout,
 			Timestamp: time.Now(),

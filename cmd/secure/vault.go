@@ -3,7 +3,7 @@ package secure
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -17,8 +17,8 @@ import (
 var SecureVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Applies hardening and provisioning to a running Vault instance",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := zap.L()
+	RunE: eoscli.Wrap(func(ctx *eoscli.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log.Named("secure-vault")
 
 		log.Info("🔐 Connecting to Vault")
 		client, err := vault.EnsureVaultReady(log)
@@ -36,15 +36,17 @@ var SecureVaultCmd = &cobra.Command{
 			return logger.LogErrAndWrap(log, "secure vault: ensure policy", err)
 		}
 
-		// 2️⃣ Ensure AppRole method is mounted
-		log.Info("🪪 Ensuring approle auth method is enabled")
-		password := "" // Placeholder — fetch or wire properly later
-		if err := vault.EnableVault(client, log, password); err != nil {
-			return logger.LogErrAndWrap(log, "enable vault", err)
+		// 2️⃣ Enable auth methods if needed
+		log.Info("🪪 Ensuring AppRole auth method is enabled")
+		opts := vault.EnableOptions{
+			Password:  "",   // TODO: replace with real password fallback
+		}
+		if err := vault.EnableVault(client, log, opts); err != nil {
+			return logger.LogErrAndWrap(log, "secure vault: enable auth methods", err)
 		}
 
-		// 3️⃣ Re-provision AppRole (idempotent)
-		log.Info("🔁 Re-confirming eos-approle settings")
+		// 3️⃣ Re-provision AppRole
+		log.Info("🔁 Re-confirming AppRole settings")
 		roleID, secretID, err := vault.EnsureAppRole(client, log, vault.DefaultAppRoleOptions())
 		if err != nil {
 			return logger.LogErrAndWrap(log, "secure vault: create approle", err)
@@ -52,25 +54,20 @@ var SecureVaultCmd = &cobra.Command{
 		if err := vault.WriteAppRoleFiles(roleID, secretID, log); err != nil {
 			return logger.LogErrAndWrap(log, "secure vault: write approle creds", err)
 		}
-		log.Info("✅ AppRole written", zap.String("role_id", roleID), zap.String("secret_id", secretID))
+		log.Info("✅ AppRole credentials written", zap.String("role_id", roleID), zap.String("secret_id", secretID))
 
-		// 4️⃣ Validate Vault Agent Token
+		// 4️⃣ Validate Vault Agent token
 		log.Info("🤖 Validating Vault Agent token")
 		token, err := vault.WaitForAgentToken(shared.VaultTokenSinkPath, log)
 		if err != nil {
-			log.Warn("🚨 Vault Agent token is missing or unreadable. Check ownership/permissions", zap.Error(err))
 			return fmt.Errorf("vault-agent token check failed: %w", err)
 		}
 		if err := vault.VerRootToken(client, token); err != nil {
-			log.Warn("🚨 Token retrieved, but failed Vault authentication", zap.Error(err))
-			return fmt.Errorf("invalid agent token: %w", err)
+			return fmt.Errorf("invalid Vault agent token: %w", err)
 		}
-
-		// ❌ FIXED: pass both args
 		vault.SetVaultToken(client, token)
 
 		// 5️⃣ Optionally revoke root token
-		// ❌ FIXED: replace ctx.Flags with proper flag read
 		shouldRevoke, err := cmd.Flags().GetBool("revoke-root")
 		if err != nil {
 			return fmt.Errorf("could not read --revoke-root flag: %w", err)
@@ -82,14 +79,16 @@ var SecureVaultCmd = &cobra.Command{
 			}
 		}
 
-		log.Info("🔒 Vault is now fully hardened and ready for production")
-		// TODO: eos.PrintNextSteps("vault") or eos.InspectVaultSummary(client)
+		// 📋 Final summary
+		log.Info("🔒 Vault hardening completed successfully",
+			zap.Bool("vault_hardened", true),
+			zap.Bool("root_token_revoked", shouldRevoke),
+		)
 
 		return nil
 	}),
 }
 
-// Register flag
 func init() {
 	SecureVaultCmd.Flags().Bool("revoke-root", false, "Revoke the root token after agent token is validated")
 	SecureCmd.AddCommand(SecureVaultCmd)

@@ -20,7 +20,7 @@ import (
 // 7. Vault Health Check and Recovery
 //--------------------------------------------------------------------
 
-// PHASE 7 — PhaseEnsureVaultReady()
+// PHASE 7 — PhaseEnsureVaultHealthy()
 //          └── isVaultProcessRunning()
 //          └── EnsureVaultEnv()
 //          └── NewClient()
@@ -29,6 +29,32 @@ import (
 //          └── recoverVaultHealth()
 //               └── initAndUnseal()
 //               └── unsealFromStoredKeys()
+
+// PhaseEnsureVaultHealthy ensures Vault is running, healthy, and ready for use.
+func PhaseEnsureVaultHealthy(log *zap.Logger) error {
+	log.Info("🚀 [Phase 7] Ensuring Vault is ready")
+
+	if isVaultProcessRunning(log) {
+		log.Info("✅ Vault process running (lsof check)") // NOTE: Only TCP presence, not real health
+	}
+
+	if _, err := EnsureVaultEnv(log); err != nil {
+		return fmt.Errorf("could not resolve VAULT_ADDR: %w", err)
+	}
+
+	client, err := NewClient(log)
+	if err != nil {
+		return fmt.Errorf("could not create Vault client: %w", err)
+	}
+
+	if err := probeVaultHealthUntilReady(log); err == nil {
+		log.Info("✅ Vault healthy after probe")
+		return nil
+	}
+
+	log.Warn("⚠️ Vault did not become healthy after retries — attempting recovery")
+	return recoverVaultHealth(client, log)
+}
 
 // CheckVaultHealth probes Vault's /v1/sys/health and returns whether Vault is healthy.
 func CheckVaultHealth(log *zap.Logger) (bool, error) {
@@ -39,9 +65,7 @@ func CheckVaultHealth(log *zap.Logger) (bool, error) {
 	}
 
 	healthURL := strings.TrimRight(addr, "/") + shared.VaultHealthPath
-	client := http.Client{
-		Timeout: shared.VaultHealthTimeout,
-	}
+	client := http.Client{Timeout: shared.VaultHealthTimeout}
 
 	resp, err := client.Get(healthURL)
 	if err != nil {
@@ -73,33 +97,6 @@ func CheckVaultHealth(log *zap.Logger) (bool, error) {
 	}
 }
 
-// PhaseEnsureVaultReady ensures Vault is running, healthy, and ready for use.
-func PhaseEnsureVaultReady(log *zap.Logger) error {
-	log.Info("🚀 [Phase] Ensuring Vault is ready")
-
-	if isVaultProcessRunning(log) {
-		log.Info("✅ Vault process already running (lsof check)")
-		return nil
-	}
-
-	if _, err := EnsureVaultEnv(log); err != nil {
-		return fmt.Errorf("could not resolve VAULT_ADDR: %w", err)
-	}
-
-	client, err := NewClient(log)
-	if err != nil {
-		return fmt.Errorf("could not create Vault client: %w", err)
-	}
-
-	if err := probeVaultHealthUntilReady(log); err == nil {
-		log.Info("✅ Vault healthy after probe")
-		return nil
-	}
-
-	log.Warn("⚠️ Vault did not become healthy after retries — attempting recovery")
-	return recoverVaultHealth(client, log)
-}
-
 // probeVaultHealthUntilReady probes Vault health repeatedly until success or retries exhausted.
 func probeVaultHealthUntilReady(log *zap.Logger) error {
 	for attempt := 1; attempt <= shared.VaultRetryCount; attempt++ {
@@ -110,12 +107,11 @@ func probeVaultHealthUntilReady(log *zap.Logger) error {
 			return nil
 		}
 		if err != nil {
-			log.Warn("🛑 Vault not healthy, retrying...", zap.Error(err))
+			log.Warn("🛑 Vault health check failed", zap.Int("attempt", attempt), zap.Error(err))
 		} else {
-			log.Warn("🛑 Vault not healthy, retrying...")
+			log.Warn("🛑 Vault unhealthy (no explicit error)", zap.Int("attempt", attempt))
 		}
 
-		log.Warn("🛑 Vault not healthy, retrying...", zap.Error(err))
 		time.Sleep(shared.VaultRetryDelay)
 	}
 	return fmt.Errorf("vault not healthy after %d attempts", shared.VaultRetryCount)
@@ -144,10 +140,11 @@ func recoverVaultHealth(client *api.Client, log *zap.Logger) error {
 }
 
 // isVaultProcessRunning checks if a Vault process is active and bound to the expected TCP port.
+// Linux-only: relies on lsof syntax.
 func isVaultProcessRunning(log *zap.Logger) bool {
 	out, err := exec.Command("lsof", "-i", shared.VaultDefaultPort).Output()
 	if err != nil {
-		log.Warn("⚠️ lsof command failed", zap.Error(err))
+		log.Warn("⚠️ lsof command failed (process check skipped)", zap.Error(err))
 		return false
 	}
 	for _, line := range strings.Split(string(out), "\n") {

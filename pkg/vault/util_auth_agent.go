@@ -11,6 +11,34 @@ import (
 	"go.uber.org/zap"
 )
 
+// PhasePrepareVaultAgent writes agent password and systemd unit.
+func PhasePrepareVaultAgent(log *zap.Logger, password string) error {
+	log.Info("🔏 [Phase X] Preparing Vault Agent configuration")
+
+	if password != "" {
+		log.Info("🔏 Writing Vault Agent authentication secret", zap.String("path", shared.VaultAgentPassPath))
+		if err := writeAgentPassword(password, log); err != nil {
+			return fmt.Errorf("write agent password: %w", err)
+		}
+		log.Info("✅ Vault Agent password written")
+	} else {
+		log.Info("ℹ️ No agent password provided — skipping password file write")
+	}
+
+	if err := WriteAgentSystemdUnit(log); err != nil {
+		return fmt.Errorf("write agent systemd unit: %w", err)
+	}
+	log.Info("✅ Vault Agent systemd unit written")
+
+	if err := EnsureAgentServiceReady(log); err != nil {
+		return fmt.Errorf("enable agent service: %w", err)
+	}
+	log.Info("✅ Vault Agent service ready and enabled")
+
+	return nil
+}
+
+
 func EnsureAgentServiceReady(log *zap.Logger) error {
 	if err := EnsureVaultAgentUnitExists(log); err != nil {
 		return err

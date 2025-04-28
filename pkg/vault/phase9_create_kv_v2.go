@@ -28,8 +28,8 @@ import (
 //           └── EnableFileAudit()
 
 // PhaseEnableAuthMethodsAndPolicies enables Vault auth methods and applies the EOS policy.
-func PhaseEnableAuthMethodsAndPolicies(client *api.Client, log *zap.Logger) error {
-	log.Info("🚀 Phase [9/12]: Enable Vault Authentication + Policies")
+func PhaseEnableKVv2(client *api.Client, log *zap.Logger) error {
+	log.Info("🔒 [Phase 9/15] Enabling Vault KV engine")
 
 	// 1️⃣ Ensure KVv2 is enabled
 	if err := EnsureKVv2Enabled(client, shared.VaultMountKV, log); err != nil {
@@ -41,35 +41,9 @@ func PhaseEnableAuthMethodsAndPolicies(client *api.Client, log *zap.Logger) erro
 		return fmt.Errorf("bootstrap KV failed: %w", err)
 	}
 
-	// 3️⃣ Enable userpass/approle auth methods
-	if err := EnsureVaultAuthMethods(client, log); err != nil {
-		return fmt.Errorf("enable auth methods: %w", err)
-	}
-
 	// 4️⃣ Upload eos-policy
 	if err := EnsurePolicy(client, log); err != nil {
 		return fmt.Errorf("apply EOS policy: %w", err)
-	}
-
-	// 5️⃣ Prompt for EOS admin password
-	eosCreds, err := PromptForEosPassword(log)
-	if err != nil {
-		return fmt.Errorf("prompt eos password: %w", err)
-	}
-	if len(eosCreds.Password) < 8 {
-		log.Error("eos user password too short", zap.Int("length", len(eosCreds.Password)))
-		return fmt.Errorf("eos password must be at least 8 characters")
-	}
-
-	// 6️⃣ Create the eos user with full policy
-	if err := ApplyAdminPolicy(*eosCreds, client, log); err != nil {
-		return fmt.Errorf("apply admin policy: %w", err)
-	}
-
-	// 7️⃣ Enable file audit logging (mandatory)
-	if err := EnableFileAudit(client, log); err != nil {
-		log.Error("❌ Failed to enable file audit logging", zap.Error(err))
-		return fmt.Errorf("enable file audit failed: %w", err)
 	}
 
 	log.Info("✅ Auth methods, policy, eos user, and auditing successfully configured")

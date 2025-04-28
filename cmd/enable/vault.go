@@ -8,32 +8,40 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// EnableVaultCmd initializes, unseals, and enables Vault for EOS.
 var EnableVaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Initializes, unseals, and enables Vault (TLS, AppRole, and EOS policy)",
+	Short: "Orchestrates minimal secure runtime setup for Vault (server, approle, agent, api)",
+	Long: `Connects to Vault, ensures server readiness, and selectively enables components:
+AppRole auth, Vault Agent, and API client connectivity.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("enable-vault")
+		log := ctx.Log.Named("cmd/enable/vault")
 
-		log.Info("🔌 Connecting to Vault")
+		log.Info("🔌 [Phase7] Connecting to Vault server and checking health...")
 		client, err := vault.EnsureVaultReady(log)
 		if err != nil {
 			return logger.LogErrAndWrap(log, "connect vault", err)
 		}
 
-		log.Info("🚀 Starting Vault enable lifecycle")
-		password := ""
-		if err := vault.EnableVault(client, log, password); err != nil {
+		// Fill out EnableOptions for lifecycle orchestration
+		opts := vault.EnableOpts
+		opts.AppRoleOptions = vault.DefaultAppRoleOptions() // You could make this user-customizable later if needed
+
+		log.Info("🛠️ [Phase8+] Enabling selected Vault components...")
+		if err := vault.EnableVault(client, log, opts); err != nil {
 			return logger.LogErrAndWrap(log, "enable vault", err)
 		}
 
-		log.Info("✅ Vault fully enabled and ready for secure use")
+		log.Info("✅ Vault setup completed successfully")
 		log.Info("ℹ️  Next step: run `eos secure vault` to finalize hardening")
 		return nil
 	}),
 }
 
 func init() {
-	EnableVaultCmd.Flags().Bool("non-interactive", false, "Run without interactive prompts")
+	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAppRole, "approle", false, "Enable AppRole authentication method")
+	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAgent, "agent", false, "Enable Vault Agent setup")
+	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAPI, "api", false, "Verify Vault API client connectivity")
+	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.NonInteractive, "non-interactive", false, "Run without interactive prompts")
+	EnableVaultCmd.Flags().StringVar(&vault.EnableOpts.Password, "password", "", "EOS Vault user password (optional; fallback to prompt)")
 	EnableCmd.AddCommand(EnableVaultCmd)
 }
