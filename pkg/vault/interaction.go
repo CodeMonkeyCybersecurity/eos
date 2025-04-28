@@ -1,3 +1,5 @@
+// pkg/vault/interaction
+
 package vault
 
 import (
@@ -9,30 +11,6 @@ import (
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
-
-// PromptForUnsealAndRoot prompts the user for 3 unseal keys and 1 root token.
-// Returns an error if input reading fails.
-func PromptForUnsealAndRoot(log *zap.Logger) (api.InitResponse, error) {
-	log.Info("Prompting for unseal keys and root token")
-	fmt.Println("🔐 Please enter 3 unseal keys and the root token")
-
-	keys, err := interaction.PromptSecrets("Unseal Key", 3, log)
-	if err != nil {
-		log.Error("Failed to read unseal keys", zap.Error(err))
-		return api.InitResponse{}, fmt.Errorf("failed to prompt for unseal keys: %w", err)
-	}
-
-	root, err := interaction.PromptSecrets("Root Token", 1, log)
-	if err != nil {
-		log.Error("Failed to read root token", zap.Error(err))
-		return api.InitResponse{}, fmt.Errorf("failed to prompt for root token: %w", err)
-	}
-
-	return api.InitResponse{
-		KeysB64:   keys,
-		RootToken: root[0],
-	}, nil
-}
 
 // PromptForEosPassword securely prompts for and confirms the eos Vault password.
 // Returns an error if input reading fails or confirmation mismatches.
