@@ -1,6 +1,7 @@
 package eoscli
 
 import (
+	"context"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
@@ -16,12 +17,23 @@ import (
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		var err error
+		const timeout = 1 * time.Minute // ⏰ Global timeout for EOS CLI commands
 		start := time.Now()
 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
-		ctx := eosio.NewRuntimeContext(log)
+		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
 
-		log.Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp))
+		ctx := &eosio.RuntimeContext{
+			Log:       log,
+			Ctx:       ctxWithTimeout,
+			Timestamp: time.Now(),
+		}
+
+		log.Info("🚀 Command execution started",
+			zap.Time("timestamp", ctx.Timestamp),
+			zap.Duration("timeout", timeout), // Optional but good for logging
+		)
 
 		// Setup Vault environment, but log warning if it fails
 		addr, addrErr := vault.EnsureVaultEnv(log)
