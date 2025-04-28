@@ -1,4 +1,15 @@
+// pkg/vault/util_auth_approle.go
 
+package vault
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"go.uber.org/zap"
+)
 
 func EnsureAgentServiceReady(log *zap.Logger) error {
 	if err := EnsureVaultAgentUnitExists(log); err != nil {

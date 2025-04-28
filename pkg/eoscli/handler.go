@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -12,19 +13,15 @@ import (
 )
 
 // Wrap decorates a cobra command handler to inject EOS runtime context.
-func Wrap(fn func(ctx *RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
+func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		var err error
 		start := time.Now()
 
-		log := contextualLogger(2).Named(cmd.Name())
+		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
+		ctx := eosio.NewRuntimeContext(log)
 
-		log.Info("🚀 Command execution started", zap.Time("start_time", start))
-
-		ctx := &RuntimeContext{
-			Log:       log,
-			StartTime: start,
-		}
+		log.Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp))
 
 		// Setup Vault environment, but log warning if it fails
 		addr, addrErr := vault.EnsureVaultEnv(log)

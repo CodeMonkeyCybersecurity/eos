@@ -5,11 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -123,46 +121,6 @@ func ApplyCoreSecretsAndHealthCheck(client *api.Client, log *zap.Logger) error {
 	}
 
 	log.Info("✅ Core secrets applied and Vault healthy")
-	return nil
-}
-
-func EnsureAgentServiceReady(log *zap.Logger) error {
-	if err := EnsureVaultAgentUnitExists(log); err != nil {
-		return err
-	}
-	log.Info("🚀 Reloading daemon and enabling Vault Agent service")
-	if err := system.ReloadDaemonAndEnable(log, shared.VaultAgentService); err != nil {
-		log.Error("❌ Failed to enable/start Vault Agent service", zap.Error(err))
-		return fmt.Errorf("enable/start Vault Agent service: %w", err)
-	}
-	return nil
-}
-
-func writeAgentPassword(password string, log *zap.Logger) error {
-	log.Debug("🔏 Writing Vault Agent password to file", zap.String("path", shared.VaultAgentPassPath))
-
-	data := []byte(password + "\n")
-	if err := os.WriteFile(shared.VaultAgentPassPath, data, 0600); err != nil {
-		log.Error("❌ Failed to write password file", zap.String("path", shared.VaultAgentPassPath), zap.Error(err))
-		return fmt.Errorf("failed to write Vault Agent password to %s: %w", shared.VaultAgentPassPath, err)
-	}
-
-	log.Info("✅ Vault Agent password file written",
-		zap.String("path", shared.VaultAgentPassPath),
-		zap.Int("bytes_written", len(data)))
-
-	return nil
-}
-
-func EnsureVaultAgentUnitExists(log *zap.Logger) error {
-	if _, err := os.Stat(shared.VaultAgentServicePath); os.IsNotExist(err) {
-		log.Warn("⚙️ Vault Agent systemd unit missing — creating", zap.String("path", shared.VaultAgentServicePath))
-		if err := WriteAgentSystemdUnit(log); err != nil {
-			log.Error("❌ Failed to write Vault Agent systemd unit", zap.Error(err))
-			return fmt.Errorf("write Vault Agent unit: %w", err)
-		}
-		log.Info("✅ Vault Agent systemd unit ensured", zap.String("path", shared.VaultAgentServicePath))
-	}
 	return nil
 }
 
