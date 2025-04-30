@@ -8,6 +8,9 @@ EOS_BUILD_PATH="$EOS_SRC_DIR/$EOS_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$EOS_BINARY_NAME"
 SECRETS_DIR="/var/lib/eos/secrets"
 CONFIG_DIR="/etc/eos"
+LOG_DIR="/var/log/eos"
+LOG_USER="eos"
+LOG_GROUP="eos"
 
 # Ensure running as root
 if [[ "$EUID" -ne 0 ]]; then
@@ -45,6 +48,18 @@ chown -R "$EOS_USER:$EOS_USER" /var/lib/eos
 chmod 750 /var/lib/eos
 chmod 700 "$SECRETS_DIR"
 
+echo "🔧 Setting up log directory: $LOG_DIR"
+
+if [ ! -d "$LOG_DIR" ]; then
+   mkdir -p "$LOG_DIR"
+  echo "📁 Created $LOG_DIR"
+fi
+
+ chown "$LOG_USER:$LOG_GROUP" "$LOG_DIR"
+ chmod 750 "$LOG_DIR"
+
+echo "✅ Log directory ownership and permissions set"
+
 echo "✅ Installation complete."
 echo "👉 You can now run 'eos --help' to confirm install"
-echo "🔐 You will be prompted for your own sudo password if not recently authenticated."
+echo "🔐 You will be prompted for your own  password if not recently authenticated."

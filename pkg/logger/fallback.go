@@ -8,6 +8,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -21,6 +22,7 @@ func NewFallbackLogger() *zap.Logger {
 		ParseLogLevel(os.Getenv("LOG_LEVEL")),
 	)
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	logger.Info("Logger fallback initialized")
 	return logger
 }
 
@@ -33,6 +35,15 @@ func InitializeWithFallback() {
 	path, err := FindWritableLogPath()
 	if err != nil {
 		useFallback("no writable log path found")
+		return
+	}
+
+	// 🛡️ Warn if trying to write to /var/log as non-root
+	if os.Geteuid() != 0 && strings.HasPrefix(path, "/var/log/") {
+		NewFallbackLogger().Warn("⚠️ Cannot write to system log path as non-root, falling back",
+			zap.String("attempted_path", path),
+		)
+		useFallback("non-root user cannot write to /var/log")
 		return
 	}
 
