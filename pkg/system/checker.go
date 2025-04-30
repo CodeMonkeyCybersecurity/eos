@@ -20,27 +20,47 @@ func Exists(path string) bool {
 	return err == nil || !os.IsNotExist(err)
 }
 
-// LookupUser returns the UID and GID of the given user.
+// LookupUser returns the UID and GID of the given user with structured logging.
 func LookupUser(name string) (int, int, error) {
+	log := logger.GetLogger().Named("system")
+
+	log.Debug("🔍 Looking up user", zap.String("username", name))
+
 	u, err := user.Lookup(name)
 	if err != nil {
+		log.Error("❌ User lookup failed", zap.String("username", name), zap.Error(err))
 		return 0, 0, fmt.Errorf("user lookup failed: %w", err)
 	}
+
 	uid, err := strconv.Atoi(u.Uid)
 	if err != nil {
+		log.Error("❌ Invalid UID format", zap.String("uid", u.Uid), zap.Error(err))
 		return 0, 0, fmt.Errorf("invalid UID: %w", err)
 	}
+
 	gid, err := strconv.Atoi(u.Gid)
 	if err != nil {
+		log.Error("❌ Invalid GID format", zap.String("gid", u.Gid), zap.Error(err))
 		return 0, 0, fmt.Errorf("invalid GID: %w", err)
 	}
+
+	log.Info("✅ User lookup succeeded",
+		zap.String("username", name),
+		zap.Int("uid", uid),
+		zap.Int("gid", gid),
+		zap.String("home", u.HomeDir),
+	)
+
 	return uid, gid, nil
 }
+
+
 
 func FileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
+
 
 /**/
 
