@@ -131,7 +131,7 @@ func recoverVaultHealth(client *api.Client, log *zap.Logger) error {
 
 	case health.Sealed:
 		log.Info("🔒 Vault sealed — attempting unseal from fallback")
-		return unsealFromStoredKeys(client, log)
+		return MustUnseal(client, log)
 
 	default:
 		log.Warn("❓ Unexpected Vault health state after retries; manual intervention may be required")

@@ -13,106 +13,73 @@ import (
 	"go.uber.org/zap"
 )
 
-// EnsureVaultClient guarantees the Vault client is set, using the privileged eos user.
-func EnsureVaultClient(log *zap.Logger) {
-	log.Debug("🔐 Ensuring VAULT_ADDR is configured...")
-
-	var Client *api.Client
-	var report *shared.CheckReport
-	var checkedClient *api.Client
-
-	if _, err := EnsureVaultEnv(log); err != nil {
-		log.Warn("⚠️ Failed to set Vault environment", zap.Error(err))
-	}
-
+// EnsureVaultClient guarantees a working Vault client is globally cached and returned.
+func EnsureVaultClient(log *zap.Logger) (*api.Client, error) {
 	if client, err := GetVaultClient(log); err == nil && client != nil {
-		log.Debug("✅ Vault client already initialized")
-		// ✅ Validate it works
-		// 🔍 Run full Vault diagnostics
-		report, checkedClient := Check(client, log, nil, "")
-		if checkedClient != nil {
-			SetVaultClient(checkedClient, log)
-		}
-
-		if report == nil {
-			log.Warn("⚠️ Vault check returned nil — skipping further setup")
-			return
-		}
-
-		if len(report.Notes) > 0 {
-			for _, note := range report.Notes {
-				log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
-			}
-		}
-		return
-	}
-
-	report, checkedClient = Check(Client, log, nil, "")
-	if checkedClient != nil {
-		SetVaultClient(checkedClient, log)
-	}
-	if report == nil {
-		log.Warn("⚠️ Vault check returned nil — skipping further setup")
-		return
-	}
-	if len(report.Notes) > 0 {
-		for _, note := range report.Notes {
-			log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+		if validated, _ := validateClient(client, log); validated != nil {
+			SetVaultClient(validated, log)
+			return validated, nil
 		}
 	}
 
+	if client, err := tryClientFromEnv(log); err == nil {
+		if validated, _ := validateClient(client, log); validated != nil {
+			SetVaultClient(validated, log)
+			return validated, nil
+		}
+		log.Warn("⚠️ Vault client from env is unhealthy")
+	}
+
+	if client, err := tryPrivilegedClient(log); err == nil {
+		if validated, _ := validateClient(client, log); validated != nil {
+			SetVaultClient(validated, log)
+			return validated, nil
+		}
+		log.Warn("⚠️ Privileged client is unhealthy")
+	} else {
+		log.Error("❌ Failed to create privileged Vault client", zap.Error(err))
+	}
+
+	log.Error("❌ Could not initialize a working Vault client")
+	return nil, fmt.Errorf("no valid Vault client could be established")
+}
+
+// tryClientFromEnv creates a Vault client from environment variables.
+func tryClientFromEnv(log *zap.Logger) (*api.Client, error) {
 	log.Info("🔐 Attempting to initialize Vault client from environment (VAULT_TOKEN)...")
 	client, err := NewClient(log)
-	if err == nil {
-		log.Info("✅ Vault client created from environment")
-		SetVaultClient(Client, log)
-
-		// ✅ Validate health
-		report, checkedClient := Check(client, log, nil, "")
-		if checkedClient != nil {
-			SetVaultClient(checkedClient, log)
-		}
-		if report == nil {
-			log.Warn("⚠️ Vault check returned nil — skipping further setup")
-			return
-		}
-		if len(report.Notes) > 0 {
-			for _, note := range report.Notes {
-				log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
-			}
-		}
-		return
-	}
-
-	log.Warn("⚠️ Failed to create Vault client from environment", zap.Error(err))
-	log.Info("🔐 Falling back to Vault Agent AppRole authentication...")
-
-	client, err = GetPrivilegedVaultClient(log)
 	if err != nil {
-		log.Error("❌ Vault client could not be initialized",
-			zap.Error(err),
-			zap.String("hint", "Is Vault Agent running? Is /run/eos/vault-agent-eos.token readable? Did you run `eos secure vault`?"),
-		)
-		return
+		return nil, fmt.Errorf("env client creation failed: %w", err)
 	}
+	log.Info("✅ Vault client created from environment")
+	return client, nil
+}
 
+// tryPrivilegedClient attempts to load Vault client using Vault Agent or vault_init.json.
+func tryPrivilegedClient(log *zap.Logger) (*api.Client, error) {
+	log.Info("🔐 Falling back to Vault Agent AppRole authentication...")
+	client, err := EnsurePrivilegedVaultClient(log)
+	if err != nil {
+		return nil, fmt.Errorf("privileged client setup failed: %w", err)
+	}
 	log.Info("✅ Vault client initialized via privileged agent")
-	SetVaultClient(client, log)
+	return client, nil
+}
 
-	// ✅ Validate health
-	report, checkedClient = Check(client, log, nil, "")
+// validateClient runs diagnostics and returns the final usable client (if valid).
+func validateClient(client *api.Client, log *zap.Logger) (*api.Client, *shared.CheckReport) {
+	report, checkedClient := Check(client, log, nil, "")
 	if checkedClient != nil {
-		SetVaultClient(checkedClient, log)
+		client = checkedClient
 	}
 	if report == nil {
 		log.Warn("⚠️ Vault check returned nil — skipping further setup")
-		return
+		return nil, nil
 	}
-	if len(report.Notes) > 0 {
-		for _, note := range report.Notes {
-			log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
-		}
+	for _, note := range report.Notes {
+		log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
 	}
+	return client, report
 }
 
 // NewClient returns a Vault client that

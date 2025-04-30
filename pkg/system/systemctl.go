@@ -1,4 +1,4 @@
-// pkg/system/utils.go
+// pkg/system/systemctl.go
 package system
 
 import (

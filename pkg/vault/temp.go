@@ -227,11 +227,21 @@ func PhaseEnsureClientHealthy(log *zap.Logger) error {
 			}
 			return nil
 
-		case resp.Initialized && resp.Sealed: // sealed
+		case resp.Initialized && resp.Sealed:
 			log.Info("🔒 Vault reports sealed (503) – attempting auto‑unseal")
-			if err := unsealFromStoredKeys(client, log); err != nil {
-				return fmt.Errorf("auto‑unseal failed: %w", err)
+			if err := MustUnseal(client, log); err != nil {
+				log.Error("❌ Auto-unseal failed", zap.Error(err))
+				return fmt.Errorf("auto-unseal failed: %w", err)
 			}
+			// Verify unseal succeeded
+			status, err := client.Sys().SealStatus()
+			if err != nil {
+				return fmt.Errorf("post-unseal status check failed: %w", err)
+			}
+			if status.Sealed {
+				return fmt.Errorf("vault still sealed after unseal attempt")
+			}
+			log.Info("✅ Vault successfully unsealed via fallback")
 			return nil
 
 		case resp.Standby: // standby
