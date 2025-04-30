@@ -45,6 +45,7 @@ chmod 755 "$INSTALL_PATH"
 echo "📁 Creating secrets and config directories"
 mkdir -p "$SECRETS_DIR"
 mkdir -p "$CONFIG_DIR"
+mkdir -p /var/lib/eos
 
 chown -R "$EOS_USER:$EOS_USER" /var/lib/eos
 chmod 750 /var/lib/eos
@@ -53,14 +54,36 @@ chmod 700 "$SECRETS_DIR"
 echo "🔧 Setting up log directory: $LOG_DIR"
 
 if [ ! -d "$LOG_DIR" ]; then
-   mkdir -p "$LOG_DIR"
-  echo "📁 Created $LOG_DIR"
+  if mkdir -p "$LOG_DIR"; then
+    echo "📁 Created $LOG_DIR"
+  else
+    echo "❌ Failed to create $LOG_DIR"
+    exit 1
+  fi
+else
+  echo "📁 Log directory already exists"
 fi
 
- chown "$LOG_USER:$LOG_GROUP" "$LOG_DIR"
- chmod 750 "$LOG_DIR"
+# Only chown if needed
+CURRENT_OWNER=$(stat -c "%U:%G" "$LOG_DIR" 2>/dev/null || echo "unknown:unknown")
+if [ "$CURRENT_OWNER" != "$EOS_USER:$EOS_USER" ]; then
+  if chown "$EOS_USER:$EOS_USER" "$LOG_DIR"; then
+    echo "🔑 Ownership updated to $EOS_USER:$EOS_USER"
+  else
+    echo "❌ Failed to set ownership on $LOG_DIR"
+    exit 1
+  fi
+fi
 
-echo "✅ Log directory ownership and permissions set"
+# Set permissions
+if chmod 750 "$LOG_DIR"; then
+  echo "🔒 Permissions set to 750"
+else
+  echo "❌ Failed to set permissions on $LOG_DIR"
+  exit 1
+fi
+
+echo "✅ Log directory ready: $LOG_DIR"
 
 echo "✅ Installation complete."
 echo "👉 You can now run 'eos --help' to confirm install"
