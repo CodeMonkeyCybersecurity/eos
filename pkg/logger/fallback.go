@@ -41,45 +41,46 @@ func InitializeWithFallback() {
 		return
 	}
 
-	// 📁 Attempt to ensure parent log directory exists and is writable by eos
 	logDir := filepath.Dir(path)
-	if _, statErr := os.Stat(logDir); os.IsNotExist(statErr) {
-		if mkErr := os.MkdirAll(logDir, 0o600); mkErr != nil {
+	if stat, statErr := os.Stat(logDir); os.IsNotExist(statErr) {
+		if mkErr := os.MkdirAll(logDir, 0o750); mkErr != nil {
 			fmt.Fprintf(os.Stderr, "⚠️ Failed to create log dir %s: %v — falling back\n", logDir, mkErr)
 			log = NewFallbackLogger()
 			zap.ReplaceGlobals(log)
 			return
 		}
 		fmt.Fprintf(os.Stderr, "📁 Created log directory %s\n", logDir)
-	}
-
-	info, err := os.Stat(path)
-	if err == nil && info.Mode().Perm() != 0o600 {
-		fmt.Fprintf(os.Stderr, "⚠️ Unexpected log file permissions: %v\n", info.Mode())
-	}
-
-	// ✅ Attempt to chown the log directory to eos:eos if running as root
-	if os.Geteuid() == 0 {
-		u, err := user.Lookup("eos")
-		if err == nil {
-			uid, _ := strconv.Atoi(u.Uid)
-			gid, _ := strconv.Atoi(u.Gid)
-			_ = os.Chown(logDir, uid, gid) // optional: check error and fallback
-		} else {
-			fmt.Fprintf(os.Stderr, "⚠️ Could not lookup eos user: %v — skipping chown\n", err)
+	} else if statErr == nil && !isWritable(stat) {
+		// Exists but may not be writable — try chown
+		if os.Geteuid() == 0 {
+			u, err := user.Lookup("eos")
+			if err == nil {
+				uid, _ := strconv.Atoi(u.Uid)
+				gid, _ := strconv.Atoi(u.Gid)
+				if chErr := os.Chown(logDir, uid, gid); chErr != nil {
+					fmt.Fprintf(os.Stderr, "⚠️ Could not chown %s: %v — falling back\n", logDir, chErr)
+					log = NewFallbackLogger()
+					zap.ReplaceGlobals(log)
+					return
+				}
+			} else {
+				fmt.Fprintf(os.Stderr, "⚠️ Could not lookup eos user: %v — skipping chown\n", err)
+			}
 		}
+	}
+
+	writer, err := GetLogFileWriter(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "⚠️  Could not open log file, falling back to stdout:", err)
+		log = NewFallbackLogger()
+		zap.ReplaceGlobals(log)
+		return
 	}
 
 	cfg := DefaultConsoleEncoderConfig()
 	jsonCfg := zap.NewProductionEncoderConfig()
 	jsonCfg.EncodeTime = zapcore.ISO8601TimeEncoder
 	jsonCfg.EncodeLevel = zapcore.CapitalLevelEncoder
-
-	writer, err := GetLogFileWriter(path)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "⚠️  Could not write to log file, falling back to stdout:", err)
-		writer = zapcore.AddSync(os.Stdout)
-	}
 
 	core := zapcore.NewTee(
 		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
@@ -88,10 +89,17 @@ func InitializeWithFallback() {
 
 	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(log)
-	log.Info("Logger fallback initialized",
+
+	log.Info("✅ Logger initialized",
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
 	)
+}
+
+// Helper: checks if existing dir is writable
+func isWritable(info os.FileInfo) bool {
+	mode := info.Mode().Perm()
+	return mode&0200 != 0 // owner-writable
 }
 
 func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {

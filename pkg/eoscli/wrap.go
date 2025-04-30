@@ -5,6 +5,8 @@ package eoscli
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/user"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
@@ -18,22 +20,27 @@ import (
 
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// Minimal early logger in case RequireEosUserOrReexec fails
-		log := logger.NewFallbackLogger()
+		// Global logger init — safe, idempotent
+		logger.InitializeWithFallback()
+		log := logger.GetLogger().Named(cmd.Name())
 
-		// Ensure privilege
+		// Privilege check and re-exec
 		if err := eosio.RequireEosUserOrReexec(log); err != nil {
 			log.Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
 
-		// We're now the eos user – initialize full logger
-		logger.InitializeWithFallback() // <— only now!
+		// Refine logger context
 		log = eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		logger.SetLogger(log)
 		logRuntimeExecutionContext(log)
 
-		// Runtime context
+		// Add calling user info
+		if u, err := user.LookupId(fmt.Sprint(os.Getuid())); err == nil {
+			log = log.With(zap.String("invoked_by", u.Username))
+		}
+
+		// Context setup
 		const timeout = 1 * time.Minute
 		start := time.Now()
 		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
@@ -50,7 +57,7 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			zap.Duration("timeout", timeout),
 		)
 
-		// Setup Vault
+		// Vault setup
 		addr, addrErr := vault.EnsureVaultEnv(log)
 		if addrErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
