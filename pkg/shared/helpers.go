@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -57,49 +56,4 @@ func SafeRemove(name string, log *zap.Logger) {
 	if err := os.Remove(name); err != nil {
 		log.Warn("Removing file failed", zap.String("path", name), zap.Error(err))
 	}
-}
-
-// SafeSync attempts to flush logs safely, suppressing known ignorable errors.
-// Only the first call logs any warnings to avoid repeated noise.
-func SafeSync(log *zap.Logger) {
-	if log == nil {
-		return
-	}
-
-	syncLogOnce.Do(func() {
-		if err := log.Sync(); err != nil {
-			if IsIgnorableSyncError(err) {
-				log.Debug("Logger sync skipped (harmless)", zap.String("reason", err.Error()))
-			} else {
-				log.Warn("Logger sync failed", zap.Error(err))
-			}
-		}
-	})
-}
-
-// IsIgnorableSyncError returns true if the sync error is known to be harmless.
-func IsIgnorableSyncError(err error) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-
-	// Split into parts to catch each individual sink error
-	lower := strings.ToLower(errStr)
-	harmlessPatterns := []string{
-		"sync /dev/stdout: invalid argument",
-		"sync /dev/stderr: invalid argument",
-		"sync /dev/stdout",
-		"sync /dev/stderr",
-		"bad file descriptor",
-		"invalid argument",
-	}
-
-	for _, pattern := range harmlessPatterns {
-		if strings.Contains(lower, pattern) {
-			return true
-		}
-	}
-
-	return false
 }
