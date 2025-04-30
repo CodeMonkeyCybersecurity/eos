@@ -62,7 +62,7 @@ func SafeRemove(name string, log *zap.Logger) {
 // SafeSync attempts to flush logs safely, suppressing known ignorable errors.
 // Unexpected errors are logged as warnings, but do not interrupt CLI flow.
 func SafeSync(log *zap.Logger) {
-	if log == nil {
+	if log == nil || syncedAlready.Swap(true) {
 		return
 	}
 	if err := log.Sync(); err != nil {
