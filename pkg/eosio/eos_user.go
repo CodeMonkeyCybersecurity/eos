@@ -15,8 +15,11 @@ import (
 
 // RequireEosUserOrReexec ensures the current process is running as the 'eos' system user.
 // If not, it attempts to re-execute the current binary using 'sudo -u eos ...'.
-// Returns an error if user detection or sudo fails.
 func RequireEosUserOrReexec(log *zap.Logger) error {
+	if log == nil {
+		return fmt.Errorf("logger not initialized before RequireEosUserOrReexec")
+	}
+
 	if strings.HasPrefix(os.Args[0], "/tmp/") {
 		log.Error("🛑 Cannot escalate with `go run`. Use `go build -o eos`.")
 		return fmt.Errorf("binary path %s is not suitable for sudo", os.Args[0])
@@ -38,6 +41,7 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 		log.Error("Failed to get current binary path", zap.Error(err))
 		return err
 	}
+
 	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
 	cmd := exec.Command("sudo", fullArgs...)
 	cmd.Stdout = os.Stdout
@@ -48,6 +52,6 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 		return err
 	}
 
-	os.Exit(0) // Successful re-exec; prevent further execution
+	os.Exit(0) // Successful re-exec
 	return nil
 }

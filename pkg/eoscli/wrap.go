@@ -19,35 +19,46 @@ import (
 
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		if err := eosio.RequireEosUserOrReexec(nil); err != nil {
-			logger.NewFallbackLogger().Error("❌ Privilege check failed", zap.Error(err))
+		// Initialize logger early
+		logger.InitializeWithFallback()
+		baseLog := logger.L()
+		if baseLog == nil {
+			fmt.Fprintln(os.Stderr, "🚨 logger.L() is nil before RequireEosUserOrReexec")
+			os.Exit(1)
+		}
+		logger.SetLogger(baseLog)
+
+		// Run privilege elevation check early
+		if err := eosio.RequireEosUserOrReexec(baseLog); err != nil {
+			baseLog.Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
 
+		// Add metadata to logger
 		userField := zap.Skip()
 		if u, err := user.LookupId(fmt.Sprint(os.Getuid())); err == nil {
 			userField = zap.String("invoked_by", u.Username)
 		}
-
-		log := logger.L().With(userField)
+		log := baseLog.With(userField)
 		logger.SetLogger(log)
 
-		// Timeout + context
+		// Setup context
 		const timeout = 1 * time.Minute
 		start := time.Now()
 		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
-		ctx := &eosio.RuntimeContext{Log: log, Ctx: ctxWithTimeout, Timestamp: time.Now()}
-		log.Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp), zap.Duration("timeout", timeout))
+		ctx := &eosio.RuntimeContext{Log: log, Ctx: ctxWithTimeout, Timestamp: start}
+		log.Info("🚀 Command execution started", zap.Time("timestamp", start), zap.Duration("timeout", timeout))
 
-		// Vault setup
+		// Setup Vault
 		addr, addrErr := vault.EnsureVaultEnv(log)
 		if addrErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
 		}
 		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
+		// Execute command
 		var err error
 		defer func() {
 			duration := time.Since(start)
