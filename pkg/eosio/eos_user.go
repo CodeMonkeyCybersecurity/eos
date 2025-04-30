@@ -33,7 +33,12 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 	}
 
 	log.Info("🔐 Elevating to 'eos' user via sudo")
-	fullArgs := append([]string{"-u", shared.EosID, os.Args[0]}, os.Args[1:]...)
+	binaryPath, err := os.Executable()
+	if err != nil {
+		log.Error("Failed to get current binary path", zap.Error(err))
+		return err
+	}
+	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)	
 	cmd := exec.Command("sudo", fullArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
