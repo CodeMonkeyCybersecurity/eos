@@ -5,6 +5,7 @@ package logger
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -31,6 +32,18 @@ func InitializeWithFallback() {
 		log = NewFallbackLogger()
 		zap.ReplaceGlobals(log)
 		return
+	}
+
+	// 📁 Attempt to ensure parent log directory exists
+	logDir := filepath.Dir(path)
+	if _, statErr := os.Stat(logDir); os.IsNotExist(statErr) {
+		if mkErr := os.MkdirAll(logDir, 0o750); mkErr != nil {
+			fmt.Fprintf(os.Stderr, "⚠️ Failed to create log dir %s: %v — falling back\n", logDir, mkErr)
+			log = NewFallbackLogger()
+			zap.ReplaceGlobals(log)
+			return
+		}
+		fmt.Fprintf(os.Stderr, "📁 Created log directory %s\n", logDir)
 	}
 
 	cfg := DefaultConsoleEncoderConfig()
