@@ -5,6 +5,7 @@ package eoscli
 import (
 	"os"
 	"os/user"
+
 	"go.uber.org/zap"
 )
 

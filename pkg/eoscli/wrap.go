@@ -16,24 +16,26 @@ import (
 	"go.uber.org/zap"
 )
 
-// Wrap decorates a cobra command handler to inject EOS runtime context.
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// Declare logger early for use in re-exec error handling
-		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
+		// Minimal early logger in case RequireEosUserOrReexec fails
+		log := logger.NewFallbackLogger()
 
-		// Log user + execution path info early
-		logRuntimeExecutionContext(log)
-
-		// Re-exec as 'eos' user if not already
+		// Ensure privilege
 		if err := eosio.RequireEosUserOrReexec(log); err != nil {
 			log.Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
 
+		// We're now the eos user – initialize full logger
+		logger.InitializeWithFallback() // <— only now!
+		log = eosio.ContextualLogger(2, nil).Named(cmd.Name())
+		logger.SetLogger(log)
+		logRuntimeExecutionContext(log)
+
+		// Runtime context
 		const timeout = 1 * time.Minute
 		start := time.Now()
-
 		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
@@ -48,14 +50,14 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			zap.Duration("timeout", timeout),
 		)
 
-		// Setup Vault environment
+		// Setup Vault
 		addr, addrErr := vault.EnsureVaultEnv(log)
 		if addrErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
 		}
 		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
-		var err error // 👈 declare err early so it’s in scope for defer
+		var err error
 		defer func() {
 			duration := time.Since(start)
 			logger.LogCommandLifecycle(cmd.Name())(&err)

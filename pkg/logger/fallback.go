@@ -28,6 +28,11 @@ func NewFallbackLogger() *zap.Logger {
 }
 
 func InitializeWithFallback() {
+	if initialized {
+		return
+	}
+	initialized = true
+
 	path, err := FindWritableLogPath()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "⚠️  No writable log path found. Logging to console only.")
@@ -46,6 +51,11 @@ func InitializeWithFallback() {
 			return
 		}
 		fmt.Fprintf(os.Stderr, "📁 Created log directory %s\n", logDir)
+	}
+
+	info, err := os.Stat(path)
+	if err == nil && info.Mode().Perm() != 0o600 {
+		fmt.Fprintf(os.Stderr, "⚠️ Unexpected log file permissions: %v\n", info.Mode())
 	}
 
 	// ✅ Attempt to chown the log directory to eos:eos if running as root

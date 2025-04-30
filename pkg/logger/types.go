@@ -10,3 +10,5 @@ type ctxKey string
 const traceIDKey ctxKey = "trace_id"
 
 const JournalSinceDefault = "today"
+
+var initialized bool
