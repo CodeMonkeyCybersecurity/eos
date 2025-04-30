@@ -1,7 +1,6 @@
 package logger
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -44,24 +43,6 @@ func GetLogger() *zap.Logger {
 		return fallback
 	}
 	return l
-}
-
-func Sync(strict ...bool) error {
-	log := L()
-	if log == nil {
-		return nil
-	}
-	err := log.Sync()
-	if err == nil || (!StrictEnabled(strict) && IsIgnorableSyncError(err)) {
-		return nil
-	}
-	log.Error("Failed to sync logger", zap.Error(err))
-	return err
-}
-
-func IsIgnorableSyncError(err error) bool {
-	var pathErr *os.PathError
-	return errors.As(err, &pathErr) || err.Error() == "sync /dev/stdout: invalid argument"
 }
 
 func StrictEnabled(flags []bool) bool {

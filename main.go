@@ -15,18 +15,9 @@ See LICENSE.agpl and LICENSE.dnh for full details.
 package main
 
 import (
-	"go.uber.org/zap"
-
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func main() {
-	logger.InitializeWithFallback()
-
-	log := zap.L().Named("main")
-	defer shared.SafeSync(log)
-
 	cmd.Execute()
 }
