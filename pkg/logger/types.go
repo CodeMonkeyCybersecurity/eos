@@ -12,3 +12,8 @@ const traceIDKey ctxKey = "trace_id"
 const JournalSinceDefault = "today"
 
 var initialized bool
+
+const (
+	DefaultLogDirPerm = 0o700
+	DefaultLogUser    = "eos"
+)

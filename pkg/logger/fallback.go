@@ -13,11 +13,6 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const (
-	DefaultLogDirPerm = 0o700
-	DefaultLogUser    = "eos"
-)
-
 func NewFallbackLogger() *zap.Logger {
 	cfg := baseEncoderConfig()
 	core := zapcore.NewCore(
@@ -26,7 +21,6 @@ func NewFallbackLogger() *zap.Logger {
 		ParseLogLevel(os.Getenv("LOG_LEVEL")),
 	)
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-	logger.Info("Logger fallback initialized")
 	return logger
 }
 
@@ -65,10 +59,11 @@ func InitializeWithFallback() {
 		zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), writer, zap.InfoLevel),
 	)
 
-	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-	zap.ReplaceGlobals(log)
+	newLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	zap.ReplaceGlobals(newLogger)
+	SetLogger(newLogger)
 
-	log.Info("✅ Logger initialized",
+	newLogger.Info("✅ Logger initialized",
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
 	)
@@ -85,16 +80,21 @@ func prepareLogDir(dir string) error {
 	if os.Geteuid() == 0 {
 		u, err := user.Lookup(DefaultLogUser)
 		if err != nil {
-			log.Warn("🔐 eos user not found", zap.Error(err))
-			return nil
+			L().Warn("🔐 eos user not found", zap.Error(err))
+			return fmt.Errorf("eos user lookup failed: %w", err)
 		}
+
 		uid, err1 := strconv.Atoi(u.Uid)
 		gid, err2 := strconv.Atoi(u.Gid)
 		if err1 != nil || err2 != nil {
 			return fmt.Errorf("invalid UID/GID: uid=%v, gid=%v", err1, err2)
 		}
+
 		if err := os.Chown(dir, uid, gid); err != nil {
 			return fmt.Errorf("chown failed: %w", err)
+		}
+		if err := os.Chmod(dir, DefaultLogDirPerm); err != nil {
+			return fmt.Errorf("chmod failed: %w", err)
 		}
 	}
 	return nil
@@ -135,6 +135,8 @@ func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 func useFallback(reason string) {
 	logger := NewFallbackLogger()
 	zap.ReplaceGlobals(logger)
+	SetLogger(logger)
+
 	logger.Warn("⚠️ Fallback logger used",
 		zap.String("reason", reason),
 		zap.String("user", os.Getenv("USER")),

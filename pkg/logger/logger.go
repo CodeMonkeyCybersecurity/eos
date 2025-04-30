@@ -2,10 +2,23 @@
 
 package logger
 
-import "go.uber.org/zap"
+import (
+	"sync/atomic"
+
+	"go.uber.org/zap"
+)
 
 var GlobalLogger *zap.Logger = zap.NewNop() // default to no-op until set
 
+var globalLogger atomic.Value
+
 func SetLogger(l *zap.Logger) {
-	GlobalLogger = l
+	globalLogger.Store(l)
+}
+
+func L() *zap.Logger {
+	if l, ok := globalLogger.Load().(*zap.Logger); ok {
+		return l
+	}
+	return zap.NewNop()
 }

@@ -1,3 +1,5 @@
+// pkg/eosio/logger.go
+
 package eosio
 
 import (
@@ -10,7 +12,7 @@ import (
 )
 
 // ContextualLogger returns a scoped logger enriched with component and action fields.
-// You can optionally pass a base logger; if nil, the default logger.L() is used.
+// If base is nil, logger.L() is used. Panics if logging is uninitialized.
 func ContextualLogger(skipFrames int, base *zap.Logger) *zap.Logger {
 	if skipFrames <= 0 {
 		skipFrames = 2
@@ -18,59 +20,49 @@ func ContextualLogger(skipFrames int, base *zap.Logger) *zap.Logger {
 
 	if base == nil {
 		base = logger.L()
+		if base == nil {
+			panic("ContextualLogger: logger.L() returned nil — logger not initialized?")
+		}
 	}
 
 	component, action, err := resolveContext(skipFrames)
 	if err != nil {
-		base = base.With(zap.Error(err))
+		base.Warn("🧭 Context resolution failed", zap.Error(err))
+		component, action = "unknown", "unknown"
 	}
 
-	if component == "" {
-		component = "unknown"
-	}
-	if action == "" {
-		action = "unknown"
-	}
-
-	l := base.With(
+	return base.With(
 		zap.String("component", component),
 		zap.String("action", action),
 	).Named(component)
-
-	l.Debug("🧭 Contextual logger initialized",
-		zap.String("component", component),
-		zap.String("action", action),
-	)
-
-	return l
 }
 
-// resolveContext extracts the caller's package and function names.
+// resolveContext extracts the calling package and function name.
 func resolveContext(skip int) (component, action string, err error) {
 	pc, file, _, ok := runtime.Caller(skip)
 	if !ok {
-		return "", "", fmt.Errorf("runtime.Caller failed")
+		return "unknown", "unknown", fmt.Errorf("runtime.Caller failed")
 	}
 
-	component, action = "unknown", "unknown"
-
+	// Infer component (directory name or filename)
 	parts := strings.Split(file, "/")
-	if len(parts) >= 2 {
+	switch {
+	case len(parts) >= 2:
 		component = parts[len(parts)-2]
-	} else if len(parts) == 1 {
+	case len(parts) == 1:
 		component = strings.TrimSuffix(parts[0], ".go")
+	default:
+		component = "unknown"
 	}
 
-	funcObj := runtime.FuncForPC(pc)
-	if funcObj == nil {
-		return component, action, fmt.Errorf("runtime.FuncForPC failed")
+	// Infer action (function name)
+	fn := runtime.FuncForPC(pc)
+	if fn == nil {
+		return component, "unknown", fmt.Errorf("runtime.FuncForPC failed for PC %d", pc)
 	}
-
-	funcName := funcObj.Name()
+	funcName := fn.Name()
 	funcParts := strings.Split(funcName, ".")
-	if len(funcParts) > 0 {
-		action = funcParts[len(funcParts)-1]
-	}
+	action = funcParts[len(funcParts)-1]
 
 	return component, action, nil
 }
