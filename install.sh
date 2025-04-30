@@ -33,8 +33,20 @@ if ! id "$EOS_USER" &>/dev/null; then
   useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER"
 fi
 
-echo "usermod -aG syslog eos"
-usermod -aG syslog eos
+# Ensure syslog group exists and add eos to it if missing
+if getent group syslog > /dev/null; then
+  if id -nG "$EOS_USER" | grep -qw "syslog"; then
+    echo "✅ $EOS_USER is already in syslog group"
+  else
+    echo "➕ Adding $EOS_USER to syslog group"
+    usermod -aG syslog "$EOS_USER" || {
+      echo "❌ Failed to add $EOS_USER to syslog group"
+      exit 1
+    }
+  fi
+else
+  echo "⚠️ syslog group not found — skipping group assignment"
+fi
 
 # Install binary
 echo "🧹 Cleaning old EOS binary..."
