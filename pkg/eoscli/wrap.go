@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,8 +23,6 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			logger.NewFallbackLogger().Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
-
-		logger.InitializeWithFallback()
 
 		userField := zap.Skip()
 		if u, err := user.LookupId(fmt.Sprint(os.Getuid())); err == nil {
@@ -64,7 +61,6 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			} else {
 				log.Info("✅ EOS command finished successfully", zap.Duration("duration", duration))
 			}
-			shared.SafeSync(log)
 		}()
 
 		err = fn(ctx, cmd, args)

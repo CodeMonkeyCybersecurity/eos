@@ -16,8 +16,13 @@ package main
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func main() {
+	logger.InitializeWithFallback()
+	defer shared.SafeSync(logger.L())
+
 	cmd.Execute()
 }

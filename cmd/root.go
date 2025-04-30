@@ -5,12 +5,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -48,31 +45,9 @@ and reverse proxy configurations via Hecate.`,
 	}),
 }
 
-// HelpCmd wraps help so that it can be invoked like a normal command.
-var HelpCmd = &cobra.Command{
-	Use:   "help",
-	Short: "Help about any command",
-	Long:  "Displays help for eos or a specific subcommand.",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		// If no arguments, show root help
-		if len(args) == 0 {
-			return RootCmd.Help()
-		}
-		// Otherwise, find the command and show its help.
-		c, _, err := RootCmd.Find(args)
-		if err != nil || c == nil {
-			return fmt.Errorf("command not found: %s", strings.Join(args, " "))
-		}
-		return c.Help()
-	}),
-}
-
 // RegisterCommands adds all subcommands to the root command.
 func RegisterCommands() {
-	RootCmd.SetHelpCommand(HelpCmd)
-
-	// Fix: logger.GetLogger is a function, call it
-	log := logger.GetLogger()
+	log := logger.L()
 
 	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !helpLogged {
@@ -106,21 +81,18 @@ func RegisterCommands() {
 
 // Execute initializes and runs the root command.
 func Execute() {
-	defer shared.SafeSync(zap.L())
+	log := logger.L()
+	log.Info("Eos CLI starting")
 
-	zap.L().Info("Eos CLI starting")
-
+	eos.SetLogger(log)
 	RegisterCommands()
-
-	log := logger.GetLogger()
-	eoscli.SetLogger(log)
 
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
-			zap.L().Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(0) // graceful exit for user mistakes
+			log.Warn("CLI completed with user error", zap.Error(err))
+			os.Exit(0)
 		} else {
-			zap.L().Error("CLI execution error", zap.Error(err))
+			log.Error("CLI execution error", zap.Error(err))
 			os.Exit(1)
 		}
 	}
