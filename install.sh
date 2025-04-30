@@ -2,7 +2,7 @@
 set -euo pipefail
 
 EOS_USER="eos"
-EOS_SRC_DIR="/home/eos/eos-dev"
+EOS_SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 EOS_BINARY_NAME="eos"
 EOS_BUILD_PATH="$EOS_SRC_DIR/$EOS_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$EOS_BINARY_NAME"
