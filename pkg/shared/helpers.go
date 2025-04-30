@@ -1,4 +1,4 @@
-// pkg/shared/vars.go
+// pkg/shared/helpers.go
 
 package shared
 
@@ -68,9 +68,8 @@ func SafeSync(log *zap.Logger) {
 
 	syncLogOnce.Do(func() {
 		if err := log.Sync(); err != nil {
-			msg := err.Error()
 			if IsIgnorableSyncError(err) {
-				log.Debug("Logger sync skipped (harmless)", zap.String("reason", msg))
+				log.Debug("Logger sync skipped (harmless)", zap.String("reason", err.Error()))
 			} else {
 				log.Warn("Logger sync failed", zap.Error(err))
 			}
@@ -84,8 +83,23 @@ func IsIgnorableSyncError(err error) bool {
 		return false
 	}
 	errStr := err.Error()
-	return strings.Contains(errStr, "invalid argument") ||
-		strings.Contains(errStr, "bad file descriptor") ||
-		strings.Contains(errStr, "multiple errors") ||
-		strings.Contains(errStr, "sync /dev/stdout") // explicit match
+
+	// Split into parts to catch each individual sink error
+	lower := strings.ToLower(errStr)
+	harmlessPatterns := []string{
+		"sync /dev/stdout: invalid argument",
+		"sync /dev/stderr: invalid argument",
+		"sync /dev/stdout",
+		"sync /dev/stderr",
+		"bad file descriptor",
+		"invalid argument",
+	}
+
+	for _, pattern := range harmlessPatterns {
+		if strings.Contains(lower, pattern) {
+			return true
+		}
+	}
+
+	return false
 }
