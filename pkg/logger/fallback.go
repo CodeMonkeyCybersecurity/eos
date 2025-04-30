@@ -40,9 +40,6 @@ func InitializeWithFallback() {
 
 	// 🛡️ Warn if trying to write to /var/log as non-root
 	if os.Geteuid() != 0 && strings.HasPrefix(path, "/var/log/") {
-		NewFallbackLogger().Warn("⚠️ Cannot write to system log path as non-root, falling back",
-			zap.String("attempted_path", path),
-		)
 		useFallback("non-root user cannot write to /var/log")
 		return
 	}

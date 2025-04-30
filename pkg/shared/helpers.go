@@ -59,22 +59,27 @@ func SafeRemove(name string, log *zap.Logger) {
 	}
 }
 
-// SafeSync attempts to sync the zap logger, gracefully handling harmless errors.
-// Known harmless errors (e.g., "sync /dev/stdout: invalid argument") are suppressed with a soft warning.
-// Unexpected errors are logged as warnings without crashing the CLI.
+// SafeSync attempts to flush logs safely, suppressing known ignorable errors.
+// Unexpected errors are logged as warnings, but do not interrupt CLI flow.
 func SafeSync(log *zap.Logger) {
 	if log == nil {
 		return
 	}
-
 	if err := log.Sync(); err != nil {
-		errStr := err.Error()
-
-		switch {
-		case strings.Contains(errStr, "invalid argument"), strings.Contains(errStr, "bad file descriptor"):
-			log.Warn("Logger sync harmlessly skipped", zap.String("reason", errStr))
-		default:
-			log.Warn("Nonstandard logger sync issue", zap.Error(err))
+		if IsIgnorableSyncError(err) {
+			log.Debug("Logger sync skipped (harmless)", zap.String("reason", err.Error()))
+		} else {
+			log.Warn("Logger sync failed", zap.Error(err))
 		}
 	}
+}
+
+// IsIgnorableSyncError returns true if the sync error is known to be harmless.
+func IsIgnorableSyncError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "invalid argument") ||
+		strings.Contains(errStr, "bad file descriptor")
 }
