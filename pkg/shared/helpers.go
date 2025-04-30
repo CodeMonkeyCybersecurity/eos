@@ -68,8 +68,9 @@ func SafeSync(log *zap.Logger) {
 
 	syncLogOnce.Do(func() {
 		if err := log.Sync(); err != nil {
+			msg := err.Error()
 			if IsIgnorableSyncError(err) {
-				log.Debug("Logger sync skipped (harmless)", zap.String("reason", err.Error()))
+				log.Debug("Logger sync skipped (harmless)", zap.String("reason", msg))
 			} else {
 				log.Warn("Logger sync failed", zap.Error(err))
 			}
@@ -84,5 +85,7 @@ func IsIgnorableSyncError(err error) bool {
 	}
 	errStr := err.Error()
 	return strings.Contains(errStr, "invalid argument") ||
-		strings.Contains(errStr, "bad file descriptor")
+		strings.Contains(errStr, "bad file descriptor") ||
+		strings.Contains(errStr, "multiple errors") ||
+		strings.Contains(errStr, "sync /dev/stdout") // explicit match
 }
