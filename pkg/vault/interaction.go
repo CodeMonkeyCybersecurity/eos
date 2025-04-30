@@ -42,7 +42,7 @@ func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		log.Error("❌ Cannot prompt for secret input: not a TTY")
-		return "", fmt.Errorf("secret prompt failed: no terminal available")
+		return nil, fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
 	var keys []string
