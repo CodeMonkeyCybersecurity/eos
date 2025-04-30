@@ -46,5 +46,5 @@ chmod 750 /var/lib/eos
 chmod 700 "$SECRETS_DIR"
 
 echo "✅ Installation complete."
-echo "👉 You can now run 'eos pandora read test-data'"
+echo "👉 You can now run 'eos --help' to confirm install"
 echo "🔐 You will be prompted for your own sudo password if not recently authenticated."
