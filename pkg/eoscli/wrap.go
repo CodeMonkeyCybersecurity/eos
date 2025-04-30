@@ -29,7 +29,7 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			userField = zap.String("invoked_by", u.Username)
 		}
 
-		log := eosio.ContextualLogger(2, nil).With(userField)
+		log := logger.L().With(userField)
 		logger.SetLogger(log)
 
 		// Timeout + context
