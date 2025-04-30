@@ -33,6 +33,9 @@ if ! id "$EOS_USER" &>/dev/null; then
   useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER"
 fi
 
+echo "usermod -aG syslog eos"
+usermod -aG syslog eos
+
 # Install binary
 echo "🧹 Cleaning old EOS binary..."
 rm -rf "$INSTALL_PATH"
