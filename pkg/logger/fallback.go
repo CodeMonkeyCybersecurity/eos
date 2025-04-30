@@ -13,15 +13,18 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func NewFallbackLogger() *zap.Logger {
-	cfg := DefaultConsoleEncoderConfig()
+const (
+	DefaultLogDirPerm = 0o700
+	DefaultLogUser    = "eos"
+)
 
+func NewFallbackLogger() *zap.Logger {
+	cfg := baseEncoderConfig()
 	core := zapcore.NewCore(
 		zapcore.NewConsoleEncoder(cfg),
 		zapcore.AddSync(os.Stdout),
 		ParseLogLevel(os.Getenv("LOG_LEVEL")),
 	)
-
 	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	logger.Info("Logger fallback initialized")
 	return logger
@@ -35,56 +38,31 @@ func InitializeWithFallback() {
 
 	path, err := FindWritableLogPath()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "⚠️  No writable log path found. Logging to console only.")
-		log = NewFallbackLogger()
-		zap.ReplaceGlobals(log)
+		useFallback("no writable log path found")
 		return
 	}
 
 	logDir := filepath.Dir(path)
-	if stat, statErr := os.Stat(logDir); os.IsNotExist(statErr) {
-		if mkErr := os.MkdirAll(logDir, 0o750); mkErr != nil {
-			fmt.Fprintf(os.Stderr, "⚠️ Failed to create log dir %s: %v — falling back\n", logDir, mkErr)
-			log = NewFallbackLogger()
-			zap.ReplaceGlobals(log)
-			return
-		}
-		fmt.Fprintf(os.Stderr, "📁 Created log directory %s\n", logDir)
-	} else if statErr == nil && !isWritable(stat) {
-		// Exists but may not be writable — try chown
-		if os.Geteuid() == 0 {
-			u, err := user.Lookup("eos")
-			if err == nil {
-				uid, _ := strconv.Atoi(u.Uid)
-				gid, _ := strconv.Atoi(u.Gid)
-				if chErr := os.Chown(logDir, uid, gid); chErr != nil {
-					fmt.Fprintf(os.Stderr, "⚠️ Could not chown %s: %v — falling back\n", logDir, chErr)
-					log = NewFallbackLogger()
-					zap.ReplaceGlobals(log)
-					return
-				}
-			} else {
-				fmt.Fprintf(os.Stderr, "⚠️ Could not lookup eos user: %v — skipping chown\n", err)
-			}
-		}
+	if err := prepareLogDir(logDir); err != nil {
+		useFallback(fmt.Sprintf("log dir preparation failed: %v", err))
+		return
+	}
+
+	if !testWritable(logDir) {
+		useFallback(fmt.Sprintf("write test failed for %s", logDir))
+		return
 	}
 
 	writer, err := GetLogFileWriter(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "⚠️  Could not open log file, falling back to stdout:", err)
-		log = NewFallbackLogger()
-		zap.ReplaceGlobals(log)
+		useFallback(fmt.Sprintf("could not open log file: %v", err))
 		return
 	}
 
-	cfg := DefaultConsoleEncoderConfig()
-	jsonCfg := zap.NewProductionEncoderConfig()
-	jsonCfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	jsonCfg.EncodeLevel = zapcore.CapitalLevelEncoder
-
+	encoderCfg := baseEncoderConfig()
 	core := zapcore.NewTee(
-		zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
-		zapcore.NewCore(zapcore.NewJSONEncoder(jsonCfg), writer, zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewConsoleEncoder(encoderCfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), writer, zap.InfoLevel),
 	)
 
 	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
@@ -96,20 +74,69 @@ func InitializeWithFallback() {
 	)
 }
 
-// Helper: checks if existing dir is writable
-func isWritable(info os.FileInfo) bool {
-	mode := info.Mode().Perm()
-	return mode&0200 != 0 // owner-writable
+// prepareLogDir ensures the log directory exists and is owned by the 'eos' user if root.
+func prepareLogDir(dir string) error {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		if err := os.MkdirAll(dir, DefaultLogDirPerm); err != nil {
+			return fmt.Errorf("mkdir failed: %w", err)
+		}
+	}
+
+	if os.Geteuid() == 0 {
+		u, err := user.Lookup(DefaultLogUser)
+		if err != nil {
+			log.Warn("🔐 eos user not found", zap.Error(err))
+			return nil
+		}
+		uid, err1 := strconv.Atoi(u.Uid)
+		gid, err2 := strconv.Atoi(u.Gid)
+		if err1 != nil || err2 != nil {
+			return fmt.Errorf("invalid UID/GID: uid=%v, gid=%v", err1, err2)
+		}
+		if err := os.Chown(dir, uid, gid); err != nil {
+			return fmt.Errorf("chown failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func testWritable(dir string) bool {
+	testFile := filepath.Join(dir, ".write_test")
+	f, err := os.Create(testFile)
+	if err != nil {
+		return false
+	}
+	defer os.Remove(testFile)
+	defer f.Close()
+	return true
+}
+
+func baseEncoderConfig() zapcore.EncoderConfig {
+	cfg := zap.NewProductionEncoderConfig()
+	cfg.TimeKey = "time"
+	cfg.LevelKey = "level"
+	cfg.CallerKey = "caller"
+	cfg.MessageKey = "msg"
+	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	return cfg
 }
 
 func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
-	cfg := zap.NewProductionEncoderConfig()
+	cfg := baseEncoderConfig()
 	cfg.TimeKey = "T"
 	cfg.LevelKey = "L"
 	cfg.NameKey = "N"
 	cfg.CallerKey = "C"
 	cfg.MessageKey = "M"
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
-	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	return cfg
+}
+
+func useFallback(reason string) {
+	logger := NewFallbackLogger()
+	zap.ReplaceGlobals(logger)
+	logger.Warn("⚠️ Fallback logger used",
+		zap.String("reason", reason),
+		zap.String("user", os.Getenv("USER")),
+	)
 }
