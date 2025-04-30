@@ -34,6 +34,8 @@ if ! id "$EOS_USER" &>/dev/null; then
 fi
 
 # Install binary
+echo "🧹 Cleaning old EOS binary..."
+rm -f "$INSTALL_PATH"
 echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
 cp "$EOS_BINARY_NAME" "$INSTALL_PATH"
 chown root:root "$INSTALL_PATH"
