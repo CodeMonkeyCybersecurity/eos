@@ -60,18 +60,21 @@ func SafeRemove(name string, log *zap.Logger) {
 }
 
 // SafeSync attempts to flush logs safely, suppressing known ignorable errors.
-// Unexpected errors are logged as warnings, but do not interrupt CLI flow.
+// Only the first call logs any warnings to avoid repeated noise.
 func SafeSync(log *zap.Logger) {
-	if log == nil || syncedAlready.Swap(true) {
+	if log == nil {
 		return
 	}
-	if err := log.Sync(); err != nil {
-		if IsIgnorableSyncError(err) {
-			log.Debug("Logger sync skipped (harmless)", zap.String("reason", err.Error()))
-		} else {
-			log.Warn("Logger sync failed", zap.Error(err))
+
+	syncLogOnce.Do(func() {
+		if err := log.Sync(); err != nil {
+			if IsIgnorableSyncError(err) {
+				log.Debug("Logger sync skipped (harmless)", zap.String("reason", err.Error()))
+			} else {
+				log.Warn("Logger sync failed", zap.Error(err))
+			}
 		}
-	}
+	})
 }
 
 // IsIgnorableSyncError returns true if the sync error is known to be harmless.

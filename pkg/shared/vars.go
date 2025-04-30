@@ -4,7 +4,7 @@ package shared
 
 import (
 	"errors"
-	"sync/atomic"
+	"sync"
 )
 
 var DefaultMarkers = []string{"80", "443"}
@@ -14,4 +14,4 @@ var (
 	ErrFallbackUnusable = errors.New("fallback path unusable")
 )
 
-var syncedAlready atomic.Bool
+var syncLogOnce sync.Once
