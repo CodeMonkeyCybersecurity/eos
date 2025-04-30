@@ -21,6 +21,11 @@ import (
 
 func main() {
 	logger.InitializeWithFallback()
+	log := logger.L()
+	if log == nil {
+		panic("❌ logger.L() returned nil — logger not initialized")
+	}
+	log.Info("✅ Logger is alive before CLI runs")
 
 	cmd.Execute()
 }
