@@ -22,6 +22,9 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		// Declare logger early for use in re-exec error handling
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 
+		// Log user + execution path info early
+		logRuntimeExecutionContext(log)
+
 		// Re-exec as 'eos' user if not already
 		if err := eosio.RequireEosUserOrReexec(log); err != nil {
 			log.Error("❌ Privilege check failed", zap.Error(err))

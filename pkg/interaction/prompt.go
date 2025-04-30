@@ -50,6 +50,11 @@ func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool,
 // Logs an error if reading fails, returns empty string on failure.
 // Returns trimmed input or warns if no input is provided.
 func PromptSecret(prompt string, log *zap.Logger) (string, error) {
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		log.Error("❌ Cannot prompt for secret input: not a TTY")
+		return "", fmt.Errorf("secret prompt failed: no terminal available")
+	}
+
 	fmt.Print(prompt + ": ")
 	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
@@ -66,6 +71,12 @@ func PromptSecret(prompt string, log *zap.Logger) (string, error) {
 
 // PromptSecrets prompts the user for multiple hidden inputs (e.g., unseal keys).
 func PromptSecrets(promptBase string, count int, log *zap.Logger) ([]string, error) {
+
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		log.Error("❌ Cannot prompt for secret input: not a TTY")
+		return nil, fmt.Errorf("secret prompt failed: no terminal available")
+	}
+
 	secrets := make([]string, 0, count)
 	for i := 1; i <= count; i++ {
 		prompt := fmt.Sprintf("%s %d", promptBase, i)

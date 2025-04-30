@@ -3,9 +3,11 @@
 package eosio
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
@@ -15,6 +17,11 @@ import (
 // If not, it attempts to re-execute the current binary using 'sudo -u eos ...'.
 // Returns an error if user detection or sudo fails.
 func RequireEosUserOrReexec(log *zap.Logger) error {
+	if strings.HasPrefix(os.Args[0], "/tmp/") {
+		log.Error("🛑 Cannot escalate with `go run`. Use `go build -o eos`.")
+		return fmt.Errorf("binary path %s is not suitable for sudo", os.Args[0])
+	}
+
 	currentUser, err := user.Current()
 	if err != nil {
 		log.Error("Failed to detect current user", zap.Error(err))

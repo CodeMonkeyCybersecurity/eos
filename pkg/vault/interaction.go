@@ -4,12 +4,14 @@ package vault
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 // PromptForEosPassword securely prompts for and confirms the eos Vault password.
@@ -37,6 +39,11 @@ func PromptForEosPassword(log *zap.Logger) (*shared.UserpassCreds, error) {
 func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 	log.Info("Prompting for unseal keys and root token (fallback path)")
 	fmt.Println("🔐 Please enter 3 unseal keys and the root token")
+
+	if !term.IsTerminal(int(os.Stdin.Fd())) {
+		log.Error("❌ Cannot prompt for secret input: not a TTY")
+		return "", fmt.Errorf("secret prompt failed: no terminal available")
+	}
 
 	var keys []string
 	for i := 1; i <= 3; i++ {
