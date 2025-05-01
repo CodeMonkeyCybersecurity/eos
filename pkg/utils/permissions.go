@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -21,14 +23,18 @@ func CheckSudo() bool {
 	return err != nil
 }
 
-// IsPrivilegedUser returns true if the current user is UID 0 (root)
-func IsPrivilegedUser() bool {
-	return os.Geteuid() == 0
+func IsPrivilegedUser(log *zap.Logger) bool {
+	current, err := user.Current()
+	if err != nil {
+		log.Warn("🧪 Could not determine current user", zap.Error(err))
+		return os.Geteuid() == 0
+	}
+	return current.Username == shared.EosUser || os.Geteuid() == 0
 }
 
 /* EnforceSecretsAccess blocks --show-secrets unless run as root */
 func EnforceSecretsAccess(log *zap.Logger, show bool) bool {
-	if show && !IsPrivilegedUser() {
+	if show && !IsPrivilegedUser(log) {
 		log.Warn("Non-root user attempted to use --show-secrets")
 		fmt.Fprintln(os.Stderr, "🚫 --show-secrets can only be used by root or sudo.")
 		return false
@@ -37,7 +43,7 @@ func EnforceSecretsAccess(log *zap.Logger, show bool) bool {
 }
 
 func RequireRoot(log *zap.Logger) {
-	if !IsPrivilegedUser() {
+	if !IsPrivilegedUser(log) {
 		log.Error("Root access required")
 		fmt.Fprintln(os.Stderr, "❌ This command must be run as root (try sudo).")
 		os.Exit(1)

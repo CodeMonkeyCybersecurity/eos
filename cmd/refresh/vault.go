@@ -4,11 +4,11 @@ package refresh
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -29,8 +29,8 @@ var VaultRefreshCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("refresh-vault")
 
-		if os.Geteuid() != 0 {
-			log.Fatal("Root privileges are required to refresh Vault.")
+		if !utils.IsPrivilegedUser(log) {
+			return fmt.Errorf("vault refresh requires 'eos' or root privileges")
 		}
 
 		log.Info("🔄 Refreshing Vault service...")
