@@ -4,10 +4,9 @@ package refresh
 
 import (
 	"fmt"
-	"os/exec"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -34,18 +33,8 @@ var VaultRefreshCmd = &cobra.Command{
 		}
 
 		log.Info("🔄 Refreshing Vault service...")
-
-		if err := exec.Command("systemctl", "stop", "vault").Run(); err != nil {
-			log.Warn("⚠️ Failed to stop Vault via systemctl", zap.Error(err))
-		} else {
-			log.Info("✅ Vault service stopped")
-		}
-
-		time.Sleep(2 * time.Second)
-
-		if err := exec.Command("systemctl", "start", "vault").Run(); err != nil {
-			log.Error("❌ Failed to start Vault via systemctl", zap.Error(err))
-			return err
+		if err := system.RestartSystemdUnitWithRetry(log, "vault", 3, 2); err != nil {
+			return fmt.Errorf("vault restart failed: %w", err)
 		}
 
 		log.Info("✅ Vault service restarted successfully")
