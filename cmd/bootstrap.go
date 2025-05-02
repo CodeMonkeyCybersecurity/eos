@@ -6,58 +6,64 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
+func init() {
+	RootCmd.AddCommand(BootstrapCmd)
+	BootstrapCmd.Flags().BoolVarP(&shared.AutoApprove, "yes", "y", false, "Automatically apply fixes without prompting")
+
+}
+
 // BootstrapCmd wires system checks and preparation.
 var BootstrapCmd = &cobra.Command{
 	Use:   "bootstrap",
 	Short: "Run initial system checks and prepare EOS environment",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("bootstrap")
-
 		log.Info("🚀 Starting EOS bootstrap process")
 
-		// Step 1: Check eos user
-		log.Info("🔍 Checking eos user setup")
-		if err := system.EnsureEosUser(true, false, log); err != nil {
-			log.Error("❌ Failed to ensure eos user", zap.Error(err))
-			return fmt.Errorf("bootstrap failed: %w", err)
+		// Pre-check: can we sudo?
+		if err := system.CheckNonInteractiveSudo(); err != nil {
+			return fmt.Errorf("bootstrap failed: sudo check: %w", err)
 		}
 
-		// Step 2: Check sudo permissions
-		log.Info("🔍 Checking eos sudo permissions")
+		// Step 1: Check eos sudoers BEFORE switching to eos user
 		ok, err := system.CheckEosSudoPermissions()
 		if err != nil {
 			log.Warn("⚠️ Error checking sudo permissions", zap.Error(err))
 		}
 		if !ok {
-			log.Warn("❌ eos user missing sudoers entry or has wrong permissions")
-			fmt.Println("⚠ eos user lacks required sudo permissions for systemctl.")
-			fmt.Println("Would you like EOS to fix this automatically? (y/N)")
-
-			var input string
-			_, err := fmt.Scanln(&input)
-			if err != nil {
-				return fmt.Errorf("failed to read input: %w", err)
+			// Prompt or auto-approve before privilege switch
+			fixOk, promptErr := system.PromptWithFallback("⚠ eos user lacks required sudo permissions for systemctl. Fix automatically? (y/N): ")
+			if promptErr != nil {
+				return fmt.Errorf("bootstrap aborted: %w", promptErr)
 			}
-			if input == "y" || input == "Y" {
-				if err := system.FixEosSudoersFile(log); err != nil {
-					return fmt.Errorf("failed to fix sudoers file: %w", err)
-				}
-				log.Info("✅ Fixed eos sudoers entry")
-			} else {
-				log.Warn("❌ User declined sudoers fix")
-				fmt.Println("⚠ Please add this manually: eos ALL=(ALL) NOPASSWD: /bin/systemctl")
-				return fmt.Errorf("bootstrap failed: sudoers entry missing")
+			if !fixOk {
+				log.Warn("User declined to auto-fix sudoers entry")
+				return fmt.Errorf("bootstrap aborted by user")
 			}
-		} else {
-			log.Info("✅ eos sudo permissions verified")
+			if err := system.FixEosSudoersFile(log); err != nil {
+				return fmt.Errorf("failed to fix sudoers file: %w", err)
+			}
 		}
 
-		// Step 3: Verify EOS directories
+		// Switch to eos user AFTER fixes are decided
+		if err := eosio.RequireEosUserOrReexec(log); err != nil {
+			return fmt.Errorf("bootstrap privilege escalation failed: %w", err)
+		}
+
+		// Step 2: Ensure eos user exists
+		log.Info("🔍 Checking eos user setup")
+		if err := system.EnsureEosUser(true, false, log); err != nil {
+			return fmt.Errorf("bootstrap failed: %w", err)
+		}
+
+		// Step 3: Prepare EOS directories
 		if err := system.CreateEosDirectories(log); err != nil {
 			return fmt.Errorf("failed to prepare directories: %w", err)
 		}
@@ -66,8 +72,4 @@ var BootstrapCmd = &cobra.Command{
 		fmt.Println("✅ EOS bootstrap completed successfully")
 		return nil
 	}),
-}
-
-func init() {
-	RootCmd.AddCommand(BootstrapCmd)
 }

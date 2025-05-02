@@ -117,8 +117,7 @@ func PromptSelect(prompt string, options []string, log *zap.Logger) string {
 	}
 }
 
-// PromptYesNo asks a yes/no question and returns true/false.
-// If input is blank, it returns the `defaultYes` fallback.
+// PromptYesNo asks a yes/no question and returns true/false. Falls back to default if unknown.
 func PromptYesNo(prompt string, defaultYes bool, log *zap.Logger) bool {
 	defPrompt := DefaultYesPrompt
 	if !defaultYes {
@@ -133,18 +132,13 @@ func PromptYesNo(prompt string, defaultYes bool, log *zap.Logger) bool {
 		return defaultYes
 	}
 
-	input = strings.ToLower(input)
-	switch input {
-	case "y", "yes":
-		log.Info("✅ User confirmed yes", zap.String("prompt", prompt))
-		return true
-	case "n", "no":
-		log.Info("❌ User selected no", zap.String("prompt", prompt))
-		return false
-	default:
-		log.Info("ℹ️ Default applied", zap.String("prompt", prompt), zap.Bool("default_yes", defaultYes))
-		return defaultYes
+	if answer, ok := NormalizeYesNoInput(input); ok {
+		log.Info("✅ User input parsed", zap.Bool("answer", answer))
+		return answer
 	}
+
+	log.Info("ℹ️ Default applied", zap.String("prompt", prompt), zap.Bool("default_yes", defaultYes))
+	return defaultYes
 }
 
 // PromptConfirmOrValue asks the user to accept a default or enter a custom value.
@@ -179,3 +173,23 @@ func PromptInput(prompt, defaultVal string, log *zap.Logger) string {
 	}
 	return input
 }
+
+// NormalizeYesNoInput returns true if the provided input string is an affirmative response like "y" or "yes".
+// It trims whitespace and lowercases input before comparison.
+func NormalizeYesNoInput(input string) (bool, bool) {
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input == "y" || input == "yes" {
+		return true, true
+	}
+	if input == "n" || input == "no" {
+		return false, true
+	}
+	return false, false // unknown
+}
+
+const (
+	YesShort = "y"
+	YesLong  = "yes"
+	NoShort  = "n"
+	NoLong   = "no"
+)
