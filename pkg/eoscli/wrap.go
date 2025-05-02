@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,6 +25,12 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		// Try privilege elevation — do NOT log here yet
 		if err := eosio.RequireEosUserOrReexec(nil); err != nil {
 			return fmt.Errorf("privilege check failed: %w", err)
+		}
+
+		// Run system binary checks — fallback to stderr because logger not ready yet
+		if err := system.CheckSystemBinaries(); err != nil {
+			fmt.Fprintf(os.Stderr, "❌ System binary check failed: %v\n", err)
+			return fmt.Errorf("missing required system binaries: %w", err)
 		}
 
 		// Now initialize logger AFTER escalation

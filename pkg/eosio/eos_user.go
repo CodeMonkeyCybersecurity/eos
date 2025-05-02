@@ -18,7 +18,9 @@ import (
 // If not, it re-executes the current binary using 'sudo -u eos bash -c ...'.
 func RequireEosUserOrReexec(log *zap.Logger) error {
 	if log == nil {
-		return fmt.Errorf("logger not initialized before RequireEosUserOrReexec")
+		fmt.Fprintf(os.Stderr, "⚠ EOS requires sudo privileges\n")
+	} else {
+		log.Info("Elevating to eos user...")
 	}
 
 	if strings.HasPrefix(os.Args[0], "/tmp/") {

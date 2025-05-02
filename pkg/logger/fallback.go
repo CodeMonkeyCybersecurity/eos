@@ -9,12 +9,15 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+var fallbackOnce sync.Once
 
 func NewFallbackLogger() *zap.Logger {
 	cfg := baseEncoderConfig()
@@ -37,28 +40,28 @@ func InitializeWithFallback(log *zap.Logger) error {
 
 	path, err := FindWritableLogPath()
 	if err != nil {
-		useFallback("no writable log path found")
+		useFallbackOnce("no writable log path found")
 		return eoserr.ErrFallbackUsed
 	}
 
 	if os.Geteuid() != 0 && strings.HasPrefix(path, shared.EosLogDir) {
-		useFallback(fmt.Sprintf("non-root user cannot write to %s", shared.EosLogDir))
+		useFallbackOnce(fmt.Sprintf("non-root user cannot write to %s", shared.EosLogDir))
 		return eoserr.ErrFallbackUsed
 	}
 
 	if err := prepareLogDir(shared.EosLogDir); err != nil {
-		useFallback(fmt.Sprintf("log dir preparation failed: %v", err))
+		useFallbackOnce(fmt.Sprintf("log dir preparation failed: %v", err))
 		return eoserr.ErrFallbackUsed
 	}
 
-	if !testWritable(shared.EosLogDir, log) {
-		useFallback(fmt.Sprintf("write test failed for %s", shared.EosLogDir))
+	if !testWritable(shared.EosLogDir) {
+		useFallbackOnce(fmt.Sprintf("write test failed for %s", shared.EosLogDir))
 		return eoserr.ErrFallbackUsed
 	}
 
 	writer, err := GetLogFileWriter(path)
 	if err != nil {
-		useFallback(fmt.Sprintf("could not open log file: %v", err))
+		useFallbackOnce(fmt.Sprintf("could not open log file: %v", err))
 		return eoserr.ErrFallbackUsed
 	}
 
@@ -89,7 +92,6 @@ func prepareLogDir(dir string) error {
 	if os.Geteuid() == 0 {
 		u, err := user.Lookup(shared.EosID)
 		if err != nil {
-			L().Warn("🔐 eos user not found", zap.Error(err))
 			return fmt.Errorf("eos user lookup failed: %w", err)
 		}
 
@@ -109,15 +111,38 @@ func prepareLogDir(dir string) error {
 	return nil
 }
 
-func testWritable(dir string, log *zap.Logger) bool {
+func testWritable(dir string) bool {
 	testFile := filepath.Join(dir, ".write_test.log")
 	f, err := os.Create(testFile)
 	if err != nil {
 		return false
 	}
-	defer shared.SafeClose(f, log)
-	shared.SafeRemove(testFile, log)
+	defer func() {
+		_ = f.Close()
+		_ = os.Remove(testFile)
+	}()
 	return true
+}
+
+func useFallbackOnce(reason string) {
+	fallbackOnce.Do(func() {
+		logger := NewFallbackLogger()
+		zap.ReplaceGlobals(logger)
+		SetLogger(logger)
+
+		u, err := user.Current()
+		username := "unknown"
+		if err == nil {
+			username = u.Username
+		}
+
+		fmt.Fprintf(os.Stderr, "⚠ EOS fallback logger engaged: %s\n", reason)
+
+		logger.Warn("⚠️ Fallback logger used",
+			zap.String("reason", reason),
+			zap.String("user", username),
+		)
+	})
 }
 
 func baseEncoderConfig() zapcore.EncoderConfig {
@@ -139,15 +164,4 @@ func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 	cfg.CallerKey = "C"
 	cfg.MessageKey = "M"
 	return cfg
-}
-
-func useFallback(reason string) {
-	logger := NewFallbackLogger()
-	zap.ReplaceGlobals(logger)
-	SetLogger(logger)
-
-	logger.Warn("⚠️ Fallback logger used",
-		zap.String("reason", reason),
-		zap.String("user", os.Getenv("USER")),
-	)
 }

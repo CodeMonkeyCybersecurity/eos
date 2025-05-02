@@ -1,4 +1,4 @@
-/* pkg/system/checker.go */
+// pkg/system/check.go
 package system
 
 import (
@@ -13,6 +13,15 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"go.uber.org/zap"
 )
+
+func CheckSystemBinaries() error {
+	_, err1 := exec.LookPath("sudo")
+	_, err2 := exec.LookPath("bash")
+	if err1 != nil || err2 != nil {
+		return fmt.Errorf("missing required system binaries: sudo (%v), bash (%v)", err1, err2)
+	}
+	return nil
+}
 
 // Exists returns true if the file or directory at the given path exists.
 func Exists(path string) bool {
