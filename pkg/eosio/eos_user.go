@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
@@ -18,9 +19,10 @@ import (
 // If not, it re-executes the current binary using 'sudo -u eos bash -c ...'.
 func RequireEosUserOrReexec(log *zap.Logger) error {
 	if log == nil {
-		fmt.Fprintf(os.Stderr, "⚠ EOS requires sudo privileges\n")
-	} else {
-		log.Info("Elevating to eos user...")
+		log = logger.L()
+		if log == nil {
+			log = logger.NewFallbackLogger()
+		}
 	}
 
 	if strings.HasPrefix(os.Args[0], "/tmp/") {
@@ -57,7 +59,7 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Error("sudo bash -c failed", zap.Error(err))
+		log.Error("sudo -u eos bash -c failed", zap.Error(err))
 		return err
 	}
 
