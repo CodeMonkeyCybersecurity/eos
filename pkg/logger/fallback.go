@@ -80,43 +80,78 @@ func InitializeWithFallback() {
 
 // prepareLogDir ensures the log directory exists and is owned by the 'eos' user if root.
 func prepareLogDir(dir string) error {
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
+	log := L()
+	log.Info("🔍 Preparing log directory", zap.String("dir", dir))
+
+	info, err := os.Stat(dir)
+	if os.IsNotExist(err) {
+		log.Warn("📂 Log directory does not exist, creating", zap.String("dir", dir))
 		if err := os.MkdirAll(dir, DefaultLogDirPerm); err != nil {
+			log.Error("❌ Failed to create log directory", zap.Error(err))
 			return fmt.Errorf("mkdir failed: %w", err)
 		}
+	} else if err != nil {
+		log.Error("❌ Failed to stat log directory", zap.Error(err))
+		return fmt.Errorf("stat failed: %w", err)
+	} else {
+		log.Info("✅ Log directory exists", zap.Any("permissions", info.Mode()))
 	}
 
-	if os.Geteuid() == 0 {
+	// Check effective UID
+	euid := os.Geteuid()
+	log.Info("👤 Effective UID", zap.Int("euid", euid))
+
+	if euid == 0 {
 		u, err := user.Lookup(DefaultLogUser)
 		if err != nil {
-			L().Warn("🔐 eos user not found", zap.Error(err))
+			log.Warn("🔐 eos user not found", zap.Error(err))
 			return fmt.Errorf("eos user lookup failed: %w", err)
 		}
 
 		uid, err1 := strconv.Atoi(u.Uid)
 		gid, err2 := strconv.Atoi(u.Gid)
 		if err1 != nil || err2 != nil {
+			log.Error("❌ Invalid UID/GID", zap.String("uid", u.Uid), zap.String("gid", u.Gid))
 			return fmt.Errorf("invalid UID/GID: uid=%v, gid=%v", err1, err2)
 		}
 
+		log.Info("🔧 Changing ownership", zap.Int("uid", uid), zap.Int("gid", gid))
 		if err := os.Chown(dir, uid, gid); err != nil {
+			log.Error("❌ chown failed", zap.Error(err))
 			return fmt.Errorf("chown failed: %w", err)
 		}
+
+		log.Info("🔧 Setting permissions", zap.String("permissions", fmt.Sprintf("%#o", DefaultLogDirPerm)))
 		if err := os.Chmod(dir, DefaultLogDirPerm); err != nil {
+			log.Error("❌ chmod failed", zap.Error(err))
 			return fmt.Errorf("chmod failed: %w", err)
 		}
 	}
+
+	log.Info("✅ Log directory prepared")
 	return nil
 }
 
 func testWritable(dir string) bool {
+	log := L()
 	testFile := filepath.Join(dir, ".write_test")
+	log.Info("📝 Testing write permission", zap.String("file", testFile))
+
 	f, err := os.Create(testFile)
 	if err != nil {
+		log.Warn("❌ Write test failed (create error)", zap.Error(err))
 		return false
 	}
-	defer os.Remove(testFile)
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			log.Warn("⚠️ Failed to close test file", zap.Error(err))
+		}
+		if err := os.Remove(testFile); err != nil {
+			log.Warn("⚠️ Failed to remove test file", zap.Error(err))
+		}
+	}()
+
+	log.Info("✅ Write test succeeded")
 	return true
 }
 
