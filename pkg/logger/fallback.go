@@ -146,8 +146,31 @@ func useFallback(reason string) {
 	zap.ReplaceGlobals(logger)
 	SetLogger(logger)
 
+	currentUser, err := user.Current()
+	username := "unknown"
+	uid := "unknown"
+	gid := "unknown"
+	homeDir := "unknown"
+
+	if err == nil {
+		username = currentUser.Username
+		uid = currentUser.Uid
+		gid = currentUser.Gid
+		homeDir = currentUser.HomeDir
+	}
+
+	cwd, _ := os.Getwd()
+	envPath := os.Getenv("PATH")
+	envUser := os.Getenv("USER")
+
 	logger.Warn("⚠️ Fallback logger used",
 		zap.String("reason", reason),
-		zap.String("user", os.Getenv("USER")),
+		zap.String("effective_user", envUser),
+		zap.String("detected_user", username),
+		zap.String("uid", uid),
+		zap.String("gid", gid),
+		zap.String("home", homeDir),
+		zap.String("cwd", cwd),
+		zap.String("path", envPath),
 	)
 }
