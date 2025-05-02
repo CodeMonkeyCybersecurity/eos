@@ -15,7 +15,7 @@ import (
 )
 
 // RequireEosUserOrReexec ensures the current process is running as the 'eos' system user.
-// If not, it attempts to re-execute the current binary using 'sudo -u eos ...'.
+// If not, it re-executes the current binary using 'sudo -u eos bash -c ...'.
 func RequireEosUserOrReexec(log *zap.Logger) error {
 	if log == nil {
 		return fmt.Errorf("logger not initialized before RequireEosUserOrReexec")
@@ -36,20 +36,26 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 		return nil // Already running as eos
 	}
 
-	log.Info("🔐 Elevating to 'eos' user via sudo")
+	log.Info("🔐 Elevating to 'eos' user via sudo bash -c")
+
 	binaryPath, err := os.Executable()
 	if err != nil {
 		log.Error("Failed to get current binary path", zap.Error(err))
 		return err
 	}
 
-	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
-	cmd := exec.Command("sudo", fullArgs...)
+	// Build the full command string: `eos <args...>`
+	escapedArgs := []string{binaryPath}
+	escapedArgs = append(escapedArgs, os.Args[1:]...)
+	fullCommand := strings.Join(escapedArgs, " ")
+
+	// sudo -u eos bash -c '<command>'
+	cmd := exec.Command("sudo", "-u", shared.EosID, "bash", "-c", fullCommand)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Error("sudo failed", zap.Error(err))
+		log.Error("sudo bash -c failed", zap.Error(err))
 		return err
 	}
 
