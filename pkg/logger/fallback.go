@@ -1,4 +1,4 @@
-/* pkg/logger/fallback.go */
+// pkg/logger/fallback.go
 
 package logger
 
@@ -46,14 +46,13 @@ func InitializeWithFallback(log *zap.Logger) error {
 		return eoserr.ErrFallbackUsed
 	}
 
-	logDir := filepath.Dir(path)
-	if err := prepareLogDir(logDir); err != nil {
+	if err := prepareLogDir(shared.EosLogDir); err != nil {
 		useFallback(fmt.Sprintf("log dir preparation failed: %v", err))
 		return eoserr.ErrFallbackUsed
 	}
 
-	if !testWritable(logDir, log) {
-		useFallback(fmt.Sprintf("write test failed for %s", logDir))
+	if !testWritable(shared.EosLogDir, log) {
+		useFallback(fmt.Sprintf("write test failed for %s", shared.EosLogDir))
 		return eoserr.ErrFallbackUsed
 	}
 
@@ -88,7 +87,7 @@ func prepareLogDir(dir string) error {
 	}
 
 	if os.Geteuid() == 0 {
-		u, err := user.Lookup(DefaultLogUser)
+		u, err := user.Lookup(shared.EosID)
 		if err != nil {
 			L().Warn("🔐 eos user not found", zap.Error(err))
 			return fmt.Errorf("eos user lookup failed: %w", err)
@@ -111,7 +110,7 @@ func prepareLogDir(dir string) error {
 }
 
 func testWritable(dir string, log *zap.Logger) bool {
-	testFile := filepath.Join(dir, ".write_test")
+	testFile := filepath.Join(dir, ".write_test.log")
 	f, err := os.Create(testFile)
 	if err != nil {
 		return false

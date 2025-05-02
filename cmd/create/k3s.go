@@ -152,9 +152,8 @@ func deployK3s() {
 // saveScript writes the install command to a script file and returns the file path.
 func saveScript(cmdStr string) string {
 	// Ensure the log directory exists
-	logDir := "/var/log/eos"
-	if err := os.MkdirAll(logDir, shared.DirPermStandard); err != nil {
-		fmt.Printf("Warning: Could not create log directory %s: %v\n", logDir, err)
+	if err := os.MkdirAll(shared.EosLogDir, shared.DirPermStandard); err != nil {
+		fmt.Printf("Warning: Could not create log directory %s: %v\n", shared.EosLogDir, err)
 	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -170,7 +169,7 @@ func saveScript(cmdStr string) string {
 set -x
 exec > >(tee -a %s/k3s-deploy.log) 2>&1
 %s
-`, logDir, cmdStr)
+`, shared.EosLogDir, cmdStr)
 	err = os.WriteFile(scriptPath, []byte(scriptContent), shared.DirPermStandard)
 	if err != nil {
 		fmt.Printf("Warning: Failed to write script file: %v\n", err)

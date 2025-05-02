@@ -7,6 +7,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 )
@@ -26,6 +27,9 @@ var BootstrapCmd = &cobra.Command{
 			return fmt.Errorf("sudoers setup failed: %w", err)
 		}
 		if err := system.CreateEosDirectories(log); err != nil {
+			return fmt.Errorf("directory setup failed: %w", err)
+		}
+		if err := logger.InitializeWithFallback(log); err != nil {
 			return fmt.Errorf("directory setup failed: %w", err)
 		}
 
