@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -24,11 +25,14 @@ var VaultRefreshCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Refreshes (restarts) the Vault service",
 	Long:  `Stops and restarts the Vault service cleanly through systemd.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("refresh-vault")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log.Named("refresh-vault")
 
-		if !system.IsPrivilegedUser(log) {
-			return fmt.Errorf("vault refresh requires 'eos' or root privileges")
+		// Check if we are root or have sudo privileges
+		if err := system.EnsureEosSudoReady(log); err != nil {
+			log.Error("❌ Required privileges not available", zap.Error(err))
+			fmt.Println("👉 Please run: sudo -v && eos refresh vault --unseal")
+			return fmt.Errorf("insufficient privileges: %w", err)
 		}
 
 		log.Info("🔄 Refreshing Vault service...")
