@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -39,8 +40,8 @@ func InitializeWithFallback() {
 	}
 
 	// 🛡️ Warn if trying to write to /var/log as non-root
-	if os.Geteuid() != 0 && strings.HasPrefix(path, "/var/log/") {
-		useFallback("non-root user cannot write to /var/log")
+	if os.Geteuid() != 0 && strings.HasPrefix(path, shared.EosLogDir) {
+		useFallback(fmt.Sprintf("non-root user cannot write to %s", shared.EosLogDir))
 		return
 	}
 
