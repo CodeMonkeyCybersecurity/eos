@@ -41,8 +41,8 @@ func InitializeWithFallback(log *zap.Logger) error {
 		return eoserr.ErrFallbackUsed
 	}
 
-	if os.Geteuid() != 0 && strings.HasPrefix(path, "/var/log/") {
-		useFallback("non-root user cannot write to /var/log")
+	if os.Geteuid() != 0 && strings.HasPrefix(path, shared.EosLogDir) {
+		useFallback(fmt.Sprintf("non-root user cannot write to %s", shared.EosLogDir))
 		return eoserr.ErrFallbackUsed
 	}
 

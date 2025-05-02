@@ -15,13 +15,13 @@ const (
 	// TLSDir is the directory for Vault TLS certificate files.
 	// TLSKey and TLSCrt represent the file paths to the private key and certificate.
 
-	TLSDir = "/opt/vault/tls/"
-	TLSKey = TLSDir + "tls.key"
-	TLSCrt = TLSDir + "tls.crt"
-
 	// Storage
-	VaultDir             = "/opt/vault/"
-	VaultDataPath        = VaultDir + "data"
+	VaultDir      = "/opt/vault/"
+	VaultDataPath = VaultDir + "data"
+	TLSDir        = VaultDir + "tls"
+	TLSKey        = TLSDir + "tls.key"
+	TLSCrt        = TLSDir + "tls.crt"
+
 	VaultConfigDirDebian = "/etc/vault.d"
 	VaultConfigPath      = "/etc/vault.d/vault.hcl"
 

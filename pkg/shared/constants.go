@@ -3,12 +3,14 @@
 package shared
 
 const (
-	VarEos              = "/var/lib/eos"
+	VarEos              = "/var/lib/eos/"
 	EosSudoersPath      = "/etc/sudoers.d/eos"
 	SystemctlVaultStart = "/usr/bin/systemctl start vault*"
 	CatVaultAgentToken  = "/bin/cat /run/eos/vault_agent_eos.token"
 	SudoersLine         = "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
-	VarLogEos           = "/var/log/eos"
+	EosLogDir           = "/var/log/eos/"
+	EosLogs             = EosLogDir + "eos.log"
+	EosLogsPWD          = "./eos.log"
 	EosShellNoLogin     = "/usr/sbin/nologin"
 	EosShellBash        = "/bin/bash"
 )

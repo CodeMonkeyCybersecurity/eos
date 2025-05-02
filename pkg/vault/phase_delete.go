@@ -17,11 +17,11 @@ import (
 // for cleanup during reinstallation or reset.
 func GetVaultWildcardPurgePaths() []string {
 	return []string{
-		"/etc/vault*",      // wildcard for legacy configs
-		"/var/snap/vault*", // snap installs
-		"/var/log/vault*",  // log spill
-		"/opt/vault*",
-		"/run/eos*",
+		shared.VaultLegacyConfigWildcard, // wildcard for legacy configs
+		"/var/snap/vault*",               // snap installs
+		shared.VaultLogWildcard,          // log spill
+		shared.VaultDir,
+		shared.EosRunDir,
 	}
 }
 
