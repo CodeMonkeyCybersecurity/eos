@@ -1,4 +1,4 @@
-/* cmd/root.go */
+// cmd/root.go
 
 package cmd
 
@@ -32,6 +32,19 @@ import (
 var helpLogged bool // global guard to log help only once
 const NoSubcommandMsg = "⚠️  No subcommand provided. Try `eos help`."
 
+var subcommands = []*cobra.Command{create.CreateCmd,
+	read.ReadCmd,
+	update.UpdateCmd,
+	delete.DeleteCmd,
+	refresh.RefreshCmd,
+	secure.SecureCmd,
+	disable.DisableCmd,
+	enable.EnableCmd,
+	sync.SyncCmd,
+	hecate.HecateCmd,
+	delphi.DelphiCmd,
+	pandora.PandoraCmd}
+
 // RootCmd is the base command for the EOS CLI, registering top-level subcommands.
 var RootCmd = &cobra.Command{
 	Use:   "eos",
@@ -42,12 +55,12 @@ and reverse proxy configurations via Hecate.`,
 
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("root")
-		log.Warn("No subcommand provided. Suggest running `eos help`")
+		log.Warn(NoSubcommandMsg)
 		return fmt.Errorf("no subcommand provided: run `eos help`")
 	}),
 }
 
-// RegisterCommands attaches all subcommands to RootCmd.
+// RegisterCommands attaches all subcommands to the EOS root command.
 func RegisterCommands() {
 	log := logger.L()
 
@@ -63,20 +76,7 @@ func RegisterCommands() {
 	})
 
 	// Group subcommands for cleanliness
-	for _, subCmd := range []*cobra.Command{
-		create.CreateCmd,
-		read.ReadCmd,
-		update.UpdateCmd,
-		delete.DeleteCmd,
-		refresh.RefreshCmd,
-		secure.SecureCmd,
-		disable.DisableCmd,
-		enable.EnableCmd,
-		sync.SyncCmd,
-		hecate.HecateCmd,
-		delphi.DelphiCmd,
-		pandora.PandoraCmd,
-	} {
+	for _, subCmd := range subcommands {
 		RootCmd.AddCommand(subCmd)
 	}
 }
@@ -84,7 +84,8 @@ func RegisterCommands() {
 // Execute runs the EOS CLI root command and handles global error handling.
 func Execute() {
 	if err := logger.InitializeWithFallback(nil); err != nil {
-		fmt.Fprintf(os.Stderr, "⚠ logger fallback: %v\n", err)
+		log := logger.L()
+		log.Warn("⚠ Logger fallback in effect", zap.Error(err))
 	}
 	log := logger.L()
 	log.Info("Eos CLI starting")
@@ -95,7 +96,7 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
 			log.Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(1) // changed to 1, optional
+			os.Exit(2)
 		} else {
 			log.Error("CLI execution error", zap.Error(err))
 			os.Exit(1)

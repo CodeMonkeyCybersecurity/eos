@@ -91,7 +91,7 @@ func InitializeVaultOnly(log *zap.Logger) (string, error) {
 	}
 
 	addr := VaultAddress()
-	log.Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String("VAULT_ADDR", addr))
+	log.Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String(shared.VaultAddrEnv, addr))
 
 	return addr, nil
 }

@@ -34,7 +34,7 @@ func Check(client *api.Client, log *zap.Logger, storedHashes []string, hashedRoo
 	healthy, err := CheckVaultHealth(log)
 	if err != nil || !healthy {
 		log.Warn("🔌 Vault health check failed",
-			zap.String("VAULT_ADDR", addr),
+			zap.String(shared.VaultAddrEnv, addr),
 			zap.Error(err))
 		report.Notes = append(report.Notes, fmt.Sprintf("Vault health check failed: %v", err))
 		return report, nil

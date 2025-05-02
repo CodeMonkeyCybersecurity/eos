@@ -11,8 +11,8 @@ import (
 // GetVaultAddr returns the Vault address from the VAULT_ADDR environment variable,
 // falling back to a default localhost address if unset.
 func GetVaultAddr(log *zap.Logger) string {
-	if addr := os.Getenv("VAULT_ADDR"); addr != "" {
-		log.Debug("✅ Using VAULT_ADDR from environment", zap.String("VAULT_ADDR", addr))
+	if addr := os.Getenv(VaultAddrEnv); addr != "" {
+		log.Debug("✅ Using VAULT_ADDR from environment", zap.String(VaultAddrEnv, addr))
 		return addr
 	}
 	log.Warn("⚠️ VAULT_ADDR not set — falling back to localhost default")

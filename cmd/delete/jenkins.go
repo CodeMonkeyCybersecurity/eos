@@ -35,7 +35,7 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 
 		// Backup all volumes defined in the compose file.
 		backupDir := "/srv/container-volume-backups"
-		backupResults, err := docker.BackupVolumes(volumes, backupDir)
+		backupResults, err := docker.BackupVolumes(volumes, backupDir, log)
 		if err != nil {
 			log.Error("Error backing up volumes", zap.Error(err))
 		} else {
@@ -64,7 +64,7 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 
 		// Now remove the volumes after backup.
 		log.Info("Removing volumes defined in docker-compose", zap.Any("volumes", volumes))
-		if err := docker.RemoveVolumes(volumes); err != nil {
+		if err := docker.RemoveVolumes(volumes, log); err != nil {
 			log.Error("Error removing volumes", zap.Error(err))
 		} else {
 			log.Info("Volumes removed successfully")

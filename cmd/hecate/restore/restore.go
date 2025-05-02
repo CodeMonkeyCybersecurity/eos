@@ -1,3 +1,5 @@
+// cmd/hecate/restore/restore.go
+
 package restore
 
 import (
@@ -116,10 +118,6 @@ func RestoreCompose() {
 	system.RestoreFile(backupCompose, shared.DefaultComposeYML)
 }
 
-// log is a package-level variable for the Zap logger.
-var log *zap.Logger
-
 func init() {
 	// Initialize the shared logger for the entire deploy package
-	log = logger.L()
 }

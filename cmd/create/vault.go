@@ -6,6 +6,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -44,7 +45,7 @@ var CreateVaultCmd = &cobra.Command{
 			return logger.LogErrAndWrap(log, "create vault: initialize", err)
 		}
 
-		log.Info("✅ Vault initialized", zap.String("VAULT_ADDR", addr))
+		log.Info("✅ Vault initialized", zap.String(shared.VaultAddrEnv, addr))
 
 		// 🛎️ New hint to user: guide next steps!
 		fmt.Println("")

@@ -3,7 +3,10 @@
 package docker
 
 import (
+	"fmt"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"go.uber.org/zap"
 )
 
 //
@@ -15,7 +18,8 @@ import (
 func RemoveImages(images []string) error {
 	for _, image := range images {
 		if err := execute.Execute("docker", "rmi", image); err != nil {
-		} else {
+			log.Warn("Failed to remove docker image", zap.Error(err))
+			return fmt.Errorf("failed to remove docker image")
 		}
 	}
 	return nil

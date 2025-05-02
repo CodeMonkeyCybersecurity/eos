@@ -76,16 +76,16 @@ func CheckVaultHealth(log *zap.Logger) (bool, error) {
 
 	switch resp.StatusCode {
 	case 200:
-		log.Info("✅ Vault is healthy", zap.String("VAULT_ADDR", addr))
+		log.Info("✅ Vault is healthy", zap.String(shared.VaultAddrEnv, addr))
 		return true, nil
 	case 429:
-		log.Warn("⚠️ Vault is overloaded (429)", zap.String("VAULT_ADDR", addr))
+		log.Warn("⚠️ Vault is overloaded (429)", zap.String(shared.VaultAddrEnv, addr))
 		return true, nil // still usable
 	case 501:
-		log.Warn("⚠️ Vault is uninitialized (501)", zap.String("VAULT_ADDR", addr))
+		log.Warn("⚠️ Vault is uninitialized (501)", zap.String(shared.VaultAddrEnv, addr))
 		return false, nil
 	case 503:
-		log.Warn("⚠️ Vault is sealed or standby (503)", zap.String("VAULT_ADDR", addr))
+		log.Warn("⚠️ Vault is sealed or standby (503)", zap.String(shared.VaultAddrEnv, addr))
 		return false, nil
 	default:
 		body, readErr := io.ReadAll(resp.Body)

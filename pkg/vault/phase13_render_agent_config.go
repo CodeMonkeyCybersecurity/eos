@@ -56,7 +56,7 @@ func PhaseRenderVaultAgentConfig(client *api.Client, log *zap.Logger) error {
 
 func RenderAgentConfig(addr, roleID, secretID string, log *zap.Logger) error {
 	log.Info("🧩 Rendering Vault Agent HCL template",
-		zap.String("VAULT_ADDR", addr),
+		zap.String(shared.VaultAddrEnv, addr),
 		zap.String("role_id_path", shared.RoleIDPath),
 		zap.String("secret_id_path", shared.SecretIDPath),
 		zap.String("config_path", shared.VaultAgentConfigPath),

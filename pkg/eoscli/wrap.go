@@ -12,18 +12,23 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
+// Wrap decorates a cobra command with EOS runtime context, logger, and error handling.
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		// Initialize logger early
-		logger.InitializeWithFallback(nil)
+		if err := logger.InitializeWithFallback(nil); err != nil {
+			fmt.Fprintf(os.Stderr, "⚠ logger fallback: %v\n", err)
+		}
 		baseLog := logger.L()
 		if baseLog == nil {
-			fmt.Fprintln(os.Stderr, "🚨 logger.L() is nil before RequireEosUserOrReexec")
+			fallback := logger.NewFallbackLogger()
+			fallback.Error("logger.L() is nil before RequireEosUserOrReexec")
 			os.Exit(1)
 		}
 		logger.SetLogger(baseLog)
@@ -56,7 +61,7 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		if addrErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
 		}
-		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
+		log.Info("🔐 VAULT_ADDR resolved", zap.String(shared.VaultAddrEnv, addr))
 
 		// Execute command
 		var err error

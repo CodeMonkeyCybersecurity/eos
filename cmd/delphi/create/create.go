@@ -73,12 +73,7 @@ type PackageMapping struct {
 }
 
 func runMapping() {
-	cfg, err := delphi.ReadConfig(log)
-	if err != nil {
-		log.Fatal("Failed to load config", zap.Error(err))
-	}
-
-	cfg, err = delphi.ResolveConfig(log)
+	cfg, err := delphi.ResolveConfig(log) // Combine into a single call if ReadConfig is redundant
 	if err != nil {
 		log.Fatal("Failed to resolve Delphi config", zap.Error(err))
 	}

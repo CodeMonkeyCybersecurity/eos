@@ -181,8 +181,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string, log *zap.Logger
 	return nil
 }
 
-func InspectAgentUpgradeResule(cfg *Config, log *zap.Logger) {
-	// Load and confirm configuration.
+func InspectAgentUpgradeResule(log *zap.Logger) {
 	cfg, err := LoadConfig()
 	if err != nil {
 		fmt.Printf("Error loading configuration: %v\n", err)
