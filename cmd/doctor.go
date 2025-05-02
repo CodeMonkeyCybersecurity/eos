@@ -3,61 +3,47 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"os/user"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var DoctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Run EOS diagnostics to check system readiness",
 	Long:  `This command checks for common system misconfigurations and provides remediation advice.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("🩺 Running EOS doctor...")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log.Named("doctor")
+		log.Info("🩺 Running EOS doctor...")
 
 		currentUser, _ := user.Current()
-		fmt.Printf("👤 Current user: %s\n", currentUser.Username)
-		info, err := os.Stat(shared.EosSudoersPath)
-		if os.IsNotExist(err) {
-			fmt.Println("❌ /etc/sudoers.d/eos file missing")
-		} else {
-			fmt.Println("✅ /etc/sudoers.d/eos file present")
-			if info.Mode().Perm() != 0440 {
-				fmt.Printf("❌ /etc/sudoers.d/eos has wrong permissions: %o\n", info.Mode().Perm())
-				fmt.Println("➡️  Should be 440; will attempt to fix with `eos bootstrap` or `FixSudoersFile()`")
-			} else {
-				fmt.Println("✅ /etc/sudoers.d/eos permissions are correct (440)")
-			}
-		}
-		if _, err := os.Stat("/etc/sudoers.d/eos"); os.IsNotExist(err) {
-			fmt.Println("❌ /etc/sudoers.d/eos file missing")
-		} else {
-			fmt.Println("✅ /etc/sudoers.d/eos file present")
-		}
-		if !system.CheckSudoersMembership("eos") {
-			fmt.Println("❌ eos user is missing from sudoers.")
-			fmt.Println("➡️  Add this line to /etc/sudoers.d/eos:")
-			fmt.Println("    eos ALL=(ALL) NOPASSWD: /bin/systemctl")
-		} else {
-			fmt.Println("✅ eos user is present in sudoers")
-		}
+		log.Info("👤 Current user", zap.String("username", currentUser.Username))
 
-		if !system.CanSudoSystemctl("status", "vault") {
-			fmt.Println("❌ eos user lacks NOPASSWD sudo for systemctl.")
+		ok, checkErr := system.CheckSudoersFile()
+		if !ok {
+			log.Warn("❌ /etc/sudoers.d/eos is missing or incorrect")
+			log.Info("⚠️ Attempting to fix automatically...")
+			if checkErr != nil {
+				log.Warn("Failed to check sudoers file", zap.Error(checkErr))
+			} else {
+				log.Info("✅ Fixed sudoers file")
+			}
 		} else {
-			fmt.Println("✅ NOPASSWD sudo check passed")
+			log.Info("✅ /etc/sudoers.d/eos file is valid")
 		}
 
 		if _, err := os.Stat("/var/lib/eos"); os.IsNotExist(err) {
-			fmt.Println("❌ /var/lib/eos directory missing")
+			log.Warn("❌ /var/lib/eos directory missing")
 		} else {
-			fmt.Println("✅ /var/lib/eos directory present")
+			log.Info("✅ /var/lib/eos directory present")
 		}
 
-		fmt.Println("✅ EOS doctor check complete")
-	},
+		log.Info("✅ EOS doctor check complete")
+		return nil
+	}),
 }

@@ -85,7 +85,7 @@ func EnsureVaultUserLifecycle(log *zap.Logger, client *api.Client) error {
 		return err
 	}
 
-	if err := system.ValidateSudoAccess(log); err != nil {
+	if err := system.ValidateEosSudoAccess(log); err != nil {
 		return err
 
 	}

@@ -56,9 +56,6 @@ func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delayS
 		zap.String("action", action),
 		zap.String("unit", unit),
 	)
-	if !CheckSudoersMembership("eos") && !CanInteractiveSudo() {
-		return fmt.Errorf("❌ eos user is missing from sudoers and has no interactive sudo; please run `eos bootstrap` or fix manually")
-	}
 
 	if !CanSudoSystemctl("status", unit) {
 		if !CanInteractiveSudo() {

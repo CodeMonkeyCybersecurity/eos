@@ -7,6 +7,10 @@ const (
 	EosSudoersPath      = "/etc/sudoers.d/eos"
 	SystemctlVaultStart = "/usr/bin/systemctl start vault*"
 	CatVaultAgentToken  = "/bin/cat /run/eos/vault_agent_eos.token"
+	SudoersLine         = "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
+	VarLogEos           = "/var/log/eos"
+	EosShellNoLogin     = "/usr/sbin/nologin"
+	EosShellBash        = "/bin/bash"
 )
 
 const SudoersEosEntry = `eos ALL=(ALL) NOPASSWD: ` + SystemctlVaultStart + `, ` + CatVaultAgentToken

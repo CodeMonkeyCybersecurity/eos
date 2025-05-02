@@ -15,20 +15,9 @@ See LICENSE.agpl and LICENSE.dnh for full details.
 package main
 
 import (
-	"fmt"
-
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 func main() {
-	logger.InitializeWithFallback()
-	log := logger.L()
-	if log == nil {
-		fmt.Println("🚨 logger.L() is nil here")
-		panic("❌ logger.L() returned nil — logger not initialized")
-	}
-	log.Info("✅ Logger is alive before CLI runs")
-
 	cmd.Execute()
 }

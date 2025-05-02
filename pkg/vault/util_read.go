@@ -89,14 +89,14 @@ func ReadSecret(log *zap.Logger, path string) (*api.Secret, error) {
 		return nil, err
 	}
 	if secret == nil {
-		return nil, ErrSecretNotFound
+		return nil, eoserr.ErrSecretNotFound
 	}
 	return secret, nil
 }
 
 // IsNotFoundError returns true if the error indicates a missing secret.
 func IsNotFoundError(err error) bool {
-	return errors.Is(err, ErrSecretNotFound)
+	return errors.Is(err, eoserr.ErrSecretNotFound)
 }
 
 // Read attempts to retrieve a config object from Vault. If Vault is unavailable or the read fails,

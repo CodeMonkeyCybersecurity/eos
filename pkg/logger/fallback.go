@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -26,45 +28,44 @@ func NewFallbackLogger() *zap.Logger {
 	return logger
 }
 
-func InitializeWithFallback() {
+// InitializeWithFallback sets up the logger or falls back; returns eoserr.ErrFallbackUsed if fallback engaged.
+func InitializeWithFallback(log *zap.Logger) error {
 	if initialized {
-		return
+		return nil
 	}
 	initialized = true
 
 	path, err := FindWritableLogPath()
 	if err != nil {
 		useFallback("no writable log path found")
-		return
+		return eoserr.ErrFallbackUsed
 	}
 
-	// 🛡️ Warn if trying to write to /var/log as non-root
 	if os.Geteuid() != 0 && strings.HasPrefix(path, "/var/log/") {
 		useFallback("non-root user cannot write to /var/log")
-		return
+		return eoserr.ErrFallbackUsed
 	}
 
 	logDir := filepath.Dir(path)
 	if err := prepareLogDir(logDir); err != nil {
 		useFallback(fmt.Sprintf("log dir preparation failed: %v", err))
-		return
+		return eoserr.ErrFallbackUsed
 	}
 
-	if !testWritable(logDir) {
+	if !testWritable(logDir, log) {
 		useFallback(fmt.Sprintf("write test failed for %s", logDir))
-		return
+		return eoserr.ErrFallbackUsed
 	}
 
 	writer, err := GetLogFileWriter(path)
 	if err != nil {
 		useFallback(fmt.Sprintf("could not open log file: %v", err))
-		return
+		return eoserr.ErrFallbackUsed
 	}
 
-	encoderCfg := baseEncoderConfig()
 	core := zapcore.NewTee(
-		zapcore.NewCore(zapcore.NewConsoleEncoder(encoderCfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
-		zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), writer, zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewConsoleEncoder(baseEncoderConfig()), zapcore.Lock(os.Stdout), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(baseEncoderConfig()), writer, zap.InfoLevel),
 	)
 
 	newLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
@@ -75,6 +76,7 @@ func InitializeWithFallback() {
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
 	)
+	return nil
 }
 
 // prepareLogDir ensures the log directory exists and is owned by the 'eos' user if root.
@@ -108,14 +110,14 @@ func prepareLogDir(dir string) error {
 	return nil
 }
 
-func testWritable(dir string) bool {
+func testWritable(dir string, log *zap.Logger) bool {
 	testFile := filepath.Join(dir, ".write_test")
 	f, err := os.Create(testFile)
 	if err != nil {
 		return false
 	}
-	defer os.Remove(testFile)
-	defer f.Close()
+	defer shared.SafeClose(f, log)
+	shared.SafeRemove(testFile, log)
 	return true
 }
 

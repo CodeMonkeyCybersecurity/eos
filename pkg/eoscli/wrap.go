@@ -20,7 +20,7 @@ import (
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		// Initialize logger early
-		logger.InitializeWithFallback()
+		logger.InitializeWithFallback(nil)
 		baseLog := logger.L()
 		if baseLog == nil {
 			fmt.Fprintln(os.Stderr, "🚨 logger.L() is nil before RequireEosUserOrReexec")

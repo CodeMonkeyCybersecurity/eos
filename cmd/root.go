@@ -30,8 +30,9 @@ import (
 )
 
 var helpLogged bool // global guard to log help only once
+const NoSubcommandMsg = "⚠️  No subcommand provided. Try `eos help`."
 
-// RootCmd is the base command for eos.
+// RootCmd is the base command for the EOS CLI, registering top-level subcommands.
 var RootCmd = &cobra.Command{
 	Use:   "eos",
 	Short: "Eos CLI for automation, orchestration, and hardening",
@@ -40,12 +41,13 @@ and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
 
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
-		return cmd.Help()
+		log := ctx.Log.Named("root")
+		log.Warn("No subcommand provided. Suggest running `eos help`")
+		return fmt.Errorf("no subcommand provided: run `eos help`")
 	}),
 }
 
-// RegisterCommands adds all subcommands to the root command.
+// RegisterCommands attaches all subcommands to RootCmd.
 func RegisterCommands() {
 	log := logger.L()
 
@@ -79,8 +81,11 @@ func RegisterCommands() {
 	}
 }
 
-// Execute initializes and runs the root command.
+// Execute runs the EOS CLI root command and handles global error handling.
 func Execute() {
+	if err := logger.InitializeWithFallback(nil); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠ logger fallback: %v\n", err)
+	}
 	log := logger.L()
 	log.Info("Eos CLI starting")
 
@@ -90,7 +95,7 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
 			log.Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(0)
+			os.Exit(1) // changed to 1, optional
 		} else {
 			log.Error("CLI execution error", zap.Error(err))
 			os.Exit(1)

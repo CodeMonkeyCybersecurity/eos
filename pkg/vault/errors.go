@@ -4,6 +4,8 @@ package vault
 import (
 	"errors"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 )
 
 // IsSecretNotFound checks if a Vault error is a "404 not found" style error.
@@ -15,8 +17,5 @@ func IsSecretNotFound(err error) bool {
 	msg := err.Error()
 	return strings.Contains(msg, "no secret") ||
 		strings.Contains(msg, "404") ||
-		errors.Is(err, ErrSecretNotFound)
+		errors.Is(err, eoserr.ErrSecretNotFound)
 }
-
-// Optional: you can predefine a standard error for special cases
-var ErrSecretNotFound = errors.New("vault secret not found")

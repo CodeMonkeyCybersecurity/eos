@@ -9,6 +9,7 @@ import (
 	"os/user"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
@@ -52,6 +53,6 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 		return err
 	}
 
-	os.Exit(0) // Successful re-exec
-	return nil
+	// Instead of os.Exit(0), return sentinel error
+	return eoserr.ErrReexecCompleted
 }
