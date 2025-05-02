@@ -195,3 +195,35 @@ func CreateEosDirectories(log *zap.Logger) error {
 	}
 	return nil
 }
+
+func CheckEosSudoPermissions() (bool, error) {
+	info, err := os.Stat(shared.EosSudoersPath)
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	if info.Mode().Perm() != 0440 {
+		return false, fmt.Errorf("wrong permissions: %o", info.Mode().Perm())
+	}
+	contents, err := os.ReadFile(shared.EosSudoersPath)
+	if err != nil {
+		return false, err
+	}
+	if !strings.Contains(string(contents), "eos ALL=(ALL) NOPASSWD: /bin/systemctl") {
+		return false, fmt.Errorf("incorrect content")
+	}
+	return true, nil
+}
+
+func FixEosSudoersFile(log *zap.Logger) error {
+	sudoersLine := "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
+	cmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf("echo '%s' > /etc/sudoers.d/eos", sudoersLine))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to write sudoers file: %w", err)
+	}
+	cmd = exec.Command("sudo", "chmod", "440", "/etc/sudoers.d/eos")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to set sudoers permissions: %w", err)
+	}
+	log.Info("✅ Fixed /etc/sudoers.d/eos file and permissions")
+	return nil
+}

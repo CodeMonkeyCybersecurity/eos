@@ -25,7 +25,7 @@ var DoctorCmd = &cobra.Command{
 		currentUser, _ := user.Current()
 		log.Info("👤 Current user", zap.String("username", currentUser.Username))
 
-		ok, checkErr := system.CheckSudoersFile()
+		ok, checkErr := system.CheckEosSudoPermissions()
 		if !ok {
 			log.Warn("❌ /etc/sudoers.d/eos is missing or incorrect")
 			log.Info("⚠️ Attempting to fix automatically...")
