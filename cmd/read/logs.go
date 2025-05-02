@@ -7,7 +7,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,7 +21,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-logs")
 
-		if !utils.IsPrivilegedUser(log) {
+		if !system.IsPrivilegedUser(log) {
 			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 

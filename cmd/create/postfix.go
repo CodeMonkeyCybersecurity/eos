@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
@@ -28,7 +29,7 @@ var CreatePostfixCmd = &cobra.Command{
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := logger.GetLogger()
-		utils.RequireRoot(log)
+		system.RequireRoot(log)
 
 		osType := platform.DetectLinuxDistro(log)
 		log.Info("Detected OS", zap.String("type", osType))

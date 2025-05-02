@@ -56,12 +56,19 @@ func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delayS
 		zap.String("action", action),
 		zap.String("unit", unit),
 	)
+	if !CheckSudoersMembership("eos") && !CanInteractiveSudo() {
+		return fmt.Errorf("❌ eos user is missing from sudoers and has no interactive sudo; please run `eos bootstrap` or fix manually")
+	}
 
 	if !CanSudoSystemctl("status", unit) {
+		if !CanInteractiveSudo() {
+			return fmt.Errorf("❌ eos user missing sudo permissions; please add:\n    eos ALL=(ALL) NOPASSWD: /bin/systemctl")
+		}
 		log.Warn("⚠️ NOPASSWD sudo missing. Attempting interactive sudo...")
 		if err := PromptAndRunInteractiveSystemctl(action, unit); err != nil {
 			return fmt.Errorf("interactive systemctl %s %s failed: %w", action, unit, err)
 		}
+		log.Info("✅ Interactive sudo succeeded; skipping retries")
 		return nil
 	}
 

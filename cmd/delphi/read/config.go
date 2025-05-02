@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
 var InspectConfigCmd = &cobra.Command{
@@ -30,7 +30,7 @@ var InspectConfigCmd = &cobra.Command{
 			return err
 		}
 
-		if !utils.EnforceSecretsAccess(log, showSecrets) {
+		if !system.EnforceSecretsAccess(log, showSecrets) {
 			return nil
 		}
 

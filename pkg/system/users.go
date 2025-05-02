@@ -189,7 +189,7 @@ func generateOrPromptPassword(auto bool, log *zap.Logger) (string, error) {
 
 // EnsureSudoersEntryForEos ensures a sudoers entry exists for the eos user.
 func EnsureSudoersEntryForEos(log *zap.Logger, auto bool) error {
-	const path = shared.SudoersEosPath
+	const path = shared.EosSudoersPath
 	const entry = shared.SudoersEosEntry
 
 	log.Info("🔍 Checking for existing sudoers entry", zap.String("path", path))

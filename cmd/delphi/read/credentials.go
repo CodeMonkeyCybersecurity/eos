@@ -10,7 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -25,7 +25,7 @@ var InspectCredentialsCmd = &cobra.Command{
 			log.Fatal("Failed to resolve Delphi config", zap.Error(err))
 		}
 
-		if !utils.EnforceSecretsAccess(log, showSecrets) {
+		if !system.EnforceSecretsAccess(log, showSecrets) {
 			return nil
 		}
 

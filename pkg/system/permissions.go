@@ -1,12 +1,13 @@
-// pkg/utils/permissions.go
+// pkg/system/permissions.go
 
-package utils
+package system
 
 import (
 	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
@@ -61,4 +62,44 @@ func FailIfPermissionDenied(log *zap.Logger, action, path string, err error) {
 		fmt.Fprintf(os.Stderr, "   sudo eos %s\n\n", os.Args[1:])
 		os.Exit(1)
 	}
+}
+
+func FixSudoersFile() error {
+	sudoersLine := "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
+	cmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf("echo '%s' > /etc/sudoers.d/eos", sudoersLine))
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to write /etc/sudoers.d/eos: %w", err)
+	}
+	cmd = exec.Command("sudo", "chmod", "440", "/etc/sudoers.d/eos")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to set permissions on /etc/sudoers.d/eos: %w", err)
+	}
+	fmt.Println("✅ Fixed /etc/sudoers.d/eos file and permissions")
+	return nil
+}
+
+// CanInteractiveSudo checks if the current user can run 'sudo' interactively.
+// It tries 'sudo -v' to validate cached credentials or prompt if needed.
+func CanInteractiveSudo() bool {
+	cmd := exec.Command("sudo", "-v")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err := cmd.Run()
+	if err != nil {
+		fmt.Printf("❌ interactive sudo check failed: %v\n", err)
+		return false
+	}
+	return true
+}
+
+func CheckSudoersMembership(username string) bool {
+	cmd := exec.Command("sudo", "grep", "-r", username, "/etc/sudoers", "/etc/sudoers.d")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("❌ sudoers membership check failed: %v\n", err)
+		return false
+	}
+	return strings.Contains(string(out), username)
 }

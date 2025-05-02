@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"go.uber.org/zap"
 )
 
@@ -61,7 +60,7 @@ func Rm(path, label string, log *zap.Logger) error {
 	}
 
 	if err != nil {
-		utils.FailIfPermissionDenied(log, "access "+label, path, err)
+		FailIfPermissionDenied(log, "access "+label, path, err)
 		log.Error("Error accessing path", zap.String("label", label), zap.String("path", path), zap.Error(err))
 		fmt.Printf("❌ Error accessing %s (%s): %v\n", label, path, err)
 		return err
@@ -78,7 +77,7 @@ func Rm(path, label string, log *zap.Logger) error {
 	}
 
 	if err != nil {
-		utils.FailIfPermissionDenied(log, "remove "+label, path, err)
+		FailIfPermissionDenied(log, "remove "+label, path, err)
 		log.Error("Failed to remove", zap.String("label", label), zap.String("path", path), zap.Error(err))
 		fmt.Printf("❌ Failed to remove %s (%s): %v\n", label, path, err)
 		return err

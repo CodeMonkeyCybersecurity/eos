@@ -12,7 +12,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,7 +23,7 @@ var CreateDockerCmd = &cobra.Command{
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Assume that 'log' is globally defined or available in context.
-		utils.RequireRoot(log)
+		system.RequireRoot(log)
 
 		log.Info("Uninstalling conflicting Docker packages...")
 		docker.UninstallConflictingPackages()
