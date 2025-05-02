@@ -227,3 +227,19 @@ func FixEosSudoersFile(log *zap.Logger) error {
 	log.Info("✅ Fixed /etc/sudoers.d/eos file and permissions")
 	return nil
 }
+
+
+func EnsureEosSudoReady(log *zap.Logger) error {
+    if err := CheckNonInteractiveSudo(); err != nil {
+        log.Warn("sudo check failed", zap.Error(err))
+        if IsInteractive() {
+            fmt.Println("Please run:")
+            fmt.Println("  sudo -v")
+            fmt.Println("Then rerun:")
+            fmt.Println("  eos bootstrap")
+            return fmt.Errorf("sudo session required")
+        }
+        return fmt.Errorf("sudo check failed: %w", err)
+    }
+    return nil
+}
