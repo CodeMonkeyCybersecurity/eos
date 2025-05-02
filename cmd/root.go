@@ -1,4 +1,4 @@
-// cmd/root.go
+/* cmd/root.go */
 
 package cmd
 
@@ -30,22 +30,8 @@ import (
 )
 
 var helpLogged bool // global guard to log help only once
-const NoSubcommandMsg = "⚠️  No subcommand provided. Try `eos help`."
 
-var subcommands = []*cobra.Command{create.CreateCmd,
-	read.ReadCmd,
-	update.UpdateCmd,
-	delete.DeleteCmd,
-	refresh.RefreshCmd,
-	secure.SecureCmd,
-	disable.DisableCmd,
-	enable.EnableCmd,
-	sync.SyncCmd,
-	hecate.HecateCmd,
-	delphi.DelphiCmd,
-	pandora.PandoraCmd}
-
-// RootCmd is the base command for the EOS CLI, registering top-level subcommands.
+// RootCmd is the base command for eos.
 var RootCmd = &cobra.Command{
 	Use:   "eos",
 	Short: "Eos CLI for automation, orchestration, and hardening",
@@ -54,13 +40,12 @@ and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
 
 	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("root")
-		log.Warn(NoSubcommandMsg)
-		return fmt.Errorf("no subcommand provided: run `eos help`")
+		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
+		return cmd.Help()
 	}),
 }
 
-// RegisterCommands attaches all subcommands to the EOS root command.
+// RegisterCommands adds all subcommands to the root command.
 func RegisterCommands() {
 	log := logger.L()
 
@@ -76,17 +61,26 @@ func RegisterCommands() {
 	})
 
 	// Group subcommands for cleanliness
-	for _, subCmd := range subcommands {
+	for _, subCmd := range []*cobra.Command{
+		create.CreateCmd,
+		read.ReadCmd,
+		update.UpdateCmd,
+		delete.DeleteCmd,
+		refresh.RefreshCmd,
+		secure.SecureCmd,
+		disable.DisableCmd,
+		enable.EnableCmd,
+		sync.SyncCmd,
+		hecate.HecateCmd,
+		delphi.DelphiCmd,
+		pandora.PandoraCmd,
+	} {
 		RootCmd.AddCommand(subCmd)
 	}
 }
 
-// Execute runs the EOS CLI root command and handles global error handling.
+// Execute initializes and runs the root command.
 func Execute() {
-	if err := logger.InitializeWithFallback(nil); err != nil {
-		log := logger.L()
-		log.Warn("⚠ Logger fallback in effect", zap.Error(err))
-	}
 	log := logger.L()
 	log.Info("Eos CLI starting")
 
@@ -96,7 +90,7 @@ func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
 			log.Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(2)
+			os.Exit(0)
 		} else {
 			log.Error("CLI execution error", zap.Error(err))
 			os.Exit(1)

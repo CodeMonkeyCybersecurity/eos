@@ -9,20 +9,15 @@ import (
 	"os/user"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
 // RequireEosUserOrReexec ensures the current process is running as the 'eos' system user.
-// If not, it re-executes the current binary using 'sudo -u eos bash -c ...'.
+// If not, it attempts to re-execute the current binary using 'sudo -u eos ...'.
 func RequireEosUserOrReexec(log *zap.Logger) error {
 	if log == nil {
-		log = logger.L()
-		if log == nil {
-			log = logger.NewFallbackLogger()
-		}
+		return fmt.Errorf("logger not initialized before RequireEosUserOrReexec")
 	}
 
 	if strings.HasPrefix(os.Args[0], "/tmp/") {
@@ -40,29 +35,23 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 		return nil // Already running as eos
 	}
 
-	log.Info("🔐 Elevating to 'eos' user via sudo bash -c")
-
+	log.Info("🔐 Elevating to 'eos' user via sudo")
 	binaryPath, err := os.Executable()
 	if err != nil {
 		log.Error("Failed to get current binary path", zap.Error(err))
 		return err
 	}
 
-	// Build the full command string: `eos <args...>`
-	escapedArgs := []string{binaryPath}
-	escapedArgs = append(escapedArgs, os.Args[1:]...)
-	fullCommand := strings.Join(escapedArgs, " ")
-
-	// sudo -u eos bash -c '<command>'
-	cmd := exec.Command("sudo", "-u", shared.EosID, "bash", "-c", fullCommand)
+	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
+	cmd := exec.Command("sudo", fullArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Error("sudo -u eos bash -c failed", zap.Error(err))
+		log.Error("sudo failed", zap.Error(err))
 		return err
 	}
 
-	// Instead of os.Exit(0), return sentinel error
-	return eoserr.ErrReexecCompleted
+	os.Exit(0) // Successful re-exec
+	return nil
 }

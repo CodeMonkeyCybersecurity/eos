@@ -1,4 +1,4 @@
-// pkg/logger/fallback.go
+/* pkg/logger/fallback.go */
 
 package logger
 
@@ -9,15 +9,10 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-var fallbackOnce sync.Once
 
 func NewFallbackLogger() *zap.Logger {
 	cfg := baseEncoderConfig()
@@ -31,43 +26,45 @@ func NewFallbackLogger() *zap.Logger {
 	return logger
 }
 
-// InitializeWithFallback sets up the logger or falls back; returns eoserr.ErrFallbackUsed if fallback engaged.
-func InitializeWithFallback(log *zap.Logger) error {
+func InitializeWithFallback() {
 	if initialized {
-		return nil
+		return
 	}
 	initialized = true
 
 	path, err := FindWritableLogPath()
 	if err != nil {
-		useFallbackOnce("no writable log path found")
-		return eoserr.ErrFallbackUsed
+		useFallback("no writable log path found")
+		return
 	}
 
-	if os.Geteuid() != 0 && strings.HasPrefix(path, shared.EosLogDir) {
-		useFallbackOnce(fmt.Sprintf("non-root user cannot write to %s", shared.EosLogDir))
-		return eoserr.ErrFallbackUsed
+	// 🛡️ Warn if trying to write to /var/log as non-root
+	if os.Geteuid() != 0 && strings.HasPrefix(path, "/var/log/") {
+		useFallback("non-root user cannot write to /var/log")
+		return
 	}
 
-	if err := prepareLogDir(shared.EosLogDir); err != nil {
-		useFallbackOnce(fmt.Sprintf("log dir preparation failed: %v", err))
-		return eoserr.ErrFallbackUsed
+	logDir := filepath.Dir(path)
+	if err := prepareLogDir(logDir); err != nil {
+		useFallback(fmt.Sprintf("log dir preparation failed: %v", err))
+		return
 	}
 
-	if !testWritable(shared.EosLogDir) {
-		useFallbackOnce(fmt.Sprintf("write test failed for %s", shared.EosLogDir))
-		return eoserr.ErrFallbackUsed
+	if !testWritable(logDir) {
+		useFallback(fmt.Sprintf("write test failed for %s", logDir))
+		return
 	}
 
 	writer, err := GetLogFileWriter(path)
 	if err != nil {
-		useFallbackOnce(fmt.Sprintf("could not open log file: %v", err))
-		return eoserr.ErrFallbackUsed
+		useFallback(fmt.Sprintf("could not open log file: %v", err))
+		return
 	}
 
+	encoderCfg := baseEncoderConfig()
 	core := zapcore.NewTee(
-		zapcore.NewCore(zapcore.NewConsoleEncoder(baseEncoderConfig()), zapcore.Lock(os.Stdout), zap.InfoLevel),
-		zapcore.NewCore(zapcore.NewJSONEncoder(baseEncoderConfig()), writer, zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewConsoleEncoder(encoderCfg), zapcore.Lock(os.Stdout), zap.InfoLevel),
+		zapcore.NewCore(zapcore.NewJSONEncoder(encoderCfg), writer, zap.InfoLevel),
 	)
 
 	newLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
@@ -78,7 +75,6 @@ func InitializeWithFallback(log *zap.Logger) error {
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
 	)
-	return nil
 }
 
 // prepareLogDir ensures the log directory exists and is owned by the 'eos' user if root.
@@ -90,8 +86,9 @@ func prepareLogDir(dir string) error {
 	}
 
 	if os.Geteuid() == 0 {
-		u, err := user.Lookup(shared.EosID)
+		u, err := user.Lookup(DefaultLogUser)
 		if err != nil {
+			L().Warn("🔐 eos user not found", zap.Error(err))
 			return fmt.Errorf("eos user lookup failed: %w", err)
 		}
 
@@ -112,37 +109,14 @@ func prepareLogDir(dir string) error {
 }
 
 func testWritable(dir string) bool {
-	testFile := filepath.Join(dir, ".write_test.log")
+	testFile := filepath.Join(dir, ".write_test")
 	f, err := os.Create(testFile)
 	if err != nil {
 		return false
 	}
-	defer func() {
-		_ = f.Close()
-		_ = os.Remove(testFile)
-	}()
+	defer os.Remove(testFile)
+	defer f.Close()
 	return true
-}
-
-func useFallbackOnce(reason string) {
-	fallbackOnce.Do(func() {
-		logger := NewFallbackLogger()
-		zap.ReplaceGlobals(logger)
-		SetLogger(logger)
-
-		u, err := user.Current()
-		username := "unknown"
-		if err == nil {
-			username = u.Username
-		}
-
-		fmt.Fprintf(os.Stderr, "⚠ EOS fallback logger engaged: %s\n", reason)
-
-		logger.Warn("⚠️ Fallback logger used",
-			zap.String("reason", reason),
-			zap.String("user", username),
-		)
-	})
 }
 
 func baseEncoderConfig() zapcore.EncoderConfig {
@@ -164,4 +138,15 @@ func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 	cfg.CallerKey = "C"
 	cfg.MessageKey = "M"
 	return cfg
+}
+
+func useFallback(reason string) {
+	logger := NewFallbackLogger()
+	zap.ReplaceGlobals(logger)
+	SetLogger(logger)
+
+	logger.Warn("⚠️ Fallback logger used",
+		zap.String("reason", reason),
+		zap.String("user", os.Getenv("USER")),
+	)
 }
