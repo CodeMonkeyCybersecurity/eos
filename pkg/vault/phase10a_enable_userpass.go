@@ -130,7 +130,7 @@ func WriteUserpassCredentialsFallback(password string, log *zap.Logger) error {
 	}
 
 	// After writing the fallback file successfully:
-	if err := system.ChownRecursive("/var/lib/eos/secrets", uid, gid, log); err != nil {
+	if err := system.ChownRecursive(shared.SecretsDir, uid, gid, log); err != nil {
 		log.Warn("⚠️ Failed to enforce EOS ownership after writing userpass fallback", zap.Error(err))
 	}
 

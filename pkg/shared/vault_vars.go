@@ -21,7 +21,8 @@ var Policies = map[string]string{
 
 var (
 	// Vault Secrets + Tokens
-	SecretsDir                = "/var/lib/eos/secrets"
+	EosVarDir                 = "/var/lib/eos/"
+	SecretsDir                = filepath.Join(EosVarDir, "secret")
 	VaultInitPath             = filepath.Join(SecretsDir, "vault_init"+SecretsExt)
 	DelphiFallbackSecretsPath = filepath.Join(SecretsDir, "delphi_fallback"+SecretsExt)
 	EosUserVaultFallback      = filepath.Join(SecretsDir, "vault_userpass"+SecretsExt)

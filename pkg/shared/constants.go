@@ -3,7 +3,6 @@
 package shared
 
 const (
-	VarEos              = "/var/lib/eos/"
 	EosSudoersPath      = "/etc/sudoers.d/eos"
 	SystemctlVaultStart = "/usr/bin/systemctl start vault*"
 	CatVaultAgentToken  = "/bin/cat /run/eos/vault_agent_eos.token"

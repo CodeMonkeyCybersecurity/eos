@@ -185,7 +185,7 @@ func SetupEosSudoers(log *zap.Logger) error {
 }
 
 func CreateEosDirectories(log *zap.Logger) error {
-	dirs := []string{shared.VarEos, shared.EosLogDir}
+	dirs := []string{shared.EosVarDir, shared.EosLogDir}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0750); err != nil {
 			log.Warn("Failed to create directory", zap.String("path", dir), zap.Error(err))

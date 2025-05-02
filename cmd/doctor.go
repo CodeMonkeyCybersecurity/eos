@@ -8,6 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,9 +25,6 @@ var DoctorCmd = &cobra.Command{
 		currentUser, _ := user.Current()
 		log.Info("👤 Current user", zap.String("username", currentUser.Username))
 
-
-
-		
 		ok, checkErr := system.CheckSudoersFile()
 		if !ok {
 			log.Warn("❌ /etc/sudoers.d/eos is missing or incorrect")
@@ -40,7 +38,7 @@ var DoctorCmd = &cobra.Command{
 			log.Info("✅ /etc/sudoers.d/eos file is valid")
 		}
 
-		if _, err := os.Stat("/var/lib/eos"); os.IsNotExist(err) {
+		if _, err := os.Stat(shared.EosVarDir); os.IsNotExist(err) {
 			log.Warn("❌ /var/lib/eos directory missing")
 		} else {
 			log.Info("✅ /var/lib/eos directory present")
