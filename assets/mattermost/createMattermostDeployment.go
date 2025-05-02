@@ -47,13 +47,13 @@ func main() {
 
 	// Step 4: Set the permissions on the mattermost directory.
 	fmt.Println("Changing ownership of ./volumes/app/mattermost to UID 2000:2000...")
-	if err := runCommand("sudo", "chown", "-R", "2000:2000", "./volumes/app/mattermost"); err != nil {
+	if err := runCommand("chown", "-R", "2000:2000", "./volumes/app/mattermost"); err != nil {
 		log.Fatalf("Error changing ownership: %v", err)
 	}
 
 	// Step 5: Deploy Mattermost without nginx (Hecate will be your reverse proxy)
 	fmt.Println("Deploying Mattermost without nginx...")
-	if err := runCommand("sudo", "docker", "compose", "-f", "docker-compose.yml", "-f", "docker-compose.without-nginx.yml", "up", "-d"); err != nil {
+	if err := runCommand("docker", "compose", "-f", "docker-compose.yml", "-f", "docker-compose.without-nginx.yml", "up", "-d"); err != nil {
 		log.Fatalf("Error deploying Mattermost: %v", err)
 	}
 

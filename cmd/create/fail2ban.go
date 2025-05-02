@@ -25,16 +25,16 @@ var CreateFail2banCmd = &cobra.Command{
 			desc string
 			fn   func() error
 		}{
-			{"Update apt", func() error { return execute.Execute("sudo", "apt", "update") }},
-			{"Install fail2ban", func() error { return execute.Execute("sudo", "apt", "install", "-y", "fail2ban") }},
+			{"Update apt", func() error { return execute.Execute("apt", "update") }},
+			{"Install fail2ban", func() error { return execute.Execute("apt", "install", "-y", "fail2ban") }},
 			{"Backup jail.conf", func() error {
-				return execute.Execute("sudo", "cp", "/etc/fail2ban/jail.conf", "/etc/fail2ban/jail.conf.bak")
+				return execute.Execute("cp", "/etc/fail2ban/jail.conf", "/etc/fail2ban/jail.conf.bak")
 			}},
 			{"Write jail.local", createJailLocal},
-			{"Restart fail2ban", func() error { return execute.Execute("sudo", "systemctl", "restart", "fail2ban") }},
-			{"Enable fail2ban", func() error { return execute.Execute("sudo", "systemctl", "enable", "fail2ban") }},
-			{"Check fail2ban status", func() error { return execute.Execute("sudo", "fail2ban-client", "status") }},
-			{"Check sshd jail status", func() error { return execute.Execute("sudo", "fail2ban-client", "status", "sshd") }},
+			{"Restart fail2ban", func() error { return execute.Execute("systemctl", "restart", "fail2ban") }},
+			{"Enable fail2ban", func() error { return execute.Execute("systemctl", "enable", "fail2ban") }},
+			{"Check fail2ban status", func() error { return execute.Execute("fail2ban-client", "status") }},
+			{"Check sshd jail status", func() error { return execute.Execute("fail2ban-client", "status", "sshd") }},
 		}
 
 		for _, step := range steps {
@@ -67,7 +67,7 @@ maxretry = 5
 	if err := os.WriteFile(tmpFile, []byte(config), 0644); err != nil {
 		return err
 	}
-	return execute.Execute("sudo", "mv", tmpFile, "/etc/fail2ban/jail.local")
+	return execute.Execute("mv", tmpFile, "/etc/fail2ban/jail.local")
 }
 
 func init() {

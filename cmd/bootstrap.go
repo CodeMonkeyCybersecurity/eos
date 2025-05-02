@@ -4,7 +4,6 @@ package cmd
 
 import (
 	"fmt"
-	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
@@ -54,16 +53,6 @@ var BootstrapCmd = &cobra.Command{
 		// Step 3: Create directories
 		if err := system.CreateEosDirectories(log); err != nil {
 			return fmt.Errorf("failed to create eos directories: %w", err)
-		}
-
-		// Step 4: Show sudoers file
-		fmt.Println("📄 eos sudoers file content:")
-		cmdShow := exec.Command("sudo", "cat", "/etc/sudoers.d/eos")
-		out, err := cmdShow.CombinedOutput()
-		if err != nil {
-			log.Warn("⚠️ Failed to display sudoers file", zap.Error(err))
-		} else {
-			fmt.Println(string(out))
 		}
 
 		log.Info("🎉 Bootstrap complete")

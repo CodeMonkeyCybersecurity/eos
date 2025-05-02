@@ -71,7 +71,7 @@ var CertsCmd = &cobra.Command{
 
 		// 4. Run certbot to obtain the certificate.
 		certbotCmd := []string{
-			"sudo", "certbot", "certonly", "--standalone",
+			"certbot", "certonly", "--standalone",
 			"-d", fullDomain,
 			"--email", mailCert,
 			"--agree-tos",
@@ -84,7 +84,7 @@ var CertsCmd = &cobra.Command{
 		// 5. Verify that the certificate files exist.
 		certPath := fmt.Sprintf("letsEncryptPath%s/", fullDomain)
 		fmt.Printf("Verifying that the certificates are in '%s'...\n", certPath)
-		if err := runCommand([]string{"sudo", "ls", "-l", certPath}); err != nil {
+		if err := runCommand([]string{"ls", "-l", certPath}); err != nil {
 			fmt.Printf("Error verifying certificates at %s: %v\n", certPath, err)
 			os.Exit(1)
 		}
@@ -129,22 +129,22 @@ var CertsCmd = &cobra.Command{
 		destPrivkey := fmt.Sprintf("certs/%s.privkey.pem", certName)
 
 		fmt.Println("Copying certificate files...")
-		if err := runCommand([]string{"sudo", "cp", sourceFullchain, destFullchain}); err != nil {
+		if err := runCommand([]string{"cp", sourceFullchain, destFullchain}); err != nil {
 			fmt.Printf("Error copying fullchain.pem: %v\n", err)
 			return fmt.Errorf("checking docker processes: %w", err)
 		}
-		if err := runCommand([]string{"sudo", "cp", sourcePrivkey, destPrivkey}); err != nil {
+		if err := runCommand([]string{"cp", sourcePrivkey, destPrivkey}); err != nil {
 			fmt.Printf("Error copying privkey.pem: %v\n", err)
 			return fmt.Errorf("checking docker processes: %w", err)
 		}
 
 		// 9. Set appropriate permissions.
 		fmt.Println("Setting appropriate permissions on the certificate files...")
-		if err := runCommand([]string{"sudo", "chmod", "644", destFullchain}); err != nil {
+		if err := runCommand([]string{"chmod", "644", destFullchain}); err != nil {
 			fmt.Printf("Error setting permissions on %s: %v\n", destFullchain, err)
 			return fmt.Errorf("checking docker processes: %w", err)
 		}
-		if err := runCommand([]string{"sudo", "chmod", "600", destPrivkey}); err != nil {
+		if err := runCommand([]string{"chmod", "600", destPrivkey}); err != nil {
 			fmt.Printf("Error setting permissions on %s: %v\n", destPrivkey, err)
 			return fmt.Errorf("checking docker processes: %w", err)
 		}

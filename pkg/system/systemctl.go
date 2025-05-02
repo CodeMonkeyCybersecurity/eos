@@ -109,7 +109,7 @@ func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delayS
 // CanSudoSystemctl checks if the current user can run sudo systemctl <action> <unit> without a password.
 // Example: CanSudoSystemctl("status", "vault")
 func CanSudoSystemctl(action, unit string) bool {
-	cmd := exec.Command("sudo", "-n", "systemctl", action, unit)
+	cmd := exec.Command("systemctl", action, unit)
 	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("❌ sudo -n systemctl %s %s failed: %v\n", action, unit, err)
@@ -122,7 +122,7 @@ func PromptAndRunInteractiveSystemctl(action, unit string) error {
 	fmt.Printf("⚠️ Privilege escalation required to run 'systemctl %s %s'\n", action, unit)
 	fmt.Println("\nYou will be prompted for your password.")
 
-	cmd := exec.Command("sudo", "systemctl", action, unit)
+	cmd := exec.Command("systemctl", action, unit)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

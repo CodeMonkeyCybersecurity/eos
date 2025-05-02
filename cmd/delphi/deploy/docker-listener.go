@@ -24,21 +24,21 @@ var DockerListenerCmd = &cobra.Command{
 
 		// Step 1: Install required system packages
 		log.Info("🔧 Installing Python virtual environment tools...")
-		if err := execute.Execute("sudo", "apt", "update"); err != nil {
+		if err := execute.Execute("apt", "update"); err != nil {
 			log.Fatal("❌ Failed to update package lists", zap.Error(err))
 		}
 
-		if err := execute.Execute("sudo", "apt", "install", "-y", "python3-venv", "python3-pip"); err != nil {
+		if err := execute.Execute("apt", "install", "-y", "python3-venv", "python3-pip"); err != nil {
 			log.Fatal("❌ Failed to install required Python packages", zap.Error(err))
 		}
 
 		// Step 2: Create virtual environment
 		log.Info("📂 Creating virtual environment")
-		if err := execute.Execute("sudo", "mkdir", "-p", shared.VenvPath); err != nil {
+		if err := execute.Execute("mkdir", "-p", shared.VenvPath); err != nil {
 			log.Fatal("❌ Failed to create virtual environment directory", zap.Error(err))
 		}
 
-		if err := execute.Execute("sudo", "python3", "-m", "venv", shared.VenvPath); err != nil {
+		if err := execute.Execute("python3", "-m", "venv", shared.VenvPath); err != nil {
 			log.Fatal("❌ Failed to create virtual environment", zap.Error(err))
 		}
 
@@ -55,7 +55,7 @@ var DockerListenerCmd = &cobra.Command{
 		} else {
 			// Backup the original script
 			backupPath := shared.DockerListener + ".bak"
-			if err := execute.Execute("sudo", "cp", shared.DockerListener, backupPath); err != nil {
+			if err := execute.Execute("cp", shared.DockerListener, backupPath); err != nil {
 				log.Warn("Failed to backup DockerListener", zap.Error(err))
 			}
 
@@ -73,7 +73,7 @@ var DockerListenerCmd = &cobra.Command{
 
 		// Step 5: Restart Wazuh Agent
 		log.Info("🔄 Restarting Wazuh Agent...")
-		if err := execute.Execute("sudo", "systemctl", "restart", "wazuh-agent"); err != nil {
+		if err := execute.Execute("systemctl", "restart", "wazuh-agent"); err != nil {
 			log.Fatal("❌ Failed to restart Wazuh Agent", zap.Error(err))
 		}
 		return nil

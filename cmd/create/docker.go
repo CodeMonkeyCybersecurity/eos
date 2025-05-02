@@ -85,7 +85,7 @@ func installDocker(log *zap.Logger) {
 func verifyDockerHelloWorld(log *zap.Logger, useSudo bool) {
 	cmd := []string{"docker", "run", "hello-world"}
 	if useSudo {
-		cmd = append([]string{"sudo"}, cmd...)
+		cmd = append([]string{}, cmd...)
 	}
 	if err := execute.Execute(cmd[0], cmd[1:]...); err != nil {
 		log.Error("'docker run hello-world' failed", zap.Error(err))

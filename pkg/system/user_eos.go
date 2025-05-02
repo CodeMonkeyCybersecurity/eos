@@ -124,7 +124,7 @@ func RepairEosSecrets(log *zap.Logger) error {
 }
 
 func ValidateEosSudoAccess(log *zap.Logger) error {
-	cmd := exec.Command("sudo", "-u", shared.EosID, "cat", shared.VaultAgentTokenPath)
+	cmd := exec.Command("cat", shared.VaultAgentTokenPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		log.Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
@@ -216,11 +216,11 @@ func CheckEosSudoPermissions() (bool, error) {
 
 func FixEosSudoersFile(log *zap.Logger) error {
 	sudoersLine := "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
-	cmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf("echo '%s' > /etc/sudoers.d/eos", sudoersLine))
+	cmd := exec.Command(fmt.Sprintf("echo '%s' > /etc/sudoers.d/eos", sudoersLine))
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to write sudoers file: %w", err)
 	}
-	cmd = exec.Command("sudo", "chmod", "440", "/etc/sudoers.d/eos")
+	cmd = exec.Command("chmod", "440", "/etc/sudoers.d/eos")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to set sudoers permissions: %w", err)
 	}

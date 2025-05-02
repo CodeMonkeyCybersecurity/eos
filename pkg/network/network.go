@@ -18,7 +18,7 @@ func CheckIPv6Enabled() bool {
 
 // enableIPv6 attempts to enable IPv6 (requires root privileges).
 func EnableIPv6() error {
-	cmd := exec.Command("sudo", "sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0")
+	cmd := exec.Command("sysctl", "-w", "net.ipv6.conf.all.disable_ipv6=0")
 	return cmd.Run()
 }
 

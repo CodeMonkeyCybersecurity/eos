@@ -274,7 +274,7 @@ func CheckVaultTokenFile(log *zap.Logger) error {
 func RunVaultTestQuery(log *zap.Logger) error {
 	log.Info("Running test query using Vault Agent token", zap.String("path", shared.TestKVPath))
 
-	cmd := exec.Command("sudo", "-u", shared.EosID, "vault", "kv", "get", "-format=json", shared.TestKVPath)
+	cmd := exec.Command("vault", "kv", "get", "-format=json", shared.TestKVPath)
 	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
 
 	output, err := cmd.CombinedOutput()

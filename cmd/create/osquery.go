@@ -59,7 +59,7 @@ var createOsQueryCmd = &cobra.Command{
 
 func installOsquery(log *zap.Logger, arch string) error {
 	log.Info("Creating /etc/apt/keyrings directory...")
-	if err := execute.Execute("sudo", "mkdir", "-p", "/etc/apt/keyrings"); err != nil {
+	if err := execute.Execute("mkdir", "-p", "/etc/apt/keyrings"); err != nil {
 		return fmt.Errorf("mkdir keyrings: %w", err)
 	}
 
@@ -73,7 +73,7 @@ func installOsquery(log *zap.Logger, arch string) error {
 	}
 
 	log.Info("Saving GPG key to /etc/apt/keyrings/osquery.asc")
-	teeCmd := exec.Command("sudo", "tee", "/etc/apt/keyrings/osquery.asc")
+	teeCmd := exec.Command("tee", "/etc/apt/keyrings/osquery.asc")
 	teeCmd.Stdin = &curlOutput
 	teeCmd.Stdout = os.Stdout
 	teeCmd.Stderr = os.Stderr
@@ -83,17 +83,17 @@ func installOsquery(log *zap.Logger, arch string) error {
 
 	log.Info("Writing osquery APT repository...")
 	repoLine := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/osquery.asc] https://pkg.osquery.io/deb deb main", arch)
-	if err := execute.Execute("sudo", "sh", "-c", fmt.Sprintf("echo '%s' > /etc/apt/sources.list.d/osquery.list", repoLine)); err != nil {
+	if err := execute.Execute("sh", "-c", fmt.Sprintf("echo '%s' > /etc/apt/sources.list.d/osquery.list", repoLine)); err != nil {
 		return fmt.Errorf("add repo: %w", err)
 	}
 
 	log.Info("Updating APT cache...")
-	if err := execute.Execute("sudo", "apt", "update"); err != nil {
+	if err := execute.Execute("apt", "update"); err != nil {
 		return fmt.Errorf("apt update: %w", err)
 	}
 
 	log.Info("Installing osquery...")
-	if err := execute.Execute("sudo", "apt", "install", "-y", "osquery"); err != nil {
+	if err := execute.Execute("apt", "install", "-y", "osquery"); err != nil {
 		return fmt.Errorf("apt install: %w", err)
 	}
 
