@@ -51,6 +51,26 @@ func RequireRoot(log *zap.Logger) {
 	}
 }
 
+// RequireRootInteractive ensures the user is root or has sudo, and prompts if needed.
+func RequireRootInteractive() error {
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("cannot determine current user: %w", err)
+	}
+	if currentUser.Uid == "0" {
+		return nil // already root
+	}
+	fmt.Println("⚠️ Bootstrap requires root privileges. You may be prompted for your password.")
+	cmd := exec.Command("sudo", "-v")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to acquire sudo privileges: %w", err)
+	}
+	return nil
+}
+
 func FailIfPermissionDenied(log *zap.Logger, action, path string, err error) {
 	if os.IsPermission(err) {
 		log.Error(fmt.Sprintf("❌ %s failed due to permissions", action),
@@ -89,4 +109,3 @@ func CheckSudoersMembership(username string) bool {
 	}
 	return strings.Contains(string(out), username)
 }
-
