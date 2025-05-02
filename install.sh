@@ -69,37 +69,37 @@ chmod 700 "$SECRETS_DIR"
 echo "🔧 Setting up log directory: $LOG_DIR"
 
 if [ ! -d "$LOG_DIR" ]; then
-  if mkdir -p "$LOG_DIR"; then
-    echo "📁 Created $LOG_DIR"
-  else
-    echo "❌ Failed to create $LOG_DIR"
-    exit 1
-  fi
-else
-  echo "📁 Log directory already exists"
+  mkdir -p "$LOG_DIR" && echo "📁 Created $LOG_DIR"
 fi
 
-# Only chown if needed
 CURRENT_OWNER=$(stat -c "%U:%G" "$LOG_DIR" 2>/dev/null || echo "unknown:unknown")
 if [ "$CURRENT_OWNER" != "$EOS_USER:$EOS_USER" ]; then
-  if chown "$EOS_USER:$EOS_USER" "$LOG_DIR"; then
-    echo "🔑 Ownership updated to $EOS_USER:$EOS_USER"
-  else
-    echo "❌ Failed to set ownership on $LOG_DIR"
-    exit 1
-  fi
+  chown "$EOS_USER:$EOS_USER" "$LOG_DIR" && echo "🔑 Ownership updated to $EOS_USER:$EOS_USER"
 fi
 
-# Set permissions
-if chmod 750 "$LOG_DIR"; then
-  echo "🔒 Permissions set to 750"
-else
-  echo "❌ Failed to set permissions on $LOG_DIR"
-  exit 1
-fi
+chmod 750 "$LOG_DIR" && echo "🔒 Permissions set to 750"
 
 echo "✅ Log directory ready: $LOG_DIR"
 
-echo "✅ Installation complete."
-echo "👉 You can now run 'eos --help' to confirm install"
-echo "🔐 You will be prompted for your own  password if not recently authenticated."
+# --- BOOTSTRAP ADDITIONS BELOW ---
+
+# Add eos sudoers entry
+if [ ! -f /etc/sudoers.d/eos ]; then
+  echo "⚙️ Adding eos to sudoers"
+  echo "eos ALL=(ALL) NOPASSWD: /bin/systemctl" > /etc/sudoers.d/eos
+  chmod 440 /etc/sudoers.d/eos
+  visudo -c || { echo "❌ Sudoers validation failed"; exit 1; }
+  echo "✅ Sudoers entry added"
+else
+  echo "✅ eos sudoers entry already exists"
+fi
+
+# Show sudoers file
+echo "📄 /etc/sudoers.d/eos content:"
+cat /etc/sudoers.d/eos
+
+# Summary
+echo ""
+echo "🎉 EOS installation and bootstrap complete!"
+echo "👉 You can now run: eos bootstrap --yes"
+echo "👉 To check installed binary: eos --help"
