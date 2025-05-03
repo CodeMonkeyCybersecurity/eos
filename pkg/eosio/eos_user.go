@@ -1,7 +1,8 @@
+// pkg/eosio/eos_user.go
+
 package eosio
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -12,95 +13,41 @@ import (
 	"go.uber.org/zap"
 )
 
-// ErrAlreadyEos is returned when escalation is skipped because the process is already running as 'eos'.
-var ErrAlreadyEos = errors.New("already running as eos user")
-var ErrEosReexecCompleted = errors.New("re-execution completed, parent exiting")
-
-const (
-	TmpPrefix = "/tmp/"
-	BashCmd   = "bash"
-	SudoCmd   = "sudo"
-)
-
-func RequireEosUserOrReexecWithShell(log *zap.Logger, requiresShell bool) error {
-	return RequireEosUserOrReexec(log, requiresShell)
-}
-
-func RequireEosUserOrReexec(log *zap.Logger, withShell bool) error {
-	if log == nil {
-		return fmt.Errorf("logger is nil; initialize logger before calling RequireEosUserOrReexec")
-	}
-	if strings.HasPrefix(os.Args[0], TmpPrefix) {
-		return fmt.Errorf("🛑 Cannot escalate with `go run`. Use `go build -o eos`")
+// RequireEosUserOrReexec ensures the current process is running as the 'eos' system user.
+// If not, it attempts to re-execute the current binary using 'sudo -u eos ...'.
+// Returns an error if user detection or sudo fails.
+func RequireEosUserOrReexec(log *zap.Logger) error {
+	if strings.HasPrefix(os.Args[0], "/tmp/") {
+		log.Error("🛑 Cannot escalate with `go run`. Use `go build -o eos`.")
+		return fmt.Errorf("binary path %s is not suitable for sudo", os.Args[0])
 	}
 
-	isEos, err := IsRunningAsEos()
+	currentUser, err := user.Current()
 	if err != nil {
-		return fmt.Errorf("detecting current user failed: %w", err)
-	}
-	if isEos {
-		log.Info("👤 Already running as 'eos' user; skipping sudo escalation")
-		return ErrAlreadyEos
+		log.Error("Failed to detect current user", zap.Error(err))
+		return err
 	}
 
-	cmd, cmdStr, err := buildSudoCommand(withShell)
-	if err != nil {
-		return fmt.Errorf("building sudo command failed: %w", err)
-	}
-	log.Info("🔐 Elevating to 'eos' user", zap.String("command", cmdStr))
-
-	output, err := cmd.CombinedOutput()
-	trimmed := strings.TrimSpace(string(output))
-	if err != nil {
-		log.Error("❌ sudo escalation failed",
-			zap.Error(err),
-			zap.String("command", cmdStr),
-			zap.String("output", trimmed),
-			zap.String("hint", "check NOPASSWD in sudoers and shell for 'eos' in /etc/passwd"))
-		return fmt.Errorf("sudo escalation failed: %w; output: %s", err, trimmed)
+	if currentUser.Username == shared.EosID {
+		return nil // Already running as eos
 	}
 
-	log.Info("✅ Re-execution under 'eos' succeeded; exiting parent")
-	return ErrEosReexecCompleted
-}
-
-func buildSudoCommand(withShell bool) (*exec.Cmd, string, error) {
+	log.Info("🔐 Elevating to 'eos' user via sudo")
 	binaryPath, err := os.Executable()
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to get executable path: %w", err)
-	}
-	if withShell {
-		args := strings.Join(os.Args[1:], " ")
-		cmdStr := fmt.Sprintf("%s %s", binaryPath, args)
-		return exec.Command(SudoCmd, "-u", shared.EosID, BashCmd, "-c", cmdStr),
-			fmt.Sprintf("sudo -u %s bash -c '%s'", shared.EosID, cmdStr), nil
+		log.Error("Failed to get current binary path", zap.Error(err))
+		return err
 	}
 	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
-	return exec.Command(SudoCmd, fullArgs...),
-		fmt.Sprintf("sudo -u %s %s %s", shared.EosID, binaryPath, strings.Join(os.Args[1:], " ")), nil
-}
+	cmd := exec.Command("sudo", fullArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 
-func IsRunningAsEos() (bool, error) {
-	u, err := user.Current()
-	if err != nil {
-		return false, err
-	}
-	return u.Username == shared.EosID, nil
-}
-
-func GetInvokedUsername() (string, error) {
-	u, err := user.Current()
-	if err != nil {
-		return "", err
-	}
-	return u.Username, nil
-}
-
-// CanSudoToEos runs a dry-run check: sudo -u eos true.
-func CanSudoToEos() (bool, error) {
-	cmd := exec.Command(SudoCmd, "-u", shared.EosID, "true")
 	if err := cmd.Run(); err != nil {
-		return false, fmt.Errorf("sudo dry-run failed: %w", err)
+		log.Error("sudo failed", zap.Error(err))
+		return err
 	}
-	return true, nil
+
+	os.Exit(0) // Successful re-exec; prevent further execution
+	return nil
 }

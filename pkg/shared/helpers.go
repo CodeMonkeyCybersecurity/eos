@@ -1,4 +1,4 @@
-// pkg/shared/helpers.go
+// pkg/shared/vars.go
 
 package shared
 
@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -55,5 +56,25 @@ func SafeHelp(cmd *cobra.Command, log *zap.Logger) {
 func SafeRemove(name string, log *zap.Logger) {
 	if err := os.Remove(name); err != nil {
 		log.Warn("Removing file failed", zap.String("path", name), zap.Error(err))
+	}
+}
+
+// SafeSync attempts to sync the zap logger, gracefully handling harmless errors.
+// Known harmless errors (e.g., "sync /dev/stdout: invalid argument") are suppressed with a soft warning.
+// Unexpected errors are logged as warnings without crashing the CLI.
+func SafeSync(log *zap.Logger) {
+	if log == nil {
+		return
+	}
+
+	if err := log.Sync(); err != nil {
+		errStr := err.Error()
+
+		switch {
+		case strings.Contains(errStr, "invalid argument"), strings.Contains(errStr, "bad file descriptor"):
+			log.Warn("Logger sync harmlessly skipped", zap.String("reason", errStr))
+		default:
+			log.Warn("Nonstandard logger sync issue", zap.Error(err))
+		}
 	}
 }

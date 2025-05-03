@@ -17,15 +17,16 @@ func PlatformLogPaths() []string {
 	case "darwin":
 		return []string{
 			xdg.XDGStatePath(shared.EosID, "eos.log"),
-			shared.EosLogsPWD,
 			"/tmp/eos/eos.log",
+			"./eos.log",
 		}
 	case "linux":
 		return []string{
-			shared.EosLogs, // best if writable (via sudo or eos user)
-			xdg.XDGStatePath(shared.EosID, "eos.log"), // user-local fallback (e.g., ~/.local/state/eos/eos.log)
-			shared.EosLogsPWD,                         // current working dir – ideal for devs
-			"/tmp/eos/eos.log",                        // ephemeral
+			"/var/log/eos/eos.log",
+			"/run/eos/eos.log",
+			xdg.XDGStatePath(shared.EosID, "eos.log"),
+			"/tmp/eos/eos.log",
+			"./eos.log",
 		}
 	case "windows":
 		return []string{
@@ -34,6 +35,6 @@ func PlatformLogPaths() []string {
 			".\\eos.log",
 		}
 	default:
-		return []string{shared.EosLogsPWD}
+		return []string{"./eos.log"}
 	}
 }

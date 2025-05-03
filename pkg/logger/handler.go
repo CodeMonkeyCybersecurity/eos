@@ -1,13 +1,22 @@
+/* pkg/logger/handler.go */
+
 package logger
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"go.uber.org/zap"
 )
 
+var log *zap.Logger
+
 func Initialize(cfg zap.Config) {
+	if log != nil {
+		return
+	}
+
 	for _, path := range cfg.OutputPaths {
 		if path != "stdout" && path != "stderr" {
 			if err := EnsureLogPermissions(path); err != nil {
@@ -17,32 +26,49 @@ func Initialize(cfg zap.Config) {
 		}
 	}
 
-	logger, err := cfg.Build()
+	var err error
+	log, err = cfg.Build()
 	if err != nil {
-		logger, _ = zap.NewProduction()
+		log, _ = zap.NewProduction() // fallback to stdout-only logger
 	}
 
-	zap.ReplaceGlobals(logger)
-	SetLogger(logger)
-
-	logger.Info("Logger initialized", zap.String("log_level", cfg.Level.String()))
+	zap.ReplaceGlobals(log)
+	log.Info("Logger initialized", zap.String("log_level", cfg.Level.String()))
 }
 
+// InitFallback sets up an in-memory console logger and replaces globals.
 func InitFallback() {
-	fallback := NewFallbackLogger()
-	zap.ReplaceGlobals(fallback)
-	SetLogger(fallback)
+	log = NewFallbackLogger()
+	zap.ReplaceGlobals(log)
+}
+
+func L() *zap.Logger {
+	return GetLogger()
 }
 
 func GetLogger() *zap.Logger {
-	l := L()
-	if l == nil {
-		fallback := NewFallbackLogger()
-		zap.ReplaceGlobals(fallback)
-		SetLogger(fallback)
-		return fallback
+	if log == nil {
+		log = NewFallbackLogger()
+		zap.ReplaceGlobals(log)
 	}
-	return l
+	return log
+}
+
+func Sync(strict ...bool) error {
+	if log == nil {
+		return nil
+	}
+	err := log.Sync()
+	if err == nil || (!StrictEnabled(strict) && IsIgnorableSyncError(err)) {
+		return nil
+	}
+	log.Error("Failed to sync logger", zap.Error(err))
+	return err
+}
+
+func IsIgnorableSyncError(err error) bool {
+	var pathErr *os.PathError
+	return errors.As(err, &pathErr) || err.Error() == "sync /dev/stdout: invalid argument"
 }
 
 func StrictEnabled(flags []bool) bool {

@@ -1,4 +1,4 @@
-// pkg/logger/lifecycle.go
+/* pkg/logger/lifecycle.go */
 
 package logger
 
@@ -82,16 +82,16 @@ func ResolveLogPath() string {
 		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err == nil {
 			if cerr := file.Close(); cerr != nil {
-				L().Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
+				log.Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
 			}
-			L().Info("📝 Using resolved log path", zap.String("log_path", path))
+			log.Info("📝 Using resolved log path", zap.String("log_path", path))
 			return path
 		} else {
-			L().Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
+			log.Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
 		}
 	}
 
-	L().Warn("⚠️ No writable log path could be resolved")
+	log.Warn("⚠️ No writable log path could be resolved")
 	return ""
 }
 
