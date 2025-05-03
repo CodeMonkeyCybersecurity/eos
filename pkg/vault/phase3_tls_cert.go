@@ -183,6 +183,9 @@ func GenerateVaultTLSCert() error {
 		return fmt.Errorf("failed to create TLS directory: %w", err)
 	}
 
+	// 🚀 Remove prompt, always generate
+	zap.L().Info("⚙️ No TLS certs found, automatically generating self-signed TLS certs")
+
 	configContent := fmt.Sprintf(`
 [req]
 distinguished_name = req
