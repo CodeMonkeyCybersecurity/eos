@@ -45,7 +45,7 @@ func runPrimaryPasswordRotation(ctx *eosio.RuntimeContext, apiPassword string) (
 	ctx.Log.Info("🔐 Attempting primary password rotation using Wazuh API password")
 	var stdout bytes.Buffer
 
-	cmd := exec.Command("sudo", "bash", delphi.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", apiPassword)
+	cmd := exec.Command( "bash", delphi.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", apiPassword)
 	cmd.Stdout = &stdout
 	cmd.Stderr = os.Stderr
 
@@ -99,7 +99,7 @@ func runFallbackPasswordRotation(ctx *eosio.RuntimeContext) (string, error) {
 	}
 	ctx.Log.Info("✅ Updated password for wazuh")
 
-	retryCmd := exec.Command("sudo", "bash", delphi.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", newPass)
+	retryCmd := exec.Command( "bash", delphi.DelphiPasswdToolPath, "-a", "-A", "-au", "wazuh", "-ap", newPass)
 	retryCmd.Stdout = os.Stdout
 	retryCmd.Stderr = os.Stderr
 	if err := retryCmd.Run(); err != nil {
@@ -136,7 +136,7 @@ func parseSecrets(ctx *eosio.RuntimeContext, stdout *bytes.Buffer) map[string]st
 func restartServices(ctx *eosio.RuntimeContext, services []string) {
 	for _, svc := range services {
 		ctx.Log.Info("🔄 Restarting service", zap.String("service", svc))
-		cmd := exec.Command("sudo", "systemctl", "restart", svc)
+		cmd := exec.Command( "systemctl", "restart", svc)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			ctx.Log.Warn("Restart failed", zap.String("service", svc), zap.Error(err), zap.String("output", string(output)))

@@ -83,7 +83,7 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 			for _, m := range matches {
 				if err := system.Rm(ctx, m, owner); err != nil {
 					// fallback to sudo rm -rf
-					fallbackErr := exec.CommandContext(ctx, "sudo", "rm", "-rf", m).Run()
+					fallbackErr := exec.CommandContext(ctx,  "rm", "-rf", m).Run()
 					if fallbackErr != nil {
 						errs[m] = fallbackErr
 						log.Warn("❌ Failed to remove path (even with sudo)", zap.String("path", m), zap.Error(fallbackErr))
@@ -98,7 +98,7 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 			}
 		} else {
 			if err := system.Rm(ctx, path, owner); err != nil {
-				fallbackErr := exec.CommandContext(ctx, "sudo", "rm", "-rf", path).Run()
+				fallbackErr := exec.CommandContext(ctx,  "rm", "-rf", path).Run()
 				if fallbackErr != nil {
 					errs[path] = fallbackErr
 					log.Warn("❌ Failed to remove path (even with sudo)", zap.String("path", path), zap.Error(fallbackErr))
@@ -115,10 +115,10 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 	}
 
 	// Safe systemd reload
-	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reexec").Run(); err != nil {
+	if err := exec.CommandContext(ctx,  "systemctl", "daemon-reexec").Run(); err != nil {
 		log.Warn("⚠️ Failed daemon-reexec", zap.Error(err))
 	}
-	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reload").Run(); err != nil {
+	if err := exec.CommandContext(ctx,  "systemctl", "daemon-reload").Run(); err != nil {
 		log.Warn("⚠️ Failed daemon-reload", zap.Error(err))
 	}
 

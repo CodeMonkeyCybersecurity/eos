@@ -24,7 +24,7 @@ func InstallKVM() error {
 // runInstall runs the given install command with stdout/stderr streaming.
 func runInstall(cmd string) error {
 	fmt.Println("📦 Installing KVM and dependencies...")
-	c := exec.Command("sudo", "bash", "-c", cmd)
+	c := exec.Command( "bash", "-c", cmd)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	return c.Run()
@@ -33,10 +33,10 @@ func runInstall(cmd string) error {
 // EnsureLibvirtd ensures libvirtd is started and enabled.
 func EnsureLibvirtd() error {
 	fmt.Println("🔧 Ensuring libvirtd service is running...")
-	if err := exec.Command("sudo", "systemctl", "start", "libvirtd").Run(); err != nil {
+	if err := exec.Command( "systemctl", "start", "libvirtd").Run(); err != nil {
 		return fmt.Errorf("failed to start libvirtd: %w", err)
 	}
-	if err := exec.Command("sudo", "systemctl", "enable", "libvirtd").Run(); err != nil {
+	if err := exec.Command( "systemctl", "enable", "libvirtd").Run(); err != nil {
 		return fmt.Errorf("failed to enable libvirtd: %w", err)
 	}
 	fmt.Println("✅ libvirtd is active and enabled.")

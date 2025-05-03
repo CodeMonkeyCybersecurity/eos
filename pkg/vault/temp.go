@@ -168,7 +168,7 @@ func PhaseEnsureClientHealthy() error {
 	//--------------------------------------------------------------------
 	// 0. Fast‑path: is something already listening on 8179 as eos/vault?
 	//--------------------------------------------------------------------
-	if out, _ := exec.Command("sudo", "lsof", "-i", shared.VaultDefaultPort).Output(); len(out) > 0 {
+	if out, _ := exec.Command( "lsof", "-i", shared.VaultDefaultPort).Output(); len(out) > 0 {
 		zap.L().Info("📡 Detected process on port 8179",
 			zap.String("output", string(out)))
 

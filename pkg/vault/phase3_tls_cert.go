@@ -64,7 +64,7 @@ func TrustVaultCA_RHEL() error {
 	}
 
 	// RHEL9 / CentOS Stream 9
-	cmd := exec.Command("sudo", "update-ca-trust", "extract")
+	cmd := exec.Command( "update-ca-trust", "extract")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -91,7 +91,7 @@ func TrustVaultCA_Debian() error {
 		zap.L().Warn("could not chown CA file", zap.Error(err))
 	}
 
-	cmd := exec.Command("sudo", "update-ca-certificates")
+	cmd := exec.Command( "update-ca-certificates")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -173,7 +173,7 @@ IP.1 = %s
 	zap.L().Info("🔐 Generating Vault TLS certificate with SANs",
 		zap.String("hostname", hostname), zap.String("config", tmpConfigPath))
 
-	cmd := exec.Command("sudo", "openssl", "req", "-new", "-newkey", "rsa:4096",
+	cmd := exec.Command( "openssl", "req", "-new", "-newkey", "rsa:4096",
 		"-days", "825", "-nodes", "-x509",
 		"-subj", "/CN="+hostname,
 		"-keyout", shared.TLSKey,

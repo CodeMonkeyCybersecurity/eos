@@ -70,8 +70,8 @@ func InstallVaultViaApt() error {
 
 	// Step 1: Download and save the HashiCorp GPG key
 	zap.L().Info("➕ Downloading HashiCorp GPG key")
-	curlCmd := exec.CommandContext(ctx, "sudo", "curl", "-fsSL", "https://apt.releases.hashicorp.com/gpg")
-	gpgCmd := exec.CommandContext(ctx, "sudo", "gpg", "--dearmor", "-o", "/usr/share/keyrings/hashicorp-archive-keyring.gpg")
+	curlCmd := exec.CommandContext(ctx,  "curl", "-fsSL", "https://apt.releases.hashicorp.com/gpg")
+	gpgCmd := exec.CommandContext(ctx,  "gpg", "--dearmor", "-o", "/usr/share/keyrings/hashicorp-archive-keyring.gpg")
 
 	pipeReader, pipeWriter := io.Pipe()
 	curlCmd.Stdout = pipeWriter
@@ -118,12 +118,12 @@ func InstallVaultViaApt() error {
 
 	// Step 3: Update and install
 	zap.L().Info("♻️ Updating APT package cache")
-	if err := exec.CommandContext(ctx, "sudo", "apt-get", "update").Run(); err != nil {
+	if err := exec.CommandContext(ctx,  "apt-get", "update").Run(); err != nil {
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
 
 	zap.L().Info("📦 Installing Vault from HashiCorp repo via apt")
-	installCmd := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", "vault")
+	installCmd := exec.CommandContext(ctx,  "apt-get", "install", "-y", "vault")
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
 	if err := installCmd.Run(); err != nil {

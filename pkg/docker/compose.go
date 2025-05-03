@@ -89,8 +89,7 @@ func RunDockerComposeAllServices(composeFile, service string) error {
 // The provided args should include the subcommands (e.g. "-f", "docker-compose.yaml", "up", "-d").
 func GetDockerComposeCmd(args ...string) (*exec.Cmd, error) {
 	if _, err := exec.LookPath("docker-compose"); err == nil {
-		fullArgs := append([]string{"docker-compose"}, args...)
-		return exec.Command("sudo", fullArgs...), nil
+		return exec.Command("docker-compose", args...), nil
 	}
 	if _, err := exec.LookPath("docker"); err == nil {
 		fullArgs := append([]string{"compose"}, args...)

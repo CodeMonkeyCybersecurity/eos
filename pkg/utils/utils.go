@@ -32,7 +32,7 @@ func DeployApp(app string, force bool) error {
 	}
 
 	// Restart Nginx
-	cmdRestart := exec.Command("sudo", "systemctl", "restart", "nginx")
+	cmdRestart := exec.Command( "systemctl", "restart", "nginx")
 	if err := cmdRestart.Run(); err != nil {
 		return fmt.Errorf("failed to restart nginx: %w", err)
 	}

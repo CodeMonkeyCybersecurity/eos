@@ -62,7 +62,7 @@ func DeployCompose() error {
 	// Fix permissions on the target directory so that containers (e.g., Grafana) can write to volumes.
 	// The official Grafana Docker image runs as UID/GID 472.
 	fmt.Printf("Fixing ownership of %s to UID 472:472\n", targetDir)
-	chownCmd := exec.Command("sudo", "chown", "-R", "472:472", targetDir)
+	chownCmd := exec.Command( "chown", "-R", "472:472", targetDir)
 	chownCmd.Stdout = os.Stdout
 	chownCmd.Stderr = os.Stderr
 	if err := chownCmd.Run(); err != nil {
@@ -71,7 +71,7 @@ func DeployCompose() error {
 
 	// Run "docker compose up -d" in the target directory.
 	fmt.Printf("Running 'docker compose up -d' in %s\n", targetDir)
-	dockerCmd := exec.Command("sudo", "docker", "compose", "up", "-d")
+	dockerCmd := exec.Command( "docker", "compose", "up", "-d")
 	dockerCmd.Dir = targetDir
 	dockerCmd.Stdout = os.Stdout
 	dockerCmd.Stderr = os.Stderr

@@ -55,7 +55,7 @@ func ExtractWazuhUserPassword() (string, error) {
 
 func UpdateWazuhUserPassword(jwtToken, userID, newPass string) error {
 	payload := fmt.Sprintf(`{"password": "%s"}`, newPass)
-	cmd := exec.Command("sudo", "curl", "-k", "-X", "PUT",
+	cmd := exec.Command( "curl", "-k", "-X", "PUT",
 		fmt.Sprintf("https://127.0.0.1:55000/security/users/%s", userID),
 		"-H", "Authorization: Bearer "+jwtToken,
 		"-H", "Content-Type: application/json",
@@ -83,7 +83,7 @@ func ExtractWazuhWuiPassword() (string, error) {
 }
 
 func RerunPasswordTool(adminUser, newPass string) error {
-	cmd := exec.Command("sudo", "bash", "/usr/local/bin/wazuh-passwords-tool.sh",
+	cmd := exec.Command( "bash", "/usr/local/bin/wazuh-passwords-tool.sh",
 		"-a", "-A", "-au", adminUser, "-ap", newPass)
 
 	cmd.Stdout = os.Stdout
@@ -92,7 +92,7 @@ func RerunPasswordTool(adminUser, newPass string) error {
 }
 
 func FindUserID(jwtToken, username string) (string, error) {
-	cmd := exec.Command("sudo", "curl", "-k", "-X", "GET",
+	cmd := exec.Command( "curl", "-k", "-X", "GET",
 		"https://127.0.0.1:55000/security/users?pretty=true",
 		"-H", "Authorization: Bearer "+jwtToken)
 

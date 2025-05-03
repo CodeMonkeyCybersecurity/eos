@@ -29,14 +29,14 @@ var VaultUpdateCmd = &cobra.Command{
 		switch distro {
 		case "rhel":
 			fmt.Println("🔄 Updating Vault via dnf...")
-			updateCmd = exec.Command("sudo", "dnf", "upgrade", "-y", "vault")
+			updateCmd = exec.Command( "dnf", "upgrade", "-y", "vault")
 		case "debian":
 			fmt.Println("🔄 Updating Vault via apt...")
-			updateCmd = exec.Command("sudo", "apt", "update")
+			updateCmd = exec.Command( "apt", "update")
 			if err := updateCmd.Run(); err != nil {
 				zap.L().Fatal("Failed to run apt update", zap.Error(err))
 			}
-			updateCmd = exec.Command("sudo", "apt", "install", "-y", "vault")
+			updateCmd = exec.Command( "apt", "install", "-y", "vault")
 		default:
 			zap.L().Fatal("Unsupported or unknown distro", zap.String("distro", distro))
 		}

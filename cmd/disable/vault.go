@@ -63,14 +63,14 @@ func runStopVault(ctx *eosio.RuntimeContext, _ *cobra.Command, _ []string) error
 func systemctl(args ...string) error { return exec.Command("systemctl", args...).Run() }
 
 func killByPort(port string) int {
-	out, err := exec.Command("sudo", "lsof", "-i", ":"+port, "-t").Output()
+	out, err := exec.Command( "lsof", "-i", ":"+port, "-t").Output()
 	if err != nil || len(out) == 0 {
 		return 0
 	}
 	pids := strings.Split(strings.TrimSpace(string(out)), "\n")
 	for _, p := range pids {
 		if pid, _ := strconv.Atoi(p); pid != 0 {
-			_ = exec.Command("sudo", "kill", "-9", strconv.Itoa(pid)).Run()
+			_ = exec.Command( "kill", "-9", strconv.Itoa(pid)).Run()
 			zap.L().Info("🔪 Killed process on port "+port, zap.Int("pid", pid))
 		}
 	}

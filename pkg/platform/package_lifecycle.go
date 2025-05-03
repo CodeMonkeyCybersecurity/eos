@@ -56,19 +56,20 @@ func runDnfWithRetry(pkgName string) error {
 	if ctx.Err() == context.DeadlineExceeded {
 		zap.L().Warn("DNF timed out. Running mirror recovery...")
 
-		if err := exec.Command("sudo", "dnf", "clean", "all").Run(); err != nil {
+		cleanCmd := exec.Command("dnf", "clean", "all")
+		if err := cleanCmd.Run(); err != nil {
 			zap.L().Error("Failed to clean DNF cache", zap.Error(err))
 			return err
 		}
 
-		makecache := exec.Command("sudo", "dnf", "--setopt=timeout=10", "--setopt=retries=0", "--setopt=fastestmirror=True", "makecache")
+		makecache := exec.Command("dnf", "--setopt=timeout=10", "--setopt=retries=0", "--setopt=fastestmirror=True", "makecache")
 		if out, err := makecache.CombinedOutput(); err != nil {
 			zap.L().Error("DNF makecache failed", zap.ByteString("output", out), zap.Error(err))
 			return err
 		}
 
 		zap.L().Info("Retrying DNF install")
-		retryCmd := exec.Command("sudo", append([]string{"dnf"}, args...)...)
+		retryCmd := exec.Command("dnf", args...)
 		retryOut, retryErr := retryCmd.CombinedOutput()
 		if retryErr != nil {
 			zap.L().Error("Retry failed", zap.ByteString("output", retryOut), zap.Error(retryErr))

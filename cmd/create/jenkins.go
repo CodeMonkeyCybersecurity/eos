@@ -105,7 +105,7 @@ var CreateJenkinsCmd = &cobra.Command{
 			containerName := "jenkins"
 
 			// Execute the command to retrieve the initial admin password from the container.
-			cmd := exec.Command("sudo", "docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
+			cmd := exec.Command( "docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				zap.L().Warn("Failed to retrieve initial admin password from container", zap.Error(err))

@@ -75,8 +75,8 @@ var CreateHeraCmd = &cobra.Command{
 
 		// Generate secrets
 		zap.L().Info("🔐 Generating secrets for .env file")
-		pgPassCmd := exec.Command("sudo", "openssl", "rand", "-base64", "36")
-		secretKeyCmd := exec.Command("sudo", "openssl", "rand", "-base64", "60")
+		pgPassCmd := exec.Command( "openssl", "rand", "-base64", "36")
+		secretKeyCmd := exec.Command( "openssl", "rand", "-base64", "60")
 
 		pgPassBytes, err := pgPassCmd.Output()
 		if err != nil {
@@ -114,7 +114,7 @@ var CreateHeraCmd = &cobra.Command{
 
 		// Fix directory ownership so the container can write as needed.
 		zap.L().Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
-		chownCmd := exec.Command("sudo", "chown", "-R", "472:472", shared.HeraDir)
+		chownCmd := exec.Command( "chown", "-R", "472:472", shared.HeraDir)
 		chownCmd.Stdout = os.Stdout
 		chownCmd.Stderr = os.Stderr
 		if err := chownCmd.Run(); err != nil {

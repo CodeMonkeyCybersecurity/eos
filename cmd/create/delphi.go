@@ -77,17 +77,17 @@ func runDelphiInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []stri
 	distro := platform.DetectLinuxDistro()
 	switch distro {
 	case "debian", "ubuntu":
-		cmd := exec.Command("sudo", "sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
+		cmd := exec.Command( "sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			log.Warn("Failed to comment out Wazuh APT repo", zap.Error(err))
 		} else {
 			log.Info("✅ Wazuh APT repo commented out")
-			_ = exec.Command("sudo", "apt", "update").Run()
+			_ = exec.Command( "apt", "update").Run()
 		}
 	default:
-		cmd := exec.Command("sudo", "sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
+		cmd := exec.Command( "sed", "-i", "s/^enabled=1/enabled=0/", "/etc/yum.repos.d/wazuh.repo")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -115,7 +115,7 @@ func extractWazuhPasswords() error {
 		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
 		if system.Exists(tarPath) {
 			zap.L().Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
-			cmd := exec.Command("sudo", "tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
+			cmd := exec.Command( "tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr
 			if err := cmd.Run(); err != nil {

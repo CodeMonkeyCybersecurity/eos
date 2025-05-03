@@ -35,7 +35,7 @@ func IsInteractive() bool {
 
 // CheckBasicSudo runs 'sudo -n true' to check if we have non-interactive sudo.
 func CheckNonInteractiveSudo() error {
-	cmd := exec.Command("sudo", "-n", "true")
+	cmd := exec.Command( "-n", "true")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("sudo check failed: %w. Please ensure you have sudo access", err)
 	}

@@ -124,7 +124,7 @@ func RepairEosSecrets() error {
 }
 
 func ValidateEosSudoAccess() error {
-	cmd := exec.Command("sudo", "cat", shared.VaultAgentTokenPath)
+	cmd := exec.Command( "cat", shared.VaultAgentTokenPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		zap.L().Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
@@ -166,7 +166,7 @@ func EnsureSudoersEntryForEos(auto bool) error {
 	zap.L().Info("✅ Sudoers entry written successfully", zap.String("path", path))
 
 	zap.L().Info("🧪 Validating sudoers file with visudo -c")
-	if err := exec.Command("sudo", "visudo", "-c").Run(); err != nil {
+	if err := exec.Command( "visudo", "-c").Run(); err != nil {
 		zap.L().Warn("❌ Sudoers file validation failed", zap.Error(err))
 		return fmt.Errorf("sudoers validation failed")
 	}
@@ -220,7 +220,7 @@ func FixEosSudoersFile() error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to write sudoers file: %w", err)
 	}
-	cmd = exec.Command("sudo", "chmod", "440", "/etc/sudoers.d/eos")
+	cmd = exec.Command( "chmod", "440", "/etc/sudoers.d/eos")
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to set sudoers permissions: %w", err)
 	}

@@ -33,14 +33,14 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		// Kill Vault processes if any
-		run("sudo", "pkill", "-f", "vault server")
+		run( "pkill", "-f", "vault server")
 
 		// Remove Vault depending on platform
 		switch distro {
 		case "debian":
-			run("sudo", "apt-get", "remove", "-y", "vault")
+			run( "apt-get", "remove", "-y", "vault")
 		case "rhel":
-			run("sudo", "dnf", "remove", "-y", "vault")
+			run( "dnf", "remove", "-y", "vault")
 		}
 
 		if purge {
