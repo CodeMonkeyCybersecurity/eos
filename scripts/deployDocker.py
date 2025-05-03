@@ -32,7 +32,7 @@ def uninstall_conflicting_packages():
     ]
     print("\nUninstalling conflicting packages...")
     for pkg in packages:
-        run_command(["apt-get", "remove", "-y", pkg], check=False)  # ignore errors if package is not installed
+        run_command(["sudo", "apt-get", "remove", "-y", pkg], check=False)  # ignore errors if package is not installed
 
 def uninstall_snap_docker():
     print("\nUninstalling Docker if installed via snap...")
@@ -46,8 +46,8 @@ def update_apt_repos():
 
 def install_prerequisites_and_gpg():
     print("\nInstalling prerequisites and adding Docker's official GPG key...")
-    run_command(["apt-get", "update"])
-    run_command(["apt-get", "install", "-y", "ca-certificates", "curl"])
+    run_command(["sudo", "apt-get", "update"])
+    run_command(["sudo", "apt-get", "install", "-y", "ca-certificates", "curl"])
     run_command(["install", "-m", "0755", "-d", "/etc/apt/keyrings"])
     run_command(["curl", "-fsSL", "https://download.docker.com/linux/ubuntu/gpg",
                  "-o", "/etc/apt/keyrings/docker.asc"])
@@ -93,7 +93,7 @@ def add_docker_repo():
     except Exception as e:
         print("Error writing repository file:", e, file=sys.stderr)
         sys.exit(1)
-    run_command(["apt-get", "update"])
+    run_command(["sudo", "apt-get", "update"])
 
 def install_docker():
     print("\nInstalling the latest Docker packages...")
@@ -101,7 +101,7 @@ def install_docker():
         "docker-ce", "docker-ce-cli", "containerd.io",
         "docker-buildx-plugin", "docker-compose-plugin"
     ]
-    run_command(["apt-get", "install", "-y"] + packages)
+    run_command(["sudo", "apt-get", "install", "-y"] + packages)
 
 def verify_docker_hello_world(use_sudo=True):
     print("\nVerifying Docker installation by running hello-world...")

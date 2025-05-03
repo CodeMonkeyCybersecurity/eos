@@ -63,7 +63,7 @@ func addDockerRepo(log *zap.Logger) {
 		// log.Fatal will exit the application if repo file writing fails.
 		log.Fatal("Error writing Docker repo file", zap.Error(err))
 	}
-	if err := execute.Execute("apt-get", "update"); err != nil {
+	if err := execute.Execute("sudo", "apt-get", "update"); err != nil {
 		log.Error("Failed to update apt repositories", zap.Error(err))
 		return
 	}

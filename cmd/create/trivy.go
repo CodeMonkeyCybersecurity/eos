@@ -18,7 +18,7 @@ func installTrivy(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 	log.Info("📦 Starting Trivy installation")
 
 	log.Info("🔧 Installing required packages: wget, gnupg")
-	if err := exec.Command("apt-get", "install", "-y", "wget", "gnupg").Run(); err != nil {
+	if err := exec.Command("sudo", "apt-get", "install", "-y", "wget", "gnupg").Run(); err != nil {
 		log.Error("❌ Failed to install prerequisites", zap.Error(err))
 		return fmt.Errorf("failed to install required packages: %w", err)
 	}
@@ -34,13 +34,13 @@ func installTrivy(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 	}
 
 	log.Info("🔄 Updating APT package lists")
-	if err := exec.Command("apt-get", "update").Run(); err != nil {
+	if err := exec.Command("sudo", "apt-get", "update").Run(); err != nil {
 		log.Error("❌ Failed to update package lists", zap.Error(err))
 		return fmt.Errorf("failed to update package lists: %w", err)
 	}
 
 	log.Info("📦 Installing Trivy")
-	if err := exec.Command("apt-get", "install", "-y", "trivy").Run(); err != nil {
+	if err := exec.Command("sudo", "apt-get", "install", "-y", "trivy").Run(); err != nil {
 		log.Error("❌ Failed to install Trivy", zap.Error(err))
 		return fmt.Errorf("failed to install Trivy: %w", err)
 	}

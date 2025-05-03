@@ -122,7 +122,7 @@ func uninstallLinux(log *zap.Logger) {
 
 func uninstallDeb(log *zap.Logger) {
 	log.Info("Uninstalling with apt-get purge...")
-	cmd := exec.Command("apt-get", "purge", "-y", "wazuh-agent")
+	cmd := exec.Command("sudo", "apt-get", "purge", "-y", "wazuh-agent")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
