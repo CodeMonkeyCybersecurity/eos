@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
@@ -182,11 +181,6 @@ func GenerateVaultTLSCert() error {
 
 	if err := os.MkdirAll(shared.TLSDir, shared.DirPermStandard); err != nil {
 		return fmt.Errorf("failed to create TLS directory: %w", err)
-	}
-
-	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true)
-	if !ok {
-		return fmt.Errorf("user declined TLS certificate generation")
 	}
 
 	configContent := fmt.Sprintf(`
