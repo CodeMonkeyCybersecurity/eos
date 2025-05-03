@@ -6,6 +6,7 @@ import (
 	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
@@ -18,10 +19,10 @@ var InspectLogsCmd = &cobra.Command{
 	Short: "Inspect EOS logs (requires root or eos privileges)",
 	Long: `Displays the last 100 lines of recent EOS logs.
 Tries known log file locations first. If none found, falls back to journalctl.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-logs")
 
-		if !system.IsPrivilegedUser(log) {
+		if !system.IsPrivilegedUser() {
 			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 
@@ -32,7 +33,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 
 		for _, candidate := range logger.PlatformLogPaths() {
 			path := os.ExpandEnv(candidate)
-			if content, err := logger.TryReadLogFile(path, log); err == nil {
+			if content, err := logger.TryReadLogFile(path); err == nil {
 				prefix := "📄"
 				if path == active {
 					prefix = "⭐"
@@ -49,7 +50,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 			fmt.Println("\n⚠️")
 			fmt.Println("No log files found. Trying journalctl fallback...")
 			fmt.Println("\n⚠️")
-			out, err := logger.TryJournalctl(log)
+			out, err := logger.TryJournalctl()
 			if err != nil {
 				return fmt.Errorf("journalctl fallback failed: %w", err)
 			}

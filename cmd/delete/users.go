@@ -3,6 +3,7 @@ package delete
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -12,12 +13,12 @@ var DeleteUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Delete users",
 	Long:  `Delete users by specifying the target user.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			log.Fatal("Please specify the user to delete.")
+			zap.L().Fatal("Please specify the user to delete.")
 		}
 		user := args[0]
-		log.Info("Deleting user", zap.String("user", user))
+		zap.L().Info("Deleting user", zap.String("user", user))
 		// Add your delete logic here.
 		return nil
 	}),

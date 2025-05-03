@@ -13,10 +13,10 @@ import (
 
 // ReloadDaemonAndEnable reloads systemd, then enables & starts the given unit.
 // It returns an error if either step fails.
-func ReloadDaemonAndEnable(log *zap.Logger, unit string) error {
+func ReloadDaemonAndEnable(unit string) error {
 	// 1) reload systemd
 	if out, err := exec.Command("sudo", "systemctl", "daemon-reload").CombinedOutput(); err != nil {
-		log.Warn("systemd daemon-reload failed",
+		zap.L().Warn("systemd daemon-reload failed",
 			zap.Error(err),
 			zap.ByteString("output", out),
 		)
@@ -25,7 +25,7 @@ func ReloadDaemonAndEnable(log *zap.Logger, unit string) error {
 
 	// 2) enable & start the unit
 	if out, err := exec.Command("sudo", "systemctl", "enable", "--now", unit).CombinedOutput(); err != nil {
-		log.Warn("failed to enable/start service",
+		zap.L().Warn("failed to enable/start service",
 			zap.String("unit", unit),
 			zap.Error(err),
 			zap.ByteString("output", out),
@@ -33,26 +33,26 @@ func ReloadDaemonAndEnable(log *zap.Logger, unit string) error {
 		return fmt.Errorf("enable --now %s: %w", unit, err)
 	}
 
-	log.Info("✅ systemd unit enabled & started",
+	zap.L().Info("✅ systemd unit enabled & started",
 		zap.String("unit", unit),
 	)
 	return nil
 }
 
-func StartSystemdUnitWithRetry(log *zap.Logger, unit string, retries int, delaySeconds int) error {
-	return RunSystemctlWithRetry(log, "start", unit, retries, delaySeconds)
+func StartSystemdUnitWithRetry(unit string, retries int, delaySeconds int) error {
+	return RunSystemctlWithRetry("start", unit, retries, delaySeconds)
 }
 
-func StopSystemdUnitWithRetry(log *zap.Logger, unit string, retries int, delaySeconds int) error {
-	return RunSystemctlWithRetry(log, "stop", unit, retries, delaySeconds)
+func StopSystemdUnitWithRetry(unit string, retries int, delaySeconds int) error {
+	return RunSystemctlWithRetry("stop", unit, retries, delaySeconds)
 }
 
-func RestartSystemdUnitWithRetry(log *zap.Logger, unit string, retries int, delaySeconds int) error {
-	return RunSystemctlWithRetry(log, "restart", unit, retries, delaySeconds)
+func RestartSystemdUnitWithRetry(unit string, retries int, delaySeconds int) error {
+	return RunSystemctlWithRetry("restart", unit, retries, delaySeconds)
 }
 
-func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delaySeconds int) error {
-	log.Info("⚙️ systemctl action initiated",
+func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error {
+	zap.L().Info("⚙️ systemctl action initiated",
 		zap.String("action", action),
 		zap.String("unit", unit),
 	)
@@ -61,11 +61,11 @@ func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delayS
 		if !CanInteractiveSudo() {
 			return fmt.Errorf("❌ eos user missing sudo permissions; please add:\n    eos ALL=(ALL) NOPASSWD: /bin/systemctl")
 		}
-		log.Warn("⚠️ NOPASSWD sudo missing. Attempting interactive sudo...")
+		zap.L().Warn("⚠️ NOPASSWD sudo missing. Attempting interactive sudo...")
 		if err := PromptAndRunInteractiveSystemctl(action, unit); err != nil {
 			return fmt.Errorf("interactive systemctl %s %s failed: %w", action, unit, err)
 		}
-		log.Info("✅ Interactive sudo succeeded; skipping retries")
+		zap.L().Info("✅ Interactive sudo succeeded; skipping retries")
 		return nil
 	}
 
@@ -75,19 +75,19 @@ func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delayS
 		out, err := cmd.CombinedOutput()
 
 		if bytes.Contains(out, []byte("Authentication is required")) {
-			log.Error("❌ Insufficient sudo privileges. Please add to sudoers...",
+			zap.L().Error("❌ Insufficient sudo privileges. Please add to sudoers...",
 				zap.String("recommendation", "eos ALL=(ALL) NOPASSWD: /bin/systemctl"))
 			return fmt.Errorf("sudo privileges missing; systemctl %s %s requires password", action, unit)
 		}
 
 		if err == nil {
-			log.Info(fmt.Sprintf("✅ systemd unit %s succeeded", action),
+			zap.L().Info(fmt.Sprintf("✅ systemd unit %s succeeded", action),
 				zap.String("unit", unit),
 			)
 			return nil
 		}
 
-		log.Warn(fmt.Sprintf("⚠️ systemctl %s failed", action),
+		zap.L().Warn(fmt.Sprintf("⚠️ systemctl %s failed", action),
 			zap.Int("attempt", i+1),
 			zap.String("unit", unit),
 			zap.Error(err),
@@ -97,11 +97,11 @@ func RunSystemctlWithRetry(log *zap.Logger, action, unit string, retries, delayS
 		time.Sleep(time.Duration(delaySeconds) * time.Second)
 	}
 
-	log.Error(fmt.Sprintf("❌ systemd unit %s failed after retries", action),
+	zap.L().Error(fmt.Sprintf("❌ systemd unit %s failed after retries", action),
 		zap.String("unit", unit),
 		zap.Error(lastErr),
 	)
-	log.Info("🩺 Run `systemctl status " + unit + " -l` or `journalctl -u " + unit + "` to investigate further")
+	zap.L().Info("🩺 Run `systemctl status " + unit + " -l` or `journalctl -u " + unit + "` to investigate further")
 
 	return fmt.Errorf("systemctl %s for unit %q failed: %w", action, unit, lastErr)
 }

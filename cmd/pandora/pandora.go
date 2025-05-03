@@ -9,10 +9,9 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/update"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 // PandoraCmd groups commands related to managing pandora (Wazuh) components.
@@ -21,8 +20,8 @@ var PandoraCmd = &cobra.Command{
 	Short: "Manage pandora (Vault) components",
 	Long:  "Commands related to pandora and integrations such as install, remove, and inspect.",
 	// Optionally, you can define a Run function to display help if no subcommand is provided.
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		shared.SafeHelp(cmd, log)
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		shared.SafeHelp(cmd)
 		return nil
 	}),
 }
@@ -35,9 +34,8 @@ func init() {
 }
 
 // log is a package-level variable for the Zap logger.
-var log *zap.Logger
 
 func init() {
 	// Initialize the shared logger for the entire deploy package
-	log = logger.L()
+
 }

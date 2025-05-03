@@ -6,7 +6,9 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // createProcessCmd represents the create command for processes
@@ -14,9 +16,9 @@ var CreateProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Create a new process",
 	Long:  `This command allows you to create a new process in the system.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			log.Fatal("Please provide details to create a process.")
+			zap.L().Fatal("Please provide details to create a process.")
 		}
 		processDetails := args[0]
 		fmt.Printf("Creating process: %s...\n", processDetails)

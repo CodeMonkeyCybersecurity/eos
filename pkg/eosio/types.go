@@ -32,9 +32,8 @@ type RuntimeContext struct {
 }
 
 // NewRuntimeContext initializes a RuntimeContext with safe defaults.
-func NewRuntimeContext(log *zap.Logger) *RuntimeContext {
+func NewRuntimeContext() *RuntimeContext {
 	return &RuntimeContext{
-		Log:       log,
 		Ctx:       context.Background(),
 		Timestamp: time.Now(),
 	}

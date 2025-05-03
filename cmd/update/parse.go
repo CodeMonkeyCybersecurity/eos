@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
@@ -19,8 +20,7 @@ var (
 var ParseCmd = &cobra.Command{
 	Use:   "parse",
 	Short: "Split a ChatGPT-style conversations.json into individual files",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("parse")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		if !jsonMode {
 			return fmt.Errorf("only --json mode is currently supported")
@@ -31,7 +31,7 @@ var ParseCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("failed to open input file: %w", err)
 		}
-		defer shared.SafeClose(file, log)
+		defer shared.SafeClose(file)
 
 		var conversations []map[string]interface{}
 		if err := json.NewDecoder(file).Decode(&conversations); err != nil {
@@ -51,7 +51,7 @@ var ParseCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("failed to create output file: %w", err)
 			}
-			defer shared.SafeClose(outFile, log) // Safe close each file
+			defer shared.SafeClose(outFile) // Safe close each file
 
 			enc := json.NewEncoder(outFile)
 			enc.SetIndent("", "  ")

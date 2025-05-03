@@ -4,6 +4,7 @@ package hecate
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/backup"
@@ -14,10 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/restore"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/update"
 	"go.uber.org/zap"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
-
 
 // HecateCmd groups reverse proxy–related commands.
 var HecateCmd = &cobra.Command{
@@ -25,9 +23,9 @@ var HecateCmd = &cobra.Command{
 	Short: "Manage and configure reverse proxy settings for Hecate",
 	Long:  "Hecate commands allow you to deploy, inspect, and manage reverse proxy configurations.",
 	// You can optionally add a Run function if you want to provide default behavior when no subcommand is used.
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
+		zap.L().Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),

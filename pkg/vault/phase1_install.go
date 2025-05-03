@@ -26,50 +26,50 @@ import (
 
 // PhaseInstallVault ensures Vault binary is installed via APT or DNF,
 // depending on detected Linux distribution. No-op if already installed.
-func PhaseInstallVault(log *zap.Logger) error {
-	log.Info("[1/13] Ensuring Vault is installed")
+func PhaseInstallVault() error {
+	zap.L().Info("[1/13] Ensuring Vault is installed")
 
-	distro := platform.DetectLinuxDistro(log)
-	log.Info("Detected Linux distribution", zap.String("distro", distro))
+	distro := platform.DetectLinuxDistro()
+	zap.L().Info("Detected Linux distribution", zap.String("distro", distro))
 
 	switch distro {
 	case "debian":
-		log.Info("Using APT to install Vault", zap.String("installer", "apt-get"))
-		if err := InstallVaultViaApt(log); err != nil {
-			log.Error("❌ Vault installation via APT failed", zap.Error(err))
+		zap.L().Info("Using APT to install Vault", zap.String("installer", "apt-get"))
+		if err := InstallVaultViaApt(); err != nil {
+			zap.L().Error("❌ Vault installation via APT failed", zap.Error(err))
 			return fmt.Errorf("vault install via apt failed: %w", err)
 		}
 	case "rhel":
-		log.Info("Using DNF to install Vault", zap.String("installer", "dnf"))
-		if err := InstallVaultViaDnf(log); err != nil {
-			log.Error("❌ Vault installation via DNF failed", zap.Error(err))
+		zap.L().Info("Using DNF to install Vault", zap.String("installer", "dnf"))
+		if err := InstallVaultViaDnf(); err != nil {
+			zap.L().Error("❌ Vault installation via DNF failed", zap.Error(err))
 			return fmt.Errorf("vault install via dnf failed: %w", err)
 		}
 	default:
-		log.Error("❌ Unsupported Linux distro for Vault install", zap.String("distro", distro))
+		zap.L().Error("❌ Unsupported Linux distro for Vault install", zap.String("distro", distro))
 		return fmt.Errorf("unsupported distro for Vault install: %s", distro)
 	}
 
-	log.Info("✅ Vault installed successfully")
+	zap.L().Info("✅ Vault installed successfully")
 	return nil
 }
 
 // InstallVaultViaApt ensures the Vault binary is installed on Debian-based systems via APT.
 // It adds the official HashiCorp repository if needed, installs Vault, and verifies the binary path.
-func InstallVaultViaApt(log *zap.Logger) error {
-	log.Info("🔍 Checking if Vault is already installed via apt")
+func InstallVaultViaApt() error {
+	zap.L().Info("🔍 Checking if Vault is already installed via apt")
 	if _, err := exec.LookPath("vault"); err == nil {
-		log.Info("✅ Vault is already installed")
+		zap.L().Info("✅ Vault is already installed")
 		return nil
 	}
 
-	log.Info("📦 Vault binary not found, proceeding with installation via apt")
+	zap.L().Info("📦 Vault binary not found, proceeding with installation via apt")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	// Step 1: Download and save the HashiCorp GPG key
-	log.Info("➕ Downloading HashiCorp GPG key")
+	zap.L().Info("➕ Downloading HashiCorp GPG key")
 	curlCmd := exec.CommandContext(ctx, "sudo", "curl", "-fsSL", "https://apt.releases.hashicorp.com/gpg")
 	gpgCmd := exec.CommandContext(ctx, "sudo", "gpg", "--dearmor", "-o", "/usr/share/keyrings/hashicorp-archive-keyring.gpg")
 
@@ -92,7 +92,7 @@ func InstallVaultViaApt(log *zap.Logger) error {
 		return fmt.Errorf("curl command failed: %w", err)
 	}
 	if err := pipeWriter.Close(); err != nil {
-		log.Warn("Failed to close pipeWriter", zap.Error(err))
+		zap.L().Warn("Failed to close pipeWriter", zap.Error(err))
 	}
 
 	if err := gpgCmd.Wait(); err != nil {
@@ -100,7 +100,7 @@ func InstallVaultViaApt(log *zap.Logger) error {
 	}
 
 	// Step 2: Write the APT source list
-	log.Info("➕ Adding HashiCorp APT repository")
+	zap.L().Info("➕ Adding HashiCorp APT repository")
 	distroCodenameCmd := exec.CommandContext(ctx, "lsb_release", "-cs")
 	codenameBytes, err := distroCodenameCmd.Output()
 	if err != nil {
@@ -117,12 +117,12 @@ func InstallVaultViaApt(log *zap.Logger) error {
 	}
 
 	// Step 3: Update and install
-	log.Info("♻️ Updating APT package cache")
+	zap.L().Info("♻️ Updating APT package cache")
 	if err := exec.CommandContext(ctx, "sudo", "apt-get", "update").Run(); err != nil {
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
 
-	log.Info("📦 Installing Vault from HashiCorp repo via apt")
+	zap.L().Info("📦 Installing Vault from HashiCorp repo via apt")
 	installCmd := exec.CommandContext(ctx, "sudo", "apt-get", "install", "-y", "vault")
 	installCmd.Stdout = os.Stdout
 	installCmd.Stderr = os.Stderr
@@ -137,25 +137,25 @@ func InstallVaultViaApt(log *zap.Logger) error {
 	if info.Mode()&0111 == 0 {
 		return fmt.Errorf("vault binary is not executable (permissions issue)")
 	}
-	log.Info("✅ Vault binary found", zap.String("path", shared.VaultBinaryPath))
+	zap.L().Info("✅ Vault binary found", zap.String("path", shared.VaultBinaryPath))
 	return nil
 }
 
-func InstallVaultViaDnf(log *zap.Logger) error {
-	log.Info("🔍 Checking if Vault is already installed via dnf")
+func InstallVaultViaDnf() error {
+	zap.L().Info("🔍 Checking if Vault is already installed via dnf")
 	if _, err := exec.LookPath("vault"); err == nil {
-		log.Info("✅ Vault is already installed")
+		zap.L().Info("✅ Vault is already installed")
 		return nil
 	}
 
-	log.Info("📦 Vault binary not found, proceeding with installation via dnf")
+	zap.L().Info("📦 Vault binary not found, proceeding with installation via dnf")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	repoFile := "/etc/yum.repos.d/hashicorp.repo"
 	if _, err := os.Stat(repoFile); os.IsNotExist(err) {
-		log.Info("➕ Adding HashiCorp YUM repo")
+		zap.L().Info("➕ Adding HashiCorp YUM repo")
 		repoContent := `[hashicorp]
 name=HashiCorp Stable - $basearch
 baseurl=https://rpm.releases.hashicorp.com/RHEL/9/$basearch/stable
@@ -167,11 +167,11 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 		}
 	}
 
-	log.Info("♻️ Cleaning and refreshing DNF cache")
+	zap.L().Info("♻️ Cleaning and refreshing DNF cache")
 	_ = exec.CommandContext(ctx, "dnf", "clean", "all").Run()
 	_ = exec.CommandContext(ctx, "dnf", "makecache").Run()
 
-	log.Info("📦 Installing Vault via dnf")
+	zap.L().Info("📦 Installing Vault via dnf")
 	dnfCmd := exec.CommandContext(ctx, "dnf", "install", "-y", "vault")
 	dnfCmd.Stdout = os.Stdout
 	dnfCmd.Stderr = os.Stderr
@@ -179,6 +179,6 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg`
 		return fmt.Errorf("vault installation via dnf failed: %w", err)
 	}
 
-	log.Info("✅ Vault installed successfully via dnf")
+	zap.L().Info("✅ Vault installed successfully via dnf")
 	return nil
 }

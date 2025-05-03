@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
@@ -28,10 +29,10 @@ By default, this checks your system's hardware (4GB RAM, 2+ cores). Use --ignore
 	RunE: eos.Wrap(runDelphiInstall),
 }
 
-func runDelphiInstall(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runDelphiInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("delphi")
 
-	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}, log); err != nil {
+	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}); err != nil {
 		log.Fatal("Unsupported Linux distro", zap.Error(err))
 	}
 
@@ -68,12 +69,12 @@ func runDelphiInstall(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string
 	log.Info("✅ Wazuh installation completed")
 
 	log.Info("🔐 Attempting to extract Wazuh admin credentials")
-	if err := extractWazuhPasswords(log); err != nil {
+	if err := extractWazuhPasswords(); err != nil {
 		log.Warn("⚠️ Could not extract Wazuh credentials", zap.Error(err))
 	}
 
 	log.Info("🚫 Disabling Wazuh repo updates")
-	distro := platform.DetectLinuxDistro(log)
+	distro := platform.DetectLinuxDistro()
 	switch distro {
 	case "debian", "ubuntu":
 		cmd := exec.Command("sudo", "sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
@@ -108,12 +109,12 @@ func runDelphiInstall(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string
 	return nil
 }
 
-func extractWazuhPasswords(log *zap.Logger) error {
+func extractWazuhPasswords() error {
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	for _, dir := range searchPaths {
 		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
 		if system.Exists(tarPath) {
-			log.Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
+			zap.L().Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
 			cmd := exec.Command("sudo", "tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr

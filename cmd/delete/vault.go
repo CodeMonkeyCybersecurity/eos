@@ -7,6 +7,7 @@ import (
 	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -20,14 +21,14 @@ var DeleteVaultCmd = &cobra.Command{
 	Short: "Deletes the Vault installation",
 	Long:  `Removes the Vault package (via snap, apt, or dnf) and optionally purges all configuration, data, and logs.`,
 
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		log.Info("🧨 Deleting Vault...")
+		zap.L().Info("🧨 Deleting Vault...")
 
-		distro := platform.DetectLinuxDistro(log)
-		osPlatform := platform.GetOSPlatform(log)
+		distro := platform.DetectLinuxDistro()
+		osPlatform := platform.GetOSPlatform()
 		if osPlatform != "linux" {
-			log.Fatal("Vault uninstallation only supported on Linux")
+			zap.L().Fatal("Vault uninstallation only supported on Linux")
 		}
 
 		// Kill Vault processes if any
@@ -42,13 +43,13 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		if purge {
-			log.Info("🧹 Purging Vault files and directories...")
+			zap.L().Info("🧹 Purging Vault files and directories...")
 
 			for _, path := range vault.GetVaultPurgePaths() {
 				if err := os.RemoveAll(path); err != nil {
-					log.Warn("Failed to remove path", zap.String("path", path), zap.Error(err))
+					zap.L().Warn("Failed to remove path", zap.String("path", path), zap.Error(err))
 				} else {
-					log.Info("Removed path", zap.String("path", path))
+					zap.L().Info("Removed path", zap.String("path", path))
 				}
 			}
 
@@ -56,13 +57,13 @@ var DeleteVaultCmd = &cobra.Command{
 				run("sh", "-c", "rm -rf "+wildcard)
 			}
 
-			log.Info("Cleaning up Vault repo and keyring...")
-			vault.Purge(distro, log)
+			zap.L().Info("Cleaning up Vault repo and keyring...")
+			vault.Purge(distro)
 		} else {
-			log.Info("Skipping purge (--no-purge provided)")
+			zap.L().Info("Skipping purge (--no-purge provided)")
 		}
 
-		log.Info("✅ Vault deletion complete.")
+		zap.L().Info("✅ Vault deletion complete.")
 		return nil
 	}),
 }
@@ -78,8 +79,8 @@ func run(name string, args ...string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Warn("Command failed", zap.String("cmd", name+" "+args[0]), zap.Error(err))
+		zap.L().Warn("Command failed", zap.String("cmd", name+" "+args[0]), zap.Error(err))
 	} else {
-		log.Info("Ran", zap.String("cmd", name+" "+args[0]))
+		zap.L().Info("Ran", zap.String("cmd", name+" "+args[0]))
 	}
 }

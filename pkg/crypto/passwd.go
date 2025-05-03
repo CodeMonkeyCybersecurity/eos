@@ -56,15 +56,14 @@ func TestGeneratePassword(t *testing.T) {
 }
 
 func TestValidateStrongPassword(t *testing.T) {
-	log := zap.NewNop() // No-op logger for tests
 
 	valid := "Astrong!Pass123"
-	if err := ValidateStrongPassword(valid, log); err != nil {
+	if err := ValidateStrongPassword(valid); err != nil {
 		t.Errorf("ValidateStrongPassword rejected valid password: %v", err)
 	}
 
 	invalid := "weakpass"
-	if err := ValidateStrongPassword(invalid, log); err == nil {
+	if err := ValidateStrongPassword(invalid); err == nil {
 		t.Error("ValidateStrongPassword accepted weak password, expected error")
 	}
 }
@@ -104,9 +103,9 @@ func shuffle(b []byte) error {
 }
 
 // ValidateStrongPassword ensures min length and mixed char types.
-func ValidateStrongPassword(input string, log *zap.Logger) error {
+func ValidateStrongPassword(input string) error {
 	if len(input) < 12 {
-		log.Warn("password too short", zap.Int("length", len(input)))
+		zap.L().Warn("password too short", zap.Int("length", len(input)))
 		return errors.New(shared.ErrPasswordTooShort)
 	}
 
@@ -125,7 +124,7 @@ func ValidateStrongPassword(input string, log *zap.Logger) error {
 	}
 
 	if !hasUpper || !hasLower || !hasDigit || !hasSymbol {
-		log.Warn("password missing required character classes")
+		zap.L().Warn("password missing required character classes")
 		return errors.New(shared.ErrPasswordMissingClasses)
 	}
 

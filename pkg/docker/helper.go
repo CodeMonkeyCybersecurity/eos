@@ -8,12 +8,9 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 )
-
-var log = logger.L()
 
 // DeployCompose performs the following actions:
 // 1. Gets the current working directory and uses its base name as the application name.
@@ -57,7 +54,7 @@ func DeployCompose() error {
 	for _, file := range composeFiles {
 		destFile := filepath.Join(targetDir, filepath.Base(file))
 		fmt.Printf("Copying %s to %s\n", file, destFile)
-		if err := system.CopyFile(file, destFile, 0, log); err != nil {
+		if err := system.CopyFile(file, destFile, 0); err != nil {
 			return fmt.Errorf("error copying file %s: %v", file, err)
 		}
 	}

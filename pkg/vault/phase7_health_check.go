@@ -31,36 +31,36 @@ import (
 //               └── unsealFromStoredKeys()
 
 // PhaseEnsureVaultHealthy ensures Vault is running, healthy, and ready for use.
-func PhaseEnsureVaultHealthy(log *zap.Logger) error {
-	log.Info("🚀 [Phase 7] Ensuring Vault is ready")
+func PhaseEnsureVaultHealthy() error {
+	zap.L().Info("🚀 [Phase 7] Ensuring Vault is ready")
 
-	if isVaultProcessRunning(log) {
-		log.Info("✅ Vault process running (lsof check)") // NOTE: Only TCP presence, not real health
+	if isVaultProcessRunning() {
+		zap.L().Info("✅ Vault process running (lsof check)") // NOTE: Only TCP presence, not real health
 	}
 
-	if _, err := EnsureVaultEnv(log); err != nil {
+	if _, err := EnsureVaultEnv(); err != nil {
 		return fmt.Errorf("could not resolve VAULT_ADDR: %w", err)
 	}
 
-	client, err := NewClient(log)
+	client, err := NewClient()
 	if err != nil {
 		return fmt.Errorf("could not create Vault client: %w", err)
 	}
 
-	if err := probeVaultHealthUntilReady(log); err == nil {
-		log.Info("✅ Vault healthy after probe")
+	if err := probeVaultHealthUntilReady(); err == nil {
+		zap.L().Info("✅ Vault healthy after probe")
 		return nil
 	}
 
-	log.Warn("⚠️ Vault did not become healthy after retries — attempting recovery")
-	return recoverVaultHealth(client, log)
+	zap.L().Warn("⚠️ Vault did not become healthy after retries — attempting recovery")
+	return recoverVaultHealth(client)
 }
 
 // CheckVaultHealth probes Vault's /v1/sys/health and returns whether Vault is healthy.
-func CheckVaultHealth(log *zap.Logger) (bool, error) {
+func CheckVaultHealth() (bool, error) {
 	addr := os.Getenv(shared.VaultAddrEnv)
 	if addr == "" {
-		log.Error("❌ VAULT_ADDR not set")
+		zap.L().Error("❌ VAULT_ADDR not set")
 		return false, fmt.Errorf("VAULT_ADDR not set")
 	}
 
@@ -69,47 +69,47 @@ func CheckVaultHealth(log *zap.Logger) (bool, error) {
 
 	resp, err := client.Get(healthURL)
 	if err != nil {
-		log.Error("❌ Vault health check request failed", zap.String("url", healthURL), zap.Error(err))
+		zap.L().Error("❌ Vault health check request failed", zap.String("url", healthURL), zap.Error(err))
 		return false, fmt.Errorf("vault not responding at %s: %w", addr, err)
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	switch resp.StatusCode {
 	case 200:
-		log.Info("✅ Vault is healthy", zap.String(shared.VaultAddrEnv, addr))
+		zap.L().Info("✅ Vault is healthy", zap.String(shared.VaultAddrEnv, addr))
 		return true, nil
 	case 429:
-		log.Warn("⚠️ Vault is overloaded (429)", zap.String(shared.VaultAddrEnv, addr))
+		zap.L().Warn("⚠️ Vault is overloaded (429)", zap.String(shared.VaultAddrEnv, addr))
 		return true, nil // still usable
 	case 501:
-		log.Warn("⚠️ Vault is uninitialized (501)", zap.String(shared.VaultAddrEnv, addr))
+		zap.L().Warn("⚠️ Vault is uninitialized (501)", zap.String(shared.VaultAddrEnv, addr))
 		return false, nil
 	case 503:
-		log.Warn("⚠️ Vault is sealed or standby (503)", zap.String(shared.VaultAddrEnv, addr))
+		zap.L().Warn("⚠️ Vault is sealed or standby (503)", zap.String(shared.VaultAddrEnv, addr))
 		return false, nil
 	default:
 		body, readErr := io.ReadAll(resp.Body)
 		if readErr != nil {
-			log.Warn("⚠️ Failed to read Vault health body", zap.Error(readErr))
+			zap.L().Warn("⚠️ Failed to read Vault health body", zap.Error(readErr))
 		}
-		log.Error("🚨 Vault unhealthy", zap.Int("status_code", resp.StatusCode), zap.String("body", string(body)))
+		zap.L().Error("🚨 Vault unhealthy", zap.Int("status_code", resp.StatusCode), zap.String("body", string(body)))
 		return false, fmt.Errorf("vault unhealthy: %s", string(body))
 	}
 }
 
 // probeVaultHealthUntilReady probes Vault health repeatedly until success or retries exhausted.
-func probeVaultHealthUntilReady(log *zap.Logger) error {
+func probeVaultHealthUntilReady() error {
 	for attempt := 1; attempt <= shared.VaultRetryCount; attempt++ {
-		log.Info("🔁 Vault health probe", zap.Int("attempt", attempt))
+		zap.L().Info("🔁 Vault health probe", zap.Int("attempt", attempt))
 
-		healthy, err := CheckVaultHealth(log)
+		healthy, err := CheckVaultHealth()
 		if healthy && err == nil {
 			return nil
 		}
 		if err != nil {
-			log.Warn("🛑 Vault health check failed", zap.Int("attempt", attempt), zap.Error(err))
+			zap.L().Warn("🛑 Vault health check failed", zap.Int("attempt", attempt), zap.Error(err))
 		} else {
-			log.Warn("🛑 Vault unhealthy (no explicit error)", zap.Int("attempt", attempt))
+			zap.L().Warn("🛑 Vault unhealthy (no explicit error)", zap.Int("attempt", attempt))
 		}
 
 		time.Sleep(shared.VaultRetryDelay)
@@ -118,7 +118,7 @@ func probeVaultHealthUntilReady(log *zap.Logger) error {
 }
 
 // recoverVaultHealth attempts initialization or unsealing based on Vault health status.
-func recoverVaultHealth(client *api.Client, log *zap.Logger) error {
+func recoverVaultHealth(client *api.Client) error {
 	health, err := client.Sys().Health()
 	if err != nil {
 		return fmt.Errorf("vault health API call failed: %w", err)
@@ -126,25 +126,25 @@ func recoverVaultHealth(client *api.Client, log *zap.Logger) error {
 
 	switch {
 	case !health.Initialized:
-		log.Info("💥 Vault uninitialized — running initialization")
-		return initAndUnseal(client, log)
+		zap.L().Info("💥 Vault uninitialized — running initialization")
+		return initAndUnseal(client)
 
 	case health.Sealed:
-		log.Info("🔒 Vault sealed — attempting unseal from fallback")
-		return MustUnseal(client, log)
+		zap.L().Info("🔒 Vault sealed — attempting unseal from fallback")
+		return MustUnseal(client)
 
 	default:
-		log.Warn("❓ Unexpected Vault health state after retries; manual intervention may be required")
+		zap.L().Warn("❓ Unexpected Vault health state after retries; manual intervention may be required")
 		return fmt.Errorf("unexpected vault health state: initialized=%v sealed=%v", health.Initialized, health.Sealed)
 	}
 }
 
 // isVaultProcessRunning checks if a Vault process is active and bound to the expected TCP port.
 // Linux-only: relies on lsof syntax.
-func isVaultProcessRunning(log *zap.Logger) bool {
+func isVaultProcessRunning() bool {
 	out, err := exec.Command("sudo", "lsof", "-i", shared.VaultDefaultPort).Output()
 	if err != nil {
-		log.Warn("⚠️ lsof command failed (process check skipped)", zap.Error(err))
+		zap.L().Warn("⚠️ lsof command failed (process check skipped)", zap.Error(err))
 		return false
 	}
 	for _, line := range strings.Split(string(out), "\n") {

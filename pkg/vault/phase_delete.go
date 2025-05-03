@@ -50,9 +50,9 @@ func GetVaultPurgePaths() []string {
 
 // Purge removes Vault repo artifacts and paths based on the Linux distro.
 // It returns a list of removed files and a map of errors keyed by path.
-func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]error) {
+func Purge(distro string) (removed []string, errs map[string]error) {
 	errs = make(map[string]error)
-	log.Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
+	zap.L().Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
 
 	pathsToRemove := []string{}
 
@@ -62,7 +62,7 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	case "rhel":
 		pathsToRemove = append(pathsToRemove, shared.DnfRepoFilePath)
 	default:
-		log.Warn("⚠️ No package manager cleanup defined for distro", zap.String("distro", distro))
+		zap.L().Warn("⚠️ No package manager cleanup defined for distro", zap.String("distro", distro))
 	}
 
 	pathsToRemove = append(pathsToRemove, shared.VaultBinaryPath)
@@ -70,13 +70,13 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	for _, path := range pathsToRemove {
 		if err := os.Remove(path); err != nil {
 			if os.IsNotExist(err) {
-				log.Info("ℹ️ File already absent", zap.String("path", path))
+				zap.L().Info("ℹ️ File already absent", zap.String("path", path))
 				continue
 			}
-			log.Error("❌ Failed to remove file", zap.String("path", path), zap.Error(err))
+			zap.L().Error("❌ Failed to remove file", zap.String("path", path), zap.Error(err))
 			errs[path] = fmt.Errorf("failed to remove %s: %w", path, err)
 		} else {
-			log.Info("✅ Removed file", zap.String("path", path))
+			zap.L().Info("✅ Removed file", zap.String("path", path))
 			removed = append(removed, path)
 		}
 	}
@@ -86,19 +86,19 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	defer cancel()
 
 	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reexec").Run(); err != nil {
-		log.Warn("⚠️ Failed daemon-reexec", zap.Error(err))
+		zap.L().Warn("⚠️ Failed daemon-reexec", zap.Error(err))
 	}
 	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reload").Run(); err != nil {
-		log.Warn("⚠️ Failed daemon-reload", zap.Error(err))
+		zap.L().Warn("⚠️ Failed daemon-reload", zap.Error(err))
 	}
 
-	log.Info("✅ Vault purge complete", zap.Int("paths_removed", len(removed)), zap.Int("errors", len(errs)))
+	zap.L().Info("✅ Vault purge complete", zap.Int("paths_removed", len(removed)), zap.Int("errors", len(errs)))
 	return removed, errs
 }
 
 // VaultDelete removes a secret at the given KV v2 path
-func VaultDelete(path string, log *zap.Logger) error {
-	client, err := GetPrivilegedVaultClient(log)
+func VaultDelete(path string) error {
+	client, err := GetPrivilegedVaultClient()
 	if err != nil {
 		return err
 	}
@@ -107,8 +107,8 @@ func VaultDelete(path string, log *zap.Logger) error {
 }
 
 // VaultDestroy permanently deletes a secret at the given KV v2 path
-func VaultPurge(path string, log *zap.Logger) error {
-	client, err := GetPrivilegedVaultClient(log)
+func VaultPurge(path string) error {
+	client, err := GetPrivilegedVaultClient()
 	if err != nil {
 		return err
 	}

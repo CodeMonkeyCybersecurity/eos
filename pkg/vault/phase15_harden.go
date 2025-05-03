@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
+func RevokeRootToken(client *api.Client, token string) error {
 	client.SetToken(token)
 
 	err := client.Auth().Token().RevokeSelf("")
@@ -17,6 +17,6 @@ func RevokeRootToken(client *api.Client, token string, log *zap.Logger) error {
 		return fmt.Errorf("failed to revoke root token: %w", err)
 	}
 
-	log.Info("✅ Root token revoked")
+	zap.L().Info("✅ Root token revoked")
 	return nil
 }

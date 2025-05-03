@@ -40,7 +40,7 @@ Host %s
 	if err != nil {
 		return fmt.Errorf("failed to open SSH config: %w", err)
 	}
-	defer shared.SafeClose(f, log)
+	defer shared.SafeClose(f)
 
 	// Only add entry if not already present
 	data, err := os.ReadFile(configPath)

@@ -48,9 +48,9 @@ var CertsCmd = &cobra.Command{
 			return fmt.Errorf("checking docker processes: %w", err)
 		}
 
-		baseDomain := interaction.PromptInput("Enter the base domain (e.g. domain.com)", prevValues["BASE_DOMAIN"], log)
+		baseDomain := interaction.PromptInput("Enter the base domain (e.g. domain.com)", prevValues["BASE_DOMAIN"])
 		subdomain := promptSubdomain()
-		mailCert := interaction.PromptInput("Enter the contact email (e.g. example@domain.com)", prevValues["EMAIL"], log)
+		mailCert := interaction.PromptInput("Enter the contact email (e.g. example@domain.com)", prevValues["EMAIL"])
 
 		// Save the new values for future runs.
 		newValues := map[string]string{
@@ -115,7 +115,7 @@ var CertsCmd = &cobra.Command{
 				certName = defaultCertName
 				break
 			} else if confirm == "no" || confirm == "n" {
-				certName = interaction.PromptInput("Enter the desired certificate name (for file naming)", "", log)
+				certName = interaction.PromptInput("Enter the desired certificate name (for file naming)", "")
 				break
 			} else {
 				fmt.Println("Please answer yes or no.")

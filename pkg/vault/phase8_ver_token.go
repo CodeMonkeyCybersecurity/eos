@@ -20,10 +20,10 @@ import (
 //          └── SetVaultToken()
 
 // PhasePromptAndVerRootToken prompts for root token, validates it, and sets it on client.
-func PhasePromptAndVerRootToken(client *api.Client, log *zap.Logger) error {
-	log.Info("🔑 [Phase 8] Prompting and validating Vault root token")
+func PhasePromptAndVerRootToken(client *api.Client) error {
+	zap.L().Info("🔑 [Phase 8] Prompting and validating Vault root token")
 
-	token, err := PromptRootToken(log)
+	token, err := PromptRootToken()
 	if err != nil {
 		return fmt.Errorf("prompt root token: %w", err)
 	}
@@ -33,14 +33,14 @@ func PhasePromptAndVerRootToken(client *api.Client, log *zap.Logger) error {
 	}
 
 	SetVaultToken(client, token)
-	log.Info("✅ Root token validated and applied")
+	zap.L().Info("✅ Root token validated and applied")
 	return nil
 }
 
 // PromptRootToken requests the root token from the user.
-func PromptRootToken(log *zap.Logger) (string, error) {
-	log.Info("🔑 Please enter the Vault root token")
-	tokens, err := interaction.PromptSecrets("Root Token", 1, log)
+func PromptRootToken() (string, error) {
+	zap.L().Info("🔑 Please enter the Vault root token")
+	tokens, err := interaction.PromptSecrets("Root Token", 1)
 	if err != nil {
 		return "", err
 	}

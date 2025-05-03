@@ -21,24 +21,24 @@ import (
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
 func PhaseEnableUserpass(client *api.Client, log *zap.Logger, password string) error {
-	log.Info("🧑‍💻 [Phase 10] Enabling userpass auth method and EOS user")
+	zap.L().Info("🧑‍💻 [Phase 10] Enabling userpass auth method and EOS user")
 
 	// Validate password
 	if password == "" {
-		log.Warn("⚠️ No password provided, prompting user interactively...")
+		zap.L().Warn("⚠️ No password provided, prompting user interactively...")
 		var err error
-		password, err = crypto.PromptPassword("Enter password for EOS Vault user: ", log)
+		password, err = crypto.PromptPassword("Enter password for EOS Vault user: ")
 		if err != nil {
 			return fmt.Errorf("failed to read password interactively: %w", err)
 		}
 	} else {
 		// Validate CLI-passed password as well!
-		if err := crypto.ValidateStrongPassword(password, log); err != nil {
+		if err := crypto.ValidateStrongPassword(password); err != nil {
 			return fmt.Errorf("provided password failed validation: %w", err)
 		}
 	}
 
-	if err := EnableUserpassAuth(client, log); err != nil {
+	if err := EnableUserpassAuth(client); err != nil {
 		return fmt.Errorf("enable userpass auth: %w", err)
 	}
 
@@ -46,39 +46,39 @@ func PhaseEnableUserpass(client *api.Client, log *zap.Logger, password string) e
 		return fmt.Errorf("ensure userpass user: %w", err)
 	}
 
-	log.Info("✅ Userpass auth method and EOS user configured")
+	zap.L().Info("✅ Userpass auth method and EOS user configured")
 	return nil
 }
 
 // EnableUserpassAuth enables the userpass auth method if it is not already mounted.
-func EnableUserpassAuth(client *api.Client, log *zap.Logger) error {
-	log.Info("📡 Enabling userpass auth method if needed...")
+func EnableUserpassAuth(client *api.Client) error {
+	zap.L().Info("📡 Enabling userpass auth method if needed...")
 
 	err := client.Sys().EnableAuthWithOptions("userpass", &api.EnableAuthOptions{Type: "userpass"})
 	if err == nil {
-		log.Info("✅ Userpass auth method enabled")
+		zap.L().Info("✅ Userpass auth method enabled")
 		return nil
 	}
 
 	if strings.Contains(err.Error(), "path is already in use") {
-		log.Warn("⚠️ Userpass auth method already enabled", zap.Error(err))
+		zap.L().Warn("⚠️ Userpass auth method already enabled", zap.Error(err))
 		return nil
 	}
 
-	log.Error("❌ Failed to enable userpass auth method", zap.Error(err))
+	zap.L().Error("❌ Failed to enable userpass auth method", zap.Error(err))
 	return fmt.Errorf("enable userpass auth: %w", err)
 }
 
 // EnsureUserpassUser ensures the eos user exists under userpass auth.
 func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) error {
-	log.Info("👤 Ensuring EOS user exists under userpass auth")
+	zap.L().Info("👤 Ensuring EOS user exists under userpass auth")
 
 	path := "auth/userpass/users/eos"
 
 	// Check if user already exists
 	secret, err := client.Logical().Read(path)
 	if err == nil && secret != nil {
-		log.Warn("⚠️ EOS user already exists under userpass auth; skipping creation")
+		zap.L().Warn("⚠️ EOS user already exists under userpass auth; skipping creation")
 		return nil
 	}
 
@@ -91,10 +91,10 @@ func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) er
 		return fmt.Errorf("create userpass user: %w", err)
 	}
 
-	log.Info("✅ EOS user created under userpass auth")
+	zap.L().Info("✅ EOS user created under userpass auth")
 
 	// Save password fallback
-	if err := WriteUserpassCredentialsFallback(password, log); err != nil {
+	if err := WriteUserpassCredentialsFallback(password); err != nil {
 		return fmt.Errorf("write userpass fallback: %w", err)
 	}
 
@@ -102,8 +102,8 @@ func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) er
 }
 
 // WriteUserpassCredentialsFallback saves the EOS userpass password to Vault and fallback disk.
-func WriteUserpassCredentialsFallback(password string, log *zap.Logger) error {
-	log.Info("💾 Saving EOS userpass password to fallback and Vault")
+func WriteUserpassCredentialsFallback(password string) error {
+	zap.L().Info("💾 Saving EOS userpass password to fallback and Vault")
 
 	fallbackFile := shared.EosUserVaultFallback + "/userpass-password"
 	fallbackDir := filepath.Dir(fallbackFile)
@@ -117,7 +117,7 @@ func WriteUserpassCredentialsFallback(password string, log *zap.Logger) error {
 	if err := system.WriteOwnedFile(fallbackFile, []byte(password+"\n"), 0o600, shared.EosUser); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
-	log.Info("✅ Userpass password written to fallback file", zap.String("path", fallbackFile))
+	zap.L().Info("✅ Userpass password written to fallback file", zap.String("path", fallbackFile))
 
 	// Prepare KV payload
 	secrets := map[string]interface{}{
@@ -130,20 +130,20 @@ func WriteUserpassCredentialsFallback(password string, log *zap.Logger) error {
 	}
 
 	// After writing the fallback file successfully:
-	if err := system.ChownRecursive(shared.SecretsDir, uid, gid, log); err != nil {
-		log.Warn("⚠️ Failed to enforce EOS ownership after writing userpass fallback", zap.Error(err))
+	if err := system.ChownRecursive(shared.SecretsDir, uid, gid); err != nil {
+		zap.L().Warn("⚠️ Failed to enforce EOS ownership after writing userpass fallback", zap.Error(err))
 	}
 
 	// Write to Vault KV
-	client, err := NewClient(log)
+	client, err := NewClient()
 	if err != nil {
 		return fmt.Errorf("get vault client for fallback write: %w", err)
 	}
-	if err := WriteKVv2(client, "secret", "eos/userpass-password", secrets, log); err != nil {
+	if err := WriteKVv2(client, "secret", "eos/userpass-password", secrets); err != nil {
 		return fmt.Errorf("write password to vault kv: %w", err)
 	}
 
-	log.Info("✅ Userpass password written to Vault KV", zap.String("path", "secret/eos/userpass-password"))
+	zap.L().Info("✅ Userpass password written to Vault KV", zap.String("path", "secret/eos/userpass-password"))
 
 	return nil
 }

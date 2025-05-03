@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
@@ -32,7 +33,7 @@ Example configuration:
 
 Usage:
   hecate update jenkins --backendIP <new-ip>`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if backendIP == "" {
 			fmt.Println("Error: please provide a new backend IP using the --backendIP flag")
 			return nil
@@ -59,7 +60,7 @@ Usage:
 			return err
 		}
 		fmt.Println("Hecate redeployed successfully with new Jenkins backend IP.")
-		shared.SafeHelp(cmd, log)
+		shared.SafeHelp(cmd)
 		return nil
 	}),
 }

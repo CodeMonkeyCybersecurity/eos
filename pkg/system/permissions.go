@@ -24,28 +24,28 @@ func CheckSudo() bool {
 	return err != nil
 }
 
-func IsPrivilegedUser(log *zap.Logger) bool {
+func IsPrivilegedUser() bool {
 	current, err := user.Current()
 	if err != nil {
-		log.Warn("🧪 Could not determine current user", zap.Error(err))
+		zap.L().Warn("🧪 Could not determine current user", zap.Error(err))
 		return os.Geteuid() == 0
 	}
 	return current.Username == shared.EosUser || os.Geteuid() == 0
 }
 
 /* EnforceSecretsAccess blocks --show-secrets unless run as root */
-func EnforceSecretsAccess(log *zap.Logger, show bool) bool {
-	if show && !IsPrivilegedUser(log) {
-		log.Warn("Non-root user attempted to use --show-secrets")
+func EnforceSecretsAccess(show bool) bool {
+	if show && !IsPrivilegedUser() {
+		zap.L().Warn("Non-root user attempted to use --show-secrets")
 		fmt.Fprintln(os.Stderr, "🚫 --show-secrets can only be used by root or sudo.")
 		return false
 	}
 	return true
 }
 
-func RequireRoot(log *zap.Logger) {
-	if !IsPrivilegedUser(log) {
-		log.Error("Root access required")
+func RequireRoot() {
+	if !IsPrivilegedUser() {
+		zap.L().Error("Root access required")
 		fmt.Fprintln(os.Stderr, "❌ This command must be run as root (try sudo).")
 		os.Exit(1)
 	}
@@ -71,9 +71,9 @@ func RequireRootInteractive() error {
 	return nil
 }
 
-func FailIfPermissionDenied(log *zap.Logger, action, path string, err error) {
+func FailIfPermissionDenied(action, path string, err error) {
 	if os.IsPermission(err) {
-		log.Error(fmt.Sprintf("❌ %s failed due to permissions", action),
+		zap.L().Error(fmt.Sprintf("❌ %s failed due to permissions", action),
 			zap.String("path", path),
 			zap.Error(err),
 		)

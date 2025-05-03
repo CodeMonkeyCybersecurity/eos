@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,32 +21,32 @@ import (
 var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("Disabling system suspension and hibernation...")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
+		zap.L().Info("Disabling system suspension and hibernation...")
 
 		if runtime.GOOS != "linux" {
-			log.Warn("System suspension disabling is only supported on Linux.")
+			zap.L().Warn("System suspension disabling is only supported on Linux.")
 			fmt.Println("❌ This command is not supported on your operating system.")
 			return nil
 		}
 
 		if err := disableSystemdTargets(); err != nil {
-			log.Error("Failed to disable suspend/hibernate targets", zap.Error(err))
+			zap.L().Error("Failed to disable suspend/hibernate targets", zap.Error(err))
 			return fmt.Errorf("failed to disable system targets: %w", err)
 		}
 
 		if err := maskSleepTargets(); err != nil {
-			log.Error("Failed to mask sleep targets", zap.Error(err))
+			zap.L().Error("Failed to mask sleep targets", zap.Error(err))
 			return fmt.Errorf("failed to mask sleep targets: %w", err)
 		}
 
 		if err := disableLogindSleep(); err != nil {
-			log.Error("Failed to patch /etc/systemd/logind.conf", zap.Error(err))
+			zap.L().Error("Failed to patch /etc/systemd/logind.conf", zap.Error(err))
 			return fmt.Errorf("failed to modify logind.conf: %w", err)
 		}
 
-		log.Info("✅ System suspension and hibernation disabled successfully.")
+		zap.L().Info("✅ System suspension and hibernation disabled successfully.")
 		fmt.Println("✅ Suspension/hibernation is now disabled and persistent.")
 		return nil
 	}),
@@ -131,7 +131,7 @@ func disableLogindSleep() error {
 	}
 
 	// ✅ Logging fix
-	logger.L().Info("Suspension hardening complete", zap.Strings("modified_units", []string{
+	zap.L().Info("Suspension hardening complete", zap.Strings("modified_units", []string{
 		"suspend.target", "hibernate.target", "sleep.target", "systemd-logind",
 	}))
 

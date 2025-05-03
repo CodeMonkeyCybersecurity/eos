@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -47,7 +47,7 @@ func removeUnwantedConfFiles(allowedFiles map[string]bool) {
 		return nil
 	})
 	if err != nil {
-		logger.GetLogger().Fatal("Error walking the directory", zap.Error(err))
+		zap.L().Fatal("Error walking the directory", zap.Error(err))
 	}
 
 	if len(removedFiles) == 0 {
@@ -65,11 +65,11 @@ var appsCmd = &cobra.Command{
 	Use:   "apps",
 	Short: "Update enabled applications in the conf.d directory",
 	Long:  `Select and keep configuration files for enabled Eos backend web apps while removing others.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("Running update apps command")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		log.Info("=== Eos Backend Web Apps Selector ===\n")
+		zap.L().Info("Running update apps command")
+
+		zap.L().Info("=== Eos Backend Web Apps Selector ===\n")
 		reader := bufio.NewReader(os.Stdin)
 
 		// Load previous values from the configuration file.
@@ -77,7 +77,7 @@ var appsCmd = &cobra.Command{
 		defaultApps := lastValues["APPS_SELECTION"]
 
 		// Display available apps.
-		hecate.DisplayOptions(log)
+		hecate.DisplayOptions()
 
 		// Prompt for a selection.
 		allowedFiles, selectionStr := hecate.GetUserSelection(defaultApps, reader)
@@ -112,7 +112,7 @@ var appsCmd = &cobra.Command{
 
 		// Save the selection back to the last values file.
 		lastValues["APPS_SELECTION"] = selectionStr
-		hecate.SaveLastValues(lastValues, log)
+		hecate.SaveLastValues(lastValues)
 
 		fmt.Println("\nUpdate complete.")
 		return nil

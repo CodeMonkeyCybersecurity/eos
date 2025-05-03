@@ -12,7 +12,7 @@ import (
 	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,65 +24,63 @@ var CreateBackupCmd = &cobra.Command{
 	Short: "Create a new restic backup",
 	Long: `This command initializes a restic repository if not already initialized,
 then creates a backup of specified directories.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		// Step 1: Ensure Restic is Installed
-		log.Info("Ensuring Restic is installed")
+		zap.L().Info("Ensuring Restic is installed")
 		if err := ensureResticInstalled(); err != nil {
-			log.Error("Failed to ensure Restic is installed", zap.Error(err))
+			zap.L().Error("Failed to ensure Restic is installed", zap.Error(err))
 			return err
 		}
 
 		// Step 2: Generate SSH Keys
-		log.Info("Generating SSH keys for backup")
+		zap.L().Info("Generating SSH keys for backup")
 		if err := generateSSHKeys(); err != nil {
-			log.Error("Failed to generate SSH keys", zap.Error(err))
+			zap.L().Error("Failed to generate SSH keys", zap.Error(err))
 			return err
 		}
 
 		// Step 3: Copy SSH Keys to Backup Server
-		log.Info("Copying SSH keys to the backup server")
+		zap.L().Info("Copying SSH keys to the backup server")
 		if err := copySSHKeys(); err != nil {
-			log.Error("Failed to copy SSH keys", zap.Error(err))
+			zap.L().Error("Failed to copy SSH keys", zap.Error(err))
 			return err
 		}
 
 		// Step 4: Initialize Restic Repository
-		log.Info("Initializing restic repository")
+		zap.L().Info("Initializing restic repository")
 		if err := initializeResticRepo(); err != nil {
-			log.Error("Failed to initialize restic repository", zap.Error(err))
+			zap.L().Error("Failed to initialize restic repository", zap.Error(err))
 			return err
 		}
 
 		// Step 5: Backup Data
-		log.Info("Backing up data")
+		zap.L().Info("Backing up data")
 		if err := performResticBackup(); err != nil {
-			log.Error("Failed to backup data", zap.Error(err))
+			zap.L().Error("Failed to backup data", zap.Error(err))
 			return err
 		}
 
-		log.Info("Backup completed successfully")
+		zap.L().Info("Backup completed successfully")
 		return nil
 	}),
 }
 
 // ensureResticInstalled ensures Restic is installed on the system
 func ensureResticInstalled() error {
-	log := logger.GetLogger()
 
 	// Ensure the script is run with sudo
 	if os.Getenv("SUDO_USER") == "" {
-		log.Error("Restic installation requires sudo permissions")
+		zap.L().Error("Restic installation requires sudo permissions")
 		return fmt.Errorf("need sudo permissions: run `sudo apt install restic`")
 	}
 	// Check for Restic installation
 	_, err := exec.LookPath("restic")
 	if err != nil {
-		log.Error("Restic is not installed", zap.Error(err))
+		zap.L().Error("Restic is not installed", zap.Error(err))
 		return fmt.Errorf("restic is not installed: run `sudo apt install restic`")
 	}
-	log.Info("Restic is installed and ready to use")
+	zap.L().Info("Restic is installed and ready to use")
 	return nil
 }
 
@@ -134,20 +132,19 @@ func performResticBackup() error {
 
 // getResticPassword retrieves and stores the Restic repository password
 func getResticPassword() string {
-	log := logger.GetLogger()
 
 	var password string
 	fmt.Print("Enter your Restic repository password: ")
 	_, err := fmt.Scanln(&password)
 	if err != nil {
-		log.Error("Failed to retrieve password", zap.Error(err))
+		zap.L().Error("Failed to retrieve password", zap.Error(err))
 		os.Exit(1)
 	}
 
 	file := "/home/eos_user/.restic-password" // Updated path
 	err = os.WriteFile(file, []byte(password), 0600)
 	if err != nil {
-		log.Error("Failed to write password file", zap.Error(err))
+		zap.L().Error("Failed to write password file", zap.Error(err))
 		os.Exit(1)
 	}
 	return password
@@ -155,10 +152,10 @@ func getResticPassword() string {
 
 // hostname retrieves the current hostname
 func hostname() string {
-	log := logger.GetLogger()
+
 	name, err := os.Hostname()
 	if err != nil {
-		log.Warn("Failed to retrieve hostname, using 'unknown'", zap.Error(err))
+		zap.L().Warn("Failed to retrieve hostname, using 'unknown'", zap.Error(err))
 		return "unknown"
 	}
 	return name

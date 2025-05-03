@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -22,12 +23,12 @@ var SecureDelphiCmd = &cobra.Command{
 	Use:   "delphi",
 	Short: "Harden Delphi (Wazuh) by rotating passwords and updating configs",
 	Long:  `Downloads and runs the Wazuh password tool to rotate all credentials and restart relevant services.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, _ *cobra.Command, _ []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, _ *cobra.Command, _ []string) error {
 		return runDelphiHardening(ctx)
 	}),
 }
 
-func downloadPasswordTool(ctx *eos.RuntimeContext) error {
+func downloadPasswordTool(ctx *eosio.RuntimeContext) error {
 	ctx.Log.Info("📥 Downloading Wazuh password management tool")
 	if err := utils.DownloadFile(delphi.DelphiPasswdToolPath, delphi.DelphiPasswdToolURL); err != nil {
 		ctx.Log.Error("Failed to download password tool", zap.Error(err))
@@ -40,7 +41,7 @@ func downloadPasswordTool(ctx *eos.RuntimeContext) error {
 	return nil
 }
 
-func runPrimaryPasswordRotation(ctx *eos.RuntimeContext, apiPassword string) (*bytes.Buffer, error) {
+func runPrimaryPasswordRotation(ctx *eosio.RuntimeContext, apiPassword string) (*bytes.Buffer, error) {
 	ctx.Log.Info("🔐 Attempting primary password rotation using Wazuh API password")
 	var stdout bytes.Buffer
 
@@ -56,7 +57,7 @@ func runPrimaryPasswordRotation(ctx *eos.RuntimeContext, apiPassword string) (*b
 	return &stdout, nil
 }
 
-func runFallbackPasswordRotation(ctx *eos.RuntimeContext) (string, error) {
+func runFallbackPasswordRotation(ctx *eosio.RuntimeContext) (string, error) {
 	ctx.Log.Info("🔁 Attempting fallback password rotation...")
 
 	ymlPath := "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
@@ -79,21 +80,21 @@ func runFallbackPasswordRotation(ctx *eos.RuntimeContext) (string, error) {
 		VerifyCertificates: false,
 	}
 
-	token, err := delphi.AuthenticateUser(&cfg, "wazuh-wui", extracted, log)
+	token, err := delphi.AuthenticateUser(&cfg, "wazuh-wui", extracted)
 	if err != nil {
 		return "", fmt.Errorf("fallback: auth failed: %w", err)
 	}
 	cfg.Token = token
 	ctx.Log.Info("✅ Authenticated with wazuh-wui")
 
-	userID, err := delphi.GetUserIDByUsername(&cfg, "wazuh", log)
+	userID, err := delphi.GetUserIDByUsername(&cfg, "wazuh")
 	if err != nil {
 		return "", fmt.Errorf("fallback: could not get user ID: %w", err)
 	}
 	ctx.Log.Info("🔍 Found wazuh user ID", zap.String("userID", userID))
 
 	newPass, _ := crypto.GeneratePassword(20)
-	if err := delphi.UpdateUserPassword(&cfg, userID, newPass, log); err != nil {
+	if err := delphi.UpdateUserPassword(&cfg, userID, newPass); err != nil {
 		return "", fmt.Errorf("fallback: could not update user password: %w", err)
 	}
 	ctx.Log.Info("✅ Updated password for wazuh")
@@ -109,7 +110,7 @@ func runFallbackPasswordRotation(ctx *eos.RuntimeContext) (string, error) {
 	return newPass, nil
 }
 
-func parseSecrets(ctx *eos.RuntimeContext, stdout *bytes.Buffer) map[string]string {
+func parseSecrets(ctx *eosio.RuntimeContext, stdout *bytes.Buffer) map[string]string {
 	secrets := make(map[string]string)
 	scanner := bufio.NewScanner(stdout)
 
@@ -132,7 +133,7 @@ func parseSecrets(ctx *eos.RuntimeContext, stdout *bytes.Buffer) map[string]stri
 	return secrets
 }
 
-func restartServices(ctx *eos.RuntimeContext, services []string) {
+func restartServices(ctx *eosio.RuntimeContext, services []string) {
 	for _, svc := range services {
 		ctx.Log.Info("🔄 Restarting service", zap.String("service", svc))
 		cmd := exec.Command("sudo", "systemctl", "restart", svc)
@@ -145,13 +146,13 @@ func restartServices(ctx *eos.RuntimeContext, services []string) {
 	}
 }
 
-func runDelphiHardening(ctx *eos.RuntimeContext) error {
+func runDelphiHardening(ctx *eosio.RuntimeContext) error {
 	if err := downloadPasswordTool(ctx); err != nil {
 		return err
 	}
 
 	ctx.Log.Info("🔍 Extracting current Wazuh API password")
-	apiPass, err := delphi.ExtractWazuhUserPassword(log)
+	apiPass, err := delphi.ExtractWazuhUserPassword()
 	if err != nil {
 		ctx.Log.Error("Failed to extract API password", zap.Error(err))
 		return err
@@ -178,7 +179,7 @@ func runDelphiHardening(ctx *eos.RuntimeContext) error {
 	})
 
 	ctx.Log.Info("🔐 Storing secrets in Vault")
-	if err := vault.HandleFallbackOrStore("delphi", secrets, ctx.Log); err != nil {
+	if err := vault.HandleFallbackOrStore("delphi", secrets); err != nil {
 		ctx.Log.Error("Failed to store secrets", zap.Error(err))
 		return err
 	}

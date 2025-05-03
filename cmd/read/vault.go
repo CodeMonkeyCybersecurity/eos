@@ -11,6 +11,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -31,17 +32,17 @@ func init() {
 var InspectVaultInitCmd = &cobra.Command{
 	Use:   "vault-init",
 	Short: "Inspect Vault initialization keys, root token, and eos credentials",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-init")
 
 		// Load Vault Init Result
-		initResult, err := vault.ReadVaultInitResult(log)
+		initResult, err := vault.ReadVaultInitResult()
 		if err != nil {
-			return logger.LogErrAndWrap(log, "inspect vault-init: load init result", err)
+			return logger.LogErrAndWrap("inspect vault-init: load init result", err)
 		}
 
 		// Load eos password credentials
-		eosCreds, err := system.LoadPasswordFromSecrets(log)
+		eosCreds, err := system.LoadPasswordFromSecrets()
 		if err != nil {
 			log.Warn("⚠️ Could not load eos password file", zap.Error(err))
 		}
@@ -100,11 +101,11 @@ var InspectVaultInitCmd = &cobra.Command{
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault")
 
 		log.Info("Listing secrets under secret/eos")
-		entries, err := vault.ListUnder(shared.EosID, log)
+		entries, err := vault.ListUnder(shared.EosID)
 		if err != nil {
 			log.Error("Failed to list Vault secrets", zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
@@ -123,16 +124,16 @@ var InspectVaultCmd = &cobra.Command{
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Check Vault Agent status and basic functionality",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-agent")
 
-		if err := vault.CheckVaultAgentService(log); err != nil {
+		if err := vault.CheckVaultAgentService(); err != nil {
 			return err
 		}
-		if err := vault.CheckVaultTokenFile(log); err != nil {
+		if err := vault.CheckVaultTokenFile(); err != nil {
 			return err
 		}
-		if err := vault.RunVaultTestQuery(log); err != nil {
+		if err := vault.RunVaultTestQuery(); err != nil {
 			return err
 		}
 
@@ -146,16 +147,16 @@ var InspectVaultLDAPCmd = &cobra.Command{
 	Use:   "ldap",
 	Short: "View stored LDAP config in Vault",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("inspect-vault-ldap")
+		zap.L().Named("inspect-vault-ldap")
 		cfg := &ldap.LDAPConfig{}
 
-		err := vault.ReadFromVaultAt(context.Background(), shared.LDAPVaultMount, shared.LDAPVaultPath, cfg, log)
+		err := vault.ReadFromVaultAt(context.Background(), shared.LDAPVaultMount, shared.LDAPVaultPath, cfg)
 		if err != nil {
-			log.Error("Failed to load LDAP config from Vault", zap.Error(err))
+			zap.L().Error("Failed to load LDAP config from Vault", zap.Error(err))
 			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
 		}
 
-		log.Info("LDAP Config Retrieved",
+		zap.L().Info("LDAP Config Retrieved",
 			zap.String("fqdn", cfg.FQDN),
 			zap.String("bind_dn", cfg.BindDN),
 			zap.String("user_base", cfg.UserBase),
@@ -171,12 +172,12 @@ var InspectVaultLDAPCmd = &cobra.Command{
 var InspectSecretsCmd = &cobra.Command{
 	Use:   "secrets",
 	Short: "List and view EOS secrets (redacted)",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-secrets")
 
 		files, err := os.ReadDir(shared.SecretsDir)
 		if err != nil {
-			return logger.LogErrAndWrap(log, "inspect secrets: read secrets dir", err)
+			return logger.LogErrAndWrap("inspect secrets: read secrets dir", err)
 		}
 
 		if len(files) == 0 {

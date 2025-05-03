@@ -12,7 +12,7 @@ import (
 )
 
 // ConfirmIrreversibleDeletion gets final consent before wiping unseal material.
-func ConfirmIrreversibleDeletion(log *zap.Logger) error {
+func ConfirmIrreversibleDeletion() error {
 	fmt.Println("⚠️ Confirm irreversible deletion of unseal materials. This action is final.")
 	fmt.Print("Type 'yes' to proceed: ")
 
@@ -22,6 +22,6 @@ func ConfirmIrreversibleDeletion(log *zap.Logger) error {
 	if resp != "yes" {
 		return fmt.Errorf("user aborted deletion confirmation")
 	}
-	log.Info("🧹 User confirmed deletion of in-memory secrets")
+	zap.L().Info("🧹 User confirmed deletion of in-memory secrets")
 	return nil
 }

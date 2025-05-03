@@ -3,6 +3,7 @@ package update
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 )
@@ -14,8 +15,8 @@ var UpdatePackagesCmd = &cobra.Command{
 	Aliases: []string{"pkgs"},
 	Short:   "Update system packages based on detected OS",
 	Long:    "Detects the host OS and executes the appropriate update and cleanup commands. Supports scheduling via --cron.",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return platform.PackageUpdate(Cron, log)
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		return platform.PackageUpdate(Cron)
 	}),
 }
 

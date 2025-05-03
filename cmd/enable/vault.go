@@ -3,9 +3,11 @@ package enable
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var EnableVaultCmd = &cobra.Command{
@@ -13,26 +15,26 @@ var EnableVaultCmd = &cobra.Command{
 	Short: "Orchestrates minimal secure runtime setup for Vault (server, approle, agent, api)",
 	Long: `Connects to Vault, ensures server readiness, and selectively enables components:
 AppRole auth, Vault Agent, and API client connectivity.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("cmd/enable/vault")
 
-		log.Info("🔌 [Phase7] Connecting to Vault server and checking health...")
-		client, err := vault.EnsureVaultReady(log)
+		zap.L().Info("🔌 [Phase7] Connecting to Vault server and checking health...")
+		client, err := vault.EnsureVaultReady()
 		if err != nil {
-			return logger.LogErrAndWrap(log, "connect vault", err)
+			return logger.LogErrAndWrap("connect vault", err)
 		}
 
 		// Fill out EnableOptions for lifecycle orchestration
 		opts := vault.EnableOpts
 		opts.AppRoleOptions = vault.DefaultAppRoleOptions() // You could make this user-customizable later if needed
 
-		log.Info("🛠️ [Phase8+] Enabling selected Vault components...")
+		zap.L().Info("🛠️ [Phase8+] Enabling selected Vault components...")
 		if err := vault.EnableVault(client, log, opts); err != nil {
-			return logger.LogErrAndWrap(log, "enable vault", err)
+			return logger.LogErrAndWrap("enable vault", err)
 		}
 
-		log.Info("✅ Vault setup completed successfully")
-		log.Info("ℹ️  Next step: run `eos secure vault` to finalize hardening")
+		zap.L().Info("✅ Vault setup completed successfully")
+		zap.L().Info("ℹ️  Next step: run `eos secure vault` to finalize hardening")
 		return nil
 	}),
 }

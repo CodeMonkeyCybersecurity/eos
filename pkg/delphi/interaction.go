@@ -9,11 +9,10 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"go.uber.org/zap"
 )
 
 // ConfirmConfig allows the user to review and optionally edit the current config.
-func ConfirmConfig(cfg *Config, log *zap.Logger) *Config {
+func ConfirmConfig(cfg *Config) *Config {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)
 	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
@@ -28,31 +27,31 @@ func ConfirmConfig(cfg *Config, log *zap.Logger) *Config {
 
 	fmt.Printf("  LatestVersion: %s\n", cfg.LatestVersion)
 
-	answer := strings.ToLower(interaction.PromptInput("Are these values correct? (y/n)", "y", log))
+	answer := strings.ToLower(interaction.PromptInput("Are these values correct? (y/n)", "y"))
 	if answer != "y" {
 		fmt.Println("Enter new values (press Enter to keep the current value):")
 
-		newVal := interaction.PromptInput(fmt.Sprintf("Protocol [%s]", cfg.Protocol), cfg.Protocol, log)
+		newVal := interaction.PromptInput(fmt.Sprintf("Protocol [%s]", cfg.Protocol), cfg.Protocol)
 		if newVal != "" {
 			cfg.Protocol = newVal
 		}
 
-		newVal = interaction.PromptInput(fmt.Sprintf("FQDN [%s]", cfg.FQDN), cfg.FQDN, log)
+		newVal = interaction.PromptInput(fmt.Sprintf("FQDN [%s]", cfg.FQDN), cfg.FQDN)
 		if newVal != "" {
 			cfg.FQDN = newVal
 		}
 
-		newVal = interaction.PromptInput(fmt.Sprintf("Port [%s]", cfg.Port), cfg.Port, log)
+		newVal = interaction.PromptInput(fmt.Sprintf("Port [%s]", cfg.Port), cfg.Port)
 		if newVal != "" {
 			cfg.Port = newVal
 		}
 
-		newVal = interaction.PromptInput(fmt.Sprintf("API Username [%s]", cfg.APIUser), cfg.APIUser, log)
+		newVal = interaction.PromptInput(fmt.Sprintf("API Username [%s]", cfg.APIUser), cfg.APIUser)
 		if newVal != "" {
 			cfg.APIUser = newVal
 		}
 
-		pw, err := crypto.PromptPassword("API Password", log)
+		pw, err := crypto.PromptPassword("API Password")
 		if err != nil {
 			fmt.Printf("❌ Failed to read password: %v\n", err)
 			os.Exit(1)
@@ -61,12 +60,12 @@ func ConfirmConfig(cfg *Config, log *zap.Logger) *Config {
 			cfg.APIPassword = pw
 		}
 
-		newVal = interaction.PromptInput(fmt.Sprintf("Latest Version [%s]", cfg.LatestVersion), cfg.LatestVersion, log)
+		newVal = interaction.PromptInput(fmt.Sprintf("Latest Version [%s]", cfg.LatestVersion), cfg.LatestVersion)
 		if newVal != "" {
 			cfg.LatestVersion = newVal
 		}
 
-		if err := WriteConfig(cfg, log); err != nil {
+		if err := WriteConfig(cfg); err != nil {
 			fmt.Printf("❌ Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}

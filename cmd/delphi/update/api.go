@@ -5,8 +5,9 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 var (
@@ -24,8 +25,7 @@ var UpdateDelphiApiCmd = &cobra.Command{
 	Use:   "api",
 	Short: "Upgrade the Wazuh API configuration",
 	Long:  "Upgrade the Wazuh API configuration locally or across the cluster. Defaults to --local if no flag is set.",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		// Default to --local if nothing is passed
 		if !localOnly && !upgradeAll {
@@ -34,12 +34,12 @@ var UpdateDelphiApiCmd = &cobra.Command{
 
 		switch {
 		case localOnly:
-			log.Info("Upgrading Wazuh API config on local node...")
+			zap.L().Info("Upgrading Wazuh API config on local node...")
 			// TODO: insert local upgrade logic here
 			fmt.Println("✓ Local Wazuh API config upgrade complete")
 
 		case upgradeAll:
-			log.Info("Upgrading Wazuh API config on all nodes...")
+			zap.L().Info("Upgrading Wazuh API config on all nodes...")
 			// TODO: insert distributed upgrade logic here
 			fmt.Println("✓ Cluster-wide Wazuh API config upgrade complete")
 

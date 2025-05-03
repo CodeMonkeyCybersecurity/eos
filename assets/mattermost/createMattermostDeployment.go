@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -15,18 +15,18 @@ func main() {
 	// Step 1: Clone the repository and enter the directory.
 	fmt.Println("Cloning the repository and entering the directory...")
 	if err := runCommand("git", "clone", "https://github.com/mattermost/docker"); err != nil {
-		log.Fatalf("Error cloning repository: %v", err)
+		zap.L().Fatal("Error cloning repository: %v")
 	}
 
 	// Change directory to "docker"
 	if err := os.Chdir("docker"); err != nil {
-		log.Fatalf("Error changing directory to 'docker': %v", err)
+		zap.L().Fatal("Error changing directory to 'docker': %v")
 	}
 
 	// Step 2: Create your .env file by copying and adjusting the env.example file.
 	fmt.Println("Creating .env file by copying env.example...")
 	if err := runCommand("cp", "env.example", ".env"); err != nil {
-		log.Fatalf("Error copying env.example to .env: %v", err)
+		zap.L().Fatal("Error copying env.example to .env: %v")
 	}
 
 	// Step 3: Create the required directories.
@@ -41,20 +41,20 @@ func main() {
 	fmt.Println("Creating required directories with proper permissions...")
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, shared.DirPermStandard); err != nil {
-			log.Fatalf("Error creating directory %s: %v", dir, err)
+			zap.L().Fatal("Error creating directory %s: %v")
 		}
 	}
 
 	// Step 4: Set the permissions on the mattermost directory.
 	fmt.Println("Changing ownership of ./volumes/app/mattermost to UID 2000:2000...")
 	if err := runCommand("chown", "-R", "2000:2000", "./volumes/app/mattermost"); err != nil {
-		log.Fatalf("Error changing ownership: %v", err)
+		zap.L().Fatal("Error changing ownership: %v")
 	}
 
 	// Step 5: Deploy Mattermost without nginx (Hecate will be your reverse proxy)
 	fmt.Println("Deploying Mattermost without nginx...")
 	if err := runCommand("docker", "compose", "-f", "docker-compose.yml", "-f", "docker-compose.without-nginx.yml", "up", "-d"); err != nil {
-		log.Fatalf("Error deploying Mattermost: %v", err)
+		zap.L().Fatal("Error deploying Mattermost: %v")
 	}
 
 	// Final message

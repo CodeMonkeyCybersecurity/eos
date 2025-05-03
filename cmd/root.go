@@ -8,6 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -24,9 +25,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
-
 	// Internal packages
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var helpLogged bool // global guard to log help only once
@@ -39,7 +38,7 @@ var RootCmd = &cobra.Command{
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
 
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
 		return cmd.Help()
 	}),
@@ -47,16 +46,15 @@ and reverse proxy configurations via Hecate.`,
 
 // RegisterCommands adds all subcommands to the root command.
 func RegisterCommands() {
-	log := logger.L()
 
 	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !helpLogged {
-			log.Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
+			zap.L().Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
 			helpLogged = true
-			defer log.Info("Global help display complete", zap.String("command", cmd.Name()))
+			defer zap.L().Info("Global help display complete", zap.String("command", cmd.Name()))
 		}
 		if err := cmd.Root().Usage(); err != nil {
-			log.Warn("Failed to print usage", zap.Error(err))
+			zap.L().Warn("Failed to print usage", zap.Error(err))
 		}
 	})
 
@@ -81,18 +79,17 @@ func RegisterCommands() {
 
 // Execute initializes and runs the root command.
 func Execute() {
-	log := logger.L()
-	log.Info("Eos CLI starting")
 
-	eos.SetLogger(log)
+	zap.L().Info("Eos CLI starting")
+
 	RegisterCommands()
 
 	if err := RootCmd.Execute(); err != nil {
 		if eoserr.IsExpectedUserError(err) {
-			log.Warn("CLI completed with user error", zap.Error(err))
+			zap.L().Warn("CLI completed with user error", zap.Error(err))
 			os.Exit(0)
 		} else {
-			log.Error("CLI execution error", zap.Error(err))
+			zap.L().Error("CLI execution error", zap.Error(err))
 			os.Exit(1)
 		}
 	}

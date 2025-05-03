@@ -16,13 +16,13 @@ import (
 
 // PromptForEosPassword securely prompts for and confirms the eos Vault password.
 // Returns an error if input reading fails or confirmation mismatches.
-func PromptForEosPassword(log *zap.Logger) (*shared.UserpassCreds, error) {
-	password, err := interaction.PromptSecret("🔐 Enter eos Vault password", log)
+func PromptForEosPassword() (*shared.UserpassCreds, error) {
+	password, err := interaction.PromptSecret("🔐 Enter eos Vault password")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read password: %w", err)
 	}
 
-	confirm, err := interaction.PromptSecret("🔐 Confirm password", log)
+	confirm, err := interaction.PromptSecret("🔐 Confirm password")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read password confirmation: %w", err)
 	}
@@ -36,18 +36,18 @@ func PromptForEosPassword(log *zap.Logger) (*shared.UserpassCreds, error) {
 
 // PromptForInitResult prompts interactively for unseal keys and a root token.
 // Returns an error if any prompt fails or input is blank.
-func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
-	log.Info("Prompting for unseal keys and root token (fallback path)")
+func PromptForInitResult() (*api.InitResponse, error) {
+	zap.L().Info("Prompting for unseal keys and root token (fallback path)")
 	fmt.Println("🔐 Please enter 3 unseal keys and the root token")
 
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		log.Error("❌ Cannot prompt for secret input: not a TTY")
+		zap.L().Error("❌ Cannot prompt for secret input: not a TTY")
 		return nil, fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
 	var keys []string
 	for i := 1; i <= 3; i++ {
-		key, err := interaction.PromptSecret(fmt.Sprintf("Unseal Key %d", i), log)
+		key, err := interaction.PromptSecret(fmt.Sprintf("Unseal Key %d", i))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read unseal key %d: %w", i, err)
 		}
@@ -57,7 +57,7 @@ func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 		keys = append(keys, key)
 	}
 
-	rootToken, err := interaction.PromptSecret("Root Token", log)
+	rootToken, err := interaction.PromptSecret("Root Token")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root token: %w", err)
 	}
@@ -72,7 +72,7 @@ func PromptForInitResult(log *zap.Logger) (*api.InitResponse, error) {
 }
 
 // PromptUnsealKeys requests 3 unseal keys interactively with hidden input.
-func PromptUnsealKeys(log *zap.Logger) ([]string, error) {
-	log.Info("🔐 Please enter 3 base64-encoded unseal keys")
-	return interaction.PromptSecrets("Unseal Key", 3, log)
+func PromptUnsealKeys() ([]string, error) {
+	zap.L().Info("🔐 Please enter 3 base64-encoded unseal keys")
+	return interaction.PromptSecrets("Unseal Key", 3)
 }

@@ -14,11 +14,10 @@ import (
 	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"go.uber.org/zap"
 	"golang.org/x/term"
 )
 
-func DeleteAgent(agentID string, token string, config *Config, log *zap.Logger) (map[string]interface{}, error) {
+func DeleteAgent(agentID string, token string, config *Config) (map[string]interface{}, error) {
 	url := fmt.Sprintf("%s://%s:%s/agents/%s?pretty=true", config.Protocol, config.FQDN, config.Port, agentID)
 
 	req, _ := http.NewRequest("DELETE", url, nil)
@@ -30,7 +29,7 @@ func DeleteAgent(agentID string, token string, config *Config, log *zap.Logger) 
 	if err != nil {
 		return nil, fmt.Errorf("API request failed: %w", err)
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	var result map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&result)
@@ -38,7 +37,7 @@ func DeleteAgent(agentID string, token string, config *Config, log *zap.Logger) 
 }
 
 // UpgradeAgents calls the Wazuh API to upgrade a list of agent IDs.
-func UpgradeAgents(cfg *Config, token string, agentIDs []string, payload map[string]interface{}, log *zap.Logger) error {
+func UpgradeAgents(cfg *Config, token string, agentIDs []string, payload map[string]interface{}) error {
 	url := fmt.Sprintf("%s://%s:%s/agents/upgrade?agents_list=%s&pretty=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port, strings.Join(agentIDs, ","))
 
@@ -65,7 +64,7 @@ func UpgradeAgents(cfg *Config, token string, agentIDs []string, payload map[str
 	if err != nil {
 		return err
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("upgrade failed: %s", resp.Status)
@@ -134,7 +133,7 @@ func PromptPassword(prompt, defaultVal string) string {
 }
 
 // queryUpgradeResult sends a PUT request to query upgrade task results.
-func queryUpgradeResult(apiURL, token string, agentIDs []string, log *zap.Logger) error {
+func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 	// Build query parameter as comma-separated list.
 	agentsQuery := strings.Join(agentIDs, ",")
 	queryURL := fmt.Sprintf("%s/agents/upgrade_result?agents_list=%s&pretty=true", apiURL, agentsQuery)
@@ -168,7 +167,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string, log *zap.Logger
 	if err != nil {
 		return err
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
@@ -181,13 +180,13 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string, log *zap.Logger
 	return nil
 }
 
-func InspectAgentUpgradeResule(log *zap.Logger) {
+func InspectAgentUpgradeResule() {
 	cfg, err := LoadConfig()
 	if err != nil {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
-	cfg = ConfirmConfig(cfg, log)
+	cfg = ConfirmConfig(cfg)
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"
 	}
@@ -199,7 +198,7 @@ func InspectAgentUpgradeResule(log *zap.Logger) {
 
 	// Authenticate.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
-	token, err := Authenticate(cfg, log)
+	token, err := Authenticate(cfg)
 	if err != nil {
 		fmt.Printf("Error during authentication: %v\n", err)
 		os.Exit(1)
@@ -223,7 +222,7 @@ func InspectAgentUpgradeResule(log *zap.Logger) {
 	}
 
 	// Query upgrade result.
-	err = queryUpgradeResult(apiURL, token, agentIDs, log)
+	err = queryUpgradeResult(apiURL, token, agentIDs)
 	if err != nil {
 		fmt.Printf("Error querying upgrade result: %v\n", err)
 		os.Exit(1)

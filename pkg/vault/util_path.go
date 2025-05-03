@@ -13,17 +13,17 @@ import (
 )
 
 // VaultPath returns the full Vault path for a logical entry name.
-func VaultPath(name string, log *zap.Logger) string {
+func VaultPath(name string) string {
 	if strings.Contains(name, "/") {
-		log.Warn("VaultPath should not receive slashes", zap.String("input", name))
+		zap.L().Warn("VaultPath should not receive slashes", zap.String("input", name))
 	}
 	final := fmt.Sprintf("%s/%s", shared.DefaultNamespace, name)
-	log.Debug("Resolved Vault path", zap.String("input", name), zap.String("result", final))
+	zap.L().Debug("Resolved Vault path", zap.String("input", name), zap.String("result", final))
 	return final
 }
 
 // DiskPath constructs a fallback config path like: /var/lib/eos/secrets/<name>.json
-func DiskPath(name string, log *zap.Logger) string {
+func DiskPath(name string) string {
 	var final string
 
 	// Always prefer storing fallback disk files in SecretsDir
@@ -36,20 +36,20 @@ func DiskPath(name string, log *zap.Logger) string {
 		final = filepath.Join(shared.SecretsDir, "vault_userpass.json")
 	default:
 		final = filepath.Join(shared.SecretsDir, name+".json")
-		log.Warn("DiskPath fallback: unknown name, using default layout", zap.String("name", name))
+		zap.L().Warn("DiskPath fallback: unknown name, using default layout", zap.String("name", name))
 	}
 
-	log.Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
+	zap.L().Debug("Resolved disk path", zap.String("input", name), zap.String("result", final))
 	return final
 }
 
 // ensureVaultDataDir ensures the Vault data directory exists.
-func ensureVaultDataDir(log *zap.Logger) error {
+func ensureVaultDataDir() error {
 	dataPath := shared.VaultDataPath
 	if err := os.MkdirAll(dataPath, 0700); err != nil {
-		log.Error("❌ Failed to create Vault data dir", zap.String("path", dataPath), zap.Error(err))
+		zap.L().Error("❌ Failed to create Vault data dir", zap.String("path", dataPath), zap.Error(err))
 		return fmt.Errorf("failed to create Vault data dir: %w", err)
 	}
-	log.Info("✅ Vault data directory ready", zap.String("path", dataPath))
+	zap.L().Info("✅ Vault data directory ready", zap.String("path", dataPath))
 	return nil
 }

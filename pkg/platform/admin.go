@@ -9,14 +9,14 @@ import (
 	"go.uber.org/zap"
 )
 
-func GuessAdminGroup(log *zap.Logger) string {
+func GuessAdminGroup() string {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "sudo"
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Warn("Failed to close log file", zap.Error(err))
+			zap.L().Warn("Failed to close log file", zap.Error(err))
 		}
 	}()
 

@@ -18,7 +18,7 @@ import (
 //
 
 // GetOSPlatform returns a string representing the OS platform.
-func GetOSPlatform(log *zap.Logger) string {
+func GetOSPlatform() string {
 	switch runtime.GOOS {
 	case "darwin":
 		return "macos"
@@ -32,14 +32,14 @@ func GetOSPlatform(log *zap.Logger) string {
 }
 
 // DetectLinuxDistro returns "debian", "rhel", or "unknown"
-func DetectLinuxDistro(log *zap.Logger) string {
+func DetectLinuxDistro() string {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "unknown"
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Warn("Failed to close log file", zap.Error(err))
+			zap.L().Warn("Failed to close log file", zap.Error(err))
 		}
 	}()
 
@@ -56,12 +56,12 @@ func DetectLinuxDistro(log *zap.Logger) string {
 	return "unknown"
 }
 
-func RequireLinuxDistro(allowed []string, log *zap.Logger) error {
-	if GetOSPlatform(log) != "linux" {
-		return fmt.Errorf("unsupported platform: %s (only 'linux' is supported)", GetOSPlatform(log))
+func RequireLinuxDistro(allowed []string) error {
+	if GetOSPlatform() != "linux" {
+		return fmt.Errorf("unsupported platform: %s (only 'linux' is supported)", GetOSPlatform())
 	}
 
-	distro := DetectLinuxDistro(log)
+	distro := DetectLinuxDistro()
 	for _, d := range allowed {
 		if distro == d {
 			return nil
@@ -71,12 +71,12 @@ func RequireLinuxDistro(allowed []string, log *zap.Logger) error {
 	return fmt.Errorf("unsupported Linux distribution: %s", distro)
 }
 
-func GetArch(log *zap.Logger) string {
+func GetArch() string {
 	return runtime.GOARCH
 }
 
 // IsCommandAvailable checks if a command exists in the system PATH.
-func IsCommandAvailable(name string, log *zap.Logger) bool {
+func IsCommandAvailable(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
 }

@@ -15,8 +15,8 @@ import (
 )
 
 // LoginAppRole authenticates to Vault using stored RoleID and SecretID.
-func LoginAppRole(log *zap.Logger) (*api.Client, error) {
-	client, err := NewClient(log) // or your GetVaultClient helper
+func LoginAppRole() (*api.Client, error) {
+	client, err := NewClient() // or your GetVaultClient helper
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
@@ -46,11 +46,11 @@ func LoginAppRole(log *zap.Logger) (*api.Client, error) {
 	// Set the client token
 	client.SetToken(secret.Auth.ClientToken)
 
-	log.Info("✅ Successfully authenticated with Vault using AppRole")
+	zap.L().Info("✅ Successfully authenticated with Vault using AppRole")
 	return client, nil
 }
 
-func readAppRoleCredsFromDisk(log *zap.Logger) (string, string, error) {
+func readAppRoleCredsFromDisk() (string, string, error) {
 	roleIDBytes, err := os.ReadFile(shared.RoleIDPath)
 	if err != nil {
 		return "", "", fmt.Errorf("read role_id from disk: %w", err)
@@ -62,7 +62,7 @@ func readAppRoleCredsFromDisk(log *zap.Logger) (string, string, error) {
 	roleID := strings.TrimSpace(string(roleIDBytes))
 	secretID := strings.TrimSpace(string(secretIDBytes))
 
-	log.Info("📄 Loaded AppRole credentials from disk",
+	zap.L().Info("📄 Loaded AppRole credentials from disk",
 		zap.String("role_id_path", shared.RoleIDPath),
 		zap.String("secret_id_path", shared.SecretIDPath),
 	)
@@ -71,22 +71,22 @@ func readAppRoleCredsFromDisk(log *zap.Logger) (string, string, error) {
 
 // PhaseCreateAppRole creates the EOS AppRole and saves credentials.
 func PhaseCreateAppRole(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
-	log.Info("🔑 [Phase 10] Creating AppRole for EOS")
+	zap.L().Info("🔑 [Phase 10] Creating AppRole for EOS")
 
-	roleID, secretID, err := EnsureAppRole(client, log, opts)
+	roleID, secretID, err := EnsureAppRole(client, opts)
 	if err != nil {
-		log.Error("❌ Failed to ensure AppRole", zap.Error(err))
+		zap.L().Error("❌ Failed to ensure AppRole", zap.Error(err))
 		return "", "", fmt.Errorf("ensure AppRole: %w", err)
 	}
 
-	log.Info("✅ AppRole provisioning complete 🎉")
+	zap.L().Info("✅ AppRole provisioning complete 🎉")
 	return roleID, secretID, nil
 }
 
 // WriteAppRoleFiles writes the Vault AppRole role_id and secret_id to disk with secure permissions.
-func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
+func WriteAppRoleFiles(roleID, secretID string) error {
 	dir := filepath.Dir(shared.RoleIDPath)
-	log.Info("📁 Ensuring AppRole directory", zap.String("path", dir))
+	zap.L().Info("📁 Ensuring AppRole directory", zap.String("path", dir))
 	if err := system.EnsureOwnedDir(dir, 0o700, shared.EosUser); err != nil {
 		return err
 	}
@@ -96,21 +96,21 @@ func WriteAppRoleFiles(roleID, secretID string, log *zap.Logger) error {
 		shared.SecretIDPath: secretID + "\n",
 	}
 	for path, data := range pairs {
-		log.Debug("✏️  Writing AppRole file", zap.String("path", path))
+		zap.L().Debug("✏️  Writing AppRole file", zap.String("path", path))
 		if err := system.WriteOwnedFile(path, []byte(data), 0o600, shared.EosUser); err != nil {
 			return err
 		}
 	}
 
-	log.Info("✅ AppRole credentials written",
+	zap.L().Info("✅ AppRole credentials written",
 		zap.String("role_file", shared.RoleIDPath),
 		zap.String("secret_file", shared.SecretIDPath))
 	return nil
 }
 
 // refreshAppRoleCreds retrieves fresh credentials but does NOT write files.
-func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, error) {
-	log.Debug("🔑 Requesting fresh AppRole credentials")
+func refreshAppRoleCreds(client *api.Client) (string, string, error) {
+	zap.L().Debug("🔑 Requesting fresh AppRole credentials")
 
 	roleResp, err := client.Logical().Read(shared.RolePath + "/role-id")
 	if err != nil {
@@ -134,20 +134,20 @@ func refreshAppRoleCreds(client *api.Client, log *zap.Logger) (string, string, e
 }
 
 // EnsureAppRole provisions the AppRole if missing or refreshes credentials if needed.
-func EnsureAppRole(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
+func EnsureAppRole(client *api.Client, opts shared.AppRoleOptions) (string, string, error) {
 	if !opts.ForceRecreate {
 		if _, err := os.Stat(shared.RoleIDPath); err == nil {
-			log.Info("🔐 AppRole credentials already exist", zap.String("path", shared.RoleIDPath))
+			zap.L().Info("🔐 AppRole credentials already exist", zap.String("path", shared.RoleIDPath))
 			if opts.RefreshCreds {
-				return refreshAppRoleCreds(client, log)
+				return refreshAppRoleCreds(client)
 			}
-			return readAppRoleCredsFromDisk(log)
+			return readAppRoleCredsFromDisk()
 		}
 	}
 
-	log.Info("🛠 Creating Vault AppRole", zap.String("role", shared.RoleName))
+	zap.L().Info("🛠 Creating Vault AppRole", zap.String("role", shared.RoleName))
 
-	if err := EnableAppRoleAuth(client, log); err != nil {
+	if err := EnableAppRoleAuth(client); err != nil {
 		return "", "", fmt.Errorf("enable AppRole auth: %w", err)
 	}
 
@@ -160,32 +160,32 @@ func EnsureAppRole(client *api.Client, log *zap.Logger, opts shared.AppRoleOptio
 	if _, err := client.Logical().Write(shared.RolePath, roleData); err != nil {
 		return "", "", fmt.Errorf("write AppRole: %w", err)
 	}
-	log.Info("✅ AppRole written")
+	zap.L().Info("✅ AppRole written")
 
-	roleID, secretID, err := refreshAppRoleCreds(client, log)
+	roleID, secretID, err := refreshAppRoleCreds(client)
 	if err != nil {
 		return "", "", fmt.Errorf("fetch AppRole creds: %w", err)
 	}
 
-	if err := WriteAppRoleFiles(roleID, secretID, log); err != nil {
+	if err := WriteAppRoleFiles(roleID, secretID); err != nil {
 		return "", "", fmt.Errorf("write AppRole files: %w", err)
 	}
 
 	return roleID, secretID, nil
 }
 
-func EnableAppRoleAuth(client *api.Client, log *zap.Logger) error {
-	log.Info("📡 Enabling AppRole auth method if needed...")
+func EnableAppRoleAuth(client *api.Client) error {
+	zap.L().Info("📡 Enabling AppRole auth method if needed...")
 
 	err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"})
 	if err == nil {
 		return nil
 	}
 	if strings.Contains(err.Error(), "path is already in use") {
-		log.Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
+		zap.L().Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
 		return nil
 	}
-	log.Error("❌ Failed to enable AppRole auth method", zap.Error(err))
+	zap.L().Error("❌ Failed to enable AppRole auth method", zap.Error(err))
 	return fmt.Errorf("enable approle auth: %w", err)
 }
 

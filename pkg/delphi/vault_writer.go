@@ -12,38 +12,34 @@ import (
 )
 
 // WriteConfig writes Delphi config to Vault (if available), and always to disk as fallback.
-func WriteConfig(cfg *Config, log *zap.Logger) error {
-	if log == nil {
-		log = zap.NewNop()
-	}
-
+func WriteConfig(cfg *Config) error {
 	// Always write to disk
 	diskPath := xdg.XDGConfigPath(shared.EosID, "delphi.json")
 	if err := xdg.EnsureDir(diskPath); err != nil {
-		log.Warn("❌ Failed to ensure disk config directory", zap.Error(err))
+		zap.L().Warn("❌ Failed to ensure disk config directory", zap.Error(err))
 		return fmt.Errorf("unable to create config path: %w", err)
 	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		log.Warn("❌ Failed to marshal Delphi config", zap.Error(err))
+		zap.L().Warn("❌ Failed to marshal Delphi config", zap.Error(err))
 		return fmt.Errorf("unable to marshal config: %w", err)
 	}
 
 	if err := os.WriteFile(diskPath, data, 0644); err != nil {
-		log.Warn("❌ Failed to write config to disk", zap.Error(err))
+		zap.L().Warn("❌ Failed to write config to disk", zap.Error(err))
 		return fmt.Errorf("unable to write config to disk: %w", err)
 	}
 
-	log.Info("💾 Delphi config saved to disk", zap.String("path", diskPath))
+	zap.L().Info("💾 Delphi config saved to disk", zap.String("path", diskPath))
 
 	// Attempt Vault write (optional)
-	if err := vault.Write(nil, VaultDelphiConfig, cfg, log); err != nil {
-		log.Warn("⚠️  Failed to write config to Vault", zap.Error(err))
+	if err := vault.Write(nil, VaultDelphiConfig, cfg); err != nil {
+		zap.L().Warn("⚠️  Failed to write config to Vault", zap.Error(err))
 		// Not fatal — return nil to allow disk-only fallback
 		return nil
 	}
 
-	log.Info("✅ Delphi config also saved to Vault", zap.String("vault_path", VaultDelphiConfig))
+	zap.L().Info("✅ Delphi config also saved to Vault", zap.String("vault_path", VaultDelphiConfig))
 	return nil
 }

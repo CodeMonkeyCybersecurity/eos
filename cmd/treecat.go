@@ -12,24 +12,23 @@ import (
 	"unicode/utf8"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var TreecatCmd = &cobra.Command{
 	Use:   "treecat [path]",
 	Short: "Recursively show directory structure and preview file contents",
 	Args:  cobra.ExactArgs(1),
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
 		root := args[0]
 
 		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
-				log.Warn("Skipping path due to error", zap.String("path", path), zap.Error(err))
+				zap.L().Warn("Skipping path due to error", zap.String("path", path), zap.Error(err))
 				return nil
 			}
 
@@ -40,9 +39,9 @@ var TreecatCmd = &cobra.Command{
 			fmt.Printf("%s- %s\n", indent, d.Name())
 
 			if d.Type().IsRegular() {
-				preview, err := previewFile(path, log)
+				preview, err := previewFile(path)
 				if err != nil {
-					log.Warn("Could not preview file", zap.String("file", path), zap.Error(err))
+					zap.L().Warn("Could not preview file", zap.String("file", path), zap.Error(err))
 					return nil
 				}
 
@@ -54,19 +53,19 @@ var TreecatCmd = &cobra.Command{
 		})
 
 		if err != nil {
-			log.Error("Failed to walk directory", zap.Error(err))
+			zap.L().Error("Failed to walk directory", zap.Error(err))
 			os.Exit(1)
 		}
 		return nil
 	}),
 }
 
-func previewFile(path string, log *zap.Logger) (string, error) {
+func previewFile(path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer shared.SafeClose(f, log)
+	defer shared.SafeClose(f)
 
 	buf := make([]byte, shared.MaxPreviewSize)
 	n, err := f.Read(buf)

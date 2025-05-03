@@ -10,11 +10,10 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"go.uber.org/zap"
 )
 
 // GetJSON performs an unauthenticated GET request and returns parsed JSON.
-func GetJSON(url string, headers map[string]string, log *zap.Logger) (map[string]interface{}, error) {
+func GetJSON(url string, headers map[string]string) (map[string]interface{}, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // for unauthenticated GETs
@@ -33,7 +32,7 @@ func GetJSON(url string, headers map[string]string, log *zap.Logger) (map[string
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)

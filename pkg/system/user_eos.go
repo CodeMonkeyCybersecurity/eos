@@ -19,12 +19,12 @@ import (
 
 // EnsureEosUser creates or validates the 'eos' Linux system user, configures its shell,
 // sets a password, and prepares sudoers and credentials.
-func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
+func EnsureEosUser(auto bool, loginShell bool) error {
 	username := shared.EosID
 
 	// Check if user already exists
 	if UserExists(username) {
-		log.Info("✅ eos user exists", zap.String("user", username))
+		zap.L().Info("✅ eos user exists", zap.String("user", username))
 
 		_, err := user.Lookup(username)
 		if err != nil {
@@ -35,16 +35,16 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 			return err
 		}
 		if !strings.Contains(shell, "nologin") {
-			log.Warn("❌ eos user has shell access, which is unexpected", zap.String("shell", shell))
+			zap.L().Warn("❌ eos user has shell access, which is unexpected", zap.String("shell", shell))
 			return fmt.Errorf("user '%s' has shell access: %s (expected /usr/sbin/nologin)", username, shell)
 		}
 
-		log.Info("✅ eos user has no shell access")
-		log.Info("✅ eos user validation complete")
+		zap.L().Info("✅ eos user has no shell access")
+		zap.L().Info("✅ eos user validation complete")
 		return nil
 	}
 
-	log.Warn("👤 eos user not found — creating...")
+	zap.L().Warn("👤 eos user not found — creating...")
 
 	// Interactive username override (optional)
 	if !auto {
@@ -61,7 +61,7 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
-	password, err := generateOrPromptPassword(auto, log)
+	password, err := generateOrPromptPassword(auto)
 	if err != nil {
 		return fmt.Errorf("password generation failed: %w", err)
 	}
@@ -70,17 +70,17 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 		return fmt.Errorf("failed to set password for user '%s': %w", username, err)
 	}
 
-	if err := EnsureSudoersEntryForEos(log, auto); err != nil {
+	if err := EnsureSudoersEntryForEos(auto); err != nil {
 		return fmt.Errorf("failed to configure sudo access: %w", err)
 	}
 
-	if err := SavePasswordToSecrets(username, password, log); err != nil {
-		log.Warn("⚠️ Could not save password to disk", zap.Error(err))
+	if err := SavePasswordToSecrets(username, password); err != nil {
+		zap.L().Warn("⚠️ Could not save password to disk", zap.Error(err))
 	}
 
 	userExists := UserExists(shared.EosID)
 	if userExists && !SecretsExist() {
-		log.Warn("EOS password file missing — generating replacement password")
+		zap.L().Warn("EOS password file missing — generating replacement password")
 
 		newPass, err := crypto.GeneratePassword(20)
 		if err != nil {
@@ -91,23 +91,23 @@ func EnsureEosUser(auto bool, loginShell bool, log *zap.Logger) error {
 			return fmt.Errorf("failed to set replacement password for eos user: %w", err)
 		}
 
-		if err := SavePasswordToSecrets(shared.EosID, newPass, log); err != nil {
+		if err := SavePasswordToSecrets(shared.EosID, newPass); err != nil {
 			return fmt.Errorf("failed to save replacement password: %w", err)
 		}
 
-		log.Info("✅ Replacement eos credentials generated and saved")
+		zap.L().Info("✅ Replacement eos credentials generated and saved")
 	}
 
 	// Memory hygiene (zero password string)
 	passwordBytes := []byte(password)
 	crypto.SecureZero(passwordBytes)
 
-	log.Info("✅ eos user created and configured", zap.String("username", username))
+	zap.L().Info("✅ eos user created and configured", zap.String("username", username))
 	return nil
 }
 
 // RepairEosSecrets generates a new strong password and saves it securely.
-func RepairEosSecrets(log *zap.Logger) error {
+func RepairEosSecrets() error {
 	password, err := crypto.GeneratePassword(20)
 	if err != nil {
 		return fmt.Errorf("generate password: %w", err)
@@ -115,83 +115,83 @@ func RepairEosSecrets(log *zap.Logger) error {
 	if err := SetPassword(shared.EosID, password); err != nil {
 		return fmt.Errorf("set password: %w", err)
 	}
-	if err := SavePasswordToSecrets(shared.EosID, password, log); err != nil {
+	if err := SavePasswordToSecrets(shared.EosID, password); err != nil {
 		return fmt.Errorf("save password: %w", err)
 	}
 
-	log.Info("✅ Regenerated eos credentials successfully", zap.String("user", shared.EosID))
+	zap.L().Info("✅ Regenerated eos credentials successfully", zap.String("user", shared.EosID))
 	return nil
 }
 
-func ValidateEosSudoAccess(log *zap.Logger) error {
+func ValidateEosSudoAccess() error {
 	cmd := exec.Command("sudo", "cat", shared.VaultAgentTokenPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
+		zap.L().Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
 		return fmt.Errorf("sudo check failed")
 	}
-	log.Info("✅ sudo test succeeded")
+	zap.L().Info("✅ sudo test succeeded")
 	return nil
 }
 
 // EnsureSudoersEntryForEos ensures a sudoers entry exists for the eos user.
-func EnsureSudoersEntryForEos(log *zap.Logger, auto bool) error {
+func EnsureSudoersEntryForEos(auto bool) error {
 	const path = shared.EosSudoersPath
 	const entry = shared.SudoersEosEntry
 
-	log.Info("🔍 Checking for existing sudoers entry", zap.String("path", path))
+	zap.L().Info("🔍 Checking for existing sudoers entry", zap.String("path", path))
 	if _, err := os.Stat(path); err == nil {
-		log.Info("✅ Sudoers file for eos already exists", zap.String("path", path))
+		zap.L().Info("✅ Sudoers file for eos already exists", zap.String("path", path))
 		return nil
 	}
 
 	if !auto {
 		reader := bufio.NewReader(os.Stdin)
-		resp, err := interaction.ReadLine(reader, "Create sudoers entry for eos? (y/N)", log)
+		resp, err := interaction.ReadLine(reader, "Create sudoers entry for eos? (y/N)")
 		if err != nil {
-			log.Warn("❌ Failed to read sudoers prompt", zap.Error(err))
+			zap.L().Warn("❌ Failed to read sudoers prompt", zap.Error(err))
 			return err
 		}
 		if strings.ToLower(resp) != "y" {
-			log.Warn("⚠️ User declined to write sudoers file")
+			zap.L().Warn("⚠️ User declined to write sudoers file")
 			return nil
 		}
 	}
 
-	log.Info("✍️  Writing sudoers entry", zap.String("path", path))
+	zap.L().Info("✍️  Writing sudoers entry", zap.String("path", path))
 	if err := os.WriteFile(path, []byte(entry+"\n"), 0440); err != nil {
 		return fmt.Errorf("write sudoers entry: %w", err)
 	}
 
-	log.Info("✅ Sudoers entry written successfully", zap.String("path", path))
+	zap.L().Info("✅ Sudoers entry written successfully", zap.String("path", path))
 
-	log.Info("🧪 Validating sudoers file with visudo -c")
+	zap.L().Info("🧪 Validating sudoers file with visudo -c")
 	if err := exec.Command("sudo", "visudo", "-c").Run(); err != nil {
-		log.Warn("❌ Sudoers file validation failed", zap.Error(err))
+		zap.L().Warn("❌ Sudoers file validation failed", zap.Error(err))
 		return fmt.Errorf("sudoers validation failed")
 	}
 
-	log.Info("✅ Sudoers file is valid")
+	zap.L().Info("✅ Sudoers file is valid")
 	return nil
 }
 
-func SetupEosSudoers(log *zap.Logger) error {
-	if err := FixEosSudoersFile(log); err != nil {
-		log.Warn("Failed to write sudoers file", zap.Error(err))
+func SetupEosSudoers() error {
+	if err := FixEosSudoersFile(); err != nil {
+		zap.L().Warn("Failed to write sudoers file", zap.Error(err))
 		return err
 	}
-	log.Info("✅ Added eos to sudoers")
+	zap.L().Info("✅ Added eos to sudoers")
 	return nil
 }
 
-func CreateEosDirectories(log *zap.Logger) error {
+func CreateEosDirectories() error {
 	dirs := []string{shared.EosVarDir, shared.EosLogDir}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0750); err != nil {
-			log.Warn("Failed to create directory", zap.String("path", dir), zap.Error(err))
+			zap.L().Warn("Failed to create directory", zap.String("path", dir), zap.Error(err))
 			return err
 		}
-		log.Info("✅ Directory ready", zap.String("path", dir))
+		zap.L().Info("✅ Directory ready", zap.String("path", dir))
 	}
 	return nil
 }
@@ -214,7 +214,7 @@ func CheckEosSudoPermissions() (bool, error) {
 	return true, nil
 }
 
-func FixEosSudoersFile(log *zap.Logger) error {
+func FixEosSudoersFile() error {
 	sudoersLine := "eos ALL=(ALL) NOPASSWD: /bin/systemctl"
 	cmd := exec.Command(fmt.Sprintf("echo '%s' > /etc/sudoers.d/eos", sudoersLine))
 	if err := cmd.Run(); err != nil {
@@ -224,13 +224,13 @@ func FixEosSudoersFile(log *zap.Logger) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to set sudoers permissions: %w", err)
 	}
-	log.Info("✅ Fixed /etc/sudoers.d/eos file and permissions")
+	zap.L().Info("✅ Fixed /etc/sudoers.d/eos file and permissions")
 	return nil
 }
 
-func EnsureEosSudoReady(log *zap.Logger) error {
+func EnsureEosSudoReady() error {
 	if err := CheckNonInteractiveSudo(); err != nil {
-		log.Warn("sudo check failed", zap.Error(err))
+		zap.L().Warn("sudo check failed", zap.Error(err))
 		if IsInteractive() {
 			fmt.Println("Please run:")
 			fmt.Println("  sudo -v")

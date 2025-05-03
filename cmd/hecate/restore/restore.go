@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
@@ -31,9 +31,9 @@ If --timestamp is provided (e.g. --timestamp 20250325-101010), then restore will
   docker-compose.yml.<timestamp>.bak
 
 If no --timestamp is given, the command enters interactive mode to choose which resources to restore.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
+		zap.L().Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),

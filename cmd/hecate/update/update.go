@@ -4,12 +4,10 @@ package update
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
-
-var log *zap.Logger
 
 // UpdateCmd represents the "update" command.
 var UpdateCmd = &cobra.Command{
@@ -22,8 +20,8 @@ Examples:
   hecate update eos
   hecate update http
   hecate update docker-compose`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("No subcommand provided for update command.", zap.String("command", cmd.Use))
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("No subcommand provided for update command.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),
@@ -31,7 +29,6 @@ Examples:
 
 func init() {
 	// Initialize the shared global logger.
-	log = logger.L()
 
 	// Attach subcommands to UpdateCmd.
 	UpdateCmd.AddCommand(runCertsCmd)
@@ -45,8 +42,8 @@ func init() {
 var runCertsCmd = &cobra.Command{
 	Use:   "certs",
 	Short: "Renew SSL certificates",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("No subcommand provided for certs command.", zap.String("command", cmd.Use))
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("No subcommand provided for certs command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()
 		return nil
 	}),
@@ -56,8 +53,8 @@ var runCertsCmd = &cobra.Command{
 var runEosCmd = &cobra.Command{
 	Use:   "eos",
 	Short: "Update Eos system",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("No subcommand provided for eos command.", zap.String("command", cmd.Use))
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("No subcommand provided for eos command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()
 		return nil
 	}),
@@ -67,8 +64,8 @@ var runEosCmd = &cobra.Command{
 var runHttpCmd = &cobra.Command{
 	Use:   "http",
 	Short: "Update HTTP configurations",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("No subcommand provided for http command.", zap.String("command", cmd.Use))
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("No subcommand provided for http command.", zap.String("command", cmd.Use))
 		_ = cmd.Help()
 		return nil
 	}),

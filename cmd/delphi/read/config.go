@@ -7,12 +7,12 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
 
 var InspectConfigCmd = &cobra.Command{
@@ -20,17 +20,16 @@ var InspectConfigCmd = &cobra.Command{
 	Short:   "Inspect the currently loaded Delphi configuration",
 	Long:    "Displays the contents of the delphi.json config file, with sensitive fields masked for safety.",
 	Aliases: []string{"cfg", "settings"},
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig(log)
+		cfg, err := delphi.ReadConfig()
 		if err != nil {
-			log.Error("Failed to load Delphi config", zap.Error(err))
+			zap.L().Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)
 			return err
 		}
 
-		if !system.EnforceSecretsAccess(log, showSecrets) {
+		if !system.EnforceSecretsAccess(showSecrets) {
 			return nil
 		}
 
@@ -42,7 +41,7 @@ var InspectConfigCmd = &cobra.Command{
 
 		cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
-			log.Error("Failed to marshal Delphi config", zap.Error(err))
+			zap.L().Error("Failed to marshal Delphi config", zap.Error(err))
 			fmt.Println("❌ Error printing config:", err)
 			return err
 		}

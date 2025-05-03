@@ -18,8 +18,8 @@ import (
 //--------------------------------------------------------------------
 
 // Phase 8A: Enable API Client Access
-// └── GetPrivilegedVaultClient(log)
-//     ├── GetVaultClient(log)
+// └── GetPrivilegedVaultClient()
+//     ├── GetVaultClient()
 //     │   └── (returns the existing Vault client)
 //     └── validateVaultToken(client)
 //         └── client.Auth().Token().LookupSelf()
@@ -32,21 +32,21 @@ func SetVaultToken(client *api.Client, token string) {
 
 // GetPrivilegedVaultClient simply returns the authenticated Vault client if available.
 // It validates that the token is usable immediately.
-func GetPrivilegedVaultClient(log *zap.Logger) (*api.Client, error) {
-	log.Info("🔐 Checking Vault client token validity...")
+func GetPrivilegedVaultClient() (*api.Client, error) {
+	zap.L().Info("🔐 Checking Vault client token validity...")
 
-	client, err := GetVaultClient(log)
+	client, err := GetVaultClient()
 	if err != nil {
-		log.Error("❌ Failed to retrieve existing Vault client", zap.Error(err))
+		zap.L().Error("❌ Failed to retrieve existing Vault client", zap.Error(err))
 		return nil, fmt.Errorf("get vault client: %w", err)
 	}
 
 	if err := validateVaultToken(client); err != nil {
-		log.Error("❌ Vault client token appears invalid", zap.Error(err))
+		zap.L().Error("❌ Vault client token appears invalid", zap.Error(err))
 		return nil, fmt.Errorf("vault client invalid: %w", err)
 	}
 
-	log.Info("✅ Vault client authenticated and ready")
+	zap.L().Info("✅ Vault client authenticated and ready")
 	return client, nil
 }
 

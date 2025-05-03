@@ -7,26 +7,26 @@ import (
 	"go.uber.org/zap"
 )
 
-func ResolveConfig(log *zap.Logger) (*Config, error) {
+func ResolveConfig() (*Config, error) {
 	// 1. Try Vault
-	cfg, err := ReadConfig(log)
+	cfg, err := ReadConfig()
 	if err == nil && cfg.IsValid() {
 		return cfg, nil
 	}
 
 	// 2. Try disk fallback
-	cfg, err = ReadConfig(log) // fixed arg
+	cfg, err = ReadConfig() // fixed arg
 	if err == nil && cfg.IsValid() {
-		log.Info("Loaded Delphi config from disk fallback")
+		zap.L().Info("Loaded Delphi config from disk fallback")
 		return cfg, nil
 	}
 
 	// 3. Prompt interactively
-	cfg = PromptDelphiConfig(log)
+	cfg = PromptDelphiConfig()
 
-	ok, err := interaction.ResolveObject(cfg, log)
+	ok, err := interaction.ResolveObject(cfg)
 	if err != nil {
-		log.Warn("Confirmation failed", zap.Error(err))
+		zap.L().Warn("Confirmation failed", zap.Error(err))
 		return nil, err
 	}
 	if !ok {
@@ -34,6 +34,6 @@ func ResolveConfig(log *zap.Logger) (*Config, error) {
 	}
 
 	// 5. Save and return
-	_ = WriteConfig(cfg, log)
+	_ = WriteConfig(cfg)
 	return cfg, nil
 }

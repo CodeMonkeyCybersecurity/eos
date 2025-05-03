@@ -23,7 +23,7 @@ type HecateConfig struct {
 	Email      string
 }
 
-func LoadConfig(defaultSubdomain string, log *zap.Logger) (*HecateConfig, error) {
+func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 	cfg := &HecateConfig{}
 
 	if _, err := os.Stat(shared.HecateLastValuesFile); err == nil {
@@ -34,7 +34,7 @@ func LoadConfig(defaultSubdomain string, log *zap.Logger) (*HecateConfig, error)
 		}
 		defer func() {
 			if err := file.Close(); err != nil {
-				log.Warn("Failed to close log file", zap.Error(err))
+				zap.L().Warn("Failed to close log file", zap.Error(err))
 			}
 		}()
 

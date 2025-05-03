@@ -6,11 +6,10 @@ import (
 	"fmt"
 
 	"github.com/go-ldap/ldap/v3"
-	"go.uber.org/zap"
 )
 
-func deleteUser(dn string, config *LDAPConfig, log *zap.Logger) error {
-	conn, err := ConnectWithGivenConfig(config, log)
+func deleteUser(dn string, config *LDAPConfig) error {
+	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
@@ -27,8 +26,8 @@ func deleteUser(dn string, config *LDAPConfig, log *zap.Logger) error {
 	return nil
 }
 
-func deleteGroup(dn string, config *LDAPConfig, log *zap.Logger) error {
-	conn, err := ConnectWithGivenConfig(config, log)
+func deleteGroup(dn string, config *LDAPConfig) error {
+	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}

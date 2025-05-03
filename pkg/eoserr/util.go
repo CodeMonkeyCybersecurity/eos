@@ -92,26 +92,26 @@ func IsExpectedUserError(err error) bool {
 }
 
 // PrintError prints a human-readable error message without exiting.
-func PrintError(log *zap.Logger, userMessage string, err error) {
+func PrintError(userMessage string, err error) {
 	if DebugEnabled() {
-		log.Fatal(userMessage, zap.Error(err)) // Full structured fatal if debugging
+		zap.L().Fatal(userMessage, zap.Error(err)) // Full structured fatal if debugging
 		return
 	}
 
 	if err != nil {
 		if IsExpectedUserError(err) {
-			log.Warn(userMessage, zap.Error(err))
+			zap.L().Warn(userMessage, zap.Error(err))
 			fmt.Fprintf(os.Stderr, "⚠️  Notice: %s: %v\n", userMessage, err)
 		} else {
-			log.Error(userMessage, zap.Error(err))
+			zap.L().Error(userMessage, zap.Error(err))
 			fmt.Fprintf(os.Stderr, "❌ Error: %s: %v\n", userMessage, err)
 		}
 	}
 }
 
 // ExitWithError prints the error and exits with status 1.
-func ExitWithError(log *zap.Logger, userMessage string, err error) {
-	PrintError(log, userMessage, err)
+func ExitWithError(userMessage string, err error) {
+	PrintError(userMessage, err)
 	fmt.Fprintln(os.Stderr, "👉 Tip: rerun with --debug for more details.")
 	os.Exit(1)
 }

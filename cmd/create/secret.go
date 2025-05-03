@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +25,7 @@ var CreateSecretCmd = &cobra.Command{
 	Example: `  eos create secret
   eos create secret --length 64
   eos create secret --length 24 --format base64`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if length <= 0 {
 			length = 32 // Default to openssl rand -hex 32
 		}

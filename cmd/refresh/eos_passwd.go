@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -16,7 +17,7 @@ var RefreshEosPasswdCmd = &cobra.Command{
 	Short: "Refresh the EOS user password and update secrets safely",
 	Long: `Regenerates a strong EOS password,
 updates the system account password, and saves new credentials to disk.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("refresh-eos-passwd")
 
 		if !system.UserExists("eos") {
@@ -24,7 +25,7 @@ updates the system account password, and saves new credentials to disk.`,
 			return fmt.Errorf("eos user does not exist")
 		}
 
-		if err := system.RepairEosSecrets(log); err != nil {
+		if err := system.RepairEosSecrets(); err != nil {
 			log.Error("Failed to refresh EOS credentials", zap.Error(err))
 			return fmt.Errorf("refresh eos password: %w", err)
 		}

@@ -11,8 +11,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
@@ -31,7 +31,7 @@ var CreateUserCmd = &cobra.Command{
 	Short: "Create a new Linux user",
 	Long: `Creates a new user account and optionally adds them to the admin group, 
 generates SSH keys, and sets a secure password.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return runCreateUser(cmd, args)
 	}),
 }
@@ -45,7 +45,6 @@ func init() {
 
 // runCreateUser coordinates all steps needed to create a new user.
 func runCreateUser(_ *cobra.Command, _ []string) error {
-	log := logger.L()
 
 	// Setup a signal handler for graceful cancellation.
 	setupSignalHandler()
@@ -69,21 +68,21 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 
 	// Exit early if the user already exists.
 	if system.UserExists(username) {
-		log.Warn("User already exists", zap.String("username", username))
+		zap.L().Warn("User already exists", zap.String("username", username))
 		return nil
 	}
 
 	// Determine the login shell.
 	shell := "/usr/sbin/nologin"
 	if loginShell {
-		log.Info("Creating user with login shell")
+		zap.L().Info("Creating user with login shell")
 		shell = "/bin/bash"
 	} else {
-		log.Info("Creating system user with no login shell")
+		zap.L().Info("Creating system user with no login shell")
 	}
 
 	// Create the new user.
-	log.Info("Creating user", zap.String("username", username))
+	zap.L().Info("Creating user", zap.String("username", username))
 	if err := execute.Execute("useradd", "-m", "-s", shell, username); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
@@ -117,7 +116,7 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 	}
 
 	// Decide if the user should have admin privileges.
-	adminGroup := platform.GuessAdminGroup(log)
+	adminGroup := platform.GuessAdminGroup()
 	if !auto {
 		input, err := prompt(reader, "Should this user have sudo privileges? (yes/no): ")
 		if err != nil {
@@ -128,7 +127,7 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 		}
 	}
 	if adminGroup != "" {
-		log.Info("Granting admin privileges", zap.String("group", adminGroup))
+		zap.L().Info("Granting admin privileges", zap.String("group", adminGroup))
 		if err := execute.Execute("usermod", "-aG", adminGroup, username); err != nil {
 			return fmt.Errorf("error adding to admin group: %w", err)
 		}
@@ -144,12 +143,12 @@ func runCreateUser(_ *cobra.Command, _ []string) error {
 	fmt.Println("📁 SSH key:", "/home/"+username+"/.ssh/id_rsa")
 
 	// Attempt to store the credentials in Vault.
-	// if err := vault.StoreUserSecret(username, password, "/home/"+username+"/.ssh/id_rsa", log); err != nil {
-	// 	log.Warn("Vault is not available or write failed", zap.Error(err))
+	// if err := vault.StoreUserSecret(username, password, "/home/"+username+"/.ssh/id_rsa"); err != nil {
+	// 	zap.L().Warn("Vault is not available or write failed", zap.Error(err))
 	// 	fmt.Println("⚠️ Vault write failed. Save these credentials manually:")
 	// 	fmt.Printf("🔐 Password for %s: %s\n", username, password)
 	// } else {
-	// 	log.Info("User credentials securely stored in Vault")
+	// 	zap.L().Info("User credentials securely stored in Vault")
 	// 	fmt.Println("🔐 Credentials stored in Vault for user:", username)
 	// }
 
@@ -179,11 +178,11 @@ func prompt(reader *bufio.Reader, message string) (string, error) {
 
 // createSSHKeys generates SSH key pair for the new user and sets proper permissions.
 func createSSHKeys(username string) error {
-	log := logger.L()
+
 	home := "/home/" + username
 	sshDir := home + "/.ssh"
 
-	log.Info("Creating SSH key for user", zap.String("username", username))
+	zap.L().Info("Creating SSH key for user", zap.String("username", username))
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return fmt.Errorf("failed to create SSH directory: %w", err)
 	}

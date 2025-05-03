@@ -12,10 +12,10 @@ import (
 )
 
 // RemoveVolumes deletes the specified Docker volumes.
-func RemoveVolumes(volumes []string, log *zap.Logger) error {
+func RemoveVolumes(volumes []string) error {
 	for _, volume := range volumes {
 		if err := execute.Execute("docker", "volume", "rm", volume); err != nil {
-			log.Warn("Failed to remove volume", zap.String("volume", volume), zap.Error(err))
+			zap.L().Warn("Failed to remove volume", zap.String("volume", volume), zap.Error(err))
 			return fmt.Errorf("failed to remove volume %s: %w", volume, err)
 		}
 	}
@@ -23,7 +23,7 @@ func RemoveVolumes(volumes []string, log *zap.Logger) error {
 }
 
 // BackupVolume creates a tar.gz backup of a single Docker volume.
-func BackupVolume(volumeName, backupDir string, log *zap.Logger) (string, error) {
+func BackupVolume(volumeName, backupDir string) (string, error) {
 	timestamp := time.Now().Format("20060102_150405")
 	backupFile := fmt.Sprintf("%s_%s.tar.gz", timestamp, volumeName)
 	cmd := []string{
@@ -41,7 +41,7 @@ func BackupVolume(volumeName, backupDir string, log *zap.Logger) (string, error)
 }
 
 // BackupVolumes backs up all provided Docker volumes to the backupDir.
-func BackupVolumes(volumes []string, backupDir string, log *zap.Logger) (map[string]string, error) {
+func BackupVolumes(volumes []string, backupDir string) (map[string]string, error) {
 	backupResults := make(map[string]string)
 
 	if err := os.MkdirAll(backupDir, shared.DirPermStandard); err != nil {
@@ -49,9 +49,9 @@ func BackupVolumes(volumes []string, backupDir string, log *zap.Logger) (map[str
 	}
 
 	for _, vol := range volumes {
-		backupFile, err := BackupVolume(vol, backupDir, log)
+		backupFile, err := BackupVolume(vol, backupDir)
 		if err != nil {
-			log.Warn("Failed to backup volume", zap.String("volume", vol), zap.Error(err))
+			zap.L().Warn("Failed to backup volume", zap.String("volume", vol), zap.Error(err))
 			continue // skip this volume, continue with others
 		}
 		backupResults[vol] = backupFile

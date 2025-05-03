@@ -7,12 +7,11 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/go-ldap/ldap/v3"
-	"go.uber.org/zap"
 )
 
 // AddUser creates a new LDAP user entry
-func createUser(config *LDAPConfig, user LDAPUser, password string, log *zap.Logger) error {
-	conn, err := ConnectWithGivenConfig(config, log)
+func createUser(config *LDAPConfig, user LDAPUser, password string) error {
+	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
@@ -36,12 +35,12 @@ func createUser(config *LDAPConfig, user LDAPUser, password string, log *zap.Log
 }
 
 // CreateGroup adds a new LDAP group (groupOfNames) with no members yet
-func createGroup(config *LDAPConfig, group LDAPGroup, log *zap.Logger) error {
-	conn, err := ConnectWithGivenConfig(config, log)
+func createGroup(config *LDAPConfig, group LDAPGroup) error {
+	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
-	defer shared.SafeClose(conn, log)
+	defer shared.SafeClose(conn)
 
 	req := ldap.NewAddRequest(group.DN, nil)
 	req.Attribute("objectClass", []string{"groupOfNames", "top"})

@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"go.uber.org/zap"
 )
 
@@ -31,29 +30,29 @@ func Exists(path string) bool {
 
 // LookupUser returns the UID and GID of the given user with structured logging.
 func LookupUser(name string) (int, int, error) {
-	log := logger.GetLogger().Named("system")
+	zap.L().Named("system")
 
-	log.Debug("🔍 Looking up user", zap.String("username", name))
+	zap.L().Debug("🔍 Looking up user", zap.String("username", name))
 
 	u, err := user.Lookup(name)
 	if err != nil {
-		log.Error("❌ User lookup failed", zap.String("username", name), zap.Error(err))
+		zap.L().Error("❌ User lookup failed", zap.String("username", name), zap.Error(err))
 		return 0, 0, fmt.Errorf("user lookup failed: %w", err)
 	}
 
 	uid, err := strconv.Atoi(u.Uid)
 	if err != nil {
-		log.Error("❌ Invalid UID format", zap.String("uid", u.Uid), zap.Error(err))
+		zap.L().Error("❌ Invalid UID format", zap.String("uid", u.Uid), zap.Error(err))
 		return 0, 0, fmt.Errorf("invalid UID: %w", err)
 	}
 
 	gid, err := strconv.Atoi(u.Gid)
 	if err != nil {
-		log.Error("❌ Invalid GID format", zap.String("gid", u.Gid), zap.Error(err))
+		zap.L().Error("❌ Invalid GID format", zap.String("gid", u.Gid), zap.Error(err))
 		return 0, 0, fmt.Errorf("invalid GID: %w", err)
 	}
 
-	log.Info("✅ User lookup succeeded",
+	zap.L().Info("✅ User lookup succeeded",
 		zap.String("username", name),
 		zap.Int("uid", uid),
 		zap.Int("gid", gid),
@@ -82,11 +81,11 @@ func GetInternalHostname() string {
 
 // GetUbuntuCodename reads /etc/os-release and returns UBUNTU_CODENAME or VERSION_CODENAME
 func GetUbuntuCodename() string {
-	log := logger.GetLogger()
+	
 	file, _ := os.Open("/etc/os-release")
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Warn("Failed to close log file", zap.Error(err))
+			zap.L().Warn("Failed to close log file", zap.Error(err))
 		}
 	}()
 

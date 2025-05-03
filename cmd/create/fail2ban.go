@@ -6,7 +6,7 @@ import (
 	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/spf13/cobra"
@@ -17,9 +17,9 @@ var CreateFail2banCmd = &cobra.Command{
 	Use:   "fail2ban",
 	Short: "Deploy and configure Fail2Ban",
 	Long:  "Install Fail2Ban, apply secure jail.local settings, and enable basic SSH protection.",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("Starting Fail2Ban setup...")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
+		zap.L().Info("Starting Fail2Ban setup...")
 
 		steps := []struct {
 			desc string
@@ -38,14 +38,14 @@ var CreateFail2banCmd = &cobra.Command{
 		}
 
 		for _, step := range steps {
-			log.Info("▶ " + step.desc)
+			zap.L().Info("▶ " + step.desc)
 			if err := step.fn(); err != nil {
-				log.Error("❌ Failed: "+step.desc, zap.Error(err))
+				zap.L().Error("❌ Failed: "+step.desc, zap.Error(err))
 				os.Exit(1)
 			}
 		}
 
-		log.Info("✅ Fail2Ban deployed successfully!")
+		zap.L().Info("✅ Fail2Ban deployed successfully!")
 		return nil
 	}),
 }

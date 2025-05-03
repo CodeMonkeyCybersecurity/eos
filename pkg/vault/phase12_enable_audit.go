@@ -10,8 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.log.
-func EnableFileAudit(client *api.Client, log *zap.Logger) error {
+// EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.zap.L().
+func EnableFileAudit(client *api.Client) error {
 	// Check if the audit device is already enabled
 	audits, err := client.Sys().ListAudit()
 	if err != nil {
@@ -19,7 +19,7 @@ func EnableFileAudit(client *api.Client, log *zap.Logger) error {
 	}
 
 	if _, exists := audits[shared.AuditID]; exists {
-		log.Info("Audit device already enabled at sys/audit/file. Skipping.")
+		zap.L().Info("Audit device already enabled at sys/audit/file. Skipping.")
 		return nil
 	}
 

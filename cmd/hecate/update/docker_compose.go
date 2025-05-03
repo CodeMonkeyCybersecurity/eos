@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -19,8 +19,8 @@ import (
 var dockerComposeCmd = &cobra.Command{
 	Use:   "docker-compose",
 	Short: "Update the docker-compose file based on selected Eos apps",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
 		lastValues := hecate.LoadLastValues()
 		selectedApps := make(map[string]bool)
 
@@ -34,7 +34,7 @@ var dockerComposeCmd = &cobra.Command{
 				}
 			}
 			if len(selectedApps) == 0 {
-				log.Error("No supported apps found in the command-line arguments.")
+				zap.L().Error("No supported apps found in the command-line arguments.")
 				return fmt.Errorf("no supported apps found in the command-line arguments")
 			}
 			var keys []string
@@ -44,7 +44,7 @@ var dockerComposeCmd = &cobra.Command{
 			lastValues["APPS_SELECTION"] = strings.Join(keys, ", ")
 		} else {
 			// Interactive mode.
-			hecate.DisplayOptions(log)
+			hecate.DisplayOptions()
 			defaultSelection := lastValues["APPS_SELECTION"]
 
 			// Create a reader for input.
@@ -53,10 +53,10 @@ var dockerComposeCmd = &cobra.Command{
 			var sel string
 			selectedApps, sel = hecate.GetUserSelection(defaultSelection, reader)
 			lastValues["APPS_SELECTION"] = sel
-			hecate.SaveLastValues(lastValues, log)
+			hecate.SaveLastValues(lastValues)
 		}
 		if err := hecate.UpdateComposeFile(selectedApps); err != nil {
-			log.Error("Error updating docker-compose file.", zap.Error(err))
+			zap.L().Error("Error updating docker-compose file.", zap.Error(err))
 			return err
 		}
 		return nil

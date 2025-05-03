@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
@@ -26,23 +27,23 @@ var UpdateTestDataCmd = &cobra.Command{
 	Use:   "test-data",
 	Short: "Update test-data in Vault (fallback to disk)",
 	Long:  `Updates the stored test-data in Vault. If Vault is unavailable, updates the fallback local test-data.json.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-update-test-data")
 
-		client, err := vault.EnsurePrivilegedVaultClient(log)
+		client, err := vault.EnsurePrivilegedVaultClient()
 		if err != nil {
 			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
 			client = nil
 		} else {
-			vault.SetVaultClient(client, log)
-			validateAndCache(client, log)
+			vault.SetVaultClient(client)
+			validateAndCache(client)
 		}
 
 		newData := generateUpdatedTestData()
 
 		if client != nil {
 			log.Info("✏️ Attempting to update test-data in Vault...")
-			if err := vault.Write(client, testDataVaultPath, newData, log); err == nil {
+			if err := vault.Write(client, testDataVaultPath, newData); err == nil {
 				fmt.Println()
 				fmt.Println("✏️ Test Data Update Summary")
 				fmt.Println("  🔐 Vault: SUCCESS")
@@ -101,17 +102,17 @@ func generateUpdatedTestData() map[string]interface{} {
 }
 
 // validateAndCache ensures Vault client health check and cache
-func validateAndCache(client *api.Client, log *zap.Logger) {
-	report, checked := vault.Check(client, log, nil, "")
+func validateAndCache(client *api.Client) {
+	report, checked := vault.Check(client, nil, "")
 	if checked != nil {
-		vault.SetVaultClient(checked, log)
+		vault.SetVaultClient(checked)
 	}
 	if report == nil {
-		log.Warn("⚠️ Vault check returned nil — skipping further setup")
+		zap.L().Warn("⚠️ Vault check returned nil — skipping further setup")
 		return
 	}
 	for _, note := range report.Notes {
-		log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+		zap.L().Warn("⚠️ Vault diagnostic note", zap.String("note", note))
 	}
 }
 

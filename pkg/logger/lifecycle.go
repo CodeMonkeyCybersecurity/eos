@@ -1,4 +1,4 @@
-/* pkg/logger/lifecycle.go */
+// pkg/logger/lifecycle.go
 
 package logger
 
@@ -31,26 +31,26 @@ func WithCommandLogging(ctx context.Context, name string, fn func(context.Contex
 	traceID := GenerateTraceID()
 	ctx = WithTraceID(ctx, traceID)
 
-	log := L().With(zap.String("trace_id", traceID))
+	zap.L().With(zap.String("trace_id", traceID))
 	start := time.Now()
 
-	log.Info("Command started", zap.String("command", name), zap.Time("start_time", start))
+	zap.L().Info("Command started", zap.String("command", name), zap.Time("start_time", start))
 
 	err := fn(ctx)
 
 	duration := time.Since(start)
 	if err != nil {
 		if eoserr.IsExpectedUserError(err) {
-			log.Warn("Command completed with user error", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
+			zap.L().Warn("Command completed with user error", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
 		} else {
 			if eoserr.IsExpectedUserError(err) {
-				log.Warn("Command completed with user error", zap.Error(err))
+				zap.L().Warn("Command completed with user error", zap.Error(err))
 			} else {
-				log.Error("Command failed", zap.Error(err))
+				zap.L().Error("Command failed", zap.Error(err))
 			}
 		}
 	} else {
-		log.Info("Command completed", zap.String("command", name), zap.Duration("duration", duration))
+		zap.L().Info("Command completed", zap.String("command", name), zap.Duration("duration", duration))
 	}
 	return traceID, err
 }
@@ -82,30 +82,30 @@ func ResolveLogPath() string {
 		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err == nil {
 			if cerr := file.Close(); cerr != nil {
-				log.Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
+				zap.L().Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
 			}
-			log.Info("📝 Using resolved log path", zap.String("log_path", path))
+			zap.L().Info("📝 Using resolved log path", zap.String("log_path", path))
 			return path
 		} else {
-			log.Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
+			zap.L().Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
 		}
 	}
 
-	log.Warn("⚠️ No writable log path could be resolved")
+	zap.L().Warn("⚠️ No writable log path could be resolved")
 	return ""
 }
 
 // LogCommandLifecycle returns a deferred function for consistent start/stop logging.
 func LogCommandLifecycle(cmdName string) func(err *error) {
 	start := time.Now()
-	L().Info("Command started", zap.String("command", cmdName), zap.Time("start_time", start))
+	zap.L().Info("Command started", zap.String("command", cmdName), zap.Time("start_time", start))
 
 	return func(err *error) {
 		duration := time.Since(start)
 		if *err != nil {
-			L().Error("Command failed", zap.String("command", cmdName), zap.Duration("duration", duration), zap.Error(*err))
+			zap.L().Error("Command failed", zap.String("command", cmdName), zap.Duration("duration", duration), zap.Error(*err))
 		} else {
-			L().Info("Command completed", zap.String("command", cmdName), zap.Duration("duration", duration))
+			zap.L().Info("Command completed", zap.String("command", cmdName), zap.Duration("duration", duration))
 		}
 	}
 }

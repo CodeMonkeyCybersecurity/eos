@@ -49,7 +49,7 @@ func GetUserShell(username string) (string, error) {
 }
 
 // generateOrPromptPassword generates a password automatically or securely prompts the user.
-func generateOrPromptPassword(auto bool, log *zap.Logger) (string, error) {
+func generateOrPromptPassword(auto bool) (string, error) {
 	if auto {
 		return crypto.GeneratePassword(20)
 	}
@@ -63,8 +63,8 @@ func generateOrPromptPassword(auto bool, log *zap.Logger) (string, error) {
 			return "", fmt.Errorf("failed to read password: %w", err)
 		}
 
-		if err := crypto.ValidateStrongPassword(pw1, log); err != nil {
-			log.Warn("❌ Password too weak", zap.Error(err))
+		if err := crypto.ValidateStrongPassword(pw1); err != nil {
+			zap.L().Warn("❌ Password too weak", zap.Error(err))
 			continue
 		}
 
@@ -75,7 +75,7 @@ func generateOrPromptPassword(auto bool, log *zap.Logger) (string, error) {
 		}
 
 		if pw1 != pw2 {
-			log.Warn("❌ Passwords do not match")
+			zap.L().Warn("❌ Passwords do not match")
 			continue
 		}
 
@@ -96,32 +96,32 @@ func promptUsername() string {
 
 // LoadPasswordFromSecrets loads the eos user credentials from JSON using shared.UserpassCreds.
 // LoadPasswordFromSecrets loads the eos user credentials from eos-passwd.json.
-func LoadPasswordFromSecrets(log *zap.Logger) (*shared.UserpassCreds, error) {
+func LoadPasswordFromSecrets() (*shared.UserpassCreds, error) {
 	secretsPath := filepath.Join(shared.SecretsDir, shared.SecretsFilename)
 
 	data, err := os.ReadFile(secretsPath)
 	if err != nil {
-		log.Warn("❌ Failed to read eos password file", zap.String("path", secretsPath), zap.Error(err))
+		zap.L().Warn("❌ Failed to read eos password file", zap.String("path", secretsPath), zap.Error(err))
 		return nil, fmt.Errorf("read secrets file: %w", err)
 	}
 
 	var creds shared.UserpassCreds
 	if err := json.Unmarshal(data, &creds); err != nil {
-		log.Warn("❌ Failed to parse eos password JSON", zap.String("path", secretsPath), zap.Error(err))
+		zap.L().Warn("❌ Failed to parse eos password JSON", zap.String("path", secretsPath), zap.Error(err))
 		return nil, fmt.Errorf("unmarshal secrets: %w", err)
 	}
 
 	if creds.Username == "" || creds.Password == "" {
-		log.Warn("❌ Loaded eos credentials are incomplete", zap.Any("creds", creds))
+		zap.L().Warn("❌ Loaded eos credentials are incomplete", zap.Any("creds", creds))
 		return nil, fmt.Errorf("incomplete credentials loaded from %s", secretsPath)
 	}
 
-	log.Info("✅ Loaded eos credentials successfully", zap.String("username", creds.Username))
+	zap.L().Info("✅ Loaded eos credentials successfully", zap.String("username", creds.Username))
 	return &creds, nil
 }
 
 // SavePasswordToSecrets saves the eos user credentials as JSON using shared.UserpassCreds.
-func SavePasswordToSecrets(username, password string, log *zap.Logger) error {
+func SavePasswordToSecrets(username, password string) error {
 	secretsPath := filepath.Join(shared.SecretsDir, shared.SecretsFilename)
 
 	creds := shared.UserpassCreds{
@@ -142,6 +142,6 @@ func SavePasswordToSecrets(username, password string, log *zap.Logger) error {
 		return fmt.Errorf("failed to write credentials to file: %w", err)
 	}
 
-	log.Info("🔐 eos credentials saved", zap.String("path", secretsPath))
+	zap.L().Info("🔐 eos credentials saved", zap.String("path", secretsPath))
 	return nil
 }

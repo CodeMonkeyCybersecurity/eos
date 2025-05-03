@@ -10,24 +10,23 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"go.uber.org/zap"
 )
 
 // ----------------------------
 // 🔐 Hashing
 // ----------------------------
 
-func ConfirmHashedInputs(reader *bufio.Reader, keyLabel string, count int, tokenLabel string, expectedHashes []string, expectedTokenHash string, log *zap.Logger) error {
+func ConfirmHashedInputs(reader *bufio.Reader, keyLabel string, count int, tokenLabel string, expectedHashes []string, expectedTokenHash string) error {
 	for {
 		fmt.Printf("Please re-enter %d unique keys and the token to confirm.\n", count)
 
-		keys, err := interaction.ReadLines(reader, keyLabel, count, log)
+		keys, err := interaction.ReadLines(reader, keyLabel, count)
 		if err != nil {
 			fmt.Println("❌ Error reading keys:", err)
 			continue
 		}
 
-		token, err := interaction.ReadLine(reader, tokenLabel, log)
+		token, err := interaction.ReadLine(reader, tokenLabel)
 		if err != nil {
 			fmt.Println("❌ Error reading token:", err)
 			continue

@@ -17,14 +17,14 @@ import (
 //--------------------------------------------------------------------
 
 // PhaseWriteBootstrapSecretAndRecheck writes a test secret and verifies Vault health.
-func PhaseWriteBootstrapSecretAndRecheck(client *api.Client, log *zap.Logger) error {
-	log.Info("🧪 [Phase 9B] Writing bootstrap test secret and verifying Vault health")
+func PhaseWriteBootstrapSecretAndRecheck(client *api.Client) error {
+	zap.L().Info("🧪 [Phase 9B] Writing bootstrap test secret and verifying Vault health")
 
-	if err := PhaseWriteTestSecret(client, shared.VaultTestPath, map[string]string{"example_key": "example_value"}, log); err != nil {
+	if err := PhaseWriteTestSecret(client, shared.VaultTestPath, map[string]string{"example_key": "example_value"}); err != nil {
 		return fmt.Errorf("bootstrap test secret write failed: %w", err)
 	}
 
-	healthy, err := CheckVaultHealth(log)
+	healthy, err := CheckVaultHealth()
 	if err != nil {
 		return fmt.Errorf("vault health recheck failed: %w", err)
 	}
@@ -32,19 +32,19 @@ func PhaseWriteBootstrapSecretAndRecheck(client *api.Client, log *zap.Logger) er
 		return fmt.Errorf("vault unhealthy after bootstrap secret phase")
 	}
 
-	log.Info("✅ Bootstrap secret written and Vault healthy")
+	zap.L().Info("✅ Bootstrap secret written and Vault healthy")
 	return nil
 }
 
 // PhaseWriteTestSecret writes harmless test data into Vault at the given KV path.
-func PhaseWriteTestSecret(client *api.Client, kvPath string, kvData map[string]string, log *zap.Logger) error {
-	log.Info("🧪 Writing bootstrap test secret", zap.String("path", kvPath))
+func PhaseWriteTestSecret(client *api.Client, kvPath string, kvData map[string]string) error {
+	zap.L().Info("🧪 Writing bootstrap test secret", zap.String("path", kvPath))
 
 	kv := client.KVv2("secret")
 
 	// Initialize an empty map if needed
 	if kvData == nil {
-		log.Warn("⚠️ No data provided for bootstrap secret — initializing empty payload")
+		zap.L().Warn("⚠️ No data provided for bootstrap secret — initializing empty payload")
 		kvData = make(map[string]string)
 	}
 
@@ -60,6 +60,6 @@ func PhaseWriteTestSecret(client *api.Client, kvPath string, kvData map[string]s
 		return fmt.Errorf("write bootstrap secret at %s: %w", kvPath, err)
 	}
 
-	log.Info("✅ Bootstrap test secret written", zap.String("path", kvPath), zap.Int("keys", len(kvData)))
+	zap.L().Info("✅ Bootstrap test secret written", zap.String("path", kvPath), zap.Int("keys", len(kvData)))
 	return nil
 }

@@ -12,14 +12,11 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
-
-var log = logger.L()
 
 const hetznerAPIBase = "https://dns.hetzner.com/api/v1"
 
@@ -85,11 +82,11 @@ To confirm that your variable is set correctly, run:
    
 Then, run this command again.
      `,
-		RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+		RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 			// Basic validation
 			if domain == "" || ip == "" {
 				err := fmt.Errorf("domain and ip are required")
-				log.Error("Missing required flags", zap.String("domain", domain), zap.String("ip", ip), zap.Error(err))
+				zap.L().Error("Missing required flags", zap.String("domain", domain), zap.String("ip", ip), zap.Error(err))
 				return err
 			}
 
@@ -97,25 +94,25 @@ Then, run this command again.
 			hetznerToken := os.Getenv("HETZNER_DNS_API_TOKEN")
 			if hetznerToken == "" {
 				err := fmt.Errorf("missing Hetzner DNS API token (env HETZNER_DNS_API_TOKEN)")
-				log.Error("No Hetzner API token found in environment", zap.Error(err))
+				zap.L().Error("No Hetzner API token found in environment", zap.Error(err))
 				return err
 			}
 
 			// 1) Fetch the zone ID
 			zoneID, err := getZoneIDForDomain(hetznerToken, domain)
 			if err != nil {
-				log.Error("Failed to get zone for domain",
+				zap.L().Error("Failed to get zone for domain",
 					zap.String("domain", domain),
 					zap.Error(err),
 				)
 				return fmt.Errorf("failed to get zone for domain %q: %v", domain, err)
 			}
 
-			log.Info("Using zone for domain",
+			zap.L().Info("Using zone for domain",
 				zap.String("zoneID", zoneID),
 				zap.String("domain", domain),
 			)
-			log.Info("Attempting to create wildcard record",
+			zap.L().Info("Attempting to create wildcard record",
 				zap.String("wildcard", "*."+domain),
 				zap.String("ip", ip),
 			)
@@ -123,14 +120,14 @@ Then, run this command again.
 			// 2) Attempt to create a wildcard record
 			err = createRecord(hetznerToken, zoneID, "*", ip)
 			if err != nil {
-				log.Warn("Wildcard record creation failed",
+				zap.L().Warn("Wildcard record creation failed",
 					zap.Error(err),
 					zap.String("wildcard", "*."+domain),
 				)
 
 				// Fallback to a normal subdomain
 				subdomain := "wildcard-fallback"
-				log.Info("Falling back to normal subdomain record",
+				zap.L().Info("Falling back to normal subdomain record",
 					zap.String("subdomain", subdomain),
 					zap.String("domain", domain),
 					zap.String("ip", ip),
@@ -138,7 +135,7 @@ Then, run this command again.
 
 				fallbackErr := createRecord(hetznerToken, zoneID, subdomain, ip)
 				if fallbackErr != nil {
-					log.Error("Subdomain creation failed after wildcard failure",
+					zap.L().Error("Subdomain creation failed after wildcard failure",
 						zap.String("subdomain", subdomain),
 						zap.String("domain", domain),
 						zap.String("ip", ip),
@@ -147,7 +144,7 @@ Then, run this command again.
 					return fmt.Errorf("subdomain creation failed after wildcard failure: %v", fallbackErr)
 				}
 
-				log.Info("Successfully created subdomain record",
+				zap.L().Info("Successfully created subdomain record",
 					zap.String("record", subdomain+"."+domain),
 					zap.String("ip", ip),
 				)
@@ -155,7 +152,7 @@ Then, run this command again.
 			}
 
 			// If we succeed with wildcard
-			log.Info("Successfully created wildcard record",
+			zap.L().Info("Successfully created wildcard record",
 				zap.String("wildcard", "*."+domain),
 				zap.String("ip", ip),
 			)
@@ -175,7 +172,7 @@ func getZoneIDForDomain(token, domain string) (string, error) {
 
 	req, err := http.NewRequest("GET", hetznerAPIBase+"/zones", nil)
 	if err != nil {
-		log.Error("Failed to create request for fetching zones", zap.Error(err))
+		zap.L().Error("Failed to create request for fetching zones", zap.Error(err))
 		return "", err
 	}
 	req.Header.Set("Auth-API-Token", token)
@@ -183,13 +180,13 @@ func getZoneIDForDomain(token, domain string) (string, error) {
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error("Failed to execute HTTP request for fetching zones", zap.Error(err))
+		zap.L().Error("Failed to execute HTTP request for fetching zones", zap.Error(err))
 		return "", err
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		log.Error("Unexpected status from zones list",
+		zap.L().Error("Unexpected status from zones list",
 			zap.Int("statusCode", resp.StatusCode),
 		)
 		return "", fmt.Errorf("unexpected status from zones list: %s", resp.Status)
@@ -197,7 +194,7 @@ func getZoneIDForDomain(token, domain string) (string, error) {
 
 	var zr ZonesResponse
 	if err := json.NewDecoder(resp.Body).Decode(&zr); err != nil {
-		log.Error("Failed to decode JSON for zones response", zap.Error(err))
+		zap.L().Error("Failed to decode JSON for zones response", zap.Error(err))
 		return "", err
 	}
 
@@ -209,7 +206,7 @@ func getZoneIDForDomain(token, domain string) (string, error) {
 	}
 
 	err = fmt.Errorf("zone not found for domain %q", domain)
-	log.Error("Zone not found for domain", zap.String("domain", domain), zap.Error(err))
+	zap.L().Error("Zone not found for domain", zap.String("domain", domain), zap.Error(err))
 	return "", err
 }
 
@@ -225,13 +222,13 @@ func createRecord(token, zoneID, name, ip string) error {
 
 	bodyBytes, err := json.Marshal(&reqBody)
 	if err != nil {
-		log.Error("Failed to marshal CreateRecordRequest", zap.Error(err))
+		zap.L().Error("Failed to marshal CreateRecordRequest", zap.Error(err))
 		return err
 	}
 
 	req, err := http.NewRequest("POST", hetznerAPIBase+"/records", bytes.NewBuffer(bodyBytes))
 	if err != nil {
-		log.Error("Failed to create request for creating record", zap.Error(err))
+		zap.L().Error("Failed to create request for creating record", zap.Error(err))
 		return err
 	}
 	req.Header.Set("Auth-API-Token", token)
@@ -240,10 +237,10 @@ func createRecord(token, zoneID, name, ip string) error {
 	client := &http.Client{Timeout: 15 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Error("Failed to execute HTTP request for creating record", zap.Error(err))
+		zap.L().Error("Failed to execute HTTP request for creating record", zap.Error(err))
 		return err
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	if resp.StatusCode != http.StatusCreated {
 		var responseBody bytes.Buffer
@@ -252,17 +249,17 @@ func createRecord(token, zoneID, name, ip string) error {
 			resp.StatusCode,
 			responseBody.String(),
 		)
-		log.Error("createRecord: unexpected status", zap.String("error", errMsg))
+		zap.L().Error("createRecord: unexpected status", zap.String("error", errMsg))
 		return err
 	}
 
 	var recordResp RecordResponse
 	if err := json.NewDecoder(resp.Body).Decode(&recordResp); err != nil {
-		log.Error("Failed to decode record creation response", zap.Error(err))
+		zap.L().Error("Failed to decode record creation response", zap.Error(err))
 		return err
 	}
 
-	log.Debug("Record creation response decoded successfully",
+	zap.L().Debug("Record creation response decoded successfully",
 		zap.String("recordID", recordResp.Record.ID),
 		zap.String("recordName", recordResp.Record.Name),
 		zap.String("recordType", recordResp.Record.Type),

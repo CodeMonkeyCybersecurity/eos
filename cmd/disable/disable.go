@@ -4,8 +4,7 @@ package disable
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -15,10 +14,9 @@ var DisableCmd = &cobra.Command{
 	Use:   "disable",
 	Short: "Disable system features (e.g., suspension, hibernation)",
 
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.L()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		log.Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+		zap.L().Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		return cmd.Help()
 	}),
 }

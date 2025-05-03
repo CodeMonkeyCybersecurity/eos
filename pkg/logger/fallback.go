@@ -1,4 +1,4 @@
-/* pkg/logger/fallback.go */
+// pkg/logger/fallback.go
 
 package logger
 
@@ -10,26 +10,21 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-func NewFallbackLogger() *zap.Logger {
-	cfg := DefaultConsoleEncoderConfig()
-
-	core := zapcore.NewCore(
-		zapcore.NewConsoleEncoder(cfg),
-		zapcore.AddSync(os.Stdout),
-		ParseLogLevel(os.Getenv("LOG_LEVEL")),
-	)
-
-	logger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-	logger.Info("Logger fallback initialized")
-	return logger
-}
-
-func InitializeWithFallback() {
+func InitFallback() {
 	path, err := FindWritableLogPath()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "⚠️  No writable log path found. Logging to console only.")
-		log = NewFallbackLogger()
-		zap.ReplaceGlobals(log)
+
+		cfg := DefaultConsoleEncoderConfig()
+		fallbackCore := zapcore.NewCore(
+			zapcore.NewConsoleEncoder(cfg),
+			zapcore.AddSync(os.Stdout),
+			ParseLogLevel(os.Getenv("LOG_LEVEL")),
+		)
+
+		fallbackLogger := zap.New(fallbackCore, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+		zap.ReplaceGlobals(fallbackLogger)
+		fallbackLogger.Info("Logger fallback initialized")
 		return
 	}
 
@@ -49,9 +44,9 @@ func InitializeWithFallback() {
 		zapcore.NewCore(zapcore.NewJSONEncoder(jsonCfg), writer, zap.InfoLevel),
 	)
 
-	log = zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
-	zap.ReplaceGlobals(log)
-	log.Info("Logger fallback initialized",
+	combinedLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
+	zap.ReplaceGlobals(combinedLogger)
+	combinedLogger.Info("Logger fallback initialized",
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
 	)

@@ -26,41 +26,41 @@ import (
 // PHASE 3 — GenerateVaultTLSCert() + TrustVaultCA()
 
 // TrustVaultCA dispatches to the correct CA‐trust helper based on the distro.
-func TrustVaultCA(log *zap.Logger) error {
-	distro := platform.DetectLinuxDistro(log)
-	log.Info("🔐 Trusting Vault CA system‑wide", zap.String("distro", distro))
+func TrustVaultCA() error {
+	distro := platform.DetectLinuxDistro()
+	zap.L().Info("🔐 Trusting Vault CA system‑wide", zap.String("distro", distro))
 
 	switch distro {
 	case "debian", "ubuntu":
-		if err := TrustVaultCA_Debian(log); err != nil {
+		if err := TrustVaultCA_Debian(); err != nil {
 			return fmt.Errorf("debian CA trust: %w", err)
 		}
 	default:
-		if err := TrustVaultCA_RHEL(log); err != nil {
+		if err := TrustVaultCA_RHEL(); err != nil {
 			return fmt.Errorf("rhel CA trust: %w", err)
 		}
 	}
 
-	log.Info("✅ Vault CA is now trusted system‑wide")
+	zap.L().Info("✅ Vault CA is now trusted system‑wide")
 	return nil
 }
 
-func TrustVaultCA_RHEL(log *zap.Logger) error {
+func TrustVaultCA_RHEL() error {
 	src := shared.TLSCrt
 	dest := shared.VaultSystemCATrustPath
 
-	log.Info("📥 Installing Vault CA into system trust store",
+	zap.L().Info("📥 Installing Vault CA into system trust store",
 		zap.String("src", src),
 		zap.String("dest", dest),
 	)
 
 	// copy the file (overwrite if needed)
-	if err := system.CopyFile(src, dest, shared.FilePermStandard, log); err != nil {
+	if err := system.CopyFile(src, dest, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	// ensure root owns it
 	if err := os.Chown(dest, 0, 0); err != nil {
-		log.Warn("could not chown system CA file", zap.Error(err))
+		zap.L().Warn("could not chown system CA file", zap.Error(err))
 	}
 
 	// RHEL9 / CentOS Stream 9
@@ -68,72 +68,72 @@ func TrustVaultCA_RHEL(log *zap.Logger) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Error("❌ Failed to update system CA trust", zap.Error(err))
+		zap.L().Error("❌ Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
-	log.Info("✅ Vault CA is now trusted system‑wide")
+	zap.L().Info("✅ Vault CA is now trusted system‑wide")
 	return nil
 }
 
 // TrustVaultCADebian installs the Vault CA into Debian/Ubuntu's trust store.
-func TrustVaultCA_Debian(log *zap.Logger) error {
+func TrustVaultCA_Debian() error {
 	src := shared.TLSCrt
 	dest := "/usr/local/share/ca-certificates/vault-local-ca.crt"
 
-	log.Info("📥 Installing Vault CA into Debian trust store",
+	zap.L().Info("📥 Installing Vault CA into Debian trust store",
 		zap.String("src", src), zap.String("dest", dest))
 
-	if err := system.CopyFile(src, dest, shared.FilePermStandard, log); err != nil {
+	if err := system.CopyFile(src, dest, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	if err := os.Chown(dest, 0, 0); err != nil {
-		log.Warn("could not chown CA file", zap.Error(err))
+		zap.L().Warn("could not chown CA file", zap.Error(err))
 	}
 
 	cmd := exec.Command("sudo", "update-ca-certificates")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Error("❌ Failed to update system CA trust", zap.Error(err))
+		zap.L().Error("❌ Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
-	log.Info("✅ Vault CA trusted system-wide on Debian/Ubuntu")
+	zap.L().Info("✅ Vault CA trusted system-wide on Debian/Ubuntu")
 	return nil
 }
 
 // GenerateVaultTLSCert generates a self-signed TLS certificate for Vault,
 // including SANs for internal hostname and 127.0.0.1, and stores them securely.
-func GenerateVaultTLSCert(log *zap.Logger) error {
-	log.Info("📁 Checking for existing Vault TLS certs",
+func GenerateVaultTLSCert() error {
+	zap.L().Info("📁 Checking for existing Vault TLS certs",
 		zap.String("key", shared.TLSKey),
 		zap.String("crt", shared.TLSCrt))
 
 	if tlsCertsExist() {
-		log.Info("✅ TLS certs already exist, skipping generation")
+		zap.L().Info("✅ TLS certs already exist, skipping generation")
 		return nil
 	}
 
-	if err := fixTLSCertIfMissingSAN(log); err != nil {
-		log.Warn("⚠️ Could not verify SAN TLS cert status", zap.Error(err))
+	if err := fixTLSCertIfMissingSAN(); err != nil {
+		zap.L().Warn("⚠️ Could not verify SAN TLS cert status", zap.Error(err))
 	}
 
 	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
-		log.Info("✅ TLS certs already exist after SAN check, skipping")
+		zap.L().Info("✅ TLS certs already exist after SAN check, skipping")
 		return nil
 	}
 
 	hostname := system.GetInternalHostname()
-	log.Debug("🔎 Got internal hostname for SAN", zap.String("hostname", hostname))
+	zap.L().Debug("🔎 Got internal hostname for SAN", zap.String("hostname", hostname))
 
 	// Create TLS directory
 	if err := os.MkdirAll(shared.TLSDir, shared.DirPermStandard); err != nil {
-		log.Error("❌ Failed to create TLS directory", zap.Error(err))
+		zap.L().Error("❌ Failed to create TLS directory", zap.Error(err))
 		return fmt.Errorf("failed to create TLS directory: %w", err)
 	}
 
-	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true, log)
+	ok := interaction.PromptYesNo("No TLS certs found. Generate self-signed TLS certs now?", true)
 	if !ok {
 		return fmt.Errorf("user declined TLS certificate generation")
 	}
@@ -159,7 +159,7 @@ IP.1 = %s
 		return fmt.Errorf("failed to create temp openssl config: %w", err)
 	}
 	if err := os.Remove(tmpFile.Name()); err != nil {
-		log.Warn("Failed to remove temp file", zap.Error(err))
+		zap.L().Warn("Failed to remove temp file", zap.Error(err))
 	}
 	tmpConfigPath := tmpFile.Name()
 
@@ -170,7 +170,7 @@ IP.1 = %s
 		return fmt.Errorf("failed to close temp openssl config: %w", err)
 	}
 
-	log.Info("🔐 Generating Vault TLS certificate with SANs",
+	zap.L().Info("🔐 Generating Vault TLS certificate with SANs",
 		zap.String("hostname", hostname), zap.String("config", tmpConfigPath))
 
 	cmd := exec.Command("sudo", "openssl", "req", "-new", "-newkey", "rsa:4096",
@@ -188,19 +188,19 @@ IP.1 = %s
 		return fmt.Errorf("openssl failed: %w", err)
 	}
 
-	log.Info("🔐 Securing Vault TLS certs...")
-	if err := secureVaultTLSOwnership(log); err != nil {
-		log.Warn("could not apply correct ownership to TLS certs", zap.Error(err))
+	zap.L().Info("🔐 Securing Vault TLS certs...")
+	if err := secureVaultTLSOwnership(); err != nil {
+		zap.L().Warn("could not apply correct ownership to TLS certs", zap.Error(err))
 	}
 
-	log.Info("✅ Vault TLS cert generated and secured",
+	zap.L().Info("✅ Vault TLS cert generated and secured",
 		zap.String("key", shared.TLSKey),
 		zap.String("crt", shared.TLSCrt))
 
 	return nil
 }
 
-func fixTLSCertIfMissingSAN(log *zap.Logger) error {
+func fixTLSCertIfMissingSAN() error {
 	url := shared.VaultHealthEndpoint
 	client := &http.Client{
 		Timeout: 3 * time.Second,
@@ -211,89 +211,89 @@ func fixTLSCertIfMissingSAN(log *zap.Logger) error {
 		},
 	}
 
-	log.Debug("🔍 Testing TLS connection for SAN validation", zap.String("url", url))
+	zap.L().Debug("🔍 Testing TLS connection for SAN validation", zap.String("url", url))
 
 	resp, err := client.Get(url)
 	if err != nil {
 		errStr := err.Error()
 
 		if os.IsTimeout(err) {
-			log.Warn("⏱️ TLS check timed out – assuming Vault not running")
+			zap.L().Warn("⏱️ TLS check timed out – assuming Vault not running")
 			return nil // Not a cert issue
 		}
 
 		if strings.Contains(errStr, "x509: cannot validate certificate for 127.0.0.1") &&
 			strings.Contains(errStr, "doesn't contain any IP SANs") {
-			log.Warn("❌ Detected TLS cert missing SAN for 127.0.0.1 — forcing regeneration")
+			zap.L().Warn("❌ Detected TLS cert missing SAN for 127.0.0.1 — forcing regeneration")
 
-			if err := removeBadTLSCerts(log); err != nil {
+			if err := removeBadTLSCerts(); err != nil {
 				return fmt.Errorf("failed to remove broken certs after SAN check: %w", err)
 			}
 			return nil
 		}
 
 		if strings.Contains(errStr, "x509: certificate is not valid for") {
-			log.Warn("❌ Detected certificate hostname mismatch — forcing TLS cert regeneration",
+			zap.L().Warn("❌ Detected certificate hostname mismatch — forcing TLS cert regeneration",
 				zap.String("error", errStr))
 
-			if err := removeBadTLSCerts(log); err != nil {
+			if err := removeBadTLSCerts(); err != nil {
 				return fmt.Errorf("failed to remove broken certs after hostname mismatch: %w", err)
 			}
 			return nil
 		}
 
-		log.Debug("TLS connection failed, but not due to SAN issue", zap.Error(err))
+		zap.L().Debug("TLS connection failed, but not due to SAN issue", zap.Error(err))
 		return nil // Different TLS failure — do not delete
 	}
 
-	defer shared.SafeClose(resp.Body, log)
-	log.Debug("✅ TLS cert appears valid – continuing")
+	defer shared.SafeClose(resp.Body)
+	zap.L().Debug("✅ TLS cert appears valid – continuing")
 	return nil
 }
 
 // Helper
-func removeBadTLSCerts(log *zap.Logger) error {
+func removeBadTLSCerts() error {
 	for _, path := range []string{shared.TLSKey, shared.TLSCrt} {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			log.Error("❌ Failed to remove broken TLS cert file", zap.String("path", path), zap.Error(err))
+			zap.L().Error("❌ Failed to remove broken TLS cert file", zap.String("path", path), zap.Error(err))
 			return err
 		}
-		log.Info("✅ Removed broken TLS cert file", zap.String("path", path))
+		zap.L().Info("✅ Removed broken TLS cert file", zap.String("path", path))
 	}
 	return nil
 }
 
-func EnsureVaultTLS(log *zap.Logger) (string, string, error) {
+func EnsureVaultTLS() (string, string, error) {
 	// Quick check if files exist
 	if !system.FileExists(shared.TLSKey) || !system.FileExists(shared.TLSCrt) {
-		log.Warn("🔐 TLS certs missing — triggering generation")
-		if err := GenerateVaultTLSCert(log); err != nil {
+		zap.L().Warn("🔐 TLS certs missing — triggering generation")
+		if err := GenerateVaultTLSCert(); err != nil {
 			return "", "", fmt.Errorf("failed to generate Vault TLS certs: %w", err)
 		}
 		return shared.TLSCrt, shared.TLSKey, nil
 	}
 
 	// Extra: Inspect certificate for valid SANs
-	hasValidSAN, err := checkTLSCertForSAN(shared.TLSCrt, log)
+	hasValidSAN, err := checkTLSCertForSAN(shared.TLSCrt)
 	if err != nil {
-		log.Warn("⚠️ Could not inspect existing TLS cert, forcing regeneration", zap.Error(err))
-		_ = removeBadTLSCerts(log) // Best effort
-		if err := GenerateVaultTLSCert(log); err != nil {
+		zap.L().Warn("⚠️ Could not inspect existing TLS cert, forcing regeneration", zap.Error(err))
+		_ = removeBadTLSCerts() // Best effort
+		if err := GenerateVaultTLSCert(); err != nil {
 			return "", "", fmt.Errorf("failed to generate Vault TLS certs after SAN check failure: %w", err)
 		}
 		return shared.TLSCrt, shared.TLSKey, nil
 	}
 
 	if !hasValidSAN {
-		log.Warn("❌ Existing Vault TLS cert missing or invalid SANs — forcing regeneration")
-		_ = removeBadTLSCerts(log) // Best effort
-		if err := GenerateVaultTLSCert(log); err != nil {
+		zap.L().Warn("❌ Existing Vault TLS cert missing or invalid SANs — forcing regeneration")
+		_ = removeBadTLSCerts() // Best effort
+		if err := GenerateVaultTLSCert(); err != nil {
 			return "", "", fmt.Errorf("failed to regenerate Vault TLS cert with SANs: %w", err)
 		}
 		return shared.TLSCrt, shared.TLSKey, nil
 	}
 
-	log.Info("✅ Vault TLS cert exists and SANs are valid", zap.String("crt", shared.TLSCrt))
+	zap.L().Info("✅ Vault TLS cert exists and SANs are valid", zap.String("crt", shared.TLSCrt))
 	return shared.TLSCrt, shared.TLSKey, nil
 }
 
@@ -301,10 +301,10 @@ func tlsCertsExist() bool {
 	return system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt)
 }
 
-func secureVaultTLSOwnership(log *zap.Logger) error {
+func secureVaultTLSOwnership() error {
 	uid, gid, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("could not lookup eos user", zap.Error(err))
+		zap.L().Warn("could not lookup eos user", zap.Error(err))
 		return err
 	}
 
@@ -317,50 +317,50 @@ func secureVaultTLSOwnership(log *zap.Logger) error {
 		{shared.TLSDir, shared.FilePermOwnerRWX},
 	} {
 		if err := os.Chown(file.path, uid, gid); err != nil {
-			log.Warn("⚠️ Failed to chown", zap.String("path", file.path), zap.Error(err))
+			zap.L().Warn("⚠️ Failed to chown", zap.String("path", file.path), zap.Error(err))
 		} else {
-			log.Info("✅ Set ownership", zap.String("path", file.path), zap.Int("uid", uid), zap.Int("gid", gid))
+			zap.L().Info("✅ Set ownership", zap.String("path", file.path), zap.Int("uid", uid), zap.Int("gid", gid))
 		}
 
 		if err := os.Chmod(file.path, file.perm); err != nil {
-			log.Warn("⚠️ Failed to chmod", zap.String("path", file.path), zap.Error(err))
+			zap.L().Warn("⚠️ Failed to chmod", zap.String("path", file.path), zap.Error(err))
 		} else {
-			log.Info("✅ Set permissions", zap.String("path", file.path), zap.String("perm", fmt.Sprintf("%#o", file.perm)))
+			zap.L().Info("✅ Set permissions", zap.String("path", file.path), zap.String("perm", fmt.Sprintf("%#o", file.perm)))
 		}
 	}
 
 	// Now ensure CA is available for the Vault Agent
-	return EnsureVaultAgentCAExists(log)
+	return EnsureVaultAgentCAExists()
 }
 
 // EnsureVaultAgentCAExists ensures that the Vault Agent CA cert is present.
 // If missing, it re-copies it from the Vault server TLS cert.
-func EnsureVaultAgentCAExists(log *zap.Logger) error {
+func EnsureVaultAgentCAExists() error {
 	src := shared.TLSCrt
 	dst := shared.VaultAgentCACopyPath
 
 	if system.FileExists(dst) {
-		log.Debug("✅ Vault Agent CA cert already exists", zap.String("path", dst))
+		zap.L().Debug("✅ Vault Agent CA cert already exists", zap.String("path", dst))
 		return nil
 	}
 
-	log.Warn("⚠️ Vault Agent CA cert missing, attempting to re-copy",
+	zap.L().Warn("⚠️ Vault Agent CA cert missing, attempting to re-copy",
 		zap.String("src", src), zap.String("dst", dst))
 
-	if err := system.CopyFile(src, dst, shared.FilePermStandard, log); err != nil {
+	if err := system.CopyFile(src, dst, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("failed to copy Vault Agent CA cert: %w", err)
 	}
 
 	uid, gid, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		log.Warn("could not lookup eos user for CA cert ownership", zap.Error(err))
+		zap.L().Warn("could not lookup eos user for CA cert ownership", zap.Error(err))
 		return err
 	}
 
 	if err := os.Chown(dst, uid, gid); err != nil {
-		log.Warn("could not chown Vault Agent CA cert", zap.Error(err))
+		zap.L().Warn("could not chown Vault Agent CA cert", zap.Error(err))
 	} else {
-		log.Info("✅ Vault Agent CA cert ownership corrected", zap.String("path", dst),
+		zap.L().Info("✅ Vault Agent CA cert ownership corrected", zap.String("path", dst),
 			zap.Int("uid", uid), zap.Int("gid", gid))
 	}
 
@@ -368,7 +368,7 @@ func EnsureVaultAgentCAExists(log *zap.Logger) error {
 }
 
 // checkTLSCertForSAN parses the cert and ensures it has SANs matching localhost or internal hostname.
-func checkTLSCertForSAN(certPath string, log *zap.Logger) (bool, error) {
+func checkTLSCertForSAN(certPath string) (bool, error) {
 	data, err := os.ReadFile(certPath)
 	if err != nil {
 		return false, fmt.Errorf("read cert: %w", err)
@@ -385,7 +385,7 @@ func checkTLSCertForSAN(certPath string, log *zap.Logger) (bool, error) {
 	}
 
 	if len(cert.DNSNames) == 0 && len(cert.IPAddresses) == 0 {
-		log.Warn("TLS cert missing SANs entirely")
+		zap.L().Warn("TLS cert missing SANs entirely")
 		return false, nil
 	}
 

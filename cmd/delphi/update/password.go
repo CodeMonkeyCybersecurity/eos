@@ -8,12 +8,12 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 )
 
@@ -28,37 +28,36 @@ var PasswordCmd = &cobra.Command{
 	Short: "Update a Wazuh user's password",
 	Long: `Update the password of a Wazuh (Delphi) user using their username.
 Supports interactive confirmation and XDG-safe password storage if requested.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		if username == "" {
 			return errors.New("username is required (use --username)")
 		}
 
-		cfg, err := delphi.ReadConfig(log)
+		cfg, err := delphi.ReadConfig()
 		if err != nil {
-			log.Fatal("Failed to load Delphi config", zap.Error(err))
+			zap.L().Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
 		// Prompt for current password
-		currentPassword, err := crypto.PromptPassword("Current password", log)
+		currentPassword, err := crypto.PromptPassword("Current password")
 		if err != nil {
 			return fmt.Errorf("failed to read current password: %w", err)
 		}
 
-		log.Info("Authenticating with current password...")
+		zap.L().Info("Authenticating with current password...")
 
-		if _, err := delphi.AuthenticateUser(cfg, username, currentPassword, log); err != nil {
+		if _, err := delphi.AuthenticateUser(cfg, username, currentPassword); err != nil {
 			return fmt.Errorf("authentication failed: %w", err)
 		}
 
-		userID, err := delphi.GetUserIDByUsername(cfg, username, log)
+		userID, err := delphi.GetUserIDByUsername(cfg, username)
 		if err != nil {
 			return fmt.Errorf("unable to resolve user ID for username %s: %w", username, err)
 		}
 
 		if strings.EqualFold(username, "wazuh-wui") {
-			confirm, err := interaction.Resolve("You are updating the wazuh-wui user. This will impact the Wazuh dashboard. Proceed?", log)
+			confirm, err := interaction.Resolve("You are updating the wazuh-wui user. This will impact the Wazuh dashboard. Proceed?")
 			if err != nil || !confirm {
 				return errors.New("aborted by user")
 			}
@@ -66,11 +65,11 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 
 		// Prompt for password (if not provided via flag)
 		if password == "" {
-			pw1, err := crypto.PromptPassword("New password", log)
+			pw1, err := crypto.PromptPassword("New password")
 			if err != nil {
 				return err
 			}
-			pw2, err := crypto.PromptPassword("Confirm password", log)
+			pw2, err := crypto.PromptPassword("Confirm password")
 			if err != nil {
 				return err
 			}
@@ -80,18 +79,18 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			password = pw1
 		}
 
-		if err := delphi.UpdateUserPassword(cfg, userID, password, log); err != nil {
+		if err := delphi.UpdateUserPassword(cfg, userID, password); err != nil {
 			return fmt.Errorf("failed to update password: %w", err)
 		}
 
-		log.Info("Password updated successfully", zap.String("username", username))
+		zap.L().Info("Password updated successfully", zap.String("username", username))
 
 		if storePassword {
 			path, err := xdg.SaveCredential("delphi", username, password)
 			if err != nil {
-				log.Warn("Password update succeeded but storing password failed", zap.Error(err))
+				zap.L().Warn("Password update succeeded but storing password failed", zap.Error(err))
 			} else {
-				log.Info("Password stored securely", zap.String("path", path))
+				zap.L().Info("Password stored securely", zap.String("path", path))
 			}
 		}
 

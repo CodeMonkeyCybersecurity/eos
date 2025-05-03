@@ -7,36 +7,32 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-
 	"go.uber.org/zap"
 )
 
-var log = logger.L()
-
 // RestoreFile copies a single file from src to dst.
 func RestoreFile(src, dst string) {
-	log.Info("Restoring file", zap.String("source", src), zap.String("destination", dst))
+	zap.L().Info("Restoring file", zap.String("source", src), zap.String("destination", dst))
 
-	if err := CopyFile(src, dst, 0, log); err != nil {
-		log.Error("Failed to restore file", zap.Error(err))
+	if err := CopyFile(src, dst, 0); err != nil {
+		zap.L().Error("Failed to restore file", zap.Error(err))
 	} else {
-		log.Info("File restored successfully", zap.String("destination", dst))
+		zap.L().Info("File restored successfully", zap.String("destination", dst))
 	}
 }
 
 // RestoreDir copies a full directory from src to dst.
 func RestoreDir(src, dst string) {
-	log.Info("Restoring directory", zap.String("source", src), zap.String("destination", dst))
+	zap.L().Info("Restoring directory", zap.String("source", src), zap.String("destination", dst))
 
-	if err := Rm(dst, "destination directory", log); err != nil {
-		log.Error("Failed to clean destination", zap.String("destination", dst), zap.Error(err))
+	if err := Rm(dst, "destination directory"); err != nil {
+		zap.L().Error("Failed to clean destination", zap.String("destination", dst), zap.Error(err))
 		return
 	}
-	if err := CopyDir(src, dst, log); err != nil {
-		log.Error("Failed to restore directory", zap.String("source", src), zap.Error(err))
+	if err := CopyDir(src, dst); err != nil {
+		zap.L().Error("Failed to restore directory", zap.String("source", src), zap.Error(err))
 	} else {
-		log.Info("Directory restored successfully", zap.String("destination", dst))
+		zap.L().Info("Directory restored successfully", zap.String("destination", dst))
 	}
 }
 

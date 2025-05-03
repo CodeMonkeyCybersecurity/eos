@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
@@ -18,7 +19,7 @@ var InspectUsersCmd = &cobra.Command{
 	Short: "Retrieve information about system users",
 	Long: `This command retrieves a list of all system users on the current machine
 by reading the /etc/passwd file.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("Reading users...")
 		users, err := getSystemUsers()
 		if err != nil {
@@ -40,7 +41,7 @@ func getSystemUsers() ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open /etc/passwd: %w", err)
 	}
-	defer shared.SafeClose(file, log)
+	defer shared.SafeClose(file)
 
 	var users []string
 	scanner := bufio.NewScanner(file)

@@ -21,21 +21,21 @@ func ReadLogFile(path string) (string, error) {
 }
 
 // TryReadLogFile safely reads a log file after validating that it exists and is not a directory.
-func TryReadLogFile(path string, log *zap.Logger) (string, error) {
+func TryReadLogFile(path string) (string, error) {
 	fi, err := os.Stat(path)
 	if err != nil || fi.IsDir() {
-		log.Warn("Invalid log file path", zap.String("path", path))
+		zap.L().Warn("Invalid log file path", zap.String("path", path))
 		return "", fmt.Errorf("invalid log file path: %s", path)
 	}
 	return ReadLogFile(path)
 }
 
 // TryJournalctl fetches recent EOS logs using journalctl, returning the output.
-func TryJournalctl(log *zap.Logger) (string, error) {
+func TryJournalctl() (string, error) {
 	cmd := exec.Command("journalctl", "-u", shared.EosID, "--no-pager", "--since", journalSinceDefault)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Warn("Failed to query journalctl", zap.Error(err))
+		zap.L().Warn("Failed to query journalctl", zap.Error(err))
 		return "", fmt.Errorf("could not query journalctl: %w", err)
 	}
 	return string(out), nil

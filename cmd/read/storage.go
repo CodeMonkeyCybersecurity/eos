@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 )
 
@@ -15,7 +16,7 @@ var InspectStorageCmd = &cobra.Command{
 	Short: "Retrieve information about storage devices and filesystem usage",
 	Long: `The read storage command displays detailed information about block devices 
 and the usage of mounted filesystems, combining the functionality of lsblk and df -h.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("Reading storage information...")
 
 		// Run lsblk

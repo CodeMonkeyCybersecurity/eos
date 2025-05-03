@@ -13,25 +13,24 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
-	"go.uber.org/zap"
 )
 
 // TestConnection attempts a bind to verify the LDAP connection works.
-func CheckConnection(cfg *LDAPConfig, log *zap.Logger) error {
-	conn, err := ConnectWithGivenConfig(cfg, log)
+func CheckConnection(cfg *LDAPConfig) error {
+	conn, err := ConnectWithGivenConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
-	defer shared.SafeClose(conn, log)
+	defer shared.SafeClose(conn)
 
 	return nil
 }
 
 // TryReadFromVault attempts to load the LDAP config from Vault.
 // It returns nil if not found or incomplete.
-func TryReadFromVault(client *api.Client, log *zap.Logger) (*LDAPConfig, error) {
+func TryReadFromVault(client *api.Client) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	if err := vault.Read(client, "secret/ldap/config", &cfg, log); err != nil {
+	if err := vault.Read(client, "secret/ldap/config", &cfg); err != nil {
 		return nil, err
 	}
 	if cfg.FQDN == "" || cfg.BindDN == "" {
@@ -40,7 +39,7 @@ func TryReadFromVault(client *api.Client, log *zap.Logger) (*LDAPConfig, error) 
 	return &cfg, nil
 }
 
-func TryLoadFromEnv(log *zap.Logger) *LDAPConfig {
+func TryLoadFromEnv() *LDAPConfig {
 	fqdn := os.Getenv("LDAP_FQDN")
 	bind := os.Getenv("LDAP_BIND_DN")
 	pass := os.Getenv("LDAP_PASSWORD")
@@ -72,7 +71,7 @@ func TryLoadFromEnv(log *zap.Logger) *LDAPConfig {
 	}
 }
 
-func TryDetectFromHost(log *zap.Logger) *LDAPConfig {
+func TryDetectFromHost() *LDAPConfig {
 	timeout := 500 * time.Millisecond
 	conn, err := net.DialTimeout("tcp", "localhost:389", timeout)
 	if err != nil {
@@ -94,7 +93,7 @@ func TryDetectFromHost(log *zap.Logger) *LDAPConfig {
 }
 
 // IsPortOpen checks if a port is listening on localhost (e.g. 389 for LDAP)
-func IsPortOpen(port int, log *zap.Logger) bool {
+func IsPortOpen(port int) bool {
 	address := fmt.Sprintf("127.0.0.1:%d", port)
 	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
 	if err != nil {
@@ -105,7 +104,7 @@ func IsPortOpen(port int, log *zap.Logger) bool {
 }
 
 // IsSystemdUnitActive checks if a systemd service (e.g. slapd) is active
-func IsSystemdUnitActive(name string, log *zap.Logger) bool {
+func IsSystemdUnitActive(name string) bool {
 	out, err := exec.Command("systemctl", "is-active", name).Output()
 	if err != nil {
 		return false
@@ -113,14 +112,14 @@ func IsSystemdUnitActive(name string, log *zap.Logger) bool {
 	return strings.TrimSpace(string(out)) == "active"
 }
 
-func runLDAPProbe(log *zap.Logger) error {
+func runLDAPProbe() error {
 	cmd := exec.Command("ldapsearch", "-x", "-H", "ldap://localhost", "-b", "", "-s", "base")
 	cmd.Stdout = nil
 	cmd.Stderr = nil
 	return cmd.Run()
 }
 
-func runLDAPAuthProbe(bindDN, password string, log *zap.Logger) error {
+func runLDAPAuthProbe(bindDN, password string) error {
 	cmd := exec.Command("ldapsearch", "-x", "-H", "ldap://localhost", "-D", bindDN, "-w", password, "-b", "", "-s", "base")
 	cmd.Stdout = nil
 	cmd.Stderr = nil

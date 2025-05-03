@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -27,7 +27,7 @@ var CreateSSHCmd = &cobra.Command{
 	Short: "Create a FIPS-compliant SSH key and connect it to a remote host",
 	Long: `Generates a 2048-bit RSA key for FIPS compliance, installs it to a remote host using ssh-copy-id,
 and configures it in your ~/.ssh/config for easy reuse.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return runCreateSSH(cmd, args)
 	}),
 }
@@ -41,7 +41,6 @@ func init() {
 }
 
 func runCreateSSH(_ *cobra.Command, _ []string) error {
-	log := logger.L()
 
 	// Resolve user home directory and SSH paths.
 	currentUser, err := user.Current()
@@ -59,7 +58,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 
 	// Prompt for target login if not provided.
 	if targetLogin == "" {
-		targetLogin = interaction.PromptInput("Enter target login (<user@host>)", "", log)
+		targetLogin = interaction.PromptInput("Enter target login (<user@host>)", "")
 	}
 	parts := strings.Split(strings.TrimSpace(targetLogin), "@")
 	if len(parts) != 2 {
@@ -67,7 +66,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	}
 	remoteUser, host := parts[0], parts[1]
 
-	log.Info("Ensuring ~/.ssh exists", zap.String("path", sshDir))
+	zap.L().Info("Ensuring ~/.ssh exists", zap.String("path", sshDir))
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return fmt.Errorf("failed to create ~/.ssh: %w", err)
 	}
@@ -76,7 +75,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	if _, err := os.Stat(keyPath); err == nil && !force {
 		fmt.Println("🔑 Key already exists:", keyPath)
 	} else {
-		log.Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
+		zap.L().Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
 		if err := system.GenerateFIPSKey(keyPath); err != nil {
 			return fmt.Errorf("failed to generate SSH key: %w", err)
 		}

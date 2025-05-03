@@ -12,77 +12,77 @@ import (
 	"go.uber.org/zap"
 )
 
-func InstallVaultBinary(log *zap.Logger) error {
-	return PhaseInstallVault(log)
+func InstallVaultBinary() error {
+	return PhaseInstallVault()
 }
 
-func PrepareEnvironment(log *zap.Logger) error {
-	if _, err := EnsureVaultEnv(log); err != nil {
+func PrepareEnvironment() error {
+	if _, err := EnsureVaultEnv(); err != nil {
 		return err
 	}
-	if err := system.EnsureEosUser(true, false, log); err != nil {
+	if err := system.EnsureEosUser(true, false); err != nil {
 		return err
 	}
-	if err := EnsureVaultDirs(log); err != nil {
+	if err := EnsureVaultDirs(); err != nil {
 		return err
 	}
-	if err := PrepareVaultAgentEnvironment(log); err != nil {
+	if err := PrepareVaultAgentEnvironment(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func GenerateTLS(log *zap.Logger) error {
-	log.Info("📁 Starting full Vault TLS generation and trust setup")
+func GenerateTLS() error {
+	zap.L().Info("📁 Starting full Vault TLS generation and trust setup")
 
-	crt, key, err := EnsureVaultTLS(log)
+	crt, key, err := EnsureVaultTLS()
 	if err != nil {
 		return fmt.Errorf("ensure vault TLS certs: %w", err)
 	}
-	log.Info("✅ Vault TLS certs ensured", zap.String("key", key), zap.String("crt", crt))
+	zap.L().Info("✅ Vault TLS certs ensured", zap.String("key", key), zap.String("crt", crt))
 
-	if err := TrustVaultCA(log); err != nil {
+	if err := TrustVaultCA(); err != nil {
 		return fmt.Errorf("trust vault CA system-wide: %w", err)
 	}
-	log.Info("✅ Vault CA trusted system-wide")
+	zap.L().Info("✅ Vault CA trusted system-wide")
 
-	if err := secureVaultTLSOwnership(log); err != nil {
+	if err := secureVaultTLSOwnership(); err != nil {
 		return fmt.Errorf("secure Vault TLS ownership: %w", err)
 	}
-	log.Info("✅ Vault Agent CA cert ensured")
-	log.Info("✅ Vault TLS generation and trust setup complete")
+	zap.L().Info("✅ Vault Agent CA cert ensured")
+	zap.L().Info("✅ Vault TLS generation and trust setup complete")
 
 	return nil
 }
 
-func WriteAndValidateConfig(log *zap.Logger) error {
-	if err := PhaseEnsureVaultConfigExists(log); err != nil {
+func WriteAndValidateConfig() error {
+	if err := PhaseEnsureVaultConfigExists(); err != nil {
 		return err
 	}
-	if err := PhasePatchVaultConfigIfNeeded(log); err != nil {
+	if err := PhasePatchVaultConfigIfNeeded(); err != nil {
 		return err
 	}
-	if err := ValidateVaultConfig(log); err != nil {
+	if err := ValidateVaultConfig(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func StartVault(log *zap.Logger) error {
-	return StartVaultService(log)
+func StartVault() error {
+	return StartVaultService()
 }
 
-func InitializeVaultOnly(log *zap.Logger) (string, error) {
-	if _, err := EnsureVaultEnv(log); err != nil {
+func InitializeVaultOnly() (string, error) {
+	if _, err := EnsureVaultEnv(); err != nil {
 		return "", fmt.Errorf("ensure Vault environment: %w", err)
 	}
 
-	client, err := CreateVaultClient(log)
+	client, err := CreateVaultClient()
 	if err != nil {
 		return "", fmt.Errorf("create Vault client: %w", err)
 	}
 
-	client, err = PhaseInitVaultOnly(client, log)
+	client, err = PhaseInitVaultOnly(client)
 	if err != nil {
 		return "", fmt.Errorf("initialize Vault only: %w", err)
 	}
@@ -91,13 +91,13 @@ func InitializeVaultOnly(log *zap.Logger) (string, error) {
 	}
 
 	addr := VaultAddress()
-	log.Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String(shared.VaultAddrEnv, addr))
+	zap.L().Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String(shared.VaultAddrEnv, addr))
 
 	return addr, nil
 }
 
-func CreateVaultClient(log *zap.Logger) (*api.Client, error) {
-	return NewClient(log)
+func CreateVaultClient() (*api.Client, error) {
+	return NewClient()
 }
 
 func VaultAddress() string {

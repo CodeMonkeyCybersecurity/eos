@@ -8,12 +8,13 @@ import (
 	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
 // installTrivy installs the Trivy vulnerability scanner.
-func installTrivy(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+func installTrivy(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("trivy-installer")
 	log.Info("📦 Starting Trivy installation")
 

@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
@@ -28,7 +27,7 @@ func LoadLastValues() map[string]string {
 	}
 	defer func() {
 		if cerr := file.Close(); cerr != nil {
-			logger.GetLogger().Warn("Failed to close LastValuesFile", zap.Error(cerr))
+			zap.L().Warn("Failed to close LastValuesFile", zap.Error(cerr))
 		}
 	}()
 
@@ -46,7 +45,7 @@ func LoadLastValues() map[string]string {
 		values[key] = value
 	}
 	if err := scanner.Err(); err != nil {
-		logger.GetLogger().Error("Error reading last values", zap.Error(err))
+		zap.L().Error("Error reading last values", zap.Error(err))
 	}
 	return values
 }
@@ -61,7 +60,7 @@ func PromptInput(varName, promptMessage, defaultVal string, reader *bufio.Reader
 		}
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			logger.GetLogger().Error("Error reading input", zap.Error(err))
+			zap.L().Error("Error reading input", zap.Error(err))
 			continue
 		}
 		input = strings.TrimSpace(input)
@@ -76,14 +75,14 @@ func PromptInput(varName, promptMessage, defaultVal string, reader *bufio.Reader
 }
 
 // saveLastValues writes the provided map to LastValuesFile in key="value" format.
-func SaveLastValues(values map[string]string, log *zap.Logger) {
+func SaveLastValues(values map[string]string) {
 	file, err := os.Create(LastValuesFile)
 	if err != nil {
-		logger.GetLogger().Fatal("Unable to save values", zap.Error(err))
+		zap.L().Fatal("Unable to save values", zap.Error(err))
 	}
 	defer func() {
 		if cerr := file.Close(); cerr != nil {
-			logger.GetLogger().Warn("Failed to close LastValuesFile", zap.Error(cerr))
+			zap.L().Warn("Failed to close LastValuesFile", zap.Error(cerr))
 		}
 	}()
 
@@ -92,10 +91,10 @@ func SaveLastValues(values map[string]string, log *zap.Logger) {
 		// Write each line as: key="value"
 		_, err := fmt.Fprintf(writer, "%s=\"%s\"\n", key, value)
 		if err != nil {
-			logger.GetLogger().Fatal("Error writing to file", zap.Error(err))
+			zap.L().Fatal("Error writing to file", zap.Error(err))
 		}
 	}
-	shared.SafeFlush(writer, log)
+	shared.SafeFlush(writer)
 }
 
 // backupFile creates a backup of the provided file by copying it to a new file with a timestamp.
@@ -121,7 +120,7 @@ func BackupFile(filepathStr string) error {
 	}
 	defer func() {
 		if cerr := src.Close(); cerr != nil {
-			logger.GetLogger().Warn("Failed to close source file during backup", zap.Error(cerr))
+			zap.L().Warn("Failed to close source file during backup", zap.Error(cerr))
 		}
 	}()
 
@@ -131,7 +130,7 @@ func BackupFile(filepathStr string) error {
 	}
 	defer func() {
 		if cerr := dest.Close(); cerr != nil {
-			logger.GetLogger().Warn("Failed to close destination file during backup", zap.Error(cerr))
+			zap.L().Warn("Failed to close destination file during backup", zap.Error(cerr))
 		}
 	}()
 
@@ -143,14 +142,14 @@ func BackupFile(filepathStr string) error {
 }
 
 // displayOptions prints the available Eos backend web apps.
-func DisplayOptions(log *zap.Logger) {
+func DisplayOptions() {
 	fmt.Println("Available Eos backend web apps:")
 	// To display options in order, first sort the keys numerically.
 	var keys []int
 	keyMap := make(map[int]string)
 	for keyStr := range AppsSelection {
 		var num int
-		shared.SafeSscanf(keyStr, "%d", &num, log)
+		shared.SafeSscanf(keyStr, "%d", &num)
 		keys = append(keys, num)
 		keyMap[num] = keyStr
 	}
@@ -175,7 +174,7 @@ func GetUserSelection(defaultSelection string, reader *bufio.Reader) (map[string
 		fmt.Print(promptMsg)
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			logger.GetLogger().Fatal("Error reading input", zap.Error(err))
+			zap.L().Fatal("Error reading input", zap.Error(err))
 		}
 		input = strings.TrimSpace(input)
 		// Use the default if nothing was entered.

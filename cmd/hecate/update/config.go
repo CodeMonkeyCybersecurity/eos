@@ -6,8 +6,10 @@ import (
 	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/spf13/cobra"
+	"go.uber.org/zap"
 )
 
 // configCmd is the "config" subcommand for updating conf.d configuration files.
@@ -15,11 +17,11 @@ var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Update configuration files in conf.d",
 	Long:  `Recursively update configuration files in the conf.d directory by replacing placeholder variables.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("Running update config command")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("Running update config command")
 
 		// Display a header for the interactive update.
-		log.Info("=== Recursive conf.d Variable Updater ===\n")
+		zap.L().Info("=== Recursive conf.d Variable Updater ===\n")
 
 		// Load previous values if available.
 		// NOTE: LoadLastValues returns only a map, so we remove the error assignment.
@@ -42,12 +44,12 @@ var configCmd = &cobra.Command{
 			"BASE_DOMAIN":       baseDomain,
 		}
 		// SaveLastValues does not return a value, so simply call it:
-		hecate.SaveLastValues(newValues, log)
+		hecate.SaveLastValues(newValues)
 
 		// Ensure the conf.d directory exists.
 		if info, err := os.Stat(hecate.ConfDir); err != nil || !info.IsDir() {
 			errMsg := fmt.Sprintf("Error: Directory '%s' not found in the current directory.", hecate.ConfDir)
-			log.Error(errMsg)
+			zap.L().Error(errMsg)
 			fmt.Println(errMsg)
 			return err
 		}

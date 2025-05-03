@@ -17,22 +17,22 @@ import (
 
 /**/
 // Remember prompts the user for a Vault config field and persists it using fallback logic.
-func Remember(name, key, prompt, def string, log *zap.Logger) (string, error) {
+func Remember(name, key, prompt, def string) (string, error) {
 	// Attempt to load previously stored secrets.
 	values := map[string]string{}
 	// We assume loadWithFallback is a Vault-specific function that loads the config
 	// from Vault (or falls back to disk) and unmarshals into the map.
-	if err := HandleFallbackOrStore(name, values, log); err != nil {
-		log.Warn("Fallback config not loaded; may be first-time use", zap.Error(err))
+	if err := HandleFallbackOrStore(name, values); err != nil {
+		zap.L().Warn("Fallback config not loaded; may be first-time use", zap.Error(err))
 	}
 
 	// Use the generic interaction helper to prompt the user.
 	current := values[key] // could be empty if not present
-	val := interaction.Remember(key, prompt, def, current, log)
+	val := interaction.Remember(key, prompt, def, current)
 	values[key] = val
 
 	// Persist the updated config using the Vault fallback mechanism.
-	if err := HandleFallbackOrStore(name, values, log); err != nil {
+	if err := HandleFallbackOrStore(name, values); err != nil {
 		return "", fmt.Errorf("failed to persist %q to Vault or fallback: %w", key, err)
 	}
 
@@ -42,18 +42,18 @@ func Remember(name, key, prompt, def string, log *zap.Logger) (string, error) {
 /**/
 
 /**/
-func PromptOrRecallUnsealKeys(log *zap.Logger) ([]string, string, error) {
+func PromptOrRecallUnsealKeys() ([]string, string, error) {
 	keys := make([]string, 0, 3)
 
 	for i := 1; i <= 3; i++ {
-		key, err := Remember("vault_init", fmt.Sprintf("unseal_key_%d", i), fmt.Sprintf("Enter Unseal Key %d", i), "", log)
+		key, err := Remember("vault_init", fmt.Sprintf("unseal_key_%d", i), fmt.Sprintf("Enter Unseal Key %d", i), "")
 		if err != nil {
 			return nil, "", err
 		}
 		keys = append(keys, key)
 	}
 
-	root, err := Remember("vault_init", "root_token", "Enter Root Token", "", log)
+	root, err := Remember("vault_init", "root_token", "Enter Root Token", "")
 	if err != nil {
 		return nil, "", err
 	}
@@ -64,8 +64,8 @@ func PromptOrRecallUnsealKeys(log *zap.Logger) ([]string, string, error) {
 /**/
 
 /**/
-func rememberBootstrapHashes(log *zap.Logger) ([]string, string, error) {
-	secrets, err := ReadFallbackSecrets(log)
+func rememberBootstrapHashes() ([]string, string, error) {
+	secrets, err := ReadFallbackSecrets()
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to load vault_init fallback secrets: %w", err)
 	}

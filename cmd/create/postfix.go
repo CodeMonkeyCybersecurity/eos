@@ -10,11 +10,11 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
@@ -27,47 +27,47 @@ var CreatePostfixCmd = &cobra.Command{
 	Use:   "postfix",
 	Short: "Install and configure Postfix as an SMTP relay",
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		system.RequireRoot(log)
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		osType := platform.DetectLinuxDistro(log)
-		log.Info("Detected OS", zap.String("type", osType))
+		system.RequireRoot()
+
+		osType := platform.DetectLinuxDistro()
+		zap.L().Info("Detected OS", zap.String("type", osType))
 
 		// Package install
 		switch osType {
 		case "debian":
 			if err := execute.ExecuteShell(`DEBIAN_FRONTEND=noninteractive apt update && apt install -y postfix bsd-mailx libsasl2-modules`); err != nil {
-				log.Error("Error installing packages on Debian", zap.Error(err))
+				zap.L().Error("Error installing packages on Debian", zap.Error(err))
 				return err
 			}
 			if err := execute.ExecuteShell(`cp /usr/share/postfix/main.cf.debian /etc/postfix/main.cf`); err != nil {
-				log.Error("Error copying main.cf.debian to /etc/postfix/main.cf", zap.Error(err))
+				zap.L().Error("Error copying main.cf.debian to /etc/postfix/main.cf", zap.Error(err))
 				return err
 			}
 		case "rhel":
 			if err := execute.ExecuteShell(`yum update -y && yum install -y postfix mailx cyrus-sasl cyrus-sasl-plain`); err != nil {
-				log.Error("Error installing packages on RHEL", zap.Error(err))
+				zap.L().Error("Error installing packages on RHEL", zap.Error(err))
 				return err
 			}
 		default:
-			log.Warn("Unknown OS, skipping package installation")
+			zap.L().Warn("Unknown OS, skipping package installation")
 		}
 
 		// Start/restart service
 		switch osType {
 		case "debian":
 			if err := execute.Execute("postfix", "start"); err != nil {
-				log.Error("Error starting postfix", zap.Error(err))
+				zap.L().Error("Error starting postfix", zap.Error(err))
 				return err
 			}
 			if err := execute.Execute("postfix", "status"); err != nil {
-				log.Error("Error checking postfix status", zap.Error(err))
+				zap.L().Error("Error checking postfix status", zap.Error(err))
 				return err
 			}
 		case "rhel":
 			if err := execute.ExecuteShell("service postfix restart"); err != nil {
-				log.Error("Error restarting postfix service on RHEL", zap.Error(err))
+				zap.L().Error("Error restarting postfix service on RHEL", zap.Error(err))
 				return err
 			}
 		}
@@ -77,7 +77,7 @@ var CreatePostfixCmd = &cobra.Command{
 		fmt.Print("Enter your SMTP host (default: smtp.gmail.com): ")
 		smtpHost, err := reader.ReadString('\n')
 		if err != nil {
-			log.Error("Error reading SMTP host", zap.Error(err))
+			zap.L().Error("Error reading SMTP host", zap.Error(err))
 			return err
 		}
 		smtpHost = strings.TrimSpace(smtpHost)
@@ -88,12 +88,12 @@ var CreatePostfixCmd = &cobra.Command{
 		fmt.Print("Enter your email address: ")
 		email, err := reader.ReadString('\n')
 		if err != nil {
-			log.Error("Error reading email address", zap.Error(err))
+			zap.L().Error("Error reading email address", zap.Error(err))
 			return err
 		}
 		email = strings.TrimSpace(email)
 
-		password, err := crypto.PromptPassword("Enter your app password: ", log)
+		password, err := crypto.PromptPassword("Enter your app password: ")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "❌ Failed to read password:", err)
 			os.Exit(1)
@@ -101,38 +101,38 @@ var CreatePostfixCmd = &cobra.Command{
 
 		// Backup config files
 		if err := utils.BackupFile("/etc/postfix/main.cf"); err != nil {
-			log.Error("Error backing up /etc/postfix/main.cf", zap.Error(err))
+			zap.L().Error("Error backing up /etc/postfix/main.cf", zap.Error(err))
 			return err
 		}
 		if err := utils.BackupFile("/etc/postfix/sasl_passwd"); err != nil {
-			log.Error("Error backing up /etc/postfix/sasl_passwd", zap.Error(err))
+			zap.L().Error("Error backing up /etc/postfix/sasl_passwd", zap.Error(err))
 			return err
 		}
 
 		// Append configuration to main.cf
 		if err := appendPostfixConfig(smtpHost, osType); err != nil {
-			log.Error("Error appending Postfix configuration", zap.Error(err))
+			zap.L().Error("Error appending Postfix configuration", zap.Error(err))
 			return err
 		}
 
 		// Write sasl_passwd
 		cred := fmt.Sprintf("[%s]:587 %s:%s\n", smtpHost, email, password)
 		if err := os.WriteFile("/etc/postfix/sasl_passwd", []byte(cred), 0600); err != nil {
-			log.Error("Error writing /etc/postfix/sasl_passwd", zap.Error(err))
+			zap.L().Error("Error writing /etc/postfix/sasl_passwd", zap.Error(err))
 			return err
 		}
 
 		// postmap and set permissions
 		if err := execute.Execute("postmap", "/etc/postfix/sasl_passwd"); err != nil {
-			log.Error("Error running postmap", zap.Error(err))
+			zap.L().Error("Error running postmap", zap.Error(err))
 			return err
 		}
 		if err := execute.Execute("chown", "root:root", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db"); err != nil {
-			log.Error("Error setting ownership on sasl_passwd files", zap.Error(err))
+			zap.L().Error("Error setting ownership on sasl_passwd files", zap.Error(err))
 			return err
 		}
 		if err := execute.Execute("chmod", "0600", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db"); err != nil {
-			log.Error("Error setting permissions on sasl_passwd files", zap.Error(err))
+			zap.L().Error("Error setting permissions on sasl_passwd files", zap.Error(err))
 			return err
 		}
 
@@ -142,13 +142,13 @@ var CreatePostfixCmd = &cobra.Command{
 			if err := execute.Execute("systemctl", "restart", "postfix"); err != nil {
 				// Fallback to reload if restart fails
 				if err := execute.Execute("postfix", "reload"); err != nil {
-					log.Error("Error reloading postfix", zap.Error(err))
+					zap.L().Error("Error reloading postfix", zap.Error(err))
 					return err
 				}
 			}
 		case "rhel":
 			if err := execute.ExecuteShell("service postfix restart"); err != nil {
-				log.Error("Error restarting postfix service on RHEL", zap.Error(err))
+				zap.L().Error("Error restarting postfix service on RHEL", zap.Error(err))
 				return err
 			}
 		}
@@ -156,11 +156,11 @@ var CreatePostfixCmd = &cobra.Command{
 		// Configure TLS fingerprint for RHEL
 		if osType == "rhel" {
 			if err := execute.Execute("postconf", "-e", "smtp_tls_fingerprint_digest=sha256"); err != nil {
-				log.Error("Error setting smtp_tls_fingerprint_digest", zap.Error(err))
+				zap.L().Error("Error setting smtp_tls_fingerprint_digest", zap.Error(err))
 				return err
 			}
 			if err := execute.Execute("postconf", "-e", "smtpd_tls_fingerprint_digest=sha256"); err != nil {
-				log.Error("Error setting smtpd_tls_fingerprint_digest", zap.Error(err))
+				zap.L().Error("Error setting smtpd_tls_fingerprint_digest", zap.Error(err))
 				return err
 			}
 		}
@@ -169,33 +169,33 @@ var CreatePostfixCmd = &cobra.Command{
 		fmt.Print("Enter test recipient email: ")
 		receiver, err := reader.ReadString('\n')
 		if err != nil {
-			log.Error("Error reading test recipient email", zap.Error(err))
+			zap.L().Error("Error reading test recipient email", zap.Error(err))
 			return err
 		}
 		receiver = strings.TrimSpace(receiver)
 		cmdStr := fmt.Sprintf(`echo "Test mail from postfix" | mail -s "Test Postfix" -r "%s" %s`, email, receiver)
 		if err := execute.ExecuteShell(cmdStr); err != nil {
-			log.Error("Error sending test mail", zap.Error(err))
+			zap.L().Error("Error sending test mail", zap.Error(err))
 			return err
 		}
 
 		// Final check
 		if err := execute.Execute("postfix", "check"); err != nil {
-			log.Error("Error checking postfix", zap.Error(err))
+			zap.L().Error("Error checking postfix", zap.Error(err))
 			return err
 		}
 
 		// Show final files
 		if err := utils.CatFile("/etc/postfix/main.cf"); err != nil {
-			log.Error("Error displaying /etc/postfix/main.cf", zap.Error(err))
+			zap.L().Error("Error displaying /etc/postfix/main.cf", zap.Error(err))
 			return err
 		}
 		if err := utils.CatFile("/etc/postfix/sasl_passwd"); err != nil {
-			log.Error("Error displaying /etc/postfix/sasl_passwd", zap.Error(err))
+			zap.L().Error("Error displaying /etc/postfix/sasl_passwd", zap.Error(err))
 			return err
 		}
 
-		log.Info("✅ Postfix SMTP relay setup complete.")
+		zap.L().Info("✅ Postfix SMTP relay setup complete.")
 		return nil
 	}),
 }
@@ -229,7 +229,7 @@ smtp_use_tls = yes
 	if err != nil {
 		return fmt.Errorf("failed to open /etc/postfix/main.cf: %w", err)
 	}
-	defer shared.SafeClose(f, log)
+	defer shared.SafeClose(f)
 
 	if _, err := f.WriteString(config); err != nil {
 		return fmt.Errorf("failed to write config to /etc/postfix/main.cf: %w", err)

@@ -11,12 +11,12 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -31,15 +31,15 @@ var CreateHeraCmd = &cobra.Command{
 - Creating the external Docker network 'arachne-net'
 - Fixing directory ownership for proper volume permissions
 - Running docker compose up -d and displaying service status & access URL`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("🚀 Starting Hera (Authentik) deployment")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+
+		zap.L().Info("🚀 Starting Hera (Authentik) deployment")
 
 		// Ensure target directory exists
 		if _, err := os.Stat(shared.HeraDir); os.IsNotExist(err) {
-			log.Warn("Hera directory does not exist; creating it", zap.String("path", shared.HeraDir))
+			zap.L().Warn("Hera directory does not exist; creating it", zap.String("path", shared.HeraDir))
 			if err := os.MkdirAll(shared.HeraDir, shared.DirPermStandard); err != nil {
-				log.Fatal("Failed to create Hera directory", zap.Error(err))
+				zap.L().Fatal("Failed to create Hera directory", zap.Error(err))
 			}
 		}
 
@@ -47,11 +47,11 @@ var CreateHeraCmd = &cobra.Command{
 		var composeFiles []string
 		localYml, err := filepath.Glob("docker-compose.yml")
 		if err != nil {
-			log.Warn("Error globbing docker-compose.yml", zap.Error(err))
+			zap.L().Warn("Error globbing docker-compose.yml", zap.Error(err))
 		}
 		localYaml, err := filepath.Glob("docker-compose.yaml")
 		if err != nil {
-			log.Warn("Error globbing docker-compose.yaml", zap.Error(err))
+			zap.L().Warn("Error globbing docker-compose.yaml", zap.Error(err))
 		}
 		composeFiles = append(composeFiles, localYml...)
 		composeFiles = append(composeFiles, localYaml...)
@@ -60,31 +60,31 @@ var CreateHeraCmd = &cobra.Command{
 			// Use local docker-compose file(s)
 			for _, file := range composeFiles {
 				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
-				log.Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
-				if err := system.CopyFile(file, destFile, 0, log); err != nil {
-					log.Fatal("Failed to copy docker-compose file", zap.Error(err))
+				zap.L().Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
+				if err := system.CopyFile(file, destFile, 0); err != nil {
+					zap.L().Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}
 			}
 		} else {
 			// Download the latest docker-compose.yml from the remote URL
-			log.Info("📦 Downloading latest docker-compose.yml")
+			zap.L().Info("📦 Downloading latest docker-compose.yml")
 			if err := execute.ExecuteInDir(shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
-				log.Fatal("Failed to download docker-compose.yml", zap.Error(err))
+				zap.L().Fatal("Failed to download docker-compose.yml", zap.Error(err))
 			}
 		}
 
 		// Generate secrets
-		log.Info("🔐 Generating secrets for .env file")
+		zap.L().Info("🔐 Generating secrets for .env file")
 		pgPassCmd := exec.Command("sudo", "openssl", "rand", "-base64", "36")
 		secretKeyCmd := exec.Command("sudo", "openssl", "rand", "-base64", "60")
 
 		pgPassBytes, err := pgPassCmd.Output()
 		if err != nil {
-			log.Fatal("Failed to generate PG_PASS", zap.Error(err))
+			zap.L().Fatal("Failed to generate PG_PASS", zap.Error(err))
 		}
 		secretKeyBytes, err := secretKeyCmd.Output()
 		if err != nil {
-			log.Fatal("Failed to generate AUTHENTIK_SECRET_KEY", zap.Error(err))
+			zap.L().Fatal("Failed to generate AUTHENTIK_SECRET_KEY", zap.Error(err))
 		}
 
 		pgPass := strings.TrimSpace(string(pgPassBytes))
@@ -108,40 +108,40 @@ var CreateHeraCmd = &cobra.Command{
 
 		envPath := filepath.Join(shared.HeraDir, ".env")
 		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
-			log.Fatal("Failed to write .env file", zap.Error(err))
+			zap.L().Fatal("Failed to write .env file", zap.Error(err))
 		}
-		log.Info("✅ .env file created", zap.String("path", envPath))
+		zap.L().Info("✅ .env file created", zap.String("path", envPath))
 
 		// Fix directory ownership so the container can write as needed.
-		log.Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
+		zap.L().Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
 		chownCmd := exec.Command("sudo", "chown", "-R", "472:472", shared.HeraDir)
 		chownCmd.Stdout = os.Stdout
 		chownCmd.Stderr = os.Stderr
 		if err := chownCmd.Run(); err != nil {
-			log.Fatal("Error running chown", zap.Error(err))
+			zap.L().Fatal("Error running chown", zap.Error(err))
 		}
 
 		// Ensure external network is present
 		if err := docker.EnsureArachneNetwork(); err != nil {
-			log.Fatal("Could not create or verify arachne-net", zap.Error(err))
+			zap.L().Fatal("Could not create or verify arachne-net", zap.Error(err))
 		}
 
 		// Pull images and deploy
-		log.Info("🐳 Pulling docker images")
+		zap.L().Info("🐳 Pulling docker images")
 		if err := execute.ExecuteInDir(shared.HeraDir, "docker", "compose", "pull"); err != nil {
-			log.Fatal("Failed to pull docker images", zap.Error(err))
+			zap.L().Fatal("Failed to pull docker images", zap.Error(err))
 		}
 
-		log.Info("🚀 Launching Hera via docker compose")
+		zap.L().Info("🚀 Launching Hera via docker compose")
 		if err := execute.ExecuteInDir(shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
-			log.Fatal("Failed to run docker compose", zap.Error(err))
+			zap.L().Fatal("Failed to run docker compose", zap.Error(err))
 		}
 
 		time.Sleep(5 * time.Second)
 
-		log.Info("🔍 Verifying container status")
+		zap.L().Info("🔍 Verifying container status")
 		if err := docker.CheckDockerContainers(); err != nil {
-			log.Warn("Docker containers may not have started cleanly", zap.Error(err))
+			zap.L().Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 
 		fmt.Println("\n🎉 Hera (Authentik) is deploying.")

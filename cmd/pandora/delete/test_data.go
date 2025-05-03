@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
@@ -25,23 +26,23 @@ var DeleteTestDataCmd = &cobra.Command{
 	Use:   "test-data",
 	Short: "Delete test-data from Vault (fallback to disk)",
 	Long:  `Deletes the test-data from Vault. Falls back to deleting local test-data.json if Vault is unavailable.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-delete-test-data")
 
-		client, err := vault.EnsurePrivilegedVaultClient(log)
+		client, err := vault.EnsurePrivilegedVaultClient()
 		if err != nil {
 			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
-			return deleteTestDataFromDisk(log)
+			return deleteTestDataFromDisk()
 		}
 
-		vault.SetVaultClient(client, log)
-		validateAndCache(client, log)
+		vault.SetVaultClient(client)
+		validateAndCache(client)
 
 		log.Info("🗑️ Attempting to delete test-data from Vault...")
-		err = vault.Delete(client, testDataVaultPath, log)
+		err = vault.Delete(client, testDataVaultPath)
 		if err != nil {
 			log.Warn("⚠️ Vault delete failed, falling back to disk", zap.Error(err))
-			return deleteTestDataFromDisk(log)
+			return deleteTestDataFromDisk()
 		}
 
 		fmt.Println()
@@ -53,10 +54,10 @@ var DeleteTestDataCmd = &cobra.Command{
 	}),
 }
 
-func deleteTestDataFromDisk(log *zap.Logger) error {
+func deleteTestDataFromDisk() error {
 	path := filepath.Join(shared.SecretsDir, testDataFilename)
 	if err := os.Remove(path); err != nil {
-		log.Error("❌ Failed to delete fallback test-data file", zap.String("path", path), zap.Error(err))
+		zap.L().Error("❌ Failed to delete fallback test-data file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("delete fallback test-data file: %w", err)
 	}
 
@@ -64,22 +65,22 @@ func deleteTestDataFromDisk(log *zap.Logger) error {
 	fmt.Println("🗑️  Test Data Deletion Summary")
 	fmt.Println("  💾 Disk: SUCCESS")
 	fmt.Printf("    📂 Path: %s\n\n", path)
-	log.Info("✅ Test-data deleted successfully (fallback)", zap.String("path", path))
+	zap.L().Info("✅ Test-data deleted successfully (fallback)", zap.String("path", path))
 	return nil
 }
 
 // validateAndCache ensures Vault client health check and cache
-func validateAndCache(client *api.Client, log *zap.Logger) {
-	report, checked := vault.Check(client, log, nil, "")
+func validateAndCache(client *api.Client) {
+	report, checked := vault.Check(client, nil, "")
 	if checked != nil {
-		vault.SetVaultClient(checked, log)
+		vault.SetVaultClient(checked)
 	}
 	if report == nil {
-		log.Warn("⚠️ Vault check returned nil — skipping further setup")
+		zap.L().Warn("⚠️ Vault check returned nil — skipping further setup")
 		return
 	}
 	for _, note := range report.Notes {
-		log.Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+		zap.L().Warn("⚠️ Vault diagnostic note", zap.String("note", note))
 	}
 }
 

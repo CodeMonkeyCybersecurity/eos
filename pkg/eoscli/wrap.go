@@ -19,15 +19,13 @@ import (
 // Wrap decorates a cobra command handler to inject EOS runtime context.
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// Declare logger early for use in re-exec error handling
+		logger.InitFallback() // <- ensure fallback logging
+
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
+		eosio.LogRuntimeExecutionContext()
 
-		// Log user + execution path info early
-		logRuntimeExecutionContext(log)
-
-		// Re-exec as 'eos' user if not already
-		if err := eosio.RequireEosUserOrReexec(log); err != nil {
-			log.Error("❌ Privilege check failed", zap.Error(err))
+		if err := eosio.RequireEosUserOrReexec(); err != nil {
+			zap.L().Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
 
@@ -43,36 +41,33 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			Timestamp: time.Now(),
 		}
 
-		log.Info("🚀 Command execution started",
-			zap.Time("timestamp", ctx.Timestamp),
-			zap.Duration("timeout", timeout),
-		)
+		zap.L().Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp), zap.Duration("timeout", timeout))
 
-		// Setup Vault environment
-		addr, addrErr := vault.EnsureVaultEnv(log)
+		addr, addrErr := vault.EnsureVaultEnv()
 		if addrErr != nil {
-			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
+			zap.L().Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
 		}
-		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
+		zap.L().Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
-		var err error // 👈 declare err early so it’s in scope for defer
+		var err error
 		defer func() {
 			duration := time.Since(start)
 			logger.LogCommandLifecycle(cmd.Name())(&err)
 
 			if err != nil {
 				if eoserr.IsExpectedUserError(err) {
-					log.Warn("⚠️ EOS user error", zap.Error(err), zap.Duration("duration", duration))
+					zap.L().Warn("⚠️ EOS user error", zap.Error(err), zap.Duration("duration", duration))
 				} else {
-					log.Error("❌ EOS command failed", zap.Error(err), zap.Duration("duration", duration))
+					zap.L().Error("❌ EOS command failed", zap.Error(err), zap.Duration("duration", duration))
 				}
 			} else {
-				log.Info("✅ EOS command finished successfully", zap.Duration("duration", duration))
+				zap.L().Info("✅ EOS command finished successfully", zap.Duration("duration", duration))
 			}
 
-			shared.SafeSync(log)
+			shared.SafeSync()
 		}()
 
+		zap.L().Debug("Entering wrapped command function")
 		err = fn(ctx, cmd, args)
 		return err
 	}

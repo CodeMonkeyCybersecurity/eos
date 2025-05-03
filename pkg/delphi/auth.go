@@ -10,12 +10,11 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"go.uber.org/zap"
 )
 
 // Authenticate logs in to the Wazuh API using the current Delphi config
 // and returns a JWT token.
-func Authenticate(cfg *Config, log *zap.Logger) (string, error) {
+func Authenticate(cfg *Config) (string, error) {
 	authURL := fmt.Sprintf("%s/security/user/authenticate?raw=true", strings.TrimRight(cfg.Endpoint, "/"))
 
 	req, err := http.NewRequest("POST", authURL, nil)
@@ -36,7 +35,7 @@ func Authenticate(cfg *Config, log *zap.Logger) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("auth request failed: %w", err)
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -57,13 +56,13 @@ func Authenticate(cfg *Config, log *zap.Logger) (string, error) {
 
 // AuthenticatedGetJSON performs a GET request using the stored JWT token
 // and returns the response body and HTTP status code.
-func AuthenticatedGetJSON(cfg *Config, path string, log *zap.Logger) (string, int) {
+func AuthenticatedGetJSON(cfg *Config, path string) (string, int) {
 	resp, err := AuthenticatedGet(cfg, path)
 	if err != nil {
 		fmt.Printf("❌ Request failed: %v\n", err)
 		os.Exit(1)
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	body, _ := io.ReadAll(resp.Body)
 	return string(body), resp.StatusCode
@@ -71,7 +70,7 @@ func AuthenticatedGetJSON(cfg *Config, path string, log *zap.Logger) (string, in
 
 // AuthenticateUser tries to log in using an arbitrary username/password pair.
 // Useful for testing or rotating credentials.
-func AuthenticateUser(cfg *Config, username, password string, log *zap.Logger) (string, error) {
+func AuthenticateUser(cfg *Config, username, password string) (string, error) {
 	url := fmt.Sprintf("%s://%s:%s/security/user/authenticate?raw=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port)
 
@@ -93,7 +92,7 @@ func AuthenticateUser(cfg *Config, username, password string, log *zap.Logger) (
 	if err != nil {
 		return "", fmt.Errorf("auth request failed: %w", err)
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 )
 
@@ -23,7 +24,7 @@ Examples:
   hecate delete jenkins
   hecate delete resources`,
 	Args: cobra.MaximumNArgs(1),
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			fmt.Println("🗑️  Please use a subcommand like 'delete resources' or specify an app name.")
 			return nil
@@ -46,7 +47,7 @@ var deleteResourcesCmd = &cobra.Command{
   3) Delete Eos backend web apps configuration files
   4) Delete (or revert) Nginx defaults
   5) Delete all specified resources`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		runDeleteConfig()
 		return nil
 	}),

@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
@@ -18,26 +19,26 @@ import (
 var InspectCredentialsCmd = &cobra.Command{
 	Use:   "credentials",
 	Short: "List all Delphi (Wazuh) user credentials",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ResolveConfig(log)
+		cfg, err := delphi.ResolveConfig()
 		if err != nil {
-			log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+			zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
 		}
 
-		if !system.EnforceSecretsAccess(log, showSecrets) {
+		if !system.EnforceSecretsAccess(showSecrets) {
 			return nil
 		}
 
 		if cfg.Token == "" {
-			token, err := delphi.Authenticate(cfg, log)
+			token, err := delphi.Authenticate(cfg)
 			if err != nil {
 				fmt.Printf("❌ Authentication failed: %v\n", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
-			if err := delphi.WriteConfig(cfg, log); err != nil {
-				log.Warn("Failed to write config", zap.Error(err))
+			if err := delphi.WriteConfig(cfg); err != nil {
+				zap.L().Warn("Failed to write config", zap.Error(err))
 			}
 		}
 
@@ -46,7 +47,7 @@ var InspectCredentialsCmd = &cobra.Command{
 			fmt.Printf("❌ Failed to fetch users: %v\n", err)
 			os.Exit(1)
 		}
-		defer shared.SafeClose(resp.Body, log)
+		defer shared.SafeClose(resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("❌ Failed with status code: %d\n", resp.StatusCode)

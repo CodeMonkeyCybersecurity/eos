@@ -9,11 +9,11 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -29,7 +29,7 @@ For worker nodes, you'll be prompted for the server URL and node token.
 Additional checks for IPv6 and Tailscale are performed.
 The generated install command is previewed and saved to a script file
 for safe, human-approved execution.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		deployK3s()
 		return nil
 	}),
@@ -40,14 +40,14 @@ func init() {
 }
 
 func deployK3s() {
-	log := logger.GetLogger()
+
 	reader := bufio.NewReader(os.Stdin)
 
 	// Ask if this is a server or worker node.
 	fmt.Print("Is this node a server or worker? [server/worker]: ")
 	roleInput, err := reader.ReadString('\n')
 	if err != nil {
-		log.Error("Failed to read input", zap.Error(err))
+		zap.L().Error("Failed to read input", zap.Error(err))
 		os.Exit(1)
 	}
 	role := strings.TrimSpace(strings.ToLower(roleInput))
@@ -58,25 +58,25 @@ func deployK3s() {
 		tailscaleIP, err := network.GetTailscaleIPv6()
 		if err == nil && tailscaleIP != "" {
 			nodeIP = tailscaleIP
-			log.Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
+			zap.L().Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
 		} else {
-			log.Info("Tailscale IPv6 not detected; proceeding without --node-ip flag")
+			zap.L().Info("Tailscale IPv6 not detected; proceeding without --node-ip flag")
 		}
 	} else {
-		log.Warn("IPv6 is disabled. Attempting to enable it...")
+		zap.L().Warn("IPv6 is disabled. Attempting to enable it...")
 		if err := network.EnableIPv6(); err != nil {
-			log.Warn("Could not enable IPv6", zap.Error(err))
+			zap.L().Warn("Could not enable IPv6", zap.Error(err))
 		} else {
-			log.Info("IPv6 enabled. Retrying Tailscale detection...")
+			zap.L().Info("IPv6 enabled. Retrying Tailscale detection...")
 			if ip, err := network.GetTailscaleIPv6(); err == nil && ip != "" {
 				nodeIP = ip
-				log.Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
+				zap.L().Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
 			}
 		}
 	}
 
 	// 🔥 Unified firewall status check
-	platform.CheckFirewallStatus(log)
+	platform.CheckFirewallStatus()
 
 	var installCmd string
 
@@ -138,7 +138,7 @@ func deployK3s() {
 	fmt.Println("To monitor logs in real time: tail -f /var/log/eos/k3s-deploy.log")
 
 	if err := execute.Execute("sh", scriptPath); err != nil {
-		log.Error("Failed to execute install script", zap.Error(err))
+		zap.L().Error("Failed to execute install script", zap.Error(err))
 		fmt.Println("Installation failed. Check logs for details.")
 		os.Exit(1)
 	}
@@ -161,7 +161,7 @@ func saveScript(cmdStr string) string {
 	}
 	dir := homeDir + "/.local/state/eos"
 	if err := os.MkdirAll(dir, shared.DirPermStandard); err != nil {
-		log.Warn("Failed to create directory for install script", zap.String("path", dir), zap.Error(err))
+		zap.L().Warn("Failed to create directory for install script", zap.String("path", dir), zap.Error(err))
 	}
 	scriptPath := dir + "/k3s-install.sh"
 	// Prepend with set -x for debugging and redirect output to a log file.

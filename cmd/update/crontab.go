@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
@@ -25,13 +26,13 @@ func init() {
 	UpdateCmd.AddCommand(CrontabCmd)
 }
 
-func runCrontabUpdate(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runCrontabUpdate(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("crontab")
 
 	// Trim and prompt if needed
 	email = strings.TrimSpace(email)
 	if email == "" {
-		email = interaction.PromptInput("📧 Email address for cron failure alerts", "e.g., your@email.com", log)
+		email = interaction.PromptInput("📧 Email address for cron failure alerts", "e.g., your@email.com")
 	}
 	if email == "" {
 		log.Error("No email address provided. Aborting update.")

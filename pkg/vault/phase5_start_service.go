@@ -28,39 +28,39 @@ import (
 //             └── waitForVaultHealth()
 
 // StartVaultService installs, enables, and starts the Vault SERVER (vault.service).
-func StartVaultService(log *zap.Logger) error {
-	log.Info("🛠️ Writing Vault SERVER systemd unit file")
-	if err := WriteVaultServerSystemdUnit(log); err != nil {
+func StartVaultService() error {
+	zap.L().Info("🛠️ Writing Vault SERVER systemd unit file")
+	if err := WriteVaultServerSystemdUnit(); err != nil {
 		return fmt.Errorf("write server systemd unit: %w", err)
 	}
 
-	log.Info("🛠️ Validating Vault server config before starting")
-	if err := ValidateVaultConfig(log); err != nil {
-		log.Error("❌ Vault config validation failed", zap.Error(err))
+	zap.L().Info("🛠️ Validating Vault server config before starting")
+	if err := ValidateVaultConfig(); err != nil {
+		zap.L().Error("❌ Vault config validation failed", zap.Error(err))
 		return fmt.Errorf("vault config validation failed: %w", err)
 	}
 
-	log.Info("🔄 Reloading systemd daemon and enabling vault.service")
-	if err := system.ReloadDaemonAndEnable(log, shared.VaultServiceName); err != nil {
+	zap.L().Info("🔄 Reloading systemd daemon and enabling vault.service")
+	if err := system.ReloadDaemonAndEnable(shared.VaultServiceName); err != nil {
 		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
 
-	if err := ensureVaultDataDir(log); err != nil {
+	if err := ensureVaultDataDir(); err != nil {
 		return err
 	}
 
-	log.Info("🚀 Starting Vault systemd service")
-	if err := startVaultSystemdService(log); err != nil {
-		log.Error("❌ Failed to start vault.service", zap.Error(err))
-		captureVaultLogsOnFailure(log)
+	zap.L().Info("🚀 Starting Vault systemd service")
+	if err := startVaultSystemdService(); err != nil {
+		zap.L().Error("❌ Failed to start vault.service", zap.Error(err))
+		captureVaultLogsOnFailure()
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 
-	log.Info("✅ Vault systemd service started, checking health...")
-	return waitForVaultHealth(log, shared.VaultMaxHealthWait)
+	zap.L().Info("✅ Vault systemd service started, checking health...")
+	return waitForVaultHealth(shared.VaultMaxHealthWait)
 }
 
-func WriteAgentSystemdUnit(log *zap.Logger) error {
+func WriteAgentSystemdUnit() error {
 	unit := fmt.Sprintf(shared.AgentSystemDUnit,
 		shared.VaultAgentUser,
 		shared.VaultAgentGroup,
@@ -72,29 +72,29 @@ func WriteAgentSystemdUnit(log *zap.Logger) error {
 		shared.VaultAgentConfigPath,
 	)
 
-	log.Debug("✍️ Writing Vault AGENT systemd unit", zap.String("path", shared.VaultAgentServicePath))
+	zap.L().Debug("✍️ Writing Vault AGENT systemd unit", zap.String("path", shared.VaultAgentServicePath))
 	if err := os.WriteFile(shared.VaultAgentServicePath,
 		[]byte(strings.TrimSpace(unit)+"\n"),
 		shared.FilePermStandard,
 	); err != nil {
 		return fmt.Errorf("write agent unit file: %w", err)
 	}
-	log.Info("✅ Vault agent systemd unit written", zap.String("path", shared.VaultAgentServicePath))
+	zap.L().Info("✅ Vault agent systemd unit written", zap.String("path", shared.VaultAgentServicePath))
 	return nil
 }
 
-func WriteVaultServerSystemdUnit(log *zap.Logger) error {
+func WriteVaultServerSystemdUnit() error {
 	unit := strings.TrimSpace(shared.ServerSystemDUnit) + "\n"
 	err := os.WriteFile(shared.VaultServicePath, []byte(unit), shared.FilePermStandard)
 	if err != nil {
 		return fmt.Errorf("write vault server unit: %w", err)
 	}
-	log.Info("✅ Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
+	zap.L().Info("✅ Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
 	return nil
 }
 
 // startVaultSystemdService safely starts the vault.service.
-func startVaultSystemdService(log *zap.Logger) error {
+func startVaultSystemdService() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -103,34 +103,34 @@ func startVaultSystemdService(log *zap.Logger) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Error("❌ Failed to start vault.service", zap.Error(err))
+		zap.L().Error("❌ Failed to start vault.service", zap.Error(err))
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 	return nil
 }
 
 // waitForVaultHealth probes Vault's TCP port until healthy or timeout.
-func waitForVaultHealth(log *zap.Logger, maxWait time.Duration) error {
-	log.Info("⏳ Waiting for Vault to start listening on port", zap.Int("port", shared.VaultDefaultPortInt))
+func waitForVaultHealth(maxWait time.Duration) error {
+	zap.L().Info("⏳ Waiting for Vault to start listening on port", zap.Int("port", shared.VaultDefaultPortInt))
 	start := time.Now()
 	for {
 		if time.Since(start) > maxWait {
-			captureVaultLogsOnFailure(log)
+			captureVaultLogsOnFailure()
 			return fmt.Errorf("vault did not become healthy within %s", maxWait)
 		}
 		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, shared.VaultRetryDelay)
 		if err == nil {
-			defer shared.SafeClose(conn, log)
-			log.Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
+			defer shared.SafeClose(conn)
+			zap.L().Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
 			return nil
 		}
-		log.Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
+		zap.L().Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
 		time.Sleep(shared.VaultRetryDelay)
 	}
 }
 
 // ValidateCriticalPaths checks that Vault critical directories are owned and writable by the service user.
-func ValidateCriticalPaths(log *zap.Logger) error {
+func ValidateCriticalPaths() error {
 	criticalPaths := []string{
 		shared.VaultDataPath, // /opt/vault/data
 	}
@@ -161,7 +161,7 @@ func ValidateCriticalPaths(log *zap.Logger) error {
 			return fmt.Errorf("critical path %s is not writable (permissions %#o)", path, info.Mode().Perm())
 		}
 
-		log.Info("✅ Critical path validated", zap.String("path", path))
+		zap.L().Info("✅ Critical path validated", zap.String("path", path))
 	}
 
 	return nil

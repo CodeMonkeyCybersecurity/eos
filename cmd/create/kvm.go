@@ -5,6 +5,7 @@ import (
 	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
@@ -26,7 +27,7 @@ func init() {
 	CreateKvmCmd.Flags().BoolVar(&enableBridge, "network-bridge", false, "Configure a bridge (br0) using the default network interface via Netplan")
 }
 
-func runDeployKVM(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runDeployKVM(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("kvm")
 
 	if os.Geteuid() != 0 {
@@ -57,7 +58,7 @@ func runDeployKVM(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 	}
 	log.Info("✅ libvirtd is active")
 
-	isoDir := interaction.PromptConfirmOrValue("The hypervisor needs access to an ISO directory", "/srv/iso", log)
+	isoDir := interaction.PromptConfirmOrValue("The hypervisor needs access to an ISO directory", "/srv/iso")
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
 		log.Info("🔐 Setting ACL for ISO directory", zap.String("path", isoDir))
 		system.SetLibvirtACL(isoDir)
@@ -65,7 +66,7 @@ func runDeployKVM(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 		log.Warn("ISO directory not found or invalid", zap.String("path", isoDir))
 	}
 
-	if interaction.PromptYesNo("Would you like to autostart the default libvirt network?", false, log) {
+	if interaction.PromptYesNo("Would you like to autostart the default libvirt network?", false) {
 		log.Info("⚙️  Enabling autostart for default libvirt network")
 		system.SetLibvirtDefaultNetworkAutostart()
 	} else {

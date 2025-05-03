@@ -6,12 +6,10 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"go.uber.org/zap"
 )
-
-var log = logger.L()
 
 var (
 	showSecrets bool
@@ -27,9 +25,8 @@ user permissions, versioning data, keepalive status, and other useful insights.
 
 Subcommands are required to specify which type of information to inspect.`,
 	Aliases: []string{"read", "get"},
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-		log.Info("'eos delphi inspect' was called without a subcommand")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("'eos delphi inspect' was called without a subcommand")
 
 		fmt.Println("❌ Missing subcommand.")
 		fmt.Println("ℹ️  Run `eos delphi inspect --help` to see available options.")

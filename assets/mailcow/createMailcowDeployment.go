@@ -2,47 +2,48 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
+
+	"go.uber.org/zap"
 )
 
 func main() {
 	fmt.Println("Install mailcow")
 	// Clone the mailcow-dockerized repository
 	if err := runCommand("git", "clone", "https://github.com/mailcow/mailcow-dockerized"); err != nil {
-		log.Fatalf("Error cloning repository: %v", err)
+		zap.L().Fatal("Error cloning repository: %v")
 	}
 
 	// Change working directory to "mailcow-dockerized"
 	if err := os.Chdir("mailcow-dockerized"); err != nil {
-		log.Fatalf("Error changing directory: %v", err)
+		zap.L().Fatal("Error changing directory: %v")
 	}
 
 	// Generate a configuration file (this will prompt for a FQDN)
 	fmt.Println("Generate a configuration file. Use a FQDN (host.domain.tld) as hostname when asked.")
 	if err := runCommand("./generate_config.sh"); err != nil {
-		log.Fatalf("Error generating configuration: %v", err)
+		zap.L().Fatal("Error generating configuration: %v")
 	}
 
 	// Open mailcow.conf in nano for editing
 	fmt.Println("Change configuration if you want or need to.")
 	if err := runCommand("nano", "mailcow.conf"); err != nil {
-		log.Fatalf("Error opening mailcow.conf in nano: %v", err)
+		zap.L().Fatal("Error opening mailcow.conf in nano: %v")
 	}
 
 	// Start mailcow by pulling images and starting the containers
 	fmt.Println("Start mailcow")
 	if err := runCommand("docker", "compose", "pull"); err != nil {
-		log.Fatalf("Error pulling docker images: %v", err)
+		zap.L().Fatal("Error pulling docker images: %v")
 	}
 	if err := runCommand("docker", "compose", "up", "-d"); err != nil {
-		log.Fatalf("Error starting docker compose: %v", err)
+		zap.L().Fatal("Error starting docker compose: %v")
 	}
 
 	// List running docker containers
 	if err := runCommand("docker", "ps"); err != nil {
-		log.Fatalf("Error listing docker containers: %v", err)
+		zap.L().Fatal("Error listing docker containers: %v")
 	}
 
 	// Final instructions and credentials

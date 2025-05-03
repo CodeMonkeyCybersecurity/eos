@@ -10,23 +10,21 @@ import (
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 )
-
-var log = logger.L()
 
 // CreateCmd is the root command for creation-related Delphi actions
 var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create Delphi resources",
 	Long:  "Create or generate Delphi-related resources, configurations, and mappings.",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("'eos delphi create' was called without a subcommand")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("'eos delphi create' was called without a subcommand")
 		return nil
 	}),
 }
@@ -34,7 +32,7 @@ var CreateCmd = &cobra.Command{
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		runMapping()
 		return nil
 	}),
@@ -73,9 +71,9 @@ type PackageMapping struct {
 }
 
 func runMapping() {
-	cfg, err := delphi.ResolveConfig(log) // Combine into a single call if ReadConfig is redundant
+	cfg, err := delphi.ResolveConfig() // Combine into a single call if ReadConfig is redundant
 	if err != nil {
-		log.Fatal("Failed to resolve Delphi config", zap.Error(err))
+		zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
 	}
 
 	if cfg.Protocol == "" {
@@ -88,16 +86,16 @@ func runMapping() {
 	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	apiURL = strings.TrimRight(apiURL, "/")
 
-	log.Info("Authenticating to Wazuh API", zap.String("url", apiURL))
-	token, err := delphi.Authenticate(cfg, log)
+	zap.L().Info("Authenticating to Wazuh API", zap.String("url", apiURL))
+	token, err := delphi.Authenticate(cfg)
 	if err != nil {
-		log.Fatal("Authentication failed", zap.Error(err))
+		zap.L().Fatal("Authentication failed", zap.Error(err))
 	}
 
 	agentsEndpoint := fmt.Sprintf("%s/agents?select=id,os,version", apiURL)
 	req, err := http.NewRequest("GET", agentsEndpoint, nil)
 	if err != nil {
-		log.Fatal("Error creating request", zap.Error(err))
+		zap.L().Fatal("Error creating request", zap.Error(err))
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -105,14 +103,14 @@ func runMapping() {
 	client := &http.Client{Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Fatal("Error making request", zap.Error(err))
+		zap.L().Fatal("Error making request", zap.Error(err))
 	}
-	defer shared.SafeClose(resp.Body, log)
+	defer shared.SafeClose(resp.Body)
 
 	var agentsResp AgentsResponse
 	decoder := json.NewDecoder(resp.Body)
 	if err := decoder.Decode(&agentsResp); err != nil {
-		log.Fatal("Failed to decode response", zap.Error(err))
+		zap.L().Fatal("Failed to decode response", zap.Error(err))
 	}
 
 	for _, agent := range agentsResp.Data.AffectedItems {

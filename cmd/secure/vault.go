@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
@@ -17,48 +18,48 @@ import (
 var SecureVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Applies hardening and provisioning to a running Vault instance",
-	RunE: eoscli.Wrap(func(ctx *eoscli.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("secure-vault")
 
-		log.Info("🔐 Connecting to Vault")
-		client, err := vault.EnsureVaultReady(log)
+		zap.L().Info("🔐 Connecting to Vault")
+		client, err := vault.EnsureVaultReady()
 		if err != nil {
-			return logger.LogErrAndWrap(log, "secure vault: connect failed", err)
+			return logger.LogErrAndWrap("secure vault: connect failed", err)
 		}
 
-		if vault.IsVaultSealed(client, log) {
+		if vault.IsVaultSealed(client) {
 			return fmt.Errorf("vault is sealed — please run `eos enable vault` before `secure vault`")
 		}
 
 		// 1️⃣ Ensure EOS Policy
-		log.Info("📜 Ensuring eos-policy exists")
-		if err := vault.EnsurePolicy(client, log); err != nil {
-			return logger.LogErrAndWrap(log, "secure vault: ensure policy", err)
+		zap.L().Info("📜 Ensuring eos-policy exists")
+		if err := vault.EnsurePolicy(client); err != nil {
+			return logger.LogErrAndWrap("secure vault: ensure policy", err)
 		}
 
 		// 2️⃣ Enable auth methods if needed
-		log.Info("🪪 Ensuring AppRole auth method is enabled")
+		zap.L().Info("🪪 Ensuring AppRole auth method is enabled")
 		opts := vault.EnableOptions{
 			Password: "", // TODO: replace with real password fallback
 		}
 		if err := vault.EnableVault(client, log, opts); err != nil {
-			return logger.LogErrAndWrap(log, "secure vault: enable auth methods", err)
+			return logger.LogErrAndWrap("secure vault: enable auth methods", err)
 		}
 
 		// 3️⃣ Re-provision AppRole
-		log.Info("🔁 Re-confirming AppRole settings")
-		roleID, secretID, err := vault.EnsureAppRole(client, log, vault.DefaultAppRoleOptions())
+		zap.L().Info("🔁 Re-confirming AppRole settings")
+		roleID, secretID, err := vault.EnsureAppRole(client, vault.DefaultAppRoleOptions())
 		if err != nil {
-			return logger.LogErrAndWrap(log, "secure vault: create approle", err)
+			return logger.LogErrAndWrap("secure vault: create approle", err)
 		}
-		if err := vault.WriteAppRoleFiles(roleID, secretID, log); err != nil {
-			return logger.LogErrAndWrap(log, "secure vault: write approle creds", err)
+		if err := vault.WriteAppRoleFiles(roleID, secretID); err != nil {
+			return logger.LogErrAndWrap("secure vault: write approle creds", err)
 		}
-		log.Info("✅ AppRole credentials written", zap.String("role_id", roleID), zap.String("secret_id", secretID))
+		zap.L().Info("✅ AppRole credentials written", zap.String("role_id", roleID), zap.String("secret_id", secretID))
 
 		// 4️⃣ Validate Vault Agent token
-		log.Info("🤖 Validating Vault Agent token")
-		token, err := vault.WaitForAgentToken(shared.VaultTokenSinkPath, log)
+		zap.L().Info("🤖 Validating Vault Agent token")
+		token, err := vault.WaitForAgentToken(shared.VaultTokenSinkPath)
 		if err != nil {
 			return fmt.Errorf("vault-agent token check failed: %w", err)
 		}
@@ -73,14 +74,14 @@ var SecureVaultCmd = &cobra.Command{
 			return fmt.Errorf("could not read --revoke-root flag: %w", err)
 		}
 		if shouldRevoke {
-			log.Warn("🚨 Revoking root token (irreversible)")
-			if err := vault.RevokeRootToken(client, "", log); err != nil {
-				return logger.LogErrAndWrap(log, "secure vault: revoke root", err)
+			zap.L().Warn("🚨 Revoking root token (irreversible)")
+			if err := vault.RevokeRootToken(client, ""); err != nil {
+				return logger.LogErrAndWrap("secure vault: revoke root", err)
 			}
 		}
 
 		// 📋 Final summary
-		log.Info("🔒 Vault hardening completed successfully",
+		zap.L().Info("🔒 Vault hardening completed successfully",
 			zap.Bool("vault_hardened", true),
 			zap.Bool("root_token_revoked", shouldRevoke),
 		)

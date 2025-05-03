@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"go.uber.org/zap"
 )
 
 // PromptWithDefault prompts the user and returns their response or a default value if empty.
-func PromptWithDefault(label, defaultValue string, log *zap.Logger) string {
+func PromptWithDefault(label, defaultValue string) string {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Printf("%s [%s]: ", label, defaultValue)
 	text, _ := reader.ReadString('\n')
@@ -22,7 +20,7 @@ func PromptWithDefault(label, defaultValue string, log *zap.Logger) string {
 }
 
 // PromptRequired prompts the user for input and loops until a non-empty string is entered.
-func PromptRequired(label string, log *zap.Logger) string {
+func PromptRequired(label string) string {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Printf("%s: ", label)

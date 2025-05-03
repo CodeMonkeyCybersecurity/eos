@@ -15,45 +15,45 @@ import (
 //--------------------------------------------------------------------
 
 // EnableAppRoleFlow(client, log, opts)
-// ├── EnableAppRoleAuth(client, log)
+// ├── EnableAppRoleAuth(client)
 // │    └── client.Sys().EnableAuthWithOptions("approle")
 // ├── EnsureAppRole(client, log, opts)
 // │    ├── os.Stat(RoleIDPath)
-// │    ├── vault.refreshAppRoleCreds(client, log) (optional)
-// │    ├── vault.EnableAppRoleAuth(client, log) (if needed)
+// │    ├── vault.refreshAppRoleCreds(client) (optional)
+// │    ├── vault.EnableAppRoleAuth(client) (if needed)
 // │    ├── client.Logical().Write(shared.RolePath, roleData)
-// │    ├── vault.refreshAppRoleCreds(client, log)
-// │    └── vault.WriteAppRoleFiles(roleID, secretID, log)
+// │    ├── vault.refreshAppRoleCreds(client)
+// │    └── vault.WriteAppRoleFiles(roleID, secretID)
 // │         ├── system.EnsureOwnedDir
 // │         └── system.WriteOwnedFile(role_id, secret_id)
 // └── Done
 
 func PhaseEnableAppRole(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {
-	log.Info("[Phase10] Setting up Vault AppRole")
+	zap.L().Info("[Phase10] Setting up Vault AppRole")
 	return EnableAppRoleFlow(client, log, opts)
 }
 
 // EnableAppRoleFlow enables AppRole authentication method
 // and provisions EOS-specific AppRole credentials.
 func EnableAppRoleFlow(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {
-	log.Info("🪪 [Enable] Starting AppRole setup flow")
+	zap.L().Info("🪪 [Enable] Starting AppRole setup flow")
 
-	log.Info("📡 Checking if AppRole auth method is enabled")
-	if err := EnableAppRoleAuth(client, log); err != nil {
+	zap.L().Info("📡 Checking if AppRole auth method is enabled")
+	if err := EnableAppRoleAuth(client); err != nil {
 		return fmt.Errorf("enable approle auth: %w", err)
 	}
 
-	log.Info("🔑 Creating or reusing AppRole credentials")
-	roleID, secretID, err := EnsureAppRole(client, log, opts)
+	zap.L().Info("🔑 Creating or reusing AppRole credentials")
+	roleID, secretID, err := EnsureAppRole(client, opts)
 	if err != nil {
 		return fmt.Errorf("ensure AppRole: %w", err)
 	}
 
-	log.Info("✏️ Writing AppRole credentials to disk")
-	if err := WriteAppRoleFiles(roleID, secretID, log); err != nil {
+	zap.L().Info("✏️ Writing AppRole credentials to disk")
+	if err := WriteAppRoleFiles(roleID, secretID); err != nil {
 		return fmt.Errorf("write AppRole files: %w", err)
 	}
 
-	log.Info("✅ AppRole setup complete", zap.String("role_id", roleID))
+	zap.L().Info("✅ AppRole setup complete", zap.String("role_id", roleID))
 	return nil
 }

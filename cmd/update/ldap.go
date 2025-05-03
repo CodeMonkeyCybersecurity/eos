@@ -6,6 +6,7 @@ import (
 	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 )
 
@@ -19,7 +20,7 @@ var UpdateLDAPCmd = &cobra.Command{
 	Short: "Regenerate LDAP TLS certificate with IP SAN",
 	Long: `Regenerates the TLS certificate for your LDAP server, including the IP address
 in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP.`,
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if ipSAN == "" {
 			return fmt.Errorf("--ip flag is required to set SAN IP")
 		}

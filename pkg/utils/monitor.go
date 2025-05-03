@@ -20,14 +20,14 @@ import (
 
 // monitorVaultLogs tails the log file and prints new lines to STDOUT.
 // It returns when it sees a line containing the specified marker or when the context is done.
-func MonitorVaultLogs(ctx context.Context, logFilePath, marker string, log *zap.Logger) error {
+func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	file, err := os.Open(logFilePath)
 	if err != nil {
 		return fmt.Errorf("failed to open log file for monitoring: %w", err)
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			log.Warn("Failed to close log file", zap.Error(err))
+			zap.L().Warn("Failed to close log file", zap.Error(err))
 		}
 	}()
 

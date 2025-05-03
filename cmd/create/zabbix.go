@@ -6,6 +6,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/spf13/cobra"
@@ -15,16 +16,16 @@ import (
 var CreateZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
 	Short: "Deploy Zabbix monitoring stack using Docker Compose",
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log.Info("Starting Zabbix installation...")
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		zap.L().Info("Starting Zabbix installation...")
 
 		if err := deployZabbix(); err != nil {
-			log.Error("Zabbix installation failed", zap.Error(err))
+			zap.L().Error("Zabbix installation failed", zap.Error(err))
 			fmt.Println("Zabbix installation failed:", err)
 			os.Exit(1)
 		}
 
-		log.Info("Zabbix successfully installed")
+		zap.L().Info("Zabbix successfully installed")
 		fmt.Println("Zabbix successfully deployed at http://localhost:8080")
 		return nil
 	}),
@@ -48,7 +49,7 @@ func deployZabbix() error {
 	}
 
 	// Start the stack
-	log.Info("Running docker compose up...")
+	zap.L().Info("Running docker compose up...")
 	if err := docker.RunCommand("docker", "compose", "-f", shared.ZabbixComposeYML, "up", "-d"); err != nil {
 		return fmt.Errorf("failed to run docker compose: %w", err)
 	}

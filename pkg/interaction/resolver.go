@@ -7,11 +7,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
-	"go.uber.org/zap"
 )
 
-func Resolve(prompt string, log *zap.Logger) (bool, error) {
+func Resolve(prompt string) (bool, error) {
 	fmt.Printf("%s (y/N): ", prompt)
 	reader := bufio.NewReader(os.Stdin)
 	input, err := reader.ReadString('\n')
@@ -22,7 +20,7 @@ func Resolve(prompt string, log *zap.Logger) (bool, error) {
 	return input == "y" || input == "yes", nil
 }
 
-func ResolveObject(c Confirmable, log *zap.Logger) (bool, error) {
+func ResolveObject(c Confirmable) (bool, error) {
 	fmt.Println(c.Summary())
-	return Resolve("Are these values correct?", log)
+	return Resolve("Are these values correct?")
 }

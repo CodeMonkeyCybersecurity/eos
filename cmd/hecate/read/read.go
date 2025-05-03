@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +21,7 @@ Examples:
 	hecate inspect config
 	hecate inspect`,
 	Aliases: []string{"read", "get"},
-	RunE: eos.Wrap(func(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("🔍 Please use a subcommand (e.g. 'inspect config') to inspect a resource.")
 		return nil
 	}),

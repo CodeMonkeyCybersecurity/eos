@@ -26,18 +26,18 @@ func (c *Config) IsValid() bool {
 		c.APIPassword != ""
 }
 
-func PromptDelphiConfig(log *zap.Logger) *Config {
-	password, err := crypto.PromptPassword("Enter the API password", log)
+func PromptDelphiConfig() *Config {
+	password, err := crypto.PromptPassword("Enter the API password")
 	if err != nil {
-		log.Error("❌ Failed to read password: %v\n")
+		zap.L().Error("❌ Failed to read password: %v\n")
 		os.Exit(1)
 	}
 
 	return &Config{
-		FQDN:               interaction.PromptInput("Enter the Wazuh FQDN", "delphi.domain.com", log),
-		Port:               interaction.PromptInput("Enter the port", "55000", log),
-		Protocol:           interaction.PromptInput("Enter the protocol (http or https)", "https", log),
-		APIUser:            interaction.PromptInput("Enter the API username", "wazuh-wui", log),
+		FQDN:               interaction.PromptInput("Enter the Wazuh FQDN", "delphi.domain.com"),
+		Port:               interaction.PromptInput("Enter the port", "55000"),
+		Protocol:           interaction.PromptInput("Enter the protocol (http or https)", "https"),
+		APIUser:            interaction.PromptInput("Enter the API username", "wazuh-wui"),
 		APIPassword:        password,
 		VerifyCertificates: false,
 	}
