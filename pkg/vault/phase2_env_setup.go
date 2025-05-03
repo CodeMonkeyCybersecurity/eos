@@ -92,9 +92,6 @@ func EnsureVaultDirs() error {
 	if err := createBaseDirs(); err != nil {
 		return err
 	}
-	if err := secureTLSFiles(); err != nil {
-		return err
-	}
 	if err := secureVaultDirOwnership(); err != nil {
 		return err
 	}
@@ -129,34 +126,6 @@ func createBaseDirs() error {
 		}
 		if err := os.Chown(d.path, eosUID, eosGID); err != nil {
 			zap.L().Warn("⚠️ Failed to chown directory", zap.String("path", d.path), zap.Error(err))
-		}
-	}
-	return nil
-}
-
-func secureTLSFiles() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosID) // 🔥 Change back to eos
-	if err != nil {
-		zap.L().Error("⚠️ Could not resolve eos UID/GID for TLS files", zap.Error(err))
-	}
-
-	tlsFiles := []struct {
-		path string
-		perm os.FileMode
-	}{
-		{shared.TLSKey, 0600},
-		{shared.TLSCrt, 0644},
-	}
-
-	for _, tf := range tlsFiles {
-		zap.L().Debug("🔧 Securing TLS file", zap.String("path", tf.path))
-		if err := os.Chown(tf.path, eosUID, eosGID); err != nil {
-			zap.L().Error("❌ Failed to chown TLS file", zap.String("path", tf.path), zap.Error(err))
-			return fmt.Errorf("failed to secure %s: %w", tf.path, err)
-		}
-		if err := os.Chmod(tf.path, tf.perm); err != nil {
-			zap.L().Error("❌ Failed to chmod TLS file", zap.String("path", tf.path), zap.Error(err))
-			return fmt.Errorf("failed to secure %s: %w", tf.path, err)
 		}
 	}
 	return nil

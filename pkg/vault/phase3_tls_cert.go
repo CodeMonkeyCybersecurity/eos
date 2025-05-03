@@ -19,6 +19,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// GenerateTLS() →
+//     EnsureVaultTLS() →
+//         GenerateVaultTLSCert() →
+// 			tlsCertsExist()
+// 			fixTLSCertIfMissingSAN()
+// 				removeBadTLSCerts()
+// 			secureVaultTLSOwnership()
+// 			secureTLSFiles() ← *** this needs to be added AFTER cert generation ***
+//     TrustVaultCA()
+//     secureVaultTLSOwnership()  ← still handles dir + CA agent copy
+
 //--------------------------------------------------------------------
 // 3.  Generate TLS Certificates
 //--------------------------------------------------------------------
@@ -64,7 +75,7 @@ func TrustVaultCA_RHEL() error {
 	}
 
 	// RHEL9 / CentOS Stream 9
-	cmd := exec.Command( "update-ca-trust", "extract")
+	cmd := exec.Command("update-ca-trust", "extract")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -91,7 +102,7 @@ func TrustVaultCA_Debian() error {
 		zap.L().Warn("could not chown CA file", zap.Error(err))
 	}
 
-	cmd := exec.Command( "update-ca-certificates")
+	cmd := exec.Command("update-ca-certificates")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -173,7 +184,7 @@ IP.1 = %s
 	zap.L().Info("🔐 Generating Vault TLS certificate with SANs",
 		zap.String("hostname", hostname), zap.String("config", tmpConfigPath))
 
-	cmd := exec.Command( "openssl", "req", "-new", "-newkey", "rsa:4096",
+	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096",
 		"-days", "825", "-nodes", "-x509",
 		"-subj", "/CN="+hostname,
 		"-keyout", shared.TLSKey,
@@ -188,9 +199,14 @@ IP.1 = %s
 		return fmt.Errorf("openssl failed: %w", err)
 	}
 
-	zap.L().Info("🔐 Securing Vault TLS certs...")
+	// 🔑 Secure just the cert + key files with strict perms
+	if err := secureTLSFiles(); err != nil {
+		zap.L().Warn("could not apply secureTLSFiles ownership/permissions", zap.Error(err))
+	}
+
+	// 🛡️ Then secure directory + Vault Agent CA copy
 	if err := secureVaultTLSOwnership(); err != nil {
-		zap.L().Warn("could not apply correct ownership to TLS certs", zap.Error(err))
+		zap.L().Warn("could not apply secureVaultTLSOwnership", zap.Error(err))
 	}
 
 	zap.L().Info("✅ Vault TLS cert generated and secured",
@@ -391,4 +407,32 @@ func checkTLSCertForSAN(certPath string) (bool, error) {
 
 	// Optional: you can enforce certain DNS names here if you want stricter matching
 	return true, nil
+}
+
+func secureTLSFiles() error {
+	eosUID, eosGID, err := system.LookupUser(shared.EosID) // 🔥 Change back to eos
+	if err != nil {
+		zap.L().Error("⚠️ Could not resolve eos UID/GID for TLS files", zap.Error(err))
+	}
+
+	tlsFiles := []struct {
+		path string
+		perm os.FileMode
+	}{
+		{shared.TLSKey, 0600},
+		{shared.TLSCrt, 0644},
+	}
+
+	for _, tf := range tlsFiles {
+		zap.L().Debug("🔧 Securing TLS file", zap.String("path", tf.path))
+		if err := os.Chown(tf.path, eosUID, eosGID); err != nil {
+			zap.L().Error("❌ Failed to chown TLS file", zap.String("path", tf.path), zap.Error(err))
+			return fmt.Errorf("failed to secure %s: %w", tf.path, err)
+		}
+		if err := os.Chmod(tf.path, tf.perm); err != nil {
+			zap.L().Error("❌ Failed to chmod TLS file", zap.String("path", tf.path), zap.Error(err))
+			return fmt.Errorf("failed to secure %s: %w", tf.path, err)
+		}
+	}
+	return nil
 }
