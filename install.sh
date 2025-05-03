@@ -15,7 +15,7 @@ LOG_USER="$EOS_USER"
 LOG_GROUP="$EOS_USER"
 
 # Check for required commands
-for cmd in go useradd usermod visudo stat cmp; do
+for cmd in go useradd usermod visudo stat; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "❌ Required command '$cmd' not found"
     exit 1
@@ -53,15 +53,12 @@ else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
-# Only replace binary if it differs
-if [[ -f "$INSTALL_PATH" ]] && cmp --silent "$EOS_BUILD_PATH" "$INSTALL_PATH"; then
-  echo "✅ Binary already up to date at $INSTALL_PATH"
-else
-  echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
-  cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
-  chown root:root "$INSTALL_PATH"
-  chmod 755 "$INSTALL_PATH"
-fi
+# Always replace binary
+rm -rf "$INSTALL_PATH"
+echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
+cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
+chown root:root "$INSTALL_PATH"
+chmod 755 "$INSTALL_PATH"
 
 # Create directories safely
 echo "📁 Creating secrets and config directories"
