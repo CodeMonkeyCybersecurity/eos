@@ -22,7 +22,7 @@ for cmd in go useradd usermod visudo stat; do
   }
 done
 
-# Build as invoking user
+# If not running as root, switch to sudo after build
 if [[ "$EUID" -ne 0 ]]; then
   echo "📦 Building EOS as regular user from $EOS_SRC_DIR..."
   if [[ ! -d "$EOS_SRC_DIR" ]]; then
@@ -30,10 +30,17 @@ if [[ "$EUID" -ne 0 ]]; then
     exit 1
   fi
   cd "$EOS_SRC_DIR"
+  rm -f "$EOS_BINARY_NAME"
   go build -o "$EOS_BINARY_NAME" ./main.go || { echo "❌ Build failed"; exit 1; }
   echo "🔐 Re-running with sudo..."
   exec sudo "$0" "$@"
 fi
+
+# Build as root to ensure rebuild always happens
+echo "📦 Rebuilding EOS as root from $EOS_SRC_DIR..."
+cd "$EOS_SRC_DIR"
+rm -f "$EOS_BINARY_NAME"
+go build -o "$EOS_BINARY_NAME" ./main.go || { echo "❌ Build failed as root"; exit 1; }
 
 # Ensure eos user exists
 if ! id "$EOS_USER" &>/dev/null; then
@@ -53,8 +60,8 @@ else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
-# Always replace binary
-rm -rf "$INSTALL_PATH"
+# Always replace installed binary
+rm -f "$INSTALL_PATH"
 echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
 cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
 chown root:root "$INSTALL_PATH"
