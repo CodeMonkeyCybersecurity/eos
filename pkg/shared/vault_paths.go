@@ -17,8 +17,8 @@ const (
 
 	// Storage
 	VaultDir      = "/opt/vault/"
-	VaultDataPath = VaultDir + "data"
-	TLSDir        = VaultDir + "tls"
+	VaultDataPath = VaultDir + "data/"
+	TLSDir        = VaultDir + "tls/"
 	TLSKey        = TLSDir + "tls.key"
 	TLSCrt        = TLSDir + "tls.crt"
 

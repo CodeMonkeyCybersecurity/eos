@@ -99,7 +99,7 @@ func NewClient() (*api.Client, error) {
 	// 2) if the caller did NOT provide a CA path, inject our local one
 	if os.Getenv("VAULT_CACERT") == "" {
 		if err := cfg.ConfigureTLS(&api.TLSConfig{
-			CACert: "/opt/vault/tls/tls.crt",
+			CACert: shared.TLSCrt,
 		}); err != nil {
 			return nil, fmt.Errorf("tls‑config: %w", err)
 		}
