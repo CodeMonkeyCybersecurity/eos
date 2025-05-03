@@ -8,7 +8,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
-	"strings"
+	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
@@ -36,12 +36,6 @@ func InitializeWithFallback() {
 	path, err := FindWritableLogPath()
 	if err != nil {
 		useFallback("no writable log path found")
-		return
-	}
-
-	// 🛡️ Warn if trying to write to /var/log as non-root
-	if os.Geteuid() != 0 && strings.HasPrefix(path, shared.EosLogDir) {
-		useFallback(fmt.Sprintf("non-root user cannot write to %s", shared.EosLogDir))
 		return
 	}
 
@@ -132,6 +126,7 @@ func prepareLogDir(dir string) error {
 	return nil
 }
 
+// Update testWritable for detailed error visibility
 func testWritable(dir string) bool {
 	log := L()
 	testFile := filepath.Join(dir, ".write_test")
@@ -139,7 +134,10 @@ func testWritable(dir string) bool {
 
 	f, err := os.Create(testFile)
 	if err != nil {
-		log.Warn("❌ Write test failed (create error)", zap.Error(err))
+		log.Warn("❌ Write test failed (create error)",
+			zap.String("file", testFile),
+			zap.Error(err),
+		)
 		return false
 	}
 	defer func() {
@@ -176,6 +174,7 @@ func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 	return cfg
 }
 
+// Modified useFallback with extra directory diagnostics
 func useFallback(reason string) {
 	logger := NewFallbackLogger()
 	zap.ReplaceGlobals(logger)
@@ -198,6 +197,25 @@ func useFallback(reason string) {
 	envPath := os.Getenv("PATH")
 	envUser := os.Getenv("USER")
 
+	// Add directory diagnostics
+	logDir := shared.EosLogDir
+	info, statErr := os.Stat(logDir)
+	if statErr != nil {
+		logger.Warn("⚠️ Could not stat log directory",
+			zap.String("dir", logDir),
+			zap.Error(statErr),
+		)
+	} else {
+		sys := info.Sys().(*syscall.Stat_t)
+		logger.Warn("⚠️ Log directory status",
+			zap.String("dir", logDir),
+			zap.Any("permissions", info.Mode()),
+			zap.Uint32("owner_uid", sys.Uid),
+			zap.Uint32("owner_gid", sys.Gid),
+		)
+	}
+
+	// Include fallback context
 	logger.Warn("⚠️ Fallback logger used",
 		zap.String("reason", reason),
 		zap.String("effective_user", envUser),
