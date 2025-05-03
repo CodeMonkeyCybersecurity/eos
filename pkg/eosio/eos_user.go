@@ -35,12 +35,13 @@ func requireEosUserOrReexec(log *zap.Logger, withShell bool) error {
 	if strings.HasPrefix(os.Args[0], TmpPrefix) {
 		return fmt.Errorf("🛑 Cannot escalate with `go run`. Use `go build -o eos`")
 	}
+
 	isEos, err := IsRunningAsEos()
 	if err != nil {
 		return fmt.Errorf("detecting current user failed: %w", err)
 	}
 	if isEos {
-		log.Debug("Already running as eos user, skipping escalation")
+		log.Info("👤 Already running as 'eos' user; skipping sudo escalation")
 		return nil
 	}
 
@@ -53,16 +54,15 @@ func requireEosUserOrReexec(log *zap.Logger, withShell bool) error {
 	output, err := cmd.CombinedOutput()
 	trimmed := strings.TrimSpace(string(output))
 	if err != nil {
-		log.Error("sudo escalation failed",
+		log.Error("❌ sudo escalation failed",
 			zap.Error(err),
-			zap.String("output", trimmed),
 			zap.String("command", cmdStr),
-			zap.String("hint", "check sudoers NOPASSWD and eos shell in /etc/passwd"))
+			zap.String("output", trimmed),
+			zap.String("hint", "check NOPASSWD in sudoers and shell for 'eos' in /etc/passwd"))
 		return fmt.Errorf("sudo escalation failed: %w; output: %s", err, trimmed)
 	}
 
-	log.Info("✅ Re-execution under 'eos' succeeded")
-	os.Exit(0)
+	log.Info("✅ Re-execution under 'eos' succeeded; exiting parent")
 	return ErrEosReexecCompleted
 }
 
