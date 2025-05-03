@@ -99,15 +99,15 @@ func ValidateVaultConfig() error {
 		}
 	}
 
-	// ✨ More thorough: run vault server -check
+	// ✨ More thorough: run vault server
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "vault", "server", "-config", shared.VaultConfigPath, "-check")
+	cmd := exec.CommandContext(ctx, "vault", "server", "-config", shared.VaultConfigPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	zap.L().Info("🔎 Running 'vault server -check'")
+	zap.L().Info("🔎 Running 'vault server'")
 	if err := cmd.Run(); err != nil {
 		zap.L().Error("❌ Vault server config validation failed", zap.Error(err))
 		return fmt.Errorf("vault config validation failed: %w", err)
