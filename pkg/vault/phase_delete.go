@@ -82,6 +82,15 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 			matches, _ := filepath.Glob(path)
 			for _, m := range matches {
 				if err := system.Rm(ctx, m, owner); err != nil {
+					// fallback to sudo rm -rf
+					fallbackErr := exec.CommandContext(ctx, "sudo", "rm", "-rf", m).Run()
+					if fallbackErr != nil {
+						errs[m] = fallbackErr
+						log.Warn("❌ Failed to remove path (even with sudo)", zap.String("path", m), zap.Error(fallbackErr))
+					} else {
+						removed = append(removed, m)
+						log.Info("✅ Removed with sudo rm -rf", zap.String("path", m))
+					}
 					errs[m] = err
 				} else {
 					removed = append(removed, m)
@@ -89,9 +98,18 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 			}
 		} else {
 			if err := system.Rm(ctx, path, owner); err != nil {
+				fallbackErr := exec.CommandContext(ctx, "sudo", "rm", "-rf", path).Run()
+				if fallbackErr != nil {
+					errs[path] = fallbackErr
+					log.Warn("❌ Failed to remove path (even with sudo)", zap.String("path", path), zap.Error(fallbackErr))
+				} else {
+					removed = append(removed, path)
+					log.Info("✅ Removed with sudo rm -rf", zap.String("path", path))
+				}
 				errs[path] = err
 			} else {
 				removed = append(removed, path)
+				log.Info("✅ Removed with system.Rm", zap.String("path", path))
 			}
 		}
 	}

@@ -5,6 +5,7 @@ package delete
 import (
 	"os"
 	"os/exec"
+	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
@@ -79,8 +80,8 @@ func run(name string, args ...string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		zap.L().Warn("Command failed", zap.String("cmd", name+" "+args[0]), zap.Error(err))
+		zap.L().Warn("❌ Command failed", zap.String("cmd", name+" "+strings.Join(args, " ")), zap.Error(err))
 	} else {
-		zap.L().Info("Ran", zap.String("cmd", name+" "+args[0]))
+		zap.L().Info("✅ Ran", zap.String("cmd", name+" "+strings.Join(args, " ")))
 	}
 }

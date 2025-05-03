@@ -86,7 +86,7 @@ echo "✅ Log directory ready: $LOG_DIR"
 # Add eos sudoers entry
 if [ ! -f /etc/sudoers.d/eos ]; then
   echo "⚙️ Adding eos to sudoers"
-  echo "eos ALL=(ALL) NOPASSWD: /bin/systemctl" > /etc/sudoers.d/eos
+  echo "eos ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/eos
   chmod 440 /etc/sudoers.d/eos
   visudo -c || { echo "❌ Sudoers validation failed"; exit 1; }
   echo "✅ Sudoers entry added"
