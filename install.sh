@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+trap 'echo "❌ Installation failed on line $LINENO"; exit 1' ERR
+
 EOS_USER="eos"
 EOS_SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 EOS_BINARY_NAME="eos"
@@ -9,23 +11,29 @@ INSTALL_PATH="/usr/local/bin/$EOS_BINARY_NAME"
 SECRETS_DIR="/var/lib/eos/secrets"
 CONFIG_DIR="/etc/eos"
 LOG_DIR="/var/log/eos"
-LOG_USER="eos"
-LOG_GROUP="eos"
+LOG_USER="$EOS_USER"
+LOG_GROUP="$EOS_USER"
 
-# Ensure running as root
+# Check for required commands
+for cmd in go useradd usermod visudo stat cmp; do
+  command -v "$cmd" >/dev/null 2>&1 || {
+    echo "❌ Required command '$cmd' not found"
+    exit 1
+  }
+done
+
+# Build as invoking user
 if [[ "$EUID" -ne 0 ]]; then
-  echo "🔐 This script requires root privileges. Re-running with sudo..."
+  echo "📦 Building EOS as regular user from $EOS_SRC_DIR..."
+  if [[ ! -d "$EOS_SRC_DIR" ]]; then
+    echo "❌ Source directory $EOS_SRC_DIR not found"
+    exit 1
+  fi
+  cd "$EOS_SRC_DIR"
+  go build -o "$EOS_BINARY_NAME" ./main.go || { echo "❌ Build failed"; exit 1; }
+  echo "🔐 Re-running with sudo..."
   exec sudo "$0" "$@"
 fi
-
-echo "📦 Building EOS from $EOS_SRC_DIR..."
-if [[ ! -d "$EOS_SRC_DIR" ]]; then
-  echo "❌ Source directory $EOS_SRC_DIR not found"
-  exit 1
-fi
-
-cd "$EOS_SRC_DIR"
-go build -o "$EOS_BINARY_NAME" ./main.go
 
 # Ensure eos user exists
 if ! id "$EOS_USER" &>/dev/null; then
@@ -33,60 +41,50 @@ if ! id "$EOS_USER" &>/dev/null; then
   useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER"
 fi
 
-# Ensure syslog group exists and add eos to it if missing
+# Ensure syslog group exists and add eos to it
 if getent group syslog > /dev/null; then
   if id -nG "$EOS_USER" | grep -qw "syslog"; then
     echo "✅ $EOS_USER is already in syslog group"
   else
     echo "➕ Adding $EOS_USER to syslog group"
-    usermod -aG syslog "$EOS_USER" || {
-      echo "❌ Failed to add $EOS_USER to syslog group"
-      exit 1
-    }
+    usermod -aG syslog "$EOS_USER"
   fi
 else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
-# Install binary
-echo "🧹 Cleaning old EOS binary..."
-rm -rf "$INSTALL_PATH"
-echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
-cp "$EOS_BINARY_NAME" "$INSTALL_PATH"
-chown root:root "$INSTALL_PATH"
-chmod 755 "$INSTALL_PATH"
+# Only replace binary if it differs
+if [[ -f "$INSTALL_PATH" ]] && cmp --silent "$EOS_BUILD_PATH" "$INSTALL_PATH"; then
+  echo "✅ Binary already up to date at $INSTALL_PATH"
+else
+  echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
+  cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
+  chown root:root "$INSTALL_PATH"
+  chmod 755 "$INSTALL_PATH"
+fi
 
-# Create directories
+# Create directories safely
 echo "📁 Creating secrets and config directories"
-mkdir -p "$SECRETS_DIR"
-mkdir -p "$CONFIG_DIR"
-mkdir -p /var/lib/eos
-
+mkdir -p "$SECRETS_DIR" "$CONFIG_DIR" /var/lib/eos
 chown -R "$EOS_USER:$EOS_USER" /var/lib/eos
 chmod 750 /var/lib/eos
 chmod 700 "$SECRETS_DIR"
 
 echo "🔧 Setting up log directory: $LOG_DIR"
-
 if [ ! -d "$LOG_DIR" ]; then
   mkdir -p "$LOG_DIR" && echo "📁 Created $LOG_DIR"
 fi
-
 CURRENT_OWNER=$(stat -c "%U:%G" "$LOG_DIR" 2>/dev/null || echo "unknown:unknown")
 if [ "$CURRENT_OWNER" != "$EOS_USER:$EOS_USER" ]; then
   chown "$EOS_USER:$EOS_USER" "$LOG_DIR" && echo "🔑 Ownership updated to $EOS_USER:$EOS_USER"
 fi
-
 chmod 750 "$LOG_DIR" && echo "🔒 Permissions set to 750"
-
 echo "✅ Log directory ready: $LOG_DIR"
 
-# --- BOOTSTRAP ADDITIONS BELOW ---
-
-# Add eos sudoers entry
+# Add eos sudoers entry (restrict to eos binary only)
 if [ ! -f /etc/sudoers.d/eos ]; then
   echo "⚙️ Adding eos to sudoers"
-  echo "eos ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/eos
+  echo "eos ALL=(ALL) NOPASSWD: $INSTALL_PATH" > /etc/sudoers.d/eos
   chmod 440 /etc/sudoers.d/eos
   visudo -c || { echo "❌ Sudoers validation failed"; exit 1; }
   echo "✅ Sudoers entry added"
