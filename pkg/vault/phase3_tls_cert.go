@@ -1,4 +1,5 @@
 // pkg/vault/phase3_tls_cert.go
+
 package vault
 
 import (
@@ -19,22 +20,63 @@ import (
 	"go.uber.org/zap"
 )
 
-// GenerateTLS() →
-//     EnsureVaultTLS() →
-//         GenerateVaultTLSCert() →
-// 			tlsCertsExist()
-// 			fixTLSCertIfMissingSAN()
-// 				removeBadTLSCerts()
-// 			secureVaultTLSOwnership()
-// 			secureTLSFiles() ← *** this needs to be added AFTER cert generation ***
-//     TrustVaultCA()
-//     secureVaultTLSOwnership()  ← still handles dir + CA agent copy
+// EnsureVaultTLS() →
+// ---	checkTLSCertForSAN()
+// ---	GenerateVaultTLSCert()
+// ------	(if SAN missing → removeBadTLSCerts() → GenerateVaultTLSCert())
+// ---	removeBadTLSCerts()
+
+// TrustVaultCA()
+// ---	TrustVaultCA_RHEL()  [if RHEL-like]
+// ---	TrustVaultCA_Debian()  [if Debian-like]
+
+// GenerateVaultTLSCert()
+// --- tlsCertsExist()
+// --- fixTLSCertIfMissingSAN()
+// ------	removeBadTLSCerts()
+// --- secureTLSFiles()
+// --- secureVaultTLSOwnership()
+// ------	EnsureVaultAgentCAExists()
 
 //--------------------------------------------------------------------
 // 3.  Generate TLS Certificates
 //--------------------------------------------------------------------
 
 // PHASE 3 — GenerateVaultTLSCert() + TrustVaultCA()
+
+func EnsureVaultTLS() (string, string, error) {
+	// Quick check if files exist
+	if !system.FileExists(shared.TLSKey) || !system.FileExists(shared.TLSCrt) {
+		zap.L().Warn("🔐 TLS certs missing — triggering generation")
+		if err := GenerateVaultTLSCert(); err != nil {
+			return "", "", fmt.Errorf("failed to generate Vault TLS certs: %w", err)
+		}
+		return shared.TLSCrt, shared.TLSKey, nil
+	}
+
+	// Extra: Inspect certificate for valid SANs
+	hasValidSAN, err := checkTLSCertForSAN(shared.TLSCrt)
+	if err != nil {
+		zap.L().Warn("⚠️ Could not inspect existing TLS cert, forcing regeneration", zap.Error(err))
+		_ = removeBadTLSCerts() // Best effort
+		if err := GenerateVaultTLSCert(); err != nil {
+			return "", "", fmt.Errorf("failed to generate Vault TLS certs after SAN check failure: %w", err)
+		}
+		return shared.TLSCrt, shared.TLSKey, nil
+	}
+
+	if !hasValidSAN {
+		zap.L().Warn("❌ Existing Vault TLS cert missing or invalid SANs — forcing regeneration")
+		_ = removeBadTLSCerts() // Best effort
+		if err := GenerateVaultTLSCert(); err != nil {
+			return "", "", fmt.Errorf("failed to regenerate Vault TLS cert with SANs: %w", err)
+		}
+		return shared.TLSCrt, shared.TLSKey, nil
+	}
+
+	zap.L().Info("✅ Vault TLS cert exists and SANs are valid", zap.String("crt", shared.TLSCrt))
+	return shared.TLSCrt, shared.TLSKey, nil
+}
 
 // TrustVaultCA dispatches to the correct CA‐trust helper based on the distro.
 func TrustVaultCA() error {
@@ -114,8 +156,7 @@ func TrustVaultCA_Debian() error {
 	return nil
 }
 
-// GenerateVaultTLSCert generates a self-signed TLS certificate for Vault,
-// including SANs for internal hostname and 127.0.0.1, and stores them securely.
+// GenerateVaultTLSCert generates a self-signed TLS certificate for Vault.
 func GenerateVaultTLSCert() error {
 	zap.L().Info("📁 Checking for existing Vault TLS certs",
 		zap.String("key", shared.TLSKey),
@@ -136,11 +177,10 @@ func GenerateVaultTLSCert() error {
 	}
 
 	hostname := system.GetInternalHostname()
+	publicHostname, _ := os.Hostname()
 	zap.L().Debug("🔎 Got internal hostname for SAN", zap.String("hostname", hostname))
 
-	// Create TLS directory
 	if err := os.MkdirAll(shared.TLSDir, shared.DirPermStandard); err != nil {
-		zap.L().Error("❌ Failed to create TLS directory", zap.Error(err))
 		return fmt.Errorf("failed to create TLS directory: %w", err)
 	}
 
@@ -148,9 +188,6 @@ func GenerateVaultTLSCert() error {
 	if !ok {
 		return fmt.Errorf("user declined TLS certificate generation")
 	}
-
-	// Create temporary OpenSSL config with SANs
-	publicHostname, _ := os.Hostname() // Add actual system hostname
 
 	configContent := fmt.Sprintf(`
 [req]
@@ -169,10 +206,12 @@ IP.1 = %s
 	if err != nil {
 		return fmt.Errorf("failed to create temp openssl config: %w", err)
 	}
-	if err := os.Remove(tmpFile.Name()); err != nil {
-		zap.L().Warn("Failed to remove temp file", zap.Error(err))
-	}
 	tmpConfigPath := tmpFile.Name()
+	defer func() {
+		if err := os.Remove(tmpConfigPath); err != nil {
+			zap.L().Warn("Failed to remove temp file", zap.Error(err))
+		}
+	}()
 
 	if _, err := tmpFile.Write([]byte(configContent)); err != nil {
 		return fmt.Errorf("failed to write temp openssl config: %w", err)
@@ -199,12 +238,9 @@ IP.1 = %s
 		return fmt.Errorf("openssl failed: %w", err)
 	}
 
-	// 🔑 Secure just the cert + key files with strict perms
 	if err := secureTLSFiles(); err != nil {
 		zap.L().Warn("could not apply secureTLSFiles ownership/permissions", zap.Error(err))
 	}
-
-	// 🛡️ Then secure directory + Vault Agent CA copy
 	if err := secureVaultTLSOwnership(); err != nil {
 		zap.L().Warn("could not apply secureVaultTLSOwnership", zap.Error(err))
 	}
@@ -277,40 +313,6 @@ func removeBadTLSCerts() error {
 		zap.L().Info("✅ Removed broken TLS cert file", zap.String("path", path))
 	}
 	return nil
-}
-
-func EnsureVaultTLS() (string, string, error) {
-	// Quick check if files exist
-	if !system.FileExists(shared.TLSKey) || !system.FileExists(shared.TLSCrt) {
-		zap.L().Warn("🔐 TLS certs missing — triggering generation")
-		if err := GenerateVaultTLSCert(); err != nil {
-			return "", "", fmt.Errorf("failed to generate Vault TLS certs: %w", err)
-		}
-		return shared.TLSCrt, shared.TLSKey, nil
-	}
-
-	// Extra: Inspect certificate for valid SANs
-	hasValidSAN, err := checkTLSCertForSAN(shared.TLSCrt)
-	if err != nil {
-		zap.L().Warn("⚠️ Could not inspect existing TLS cert, forcing regeneration", zap.Error(err))
-		_ = removeBadTLSCerts() // Best effort
-		if err := GenerateVaultTLSCert(); err != nil {
-			return "", "", fmt.Errorf("failed to generate Vault TLS certs after SAN check failure: %w", err)
-		}
-		return shared.TLSCrt, shared.TLSKey, nil
-	}
-
-	if !hasValidSAN {
-		zap.L().Warn("❌ Existing Vault TLS cert missing or invalid SANs — forcing regeneration")
-		_ = removeBadTLSCerts() // Best effort
-		if err := GenerateVaultTLSCert(); err != nil {
-			return "", "", fmt.Errorf("failed to regenerate Vault TLS cert with SANs: %w", err)
-		}
-		return shared.TLSCrt, shared.TLSKey, nil
-	}
-
-	zap.L().Info("✅ Vault TLS cert exists and SANs are valid", zap.String("crt", shared.TLSCrt))
-	return shared.TLSCrt, shared.TLSKey, nil
 }
 
 func tlsCertsExist() bool {

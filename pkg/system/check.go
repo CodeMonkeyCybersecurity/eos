@@ -81,7 +81,7 @@ func GetInternalHostname() string {
 
 // GetUbuntuCodename reads /etc/os-release and returns UBUNTU_CODENAME or VERSION_CODENAME
 func GetUbuntuCodename() string {
-	
+
 	file, _ := os.Open("/etc/os-release")
 	defer func() {
 		if err := file.Close(); err != nil {
