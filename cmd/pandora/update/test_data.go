@@ -30,7 +30,7 @@ var UpdateTestDataCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-update-test-data")
 
-		client, err := vault.EnsurePrivilegedVaultClient()
+		client, err := vault.GetVaultClient()
 		if err != nil {
 			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
 			client = nil

@@ -29,10 +29,12 @@ var DeleteTestDataCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-delete-test-data")
 
-		client, err := vault.EnsurePrivilegedVaultClient()
+		client, err := vault.GetVaultClient()
 		if err != nil {
-			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
-			return deleteTestDataFromDisk()
+			log.Warn("⚠️ Vault client unavailable", zap.Error(err))
+			client = nil // Will trigger fallback to disk
+		} else {
+			validateAndCache(client)
 		}
 
 		vault.SetVaultClient(client)

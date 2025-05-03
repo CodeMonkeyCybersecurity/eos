@@ -46,7 +46,7 @@ var VaultRefreshCmd = &cobra.Command{
 		if shouldUnseal {
 			log.Info("🔐 Attempting unseal because --unseal flag was provided")
 
-			client, err := vault.EnsureVaultClient()
+			client, err := vault.GetVaultClient()
 			if err != nil {
 				log.Error("❌ Failed to create Vault client", zap.Error(err))
 				return fmt.Errorf("vault client setup failed: %w", err)

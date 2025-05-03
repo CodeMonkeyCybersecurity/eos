@@ -27,9 +27,9 @@ attempts to upload it into Vault, and falls back to saving locally if Vault is u
 		log := ctx.Log.Named("pandora-create-test-data")
 		data := generateTestData()
 
-		client, err := vault.EnsurePrivilegedVaultClient()
+		client, err := vault.GetVaultClient()
 		if err != nil {
-			log.Warn("⚠️ Vault privileged client unavailable", zap.Error(err))
+			log.Warn("⚠️ Vault client unavailable", zap.Error(err))
 			client = nil // Will trigger fallback to disk
 		} else {
 			validateAndCache(client)

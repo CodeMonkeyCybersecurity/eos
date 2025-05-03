@@ -37,7 +37,6 @@ import (
 // Phase 2: Ensure Vault Environment and Directories
 //--------------------------------------------------------------------
 
-
 func PrepareEnvironment() error {
 	if _, err := EnsureVaultEnv(); err != nil {
 		return err
@@ -53,7 +52,6 @@ func PrepareEnvironment() error {
 	}
 	return nil
 }
-
 
 func EnsureVaultEnv() (string, error) {
 	const testTimeout = 500 * time.Millisecond

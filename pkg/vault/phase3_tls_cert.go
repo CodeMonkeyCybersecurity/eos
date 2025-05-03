@@ -43,8 +43,6 @@ import (
 
 // PHASE 3 — GenerateVaultTLSCert() + TrustVaultCA()
 
-
-
 func GenerateTLS() error {
 	zap.L().Info("📁 Starting full Vault TLS generation and trust setup")
 
@@ -67,7 +65,6 @@ func GenerateTLS() error {
 
 	return nil
 }
-
 
 func EnsureVaultTLS() (string, string, error) {
 	// Quick check if files exist
