@@ -19,6 +19,12 @@ import (
 
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
+		// Check command annotation: requires_shell (default false)
+		requiresShell := false
+		if cmd.Annotations != nil && cmd.Annotations["requires_shell"] == "true" {
+			requiresShell = true
+		}
+
 		// Initialize logger early
 		logger.InitializeWithFallback()
 		baseLog := logger.L()
@@ -29,7 +35,7 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		logger.SetLogger(baseLog)
 
 		// Run privilege elevation check early
-		if err := eosio.RequireEosUserOrReexec(baseLog); err != nil {
+		if err := eosio.RequireEosUserOrReexecWithShell(baseLog, requiresShell); err != nil {
 			baseLog.Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
