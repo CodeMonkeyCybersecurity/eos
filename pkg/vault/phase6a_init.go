@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -32,7 +31,6 @@ func InitializeVault() error {
 
 	return nil
 }
-
 
 // PhaseInitVaultOnly initializes Vault if not already initialized.
 func PhaseInitVault(client *api.Client) (*api.Client, error) {
@@ -59,11 +57,6 @@ func PhaseInitVault(client *api.Client) (*api.Client, error) {
 		zap.L().Warn("⚠️ Failed to persist Vault init result — printing keys to console")
 		fmt.Printf("\n\nUNSEAL KEYS:\n%v\n\nROOT TOKEN:\n%s\n\n", initRes.KeysB64, initRes.RootToken)
 		return nil, fmt.Errorf("save vault init result: %w", err)
-	}
-
-	// Strongly suggest user to manually confirm backup
-	if err := PromptToSaveVaultInitData(initRes); err != nil {
-		return nil, fmt.Errorf("user did not confirm backup: %w", err)
 	}
 
 	zap.L().Warn("⚠️ Vault is initialized but NOT unsealed yet")
@@ -113,23 +106,5 @@ func SaveInitResult(initRes *api.InitResponse) error {
 	}
 
 	zap.L().Info("💾 Vault init result saved securely", zap.String("path", path))
-	return nil
-}
-
-// PromptToSaveVaultInitData asks user to confirm that they have safely backed up unseal material.
-func PromptToSaveVaultInitData(init *api.InitResponse) error {
-	fmt.Println("\n⚠️  WARNING: This is the only time you will see these unseal keys and root token.")
-	fmt.Println("You MUST securely back them up. Losing them means permanent loss of access.")
-	fmt.Print("\nType 'yes' to confirm you have saved the keys somewhere safe: ")
-
-	var response string
-	if _, err := fmt.Scanln(&response); err != nil {
-		zap.L().Warn("Failed to read user input", zap.Error(err))
-	}
-	if strings.ToLower(strings.TrimSpace(response)) != "yes" {
-		return fmt.Errorf("user did not confirm secure storage of unseal material")
-	}
-
-	zap.L().Info("✅ User confirmed Vault init material backup")
 	return nil
 }

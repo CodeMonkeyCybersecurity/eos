@@ -75,10 +75,6 @@ func handleInitMaterial(initRes *api.InitResponse) error {
 	if len(initRes.Keys) == 0 || initRes.RootToken == "" {
 		return fmt.Errorf("invalid init result: missing keys or root token")
 	}
-
-	if err := PromptToSaveVaultInitData(initRes); err != nil {
-		return err
-	}
 	if err := ConfirmUnsealMaterialSaved(initRes); err != nil {
 		return err
 	}
