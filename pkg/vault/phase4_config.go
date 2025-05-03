@@ -16,6 +16,19 @@ import (
 // 4️⃣ Render, Write, Validate Vault Configuration vault.hcl
 //--------------------------------------------------------------------
 
+func WriteAndValidateConfig() error {
+	if err := PhaseEnsureVaultConfigExists(); err != nil {
+		return err
+	}
+	if err := PhasePatchVaultConfigIfNeeded(); err != nil {
+		return err
+	}
+	if err := ValidateVaultConfig(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // PhaseEnsureVaultConfigExists ensures that Vault's server config exists or writes a default.
 func PhaseEnsureVaultConfigExists() error {
 	zap.L().Info("📋 Checking if Vault config exists", zap.String("path", shared.VaultConfigPath))

@@ -1,4 +1,4 @@
-// pkg/vault/vault_lifecycle.go
+// pkg/vault/phase1_install.go
 
 package vault
 

@@ -37,6 +37,24 @@ import (
 // Phase 2: Ensure Vault Environment and Directories
 //--------------------------------------------------------------------
 
+
+func PrepareEnvironment() error {
+	if _, err := EnsureVaultEnv(); err != nil {
+		return err
+	}
+	if err := system.EnsureEosUser(true, false); err != nil {
+		return err
+	}
+	if err := EnsureVaultDirs(); err != nil {
+		return err
+	}
+	if err := PrepareVaultAgentEnvironment(); err != nil {
+		return err
+	}
+	return nil
+}
+
+
 func EnsureVaultEnv() (string, error) {
 	const testTimeout = 500 * time.Millisecond
 

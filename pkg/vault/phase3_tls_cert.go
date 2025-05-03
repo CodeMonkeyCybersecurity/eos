@@ -43,6 +43,32 @@ import (
 
 // PHASE 3 — GenerateVaultTLSCert() + TrustVaultCA()
 
+
+
+func GenerateTLS() error {
+	zap.L().Info("📁 Starting full Vault TLS generation and trust setup")
+
+	crt, key, err := EnsureVaultTLS()
+	if err != nil {
+		return fmt.Errorf("ensure vault TLS certs: %w", err)
+	}
+	zap.L().Info("✅ Vault TLS certs ensured", zap.String("key", key), zap.String("crt", crt))
+
+	if err := TrustVaultCA(); err != nil {
+		return fmt.Errorf("trust vault CA system-wide: %w", err)
+	}
+	zap.L().Info("✅ Vault CA trusted system-wide")
+
+	if err := secureVaultTLSOwnership(); err != nil {
+		return fmt.Errorf("secure Vault TLS ownership: %w", err)
+	}
+	zap.L().Info("✅ Vault Agent CA cert ensured")
+	zap.L().Info("✅ Vault TLS generation and trust setup complete")
+
+	return nil
+}
+
+
 func EnsureVaultTLS() (string, string, error) {
 	// Quick check if files exist
 	if !system.FileExists(shared.TLSKey) || !system.FileExists(shared.TLSCrt) {

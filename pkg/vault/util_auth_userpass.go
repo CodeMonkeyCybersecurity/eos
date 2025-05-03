@@ -17,11 +17,11 @@ func EnableVaultUserpass(ctx *eosio.RuntimeContext) error {
 		return fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	// 1. Enable userpass auth if needed
-	if err := EnsureAuthMethod(client, "userpass", "userpass/"); err != nil {
-		return fmt.Errorf("failed to enable userpass auth: %w", err)
+	// 1. Enable userpass and approle auth if needed
+	if err := EnsureVaultAuthMethods(client); err != nil {
+		return fmt.Errorf("failed to enable auth methods: %w", err)
 	}
-	zap.L().Info("✅ Userpass auth method enabled")
+	zap.L().Info("✅ Userpass and approle auth methods ensured")
 
 	// 2. Ensure eos-policy exists
 	if err := EnsurePolicy(client); err != nil {

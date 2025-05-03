@@ -1,8 +1,6 @@
-// pkg/vault/lifecycle2_enable.go
 package vault
 
 import (
-	"errors"
 	"fmt"
 	"os"
 
@@ -11,74 +9,6 @@ import (
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
-
-//--------------------------------------------------------------------
-// EOS Vault Enablement Lifecycle
-//
-// Phases:
-// 6a. Initialize Vault Only (InitializeVaultOnly)
-// 6b. Create Vault Client (CreateVaultClient)
-// 7.  Check Vault Health
-// 8.  Validate Root Token
-// 9.  Enable Auth Methods and Apply Policies
-// 10. Enable AppRole OR Userpass (Exclusive)
-// 11. Render Vault Agent Config
-// 12. Start Vault Agent and Validate
-//--------------------------------------------------------------------
-
-// InitializeVaultOnly()
-//  ├── EnsureVaultEnv()             [external]
-//  ├── CreateVaultClient()
-//  │    └── NewClient()            [external]
-//  ├── PhaseInitVaultOnly(client)  [external]
-//  └── VaultAddress()
-
-// CreateVaultClient()
-//  └── NewClient()                 [external]
-
-// VaultAddress()
-//  └── os.Getenv()
-
-// EnableVault(client, log, opts)
-//  ├── PhaseEnsureVaultHealthy()                 [external]
-//  ├── PhasePromptAndVerRootToken(client)        [external]
-//  ├── GetPrivilegedVaultClient()               [external]
-//  ├── PhaseEnableKVv2(client)                 [external]
-//  ├── PhaseEnableAppRole(client, log, opts)   [external, if opts.EnableAppRole]
-//  ├── PhaseEnableUserpass(client, log, opts)  [external, if opts.EnableUserpass]
-//  ├── EnsurePolicy(client)                    [external]
-//  ├── EnableFileAudit(client)                [external]
-//  ├── PhaseRenderVaultAgentConfig(client)    [external, if opts.EnableAgent]
-//  ├── PhaseStartVaultAgentAndValidate(client) [external, if opts.EnableAgent]
-//  ├── PhaseWriteBootstrapSecretAndRecheck(client) [external]
-//  └── PrintEnableNextSteps()
-
-// PrintEnableNextSteps()
-//  └── fmt.Println() calls
-
-func InitializeVaultOnly() (string, error) {
-	if _, err := EnsureVaultEnv(); err != nil {
-		return "", fmt.Errorf("ensure Vault environment: %w", err)
-	}
-
-	client, err := CreateVaultClient()
-	if err != nil {
-		return "", fmt.Errorf("create Vault client: %w", err)
-	}
-
-	client, err = PhaseInitVaultOnly(client)
-	if err != nil {
-		return "", fmt.Errorf("initialize Vault only: %w", err)
-	}
-	if client == nil {
-		return "", fmt.Errorf("vault client invalid after initialization; Vault server may be unreachable or misconfigured")
-	}
-
-	addr := VaultAddress()
-	zap.L().Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String(shared.VaultAddrEnv, addr))
-
-	return addr, nil
-}
 
 func CreateVaultClient() (*api.Client, error) {
 	return NewClient()
@@ -89,101 +19,64 @@ func VaultAddress() string {
 }
 
 func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error {
-	zap.L().Info("🚀 [Enable] Starting Vault enablement flow")
+	zap.L().Info("🚀 Starting Vault enablement flow")
 
-	// --- 1. Validate conflicting options
+	// Step 0: Initialize and unseal Vault if needed
+	unsealedClient, err := UnsealVault()
+	if err != nil {
+		return logger.LogErrAndWrap("initialize and unseal vault", err)
+	}
+	client = unsealedClient
+
+	// Step 1: Validate options
 	if opts.EnableAppRole && opts.EnableUserpass {
-		zap.L().Error("❌ Cannot enable both AppRole and Userpass authentication at the same time")
-		fmt.Println("\n🚫 You cannot enable both --approle and --userpass simultaneously.")
-		fmt.Println("\n👉 Please re-run with either --approle or --userpass, not both.")
-		return errors.New("conflicting authentication options: approle and userpass")
+		return fmt.Errorf("cannot enable both AppRole and Userpass authentication at the same time")
 	}
 
-	// --- 2. Ensure Vault server is healthy
-	zap.L().Info("🔍 [Phase 7/15] Checking Vault server health...")
-	if err := PhaseEnsureVaultHealthy(); err != nil {
-		return logger.LogErrAndWrap("vault health check", err)
+	// Step 2–4: Check health, root token, API client
+	steps := []struct {
+		name string
+		fn   func() error
+	}{
+		{"check vault health", PhaseEnsureVaultHealthy},
+		{"validate root token", func() error { return PhasePromptAndVerRootToken(client) }},
+		{"verify vault API client", func() error { _, err := GetPrivilegedVaultClient(); return err }},
 	}
-	zap.L().Info("✅ Vault server is healthy")
-
-	// --- 3. Prompt for and validate root token
-	zap.L().Info("🔑 [Phase 8/15] Validating Vault root token...")
-	if err := PhasePromptAndVerRootToken(client); err != nil {
-		return logger.LogErrAndWrap("validate root token", err)
+	for _, step := range steps {
+		zap.L().Info(fmt.Sprintf("🔍 %s...", step.name))
+		if err := step.fn(); err != nil {
+			return logger.LogErrAndWrap(step.name, err)
+		}
 	}
-	zap.L().Info("✅ Root token validated")
 
-	// --- 4. Confirm Vault API client is usable
-	zap.L().Info("🌐 [Phase 8A/12] Verifying Vault API client...")
-	if _, err := GetPrivilegedVaultClient(); err != nil {
-		return logger.LogErrAndWrap("verify vault api client", err)
-	}
-	zap.L().Info("✅ Vault API client is ready")
-
-	zap.L().Info("🔒 [Phase 9/15] Enabling KV v2 secret engine...")
+	// Step 5: Enable KV v2
 	if err := PhaseEnableKVv2(client); err != nil {
-		return logger.LogErrAndWrap("KV v2 secret engine", err)
-	}
-	zap.L().Info("✅ KV v2 secrets engine and base EOS policy configured")
-
-	// --- 5. Enable authentication method
-	approleReady := false
-
-	if opts.EnableAppRole {
-		zap.L().Info("🪪 [Phase 10/15] Enabling AppRole authentication...")
-		if err := PhaseEnableAppRole(client, log, opts.AppRoleOptions); err != nil {
-			return logger.LogErrAndWrap("enable approle", err)
-		}
-		zap.L().Info("✅ AppRole authentication enabled")
-		approleReady = true
+		return logger.LogErrAndWrap("enable KV v2", err)
 	}
 
-	if opts.EnableUserpass {
-		zap.L().Info("🧑‍💻 [Phase 10/15] Enabling Userpass authentication...")
-		if err := PhaseEnableUserpass(client, log, opts.Password); err != nil {
-			return logger.LogErrAndWrap("enable userpass", err)
-		}
-		zap.L().Info("✅ Userpass authentication enabled")
+	// Step 6: Enable authentication methods
+	if err := enableAuthMethods(client, log, opts); err != nil {
+		return err
 	}
 
-	// --- 6. Write core policies
-	zap.L().Info("📜 [Phase 11/15] Writing core Vault policies...")
+	// Step 7: Write core policies
 	if err := EnsurePolicy(client); err != nil {
 		return logger.LogErrAndWrap("write policies", err)
 	}
-	zap.L().Info("✅ Vault core policies written")
 
-	// --- 7. Enable audit backend
-	zap.L().Info("🪵 [Phase 12/15] Enabling Vault audit logging...")
+	// Step 8: Enable audit backend
 	if err := EnableFileAudit(client); err != nil {
-		return logger.LogErrAndWrap("enable audit logging", err)
+		return logger.LogErrAndWrap("enable audit backend", err)
 	}
-	zap.L().Info("✅ Vault audit backend enabled")
 
-	// --- 8. Render and start Vault Agent (if selected)
+	// Step 9: Optional agent setup
 	if opts.EnableAgent {
-		if !approleReady {
-			zap.L().Error("❌ Vault Agent requires AppRole authentication to be enabled first")
-			fmt.Println("\n🚫 Vault Agent cannot be enabled without AppRole authentication.")
-			fmt.Println("\n👉 Please re-run with --approle or skip --agent.")
-			return errors.New("vault agent requires approle")
+		if err := setupVaultAgent(client, opts); err != nil {
+			return err
 		}
-
-		zap.L().Info("🤖 [Phase 13/15] Rendering Vault Agent configuration...")
-		if err := PhaseRenderVaultAgentConfig(client); err != nil {
-			return logger.LogErrAndWrap("render vault agent config", err)
-		}
-		zap.L().Info("✅ Vault Agent config rendered")
-
-		zap.L().Info("🚀 [Phase 14/15] Starting Vault Agent and validating...")
-		if err := PhaseStartVaultAgentAndValidate(client); err != nil {
-			return logger.LogErrAndWrap("start vault agent", err)
-		}
-		zap.L().Info("✅ Vault Agent running and token validated")
 	}
 
-	// --- 9. Apply core secrets and perform final health check
-	zap.L().Info("🔐 [Phase 15/15] Applying core secrets and verifying readiness...")
+	// Step 10: Apply core secrets and verify readiness
 	if err := PhaseWriteBootstrapSecretAndRecheck(client); err != nil {
 		return logger.LogErrAndWrap("apply core secrets", err)
 	}
@@ -193,12 +86,36 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 	return nil
 }
 
-// PrintEnableNextSteps prints final user instructions after enabling Vault.
+func enableAuthMethods(client *api.Client, log *zap.Logger, opts EnableOptions) error {
+	if opts.EnableAppRole {
+		if err := PhaseEnableAppRole(client, log, opts.AppRoleOptions); err != nil {
+			return logger.LogErrAndWrap("enable AppRole", err)
+		}
+	}
+	if opts.EnableUserpass {
+		if err := PhaseEnableUserpass(client, log, opts.Password); err != nil {
+			return logger.LogErrAndWrap("enable Userpass", err)
+		}
+	}
+	return nil
+}
+
+func setupVaultAgent(client *api.Client, opts EnableOptions) error {
+	if !opts.EnableAppRole {
+		return fmt.Errorf("vault Agent requires AppRole authentication")
+	}
+	if err := PhaseRenderVaultAgentConfig(client); err != nil {
+		return logger.LogErrAndWrap("render Vault Agent config", err)
+	}
+	if err := PhaseStartVaultAgentAndValidate(client); err != nil {
+		return logger.LogErrAndWrap("start Vault Agent", err)
+	}
+	return nil
+}
+
 func PrintEnableNextSteps() {
-	fmt.Println("")
-	fmt.Println("🔔 Vault setup is now complete!")
+	fmt.Println("\n🔔 Vault setup is now complete!")
 	fmt.Println("👉 Next steps:")
 	fmt.Println("   1. Run: eos secure vault   (to finalize hardening and cleanup)")
 	fmt.Println("   2. Optionally onboard new users, configure roles, or deploy agents.")
-	fmt.Println("")
 }

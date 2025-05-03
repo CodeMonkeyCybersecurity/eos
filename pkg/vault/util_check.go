@@ -1,5 +1,3 @@
-// pkg/vault/util_checker.go
-
 package vault
 
 import (
@@ -16,216 +14,121 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
-// Check performs a full sanity check on Vault health, binary installation,
-// initialization status, seal status, and KV functionality.
-// It returns a CheckReport summarizing the findings.
 func Check(client *api.Client, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
 	report := &shared.CheckReport{}
 
-	// 1️⃣ Environment sanity
-	addr := os.Getenv(shared.VaultAddrEnv)
-	if addr == "" {
-		zap.L().Error("❌ VAULT_ADDR not set")
-		report.Notes = append(report.Notes, "VAULT_ADDR environment variable not set")
-		return report, nil
+	// 1️⃣ Check VAULT_ADDR
+	if os.Getenv(shared.VaultAddrEnv) == "" {
+		return failReport(report, "VAULT_ADDR environment variable not set")
 	}
 
-	// 2️⃣ HTTP liveness probe
-	healthy, err := CheckVaultHealth()
-	if err != nil || !healthy {
-		zap.L().Warn("🔌 Vault health check failed",
-			zap.String(shared.VaultAddrEnv, addr),
-			zap.Error(err))
-		report.Notes = append(report.Notes, fmt.Sprintf("Vault health check failed: %v", err))
-		return report, nil
+	// 2️⃣ Check Vault health
+	if healthy, err := CheckVaultHealth(); err != nil || !healthy {
+		return failReport(report, fmt.Sprintf("Vault health check failed: %v", err))
 	}
-	zap.L().Info("✅ Vault HTTP health probe passed")
 
-	// 3️⃣ Vault binary check
+	// 3️⃣ Check vault binary
 	if !isInstalled() {
-		zap.L().Warn("Vault binary not found in PATH")
-		report.Notes = append(report.Notes, "Vault binary not installed or not found in $PATH")
-		return report, nil
+		return failReport(report, "Vault binary not installed or not found in $PATH")
 	}
 	report.Installed = true
 
-	// 4️⃣ Recover Vault client if nil
+	// 4️⃣ Ensure client
 	if client == nil {
-		zap.L().Info("ℹ️ Vault client was nil, creating new client")
-		newClient, err := NewClient()
+		c, err := NewClient()
 		if err != nil {
-			zap.L().Warn("Failed to create Vault client", zap.Error(err))
-			report.Notes = append(report.Notes, "Could not initialize Vault client")
-			return report, nil
+			return failReport(report, "Could not initialize Vault client")
 		}
-		client = newClient
+		client = c
 	}
 
-	// 5️⃣ Initialization check
-	report.Initialized, err = IsVaultInitialized(client)
-	if err != nil {
-		zap.L().Warn("Vault initialization status check failed", zap.Error(err))
-		report.Notes = append(report.Notes, fmt.Sprintf("Vault init check failed: %v", err))
-		return report, client
+	// 5️⃣ Check initialized & sealed
+	if ok, err := IsVaultInitialized(client); err == nil {
+		report.Initialized = ok
+	} else {
+		return failReport(report, fmt.Sprintf("Vault init check failed: %v", err))
 	}
-
-	// 6️⃣ Seal check
 	report.Sealed = IsVaultSealed(client)
 	if report.Sealed {
-		zap.L().Warn("🔒 Vault is currently sealed")
 		report.Notes = append(report.Notes, "Vault is sealed")
-	} else {
-		zap.L().Info("✅ Vault is unsealed and accessible")
 	}
 
-	// 7️⃣ KV test
+	// 6️⃣ Test KV
 	if err := testKVSecret(client); err != nil {
-		zap.L().Warn("❌ KV secret test failed", zap.Error(err))
 		report.Notes = append(report.Notes, fmt.Sprintf("KV test failed: %v", err))
 	} else {
 		report.KVWorking = true
-		zap.L().Info("✅ KV secret test passed")
 	}
 
-	// 8️⃣ (Optional) Vault secrets verification
-	if len(storedHashes) > 0 && hashedRoot != "" {
-		zap.L().Info("🔐 Checking unseal keys and root token against stored hashes")
-		if verifyVaultSecrets(storedHashes, hashedRoot) {
-			zap.L().Info("✅ Vault secret verification succeeded")
-		} else {
-			zap.L().Warn("❌ Vault secret verification failed")
-			report.Notes = append(report.Notes, "Vault secret mismatch or verification failed")
-		}
+	// 7️⃣ Verify secrets
+	if len(storedHashes) > 0 && hashedRoot != "" && !verifyVaultSecrets(storedHashes, hashedRoot) {
+		report.Notes = append(report.Notes, "Vault secret mismatch or verification failed")
 	}
 
-	// ✅ Final report
 	return report, client
+}
+
+func failReport(r *shared.CheckReport, msg string) (*shared.CheckReport, *api.Client) {
+	zap.L().Warn(msg)
+	r.Notes = append(r.Notes, msg)
+	return r, nil
 }
 
 func verifyVaultSecrets(storedHashes []string, hashedRoot string) bool {
 	keys, root, err := PromptOrRecallUnsealKeys()
-	if err != nil {
-		zap.L().Warn("Failed to prompt for unseal keys and root", zap.Error(err))
+	if err != nil || !crypto.AllUnique(keys) {
 		return false
 	}
-	if !crypto.AllUnique(keys) {
-		zap.L().Warn("Duplicate unseal keys detected")
-		return false
-	}
-	hashedInputs := crypto.HashStrings(keys)
-	if !crypto.AllHashesPresent(hashedInputs, storedHashes) {
-		zap.L().Warn("Unseal keys mismatch")
-		return false
-	}
-	if crypto.HashString(root) != hashedRoot {
-		zap.L().Warn("Root token mismatch")
-		return false
-	}
-	return true
+	return crypto.AllHashesPresent(crypto.HashStrings(keys), storedHashes) &&
+		crypto.HashString(root) == hashedRoot
 }
 
 func isInstalled() bool {
 	_, err := exec.LookPath("vault")
-	if err != nil {
-		zap.L().Warn("Vault binary not found in PATH", zap.Error(err))
-		return false
-	}
-	zap.L().Info("✅ Vault binary found in PATH")
-	return true
+	return err == nil
 }
 
-// InitializeVault(client *api.Client) (VaultInitResponse, error)
 func IsVaultInitialized(client *api.Client) (bool, error) {
-	if client == nil {
-		return false, fmt.Errorf("vault client is nil")
-	}
 	status, err := client.Sys().Health()
-	if err != nil {
-		zap.L().Warn("Failed to query Vault health", zap.Error(err))
-		return false, err
-	}
-	zap.L().Info("Vault health check complete", zap.Bool("initialized", status.Initialized), zap.Bool("sealed", status.Sealed))
-	return status.Initialized, nil
+	return err == nil && status.Initialized, err
 }
 
-// isVaultSealed checks if Vault is sealed and logs the result.
 func IsVaultSealed(client *api.Client) bool {
-	health, err := client.Sys().Health()
-	if err != nil {
-		zap.L().Warn("Unable to determine Vault sealed state", zap.Error(err))
-		return false // fail-open assumption
-	}
-	zap.L().Debug("Vault sealed check complete", zap.Bool("sealed", health.Sealed))
-	return health.Sealed
+	status, err := client.Sys().Health()
+	return err == nil && status.Sealed
 }
 
-// TestKVSecret writes and reads a test secret from the KV engine.
 func testKVSecret(client *api.Client) error {
-	zap.L().Info("📝 Writing test secret to Vault...")
-
 	kv := client.KVv2("secret")
-
 	if _, err := kv.Put(context.Background(), shared.TestKVPath, map[string]interface{}{shared.TestKVKey: shared.TestKVValue}); err != nil {
-		zap.L().Error("Failed to write test secret", zap.String("path", shared.TestKVPath), zap.Error(err))
-		return fmt.Errorf("failed to write test secret: %w", err)
+		return err
 	}
-
-	secret, err := kv.Get(context.Background(), shared.TestKVPath)
-	if err != nil {
-		zap.L().Error("Failed to read test secret", zap.String("path", shared.TestKVPath), zap.Error(err))
-		return fmt.Errorf("failed to read test secret: %w", err)
-	}
-
-	value := secret.Data[shared.TestKVKey]
-	zap.L().Info("✅ Test secret read successful", zap.String("path", shared.TestKVPath), zap.Any("value", value))
-	return nil
+	_, err := kv.Get(context.Background(), shared.TestKVPath)
+	return err
 }
 
-// CheckVaultSecrets prompts the user for unseal keys + root token, validates them.
 func CheckVaultSecrets() {
-	zap.L().Info("🔐 Prompting user to verify unseal keys and root token...")
-
-	// Ask the user to re-enter 3 unseal keys and the root token
 	keys, root, err := PromptOrRecallUnsealKeys()
-	if err != nil {
-		zap.L().Warn("Failed to recall or prompt for secrets", zap.Error(err))
-		fmt.Println("❌ Vault secret check aborted.")
+	if err != nil || !crypto.AllUnique(keys) {
+		fmt.Println("❌ Secret check aborted or invalid keys")
 		return
 	}
-
-	// Prevent duplicated keys
-	if !crypto.AllUnique(keys) {
-		zap.L().Warn("Duplicate unseal keys detected")
-		fmt.Println("❌ Please ensure you enter 3 unique keys.")
-		return
-	}
-
-	// Load previously stored reference values
 	storedHashes, hashedRoot, err := rememberBootstrapHashes()
 	if err != nil {
-		zap.L().Warn("Failed to load stored Vault bootstrap hashes", zap.Error(err))
 		fmt.Println("❌ Unable to verify unseal keys — no trusted reference available.")
 		return
 	}
-
-	// Hash and compare
-	hashedInputs := crypto.HashStrings(keys)
-	if !crypto.AllHashesPresent(hashedInputs, storedHashes) || crypto.HashString(root) != hashedRoot {
-		zap.L().Warn("Entered secrets did not match stored hashes")
+	if crypto.AllHashesPresent(crypto.HashStrings(keys), storedHashes) && crypto.HashString(root) == hashedRoot {
+		fmt.Println("✅ Unseal keys and root token verified.")
+	} else {
 		fmt.Println("❌ Secrets do not match known trusted values.")
-		return
 	}
-
-	zap.L().Info("✅ Vault secrets verified successfully")
-	fmt.Println("✅ Unseal keys and root token verified.")
 }
 
-// IsAlreadyInitialized returns true if the error indicates Vault is already initialized.
 func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }
 
-// ListVault returns keys under a path in Vault's secret KV engine.
 func ListVault(path string) ([]string, error) {
 	client, err := GetPrivilegedVaultClient()
 	if err != nil {
@@ -235,10 +138,7 @@ func ListVault(path string) ([]string, error) {
 	if err != nil || list == nil {
 		return nil, err
 	}
-	rawKeys, ok := list.Data["keys"].([]interface{})
-	if !ok {
-		return nil, fmt.Errorf("unexpected format for Vault list keys")
-	}
+	rawKeys, _ := list.Data["keys"].([]interface{})
 	keys := make([]string, len(rawKeys))
 	for i, k := range rawKeys {
 		keys[i] = fmt.Sprintf("%v", k)
@@ -247,56 +147,32 @@ func ListVault(path string) ([]string, error) {
 }
 
 func CheckVaultAgentService() error {
-	zap.L().Info("Checking Vault Agent systemd service", zap.String("service", shared.VaultAgentService))
-
-	cmd := exec.Command( "systemctl", "is-active", "--quiet", shared.VaultAgentService)
-	if err := cmd.Run(); err != nil {
-		zap.L().Error("Vault Agent service inactive", zap.Error(err))
-		return fmt.Errorf("vault agent service is not running")
-	}
-
-	zap.L().Info("Vault Agent service is active")
-	return nil
+	return exec.Command("systemctl", "is-active", "--quiet", shared.VaultAgentService).Run()
 }
 
 func CheckVaultTokenFile() error {
-	zap.L().Info("Checking Vault Agent token file", zap.String("path", shared.VaultAgentTokenPath))
-
 	if _, err := os.Stat(shared.VaultAgentTokenPath); os.IsNotExist(err) {
-		zap.L().Error("Vault token file missing", zap.String("path", shared.VaultAgentTokenPath))
 		return fmt.Errorf("vault token file not found at %s", shared.VaultAgentTokenPath)
 	}
-
-	zap.L().Info("Vault token file exists", zap.String("path", shared.VaultAgentTokenPath))
 	return nil
 }
 
 func RunVaultTestQuery() error {
-	zap.L().Info("Running test query using Vault Agent token", zap.String("path", shared.TestKVPath))
-
-	cmd := exec.Command( "vault", "kv", "get", "-format=json", shared.TestKVPath)
+	cmd := exec.Command("vault", "kv", "get", "-format=json", shared.TestKVPath)
 	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		zap.L().Error("Vault test query failed", zap.ByteString("output", output), zap.Error(err))
-		return fmt.Errorf("vault test query failed: %w", err)
-	}
-
-	zap.L().Info("Vault test query succeeded", zap.ByteString("response", output))
-	return nil
+	return cmd.Run()
 }
 
 func EnsureVaultReady() (*api.Client, error) {
 	client, err := NewClient()
 	if err != nil {
-		return nil, fmt.Errorf("vault client error: %w", err)
+		return nil, err
 	}
-
-	// Call SetupVault to initialize/unseal Vault.
-	client, _, err = SetupVault(client)
-	if err != nil {
-		return nil, fmt.Errorf("vault not ready: %w", err)
+	if err := probeVaultHealthUntilReady(client); err == nil {
+		return client, nil
+	}
+	if err := recoverVaultHealth(client); err != nil {
+		return nil, fmt.Errorf("vault recovery failed: %w", err)
 	}
 	return client, nil
 }

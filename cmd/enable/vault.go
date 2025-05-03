@@ -5,7 +5,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -19,24 +18,17 @@ AppRole auth, Vault Agent, and API client connectivity.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("cmd/enable/vault")
 
-		addr, err := vault.InitializeVaultOnly()
+		// Step 1: Get client
+		client, err := vault.CreateVaultClient()
 		if err != nil {
-			return logger.LogErrAndWrap("create vault: initialize", err)
+			return logger.LogErrAndWrap("create vault client", err)
 		}
 
-		log.Info("✅ Vault initialized", zap.String(shared.VaultAddrEnv, addr))
-
-		zap.L().Info("🔌 [Phase7] Connecting to Vault server and checking health...")
-		client, err := vault.EnsureVaultReady()
-		if err != nil {
-			return logger.LogErrAndWrap("connect vault", err)
-		}
-
-		// Fill out EnableOptions for lifecycle orchestration
+		// Step 2: Fill EnableOptions
 		opts := vault.EnableOpts
-		opts.AppRoleOptions = vault.DefaultAppRoleOptions() // You could make this user-customizable later if needed
+		opts.AppRoleOptions = vault.DefaultAppRoleOptions()
 
-		zap.L().Info("🛠️ [Phase8+] Enabling selected Vault components...")
+		// Step 3: Run lifecycle orchestration
 		if err := vault.EnableVault(client, log, opts); err != nil {
 			return logger.LogErrAndWrap("enable vault", err)
 		}

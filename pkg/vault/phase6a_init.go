@@ -19,8 +19,23 @@ import (
 // 6a️⃣ Initialize Vault (only — no unseal yet)
 //--------------------------------------------------------------------
 
+func InitializeVault() error {
+	client, err := CreateVaultClient()
+	if err != nil {
+		return fmt.Errorf("create Vault client: %w", err)
+	}
+
+	_, err = PhaseInitVault(client)
+	if err != nil {
+		return fmt.Errorf("initialize Vault: %w", err)
+	}
+
+	return nil
+}
+
+
 // PhaseInitVaultOnly initializes Vault if not already initialized.
-func PhaseInitVaultOnly(client *api.Client) (*api.Client, error) {
+func PhaseInitVault(client *api.Client) (*api.Client, error) {
 	zap.L().Info("🚀 Phase 6a/6: Initialize Vault (only, no unseal)")
 
 	status, err := client.Sys().InitStatus()

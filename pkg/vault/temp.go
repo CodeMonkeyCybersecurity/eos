@@ -3,13 +3,10 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -160,137 +157,28 @@ func PrepareVaultDirsAndConfig(distro string) (string, string, string, error) {
 	return configDir, configFile, vaultAddr, nil
 }
 
-// PhaseEnsureClientHealthy makes sure we can reach a healthy Vault
-// instance, and if not, attempts init / unseal flows automatically.
-func PhaseEnsureClientHealthy() error {
-	zap.L().Info("[4/6] Ensuring Vault client is available and healthy")
-
-	//--------------------------------------------------------------------
-	// 0. Fast‑path: is something already listening on 8179 as eos/vault?
-	//--------------------------------------------------------------------
-	if out, _ := exec.Command( "lsof", "-i", shared.VaultDefaultPort).Output(); len(out) > 0 {
-		zap.L().Info("📡 Detected process on port 8179",
-			zap.String("output", string(out)))
-
-		for _, line := range strings.Split(string(out), "\n") {
-			if strings.Contains(line, "vault") && strings.Contains(line, shared.EosUser) {
-				zap.L().Info("✅ Vault already running as 'eos' – skipping health loop")
-				return nil
-			}
-		}
-		zap.L().Info("ℹ️ Port 8179 is in use (but not vault:eos) – continuing with SDK check")
-	}
-
-	//--------------------------------------------------------------------
-	// 1.  Sanity: VAULT_ADDR and binary
-	//--------------------------------------------------------------------
-	if _, err := EnsureVaultEnv(); err != nil {
-		return fmt.Errorf("could not determine Vault address: %w", err)
-	}
-	if _, err := exec.LookPath("vault"); err != nil {
-		return fmt.Errorf("vault binary not installed or not in $PATH")
-	}
-
-	//--------------------------------------------------------------------
-	// 2.  Health‑check / bootstrap loop (max 5 attempts)
-	//--------------------------------------------------------------------
-	client, err := NewClient()
-	if err != nil {
-		return fmt.Errorf("failed to create Vault client: %w", err)
-	}
-
-	for attempt := 1; attempt <= 5; attempt++ {
-		zap.L().Info("🔁 Vault health probe",
-			zap.Int("attempt", attempt))
-
-		ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		resp, err := client.Sys().HealthWithContext(ctx)
-		cancel() // no defer inside the loop
-
-		if err != nil {
-			zap.L().Warn("🔌 Health request failed – retrying",
-				zap.Error(err))
-			time.Sleep(shared.VaultRetryDelay)
-			continue
-		}
-
-		switch {
-		case resp.Initialized && !resp.Sealed && !resp.Standby: // healthy & unsealed
-			zap.L().Info("✅ Vault is initialised and unsealed",
-				zap.String("version", resp.Version))
-			return nil
-
-		case !resp.Initialized: // not initialised
-			zap.L().Info("ℹ️ Vault reports uninitialised (501) – running init flow")
-			if err := initAndUnseal(client); err != nil {
-				return fmt.Errorf("init/unseal failed: %w", err)
-			}
-			return nil
-
-		case resp.Initialized && resp.Sealed:
-			zap.L().Info("🔒 Vault reports sealed (503) – attempting auto‑unseal")
-			if err := MustUnseal(client); err != nil {
-				zap.L().Error("❌ Auto-unseal failed", zap.Error(err))
-				return fmt.Errorf("auto-unseal failed: %w", err)
-			}
-			// Verify unseal succeeded
-			status, err := client.Sys().SealStatus()
-			if err != nil {
-				return fmt.Errorf("post-unseal status check failed: %w", err)
-			}
-			if status.Sealed {
-				return fmt.Errorf("vault still sealed after unseal attempt")
-			}
-			zap.L().Info("✅ Vault successfully unsealed via fallback")
-			return nil
-
-		case resp.Standby: // standby
-			zap.L().Info("🟡 Vault is in standby – treating as healthy for CLI")
-			return nil
-
-		default:
-			zap.L().Warn("⚠️ Unexpected health state",
-				zap.Any("response", resp))
-			time.Sleep(shared.VaultRetryDelay)
-			return err
-		}
-	}
-	return fmt.Errorf("vault not healthy after multiple attempts")
-}
-
 func EnsureVaultAuthEnabled(client *api.Client, method, path string) error {
-	existing, err := client.Sys().ListAuth()
-	if err != nil {
-		return err
-	}
-	if _, ok := existing[path]; ok {
-		return nil
-	}
-	return client.Sys().EnableAuthWithOptions(strings.TrimSuffix(path, "/"), &api.EnableAuthOptions{Type: method})
-}
-
-func EnsureVaultAuthMethods(client *api.Client) error {
-	if err := EnsureAuthMethod(client, "userpass", "userpass/"); err != nil {
-		return err
-	}
-	if err := EnsureAuthMethod(client, "approle", "approle/"); err != nil {
-		return err
-	}
-	return nil
-}
-
-func EnsureAuthMethod(client *api.Client, methodType, mountPath string) error {
 	existing, err := client.Sys().ListAuth()
 	if err != nil {
 		return fmt.Errorf("failed to list Vault auth methods: %w", err)
 	}
-
-	if _, ok := existing[mountPath]; ok {
+	if _, ok := existing[path]; ok {
 		return nil // Already enabled
 	}
-
 	return client.Sys().EnableAuthWithOptions(
-		strings.TrimSuffix(mountPath, "/"),
-		&api.EnableAuthOptions{Type: methodType},
+		strings.TrimSuffix(path, "/"),
+		&api.EnableAuthOptions{Type: method},
 	)
+}
+
+func EnsureVaultAuthMethods(client *api.Client) error {
+	for _, m := range []struct{ Type, Path string }{
+		{"userpass", "userpass/"},
+		{"approle", "approle/"},
+	} {
+		if err := EnsureVaultAuthEnabled(client, m.Type, m.Path); err != nil {
+			return err
+		}
+	}
+	return nil
 }
