@@ -29,10 +29,10 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 	}
 
 	if currentUser.Username == shared.EosID {
-		return nil // Already running as eos
+		log.Info("👤 Already running as 'eos' user; no escalation needed")
+		return nil
 	}
 
-	log.Info("🔐 Elevating to 'eos' user via sudo")
 	binaryPath, err := os.Executable()
 	if err != nil {
 		log.Error("Failed to get current binary path", zap.Error(err))
@@ -40,14 +40,33 @@ func RequireEosUserOrReexec(log *zap.Logger) error {
 	}
 	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
 	cmd := exec.Command("sudo", fullArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	var stdoutBuf, stderrBuf strings.Builder
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
 
-	if err := cmd.Run(); err != nil {
-		log.Error("sudo failed", zap.Error(err))
+	cmdStr := fmt.Sprintf("sudo -u %s %s %s", shared.EosID, binaryPath, strings.Join(os.Args[1:], " "))
+	log.Info("🔐 Preparing sudo escalation",
+		zap.String("cmd", cmdStr),
+		zap.Strings("args", cmd.Args),
+		zap.String("PATH", os.Getenv("PATH")),
+		zap.String("SHELL", os.Getenv("SHELL")),
+	)
+
+	err = cmd.Run()
+	log.Info("🔐 sudo stdout", zap.String("stdout", stdoutBuf.String()))
+	log.Info("🔐 sudo stderr", zap.String("stderr", stderrBuf.String()))
+
+	if err != nil {
+		log.Error("❌ sudo failed",
+			zap.Error(err),
+			zap.String("cmd", cmdStr),
+			zap.String("stdout", stdoutBuf.String()),
+			zap.String("stderr", stderrBuf.String()),
+		)
 		return err
 	}
 
+	log.Info("✅ sudo escalation succeeded; exiting parent process")
 	os.Exit(0) // Successful re-exec; prevent further execution
 	return nil
 }
