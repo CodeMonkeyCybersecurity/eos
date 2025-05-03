@@ -249,7 +249,7 @@ func ListVault(path string, log *zap.Logger) ([]string, error) {
 func CheckVaultAgentService(log *zap.Logger) error {
 	log.Info("Checking Vault Agent systemd service", zap.String("service", shared.VaultAgentService))
 
-	cmd := exec.Command("systemctl", "is-active", "--quiet", shared.VaultAgentService)
+	cmd := exec.Command("sudo", "systemctl", "is-active", "--quiet", shared.VaultAgentService)
 	if err := cmd.Run(); err != nil {
 		log.Error("Vault Agent service inactive", zap.Error(err))
 		return fmt.Errorf("vault agent service is not running")
@@ -274,7 +274,7 @@ func CheckVaultTokenFile(log *zap.Logger) error {
 func RunVaultTestQuery(log *zap.Logger) error {
 	log.Info("Running test query using Vault Agent token", zap.String("path", shared.TestKVPath))
 
-	cmd := exec.Command("vault", "kv", "get", "-format=json", shared.TestKVPath)
+	cmd := exec.Command("sudo", "vault", "kv", "get", "-format=json", shared.TestKVPath)
 	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
 
 	output, err := cmd.CombinedOutput()

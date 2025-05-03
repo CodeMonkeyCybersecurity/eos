@@ -142,7 +142,7 @@ func recoverVaultHealth(client *api.Client, log *zap.Logger) error {
 // isVaultProcessRunning checks if a Vault process is active and bound to the expected TCP port.
 // Linux-only: relies on lsof syntax.
 func isVaultProcessRunning(log *zap.Logger) bool {
-	out, err := exec.Command("lsof", "-i", shared.VaultDefaultPort).Output()
+	out, err := exec.Command("sudo", "lsof", "-i", shared.VaultDefaultPort).Output()
 	if err != nil {
 		log.Warn("⚠️ lsof command failed (process check skipped)", zap.Error(err))
 		return false

@@ -71,7 +71,7 @@ func PromptLDAPDetails(log *zap.Logger) (*LDAPConfig, error) {
 
 func DownloadAndPlaceCert(fqdn string, log *zap.Logger) error {
 
-	cmd := exec.Command("bash", "-c", fmt.Sprintf(
+	cmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf(
 		`echo -n | openssl s_client -connect %s:636 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /etc/wazuh-indexer/opensearch-security/ldapcacert.pem`,
 		fqdn,
 	))
@@ -246,7 +246,7 @@ func PatchRolesMappingYML(cfg *LDAPConfig, log *zap.Logger) error {
 func RunSecurityAdmin(filename string, log *zap.Logger) error {
 	path := filepath.Join("/etc/wazuh-indexer/opensearch-security", filename)
 
-	cmd := exec.Command("bash", "-c", fmt.Sprintf(
+	cmd := exec.Command("sudo", "bash", "-c", fmt.Sprintf(
 		`export JAVA_HOME=/usr/share/wazuh-indexer/jdk/ && bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f %s -icl -key /etc/wazuh-indexer/certs/admin-key.pem -cert /etc/wazuh-indexer/certs/admin.pem -cacert /etc/wazuh-indexer/certs/root-ca.pem -h 127.0.0.1 -nhnv`,
 		path,
 	))
@@ -256,7 +256,7 @@ func RunSecurityAdmin(filename string, log *zap.Logger) error {
 }
 
 func RestartDashboard(log *zap.Logger) error {
-	cmd := exec.Command("systemctl", "restart", "wazuh-dashboard")
+	cmd := exec.Command("sudo", "systemctl", "restart", "wazuh-dashboard")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

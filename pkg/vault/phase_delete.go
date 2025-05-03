@@ -85,10 +85,10 @@ func Purge(distro string, log *zap.Logger) (removed []string, errs map[string]er
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	if err := exec.CommandContext(ctx, "systemctl", "daemon-reexec").Run(); err != nil {
+	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reexec").Run(); err != nil {
 		log.Warn("⚠️ Failed daemon-reexec", zap.Error(err))
 	}
-	if err := exec.CommandContext(ctx, "systemctl", "daemon-reload").Run(); err != nil {
+	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reload").Run(); err != nil {
 		log.Warn("⚠️ Failed daemon-reload", zap.Error(err))
 	}
 

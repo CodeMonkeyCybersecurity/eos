@@ -59,7 +59,7 @@ func init() {
 // disableSystemdTargets disables suspend and hibernate targets
 func disableSystemdTargets() error {
 	fmt.Println("🔧 Disabling suspend.target and hibernate.target...")
-	cmd := exec.Command("systemctl", "disable", "suspend.target", "hibernate.target")
+	cmd := exec.Command("sudo", "systemctl", "disable", "suspend.target", "hibernate.target")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -68,7 +68,7 @@ func disableSystemdTargets() error {
 // maskSleepTargets masks system sleep targets
 func maskSleepTargets() error {
 	fmt.Println("🔧 Masking sleep.target, suspend.target, hibernate.target...")
-	cmd := exec.Command("systemctl", "mask", "sleep.target", "suspend.target", "hibernate.target")
+	cmd := exec.Command("sudo", "systemctl", "mask", "sleep.target", "suspend.target", "hibernate.target")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -121,12 +121,12 @@ func disableLogindSleep() error {
 	fmt.Println("🔄 Reloading systemd daemon and restarting systemd-logind...")
 
 	// Reload systemd to apply changes
-	if err := exec.Command("systemctl", "daemon-reexec").Run(); err != nil {
+	if err := exec.Command("sudo", "systemctl", "daemon-reexec").Run(); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w", err)
 	}
 
 	// Restart logind to pick up the config changes
-	if err := exec.Command("systemctl", "restart", "systemd-logind").Run(); err != nil {
+	if err := exec.Command("sudo", "systemctl", "restart", "systemd-logind").Run(); err != nil {
 		return fmt.Errorf("failed to restart systemd-logind: %w", err)
 	}
 

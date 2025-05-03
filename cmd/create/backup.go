@@ -89,7 +89,7 @@ func ensureResticInstalled() error {
 // generateSSHKeys generates SSH keys for accessing the backup server
 func generateSSHKeys() error {
 	// You may want to add checks to avoid overwriting existing keys.
-	cmd := exec.Command("ssh-keygen", "-q", "-N", "", "-f", "/home/eos_user/.ssh/id_rsa")
+	cmd := exec.Command("sudo", "ssh-keygen", "-q", "-N", "", "-f", "/home/eos_user/.ssh/id_rsa")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -98,7 +98,7 @@ func generateSSHKeys() error {
 // copySSHKeys copies the generated SSH keys to the backup server
 func copySSHKeys() error {
 	// Use standard "user@host" syntax; adjust if needed.
-	cmd := exec.Command("ssh-copy-id", "eos_user@backup")
+	cmd := exec.Command("sudo", "ssh-copy-id", "eos_user@backup")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -107,7 +107,7 @@ func copySSHKeys() error {
 // initializeResticRepo initializes the Restic repository
 func initializeResticRepo() error {
 	repoPath := fmt.Sprintf("sftp:eos_user@backup:/srv/restic-repos/%s", hostname())
-	cmd := exec.Command("restic", "-r", repoPath, "init")
+	cmd := exec.Command("sudo", "restic", "-r", repoPath, "init")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -119,6 +119,7 @@ func performResticBackup() error {
 	password := getResticPassword()
 
 	cmd := exec.Command(
+		"sudo",
 		"restic", "-r", repoPath,
 		"--password-file=/home/eos_user/.restic-password",
 		"--verbose", "backup",

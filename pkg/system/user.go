@@ -18,7 +18,7 @@ import (
 
 // SetPassword sets the Linux user's password using chpasswd.
 func SetPassword(username, password string) error {
-	cmd := exec.Command("chpasswd")
+	cmd := exec.Command("sudo", "chpasswd")
 	cmd.Stdin = strings.NewReader(fmt.Sprintf("%s:%s", username, password))
 	return cmd.Run()
 }
@@ -31,12 +31,12 @@ func SecretsExist() bool {
 
 // UserExists checks if a Linux user exists.
 func UserExists(name string) bool {
-	return exec.Command("id", name).Run() == nil
+	return exec.Command("sudo", "id", name).Run() == nil
 }
 
 // GetUserShell returns the shell configured for the given user.
 func GetUserShell(username string) (string, error) {
-	cmd := exec.Command("getent", "passwd", username)
+	cmd := exec.Command("sudo", "getent", "passwd", username)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get shell for user '%s': %w", username, err)

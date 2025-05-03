@@ -36,7 +36,7 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 		for _, c := range cmds {
 			fmt.Printf("🔧 Executing: %s\n", c)
 			if !dryRun {
-				cmd := exec.Command("bash", "-c", c)
+				cmd := exec.Command("sudo", "bash", "-c", c)
 				cmd.Stdout = cmd.Stderr
 				if err := cmd.Run(); err != nil {
 					return fmt.Errorf("failed to run command: %s: %w", c, err)

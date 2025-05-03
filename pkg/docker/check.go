@@ -10,7 +10,7 @@ import (
 
 // CheckDockerContainers runs "docker ps" and logs its output.
 func CheckDockerContainers() error {
-	cmd := exec.Command("docker", "ps")
+	cmd := exec.Command("sudo", "docker", "ps")
 	output, err := cmd.CombinedOutput()
 	fmt.Println(string(output)) // Still prints to terminal for visibility
 

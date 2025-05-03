@@ -73,7 +73,7 @@ func installOsquery(log *zap.Logger, arch string) error {
 	}
 
 	log.Info("Saving GPG key to /etc/apt/keyrings/osquery.asc")
-	teeCmd := exec.Command("tee", "/etc/apt/keyrings/osquery.asc")
+	teeCmd := exec.Command("sudo", "tee", "/etc/apt/keyrings/osquery.asc")
 	teeCmd.Stdin = &curlOutput
 	teeCmd.Stdout = os.Stdout
 	teeCmd.Stderr = os.Stderr
@@ -88,12 +88,12 @@ func installOsquery(log *zap.Logger, arch string) error {
 	}
 
 	log.Info("Updating APT cache...")
-	if err := execute.Execute("apt", "update"); err != nil {
+	if err := execute.Execute("sudo", "apt", "update"); err != nil {
 		return fmt.Errorf("apt update: %w", err)
 	}
 
 	log.Info("Installing osquery...")
-	if err := execute.Execute("apt", "install", "-y", "osquery"); err != nil {
+	if err := execute.Execute("sudo", "apt", "install", "-y", "osquery"); err != nil {
 		return fmt.Errorf("apt install: %w", err)
 	}
 

@@ -1,3 +1,5 @@
+// cmd/delete/vault.go
+
 package delete
 
 import (
@@ -29,7 +31,7 @@ var DeleteVaultCmd = &cobra.Command{
 		}
 
 		// Kill Vault processes if any
-		run("pkill", "-f", "vault server")
+		run("sudo", "pkill", "-f", "vault server")
 
 		// Remove Vault depending on platform
 		switch distro {

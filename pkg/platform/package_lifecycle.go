@@ -6,7 +6,6 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -58,17 +57,19 @@ func runDnfWithRetry(pkgName string) error {
 	if ctx.Err() == context.DeadlineExceeded {
 		log.Warn("DNF timed out. Running mirror recovery...")
 
-		if err := exec.Command("dnf", "clean", "all").Run(); err != nil {
-			log.Warn("Failed to clean DNF cache", zap.Error(err))
+		if err := exec.Command("sudo", "dnf", "clean", "all").Run(); err != nil {
+			log.Error("Failed to clean DNF cache", zap.Error(err))
+			return err
 		}
-		makecache := exec.Command("dnf", "--setopt=timeout=10", "--setopt=retries=0", "--setopt=fastestmirror=True", "makecache")
+
+		makecache := exec.Command("sudo", "dnf", "--setopt=timeout=10", "--setopt=retries=0", "--setopt=fastestmirror=True", "makecache")
 		if out, err := makecache.CombinedOutput(); err != nil {
 			log.Error("DNF makecache failed", zap.ByteString("output", out), zap.Error(err))
 			return err
 		}
 
 		log.Info("Retrying DNF install")
-		retryCmd := exec.Command("dnf", args...)
+		retryCmd := exec.Command("sudo", append([]string{"dnf"}, args...)...)
 		retryOut, retryErr := retryCmd.CombinedOutput()
 		if retryErr != nil {
 			log.Error("Retry failed", zap.ByteString("output", retryOut), zap.Error(retryErr))
@@ -84,12 +85,13 @@ func runDnfWithRetry(pkgName string) error {
 	return err
 }
 
-func runAndLog(cmd, shell string, shellArg string) error {
+func runAndLog(cmd string, shell string, shellArg string) error {
 	log := logger.GetLogger()
 	log.Info("Running update command", zap.String("cmd", cmd))
-	err := execute.ExecuteAndLog(shell, shellArg, cmd)
+	execCmd := exec.Command(shell, shellArg, cmd)
+	out, err := execCmd.CombinedOutput()
 	if err != nil {
-		log.Error("Update command failed", zap.Error(err))
+		log.Error("Update command failed", zap.Error(err), zap.ByteString("output", out))
 	}
 	return err
 }

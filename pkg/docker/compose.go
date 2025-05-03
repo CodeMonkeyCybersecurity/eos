@@ -15,53 +15,37 @@ import (
 // in the docker compose file ("docker-compose.yml") and uncomments every line (removes a leading '#')
 // until reaching the line that contains "# <- finish". It returns an error if something goes wrong.
 func UncommentSegment(segmentComment string) error {
-	dockerComposePath := "docker-compose.yml" // Always use this file.
-
+	dockerComposePath := "docker-compose.yml"
 	inputFile, err := os.Open(dockerComposePath)
 	if err != nil {
 		return fmt.Errorf("failed to open file %s: %w", dockerComposePath, err)
 	}
-	// Defer a closure that checks the error return from Close.
 	defer func() {
-		if err := inputFile.Close(); err != nil {
-			// Optionally, log or print this error.
-			fmt.Fprintf(os.Stderr, "failed to close input file: %v\n", err)
+		if cerr := inputFile.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "failed to close input file: %v\n", cerr)
 		}
 	}()
 
 	var lines []string
 	scanner := bufio.NewScanner(inputFile)
 	uncommenting := false
+	re := regexp.MustCompile(`^(\s*)#\s*(.*)$`) // compile once
 
 	for scanner.Scan() {
 		line := scanner.Text()
-
-		// If the line contains the start marker, start uncommenting.
 		if strings.Contains(line, segmentComment) {
 			uncommenting = true
 		}
-
-		// If the line contains the finish marker, then do not uncomment it; instead, leave it intact
-		// (or you can choose to remove it entirely) and stop uncommenting.
 		if uncommenting && strings.Contains(line, "<- finish") {
-			lines = append(lines, line) // Append finish marker as is.
+			lines = append(lines, line)
 			uncommenting = false
-			continue // Skip further processing for this line.
+			continue
 		}
-
-		// If we are in uncommenting mode, remove a leading '#' if present.
-		if uncommenting {
-			// Remove only the first '#' after any leading whitespace.
-			// We can use a simple regex here to ensure we preserve indentation and any dash.
-			re := regexp.MustCompile(`^(\s*)#\s*(.*)$`)
-			if re.MatchString(line) {
-				line = re.ReplaceAllString(line, "$1$2")
-			}
+		if uncommenting && re.MatchString(line) {
+			line = re.ReplaceAllString(line, "$1$2")
 		}
-
 		lines = append(lines, line)
 	}
-
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading file %s: %w", dockerComposePath, err)
 	}
@@ -70,42 +54,34 @@ func UncommentSegment(segmentComment string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file for writing %s: %w", dockerComposePath, err)
 	}
-	// Defer a closure that checks the error return from Close.
 	defer func() {
-		if err := outputFile.Close(); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to close output file: %v\n", err)
+		if cerr := outputFile.Close(); cerr != nil {
+			fmt.Fprintf(os.Stderr, "failed to close output file: %v\n", cerr)
 		}
 	}()
 
 	for _, l := range lines {
-		_, _ = fmt.Fprintln(outputFile, l)
+		if _, err := fmt.Fprintln(outputFile, l); err != nil {
+			return fmt.Errorf("failed writing to file %s: %w", dockerComposePath, err)
+		}
 	}
 
 	return nil
 }
 
-//
-//---------------------------- COMPOSE YML FUNCTIONS ---------------------------- //
-//
 
-// RunDockerComposeService starts a specific service from a docker-compose file
 // RunDockerComposeAllServices starts a specific service from a docker-compose file.
 func RunDockerComposeAllServices(composeFile, service string) error {
-
-	// Build arguments for the compose command.
 	args := []string{"-f", composeFile, "up", "-d"}
 	cmd, err := GetDockerComposeCmd(args...)
 	if err != nil {
 		return err
 	}
-
 	output, err := cmd.CombinedOutput()
-	fmt.Println(string(output)) // Print logs to console
-
+	fmt.Println(string(output))
 	if err != nil {
 		return fmt.Errorf("docker-compose up failed: %s", output)
 	}
-
 	return nil
 }
 
@@ -113,15 +89,13 @@ func RunDockerComposeAllServices(composeFile, service string) error {
 // It first checks for "docker-compose". If not found, it falls back to "docker compose".
 // The provided args should include the subcommands (e.g. "-f", "docker-compose.yaml", "up", "-d").
 func GetDockerComposeCmd(args ...string) (*exec.Cmd, error) {
-	// Check for the old docker-compose binary.
 	if _, err := exec.LookPath("docker-compose"); err == nil {
-		return exec.Command("docker-compose", args...), nil
+		fullArgs := append([]string{"docker-compose"}, args...)
+		return exec.Command("sudo", fullArgs...), nil
 	}
-	// Fallback to "docker compose" (as two separate tokens).
 	if _, err := exec.LookPath("docker"); err == nil {
-		// Prepend "compose" as the first argument.
-		newArgs := append([]string{"compose"}, args...)
-		return exec.Command("docker", newArgs...), nil
+		fullArgs := append([]string{"compose"}, args...)
+		return exec.Command("docker", fullArgs...), nil
 	}
 	return nil, fmt.Errorf("neither docker-compose nor docker CLI with compose plugin found in PATH")
 }

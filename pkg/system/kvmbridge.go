@@ -53,7 +53,7 @@ func ConfigureKVMBridge() error {
 		return fmt.Errorf("failed to write netplan bridge config: %w", err)
 	}
 
-	cmd := exec.Command("netplan", "apply")
+	cmd := exec.Command("sudo", "netplan", "apply")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to apply netplan config: %w\nOutput: %s", err, string(out))
 	}
@@ -63,7 +63,7 @@ func ConfigureKVMBridge() error {
 }
 
 func detectDefaultInterface() (string, error) {
-	cmd := exec.Command("ip", "route", "show", "default")
+	cmd := exec.Command("sudo", "ip", "route", "show", "default")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
@@ -85,7 +85,7 @@ func backupNetplanConfigs() error {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	cmd := exec.Command("cp", "-r", "/etc/netplan/.", backupDir)
+	cmd := exec.Command("sudo", "cp", "-r", "/etc/netplan/.", backupDir)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to back up Netplan configs: %w\nOutput: %s", err, string(out))
 	}

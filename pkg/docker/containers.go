@@ -17,7 +17,7 @@ import (
 // StopContainersBySubstring stops all containers whose names contain the given substring.
 func StopContainersBySubstring(substring string) error {
 	// Run "docker ps" with a filter for the substring.
-	out, err := exec.Command("docker", "ps", "--filter", "name="+substring, "--format", "{{.Names}}").Output()
+	out, err := exec.Command("sudo", "docker", "ps", "--filter", "name="+substring, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
 	}
@@ -46,7 +46,7 @@ func StopContainersBySubstring(substring string) error {
 // StopContainer checks if a container with the given name is running, and stops it if it is.
 func StopContainer(containerName string) error {
 	// Run "docker ps" to check if the container is running.
-	out, err := exec.Command("docker", "ps", "--filter", "name="+containerName, "--format", "{{.Names}}").Output()
+	out, err := exec.Command("sudo", "docker", "ps", "--filter", "name="+containerName, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
 	}

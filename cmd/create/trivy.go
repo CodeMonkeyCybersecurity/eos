@@ -28,7 +28,7 @@ func installTrivy(ctx *eos.RuntimeContext, cmd *cobra.Command, args []string) er
 	wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - && 
 	echo "deb https://aquasecurity.github.io/trivy-repo/deb stable main" > /etc/apt/sources.list.d/trivy.list
 	`
-	if err := exec.Command("bash", "-c", addRepoCmd).Run(); err != nil {
+	if err := exec.Command("sudo", "bash", "-c", addRepoCmd).Run(); err != nil {
 		log.Error("❌ Failed to add Trivy APT repo", zap.Error(err))
 		return fmt.Errorf("failed to add Trivy repository: %w", err)
 	}

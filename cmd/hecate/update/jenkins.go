@@ -51,7 +51,7 @@ Usage:
 
 		// Redeploy Hecate via docker-compose up -d
 		fmt.Println("Redeploying Hecate using docker-compose up -d...")
-		cmdDocker := exec.Command("docker-compose", "up", "-d")
+		cmdDocker := exec.Command("sudo", "docker compose", "up", "-d")
 		cmdDocker.Stdout = os.Stdout
 		cmdDocker.Stderr = os.Stderr
 		if err := cmdDocker.Run(); err != nil {
