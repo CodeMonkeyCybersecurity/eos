@@ -12,6 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// ErrAlreadyEos is returned when escalation is skipped because the process is already running as 'eos'.
+var ErrAlreadyEos = errors.New("already running as eos user")
 var ErrEosReexecCompleted = errors.New("re-execution completed, parent exiting")
 
 const (
@@ -20,15 +22,11 @@ const (
 	SudoCmd   = "sudo"
 )
 
-func RequireEosUserOrReexec(log *zap.Logger) error {
-	return requireEosUserOrReexec(log, false)
-}
-
 func RequireEosUserOrReexecWithShell(log *zap.Logger, requiresShell bool) error {
-	return requireEosUserOrReexec(log, requiresShell)
+	return RequireEosUserOrReexec(log, requiresShell)
 }
 
-func requireEosUserOrReexec(log *zap.Logger, withShell bool) error {
+func RequireEosUserOrReexec(log *zap.Logger, withShell bool) error {
 	if log == nil {
 		return fmt.Errorf("logger is nil; initialize logger before calling RequireEosUserOrReexec")
 	}
@@ -42,7 +40,7 @@ func requireEosUserOrReexec(log *zap.Logger, withShell bool) error {
 	}
 	if isEos {
 		log.Info("👤 Already running as 'eos' user; skipping sudo escalation")
-		return nil
+		return ErrAlreadyEos
 	}
 
 	cmd, cmdStr, err := buildSudoCommand(withShell)
@@ -96,4 +94,13 @@ func GetInvokedUsername() (string, error) {
 		return "", err
 	}
 	return u.Username, nil
+}
+
+// CanSudoToEos runs a dry-run check: sudo -u eos true.
+func CanSudoToEos() (bool, error) {
+	cmd := exec.Command(SudoCmd, "-u", shared.EosID, "true")
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("sudo dry-run failed: %w", err)
+	}
+	return true, nil
 }

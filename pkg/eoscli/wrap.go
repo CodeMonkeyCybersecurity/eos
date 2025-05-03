@@ -31,12 +31,22 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		log := baseLog.With(zap.String("invoked_by", invokedBy))
 		logger.SetLogger(log)
 
+		if ok, checkErr := eosio.CanSudoToEos(); checkErr != nil || !ok {
+			log.Warn("⚠️ sudo dry-run check for 'eos' user failed",
+				zap.Error(checkErr),
+				zap.Bool("can_sudo", ok),
+				zap.String("hint", "verify 'eos ALL=(ALL) NOPASSWD: ALL' or at least 'sudo -u eos true' works"))
+		}
+
 		if err := eosio.RequireEosUserOrReexecWithShell(log, cmd.Annotations[RequiresShellAnnotation] == "true"); err != nil {
-			if err == eosio.ErrEosReexecCompleted {
+			if err == eosio.ErrAlreadyEos {
+				log.Info("👤 Already running as 'eos'; continuing without escalation")
+			} else if err == eosio.ErrEosReexecCompleted {
 				return nil // stop upstream; process already exited
+			} else {
+				log.Error("❌ Privilege check failed; see earlier sudo error logs", zap.Error(err))
+				return fmt.Errorf("privilege check failed: %w", err)
 			}
-			log.Error("❌ Privilege check failed", zap.Error(err))
-			return fmt.Errorf("privilege check failed: %w", err)
 		}
 
 		const timeout = 1 * time.Minute
