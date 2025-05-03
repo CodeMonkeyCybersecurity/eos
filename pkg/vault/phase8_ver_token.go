@@ -1,58 +1,73 @@
-// pkg/vault/phase8_validate_root_token.go
-
 package vault
 
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
-//--------------------------------------------------------------------
-// 8. Prompt and Validate Root Token
-//--------------------------------------------------------------------
-
-// PHASE 8 — PhasePromptAndVerRootToken()
-//          └── PromptRootToken()
-//          └── VerRootToken()
-//          └── SetVaultToken()
-
-// PhasePromptAndVerRootToken prompts for root token, validates it, and sets it on client.
+// PhasePromptAndVerRootToken runs a fallback auth cascade and sets the token.
 func PhasePromptAndVerRootToken(client *api.Client) error {
-	zap.L().Info("🔑 [Phase 8] Prompting and validating Vault root token")
+	zap.L().Info("🔑 [Phase 8] Starting Vault authentication fallback cascade")
 
-	token, err := PromptRootToken()
+	// 1. Try agent token
+	if token, err := tryAgentToken(client); err == nil && verifyToken(client, token) {
+		SetVaultToken(client, token)
+		zap.L().Info("✅ Authenticated via agent token")
+		return nil
+	} else {
+		zap.L().Warn("⚠️ Agent token failed", zap.Error(err))
+	}
+
+	// 2. Try AppRole
+	if token, err := tryAppRole(client); err == nil && verifyToken(client, token) {
+		SetVaultToken(client, token)
+		zap.L().Info("✅ Authenticated via AppRole")
+		return nil
+	} else {
+		zap.L().Warn("⚠️ AppRole auth failed", zap.Error(err))
+	}
+
+	// 3. Try reading token from file
+	if token, err := tryTokenFile(client); err == nil && verifyToken(client, token) {
+		SetVaultToken(client, token)
+		zap.L().Info("✅ Authenticated via token file")
+		return nil
+	} else {
+		zap.L().Warn("⚠️ Token file auth failed", zap.Error(err))
+	}
+
+	// 4. Prompt user for root token
+	token, err := promptRootToken(client)
 	if err != nil {
 		return fmt.Errorf("prompt root token: %w", err)
 	}
-
-	if err := VerRootToken(client, token); err != nil {
+	if err := VerifyRootToken(client, token); err != nil {
 		return fmt.Errorf("validate root token: %w", err)
 	}
-
 	SetVaultToken(client, token)
 	zap.L().Info("✅ Root token validated and applied")
+
 	return nil
 }
 
-// PromptRootToken requests the root token from the user.
-func PromptRootToken() (string, error) {
-	zap.L().Info("🔑 Please enter the Vault root token")
-	tokens, err := interaction.PromptSecrets("Root Token", 1)
+// recoverVaultHealth handles unseal or init if Vault is sealed or uninitialized.
+func recoverVaultHealth(client *api.Client) error {
+	status, err := client.Sys().Health()
 	if err != nil {
-		return "", err
+		return fmt.Errorf("vault health API call failed: %w", err)
 	}
-	return tokens[0], nil
-}
 
-// VerRootToken checks if the root token is valid via a simple self-lookup.
-func VerRootToken(client *api.Client, token string) error {
-	client.SetToken(token)
-	secret, err := client.Auth().Token().LookupSelf()
-	if err != nil || secret == nil {
-		return fmt.Errorf("token validation failed: %w", err)
+	switch {
+	case !status.Initialized:
+		zap.L().Info("💥 Vault uninitialized — running init + unseal flow")
+		_, err := UnsealVault()
+		return err
+	case status.Sealed:
+		zap.L().Info("🔒 Vault sealed — attempting fallback unseal")
+		return MustUnseal(client)
+	default:
+		return fmt.Errorf("unexpected vault state: initialized=%v sealed=%v", status.Initialized, status.Sealed)
 	}
-	return nil
 }

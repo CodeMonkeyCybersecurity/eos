@@ -35,8 +35,9 @@ func PhaseEnsureVaultHealthy() error {
 		return nil
 	}
 
-	zap.L().Warn("⚠️ Vault did not become healthy after retries — attempting recovery")
-	return recoverVaultHealth(client)
+	// Removed recovery logic; Phase 8 will handle recovery
+	zap.L().Warn("⚠️ Vault did not become healthy after retries; escalate to phase 8")
+	return err
 }
 
 func probeVaultHealthUntilReady(client *api.Client) error {
@@ -51,17 +52,12 @@ func probeVaultHealthUntilReady(client *api.Client) error {
 		}
 
 		if !status.Initialized {
-			zap.L().Info("ℹ️ Vault uninitialized — running init + unseal flow")
-			_, err := UnsealVault()
-			return err
+			return fmt.Errorf("vault uninitialized; defer to phase 8")
 		}
 		if status.Initialized && status.Sealed {
-			zap.L().Info("🔒 Vault sealed — attempting auto-unseal")
-			if err := MustUnseal(client); err != nil {
-				return fmt.Errorf("auto-unseal failed: %w", err)
-			}
-			return nil
+			return fmt.Errorf("vault sealed; defer to phase 8")
 		}
+
 		if !status.Sealed && !status.Standby {
 			return nil
 		}
@@ -96,25 +92,6 @@ func CheckVaultHealth() (bool, error) {
 	default:
 		body, _ := io.ReadAll(resp.Body)
 		return false, fmt.Errorf("unexpected vault health: %s", body)
-	}
-}
-
-func recoverVaultHealth(client *api.Client) error {
-	status, err := client.Sys().Health()
-	if err != nil {
-		return fmt.Errorf("vault health API call failed: %w", err)
-	}
-
-	switch {
-	case !status.Initialized:
-		zap.L().Info("💥 Vault uninitialized — running init + unseal flow")
-		_, err := UnsealVault()
-		return err
-	case status.Sealed:
-		zap.L().Info("🔒 Vault sealed — attempting fallback unseal")
-		return MustUnseal(client)
-	default:
-		return fmt.Errorf("unexpected vault state: initialized=%v sealed=%v", status.Initialized, status.Sealed)
 	}
 }
 

@@ -63,7 +63,7 @@ var SecureVaultCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("vault-agent token check failed: %w", err)
 		}
-		if err := vault.VerRootToken(client, token); err != nil {
+		if err := vault.VerifyRootToken(client, token); err != nil {
 			return fmt.Errorf("invalid Vault agent token: %w", err)
 		}
 		vault.SetVaultToken(client, token)
