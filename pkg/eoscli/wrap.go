@@ -15,11 +15,8 @@ import (
 
 const RequiresShellAnnotation = "requires_shell"
 
-// Wrap wraps a Cobra command handler with EOS runtime setup.
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
-	return func(cmd *cobra.Command, args []string) error {
-		requiresShell := cmd.Annotations[RequiresShellAnnotation] == "true"
-
+	return func(cmd *cobra.Command, args []string) (errExec error) {
 		logger.InitializeWithFallback()
 		baseLog := logger.L()
 		if baseLog == nil {
@@ -34,7 +31,10 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		log := baseLog.With(zap.String("invoked_by", invokedBy))
 		logger.SetLogger(log)
 
-		if err := eosio.RequireEosUserOrReexecWithShell(log, requiresShell); err != nil {
+		if err := eosio.RequireEosUserOrReexecWithShell(log, cmd.Annotations[RequiresShellAnnotation] == "true"); err != nil {
+			if err == eosio.ErrEosReexecCompleted {
+				return nil // stop upstream; process already exited
+			}
 			log.Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
@@ -53,8 +53,11 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		}
 		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
-		var errExec error
 		defer func() {
+			if r := recover(); r != nil {
+				log.Error("❌ Command panicked", zap.Any("recover", r))
+				errExec = fmt.Errorf("command panicked: %v", r)
+			}
 			duration := time.Since(start)
 			logger.LogCommandLifecycle(cmd.Name())(&errExec)
 			if errExec != nil {

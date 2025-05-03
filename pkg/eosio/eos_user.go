@@ -1,6 +1,7 @@
 package eosio
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,23 +12,23 @@ import (
 	"go.uber.org/zap"
 )
 
+var ErrEosReexecCompleted = errors.New("re-execution completed, parent exiting")
+
 const (
 	TmpPrefix = "/tmp/"
 	BashCmd   = "bash"
 	SudoCmd   = "sudo"
 )
 
-// RequireEosUserOrReexec ensures the current process runs as the 'eos' system user.
 func RequireEosUserOrReexec(log *zap.Logger) error {
-	return requireEosUserOrReexecInternal(log, false)
+	return requireEosUserOrReexec(log, false)
 }
 
-// RequireEosUserOrReexecWithShell ensures the process runs as 'eos', optionally using bash -c.
 func RequireEosUserOrReexecWithShell(log *zap.Logger, requiresShell bool) error {
-	return requireEosUserOrReexecInternal(log, requiresShell)
+	return requireEosUserOrReexec(log, requiresShell)
 }
 
-func requireEosUserOrReexecInternal(log *zap.Logger, withShell bool) error {
+func requireEosUserOrReexec(log *zap.Logger, withShell bool) error {
 	if log == nil {
 		return fmt.Errorf("logger is nil; initialize logger before calling RequireEosUserOrReexec")
 	}
@@ -36,31 +37,33 @@ func requireEosUserOrReexecInternal(log *zap.Logger, withShell bool) error {
 	}
 	isEos, err := IsRunningAsEos()
 	if err != nil {
-		log.Error("Failed to detect current user", zap.Error(err))
-		return err
+		return fmt.Errorf("detecting current user failed: %w", err)
 	}
 	if isEos {
 		log.Debug("Already running as eos user, skipping escalation")
 		return nil
 	}
+
 	cmd, cmdStr, err := buildSudoCommand(withShell)
 	if err != nil {
-		log.Error("Failed to build sudo command", zap.Error(err))
-		return err
+		return fmt.Errorf("building sudo command failed: %w", err)
 	}
 	log.Info("🔐 Elevating to 'eos' user", zap.String("command", cmdStr))
 
 	output, err := cmd.CombinedOutput()
+	trimmed := strings.TrimSpace(string(output))
 	if err != nil {
 		log.Error("sudo escalation failed",
 			zap.Error(err),
-			zap.ByteString("output", output),
+			zap.String("output", trimmed),
 			zap.String("command", cmdStr),
 			zap.String("hint", "check sudoers NOPASSWD and eos shell in /etc/passwd"))
-		return fmt.Errorf("sudo escalation failed: %w", err)
+		return fmt.Errorf("sudo escalation failed: %w; output: %s", err, trimmed)
 	}
+
 	log.Info("✅ Re-execution under 'eos' succeeded")
-	return fmt.Errorf("re-execution completed, parent exiting")
+	os.Exit(0)
+	return ErrEosReexecCompleted
 }
 
 func buildSudoCommand(withShell bool) (*exec.Cmd, string, error) {
@@ -71,13 +74,14 @@ func buildSudoCommand(withShell bool) (*exec.Cmd, string, error) {
 	if withShell {
 		args := strings.Join(os.Args[1:], " ")
 		cmdStr := fmt.Sprintf("%s %s", binaryPath, args)
-		return exec.Command(SudoCmd, "-u", shared.EosID, BashCmd, "-c", cmdStr), fmt.Sprintf("sudo -u %s bash -c '%s'", shared.EosID, cmdStr), nil
+		return exec.Command(SudoCmd, "-u", shared.EosID, BashCmd, "-c", cmdStr),
+			fmt.Sprintf("sudo -u %s bash -c '%s'", shared.EosID, cmdStr), nil
 	}
 	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
-	return exec.Command(SudoCmd, fullArgs...), fmt.Sprintf("sudo -u %s %s %s", shared.EosID, binaryPath, strings.Join(os.Args[1:], " ")), nil
+	return exec.Command(SudoCmd, fullArgs...),
+		fmt.Sprintf("sudo -u %s %s %s", shared.EosID, binaryPath, strings.Join(os.Args[1:], " ")), nil
 }
 
-// IsRunningAsEos returns true if the current process runs as the 'eos' user.
 func IsRunningAsEos() (bool, error) {
 	u, err := user.Current()
 	if err != nil {
@@ -86,7 +90,6 @@ func IsRunningAsEos() (bool, error) {
 	return u.Username == shared.EosID, nil
 }
 
-// GetInvokedUsername returns the current username or an error.
 func GetInvokedUsername() (string, error) {
 	u, err := user.Current()
 	if err != nil {
