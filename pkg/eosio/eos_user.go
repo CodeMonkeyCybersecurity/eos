@@ -1,5 +1,3 @@
-// pkg/eosio/eos_user.go
-
 package eosio
 
 import (
@@ -13,99 +11,86 @@ import (
 	"go.uber.org/zap"
 )
 
-// RequireEosUserOrReexec ensures the current process is running as the 'eos' system user.
-// If not, it attempts to re-execute the current binary using 'sudo -u eos ...'.
+const (
+	TmpPrefix = "/tmp/"
+	BashCmd   = "bash"
+	SudoCmd   = "sudo"
+)
+
+// RequireEosUserOrReexec ensures the current process runs as the 'eos' system user.
 func RequireEosUserOrReexec(log *zap.Logger) error {
-	if log == nil {
-		return fmt.Errorf("logger not initialized before RequireEosUserOrReexec")
-	}
-
-	if strings.HasPrefix(os.Args[0], "/tmp/") {
-		log.Error("🛑 Cannot escalate with `go run`. Use `go build -o eos`.")
-		return fmt.Errorf("binary path %s is not suitable for sudo", os.Args[0])
-	}
-
-	currentUser, err := user.Current()
-	if err != nil {
-		log.Error("Failed to detect current user", zap.Error(err))
-		return err
-	}
-
-	if currentUser.Username == shared.EosID {
-		return nil // Already running as eos
-	}
-
-	log.Info("🔐 Elevating to 'eos' user via sudo")
-	binaryPath, err := os.Executable()
-	if err != nil {
-		log.Error("Failed to get current binary path", zap.Error(err))
-		return err
-	}
-
-	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
-	cmd := exec.Command("sudo", fullArgs...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		log.Error("sudo failed", zap.Error(err))
-		return err
-	}
-
-	os.Exit(0) // Successful re-exec
-	return nil
+	return requireEosUserOrReexecInternal(log, false)
 }
 
+// RequireEosUserOrReexecWithShell ensures the process runs as 'eos', optionally using bash -c.
 func RequireEosUserOrReexecWithShell(log *zap.Logger, requiresShell bool) error {
-	if requiresShell {
-		return RequireEosUserOrReexecWithBashC(log)
-	}
-	return RequireEosUserOrReexec(log)
+	return requireEosUserOrReexecInternal(log, requiresShell)
 }
 
-// RequireEosUserOrReexecWithBashC elevates the current process as 'eos' user
-// and wraps the command in a bash -c shell.
-func RequireEosUserOrReexecWithBashC(log *zap.Logger) error {
+func requireEosUserOrReexecInternal(log *zap.Logger, withShell bool) error {
 	if log == nil {
-		return fmt.Errorf("logger not initialized before RequireEosUserOrReexecWithBashC")
+		return fmt.Errorf("logger is nil; initialize logger before calling RequireEosUserOrReexec")
 	}
-
-	if strings.HasPrefix(os.Args[0], "/tmp/") {
-		log.Error("🛑 Cannot escalate with `go run`. Use `go build -o eos`.")
-		return fmt.Errorf("binary path %s is not suitable for sudo", os.Args[0])
+	if strings.HasPrefix(os.Args[0], TmpPrefix) {
+		return fmt.Errorf("🛑 Cannot escalate with `go run`. Use `go build -o eos`")
 	}
-
-	currentUser, err := user.Current()
+	isEos, err := IsRunningAsEos()
 	if err != nil {
 		log.Error("Failed to detect current user", zap.Error(err))
 		return err
 	}
-
-	if currentUser.Username == shared.EosID {
-		return nil // Already running as eos
+	if isEos {
+		log.Debug("Already running as eos user, skipping escalation")
+		return nil
 	}
+	cmd, cmdStr, err := buildSudoCommand(withShell)
+	if err != nil {
+		log.Error("Failed to build sudo command", zap.Error(err))
+		return err
+	}
+	log.Info("🔐 Elevating to 'eos' user", zap.String("command", cmdStr))
 
-	log.Info("🔐 Elevating to 'eos' user via sudo bash -c")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		log.Error("sudo escalation failed",
+			zap.Error(err),
+			zap.ByteString("output", output),
+			zap.String("command", cmdStr),
+			zap.String("hint", "check sudoers NOPASSWD and eos shell in /etc/passwd"))
+		return fmt.Errorf("sudo escalation failed: %w", err)
+	}
+	log.Info("✅ Re-execution under 'eos' succeeded")
+	return fmt.Errorf("re-execution completed, parent exiting")
+}
+
+func buildSudoCommand(withShell bool) (*exec.Cmd, string, error) {
 	binaryPath, err := os.Executable()
 	if err != nil {
-		log.Error("Failed to get current binary path", zap.Error(err))
-		return err
+		return nil, "", fmt.Errorf("failed to get executable path: %w", err)
 	}
-
-	// Reconstruct command string
-	args := strings.Join(os.Args[1:], " ")
-	fullCommand := fmt.Sprintf("%s %s", binaryPath, args)
-
-	// Build sudo command with bash -c
-	cmd := exec.Command("sudo", "-u", shared.EosID, "bash", "-c", fullCommand)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	if err := cmd.Run(); err != nil {
-		log.Error("sudo bash -c failed", zap.Error(err))
-		return err
+	if withShell {
+		args := strings.Join(os.Args[1:], " ")
+		cmdStr := fmt.Sprintf("%s %s", binaryPath, args)
+		return exec.Command(SudoCmd, "-u", shared.EosID, BashCmd, "-c", cmdStr), fmt.Sprintf("sudo -u %s bash -c '%s'", shared.EosID, cmdStr), nil
 	}
+	fullArgs := append([]string{"-u", shared.EosID, binaryPath}, os.Args[1:]...)
+	return exec.Command(SudoCmd, fullArgs...), fmt.Sprintf("sudo -u %s %s %s", shared.EosID, binaryPath, strings.Join(os.Args[1:], " ")), nil
+}
 
-	os.Exit(0) // Successful re-exec
-	return nil
+// IsRunningAsEos returns true if the current process runs as the 'eos' user.
+func IsRunningAsEos() (bool, error) {
+	u, err := user.Current()
+	if err != nil {
+		return false, err
+	}
+	return u.Username == shared.EosID, nil
+}
+
+// GetInvokedUsername returns the current username or an error.
+func GetInvokedUsername() (string, error) {
+	u, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return u.Username, nil
 }

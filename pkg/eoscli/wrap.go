@@ -1,12 +1,8 @@
-// pkg/eoscli/wrap.go
-
 package eoscli
 
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/user"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
@@ -17,70 +13,62 @@ import (
 	"go.uber.org/zap"
 )
 
+const RequiresShellAnnotation = "requires_shell"
+
+// Wrap wraps a Cobra command handler with EOS runtime setup.
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
-		// Check command annotation: requires_shell (default false)
-		requiresShell := false
-		if cmd.Annotations != nil && cmd.Annotations["requires_shell"] == "true" {
-			requiresShell = true
-		}
+		requiresShell := cmd.Annotations[RequiresShellAnnotation] == "true"
 
-		// Initialize logger early
 		logger.InitializeWithFallback()
 		baseLog := logger.L()
 		if baseLog == nil {
-			fmt.Fprintln(os.Stderr, "🚨 logger.L() is nil before RequireEosUserOrReexec")
-			os.Exit(1)
+			return fmt.Errorf("logger initialization failed before RequireEosUserOrReexec")
 		}
-		logger.SetLogger(baseLog)
 
-		// Run privilege elevation check early
-		if err := eosio.RequireEosUserOrReexecWithShell(baseLog, requiresShell); err != nil {
-			baseLog.Error("❌ Privilege check failed", zap.Error(err))
+		invokedBy, err := eosio.GetInvokedUsername()
+		if err != nil {
+			baseLog.Warn("Failed to detect invoking user", zap.Error(err))
+			invokedBy = "unknown"
+		}
+		log := baseLog.With(zap.String("invoked_by", invokedBy))
+		logger.SetLogger(log)
+
+		if err := eosio.RequireEosUserOrReexecWithShell(log, requiresShell); err != nil {
+			log.Error("❌ Privilege check failed", zap.Error(err))
 			return fmt.Errorf("privilege check failed: %w", err)
 		}
 
-		// Add metadata to logger
-		userField := zap.Skip()
-		if u, err := user.LookupId(fmt.Sprint(os.Getuid())); err == nil {
-			userField = zap.String("invoked_by", u.Username)
-		}
-		log := baseLog.With(userField)
-		logger.SetLogger(log)
-
-		// Setup context
 		const timeout = 1 * time.Minute
 		start := time.Now()
 		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 
 		ctx := &eosio.RuntimeContext{Log: log, Ctx: ctxWithTimeout, Timestamp: start}
-		log.Info("🚀 Command execution started", zap.Time("timestamp", start), zap.Duration("timeout", timeout))
+		log.Info("🚀 Command execution started", zap.String("command", cmd.Name()), zap.Time("timestamp", start), zap.Duration("timeout", timeout))
 
-		// Setup Vault
 		addr, addrErr := vault.EnsureVaultEnv(log)
 		if addrErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
 		}
 		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
-		// Execute command
-		var err error
+		var errExec error
 		defer func() {
 			duration := time.Since(start)
-			logger.LogCommandLifecycle(cmd.Name())(&err)
-			if err != nil {
-				if eoserr.IsExpectedUserError(err) {
-					log.Warn("⚠️ EOS user error", zap.Error(err), zap.Duration("duration", duration))
+			logger.LogCommandLifecycle(cmd.Name())(&errExec)
+			if errExec != nil {
+				if eoserr.IsExpectedUserError(errExec) {
+					log.Warn("⚠️ EOS user error", zap.Error(errExec), zap.Duration("duration", duration))
 				} else {
-					log.Error("❌ EOS command failed", zap.Error(err), zap.Duration("duration", duration))
+					log.Error("❌ EOS command failed", zap.Error(errExec), zap.Duration("duration", duration))
 				}
 			} else {
 				log.Info("✅ EOS command finished successfully", zap.Duration("duration", duration))
 			}
 		}()
 
-		err = fn(ctx, cmd, args)
-		return err
+		errExec = fn(ctx, cmd, args)
+		return errExec
 	}
 }
