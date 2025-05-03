@@ -135,10 +135,9 @@ func createBaseDirs() error {
 }
 
 func secureTLSFiles() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosUser) // 🔥 Change back to eos
+	eosUID, eosGID, err := system.LookupUser(shared.EosID) // 🔥 Change back to eos
 	if err != nil {
-		zap.L().Warn("⚠️ Could not resolve eos UID/GID for TLS files", zap.Error(err))
-		eosUID, eosGID = 1001, 1001
+		zap.L().Error("⚠️ Could not resolve eos UID/GID for TLS files", zap.Error(err))
 	}
 
 	tlsFiles := []struct {
@@ -166,8 +165,8 @@ func secureTLSFiles() error {
 func secureVaultDirOwnership() error {
 	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
 	if err != nil {
-		zap.L().Warn("⚠️ Could not resolve eos UID/GID for Vault base", zap.Error(err))
-		eosUID, eosGID = 1001, 1001
+		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
+		return fmt.Errorf("failed to lookup eos user: %w", err)
 	}
 
 	zap.L().Info("🔧 Recursively fixing Vault directory ownership", zap.String("path", shared.VaultDir))
@@ -198,7 +197,14 @@ func PrepareVaultAgentEnvironment() error {
 func ValidateVaultAgentRuntimeEnvironment() error {
 	zap.L().Info("🔍 Validating Vault Agent runtime environment")
 
-	// 1. Check if /run/eos exists and is owned by eos
+	// Resolve eos user UID and GID safely
+	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	if err != nil {
+		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
+		return fmt.Errorf("failed to lookup eos user: %w", err)
+	}
+
+	// Check if /run/eos exists and is a directory
 	info, err := os.Stat(shared.EosRunDir)
 	if os.IsNotExist(err) {
 		zap.L().Error("❌ Missing runtime directory", zap.String("path", shared.EosRunDir))
@@ -212,16 +218,26 @@ func ValidateVaultAgentRuntimeEnvironment() error {
 		zap.L().Error("❌ Runtime path is not a directory", zap.String("path", shared.EosRunDir))
 		return fmt.Errorf("runtime path is not a directory: %s", shared.EosRunDir)
 	}
-	stat := info.Sys()
-	if stat == nil {
+
+	// Check ownership of the runtime directory
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok {
 		zap.L().Warn("⚠️ Unable to get ownership info of runtime directory")
 	} else {
-		if stat.(*syscall.Stat_t).Uid != 1001 { // 🔥 Assume eos UID 1001 or resolve dynamically
-			zap.L().Warn("⚠️ Runtime directory not owned by eos user", zap.String("path", shared.EosRunDir))
+		currentUID := stat.Uid
+		currentGID := stat.Gid
+		if currentUID != uint32(eosUID) || currentGID != uint32(eosGID) {
+			zap.L().Warn("⚠️ Runtime directory not owned by eos user",
+				zap.String("path", shared.EosRunDir),
+				zap.Uint32("current_uid", currentUID),
+				zap.Uint32("current_gid", currentGID),
+				zap.Int("expected_uid", eosUID),
+				zap.Int("expected_gid", eosGID),
+			)
 		}
 	}
 
-	// 2. Check if Vault binary exists
+	// Check if Vault binary exists in PATH
 	vaultPath, err := exec.LookPath("vault")
 	if err != nil {
 		zap.L().Error("❌ Vault binary not found in PATH", zap.Error(err))
