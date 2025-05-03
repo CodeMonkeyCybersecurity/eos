@@ -25,13 +25,6 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		eosio.LogRuntimeExecutionContext()
 
-		log.Info("🔍 Starting privilege check")
-		if err := eosio.CheckEffectiveUser("eos"); err != nil {
-			log.Error("❌ Privilege check failed", zap.Error(err))
-			return fmt.Errorf("privilege check failed: %w", err)
-		}
-		log.Info("✅ Privilege check passed")
-
 		const timeout = 1 * time.Minute
 		start := time.Now()
 
