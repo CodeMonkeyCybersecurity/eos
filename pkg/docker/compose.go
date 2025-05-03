@@ -69,7 +69,6 @@ func UncommentSegment(segmentComment string) error {
 	return nil
 }
 
-
 // RunDockerComposeAllServices starts a specific service from a docker-compose file.
 func RunDockerComposeAllServices(composeFile, service string) error {
 	args := []string{"-f", composeFile, "up", "-d"}

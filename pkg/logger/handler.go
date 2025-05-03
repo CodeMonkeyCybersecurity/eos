@@ -20,8 +20,8 @@ func Initialize(cfg zap.Config) {
 	for _, path := range cfg.OutputPaths {
 		if path != "stdout" && path != "stderr" {
 			if err := EnsureLogPermissions(path); err != nil {
-				GetLogger().Error("Log permission error", zap.String("path", path), zap.Error(err))
-				os.Exit(1)
+				fmt.Fprintln(os.Stderr, "⚠️ Log permission error:", err)
+				panic(err)
 			}
 		}
 	}
@@ -29,8 +29,7 @@ func Initialize(cfg zap.Config) {
 	var err error
 	log, err = cfg.Build()
 	if err != nil {
-		log, _ = zap.NewProduction()
-		log.Warn("Falling back to production logger", zap.Error(err))
+		log, _ = zap.NewProduction() // fallback to stdout-only logger
 	}
 
 	zap.ReplaceGlobals(log)
@@ -43,11 +42,13 @@ func InitFallback() {
 	zap.ReplaceGlobals(log)
 }
 
+func Logger() *zap.Logger {
+	return GetLogger()
+}
+
 func GetLogger() *zap.Logger {
 	if log == nil {
-		fallback := NewFallbackLogger()
-		fallback.Warn("Using fallback logger")
-		log = fallback
+		log = NewFallbackLogger()
 		zap.ReplaceGlobals(log)
 	}
 	return log

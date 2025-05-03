@@ -9,94 +9,97 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 )
 
-// CommandError wraps errors from command execution.
-type CommandError struct {
-	Command string
-	Output  string
-	Err     error
-}
+//
+//---------------------------- COMMAND EXECUTION ---------------------------- //
+//
 
-func (e *CommandError) Error() string {
-	return fmt.Sprintf("command failed: %s\nerror: %v\noutput:\n%s", e.Command, e.Err, e.Output)
-}
-
-func (e *CommandError) Unwrap() error {
-	return e.Err
-}
-
-// Execute runs a command with arguments.
+// Execute runs a command with separate arguments and returns a rich error if it fails.
 func Execute(command string, args ...string) error {
-	return runCommand(command, args, "", false)
+	cmdStr := fmt.Sprintf("%s %s", command, strings.Join(args, " "))
+	fmt.Printf("➡ Executing command: %s\n", cmdStr)
+
+	cmd := exec.Command(command, args...)
+	output, err := cmd.CombinedOutput()
+	fmt.Print(string(output))
+
+	if err != nil {
+		return fmt.Errorf("❌ Command failed: %s\n%s", cmdStr, string(output))
+	}
+	fmt.Printf("✅ Command completed: %s\n", cmdStr)
+	return nil
 }
 
-// ExecuteShell runs a shell command string through bash.
+// ExecuteShell runs a shell command string through Bash.
 func ExecuteShell(command string) error {
-	return runCommand("bash", []string{"-c", command}, "", false)
+	fmt.Printf("➡ Executing shell command: %s\n", command)
+	cmd := exec.Command("bash", "-c", command)
+	output, err := cmd.CombinedOutput()
+	fmt.Print(string(output))
+
+	if err != nil {
+		return fmt.Errorf("❌ Shell command failed: %w\noutput:\n%s", err, string(output))
+	}
+	fmt.Printf("✅ Shell command completed: %s\n", command)
+	return nil
 }
 
-// ExecuteInDir runs a command in a specific directory.
+// ExecuteInDir runs a command from a specific working directory.
 func ExecuteInDir(dir, command string, args ...string) error {
-	return runCommand(command, args, dir, false)
+	fmt.Printf("➡ Executing in %s: %s %s\n", dir, command, strings.Join(args, " "))
+	cmd := exec.Command(command, args...)
+	cmd.Dir = dir
+	output, err := cmd.CombinedOutput()
+	fmt.Print(string(output))
+
+	if err != nil {
+		return fmt.Errorf("❌ Command in directory failed: %w\noutput:\n%s", err, string(output))
+	}
+	fmt.Printf("✅ Directory command completed: %s\n", command)
+	return nil
 }
 
-// ExecuteSudo runs a command with sudo.
-func ExecuteSudo(command string, args ...string) error {
-	fullArgs := append([]string{command}, args...)
-	return runCommand("sudo", fullArgs, "", false)
-}
-
-// ExecuteAndLog streams stdout/stderr live.
-func ExecuteAndLog(command string, args ...string) error {
-	return runCommand(command, args, "", true)
-}
-
-// ExecuteRaw returns an *exec.Cmd for advanced use.
+// ExecuteRaw returns an *exec.Cmd for manual execution and handling.
 func ExecuteRaw(command string, args ...string) *exec.Cmd {
 	return exec.Command(command, args...)
 }
 
-// runCommand executes a command and optionally streams output.
-func runCommand(command string, args []string, dir string, stream bool) error {
-	cmdStr := fmt.Sprintf("%s %s", command, shellQuote(args))
-	fmt.Printf("➡ Executing: %s\n", cmdStr)
+// ExecuteAndLog runs a command and streams stdout/stderr live.
+func ExecuteAndLog(name string, args ...string) error {
+	fmt.Printf("🚀 Running: %s %s\n", name, joinArgs(args))
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, command, args...)
-	if dir != "" {
-		cmd.Dir = dir
-	}
+	cmd := exec.CommandContext(ctx, name, args...)
 
 	var outputBuf bytes.Buffer
-	if stream {
-		cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
-		cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
-	} else {
-		cmd.Stdout = &outputBuf
-		cmd.Stderr = &outputBuf
+	cmd.Stdout = io.MultiWriter(os.Stdout, &outputBuf)
+	cmd.Stderr = io.MultiWriter(os.Stderr, &outputBuf)
+
+	if err := cmd.Run(); err != nil {
+		fullOutput := outputBuf.String()
+		summary := eoserr.ExtractSummary(fullOutput, 2)
+		return fmt.Errorf("❌ Command failed: %s %s: %w - %s", name, joinArgs(args), err, summary)
 	}
 
-	err := cmd.Run()
-	output := outputBuf.String()
-	if err != nil {
-		return &CommandError{Command: cmdStr, Output: output, Err: err}
-	}
-
-	fmt.Printf("✅ Completed: %s\n", cmdStr)
+	fmt.Printf("✅ Completed: %s %s\n", name, joinArgs(args))
 	return nil
 }
 
-// shellQuote safely quotes command-line arguments.
+// joinArgs formats arguments for display.
+func joinArgs(args []string) string {
+	return shellQuote(args)
+}
+
+// shellQuote ensures args are properly quoted for visibility.
 func shellQuote(args []string) string {
 	var quoted []string
 	for _, arg := range args {
-		if strings.ContainsAny(arg, " \t\"'") {
-			arg = fmt.Sprintf("'%s'", strings.ReplaceAll(arg, "'", "'\"'\"'"))
-		}
-		quoted = append(quoted, arg)
+		quoted = append(quoted, fmt.Sprintf("'%s'", arg))
 	}
 	return strings.Join(quoted, " ")
 }
