@@ -4,12 +4,13 @@ package vault
 
 import (
 	"context"
-	"fmt"
-	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -52,7 +53,8 @@ func GetVaultPurgePaths() []string {
 // It returns a list of removed files and a map of errors keyed by path.
 func Purge(distro string) (removed []string, errs map[string]error) {
 	errs = make(map[string]error)
-	zap.L().Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
+	log := zap.L()
+	log.Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
 
 	pathsToRemove := []string{}
 
@@ -62,37 +64,47 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 	case "rhel":
 		pathsToRemove = append(pathsToRemove, shared.DnfRepoFilePath)
 	default:
-		zap.L().Warn("⚠️ No package manager cleanup defined for distro", zap.String("distro", distro))
+		log.Warn("⚠️ No package manager cleanup defined for distro", zap.String("distro", distro))
 	}
 
-	pathsToRemove = append(pathsToRemove, shared.VaultBinaryPath)
+	// Combine both wildcard and direct purge paths, plus distro-specific
+	allPaths := append(GetVaultWildcardPurgePaths(), GetVaultPurgePaths()...)
+	allPaths = append(allPaths, pathsToRemove...)
 
-	for _, path := range pathsToRemove {
-		if err := os.Remove(path); err != nil {
-			if os.IsNotExist(err) {
-				zap.L().Info("ℹ️ File already absent", zap.String("path", path))
-				continue
-			}
-			zap.L().Error("❌ Failed to remove file", zap.String("path", path), zap.Error(err))
-			errs[path] = fmt.Errorf("failed to remove %s: %w", path, err)
-		} else {
-			zap.L().Info("✅ Removed file", zap.String("path", path))
-			removed = append(removed, path)
-		}
-	}
-
-	// Safe systemd reload with timeout
+	// Safe systemd reload context
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reexec").Run(); err != nil {
-		zap.L().Warn("⚠️ Failed daemon-reexec", zap.Error(err))
-	}
-	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reload").Run(); err != nil {
-		zap.L().Warn("⚠️ Failed daemon-reload", zap.Error(err))
+	owner := "vault-purge"
+
+	for _, path := range allPaths {
+		if strings.Contains(path, "*") {
+			matches, _ := filepath.Glob(path)
+			for _, m := range matches {
+				if err := system.Rm(ctx, m, owner); err != nil {
+					errs[m] = err
+				} else {
+					removed = append(removed, m)
+				}
+			}
+		} else {
+			if err := system.Rm(ctx, path, owner); err != nil {
+				errs[path] = err
+			} else {
+				removed = append(removed, path)
+			}
+		}
 	}
 
-	zap.L().Info("✅ Vault purge complete", zap.Int("paths_removed", len(removed)), zap.Int("errors", len(errs)))
+	// Safe systemd reload
+	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reexec").Run(); err != nil {
+		log.Warn("⚠️ Failed daemon-reexec", zap.Error(err))
+	}
+	if err := exec.CommandContext(ctx, "sudo", "systemctl", "daemon-reload").Run(); err != nil {
+		log.Warn("⚠️ Failed daemon-reload", zap.Error(err))
+	}
+
+	log.Info("✅ Vault purge complete", zap.Int("paths_removed", len(removed)), zap.Int("errors", len(errs)))
 	return removed, errs
 }
 

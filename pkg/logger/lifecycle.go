@@ -31,29 +31,26 @@ func WithCommandLogging(ctx context.Context, name string, fn func(context.Contex
 	traceID := GenerateTraceID()
 	ctx = WithTraceID(ctx, traceID)
 
-	zap.L().With(zap.String("trace_id", traceID))
+	log := zap.L().With(zap.String("trace_id", traceID))
 	start := time.Now()
 
-	zap.L().Info("Command started", zap.String("command", name), zap.Time("start_time", start))
+	log.Info("Command started", zap.String("command", name), zap.Time("start_time", start))
 
 	err := fn(ctx)
 
 	duration := time.Since(start)
 	if err != nil {
 		if eoserr.IsExpectedUserError(err) {
-			zap.L().Warn("Command completed with user error", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
+			log.Warn("Command completed with user error", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
 		} else {
-			if eoserr.IsExpectedUserError(err) {
-				zap.L().Warn("Command completed with user error", zap.Error(err))
-			} else {
-				zap.L().Error("Command failed", zap.Error(err))
-			}
+			log.Error("Command failed", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
 		}
 	} else {
-		zap.L().Info("Command completed", zap.String("command", name), zap.Duration("duration", duration))
+		log.Info("Command completed", zap.String("command", name), zap.Duration("duration", duration))
 	}
 	return traceID, err
 }
+
 func WithTraceID(ctx context.Context, traceID string) context.Context {
 	return context.WithValue(ctx, traceIDKey, traceID)
 }

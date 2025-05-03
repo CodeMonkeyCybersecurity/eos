@@ -3,11 +3,13 @@
 package system
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"go.uber.org/zap"
 )
 
@@ -46,43 +48,66 @@ func WriteOwnedFile(path string, data []byte, perm os.FileMode, owner string) er
 	return nil
 }
 
-/**/
+// Rm deletes a file or directory if it exists, with structured logging and traceability.
+// Rm deletes a file or directory if it exists, with structured logging and traceability.
+func Rm(ctx context.Context, path, label string) error {
+	traceID := logger.TraceIDFromContext(ctx)
+	log := zap.L().With(zap.String("traceID", traceID))
 
-// RemoveWithLog deletes a file or directory if it exists, with descriptive logging.
-func Rm(path, label string) error {
+	abs, _ := filepath.Abs(path)
 	info, err := os.Stat(path)
+
 	if os.IsNotExist(err) {
-		abs, _ := filepath.Abs(path)
-		zap.L().Warn("Path not found", zap.String("label", label), zap.String("path", abs))
+		log.Warn("Path not found",
+			zap.String("label", label),
+			zap.String("path", abs),
+		)
 		fmt.Printf("⚠️  %s not found: %s\n", label, abs)
 		return nil
 	}
 
 	if err != nil {
 		FailIfPermissionDenied("access "+label, path, err)
-		zap.L().Error("Error accessing path", zap.String("label", label), zap.String("path", path), zap.Error(err))
+		log.Error("Error accessing path",
+			zap.String("label", label),
+			zap.String("path", path),
+			zap.Error(err),
+		)
 		fmt.Printf("❌ Error accessing %s (%s): %v\n", label, path, err)
 		return err
 	}
 
 	if info.IsDir() {
-		zap.L().Info("Removing directory", zap.String("label", label), zap.String("path", path))
+		log.Info("Removing directory",
+			zap.String("label", label),
+			zap.String("path", path),
+		)
 		fmt.Printf("🧹 Removing directory (%s): %s\n", label, path)
 		err = os.RemoveAll(path)
 	} else {
-		zap.L().Info("Removing file", zap.String("label", label), zap.String("path", path))
+		log.Info("Removing file",
+			zap.String("label", label),
+			zap.String("path", path),
+		)
 		fmt.Printf("🧹 Removing file (%s): %s\n", label, path)
 		err = os.Remove(path)
 	}
 
 	if err != nil {
 		FailIfPermissionDenied("remove "+label, path, err)
-		zap.L().Error("Failed to remove", zap.String("label", label), zap.String("path", path), zap.Error(err))
+		log.Error("Failed to remove",
+			zap.String("label", label),
+			zap.String("path", path),
+			zap.Error(err),
+		)
 		fmt.Printf("❌ Failed to remove %s (%s): %v\n", label, path, err)
 		return err
 	}
 
-	zap.L().Info("Successfully removed", zap.String("label", label), zap.String("path", path))
+	log.Info("Successfully removed",
+		zap.String("label", label),
+		zap.String("path", path),
+	)
 	fmt.Printf("✅ %s removed: %s\n", label, path)
 	return nil
 }

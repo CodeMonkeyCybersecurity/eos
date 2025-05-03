@@ -3,6 +3,7 @@
 package backup
 
 import (
+	"context"
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
@@ -21,6 +22,8 @@ var BackupConfigCmd = &cobra.Command{
 	Short: "Backup configuration and files",
 	Long:  `Backup important configuration directories and files.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		stdCtx := context.Background() // 🛠️ new: get context safely
+
 		// Backup the conf.d directory.
 		srcInfo, err := os.Stat(hecate.ConfDir)
 
@@ -33,7 +36,7 @@ var BackupConfigCmd = &cobra.Command{
 			zap.L().Error("Error: Source directory '%s' does not exist.\n")
 			os.Exit(1)
 		}
-		if err := system.Rm(hecate.BackupConf, "backup conf"); err != nil {
+		if err := system.Rm(stdCtx, hecate.BackupConf, "backup conf"); err != nil {
 			zap.L().Error("Failed to remove existing backup", zap.String("path", hecate.BackupConf), zap.Error(err))
 			os.Exit(1)
 		}
@@ -49,7 +52,7 @@ var BackupConfigCmd = &cobra.Command{
 			zap.L().Error("Missing or invalid certs", zap.String("dir", shared.DefaultCertsDir), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.Rm(hecate.BackupConf, "backup conf"); err != nil {
+		if err := system.Rm(stdCtx, hecate.BackupConf, "backup conf"); err != nil {
 			zap.L().Error("Failed to remove existing hecate.Backup", zap.String("path", hecate.BackupCerts), zap.Error(err))
 			os.Exit(1)
 		}
@@ -65,7 +68,7 @@ var BackupConfigCmd = &cobra.Command{
 			zap.L().Error("Missing or invalid compose file", zap.String("file", shared.DefaultComposeYML), zap.Error(err))
 			os.Exit(1)
 		}
-		if err := system.Rm(hecate.BackupConf, "backup conf"); err != nil {
+		if err := system.Rm(stdCtx, hecate.BackupConf, "backup conf"); err != nil {
 			zap.L().Error("Failed to remove existing backup", zap.String("path", hecate.BackupCompose), zap.Error(err))
 			os.Exit(1)
 		}

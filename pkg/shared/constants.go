@@ -1,4 +1,4 @@
-// pkg/shared/consts.go
+// pkg/shared/constants.go
 
 package shared
 

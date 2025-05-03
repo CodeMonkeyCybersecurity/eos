@@ -3,6 +3,7 @@
 package system
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,9 +24,11 @@ func RestoreFile(src, dst string) {
 
 // RestoreDir copies a full directory from src to dst.
 func RestoreDir(src, dst string) {
+	stdCtx := context.Background()
+
 	zap.L().Info("Restoring directory", zap.String("source", src), zap.String("destination", dst))
 
-	if err := Rm(dst, "destination directory"); err != nil {
+	if err := Rm(stdCtx, dst, "destination directory"); err != nil {
 		zap.L().Error("Failed to clean destination", zap.String("destination", dst), zap.Error(err))
 		return
 	}
