@@ -5,6 +5,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -17,6 +18,13 @@ var EnableVaultCmd = &cobra.Command{
 AppRole auth, Vault Agent, and API client connectivity.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("cmd/enable/vault")
+
+		addr, err := vault.InitializeVaultOnly()
+		if err != nil {
+			return logger.LogErrAndWrap("create vault: initialize", err)
+		}
+
+		log.Info("✅ Vault initialized", zap.String(shared.VaultAddrEnv, addr))
 
 		zap.L().Info("🔌 [Phase7] Connecting to Vault server and checking health...")
 		client, err := vault.EnsureVaultReady()

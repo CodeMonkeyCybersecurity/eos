@@ -4,8 +4,10 @@ package vault
 import (
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -14,6 +16,8 @@ import (
 // EOS Vault Enablement Lifecycle
 //
 // Phases:
+// 6a. Initialize Vault Only (InitializeVaultOnly)
+// 6b. Create Vault Client (CreateVaultClient)
 // 7.  Check Vault Health
 // 8.  Validate Root Token
 // 9.  Enable Auth Methods and Apply Policies
@@ -21,6 +25,68 @@ import (
 // 11. Render Vault Agent Config
 // 12. Start Vault Agent and Validate
 //--------------------------------------------------------------------
+
+// InitializeVaultOnly()
+//  ├── EnsureVaultEnv()             [external]
+//  ├── CreateVaultClient()
+//  │    └── NewClient()            [external]
+//  ├── PhaseInitVaultOnly(client)  [external]
+//  └── VaultAddress()
+
+// CreateVaultClient()
+//  └── NewClient()                 [external]
+
+// VaultAddress()
+//  └── os.Getenv()
+
+// EnableVault(client, log, opts)
+//  ├── PhaseEnsureVaultHealthy()                 [external]
+//  ├── PhasePromptAndVerRootToken(client)        [external]
+//  ├── GetPrivilegedVaultClient()               [external]
+//  ├── PhaseEnableKVv2(client)                 [external]
+//  ├── PhaseEnableAppRole(client, log, opts)   [external, if opts.EnableAppRole]
+//  ├── PhaseEnableUserpass(client, log, opts)  [external, if opts.EnableUserpass]
+//  ├── EnsurePolicy(client)                    [external]
+//  ├── EnableFileAudit(client)                [external]
+//  ├── PhaseRenderVaultAgentConfig(client)    [external, if opts.EnableAgent]
+//  ├── PhaseStartVaultAgentAndValidate(client) [external, if opts.EnableAgent]
+//  ├── PhaseWriteBootstrapSecretAndRecheck(client) [external]
+//  └── PrintEnableNextSteps()
+
+// PrintEnableNextSteps()
+//  └── fmt.Println() calls
+
+func InitializeVaultOnly() (string, error) {
+	if _, err := EnsureVaultEnv(); err != nil {
+		return "", fmt.Errorf("ensure Vault environment: %w", err)
+	}
+
+	client, err := CreateVaultClient()
+	if err != nil {
+		return "", fmt.Errorf("create Vault client: %w", err)
+	}
+
+	client, err = PhaseInitVaultOnly(client)
+	if err != nil {
+		return "", fmt.Errorf("initialize Vault only: %w", err)
+	}
+	if client == nil {
+		return "", fmt.Errorf("vault client invalid after initialization; Vault server may be unreachable or misconfigured")
+	}
+
+	addr := VaultAddress()
+	zap.L().Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String(shared.VaultAddrEnv, addr))
+
+	return addr, nil
+}
+
+func CreateVaultClient() (*api.Client, error) {
+	return NewClient()
+}
+
+func VaultAddress() string {
+	return os.Getenv(shared.VaultAddrEnv)
+}
 
 func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error {
 	zap.L().Info("🚀 [Enable] Starting Vault enablement flow")

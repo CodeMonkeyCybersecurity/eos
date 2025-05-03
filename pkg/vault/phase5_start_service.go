@@ -21,11 +21,27 @@ import (
 // 5.  Install and Start vault.service
 //--------------------------------------------------------------------
 
-// PHASE 5 — StartVaultService()
-//             └── WriteSystemdUnit()
-//             └── ReloadDaemonAndEnable()
-//             └── startVaultSystemdService()
-//             └── waitForVaultHealth()
+// StartVaultService()
+//  ├── WriteVaultServerSystemdUnit()
+//  ├── ValidateVaultConfig()   [⚠ external, not defined in this file]
+//  ├── system.ReloadDaemonAndEnable()  [⚠ external]
+//  ├── ensureVaultDataDir()    [⚠ external, not defined in this file]
+//  ├── startVaultSystemdService()
+//  ├── waitForVaultHealth()
+//  └── PrintNextSteps()        [⚠ external, added from your new function]
+
+// WriteAgentSystemdUnit()
+
+// WriteVaultServerSystemdUnit()
+
+// startVaultSystemdService()
+
+// waitForVaultHealth()
+//  └── captureVaultLogsOnFailure()  [⚠ external]
+//  └── shared.SafeClose()           [⚠ external]
+
+// ValidateCriticalPaths()
+//  └── system.LookupUser()          [⚠ external]
 
 // StartVaultService installs, enables, and starts the Vault SERVER (vault.service).
 func StartVaultService() error {
@@ -57,7 +73,14 @@ func StartVaultService() error {
 	}
 
 	zap.L().Info("✅ Vault systemd service started, checking health...")
-	return waitForVaultHealth(shared.VaultMaxHealthWait)
+	if err := waitForVaultHealth(shared.VaultMaxHealthWait); err != nil {
+		return err
+	}
+
+	// ✅ Print user instructions here
+	PrintNextSteps()
+
+	return nil
 }
 
 func WriteAgentSystemdUnit() error {

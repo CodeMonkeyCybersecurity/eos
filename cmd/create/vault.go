@@ -7,7 +7,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -40,21 +39,6 @@ var CreateVaultCmd = &cobra.Command{
 		if err := vault.StartVault(); err != nil {
 			return logger.LogErrAndWrap("create vault: start service", err)
 		}
-
-		addr, err := vault.InitializeVaultOnly()
-		if err != nil {
-			return logger.LogErrAndWrap("create vault: initialize", err)
-		}
-
-		log.Info("✅ Vault initialized", zap.String(shared.VaultAddrEnv, addr))
-
-		// 🛎️ New hint to user: guide next steps!
-		fmt.Println("")
-		fmt.Println("🔔 Vault has been initialized, but is not yet unsealed.")
-		fmt.Println("👉 Next steps:")
-		fmt.Println("   1. Run: eos inspect vault-init   (to view and save your init keys)")
-		fmt.Println("   2. Run: eos enable vault         (to unseal and fully enable Vault)")
-		fmt.Println("")
 
 		return nil
 	}),

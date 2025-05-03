@@ -4,11 +4,8 @@ package vault
 
 import (
 	"fmt"
-	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
-	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
 
@@ -70,36 +67,4 @@ func WriteAndValidateConfig() error {
 
 func StartVault() error {
 	return StartVaultService()
-}
-
-func InitializeVaultOnly() (string, error) {
-	if _, err := EnsureVaultEnv(); err != nil {
-		return "", fmt.Errorf("ensure Vault environment: %w", err)
-	}
-
-	client, err := CreateVaultClient()
-	if err != nil {
-		return "", fmt.Errorf("create Vault client: %w", err)
-	}
-
-	client, err = PhaseInitVaultOnly(client)
-	if err != nil {
-		return "", fmt.Errorf("initialize Vault only: %w", err)
-	}
-	if client == nil {
-		return "", fmt.Errorf("vault client invalid after initialization; Vault server may be unreachable or misconfigured")
-	}
-
-	addr := VaultAddress()
-	zap.L().Info("✅ Vault initialized successfully — unseal keys securely stored", zap.String(shared.VaultAddrEnv, addr))
-
-	return addr, nil
-}
-
-func CreateVaultClient() (*api.Client, error) {
-	return NewClient()
-}
-
-func VaultAddress() string {
-	return os.Getenv(shared.VaultAddrEnv)
 }
