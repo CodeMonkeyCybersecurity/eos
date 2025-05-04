@@ -9,7 +9,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -109,15 +108,6 @@ func Unseal(client *api.Client, init *api.InitResponse) error {
 		}
 	}
 	return errors.New("vault remains sealed after 3 unseal keys")
-}
-
-func LoadInitResultOrPrompt(client *api.Client) (*api.InitResponse, error) {
-	initRes := new(api.InitResponse)
-	if err := ReadFallbackJSON(shared.VaultInitPath, initRes); err != nil {
-		zap.L().Warn("⚠️ Fallback file missing, prompting user", zap.Error(err))
-		return PromptForInitResult()
-	}
-	return initRes, nil
 }
 
 func ConfirmUnsealMaterialSaved(init *api.InitResponse) error {

@@ -116,7 +116,7 @@ func EnsureVaultDirs() error {
 }
 
 func createBaseDirs() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	eosUID, eosGID, err := system.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
 		return fmt.Errorf("critical: eos system user not found: %w", err)
@@ -148,7 +148,7 @@ func createBaseDirs() error {
 }
 
 func secureVaultDirOwnership() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	eosUID, eosGID, err := system.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)
@@ -183,7 +183,7 @@ func ValidateVaultAgentRuntimeEnvironment() error {
 	zap.L().Info("🔍 Validating Vault Agent runtime environment")
 
 	// Resolve eos user UID and GID safely
-	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	eosUID, eosGID, err := system.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)

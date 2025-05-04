@@ -17,7 +17,7 @@ func VaultPath(name string) string {
 	if strings.Contains(name, "/") {
 		zap.L().Warn("VaultPath should not receive slashes", zap.String("input", name))
 	}
-	final := fmt.Sprintf("%s/%s", shared.DefaultNamespace, name)
+	final := fmt.Sprintf("%s/%s", shared.EosID, name)
 	zap.L().Debug("Resolved Vault path", zap.String("input", name), zap.String("result", final))
 	return final
 }

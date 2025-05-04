@@ -19,7 +19,7 @@ import (
 
 // CheckSudo checks if the current user has sudo privileges
 func CheckSudo() bool {
-	cmd := exec.Command( "-n", "true")
+	cmd := exec.Command("-n", "true")
 	err := cmd.Run()
 	return err != nil
 }
@@ -30,7 +30,7 @@ func IsPrivilegedUser() bool {
 		zap.L().Warn("🧪 Could not determine current user", zap.Error(err))
 		return os.Geteuid() == 0
 	}
-	return current.Username == shared.EosUser || os.Geteuid() == 0
+	return current.Username == shared.EosID || os.Geteuid() == 0
 }
 
 /* EnforceSecretsAccess blocks --show-secrets unless run as root */
@@ -61,7 +61,7 @@ func RequireRootInteractive() error {
 		return nil // already root
 	}
 	fmt.Println("⚠️ Bootstrap requires root privileges. You may be prompted for your password.")
-	cmd := exec.Command( "-v")
+	cmd := exec.Command("-v")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -87,7 +87,7 @@ func FailIfPermissionDenied(action, path string, err error) {
 // CanInteractiveSudo checks if the current user can run 'sudo' interactively.
 // It tries 'sudo -v' to validate cached credentials or prompt if needed.
 func CanInteractiveSudo() bool {
-	cmd := exec.Command( "-v")
+	cmd := exec.Command("-v")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -101,7 +101,7 @@ func CanInteractiveSudo() bool {
 }
 
 func CheckSudoersMembership(username string) bool {
-	cmd := exec.Command( "grep", "-r", username, "/etc/sudoers", "/etc/sudoers.d")
+	cmd := exec.Command("grep", "-r", username, "/etc/sudoers", "/etc/sudoers.d")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("❌ sudoers membership check failed: %v\n", err)

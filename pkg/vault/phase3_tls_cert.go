@@ -340,7 +340,7 @@ func tlsCertsExist() bool {
 }
 
 func secureVaultTLSOwnership() error {
-	uid, gid, err := system.LookupUser(shared.EosUser)
+	uid, gid, err := system.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Warn("could not lookup eos user", zap.Error(err))
 		return err
@@ -389,7 +389,7 @@ func EnsureVaultAgentCAExists() error {
 		return fmt.Errorf("failed to copy Vault Agent CA cert: %w", err)
 	}
 
-	uid, gid, err := system.LookupUser(shared.EosUser)
+	uid, gid, err := system.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Warn("could not lookup eos user for CA cert ownership", zap.Error(err))
 		return err

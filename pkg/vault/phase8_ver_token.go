@@ -29,13 +29,13 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 		zap.L().Warn("⚠️ AppRole auth failed", zap.Error(err))
 	}
 
-	// 3. Try reading token from file
-	if token, err := tryTokenFile(client); err == nil && verifyToken(client, token) {
+	// 3. Try reading root token from init file
+	if token, err := tryInitFileRootToken(client); err == nil && verifyToken(client, token) {
 		SetVaultToken(client, token)
-		zap.L().Info("✅ Authenticated via token file")
+		zap.L().Info("✅ Authenticated via init file root token")
 		return nil
 	} else {
-		zap.L().Warn("⚠️ Token file auth failed", zap.Error(err))
+		zap.L().Warn("⚠️ Init file root token auth failed", zap.Error(err))
 	}
 
 	// 4. Prompt user for root token

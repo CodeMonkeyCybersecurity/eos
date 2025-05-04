@@ -85,11 +85,11 @@ func StartVaultService() error {
 
 func WriteAgentSystemdUnit() error {
 	unit := fmt.Sprintf(shared.AgentSystemDUnit,
-		shared.VaultAgentUser,
-		shared.VaultAgentGroup,
+		shared.EosID,
+		shared.EosID,
 		shared.RuntimeDirPerms,
-		shared.VaultAgentUser,
-		shared.VaultAgentGroup,
+		shared.EosID,
+		shared.EosID,
 		shared.RuntimeDirPerms,
 		shared.EosRunDir,
 		shared.VaultAgentConfigPath,
@@ -158,7 +158,7 @@ func ValidateCriticalPaths() error {
 		shared.VaultDataPath, // /opt/vault/data
 	}
 
-	eosUID, eosGID, err := system.LookupUser(shared.EosUser)
+	eosUID, eosGID, err := system.LookupUser(shared.EosID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve eos user UID/GID: %w", err)
 	}

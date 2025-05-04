@@ -102,7 +102,7 @@ func isVaultProcessRunning() bool {
 		return false
 	}
 	for _, line := range strings.Split(string(out), "\n") {
-		if strings.Contains(line, "vault") && strings.Contains(line, shared.EosUser) {
+		if strings.Contains(line, "vault") && strings.Contains(line, shared.EosID) {
 			return true
 		}
 	}

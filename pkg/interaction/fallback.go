@@ -50,5 +50,5 @@ func HandleFallbackChoice(choice string, handlers map[string]func() error) error
 // FallbackPath returns the expected location of a fallback config file for a given name.
 func FallbackPath(name string) string {
 	fallbackPath := filepath.Join(name, shared.DefaultConfigFilename)
-	return xdg.XDGConfigPath(shared.DefaultNamespace, fallbackPath)
+	return xdg.XDGConfigPath(shared.EosID, fallbackPath)
 }

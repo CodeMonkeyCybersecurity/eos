@@ -20,8 +20,8 @@ const (
 	// Permission modes (in octal)
 	DirPermStandard        = 0755
 	RuntimeDirPerms        = 0750
-	RuntimeFilePerms       = 0640
 	FilePermOwnerRWX       = 0700
+	RuntimeFilePerms       = 0640
 	FilePermStandard       = 0644
 	FilePermOwnerReadWrite = 0600
 	FilePermReadOnly       = 0444
@@ -40,14 +40,7 @@ const (
 )
 
 const (
-	EosID            = "eos"
-	EosUser          = EosID
-	EosGroup         = EosID
-	VaultAgentUser   = EosID
-	VaultAgentGroup  = EosID
-	DefaultConfigDir = EosID
-	EosVaultUsername = EosID
-	DefaultNamespace = EosID
+	EosID = "eos"
 )
 
 const (

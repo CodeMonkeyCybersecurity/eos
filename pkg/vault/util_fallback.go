@@ -104,3 +104,24 @@ func TryLoadUnsealKeysFromFallback() (*api.InitResponse, error) {
 	zap.L().Info("✅ Fallback file validated", zap.Int("keys_found", len(initRes.KeysB64)))
 	return initRes, nil
 }
+
+// tryInitFileRootToken tries to load the root token from the fallback init file.
+func tryInitFileRootToken(client *api.Client) (string, error) {
+	initRes, err := LoadInitResultOrPrompt(client)
+	if err != nil {
+		return "", fmt.Errorf("load init result: %w", err)
+	}
+	if initRes.RootToken == "" {
+		return "", fmt.Errorf("root token missing in init result")
+	}
+	return initRes.RootToken, nil
+}
+
+func LoadInitResultOrPrompt(client *api.Client) (*api.InitResponse, error) {
+	initRes := new(api.InitResponse)
+	if err := ReadFallbackJSON(shared.VaultInitPath, initRes); err != nil {
+		zap.L().Warn("⚠️ Fallback file missing, prompting user", zap.Error(err))
+		return PromptForInitResult()
+	}
+	return initRes, nil
+}

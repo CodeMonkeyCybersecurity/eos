@@ -114,7 +114,7 @@ func WriteUserpassCredentialsFallback(password string) error {
 	}
 
 	// Write to fallback file
-	if err := system.WriteOwnedFile(fallbackFile, []byte(password+"\n"), 0o600, shared.EosUser); err != nil {
+	if err := system.WriteOwnedFile(fallbackFile, []byte(password+"\n"), 0o600, shared.EosID); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
 	zap.L().Info("✅ Userpass password written to fallback file", zap.String("path", fallbackFile))

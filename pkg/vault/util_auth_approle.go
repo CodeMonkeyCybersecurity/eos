@@ -87,7 +87,7 @@ func PhaseCreateAppRole(client *api.Client, log *zap.Logger, opts shared.AppRole
 func WriteAppRoleFiles(roleID, secretID string) error {
 	dir := filepath.Dir(shared.RoleIDPath)
 	zap.L().Info("📁 Ensuring AppRole directory", zap.String("path", dir))
-	if err := system.EnsureOwnedDir(dir, 0o700, shared.EosUser); err != nil {
+	if err := system.EnsureOwnedDir(dir, 0o700, shared.EosID); err != nil {
 		return err
 	}
 
@@ -97,7 +97,7 @@ func WriteAppRoleFiles(roleID, secretID string) error {
 	}
 	for path, data := range pairs {
 		zap.L().Debug("✏️  Writing AppRole file", zap.String("path", path))
-		if err := system.WriteOwnedFile(path, []byte(data), 0o600, shared.EosUser); err != nil {
+		if err := system.WriteOwnedFile(path, []byte(data), 0o600, shared.EosID); err != nil {
 			return err
 		}
 	}
