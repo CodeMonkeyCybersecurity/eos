@@ -1,5 +1,3 @@
-// pkg/vault/phase9_ver_kv_v2.go
-
 package vault
 
 import (
@@ -12,23 +10,32 @@ import (
 	"go.uber.org/zap"
 )
 
-//--------------------------------------------------------------------
-// Phase 9B: Write Bootstrap Secret and Recheck Vault Health
-//--------------------------------------------------------------------
-
 // PhaseWriteBootstrapSecretAndRecheck writes a test secret and verifies Vault health.
-func PhaseWriteBootstrapSecretAndRecheck(client *api.Client) error {
-	zap.L().Info("🧪 [Phase 9B] Writing bootstrap test secret and verifying Vault health")
+func PhaseWriteBootstrapSecretAndRecheck(_ *api.Client) error {
+	zap.L().Info("🧪 [Phase 9A] Writing bootstrap test secret and verifying Vault health")
 
-	if err := PhaseWriteTestSecret(client, shared.VaultTestPath, map[string]string{"example_key": "example_value"}); err != nil {
+	// ✅ Get privileged client (root or agent token, validated)
+	privilegedClient, err := GetPrivilegedVaultClient()
+	if err != nil {
+		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		return err
+	}
+	zap.L().Info("✅ Privileged Vault client ready")
+
+	// ✅ Run privileged operations
+	if err := PhaseWriteTestSecret(privilegedClient, shared.VaultTestPath, map[string]string{"example_key": "example_value"}); err != nil {
+		zap.L().Error("❌ Failed to write bootstrap test secret", zap.Error(err))
 		return fmt.Errorf("bootstrap test secret write failed: %w", err)
 	}
 
+	// ✅ Check Vault health after writing secret
 	healthy, err := CheckVaultHealth()
 	if err != nil {
+		zap.L().Error("❌ Vault health check failed", zap.Error(err))
 		return fmt.Errorf("vault health recheck failed: %w", err)
 	}
 	if !healthy {
+		zap.L().Error("❌ Vault unhealthy after bootstrap secret phase")
 		return fmt.Errorf("vault unhealthy after bootstrap secret phase")
 	}
 
@@ -42,24 +49,27 @@ func PhaseWriteTestSecret(client *api.Client, kvPath string, kvData map[string]s
 
 	kv := client.KVv2("secret")
 
-	// Initialize an empty map if needed
 	if kvData == nil {
 		zap.L().Warn("⚠️ No data provided for bootstrap secret — initializing empty payload")
 		kvData = make(map[string]string)
 	}
 
-	// Encode payload
 	data, err := json.Marshal(kvData)
 	if err != nil {
+		zap.L().Error("❌ Failed to marshal bootstrap data", zap.Error(err))
 		return fmt.Errorf("marshal bootstrap kv data: %w", err)
 	}
 	payload := map[string]interface{}{"json": string(data)}
 
-	// Write secret
 	if _, err := kv.Put(context.Background(), kvPath, payload); err != nil {
+		zap.L().Error("❌ Failed to write bootstrap secret", zap.Error(err))
 		return fmt.Errorf("write bootstrap secret at %s: %w", kvPath, err)
 	}
 
-	zap.L().Info("✅ Bootstrap test secret written", zap.String("path", kvPath), zap.Int("keys", len(kvData)))
+	zap.L().Info("✅ Bootstrap test secret written",
+		zap.String("path", kvPath),
+		zap.Int("keys", len(kvData)),
+		zap.Any("data", kvData),
+	)
 	return nil
 }

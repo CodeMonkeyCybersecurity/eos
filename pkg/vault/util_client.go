@@ -12,9 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
-var vaultClientLock sync.Mutex
+var (
+	vaultClientLock sync.Mutex
+)
 
-// GetVaultClient returns a cached or freshly initialized and validated Vault client.
+// ==========================
+// PUBLIC CLIENT ACCESSORS
+// ==========================
+
+// GetVaultClient returns the cached or freshly initialized Vault client.
 func GetVaultClient() (*api.Client, error) {
 	vaultClientLock.Lock()
 	defer vaultClientLock.Unlock()
@@ -25,8 +31,30 @@ func GetVaultClient() (*api.Client, error) {
 	}
 
 	zap.L().Warn("⚠️ Vault client uninitialized — initializing...")
+	client, err := buildValidatedClient()
+	if err != nil {
+		return nil, err
+	}
 
-	client, err := tryEnvOrPrivilegedClient()
+	shared.VaultClient = client
+	zap.L().Info("✅ Vault client initialized, validated, and cached")
+	return shared.VaultClient, nil
+}
+
+// SetVaultClient stores a Vault client globally.
+func SetVaultClient(client *api.Client) {
+	vaultClientLock.Lock()
+	defer vaultClientLock.Unlock()
+	zap.L().Debug("📦 Vault client cached globally")
+	shared.VaultClient = client
+}
+
+// ==========================
+// CLIENT CONSTRUCTION + VALIDATION
+// ==========================
+
+func buildValidatedClient() (*api.Client, error) {
+	client, err := createEnvOrPrivilegedClient()
 	if err != nil {
 		return nil, err
 	}
@@ -35,32 +63,22 @@ func GetVaultClient() (*api.Client, error) {
 	if validated == nil {
 		return nil, fmt.Errorf("initialized Vault client failed health validation")
 	}
-
-	shared.VaultClient = validated
-	zap.L().Info("✅ Vault client initialized, validated, and cached")
-	return shared.VaultClient, nil
+	return validated, nil
 }
 
-// SetVaultClient caches a Vault client globally.
-func SetVaultClient(client *api.Client) {
-	vaultClientLock.Lock()
-	defer vaultClientLock.Unlock()
-	zap.L().Debug("📦 Vault client cached globally")
-	shared.VaultClient = client
-}
-
-// tryEnvOrPrivilegedClient tries an environment-based client first, then privileged fallback.
-func tryEnvOrPrivilegedClient() (*api.Client, error) {
-	client, err := newClientWithEnv()
-	if err == nil {
+func createEnvOrPrivilegedClient() (*api.Client, error) {
+	if client, err := createClientFromEnv(); err == nil {
 		return client, nil
 	}
 	zap.L().Warn("⚠️ Environment client failed, trying privileged fallback")
-	return newPrivilegedClient()
+	return createPrivilegedClient()
 }
 
-// newClientWithEnv creates a Vault client using environment variables.
-func newClientWithEnv() (*api.Client, error) {
+// ==========================
+// CLIENT FACTORIES
+// ==========================
+
+func createClientFromEnv() (*api.Client, error) {
 	client, err := NewClient()
 	if err != nil {
 		return nil, fmt.Errorf("env client creation failed: %w", err)
@@ -69,27 +87,34 @@ func newClientWithEnv() (*api.Client, error) {
 	return client, nil
 }
 
-// newPrivilegedClient creates a Vault client using agent or root token fallback.
-func newPrivilegedClient() (*api.Client, error) {
-	token, err := readTokenFromSink(shared.VaultAgentTokenPath)
+func createPrivilegedClient() (*api.Client, error) {
+	token, err := loadPrivilegedToken()
 	if err != nil {
-		zap.L().Warn("⚠️ Vault Agent token not found, falling back to vault_init.json", zap.Error(err))
-		token, err = readRootTokenFromInitFile()
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	client, err := NewClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create new client: %w", err)
+		return nil, fmt.Errorf("failed to create privileged client: %w", err)
 	}
 	client.SetToken(token)
 	zap.L().Info("✅ Privileged Vault client ready")
 	return client, nil
 }
 
-// readRootTokenFromInitFile loads the root token from vault_init.json.
+// ==========================
+// TOKEN LOADERS
+// ==========================
+
+func loadPrivilegedToken() (string, error) {
+	if token, err := readTokenFromSink(shared.VaultAgentTokenPath); err == nil {
+		return token, nil
+	}
+
+	zap.L().Warn("⚠️ Vault Agent token not found, falling back to vault_init.json")
+	return readRootTokenFromInitFile()
+}
+
 func readRootTokenFromInitFile() (string, error) {
 	path := filepath.Join(shared.SecretsDir, "vault_init.json")
 	data, err := os.ReadFile(path)
@@ -107,14 +132,17 @@ func readRootTokenFromInitFile() (string, error) {
 	return initRes.RootToken, nil
 }
 
-// NewClient sets up a Vault API client with env and TLS config.
+// ==========================
+// CORE CLIENT CREATION
+// ==========================
+
 func NewClient() (*api.Client, error) {
 	addr, _ := EnsureVaultEnv()
 	cfg := api.DefaultConfig()
 	cfg.Address = addr
 
 	if err := cfg.ReadEnvironment(); err != nil {
-		zap.L().Warn("⚠️ could not read Vault env config", zap.Error(err))
+		zap.L().Warn("⚠️ Could not read Vault env config", zap.Error(err))
 	}
 
 	if os.Getenv("VAULT_CACERT") == "" {
@@ -134,7 +162,10 @@ func NewClient() (*api.Client, error) {
 	return client, nil
 }
 
-// validateClient checks Vault health and logs any diagnostic notes.
+// ==========================
+// VALIDATION
+// ==========================
+
 func validateClient(client *api.Client) (*api.Client, *shared.CheckReport) {
 	report, checkedClient := Check(client, nil, "")
 	if checkedClient != nil {

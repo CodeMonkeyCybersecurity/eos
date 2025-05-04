@@ -20,19 +20,24 @@ import (
 //--------------------------------------------------------------------
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
-func PhaseEnableUserpass(client *api.Client, log *zap.Logger, password string) error {
+func PhaseEnableUserpass(_ *api.Client, log *zap.Logger, password string) error {
 	zap.L().Info("🧑‍💻 [Phase 10] Enabling userpass auth method and EOS user")
+
+	// ✅ Get privileged client
+	client, err := GetPrivilegedVaultClient()
+	if err != nil {
+		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		return fmt.Errorf("get privileged vault client: %w", err)
+	}
 
 	// Validate password
 	if password == "" {
 		zap.L().Warn("⚠️ No password provided, prompting user interactively...")
-		var err error
 		password, err = crypto.PromptPassword("Enter password for EOS Vault user: ")
 		if err != nil {
 			return fmt.Errorf("failed to read password interactively: %w", err)
 		}
 	} else {
-		// Validate CLI-passed password as well!
 		if err := crypto.ValidateStrongPassword(password); err != nil {
 			return fmt.Errorf("provided password failed validation: %w", err)
 		}
@@ -100,26 +105,21 @@ func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) er
 
 	return nil
 }
-
-// WriteUserpassCredentialsFallback saves the EOS userpass password to Vault and fallback disk.
 func WriteUserpassCredentialsFallback(password string) error {
 	zap.L().Info("💾 Saving EOS userpass password to fallback and Vault")
 
 	fallbackFile := shared.EosUserVaultFallback + "/userpass-password"
 	fallbackDir := filepath.Dir(fallbackFile)
 
-	// Ensure fallback directory exists
 	if err := os.MkdirAll(fallbackDir, 0o700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
 
-	// Write to fallback file
 	if err := system.WriteOwnedFile(fallbackFile, []byte(password+"\n"), 0o600, shared.EosID); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
 	zap.L().Info("✅ Userpass password written to fallback file", zap.String("path", fallbackFile))
 
-	// Prepare KV payload
 	secrets := map[string]interface{}{
 		"eos-userpass-password": password,
 	}
@@ -129,15 +129,14 @@ func WriteUserpassCredentialsFallback(password string) error {
 		return fmt.Errorf("lookup eos uid/gid: %w", err)
 	}
 
-	// After writing the fallback file successfully:
 	if err := system.ChownRecursive(shared.SecretsDir, uid, gid); err != nil {
 		zap.L().Warn("⚠️ Failed to enforce EOS ownership after writing userpass fallback", zap.Error(err))
 	}
 
-	// Write to Vault KV
-	client, err := NewClient()
+	// ✅ Use privileged client here
+	client, err := GetPrivilegedVaultClient()
 	if err != nil {
-		return fmt.Errorf("get vault client for fallback write: %w", err)
+		return fmt.Errorf("get privileged vault client for fallback write: %w", err)
 	}
 	if err := WriteKVv2(client, "secret", "eos/userpass-password", secrets); err != nil {
 		return fmt.Errorf("write password to vault kv: %w", err)

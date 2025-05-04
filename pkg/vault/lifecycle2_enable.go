@@ -62,7 +62,7 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 	}
 
 	// Step 7: Write core policies
-	if err := EnsurePolicy(client); err != nil {
+	if err := EnsurePolicy(); err != nil {
 		return logger.LogErrAndWrap("write policies", err)
 	}
 

@@ -33,7 +33,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 1️⃣ Ensure EOS Policy
 		zap.L().Info("📜 Ensuring eos-policy exists")
-		if err := vault.EnsurePolicy(client); err != nil {
+		if err := vault.EnsurePolicy(); err != nil {
 			return logger.LogErrAndWrap("secure vault: ensure policy", err)
 		}
 

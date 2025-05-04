@@ -24,7 +24,7 @@ func EnableVaultUserpass(ctx *eosio.RuntimeContext) error {
 	zap.L().Info("✅ Userpass and approle auth methods ensured")
 
 	// 2. Ensure eos-policy exists
-	if err := EnsurePolicy(client); err != nil {
+	if err := EnsurePolicy(); err != nil {
 		return fmt.Errorf("failed to ensure eos-policy: %w", err)
 	}
 	zap.L().Info("✅ EOS policy ensured")

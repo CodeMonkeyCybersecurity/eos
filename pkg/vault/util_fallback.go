@@ -104,4 +104,3 @@ func TryLoadUnsealKeysFromFallback() (*api.InitResponse, error) {
 	zap.L().Info("✅ Fallback file validated", zap.Int("keys_found", len(initRes.KeysB64)))
 	return initRes, nil
 }
-
