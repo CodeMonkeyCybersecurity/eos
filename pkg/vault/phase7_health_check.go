@@ -108,3 +108,18 @@ func isVaultProcessRunning() bool {
 	}
 	return false
 }
+
+// validateAndCache checks Vault health and caches the client globally if usable.
+func ValidateAndCache(client *api.Client) {
+	report, checked := Check(client, nil, "")
+	if checked != nil {
+		SetVaultClient(checked)
+	}
+	if report == nil {
+		zap.L().Warn("⚠️ Vault check returned nil — skipping further setup")
+		return
+	}
+	for _, note := range report.Notes {
+		zap.L().Warn("⚠️ Vault diagnostic note", zap.String("note", note))
+	}
+}

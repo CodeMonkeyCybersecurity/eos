@@ -87,10 +87,10 @@ func WriteAgentSystemdUnit() error {
 	unit := fmt.Sprintf(shared.AgentSystemDUnit,
 		shared.VaultAgentUser,
 		shared.VaultAgentGroup,
-		shared.VaultRuntimePerms,
+		shared.RuntimeDirPerms,
 		shared.VaultAgentUser,
 		shared.VaultAgentGroup,
-		shared.VaultRuntimePerms,
+		shared.RuntimeDirPerms,
 		shared.EosRunDir,
 		shared.VaultAgentConfigPath,
 	)

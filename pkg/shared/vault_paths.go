@@ -30,3 +30,8 @@ const (
 	VaultServicePath = "/etc/systemd/system/vault.service"
 	VaultServiceName = "vault.service"
 )
+
+const (
+	TestDataVaultPath = "test-data"
+	TestDataFilename  = "test-data.json"
+)

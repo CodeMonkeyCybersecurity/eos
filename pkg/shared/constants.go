@@ -19,7 +19,8 @@ const SudoersEosEntry = `eos ALL=(ALL) NOPASSWD: ` + SystemctlVaultStart + `, ` 
 const (
 	// Permission modes (in octal)
 	DirPermStandard        = 0755
-	VaultRuntimePerms      = 0750
+	RuntimeDirPerms        = 0750
+	RuntimeFilePerms       = 0640
 	FilePermOwnerRWX       = 0700
 	FilePermStandard       = 0644
 	FilePermOwnerReadWrite = 0600
