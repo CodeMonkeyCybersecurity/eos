@@ -34,7 +34,7 @@ func InitializeVault() error {
 
 // PhaseInitVaultOnly initializes Vault if not already initialized.
 func PhaseInitVault(client *api.Client) (*api.Client, error) {
-	zap.L().Info("🚀 Phase 6a/6: Initialize Vault (only, no unseal)")
+	zap.L().Info("🚀 [Phase 6a]: Initialize Vault")
 
 	status, err := client.Sys().InitStatus()
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 
 // PhasePromptAndVerRootToken runs a fallback auth cascade and sets the token.
 func PhasePromptAndVerRootToken(client *api.Client) error {
-	zap.L().Info("🔑 [Phase 8] Starting Vault authentication fallback cascade")
+	zap.L().Info("🔑 [Phase 7] Starting Vault authentication fallback cascade")
 
 	// 1. Try agent token
 	if token, err := tryAgentToken(client); err == nil && verifyToken(client, token) {

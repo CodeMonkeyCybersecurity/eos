@@ -15,7 +15,7 @@ import (
 )
 
 func PhaseEnsureVaultHealthy() error {
-	zap.L().Info("🚀 [Phase 7] Ensuring Vault is ready")
+	zap.L().Info("🚀 [Phase 8] Ensuring Vault is ready")
 
 	if isVaultProcessRunning() {
 		zap.L().Info("✅ Vault process running (lsof check)")

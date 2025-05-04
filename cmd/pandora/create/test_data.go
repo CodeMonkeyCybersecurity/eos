@@ -20,14 +20,13 @@ attempts to upload it into Vault, and falls back to saving locally if Vault is u
 		log := ctx.Log.Named("pandora-create-test-data")
 		data := vault.GenerateTestData()
 
-		client, err := vault.GetVaultClient()
+		client, err := vault.Auth()
 		if err != nil {
-			log.Warn("⚠️ Vault client unavailable", zap.Error(err))
-			client = nil // Will trigger fallback to disk
-		} else {
-			vault.ValidateAndCache(client)
+			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
+			client = nil // triggers fallback to disk
 		}
 
+		// Write to Vault or fallback to disk
 		return vault.WriteTestDataToVaultOrFallback(client, data)
 	}),
 }
