@@ -1,17 +1,15 @@
-// pkg/vault/interaction
+// pkg/vault/interaction.go
 
 package vault
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
-	"golang.org/x/term"
 )
 
 // PromptForEosPassword securely prompts for and confirms the eos Vault password.
@@ -40,21 +38,14 @@ func PromptForInitResult() (*api.InitResponse, error) {
 	zap.L().Info("Prompting for unseal keys and root token (fallback path)")
 	fmt.Println("🔐 Please enter 3 unseal keys and the root token")
 
-	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		zap.L().Error("❌ Cannot prompt for secret input: not a TTY")
-		return nil, fmt.Errorf("secret prompt failed: no terminal available")
+	keys, err := interaction.PromptSecrets("Unseal Key", 3)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read unseal keys: %w", err)
 	}
-
-	var keys []string
-	for i := 1; i <= 3; i++ {
-		key, err := interaction.PromptSecret(fmt.Sprintf("Unseal Key %d", i))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read unseal key %d: %w", i, err)
-		}
+	for i, key := range keys {
 		if strings.TrimSpace(key) == "" {
-			return nil, fmt.Errorf("unseal key %d is blank", i)
+			return nil, fmt.Errorf("unseal key %d is blank", i+1)
 		}
-		keys = append(keys, key)
 	}
 
 	rootToken, err := interaction.PromptSecret("Root Token")

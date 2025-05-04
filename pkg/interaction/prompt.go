@@ -1,3 +1,5 @@
+// pkg/interaction/prompt.go
+
 package interaction
 
 import (

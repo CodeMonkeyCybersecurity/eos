@@ -36,8 +36,8 @@ func OrchestrateVaultAuth(client *api.Client) error {
 	}{
 		{"agent token", tryAgentToken},
 		{"AppRole", tryAppRole},
-		{"token file", tryTokenFile},
-		{"userpass", tryUserpass},
+		{"disk token file", tryTokenFile},   // renamed for clarity
+		{"userpass", tryUserpassWithPrompt}, // wrap userpass with y/N check
 		{"root token file", tryRootTokenFile},
 		{"prompt root token", promptRootToken},
 	}
@@ -104,6 +104,14 @@ func tryTokenFile(_ *api.Client) (string, error) {
 	token := strings.TrimSpace(string(data))
 	zap.L().Debug("🔑 Token file read successfully")
 	return token, nil
+}
+
+func tryUserpassWithPrompt(client *api.Client) (string, error) {
+	if !interaction.PromptYesNo("Is userpass authentication enabled?", false) {
+		zap.L().Info("⏭️ Skipping userpass (user chose 'no')")
+		return "", fmt.Errorf("userpass skipped by user")
+	}
+	return tryUserpass(client)
 }
 
 func tryUserpass(client *api.Client) (string, error) {

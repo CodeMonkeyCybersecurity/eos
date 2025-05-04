@@ -30,7 +30,7 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 	}
 	client = unsealedClient
 
-	// Step 7, 7a, 8: verify root token,  API client, overall vault health, 
+	// Step 7, 7a, 8: verify root token,  API client, overall vault health,
 	steps := []struct {
 		name string
 		fn   func() error
@@ -56,10 +56,10 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 		return err
 	}
 
-		// Step 1: Validate options
-		if opts.EnableAppRole && opts.EnableUserpass {
-			return fmt.Errorf("cannot enable both AppRole and Userpass authentication at the same time")
-		}
+	// Step 1: Validate options
+	if opts.EnableAppRole && opts.EnableUserpass {
+		return fmt.Errorf("cannot enable both AppRole and Userpass authentication at the same time")
+	}
 
 	// Step 7: Write core policies
 	if err := EnsurePolicy(client); err != nil {
