@@ -10,7 +10,7 @@ import (
 )
 
 // loadUnsealKeys loads unseal keys and root token from disk or prompt.
-func loadUnsealKeys(c *api.Client) (*api.InitResponse, error) {
+func loadUnsealKeys() (*api.InitResponse, error) {
 	initRes, err := LoadOrPromptInitResult()
 	if err != nil {
 		return nil, fmt.Errorf("could not load stored unseal keys: %w", err)
@@ -30,7 +30,7 @@ func UnsealVaultIfNeeded(client *api.Client) (bool, error) {
 		return false, nil
 	}
 
-	initRes, err := loadUnsealKeys(client)
+	initRes, err := loadUnsealKeys()
 	if err != nil {
 		return false, err
 	}

@@ -42,7 +42,7 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 	}
 
 	// 4. Prompt user for root token
-	token, err := promptRootTokenWrapper(client)
+	token, err := promptRootTokenWrapper()
 	if err != nil {
 		return fmt.Errorf("prompt root token: %w", err)
 	}
@@ -75,7 +75,7 @@ func recoverVaultHealth(client *api.Client) error {
 	}
 }
 
-func promptRootTokenWrapper(client *api.Client) (string, error) {
+func promptRootTokenWrapper() (string, error) {
 	initRes, err := LoadOrPromptInitResult()
 	if err != nil {
 		return "", fmt.Errorf("prompt root token failed: %w", err)
