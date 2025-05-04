@@ -105,14 +105,3 @@ func TryLoadUnsealKeysFromFallback() (*api.InitResponse, error) {
 	return initRes, nil
 }
 
-// tryInitFileRootToken tries to load the root token from the fallback init file.
-func tryInitFileRootToken(client *api.Client) (string, error) {
-	initRes, err := LoadInitResultOrPrompt(client)
-	if err != nil {
-		return "", fmt.Errorf("load init result: %w", err)
-	}
-	if initRes.RootToken == "" {
-		return "", fmt.Errorf("root token missing in init result")
-	}
-	return initRes.RootToken, nil
-}

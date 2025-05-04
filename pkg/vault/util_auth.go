@@ -1,13 +1,13 @@
-// pkg/vault/util_auth.go
-
 package vault
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -34,144 +34,153 @@ func OrchestrateVaultAuth(client *api.Client) error {
 		name string
 		fn   func(*api.Client) (string, error)
 	}{
-		{"agent token", tryAgentToken},
+		{"agent token", readTokenFile("/etc/vault-agent-eos.token")},
 		{"AppRole", tryAppRole},
-		{"disk token file", tryTokenFile},   // renamed for clarity
-		{"userpass", tryUserpassWithPrompt}, // wrap userpass with y/N check
-		{"root token file", tryRootTokenFile},
-		{"prompt root token", promptRootToken},
+		{"disk token file", readTokenFile("/var/lib/eos/secrets/vault.token")},
+		{"userpass", tryUserpassWithPrompt},
+		{"root token file", tryRootToken},
 	}
 
-	for _, method := range authMethods {
-		zap.L().Info(fmt.Sprintf("🔑 Trying %s", method.name))
-		token, err := method.fn(client)
+	for _, m := range authMethods {
+		zap.L().Info("🔑 Trying auth method", zap.String("method", m.name))
+		token, err := m.fn(client)
 		if err != nil {
-			zap.L().Warn(fmt.Sprintf("⚠️ %s failed", method.name), zap.Error(err))
+			zap.L().Warn("⚠️ Auth method failed", zap.String("method", m.name), zap.Error(err))
 			continue
 		}
-
-		zap.L().Debug(fmt.Sprintf("✅ %s returned token candidate: %s", method.name, token))
-
-		if verifyToken(client, token) {
+		zap.L().Debug("✅ Auth method returned token candidate", zap.String("method", m.name))
+		if VerifyToken(client, token) {
 			SetVaultToken(client, token)
-			zap.L().Info(fmt.Sprintf("✅ Authenticated using %s", method.name))
+			zap.L().Info("✅ Authenticated using method", zap.String("method", m.name))
 			return nil
 		}
-
-		zap.L().Warn(fmt.Sprintf("❌ %s verification failed", method.name))
 	}
-
-	return fmt.Errorf("all authentication methods failed")
+	errMsg := "all authentication methods failed"
+	zap.L().Error(errMsg)
+	return errors.New(errMsg)
 }
 
-func tryAgentToken(_ *api.Client) (string, error) {
-	path := "/etc/vault-agent-eos.token"
-	zap.L().Debug("📂 Reading agent token", zap.String("path", path))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read agent token: %w", err)
+func readTokenFile(path string) func(*api.Client) (string, error) {
+	return func(_ *api.Client) (string, error) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			zap.L().Warn("❌ Failed to read token file", zap.String("path", path), zap.Error(err))
+			return "", fmt.Errorf("read token file %s: %w", path, err)
+		}
+		token := strings.TrimSpace(string(data))
+		zap.L().Debug("🔑 Token file read successfully", zap.String("path", path))
+		return token, nil
 	}
-	token := strings.TrimSpace(string(data))
-	zap.L().Debug("🔑 Agent token read successfully")
-	return token, nil
 }
 
 func tryAppRole(client *api.Client) (string, error) {
-	zap.L().Debug("📂 Reading AppRole credentials from disk")
 	roleID, secretID, err := readAppRoleCredsFromDisk()
 	if err != nil {
+		zap.L().Warn("❌ Failed to read AppRole credentials", zap.Error(err))
 		return "", fmt.Errorf("read AppRole creds: %w", err)
 	}
-	zap.L().Debug("🔑 AppRole creds loaded, attempting login", zap.String("roleID", roleID))
 	secret, err := client.Logical().Write("auth/approle/login", map[string]interface{}{
-		"role_id":   roleID,
-		"secret_id": secretID,
+		"role_id": roleID, "secret_id": secretID,
 	})
 	if err != nil || secret == nil || secret.Auth == nil {
+		zap.L().Warn("❌ AppRole login failed", zap.Error(err))
 		return "", fmt.Errorf("approle login failed: %w", err)
 	}
-	zap.L().Debug("✅ AppRole login successful")
+	zap.L().Debug("✅ AppRole login successful", zap.String("roleID", roleID))
 	return secret.Auth.ClientToken, nil
-}
-
-func tryTokenFile(_ *api.Client) (string, error) {
-	path := "/var/lib/eos/secrets/vault.token"
-	zap.L().Debug("📂 Reading token file", zap.String("path", path))
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("read token file: %w", err)
-	}
-	token := strings.TrimSpace(string(data))
-	zap.L().Debug("🔑 Token file read successfully")
-	return token, nil
 }
 
 func tryUserpassWithPrompt(client *api.Client) (string, error) {
 	if !interaction.PromptYesNo("Is userpass authentication enabled?", false) {
 		zap.L().Info("⏭️ Skipping userpass (user chose 'no')")
-		return "", fmt.Errorf("userpass skipped by user")
+		return "", errors.New("userpass skipped by user")
 	}
 	return tryUserpass(client)
 }
 
 func tryUserpass(client *api.Client) (string, error) {
-	zap.L().Info("🔑 Prompting user for username and password")
 	usernames, err := interaction.PromptSecrets("Username", 1)
 	if err != nil {
+		zap.L().Warn("❌ Failed to prompt username", zap.Error(err))
 		return "", fmt.Errorf("prompt username: %w", err)
 	}
 	passwords, err := interaction.PromptSecrets("Password", 1)
 	if err != nil {
+		zap.L().Warn("❌ Failed to prompt password", zap.Error(err))
 		return "", fmt.Errorf("prompt password: %w", err)
 	}
-
-	username := usernames[0]
-	password := passwords[0]
-	zap.L().Debug("🔐 Attempting userpass login", zap.String("username", username))
-	secret, err := client.Logical().Write(fmt.Sprintf("auth/userpass/login/%s", username), map[string]interface{}{
-		"password": password,
-	})
+	username, password := usernames[0], passwords[0]
+	secret, err := client.Logical().Write(fmt.Sprintf("auth/userpass/login/%s", username),
+		map[string]interface{}{"password": password})
 	if err != nil || secret == nil || secret.Auth == nil {
+		zap.L().Warn("❌ Userpass login failed", zap.String("username", username), zap.Error(err))
 		return "", fmt.Errorf("userpass login failed: %w", err)
 	}
-	zap.L().Debug("✅ Userpass login successful")
+	zap.L().Debug("✅ Userpass login successful", zap.String("username", username))
 	return secret.Auth.ClientToken, nil
 }
 
-func tryRootTokenFile(_ *api.Client) (string, error) {
-	path := "/var/lib/eos/secrets/root.token"
-	zap.L().Debug("📂 Reading root token file", zap.String("path", path))
-	data, err := os.ReadFile(path)
+func tryRootToken(_ *api.Client) (string, error) {
+	initRes, err := LoadOrPromptInitResult()
 	if err != nil {
-		return "", fmt.Errorf("read root token file: %w", err)
+		zap.L().Warn("❌ Failed to load or prompt init result", zap.Error(err))
+		return "", fmt.Errorf("load or prompt init result: %w", err)
 	}
-	token := strings.TrimSpace(string(data))
-	zap.L().Debug("🔑 Root token file read successfully")
-	return token, nil
+	if strings.TrimSpace(initRes.RootToken) == "" {
+		errMsg := "root token is missing in init result"
+		zap.L().Warn(errMsg)
+		return "", errors.New(errMsg)
+	}
+	zap.L().Debug("✅ Root token loaded successfully")
+	return initRes.RootToken, nil
 }
 
-func promptRootToken(_ *api.Client) (string, error) {
-	zap.L().Info("🔑 Please enter the Vault root token")
-	tokens, err := interaction.PromptSecrets("Root Token", 1)
-	if err != nil {
-		return "", fmt.Errorf("prompt root token: %w", err)
+func LoadOrPromptInitResult() (*api.InitResponse, error) {
+	var res api.InitResponse
+	if err := ReadFallbackJSON(shared.VaultInitPath, &res); err != nil {
+		zap.L().Warn("⚠️ Fallback file missing, prompting user", zap.Error(err))
+		return PromptForInitResult()
 	}
-	zap.L().Debug("🔑 Root token entered by user")
-	return tokens[0], nil
+	if err := VerifyInitResult(&res); err != nil {
+		zap.L().Warn("⚠️ Loaded init result invalid, prompting user", zap.Error(err))
+		return PromptForInitResult()
+	}
+	return &res, nil
 }
 
-func VerifyRootToken(client *api.Client, token string) error {
-	zap.L().Debug("🔍 Verifying token by calling LookupSelf")
-	client.SetToken(token)
-	secret, err := client.Auth().Token().LookupSelf()
-	if err != nil || secret == nil {
-		return fmt.Errorf("token validation failed: %w", err)
+func VerifyInitResult(r *api.InitResponse) error {
+	if r == nil {
+		err := errors.New("init result is nil")
+		zap.L().Warn("❌ Invalid init result", zap.Error(err))
+		return err
+	}
+	if len(r.KeysB64) < 3 {
+		err := fmt.Errorf("expected at least 3 unseal keys, got %d", len(r.KeysB64))
+		zap.L().Warn("❌ Invalid init result", zap.Error(err))
+		return err
+	}
+	if strings.TrimSpace(r.RootToken) == "" {
+		err := errors.New("root token is missing or empty")
+		zap.L().Warn("❌ Invalid init result", zap.Error(err))
+		return err
 	}
 	return nil
 }
 
-func verifyToken(client *api.Client, token string) bool {
-	if err := VerifyRootToken(client, token); err != nil {
+func VerifyRootToken(client *api.Client, token string) error {
+	client.SetToken(token)
+	secret, err := client.Auth().Token().LookupSelf()
+	if err != nil || secret == nil {
+		zap.L().Warn("❌ Token validation failed", zap.Error(err))
+		return fmt.Errorf("token validation failed: %w", err)
+	}
+	zap.L().Debug("✅ Token validated successfully")
+	return nil
+}
+
+func VerifyToken(client *api.Client, token string) bool {
+	err := VerifyRootToken(client, token)
+	if err != nil {
 		zap.L().Warn("❌ Token verification failed", zap.Error(err))
 		return false
 	}

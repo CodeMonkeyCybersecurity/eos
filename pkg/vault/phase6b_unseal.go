@@ -11,7 +11,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -45,7 +44,7 @@ func UnsealVault() (*api.Client, error) {
 		if sealStatus.Sealed {
 			zap.L().Warn("🔒 Vault is initialized but sealed — attempting unseal")
 
-			initRes, loadErr := LoadInitResultOrPrompt(client)
+			initRes, loadErr := LoadOrPromptInitResult()
 			if loadErr != nil {
 				zap.L().Warn("⚠️ Failed to load init result file, falling back to manual prompt", zap.Error(loadErr))
 
@@ -120,7 +119,7 @@ func initVaultWithTimeout(client *api.Client) (*api.InitResponse, error) {
 
 	if IsAlreadyInitialized(err) {
 		zap.L().Warn("⚠️ Vault already initialized, loading init result")
-		return LoadInitResultOrPrompt(client)
+		return LoadOrPromptInitResult()
 	}
 
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -211,34 +210,5 @@ func ConfirmUnsealMaterialSaved(init *api.InitResponse) error {
 	}
 
 	zap.L().Info("✅ User confirmed unseal material backup")
-	return nil
-}
-
-func LoadInitResultOrPrompt(client *api.Client) (*api.InitResponse, error) {
-	initRes := new(api.InitResponse)
-	if err := ReadFallbackJSON(shared.VaultInitPath, initRes); err != nil {
-		zap.L().Warn("⚠️ Fallback file missing, prompting user", zap.Error(err))
-		return PromptForInitResult()
-	}
-
-	// NEW: validate loaded init result
-	if err := validateInitResult(initRes); err != nil {
-		zap.L().Warn("⚠️ Loaded init result is invalid or incomplete, prompting user", zap.Error(err))
-		return PromptForInitResult()
-	}
-
-	return initRes, nil
-}
-
-func validateInitResult(initRes *api.InitResponse) error {
-	if initRes == nil {
-		return fmt.Errorf("init result is nil")
-	}
-	if len(initRes.KeysB64) < 3 {
-		return fmt.Errorf("expected at least 3 unseal keys, got %d", len(initRes.KeysB64))
-	}
-	if strings.TrimSpace(initRes.RootToken) == "" {
-		return fmt.Errorf("root token is missing or empty")
-	}
 	return nil
 }

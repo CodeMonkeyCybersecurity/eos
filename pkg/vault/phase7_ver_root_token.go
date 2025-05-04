@@ -4,6 +4,7 @@ package vault
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -14,7 +15,7 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 	zap.L().Info("🔑 [Phase 7] Starting Vault authentication fallback cascade")
 
 	// 1. Try agent token
-	if token, err := tryAgentToken(client); err == nil && verifyToken(client, token) {
+	if token, err := readTokenFile("/etc/vault-agent-eos.token")(client); err == nil && VerifyToken(client, token) {
 		SetVaultToken(client, token)
 		zap.L().Info("✅ Authenticated via agent token")
 		return nil
@@ -23,7 +24,7 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 	}
 
 	// 2. Try AppRole
-	if token, err := tryAppRole(client); err == nil && verifyToken(client, token) {
+	if token, err := tryAppRole(client); err == nil && VerifyToken(client, token) {
 		SetVaultToken(client, token)
 		zap.L().Info("✅ Authenticated via AppRole")
 		return nil
@@ -32,7 +33,7 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 	}
 
 	// 3. Try reading root token from init file
-	if token, err := tryInitFileRootToken(client); err == nil && verifyToken(client, token) {
+	if token, err := tryRootToken(client); err == nil && VerifyToken(client, token) {
 		SetVaultToken(client, token)
 		zap.L().Info("✅ Authenticated via init file root token")
 		return nil
@@ -41,7 +42,7 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 	}
 
 	// 4. Prompt user for root token
-	token, err := promptRootToken(client)
+	token, err := promptRootTokenWrapper(client)
 	if err != nil {
 		return fmt.Errorf("prompt root token: %w", err)
 	}
@@ -72,4 +73,15 @@ func recoverVaultHealth(client *api.Client) error {
 	default:
 		return fmt.Errorf("unexpected vault state: initialized=%v sealed=%v", status.Initialized, status.Sealed)
 	}
+}
+
+func promptRootTokenWrapper(client *api.Client) (string, error) {
+	initRes, err := LoadOrPromptInitResult()
+	if err != nil {
+		return "", fmt.Errorf("prompt root token failed: %w", err)
+	}
+	if strings.TrimSpace(initRes.RootToken) == "" {
+		return "", fmt.Errorf("root token is missing in init result")
+	}
+	return initRes.RootToken, nil
 }
