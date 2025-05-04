@@ -47,6 +47,12 @@ func EnsurePolicy(client *api.Client) error {
 	}
 
 	zap.L().Info("✅ Policy successfully written and verified", zap.String("policy", shared.EosVaultPolicy))
+
+	// Attach policy to AppRole
+	if err := AttachPolicyToAppRole(client, zap.L()); err != nil {
+		return fmt.Errorf("failed to attach eos-policy to AppRole: %w", err)
+	}
+
 	return nil
 }
 
@@ -91,4 +97,26 @@ func truncatePolicy(policy string) string {
 		return policy[:100] + "..."
 	}
 	return policy
+}
+
+// AttachPolicyToAppRole ensures eos-policy is attached to eos-approle
+func AttachPolicyToAppRole(client *api.Client, log *zap.Logger) error {
+	rolePath := "auth/approle/role/eos-approle"
+
+	log.Info("🔑 Attaching eos-policy to eos-approle", zap.String("role_path", rolePath))
+
+	// Prepare role update payload
+	data := map[string]interface{}{
+		"policies": shared.EosVaultPolicy,
+	}
+
+	// Write to the AppRole configuration
+	_, err := client.Logical().Write(rolePath, data)
+	if err != nil {
+		log.Error("❌ Failed to attach policy to AppRole", zap.Error(err))
+		return fmt.Errorf("failed to attach eos-policy to eos-approle: %w", err)
+	}
+
+	log.Info("✅ eos-policy successfully attached to eos-approle", zap.String("policy", shared.EosVaultPolicy))
+	return nil
 }
