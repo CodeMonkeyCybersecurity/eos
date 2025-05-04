@@ -1,4 +1,4 @@
-// pkg/vault/phase11_render_agent_config.go
+// pkg/vault/phase13_render_agent_config.go
 
 //--------------------------------------------------------------------
 // 11. Render Vault Agent Configuration
@@ -26,7 +26,7 @@ import (
 
 // PhaseRenderVaultAgentConfig creates the Vault Agent HCL config.
 func PhaseRenderVaultAgentConfig(client *api.Client) error {
-	zap.L().Info("📝 [Phase 11] Rendering Vault Agent configuration")
+	zap.L().Info("📝 [Phase 13] Rendering Vault Agent configuration")
 
 	addr := os.Getenv(shared.VaultAddrEnv)
 	if addr == "" {
