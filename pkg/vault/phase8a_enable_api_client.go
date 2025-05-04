@@ -1,5 +1,3 @@
-// pkg/vault/phase8a_enable_api_client.go
-
 package vault
 
 import (
@@ -17,33 +15,35 @@ import (
 // - Validate that token (root token) is active and authorized
 //--------------------------------------------------------------------
 
-// Phase 8A: Enable API Client Access
-// └── GetPrivilegedVaultClient()
-//     ├── GetVaultClient()
-//     │   └── (returns the existing Vault client)
-//     └── validateVaultToken(client)
-//         └── client.Auth().Token().LookupSelf()
-//             └── (Vault server confirms token validity)
-
 // SetVaultToken sets the Vault token on the provided client.
 func SetVaultToken(client *api.Client, token string) {
 	client.SetToken(token)
 }
 
-// GetPrivilegedVaultClient simply returns the authenticated Vault client if available.
-// It validates that the token is usable immediately.
+// GetPrivilegedVaultClient returns a Vault client authenticated with the root token.
+// It bypasses the agent token and ensures the root token is valid.
 func GetPrivilegedVaultClient() (*api.Client, error) {
 	zap.L().Info("🔐 Checking Vault client token validity...")
 
-	client, err := GetVaultClient()
+	// Create a fresh Vault client
+	client, err := NewClient()
 	if err != nil {
-		zap.L().Error("❌ Failed to retrieve existing Vault client", zap.Error(err))
-		return nil, fmt.Errorf("get vault client: %w", err)
+		zap.L().Error("❌ Failed to create new Vault client", zap.Error(err))
+		return nil, fmt.Errorf("create new vault client: %w", err)
 	}
 
+	// Explicitly load the root token from vault_init.json
+	rootToken, err := readRootTokenFromInitFile()
+	if err != nil {
+		zap.L().Error("❌ Failed to load root token", zap.Error(err))
+		return nil, fmt.Errorf("load root token: %w", err)
+	}
+	client.SetToken(rootToken)
+
+	// Validate that the root token works
 	if err := validateVaultToken(client); err != nil {
-		zap.L().Error("❌ Vault client token appears invalid", zap.Error(err))
-		return nil, fmt.Errorf("vault client invalid: %w", err)
+		zap.L().Error("❌ Vault root token appears invalid", zap.Error(err))
+		return nil, fmt.Errorf("vault root token invalid: %w", err)
 	}
 
 	zap.L().Info("✅ Vault client authenticated and ready")
