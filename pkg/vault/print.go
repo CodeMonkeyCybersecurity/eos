@@ -1,10 +1,8 @@
 package vault
 
 import (
+	"encoding/json"
 	"fmt"
-	"path/filepath"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func PrintNextSteps() {
@@ -45,6 +43,27 @@ func PrintStorageSummary(primary string, primaryPath string, primaryResult strin
 	fmt.Println()
 }
 
-func diskFallbackPath() string {
-	return filepath.Join(shared.SecretsDir, shared.TestDataFilename)
+func PrintData(data map[string]interface{}, source, path string) {
+	fmt.Println()
+	fmt.Println("🔒 Test Data Contents:")
+	raw, _ := json.MarshalIndent(data, "", "  ")
+	fmt.Println(string(raw))
+	fmt.Println()
+
+	PrintInspectSummary(source, path)
+}
+
+func PrintInspectSummary(source, path string) {
+	fmt.Println()
+	fmt.Println("🔎 Test Data Inspection Summary")
+	switch source {
+	case "Vault":
+		fmt.Printf("  🔐 Source: %s\n", source)
+	case "Disk":
+		fmt.Printf("  💾 Source: %s\n", source)
+	default:
+		fmt.Printf("  ❓ Source: %s\n", source)
+	}
+	fmt.Printf("  📂 Path: %s\n", path)
+	fmt.Println()
 }

@@ -275,3 +275,28 @@ func ReadVaultInitResult() (*api.InitResponse, error) {
 	zap.L().Info("Vault init result loaded from disk", zap.String("path", path))
 	return initRes, nil
 }
+
+func InspectFromDisk() error {
+	zap.L().Info("🔍 Attempting to read test-data from disk fallback...")
+
+	path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			zap.L().Warn("⚠️ Fallback test-data file not found", zap.String("path", path))
+			return fmt.Errorf("no test-data found in Vault or disk")
+		}
+		zap.L().Error("❌ Failed to read fallback test-data", zap.String("path", path), zap.Error(err))
+		return fmt.Errorf("disk fallback read failed: %w", err)
+	}
+
+	var out map[string]interface{}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		zap.L().Error("❌ Invalid fallback test-data format", zap.String("path", path), zap.Error(err))
+		return fmt.Errorf("invalid fallback data format: %w", err)
+	}
+
+	PrintData(out, "Disk", path)
+	zap.L().Info("✅ Test-data read successfully from fallback")
+	return nil
+}

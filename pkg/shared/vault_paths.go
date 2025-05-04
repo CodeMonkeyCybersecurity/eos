@@ -32,6 +32,6 @@ const (
 )
 
 const (
-	TestDataVaultPath = "test-data"
+	TestDataVaultPath = "eos/test-data"
 	TestDataFilename  = "test-data.json"
 )

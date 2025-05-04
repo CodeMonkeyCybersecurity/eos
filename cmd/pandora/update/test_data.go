@@ -11,14 +11,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
-	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-)
-
-const (
-	testDataVaultPath = "eos/test-data"
-	testDataFilename  = "test-data.json"
 )
 
 // UpdateTestDataCmd overwrites the test-data in Vault,
@@ -36,18 +30,18 @@ var UpdateTestDataCmd = &cobra.Command{
 			client = nil
 		} else {
 			vault.SetVaultClient(client)
-			validateAndCache(client)
+			vault.ValidateAndCache(client)
 		}
 
-		newData := generateUpdatedTestData()
+		newData := vault.GenerateUpdatedTestData()
 
 		if client != nil {
 			log.Info("✏️ Attempting to update test-data in Vault...")
-			if err := vault.Write(client, testDataVaultPath, newData); err == nil {
+			if err := vault.Write(client, shared.TestDataVaultPath, newData); err == nil {
 				fmt.Println()
 				fmt.Println("✏️ Test Data Update Summary")
 				fmt.Println("  🔐 Vault: SUCCESS")
-				fmt.Printf("    📂 Path: secret/data/%s\n\n", testDataVaultPath)
+				fmt.Printf("    📂 Path: secret/data/%s\n\n", shared.TestDataVaultPath)
 				log.Info("✅ Test-data updated successfully (Vault)")
 				return nil
 			}
@@ -55,7 +49,7 @@ var UpdateTestDataCmd = &cobra.Command{
 		}
 
 		// Fallback to disk write
-		path := filepath.Join(shared.SecretsDir, testDataFilename)
+		path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 		raw, err := json.MarshalIndent(newData, "", "  ")
 		if err != nil {
 			log.Error("❌ Failed to marshal new test data", zap.Error(err))
@@ -74,46 +68,6 @@ var UpdateTestDataCmd = &cobra.Command{
 		log.Info("✅ Test-data updated successfully (fallback)", zap.String("path", path))
 		return nil
 	}),
-}
-
-func generateUpdatedTestData() map[string]interface{} {
-	return map[string]interface{}{
-		"users": []map[string]interface{}{
-			{
-				"username": "alice",
-				"fullname": "Alice Wonderland (Updated)",
-				"email":    "alice@wonderland.com",
-				"groups":   []string{"users", "nextcloud"},
-				"password": "UpdatedS3cretP@ss!",
-			},
-			{
-				"username": "bob",
-				"fullname": "Bob the Builder (Updated)",
-				"email":    "bob@builder.com",
-				"groups":   []string{"admins"},
-				"password": "YesWeStillCan!",
-			},
-		},
-		"groups": []string{"users", "admins", "nextcloud"},
-		"services": map[string]string{
-			"wazuh_api_url": "https://new-wazuh.example.com",
-		},
-	}
-}
-
-// validateAndCache ensures Vault client health check and cache
-func validateAndCache(client *api.Client) {
-	report, checked := vault.Check(client, nil, "")
-	if checked != nil {
-		vault.SetVaultClient(checked)
-	}
-	if report == nil {
-		zap.L().Warn("⚠️ Vault check returned nil — skipping further setup")
-		return
-	}
-	for _, note := range report.Notes {
-		zap.L().Warn("⚠️ Vault diagnostic note", zap.String("note", note))
-	}
 }
 
 func init() {

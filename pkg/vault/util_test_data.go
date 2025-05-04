@@ -29,3 +29,28 @@ func GenerateTestData() map[string]interface{} {
 		},
 	}
 }
+
+func GenerateUpdatedTestData() map[string]interface{} {
+	return map[string]interface{}{
+		"users": []map[string]interface{}{
+			{
+				"username": "alice",
+				"fullname": "Alice Wonderland (Updated)",
+				"email":    "alice@wonderland.com",
+				"groups":   []string{"users", "nextcloud"},
+				"password": "UpdatedS3cretP@ss!",
+			},
+			{
+				"username": "bob",
+				"fullname": "Bob the Builder (Updated)",
+				"email":    "bob@builder.com",
+				"groups":   []string{"admins"},
+				"password": "YesWeStillCan!",
+			},
+		},
+		"groups": []string{"users", "admins", "nextcloud"},
+		"services": map[string]string{
+			"wazuh_api_url": "https://new-wazuh.example.com",
+		},
+	}
+}

@@ -1,6 +1,8 @@
 package vault
 
 import (
+	"path/filepath"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
@@ -27,4 +29,8 @@ type AppRoleOptions struct {
 	SecretIDTTL   string
 	ForceRecreate bool
 	RefreshCreds  bool
+}
+
+func diskFallbackPath() string {
+	return filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 }
