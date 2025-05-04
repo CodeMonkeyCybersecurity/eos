@@ -1,3 +1,5 @@
+// pkg/vault/phase7a_enable_api_client.go
+
 package vault
 
 import (

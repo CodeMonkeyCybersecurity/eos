@@ -1,3 +1,5 @@
+// pkg/vault/lifecycle2_enable.go
+
 package vault
 
 import (
@@ -21,26 +23,21 @@ func VaultAddress() string {
 func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error {
 	zap.L().Info("🚀 Starting Vault enablement flow")
 
-	// Step 0: Initialize and unseal Vault if needed
+	// Step 6b: unseal Vault if needed
 	unsealedClient, err := UnsealVault()
 	if err != nil {
 		return logger.LogErrAndWrap("initialize and unseal vault", err)
 	}
 	client = unsealedClient
 
-	// Step 1: Validate options
-	if opts.EnableAppRole && opts.EnableUserpass {
-		return fmt.Errorf("cannot enable both AppRole and Userpass authentication at the same time")
-	}
-
-	// Step 2–4: Check health, root token, API client
+	// Step 7, 7a, 8: verify root token,  API client, overall vault health, 
 	steps := []struct {
 		name string
 		fn   func() error
 	}{
-		{"check vault health", PhaseEnsureVaultHealthy},
-		{"validate root token", func() error { return PhasePromptAndVerRootToken(client) }},
+		{"verify root token", func() error { return PhasePromptAndVerRootToken(client) }},
 		{"verify vault API client", func() error { _, err := GetPrivilegedVaultClient(); return err }},
+		{"verify vault healthy", PhaseEnsureVaultHealthy},
 	}
 	for _, step := range steps {
 		zap.L().Info(fmt.Sprintf("🔍 %s...", step.name))
@@ -58,6 +55,11 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 	if err := enableAuthMethods(client, log, opts); err != nil {
 		return err
 	}
+
+		// Step 1: Validate options
+		if opts.EnableAppRole && opts.EnableUserpass {
+			return fmt.Errorf("cannot enable both AppRole and Userpass authentication at the same time")
+		}
 
 	// Step 7: Write core policies
 	if err := EnsurePolicy(client); err != nil {

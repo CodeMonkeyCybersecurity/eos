@@ -116,12 +116,3 @@ func tryInitFileRootToken(client *api.Client) (string, error) {
 	}
 	return initRes.RootToken, nil
 }
-
-func LoadInitResultOrPrompt(client *api.Client) (*api.InitResponse, error) {
-	initRes := new(api.InitResponse)
-	if err := ReadFallbackJSON(shared.VaultInitPath, initRes); err != nil {
-		zap.L().Warn("⚠️ Fallback file missing, prompting user", zap.Error(err))
-		return PromptForInitResult()
-	}
-	return initRes, nil
-}
