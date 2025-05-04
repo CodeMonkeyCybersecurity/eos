@@ -15,7 +15,7 @@ func PhaseWriteBootstrapSecretAndRecheck(_ *api.Client) error {
 	zap.L().Info("🧪 [Phase 9A] Writing bootstrap test secret and verifying Vault health")
 
 	// ✅ Get privileged client (root or agent token, validated)
-	privilegedClient, err := GetPrivilegedVaultClient()
+	privilegedClient, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return err

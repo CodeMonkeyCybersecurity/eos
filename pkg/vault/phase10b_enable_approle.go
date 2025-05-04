@@ -31,7 +31,7 @@ import (
 func PhaseEnableAppRole(_ *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {
 	zap.L().Info("[Phase10] Setting up Vault AppRole", zap.Any("options", opts))
 
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)

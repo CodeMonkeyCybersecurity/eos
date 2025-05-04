@@ -130,7 +130,7 @@ func IsAlreadyInitialized(err error) bool {
 }
 
 func ListVault(path string) ([]string, error) {
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		return nil, err
 	}

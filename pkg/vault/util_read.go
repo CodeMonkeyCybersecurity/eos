@@ -18,7 +18,7 @@ import (
 
 // ReadVault reads and decodes a secret struct from Vault.
 func ReadVault[T any](path string) (*T, error) {
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get privileged Vault client: %w", err)
 	}
@@ -233,7 +233,7 @@ func ReadFallbackSecrets() (map[string]string, error) {
 // ListUnder lists keys at a Vault KV metadata path (e.g., for KV v2 list operations).
 // It uses the privileged Vault client and returns only the key names.
 func ListUnder(path string) ([]string, error) {
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Vault client: %w", err)
 	}

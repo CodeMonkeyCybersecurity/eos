@@ -30,7 +30,7 @@ func PhaseEnsureVaultHealthy() error {
 		zap.L().Info("✅ VAULT_ADDR resolved", zap.String("address", addr))
 	}
 
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to create privileged Vault client", zap.Error(err))
 		return fmt.Errorf("could not create Vault client: %w", err)

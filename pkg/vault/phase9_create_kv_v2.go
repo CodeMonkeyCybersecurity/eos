@@ -31,7 +31,7 @@ func PhaseEnableKVv2(client *api.Client) error {
 	zap.L().Info("🔒 [Phase 9] Enabling Vault KV engine")
 
 	// ✅ Get privileged client (root or agent token, validated)
-	privilegedClient, err := GetPrivilegedVaultClient()
+	privilegedClient, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return err
@@ -79,7 +79,7 @@ func IsMountEnabled(client *api.Client, mount string) (bool, error) {
 func UpdateVault(path string, update map[string]interface{}) error {
 	zap.L().Info("✏️ Updating Vault secret", zap.String("path", path))
 
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return err

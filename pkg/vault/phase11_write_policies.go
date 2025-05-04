@@ -12,7 +12,7 @@ import (
 func EnsurePolicy() error {
 	zap.L().Info("📝 Preparing to write Vault policy", zap.String("policy", shared.EosVaultPolicy))
 
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)
@@ -96,7 +96,7 @@ func truncatePolicy(policy string) string {
 func AttachPolicyToAppRole(existingClient *api.Client, log *zap.Logger) error {
 	rolePath := "auth/approle/role/eos-approle"
 
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)

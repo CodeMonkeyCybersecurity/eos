@@ -15,7 +15,7 @@ import (
 
 // GetDelphiAPICredsOrPrompt returns (username, password) either from Vault or prompt fallback
 func GetDelphiAPICredsOrPrompt() (string, string, error) {
-	client, err := vault.GetPrivilegedVaultClient()
+	client, err := vault.GetRootClient()
 	if err != nil {
 		zap.L().Warn("Failed to initialize Vault client, falling back to prompt", zap.Error(err))
 		return promptDelphiAPICreds()

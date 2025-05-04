@@ -24,7 +24,7 @@ func PhaseEnableUserpass(_ *api.Client, log *zap.Logger, password string) error 
 	zap.L().Info("🧑‍💻 [Phase 10] Enabling userpass auth method and EOS user")
 
 	// ✅ Get privileged client
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)
@@ -134,7 +134,7 @@ func WriteUserpassCredentialsFallback(password string) error {
 	}
 
 	// ✅ Use privileged client here
-	client, err := GetPrivilegedVaultClient()
+	client, err := GetRootClient()
 	if err != nil {
 		return fmt.Errorf("get privileged vault client for fallback write: %w", err)
 	}

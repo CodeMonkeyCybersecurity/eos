@@ -36,7 +36,7 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 		fn   func() error
 	}{
 		{"verify root token", func() error { return PhasePromptAndVerRootToken(client) }},
-		{"verify vault API client", func() error { _, err := GetPrivilegedVaultClient(); return err }},
+		{"verify vault API client", func() error { _, err := GetRootClient(); return err }},
 		{"verify vault healthy", PhaseEnsureVaultHealthy},
 	}
 	for _, step := range steps {
