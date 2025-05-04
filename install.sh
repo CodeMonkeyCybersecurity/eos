@@ -60,12 +60,38 @@ else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
+# Show SHA256 checksum of the existing installed binary (if present)
+if [ -f "$INSTALL_PATH" ]; then
+  if command -v sha256sum >/dev/null 2>&1; then
+    echo "🔍 Existing installed binary SHA256:"
+    sha256sum "$INSTALL_PATH"
+  elif command -v shasum >/dev/null 2>&1; then
+    echo "🔍 Existing installed binary SHA256:"
+    shasum -a 256 "$INSTALL_PATH"
+  else
+    echo "⚠️ Neither sha256sum nor shasum found; skipping SHA256 display"
+  fi
+else
+  echo "ℹ️ No existing installed binary to checksum"
+fi
+
 # Always replace installed binary
 rm -f "$INSTALL_PATH"
 echo "🚚 Installing $EOS_BINARY_NAME to $INSTALL_PATH"
 cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
 chown root:root "$INSTALL_PATH"
 chmod 755 "$INSTALL_PATH"
+
+# Show SHA256 checksum of the new installed binary
+if command -v sha256sum >/dev/null 2>&1; then
+  echo "🔍 New installed binary SHA256:"
+  sha256sum "$INSTALL_PATH"
+elif command -v shasum >/dev/null 2>&1; then
+  echo "🔍 New installed binary SHA256:"
+  shasum -a 256 "$INSTALL_PATH"
+else
+  echo "⚠️ Neither sha256sum nor shasum found; skipping SHA256 display"
+fi
 
 # Create directories safely
 echo "📁 Creating secrets and config directories"
