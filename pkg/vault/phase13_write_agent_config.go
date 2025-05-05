@@ -122,8 +122,7 @@ func writeAgentUnit() error {
 		Description: "Vault Agent (EOS)",
 		User:        shared.EosID,
 		Group:       shared.EosID,
-		// systemd wants just “eos” here (it will create /run/eos for you)
-		RuntimeDir:  filepath.Base(shared.EosRunDir),
+		RuntimeDir:  shared.EosRunDir,
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
 		RuntimeMode: "0700",
 	}
