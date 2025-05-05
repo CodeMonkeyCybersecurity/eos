@@ -68,7 +68,7 @@ func SafeSync() {
 
 		switch {
 		case strings.Contains(errStr, "invalid argument"), strings.Contains(errStr, "bad file descriptor"):
-			zap.L().Warn("Logger sync harmlessly skipped", zap.String("reason", errStr))
+			zap.L().Debug("Logger sync harmlessly skipped", zap.String("reason", errStr))
 		default:
 			zap.L().Warn("Nonstandard logger sync issue", zap.Error(err))
 		}
