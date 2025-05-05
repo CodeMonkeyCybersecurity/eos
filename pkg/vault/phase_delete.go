@@ -34,7 +34,7 @@ func GetVaultPurgePaths() []string {
 		shared.VaultAgentPassPath,
 		shared.VaultServicePath,
 		shared.VaultAgentServicePath,
-		shared.VaultAgentTokenPath,
+		shared.AgentToken,
 		shared.VaultTokenSinkPath,
 		shared.SecretsDir,
 		shared.EosRunDir,

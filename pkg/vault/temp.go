@@ -86,7 +86,7 @@ func EnsureVaultUserLifecycle(client *api.Client) error {
 		return err
 
 	}
-	_, _, err := EnsureAppRole(client, DefaultAppRoleOptions())
+	_, _, err := EnsureAppRole(client, shared.DefaultAppRoleOptions())
 	return err
 }
 

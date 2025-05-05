@@ -149,7 +149,7 @@ func EnsureKVv2Enabled(client *api.Client, mountPath string) error {
 func BootstrapKV(client *api.Client, kvPath string) error {
 	zap.L().Info("🧪 Writing bootstrap secret", zap.String("path", kvPath))
 
-	kvClient := client.KVv2(strings.TrimSuffix(shared.KVNamespaceSecrets, "/"))
+	kvClient := client.KVv2(strings.TrimSuffix(shared.VaultTestPath, "/"))
 
 	payload := map[string]interface{}{"value": "ok"}
 	zap.L().Debug("🔃 KV v2 put payload prepared", zap.String("path", kvPath), zap.Any("data", payload))

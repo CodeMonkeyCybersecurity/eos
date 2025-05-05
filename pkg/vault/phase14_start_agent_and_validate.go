@@ -33,7 +33,7 @@ func PhaseStartVaultAgentAndValidate(client *api.Client) error {
 		return fmt.Errorf("start vault agent service: %w", err)
 	}
 
-	tokenPath := shared.VaultAgentTokenPath
+	tokenPath := shared.AgentToken
 
 	token, err := WaitForAgentToken(tokenPath)
 	if err != nil {
@@ -66,28 +66,26 @@ func StartVaultAgentService() error {
 func WaitForAgentToken(path string) (string, error) {
 	zap.L().Info("⏳ Waiting for Vault agent token", zap.String("path", path))
 
-	const maxWait = 30 * time.Second
-	const interval = 500 * time.Millisecond
 	start := time.Now()
 
-	for time.Since(start) < maxWait {
+	for time.Since(start) < shared.MaxWait {
 		content, err := os.ReadFile(path)
 		if err == nil && len(content) > 0 {
 			token := strings.TrimSpace(string(content))
 			zap.L().Info("✅ Agent token found", zap.String("token_path", path))
 			return token, nil
 		}
-		time.Sleep(interval)
+		time.Sleep(shared.Interval)
 	}
-	return "", fmt.Errorf("agent token not found after %s", maxWait)
+	return "", fmt.Errorf("agent token not found after %s", shared.MaxWait)
 }
 
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
 func readTokenFromSink(path string) (string, error) {
 	if path == "" {
-		path = shared.VaultAgentTokenPath
+		path = shared.AgentToken
 	}
-	out, err := exec.Command( "cat", path).Output()
+	out, err := exec.Command("cat", path).Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}

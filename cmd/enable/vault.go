@@ -5,6 +5,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -26,7 +27,7 @@ AppRole auth, Vault Agent, and API client connectivity.`,
 
 		// Step 2: Fill EnableOptions
 		opts := vault.EnableOpts
-		opts.AppRoleOptions = vault.DefaultAppRoleOptions()
+		opts.AppRoleOptions = shared.DefaultAppRoleOptions()
 
 		// Step 3: Run lifecycle orchestration
 		if err := vault.EnableVault(client, log, opts); err != nil {

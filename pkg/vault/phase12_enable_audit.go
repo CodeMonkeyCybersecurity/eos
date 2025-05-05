@@ -11,24 +11,15 @@ import (
 )
 
 // EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.log.
-func EnableFileAudit(existingClient *api.Client) error {
+func EnableFileAudit(_ *api.Client) error { // 🔥 Ignore the passed client!
 	log := zap.L().Named("EnableFileAudit")
 	log.Info("🔐 Starting file audit enablement process")
 
-	var client *api.Client
-	var err error
-
-	// Check if an external client was passed in; if nil, get a root client
-	if existingClient == nil {
-		log.Info("🔑 No client provided; retrieving privileged root client")
-		client, err = GetRootClient()
-		if err != nil {
-			log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
-			return fmt.Errorf("get privileged vault client: %w", err)
-		}
-	} else {
-		client = existingClient
-		log.Info("✅ Using provided Vault client")
+	// Always get privileged root client
+	client, err := GetRootClient()
+	if err != nil {
+		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		return fmt.Errorf("get privileged vault client: %w", err)
 	}
 
 	// Check if the audit device is already enabled
@@ -48,7 +39,6 @@ func EnableFileAudit(existingClient *api.Client) error {
 		zap.String("audit_id", shared.AuditID),
 		zap.String("file_path", "/opt/vault/logs/vault_audit.log"))
 
-	// Enable the audit device at the correct location
 	err = enableFeature(client, shared.MountPath,
 		map[string]interface{}{
 			"type": "file",

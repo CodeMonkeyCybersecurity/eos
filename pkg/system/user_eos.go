@@ -124,7 +124,7 @@ func RepairEosSecrets() error {
 }
 
 func ValidateEosSudoAccess() error {
-	cmd := exec.Command("cat", shared.VaultAgentTokenPath)
+	cmd := exec.Command("cat", shared.AgentToken)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		zap.L().Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))

@@ -134,7 +134,7 @@ func ListVault(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	list, err := client.Logical().List("secret/metadata/" + path)
+	list, err := client.Logical().List(shared.VaultSecretMountPath + path)
 	if err != nil || list == nil {
 		return nil, err
 	}
@@ -151,15 +151,15 @@ func CheckVaultAgentService() error {
 }
 
 func CheckVaultTokenFile() error {
-	if _, err := os.Stat(shared.VaultAgentTokenPath); os.IsNotExist(err) {
-		return fmt.Errorf("vault token file not found at %s", shared.VaultAgentTokenPath)
+	if _, err := os.Stat(shared.AgentToken); os.IsNotExist(err) {
+		return fmt.Errorf("vault token file not found at %s", shared.AgentToken)
 	}
 	return nil
 }
 
 func RunVaultTestQuery() error {
 	cmd := exec.Command("vault", "kv", "get", "-format=json", shared.TestKVPath)
-	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.VaultAgentTokenPath)
+	cmd.Env = append(os.Environ(), "VAULT_TOKEN_PATH="+shared.AgentToken)
 	return cmd.Run()
 }
 

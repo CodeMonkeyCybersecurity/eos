@@ -196,8 +196,8 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, shared.Userpass
 	zap.L().Info("✅ Loaded vault_init.json", zap.Int("num_keys", len(initRes.KeysB64)))
 
 	var creds shared.UserpassCreds
-	zap.L().Info("📄 Reading eos userpass fallback file", zap.String("path", shared.EosUserVaultFallback))
-	if err := ReadFallbackJSON(shared.EosUserVaultFallback, &creds); err != nil {
+	zap.L().Info("📄 Reading eos userpass fallback file", zap.String("path", shared.EosUserPassFallback))
+	if err := ReadFallbackJSON(shared.EosUserPassFallback, &creds); err != nil {
 		zap.L().Fatal("❌ Failed to read vault_userpass.json", zap.Error(err))
 	}
 

@@ -21,20 +21,19 @@ func LoginAppRole() (*api.Client, error) {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	roleID, err := os.ReadFile(shared.RoleIDPath)
+	roleID, err := os.ReadFile(shared.AppRolePaths.RoleID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read role_id file: %w", err)
 	}
 
-	secretID, err := os.ReadFile(shared.SecretIDPath)
+	secretID, err := os.ReadFile(shared.AppRolePaths.SecretID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secret_id file: %w", err)
 	}
 
-	secret, err := client.Logical().Write("auth/approle/login", map[string]interface{}{
-		"role_id":   strings.TrimSpace(string(roleID)),
-		"secret_id": strings.TrimSpace(string(secretID)),
-	})
+	payload := shared.BuildAppRoleLoginPayload(string(roleID), string(secretID))
+	secret, err := client.Logical().Write(shared.AppRoleLoginPath, payload)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to authenticate with approle: %w", err)
 	}
@@ -51,11 +50,11 @@ func LoginAppRole() (*api.Client, error) {
 }
 
 func readAppRoleCredsFromDisk() (string, string, error) {
-	roleIDBytes, err := os.ReadFile(shared.RoleIDPath)
+	roleIDBytes, err := os.ReadFile(shared.AppRolePaths.RoleID)
 	if err != nil {
 		return "", "", fmt.Errorf("read role_id from disk: %w", err)
 	}
-	secretIDBytes, err := os.ReadFile(shared.SecretIDPath)
+	secretIDBytes, err := os.ReadFile(shared.AppRolePaths.SecretID)
 	if err != nil {
 		return "", "", fmt.Errorf("read secret_id from disk: %w", err)
 	}
@@ -63,8 +62,8 @@ func readAppRoleCredsFromDisk() (string, string, error) {
 	secretID := strings.TrimSpace(string(secretIDBytes))
 
 	zap.L().Info("📄 Loaded AppRole credentials from disk",
-		zap.String("role_id_path", shared.RoleIDPath),
-		zap.String("secret_id_path", shared.SecretIDPath),
+		zap.String("role_id_path", shared.AppRolePaths.RoleID),
+		zap.String("secret_id_path", shared.AppRolePaths.SecretID),
 	)
 	return roleID, secretID, nil
 }
@@ -85,15 +84,15 @@ func PhaseCreateAppRole(client *api.Client, log *zap.Logger, opts shared.AppRole
 
 // WriteAppRoleFiles writes the Vault AppRole role_id and secret_id to disk with secure permissions.
 func WriteAppRoleFiles(roleID, secretID string) error {
-	dir := filepath.Dir(shared.RoleIDPath)
+	dir := filepath.Dir(shared.AppRolePaths.RoleID)
 	zap.L().Info("📁 Ensuring AppRole directory", zap.String("path", dir))
 	if err := system.EnsureOwnedDir(dir, 0o700, shared.EosID); err != nil {
 		return err
 	}
 
 	pairs := map[string]string{
-		shared.RoleIDPath:   roleID + "\n",
-		shared.SecretIDPath: secretID + "\n",
+		shared.AppRolePaths.RoleID:   roleID + "\n",
+		shared.AppRolePaths.SecretID: secretID + "\n",
 	}
 	for path, data := range pairs {
 		zap.L().Debug("✏️  Writing AppRole file", zap.String("path", path))
@@ -103,8 +102,8 @@ func WriteAppRoleFiles(roleID, secretID string) error {
 	}
 
 	zap.L().Info("✅ AppRole credentials written",
-		zap.String("role_file", shared.RoleIDPath),
-		zap.String("secret_file", shared.SecretIDPath))
+		zap.String("role_file", shared.AppRolePaths.RoleID),
+		zap.String("secret_file", shared.AppRolePaths.SecretID))
 	return nil
 }
 
@@ -112,7 +111,7 @@ func WriteAppRoleFiles(roleID, secretID string) error {
 func refreshAppRoleCreds(client *api.Client) (string, string, error) {
 	zap.L().Debug("🔑 Requesting fresh AppRole credentials")
 
-	roleResp, err := client.Logical().Read(shared.RolePath + "/role-id")
+	roleResp, err := client.Logical().Read(shared.AppRoleRoleIDPath)
 	if err != nil {
 		return "", "", fmt.Errorf("read role_id: %w", err)
 	}
@@ -121,7 +120,7 @@ func refreshAppRoleCreds(client *api.Client) (string, string, error) {
 		return "", "", fmt.Errorf("invalid role_id in Vault response")
 	}
 
-	secretResp, err := client.Logical().Write(shared.RolePath+"/secret-id", nil)
+	secretResp, err := client.Logical().Write(shared.AppRoleSecretIDPath, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("generate secret_id: %w", err)
 	}
@@ -136,8 +135,8 @@ func refreshAppRoleCreds(client *api.Client) (string, string, error) {
 // EnsureAppRole provisions the AppRole if missing or refreshes credentials if needed.
 func EnsureAppRole(client *api.Client, opts shared.AppRoleOptions) (string, string, error) {
 	if !opts.ForceRecreate {
-		if _, err := os.Stat(shared.RoleIDPath); err == nil {
-			zap.L().Info("🔐 AppRole credentials already exist", zap.String("path", shared.RoleIDPath))
+		if _, err := os.Stat(shared.AppRolePaths.RoleID); err == nil {
+			zap.L().Info("🔐 AppRole credentials already exist", zap.String("path", shared.AppRolePaths.RoleID))
 			if opts.RefreshCreds {
 				return refreshAppRoleCreds(client)
 			}
@@ -145,19 +144,15 @@ func EnsureAppRole(client *api.Client, opts shared.AppRoleOptions) (string, stri
 		}
 	}
 
-	zap.L().Info("🛠 Creating Vault AppRole", zap.String("role", shared.RoleName))
+	zap.L().Info("🛠 Creating Vault AppRole", zap.String("role", shared.AppRoleName))
 
 	if err := EnableAppRoleAuth(client); err != nil {
 		return "", "", fmt.Errorf("enable AppRole auth: %w", err)
 	}
 
-	roleData := map[string]interface{}{
-		"policies":      []string{shared.EosVaultPolicy},
-		"token_ttl":     shared.VaultDefaultTokenTTL,
-		"token_max_ttl": shared.VaultDefaultTokenMaxTTL,
-		"secret_id_ttl": shared.VaultDefaultSecretIDTTL,
-	}
-	if _, err := client.Logical().Write(shared.RolePath, roleData); err != nil {
+	roleData := shared.DefaultAppRoleData
+
+	if _, err := client.Logical().Write(shared.AppRolePath, roleData); err != nil {
 		return "", "", fmt.Errorf("write AppRole: %w", err)
 	}
 	zap.L().Info("✅ AppRole written")
@@ -187,17 +182,4 @@ func EnableAppRoleAuth(client *api.Client) error {
 	}
 	zap.L().Error("❌ Failed to enable AppRole auth method", zap.Error(err))
 	return fmt.Errorf("enable approle auth: %w", err)
-}
-
-// DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
-func DefaultAppRoleOptions() shared.AppRoleOptions {
-	return shared.AppRoleOptions{
-		RoleName:      shared.EosID,
-		Policies:      []string{shared.EosVaultPolicy},
-		TokenTTL:      "1h",
-		TokenMaxTTL:   "4h",
-		SecretIDTTL:   "24h",
-		ForceRecreate: false,
-		RefreshCreds:  false,
-	}
 }

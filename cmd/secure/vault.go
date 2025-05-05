@@ -48,7 +48,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 3️⃣ Re-provision AppRole
 		zap.L().Info("🔁 Re-confirming AppRole settings")
-		roleID, secretID, err := vault.EnsureAppRole(client, vault.DefaultAppRoleOptions())
+		roleID, secretID, err := vault.EnsureAppRole(client, shared.DefaultAppRoleOptions())
 		if err != nil {
 			return logger.LogErrAndWrap("secure vault: create approle", err)
 		}

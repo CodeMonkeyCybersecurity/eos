@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -15,7 +16,7 @@ func PhasePromptAndVerRootToken(client *api.Client) error {
 	zap.L().Info("🔑 [Phase 7] Starting Vault authentication fallback cascade")
 
 	// 1. Try agent token
-	if token, err := readTokenFile("/etc/vault-agent-eos.token")(client); err == nil && VerifyToken(client, token) {
+	if token, err := readTokenFile(shared.AgentToken)(client); err == nil && VerifyToken(client, token) {
 		SetVaultToken(client, token)
 		zap.L().Info("✅ Authenticated via agent token")
 		return nil

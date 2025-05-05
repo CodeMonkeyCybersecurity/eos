@@ -107,7 +107,7 @@ func createPrivilegedClient() (*api.Client, error) {
 // ==========================
 
 func loadPrivilegedToken() (string, error) {
-	if token, err := readTokenFromSink(shared.VaultAgentTokenPath); err == nil {
+	if token, err := readTokenFromSink(shared.AgentToken); err == nil {
 		return token, nil
 	}
 

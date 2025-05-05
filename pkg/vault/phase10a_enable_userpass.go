@@ -78,21 +78,15 @@ func EnableUserpassAuth(client *api.Client) error {
 func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) error {
 	zap.L().Info("👤 Ensuring EOS user exists under userpass auth")
 
-	path := "auth/userpass/users/eos"
-
 	// Check if user already exists
-	secret, err := client.Logical().Read(path)
+	// Inside EnsureUserpassUser
+	secret, err := client.Logical().Read(shared.EosUserpassPath)
 	if err == nil && secret != nil {
 		zap.L().Warn("⚠️ EOS user already exists under userpass auth; skipping creation")
 		return nil
 	}
 
-	userData := map[string]interface{}{
-		"password": password,
-		"policies": []string{"eos-policy"},
-	}
-
-	if _, err := client.Logical().Write(path, userData); err != nil {
+	if _, err := client.Logical().Write(shared.EosUserpassPath, shared.UserDataTemplate(password)); err != nil {
 		return fmt.Errorf("create userpass user: %w", err)
 	}
 
@@ -108,21 +102,16 @@ func EnsureUserpassUser(client *api.Client, log *zap.Logger, password string) er
 func WriteUserpassCredentialsFallback(password string) error {
 	zap.L().Info("💾 Saving EOS userpass password to fallback and Vault")
 
-	fallbackFile := shared.EosUserVaultFallback + "/userpass-password"
-	fallbackDir := filepath.Dir(fallbackFile)
+	fallbackDir := filepath.Dir(shared.EosUserPassPasswordFile)
 
 	if err := os.MkdirAll(fallbackDir, 0o700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
 
-	if err := system.WriteOwnedFile(fallbackFile, []byte(password+"\n"), 0o600, shared.EosID); err != nil {
+	if err := system.WriteOwnedFile(shared.EosUserPassPasswordFile, []byte(password+"\n"), 0o600, shared.EosID); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
-	zap.L().Info("✅ Userpass password written to fallback file", zap.String("path", fallbackFile))
-
-	secrets := map[string]interface{}{
-		"eos-userpass-password": password,
-	}
+	zap.L().Info("✅ Userpass password written to fallback file", zap.String("path", shared.EosUserPassPasswordFile))
 
 	uid, gid, err := system.LookupUser(shared.EosID)
 	if err != nil {
@@ -138,7 +127,8 @@ func WriteUserpassCredentialsFallback(password string) error {
 	if err != nil {
 		return fmt.Errorf("get privileged vault client for fallback write: %w", err)
 	}
-	if err := WriteKVv2(client, "secret", "eos/userpass-password", secrets); err != nil {
+	// Inside WriteUserpassCredentialsFallback, Vault KV write
+	if err := WriteKVv2(client, "secret", "eos/userpass-password", shared.FallbackSecretsTemplate(password)); err != nil {
 		return fmt.Errorf("write password to vault kv: %w", err)
 	}
 

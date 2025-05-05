@@ -215,3 +215,8 @@ func WriteTestDataToVaultOrFallback(client *api.Client, data map[string]interfac
 	PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "SUCCESS")
 	return nil
 }
+
+// WriteUserpassPasswordToVault writes the userpass password to Vault KV
+func WriteUserpassPasswordToVault(client *api.Client, password string) error {
+	return WriteKVv2(client, shared.VaultSecretMount, shared.UserpassKVPath, shared.FallbackSecretsTemplate(password))
+}
