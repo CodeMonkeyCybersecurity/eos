@@ -12,7 +12,9 @@
 package vault
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -44,23 +46,22 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 		return fmt.Errorf("render/write agent HCL: %w", err)
 	}
 
-
 	// 4) Make sure our token‐sink path is a file, not a directory,
 	//    then render & write the systemd unit.
 	if fi, err := os.Stat(shared.AgentToken); err == nil && fi.IsDir() {
-	    if err := os.RemoveAll(shared.AgentToken); err != nil {
-	        return fmt.Errorf("remove stray token directory %s: %w", shared.AgentToken, err)
-	    }
+		if err := os.RemoveAll(shared.AgentToken); err != nil {
+			return fmt.Errorf("remove stray token directory %s: %w", shared.AgentToken, err)
+		}
 	}
 	// touch an empty file with 0600 perms so Vault Agent can sink into it
 	f, err := os.OpenFile(shared.AgentToken, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o600)
 	if err != nil {
-	    return fmt.Errorf("create token sink file %s: %w", shared.AgentToken, err)
+		return fmt.Errorf("create token sink file %s: %w", shared.AgentToken, err)
 	}
 	f.Close()
-	
+
 	if err := writeAgentUnit(); err != nil {
-	    return fmt.Errorf("render/write systemd unit: %w", err)
+		return fmt.Errorf("render/write systemd unit: %w", err)
 	}
 
 	// finally reload & enable
@@ -117,9 +118,9 @@ func writeAgentHCL(addr, roleID, secretID string) error {
 // writeAgentUnit renders the systemd unit and sets proper permissions.
 func writeAgentUnit() error {
 	tpl := template.Must(
-		    template.New("vault-agent-eos.service").
-		        Parse(shared.AgentSystemDUnit),
-		)
+		template.New("vault-agent-eos.service").
+			Parse(shared.AgentSystemDUnit),
+	)
 
 	data := shared.AgentSystemdData{
 		Description: "Vault Agent (EOS)",
@@ -141,6 +142,11 @@ func writeAgentUnit() error {
 	if err := tpl.Execute(f, data); err != nil {
 		return fmt.Errorf("execute unit template: %w", err)
 	}
+
+	var buf bytes.Buffer
+	tpl.Execute(&buf, data)
+	fmt.Println("\n=== RENDERED UNIT ===", buf.String())
+	io.Copy(f, &buf)
 
 	if err := os.Chmod(path, 0644); err != nil {
 		return fmt.Errorf("chmod unit %s: %w", path, err)
