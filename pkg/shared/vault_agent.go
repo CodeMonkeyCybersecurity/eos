@@ -65,7 +65,6 @@ Description={{ .Description }}
 After=network.target
 
 [Service]
-Environment=HCP_VAULT_SKIP_AUTO_PROVISION=1
 User={{ .User }}
 Group={{ .Group }}
 RuntimeDirectory={{ .RuntimeDir }}
