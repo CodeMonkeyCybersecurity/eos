@@ -1,14 +1,5 @@
 // pkg/vault/phase13_write_agent_config.go
 
-//--------------------------------------------------------------------
-// 11. Render Vault Agent Configuration
-//--------------------------------------------------------------------
-
-// PHASE 11 — PhaseRenderVaultAgentConfig()
-//            └── RenderAgentConfig()
-//            └── EnsureAgentConfig()
-//            └── ReloadDaemonAndEnable()
-
 package vault
 
 import (
@@ -23,8 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// PhaseRenderVaultAgentConfig drives everything in one pass:
-// 1) Render+write agent HCL, 2) Render+write systemd, 3) daemon-reload+enable.
+var (
+	// parse once at init
+	agentHCLTpl     = template.Must(template.New("agent.hcl").Parse(shared.AgentConfigTmpl))
+	agentServiceTpl = template.Must(template.New("vault-agent-eos.service").Parse(shared.AgentSystemDUnit))
+)
+
 func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	logger := zap.L().Named("vault.PhaseRenderVaultAgentConfig")
 
@@ -33,36 +28,29 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 		return fmt.Errorf("VAULT_ADDR not set")
 	}
 
-	// 2) ensure AppRole credentials exist on disk
+	// 1) prepare /run/eos and the sink file
+	if err := prepareTokenSink(shared.AgentToken, shared.EosID); err != nil {
+		return fmt.Errorf("prepare token sink: %w", err)
+	}
+
+	// 2) render + write HCL
 	roleID, secretID, err := readAppRoleCredsFromDisk()
 	if err != nil {
-		return fmt.Errorf("read AppRole credentials: %w", err)
+		return fmt.Errorf("read AppRole creds: %w", err)
 	}
-
-	// 3) render + write Vault Agent HCL
 	if err := writeAgentHCL(addr, roleID, secretID); err != nil {
-		return fmt.Errorf("render/write agent HCL: %w", err)
+		return fmt.Errorf("write agent HCL: %w", err)
 	}
 
-	// 4) Make sure our token‐sink path is a file, not a directory,
-	//    then render & write the systemd unit.
-	if fi, err := os.Stat(shared.AgentToken); err == nil && fi.IsDir() {
-		if err := os.RemoveAll(shared.AgentToken); err != nil {
-			return fmt.Errorf("remove stray token directory %s: %w", shared.AgentToken, err)
-		}
+	// 3) render + write systemd unit (remove any stale file first)
+	if err := os.Remove(shared.VaultAgentServicePath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("cleanup old unit file: %w", err)
 	}
-	// touch an empty file with 0600 perms so Vault Agent can sink into it
-	f, err := os.OpenFile(shared.AgentToken, os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o600)
-	if err != nil {
-		return fmt.Errorf("create token sink file %s: %w", shared.AgentToken, err)
-	}
-	f.Close()
-
 	if err := writeAgentUnit(); err != nil {
-		return fmt.Errorf("render/write systemd unit: %w", err)
+		return fmt.Errorf("write systemd unit: %w", err)
 	}
 
-	// finally reload & enable
+	// 4) reload & enable
 	if err := system.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
 		return fmt.Errorf("reload/enable service: %w", err)
 	}
@@ -71,14 +59,43 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	return nil
 }
 
-// writeAgentHCL ensures your AppRole files, renders the HCL template, writes it
-func writeAgentHCL(addr, roleID, secretID string) error {
-	// ensure the secrets directory exists
-	if err := shared.EnsureSecretsDir(); err != nil {
+// prepareTokenSink ensures the runtime directory exists, ownership is correct,
+// and the sink file is a fresh, zero‐length file owned by `user`.
+func prepareTokenSink(tokenPath, user string) error {
+	runDir := filepath.Dir(tokenPath)
+	if err := os.MkdirAll(runDir, 0o700); err != nil {
+		return err
+	}
+	uid, gid, err := system.LookupUser(user)
+	if err != nil {
+		return err
+	}
+	if err := os.Chown(runDir, uid, gid); err != nil {
 		return err
 	}
 
-	// ensure role_id & secret_id files
+	// remove stray directory if present
+	if fi, err := os.Lstat(tokenPath); err == nil && fi.IsDir() {
+		if err := os.RemoveAll(tokenPath); err != nil {
+			return err
+		}
+	}
+	f, err := os.OpenFile(tokenPath,
+		os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0o600)
+	if err != nil {
+		return err
+	}
+	if cerr := f.Close(); cerr != nil {
+		return cerr
+	}
+	return os.Chown(tokenPath, uid, gid)
+}
+
+func writeAgentHCL(addr, roleID, secretID string) error {
+	// ensure AppRole files exist
+	if err := shared.EnsureSecretsDir(); err != nil {
+		return err
+	}
 	if err := shared.EnsureFileExists(shared.AppRolePaths.RoleID, roleID, shared.OwnerReadOnly); err != nil {
 		return err
 	}
@@ -86,46 +103,27 @@ func writeAgentHCL(addr, roleID, secretID string) error {
 		return err
 	}
 
-	// parse & execute the HCL template
 	data := shared.BuildAgentTemplateData(addr)
-	tpl, err := template.New("agent.hcl").Parse(shared.AgentConfigTmpl)
-	if err != nil {
-		return fmt.Errorf("parse HCL template: %w", err)
-	}
-
 	path := shared.VaultAgentConfigPath
 	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("create config %s: %w", path, err)
+		return err
 	}
 	defer f.Close()
 
-	if err := tpl.Execute(f, data); err != nil {
-		return fmt.Errorf("execute HCL template: %w", err)
+	if err := agentHCLTpl.Execute(f, data); err != nil {
+		return err
 	}
-
-	if err := os.Chmod(path, shared.FilePermStandard); err != nil {
-		return fmt.Errorf("chmod %s: %w", path, err)
-	}
-
-	zap.L().Info("Wrote Vault Agent HCL", zap.String("path", path))
-
-	return nil
+	return os.Chmod(path, shared.FilePermStandard)
 }
 
-// writeAgentUnit renders the systemd unit and sets proper permissions.
 func writeAgentUnit() error {
-	tpl := template.Must(
-		template.New("vault-agent-eos.service").
-			Parse(shared.AgentSystemDUnit),
-	)
-
 	data := shared.AgentSystemdData{
 		Description: "Vault Agent (EOS)",
-		User:        "eos",
-		Group:       "eos",
+		User:        shared.EosID,
+		Group:       shared.EosID,
+		// systemd wants just “eos” here (it will create /run/eos for you)
 		RuntimeDir:  filepath.Base(shared.EosRunDir),
-		RuntimePath: shared.AgentToken,
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
 		RuntimeMode: "0700",
 	}
@@ -133,19 +131,12 @@ func writeAgentUnit() error {
 	path := shared.VaultAgentServicePath
 	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("create unit %s: %w", path, err)
+		return err
 	}
 	defer f.Close()
 
-	// --- now: execute once directly to the file ---
-	if err := tpl.Execute(f, data); err != nil {
-		return fmt.Errorf("execute unit template: %w", err)
+	if err := agentServiceTpl.Execute(f, data); err != nil {
+		return err
 	}
-
-	if err := os.Chmod(path, 0644); err != nil {
-		return fmt.Errorf("chmod unit %s: %w", path, err)
-	}
-
-	zap.L().Info("Wrote Vault Agent systemd unit", zap.String("path", path))
-	return nil
+	return os.Chmod(path, 0o644)
 }

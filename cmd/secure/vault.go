@@ -54,7 +54,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 4️⃣ Validate Vault Agent token
 		zap.L().Info("🤖 Validating Vault Agent token")
-		token, err := vault.WaitForAgentToken(shared.VaultTokenSinkPath)
+		token, err := vault.WaitForAgentToken(shared.VaultTokenSinkPath, shared.MaxWait)
 		if err != nil {
 			return fmt.Errorf("vault-agent token check failed: %w", err)
 		}

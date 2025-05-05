@@ -1,4 +1,5 @@
 // pkg/system/systemctl.go
+
 package system
 
 import (
@@ -15,7 +16,7 @@ import (
 // It returns an error if either step fails.
 func ReloadDaemonAndEnable(unit string) error {
 	// 1) reload systemd
-	if out, err := exec.Command( "systemctl", "daemon-reload").CombinedOutput(); err != nil {
+	if out, err := exec.Command("systemctl", "daemon-reload").CombinedOutput(); err != nil {
 		zap.L().Warn("systemd daemon-reload failed",
 			zap.Error(err),
 			zap.ByteString("output", out),
@@ -24,7 +25,7 @@ func ReloadDaemonAndEnable(unit string) error {
 	}
 
 	// 2) enable & start the unit
-	if out, err := exec.Command( "systemctl", "enable", "--now", unit).CombinedOutput(); err != nil {
+	if out, err := exec.Command("systemctl", "enable", "--now", unit).CombinedOutput(); err != nil {
 		zap.L().Warn("failed to enable/start service",
 			zap.String("unit", unit),
 			zap.Error(err),
@@ -71,7 +72,7 @@ func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error
 
 	var lastErr error
 	for i := 0; i < retries; i++ {
-		cmd := exec.Command( "systemctl", action, unit)
+		cmd := exec.Command("systemctl", action, unit)
 		out, err := cmd.CombinedOutput()
 
 		if bytes.Contains(out, []byte("Authentication is required")) {
@@ -109,7 +110,7 @@ func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error
 // CanSudoSystemctl checks if the current user can run sudo systemctl <action> <unit> without a password.
 // Example: CanSudoSystemctl("status", "vault")
 func CanSudoSystemctl(action, unit string) bool {
-	cmd := exec.Command( "systemctl", action, unit)
+	cmd := exec.Command("systemctl", action, unit)
 	err := cmd.Run()
 	if err != nil {
 		fmt.Printf("❌ sudo -n systemctl %s %s failed: %v\n", action, unit, err)
@@ -122,7 +123,7 @@ func PromptAndRunInteractiveSystemctl(action, unit string) error {
 	fmt.Printf("⚠️ Privilege escalation required to run 'systemctl %s %s'\n", action, unit)
 	fmt.Println("\nYou will be prompted for your password.")
 
-	cmd := exec.Command( "systemctl", action, unit)
+	cmd := exec.Command("systemctl", action, unit)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
