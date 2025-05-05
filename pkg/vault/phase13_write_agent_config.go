@@ -122,7 +122,7 @@ func writeAgentUnit() error {
 		Description: "Vault Agent (EOS)",
 		User:        shared.EosID,
 		Group:       shared.EosID,
-		RuntimeDir:  shared.EosRunDir,
+		RuntimeDir:   shared.EosID,
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
 		RuntimeMode: "0700",
 	}
