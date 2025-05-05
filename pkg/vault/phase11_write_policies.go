@@ -48,10 +48,6 @@ func EnsurePolicy() error {
 
 	zap.L().Info("✅ Policy successfully written and verified", zap.String("policy", policyName))
 
-	if err := AttachPolicyToAppRole(client, zap.L()); err != nil {
-		return fmt.Errorf("failed to attach eos-policy to AppRole: %w", err)
-	}
-
 	if err := AttachPolicyToEosEntity(client, zap.L()); err != nil {
 		return fmt.Errorf("failed to attach eos-policy to eos entity: %w", err)
 	}
@@ -160,29 +156,4 @@ func truncatePolicy(policy string) string {
 		return policy[:100] + "..."
 	}
 	return policy
-}
-
-func AttachPolicyToAppRole(existingClient *api.Client, log *zap.Logger) error {
-	rolePath := shared.AppRolePath
-
-	client, err := GetRootClient()
-	if err != nil {
-		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
-		return fmt.Errorf("get privileged vault client: %w", err)
-	}
-
-	log.Info("🔑 Attaching eos-policy to eos-approle", zap.String("role_path", rolePath))
-
-	data := map[string]interface{}{
-		"policies": shared.EosDefaultPolicyName,
-	}
-
-	_, err = client.Logical().Write(rolePath, data)
-	if err != nil {
-		log.Error("❌ Failed to attach policy to AppRole", zap.Error(err))
-		return fmt.Errorf("failed to attach eos-policy to eos-approle: %w", err)
-	}
-
-	log.Info("✅ eos-policy successfully attached to eos-approle", zap.String("policy", shared.EosDefaultPolicyName))
-	return nil
 }

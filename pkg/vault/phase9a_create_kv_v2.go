@@ -51,13 +51,7 @@ func PhaseEnableKVv2(client *api.Client) error {
 		return err
 	}
 
-	zap.L().Info("📜 Applying EOS policy")
-	if err := EnsurePolicy(); err != nil {
-		zap.L().Error("❌ Failed to apply EOS policy", zap.Error(err))
-		return err
-	}
-
-	zap.L().Info("✅ Auth methods, policy, eos user, and auditing successfully configured")
+	zap.L().Info("✅ KV v2 secrets engine successfully configured")
 	return nil
 }
 
