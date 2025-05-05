@@ -29,7 +29,7 @@ import (
 // └── Done
 
 func PhaseEnableAppRole(_ *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {
-	zap.L().Info("[Phase10] Setting up Vault AppRole", zap.Any("options", opts))
+	zap.L().Info("[Phase10b] Setting up Vault AppRole", zap.Any("options", opts))
 
 	client, err := GetRootClient()
 	if err != nil {

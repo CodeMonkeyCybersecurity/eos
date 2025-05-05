@@ -7,6 +7,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -20,7 +21,7 @@ updates the system account password, and saves new credentials to disk.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("refresh-eos-passwd")
 
-		if !system.UserExists("eos") {
+		if !system.UserExists(shared.EosID) {
 			log.Error("eos user not found — cannot refresh password")
 			return fmt.Errorf("eos user does not exist")
 		}

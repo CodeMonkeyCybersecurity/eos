@@ -39,7 +39,7 @@ func EnableVaultUserpass(ctx *eosio.RuntimeContext) error {
 	// 4. Create the EOS user in Vault
 	userData := map[string]interface{}{
 		"password": password,
-		"policies": shared.EosVaultPolicy,
+		"policies": shared.EosDefaultPolicyName,
 	}
 	if _, err := client.Logical().Write("auth/userpass/users/eos", userData); err != nil {
 		return fmt.Errorf("failed to create eos Vault user: %w", err)

@@ -21,7 +21,7 @@ import (
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
 func PhaseEnableUserpass(_ *api.Client, log *zap.Logger, password string) error {
-	zap.L().Info("🧑‍💻 [Phase 10] Enabling userpass auth method and EOS user")
+	zap.L().Info("🧑‍💻 [Phase 10a] Enabling userpass auth method and EOS user")
 
 	// ✅ Get privileged client
 	client, err := GetRootClient()

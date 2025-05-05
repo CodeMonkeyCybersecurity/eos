@@ -28,7 +28,7 @@ import (
 //           └── EnableFileAudit()
 
 func PhaseEnableKVv2(client *api.Client) error {
-	zap.L().Info("🔒 [Phase 9] Enabling Vault KV engine")
+	zap.L().Info("🔒 [Phase 9a] Enabling Vault KV engine")
 
 	// ✅ Get privileged client (root or agent token, validated)
 	privilegedClient, err := GetRootClient()

@@ -1,3 +1,5 @@
+// pkg/shared/vault_auth.go
+
 package shared
 
 import (
@@ -9,15 +11,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// AppRole constants and paths
-const (
-	AppRoleName      = "eos-approle"
-	AppRolePath      = "auth/approle/role/" + AppRoleName
-	AppRoleLoginPath = "auth/approle/login"
 
-	AppRoleRoleIDPath   = AppRolePath + "/role-id"
-	AppRoleSecretIDPath = AppRolePath + "/secret-id"
-)
+
+//
+// ---------------- TYPES ----------------
+//
 
 // AppRoleOptions defines configuration for provisioning or refreshing a Vault AppRole.
 type AppRoleOptions struct {
@@ -36,10 +34,27 @@ type AppRolePathsStruct struct {
 	SecretID string
 }
 
+//
+// ---------------- VARS ----------------
+//
+
 var AppRolePaths = AppRolePathsStruct{
 	RoleID:   filepath.Join(SecretsDir, "role_id"),
 	SecretID: filepath.Join(SecretsDir, "secret_id"),
 }
+
+// DefaultAppRoleData is the default Vault AppRole configuration.
+var DefaultAppRoleData = map[string]interface{}{
+	"policies":      []string{EosDefaultPolicyName},
+	"token_ttl":     VaultDefaultTokenTTL,
+	"token_max_ttl": VaultDefaultTokenMaxTTL,
+	"secret_id_ttl": VaultDefaultSecretIDTTL,
+}
+
+
+//
+// ---------------- FUNCTIONS ----------------
+//
 
 // WriteAppRoleFile writes a single secret to a file.
 func WriteAppRoleFile(path, value string, perm os.FileMode) error {
@@ -69,23 +84,37 @@ func BuildAppRoleLoginPayload(roleID, secretID string) map[string]interface{} {
 	}
 }
 
-// DefaultAppRoleData is the default Vault AppRole configuration.
-var DefaultAppRoleData = map[string]interface{}{
-	"policies":      []string{EosVaultPolicy},
-	"token_ttl":     VaultDefaultTokenTTL,
-	"token_max_ttl": VaultDefaultTokenMaxTTL,
-	"secret_id_ttl": VaultDefaultSecretIDTTL,
-}
-
 // DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
 		RoleName:      EosID,
-		Policies:      []string{EosVaultPolicy},
+		Policies:      []string{EosDefaultPolicyName},
 		TokenTTL:      "1h",
 		TokenMaxTTL:   "4h",
 		SecretIDTTL:   "24h",
 		ForceRecreate: false,
 		RefreshCreds:  false,
+	}
+}
+
+var (
+	// Path to fallback file storing userpass credentials
+	EosUserPassFallback = filepath.Join(SecretsDir, "vault_userpass.json")
+
+	// Fallback password file path (for eos user)
+	EosUserPassPasswordFile = filepath.Join(EosUserPassFallback, "userpass-password")
+)
+
+func UserDataTemplate(password string) map[string]interface{} {
+	return map[string]interface{}{
+		"password": password,
+		"policies": []string{EosDefaultPolicyName},
+	}
+}
+
+// FallbackSecretsTemplate provides the fallback secrets map for disk
+func FallbackSecretsTemplate(password string) map[string]interface{} {
+	return map[string]interface{}{
+		FallbackPasswordKey: password,
 	}
 }

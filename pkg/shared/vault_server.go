@@ -3,10 +3,12 @@
 package shared
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"text/template"
 	"time"
 
 	"github.com/hashicorp/vault/api"
@@ -18,11 +20,8 @@ type FallbackCode string
 
 // Vault constants and paths
 const (
-	AuditID                   = "file/"
-	MountPath                 = "sys/audit/" + AuditID
 	VaultAddrEnv              = "VAULT_ADDR"
 	VaultCA                   = "VAULT_CACERT"
-	VaultHealthPath           = "/v1/sys/health"
 	VaultHealthTimeout        = 5 * time.Second
 	TestTimeout               = 500 * time.Millisecond
 	VaultRetryCount           = 5
@@ -89,11 +88,36 @@ func GetVaultAddr() string {
 	return fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
 }
 
-// RenderVaultConfig renders the Vault HCL config
-func RenderVaultConfig(addr string) string {
+const vaultConfigTemplate = `
+listener "tcp" {
+  address         = "0.0.0.0:{{ .Port }}"
+  tls_cert_file   = "{{ .TLSCrt }}"
+  tls_key_file    = "{{ .TLSKey }}"
+}
+storage "file" {
+  path = "{{ .VaultDataPath }}"
+}
+disable_mlock = true
+api_addr = "{{ .APIAddr }}"
+ui = true
+log_level = "{{ .LogLevel }}"
+log_format = "{{ .LogFormat }}"
+`
+
+type VaultConfigParams struct {
+	Port          string
+	TLSCrt        string
+	TLSKey        string
+	VaultDataPath string
+	APIAddr       string
+	LogLevel      string
+	LogFormat     string
+}
+
+func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, error) {
 	if addr == "" {
 		zap.L().Warn("⚠️ Blank address provided — using localhost fallback")
-		addr = fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
+		addr = VaultDefaultLocalAddr
 	}
 	if _, err := os.Stat(TLSKey); err != nil {
 		zap.L().Warn("⚠️ TLS key missing", zap.String("TLSKey", TLSKey), zap.Error(err))
@@ -101,18 +125,30 @@ func RenderVaultConfig(addr string) string {
 	if _, err := os.Stat(TLSCrt); err != nil {
 		zap.L().Warn("⚠️ TLS cert missing", zap.String("TLSCrt", TLSCrt), zap.Error(err))
 	}
+
+	params := VaultConfigParams{
+		Port:          VaultDefaultPort,
+		TLSCrt:        TLSCrt,
+		TLSKey:        TLSKey,
+		VaultDataPath: VaultDataPath,
+		APIAddr:       addr,
+		LogLevel:      logLevel,
+		LogFormat:     logFormat,
+	}
+
+	tmpl, err := template.New("vaultConfig").Parse(vaultConfigTemplate)
+	if err != nil {
+		return "", err
+	}
+
+	var rendered bytes.Buffer
+	err = tmpl.Execute(&rendered, params)
+	if err != nil {
+		return "", err
+	}
+
 	zap.L().Info("📜 Rendering Vault config", zap.String("api_addr", addr))
-	return fmt.Sprintf(`
-listener "tcp" {
-  address         = "0.0.0.0:%s"
-  tls_cert_file   = "%s"
-  tls_key_file    = "%s"
-}
-storage "file" { path = "%s" }
-disable_mlock = true
-api_addr = "%s"
-ui = true
-`, VaultDefaultPort, TLSCrt, TLSKey, VaultDataPath, addr)
+	return rendered.String(), nil
 }
 
 // Vault systemd unit template

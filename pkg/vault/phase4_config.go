@@ -118,8 +118,18 @@ func ValidateVaultConfig() error {
 // Returns a wrapped error if writing fails.
 func WriteVaultHCL() error {
 	vaultAddr := shared.GetVaultAddr()
-	hcl := shared.RenderVaultConfig(vaultAddr)
-	configPath := shared.VaultConfigPath // should be: /etc/vault.d/vault.hcl
+	// Add sane defaults
+	logLevel := "info"
+	logFormat := "json"
+
+	// Update call to handle new signature and error
+	hcl, err := shared.RenderVaultConfig(vaultAddr, logLevel, logFormat)
+	if err != nil {
+		zap.L().Error("❌ Failed to render Vault HCL config", zap.Error(err))
+		return fmt.Errorf("render vault config: %w", err)
+	}
+
+	configPath := shared.VaultConfigPath // /etc/vault.d/vault.hcl
 
 	// Guarantee the parent directory exists
 	dir := filepath.Dir(configPath)
@@ -129,7 +139,7 @@ func WriteVaultHCL() error {
 	}
 	zap.L().Debug("✅ Vault config directory ready", zap.String("path", dir))
 
-	// Now safely write the Vault config
+	// Safely write the Vault config
 	if err := os.WriteFile(configPath, []byte(hcl), 0644); err != nil {
 		zap.L().Error("failed to write Vault HCL config", zap.Error(err))
 		return fmt.Errorf("write vault hcl: %w", err)

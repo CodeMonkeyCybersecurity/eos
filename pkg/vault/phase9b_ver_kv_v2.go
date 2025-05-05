@@ -12,7 +12,7 @@ import (
 
 // PhaseWriteBootstrapSecretAndRecheck writes a test secret and verifies Vault health.
 func PhaseWriteBootstrapSecretAndRecheck(_ *api.Client) error {
-	zap.L().Info("🧪 [Phase 9A] Writing bootstrap test secret and verifying Vault health")
+	zap.L().Info("🧪 [Phase 9b] Writing bootstrap test secret and verifying Vault health")
 
 	// ✅ Get privileged client (root or agent token, validated)
 	privilegedClient, err := GetRootClient()
