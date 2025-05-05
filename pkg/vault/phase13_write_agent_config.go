@@ -1,4 +1,4 @@
-// pkg/vault/phase13_render_agent_config.go
+// pkg/vault/phase13_write_agent_config.go
 
 //--------------------------------------------------------------------
 // 11. Render Vault Agent Configuration
@@ -12,9 +12,7 @@
 package vault
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"text/template"
@@ -126,7 +124,7 @@ func writeAgentUnit() error {
 		Description: "Vault Agent (EOS)",
 		User:        "eos",
 		Group:       "eos",
-		RuntimeDir:  filepath.Dir(shared.AgentToken),
+		RuntimeDir:  filepath.Base(filepath.Dir(shared.AgentToken)),
 		RuntimePath: shared.AgentToken,
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
 		RuntimeMode: "0700",
@@ -139,14 +137,10 @@ func writeAgentUnit() error {
 	}
 	defer f.Close()
 
+	// --- now: execute once directly to the file ---
 	if err := tpl.Execute(f, data); err != nil {
 		return fmt.Errorf("execute unit template: %w", err)
 	}
-
-	var buf bytes.Buffer
-	tpl.Execute(&buf, data)
-	fmt.Println("\n=== RENDERED UNIT ===", buf.String())
-	io.Copy(f, &buf)
 
 	if err := os.Chmod(path, 0644); err != nil {
 		return fmt.Errorf("chmod unit %s: %w", path, err)
