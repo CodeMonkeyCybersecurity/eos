@@ -66,8 +66,6 @@ const (
 	AppRoleSecretIDPath = AppRolePath + "/secret-id"
 )
 
-
-
 var AuthBackendLabels = map[string]string{
 	AuthBackendUserpass: "userpass",
 	AuthBackendApprole:  "approle",

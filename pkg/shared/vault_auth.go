@@ -11,8 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-
-
 //
 // ---------------- TYPES ----------------
 //
@@ -50,7 +48,6 @@ var DefaultAppRoleData = map[string]interface{}{
 	"token_max_ttl": VaultDefaultTokenMaxTTL,
 	"secret_id_ttl": VaultDefaultSecretIDTTL,
 }
-
 
 //
 // ---------------- FUNCTIONS ----------------
