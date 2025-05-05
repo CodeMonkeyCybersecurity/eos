@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
@@ -20,7 +21,8 @@ func VaultAddress() string {
 	return os.Getenv(shared.VaultAddrEnv)
 }
 
-func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error {
+// EnableVault now drives everything interactively.
+func EnableVault(client *api.Client, log *zap.Logger) error {
 	zap.L().Info("🚀 Starting Vault enablement flow")
 
 	// Step 6b: unseal Vault if needed
@@ -51,14 +53,18 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 		return logger.LogErrAndWrap("enable KV v2", err)
 	}
 
-	// Step 6: Enable authentication methods
-	if err := enableAuthMethods(client, log, opts); err != nil {
-		return err
+	// Step 6: interactively configure auth methods
+	if interaction.PromptYesNo("Enable AppRole authentication?", true) {
+		if err := PhaseEnableAppRole(client, log, shared.DefaultAppRoleOptions()); err != nil {
+			return logger.LogErrAndWrap("enable AppRole", err)
+		}
 	}
 
-	// Step 1: Validate options
-	if opts.EnableAppRole && opts.EnableUserpass {
-		return fmt.Errorf("cannot enable both AppRole and Userpass authentication at the same time")
+	if interaction.PromptYesNo("Enable Userpass authentication?", false) {
+		// empty password => will prompt internally
+		if err := PhaseEnableUserpass(client, log, ""); err != nil {
+			return logger.LogErrAndWrap("enable Userpass", err)
+		}
 	}
 
 	// Step 7: Write core policies
@@ -71,10 +77,14 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 		return logger.LogErrAndWrap("enable audit backend", err)
 	}
 
-	// Step 9: Optional agent setup
-	if opts.EnableAgent {
-		if err := setupVaultAgent(client, opts); err != nil {
-			return err
+	// Step 9: interactively configure Vault Agent
+	if interaction.PromptYesNo("Enable Vault Agent service?", false) {
+		// Agent requires AppRole to already be enabled above.
+		if err := PhaseRenderVaultAgentConfig(client); err != nil {
+			return logger.LogErrAndWrap("render Vault Agent config", err)
+		}
+		if err := PhaseStartVaultAgentAndValidate(client); err != nil {
+			return logger.LogErrAndWrap("start Vault Agent", err)
 		}
 	}
 
@@ -85,33 +95,6 @@ func EnableVault(client *api.Client, log *zap.Logger, opts EnableOptions) error 
 
 	zap.L().Info("🎉 Vault enablement process completed successfully")
 	PrintEnableNextSteps()
-	return nil
-}
-
-func enableAuthMethods(client *api.Client, log *zap.Logger, opts EnableOptions) error {
-	if opts.EnableAppRole {
-		if err := PhaseEnableAppRole(client, log, opts.AppRoleOptions); err != nil {
-			return logger.LogErrAndWrap("enable AppRole", err)
-		}
-	}
-	if opts.EnableUserpass {
-		if err := PhaseEnableUserpass(client, log, opts.Password); err != nil {
-			return logger.LogErrAndWrap("enable Userpass", err)
-		}
-	}
-	return nil
-}
-
-func setupVaultAgent(client *api.Client, opts EnableOptions) error {
-	if !opts.EnableAppRole {
-		return fmt.Errorf("vault Agent requires AppRole authentication")
-	}
-	if err := PhaseRenderVaultAgentConfig(client); err != nil {
-		return logger.LogErrAndWrap("render Vault Agent config", err)
-	}
-	if err := PhaseStartVaultAgentAndValidate(client); err != nil {
-		return logger.LogErrAndWrap("start Vault Agent", err)
-	}
 	return nil
 }
 

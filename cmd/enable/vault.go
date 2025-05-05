@@ -5,7 +5,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -25,12 +24,8 @@ AppRole auth, Vault Agent, and API client connectivity.`,
 			return logger.LogErrAndWrap("create vault client", err)
 		}
 
-		// Step 2: Fill EnableOptions
-		opts := vault.EnableOpts
-		opts.AppRoleOptions = shared.DefaultAppRoleOptions()
-
-		// Step 3: Run lifecycle orchestration
-		if err := vault.EnableVault(client, log, opts); err != nil {
+		// Step 2: Run lifecycle orchestration (fully interactive)
+		if err := vault.EnableVault(client, log); err != nil {
 			return logger.LogErrAndWrap("enable vault", err)
 		}
 
@@ -41,11 +36,5 @@ AppRole auth, Vault Agent, and API client connectivity.`,
 }
 
 func init() {
-	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAppRole, "approle", false, "Enable AppRole authentication method")
-	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAgent, "agent", false, "Enable Vault Agent setup")
-	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableAPI, "api", false, "Verify Vault API client connectivity")
-	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.NonInteractive, "non-interactive", false, "Run without interactive prompts")
-	EnableVaultCmd.Flags().StringVar(&vault.EnableOpts.Password, "password", "", "EOS Vault user password (optional; fallback to prompt)")
-	EnableVaultCmd.Flags().BoolVar(&vault.EnableOpts.EnableUserpass, "userpass", false, "Enable Userpass authentication method")
 	EnableCmd.AddCommand(EnableVaultCmd)
 }
