@@ -84,7 +84,7 @@ func StartVaultService() error {
 }
 
 func WriteAgentSystemdUnit() error {
-	unit := fmt.Sprintf(shared.AgentSystemDUnit,
+	unit := fmt.Sprint(shared.AgentSystemDUnit,
 		shared.EosID,
 		shared.EosID,
 		shared.RuntimeDirPerms,
