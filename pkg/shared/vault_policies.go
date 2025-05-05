@@ -70,7 +70,7 @@ path "secret/{{ .KVPath }}/*" {
 }
 path "secret/metadata/*" {
     capabilities = ["list"]
-
+}
 path "auth/userpass/users/*" {
     capabilities = ["create", "read", "update", "delete", "list"]
 }
