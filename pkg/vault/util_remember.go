@@ -63,21 +63,3 @@ func PromptOrRecallUnsealKeys() ([]string, string, error) {
 
 /**/
 
-/**/
-func rememberBootstrapHashes() ([]string, string, error) {
-	secrets, err := ReadFallbackSecrets()
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to load vault_init fallback secrets: %w", err)
-	}
-
-	hashes := []string{
-		secrets["unseal_key_1_hash"],
-		secrets["unseal_key_2_hash"],
-		secrets["unseal_key_3_hash"],
-	}
-	root := secrets["root_token_hash"]
-
-	return hashes, root, nil
-}
-
-/**/

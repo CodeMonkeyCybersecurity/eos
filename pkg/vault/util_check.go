@@ -107,24 +107,6 @@ func testKVSecret(client *api.Client) error {
 	return err
 }
 
-func CheckVaultSecrets() {
-	keys, root, err := PromptOrRecallUnsealKeys()
-	if err != nil || !crypto.AllUnique(keys) {
-		fmt.Println("❌ Secret check aborted or invalid keys")
-		return
-	}
-	storedHashes, hashedRoot, err := rememberBootstrapHashes()
-	if err != nil {
-		fmt.Println("❌ Unable to verify unseal keys — no trusted reference available.")
-		return
-	}
-	if crypto.AllHashesPresent(crypto.HashStrings(keys), storedHashes) && crypto.HashString(root) == hashedRoot {
-		fmt.Println("✅ Unseal keys and root token verified.")
-	} else {
-		fmt.Println("❌ Secrets do not match known trusted values.")
-	}
-}
-
 func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }
