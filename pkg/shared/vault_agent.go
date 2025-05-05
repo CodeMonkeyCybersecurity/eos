@@ -79,8 +79,7 @@ WantedBy=multi-user.target
 `
 
 type AgentSystemdData struct {
-	Description, User, Group, RuntimeDir, RuntimePath, ExecStart string
-	RuntimeMode                                                  os.FileMode
+	Description, User, Group, RuntimeDir, RuntimePath, ExecStart, RuntimeMode string
 }
 
 // Vault Agent service + config paths

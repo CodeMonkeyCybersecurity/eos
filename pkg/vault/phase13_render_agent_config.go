@@ -12,10 +12,8 @@
 package vault
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"text/template"
 
@@ -25,67 +23,66 @@ import (
 	"go.uber.org/zap"
 )
 
-// PhaseRenderVaultAgentConfig creates the Vault Agent HCL config, renders & installs the systemd unit,
-// then reloads & enables it.
+// PhaseRenderVaultAgentConfig drives everything in one pass:
+// 1) Render+write agent HCL, 2) Render+write systemd, 3) daemon-reload+enable.
 func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	logger := zap.L().Named("vault.PhaseRenderVaultAgentConfig")
-	logger.Info("▶️ [Phase 13] Starting PhaseRenderVaultAgentConfig")
 
-	// 1. Load VAULT_ADDR
 	addr := os.Getenv(shared.VaultAddrEnv)
-	logger.Debug("loaded environment", zap.String(shared.VaultAddrEnv, addr))
 	if addr == "" {
-		logger.Error("VAULT_ADDR is unset")
 		return fmt.Errorf("VAULT_ADDR not set")
 	}
 
-	// 2. Read existing AppRole creds
-	logger.Info("reading AppRole credentials from disk",
-		zap.String("role_path", shared.AppRolePaths.RoleID),
-		zap.String("secret_path", shared.AppRolePaths.SecretID),
-	)
-	roleID, secretID, err := readAppRoleCredsFromDisk()
-	if err != nil {
-		logger.Error("failed to read AppRole creds", zap.Error(err))
+	// ensure the AppRole creds files exist & are readable
+	if _, _, err := readAppRoleCredsFromDisk(); err != nil {
 		return fmt.Errorf("read AppRole creds: %w", err)
 	}
-	logger.Info("AppRole credentials loaded", zap.String("role_id", roleID), zap.Int("secret_id_len", len(secretID)))
 
-	// 3. Render HCL config
-	logger.Info("rendering Vault Agent HCL config",
-		zap.String("addr", addr),
-	)
-	if err := RenderAgentConfig(addr, roleID, secretID); err != nil {
-		logger.Error("RenderAgentConfig failed", zap.Error(err))
-		return fmt.Errorf("render agent config: %w", err)
+	// —— Single helper that does parse+write+chmod ——
+	if err := renderAndWriteAgentHCL(addr); err != nil {
+		return fmt.Errorf("render/write agent HCL: %w", err)
 	}
-	logger.Info("Vault Agent HCL rendered", zap.String("path", shared.VaultAgentConfigPath))
 
-	// 4. Render & write systemd unit
-	logger.Info("rendering Vault Agent systemd unit")
+	// —— Single helper for systemd unit ——
 	if err := renderAgentSystemdUnit(); err != nil {
-		logger.Error("renderAgentSystemdUnit failed", zap.Error(err))
-		return fmt.Errorf("render agent systemd unit: %w", err)
+		return fmt.Errorf("render/write systemd unit: %w", err)
 	}
 
-	// 5. Reload and enable the service
-	logger.Info("reloading systemd daemon & enabling service", zap.String("unit", shared.VaultAgentService))
+	// finally reload & enable
 	if err := system.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
-		// capture stderr if it's an ExitError
-		var exitErr *exec.ExitError
-		if errors.As(err, &exitErr) {
-			logger.Error("systemctl reload/enable failed",
-				zap.String("unit", shared.VaultAgentService),
-				zap.ByteString("stderr", exitErr.Stderr),
-			)
-		} else {
-			logger.Error("failed to reload/enable systemd unit", zap.Error(err))
-		}
-		return fmt.Errorf("reload daemon and enable agent service: %w", err)
+		return fmt.Errorf("reload/enable service: %w", err)
 	}
-	logger.Info("systemd daemon reloaded & service enabled", zap.String("unit", shared.VaultAgentService))
 
-	logger.Info("✅ PhaseRenderVaultAgentConfig completed successfully")
+	logger.Info("✅ Vault Agent config + service installed")
+	return nil
+}
+
+// renderAndWriteAgentHCL combines what used to be RenderAgentConfig + EnsureAgentConfig
+func renderAndWriteAgentHCL(addr string) error {
+	logger := zap.L().Named("vault.renderAndWriteAgentHCL")
+
+	data := shared.BuildAgentTemplateData(addr)
+	tpl, err := template.New("agent.hcl").Parse(shared.AgentConfigTmpl)
+	if err != nil {
+		return fmt.Errorf("parse HCL template: %w", err)
+	}
+
+	path := shared.VaultAgentConfigPath
+	// create or overwrite
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("create HCL file: %w", err)
+	}
+	defer f.Close()
+
+	if err := tpl.Execute(f, data); err != nil {
+		return fmt.Errorf("execute HCL template: %w", err)
+	}
+	if err := os.Chmod(path, shared.FilePermStandard); err != nil {
+		return fmt.Errorf("chmod HCL file: %w", err)
+	}
+
+	logger.Info("agent HCL written", zap.String("path", path))
 	return nil
 }
 
@@ -103,7 +100,7 @@ func renderAgentSystemdUnit() error {
 		RuntimeDir:  filepath.Dir(shared.AgentToken),
 		RuntimePath: shared.AgentToken,
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
-		RuntimeMode: 0755,
+		RuntimeMode: "0700",
 	}
 	logger.Debug("prepared systemd unit data", zap.Any("unitData", unitData))
 
@@ -208,47 +205,5 @@ func RenderAgentConfig(addr, roleID, secretID string) error {
 	logger.Info("file permissions set", zap.String("path", shared.VaultAgentConfigPath))
 
 	logger.Info("RenderAgentConfig completed successfully", zap.String("output", shared.VaultAgentConfigPath))
-	return nil
-}
-
-// EnsureAgentConfig only writes a new HCL if one doesn’t already exist.
-func EnsureAgentConfig(vaultAddr string) error {
-	logger := zap.L().Named("vault.EnsureAgentConfig")
-	logger.Info("checking for existing Vault Agent config", zap.String("path", shared.VaultAgentConfigPath))
-
-	if _, err := os.Stat(shared.VaultAgentConfigPath); err == nil {
-		logger.Info("existing config detected; skipping", zap.String("path", shared.VaultAgentConfigPath))
-		return nil
-	}
-
-	// verify AppRole creds are on disk
-	for _, p := range []struct{ name, path string }{
-		{"role_id", shared.AppRolePaths.RoleID},
-		{"secret_id", shared.AppRolePaths.SecretID},
-	} {
-		logger.Debug("verifying AppRole file exists", zap.String("type", p.name), zap.String("path", p.path))
-		if _, err := os.Stat(p.path); err != nil {
-			logger.Error("AppRole file not found", zap.String("path", p.path), zap.Error(err))
-			return fmt.Errorf("%s not found: %w", p.name, err)
-		}
-	}
-
-	// build data & template
-	logger.Debug("building agent template data", zap.String("VAULT_ADDR", vaultAddr))
-	data := shared.BuildAgentTemplateData(vaultAddr)
-	tpl, err := template.New("agent.hcl").Parse(shared.AgentConfigTmpl)
-	if err != nil {
-		logger.Error("failed to parse agent HCL template", zap.Error(err))
-		return fmt.Errorf("parse template: %w", err)
-	}
-
-	// write new config
-	logger.Info("writing new Vault Agent config", zap.String("path", shared.VaultAgentConfigPath))
-	if err := shared.WriteAgentConfig(shared.VaultAgentConfigPath, tpl, data); err != nil {
-		logger.Error("failed to write new config", zap.String("path", shared.VaultAgentConfigPath), zap.Error(err))
-		return fmt.Errorf("write config: %w", err)
-	}
-	logger.Info("new Vault Agent config written", zap.String("path", shared.VaultAgentConfigPath))
-
 	return nil
 }
