@@ -70,7 +70,7 @@ User={{ .User }}
 Group={{ .Group }}
 RuntimeDirectory={{ .RuntimeDir }}
 RuntimeDirectoryMode={{ .RuntimeMode }}
-ExecStartPre=/usr/bin/install -d -o {{ .User }} -g {{ .Group }} -m{{ .RuntimeMode }} {{ .RuntimePath }}
+ExecStartPre=/usr/bin/install -d -o {{ .User }} -g {{ .Group }} -m{{ .RuntimeMode }} {{ .RuntimeDir }}
 ExecStart={{ .ExecStart }}
 Restart=on-failure
 

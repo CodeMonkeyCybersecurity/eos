@@ -67,7 +67,7 @@ func renderAgentSystemdUnit() error {
 		RuntimeDir:  filepath.Dir(shared.AgentToken),
 		RuntimePath: shared.AgentToken,
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
-		RuntimeMode: 0755,
+		RuntimeMode: 0700,
 	}
 
 	tpl := template.Must(template.New("vault-agent-eos.service").Parse(shared.AgentSystemDUnit))
