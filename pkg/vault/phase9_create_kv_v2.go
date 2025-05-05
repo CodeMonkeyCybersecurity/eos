@@ -46,7 +46,7 @@ func PhaseEnableKVv2(client *api.Client) error {
 	}
 
 	zap.L().Info("🧪 Bootstrapping test secret")
-	if err := BootstrapKV(privilegedClient, "bootstrap/test"); err != nil {
+	if err := BootstrapKV(privilegedClient, shared.VaultTestPath); err != nil {
 		zap.L().Error("❌ Failed to bootstrap KV", zap.Error(err))
 		return err
 	}
@@ -149,7 +149,7 @@ func EnsureKVv2Enabled(client *api.Client, mountPath string) error {
 func BootstrapKV(client *api.Client, kvPath string) error {
 	zap.L().Info("🧪 Writing bootstrap secret", zap.String("path", kvPath))
 
-	kvClient := client.KVv2(strings.TrimSuffix(shared.VaultTestPath, "/"))
+	kvClient := client.KVv2(shared.VaultMountKV)
 
 	payload := map[string]interface{}{"value": "ok"}
 	zap.L().Debug("🔃 KV v2 put payload prepared", zap.String("path", kvPath), zap.Any("data", payload))
