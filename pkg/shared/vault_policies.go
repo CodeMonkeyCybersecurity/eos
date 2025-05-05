@@ -11,6 +11,7 @@ import (
 const EosDefaultPolicyName = "eos-default-policy"
 
 const EosDefaultPolicyTemplate = `
+
 path "auth/token/lookup-self" {
     capabilities = ["read"]
 }
@@ -23,10 +24,10 @@ path "auth/token/revoke-self" {
 path "sys/capabilities-self" {
     capabilities = ["update"]
 }
-path "identity/entity/id/{{"{{"}}identity.entity.id{{"}}"}}" {
+path "identity/entity/id/{{identity.entity.id}}" {
     capabilities = ["read"]
 }
-path "identity/entity/name/{{"{{"}}identity.entity.name{{"}}"}}" {
+path "identity/entity/name/{{identity.entity.name}}" {
     capabilities = ["read"]
 }
 path "sys/internal/ui/resultant-acl" {
@@ -65,8 +66,11 @@ path "sys/control-group/request" {
 path "identity/oidc/provider/+/authorize" {
     capabilities = ["read", "update"]
 }
-path "secret/{{ .KVPath }}/*" {
+path "secret/users/*" {
     capabilities = ["create", "read", "update", "delete", "list"]
+}
+path "secret/data/*" {
+  capabilities = ["create", "update", "read", "delete", "list"]
 }
 path "secret/metadata/*" {
     capabilities = ["list"]
