@@ -25,7 +25,7 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		eosio.LogRuntimeExecutionContext()
 
-		const timeout = 1 * time.Minute
+		const timeout = 3 * time.Minute
 		start := time.Now()
 
 		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
