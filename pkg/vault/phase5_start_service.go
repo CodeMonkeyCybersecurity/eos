@@ -83,29 +83,6 @@ func StartVaultService() error {
 	return nil
 }
 
-func WriteAgentSystemdUnit() error {
-	unit := fmt.Sprint(shared.AgentSystemDUnit,
-		shared.EosID,
-		shared.EosID,
-		shared.RuntimeDirPerms,
-		shared.EosID,
-		shared.EosID,
-		shared.RuntimeDirPerms,
-		shared.EosRunDir,
-		shared.VaultAgentConfigPath,
-	)
-
-	zap.L().Debug("✍️ Writing Vault AGENT systemd unit", zap.String("path", shared.VaultAgentServicePath))
-	if err := os.WriteFile(shared.VaultAgentServicePath,
-		[]byte(strings.TrimSpace(unit)+"\n"),
-		shared.FilePermStandard,
-	); err != nil {
-		return fmt.Errorf("write agent unit file: %w", err)
-	}
-	zap.L().Info("✅ Vault agent systemd unit written", zap.String("path", shared.VaultAgentServicePath))
-	return nil
-}
-
 func WriteVaultServerSystemdUnit() error {
 	unit := strings.TrimSpace(shared.ServerSystemDUnit) + "\n"
 	err := os.WriteFile(shared.VaultServicePath, []byte(unit), shared.FilePermStandard)

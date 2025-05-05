@@ -64,13 +64,7 @@ func PhaseStartVaultAgentAndValidate(client *api.Client) error {
 
 // StartVaultAgentService installs, enables, and starts the Vault AGENT (vault-agent-eos.service).
 func StartVaultAgentService() error {
-	zap.L().Info("🛠️ Writing Vault AGENT systemd unit file")
-	if err := WriteAgentSystemdUnit(); err != nil {
-		zap.L().Error("Failed to render systemd unit file", zap.String("path", shared.VaultAgentServicePath), zap.Error(err))
-		return fmt.Errorf("write agent systemd unit file (%s): %w", shared.VaultAgentServicePath, err)
-	}
-
-	zap.L().Info("🔄 Reloading systemd daemon & enabling service", zap.String("unit", shared.VaultAgentService))
+	zap.L().Info("🔄 Enabling and starting Vault Agent service", zap.String("unit", shared.VaultAgentService))
 	if err := system.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
 		// systemctl output often contains both stdout/stderr
 		var exitErr *exec.ExitError
@@ -82,7 +76,7 @@ func StartVaultAgentService() error {
 		return fmt.Errorf("reload/enable %s: %w", shared.VaultAgentService, err)
 	}
 
-	zap.L().Info("✅ Vault agent systemd service installed and started")
+	zap.L().Info("✅ Vault Agent service enabled & started")
 	return nil
 }
 
