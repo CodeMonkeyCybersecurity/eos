@@ -4,6 +4,7 @@ package create
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -18,7 +19,7 @@ var CreateTestDataCmd = &cobra.Command{
 attempts to upload it into Vault, and falls back to saving locally if Vault is unavailable.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-create-test-data")
-		data := vault.GenerateTestData()
+		data := shared.GenerateTestData()
 
 		client, err := vault.Auth()
 		if err != nil {

@@ -33,7 +33,7 @@ var UpdateTestDataCmd = &cobra.Command{
 			vault.ValidateAndCache(client)
 		}
 
-		newData := vault.GenerateUpdatedTestData()
+		newData := shared.GenerateUpdatedTestData()
 
 		if client != nil {
 			log.Info("✏️ Attempting to update test-data in Vault...")

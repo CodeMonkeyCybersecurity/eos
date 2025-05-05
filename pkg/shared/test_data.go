@@ -1,6 +1,6 @@
-// pkg/vault/util_test.go
+// pkg/shared/test_data.go
 
-package vault
+package shared
 
 // generateTestData returns a realistic in-memory test dataset for validation workflows.
 func GenerateTestData() map[string]interface{} {
@@ -9,23 +9,23 @@ func GenerateTestData() map[string]interface{} {
 			{
 				"username": "alice",
 				"fullname": "Alice Wonderland",
-				"email":    "alice@example.com",
+				"email":    "alice@cybermonkey.dev",
 				"groups":   []string{"users", "nextcloud", "keycloak"},
 				"password": "S3cr3tP@ssw0rd!",
 			},
 			{
 				"username": "bob",
 				"fullname": "Bob Builder",
-				"email":    "bob@example.com",
+				"email":    "bob@cybermonkey.dev",
 				"groups":   []string{"admins", "ldap", "scim"},
-				"password": "CanWeFixItYesWeCan!",
+				"password": "CanWeFixIt?YesWeCan!",
 			},
 		},
 		"groups": []string{"users", "admins", "nextcloud", "keycloak", "ldap", "scim"},
 		"services": map[string]string{
-			"wazuh_api_url": "https://wazuh.example.com",
-			"keycloak_url":  "https://keycloak.example.com",
-			"nextcloud_url": "https://nextcloud.example.com",
+			"wazuh_api_url": "https://wazuh.cybermonkey.dev",
+			"keycloak_url":  "https://keycloak.cybermonkey.dev",
+			"nextcloud_url": "https://nextcloud.cybermonkey.dev",
 		},
 	}
 }
@@ -50,7 +50,7 @@ func GenerateUpdatedTestData() map[string]interface{} {
 		},
 		"groups": []string{"users", "admins", "nextcloud"},
 		"services": map[string]string{
-			"wazuh_api_url": "https://new-wazuh.example.com",
+			"wazuh_api_url": "https://new-wazuh.cybermonkey.dev",
 		},
 	}
 }
