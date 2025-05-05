@@ -14,6 +14,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/template"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -40,15 +41,51 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 		return fmt.Errorf("render agent config: %w", err)
 	}
 
-	if err := EnsureAgentConfig(addr); err != nil {
-		return fmt.Errorf("ensure agent config: %w", err)
+	// ─── Render & install the systemd unit for Vault Agent ───────────────────
+	if err := renderAgentSystemdUnit(); err != nil {
+		return fmt.Errorf("render agent systemd unit: %w", err)
 	}
 
 	if err := system.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
+
 		return fmt.Errorf("reload daemon and enable agent service: %w", err)
 	}
 
 	zap.L().Info("✅ Vault Agent configuration rendered and systemd enabled")
+	return nil
+}
+
+// renderAgentSystemdUnit writes out the Vault Agent systemd service file
+// using the shared.AgentSystemDUnit template and AgentSystemdData.
+func renderAgentSystemdUnit() error {
+	// fill in the templating data
+	unitData := shared.AgentSystemdData{
+		Description: "Vault Agent (eos)",
+		User:        "eos",
+		Group:       "eos",
+		// use the same directory where we sink tokens
+		RuntimeDir:  filepath.Dir(shared.AgentToken),
+		RuntimePath: shared.AgentToken,
+		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
+		RuntimeMode: 0755,
+	}
+
+	tpl := template.Must(template.New("vault-agent-eos.service").Parse(shared.AgentSystemDUnit))
+	f, err := os.Create(shared.VaultAgentServicePath)
+	if err != nil {
+		return fmt.Errorf("create systemd unit file: %w", err)
+	}
+	defer f.Close()
+
+	if err := tpl.Execute(f, unitData); err != nil {
+		return fmt.Errorf("execute systemd unit template: %w", err)
+	}
+
+	if err := os.Chmod(shared.VaultAgentServicePath, 0644); err != nil {
+		return fmt.Errorf("chmod systemd unit file: %w", err)
+	}
+
+	zap.L().Info("✅ Vault Agent systemd unit rendered", zap.String("path", shared.VaultAgentServicePath))
 	return nil
 }
 

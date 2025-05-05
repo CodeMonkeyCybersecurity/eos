@@ -54,7 +54,7 @@ func EnableVault(client *api.Client, log *zap.Logger) error {
 	}
 
 	// Step 6: interactively configure auth methods
-	if interaction.PromptYesNo("Enable AppRole authentication?", true) {
+	if interaction.PromptYesNo("Enable AppRole authentication?", false) {
 		if err := PhaseEnableAppRole(client, log, shared.DefaultAppRoleOptions()); err != nil {
 			return logger.LogErrAndWrap("enable AppRole", err)
 		}
