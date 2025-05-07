@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -218,7 +219,7 @@ func RenderJenkinsNginx(bundle ServiceBundle) error {
 	}
 
 	targetDir := "./nginx-fragments"
-	if err := ensureDir(targetDir); err != nil {
+	if err := system.EnsureDir(targetDir); err != nil {
 		log.Error("Failed to create NGINX fragments directory", zap.Error(err))
 		return fmt.Errorf("failed to create NGINX fragments directory: %w", err)
 	}

@@ -85,6 +85,31 @@ func OrchestrateHecateWizard() error {
 
 	// === Phase 2: Collate, render, write Caddyfile ===
 	// Call the thin wrapper for Caddy
+
+	// === Build CaddySpec ===
+	var proxies []CaddyAppProxy
+	var keycloakDomain string
+
+	for _, svc := range enabledServices {
+		// Handle Keycloak separately
+		if svc.name == "Keycloak" {
+			keycloakDomain = svc.bundle.Domain
+		} else {
+			// Build a CaddyAppProxy for each other service
+			proxies = append(proxies, NewCaddyAppProxy(
+				svc.name,
+				svc.bundle.Domain,
+				backendIP,
+				svc.bundle.BackendPort,
+				"", // ExtraDirectives (leave empty for now)
+			))
+		}
+	}
+
+	spec := CaddySpec{
+		KeycloakDomain: keycloakDomain,
+		Proxies:        proxies,
+	}
 	if err := PhaseCaddy(spec); err != nil {
 		log.Error("Failed in Phase 2: Caddy setup", zap.Error(err))
 		return err
@@ -94,10 +119,10 @@ func OrchestrateHecateWizard() error {
 	// (PhaseNginx would handle Nginx collation + writing)
 	// Example:
 	// log.Info("⚙️  Running Phase Nginx...")
-	// if err := PhaseNginx(...); err != nil {
-	//     log.Error("Phase Nginx failed", zap.Error(err))
-	//     return fmt.Errorf("phase nginx failed: %w", err)
-	// }
+	if err := PhaseNginx(backendIP); err != nil {
+		log.Error("Failed in Phase 3: Nginx setup", zap.Error(err))
+		return err
+	}
 
 	log.Info("✅ Hecate setup wizard completed successfully!")
 	return nil

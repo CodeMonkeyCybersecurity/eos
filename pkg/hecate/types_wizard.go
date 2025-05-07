@@ -6,9 +6,11 @@ import "bufio"
 
 // ServiceBundle is returned by each wizard setup and holds the full config for Compose, Nginx, and Caddy.
 type ServiceBundle struct {
-	Compose *ComposeSpec
-	Nginx   *NginxSpec
-	Caddy   *CaddySpec
+	Domain      string // e.g., "hera-int.cybermonkey.dev"
+	BackendPort string // e.g., "8080"
+	Compose     *ComposeSpec
+	Nginx       *NginxSpec
+	Caddy       *CaddySpec
 }
 
 const (

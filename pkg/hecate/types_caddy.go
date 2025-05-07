@@ -21,7 +21,18 @@ type CaddyAppProxy struct {
 	Domain          string
 	BackendIP       string
 	BackendPort     string
-	ExtraDirectives string // 💡 Optional: for future extension (timeouts, headers)
+	ExtraDirectives string // 💡 Optional: timeouts, headers
+	ServiceType     string // NEW: e.g., "web", "api", "db-proxy"
+}
+
+func NewCaddyAppProxy(appName, domain, backendIP, backendPort string, extra string) CaddyAppProxy {
+	return CaddyAppProxy{
+		AppName:         appName,
+		Domain:          domain,
+		BackendIP:       backendIP,
+		BackendPort:     backendPort,
+		ExtraDirectives: extra,
+	}
 }
 
 type CaddySpec struct {
