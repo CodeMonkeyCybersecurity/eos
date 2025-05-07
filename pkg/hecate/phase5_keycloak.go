@@ -1,13 +1,11 @@
-//pkg/hecate/phase5_keycloak.go
+// pkg/hecate/phase5_keycloak.go
 
 package hecate
 
 import (
 	"bufio"
 	"fmt"
-	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"go.uber.org/zap"
 )
 
@@ -16,148 +14,86 @@ func SetupKeycloakWizard(reader *bufio.Reader) ServiceBundle {
 	log := zap.L().Named("hecate-keycloak-setup")
 	log.Info("🔧 Collecting Keycloak setup information...")
 
-	// === Prompt the user ===
-	keycloakDomain := interaction.PromptInputWithReader("Enter Keycloak domain (e.g., hera.domain.com)", "hera.domain.com", reader)
-	keycloakDBName := interaction.PromptInputWithReader("Enter Keycloak DB name", "keycloak", reader)
-	keycloakDBUser := interaction.PromptInputWithReader("Enter Keycloak DB user", "keycloak", reader)
-	keycloakDBPassword := interaction.PromptInputWithReader("Enter Keycloak DB password", "changeme", reader)
-	keycloakAdminUser := interaction.PromptInputWithReader("Enter Keycloak admin user", "admin", reader)
-	keycloakAdminPassword := interaction.PromptInputWithReader("Enter Keycloak admin password", "changeme", reader)
-
-	// === Compose Spec ===
-	serviceSpec := &ServiceSpec{
-		Name:            "keycloak",
-		FullServiceYAML: DockerKeycloakService, // Template will be rendered later
-		Environment: map[string]string{
-			"KeycloakDomain":        keycloakDomain,
-			"KeycloakDBName":        keycloakDBName,
-			"KeycloakDBUser":        keycloakDBUser,
-			"KeycloakDBPassword":    keycloakDBPassword,
-			"KeycloakAdminUser":     keycloakAdminUser,
-			"KeycloakAdminPassword": keycloakAdminPassword,
+	// Define the fields to prompt for.
+	fields := []PromptField{
+		{
+			Prompt:  "Enter Keycloak domain (e.g., hera.domain.com)",
+			Default: "hera.domain.com",
+			EnvVar:  "KeycloakDomain",
+			Reader:  reader,
 		},
-		DependsOn: []string{"kc-db"},
-		Volumes:   []string{"kc-db-data:/var/lib/postgresql/data"},
-	}
-	composeSpec := &ComposeSpec{
-		Services: map[string]*ServiceSpec{
-			"keycloak": serviceSpec,
+		{
+			Prompt:  "Enter Keycloak DB name",
+			Default: "keycloak",
+			EnvVar:  "KeycloakDBName",
+			Reader:  reader,
+		},
+		{
+			Prompt:  "Enter Keycloak DB user",
+			Default: "keycloak",
+			EnvVar:  "KeycloakDBUser",
+			Reader:  reader,
+		},
+		{
+			Prompt:  "Enter Keycloak DB password",
+			Default: "changeme",
+			EnvVar:  "KeycloakDBPassword",
+			Reader:  reader,
+		},
+		{
+			Prompt:  "Enter Keycloak admin user",
+			Default: "admin",
+			EnvVar:  "KeycloakAdminUser",
+			Reader:  reader,
+		},
+		{
+			Prompt:  "Enter Keycloak admin password",
+			Default: "changeme",
+			EnvVar:  "KeycloakAdminPassword",
+			Reader:  reader,
 		},
 	}
 
-	// === Caddy Spec ===
-	caddySpec := &CaddySpec{
-		KeycloakDomain: keycloakDomain,
-		Proxies:        []CaddyAppProxy{}, // No extra proxies for Keycloak (special case)
+	// Prepare Caddy reverse proxy info (using Docker service name internally)
+	caddyProxy := &CaddyAppProxy{
+		AppName:     "keycloak",
+		Domain:      "<KeycloakDomain>", // Placeholder; will get interpolated during rendering
+		BackendIP:   "keycloak",         // Docker service name for Keycloak container
+		BackendPort: "8080",
 	}
 
-	log.Info("✅ Keycloak ServiceBundle created")
-
-	return ServiceBundle{
-		Compose: composeSpec,
-		Nginx:   nil, // No NGINX config needed for Keycloak
-		Caddy:   caddySpec,
-	}
+	// Build the ServiceBundle using GenericWizard.
+	return GenericWizard(
+		"hecate-keycloak-setup",
+		fields,
+		"keycloak",
+		DockerKeycloakService,
+		caddyProxy,
+		nil,               // No NGINX config needed for Keycloak
+		[]string{"kc-db"}, // depends_on
+		[]string{"kc-db-data:/var/lib/postgresql/data"}, // volumes
+		nil, // ports (Keycloak is proxied)
+	)
 }
 
-// SetupKeycloakCompose handles creating the Docker Compose section for Keycloak.
-func SetupKeycloakCompose(config DockerConfig) error {
-	log := zap.L().Named("hecate-keycloak-compose")
-	log.Info("🔧 Setting up Docker Compose config for Keycloak...",
-		zap.String("domain", config.KeycloakDomain),
-		zap.String("db_name", config.KeycloakDBName),
-		zap.String("db_user", config.KeycloakDBUser),
+// SetupKeycloak performs the full setup: renders Compose, Caddy, etc.
+func SetupKeycloak(bundle ServiceBundle, targetDir string) error {
+	log := zap.L().Named("hecate-keycloak-setup")
+
+	log.Info("🚀 Starting Keycloak setup rendering...")
+
+	err := RenderBundleFragments(
+		bundle,
+		fmt.Sprintf("%s/docker-compose.override.yml", targetDir),
+		fmt.Sprintf("%s/Caddy-fragments", targetDir),
+		fmt.Sprintf("%s/conf.d/stream", targetDir),
+		"keycloak",
 	)
-
-	// Placeholder: in the real implementation, you'd render and write the docker-compose.yml entry here.
-	log.Info("📝 Would render Docker Compose block for Keycloak",
-		zap.String("compose_service", "keycloak + kc-db with environment vars, volumes, and network setup"),
-	)
-
-	// TODO: Implement actual Docker Compose writing here if needed.
-	return nil
-}
-
-// RenderKeycloakCompose renders and writes the Docker Compose block for Keycloak.
-func RenderKeycloakCompose(bundle ServiceBundle) error {
-	log := zap.L().Named("hecate-keycloak-compose-render")
-	if bundle.Compose == nil || bundle.Compose.Services == nil {
-		log.Warn("No Compose services found in bundle")
-		return nil
-	}
-
-	for name, svc := range bundle.Compose.Services {
-		log.Info("🔧 Rendering Docker Compose block for Keycloak service...",
-			zap.String("service", name),
-		)
-		rendered, err := renderTemplateFromString(svc.FullServiceYAML, svc.Environment)
-		if err != nil {
-			log.Error("Failed to render Docker Compose content", zap.String("service", name), zap.Error(err))
-			return err
-		}
-		dockerComposePath := "./docker-compose.override.yml"
-		err = appendToFile(dockerComposePath, rendered)
-		if err != nil {
-			log.Error("Failed to write Docker Compose block", zap.String("service", name), zap.Error(err),
-				zap.String("path", dockerComposePath),
-			)
-			return fmt.Errorf("failed to write Docker Compose: %w", err)
-		}
-		log.Info("📝 Docker Compose block written successfully",
-			zap.String("service", name),
-			zap.String("path", dockerComposePath),
-		)
-	}
-	return nil
-}
-
-// SetupKeycloakCaddy handles creating the Caddy reverse proxy config for Keycloak.
-func SetupKeycloakCaddy(config DockerConfig) error {
-	log := zap.L().Named("hecate-keycloak-caddy")
-	log.Info("🔧 Setting up Caddy config for Keycloak...",
-		zap.String("domain", config.KeycloakDomain),
-		zap.String("backend", "https://keycloak:8080"),
-	)
-
-	// Placeholder: in the real implementation, you'd render and write the Caddyfile entry here.
-	// For now we just log what would happen.
-	log.Info("📝 Would render Caddy config block:",
-		zap.String("caddy_block", config.KeycloakDomain+" {\n\treverse_proxy https://keycloak:8080\n}"),
-	)
-
-	// TODO: Implement actual Caddyfile writing here if needed.
-	return nil
-}
-
-// RenderKeycloakCaddy renders and writes the Caddyfile block for Keycloak.
-func RenderKeycloakCaddy(bundle ServiceBundle) error {
-	log := zap.L().Named("hecate-keycloak-caddy-render")
-
-	caddyCfg := CaddyConfig{
-		KeycloakDomain: bundle.Caddy.KeycloakDomain,
-		Proxies:        bundle.Caddy.Proxies,
-	}
-
-	caddyContent, err := RenderCaddyfileContent(caddyCfg)
 	if err != nil {
-		log.Error("Failed to render Caddyfile content", zap.Error(err))
+		log.Error("❌ Failed to render Keycloak service", zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Caddyfile content rendered successfully")
-
-	caddyfilePath := HecateCaddyfile
-	err = os.WriteFile(caddyfilePath, []byte(caddyContent), 0644)
-	if err != nil {
-		log.Error("Failed to write Caddyfile", zap.Error(err),
-			zap.String("path", caddyfilePath),
-		)
-		return fmt.Errorf("failed to write Caddyfile: %w", err)
-	}
-
-	log.Info("📝 Caddyfile written successfully",
-		zap.String("path", caddyfilePath),
-	)
-
+	log.Info("✅ Keycloak setup rendered successfully!")
 	return nil
 }

@@ -12,7 +12,7 @@ import (
 )
 
 // SetupCaddyEnvironment sets up the full Caddy environment: directories, config generation, and placement.
-func SetupCaddyEnvironment(cfg CaddyConfig) error {
+func SetupCaddyEnvironment(spec CaddySpec) error {
 	log := zap.L().Named("hecate-caddy-orchestrator")
 	log.Info("🚀 Starting full Caddy setup for Hecate...")
 
@@ -24,7 +24,7 @@ func SetupCaddyEnvironment(cfg CaddyConfig) error {
 
 	// Step 2: Generate the Caddyfile content
 	log.Info("Generating Caddyfile content...")
-	caddyContent := GenerateCaddyConfigMulti(cfg)
+	caddyContent := GenerateCaddySpecMulti(spec)
 
 	// Step 3: Write the Caddyfile locally
 	log.Info("Writing Caddyfile to working directory...")
@@ -44,12 +44,12 @@ func SetupCaddyEnvironment(cfg CaddyConfig) error {
 	return nil
 }
 
-// GenerateCaddyConfigMulti generates a Caddyfile with multiple reverse proxy blocks.
-func GenerateCaddyConfigMulti(cfg CaddyConfig) string {
+// GenerateCaddySpecMulti generates a Caddyfile with multiple reverse proxy blocks.
+func GenerateCaddySpecMulti(spec CaddySpec) string {
 	var builder strings.Builder
 
 	// Loop through each app and create a Caddy block.
-	for _, app := range cfg.Proxies {
+	for _, app := range spec.Proxies {
 		fullDomain := app.Domain
 
 		builder.WriteString(fmt.Sprintf("%s {\n", fullDomain))
@@ -71,8 +71,8 @@ func GenerateCaddyConfigMulti(cfg CaddyConfig) string {
 	}
 
 	// Always add Keycloak proxy block at the end.
-	if cfg.KeycloakDomain != "" {
-		builder.WriteString(fmt.Sprintf("%s {\n", cfg.KeycloakDomain))
+	if spec.KeycloakDomain != "" {
+		builder.WriteString(fmt.Sprintf("%s {\n", spec.KeycloakDomain))
 		builder.WriteString("    reverse_proxy hecate-kc:8080\n")
 		builder.WriteString("    # Keycloak special settings can be added here if needed\n")
 		builder.WriteString("}\n\n")

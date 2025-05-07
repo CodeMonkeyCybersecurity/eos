@@ -124,15 +124,15 @@ func RenderJenkinsCompose(bundle ServiceBundle) error {
 	return nil
 }
 
-// SetupJenkinsCaddy prompts for domain backend info and returns a CaddyConfig fragment.
-func SetupJenkinsCaddy(reader *bufio.Reader) CaddyConfig {
+// SetupJenkinsCaddy prompts for domain backend info and returns a CaddySpec fragment.
+func SetupJenkinsCaddy(reader *bufio.Reader) CaddySpec {
 	log := zap.L().Named("hecate-jenkins-caddy-setup")
 	log.Info("🔧 Collecting Jenkins Caddy reverse proxy setup information...")
 
 	jenkinsDomain := interaction.PromptInputWithReader("Enter Jenkins domain (e.g., jenkins.domain.com)", "jenkins.domain.com", reader)
 	backendIP := interaction.PromptInputWithReader("Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
 
-	caddyCfg := CaddyConfig{
+	caddyCfg := CaddySpec{
 		Proxies: []CaddyAppProxy{
 			{
 				AppName:     "jenkins",
@@ -152,7 +152,7 @@ func SetupJenkinsCaddy(reader *bufio.Reader) CaddyConfig {
 }
 
 // RenderJenkinsCaddy renders and writes the Caddyfile block for Jenkins.
-func RenderJenkinsCaddy(caddyCfg CaddyConfig) error {
+func RenderJenkinsCaddy(caddyCfg CaddySpec) error {
 	log := zap.L().Named("hecate-jenkins-caddy-render")
 	log.Info("🔧 Rendering Jenkins Caddyfile fragment...")
 

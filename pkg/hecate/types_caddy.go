@@ -8,9 +8,7 @@ import (
 	"text/template"
 )
 
-
 var caddyFragments []CaddyFragment
-
 
 // CaddyFragment is the rendered result for one service.
 type CaddyFragment struct {
@@ -24,11 +22,6 @@ type CaddyAppProxy struct {
 	BackendIP       string
 	BackendPort     string
 	ExtraDirectives string // 💡 Optional: for future extension (timeouts, headers)
-}
-
-type CaddyConfig struct {
-	Proxies        []CaddyAppProxy
-	KeycloakDomain string
 }
 
 type CaddySpec struct {
@@ -46,7 +39,7 @@ const GenericCaddyBlockTemplate = `
 }
 `
 
-func RenderCaddyfileContent(cfg CaddyConfig) (string, error) {
+func RenderCaddyfileContent(spec CaddySpec) (string, error) {
 	tmplStr := `
 {{- if .KeycloakDomain }}
 {{ .KeycloakDomain }} {
@@ -66,7 +59,7 @@ func RenderCaddyfileContent(cfg CaddyConfig) (string, error) {
 	}
 
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, cfg); err != nil {
+	if err := tmpl.Execute(&buf, spec); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

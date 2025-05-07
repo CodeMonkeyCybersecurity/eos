@@ -58,6 +58,15 @@ type ServicePorts struct {
 	UDP []string
 }
 
+const BaseNginxConf = `worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+` + StreamIncludeTemplate + `
+`
+
 // Template to render any upstream + server block.
 const GenericStreamBlockTemplate = `
 upstream {{ .UpstreamName }} {

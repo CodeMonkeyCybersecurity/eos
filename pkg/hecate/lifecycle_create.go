@@ -26,145 +26,142 @@ func SetupHecateWizard() error {
 	}
 
 	// === Service selection ===
-	keycloakEnabled := interaction.PromptYesNo("Do you want to set up Keycloak?", true)
-	nextcloudEnabled := interaction.PromptYesNo("Do you want to set up Nextcloud (Coturn only)?", false)
-	wazuhEnabled := interaction.PromptYesNo("Do you want to set up Wazuh?", false)
-	jenkinsEnabled := interaction.PromptYesNo("Do you want to set up Jenkins?", false)
+	serviceChoices := []struct {
+		name              string
+		prompt            string
+		defaultYes        bool
+		setupFunc         func(*bufio.Reader) ServiceBundle
+		useTemplateRender bool
+	}{
+		{"Keycloak", "Do you want to set up Keycloak?", false, SetupKeycloakWizard, false},
+		{"Nextcloud", "Do you want to set up Nextcloud?", false, SetupNextcloudWizard, true},
+		{"Wazuh", "Do you want to set up Wazuh?", false, SetupWazuhWizard, false},
+		{"Jenkins", "Do you want to set up Jenkins?", false, SetupJenkinsWizard, false},
+	}
+
+	// Prompt the user for each service
+	enabledServices := []struct {
+		name              string
+		bundle            ServiceBundle
+		useTemplateRender bool
+	}{}
+
+	for _, svc := range serviceChoices {
+		if interaction.PromptYesNo(svc.prompt, svc.defaultYes) {
+			bundle := svc.setupFunc(reader)
+			enabledServices = append(enabledServices, struct {
+				name              string
+				bundle            ServiceBundle
+				useTemplateRender bool
+			}{svc.name, bundle, svc.useTemplateRender})
+		}
+	}
 
 	// Check: Exit early if no services selected
-	if ShouldExitNoServicesSelected(keycloakEnabled, nextcloudEnabled, wazuhEnabled, jenkinsEnabled) {
+	if len(enabledServices) == 0 {
+		zap.L().Named("hecate-setup-check").Warn("🚫 No services selected. Exiting without making any changes.")
 		return errors.New("no services selected; exiting setup wizard")
 	}
 
-	// Ask for the backend IP once (or you can customize per service if needed)
-	var backendIP = interaction.PromptInputWithReader("Enter the backend IP address for these services:", "", reader)
+	// Ask for the backend IP once
+	backendIP := interaction.PromptInputWithReader("Enter the backend IP address for these services:", "", reader)
 
-	// === Process each service ===
-	if keycloakEnabled {
-		bundle := SetupKeycloakWizard(reader)
-
-		if bundle.Caddy != nil {
-			frag, err := bundle.Caddy.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Caddy fragment for Keycloak: %w", err)
-			}
-			caddyFragments = append(caddyFragments, frag)
-		}
-		if bundle.Nginx != nil {
-			frag, err := bundle.Nginx.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Nginx fragment for Keycloak: %w", err)
-			}
-			nginxFragments = append(nginxFragments, frag)
-		}
-		if bundle.Compose != nil && bundle.Compose.Services != nil {
-			for name, svc := range bundle.Compose.Services {
-				frag, err := svc.ToFragment()
-				if err != nil {
-					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
-					continue
-				}
-				composeFragments = append(composeFragments, frag)
-			}
-		}
-	}
-
-	if wazuhEnabled {
-		bundle := SetupWazuhWizard(reader)
-
-		if bundle.Caddy != nil {
-			frag, err := bundle.Caddy.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Caddy fragment for Wazuh: %w", err)
-			}
-			caddyFragments = append(caddyFragments, frag)
-		}
-		if bundle.Nginx != nil {
-			frag, err := bundle.Nginx.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Nginx fragment for Wazuh: %w", err)
-			}
-			nginxFragments = append(nginxFragments, frag)
-		}
-		if bundle.Compose != nil && bundle.Compose.Services != nil {
-			for name, svc := range bundle.Compose.Services {
-				frag, err := svc.ToFragment()
-				if err != nil {
-					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
-					continue
-				}
-				composeFragments = append(composeFragments, frag)
-			}
-		}
-	}
-
-	if jenkinsEnabled {
-		bundle := SetupJenkinsWizard(reader)
-
-		if bundle.Caddy != nil {
-			frag, err := bundle.Caddy.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Caddy fragment for Jenkins: %w", err)
-			}
-			caddyFragments = append(caddyFragments, frag)
-		}
-		if bundle.Nginx != nil {
-			frag, err := bundle.Nginx.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Nginx fragment for Jenkins: %w", err)
-			}
-			nginxFragments = append(nginxFragments, frag)
-		}
-		if bundle.Compose != nil && bundle.Compose.Services != nil {
-			for name, svc := range bundle.Compose.Services {
-				frag, err := svc.ToFragment()
-				if err != nil {
-					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
-					continue
-				}
-				composeFragments = append(composeFragments, frag)
-			}
-		}
-	}
-
-	if nextcloudEnabled {
-		bundle := SetupNextcloudWizard(reader)
-
-		if bundle.Caddy != nil {
-			frag, err := bundle.Caddy.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Caddy fragment for Nextcloud: %w", err)
-			}
-			caddyFragments = append(caddyFragments, frag)
-		}
-		if bundle.Nginx != nil {
-			frag, err := bundle.Nginx.ToFragment(backendIP)
-			if err != nil {
-				return fmt.Errorf("failed to render Nginx fragment for Nextcloud: %w", err)
-			}
-			nginxFragments = append(nginxFragments, frag)
-		}
-		if bundle.Compose != nil && bundle.Compose.Services != nil {
-			for name, svc := range bundle.Compose.Services {
-				frag, err := svc.ToFragment()
-				if err != nil {
-					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
-					continue
-				}
-				composeFragments = append(composeFragments, frag)
-			}
+	// Process each enabled service
+	for _, svc := range enabledServices {
+		if err := handleService(log, svc.name, svc.bundle, backendIP, svc.useTemplateRender); err != nil {
+			return fmt.Errorf("failed to process %s: %w", svc.name, err)
 		}
 	}
 
 	// === Collate everything at the end ===
-	if err := CollateAndWriteCaddyfile(caddyFragments); err != nil {
+
+	// Caddyfile
+	if err := CollateAndWriteFile(
+		"hecate-caddy-collation",
+		caddyFragments,
+		HecateCaddyfile,
+		"",
+		"",
+		func(frag CaddyFragment) string { return frag.CaddyBlock },
+	); err != nil {
 		return err
 	}
-	if err := CollateAndWriteDockerCompose(composeFragments); err != nil {
+
+	// docker-compose.yml
+	if err := CollateAndWriteFile(
+		"hecate-compose-collation",
+		composeFragments,
+		HecateDockerCompose,
+		"services:\n",
+		DockerNetworkAndVolumes,
+		func(frag DockerComposeFragment) string { return frag.ServiceYAML },
+	); err != nil {
 		return err
 	}
-	if err := CollateAndWriteNginxConfig(nginxFragments); err != nil {
-		return err
+
+	// nginx.conf (only if fragments exist)
+	if len(nginxFragments) > 0 {
+		if err := CollateAndWriteFile(
+			"hecate-nginx-collation",
+			nginxFragments,
+			HecateNginxConfig,
+			BaseNginxConf,
+			"",
+			func(_ NginxFragment) string { return "" },
+		); err != nil {
+			return err
+		}
+	} else {
+		zap.L().Named("hecate-nginx-collation").Info("No Nginx fragments to write; skipping nginx.conf")
+	}
+
+	return nil
+}
+
+// handleService processes the ServiceBundle and appends fragments.
+func handleService(
+	log *zap.Logger,
+	name string,
+	bundle ServiceBundle,
+	backendIP string,
+	useTemplateRender bool,
+) error {
+
+	if bundle.Caddy != nil {
+		frag, err := bundle.Caddy.ToFragment(backendIP)
+		if err != nil {
+			return fmt.Errorf("failed to render Caddy fragment for %s: %w", name, err)
+		}
+		caddyFragments = append(caddyFragments, frag)
+	}
+
+	if bundle.Nginx != nil {
+		frag, err := bundle.Nginx.ToFragment(backendIP)
+		if err != nil {
+			return fmt.Errorf("failed to render Nginx fragment for %s: %w", name, err)
+		}
+		nginxFragments = append(nginxFragments, frag)
+	}
+
+	if bundle.Compose != nil && bundle.Compose.Services != nil {
+		for svcName, svc := range bundle.Compose.Services {
+			if useTemplateRender {
+				rendered, err := renderTemplateFromString(svc.FullServiceYAML, svc.Environment)
+				if err != nil {
+					log.Warn("Failed to render service YAML", zap.String("service", svcName), zap.Error(err))
+					continue
+				}
+				frag := DockerComposeFragment{ServiceYAML: rendered}
+				composeFragments = append(composeFragments, frag)
+			} else {
+				frag, err := svc.ToFragment()
+				if err != nil {
+					log.Warn("Failed to render service fragment", zap.String("service", svcName), zap.Error(err))
+					continue
+				}
+				composeFragments = append(composeFragments, frag)
+			}
+		}
 	}
 
 	return nil
@@ -179,85 +176,46 @@ func ShouldExitNoServicesSelected(keycloak, nextcloud, wazuh, jenkins bool) bool
 	return false
 }
 
-// CollateAndWriteDockerCompose merges multiple DockerComposeFragment pieces and writes the docker-compose.yml.
-func CollateAndWriteDockerCompose(fragments []DockerComposeFragment) error {
-	log := zap.L().Named("hecate-compose-collation")
+func CollateAndWriteFile[T any](
+	logName string,
+	fragments []T,
+	filePath string,
+	header string,
+	footer string,
+	renderFunc func(T) string,
+) error {
+	log := zap.L().Named(logName)
+
+	// Skip file creation if no fragments & no header/footer
+	if len(fragments) == 0 && header == "" && footer == "" {
+		log.Info("No fragments to write; skipping", zap.String("path", filePath))
+		return nil
+	}
 
 	var buf bytes.Buffer
 
-	// Header (optional, can add version info here)
-	buf.WriteString("version: '3.8'\n\nservices:\n")
+	if header != "" {
+		buf.WriteString(header)
+		if header[len(header)-1] != '\n' {
+			buf.WriteString("\n")
+		}
+	}
 
 	for _, frag := range fragments {
-		buf.WriteString(frag.ServiceYAML)
+		buf.WriteString(renderFunc(frag))
 		buf.WriteString("\n\n")
 	}
 
-	// Add networks & volumes at the end
-	buf.WriteString(DockerNetworkAndVolumes)
+	if footer != "" {
+		buf.WriteString(footer)
+	}
 
-	composeFilePath := HecateDockerCompose
-	err := os.WriteFile(composeFilePath, buf.Bytes(), 0644)
+	err := os.WriteFile(filePath, buf.Bytes(), 0644)
 	if err != nil {
-		log.Error("Failed to write docker-compose.yml", zap.Error(err),
-			zap.String("path", composeFilePath),
-		)
-		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
+		log.Error("Failed to write file", zap.Error(err), zap.String("path", filePath))
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
 
-	log.Info("✅ Final docker-compose.yml written successfully", zap.String("path", composeFilePath))
-	return nil
-}
-
-// CollateAndWriteCaddyfile merges multiple CaddyConfig fragments and writes the final Caddyfile.
-func CollateAndWriteCaddyfile(fragments []CaddyFragment) error {
-	log := zap.L().Named("hecate-caddy-collation")
-
-	var buf bytes.Buffer
-	for _, frag := range fragments {
-		buf.WriteString(frag.CaddyBlock)
-		buf.WriteString("\n\n")
-	}
-
-	caddyfilePath := HecateCaddyfile
-	err := os.WriteFile(caddyfilePath, buf.Bytes(), 0644)
-	if err != nil {
-		log.Error("Failed to write Caddyfile", zap.Error(err),
-			zap.String("path", caddyfilePath),
-		)
-		return fmt.Errorf("failed to write Caddyfile: %w", err)
-	}
-
-	log.Info("✅ Final Caddyfile written successfully", zap.String("path", caddyfilePath))
-	return nil
-}
-
-// CollateAndWriteNginxConfig writes the main nginx.conf that includes service fragments.
-func CollateAndWriteNginxConfig(_ []NginxFragment) error {
-	log := zap.L().Named("hecate-nginx-collation")
-
-	// Minimal nginx.conf that includes the stream fragments
-	mainConf := `
-worker_processes  1;
-
-events {
-    worker_connections  1024;
-}
-
-` + StreamIncludeTemplate + `
-`
-
-	nginxFilePath := HecateNginxConfig
-	err := os.WriteFile(nginxFilePath, []byte(mainConf), 0644)
-	if err != nil {
-		log.Error("Failed to write nginx.conf", zap.Error(err),
-			zap.String("path", nginxFilePath),
-		)
-		return fmt.Errorf("failed to write nginx.conf: %w", err)
-	}
-
-	log.Info("✅ Main nginx.conf written successfully, using stream includes",
-		zap.String("path", nginxFilePath),
-	)
+	log.Info("✅ Final file written successfully", zap.String("path", filePath))
 	return nil
 }
