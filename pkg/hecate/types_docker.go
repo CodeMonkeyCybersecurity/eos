@@ -52,10 +52,8 @@ services:
 
 {{ .DynamicServices }}
 
-networks:
 {{ .NetworksSection }}
 
-volumes:
 {{ .VolumesSection }}
 `
 
