@@ -2,10 +2,6 @@
 
 package hecate
 
-const (
-	InstallDir = "/opt/hecate"
-)
-
 var composeFragments []DockerComposeFragment
 
 type DockerConfig struct {

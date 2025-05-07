@@ -20,6 +20,11 @@ func SetupHecateWizard() error {
 
 	log.Info("🚀 Welcome to the Hecate setup wizard!")
 
+	if err := system.EnsureDir(BaseDir); err != nil {
+		log.Error("Failed to create /opt/hecate directory", zap.Error(err))
+		return fmt.Errorf("failed to create /opt/hecate directory: %w", err)
+	}
+
 	// === Service selection ===
 	keycloakEnabled := interaction.PromptYesNo("Do you want to set up Keycloak?", true)
 	nextcloudEnabled := interaction.PromptYesNo("Do you want to set up Nextcloud (Coturn only)?", false)
@@ -30,7 +35,7 @@ func SetupHecateWizard() error {
 	if ShouldExitNoServicesSelected(keycloakEnabled, nextcloudEnabled, wazuhEnabled, jenkinsEnabled) {
 		return errors.New("no services selected; exiting setup wizard")
 	}
-	
+
 	// Ask for the backend IP once (or you can customize per service if needed)
 	var backendIP = interaction.PromptInputWithReader("Enter the backend IP address for these services:", "", reader)
 
@@ -165,10 +170,6 @@ func SetupHecateWizard() error {
 	return nil
 }
 
-func EnsureHecateDirExists() error {
-	return system.EnsureDir("/opt/hecate")
-}
-
 // ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.
 func ShouldExitNoServicesSelected(keycloak, nextcloud, wazuh, jenkins bool) bool {
 	if !keycloak && !nextcloud && !wazuh && !jenkins {
@@ -195,7 +196,7 @@ func CollateAndWriteDockerCompose(fragments []DockerComposeFragment) error {
 	// Add networks & volumes at the end
 	buf.WriteString(DockerNetworkAndVolumes)
 
-	composeFilePath := "./docker-compose.yml"
+	composeFilePath := HecateDockerCompose
 	err := os.WriteFile(composeFilePath, buf.Bytes(), 0644)
 	if err != nil {
 		log.Error("Failed to write docker-compose.yml", zap.Error(err),
@@ -218,7 +219,7 @@ func CollateAndWriteCaddyfile(fragments []CaddyFragment) error {
 		buf.WriteString("\n\n")
 	}
 
-	caddyfilePath := "./Caddyfile"
+	caddyfilePath := HecateCaddyfile
 	err := os.WriteFile(caddyfilePath, buf.Bytes(), 0644)
 	if err != nil {
 		log.Error("Failed to write Caddyfile", zap.Error(err),
@@ -246,7 +247,7 @@ events {
 ` + StreamIncludeTemplate + `
 `
 
-	nginxFilePath := "./nginx.conf"
+	nginxFilePath := HecateNginxConfig
 	err := os.WriteFile(nginxFilePath, []byte(mainConf), 0644)
 	if err != nil {
 		log.Error("Failed to write nginx.conf", zap.Error(err),

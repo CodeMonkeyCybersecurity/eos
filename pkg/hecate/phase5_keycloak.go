@@ -146,7 +146,7 @@ func RenderKeycloakCaddy(bundle ServiceBundle) error {
 
 	log.Info("✅ Caddyfile content rendered successfully")
 
-	caddyfilePath := "./Caddyfile"
+	caddyfilePath := HecateCaddyfile
 	err = os.WriteFile(caddyfilePath, []byte(caddyContent), 0644)
 	if err != nil {
 		log.Error("Failed to write Caddyfile", zap.Error(err),

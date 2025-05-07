@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"go.uber.org/zap"
@@ -96,10 +95,9 @@ func WriteCaddyfile(content string) error {
 
 // EnsureCaddyDirs creates the necessary directory structure for the Caddy service in /opt/hecate.
 func EnsureCaddyDirs() error {
-	baseDir := "/opt/hecate"
-	certsDir := filepath.Join(baseDir, "certs")
-	assetsDir := filepath.Join(baseDir, "assets", "error_pages")
-	logsDir := filepath.Join(baseDir, "logs", "caddy")
+	certsDir := HecateCertsDir
+	assetsDir := HecateAssetsDir
+	logsDir := HecateLogsDir
 
 	log := zap.L().Named("hecate-caddy-setup")
 
@@ -124,7 +122,7 @@ func EnsureCaddyDirs() error {
 // MoveCaddyfileToHecate moves the generated Caddyfile to /opt/hecate/Caddyfile.
 func MoveCaddyfileToHecate() error {
 	sourcePath := "Caddyfile"
-	destPath := "/opt/hecate/Caddyfile"
+	destPath := HecateCaddyfile
 
 	log := zap.L().Named("hecate-caddy-setup")
 

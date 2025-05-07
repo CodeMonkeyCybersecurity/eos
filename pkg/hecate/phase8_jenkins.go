@@ -162,7 +162,7 @@ func RenderJenkinsCaddy(caddyCfg CaddyConfig) error {
 		return fmt.Errorf("failed to render Jenkins Caddyfile: %w", err)
 	}
 
-	caddyfilePath := "./Caddyfile"
+	caddyfilePath := HecateCaddyfile
 	err = appendToFile(caddyfilePath, content)
 	if err != nil {
 		log.Error("Failed to append Jenkins Caddy block", zap.Error(err),
