@@ -20,6 +20,13 @@ import (
 var ignoreHardwareCheck bool
 var overwriteInstall bool
 
+func init() {
+	CreateCmd.AddCommand(CreateDelphiCmd)
+	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check")
+	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation")
+}
+
+
 var CreateDelphiCmd = &cobra.Command{
 	Use:     "delphi",
 	Aliases: []string{"wazuh"},
@@ -127,8 +134,3 @@ func extractWazuhPasswords() error {
 	return fmt.Errorf("wazuh-install-files.tar not found in expected paths")
 }
 
-func init() {
-	CreateCmd.AddCommand(CreateDelphiCmd)
-	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check")
-	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation")
-}
