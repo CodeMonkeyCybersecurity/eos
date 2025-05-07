@@ -188,6 +188,7 @@ type DockerConfig struct {
 	AppName               string
 	TCPPorts              []string
 	UDPPorts              []string
+	NginxEnabled          bool
 	CoturnEnabled         bool
 	CoturnAuthSecret      string
 	KeycloakEnabled       bool
@@ -197,8 +198,11 @@ type DockerConfig struct {
 	KeycloakDBPassword    string
 	KeycloakAdminUser     string
 	KeycloakAdminPassword string
-	NginxEnabled          bool
+	
 }
+
+
+
 
 type CaddyConfig struct {
 	AppName   string

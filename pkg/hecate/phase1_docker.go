@@ -18,26 +18,39 @@ import (
 	"go.uber.org/zap"
 )
 
-func CreateDockerCompose(reader *bufio.Reader) error {
-	log := zap.L().Named("create-docker-compose")
-	log.Info("🚀 Starting full Docker Compose setup for Hecate...")
 
-	// Step 1: Ensure /opt/hecate exists
-	if err := EnsureHecateDirExists(); err != nil {
-		log.Error("Failed to ensure /opt/hecate directory", zap.Error(err))
+// CreateDockerComposeFromConfig renders Docker Compose using provided config and writes it to disk.
+func CreateDockerComposeFromConfig(cfg DockerConfig) error {
+	log := zap.L().Named("create-docker-compose-config")
+	log.Info("🚀 Rendering Docker Compose file from provided config...")
+
+	// Parse & execute the template
+	tmpl, err := template.New("docker-compose").Parse(HecateServiceTemplate)
+	if err != nil {
+		log.Error("Failed to parse Docker Compose template", zap.Error(err))
 		return err
 	}
 
-	// Step 2: Render docker-compose.yml
-	RenderDockerCompose(reader)
+	var rendered bytes.Buffer
+	if err := tmpl.Execute(&rendered, cfg); err != nil {
+		log.Error("Failed to render Docker Compose template", zap.Error(err))
+		return err
+	}
 
-	// Step 3: Move docker-compose.yml into /opt/hecate
+	// Write to docker-compose.yml
+	outputPath := "docker-compose.yml"
+	if err := os.WriteFile(outputPath, rendered.Bytes(), 0644); err != nil {
+		log.Error("Failed to write docker-compose.yml", zap.Error(err))
+		return err
+	}
+
+	// Move to /opt/hecate
 	if err := MoveDockerComposeToHecate(); err != nil {
 		log.Error("Failed to move docker-compose.yml into /opt/hecate", zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Full Docker Compose setup completed successfully!")
+	log.Info("✅ Docker Compose file rendered and saved", zap.String("path", outputPath))
 	return nil
 }
 

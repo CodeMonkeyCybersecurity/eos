@@ -17,9 +17,10 @@ var CreateCmd = &cobra.Command{
 	Short:   "Create, deploy, install resources programmes and components (e.g., processes, users, storage, application containers)",
 	Long: `The create command allows you to create various resources such as processes, users, or storage, components or dependencies.
 For example:
-	eos deploy trivy 
-	eos deploy vault
-	eos deploy umami`,
+	eos create trivy 
+	eos create vault
+	eos create umami
+	eos create hecate`,
 
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
