@@ -16,3 +16,10 @@ const (
 	DefaultNoPrompt   = "y/N"
 	EnterChoicePrompt = "Enter choice number: "
 )
+
+const (
+	YesShort = "y"
+	YesLong  = "yes"
+	NoShort  = "n"
+	NoLong   = "no"
+)

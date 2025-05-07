@@ -50,30 +50,6 @@ func LoadLastValues() map[string]string {
 	return values
 }
 
-// promptInput asks the user for input until a non-empty string is provided (unless a default exists).
-func PromptInput(varName, promptMessage, defaultVal string, reader *bufio.Reader) string {
-	for {
-		if defaultVal != "" {
-			fmt.Printf("%s [%s]: ", promptMessage, defaultVal)
-		} else {
-			fmt.Printf("%s: ", promptMessage)
-		}
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			zap.L().Error("Error reading input", zap.Error(err))
-			continue
-		}
-		input = strings.TrimSpace(input)
-		if input == "" && defaultVal != "" {
-			return defaultVal
-		} else if input != "" {
-			return input
-		} else {
-			fmt.Printf("Error: %s cannot be empty. Please enter a valid value.\n", varName)
-		}
-	}
-}
-
 // saveLastValues writes the provided map to LastValuesFile in key="value" format.
 func SaveLastValues(values map[string]string) {
 	file, err := os.Create(LastValuesFile)
