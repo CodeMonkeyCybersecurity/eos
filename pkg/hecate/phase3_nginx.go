@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -16,23 +17,21 @@ func SetupNginxEnvironment(backendIP string) error {
 	log.Info("🚀 Starting full Nginx setup for Hecate...")
 
 	// Ensure directories exist
-	streamDir := "/opt/hecate/assets/conf.d/stream"
-	if err := ensureDir("/opt/hecate/assets/conf.d"); err != nil {
+	if err := system.EnsureDir(HecateConfDDir); err != nil {
 		return err
 	}
-	if err := ensureDir(streamDir); err != nil {
+	if err := system.EnsureDir(HecateStreamDir); err != nil {
 		return err
 	}
 
-	// Render and save StreamIncludeTemplate (this is your global stream include block)
-	includePath := "/opt/hecate/assets/conf.d/stream_include.conf"
-	if err := os.WriteFile(includePath, []byte(StreamIncludeTemplate), 0644); err != nil {
+	// Render and save StreamIncludeTemplate
+	if err := os.WriteFile(HecateStreamIncludePath, []byte(StreamIncludeTemplate), 0644); err != nil {
 		log.Error("Failed to write stream include config", zap.Error(err))
 		return err
 	}
-	log.Info("✅ Wrote stream include config", zap.String("path", includePath))
+	log.Info("✅ Wrote stream include config", zap.String("path", HecateStreamIncludePath))
 
-	// Define all services that need rendering
+	// Define services
 	services := []struct {
 		Name       string
 		Blocks     []NginxStreamBlock
@@ -41,21 +40,21 @@ func SetupNginxEnvironment(backendIP string) error {
 		{
 			Name:       "mailcow",
 			Blocks:     MailcowStreamBlocks,
-			OutputFile: filepath.Join(streamDir, "mailcow.conf"),
+			OutputFile: filepath.Join(HecateStreamDir, "mailcow.conf"),
 		},
 		{
 			Name:       "jenkins",
 			Blocks:     JenkinsStreamBlocks,
-			OutputFile: filepath.Join(streamDir, "jenkins.conf"),
+			OutputFile: filepath.Join(HecateStreamDir, "jenkins.conf"),
 		},
 		{
 			Name:       "wazuh",
 			Blocks:     WazuhStreamBlocks,
-			OutputFile: filepath.Join(streamDir, "wazuh.conf"),
+			OutputFile: filepath.Join(HecateStreamDir, "wazuh.conf"),
 		},
 	}
 
-	// Render each service’s stream config and write to file
+	// Render each service’s stream config
 	for _, svc := range services {
 		log.Info("Rendering Nginx stream config", zap.String("service", svc.Name))
 		rendered, err := RenderStreamBlocks(backendIP, svc.Blocks)
@@ -90,5 +89,21 @@ func ensureDir(path string) error {
 	} else {
 		log.Info("Directory already exists", zap.String("path", path))
 	}
+	return nil
+}
+
+// CollateNginxFragments handles collation + writing of nginx.conf (only if fragments exist).
+func CollateNginxFragments() error {
+	if len(nginxFragments) > 0 {
+		return CollateAndWriteFile(
+			"hecate-nginx-collation",
+			nginxFragments,
+			HecateNginxConfig,
+			BaseNginxConf,
+			"",
+			func(_ NginxFragment) string { return "" },
+		)
+	}
+	zap.L().Named("hecate-nginx-collation").Info("No Nginx fragments to write; skipping nginx.conf")
 	return nil
 }

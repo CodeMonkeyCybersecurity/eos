@@ -43,6 +43,22 @@ type DockerComposeFragment struct {
 	ServiceYAML string
 }
 
+const DockerComposeMasterTemplate = `
+# hecate reverse proxy 
+# docker-compose.yml
+
+services:
+{{ .CaddyService }}
+
+{{ .DynamicServices }}
+
+networks:
+{{ .NetworksSection }}
+
+volumes:
+{{ .VolumesSection }}
+`
+
 const DockerCaddyService = `
   caddy:
     image: caddy:latest
@@ -150,9 +166,13 @@ const DockerKeycloakService = `
       - hecate-net
 `
 
-const DockerNetworkAndVolumes = `
+const DockerNetworkSection = `
+
 networks:
   hecate-net:
+`
+
+const DockerVolumesSection = `
 
 volumes:
   kc-db-data:

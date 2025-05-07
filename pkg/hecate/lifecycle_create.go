@@ -14,18 +14,21 @@ import (
 	"go.uber.org/zap"
 )
 
-func SetupHecateWizard() error {
+// OrchestrateHecateWizard runs the full Hecate setup wizard and delegates to phases.
+func OrchestrateHecateWizard() error {
 	log := zap.L().Named("hecate-setup-wizard")
 	reader := bufio.NewReader(os.Stdin)
 
 	log.Info("🚀 Welcome to the Hecate setup wizard!")
 
+	// Phase 0: Ensure the base /opt/hecate directory is present
 	if err := system.EnsureDir(BaseDir); err != nil {
 		log.Error("Failed to create /opt/hecate directory", zap.Error(err))
 		return fmt.Errorf("failed to create /opt/hecate directory: %w", err)
 	}
 
-	// === Service selection ===
+	// === Phase 1: Service selection + setup ===
+	// This phase gathers user input for which services to enable and builds their ServiceBundles.
 	serviceChoices := []struct {
 		name              string
 		prompt            string
@@ -39,7 +42,6 @@ func SetupHecateWizard() error {
 		{"Jenkins", "Do you want to set up Jenkins?", false, SetupJenkinsWizard, false},
 	}
 
-	// Prompt the user for each service
 	enabledServices := []struct {
 		name              string
 		bundle            ServiceBundle
@@ -57,64 +59,47 @@ func SetupHecateWizard() error {
 		}
 	}
 
-	// Check: Exit early if no services selected
+	// Safety check: Exit early if no services selected
 	if len(enabledServices) == 0 {
 		zap.L().Named("hecate-setup-check").Warn("🚫 No services selected. Exiting without making any changes.")
 		return errors.New("no services selected; exiting setup wizard")
 	}
 
-	// Ask for the backend IP once
+	// === Collect global settings ===
 	backendIP := interaction.PromptInputWithReader("Enter the backend IP address for these services:", "", reader)
 
-	// Process each enabled service
+	// === Process + build fragments for each selected service ===
 	for _, svc := range enabledServices {
 		if err := handleService(log, svc.name, svc.bundle, backendIP, svc.useTemplateRender); err != nil {
 			return fmt.Errorf("failed to process %s: %w", svc.name, err)
 		}
 	}
 
-	// === Collate everything at the end ===
+	// === Phase 1: Collate, render, write docker-compose.yml ===
+	// NOTE: This now calls the Phase 1 thin wrapper, which handles collation + building.
+	log.Info("⚙️  Running Phase Docker Compose...")
+	if err := PhaseDockerCompose("hecate-compose-orchestrator", HecateDockerCompose); err != nil {
+		log.Error("Phase Docker Compose failed", zap.Error(err))
+		return fmt.Errorf("phase docker compose failed: %w", err)
+	}
 
-	// Caddyfile
-	if err := CollateAndWriteFile(
-		"hecate-caddy-collation",
-		caddyFragments,
-		HecateCaddyfile,
-		"",
-		"",
-		func(frag CaddyFragment) string { return frag.CaddyBlock },
-	); err != nil {
+	// === Phase 2: Collate, render, write Caddyfile ===
+	// Call the thin wrapper for Caddy
+	if err := PhaseCaddy(spec); err != nil {
+		log.Error("Failed in Phase 2: Caddy setup", zap.Error(err))
 		return err
 	}
 
-	// docker-compose.yml
-	if err := CollateAndWriteFile(
-		"hecate-compose-collation",
-		composeFragments,
-		HecateDockerCompose,
-		"services:\n",
-		DockerNetworkAndVolumes,
-		func(frag DockerComposeFragment) string { return frag.ServiceYAML },
-	); err != nil {
-		return err
-	}
+	// === Phase 4: Collate and write nginx.conf (if needed) ===
+	// (PhaseNginx would handle Nginx collation + writing)
+	// Example:
+	// log.Info("⚙️  Running Phase Nginx...")
+	// if err := PhaseNginx(...); err != nil {
+	//     log.Error("Phase Nginx failed", zap.Error(err))
+	//     return fmt.Errorf("phase nginx failed: %w", err)
+	// }
 
-	// nginx.conf (only if fragments exist)
-	if len(nginxFragments) > 0 {
-		if err := CollateAndWriteFile(
-			"hecate-nginx-collation",
-			nginxFragments,
-			HecateNginxConfig,
-			BaseNginxConf,
-			"",
-			func(_ NginxFragment) string { return "" },
-		); err != nil {
-			return err
-		}
-	} else {
-		zap.L().Named("hecate-nginx-collation").Info("No Nginx fragments to write; skipping nginx.conf")
-	}
-
+	log.Info("✅ Hecate setup wizard completed successfully!")
 	return nil
 }
 

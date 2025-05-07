@@ -4,12 +4,57 @@ package hecate
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
+
+// PhaseCaddy sets up the Caddy environment: collate, render, and write.
+// This is the phase 2 orchestrator, called by the main lifecycle.
+func PhaseCaddy(spec CaddySpec) error {
+	zap.L().Named("hecate-phase-caddy").Info("🚀 Starting Phase 2: Build and setup Caddy...")
+
+	// Ensure dirs always (even if no services selected)
+	if err := EnsureCaddyDirs(); err != nil {
+		return fmt.Errorf("failed to ensure Caddy dirs: %w", err)
+	}
+
+	// If spec has no proxies and no Keycloak domain, skip actual file generation.
+	if len(spec.Proxies) == 0 && spec.KeycloakDomain == "" {
+		zap.L().Named("hecate-phase-caddy").Info("No Caddy services selected; skipping Caddyfile generation")
+		return nil
+	}
+
+	// Actually build and deploy the Caddyfile
+	return BuildCaddyFile(spec)
+}
+
+// BuildCaddyFile generates, writes, and moves the Caddyfile to its destination.
+// This is the core function that handles file building.
+func BuildCaddyFile(spec CaddySpec) error {
+	log := zap.L().Named("hecate-caddy-builder")
+	log.Info("🛠️ Building Caddyfile...")
+
+	// Step 1: Generate Caddyfile content
+	caddyContent := GenerateCaddySpecMulti(spec)
+
+	// Step 2: Write Caddyfile locally
+	log.Info("Writing Caddyfile locally...")
+	if err := WriteCaddyfile(caddyContent); err != nil {
+		return fmt.Errorf("failed to write Caddyfile: %w", err)
+	}
+
+	// Step 3: Move to /opt/hecate
+	log.Info("Moving Caddyfile to /opt/hecate...")
+	if err := MoveCaddyfileToHecate(); err != nil {
+		return fmt.Errorf("failed to move Caddyfile: %w", err)
+	}
+
+	log.Info("✅ Caddyfile build completed")
+	return nil
+}
 
 // SetupCaddyEnvironment sets up the full Caddy environment: directories, config generation, and placement.
 func SetupCaddyEnvironment(spec CaddySpec) error {
@@ -95,56 +140,32 @@ func WriteCaddyfile(content string) error {
 
 // EnsureCaddyDirs creates the necessary directory structure for the Caddy service in /opt/hecate.
 func EnsureCaddyDirs() error {
-	certsDir := HecateCertsDir
-	assetsDir := HecateAssetsDir
-	logsDir := HecateLogsDir
 
 	log := zap.L().Named("hecate-caddy-setup")
 
-	dirs := []string{certsDir, assetsDir, logsDir}
-
-	for _, dir := range dirs {
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			log.Info("Creating directory...", zap.String("path", dir))
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				log.Error("Failed to create directory", zap.String("path", dir), zap.Error(err))
-				return err
-			}
-			log.Info("✅ Directory created", zap.String("path", dir))
-		} else {
-			log.Info("Directory already exists", zap.String("path", dir))
-		}
+	dirs := []string{HecateCertsDir, HecateAssetsDir, HecateLogsDir}
+	if err := system.EnsureDirs(dirs); err != nil {
+		log.Error("Failed to ensure Caddy directories", zap.Error(err))
+		return err
 	}
 
 	return nil
 }
 
 // MoveCaddyfileToHecate moves the generated Caddyfile to /opt/hecate/Caddyfile.
+// MoveCaddyfileToHecate moves the generated Caddyfile to /opt/hecate/Caddyfile.
 func MoveCaddyfileToHecate() error {
-	sourcePath := "Caddyfile"
-	destPath := HecateCaddyfile
+	return system.CopyFile("Caddyfile", HecateCaddyfile, 0644)
+}
 
-	log := zap.L().Named("hecate-caddy-setup")
-
-	srcFile, err := os.Open(sourcePath)
-	if err != nil {
-		log.Error("Failed to open source Caddyfile", zap.Error(err))
-		return fmt.Errorf("failed to open %s: %w", sourcePath, err)
-	}
-	defer srcFile.Close()
-
-	destFile, err := os.Create(destPath)
-	if err != nil {
-		log.Error("Failed to create destination Caddyfile", zap.Error(err))
-		return fmt.Errorf("failed to create %s: %w", destPath, err)
-	}
-	defer destFile.Close()
-
-	if _, err := io.Copy(destFile, srcFile); err != nil {
-		log.Error("Failed to copy Caddyfile to /opt/hecate", zap.Error(err))
-		return fmt.Errorf("failed to copy to %s: %w", destPath, err)
-	}
-
-	log.Info("✅ Caddyfile moved to /opt/hecate", zap.String("path", destPath))
-	return nil
+// CollateCaddyFragments handles collation + writing of the Caddyfile.
+func CollateCaddyFragments() error {
+	return CollateAndWriteFile(
+		"hecate-caddy-collation",
+		caddyFragments,
+		HecateCaddyfile,
+		"",
+		"",
+		func(frag CaddyFragment) string { return frag.CaddyBlock },
+	)
 }

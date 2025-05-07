@@ -2,142 +2,93 @@
 
 package hecate
 
-// import (
-// 	"bytes"
-// 	"os"
-// 	"strings"
-// 	"text/template"
+import (
+	"strings"
+)
 
-// 	"go.uber.org/zap"
-// )
+// OrchestrateHecateDockerCompose is a thin wrapper that collates fragments and builds the final docker-compose.yml.
+func PhaseDockerCompose(logName, filePath string) error {
+	// Step 1: Collate all compose fragments into one string block
+	dynamicServices := CollateComposeFragmentsToString()
 
-// // This function allows rendering a full docker-compose.yml from a single DockerConfig. It is kept for batch/automated setups and is NOT used by the wizard/collate flow.
+	// Step 2: Build the full docker-compose.yml with caddy + dynamic services + networks + volumes
+	return BuildHecateCompose(
+		logName,
+		DockerCaddyService, // always include the Caddy service block
+		dynamicServices,
+		filePath,
+	)
+}
 
-// // CreateDockerComposeFromConfig renders Docker Compose using provided config and writes it to disk.
-// func CreateDockerComposeFromConfig(cfg DockerConfig) error {
-// 	log := zap.L().Named("create-docker-compose-config")
-// 	log.Info("🚀 Rendering Docker Compose file from provided config...")
+// BuildHecateCompose assembles and writes the docker-compose.yml file.
+func BuildHecateCompose(
+	logName string,
+	caddyService string,
+	dynamicServices string,
+	filePath string,
+) error {
+	data := struct {
+		CaddyService    string
+		DynamicServices string
+		NetworksSection string
+		VolumesSection  string
+	}{
+		CaddyService:    caddyService,
+		DynamicServices: dynamicServices,
+		NetworksSection: DockerNetworkSection,
+		VolumesSection:  DockerVolumesSection,
+	}
 
-// 	// Parse & execute the template
-// 	tmpl, err := template.New("docker-compose").Parse(HecateServiceTemplate)
-// 	if err != nil {
-// 		log.Error("Failed to parse Docker Compose template", zap.Error(err))
-// 		return err
-// 	}
+	return RenderAndWriteTemplate(
+		logName,
+		DockerComposeMasterTemplate,
+		data,
+		filePath,
+	)
+}
 
-// 	var rendered bytes.Buffer
-// 	if err := tmpl.Execute(&rendered, cfg); err != nil {
-// 		log.Error("Failed to render Docker Compose template", zap.Error(err))
-// 		return err
-// 	}
+// CollateComposeFragments handles collation + writing of the docker-compose.yml.
+func CollateComposeFragments() error {
+	footer := GetDockerFooter()
 
-// 	// Write to docker-compose.yml
-// 	outputPath := "docker-compose.yml"
-// 	if err := os.WriteFile(outputPath, rendered.Bytes(), 0644); err != nil {
-// 		log.Error("Failed to write docker-compose.yml", zap.Error(err))
-// 		return err
-// 	}
+	return CollateAndWriteFile(
+		"hecate-compose-collation",
+		composeFragments,
+		HecateDockerCompose,
+		"services:\n",
+		footer,
+		func(frag DockerComposeFragment) string { return frag.ServiceYAML },
+	)
+}
 
-// 	// Move to /opt/hecate
-// 	if err := MoveDockerComposeToHecate(); err != nil {
-// 		log.Error("Failed to move docker-compose.yml into /opt/hecate", zap.Error(err))
-// 		return err
-// 	}
+// CollateComposeFragmentsToString collates all DockerComposeFragment objects into a single string block.
+func CollateComposeFragmentsToString() string {
+	var dynamicParts []string
+	for _, frag := range composeFragments {
+		dynamicParts = append(dynamicParts, frag.ServiceYAML)
+	}
+	return strings.Join(dynamicParts, "\n\n")
+}
 
-// 	log.Info("✅ Docker Compose file rendered and saved", zap.String("path", outputPath))
-// 	return nil
-// }
 
+// GetDockerNetworkSection returns the minimal default Docker network section.
+// TODO: Extend this dynamically based on enabled services if needed.
+func GetDockerNetworkSection() string {
+    return `
+  hecate-net:
+`
+}
 
-// func BuildDockerCompose(cfg DockerConfig, includeCoturn, includeKeycloak, includeNginx bool) (string, error) {
-// 	var composeParts []string
+// GetDockerVolumesSection returns the minimal default Docker volumes section.
+// TODO: Extend this dynamically based on enabled services if needed.
+func GetDockerVolumesSection() string {
+    return `
+  kc-db-data:
+`
+}
 
-// 	// Always include Caddy (?)
-// 	caddySection, err := RenderCaddySection(cfg)
-// 	if err != nil {
-// 		return "", err
-// 	}
-// 	composeParts = append(composeParts, caddySection)
-
-// 	if includeNginx {
-// 		nginxSection, err := RenderNginxSection(cfg)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		composeParts = append(composeParts, nginxSection)
-// 	}
-
-// 	if includeCoturn {
-// 		coturnSection, err := RenderCoturnSection(cfg)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		composeParts = append(composeParts, coturnSection)
-// 	}
-
-// 	if includeKeycloak {
-// 		keycloakSection, err := RenderKeycloakSection(cfg)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		composeParts = append(composeParts, keycloakSection)
-// 	}
-
-// 	// Add networks/volumes at the end
-// 	networksSection := RenderNetworksSection()
-// 	composeParts = append(composeParts, networksSection)
-
-// 	// Combine
-// 	return strings.Join(composeParts, "\n\n"), nil
-// }
-
-// func RenderDockerCompose(config DockerConfig) (string, error) {
-// 	var buf bytes.Buffer
-
-// 	// Always add Caddy
-// 	buf.WriteString("# Generated Hecate configuration for " + config.AppName + "\nservices:\n")
-
-// 	// Render Caddy
-// 	buf.WriteString(DockerCaddyService)
-
-// 	tmpl := template.New("hecate")
-
-// 	// Conditional: Nginx
-// 	if config.NginxEnabled {
-// 		t, err := tmpl.Parse(DockerNginxService)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		if err := t.Execute(&buf, config); err != nil {
-// 			return "", err
-// 		}
-// 	}
-
-// 	// Conditional: Coturn
-// 	if config.CoturnEnabled {
-// 		t, err := tmpl.Parse(DockerCoturnService)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		if err := t.Execute(&buf, config); err != nil {
-// 			return "", err
-// 		}
-// 	}
-
-// 	// Conditional: Keycloak
-// 	if config.KeycloakEnabled {
-// 		t, err := tmpl.Parse(DockerKeycloakService)
-// 		if err != nil {
-// 			return "", err
-// 		}
-// 		if err := t.Execute(&buf, config); err != nil {
-// 			return "", err
-// 		}
-// 	}
-
-// 	// Add networks & volumes
-// 	buf.WriteString(DockerNetworkAndVolumes)
-
-// 	return buf.String(), nil
-// }
-//
+// GetDockerFooter combines the network and volumes sections into a single footer block.
+// This is handy for passing into templates or collators that expect a single footer string.
+func GetDockerFooter() string {
+    return GetDockerNetworkSection() + "\n" + GetDockerVolumesSection()
+}

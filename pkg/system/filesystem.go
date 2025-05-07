@@ -61,6 +61,18 @@ func ensureDirWithOwner(path string, perm os.FileMode, owner string) error {
 	return nil
 }
 
+// EnsureDirs ensures that a list of directories exist (mkdir -p style).
+func EnsureDirs(paths []string) error {
+	log := zap.L().Named("system-filesystem")
+	for _, path := range paths {
+		log.Info("Ensuring directory exists", zap.String("path", path))
+		if err := EnsureDir(path); err != nil {
+			return fmt.Errorf("failed to ensure directory %s: %w", path, err)
+		}
+	}
+	return nil
+}
+
 // EnsureOwnership sets the ownership of a file or directory to the given user.
 func EnsureOwnership(path string, owner string) error {
 	log := zap.L().Named("system-filesystem")

@@ -166,3 +166,31 @@ func GenericWizard(
 		Nginx:   nginxSpec,
 	}
 }
+
+
+func RenderAndWriteTemplate(
+	logName string,
+	templateContent string,
+	data any,
+	outputPath string,
+) error {
+	log := zap.L().Named(logName)
+
+	tmpl, err := template.New("template").Parse(templateContent)
+	if err != nil {
+		return fmt.Errorf("failed to parse template: %w", err)
+	}
+
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return fmt.Errorf("failed to render template: %w", err)
+	}
+
+	if err := os.WriteFile(outputPath, buf.Bytes(), 0644); err != nil {
+		log.Error("Failed to write rendered file", zap.Error(err), zap.String("path", outputPath))
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	log.Info("✅ Template written successfully", zap.String("path", outputPath))
+	return nil
+}

@@ -13,15 +13,18 @@ type ServiceBundle struct {
 
 const (
 	// Centralized Hecate file paths
-	BaseDir               = "/opt/hecate"
-	HecateDockerCompose   = BaseDir + "/docker-compose.yml"
-	HecateCaddyfile       = BaseDir + "/Caddyfile"
-	HecateNginxConfig     = BaseDir + "/nginx.conf"
-	HecateStreamFragments = BaseDir + "/assets/conf.d/stream"
-	HecateCertsDir        = BaseDir + "/certs"
-	HecateLogsDir         = BaseDir + "/logs"
-	HecateAssetsDir       = BaseDir + "/assets"
-	HecateErrorsDir       = BaseDir + "/error_pages"
+	BaseDir                 = "/opt/hecate/"
+	HecateDockerCompose     = BaseDir + "docker-compose.yml"
+	HecateCaddyfile         = BaseDir + "Caddyfile"
+	HecateNginxConfig       = BaseDir + "nginx.conf"
+	HecateStreamFragments   = BaseDir + "assets/conf.d/stream"
+	HecateCertsDir          = BaseDir + "certs"
+	HecateLogsDir           = BaseDir + "logs"
+	HecateAssetsDir         = BaseDir + "assets"
+	HecateErrorsDir         = BaseDir + "error_pages"
+	HecateConfDDir          = HecateAssetsDir + "conf.d"
+	HecateStreamDir         = HecateConfDDir + "stream"
+	HecateStreamIncludePath = HecateConfDDir + "/stream_include.conf"
 )
 
 // PromptField describes a field to prompt the user for.

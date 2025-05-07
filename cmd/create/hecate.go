@@ -23,7 +23,7 @@ places it in /opt/hecate, and prepares it for use with EOS.`,
 		log.Info("🚀 Starting full Hecate setup wizard...")
 
 		// ✅ Call the full prompt + orchestrator flow
-		if err := hecate.SetupHecateWizard(); err != nil {
+		if err := hecate.OrchestrateHecateWizard(); err != nil {
 			log.Error("❌ Hecate setup failed", zap.Error(err))
 			return err
 		}
