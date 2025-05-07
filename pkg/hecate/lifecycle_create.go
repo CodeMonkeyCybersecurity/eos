@@ -18,78 +18,75 @@ func SetupHecateWithPrompts() error {
 
 	log.Info("🚀 Welcome to the Hecate full setup wizard!")
 
-	// === Phase 1: Collect Docker Compose info ===
-	appName := interaction.PromptInputWithReader("Enter the main app name (e.g., wazuh, mailcow, jenkins)", "", reader)
+	// === New: Service selection ===
+	setupKeycloak := interaction.PromptInputWithReader("Do you want to set up Keycloak? (yes/no)", "yes", reader)
+	setupNextcloud := interaction.PromptInputWithReader("Do you want to set up Nextcloud? (yes/no)", "no", reader)
+	setupWazuh := interaction.PromptInputWithReader("Do you want to set up Wazuh? (yes/no)", "no", reader)
+	setupMailcow := interaction.PromptInputWithReader("Do you want to set up Mailcow? (yes/no)", "no", reader)
 
-	keycloakDomain := interaction.PromptInputWithReader("Enter Keycloak domain (e.g., hera.domain.com)", "hera.domain.com", reader)
-	keycloakDBName := interaction.PromptInputWithReader("Enter Keycloak DB name", "keycloak", reader)
-	keycloakDBUser := interaction.PromptInputWithReader("Enter Keycloak DB user", "keycloak", reader)
-	keycloakDBPassword := interaction.PromptInputWithReader("Enter Keycloak DB password", "changeme1", reader)
-	keycloakAdminUser := interaction.PromptInputWithReader("Enter Keycloak admin user", "admin", reader)
-	keycloakAdminPassword := interaction.PromptInputWithReader("Enter Keycloak admin password", "changeme", reader)
-
-	coturnAuthSecret := interaction.PromptInputWithReader("Enter Coturn auth secret (for TURN server)", "change_me", reader)
-
-	tcpPortsInput := interaction.PromptInputWithReader("Enter TCP ports (comma-separated, e.g., 1515,1514,55000)", "", reader)
-	tcpPorts := parse.SplitAndTrim(tcpPortsInput)
-
-	udpPortsInput := interaction.PromptInputWithReader("Enter UDP ports (comma-separated, e.g., 1514)", "", reader)
-	udpPorts := parse.SplitAndTrim(udpPortsInput)
+	if strings.ToLower(setupKeycloak) != "yes" &&
+		strings.ToLower(setupNextcloud) != "yes" &&
+		strings.ToLower(setupWazuh) != "yes" &&
+		strings.ToLower(setupMailcow) != "yes" {
+		log.Warn("🚫 No services selected for setup. Only reverse proxy config will be applied.")
+	}
 
 	backendIP := interaction.PromptInputWithReader("Enter backend IP address (e.g., 192.168.0.1)", "", reader)
 
-	// ✅ Build the DockerConfig
-	dockerCfg := DockerConfig{
-		AppName:               appName,
-		TCPPorts:              tcpPorts,
-		UDPPorts:              udpPorts,
-		NginxEnabled:          true, // You could make this prompt-driven if needed
-		CoturnEnabled:         true,
-		CoturnAuthSecret:      coturnAuthSecret,
-		KeycloakDomain:        keycloakDomain,
-		KeycloakDBName:        keycloakDBName,
-		KeycloakDBUser:        keycloakDBUser,
-		KeycloakDBPassword:    keycloakDBPassword,
-		KeycloakAdminUser:     keycloakAdminUser,
-		KeycloakAdminPassword: keycloakAdminPassword,
-	}
-
-	// === Phase 2: Collect Caddy reverse proxy apps ===
 	var caddyApps []CaddyConfig
+	var dockerCfg *DockerConfig // Use pointer to handle skipping
 
-	for {
-		addMore := interaction.PromptInputWithReader("Do you want to add a reverse proxy app? (yes/no)", "no", reader)
-		if strings.ToLower(addMore) != "yes" {
-			break
+	// === Keycloak ===
+	if strings.ToLower(setupKeycloak) == "yes" {
+		keycloakDomain := interaction.PromptInputWithReader("Enter Keycloak domain (e.g., hera.domain.com)", "hera.domain.com", reader)
+		keycloakDBName := interaction.PromptInputWithReader("Enter Keycloak DB name", "keycloak", reader)
+		keycloakDBUser := interaction.PromptInputWithReader("Enter Keycloak DB user", "keycloak", reader)
+		keycloakDBPassword := interaction.PromptInputWithReader("Enter Keycloak DB password", "changeme1", reader)
+		keycloakAdminUser := interaction.PromptInputWithReader("Enter Keycloak admin user", "admin", reader)
+		keycloakAdminPassword := interaction.PromptInputWithReader("Enter Keycloak admin password", "changeme", reader)
+		coturnAuthSecret := interaction.PromptInputWithReader("Enter Coturn auth secret (for TURN server)", "change_me", reader)
+
+		tcpPortsInput := interaction.PromptInputWithReader("Enter TCP ports (comma-separated, e.g., 1515,1514,55000)", "", reader)
+		tcpPorts := parse.SplitAndTrim(tcpPortsInput)
+
+		udpPortsInput := interaction.PromptInputWithReader("Enter UDP ports (comma-separated, e.g., 1514)", "", reader)
+		udpPorts := parse.SplitAndTrim(udpPortsInput)
+
+		dockerCfg = &DockerConfig{
+			AppName:               "keycloak",
+			TCPPorts:              tcpPorts,
+			UDPPorts:              udpPorts,
+			NginxEnabled:          true,
+			CoturnEnabled:         true,
+			CoturnAuthSecret:      coturnAuthSecret,
+			KeycloakDomain:        keycloakDomain,
+			KeycloakDBName:        keycloakDBName,
+			KeycloakDBUser:        keycloakDBUser,
+			KeycloakDBPassword:    keycloakDBPassword,
+			KeycloakAdminUser:     keycloakAdminUser,
+			KeycloakAdminPassword: keycloakAdminPassword,
 		}
 
-		app := interaction.PromptInputWithReader("Enter app name (e.g., wazuh, mailcow, nextcloud)", "", reader)
-		domain := interaction.PromptInputWithReader("Enter domain (e.g., myapp.cybermonkey.dev)", "", reader)
-		subdomain := interaction.PromptInputWithReader("Enter subdomain (optional, press Enter to skip)", "", reader)
-		appBackendIP := interaction.PromptInputWithReader("Enter backend IP for this app", backendIP, reader)
-
 		caddyApps = append(caddyApps, CaddyConfig{
-			AppName:   app,
-			Domain:    domain,
-			Subdomain: subdomain,
-			BackendIP: appBackendIP,
+			AppName:   "keycloak",
+			Domain:    keycloakDomain,
+			BackendIP: backendIP,
 		})
-
-		log.Info("✅ Added reverse proxy app", zap.String("app", app), zap.String("domain", domain))
 	}
 
-	// === Prepare CaddyConfig for the orchestrator ===
-	caddyCfg := CaddyConfig{
-		Apps:           caddyApps,
-		KeycloakDomain: keycloakDomain,
-	}
+	// === Repeat similar blocks for Nextcloud, Wazuh, Mailcow ===
+	// (you can implement these later)
 
 	// === Orchestrate everything ===
+	caddyCfg := CaddyConfig{
+		Apps: caddyApps,
+	}
+
 	log.Info("🚀 Running full Hecate setup now...")
 
 	err := SetupFullHecateEnvironment(
 		reader,
-		dockerCfg, // ✅ pass the docker config
+		dockerCfg, // pass *DockerConfig or nil
 		caddyCfg,
 		backendIP,
 	)
@@ -103,15 +100,24 @@ func SetupHecateWithPrompts() error {
 }
 
 // SetupFullHecateEnvironment orchestrates the full Hecate setup: Docker Compose, Caddy, and Nginx.
-func SetupFullHecateEnvironment(reader *bufio.Reader, dockerCfg DockerConfig, caddyCfg CaddyConfig, backendIP string) error {
+func SetupFullHecateEnvironment(reader *bufio.Reader, dockerCfg *DockerConfig, caddyCfg CaddyConfig, backendIP string) error {
 	log := zap.L().Named("hecate-full-setup")
 	log.Info("🚀 Starting full Hecate setup (Docker + Caddy + Nginx)...")
 
-	// Phase 1: Docker Compose setup
-	log.Info("🔧 Phase 1: Docker Compose setup")
-	if err := CreateDockerComposeFromConfig(dockerCfg); err != nil { // ✅ use config
-		log.Error("❌ Failed during Docker Compose setup", zap.Error(err))
+	if err := EnsureHecateDirExists(); err != nil {
+		log.Error("Failed to ensure /opt/hecate exists", zap.Error(err))
 		return err
+	}
+
+	// Phase 1: Docker Compose setup
+	if dockerCfg != nil {
+		log.Info("🔧 Phase 1: Docker Compose setup")
+		if err := CreateDockerComposeFromConfig(*dockerCfg); err != nil {
+			log.Error("❌ Failed during Docker Compose setup", zap.Error(err))
+			return err
+		}
+	} else {
+		log.Warn("🚫 Skipping Docker Compose setup (no services selected)")
 	}
 
 	// Phase 2: Caddy setup
