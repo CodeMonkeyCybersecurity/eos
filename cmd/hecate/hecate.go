@@ -22,6 +22,8 @@ var HecateCmd = &cobra.Command{
 	Use:   "hecate",
 	Short: "Manage and configure reverse proxy settings for Hecate",
 	Long:  "Hecate commands allow you to deploy, inspect, and manage reverse proxy configurations.",
+	Aliases: []string{"h"},
+
 	// You can optionally add a Run function if you want to provide default behavior when no subcommand is used.
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
