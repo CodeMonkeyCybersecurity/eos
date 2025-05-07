@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	// Subcommands
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
@@ -67,6 +68,7 @@ func RegisterCommands() {
 		refresh.RefreshCmd,
 		secure.SecureCmd,
 		disable.DisableCmd,
+		backup.BackupCmd,
 		enable.EnableCmd,
 		sync.SyncCmd,
 		hecate.HecateCmd,

@@ -11,6 +11,10 @@ import (
 	"go.uber.org/zap"
 )
 
+func init() {
+	BackupCmd.AddCommand(BackupHecateCmd)
+}
+
 // BackupHecateCmd defines the CLI command for backing up /opt/hecate.
 var BackupHecateCmd = &cobra.Command{
 	Use:   "hecate",

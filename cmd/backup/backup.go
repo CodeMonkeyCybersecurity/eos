@@ -9,6 +9,3 @@ var BackupCmd = &cobra.Command{
 	Short: "Backup utilities for EOS",
 }
 
-func init() {
-	BackupCmd.AddCommand(BackupHecateCmd)
-}
