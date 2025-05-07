@@ -35,7 +35,6 @@ func init() {
 	UpdateCmd.AddCommand(runEosCmd)
 	UpdateCmd.AddCommand(runHttpCmd)
 	// The docker-compose subcommand is defined in docker_compose.go.
-	UpdateCmd.AddCommand(dockerComposeCmd)
 }
 
 // runCertsCmd renews SSL certificates.

@@ -1,78 +1,53 @@
-/* pkg/hecate/types.go */
+// pkg/hecate/types.go
 
 package hecate
-
-import (
-	"time"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-)
-
-// Constants for file locations.
-// Constant file and directory names.
-const (
-	LastValuesFile    = ".hecate.conf"
-	ConfDir           = "conf.d"
-	DockerComposeFile = "docker-compose.yml"
-	DstConf           = "conf.d"
-	DstCerts          = "certs"
-	DstCompose        = "docker-compose.yml"
-)
-
-const (
-	SRC_CONF       = "conf.d"
-	SRC_CERTS      = "certs"
-	SRC_COMPOSE    = "docker-compose.yml"
-	BACKUP_CONF    = "conf.d.bak"
-	BACKUP_CERTS   = "certs.bak"
-	BACKUP_COMPOSE = "docker-compose.yml.bak"
-)
-
-// Dynamic values computed at runtime.
-var (
-	Timestamp     = time.Now().Format("20060102-150405")
-	BackupConf    = shared.DefaultConfDir + "." + Timestamp + ".bak"
-	BackupCerts   = shared.DefaultCertsDir + "." + Timestamp + ".bak"
-	BackupCompose = shared.DefaultComposeYML + "." + Timestamp + ".bak"
-)
-
-// AppSelection holds an app name and its configuration file.
-type AppSelection struct {
-	AppName  string
-	ConfFile string
-}
-
-// Global mapping from option number to its corresponding AppSelection.
-var AppsSelection = map[string]AppSelection{
-	"1":  {"Static website", "base.conf"},
-	"2":  {"Wazuh", "delphi.conf"},
-	"3":  {"Mattermost", "collaborate.conf"},
-	"4":  {"Nextcloud", "cloud.conf"},
-	"5":  {"Mailcow", "mailcow.conf"},
-	"6":  {"Jenkins", "jenkins.conf"},
-	"7":  {"Grafana", "observe.conf"},
-	"8":  {"Umami", "analytics.conf"},
-	"9":  {"MinIO", "s3.conf"},
-	"10": {"Wiki.js", "wiki.conf"},
-	"11": {"ERPNext", "erp.conf"},
-	"12": {"Jellyfin", "jellyfin.conf"},
-	"13": {"Persephone", "persephone.conf"},
-}
-
-// supportedApps maps the app’s lowercase name to a list of port markers.
-var SupportedApps = map[string][]string{
-	"wazuh":     {"1515", "1514", "55000"},
-	"mailcow":   {"25", "587", "465", "110", "995", "143", "993"},
-	"nextcloud": {"3478"},
-}
 
 const (
 	InstallDir = "/opt/hecate"
 )
 
-const HecateServiceTemplate = `
-# Generated Hecate configuration for {{ .AppName }}
-services:
+var composeFragments []DockerComposeFragment
+
+type DockerConfig struct {
+	AppName               string
+	TCPPorts              []string
+	UDPPorts              []string
+	NginxEnabled          bool
+	CoturnEnabled         bool
+	CoturnAuthSecret      string
+	KeycloakEnabled       bool
+	KeycloakDomain        string
+	KeycloakDBName        string
+	KeycloakDBUser        string
+	KeycloakDBPassword    string
+	KeycloakAdminUser     string
+	KeycloakAdminPassword string
+}
+
+// ServiceSpec defines a service block for Docker Compose.
+type ServiceSpec struct {
+	Name            string
+	FullServiceYAML string            // Full YAML block (used for standalone services)
+	Ports           []string          // Ports to inject (e.g., into nginx)
+	Environment     map[string]string // Optional: extra env vars
+	DependsOn       []string
+	Volumes         []string
+	Networks        []string // 💡 [optional] good to have for merges
+}
+
+// ComposeSpec holds the full Docker Compose spec across all services.
+type ComposeSpec struct {
+	Services map[string]*ServiceSpec
+	Networks []string
+	Volumes  []string
+}
+
+// DockerComposeFragment represents a section of Docker Compose content from a service.
+type DockerComposeFragment struct {
+	ServiceYAML string
+}
+
+const DockerCaddyService = `
   caddy:
     image: caddy:latest
     container_name: hecate-caddy
@@ -87,9 +62,9 @@ services:
     restart: always
     networks:
       - hecate-net
+`
 
-
-{{- if .NginxEnabled }}
+const DockerNginxService = `
   nginx:
     image: nginx
     container_name: hecate-nginx
@@ -110,9 +85,9 @@ services:
     restart: always
     networks:
       - hecate-net
-{{- end }}
+`
 
-{{- if .CoturnEnabled }}
+const DockerCoturnService = `
   coturn:
     image: coturn/coturn
     container_name: hecate-coturn
@@ -145,8 +120,9 @@ services:
       --verbose
     networks:
       - hecate-net
-{{- end }}
+`
 
+const DockerKeycloakService = `
   kc-db:
     image: postgres:15
     container_name: hecate-kc-db
@@ -176,7 +152,9 @@ services:
       - kc-db
     networks:
       - hecate-net
+`
 
+const DockerNetworkAndVolumes = `
 networks:
   hecate-net:
 
@@ -184,32 +162,13 @@ volumes:
   kc-db-data:
 `
 
-type DockerConfig struct {
-	AppName               string
-	TCPPorts              []string
-	UDPPorts              []string
-	NginxEnabled          bool
-	CoturnEnabled         bool
-	CoturnAuthSecret      string
-	KeycloakEnabled       bool
-	KeycloakDomain        string
-	KeycloakDBName        string
-	KeycloakDBUser        string
-	KeycloakDBPassword    string
-	KeycloakAdminUser     string
-	KeycloakAdminPassword string
-	
+// ToFragment renders the ServiceSpec into a DockerComposeFragment.
+func (ss *ServiceSpec) ToFragment() (DockerComposeFragment, error) {
+	rendered, err := renderTemplateFromString(ss.FullServiceYAML, ss.Environment)
+	if err != nil {
+		return DockerComposeFragment{}, err
+	}
+	return DockerComposeFragment{
+		ServiceYAML: rendered,
+	}, nil
 }
-
-
-
-
-type CaddyConfig struct {
-	AppName   string
-	Domain    string
-	BackendIP string
-	Subdomain string
-	Apps           []CaddyConfig
-	KeycloakDomain string
-}
-

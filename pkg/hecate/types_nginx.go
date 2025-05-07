@@ -1,12 +1,30 @@
-//pkg/hecate/types_nginx.go
-
 package hecate
 
+import (
+	"bytes"
+	"fmt"
+	"text/template"
+)
 
-type NginxStreamConfig struct {
-    BackendIP string
-}
+// Centralized port maps (unchanged).
+var (
+	MailcowPorts = ServicePorts{
+		TCP: []string{"25", "587", "465", "110", "995", "143", "993"},
+		UDP: []string{},
+	}
 
+	JenkinsPorts = ServicePorts{
+		TCP: []string{"50000"},
+		UDP: []string{},
+	}
+
+	WazuhPorts = ServicePorts{
+		TCP: []string{"1515", "1514", "55000"},
+		UDP: []string{"1515", "1514"},
+	}
+)
+
+var nginxFragments []NginxFragment
 
 const StreamIncludeTemplate = `
 stream {
@@ -14,106 +32,98 @@ stream {
 }
 `
 
-
-const MailcowStreamTemplate = `
-#--------------------------------------------------
-# MAILCOW STREAMS
-#--------------------------------------------------
-upstream mailcow_smtp {
-    server {{ .BackendIP }}:25;
-}
-server {
-    listen 25;
-    proxy_pass mailcow_smtp;
+// NginxStreamBlock defines the config for one upstream + server block.
+type NginxStreamBlock struct {
+	BackendIP    string
+	UpstreamName string
+	BackendPort  string
+	ListenPort   string
 }
 
-upstream mailcow_submission {
-    server {{ .BackendIP }}:587;
-}
-server {
-    listen 587;
-    proxy_pass mailcow_submission;
+type NginxFragment struct {
+	ServiceName string
+	StreamBlock string
 }
 
-upstream mailcow_smtps {
-    server {{ .BackendIP }}:465;
-}
-server {
-    listen 465;
-    proxy_pass mailcow_smtps;
-}
-
-upstream mailcow_pop3 {
-    server {{ .BackendIP }}:110;
-}
-server {
-    listen 110;
-    proxy_pass mailcow_pop3;
+type NginxSpec struct {
+	ServiceName  string // Added for context
+	StreamBlocks []NginxStreamBlock
+	PortsTCP     []string // To help Docker Compose port injection
+	PortsUDP     []string
 }
 
-upstream mailcow_pop3s {
-    server {{ .BackendIP }}:995;
-}
-server {
-    listen 995;
-    proxy_pass mailcow_pop3s;
+// Centralized port configs (TCP/UDP) for quick reference.
+type ServicePorts struct {
+	TCP []string
+	UDP []string
 }
 
-upstream mailcow_imap {
-    server {{ .BackendIP }}:143;
+// Template to render any upstream + server block.
+const GenericStreamBlockTemplate = `
+upstream {{ .UpstreamName }} {
+    server {{ .BackendIP }}:{{ .BackendPort }};
 }
 server {
-    listen 143;
-    proxy_pass mailcow_imap;
-}
-
-upstream mailcow_imaps {
-    server {{ .BackendIP }}:993;
-}
-server {
-    listen 993;
-    proxy_pass mailcow_imaps;
+    listen {{ .ListenPort }};
+    proxy_pass {{ .UpstreamName }};
 }
 `
 
-const JenkinsStreamTemplate = `
-#--------------------------------------------------
-# JENKINS STREAM
-#--------------------------------------------------
-upstream jenkins_agent {
-    server {{ .BackendIP }}:8059;    # Backend port for agent connections
-}
-server {
-    listen 50000;                   # External port for agent connections
-    proxy_pass jenkins_agent;
-}
-`
+// Centralized service stream blocks.
+var (
+	MailcowStreamBlocks = []NginxStreamBlock{
+		{UpstreamName: "mailcow_smtp", BackendPort: "25", ListenPort: "25"},
+		{UpstreamName: "mailcow_submission", BackendPort: "587", ListenPort: "587"},
+		{UpstreamName: "mailcow_smtps", BackendPort: "465", ListenPort: "465"},
+		{UpstreamName: "mailcow_pop3", BackendPort: "110", ListenPort: "110"},
+		{UpstreamName: "mailcow_pop3s", BackendPort: "995", ListenPort: "995"},
+		{UpstreamName: "mailcow_imap", BackendPort: "143", ListenPort: "143"},
+		{UpstreamName: "mailcow_imaps", BackendPort: "993", ListenPort: "993"},
+	}
 
-const WazuhStreamTemplate = `
-#--------------------------------------------------
-# WAZUH STREAMS
-#--------------------------------------------------
-upstream wazuh_manager_1515 {
-    server {{ .BackendIP }}:1515;
-}
-server {
-    listen 1515;
-    proxy_pass wazuh_manager_1515;
+	JenkinsStreamBlocks = []NginxStreamBlock{
+		{UpstreamName: "jenkins_agent", BackendPort: "8059", ListenPort: "50000"},
+	}
+
+	WazuhStreamBlocks = []NginxStreamBlock{
+		{UpstreamName: "wazuh_manager_1515", BackendPort: "1515", ListenPort: "1515"},
+		{UpstreamName: "wazuh_manager_1514", BackendPort: "1514", ListenPort: "1514"},
+		{UpstreamName: "wazuh_manager_55000", BackendPort: "55000", ListenPort: "55000"},
+	}
+)
+
+
+// ToFragment renders the NginxSpec into a usable NginxFragment.
+func (n *NginxSpec) ToFragment(backendIP string) (NginxFragment, error) {
+	if len(n.StreamBlocks) == 0 {
+		return NginxFragment{}, fmt.Errorf("no stream blocks to render for %s", n.ServiceName)
+	}
+	rendered, err := RenderStreamBlocks(backendIP, n.StreamBlocks)
+	if err != nil {
+		return NginxFragment{}, fmt.Errorf("failed to render stream blocks: %w", err)
+	}
+	return NginxFragment{
+		ServiceName: n.ServiceName,
+		StreamBlock: rendered,
+	}, nil
 }
 
-upstream wazuh_manager_1514 {
-    server {{ .BackendIP }}:1514;
-}
-server {
-    listen 1514;
-    proxy_pass wazuh_manager_1514;
-}
+// RenderStreamBlocks renders all stream blocks for a service.
+func RenderStreamBlocks(backendIP string, blocks []NginxStreamBlock) (string, error) {
+	tmpl, err := template.New("stream").Parse(GenericStreamBlockTemplate)
+	if err != nil {
+		return "", err
+	}
 
-upstream wazuh_manager_55000 {
-    server {{ .BackendIP }}:55000;
+	var rendered bytes.Buffer
+	for _, block := range blocks {
+		// Fill in the backend IP dynamically.
+		block.BackendIP = backendIP
+
+		if err := tmpl.Execute(&rendered, block); err != nil {
+			return "", err
+		}
+		rendered.WriteString("\n\n")
+	}
+	return rendered.String(), nil
 }
-server {
-    listen 55000;
-    proxy_pass wazuh_manager_55000;
-}
-`

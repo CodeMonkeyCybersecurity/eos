@@ -50,11 +50,8 @@ func GenerateCaddyConfigMulti(cfg CaddyConfig) string {
 	var builder strings.Builder
 
 	// Loop through each app and create a Caddy block.
-	for _, app := range cfg.Apps {
+	for _, app := range cfg.Proxies {
 		fullDomain := app.Domain
-		if app.Subdomain != "" {
-			fullDomain = app.Subdomain + "." + app.Domain
-		}
 
 		builder.WriteString(fmt.Sprintf("%s {\n", fullDomain))
 		builder.WriteString(fmt.Sprintf("    reverse_proxy %s\n", app.BackendIP))

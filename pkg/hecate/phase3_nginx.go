@@ -3,142 +3,92 @@
 package hecate
 
 import (
-	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
-	"text/template"
 
 	"go.uber.org/zap"
 )
 
-// SetupNginxEnvironment sets up the full Nginx configuration: directories, rendering, and placement.
+// SetupNginxEnvironment sets up Nginx configs for Hecate (stream + include templates)
 func SetupNginxEnvironment(backendIP string) error {
 	log := zap.L().Named("hecate-nginx-orchestrator")
 	log.Info("🚀 Starting full Nginx setup for Hecate...")
 
-	// Step 1: Ensure the directory structure is ready
-	if err := EnsureNginxDirs(); err != nil {
-		log.Error("Failed to set up Nginx directories", zap.Error(err))
+	// Ensure directories exist
+	streamDir := "/opt/hecate/assets/conf.d/stream"
+	if err := ensureDir("/opt/hecate/assets/conf.d"); err != nil {
+		return err
+	}
+	if err := ensureDir(streamDir); err != nil {
 		return err
 	}
 
-	// Step 2: Render the Nginx config files
-	log.Info("Rendering Nginx config templates...")
-	rendered, err := RenderNginxConfigs(backendIP)
-	if err != nil {
-		log.Error("Failed to render Nginx configs", zap.Error(err))
+	// Render and save StreamIncludeTemplate (this is your global stream include block)
+	includePath := "/opt/hecate/assets/conf.d/stream_include.conf"
+	if err := os.WriteFile(includePath, []byte(StreamIncludeTemplate), 0644); err != nil {
+		log.Error("Failed to write stream include config", zap.Error(err))
 		return err
 	}
+	log.Info("✅ Wrote stream include config", zap.String("path", includePath))
 
-	// Step 3: Move rendered configs into /opt/hecate
-	log.Info("Moving Nginx config files to /opt/hecate...")
-	if err := MoveNginxConfigsToHecate(rendered); err != nil {
-		log.Error("Failed to move Nginx configs", zap.Error(err))
-		return err
+	// Define all services that need rendering
+	services := []struct {
+		Name       string
+		Blocks     []NginxStreamBlock
+		OutputFile string
+	}{
+		{
+			Name:       "mailcow",
+			Blocks:     MailcowStreamBlocks,
+			OutputFile: filepath.Join(streamDir, "mailcow.conf"),
+		},
+		{
+			Name:       "jenkins",
+			Blocks:     JenkinsStreamBlocks,
+			OutputFile: filepath.Join(streamDir, "jenkins.conf"),
+		},
+		{
+			Name:       "wazuh",
+			Blocks:     WazuhStreamBlocks,
+			OutputFile: filepath.Join(streamDir, "wazuh.conf"),
+		},
+	}
+
+	// Render each service’s stream config and write to file
+	for _, svc := range services {
+		log.Info("Rendering Nginx stream config", zap.String("service", svc.Name))
+		rendered, err := RenderStreamBlocks(backendIP, svc.Blocks)
+		if err != nil {
+			log.Error("Failed to render Nginx stream config", zap.String("service", svc.Name), zap.Error(err))
+			return err
+		}
+
+		if err := os.WriteFile(svc.OutputFile, []byte(rendered), 0644); err != nil {
+			log.Error("Failed to write Nginx config", zap.String("path", svc.OutputFile), zap.Error(err))
+			return err
+		}
+		log.Info("✅ Rendered and wrote Nginx config", zap.String("file", svc.OutputFile))
 	}
 
 	log.Info("✅ Full Nginx setup completed successfully!")
 	return nil
 }
 
-func EnsureNginxDirs() error {
-	baseDir := "/opt/hecate/assets/conf.d"
-	streamDir := filepath.Join(baseDir, "stream")
-
+// ensureDir ensures a directory exists (creates it if missing)
+func ensureDir(path string) error {
 	log := zap.L().Named("hecate-nginx-setup")
+	log.Info("Checking directory...", zap.String("path", path))
 
-	dirs := []string{
-		baseDir,
-		streamDir,
-	}
-
-	for _, dir := range dirs {
-		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			log.Info("Creating directory...", zap.String("path", dir))
-			if err := os.MkdirAll(dir, 0755); err != nil {
-				log.Error("Failed to create directory", zap.String("path", dir), zap.Error(err))
-				return err
-			}
-			log.Info("✅ Directory created", zap.String("path", dir))
-		} else {
-			log.Info("Directory already exists", zap.String("path", dir))
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		log.Info("Creating directory...", zap.String("path", path))
+		if err := os.MkdirAll(path, 0755); err != nil {
+			log.Error("Failed to create directory", zap.String("path", path), zap.Error(err))
+			return fmt.Errorf("failed to create directory %s: %w", path, err)
 		}
+		log.Info("✅ Directory created", zap.String("path", path))
+	} else {
+		log.Info("Directory already exists", zap.String("path", path))
 	}
-
-	return nil
-}
-
-func RenderNginxConfigs(backendIP string) (map[string]string, error) {
-	log := zap.L().Named("hecate-nginx-render")
-
-	type cfg struct {
-		BackendIP string
-	}
-
-	data := cfg{BackendIP: backendIP}
-
-	templates := map[string]string{
-		"mailcow.conf": MailcowStreamTemplate,
-		"jenkins.conf": JenkinsStreamTemplate,
-		"wazuh.conf":   WazuhStreamTemplate,
-		// This one goes in conf.d (not in stream/)
-		"delphi.stream.conf": StreamIncludeTemplate,
-	}
-
-	renderedFiles := make(map[string]string)
-
-	for filename, tmplStr := range templates {
-		tmpl, err := template.New(filename).Parse(tmplStr)
-		if err != nil {
-			log.Error("Failed to parse template", zap.String("file", filename), zap.Error(err))
-			return nil, err
-		}
-
-		var buf bytes.Buffer
-		if err := tmpl.Execute(&buf, data); err != nil {
-			log.Error("Failed to render template", zap.String("file", filename), zap.Error(err))
-			return nil, err
-		}
-
-		renderedFiles[filename] = buf.String()
-		log.Info("✅ Rendered Nginx config", zap.String("file", filename))
-	}
-
-	return renderedFiles, nil
-}
-
-func MoveNginxConfigsToHecate(rendered map[string]string) error {
-	baseDir := "/opt/hecate/assets/conf.d"
-	streamDir := filepath.Join(baseDir, "stream")
-
-	log := zap.L().Named("hecate-nginx-move")
-
-	for filename, content := range rendered {
-		var destPath string
-		if filename == "delphi.stream.conf" {
-			// This goes in conf.d
-			destPath = filepath.Join(baseDir, filename)
-		} else {
-			// All others go in stream/
-			destPath = filepath.Join(streamDir, filename)
-		}
-
-		file, err := os.Create(destPath)
-		if err != nil {
-			log.Error("Failed to create config file", zap.String("path", destPath), zap.Error(err))
-			return fmt.Errorf("failed to create %s: %w", destPath, err)
-		}
-
-		if _, err := file.WriteString(content); err != nil {
-			log.Error("Failed to write config file", zap.String("path", destPath), zap.Error(err))
-			file.Close()
-			return fmt.Errorf("failed to write %s: %w", destPath, err)
-		}
-
-		file.Close()
-		log.Info("✅ Wrote Nginx config to /opt/hecate", zap.String("path", destPath))
-	}
-
 	return nil
 }

@@ -4,158 +4,259 @@ package hecate
 
 import (
 	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
 	"os"
-	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/parse"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
-func SetupHecateWithPrompts() error {
-	log := zap.L().Named("hecate-full-setup-prompt")
+func SetupHecateWizard() error {
+	log := zap.L().Named("hecate-setup-wizard")
 	reader := bufio.NewReader(os.Stdin)
 
-	log.Info("🚀 Welcome to the Hecate full setup wizard!")
+	log.Info("🚀 Welcome to the Hecate setup wizard!")
 
-	// === New: Service selection ===
-	setupKeycloak := interaction.PromptInputWithReader("Do you want to set up Keycloak? (yes/no)", "yes", reader)
-	setupNextcloud := interaction.PromptInputWithReader("Do you want to set up Nextcloud? (yes/no)", "no", reader)
-	setupWazuh := interaction.PromptInputWithReader("Do you want to set up Wazuh? (yes/no)", "no", reader)
-	setupMailcow := interaction.PromptInputWithReader("Do you want to set up Mailcow? (yes/no)", "no", reader)
+	// === Service selection ===
+	keycloakEnabled := interaction.PromptYesNo("Do you want to set up Keycloak?", true)
+	nextcloudEnabled := interaction.PromptYesNo("Do you want to set up Nextcloud (Coturn only)?", false)
+	wazuhEnabled := interaction.PromptYesNo("Do you want to set up Wazuh?", false)
+	jenkinsEnabled := interaction.PromptYesNo("Do you want to set up Jenkins?", false)
 
-	if strings.ToLower(setupKeycloak) != "yes" &&
-		strings.ToLower(setupNextcloud) != "yes" &&
-		strings.ToLower(setupWazuh) != "yes" &&
-		strings.ToLower(setupMailcow) != "yes" {
-		log.Warn("🚫 No services selected for setup. Only reverse proxy config will be applied.")
+	// Check: Exit early if no services selected
+	if ShouldExitNoServicesSelected(keycloakEnabled, nextcloudEnabled, wazuhEnabled, jenkinsEnabled) {
+		return errors.New("no services selected; exiting setup wizard")
 	}
+	
+	// Ask for the backend IP once (or you can customize per service if needed)
+	var backendIP = interaction.PromptInputWithReader("Enter the backend IP address for these services:", "", reader)
 
-	var dockerCfg *DockerConfig
-	var allCaddyApps []CaddyConfig
+	// === Process each service ===
+	if keycloakEnabled {
+		bundle := SetupKeycloakWizard(reader)
 
-	// === Keycloak ===
-	if strings.ToLower(setupKeycloak) == "yes" {
-		kDockerCfg, kCaddyCfg := SetupKeycloak(reader)
-		dockerCfg = kDockerCfg
-		allCaddyApps = append(allCaddyApps, kCaddyCfg.Apps...)
-	}
-
-	// === Other services ===
-	if strings.ToLower(setupNextcloud) == "yes" ||
-		strings.ToLower(setupWazuh) == "yes" ||
-		strings.ToLower(setupMailcow) == "yes" {
-
-		backendIP := interaction.PromptInputWithReader("Enter backend IP address (e.g., 192.168.0.1)", "", reader)
-		log.Info("🚧 Nextcloud, Wazuh, and Mailcow setup not yet implemented")
-
-		// You would later: append CaddyConfig for these too
-		_ = backendIP // prevent unused var error for now
-	}
-
-	caddyCfg := CaddyConfig{
-		Apps: allCaddyApps,
-	}
-
-	log.Info("🚀 Running full Hecate setup now...")
-
-	err := SetupFullHecateEnvironment(
-		reader,
-		dockerCfg, // pass *DockerConfig or nil
-		caddyCfg,
-		"", // backendIP no longer needed globally
-	)
-	if err != nil {
-		log.Error("❌ Hecate setup failed", zap.Error(err))
-		return err
-	}
-
-	log.Info("✅ Hecate setup completed successfully!")
-	return nil
-}
-
-// SetupFullHecateEnvironment orchestrates the full Hecate setup: Docker Compose, Caddy, and Nginx.
-func SetupFullHecateEnvironment(reader *bufio.Reader, dockerCfg *DockerConfig, caddyCfg CaddyConfig, backendIP string) error {
-	log := zap.L().Named("hecate-full-setup")
-	log.Info("🚀 Starting full Hecate setup (Docker + Caddy + Nginx)...")
-
-	if err := EnsureHecateDirExists(); err != nil {
-		log.Error("Failed to ensure /opt/hecate exists", zap.Error(err))
-		return err
-	}
-
-	// Phase 1: Docker Compose setup
-	if dockerCfg != nil {
-		log.Info("🔧 Phase 1: Docker Compose setup")
-		if err := CreateDockerComposeFromConfig(*dockerCfg); err != nil {
-			log.Error("❌ Failed during Docker Compose setup", zap.Error(err))
-			return err
+		if bundle.Caddy != nil {
+			frag, err := bundle.Caddy.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Caddy fragment for Keycloak: %w", err)
+			}
+			caddyFragments = append(caddyFragments, frag)
 		}
-	} else {
-		log.Warn("🚫 Skipping Docker Compose setup (no services selected)")
+		if bundle.Nginx != nil {
+			frag, err := bundle.Nginx.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Nginx fragment for Keycloak: %w", err)
+			}
+			nginxFragments = append(nginxFragments, frag)
+		}
+		if bundle.Compose != nil && bundle.Compose.Services != nil {
+			for name, svc := range bundle.Compose.Services {
+				frag, err := svc.ToFragment()
+				if err != nil {
+					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
+					continue
+				}
+				composeFragments = append(composeFragments, frag)
+			}
+		}
 	}
 
-	// Phase 2: Caddy setup
-	log.Info("🔧 Phase 2: Caddy setup")
-	if err := SetupCaddyEnvironment(caddyCfg); err != nil {
-		log.Error("❌ Failed during Caddy setup", zap.Error(err))
+	if wazuhEnabled {
+		bundle := SetupWazuhWizard(reader)
+
+		if bundle.Caddy != nil {
+			frag, err := bundle.Caddy.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Caddy fragment for Wazuh: %w", err)
+			}
+			caddyFragments = append(caddyFragments, frag)
+		}
+		if bundle.Nginx != nil {
+			frag, err := bundle.Nginx.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Nginx fragment for Wazuh: %w", err)
+			}
+			nginxFragments = append(nginxFragments, frag)
+		}
+		if bundle.Compose != nil && bundle.Compose.Services != nil {
+			for name, svc := range bundle.Compose.Services {
+				frag, err := svc.ToFragment()
+				if err != nil {
+					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
+					continue
+				}
+				composeFragments = append(composeFragments, frag)
+			}
+		}
+	}
+
+	if jenkinsEnabled {
+		bundle := SetupJenkinsWizard(reader)
+
+		if bundle.Caddy != nil {
+			frag, err := bundle.Caddy.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Caddy fragment for Jenkins: %w", err)
+			}
+			caddyFragments = append(caddyFragments, frag)
+		}
+		if bundle.Nginx != nil {
+			frag, err := bundle.Nginx.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Nginx fragment for Jenkins: %w", err)
+			}
+			nginxFragments = append(nginxFragments, frag)
+		}
+		if bundle.Compose != nil && bundle.Compose.Services != nil {
+			for name, svc := range bundle.Compose.Services {
+				frag, err := svc.ToFragment()
+				if err != nil {
+					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
+					continue
+				}
+				composeFragments = append(composeFragments, frag)
+			}
+		}
+	}
+
+	if nextcloudEnabled {
+		bundle := SetupNextcloudWizard(reader)
+
+		if bundle.Caddy != nil {
+			frag, err := bundle.Caddy.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Caddy fragment for Nextcloud: %w", err)
+			}
+			caddyFragments = append(caddyFragments, frag)
+		}
+		if bundle.Nginx != nil {
+			frag, err := bundle.Nginx.ToFragment(backendIP)
+			if err != nil {
+				return fmt.Errorf("failed to render Nginx fragment for Nextcloud: %w", err)
+			}
+			nginxFragments = append(nginxFragments, frag)
+		}
+		if bundle.Compose != nil && bundle.Compose.Services != nil {
+			for name, svc := range bundle.Compose.Services {
+				frag, err := svc.ToFragment()
+				if err != nil {
+					log.Warn("Failed to render service fragment", zap.String("service", name), zap.Error(err))
+					continue
+				}
+				composeFragments = append(composeFragments, frag)
+			}
+		}
+	}
+
+	// === Collate everything at the end ===
+	if err := CollateAndWriteCaddyfile(caddyFragments); err != nil {
+		return err
+	}
+	if err := CollateAndWriteDockerCompose(composeFragments); err != nil {
+		return err
+	}
+	if err := CollateAndWriteNginxConfig(nginxFragments); err != nil {
 		return err
 	}
 
-	// Phase 3: Nginx setup
-	log.Info("🔧 Phase 3: Nginx setup")
-	if err := SetupNginxEnvironment(backendIP); err != nil {
-		log.Error("❌ Failed during Nginx setup", zap.Error(err))
-		return err
-	}
-
-	log.Info("✅ Full Hecate environment setup completed successfully!")
 	return nil
 }
 
-func SetupKeycloak(reader *bufio.Reader) (*DockerConfig, CaddyConfig) {
-	log := zap.L().Named("hecate-keycloak-setup")
-	log.Info("🔧 Collecting Keycloak setup information...")
+func EnsureHecateDirExists() error {
+	return system.EnsureDir("/opt/hecate")
+}
 
-	keycloakDomain := interaction.PromptInputWithReader("Enter Keycloak domain (e.g., hera.domain.com)", "hera.domain.com", reader)
-	keycloakDBName := interaction.PromptInputWithReader("Enter Keycloak DB name", "keycloak", reader)
-	keycloakDBUser := interaction.PromptInputWithReader("Enter Keycloak DB user", "keycloak", reader)
-	keycloakDBPassword := interaction.PromptInputWithReader("Enter Keycloak DB password", "changeme1", reader)
-	keycloakAdminUser := interaction.PromptInputWithReader("Enter Keycloak admin user", "admin", reader)
-	keycloakAdminPassword := interaction.PromptInputWithReader("Enter Keycloak admin password", "changeme", reader)
-	coturnAuthSecret := interaction.PromptInputWithReader("Enter Coturn auth secret (for TURN server)", "change_me", reader)
+// ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.
+func ShouldExitNoServicesSelected(keycloak, nextcloud, wazuh, jenkins bool) bool {
+	if !keycloak && !nextcloud && !wazuh && !jenkins {
+		zap.L().Named("hecate-setup-check").Warn("🚫 No services selected. Exiting without making any changes.")
+		return true
+	}
+	return false
+}
 
-	tcpPortsInput := interaction.PromptInputWithReader("Enter TCP ports (comma-separated, e.g., 1515,1514,55000)", "", reader)
-	tcpPorts := parse.SplitAndTrim(tcpPortsInput)
+// CollateAndWriteDockerCompose merges multiple DockerComposeFragment pieces and writes the docker-compose.yml.
+func CollateAndWriteDockerCompose(fragments []DockerComposeFragment) error {
+	log := zap.L().Named("hecate-compose-collation")
 
-	udpPortsInput := interaction.PromptInputWithReader("Enter UDP ports (comma-separated, e.g., 1514)", "", reader)
-	udpPorts := parse.SplitAndTrim(udpPortsInput)
+	var buf bytes.Buffer
 
-	dockerCfg := &DockerConfig{
-		AppName:               "keycloak",
-		TCPPorts:              tcpPorts,
-		UDPPorts:              udpPorts,
-		NginxEnabled:          true,
-		CoturnEnabled:         true,
-		CoturnAuthSecret:      coturnAuthSecret,
-		KeycloakDomain:        keycloakDomain,
-		KeycloakDBName:        keycloakDBName,
-		KeycloakDBUser:        keycloakDBUser,
-		KeycloakDBPassword:    keycloakDBPassword,
-		KeycloakAdminUser:     keycloakAdminUser,
-		KeycloakAdminPassword: keycloakAdminPassword,
+	// Header (optional, can add version info here)
+	buf.WriteString("version: '3.8'\n\nservices:\n")
+
+	for _, frag := range fragments {
+		buf.WriteString(frag.ServiceYAML)
+		buf.WriteString("\n\n")
 	}
 
-	caddyCfg := CaddyConfig{
-		Apps: []CaddyConfig{
-			{
-				AppName:   "keycloak",
-				Domain:    keycloakDomain,
-				BackendIP: "keycloak", // Docker service name or "localhost"
-			},
-		},
-		KeycloakDomain: keycloakDomain,
+	// Add networks & volumes at the end
+	buf.WriteString(DockerNetworkAndVolumes)
+
+	composeFilePath := "./docker-compose.yml"
+	err := os.WriteFile(composeFilePath, buf.Bytes(), 0644)
+	if err != nil {
+		log.Error("Failed to write docker-compose.yml", zap.Error(err),
+			zap.String("path", composeFilePath),
+		)
+		return fmt.Errorf("failed to write docker-compose.yml: %w", err)
 	}
 
-	return dockerCfg, caddyCfg
+	log.Info("✅ Final docker-compose.yml written successfully", zap.String("path", composeFilePath))
+	return nil
+}
+
+// CollateAndWriteCaddyfile merges multiple CaddyConfig fragments and writes the final Caddyfile.
+func CollateAndWriteCaddyfile(fragments []CaddyFragment) error {
+	log := zap.L().Named("hecate-caddy-collation")
+
+	var buf bytes.Buffer
+	for _, frag := range fragments {
+		buf.WriteString(frag.CaddyBlock)
+		buf.WriteString("\n\n")
+	}
+
+	caddyfilePath := "./Caddyfile"
+	err := os.WriteFile(caddyfilePath, buf.Bytes(), 0644)
+	if err != nil {
+		log.Error("Failed to write Caddyfile", zap.Error(err),
+			zap.String("path", caddyfilePath),
+		)
+		return fmt.Errorf("failed to write Caddyfile: %w", err)
+	}
+
+	log.Info("✅ Final Caddyfile written successfully", zap.String("path", caddyfilePath))
+	return nil
+}
+
+// CollateAndWriteNginxConfig writes the main nginx.conf that includes service fragments.
+func CollateAndWriteNginxConfig(_ []NginxFragment) error {
+	log := zap.L().Named("hecate-nginx-collation")
+
+	// Minimal nginx.conf that includes the stream fragments
+	mainConf := `
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+` + StreamIncludeTemplate + `
+`
+
+	nginxFilePath := "./nginx.conf"
+	err := os.WriteFile(nginxFilePath, []byte(mainConf), 0644)
+	if err != nil {
+		log.Error("Failed to write nginx.conf", zap.Error(err),
+			zap.String("path", nginxFilePath),
+		)
+		return fmt.Errorf("failed to write nginx.conf: %w", err)
+	}
+
+	log.Info("✅ Main nginx.conf written successfully, using stream includes",
+		zap.String("path", nginxFilePath),
+	)
+	return nil
 }

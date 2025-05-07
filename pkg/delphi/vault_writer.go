@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"go.uber.org/zap"
@@ -15,7 +16,7 @@ import (
 func WriteConfig(cfg *Config) error {
 	// Always write to disk
 	diskPath := xdg.XDGConfigPath(shared.EosID, "delphi.json")
-	if err := xdg.EnsureDir(diskPath); err != nil {
+	if err := system.EnsureDir(diskPath); err != nil {
 		zap.L().Warn("❌ Failed to ensure disk config directory", zap.Error(err))
 		return fmt.Errorf("unable to create config path: %w", err)
 	}
