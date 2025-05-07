@@ -189,17 +189,15 @@ func NormalizeYesNoInput(input string) (bool, bool) {
 	return false, false // unknown
 }
 
-
-
 func PromptInputWithReader(prompt, defaultVal string, reader *bufio.Reader) string {
-    input, err := ReadLine(reader, prompt)
-    if err != nil {
-        zap.L().Error("Failed to read user input", zap.Error(err))
-        return defaultVal
-    }
-    if input == "" {
-        zap.L().Debug("ℹ️ Using default value", zap.String("default", defaultVal))
-        return defaultVal
-    }
-    return input
+	input, err := ReadLine(reader, prompt)
+	if err != nil {
+		zap.L().Error("Failed to read user input", zap.Error(err))
+		return defaultVal
+	}
+	if input == "" {
+		zap.L().Debug("ℹ️ Using default value", zap.String("default", defaultVal))
+		return defaultVal
+	}
+	return input
 }

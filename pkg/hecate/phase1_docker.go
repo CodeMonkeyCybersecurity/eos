@@ -70,11 +70,10 @@ func CollateComposeFragmentsToString() string {
 	return strings.Join(dynamicParts, "\n\n")
 }
 
-
 // GetDockerNetworkSection returns the minimal default Docker network section.
 // TODO: Extend this dynamically based on enabled services if needed.
 func GetDockerNetworkSection() string {
-    return `
+	return `
   hecate-net:
 `
 }
@@ -82,7 +81,7 @@ func GetDockerNetworkSection() string {
 // GetDockerVolumesSection returns the minimal default Docker volumes section.
 // TODO: Extend this dynamically based on enabled services if needed.
 func GetDockerVolumesSection() string {
-    return `
+	return `
   kc-db-data:
 `
 }
@@ -90,5 +89,5 @@ func GetDockerVolumesSection() string {
 // GetDockerFooter combines the network and volumes sections into a single footer block.
 // This is handy for passing into templates or collators that expect a single footer string.
 func GetDockerFooter() string {
-    return GetDockerNetworkSection() + "\n" + GetDockerVolumesSection()
+	return GetDockerNetworkSection() + "\n" + GetDockerVolumesSection()
 }

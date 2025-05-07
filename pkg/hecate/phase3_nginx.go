@@ -11,27 +11,41 @@ import (
 	"go.uber.org/zap"
 )
 
-// SetupNginxEnvironment sets up Nginx configs for Hecate (stream + include templates)
-func SetupNginxEnvironment(backendIP string) error {
-	log := zap.L().Named("hecate-nginx-orchestrator")
-	log.Info("🚀 Starting full Nginx setup for Hecate...")
+// PhaseNginx sets up Nginx configs as phase 3 of Hecate.
+// This is the thin wrapper that can be called by the lifecycle orchestrator.
+func PhaseNginx(backendIP string) error {
+	log := zap.L().Named("hecate-phase-nginx")
+	log.Info("🚀 Starting Phase 3: Build and setup Nginx...")
 
-	// Ensure directories exist
-	if err := system.EnsureDir(HecateConfDDir); err != nil {
-		return err
-	}
-	if err := system.EnsureDir(HecateStreamDir); err != nil {
-		return err
+	// Always ensure directory structure first.
+	if err := EnsureNginxDirs(); err != nil {
+		return fmt.Errorf("failed to ensure Nginx dirs: %w", err)
 	}
 
-	// Render and save StreamIncludeTemplate
+	// If backend IP is empty, skip full config generation (allows noop runs)
+	if backendIP == "" {
+		log.Info("No backend IP provided; skipping Nginx stream block generation")
+		return nil
+	}
+
+	// Actually build and deploy the Nginx configs.
+	return BuildNginxEnvironment(backendIP)
+}
+
+// BuildNginxEnvironment sets up Nginx configs (stream + include templates).
+// This matches the "build phase" pattern.
+func BuildNginxEnvironment(backendIP string) error {
+	log := zap.L().Named("hecate-nginx-builder")
+	log.Info("🚀 Building Nginx configs for Hecate...")
+
+	// Step 1: Render and save StreamIncludeTemplate
 	if err := os.WriteFile(HecateStreamIncludePath, []byte(StreamIncludeTemplate), 0644); err != nil {
 		log.Error("Failed to write stream include config", zap.Error(err))
 		return err
 	}
 	log.Info("✅ Wrote stream include config", zap.String("path", HecateStreamIncludePath))
 
-	// Define services
+	// Step 2: Define services
 	services := []struct {
 		Name       string
 		Blocks     []NginxStreamBlock
@@ -54,7 +68,7 @@ func SetupNginxEnvironment(backendIP string) error {
 		},
 	}
 
-	// Render each service’s stream config
+	// Step 3: Render each service’s stream config
 	for _, svc := range services {
 		log.Info("Rendering Nginx stream config", zap.String("service", svc.Name))
 		rendered, err := RenderStreamBlocks(backendIP, svc.Blocks)
@@ -70,30 +84,28 @@ func SetupNginxEnvironment(backendIP string) error {
 		log.Info("✅ Rendered and wrote Nginx config", zap.String("file", svc.OutputFile))
 	}
 
-	log.Info("✅ Full Nginx setup completed successfully!")
+	log.Info("✅ Full Nginx build completed successfully!")
 	return nil
 }
 
-// ensureDir ensures a directory exists (creates it if missing)
-func ensureDir(path string) error {
+// EnsureNginxDirs ensures necessary Nginx directories exist.
+func EnsureNginxDirs() error {
 	log := zap.L().Named("hecate-nginx-setup")
-	log.Info("Checking directory...", zap.String("path", path))
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		log.Info("Creating directory...", zap.String("path", path))
-		if err := os.MkdirAll(path, 0755); err != nil {
-			log.Error("Failed to create directory", zap.String("path", path), zap.Error(err))
-			return fmt.Errorf("failed to create directory %s: %w", path, err)
-		}
-		log.Info("✅ Directory created", zap.String("path", path))
-	} else {
-		log.Info("Directory already exists", zap.String("path", path))
+	dirs := []string{HecateConfDDir, HecateStreamDir}
+	if err := system.EnsureDirs(dirs); err != nil {
+		log.Error("Failed to ensure Nginx directories", zap.Error(err))
+		return err
 	}
+
+	log.Info("✅ Nginx directory structure ready")
 	return nil
 }
 
 // CollateNginxFragments handles collation + writing of nginx.conf (only if fragments exist).
 func CollateNginxFragments() error {
+	log := zap.L().Named("hecate-nginx-collation")
+
 	if len(nginxFragments) > 0 {
 		return CollateAndWriteFile(
 			"hecate-nginx-collation",
@@ -101,9 +113,10 @@ func CollateNginxFragments() error {
 			HecateNginxConfig,
 			BaseNginxConf,
 			"",
-			func(_ NginxFragment) string { return "" },
+			func(_ NginxFragment) string { return "" }, // TODO: Add proper rendering if needed
 		)
 	}
-	zap.L().Named("hecate-nginx-collation").Info("No Nginx fragments to write; skipping nginx.conf")
+
+	log.Info("No Nginx fragments to write; skipping nginx.conf")
 	return nil
 }

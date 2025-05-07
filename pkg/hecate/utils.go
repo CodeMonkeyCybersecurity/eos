@@ -167,7 +167,6 @@ func GenericWizard(
 	}
 }
 
-
 func RenderAndWriteTemplate(
 	logName string,
 	templateContent string,

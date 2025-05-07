@@ -12,7 +12,7 @@ import (
 
 // GenerateFIPSKey generates a FIPS-compliant RSA SSH key (2048 bits, no passphrase)
 func GenerateFIPSKey(path string) error {
-	cmd := exec.Command( "ssh-keygen", "-t", "rsa", "-b", "4096", "-f", path, "-N", "")
+	cmd := exec.Command("ssh-keygen", "-t", "rsa", "-b", "4096", "-f", path, "-N", "")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -20,7 +20,7 @@ func GenerateFIPSKey(path string) error {
 
 // CopyKeyToRemote runs ssh-copy-id to install the public key to a remote system
 func CopyKeyToRemote(pubKeyPath, target string) error {
-	cmd := exec.Command( "ssh-copy-id", "-i", pubKeyPath, target)
+	cmd := exec.Command("ssh-copy-id", "-i", pubKeyPath, target)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

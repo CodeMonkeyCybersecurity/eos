@@ -101,7 +101,6 @@ var (
 	}
 )
 
-
 // ToFragment renders the NginxSpec into a usable NginxFragment.
 func (n *NginxSpec) ToFragment(backendIP string) (NginxFragment, error) {
 	if len(n.StreamBlocks) == 0 {
