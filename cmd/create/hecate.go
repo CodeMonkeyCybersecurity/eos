@@ -8,13 +8,9 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-)
-
-const (
-	hecateRepoURL    = "https://github.com/CodeMonkeyCybersecurity/hecate.git" // TODO: update this to your real repo
-	hecateInstallDir = "/opt/hecate"
 )
 
 // NewCreateHecateCmd creates the `create hecate` subcommand
@@ -28,9 +24,9 @@ places it in /opt/hecate, and prepares it for use with EOS.`,
 			zap.L().Info("Starting Hecate setup...")
 
 			// Check if /opt/hecate exists
-			if _, err := os.Stat(hecateInstallDir); os.IsNotExist(err) {
+			if _, err := os.Stat(shared.HecateInstallDir); os.IsNotExist(err) {
 				zap.L().Info("/opt/hecate does not exist, creating it...")
-				if err := os.MkdirAll(hecateInstallDir, 0755); err != nil {
+				if err := os.MkdirAll(shared.HecateInstallDir, 0755); err != nil {
 					zap.L().Error("Failed to create /opt/hecate", zap.Error(err))
 					return fmt.Errorf("failed to create /opt/hecate: %w", err)
 				}
@@ -39,7 +35,7 @@ places it in /opt/hecate, and prepares it for use with EOS.`,
 			}
 
 			// Check if Hecate repo already cloned
-			gitDir := filepath.Join(hecateInstallDir, ".git")
+			gitDir := filepath.Join(shared.HecateInstallDir, ".git")
 			if _, err := os.Stat(gitDir); err == nil {
 				zap.L().Info("Hecate repository already cloned, skipping clone step")
 				return nil
@@ -47,10 +43,10 @@ places it in /opt/hecate, and prepares it for use with EOS.`,
 
 			// Run: git clone <repo> /opt/hecate
 			zap.L().Info("Cloning Hecate repository...",
-				zap.String("repo", hecateRepoURL),
-				zap.String("destination", hecateInstallDir),
+				zap.String("repo", shared.HecateRepoURL),
+				zap.String("destination", shared.HecateInstallDir),
 			)
-			cmdClone := exec.Command("git", "clone", hecateRepoURL, hecateInstallDir)
+			cmdClone := exec.Command("git", "clone", shared.HecateRepoURL, shared.HecateInstallDir)
 			cmdClone.Stdout = os.Stdout
 			cmdClone.Stderr = os.Stderr
 
