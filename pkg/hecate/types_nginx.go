@@ -26,12 +26,6 @@ var (
 
 var nginxFragments []NginxFragment
 
-const StreamIncludeTemplate = `
-stream {
-    include /etc/nginx/conf.d/stream/*.conf;
-}
-`
-
 // NginxStreamBlock defines the config for one upstream + server block.
 type NginxStreamBlock struct {
 	BackendIP    string
