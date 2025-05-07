@@ -70,20 +70,16 @@ func CollateComposeFragmentsToString() string {
 	return strings.Join(dynamicParts, "\n\n")
 }
 
-// GetDockerNetworkSection returns the minimal default Docker network section.
-// TODO: Extend this dynamically based on enabled services if needed.
+// GetDockerNetworkSection returns the default Docker network section.
+// This function now reuses the centralized constant.
 func GetDockerNetworkSection() string {
-	return `
-  hecate-net:
-`
+	return DockerNetworkSection
 }
 
-// GetDockerVolumesSection returns the minimal default Docker volumes section.
-// TODO: Extend this dynamically based on enabled services if needed.
+// GetDockerVolumesSection returns the default Docker volumes section.
+// This function now reuses the centralized constant.
 func GetDockerVolumesSection() string {
-	return `
-  kc-db-data:
-`
+	return DockerVolumesSection
 }
 
 // GetDockerFooter combines the network and volumes sections into a single footer block.

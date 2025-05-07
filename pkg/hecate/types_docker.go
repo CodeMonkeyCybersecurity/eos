@@ -166,17 +166,24 @@ const DockerKeycloakService = `
       - hecate-net
 `
 
-const DockerNetworkSection = `
+// Centralized constants for Docker Compose sections
+const (
+	DockerNetworkName    = "hecate-net"
+	DockerVolumeKCDBName = "kc-db-data"
+
+	DockerNetworkSection = `
 
 networks:
-  hecate-net:
+  ` + DockerNetworkName + `:
 `
 
-const DockerVolumesSection = `
+	DockerVolumesSection = `
 
 volumes:
-  kc-db-data:
+  ` + DockerVolumeKCDBName + `:
 `
+)
+
 
 // ToFragment renders the ServiceSpec into a DockerComposeFragment.
 func (ss *ServiceSpec) ToFragment() (DockerComposeFragment, error) {
