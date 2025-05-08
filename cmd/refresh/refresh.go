@@ -13,7 +13,7 @@ var RefreshCmd = &cobra.Command{
 	Use:     "refresh",
 	Short:   "Refresh EOS system components (e.g., passwords, tokens)",
 	Long:    "Commands to refresh or reload EOS components safely and securely.",
-	Aliases: []string{"reload", "restart"},
+	Aliases: []string{"reload", "restart", "rescue"},
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("No subcommand provided for refresh command", zap.String("command", cmd.Use))
