@@ -60,7 +60,10 @@ else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
+sudo ln -sf /usr/local/go/bin/go /usr/bin/go
+sudo ln -sf /usr/local/go/bin/gofmt /usr/bin/gofmt
 sudo ln -sf /usr/local/bin/eos /usr/bin/eos
+
 
 # Show SHA256 checksum of the existing installed binary (if present)
 if [ -f "$INSTALL_PATH" ]; then
