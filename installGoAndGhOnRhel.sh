@@ -74,6 +74,12 @@ EOF
     go version
 fi
 
+# Symlink Go binary into /usr/bin to make sure it's available system-wide
+if [ ! -f /usr/bin/go ]; then
+    echo "➡️ Symlinking /usr/local/go/bin/go to /usr/bin/go for global access..."
+    ln -s /usr/local/go/bin/go /usr/bin/go
+fi
+
 # Step 2: Install gh if missing
 if ! command -v gh >/dev/null 2>&1; then
     echo "➡️ GitHub CLI (gh) not found. Installing via GitHub's official RPM repo..."
