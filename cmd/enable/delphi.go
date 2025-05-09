@@ -16,6 +16,8 @@ var EnableDelphiCmd = &cobra.Command{
 	Short: "Enable services and firewall rules for Delphi (Wazuh)",
 	Long: `Starts core Wazuh services and opens required ports in the firewall.
 This includes 443, 1514, 1515, and 55000.`,
+	Aliases: []string{"wazuh"},
+
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("🔐 Enabling Delphi firewall rules...")
