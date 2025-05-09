@@ -41,3 +41,17 @@ rm "go${GO_VERSION}.${OS}-${ARCH}.tar.gz"
 echo "➡️ Checking Go version ..."
 source "${PROFILE_FILE}"
 go version
+
+
+# Step 2: Install gh if missing
+if ! command -v gh >/dev/null 2>&1; then
+    echo "➡️ GitHub CLI (gh) not found. Installing via GitHub's official RPM repo..."
+    dnf install -y dnf-plugins-core
+    dnf config-manager --add-repo "$GH_REPO_URL"
+    dnf install -y gh
+else
+    echo "✅ gh is already installed: $(gh --version)"
+fi
+
+
+echo "✅ All done!"
