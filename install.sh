@@ -60,6 +60,8 @@ else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
+sudo ln -sf /usr/local/bin/eos /usr/bin/eos
+
 # Show SHA256 checksum of the existing installed binary (if present)
 if [ -f "$INSTALL_PATH" ]; then
   if command -v sha256sum >/dev/null 2>&1; then
