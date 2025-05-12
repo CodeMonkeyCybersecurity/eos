@@ -28,10 +28,12 @@ if [[ -z "$GO_PATH" ]]; then
     echo "   • If Go is installed for your user but not root, try:"
     echo "     sudo ln -s $(command -v go) /usr/local/bin/go"
     echo "   • If Go is not installed:"
+    echo "     cd ~"
     echo "     curl -LO https://go.dev/dl/go1.24.2.linux-amd64.tar.gz"
     echo "     sudo tar -C /usr/local -xzf go1.24.2.linux-amd64.tar.gz"
     echo "     export PATH=\"/usr/local/go/bin:\$PATH\""
-    echo "   • Then re-run: ./install.sh"
+    echo "     cd /opt/eos"
+    echo "   • Then re-run: sudo ./install.sh"
     exit 1
   fi
 fi
