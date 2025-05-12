@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -27,7 +29,7 @@ var (
 )
 
 func init() {
-	CreateCmd.AddCommand(SshKeyCmd) // Fixed: Use the top-level cobra command
+	CreateCmd.AddCommand(SshKeyCmd)
 	SshKeyCmd.Flags().StringVar(&nameOverride, "name", "", "Optional basename for SSH key")
 	SshKeyCmd.Flags().BoolVar(&printPrivate, "print-private", false, "Print private key to stdout")
 	SshKeyCmd.Flags().BoolVar(&diskFallback, "disk-fallback", false, "Write to /home/eos/.ssh if Vault unavailable")
@@ -78,16 +80,27 @@ var SshKeyCmd = &cobra.Command{
 		pubStr := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pubSSH)))
 		privPEM := encodePrivateKeyPEM(priv)
 
-		secretPath := fmt.Sprintf("pandora/%s", baseName)
+		// 🎯 NEW: Compute fingerprint
+		fp := fingerprintSHA256(pubSSH)
+
+		vaultPath := "pandora"
+		name := baseName
+		fullVaultPath := fmt.Sprintf("%s/%s", vaultPath, name)
+
 		secret := map[string]string{
 			"ssh-public":  pubStr,
 			"ssh-private": string(privPEM),
+			"fingerprint": fp, // 🎯 store fingerprint in Vault too
 		}
 
 		if useVault {
-			if err := vault.Write(client, secretPath, secret); err == nil {
-				logger.Info("🔑 SSH key written to Vault", zap.String("path", "secret/"+secretPath))
+			if err := vault.Write(client, fullVaultPath, secret); err == nil {
+				logger.Info("🔑 SSH key written to Vault",
+					zap.String("vaultPath", fullVaultPath),
+					zap.String("name", name),
+				)
 				logger.Info("📎 Public key", zap.String("pubkey", pubStr))
+				logger.Info("🔍 Fingerprint (SHA256)", zap.String("fingerprint", fp))
 				if printPrivate {
 					logger.Info("📜 Private key", zap.String("private", string(privPEM)))
 				}
@@ -119,6 +132,7 @@ var SshKeyCmd = &cobra.Command{
 
 		logger.Info("🔐 SSH key written to disk fallback", zap.String("path", privPath))
 		logger.Info("📎 Public key", zap.String("pubkey", pubStr))
+		logger.Info("🔍 Fingerprint (SHA256)", zap.String("fingerprint", fp))
 		if printPrivate {
 			logger.Info("📜 Private key", zap.String("private", string(privPEM)))
 		}
@@ -134,6 +148,11 @@ func encodePrivateKeyPEM(key ed25519.PrivateKey) []byte {
 	var buf bytes.Buffer
 	_ = pem.Encode(&buf, block)
 	return buf.Bytes()
+}
+
+func fingerprintSHA256(pub ssh.PublicKey) string {
+	hash := sha256.Sum256(pub.Marshal())
+	return fmt.Sprintf("SHA256:%s", base64.StdEncoding.EncodeToString(hash[:]))
 }
 
 func fileExists(path string) bool {
