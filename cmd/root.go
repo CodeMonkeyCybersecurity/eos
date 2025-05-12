@@ -5,6 +5,8 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"syscall"
+	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
@@ -83,6 +85,7 @@ func RegisterCommands() {
 func Execute() {
 
 	zap.L().Info("Eos CLI starting")
+	startGlobalWatchdog(3 * time.Minute)
 
 	RegisterCommands()
 
@@ -95,4 +98,15 @@ func Execute() {
 			os.Exit(1)
 		}
 	}
+}
+
+// cmd/root.go
+
+func startGlobalWatchdog(max time.Duration) {
+	go func() {
+		timer := time.NewTimer(max)
+		<-timer.C
+		fmt.Fprintf(os.Stderr, "💣 EOS watchdog: global timeout (%s) exceeded. Forcing shutdown.\n", max)
+		syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+	}()
 }
