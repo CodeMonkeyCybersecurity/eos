@@ -171,8 +171,14 @@ func PathExistsKVv2(client *api.Client, mount, path string) (bool, error) {
 	_, err := kv.Get(context.Background(), path)
 	if err != nil {
 		// HashiCorp’s SDK wraps a 404 into an *api.ResponseError with StatusCode 404
+		// KV-v2 returns a *api.ResponseError for 404, and sometimes an error containing
+		// "secret not found" if the metadata doesn’t exist—treat both as “not exists”
 		if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
-			zap.L().Debug("📭 Vault path not found", zap.String("mount", mount), zap.String("path", path))
+			zap.L().Debug("📭 Vault path not found (404)", zap.String("mount", mount), zap.String("path", path))
+			return false, nil
+		}
+		if strings.Contains(err.Error(), "secret not found") {
+			zap.L().Debug("📭 Vault path not found (legacy message)", zap.String("mount", mount), zap.String("path", path))
 			return false, nil
 		}
 		zap.L().Error("❌ Unexpected Vault error", zap.String("mount", mount), zap.String("path", path), zap.Error(err))

@@ -73,6 +73,9 @@ var SshKeyCmd = &cobra.Command{
 			}
 		}
 
+		chosen := fmt.Sprintf("%s/%s", mount, name)
+		zap.L().Info("🔍 Chosen Vault path for new SSH key", zap.String("path", chosen))
+
 		// Generate key
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
