@@ -11,76 +11,38 @@ import (
 const EosDefaultPolicyName = "eos-default-policy"
 
 const EosDefaultPolicyTemplate = `
+# Vault token and identity permissions
+path "auth/token/lookup-self" { capabilities = ["read"] }
+path "auth/token/renew-self" { capabilities = ["update"] }
+path "auth/token/revoke-self" { capabilities = ["update"] }
+path "sys/capabilities-self" { capabilities = ["update"] }
+path "identity/entity/id/{{"{{"}}identity.entity.id{{"}}"}}" { capabilities = ["read"] }
+path "identity/entity/name/{{"{{"}}identity.entity.name{{"}}"}}" { capabilities = ["read"] }
+path "sys/internal/ui/resultant-acl" { capabilities = ["read"] }
+path "sys/renew" { capabilities = ["update"] }
+path "sys/leases/renew" { capabilities = ["update"] }
+path "sys/leases/lookup" { capabilities = ["update"] }
 
-path "auth/token/lookup-self" {
-    capabilities = ["read"]
-}
-path "auth/token/renew-self" {
-    capabilities = ["update"]
-}
-path "auth/token/revoke-self" {
-    capabilities = ["update"]
-}
-path "sys/capabilities-self" {
-    capabilities = ["update"]
-}
-path "identity/entity/id/{{"{{"}}identity.entity.id{{"}}"}}" {
-    capabilities = ["read"]
-}
-path "identity/entity/name/{{"{{"}}identity.entity.name{{"}}"}}" {
-    capabilities = ["read"]
-}
-path "sys/internal/ui/resultant-acl" {
-    capabilities = ["read"]
-}
-path "sys/renew" {
-    capabilities = ["update"]
-}
-path "sys/leases/renew" {
-    capabilities = ["update"]
-}
-path "sys/leases/lookup" {
-    capabilities = ["update"]
-}
-path "cubbyhole/*" {
-    capabilities = ["create", "read", "update", "delete", "list"]
-}
-path "sys/wrapping/wrap" {
-    capabilities = ["update"]
-}
-path "sys/wrapping/lookup" {
-    capabilities = ["update"]
-}
-path "sys/wrapping/unwrap" {
-    capabilities = ["update"]
-}
-path "sys/tools/hash" {
-    capabilities = ["update"]
-}
-path "sys/tools/hash/*" {
-    capabilities = ["update"]
-}
-path "sys/control-group/request" {
-    capabilities = ["update"]
-}
-path "identity/oidc/provider/+/authorize" {
-    capabilities = ["read", "update"]
-}
-path "secret/users/*" {
-    capabilities = ["create", "read", "update", "delete", "list"]
-}
-path "secret/data/* {
-  capabilities = ["create", "update", "read", "delete", "list"]
-}
-path "secret/metadata/*" {
-    capabilities = ["read", "list"]
-}
-path "auth/userpass/users/*" {
-    capabilities = ["create", "read", "update", "delete", "list"]
-}
-path "auth/approle/role/*" {
-    capabilities = ["create", "read", "update", "delete", "list"]
-}
+# Cubbyhole and tools
+path "cubbyhole/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/wrapping/wrap" { capabilities = ["update"] }
+path "sys/wrapping/lookup" { capabilities = ["update"] }
+path "sys/wrapping/unwrap" { capabilities = ["update"] }
+path "sys/tools/hash" { capabilities = ["update"] }
+path "sys/tools/hash/*" { capabilities = ["update"] }
+path "sys/control-group/request" { capabilities = ["update"] }
+
+# OIDC authorize
+path "identity/oidc/provider/+/authorize" { capabilities = ["read", "update"] }
+
+# Secrets – dynamic KV mount path
+path "{{ .KVPath }}/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "{{ .KVPath }}/data/*" { capabilities = ["create", "update", "read", "delete", "list"] }
+path "{{ .KVPath }}/metadata/*" { capabilities = ["read", "list"] }
+
+# Auth methods
+path "auth/userpass/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "auth/approle/role/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 `
 
 func RenderEosPolicy(kvPath string) (string, error) {
