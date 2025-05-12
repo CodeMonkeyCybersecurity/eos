@@ -3,6 +3,7 @@
 package create
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -106,7 +107,19 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 		return err
 	}
 
-	return kvm.ProvisionKickstartTenantVM(ctx, vmName, pubKeyPath)
+	// Start ticker
+	ctxWithCancel, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	diskPath := filepath.Join(kvm.ImageDir, vmName+".qcow2")
+	go kvm.StartInstallStatusTicker(ctxWithCancel, log, vmName, diskPath)
+
+	// Run provisioning
+	err = kvm.ProvisionKickstartTenantVM(ctx, vmName, pubKeyPath)
+
+	// Stop ticker regardless of success
+	cancel()
+	return err
 }
 
 func getNextVMID() (string, error) {
