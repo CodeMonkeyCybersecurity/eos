@@ -135,6 +135,11 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 
 	// Try to detect IP address
 	ipAddr := waitForIP(vmName, 60*time.Second, log)
+	if ipAddr == "" {
+		mac := getMACFromDomiflist(vmName)
+		log.Info("📡 Falling back to DHCP lease lookup", zap.String("mac", mac))
+		ipAddr, _ = getIPFromDHCPLeases(mac)
+	}
 	sshUser := kvm.DefaultTenantUsername // e.g., "debugadmin"
 
 	log.Info("✅ VM provisioned",
@@ -158,6 +163,21 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 `, vmName, sshUser, ipAddr, kvm.SshKeyOverride, vmName)
 
 	return nil
+}
+
+func getMACFromDomiflist(vmName string) string {
+	out, err := exec.Command("virsh", "domiflist", vmName).Output()
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 5 && strings.Contains(fields[4], ":") {
+			return fields[4] // MAC address is in the 5th column
+		}
+	}
+	return ""
 }
 
 func getNextVMID() (string, error) {
@@ -224,6 +244,25 @@ func generateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 	return tempPath, nil
 }
 
+func getIPFromDHCPLeases(mac string) (string, error) {
+	out, err := exec.Command("virsh", "net-dhcp-leases", "default").Output()
+	if err != nil {
+		return "", err
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, mac) {
+			fields := strings.Fields(line)
+			for _, f := range fields {
+				if strings.Contains(f, "/") && strings.Contains(f, ".") {
+					return strings.Split(f, "/")[0], nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("IP not found in DHCP leases for MAC %s", mac)
+}
+
 func virtInstall(log *zap.Logger, vmName, ksPath, diskPath string) error {
 	log.Info("Starting virt-install", zap.String("ks", ksPath), zap.String("disk", diskPath))
 
@@ -238,6 +277,7 @@ func virtInstall(log *zap.Logger, vmName, ksPath, diskPath string) error {
 		"--initrd-inject", ksPath,
 		"--extra-args", "inst.ks=file:/"+filepath.Base(ksPath)+" console=ttyS0",
 		"--graphics", "none",
+		"--channel", "unix,mode=bind,target_type=virtio,name=org.qemu.guest_agent.0",
 	)
 
 	cmd.Stdout = os.Stdout

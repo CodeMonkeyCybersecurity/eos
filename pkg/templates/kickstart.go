@@ -18,7 +18,7 @@ autopart --type=lvm
 # ----------- Pre-Install (Dynamic hostname + DHCP) ----------
 %pre
 echo "# Network and hostname config" > /tmp/hostname.ks
-echo "network --bootproto=dhcp --device=link --activate" >> /tmp/hostname.ks
+echo "network --bootproto=dhcp --ipv6=auto --hostname={{ .VMName }} --device=eth0 --activate
 echo "network --hostname={{ .Hostname }}" >> /tmp/hostname.ks
 %end
 
