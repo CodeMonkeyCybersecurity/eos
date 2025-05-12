@@ -25,12 +25,13 @@ const (
 	VmBaseIDFile   = "/var/lib/libvirt/next_vm_id"
 )
 
-type TemplateContext struct {
-	SSHKey   string
-	VMName   string
-	Hostname string
-}
-
 var IsoPathOverride string
 
 const DefaultTenantUsername = "debugadmin"
+
+type KickstartTemplateData struct {
+	Username string
+	Password string
+	SSHKey   string
+	Hostname string
+}

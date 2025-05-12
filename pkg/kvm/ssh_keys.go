@@ -5,13 +5,11 @@ package kvm
 import (
 	"bytes"
 	"fmt"
-	"html/template"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
+	"text/template"
 )
 
 func PrepareTenantSSHKey(vmName string) (string, string, error) {
@@ -57,18 +55,26 @@ func GenerateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 		return "", fmt.Errorf("failed to read SSH key: %w", err)
 	}
 
-	tmpl, err := template.New("kickstart").Parse(templates.KickstartTemplate)
+	ctx := TemplateContext{
+		SSHKey:   strings.TrimSpace(string(key)),
+		VMName:   vmName,
+		Username: "debugadmin",
+		Password: "changeme123", // or generated
+		Hostname: vmName,
+		// TailscaleKey: "...", // optional
+	}
+
+	if err := ctx.Validate(); err != nil {
+		return "", fmt.Errorf("invalid template context: %w", err)
+	}
+
+	tmpl, err := template.New("kickstart").Parse(KickstartTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, TemplateContext{
-		SSHKey:   strings.TrimSpace(string(key)),
-		VMName:   vmName,
-		Hostname: vmName,
-	})
-	if err != nil {
+	if err := tmpl.Execute(&buf, ctx); err != nil {
 		return "", fmt.Errorf("failed to render kickstart: %w", err)
 	}
 
@@ -76,5 +82,6 @@ func GenerateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 	if err := os.WriteFile(tempPath, buf.Bytes(), 0644); err != nil {
 		return "", err
 	}
+
 	return tempPath, nil
 }
