@@ -20,24 +20,55 @@ func ProvisionKickstartTenantVM(ctx *eosio.RuntimeContext, vmName, pubKeyPath st
 
 	ksPath, err := GenerateKickstartWithSSH(vmName, pubKeyPath)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate kickstart: %w", err)
 	}
 	defer os.Remove(ksPath)
+	log.Info("🟡 Kickstart file generated", zap.String("path", ksPath))
 
 	if err := virtInstall(log, vmName, ksPath, diskPath); err != nil {
-		return err
+		return fmt.Errorf("virt-install failed: %w", err)
+	}
+	log.Info("🟡 virt-install finished; checking post-install VM status")
+
+	if err := ensureDomainRunning(vmName, log); err != nil {
+		log.Warn("⚠️ VM not running post-install", zap.Error(err))
 	}
 
 	ipAddr := waitForIP(vmName, 60*time.Second, log)
 	if ipAddr == "" || ipAddr == "unknown" {
+		log.Warn("⚠️ IP not found via qemu-agent; falling back to DHCP lease")
 		if mac := getMACFromDomiflist(vmName); mac != "" {
 			if fallbackIP, _ := getIPFromDHCPLeases(mac); fallbackIP != "" {
 				ipAddr = fallbackIP
+				log.Info("🔁 Found fallback DHCP IP", zap.String("ip", ipAddr))
 			}
 		}
 	}
 
-	log.Info("✅ VM provisioned", zap.String("vm", vmName), zap.String("ip", ipAddr))
+	if ipAddr == "unknown" {
+		log.Warn("⚠️ Provisioning finished but no IP could be determined")
+	} else {
+		log.Info("✅ Provisioning complete", zap.String("ip", ipAddr))
+	}
+
+	return nil
+}
+
+func ensureDomainRunning(vmName string, log *zap.Logger) error {
+	out, err := exec.Command("virsh", "domstate", vmName).Output()
+	if err != nil {
+		return fmt.Errorf("could not determine domain state: %w", err)
+	}
+	state := strings.TrimSpace(string(out))
+	log.Info("🔍 VM current state", zap.String("state", state))
+
+	if state == "shut off" {
+		log.Info("🔁 VM shut off — restarting manually")
+		if err := exec.Command("virsh", "start", vmName).Run(); err != nil {
+			return fmt.Errorf("failed to restart domain: %w", err)
+		}
+		log.Info("✅ VM restarted")
+	}
 	return nil
 }
 
