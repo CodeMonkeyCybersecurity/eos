@@ -41,7 +41,7 @@ var SshKeyCmd = &cobra.Command{
 		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
 		// our KV-v2 mount + base directory
 		const mount = "secret"
-		const baseDir = "eos/pandora"
+		const baseDir = "pandora"
 		const leafBase = "ssh-key"
 
 		// vaultPath (directory) is fixed:
