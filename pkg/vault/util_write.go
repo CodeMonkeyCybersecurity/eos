@@ -220,3 +220,25 @@ func WriteTestDataToVaultOrFallback(client *api.Client, data map[string]interfac
 func WriteUserpassPasswordToVault(client *api.Client, password string) error {
 	return WriteKVv2(client, shared.VaultSecretMount, shared.UserpassKVPath, shared.FallbackSecretsTemplate(password))
 }
+
+func WriteSSHKey(client *api.Client, basePath string, pub string, priv string, fingerprint string) error {
+	zap.L().Info("🔧 Preparing SSH key write to Vault",
+		zap.String("path", basePath),
+		zap.String("fingerprint", fingerprint),
+	)
+
+	data := map[string]string{
+		"ssh-public":  pub,
+		"ssh-private": priv,
+		"fingerprint": fingerprint,
+	}
+
+	err := Write(client, basePath, data)
+	if err != nil {
+		zap.L().Error("❌ Failed to write SSH key to Vault", zap.String("path", basePath), zap.Error(err))
+		return err
+	}
+
+	zap.L().Info("✅ SSH key successfully written to Vault", zap.String("path", basePath))
+	return nil
+}

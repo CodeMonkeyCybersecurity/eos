@@ -87,26 +87,16 @@ var SshKeyCmd = &cobra.Command{
 		name := baseName
 		fullVaultPath := fmt.Sprintf("%s/%s", vaultPath, name)
 
-		secret := map[string]string{
-			"ssh-public":  pubStr,
-			"ssh-private": string(privPEM),
-			"fingerprint": fp, // 🎯 store fingerprint in Vault too
-		}
-
 		if useVault {
-			if err := vault.Write(client, fullVaultPath, secret); err == nil {
-				logger.Info("🔑 SSH key written to Vault",
-					zap.String("vaultPath", fullVaultPath),
-					zap.String("name", name),
+			if err := vault.WriteSSHKey(client, fullVaultPath, pubStr, string(privPEM), fp); err == nil {
+				logger.Info("🔐 SSH key written to Vault",
+					zap.String("kv_path", fmt.Sprintf("secret/data/%s", fullVaultPath)),
+					zap.String("lookup_cmd", fmt.Sprintf("vault kv get secret/%s", fullVaultPath)),
+					zap.String("field_cmd", fmt.Sprintf("vault kv get -field=ssh-public secret/%s", fullVaultPath)),
+					zap.String("fingerprint", fp),
 				)
-				logger.Info("📎 Public key", zap.String("pubkey", pubStr))
-				logger.Info("🔍 Fingerprint (SHA256)", zap.String("fingerprint", fp))
-				if printPrivate {
-					logger.Info("📜 Private key", zap.String("private", string(privPEM)))
-				}
 				return nil
 			}
-			logger.Warn("⚠️ Vault write failed", zap.Error(err))
 		}
 
 		if !diskFallback {
