@@ -159,59 +159,57 @@ func EnsureVaultReady() (*api.Client, error) {
 	return client, nil
 }
 
-// CheckVaultPathExists checks if a given path exists in Vault KV.
-// It returns true if the path exists, false if not found, or an error for other issues.
-func CheckVaultPathExists(client *api.Client, path string) (bool, error) {
+// PathExistsKVv2 returns true if a KVv2 secret exists at mount/path, false if 404,
+// or an error for anything else.
+func PathExistsKVv2(client *api.Client, mount, path string) (bool, error) {
 	if client == nil {
 		return false, fmt.Errorf("vault client is nil")
 	}
+	kv := client.KVv2(mount)
 
-	cleanPath := strings.TrimPrefix(path, "secret/data/")
-	fullPath := fmt.Sprintf("secret/metadata/%s", cleanPath)
-
-	zap.L().Debug("🔍 Checking if Vault path exists", zap.String("metadata_path", fullPath))
-
-	_, err := client.Logical().Read(fullPath)
+	// Try to read; if 404, it doesn’t exist.
+	_, err := kv.Get(context.Background(), path)
 	if err != nil {
-		if strings.Contains(err.Error(), "permission denied") {
-			zap.L().Warn("🚫 Permission denied when checking Vault path", zap.String("path", fullPath))
-			return false, fmt.Errorf("permission denied for Vault path: %s", fullPath)
-		}
-		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "not found") {
-			zap.L().Debug("📭 Vault path not found", zap.String("path", fullPath))
+		// HashiCorp’s SDK wraps a 404 into an *api.ResponseError with StatusCode 404
+		if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
+			zap.L().Debug("📭 Vault path not found", zap.String("mount", mount), zap.String("path", path))
 			return false, nil
 		}
-		zap.L().Error("❌ Unexpected Vault error", zap.String("path", fullPath), zap.Error(err))
+		zap.L().Error("❌ Unexpected Vault error", zap.String("mount", mount), zap.String("path", path), zap.Error(err))
 		return false, err
 	}
 
-	zap.L().Debug("✅ Vault path exists", zap.String("path", fullPath))
+	zap.L().Debug("✅ Vault path exists", zap.String("mount", mount), zap.String("path", path))
 	return true, nil
 }
 
-// FindNextAvailableVaultPath takes a base path and appends -001, -002, ... until it finds a path that doesn't exist.
-func FindNextAvailableVaultPath(basePath string, checkFunc func(path string) (bool, error)) (string, error) {
-	// First, try the base path itself
-	exists, err := checkFunc(basePath)
+// FindNextAvailableKVv2Path takes a KVv2 mount (e.g. "secret") and a base path
+// (e.g. "eos/pandora/ssh-key") and returns the first non‐existent suffix.
+func FindNextAvailableKVv2Path(
+	client *api.Client,
+	mount string,
+	basePath string,
+	existsFn func(client *api.Client, mount, path string) (bool, error),
+) (string, error) {
+	// try basePath
+	ok, err := existsFn(client, mount, basePath)
 	if err != nil {
-		return "", fmt.Errorf("checking base Vault path: %w", err)
+		return "", fmt.Errorf("checking %s/%s: %w", mount, basePath, err)
 	}
-	if !exists {
+	if !ok {
 		return basePath, nil
 	}
 
-	// Try incrementing: basePath-001, basePath-002, etc.
 	for i := 1; i < 1000; i++ {
-		suffix := fmt.Sprintf("-%03d", i)
-		candidate := basePath + suffix
-		exists, err := checkFunc(candidate)
+		candidate := fmt.Sprintf("%s-%03d", basePath, i)
+		ok, err := existsFn(client, mount, candidate)
 		if err != nil {
-			return "", fmt.Errorf("checking candidate Vault path %q: %w", candidate, err)
+			return "", fmt.Errorf("checking %s/%s: %w", mount, candidate, err)
 		}
-		if !exists {
+		if !ok {
 			return candidate, nil
 		}
 	}
 
-	return "", fmt.Errorf("no available Vault path found for base %q after 999 attempts", basePath)
+	return "", fmt.Errorf("no available secret path under %s/%s after 999 attempts", mount, basePath)
 }

@@ -39,7 +39,10 @@ var SshKeyCmd = &cobra.Command{
 	Short: "Create and store an SSH key securely",
 	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
-		vaultPath := "eos/pandora"
+		// our KV-v2 mount + base path
+		const mount = "secret"
+		const baseKey = "eos/pandora/ssh-key"
+		vaultPath := baseKey
 
 		// Determine base name for key
 		name := nameOverride
@@ -48,32 +51,25 @@ var SshKeyCmd = &cobra.Command{
 			return fmt.Errorf("invalid --name: only alphanumeric, dashes, and underscores allowed")
 		}
 
+		// Authenticate to Vault
 		client, err := vault.Auth()
-		useVault := err == nil
+		// declare a local flag
+		useVault := (err == nil)
+		if !useVault {
+			zap.L().Warn("Vault unavailable — will fallback to disk", zap.Error(err))
+		}
 
-		// If name is not provided, or path exists, find next available name
+		// if Vault is up, pick the first free suffix
 		if useVault {
-			checkFn := func(path string) (bool, error) {
-				return vault.CheckVaultPathExists(client, path)
-			}
-
-			if name == "" {
-				name, err = vault.FindNextAvailableVaultPath(vaultPath, checkFn)
-				if err != nil {
-					zap.L().Error("Could not find available Vault path", zap.Error(err))
-					return fmt.Errorf("could not find available Vault path: %w", err)
-				}
-			} else {
-				fullVaultPath := fmt.Sprintf("%s/%s", vaultPath, name)
-				exists, err := checkFn(fullVaultPath)
-				if err != nil {
-					zap.L().Error("Vault path check failed", zap.String("path", fullVaultPath), zap.Error(err))
-					return fmt.Errorf("vault path check failed: %w", err)
-				}
-				if exists {
-					zap.L().Warn("Vault path already exists", zap.String("path", fullVaultPath))
-					return fmt.Errorf("vault path already exists")
-				}
+			name, err = vault.FindNextAvailableKVv2Path(
+				client,
+				mount,
+				baseKey,
+				vault.PathExistsKVv2,
+			)
+			if err != nil {
+				zap.L().Error("no available Vault path", zap.Error(err))
+				return err
 			}
 		}
 
