@@ -25,19 +25,15 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		eosio.LogRuntimeExecutionContext()
 
-		const timeout = 3 * time.Minute
 		start := time.Now()
-
-		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), timeout)
-		defer cancel()
 
 		ctx := &eosio.RuntimeContext{
 			Log:       log,
-			Ctx:       ctxWithTimeout,
-			Timestamp: time.Now(),
+			Ctx:       context.Background(), // no internal timeout now
+			Timestamp: start,
 		}
 
-		log.Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp), zap.Duration("timeout", timeout))
+		log.Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp))
 
 		addr, addrErr := vault.EnsureVaultEnv()
 		if addrErr != nil {
