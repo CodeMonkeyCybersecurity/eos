@@ -16,9 +16,15 @@ var enableBridge bool
 
 var CreateKvmCmd = &cobra.Command{
 	Use:   "kvm",
-	Short: "Install and configure KVM and libvirt",
-	Long: `Installs KVM, ensures libvirtd is running, sets ACLs for an ISO directory,
-and optionally autostarts the default libvirt network.`,
+	Short: "Install or provision KVM-based virtual machines",
+	Long: `Manage KVM installation and tenant provisioning.
+
+This command can install KVM and libvirt, or provision tenant VMs using Kickstart or cloud-init.
+
+Subcommands:
+  install        Set up KVM and networking
+  tenant         Provision a new tenant VM under KVM
+`,
 	RunE: eos.Wrap(runDeployKVM),
 }
 
