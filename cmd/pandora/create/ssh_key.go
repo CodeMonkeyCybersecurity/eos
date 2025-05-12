@@ -64,12 +64,7 @@ var SshKeyCmd = &cobra.Command{
 		// if Vault is up, pick the first free suffix
 		if useVault {
 			// find the first free leaf under "eos/pandora"
-			leaf, err := vault.FindNextAvailableKVv2Path(
-				client,
-				mount,
-				fmt.Sprintf("%s/%s", baseDir, leafBase),
-				vault.PathExistsKVv2,
-			)
+			leaf, err := vault.FindNextAvailableKVv2Path(client, mount, baseDir, leafBase)
 			if err != nil {
 				zap.L().Error("no available Vault path", zap.Error(err))
 				return err

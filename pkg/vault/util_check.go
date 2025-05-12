@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/vault/api"
@@ -159,68 +161,111 @@ func EnsureVaultReady() (*api.Client, error) {
 	return client, nil
 }
 
-// PathExistsKVv2 returns true if a KVv2 secret exists at mount/path,
-// false if vault returns 404 or “not found,” or an error for anything else.
+// PathExistsKVv2 returns true if the KV-v2 metadata exists at mount/path,
+// false if Vault reports a 404, or an error otherwise.
 func PathExistsKVv2(client *api.Client, mount, path string) (bool, error) {
 	if client == nil {
 		return false, fmt.Errorf("vault client is nil")
 	}
 
-	// Build the metadata URI: e.g. "secret/metadata/foo/bar"
-	metaPath := fmt.Sprintf("%s/metadata/%s", mount, path)
-	resp, err := client.Logical().Read(metaPath)
+	// Use the GetMetadata helper (KVv2.GetMetadata) so we never read secret data.
+	ctx := context.Background()
+	md, err := client.KVv2(mount).GetMetadata(ctx, path)
 	if err != nil {
-		// If the SDK wrapped a 404, treat as “doesn't exist”
+		// 404 from the server → path does not exist
 		if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
-			zap.L().Debug("📭 Vault metadata not found", zap.String("mount", mount), zap.String("path", path))
+			zap.L().Debug("📭 Vault KV-v2 metadata not found",
+				zap.String("mount", mount),
+				zap.String("path", path),
+			)
 			return false, nil
 		}
-		// Some servers return plain-text "secret not found"
-		if strings.Contains(err.Error(), "not found") {
-			zap.L().Debug("📭 Vault metadata not found (legacy)", zap.String("mount", mount), zap.String("path", path))
+		// Some backends may return plain-text errors containing "not found"
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "404") {
+			zap.L().Debug("📭 Vault KV-v2 metadata not found (text match)",
+				zap.String("mount", mount),
+				zap.String("path", path),
+			)
 			return false, nil
 		}
-		zap.L().Error("❌ Unexpected error checking Vault metadata", zap.String("mount", mount), zap.String("path", path), zap.Error(err))
+		// Anything else is unexpected
+		zap.L().Error("❌ Unexpected error checking KV-v2 metadata",
+			zap.String("mount", mount),
+			zap.String("path", path),
+			zap.Error(err),
+		)
 		return false, err
 	}
 
-	// A nil resp.Data can also mean "not found" in some versions
-	if resp == nil || resp.Data == nil {
-		zap.L().Debug("📭 Vault metadata not found (nil response)", zap.String("mount", mount), zap.String("path", path))
+	if md == nil {
+		// no metadata → treat as not existing
 		return false, nil
 	}
 
-	zap.L().Debug("✅ Vault metadata exists", zap.String("mount", mount), zap.String("path", path))
+	zap.L().Debug("✅ Vault KV-v2 metadata exists",
+		zap.String("mount", mount),
+		zap.String("path", path),
+	)
 	return true, nil
 }
 
-// FindNextAvailableKVv2Path loops basePath, basePath-001, etc., until it finds one
-// that PathExistsKVv2 reports as “false.”
+// FindNextAvailableKVv2Path returns the first path under baseDir of the form
+//
+//	baseDir/leafBase, baseDir/leafBase-001, baseDir/leafBase-002, ...
+//
+// whose metadata does *not* yet exist in the KV-v2 engine mounted at 'mount'.
 func FindNextAvailableKVv2Path(
 	client *api.Client,
-	mount, basePath string,
-	existsFn func(*api.Client, string, string) (bool, error),
+	mount, baseDir, leafBase string,
 ) (string, error) {
-	// Try the base path itself
-	ok, err := existsFn(client, mount, basePath)
+	ctx := context.Background()
+
+	// 1️⃣ List the existing entries under baseDir via the KV-v2 metadata endpoint
+	listPath := fmt.Sprintf("%s/metadata/%s", mount, baseDir)
+	sec, err := client.Logical().ListWithContext(ctx, listPath)
 	if err != nil {
-		return "", fmt.Errorf("checking %s/metadata/%s: %w", mount, basePath, err)
+		// 404 → nothing there yet, just use the base leaf
+		if respErr, ok := err.(*api.ResponseError); ok && respErr.StatusCode == 404 {
+			return fmt.Sprintf("%s/%s", baseDir, leafBase), nil
+		}
+		return "", fmt.Errorf("listing KV-v2 metadata at %s: %w", listPath, err)
 	}
-	if !ok {
-		return basePath, nil
+	if sec == nil || sec.Data == nil {
+		// no data → same as 404
+		return fmt.Sprintf("%s/%s", baseDir, leafBase), nil
 	}
 
-	// Otherwise try basePath-001 ... -999
-	for i := 1; i < 1000; i++ {
-		cand := fmt.Sprintf("%s-%03d", basePath, i)
-		ok, err := existsFn(client, mount, cand)
-		if err != nil {
-			return "", fmt.Errorf("checking %s/metadata/%s: %w", mount, cand, err)
-		}
-		if !ok {
-			return cand, nil
+	// 2️⃣ Extract the "keys" array
+	rawKeys, _ := sec.Data["keys"].([]interface{})
+	if len(rawKeys) == 0 {
+		return fmt.Sprintf("%s/%s", baseDir, leafBase), nil
+	}
+
+	// 3️⃣ Scan for the highest numeric suffix
+	maxIdx := -1
+	pattern := regexp.MustCompile(fmt.Sprintf(`^%s-(\d{3})$`, regexp.QuoteMeta(leafBase)))
+	for _, v := range rawKeys {
+		name := fmt.Sprintf("%v", v)
+		switch {
+		case name == leafBase:
+			if maxIdx < 0 {
+				maxIdx = 0
+			}
+		case pattern.MatchString(name):
+			parts := pattern.FindStringSubmatch(name)
+			if idx, err := strconv.Atoi(parts[1]); err == nil && idx > maxIdx {
+				maxIdx = idx
+			}
 		}
 	}
 
-	return "", fmt.Errorf("no available secret path under %s/%s after 999 attempts", mount, basePath)
+	// 4️⃣ Next suffix
+	nextIdx := maxIdx + 1
+	var nextLeaf string
+	if nextIdx == 0 {
+		nextLeaf = leafBase
+	} else {
+		nextLeaf = fmt.Sprintf("%s-%03d", leafBase, nextIdx)
+	}
+	return fmt.Sprintf("%s/%s", baseDir, nextLeaf), nil
 }
