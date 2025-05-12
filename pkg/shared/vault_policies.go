@@ -69,11 +69,11 @@ path "identity/oidc/provider/+/authorize" {
 path "secret/users/*" {
     capabilities = ["create", "read", "update", "delete", "list"]
 }
-path "secret/data/*" {
+path "secret/data/* {
   capabilities = ["create", "update", "read", "delete", "list"]
 }
 path "secret/metadata/*" {
-    capabilities = ["list"]
+    capabilities = ["read", "list"]
 }
 path "auth/userpass/users/*" {
     capabilities = ["create", "read", "update", "delete", "list"]
