@@ -39,11 +39,13 @@ var SshKeyCmd = &cobra.Command{
 	Short: "Create and store an SSH key securely",
 	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
-		// our KV-v2 mount + base path
+		// our KV-v2 mount + base directory
 		const mount = "secret"
-		const baseKey = "eos/pandora/ssh-key"
-		vaultPath := baseKey
+		const baseDir = "eos/pandora"
+		const leafBase = "ssh-key"
 
+		// vaultPath (directory) is fixed:
+		vaultDir := baseDir
 		// Determine base name for key
 		name := nameOverride
 		if name != "" && !isSafeName(name) {
@@ -61,19 +63,23 @@ var SshKeyCmd = &cobra.Command{
 
 		// if Vault is up, pick the first free suffix
 		if useVault {
-			name, err = vault.FindNextAvailableKVv2Path(
+			// find the first free leaf under "eos/pandora"
+			leaf, err := vault.FindNextAvailableKVv2Path(
 				client,
 				mount,
-				baseKey,
+				fmt.Sprintf("%s/%s", baseDir, leafBase),
 				vault.PathExistsKVv2,
 			)
 			if err != nil {
 				zap.L().Error("no available Vault path", zap.Error(err))
 				return err
 			}
+			// leaf == "eos/pandora/ssh-key" or ".../ssh-key-001"
+			// extract just the final segment
+			name = filepath.Base(leaf)
 		}
 
-		chosen := fmt.Sprintf("%s/%s", mount, name)
+		chosen := fmt.Sprintf("%s/%s", vaultDir, name)
 		zap.L().Info("🔍 Chosen Vault path for new SSH key", zap.String("path", chosen))
 
 		// Generate key
@@ -90,7 +96,7 @@ var SshKeyCmd = &cobra.Command{
 		privPEM := encodePrivateKeyPEM(priv)
 		fingerprint := fingerprintSHA256(pubSSH)
 
-		fullVaultPath := fmt.Sprintf("%s/%s", vaultPath, name)
+		fullVaultPath := fmt.Sprintf("%s/%s", vaultDir, name)
 
 		// Vault Write
 		if useVault {
