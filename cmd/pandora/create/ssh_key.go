@@ -12,6 +12,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -25,25 +27,30 @@ var (
 )
 
 func init() {
-	CreateCmd.AddCommand(sshKeyCmd) // Fixed: Use the top-level cobra command
-	sshKeyCmd.Flags().StringVar(&nameOverride, "name", "", "Optional basename for SSH key")
-	sshKeyCmd.Flags().BoolVar(&printPrivate, "print-private", false, "Print private key to stdout")
-	sshKeyCmd.Flags().BoolVar(&diskFallback, "disk-fallback", false, "Write to /home/eos/.ssh if Vault unavailable")
+	CreateCmd.AddCommand(SshKeyCmd) // Fixed: Use the top-level cobra command
+	SshKeyCmd.Flags().StringVar(&nameOverride, "name", "", "Optional basename for SSH key")
+	SshKeyCmd.Flags().BoolVar(&printPrivate, "print-private", false, "Print private key to stdout")
+	SshKeyCmd.Flags().BoolVar(&diskFallback, "disk-fallback", false, "Write to /home/eos/.ssh if Vault unavailable")
 }
 
-var sshKeyCmd = &cobra.Command{
+var SshKeyCmd = &cobra.Command{
 	Use:   "ssh-key",
 	Short: "Create and store an SSH key securely",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		keyDir := "/home/eos/.ssh" // Or replace with shared.EosUserHome() if available
+	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := zap.L()
+		keyDir := "/home/eos/.ssh" // TODO: Replace with shared.EosUserHome() if standardized
 		baseName := nameOverride
 
 		if baseName != "" && !isSafeName(baseName) {
-			return fmt.Errorf("invalid --name: only alphanumeric, dashes, and underscores allowed")
+			logger.Error("Invalid --name: only alphanumeric, dashes, and underscores allowed", zap.String("name", baseName))
+			return errors.New("invalid --name")
 		}
 
 		client, err := vault.Auth()
 		useVault := (err == nil)
+		if !useVault {
+			logger.Warn("Vault unavailable", zap.Error(err))
+		}
 
 		if baseName == "" {
 			for i := 1; ; i++ {
@@ -58,12 +65,14 @@ var sshKeyCmd = &cobra.Command{
 
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
-			return fmt.Errorf("generate key: %w", err)
+			logger.Error("Failed to generate SSH key", zap.Error(err))
+			return err
 		}
 
 		pubSSH, err := ssh.NewPublicKey(pub)
 		if err != nil {
-			return fmt.Errorf("encode public key: %w", err)
+			logger.Error("Failed to encode public key", zap.Error(err))
+			return err
 		}
 
 		pubStr := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pubSSH)))
@@ -77,38 +86,44 @@ var sshKeyCmd = &cobra.Command{
 
 		if useVault {
 			if err := vault.Write(client, secretPath, secret); err == nil {
-				zap.L().Info("🔑 SSH key written to Vault", zap.String("path", "secret/"+secretPath))
-				zap.L().Info("📎 Public key", zap.String("pubkey", pubStr))
+				logger.Info("🔑 SSH key written to Vault", zap.String("path", "secret/"+secretPath))
+				logger.Info("📎 Public key", zap.String("pubkey", pubStr))
 				if printPrivate {
-					fmt.Print(string(privPEM))
+					logger.Info("📜 Private key", zap.String("private", string(privPEM)))
 				}
 				return nil
 			}
-			zap.L().Warn("⚠️ Vault write failed", zap.Error(err))
+			logger.Warn("⚠️ Vault write failed", zap.Error(err))
 		}
 
 		if !diskFallback {
-			return errors.New("vault unavailable and --disk-fallback not set")
+			logger.Error("Vault write failed and --disk-fallback not set")
+			return errors.New("vault write failed and no fallback permitted")
 		}
 
 		pubPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s.pub", baseName))
 		privPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s", baseName))
+
 		if err := os.MkdirAll(keyDir, 0700); err != nil {
-			return fmt.Errorf("create key dir: %w", err)
+			logger.Error("Failed to create key directory", zap.String("path", keyDir), zap.Error(err))
+			return err
 		}
 		if err := os.WriteFile(pubPath, []byte(pubStr), 0644); err != nil {
-			return fmt.Errorf("write pub: %w", err)
+			logger.Error("Failed to write public key", zap.String("path", pubPath), zap.Error(err))
+			return err
 		}
 		if err := os.WriteFile(privPath, privPEM, 0600); err != nil {
-			return fmt.Errorf("write priv: %w", err)
+			logger.Error("Failed to write private key", zap.String("path", privPath), zap.Error(err))
+			return err
 		}
-		zap.L().Info("🔐 SSH key written to disk fallback", zap.String("path", privPath))
-		zap.L().Info("📎 Public key", zap.String("pubkey", pubStr))
+
+		logger.Info("🔐 SSH key written to disk fallback", zap.String("path", privPath))
+		logger.Info("📎 Public key", zap.String("pubkey", pubStr))
 		if printPrivate {
-			fmt.Print(string(privPEM))
+			logger.Info("📜 Private key", zap.String("private", string(privPEM)))
 		}
 		return nil
-	},
+	}),
 }
 
 func encodePrivateKeyPEM(key ed25519.PrivateKey) []byte {
