@@ -1,6 +1,6 @@
-// pkg/system/kvmbridge.go
+// pkg/kvm/kvmbridge.go
 
-package system
+package kvm
 
 import (
 	"fmt"

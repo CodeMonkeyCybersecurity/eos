@@ -14,6 +14,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -248,13 +249,17 @@ func virtInstall(log *zap.Logger, vmName, ksPath, diskPath string) error {
 
 func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	log := ctx.Log.Named("kvm.cloudinit")
-	log.Warn("cloud-init mode is not yet implemented")
 
-	// TODO:
-	// - Generate cloud-init `user-data` and `meta-data`
-	// - Create ISO or seed.img using genisoimage or cloud-localds
-	// - Inject via --disk or --cdrom into virt-install
-	// - Run virt-install with Ubuntu cloud image as base disk
+	cfg := kvm.CloudInitConfig{
+		VMName:    vmName,
+		CloudImg:  "/srv/iso/ubuntu-22.04-server-cloudimg-amd64.img",
+		PublicKey: sshKeyOverride, // use --ssh-key override path
+	}
 
-	return fmt.Errorf("cloud-init provisioning is not yet implemented — use --distro centos-stream9 instead")
+	if err := kvm.ProvisionCloudInitVM(log, cfg); err != nil {
+		return err
+	}
+
+	log.Info("💡 TODO: virt-install the VM using cloud image + seed.img")
+	return fmt.Errorf("virt-install not yet implemented")
 }
