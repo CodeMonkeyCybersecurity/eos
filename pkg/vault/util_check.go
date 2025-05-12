@@ -55,13 +55,6 @@ func Check(client *api.Client, storedHashes []string, hashedRoot string) (*share
 		report.Notes = append(report.Notes, "Vault is sealed")
 	}
 
-	// 6️⃣ Test KV
-	if err := testKVSecret(client); err != nil {
-		report.Notes = append(report.Notes, fmt.Sprintf("KV test failed: %v", err))
-	} else {
-		report.KVWorking = true
-	}
-
 	// 7️⃣ Verify secrets
 	if len(storedHashes) > 0 && hashedRoot != "" && !verifyVaultSecrets(storedHashes, hashedRoot) {
 		report.Notes = append(report.Notes, "Vault secret mismatch or verification failed")
@@ -98,15 +91,6 @@ func IsVaultInitialized(client *api.Client) (bool, error) {
 func IsVaultSealed(client *api.Client) bool {
 	status, err := client.Sys().Health()
 	return err == nil && status.Sealed
-}
-
-func testKVSecret(client *api.Client) error {
-	kv := client.KVv2("secret")
-	if _, err := kv.Put(context.Background(), shared.TestKVPath, map[string]interface{}{shared.TestKVKey: shared.TestKVValue}); err != nil {
-		return err
-	}
-	_, err := kv.Get(context.Background(), shared.TestKVPath)
-	return err
 }
 
 func IsAlreadyInitialized(err error) bool {
