@@ -95,7 +95,17 @@ var SshKeyCmd = &cobra.Command{
 
 		// Vault Write
 		if useVault {
-			if err := vault.WriteSSHKey(client, fullVaultPath, pubStr, string(privPEM), fingerprint); err == nil {
+			// Extract a real context.Context from your RuntimeContext:
+			vctx := ctx.Ctx
+			if err := vault.WriteSSHKey(
+				vctx,
+				client,
+				mount, // must supply the KV-v2 mount
+				fullVaultPath,
+				pubStr,
+				string(privPEM),
+				fingerprint,
+			); err == nil {
 				zap.L().Info("🔐 SSH key written to Vault",
 					zap.String("path", fullVaultPath),
 					zap.String("fingerprint", fingerprint),

@@ -221,24 +221,45 @@ func WriteUserpassPasswordToVault(client *api.Client, password string) error {
 	return WriteKVv2(client, shared.VaultSecretMount, shared.UserpassKVPath, shared.FallbackSecretsTemplate(password))
 }
 
-func WriteSSHKey(client *api.Client, basePath string, pub string, priv string, fingerprint string) error {
-	zap.L().Info("🔧 Preparing SSH key write to Vault",
-		zap.String("path", basePath),
-		zap.String("fingerprint", fingerprint),
+// WriteSSHKey stores an SSH key pair in Vault KV-v2 and
+// attaches the fingerprint as custom metadata (v1.16.0 client).
+func WriteSSHKey(
+	ctx context.Context,
+	client *api.Client,
+	mount, path, pub, priv, fingerprint string,
+) error {
+	if client == nil {
+		return fmt.Errorf("vault client is nil")
+	}
+
+	kv := client.KVv2(mount)
+
+	// 1️⃣ Write public/private key data
+	if _, err := kv.Put(ctx, path, map[string]interface{}{
+		"ssh_public":  pub,
+		"ssh_private": priv,
+	}); err != nil {
+		return fmt.Errorf("failed to write SSH key data at %s/%s: %w",
+			mount, path, err)
+	}
+	zap.L().Info("✅ SSH key data written",
+		zap.String("mount", mount), zap.String("path", path),
 	)
 
-	data := map[string]string{
-		"ssh-public":  pub,
-		"ssh-private": priv,
-		"fingerprint": fingerprint,
-	}
-
-	err := Write(client, basePath, data)
+	// 2️⃣ Write fingerprint into metadata via the logical client
+	metaPath := fmt.Sprintf("%s/metadata/%s", mount, path)
+	_, err := client.Logical().Write(metaPath, map[string]interface{}{
+		"custom_metadata": map[string]string{
+			"fingerprint": fingerprint,
+		},
+	})
 	if err != nil {
-		zap.L().Error("❌ Failed to write SSH key to Vault", zap.String("path", basePath), zap.Error(err))
-		return err
+		return fmt.Errorf("failed to write SSH fingerprint metadata at %s/%s: %w",
+			mount, path, err)
 	}
+	zap.L().Info("✅ SSH fingerprint metadata written",
+		zap.String("mount", mount), zap.String("path", metaPath),
+	)
 
-	zap.L().Info("✅ SSH key successfully written to Vault", zap.String("path", basePath))
 	return nil
 }
