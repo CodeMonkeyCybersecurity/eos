@@ -63,3 +63,30 @@ type LDAPConfig struct {
 	AdminRole    string
 	ReadonlyRole string
 }
+
+const ApplyConfiguration = `
+export JAVA_HOME=/usr/share/wazuh-indexer/jdk/
+bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
+ -f /etc/wazuh-indexer/opensearch-security/roles_mapping.yml \
+ -icl \
+ -key /etc/wazuh-indexer/certs/admin-key.pem \
+ -cert /etc/wazuh-indexer/certs/admin.pem \
+ -cacert /etc/wazuh-indexer/certs/root-ca.pem \
+ -h 127.0.0.1 \
+ -nhnv
+`
+
+const (
+	// Indexer configs
+	OpenSearchIndexerDir           = "/etc/wazuh-indexer/opensearch-security/"
+	OpenSearchRoleMappings  = OpenSearchIndexerDir + "roles_mapping.yml"
+	OpenSearchRoles         = OpenSearchIndexerDir + "roles.yml"
+	OpenSearchConfig        = OpenSearchIndexerDir + "config.yml"
+	OpenSearchInternalUsers = OpenSearchIndexerDir + "internal_users.yml"
+	OpenSearchActionGroups  = OpenSearchIndexerDir + "action_groups.yml"
+
+	// Dashboard configs
+	OpenSearchDashboardYml  = "/etc/wazuh-dashboard/opensearch_dashboards.yml"
+
+APIAgentConfig = "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
+)
