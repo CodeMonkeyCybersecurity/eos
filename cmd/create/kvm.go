@@ -23,9 +23,13 @@ This command can install KVM and libvirt, or provision tenant VMs using Kickstar
 
 Subcommands:
   install        Set up KVM and networking
-  tenant         Provision a new tenant VM under KVM
-`,
-	RunE: eos.Wrap(runDeployKVM),
+  tenant         Provision a new tenant VM under KVM`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return cmd.Help()
+		}
+		return eos.Wrap(runDeployKVM)(cmd, args)
+	},
 }
 
 func init() {
