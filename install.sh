@@ -14,8 +14,23 @@ LOG_DIR="/var/log/eos"
 LOG_USER="$EOS_USER"
 LOG_GROUP="$EOS_USER"
 
+# --- Detect Go explicitly and safely ---
+GO_PATH=$(command -v go || true)
+if [[ -z "$GO_PATH" ]]; then
+  # Fallback: try the original user's path
+  SUDO_USER_HOME=$(eval echo ~"${SUDO_USER:-$USER}")
+  if [[ -x "$SUDO_USER_HOME/go/bin/go" ]]; then
+    export PATH="$SUDO_USER_HOME/go/bin:$PATH"
+    echo "🧩 Using fallback Go path: $SUDO_USER_HOME/go/bin"
+  else
+    echo "❌ Required command 'go' not found in PATH"
+    echo "👉 Ensure Go is installed and visible to root"
+    exit 1
+  fi
+fi
+
 # Check for required commands
-for cmd in go useradd usermod visudo stat; do
+for cmd in useradd usermod visudo stat; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "❌ Required command '$cmd' not found"
     exit 1
@@ -60,10 +75,10 @@ else
   echo "⚠️ syslog group not found — skipping group assignment"
 fi
 
-sudo ln -sf /usr/local/go/bin/go /usr/bin/go
-sudo ln -sf /usr/local/go/bin/gofmt /usr/bin/gofmt
-sudo ln -sf /usr/local/bin/eos /usr/bin/eos
-
+# Optional hardcoded symlinks (you may remove if redundant)
+ln -sf /usr/local/go/bin/go /usr/bin/go 2>/dev/null || true
+ln -sf /usr/local/go/bin/gofmt /usr/bin/gofmt 2>/dev/null || true
+ln -sf /usr/local/bin/eos /usr/bin/eos 2>/dev/null || true
 
 # Show SHA256 checksum of the existing installed binary (if present)
 if [ -f "$INSTALL_PATH" ]; then
