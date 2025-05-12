@@ -39,7 +39,7 @@ var SshKeyCmd = &cobra.Command{
 	Short: "Create and store an SSH key securely",
 	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
-		vaultPath := "pandora"
+		vaultPath := "eos/pandora"
 
 		// Determine base name for key
 		name := nameOverride
