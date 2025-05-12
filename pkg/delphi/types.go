@@ -78,7 +78,7 @@ bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh
 
 const (
 	// Indexer configs
-	OpenSearchIndexerDir           = "/etc/wazuh-indexer/opensearch-security/"
+	OpenSearchIndexerDir    = "/etc/wazuh-indexer/opensearch-security/"
 	OpenSearchRoleMappings  = OpenSearchIndexerDir + "roles_mapping.yml"
 	OpenSearchRoles         = OpenSearchIndexerDir + "roles.yml"
 	OpenSearchConfig        = OpenSearchIndexerDir + "config.yml"
@@ -86,7 +86,7 @@ const (
 	OpenSearchActionGroups  = OpenSearchIndexerDir + "action_groups.yml"
 
 	// Dashboard configs
-	OpenSearchDashboardYml  = "/etc/wazuh-dashboard/opensearch_dashboards.yml"
+	OpenSearchDashboardYml = "/etc/wazuh-dashboard/opensearch_dashboards.yml"
 
-APIAgentConfig = "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
+	APIAgentConfig = "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
 )

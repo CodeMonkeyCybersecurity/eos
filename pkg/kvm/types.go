@@ -32,3 +32,5 @@ type TemplateContext struct {
 }
 
 var IsoPathOverride string
+
+const DefaultTenantUsername = "debugadmin"

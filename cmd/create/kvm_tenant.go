@@ -132,10 +132,30 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 		return err
 	}
 
+	// Try to detect IP address
+	ipAddr := getTenantVMIP(vmName)
+	sshUser := kvm.DefaultTenantUsername // e.g., "debugadmin"
+
 	log.Info("✅ VM provisioned",
 		zap.String("vm", vmName),
 		zap.String("disk", diskPath),
-		zap.String("kickstart", ksPath))
+		zap.String("kickstart", ksPath),
+		zap.String("ssh_user", sshUser),
+		zap.String("ip", ipAddr))
+
+	fmt.Printf(`
+✅ VM provisioned: %s
+
+🔐 SSH access:
+    ssh %s@%s
+
+📁 You used this SSH key:
+    %s
+
+🖥️  Hostname: %s
+
+`, vmName, sshUser, ipAddr, kvm.SshKeyOverride, vmName)
+
 	return nil
 }
 
@@ -239,4 +259,21 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 
 	log.Info("💡 TODO: virt-install the VM using cloud image + seed.img")
 	return fmt.Errorf("virt-install not yet implemented")
+}
+
+func getTenantVMIP(vmName string) string {
+	out, err := exec.Command("virsh", "domifaddr", vmName, "--source", "agent").Output()
+	if err != nil {
+		return "unknown (virsh agent not available)"
+	}
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		for _, f := range fields {
+			if strings.Contains(f, "/") {
+				return strings.Split(f, "/")[0] // strip CIDR
+			}
+		}
+	}
+	return "unknown"
 }
