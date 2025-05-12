@@ -24,7 +24,7 @@ var SecureVaultCmd = &cobra.Command{
 		swapOff, _ := cmd.Flags().GetBool("disable-swap")
 		coreDumpOff, _ := cmd.Flags().GetBool("disable-coredump")
 
-		zap.L().Info("🔐 Connecting to Vault")
+		log.Info("🔐 Connecting to Vault")
 		client, err := vault.EnsureVaultReady()
 		if err != nil {
 			return logger.LogErrAndWrap("secure vault: connect failed", err)
@@ -36,17 +36,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// TLS check
 		if !strings.HasPrefix(client.Address(), "https://") {
-			zap.L().Warn("⚠ Vault is not running over TLS; end-to-end encryption is strongly recommended")
-		}
-
-		// 1️⃣ Ensure EOS Policy
-		if err := vault.EnsurePolicy(); err != nil {
-			return logger.LogErrAndWrap("secure vault: ensure policy", err)
-		}
-
-		// 2️⃣ Ensure AppRole + aliases
-		if err := vault.EnableVault(client, log); err != nil {
-			return logger.LogErrAndWrap("secure vault: enable auth methods", err)
+			log.Warn("⚠ Vault is not running over TLS; end-to-end encryption is strongly recommended")
 		}
 
 		// 4️⃣ Load init result + confirm secure storage
@@ -62,32 +52,32 @@ var SecureVaultCmd = &cobra.Command{
 		if err := crypto.SecureErase(shared.VaultInitPath); err != nil {
 			return fmt.Errorf("failed to erase vault init file: %w", err)
 		}
-		zap.L().Info("✅ Securely erased vault init file")
+		log.Info("✅ Securely erased vault init file")
 
 		// 6️⃣ Disable swap (optional)
 		if swapOff {
 			if err := execute.Execute("swapoff", "-a"); err != nil {
-				zap.L().Warn("⚠ Failed to disable swap; you may need root privileges", zap.Error(err))
+				log.Warn("⚠ Failed to disable swap; you may need root privileges", zap.Error(err))
 			} else {
-				zap.L().Info("✅ Swap disabled")
+				log.Info("✅ Swap disabled")
 			}
 		}
 
 		// 7️⃣ Disable core dumps (optional)
 		if coreDumpOff {
 			if err := execute.Execute("ulimit", "-c", "0"); err != nil {
-				zap.L().Warn("⚠ Failed to disable core dumps; update systemd unit with LimitCORE=0", zap.Error(err))
+				log.Warn("⚠ Failed to disable core dumps; update systemd unit with LimitCORE=0", zap.Error(err))
 			} else {
-				zap.L().Info("✅ Core dumps disabled")
+				log.Info("✅ Core dumps disabled")
 			}
 		}
 
 		// 📋 Final reminders
-		zap.L().Info("ℹ️ Reminder: Check audit device configuration and firewall rules")
-		zap.L().Info("ℹ️ Reminder: Validate filesystem permissions on Vault binary and configs")
+		log.Info("ℹ️ Reminder: Check audit device configuration and firewall rules")
+		log.Info("ℹ️ Reminder: Validate filesystem permissions on Vault binary and configs")
 
 		// 📋 Final summary
-		zap.L().Info("🔒 Vault hardening completed",
+		log.Info("🔒 Vault hardening completed",
 			zap.Bool("vault_hardened", true),
 		)
 		return nil
