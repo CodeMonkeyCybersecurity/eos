@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -39,93 +38,103 @@ var SshKeyCmd = &cobra.Command{
 	Use:   "ssh-key",
 	Short: "Create and store an SSH key securely",
 	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		logger := zap.L()
-		keyDir := "/home/eos/.ssh" // TODO: Replace with shared.EosUserHome() if standardized
-		baseName := nameOverride
+		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
+		vaultPath := "pandora"
 
-		if baseName != "" && !isSafeName(baseName) {
-			logger.Error("Invalid --name: only alphanumeric, dashes, and underscores allowed", zap.String("name", baseName))
-			return errors.New("invalid --name")
+		// Determine base name for key
+		name := nameOverride
+		if name != "" && !isSafeName(name) {
+			zap.L().Warn("Invalid --name provided", zap.String("name", name))
+			return fmt.Errorf("invalid --name: only alphanumeric, dashes, and underscores allowed")
 		}
 
 		client, err := vault.Auth()
-		useVault := (err == nil)
-		if !useVault {
-			logger.Warn("Vault unavailable", zap.Error(err))
-		}
+		useVault := err == nil
 
-		if baseName == "" {
-			for i := 1; ; i++ {
-				test := fmt.Sprintf("ssh-key-%03d", i)
-				diskPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%03d", i))
-				if !fileExists(diskPath) {
-					baseName = test
-					break
+		// If name is not provided, or path exists, find next available name
+		if useVault {
+			checkFn := func(path string) (bool, error) {
+				return vault.CheckVaultPathExists(client, path)
+			}
+
+			if name == "" {
+				name, err = vault.FindNextAvailableVaultPath(vaultPath, checkFn)
+				if err != nil {
+					zap.L().Error("Could not find available Vault path", zap.Error(err))
+					return fmt.Errorf("could not find available Vault path: %w", err)
+				}
+			} else {
+				fullVaultPath := fmt.Sprintf("%s/%s", vaultPath, name)
+				exists, err := checkFn(fullVaultPath)
+				if err != nil {
+					zap.L().Error("Vault path check failed", zap.String("path", fullVaultPath), zap.Error(err))
+					return fmt.Errorf("vault path check failed: %w", err)
+				}
+				if exists {
+					zap.L().Warn("Vault path already exists", zap.String("path", fullVaultPath))
+					return fmt.Errorf("vault path already exists")
 				}
 			}
 		}
 
+		// Generate key
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)
 		if err != nil {
-			logger.Error("Failed to generate SSH key", zap.Error(err))
-			return err
+			return fmt.Errorf("keygen failed: %w", err)
 		}
 
 		pubSSH, err := ssh.NewPublicKey(pub)
 		if err != nil {
-			logger.Error("Failed to encode public key", zap.Error(err))
-			return err
+			return fmt.Errorf("encode public key failed: %w", err)
 		}
-
 		pubStr := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(pubSSH)))
 		privPEM := encodePrivateKeyPEM(priv)
+		fingerprint := fingerprintSHA256(pubSSH)
 
-		// 🎯 NEW: Compute fingerprint
-		fp := fingerprintSHA256(pubSSH)
-
-		vaultPath := "pandora"
-		name := baseName
 		fullVaultPath := fmt.Sprintf("%s/%s", vaultPath, name)
 
+		// Vault Write
 		if useVault {
-			if err := vault.WriteSSHKey(client, fullVaultPath, pubStr, string(privPEM), fp); err == nil {
-				logger.Info("🔐 SSH key written to Vault",
-					zap.String("kv_path", fmt.Sprintf("secret/data/%s", fullVaultPath)),
-					zap.String("lookup_cmd", fmt.Sprintf("vault kv get secret/%s", fullVaultPath)),
-					zap.String("field_cmd", fmt.Sprintf("vault kv get -field=ssh-public secret/%s", fullVaultPath)),
-					zap.String("fingerprint", fp),
+			if err := vault.WriteSSHKey(client, fullVaultPath, pubStr, string(privPEM), fingerprint); err == nil {
+				zap.L().Info("🔐 SSH key written to Vault",
+					zap.String("path", fullVaultPath),
+					zap.String("fingerprint", fingerprint),
 				)
 				return nil
+			} else {
+				zap.L().Warn("Vault write failed, falling back to disk",
+					zap.String("path", fullVaultPath),
+					zap.Error(err),
+				)
+			}
+
+			if !diskFallback {
+				zap.L().Error("Vault write failed and disk fallback is disabled")
+				return fmt.Errorf("vault write failed and disk fallback is disabled")
 			}
 		}
 
-		if !diskFallback {
-			logger.Error("Vault write failed and --disk-fallback not set")
-			return errors.New("vault write failed and no fallback permitted")
-		}
-
-		pubPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s.pub", baseName))
-		privPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s", baseName))
+		// Disk fallback
+		pubPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s.pub", name))
+		privPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s", name))
 
 		if err := os.MkdirAll(keyDir, 0700); err != nil {
-			logger.Error("Failed to create key directory", zap.String("path", keyDir), zap.Error(err))
-			return err
+			zap.L().Error("Failed to create .ssh directory", zap.String("dir", keyDir), zap.Error(err))
+			return fmt.Errorf("mkdir failed: %w", err)
 		}
 		if err := os.WriteFile(pubPath, []byte(pubStr), 0644); err != nil {
-			logger.Error("Failed to write public key", zap.String("path", pubPath), zap.Error(err))
-			return err
+			zap.L().Error("Failed to write public key", zap.String("path", pubPath), zap.Error(err))
+			return fmt.Errorf("write public key failed: %w", err)
 		}
 		if err := os.WriteFile(privPath, privPEM, 0600); err != nil {
-			logger.Error("Failed to write private key", zap.String("path", privPath), zap.Error(err))
-			return err
+			zap.L().Error("Failed to write private key", zap.String("path", privPath), zap.Error(err))
+			return fmt.Errorf("write private key failed: %w", err)
 		}
 
-		logger.Info("🔐 SSH key written to disk fallback", zap.String("path", privPath))
-		logger.Info("📎 Public key", zap.String("pubkey", pubStr))
-		logger.Info("🔍 Fingerprint (SHA256)", zap.String("fingerprint", fp))
-		if printPrivate {
-			logger.Info("📜 Private key", zap.String("private", string(privPEM)))
-		}
+		zap.L().Info("🔐 SSH key written to disk",
+			zap.String("private_key_path", privPath),
+			zap.String("public_key_path", pubPath),
+		)
 		return nil
 	}),
 }
@@ -143,11 +152,6 @@ func encodePrivateKeyPEM(key ed25519.PrivateKey) []byte {
 func fingerprintSHA256(pub ssh.PublicKey) string {
 	hash := sha256.Sum256(pub.Marshal())
 	return fmt.Sprintf("SHA256:%s", base64.StdEncoding.EncodeToString(hash[:]))
-}
-
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }
 
 func isSafeName(name string) bool {

@@ -158,3 +158,60 @@ func EnsureVaultReady() (*api.Client, error) {
 	}
 	return client, nil
 }
+
+// CheckVaultPathExists checks if a given path exists in Vault KV.
+// It returns true if the path exists, false if not found, or an error for other issues.
+func CheckVaultPathExists(client *api.Client, path string) (bool, error) {
+	if client == nil {
+		return false, fmt.Errorf("vault client is nil")
+	}
+
+	cleanPath := strings.TrimPrefix(path, "secret/data/")
+	fullPath := fmt.Sprintf("secret/metadata/%s", cleanPath)
+
+	zap.L().Debug("🔍 Checking if Vault path exists", zap.String("metadata_path", fullPath))
+
+	_, err := client.Logical().Read(fullPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "permission denied") {
+			zap.L().Warn("🚫 Permission denied when checking Vault path", zap.String("path", fullPath))
+			return false, fmt.Errorf("permission denied for Vault path: %s", fullPath)
+		}
+		if strings.Contains(err.Error(), "404") || strings.Contains(err.Error(), "not found") {
+			zap.L().Debug("📭 Vault path not found", zap.String("path", fullPath))
+			return false, nil
+		}
+		zap.L().Error("❌ Unexpected Vault error", zap.String("path", fullPath), zap.Error(err))
+		return false, err
+	}
+
+	zap.L().Debug("✅ Vault path exists", zap.String("path", fullPath))
+	return true, nil
+}
+
+// FindNextAvailableVaultPath takes a base path and appends -001, -002, ... until it finds a path that doesn't exist.
+func FindNextAvailableVaultPath(basePath string, checkFunc func(path string) (bool, error)) (string, error) {
+	// First, try the base path itself
+	exists, err := checkFunc(basePath)
+	if err != nil {
+		return "", fmt.Errorf("checking base Vault path: %w", err)
+	}
+	if !exists {
+		return basePath, nil
+	}
+
+	// Try incrementing: basePath-001, basePath-002, etc.
+	for i := 1; i < 1000; i++ {
+		suffix := fmt.Sprintf("-%03d", i)
+		candidate := basePath + suffix
+		exists, err := checkFunc(candidate)
+		if err != nil {
+			return "", fmt.Errorf("checking candidate Vault path %q: %w", candidate, err)
+		}
+		if !exists {
+			return candidate, nil
+		}
+	}
+
+	return "", fmt.Errorf("no available Vault path found for base %q after 999 attempts", basePath)
+}
