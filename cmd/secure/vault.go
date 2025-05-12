@@ -49,16 +49,6 @@ var SecureVaultCmd = &cobra.Command{
 			return logger.LogErrAndWrap("secure vault: enable auth methods", err)
 		}
 
-		// 3️⃣ Re-provision AppRole
-		roleID, secretID, err := vault.EnsureAppRole(client, shared.DefaultAppRoleOptions())
-		if err != nil {
-			return logger.LogErrAndWrap("secure vault: create approle", err)
-		}
-		if err := vault.WriteAppRoleFiles(roleID, secretID); err != nil {
-			return logger.LogErrAndWrap("secure vault: write approle creds", err)
-		}
-		zap.L().Info("✅ AppRole credentials written", zap.String("role_id", roleID))
-
 		// 4️⃣ Load init result + confirm secure storage
 		initRes, err := vault.LoadOrPromptInitResult()
 		if err != nil {
