@@ -24,10 +24,10 @@ path "auth/token/revoke-self" {
 path "sys/capabilities-self" {
     capabilities = ["update"]
 }
-path "identity/entity/id/{{identity.entity.id}}" {
+path "identity/entity/id/{{"{{"}}identity.entity.id{{"}}"}}" {
     capabilities = ["read"]
 }
-path "identity/entity/name/{{identity.entity.name}}" {
+path "identity/entity/name/{{"{{"}}identity.entity.name{{"}}"}}" {
     capabilities = ["read"]
 }
 path "sys/internal/ui/resultant-acl" {
