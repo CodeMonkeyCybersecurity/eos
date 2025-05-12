@@ -36,9 +36,9 @@ path "sys/control-group/request" { capabilities = ["update"] }
 path "identity/oidc/provider/+/authorize" { capabilities = ["read", "update"] }
 
 # Secrets – dynamic KV mount path
-path "{{ .KVPath }}/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "{{ .KVPath }}/data/*" { capabilities = ["create", "update", "read", "delete", "list"] }
-path "{{ .KVPath }}/metadata/*" { capabilities = ["read", "list"] }
+path "secret/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "secret/data/*" { capabilities = ["create", "update", "read", "delete", "list"] }
+path "secret/metadata/*" { capabilities = ["read", "list"] }
 
 # Auth methods
 path "auth/userpass/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
