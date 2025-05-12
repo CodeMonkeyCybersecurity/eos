@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
@@ -133,7 +134,7 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	}
 
 	// Try to detect IP address
-	ipAddr := getTenantVMIP(vmName)
+	ipAddr := waitForIP(vmName, 60*time.Second, log)
 	sshUser := kvm.DefaultTenantUsername // e.g., "debugadmin"
 
 	log.Info("✅ VM provisioned",
@@ -261,19 +262,35 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	return fmt.Errorf("virt-install not yet implemented")
 }
 
-func getTenantVMIP(vmName string) string {
+func waitForIP(vmName string, maxWait time.Duration, log *zap.Logger) string {
+	start := time.Now()
+	for time.Since(start) < maxWait {
+		ip, err := getTenantVMIP(vmName)
+		if err == nil && ip != "" {
+			log.Info("✅ VM IP address found", zap.String("vm", vmName), zap.String("ip", ip))
+			return ip
+		}
+		log.Debug("⌛ Still waiting for IP...", zap.String("vm", vmName), zap.Error(err))
+		time.Sleep(5 * time.Second)
+	}
+	log.Warn("⚠️ Timed out waiting for VM IP", zap.String("vm", vmName))
+	return "unknown"
+}
+
+func getTenantVMIP(vmName string) (string, error) {
 	out, err := exec.Command("virsh", "domifaddr", vmName, "--source", "agent").Output()
 	if err != nil {
-		return "unknown (virsh agent not available)"
+		return "", fmt.Errorf("virsh agent not available: %w", err)
 	}
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines {
 		fields := strings.Fields(line)
 		for _, f := range fields {
 			if strings.Contains(f, "/") {
-				return strings.Split(f, "/")[0] // strip CIDR
+				ip := strings.Split(f, "/")[0]
+				return ip, nil
 			}
 		}
 	}
-	return "unknown"
+	return "", fmt.Errorf("no IP address found in domifaddr output")
 }
