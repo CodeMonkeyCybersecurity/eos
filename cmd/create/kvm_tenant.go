@@ -21,27 +21,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-var sshKeyOverride string
-var tenantDistro string
-var userProvidedVMName string
-
-var (
-	vmPrefix = "vm-tenant-"
-)
-
-const (
-	ksTemplatePath = "/home/henry/autoinstall-tenant.ks"
-	isoDefaultPath = "/home/henry/CentOS-Stream-9-latest-x86_64-dvd1.iso"
-	imageDir       = "/var/lib/libvirt/images"
-	vmBaseIDFile   = "/var/lib/libvirt/next_vm_id"
-)
-
-type TemplateContext struct {
-	SSHKey   string
-	VMName   string
-	Hostname string
-}
-
 var CreateKvmTenantCmd = &cobra.Command{
 	Use:   "tenant",
 	Short: "Provision a new KVM tenant VM using CentOS Stream 9 or cloud-init",
@@ -68,15 +47,13 @@ Examples:
 	RunE: eos.Wrap(runCreateKvmTenant),
 }
 
-var isoPathOverride string
-
 func init() {
 	defaultKey := filepath.Join(os.Getenv("HOME"), ".ssh", "id_ed25519.pub")
-	CreateKvmTenantCmd.Flags().StringVar(&sshKeyOverride, "ssh-key", defaultKey, "Path to public SSH key to inject")
+	CreateKvmTenantCmd.Flags().StringVar(&kvm.SshKeyOverride, "ssh-key", defaultKey, "Path to public SSH key to inject")
 	CreateKvmCmd.AddCommand(CreateKvmTenantCmd)
-	CreateKvmTenantCmd.Flags().StringVar(&tenantDistro, "distro", "centos-stream9", "Distro to provision (e.g. centos-stream9, ubuntu-cloud)")
-	CreateKvmTenantCmd.Flags().StringVar(&isoPathOverride, "iso", isoDefaultPath, "Path to bootable ISO")
-	CreateKvmTenantCmd.Flags().StringVar(&userProvidedVMName, "vm-name", "", "Optional custom name for the tenant VM")
+	CreateKvmTenantCmd.Flags().StringVar(&kvm.TenantDistro, "distro", "centos-stream9", "Distro to provision (e.g. centos-stream9, ubuntu-cloud)")
+	CreateKvmTenantCmd.Flags().StringVar(&kvm.IsoPathOverride, "iso", kvm.IsoDefaultPath, "Path to bootable ISO")
+	CreateKvmTenantCmd.Flags().StringVar(&kvm.UserProvidedVMName, "vm-name", "", "Optional custom name for the tenant VM")
 }
 
 func getOSVariant(distro string) string {
@@ -94,18 +71,18 @@ func runCreateKvmTenant(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []st
 	log := ctx.Log.Named("kvm.tenant")
 
 	var vmName string
-	if userProvidedVMName != "" {
-		if strings.ContainsAny(userProvidedVMName, " \t\n") {
+	if kvm.UserProvidedVMName != "" {
+		if strings.ContainsAny(kvm.UserProvidedVMName, " \t\n") {
 			return fmt.Errorf("invalid VM name: must not contain whitespace")
 		}
-		vmName = userProvidedVMName
+		vmName = kvm.UserProvidedVMName
 	} else {
 		vmID, err := getNextVMID()
 		if err != nil {
 			log.Error("failed to determine VM ID", zap.Error(err))
 			return err
 		}
-		vmName = vmPrefix + vmID
+		vmName = kvm.VmPrefix + vmID
 	}
 
 	// Now that vmName is final, check for conflicts
@@ -113,7 +90,7 @@ func runCreateKvmTenant(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []st
 		return fmt.Errorf("a VM named %q already exists", vmName)
 	}
 
-	switch tenantDistro {
+	switch kvm.TenantDistro {
 	case "centos-stream9":
 		log.Info("Using Kickstart provisioning")
 		return runKickstartProvisioning(ctx, vmName)
@@ -121,7 +98,7 @@ func runCreateKvmTenant(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []st
 		log.Info("Using cloud-init provisioning")
 		return runCloudInitProvisioning(ctx, vmName)
 	default:
-		return fmt.Errorf("unsupported distro: %s", tenantDistro)
+		return fmt.Errorf("unsupported distro: %s", kvm.TenantDistro)
 	}
 }
 
@@ -134,12 +111,12 @@ func checkVMExists(name string) bool {
 func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	log := ctx.Log.Named("kvm.kickstart")
 
-	diskPath := filepath.Join(imageDir, vmName+".qcow2")
-	if _, err := os.Stat(sshKeyOverride); err != nil {
-		return fmt.Errorf("missing SSH key at %s", sshKeyOverride)
+	diskPath := filepath.Join(kvm.ImageDir, vmName+".qcow2")
+	if _, err := os.Stat(kvm.SshKeyOverride); err != nil {
+		return fmt.Errorf("missing SSH key at %s", kvm.SshKeyOverride)
 	}
 
-	ksPath, err := generateKickstartWithSSH(vmName, sshKeyOverride)
+	ksPath, err := generateKickstartWithSSH(vmName, kvm.SshKeyOverride)
 	if err != nil {
 		log.Error("failed to prepare Kickstart", zap.Error(err))
 		return err
@@ -163,7 +140,7 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 }
 
 func getNextVMID() (string, error) {
-	fd, err := os.OpenFile(vmBaseIDFile, os.O_RDWR|os.O_CREATE, 0644)
+	fd, err := os.OpenFile(kvm.VmBaseIDFile, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return "", fmt.Errorf("cannot open ID file: %w", err)
 	}
@@ -210,7 +187,7 @@ func generateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 	}
 
 	var buf bytes.Buffer
-	err = tmpl.Execute(&buf, TemplateContext{
+	err = tmpl.Execute(&buf, kvm.TemplateContext{
 		SSHKey:   strings.TrimSpace(string(key)),
 		VMName:   vmName,
 		Hostname: vmName,
@@ -233,10 +210,10 @@ func virtInstall(log *zap.Logger, vmName, ksPath, diskPath string) error {
 		"--name", vmName,
 		"--ram", "2048",
 		"--vcpus", "2",
-		"--os-variant", getOSVariant(tenantDistro),
+		"--os-variant", getOSVariant(kvm.TenantDistro),
 		"--disk", fmt.Sprintf("path=%s,size=20", diskPath),
-		"--location", isoPathOverride,
-		"--initrd-inject", sshKeyOverride,
+		"--location", kvm.IsoPathOverride,
+		"--initrd-inject", kvm.SshKeyOverride,
 		"--initrd-inject", ksPath,
 		"--extra-args", "inst.ks=file:/"+filepath.Base(ksPath)+" console=ttyS0",
 		"--graphics", "none",
@@ -253,7 +230,7 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	cfg := kvm.CloudInitConfig{
 		VMName:    vmName,
 		CloudImg:  "/srv/iso/ubuntu-22.04-server-cloudimg-amd64.img",
-		PublicKey: sshKeyOverride, // use --ssh-key override path
+		PublicKey: kvm.SshKeyOverride, // use --ssh-key override path
 	}
 
 	if err := kvm.ProvisionCloudInitVM(log, cfg); err != nil {
