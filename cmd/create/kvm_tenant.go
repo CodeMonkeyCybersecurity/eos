@@ -14,6 +14,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -202,23 +203,17 @@ func generateKickstartWithSSH(vmName, pubkeyPath string) (string, error) {
 		return "", fmt.Errorf("failed to read SSH key: %w", err)
 	}
 
-	tmplBytes, err := os.ReadFile(ksTemplatePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read kickstart template: %w", err)
-	}
-
-	tmpl, err := template.New("kickstart").Parse(string(tmplBytes))
+	tmpl, err := template.New("kickstart").Parse(templates.KickstartTemplate)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse template: %w", err)
 	}
 
 	var buf bytes.Buffer
-	ctx := TemplateContext{
+	err = tmpl.Execute(&buf, TemplateContext{
 		SSHKey:   strings.TrimSpace(string(key)),
 		VMName:   vmName,
 		Hostname: vmName,
-	}
-	err = tmpl.Execute(&buf, ctx)
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to render kickstart: %w", err)
 	}
@@ -240,6 +235,7 @@ func virtInstall(log *zap.Logger, vmName, ksPath, diskPath string) error {
 		"--os-variant", getOSVariant(tenantDistro),
 		"--disk", fmt.Sprintf("path=%s,size=20", diskPath),
 		"--location", isoPathOverride,
+		"--initrd-inject", sshKeyOverride,
 		"--initrd-inject", ksPath,
 		"--extra-args", "inst.ks=file:/"+filepath.Base(ksPath)+" console=ttyS0",
 		"--graphics", "none",
