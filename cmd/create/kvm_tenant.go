@@ -117,6 +117,10 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 		return fmt.Errorf("missing SSH key at %s", kvm.SshKeyOverride)
 	}
 
+	if err := kvm.ConfigureKVMBridge(); err != nil {
+		log.Warn("Bridge setup failed; VM may not have external networking", zap.Error(err))
+	}
+
 	ksPath, err := generateKickstartWithSSH(vmName, kvm.SshKeyOverride)
 	if err != nil {
 		log.Error("failed to prepare Kickstart", zap.Error(err))
@@ -135,10 +139,14 @@ func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 
 	// Try to detect IP address
 	ipAddr := waitForIP(vmName, 60*time.Second, log)
-	if ipAddr == "" {
+	if ipAddr == "" || ipAddr == "unknown" {
 		mac := getMACFromDomiflist(vmName)
 		log.Info("📡 Falling back to DHCP lease lookup", zap.String("mac", mac))
-		ipAddr, _ = getIPFromDHCPLeases(mac)
+		fallbackIP, _ := getIPFromDHCPLeases(mac)
+		if fallbackIP != "" {
+			log.Info("✅ IP resolved via DHCP lease", zap.String("ip", fallbackIP))
+			ipAddr = fallbackIP
+		}
 	}
 	sshUser := kvm.DefaultTenantUsername // e.g., "debugadmin"
 
@@ -270,6 +278,7 @@ func virtInstall(log *zap.Logger, vmName, ksPath, diskPath string) error {
 		"--name", vmName,
 		"--ram", "2048",
 		"--vcpus", "2",
+		"--network", "bridge=br0,model=virtio",
 		"--os-variant", getOSVariant(kvm.TenantDistro),
 		"--disk", fmt.Sprintf("path=%s,size=20", diskPath),
 		"--location", kvm.IsoPathOverride,

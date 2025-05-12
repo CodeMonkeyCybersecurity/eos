@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -27,38 +26,43 @@ func ConfigureKVMBridge() error {
 		return err
 	}
 
-	bridgePath := filepath.Join("/sys/class/net", iface, "bridge")
-	if _, err := os.Stat(bridgePath); err == nil {
-		fmt.Printf("🔁 Interface %s is already bridged.\n", iface)
+	// Check if a bridge already exists
+	existing, err := exec.Command("ip", "link", "show", "br0").CombinedOutput()
+	if err == nil && strings.Contains(string(existing), "br0") {
+		fmt.Println("🔁 br0 already exists; skipping bridge creation.")
 		return nil
 	}
 
+	// Render bridge YAML with IPv6 enabled
 	content := fmt.Sprintf(`network:
   version: 2
   renderer: networkd
   ethernets:
-    %s:
+    %[1]s:
       dhcp4: no
+      dhcp6: no
   bridges:
     br0:
-      interfaces: [%s]
+      interfaces: [%[1]s]
       dhcp4: true
+      dhcp6: true
+      accept-ra: true
       parameters:
         stp: false
         forward-delay: 0
-`, iface, iface)
+`, iface)
 
-	filePath := "/etc/netplan/99-kvm-bridge.yaml"
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write netplan bridge config: %w", err)
+	bridgeFile := "/etc/netplan/99-kvm-bridge.yaml"
+	if err := os.WriteFile(bridgeFile, []byte(content), 0644); err != nil {
+		return fmt.Errorf("failed to write bridge config: %w", err)
 	}
 
 	cmd := exec.Command("netplan", "apply")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to apply netplan config: %w\nOutput: %s", err, string(out))
+		return fmt.Errorf("failed to apply netplan: %w\nOutput: %s", err, string(out))
 	}
 
-	fmt.Println("✅ Bridge configured via netplan.")
+	fmt.Println("✅ br0 bridge configured and applied.")
 	return nil
 }
 

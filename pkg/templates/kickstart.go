@@ -18,7 +18,7 @@ autopart --type=lvm
 # ----------- Pre-Install (Dynamic hostname + DHCP) ----------
 %pre
 echo "# Network and hostname config" > /tmp/hostname.ks
-echo "network --bootproto=dhcp --ipv6=auto --hostname={{ .VMName }} --device=eth0 --activate
+echo "network --bootproto=dhcp --ipv6=auto --hostname={{ .VMName }} --device=eth0 --activate" >> /tmp/hostname.ks
 echo "network --hostname={{ .Hostname }}" >> /tmp/hostname.ks
 %end
 
@@ -26,6 +26,9 @@ echo "network --hostname={{ .Hostname }}" >> /tmp/hostname.ks
 
 %post --interpreter=/bin/bash
 set -euxo pipefail
+
+dnf install -y qemu-guest-agent
+systemctl enable --now qemu-guest-agent
 
 USERNAME="debugadmin"
 USERHOME="/home/$USERNAME"
