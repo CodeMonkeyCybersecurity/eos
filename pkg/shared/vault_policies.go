@@ -37,8 +37,8 @@ path "identity/oidc/provider/+/authorize" { capabilities = ["read", "update"] }
 
 # Secrets – dynamic KV mount path
 path "secret/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "secret/data/*" { capabilities = ["create", "update", "read", "delete", "list"] }
-path "secret/metadata/*" { capabilities = ["read", "list"] }
+path "secret/data/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "secret/metadata/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 
 # Auth methods
 path "auth/userpass/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
