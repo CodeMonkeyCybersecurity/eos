@@ -4,6 +4,7 @@ package sync
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -13,13 +14,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
-)
-
-var (
-	sourceVM   string
-	sourcePath string
-	destVM     string
-	destPath   string
 )
 
 var SyncKVMFileCmd = &cobra.Command{
@@ -32,30 +26,27 @@ then injects it into a destination VM.
 Both VMs must be shut off for virt-copy to work.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		timestamp := time.Now().Format("20060102_150405")
-		filename := filepath.Base(sourcePath)
+		filename := filepath.Base(kvm.SourcePath)
 		tempDir := "/var/lib/eos/transfer"
 		if err := os.MkdirAll(tempDir, 0700); err != nil {
 			return fmt.Errorf("failed to create temp dir: %w", err)
 		}
 
-		intermediate := filepath.Join(tempDir, fmt.Sprintf("%s_from-%s_to-%s_%s", timestamp, sourceVM, destVM, filename))
+		intermediate := filepath.Join(tempDir, fmt.Sprintf("%s_from-%s_to-%s_%s", timestamp, kvm.SourceVM, kvm.DestVM, filename))
 		ctx.Log.Info("📤 Starting KVM file sync",
-			zap.String("sourceVM", sourceVM),
-			zap.String("sourcePath", sourcePath),
-			zap.String("destVM", destVM),
-			zap.String("destPath", destPath),
+			zap.String("sourceVM", kvm.SourceVM),
+			zap.String("sourcePath", kvm.SourcePath),
+			zap.String("destVM", kvm.DestVM),
+			zap.String("destPath", kvm.DestPath),
 			zap.String("hostTempFile", intermediate),
 		)
 
-		if err := kvm.CopyOutFromVM(sourceVM, sourcePath, intermediate); err != nil {
-			return fmt.Errorf("extract from %s failed: %w", sourceVM, err)
+		err := kvm.SyncFileBetweenVMs(kvm.SourceVM, kvm.SourcePath, kvm.DestVM, kvm.DestPath)
+		if err != nil {
+			log.Fatal("sync failed", zap.Error(err))
 		}
 
-		if err := kvm.CopyInToVM(destVM, intermediate, destPath); err != nil {
-			return fmt.Errorf("inject to %s failed: %w", destVM, err)
-		}
-
-		ctx.Log.Info("✅ File transferred successfully", zap.String("from", sourceVM), zap.String("to", destVM))
+		ctx.Log.Info("✅ File transferred successfully", zap.String("from", kvm.SourceVM), zap.String("to", kvm.DestVM))
 		return nil
 	}),
 }
@@ -63,10 +54,10 @@ Both VMs must be shut off for virt-copy to work.`,
 func init() {
 	SyncCmd.AddCommand(SyncKVMFileCmd)
 
-	SyncKVMFileCmd.Flags().StringVar(&sourceVM, "from-vm", "", "Source VM name")
-	SyncKVMFileCmd.Flags().StringVar(&sourcePath, "from-path", "", "Path to file inside source VM")
-	SyncKVMFileCmd.Flags().StringVar(&destVM, "to-vm", "", "Destination VM name")
-	SyncKVMFileCmd.Flags().StringVar(&destPath, "to-path", "", "Destination path inside destination VM")
+	SyncKVMFileCmd.Flags().StringVar(&kvm.SourceVM, "from-vm", "", "Source VM name")
+	SyncKVMFileCmd.Flags().StringVar(&kvm.SourcePath, "from-path", "", "Path to file inside source VM")
+	SyncKVMFileCmd.Flags().StringVar(&kvm.DestVM, "to-vm", "", "Destination VM name")
+	SyncKVMFileCmd.Flags().StringVar(&kvm.DestPath, "to-path", "", "Destination path inside destination VM")
 	SyncKVMFileCmd.MarkFlagRequired("from-vm")
 	SyncKVMFileCmd.MarkFlagRequired("from-path")
 	SyncKVMFileCmd.MarkFlagRequired("to-vm")
