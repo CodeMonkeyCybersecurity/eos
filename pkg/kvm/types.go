@@ -41,3 +41,34 @@ type VM struct {
 	CreatedAt  time.Time `gorm:"autoCreateTime;column:created_at"`
 	UpdatedAt  time.Time `gorm:"autoUpdateTime;column:updated_at"`
 }
+
+type VMEntry struct {
+	Name       string
+	State      string
+	Network    string
+	MACAddress string
+	Protocol   string
+	IPAddress  string
+}
+
+// Runtime configuration set by flags (e.g. in cobra command init)
+var (
+	// TenantDistro is the OS type used to determine virt-install options
+	TenantDistro = "centos-stream9"
+
+	// IsoPathOverride defines the full ISO path used for provisioning
+	IsoPathOverride = IsoDefaultPath
+
+	// SshKeyOverride is the SSH public key path injected into tenant VMs
+	SshKeyOverride string
+
+	// UserProvidedVMName lets users override the default auto-naming
+	UserProvidedVMName string
+)
+
+type TenantConfig struct {
+	Distro     string
+	ISOPath    string
+	SSHKeyPath string
+	VMName     string
+}

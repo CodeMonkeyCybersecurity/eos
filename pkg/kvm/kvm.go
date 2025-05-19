@@ -52,7 +52,7 @@ func EnsureLibvirtd() error {
 	return nil
 }
 
-func runCreateKvmTenant(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func RunCreateKvmTenant(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("tenant")
 
 	var vmName string
@@ -173,7 +173,7 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	return fmt.Errorf("virt-install not yet implemented")
 }
 
-func runCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func RunCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("kvm")
 
 	if os.Geteuid() != 0 {

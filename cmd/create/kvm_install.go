@@ -4,16 +4,17 @@ package create
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
 	"github.com/spf13/cobra"
 )
 
 // NewCreateKvmInstallCmd returns the cobra.Command for 'eos create kvm install'
-var NewKvmInstallCmd = &cobra.Command {
+func NewKvmInstallCmd() *cobra.Command {
+	cmd := &cobra.Command{
 		Use:   "install",
 		Short: "Install KVM and configure hypervisor settings",
-		RunE:  eos.Wrap(runCreateKvmInstall),
-	}),
-}
+		RunE:  eos.Wrap(kvm.RunCreateKvmInstall),
+	}
 
 	cmd.Flags().Bool("yes", false, "Run non-interactively with defaults")
 	cmd.Flags().String("iso", "", "Path to ISO directory")
