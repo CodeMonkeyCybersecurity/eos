@@ -3,15 +3,11 @@
 package docker
 
 import (
-	"context"
 	"fmt"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
-	"github.com/docker/docker/client"
 )
 
 //
@@ -88,22 +84,27 @@ func RemoveContainers(containers []string) error {
 	return nil
 }
 
+// ListDefaultContainers lists running containers using docker CLI instead of SDK.
 func ListDefaultContainers() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cmd := exec.Command("docker", "ps", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}")
+	output, err := cmd.Output()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	containers, err := cli.ContainerList(ctx, templates.DefaultContainerListOptions())
-	if err != nil {
-		return err
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		fmt.Println("No running containers found.")
+		return nil
 	}
 
-	for _, c := range containers {
-		fmt.Printf("%s\t%s\t%v\n", c.ID[:12], c.Image, c.Names)
+	for _, line := range lines {
+		parts := strings.Split(line, "\t")
+		if len(parts) < 3 {
+			continue
+		}
+		id, image, names := parts[0], parts[1], parts[2]
+		fmt.Printf("%s\t%s\t%s\n", id[:12], image, names)
 	}
 
 	return nil

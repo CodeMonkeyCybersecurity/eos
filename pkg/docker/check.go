@@ -3,59 +3,44 @@
 package docker
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
-
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	"strings"
 )
 
-// CheckDockerContainers lists running containers using the Docker Go SDK.
+// CheckDockerContainers lists running containers using the docker CLI.
 func CheckDockerContainers() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-	if err != nil {
-		return fmt.Errorf("failed to create docker client: %w", err)
-	}
-
-	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	cmd := exec.Command("docker", "ps", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}")
+	out, err := cmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	if len(containers) == 0 {
+	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
 		fmt.Println("No running containers.")
 		return nil
 	}
 
-	for _, container := range containers {
-		fmt.Printf("Container ID: %s\tImage: %s\tNames: %v\n", container.ID[:12], container.Image, container.Names)
+	for _, line := range lines {
+		parts := strings.Split(line, "\t")
+		if len(parts) >= 3 {
+			fmt.Printf("Container ID: %s\tImage: %s\tName: %s\n", parts[0][:12], parts[1], parts[2])
+		}
 	}
 
 	return nil
 }
 
-// CheckIfDockerInstalled checks if the Docker engine is available via the Go SDK.
+// CheckIfDockerInstalled checks if Docker CLI is available and responding.
 func CheckIfDockerInstalled() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-
-	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	cmd := exec.Command("docker", "version", "--format", "'{{.Server.Version}}'")
+	err := cmd.Run()
 	if err != nil {
-		return fmt.Errorf("docker not available: %w", err)
+		return fmt.Errorf("docker CLI not available or not responding: %w", err)
 	}
-
-	_, err = cli.Ping(ctx)
-	if err != nil {
-		return fmt.Errorf("docker engine not responding: %w", err)
-	}
-
 	return nil
 }
 
