@@ -1,38 +1,67 @@
 // pkg/execute/retry.go
+
 package execute
 
 import (
+	"bytes"
+	"context"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 )
 
-// RetryCommand tries to run the given command up to maxAttempts.
-func RetryCommand(maxAttempts int, delay time.Duration, cmd *exec.Cmd) error {
+// RetryCommand retries execution with live output and structured logging.
+func RetryCommand(ctx context.Context, maxAttempts int, delay time.Duration, name string, args ...string) error {
 	var lastErr error
 	for i := 1; i <= maxAttempts; i++ {
-		fmt.Printf("🔁 Attempt %d: %s %v\n", i, cmd.Path, cmd.Args[1:])
-		out, err := cmd.CombinedOutput()
-		fmt.Print(string(out))
+		fmt.Printf("🔁 Attempt %d: %s %s\n", i, name, joinArgs(args))
 
+		cmd := exec.CommandContext(ctx, name, args...)
+
+		var buf bytes.Buffer
+		cmd.Stdout = io.MultiWriter(os.Stdout, &buf)
+		cmd.Stderr = io.MultiWriter(os.Stderr, &buf)
+
+		err := cmd.Run()
 		if err == nil {
+			fmt.Printf("✅ Attempt %d succeeded\n", i)
 			return nil
 		}
-		lastErr = fmt.Errorf("attempt %d failed: %w\noutput: %s", i, err, string(out))
-		time.Sleep(delay)
+
+		output := buf.String()
+		summary := eoserr.ExtractSummary(output, 2)
+		lastErr = fmt.Errorf("❌ attempt %d failed: %w\noutput:\n%s", i, err, summary)
+
+		if i < maxAttempts {
+			time.Sleep(delay)
+		}
 	}
-	return fmt.Errorf("all %d attempts failed: %w", maxAttempts, lastErr)
+	return fmt.Errorf("❌ all %d attempts failed: %w", maxAttempts, lastErr)
 }
 
-func RetryCaptureOutput(retries int, delay time.Duration, cmd *exec.Cmd, out *[]byte) error {
+// RetryCaptureOutput runs a command with retries and returns captured output.
+func RetryCaptureOutput(ctx context.Context, retries int, delay time.Duration, name string, args ...string) ([]byte, error) {
+	var out []byte
 	var err error
-	for i := 0; i < retries; i++ {
-		*out, err = cmd.CombinedOutput()
+
+	for i := 1; i <= retries; i++ {
+		cmd := exec.CommandContext(ctx, name, args...)
+		fmt.Printf("🔁 Capturing attempt %d: %s %s\n", i, name, joinArgs(args))
+		out, err = cmd.CombinedOutput()
+
 		if err == nil {
-			return nil
+			return out, nil
 		}
-		fmt.Printf("❌ Retry %d failed: %s\n", i+1, err)
-		time.Sleep(delay)
+
+		fmt.Printf("❌ attempt %d failed: %s\n", i, err)
+		if i < retries {
+			time.Sleep(delay)
+		}
 	}
-	return err
+
+	return out, fmt.Errorf("all %d attempts failed: %w\noutput:\n%s", retries, err, string(out))
 }

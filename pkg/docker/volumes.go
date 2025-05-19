@@ -1,3 +1,5 @@
+// pkg/docker/volumes.go
+
 package docker
 
 import (
@@ -14,7 +16,7 @@ import (
 // RemoveVolumes deletes the specified Docker volumes.
 func RemoveVolumes(volumes []string) error {
 	for _, volume := range volumes {
-		if err := execute.Execute("docker", "volume", "rm", volume); err != nil {
+		if err := execute.RunSimple("docker", "volume", "rm", volume); err != nil {
 			zap.L().Warn("Failed to remove volume", zap.String("volume", volume), zap.Error(err))
 			return fmt.Errorf("failed to remove volume %s: %w", volume, err)
 		}
@@ -34,7 +36,11 @@ func BackupVolume(volumeName, backupDir string) (string, error) {
 		"tar", "czf", fmt.Sprintf("/backup/%s", backupFile),
 		"-C", "/volume", ".",
 	}
-	if err := execute.Execute("docker", cmd...); err != nil {
+	_, err := execute.Run(execute.Options{
+		Command: "docker",
+		Args:    cmd,
+	})
+	if err != nil {
 		return "", fmt.Errorf("failed to backup volume %s: %w", volumeName, err)
 	}
 	return filepath.Join(backupDir, backupFile), nil
@@ -52,7 +58,7 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 		backupFile, err := BackupVolume(vol, backupDir)
 		if err != nil {
 			zap.L().Warn("Failed to backup volume", zap.String("volume", vol), zap.Error(err))
-			continue // skip this volume, continue with others
+			continue
 		}
 		backupResults[vol] = backupFile
 	}

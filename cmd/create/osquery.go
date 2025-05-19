@@ -58,7 +58,8 @@ var createOsQueryCmd = &cobra.Command{
 
 func installOsquery(arch string) error {
 	zap.L().Info("Creating /etc/apt/keyrings directory...")
-	if err := execute.Execute("mkdir", "-p", "/etc/apt/keyrings"); err != nil {
+	err := execute.RunSimple("mkdir", "-p", "/etc/apt/keyrings")
+	if err != nil {
 		return fmt.Errorf("mkdir keyrings: %w", err)
 	}
 
@@ -82,17 +83,20 @@ func installOsquery(arch string) error {
 
 	zap.L().Info("Writing osquery APT repository...")
 	repoLine := fmt.Sprintf("deb [arch=%s signed-by=/etc/apt/keyrings/osquery.asc] https://pkg.osquery.io/deb deb main", arch)
-	if err := execute.Execute("sh", "-c", fmt.Sprintf("echo '%s' > /etc/apt/sources.list.d/osquery.list", repoLine)); err != nil {
+	err = execute.RunSimple("sh", "-c", fmt.Sprintf("echo '%s' > /etc/apt/sources.list.d/osquery.list", repoLine))
+	if err != nil {
 		return fmt.Errorf("add repo: %w", err)
 	}
 
 	zap.L().Info("Updating APT cache...")
-	if err := execute.Execute("apt", "update"); err != nil {
+	err = execute.RunSimple("apt", "update")
+	if err != nil {
 		return fmt.Errorf("apt update: %w", err)
 	}
 
 	zap.L().Info("Installing osquery...")
-	if err := execute.Execute("apt", "install", "-y", "osquery"); err != nil {
+	err = execute.RunSimple("apt", "install", "-y", "osquery")
+	if err != nil {
 		return fmt.Errorf("apt install: %w", err)
 	}
 

@@ -42,9 +42,9 @@ var CreateDockerCmd = &cobra.Command{
 
 		addDockerRepo()
 		installDocker()
-		verifyDockerHelloWorld(true)
+		verifyDockerHelloWorld()
 		setupDockerNonRoot()
-		verifyDockerHelloWorld(false)
+		verifyDockerHelloWorld()
 
 		zap.L().Info("✅ Docker installation and post-install steps complete.")
 		return nil
@@ -61,12 +61,13 @@ func addDockerRepo() {
 	)
 	err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0644)
 	if err != nil {
-		// zap.L().Fatal will exit the application if repo file writing fails.
 		zap.L().Fatal("Error writing Docker repo file", zap.Error(err))
 	}
-	if err := execute.Execute("apt-get", "update"); err != nil {
+	if _, err := execute.Run(execute.Options{
+		Command: "apt-get",
+		Args:    []string{"update"},
+	}); err != nil {
 		zap.L().Error("Failed to update apt repositories", zap.Error(err))
-		return
 	}
 }
 
@@ -76,25 +77,31 @@ func installDocker() {
 		"docker-ce", "docker-ce-cli", "containerd.io",
 		"docker-buildx-plugin", "docker-compose-plugin",
 	}
-	args := append([]string{"apt", "install", "-y"}, packages...)
+	args := append([]string{"install", "-y"}, packages...)
 
-	if err := execute.Execute(args[0], args[1:]...); err != nil {
+	if _, err := execute.Run(execute.Options{
+		Command: "apt",
+		Args:    args,
+	}); err != nil {
 		zap.L().Error("Docker installation failed", zap.Error(err))
 	}
 }
 
-func verifyDockerHelloWorld(useSudo bool) {
+func verifyDockerHelloWorld() {
 	cmd := []string{"docker", "run", "hello-world"}
-	if useSudo {
-		cmd = append([]string{}, cmd...)
-	}
-	if err := execute.Execute(cmd[0], cmd[1:]...); err != nil {
+	if _, err := execute.Run(execute.Options{
+		Command: cmd[0],
+		Args:    cmd[1:],
+	}); err != nil {
 		zap.L().Error("'docker run hello-world' failed", zap.Error(err))
 	}
 }
 
 func setupDockerNonRoot() {
-	if err := execute.Execute("groupadd", "docker"); err != nil {
+	if _, err := execute.Run(execute.Options{
+		Command: "groupadd",
+		Args:    []string{"docker"},
+	}); err != nil {
 		zap.L().Warn("groupadd failed", zap.Error(err))
 	}
 
@@ -106,13 +113,16 @@ func setupDockerNonRoot() {
 	if user == "" || user == "root" {
 		zap.L().Warn("No non-root user detected; skipping usermod step.")
 	} else {
-		if err := execute.Execute("usermod", "-aG", "docker", user); err != nil {
+		if _, err := execute.Run(execute.Options{
+			Command: "usermod",
+			Args:    []string{"-aG", "docker", user},
+		}); err != nil {
 			zap.L().Warn("usermod failed", zap.Error(err))
 			return
 		}
-		// Use structured logging instead of fmt.Sprintf-style formatting.
 		zap.L().Info("User has been added to the docker group", zap.String("user", user))
 	}
+
 	zap.L().Info("Note: Log out and log back in or run 'newgrp docker' to apply group membership.")
 }
 

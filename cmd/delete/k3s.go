@@ -43,7 +43,7 @@ func uninstallK3s() error {
 				zap.String("role", role),
 				zap.String("path", path),
 			)
-			err := execute.Execute(path)
+			err := execute.RunSimple(path)
 			if err != nil {
 				zap.L().Error("❌ Script execution failed",
 					zap.String("role", role),

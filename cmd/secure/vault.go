@@ -56,7 +56,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 6️⃣ Disable swap (optional)
 		if swapOff {
-			if err := execute.Execute("swapoff", "-a"); err != nil {
+			if err := execute.RunSimple("swapoff", "-a"); err != nil {
 				log.Warn("⚠ Failed to disable swap; you may need root privileges", zap.Error(err))
 			} else {
 				log.Info("✅ Swap disabled")
@@ -65,7 +65,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 7️⃣ Disable core dumps (optional)
 		if coreDumpOff {
-			if err := execute.Execute("ulimit", "-c", "0"); err != nil {
+			if err := execute.RunSimple("ulimit", "-c", "0"); err != nil {
 				log.Warn("⚠ Failed to disable core dumps; update systemd unit with LimitCORE=0", zap.Error(err))
 			} else {
 				log.Info("✅ Core dumps disabled")

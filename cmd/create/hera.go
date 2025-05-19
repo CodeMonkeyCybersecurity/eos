@@ -68,7 +68,7 @@ var CreateHeraCmd = &cobra.Command{
 		} else {
 			// Download the latest docker-compose.yml from the remote URL
 			zap.L().Info("📦 Downloading latest docker-compose.yml")
-			if err := execute.ExecuteInDir(shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
+			if err := execute.RunSimple(shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
 				zap.L().Fatal("Failed to download docker-compose.yml", zap.Error(err))
 			}
 		}
@@ -128,12 +128,12 @@ var CreateHeraCmd = &cobra.Command{
 
 		// Pull images and deploy
 		zap.L().Info("🐳 Pulling docker images")
-		if err := execute.ExecuteInDir(shared.HeraDir, "docker", "compose", "pull"); err != nil {
+		if err := execute.RunSimple(shared.HeraDir, "docker", "compose", "pull"); err != nil {
 			zap.L().Fatal("Failed to pull docker images", zap.Error(err))
 		}
 
 		zap.L().Info("🚀 Launching Hera via docker compose")
-		if err := execute.ExecuteInDir(shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
+		if err := execute.RunSimple(shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
 			zap.L().Fatal("Failed to run docker compose", zap.Error(err))
 		}
 

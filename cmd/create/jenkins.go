@@ -1,4 +1,5 @@
 // cmd/create/jenkins.go
+
 package create
 
 import (
@@ -85,7 +86,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Deploy Jenkins with Docker Compose using the processed file
 		zap.L().Info("Deploying Jenkins with Docker Compose", zap.String("directory", shared.JenkinsDir))
-		if err := execute.ExecuteInDir(shared.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+		if err := execute.RunSimple(shared.JenkinsDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			zap.L().Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
@@ -105,7 +106,7 @@ var CreateJenkinsCmd = &cobra.Command{
 			containerName := "jenkins"
 
 			// Execute the command to retrieve the initial admin password from the container.
-			cmd := exec.Command( "docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
+			cmd := exec.Command("docker", "exec", containerName, "cat", "/var/jenkins_home/secrets/initialAdminPassword")
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				zap.L().Warn("Failed to retrieve initial admin password from container", zap.Error(err))

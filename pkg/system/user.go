@@ -5,13 +5,19 @@ package system
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
@@ -144,4 +150,98 @@ func SavePasswordToSecrets(username, password string) error {
 
 	zap.L().Info("🔐 eos credentials saved", zap.String("path", secretsPath))
 	return nil
+}
+
+func RunCreateUser(opts CreateUserOptions) error {
+	SetupSignalHandler()
+
+	if os.Geteuid() != 0 {
+		return errors.New("please run as root or with sudo")
+	}
+
+	username := opts.Username
+	if !opts.Auto {
+		input := interaction.PromptInput("Enter new username", "eos")
+		if input != "" {
+			username = input
+		}
+	}
+
+	if UserExists(username) {
+		zap.L().Warn("User already exists", zap.String("username", username))
+		return nil
+	}
+
+	shell := "/usr/sbin/nologin"
+	if opts.LoginShell {
+		zap.L().Info("Creating user with login shell")
+		shell = "/bin/bash"
+	} else {
+		zap.L().Info("Creating system user with no login shell")
+	}
+
+	zap.L().Info("Creating user", zap.String("username", username))
+	if err := execute.RunSimple("useradd", "-m", "-s", shell, username); err != nil {
+		return fmt.Errorf("failed to create user: %w", err)
+	}
+
+	var password string
+	if opts.Auto {
+		pw, err := crypto.GeneratePassword(20)
+		if err != nil {
+			return err
+		}
+		password = pw
+	} else {
+		pw1, err := interaction.PromptSecret("Enter password")
+		if err != nil {
+			return err
+		}
+		pw2, err := interaction.PromptSecret("Confirm password")
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(pw1) != strings.TrimSpace(pw2) {
+			return errors.New("passwords do not match")
+		}
+		password = strings.TrimSpace(pw1)
+	}
+
+	if err := SetPassword(username, password); err != nil {
+		return err
+	}
+
+	adminGroup := platform.GuessAdminGroup()
+	if !opts.Auto {
+		answer := interaction.PromptInput("Should this user have sudo privileges?", "yes")
+		if strings.TrimSpace(strings.ToLower(answer)) == "no" {
+			adminGroup = ""
+		}
+	}
+	if adminGroup != "" {
+		zap.L().Info("Granting admin privileges", zap.String("group", adminGroup))
+		if err := execute.RunSimple("usermod", "-aG", adminGroup, username); err != nil {
+			return fmt.Errorf("error adding to admin group: %w", err)
+		}
+	}
+
+	if err := CreateSSHKeys(username); err != nil {
+		return err
+	}
+
+	fmt.Println("✅ User created:", username)
+	fmt.Println("🔐 Password:", password)
+	fmt.Println("📁 SSH key:", "/home/"+username+"/.ssh/id_rsa")
+
+	return nil
+}
+
+func SetupSignalHandler() {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sig
+		fmt.Println("\n❌ Operation canceled.")
+		os.Exit(1)
+	}()
 }

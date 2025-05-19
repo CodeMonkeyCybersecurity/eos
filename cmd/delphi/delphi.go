@@ -5,8 +5,7 @@ package delphi
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/deploy"
-	read "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
@@ -31,7 +30,6 @@ var DelphiCmd = &cobra.Command{
 func init() {
 	// Register subcommands
 	DelphiCmd.AddCommand(create.CreateCmd)
-	DelphiCmd.AddCommand(deploy.DeployCmd)
 	DelphiCmd.AddCommand(read.ReadCmd)
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)

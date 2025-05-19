@@ -57,7 +57,7 @@ func EnsureEosUser(auto bool, loginShell bool) error {
 		shell = shared.EosShellBash
 	}
 
-	if err := execute.Execute("useradd", "-m", "-s", shell, username); err != nil {
+	if err := execute.RunSimple("useradd", "-m", "-s", shell, username); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 

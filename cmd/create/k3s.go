@@ -137,7 +137,7 @@ func deployK3s() {
 	fmt.Println("Check /var/log/eos/k3s-deploy.log for details.")
 	fmt.Println("To monitor logs in real time: tail -f /var/log/eos/k3s-deploy.log")
 
-	if err := execute.Execute("sh", scriptPath); err != nil {
+	if err := execute.RunSimple("sh", scriptPath); err != nil {
 		zap.L().Error("Failed to execute install script", zap.Error(err))
 		fmt.Println("Installation failed. Check logs for details.")
 		os.Exit(1)

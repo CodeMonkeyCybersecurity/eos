@@ -20,17 +20,17 @@ import (
 func DeployAndStoreSecrets(client *api.Client, path string, secrets map[string]string) error {
 	zap.L().Info("🚀 Starting Vault deployment")
 
-	if err := execute.ExecuteAndLog(shared.EosID, "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
+	if err := execute.RunSimple(shared.EosID, "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
 		zap.L().Error("Vault deploy failed", zap.Error(err))
 		return fmt.Errorf("vault deploy failed: %w", err)
 	}
 
-	if err := execute.ExecuteAndLog(shared.EosID, "enable", "vault"); err != nil {
+	if err := execute.RunSimple(shared.EosID, "enable", "vault"); err != nil {
 		zap.L().Warn("Vault enable failed — manual unseal may be required", zap.Error(err))
 		return fmt.Errorf("vault enable failed: %w", err)
 	}
 
-	if err := execute.ExecuteAndLog(shared.EosID, "secure", "vault"); err != nil {
+	if err := execute.RunSimple(shared.EosID, "secure", "vault"); err != nil {
 		zap.L().Error("Vault secure failed", zap.Error(err))
 		return fmt.Errorf("vault secure failed: %w", err)
 	}

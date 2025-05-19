@@ -38,7 +38,7 @@ func scheduleCron(cmd string, osPlatform string) error {
 	case "linux", "macos":
 		// Append the new schedule to the existing crontab.
 		crontabCmd := fmt.Sprintf("(crontab -l 2>/dev/null; echo \"%s\") | crontab -", schedule)
-		if err := execute.ExecuteAndLog("bash", "-c", crontabCmd); err != nil {
+		if err := execute.RunSimple("bash", "-c", crontabCmd); err != nil {
 			zap.L().Error("Failed to schedule cron job", zap.Error(err))
 			return err
 		}
@@ -53,7 +53,7 @@ func scheduleCron(cmd string, osPlatform string) error {
 	case "windows":
 		taskName := "EosSystemUpdate"
 		timeStr := fmt.Sprintf("%02d:%02d", hour, minute)
-		if err := execute.ExecuteAndLog("schtasks", "/Create", "/SC", "DAILY", "/TN", taskName, "/TR", cmd, "/ST", timeStr); err != nil {
+		if err := execute.RunSimple("schtasks", "/Create", "/SC", "DAILY", "/TN", taskName, "/TR", cmd, "/ST", timeStr); err != nil {
 			zap.L().Error("Failed to schedule Windows task", zap.Error(err))
 			return err
 		}

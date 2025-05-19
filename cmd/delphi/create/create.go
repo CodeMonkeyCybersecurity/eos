@@ -71,78 +71,85 @@ type PackageMapping struct {
 }
 
 func runMapping() {
-	cfg, err := delphi.ResolveConfig() // Combine into a single call if ReadConfig is redundant
+	cfg, err := delphi.ResolveConfig()
 	if err != nil {
 		zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
 	}
 
-	if cfg.Protocol == "" {
-		cfg.Protocol = "https"
-	}
-	if cfg.Port == "" {
-		cfg.Port = "55000"
-	}
-
-	apiURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
-	apiURL = strings.TrimRight(apiURL, "/")
-
-	zap.L().Info("Authenticating to Wazuh API", zap.String("url", apiURL))
+	baseURL := fmt.Sprintf("%s://%s:%s", defaultStr(cfg.Protocol, "https"), cfg.FQDN, defaultStr(cfg.Port, "55000"))
 	token, err := delphi.Authenticate(cfg)
 	if err != nil {
 		zap.L().Fatal("Authentication failed", zap.Error(err))
 	}
 
-	agentsEndpoint := fmt.Sprintf("%s/agents?select=id,os,version", apiURL)
-	req, err := http.NewRequest("GET", agentsEndpoint, nil)
+	resp, err := fetchAgents(baseURL, token)
 	if err != nil {
-		zap.L().Fatal("Error creating request", zap.Error(err))
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	tr := &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}
-	client := &http.Client{Transport: tr}
-	resp, err := client.Do(req)
-	if err != nil {
-		zap.L().Fatal("Error making request", zap.Error(err))
-	}
-	defer shared.SafeClose(resp.Body)
-
-	var agentsResp AgentsResponse
-	decoder := json.NewDecoder(resp.Body)
-	if err := decoder.Decode(&agentsResp); err != nil {
-		zap.L().Fatal("Failed to decode response", zap.Error(err))
+		zap.L().Fatal("Failed to fetch agents", zap.Error(err))
 	}
 
-	for _, agent := range agentsResp.Data.AffectedItems {
-		fmt.Printf("\nAgent %s:\n", agent.ID)
-		fmt.Printf("  OS Name: %s\n", agent.OS.Name)
-		fmt.Printf("  OS Version: %s\n", agent.OS.Version)
-		fmt.Printf("  Architecture: %s\n", agent.OS.Architecture)
+	for _, agent := range resp.Data.AffectedItems {
+		printAgentInfo(agent)
 
 		mappings := getMappings(agent.OS.Name)
 		if mappings == nil {
-			fmt.Printf("  No package mapping available for distribution: %s\n", agent.OS.Name)
+			fmt.Printf("  ❌ No mapping for distribution: %s\n", agent.OS.Name)
 			continue
 		}
-		majorVer, err := getMajorVersion(agent.OS.Version)
+
+		major, err := getMajorVersion(agent.OS.Version)
 		if err != nil {
-			fmt.Printf("  Error parsing OS version: %v\n", err)
+			fmt.Printf("  ⚠️  Could not parse version: %v\n", err)
 			continue
 		}
-		var found *PackageMapping
-		archLower := strings.ToLower(agent.OS.Architecture)
-		for _, m := range mappings {
-			if archLower == m.Arch && majorVer >= m.MinVersion {
-				found = &m
-				break
-			}
-		}
-		if found == nil {
-			fmt.Printf("  No package mapping found for %s %s (%s)\n", agent.OS.Name, agent.OS.Version, agent.OS.Architecture)
+
+		pkg := matchPackage(mappings, strings.ToLower(agent.OS.Architecture), major)
+		if pkg == "" {
+			fmt.Printf("  ❌ No suitable package for version %s (%s)\n", agent.OS.Version, agent.OS.Architecture)
 		} else {
-			fmt.Printf("  Appropriate package: %s\n", found.Package)
+			fmt.Printf("  ✅ Recommended package: %s\n", pkg)
 		}
 	}
+}
+
+func fetchAgents(baseURL, token string) (*AgentsResponse, error) {
+	url := strings.TrimRight(baseURL, "/") + "/agents?select=id,os,version"
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP error: %w", err)
+	}
+	defer shared.SafeClose(resp.Body)
+
+	var parsed AgentsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, fmt.Errorf("decode error: %w", err)
+	}
+	return &parsed, nil
+}
+
+func printAgentInfo(agent Agent) {
+	fmt.Printf("\n🖥️ Agent %s:\n", agent.ID)
+	fmt.Printf("  OS: %s %s (%s)\n", agent.OS.Name, agent.OS.Version, agent.OS.Architecture)
+}
+
+func matchPackage(mappings []PackageMapping, arch string, major int) string {
+	for _, m := range mappings {
+		if m.Arch == arch && major >= m.MinVersion {
+			return m.Package
+		}
+	}
+	return ""
+}
+
+func defaultStr(val, fallback string) string {
+	if val == "" {
+		return fallback
+	}
+	return val
 }
 
 func getMappings(distribution string) []PackageMapping {

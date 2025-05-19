@@ -88,7 +88,7 @@ var CreateUmamiCmd = &cobra.Command{
 		// Deploy Umami with Docker Compose using the processed file
 		zap.L().Info("Deploying Umami with Docker Compose",
 			zap.String("directory", shared.UmamiDir))
-		if err := execute.ExecuteInDir(shared.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+		if err := execute.RunSimple(shared.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
 			zap.L().Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 

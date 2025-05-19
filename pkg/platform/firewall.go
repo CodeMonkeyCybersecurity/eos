@@ -1,3 +1,5 @@
+// pkg/platform/firewall.go
+
 package platform
 
 import (
@@ -10,29 +12,33 @@ import (
 
 // AllowPorts opens multiple ports based on the system's firewall backend.
 func AllowPorts(ports []string) error {
-	if _, err := exec.LookPath("ufw"); err == nil {
+	switch {
+	case hasBinary("ufw"):
 		zap.L().Info("Using UFW for firewall changes")
 		return allowPortsUFW(ports)
-	}
-	if _, err := exec.LookPath("firewall-cmd"); err == nil {
+	case hasBinary("firewall-cmd"):
 		zap.L().Info("Using Firewalld for firewall changes")
 		return allowPortsFirewalld(ports)
-	}
-	if _, err := exec.LookPath("pfctl"); err == nil {
+	case hasBinary("pfctl"):
 		zap.L().Info("Detected macOS PF firewall — not yet supported")
 		return fmt.Errorf("macOS firewall (pfctl) support not yet implemented")
+	default:
+		zap.L().Warn("⚠️ No supported firewall backend found")
+		return fmt.Errorf("no supported firewall backend (ufw, firewalld, pfctl)")
 	}
-
-	zap.L().Warn("⚠️ No supported firewall backend found")
-	return fmt.Errorf("no supported firewall backend (ufw, firewalld, pfctl)")
 }
 
-// CheckFirewallStatus tries UFW, then iptables, and returns a string status.
+func hasBinary(name string) bool {
+	_, err := exec.LookPath(name)
+	return err == nil
+}
+
+// CheckFirewallStatus tries UFW, then iptables, and prints the firewall status.
 func CheckFirewallStatus() {
 	fmt.Println("🔍 Checking firewall status...")
 
-	if ufwPath, err := exec.LookPath("ufw"); err == nil {
-		zap.L().Info("UFW detected", zap.String("path", ufwPath))
+	if hasBinary("ufw") {
+		zap.L().Info("UFW detected")
 		out, err := exec.Command("ufw", "status", "verbose").CombinedOutput()
 		if err != nil {
 			zap.L().Warn("Failed to get UFW status", zap.Error(err))
@@ -42,8 +48,8 @@ func CheckFirewallStatus() {
 		return
 	}
 
-	if iptablesPath, err := exec.LookPath("iptables"); err == nil {
-		zap.L().Info("iptables detected", zap.String("path", iptablesPath))
+	if hasBinary("iptables") {
+		zap.L().Info("iptables detected")
 		out, err := exec.Command("iptables", "-L", "-n").CombinedOutput()
 		if err != nil {
 			zap.L().Warn("Failed to get iptables status", zap.Error(err))
@@ -57,32 +63,42 @@ func CheckFirewallStatus() {
 }
 
 func allowPortsUFW(ports []string) error {
-	if err := execute.Execute("ufw", "enable"); err != nil {
+	_, err := execute.Run(execute.Options{Command: "ufw", Args: []string{"enable"}})
+	if err != nil {
 		zap.L().Warn("UFW already enabled or error", zap.Error(err))
 	}
 
 	for _, port := range ports {
-		if err := execute.Execute("ufw", "allow", port); err != nil {
+		_, err := execute.Run(execute.Options{Command: "ufw", Args: []string{"allow", port}})
+		if err != nil {
 			zap.L().Error("Failed to allow port", zap.String("port", port), zap.Error(err))
 			return err
 		}
 	}
 
-	return execute.Execute("ufw", "reload")
+	_, err = execute.Run(execute.Options{Command: "ufw", Args: []string{"reload"}})
+	return err
 }
 
 func allowPortsFirewalld(ports []string) error {
-	if err := execute.Execute("firewall-cmd", "--state"); err != nil {
+	_, err := execute.Run(execute.Options{Command: "firewall-cmd", Args: []string{"--state"}})
+	if err != nil {
 		zap.L().Error("Firewalld not running", zap.Error(err))
 		return err
 	}
 
 	for _, port := range ports {
-		if err := execute.Execute("firewall-cmd", "--permanent", "--add-port="+port); err != nil {
+		arg := "--add-port=" + port
+		_, err := execute.Run(execute.Options{
+			Command: "firewall-cmd",
+			Args:    []string{"--permanent", arg},
+		})
+		if err != nil {
 			zap.L().Error("Failed to allow port in firewalld", zap.String("port", port), zap.Error(err))
 			return err
 		}
 	}
 
-	return execute.Execute("firewall-cmd", "--reload")
+	_, err = execute.Run(execute.Options{Command: "firewall-cmd", Args: []string{"--reload"}})
+	return err
 }

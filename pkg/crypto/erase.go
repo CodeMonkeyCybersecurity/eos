@@ -13,7 +13,7 @@ func SecureErase(path string) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
 	}
-	if err := execute.Execute("shred", "--remove", "--zero", "--iterations=3", path); err != nil {
+	if err := execute.RunSimple("shred", "--remove", "--zero", "--iterations=3", path); err != nil {
 		// fallback: just remove if shred is missing
 		return os.Remove(path)
 	}
