@@ -15,7 +15,7 @@ import (
 // UpdateCmd is the root command for update operations
 var UpdateCmd = &cobra.Command{
 	Use:     "update",
-	Aliases: []string{"upgrade", "modify", "change", "sync"},
+	Aliases: []string{"upgrade", "modify", "change"},
 	Short:   "Update resources (e.g., processes, users, storage)",
 	Long:    `The update command allows you to modify existing resources such as processes, users, or storage.`,
 
