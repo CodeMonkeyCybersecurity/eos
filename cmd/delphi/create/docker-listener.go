@@ -14,7 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
 var DockerListenerCmd = &cobra.Command{
 	Use:   "docker-listener",
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",

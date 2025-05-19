@@ -19,7 +19,7 @@ type Options struct {
 	Capture   bool            // Return captured output
 	LogFields []zap.Field     // Extra fields
 	Delay     time.Duration
-	Timeout time.Duration
-	DryRun bool        // Enable dry-run mode
-	Logger *zap.Logger // Optional logger (set externally)
+	Timeout   time.Duration
+	DryRun    bool        // Enable dry-run mode
+	Logger    *zap.Logger // Optional logger (set externally)
 }
