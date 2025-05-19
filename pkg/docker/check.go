@@ -3,46 +3,74 @@
 package docker
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
+
+	"github.com/docker/docker/client"
 )
 
-// CheckDockerContainers runs "docker ps" and logs its output.
+// CheckDockerContainers lists running containers using the Docker Go SDK.
 func CheckDockerContainers() error {
-	cmd := exec.Command( "docker", "ps")
-	output, err := cmd.CombinedOutput()
-	fmt.Println(string(output)) // Still prints to terminal for visibility
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return fmt.Errorf("failed to run docker ps: %v, output: %s", err, output)
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+
+	containers, err := cli.ContainerList(ctx, types.ContainerListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	if len(containers) == 0 {
+		fmt.Println("No running containers.")
+		return nil
+	}
+
+	for _, container := range containers {
+		fmt.Printf("Container ID: %s\tImage: %s\tNames: %v\n", container.ID[:12], container.Image, container.Names)
 	}
 
 	return nil
 }
 
-// CheckIfDockerInstalled checks if docker is installed.
+// CheckIfDockerInstalled checks if the Docker engine is available via the Go SDK.
 func CheckIfDockerInstalled() error {
-	return RunCommand("docker", "--version")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("docker not available: %w", err)
+	}
+
+	_, err = cli.Ping(ctx)
+	if err != nil {
+		return fmt.Errorf("docker engine not responding: %w", err)
+	}
+
+	return nil
 }
 
 // CheckIfDockerComposeInstalled checks for either 'docker compose' or 'docker-compose' and returns nil if one is found.
+// This still shells out, since Docker SDK doesn't cover Compose.
 func CheckIfDockerComposeInstalled() error {
-
-	// First check for the newer 'docker compose' plugin
 	if err := RunCommand("docker", "compose", "version"); err == nil {
 		return nil
 	}
-
-	// Fallback to the older 'docker-compose' binary
 	if err := RunCommand("docker-compose", "version"); err == nil {
 		return nil
 	}
-
-	return fmt.Errorf("docker compose not found")
+	return errors.New("docker compose not found")
 }
 
-/* RunCommand executes a command and returns an error if it fails. */
+// RunCommand executes a shell command and returns an error if it fails.
 func RunCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
