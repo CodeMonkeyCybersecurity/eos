@@ -5,12 +5,14 @@ package eoscli
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -50,6 +52,22 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 
 			duration := time.Since(start)
 			logger.LogCommandLifecycle(cmd.Name())(&err)
+
+			telemetry.TrackCommand(
+				ctx.Ctx,
+				cmd.Use,
+				err == nil,
+				duration.Milliseconds(),
+				map[string]string{
+					"os":         runtime.GOOS,
+					"arch":       runtime.GOARCH,
+					"args":       telemetry.TruncateOrHashArgs(args),
+					"vault_addr": addr,
+					"version":    "dev",                              // TODO: replace with shared/version
+					"category":   telemetry.CommandCategory(cmd.Use), // inferred grouping
+					"error_type": telemetry.ClassifyError(err),
+				},
+			)
 
 			if err != nil {
 				if eoserr.IsExpectedUserError(err) {

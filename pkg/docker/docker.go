@@ -17,7 +17,7 @@ func UninstallConflictingPackages() {
 		"podman-docker", "containerd", "runc",
 	}
 	for _, pkg := range packages {
-		_ = execute.Execute( "apt-get", "remove", "-y", pkg)
+		_ = execute.Execute("apt-get", "remove", "-y", pkg)
 	}
 }
 
@@ -28,8 +28,8 @@ func UninstallSnapDocker() {
 
 // InstallPrerequisitesAndGpg sets up apt and Docker GPG keys
 func InstallPrerequisitesAndGpg() {
-	_ = execute.Execute( "apt-get", "install", "-y", "ca-certificates", "curl")
-	_ = execute.Execute( "install", "-m", "vault.DirPermStandard", "-d", "/etc/apt/keyrings")
-	_ = execute.Execute( "curl", "-fsSL", "https://download.docker.com/linux/ubuntu/gpg", "-o", "/etc/apt/keyrings/docker.asc")
-	_ = execute.Execute( "chmod", "a+r", "/etc/apt/keyrings/docker.asc")
+	_ = execute.Execute("apt-get", "install", "-y", "ca-certificates", "curl")
+	_ = execute.Execute("install", "-m", "vault.DirPermStandard", "-d", "/etc/apt/keyrings")
+	_ = execute.Execute("curl", "-fsSL", "https://download.docker.com/linux/ubuntu/gpg", "-o", "/etc/apt/keyrings/docker.asc")
+	_ = execute.Execute("chmod", "a+r", "/etc/apt/keyrings/docker.asc")
 }

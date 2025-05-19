@@ -16,6 +16,7 @@ import (
 
 	// Subcommands
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/config"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
@@ -67,6 +68,7 @@ func RegisterCommands() {
 		read.ReadCmd,
 		update.UpdateCmd,
 		delete.DeleteCmd,
+		config.ConfigCmd,
 		refresh.RefreshCmd,
 		secure.SecureCmd,
 		disable.DisableCmd,
