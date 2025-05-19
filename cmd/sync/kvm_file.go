@@ -24,15 +24,28 @@ var (
 
 var SyncKVMFileCmd = &cobra.Command{
 	Use:   "kvm-file",
-	Short: "Transfer file from one KVM VM to another via the host",
+	Short: "Transfer a file from one KVM VM to another via the host",
+	Long: `Extracts a file from a source KVM virtual machine,
+stores it temporarily on the host with a timestamped filename,
+then injects it into a destination VM.
+
+Both VMs must be shut off for virt-copy to work.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		timestamp := time.Now().Format("20060102_150405")
 		filename := filepath.Base(sourcePath)
 		tempDir := "/var/lib/eos/transfer"
-		os.MkdirAll(tempDir, 0700)
+		if err := os.MkdirAll(tempDir, 0700); err != nil {
+			return fmt.Errorf("failed to create temp dir: %w", err)
+		}
 
 		intermediate := filepath.Join(tempDir, fmt.Sprintf("%s_from-%s_to-%s_%s", timestamp, sourceVM, destVM, filename))
-		ctx.Log.Info("Starting file sync", zap.String("source", sourceVM), zap.String("dest", destVM), zap.String("path", filename))
+		ctx.Log.Info("📤 Starting KVM file sync",
+			zap.String("sourceVM", sourceVM),
+			zap.String("sourcePath", sourcePath),
+			zap.String("destVM", destVM),
+			zap.String("destPath", destPath),
+			zap.String("hostTempFile", intermediate),
+		)
 
 		if err := kvm.CopyOutFromVM(sourceVM, sourcePath, intermediate); err != nil {
 			return fmt.Errorf("extract from %s failed: %w", sourceVM, err)
@@ -42,7 +55,7 @@ var SyncKVMFileCmd = &cobra.Command{
 			return fmt.Errorf("inject to %s failed: %w", destVM, err)
 		}
 
-		ctx.Log.Info("File transferred successfully", zap.String("from", sourceVM), zap.String("to", destVM))
+		ctx.Log.Info("✅ File transferred successfully", zap.String("from", sourceVM), zap.String("to", destVM))
 		return nil
 	}),
 }
