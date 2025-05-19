@@ -3,6 +3,8 @@
 package kvm
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
@@ -96,4 +98,66 @@ func backupNetplanConfigs() error {
 
 	fmt.Printf("🧾 Netplan configs backed up to %s\n", backupDir)
 	return nil
+}
+
+// GetAllVMsWithNetworkInfo returns a slice of every VM plus its network info.
+func GetAllVMsWithNetworkInfo() ([]VMEntry, error) {
+	// 1) virsh list --all → get name+state
+	out, err := exec.Command("virsh", "list", "--all").Output()
+	if err != nil {
+		return nil, fmt.Errorf("virsh list --all failed: %w", err)
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+
+	// Skip down to the data rows
+	for scanner.Scan() {
+		if strings.HasPrefix(scanner.Text(), " Id") {
+			break
+		}
+	}
+
+	// Parse each VM
+	var results []VMEntry
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+
+		name := fields[1]
+		state := strings.Join(fields[2:], " ")
+		vm := VMEntry{Name: name, State: state}
+
+		// 2) virsh domifaddr <name> → network, mac, proto, addr
+		if out2, err := exec.Command("virsh", "domifaddr", name).Output(); err == nil {
+			sc2 := bufio.NewScanner(bytes.NewReader(out2))
+			// skip header
+			for sc2.Scan() {
+				text := sc2.Text()
+				if strings.HasPrefix(text, " Name") {
+					continue
+				}
+				f2 := strings.Fields(text)
+				if len(f2) >= 4 {
+					vm.Network = f2[0]
+					vm.MACAddress = f2[1]
+					vm.Protocol = f2[2]
+					// drop the /mask suffix
+					vm.IPAddress = strings.SplitN(f2[3], "/", 2)[0]
+					break
+				}
+			}
+		}
+
+		results = append(results, vm)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
 }

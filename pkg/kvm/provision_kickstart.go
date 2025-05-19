@@ -15,7 +15,7 @@ import (
 )
 
 func ProvisionKickstartTenantVM(ctx *eosio.RuntimeContext, vmName, pubKeyPath string) error {
-	log := ctx.Log.Named("kvm.kickstart")
+	log := ctx.Log.Named("kickstart")
 	diskPath := filepath.Join(ImageDir, vmName+".qcow2")
 
 	ksPath, err := GenerateKickstartWithSSH(vmName, pubKeyPath)

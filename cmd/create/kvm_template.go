@@ -8,13 +8,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func runCreateKvmTemplate(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-	ctx.Log.Info("Stub: KVM template provisioning logic goes here")
-	return nil
-}
 
-func NewKvmTemplateCmd() *cobra.Command {
-	return &cobra.Command{
+
+var NewKvmTemplateCmd = &cobra.Command {
 		Use:   "template",
 		Short: "Provision a reusable KVM template image",
 		RunE:  eos.Wrap(runCreateKvmTemplate),
