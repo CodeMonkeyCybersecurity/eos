@@ -13,20 +13,55 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
+	cerr "github.com/cockroachdb/errors"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
 
 func Run(opts Options) (string, error) {
 	cmdStr := buildCommandString(opts.Command, opts.Args...)
 
-	// Use per-call logger if set, otherwise fallback
+	// Setup logger and context
 	logger := opts.Logger
 	if logger == nil {
 		logger = DefaultLogger
 	}
-	dry := opts.DryRun || DefaultDryRun
+	ctx := opts.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout(opts.Timeout))
+	defer cancel()
 
-	if dry {
+	// 📈 Start telemetry span
+	ctx, span := telemetry.StartSpan(ctx, "execute.Run")
+	defer span.End()
+	span.SetAttributes(
+		attribute.String("command", opts.Command),
+		attribute.Bool("shell", opts.Shell),
+		attribute.String("args", strings.Join(opts.Args, " ")),
+	)
+
+	// ✅ Validation
+	if opts.Struct != nil {
+		if err := verify.Struct(opts.Struct); err != nil {
+			span.RecordError(err)
+			logError(logger, "🚫 Struct validation failed", err)
+			return "", cerr.WithHint(err, "Struct-level validation failed")
+		}
+	}
+	if opts.SchemaPath != "" && opts.YAMLPath != "" {
+		if err := verify.ValidateYAMLWithCUE(opts.SchemaPath, opts.YAMLPath); err != nil {
+			span.RecordError(err)
+			logError(logger, "📄 CUE validation failed", err)
+			return "", cerr.WithHint(err, "Schema/YAML mismatch")
+		}
+	}
+
+	// 🧪 Dry-run
+	if opts.DryRun || DefaultDryRun {
 		logInfo(logger, "Dry-run: skipping execution", zap.String("command", cmdStr))
 		return "", nil
 	}
@@ -37,20 +72,12 @@ func Run(opts Options) (string, error) {
 	var err error
 
 	for i := 1; i <= max(1, opts.Retries); i++ {
-		ctx := opts.Ctx
-		if ctx == nil {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(context.Background(), defaultTimeout(opts.Timeout))
-			defer cancel()
-		}
-
 		var cmd *exec.Cmd
 		if opts.Shell {
 			cmd = exec.CommandContext(ctx, "bash", "-c", opts.Command)
 		} else {
 			cmd = exec.CommandContext(ctx, opts.Command, opts.Args...)
 		}
-
 		if opts.Dir != "" {
 			cmd.Dir = opts.Dir
 		}
@@ -69,6 +96,7 @@ func Run(opts Options) (string, error) {
 		}
 
 		summary := eoserr.ExtractSummary(output, 2)
+		span.RecordError(err)
 		logError(logger, "Execution failed", err,
 			zap.Int("attempt", i),
 			zap.String("command", cmdStr),
@@ -81,7 +109,7 @@ func Run(opts Options) (string, error) {
 	}
 
 	if err != nil {
-		return output, fmt.Errorf("command failed after %d attempts: %w", opts.Retries, err)
+		return output, cerr.Wrapf(err, "command failed after %d attempts", opts.Retries)
 	}
 
 	if opts.Capture {
@@ -103,12 +131,6 @@ func shellQuote(args []string) string {
 	}
 	return strings.Join(quoted, " ")
 }
-
-// Settable globals (optional, but encouraged to override per-call)
-var (
-	DefaultLogger *zap.Logger
-	DefaultDryRun bool
-)
 
 func logInfo(logger *zap.Logger, msg string, fields ...zap.Field) {
 	if logger != nil {

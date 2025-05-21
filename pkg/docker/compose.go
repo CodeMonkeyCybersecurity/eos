@@ -4,11 +4,15 @@ package docker
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	cerr "github.com/cockroachdb/errors"
 )
 
 // UncommentSegment finds the marker (e.g. "uncomment if using Jenkins behind Hecate")
@@ -132,4 +136,13 @@ func ExtractComposeMetadata(data []byte) ([]string, []string, []string) {
 	volumes := []string{"app_data", "db_data"}
 
 	return containers, images, volumes
+}
+
+func ComposeUp(path string) error {
+	_, err := execute.Run(execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "-f", path, "up", "-d"},
+		Ctx:     context.TODO(),
+	})
+	return cerr.WithHint(err, "Failed to run docker compose up")
 }

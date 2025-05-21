@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -14,6 +15,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+
+	cerr "github.com/cockroachdb/errors"
 )
 
 var CreateOllamaCmd = &cobra.Command{
@@ -25,8 +28,9 @@ var CreateOllamaCmd = &cobra.Command{
 			return errors.New("❌ this command is only supported on macOS")
 		}
 
-		if _, err := execute.RunShell("docker info > /dev/null 2>&1"); err != nil {
-			return fmt.Errorf("❌ Docker is not running. Start Docker Desktop and try again: %w", err)
+		if err := docker.CheckRunning(); err != nil {
+			log.Warn("Docker not running", zap.Error(err))
+			return cerr.WithHint(err, "Please start Docker Desktop before running this command")
 		}
 
 		if err := ollama.EnsureInstalled(log); err != nil {

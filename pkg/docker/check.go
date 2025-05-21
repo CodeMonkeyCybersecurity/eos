@@ -3,11 +3,15 @@
 package docker
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+
+	cerr "github.com/cockroachdb/errors"
 )
 
 // CheckDockerContainers lists running containers using the docker CLI.
@@ -47,23 +51,31 @@ func CheckIfDockerInstalled() error {
 // CheckIfDockerComposeInstalled checks for either 'docker compose' or 'docker-compose' and returns nil if one is found.
 // This still shells out, since Docker SDK doesn't cover Compose.
 func CheckIfDockerComposeInstalled() error {
-	if err := RunCommand("docker", "compose", "version"); err == nil {
+	_, err := execute.Run(execute.Options{
+		Command: "docker",
+		Args:    []string{"compose", "version"},
+		Ctx:     context.TODO(),
+	})
+	if err == nil {
 		return nil
 	}
-	if err := RunCommand("docker-compose", "version"); err == nil {
+
+	_, err = execute.Run(execute.Options{
+		Command: "docker-compose",
+		Args:    []string{"version"},
+		Ctx:     context.TODO(),
+	})
+	if err == nil {
 		return nil
 	}
+
 	return errors.New("docker compose not found")
 }
 
-// RunCommand executes a shell command and returns an error if it fails.
-func RunCommand(name string, args ...string) error {
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+func CheckRunning() error {
+	cmd := exec.Command("docker", "info")
 	if err := cmd.Run(); err != nil {
-		fmt.Printf("failed to execute command %s: %v\n", name, err)
-		return err
+		return cerr.Wrap(err, "Docker daemon is unavailable")
 	}
 	return nil
 }

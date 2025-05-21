@@ -50,8 +50,8 @@ func deployZabbix() error {
 
 	// Start the stack
 	zap.L().Info("Running docker compose up...")
-	if err := docker.RunCommand("docker", "compose", "-f", shared.ZabbixComposeYML, "up", "-d"); err != nil {
-		return fmt.Errorf("failed to run docker compose: %w", err)
+	if err := docker.ComposeUp(shared.ZabbixComposeYML); err != nil {
+		return err
 	}
 
 	return nil
