@@ -50,7 +50,10 @@ var CreateOllamaCmd = &cobra.Command{
 			return fmt.Errorf("invalid port: %d", port)
 		}
 		// Remove stale container
-		execute.RunShell("docker rm -f " + containerName)
+		out, err := execute.RunShell("docker rm -f " + containerName)
+		if err != nil {
+			log.Warn("⚠️ Failed to remove container", zap.Error(err), zap.String("output", out))
+		}
 
 		if err := ollama.RunWebUI(log, containerName, port, ollamaDir); err != nil {
 			return err

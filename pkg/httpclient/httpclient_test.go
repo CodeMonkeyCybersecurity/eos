@@ -2,6 +2,7 @@ package httpclient_test
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,6 +21,11 @@ func retryHandler(t *testing.T, failCount int, statusCode int) http.HandlerFunc 
 		}
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("ok"))
+
+		// ✅ Handle or acknowledge
+		if _, err := w.Write([]byte("ok")); err != nil {
+			log.Printf("write error: %v", err)
+		}
 	}
 }
 

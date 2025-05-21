@@ -241,7 +241,9 @@ func ChownRecursive(path string, uid, gid int) error {
 				firstErr = err
 			}
 		}
-		return nil
+		return fmt.Errorf("walk failed: %w", err)
+
 	})
+
 	return firstErr
 }

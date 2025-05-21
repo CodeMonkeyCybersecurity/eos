@@ -58,8 +58,14 @@ func init() {
 	SyncKVMFileCmd.Flags().StringVar(&kvm.SourcePath, "from-path", "", "Path to file inside source VM")
 	SyncKVMFileCmd.Flags().StringVar(&kvm.DestVM, "to-vm", "", "Destination VM name")
 	SyncKVMFileCmd.Flags().StringVar(&kvm.DestPath, "to-path", "", "Destination path inside destination VM")
-	SyncKVMFileCmd.MarkFlagRequired("from-vm")
-	SyncKVMFileCmd.MarkFlagRequired("from-path")
-	SyncKVMFileCmd.MarkFlagRequired("to-vm")
-	SyncKVMFileCmd.MarkFlagRequired("to-path")
+	must := func(err error) {
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	must(SyncKVMFileCmd.MarkFlagRequired("from-vm"))
+	must(SyncKVMFileCmd.MarkFlagRequired("from-path"))
+	must(SyncKVMFileCmd.MarkFlagRequired("to-vm"))
+	must(SyncKVMFileCmd.MarkFlagRequired("to-path"))
 }

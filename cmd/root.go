@@ -109,6 +109,8 @@ func startGlobalWatchdog(max time.Duration) {
 		timer := time.NewTimer(max)
 		<-timer.C
 		fmt.Fprintf(os.Stderr, "💣 EOS watchdog: global timeout (%s) exceeded. Forcing shutdown.\n", max)
-		syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+		if err := syscall.Kill(syscall.Getpid(), syscall.SIGKILL); err != nil {
+			zap.L().Error("Failed to send SIGKILL to self", zap.Error(err))
+		}
 	}()
 }

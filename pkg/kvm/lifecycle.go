@@ -5,6 +5,7 @@ package kvm
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -134,7 +135,11 @@ func getNextVMID() (string, error) {
 	if err := unix.Flock(int(fd.Fd()), unix.LOCK_EX); err != nil {
 		return "", fmt.Errorf("failed to lock ID file: %w", err)
 	}
-	defer unix.Flock(int(fd.Fd()), unix.LOCK_UN)
+	defer func() {
+		if err := unix.Flock(int(fd.Fd()), unix.LOCK_UN); err != nil {
+			log.Printf("unlock failed: %v", err)
+		}
+	}()
 
 	id := 1
 	data := make([]byte, 100)
