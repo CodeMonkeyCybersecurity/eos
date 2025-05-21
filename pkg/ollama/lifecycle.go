@@ -71,6 +71,11 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 		Args:    inspectRunning,
 	})
 
+	if isWebUIContainerRunningOnPort3000() {
+		log.Info("✅ OpenWebUI is already active — skipping container start")
+		return nil
+	}
+
 	if err == nil && strings.TrimSpace(output) == "true" {
 		log.Info("🔁 Web UI container already running")
 		return nil
