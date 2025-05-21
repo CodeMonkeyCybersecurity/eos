@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -47,7 +47,7 @@ func PhaseStartVaultAgentAndValidate(client *api.Client) error {
 func startVaultAgentService() error {
 	unit := shared.VaultAgentService
 	zap.L().Info("🔄 Enabling and starting service", zap.String("unit", unit))
-	if err := system.ReloadDaemonAndEnable(unit); err != nil {
+	if err := debian.ReloadDaemonAndEnable(unit); err != nil {
 		return err
 	}
 	return nil

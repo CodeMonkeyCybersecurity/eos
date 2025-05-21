@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -40,14 +40,14 @@ func runCrontabUpdate(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []stri
 	}
 
 	log.Info("🔍 Fetching current crontab...")
-	current, err := system.GetCrontab()
+	current, err := debian.GetCrontab()
 	if err != nil {
 		log.Error("❌ Failed to retrieve crontab", zap.Error(err))
 		return err
 	}
 
 	log.Info("🛟 Creating backup of existing crontab...")
-	backupPath, err := system.BackupCrontab(current)
+	backupPath, err := debian.BackupCrontab(current)
 	if err != nil {
 		log.Warn("⚠️ Could not create crontab backup", zap.Error(err))
 	} else {
@@ -55,10 +55,10 @@ func runCrontabUpdate(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []stri
 	}
 
 	log.Info("✏️ Patching crontab with MAILTO directive", zap.String("mailto", email))
-	updated := system.PatchMailto(current, email)
+	updated := debian.PatchMailto(current, email)
 
 	log.Info("📤 Applying updated crontab...")
-	if err := system.SetCrontab(updated); err != nil {
+	if err := debian.SetCrontab(updated); err != nil {
 		log.Error("❌ Failed to apply updated crontab", zap.Error(err))
 		return err
 	}

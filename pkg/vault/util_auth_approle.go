@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -86,7 +86,7 @@ func PhaseCreateAppRole(client *api.Client, log *zap.Logger, opts shared.AppRole
 func WriteAppRoleFiles(roleID, secretID string) error {
 	dir := filepath.Dir(shared.AppRolePaths.RoleID)
 	zap.L().Info("📁 Ensuring AppRole directory", zap.String("path", dir))
-	if err := system.EnsureOwnedDir(dir, 0o700, shared.EosID); err != nil {
+	if err := debian.EnsureOwnedDir(dir, 0o700, shared.EosID); err != nil {
 		return err
 	}
 
@@ -96,7 +96,7 @@ func WriteAppRoleFiles(roleID, secretID string) error {
 	}
 	for path, data := range pairs {
 		zap.L().Debug("✏️  Writing AppRole file", zap.String("path", path))
-		if err := system.WriteOwnedFile(path, []byte(data), 0o600, shared.EosID); err != nil {
+		if err := debian.WriteOwnedFile(path, []byte(data), 0o600, shared.EosID); err != nil {
 			return err
 		}
 	}

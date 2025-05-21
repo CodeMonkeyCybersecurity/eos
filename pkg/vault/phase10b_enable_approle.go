@@ -24,8 +24,8 @@ import (
 // │    ├── client.Logical().Write(shared.RolePath, roleData)
 // │    ├── vault.refreshAppRoleCreds(client)
 // │    └── vault.WriteAppRoleFiles(roleID, secretID)
-// │         ├── system.EnsureOwnedDir
-// │         └── system.WriteOwnedFile(role_id, secret_id)
+// │         ├── debian.EnsureOwnedDir
+// │         └── debian.WriteOwnedFile(role_id, secret_id)
 // └── Done
 
 func PhaseEnableAppRole(_ *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {

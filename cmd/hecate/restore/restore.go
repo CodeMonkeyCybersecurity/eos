@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -53,9 +53,9 @@ func RunAutoRestore(ts string) {
 	backupCompose := fmt.Sprintf("%s.%s.bak", shared.DefaultComposeYML, ts)
 
 	fmt.Printf("Restoring backups with timestamp %s...\n", ts)
-	system.RestoreDir(backupConf, shared.DefaultConfDir)
-	system.RestoreDir(backupCerts, shared.DefaultCertsDir)
-	system.RestoreFile(backupCompose, shared.DefaultComposeYML)
+	debian.RestoreDir(backupConf, shared.DefaultConfDir)
+	debian.RestoreDir(backupCerts, shared.DefaultCertsDir)
+	debian.RestoreFile(backupCompose, shared.DefaultComposeYML)
 }
 
 // runInteractiveRestore presents a menu to choose which resource(s) to restore.
@@ -89,33 +89,33 @@ func RunInteractiveRestore() {
 }
 
 func RestoreConf() {
-	backupConf, err := system.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultConfDir))
+	backupConf, err := debian.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultConfDir))
 	if err != nil {
 		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultConfDir, err)
 		return
 	}
 	fmt.Printf("Restoring configuration from backup: %s\n", backupConf)
-	system.RestoreDir(backupConf, shared.DefaultConfDir)
+	debian.RestoreDir(backupConf, shared.DefaultConfDir)
 }
 
 func RestoreCerts() {
-	backupCerts, err := system.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultCertsDir))
+	backupCerts, err := debian.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultCertsDir))
 	if err != nil {
 		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultCertsDir, err)
 		return
 	}
 	fmt.Printf("Restoring certificates from backup: %s\n", backupCerts)
-	system.RestoreDir(backupCerts, shared.DefaultCertsDir)
+	debian.RestoreDir(backupCerts, shared.DefaultCertsDir)
 }
 
 func RestoreCompose() {
-	backupCompose, err := system.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultComposeYML))
+	backupCompose, err := debian.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultComposeYML))
 	if err != nil {
 		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultComposeYML, err)
 		return
 	}
 	fmt.Printf("Restoring docker-compose file from backup: %s\n", backupCompose)
-	system.RestoreFile(backupCompose, shared.DefaultComposeYML)
+	debian.RestoreFile(backupCompose, shared.DefaultComposeYML)
 }
 
 func init() {

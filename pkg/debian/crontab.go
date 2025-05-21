@@ -1,5 +1,5 @@
 // pkg/system/crontab.go
-package system
+package debian
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 )
 
 func GetCrontab() (string, error) {
-	cmd := exec.Command( "crontab", "-l")
+	cmd := exec.Command("crontab", "-l")
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	if err := cmd.Run(); err != nil {
@@ -47,7 +47,7 @@ func PatchMailto(crontab, email string) string {
 }
 
 func SetCrontab(content string) error {
-	cmd := exec.Command( "crontab", "-")
+	cmd := exec.Command("crontab", "-")
 	cmd.Stdin = strings.NewReader(content)
 	return cmd.Run()
 }

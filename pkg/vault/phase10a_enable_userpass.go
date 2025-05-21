@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -108,17 +108,17 @@ func WriteUserpassCredentialsFallback(password string) error {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
 
-	if err := system.WriteOwnedFile(shared.EosUserPassPasswordFile, []byte(password+"\n"), 0o600, shared.EosID); err != nil {
+	if err := debian.WriteOwnedFile(shared.EosUserPassPasswordFile, []byte(password+"\n"), 0o600, shared.EosID); err != nil {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
 	zap.L().Info("✅ Userpass password written to fallback file", zap.String("path", shared.EosUserPassPasswordFile))
 
-	uid, gid, err := system.LookupUser(shared.EosID)
+	uid, gid, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		return fmt.Errorf("lookup eos uid/gid: %w", err)
 	}
 
-	if err := system.ChownRecursive(shared.SecretsDir, uid, gid); err != nil {
+	if err := debian.ChownRecursive(shared.SecretsDir, uid, gid); err != nil {
 		zap.L().Warn("⚠️ Failed to enforce EOS ownership after writing userpass fallback", zap.Error(err))
 	}
 

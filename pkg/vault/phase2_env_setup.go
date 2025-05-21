@@ -13,8 +13,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -41,7 +41,7 @@ func PrepareEnvironment() error {
 	if _, err := EnsureVaultEnv(); err != nil {
 		return err
 	}
-	if err := system.EnsureEosUser(true, false); err != nil {
+	if err := debian.EnsureEosUser(true, false); err != nil {
 		return err
 	}
 	if err := EnsureVaultDirs(); err != nil {
@@ -61,7 +61,7 @@ func EnsureVaultEnv() (string, error) {
 		return cur, nil
 	}
 
-	host := system.GetInternalHostname()
+	host := debian.GetInternalHostname()
 	candidates := []string{
 		fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort),
 		fmt.Sprintf(shared.VaultDefaultAddr, host),
@@ -116,7 +116,7 @@ func EnsureVaultDirs() error {
 }
 
 func createBaseDirs() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosID)
+	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
 		return fmt.Errorf("critical: eos system user not found: %w", err)
@@ -148,14 +148,14 @@ func createBaseDirs() error {
 }
 
 func secureVaultDirOwnership() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosID)
+	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)
 	}
 
 	zap.L().Info("🔧 Recursively fixing Vault directory ownership", zap.String("path", shared.VaultDir))
-	return system.ChownRecursive(shared.VaultDir, eosUID, eosGID)
+	return debian.ChownRecursive(shared.VaultDir, eosUID, eosGID)
 }
 
 func PrepareVaultAgentEnvironment() error {
@@ -183,7 +183,7 @@ func ValidateVaultAgentRuntimeEnvironment() error {
 	zap.L().Info("🔍 Validating Vault Agent runtime environment")
 
 	// Resolve eos user UID and GID safely
-	eosUID, eosGID, err := system.LookupUser(shared.EosID)
+	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)

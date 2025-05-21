@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -68,7 +68,7 @@ func GenerateTLS() error {
 
 func EnsureVaultTLS() (string, string, error) {
 	// Quick check if files exist
-	if !system.FileExists(shared.TLSKey) || !system.FileExists(shared.TLSCrt) {
+	if !debian.FileExists(shared.TLSKey) || !debian.FileExists(shared.TLSCrt) {
 		zap.L().Warn("🔐 TLS certs missing — triggering generation")
 		if err := GenerateVaultTLSCert(); err != nil {
 			return "", "", fmt.Errorf("failed to generate Vault TLS certs: %w", err)
@@ -130,7 +130,7 @@ func TrustVaultCA_RHEL() error {
 	)
 
 	// copy the file (overwrite if needed)
-	if err := system.CopyFile(src, dest, shared.FilePermStandard); err != nil {
+	if err := debian.CopyFile(src, dest, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	// ensure root owns it
@@ -159,7 +159,7 @@ func TrustVaultCA_Debian() error {
 	zap.L().Info("📥 Installing Vault CA into Debian trust store",
 		zap.String("src", src), zap.String("dest", dest))
 
-	if err := system.CopyFile(src, dest, shared.FilePermStandard); err != nil {
+	if err := debian.CopyFile(src, dest, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	if err := os.Chown(dest, 0, 0); err != nil {
@@ -193,12 +193,12 @@ func GenerateVaultTLSCert() error {
 		zap.L().Warn("⚠️ Could not verify SAN TLS cert status", zap.Error(err))
 	}
 
-	if system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt) {
+	if debian.FileExists(shared.TLSKey) && debian.FileExists(shared.TLSCrt) {
 		zap.L().Info("✅ TLS certs already exist after SAN check, skipping")
 		return nil
 	}
 
-	hostname := system.GetInternalHostname()
+	hostname := debian.GetInternalHostname()
 	publicHostname, _ := os.Hostname()
 	zap.L().Debug("🔎 Got internal hostname for SAN", zap.String("hostname", hostname))
 
@@ -336,11 +336,11 @@ func removeBadTLSCerts() error {
 }
 
 func tlsCertsExist() bool {
-	return system.FileExists(shared.TLSKey) && system.FileExists(shared.TLSCrt)
+	return debian.FileExists(shared.TLSKey) && debian.FileExists(shared.TLSCrt)
 }
 
 func secureVaultTLSOwnership() error {
-	uid, gid, err := system.LookupUser(shared.EosID)
+	uid, gid, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Warn("could not lookup eos user", zap.Error(err))
 		return err
@@ -377,7 +377,7 @@ func EnsureVaultAgentCAExists() error {
 	src := shared.TLSCrt
 	dst := shared.VaultAgentCACopyPath
 
-	if system.FileExists(dst) {
+	if debian.FileExists(dst) {
 		zap.L().Debug("✅ Vault Agent CA cert already exists", zap.String("path", dst))
 		return nil
 	}
@@ -385,11 +385,11 @@ func EnsureVaultAgentCAExists() error {
 	zap.L().Warn("⚠️ Vault Agent CA cert missing, attempting to re-copy",
 		zap.String("src", src), zap.String("dst", dst))
 
-	if err := system.CopyFile(src, dst, shared.FilePermStandard); err != nil {
+	if err := debian.CopyFile(src, dst, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("failed to copy Vault Agent CA cert: %w", err)
 	}
 
-	uid, gid, err := system.LookupUser(shared.EosID)
+	uid, gid, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Warn("could not lookup eos user for CA cert ownership", zap.Error(err))
 		return err
@@ -432,7 +432,7 @@ func checkTLSCertForSAN(certPath string) (bool, error) {
 }
 
 func secureTLSFiles() error {
-	eosUID, eosGID, err := system.LookupUser(shared.EosID) // 🔥 Change back to eos
+	eosUID, eosGID, err := debian.LookupUser(shared.EosID) // 🔥 Change back to eos
 	if err != nil {
 		zap.L().Error("⚠️ Could not resolve eos UID/GID for TLS files", zap.Error(err))
 	}

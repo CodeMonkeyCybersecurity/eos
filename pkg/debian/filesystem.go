@@ -1,6 +1,6 @@
-// pkg/system/filesystem.go
+// pkg/system/filedebian.go
 
-package system
+package debian
 
 import (
 	"context"

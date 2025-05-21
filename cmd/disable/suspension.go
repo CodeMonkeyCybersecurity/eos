@@ -27,7 +27,7 @@ var disableSuspensionCmd = &cobra.Command{
 
 		if runtime.GOOS != "linux" {
 			zap.L().Warn("System suspension disabling is only supported on Linux.")
-			fmt.Println("❌ This command is not supported on your operating system.")
+			fmt.Println("❌ This command is not supported on your operating debian.")
 			return nil
 		}
 

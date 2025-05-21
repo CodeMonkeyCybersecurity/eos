@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"go.uber.org/zap"
 )
 
@@ -93,7 +93,7 @@ func EnsureNginxDirs() error {
 	log := zap.L().Named("hecate-nginx-setup")
 
 	dirs := []string{HecateConfDDir, HecateStreamDir}
-	if err := system.EnsureDirs(dirs); err != nil {
+	if err := debian.EnsureDirs(dirs); err != nil {
 		log.Error("Failed to ensure Nginx directories", zap.Error(err))
 		return err
 	}

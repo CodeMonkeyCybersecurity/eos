@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 )
 
 //
@@ -23,20 +23,20 @@ func DeployApp(app string, cmd *cobra.Command) error {
 
 	// Check if the required HTTP config exists
 	httpConfig := filepath.Join(AssetsPath, "servers", app+".conf")
-	if !system.Exists(httpConfig) {
+	if !debian.Exists(httpConfig) {
 		zap.L().Error("Missing HTTP config file", zap.String("file", httpConfig))
 		return fmt.Errorf("missing Nginx HTTP config for %s", app)
 	}
 
 	// Copy HTTP config
-	if err := system.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf"), 0); err != nil {
+	if err := debian.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf"), 0); err != nil {
 		return fmt.Errorf("failed to copy HTTP config: %w", err)
 	}
 
 	// Copy Stream config if available
 	streamConfig := filepath.Join(AssetsPath, "stream", app+".conf")
-	if system.Exists(streamConfig) {
-		if err := system.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf"), 0); err != nil {
+	if debian.Exists(streamConfig) {
+		if err := debian.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf"), 0); err != nil {
 			return fmt.Errorf("failed to copy Stream config: %w", err)
 		}
 	}

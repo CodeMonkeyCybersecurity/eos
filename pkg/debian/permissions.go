@@ -1,6 +1,6 @@
 // pkg/system/permissions.go
 
-package system
+package debian
 
 import (
 	"fmt"

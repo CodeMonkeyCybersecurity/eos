@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -22,7 +22,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-logs")
 
-		if !system.IsPrivilegedUser() {
+		if !debian.IsPrivilegedUser() {
 			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 

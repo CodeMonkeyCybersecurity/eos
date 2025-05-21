@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 def check_docker_installed():
-    """Check if Docker is installed on the system."""
+    """Check if Docker is installed on the debian."""
     try:
         subprocess.run(['docker', '--version'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError:

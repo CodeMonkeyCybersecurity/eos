@@ -9,7 +9,7 @@ check_error() {
 }
 
 # Update system
-echo "Updating the system..."
+echo "Updating the debian..."
 sudo apt update && sudo apt upgrade -y
 check_error "System update failed"
 

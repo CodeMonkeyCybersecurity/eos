@@ -5,7 +5,11 @@ package ollama
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -24,6 +28,24 @@ func EnsureInstalled(log *zap.Logger) error {
 		}
 		log.Info("✅ Ollama installed")
 	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get user home dir: %w", err)
+	}
+	ollamaDir := filepath.Join(home, ".ollama")
+	serveLogPath := filepath.Join(ollamaDir, "serve.log")
+
+	if err := os.MkdirAll(ollamaDir, 0755); err != nil {
+		return fmt.Errorf("failed to create ollama config dir: %w", err)
+	}
+
+	// Always ensure `ollama serve` is running
+	if !platform.IsProcessRunning("ollama serve") {
+		log.Info("🚀 Starting Ollama serve process")
+		_ = StartServeProcess(log, serveLogPath)
+	}
+
 	return nil
 }
 
@@ -41,22 +63,37 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 	ctx, span := telemetry.StartSpan(ctx, "ollama.RunWebUI")
 	defer span.End()
 
-	const image = "ghcr.io/ollama-webui/ollama-webui:main"
+	// Check if container is already running
+	inspectRunning := []string{"inspect", "-f", "{{.State.Running}}", cfg.Container}
+	output, err := execute.Run(execute.Options{
+		Ctx:     ctx,
+		Command: "docker",
+		Args:    inspectRunning,
+	})
+
+	if err == nil && strings.TrimSpace(output) == "true" {
+		log.Info("🔁 Web UI container already running")
+		return nil
+	}
+
+	const image = "ghcr.io/open-webui/open-webui:main"
 	runArgs := []string{
-		"run", "--rm", "--name", cfg.Container,
-		"-p", fmt.Sprintf("%d:3000", cfg.Port),
-		"-v", fmt.Sprintf("%s:/root/.ollama", cfg.Volume),
+		"run", "-d", "--name", cfg.Container,
+		"-p", fmt.Sprintf("%d:8080", cfg.Port),
+		"--add-host=host.docker.internal:host-gateway",
+		"-v", "open-webui:/app/backend/data",
+		"--restart", "always",
 		image,
 	}
 
 	log = log.With(
 		zap.String("container", cfg.Container),
 		zap.Int("port", cfg.Port),
-		zap.String("volume", cfg.Volume),
+		zap.String("volume", "open-webui"),
 	)
 
 	log.Info("📥 Inspecting local image cache", zap.String("image", image))
-	_, err := execute.Run(execute.Options{
+	_, err = execute.Run(execute.Options{
 		Ctx:     ctx,
 		Command: "docker",
 		Args:    []string{"inspect", "--type=image", image},
@@ -79,23 +116,54 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 		log.Info("✅ Image pulled successfully")
 	}
 
-	// Step 2: Retry container launch
-	maxRetries := 3
-	for i := 1; i <= maxRetries; i++ {
-		log.Info("🚀 Launching Web UI container", zap.Int("attempt", i))
-		_, err := execute.Run(execute.Options{
-			Ctx:     ctx,
-			Command: "docker",
-			Args:    runArgs,
-		})
-		if err == nil {
-			log.Info("✅ Web UI started successfully")
-			return nil
+	log.Info("🚀 Launching Web UI container")
+	_, runErr := execute.Run(execute.Options{
+		Ctx:     ctx,
+		Command: "docker",
+		Args:    runArgs,
+	})
+	if runErr != nil {
+		span.RecordError(runErr)
+		log.Error("❌ Web UI launch failed", zap.Error(runErr))
+		return cerr.WithHint(runErr, "Docker container failed to start")
+	}
+
+	log.Info("✅ Web UI container started")
+
+	if !waitForBackend(ctx, log, "http://host.docker.internal:11434", 15*time.Second) {
+		return cerr.New("Ollama backend is not reachable — the Web UI may fail to connect")
+	}
+	return nil
+}
+
+func waitForBackend(ctx context.Context, log *zap.Logger, url string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	triedServe := false
+
+	for time.Now().Before(deadline) {
+		req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+		resp, err := http.DefaultClient.Do(req)
+		if err == nil && resp.StatusCode == 200 {
+			_ = resp.Body.Close()
+			log.Info("✅ Ollama backend reachable", zap.String("url", url))
+			return true
 		}
-		log.Warn("❌ Web UI launch failed", zap.Int("attempt", i), zap.Error(err))
-		span.RecordError(err)
+
+		if !triedServe {
+			log.Warn("🔁 Backend not reachable — attempting to start `ollama serve`")
+			home, err := os.UserHomeDir()
+			if err == nil {
+				logPath := filepath.Join(home, ".ollama", "serve.log")
+				_ = StartServeProcess(log, logPath)
+				triedServe = true
+			} else {
+				log.Warn("❌ Could not resolve user home directory to start serve", zap.Error(err))
+			}
+		}
+
 		time.Sleep(2 * time.Second)
 	}
 
-	return cerr.Newf("failed to start Web UI after %d attempts", maxRetries)
+	log.Warn("⚠️ Ollama backend did not become available in time", zap.String("url", url))
+	return false
 }

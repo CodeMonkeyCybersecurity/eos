@@ -1,5 +1,5 @@
 // pkg/system/check.go
-package system
+package debian
 
 import (
 	"bufio"

@@ -15,7 +15,7 @@ import (
 var CreateProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Create a new process",
-	Long:  `This command allows you to create a new process in the system.`,
+	Long:  `This command allows you to create a new process in the debian.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			zap.L().Fatal("Please provide details to create a process.")

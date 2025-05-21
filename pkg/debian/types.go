@@ -1,6 +1,6 @@
 // pkg/system/types.go
 
-package system
+package debian
 
 type CreateUserOptions struct {
 	Username   string

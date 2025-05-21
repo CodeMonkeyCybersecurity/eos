@@ -54,7 +54,7 @@ func installTrivy(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 var CreateTrivyCmd = &cobra.Command{
 	Use:   "trivy",
 	Short: "Install Trivy vulnerability scanner",
-	Long: `This command installs the Trivy vulnerability scanner on your system.
+	Long: `This command installs the Trivy vulnerability scanner on your debian.
  It performs the following steps:
    1. Installs required packages (wget, gnupg)
    2. Imports the Trivy public key and adds the Trivy APT repository

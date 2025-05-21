@@ -4,10 +4,10 @@ package delete
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -38,7 +38,7 @@ func uninstallK3s() error {
 
 	var ranAny bool
 	for role, path := range scripts {
-		if system.Exists(path) {
+		if debian.Exists(path) {
 			zap.L().Info("▶ Detected uninstall script",
 				zap.String("role", role),
 				zap.String("path", path),

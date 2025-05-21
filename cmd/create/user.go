@@ -3,10 +3,10 @@
 package create
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 )
 
@@ -21,12 +21,12 @@ var CreateUserCmd = &cobra.Command{
 	Short: "Create a new Linux user",
 	Long:  `Creates a new user account and optionally adds them to the admin group, generates SSH keys, and sets a secure password.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		opts := system.CreateUserOptions{
+		opts := debian.CreateUserOptions{
 			Username:   username,
 			Auto:       auto,
 			LoginShell: loginShell,
 		}
-		return system.RunCreateUser(opts)
+		return debian.RunCreateUser(opts)
 	}),
 }
 

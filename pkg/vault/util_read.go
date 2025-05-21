@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -80,7 +80,7 @@ func ReadFallbackJSON[T any](path string, target *T) error {
 // ReadVaultSecureData loads vault_init and userpass fallback files.
 func ReadVaultSecureData(client *api.Client) (*api.InitResponse, shared.UserpassCreds, []string, string) {
 	zap.L().Info("🔐 Starting secure Vault bootstrap sequence")
-	if err := system.EnsureEosUser(true, false); err != nil {
+	if err := debian.EnsureEosUser(true, false); err != nil {
 		zap.L().Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
 

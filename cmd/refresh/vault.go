@@ -5,9 +5,9 @@ package refresh
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -29,14 +29,14 @@ var VaultRefreshCmd = &cobra.Command{
 		log := ctx.Log.Named("refresh-vault")
 
 		// Check if we are root or have sudo privileges
-		if err := system.EnsureEosSudoReady(); err != nil {
+		if err := debian.EnsureEosSudoReady(); err != nil {
 			log.Error("❌ Required privileges not available", zap.Error(err))
 			fmt.Println("👉 Please run: sudo -v && eos refresh vault --unseal")
 			return fmt.Errorf("insufficient privileges: %w", err)
 		}
 
 		log.Info("🔄 Refreshing Vault service...")
-		if err := system.RestartSystemdUnitWithRetry("vault", 3, 2); err != nil {
+		if err := debian.RestartSystemdUnitWithRetry("vault", 3, 2); err != nil {
 			return fmt.Errorf("vault restart failed: %w", err)
 		}
 

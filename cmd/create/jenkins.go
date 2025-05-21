@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
@@ -127,7 +127,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		zap.L().Info("Jenkins installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", system.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8059 to access Jenkins. In line with best practice, change your password immediately.", debian.GetInternalHostname())))
 
 		return nil
 	}),

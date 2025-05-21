@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
 )
@@ -37,20 +37,20 @@ func ResolveVaultConfigDir(distro string) string {
 
 // Make this the go-to for Step 2. Keep EnsureVault(...) clean by calling this inline.
 func EnsureVaultUserLifecycle(client *api.Client) error {
-	if err := system.EnsureEosUser(true, false); err != nil {
+	if err := debian.EnsureEosUser(true, false); err != nil {
 		return err
 	}
 	if err := EnsureVaultDirs(); err != nil {
 		return err
 	}
-	if err := system.EnsureSudoersEntryForEos(true); err != nil {
+	if err := debian.EnsureSudoersEntryForEos(true); err != nil {
 		return err
 	}
 	if err := EnsureVaultAuthMethods(client); err != nil {
 		return err
 	}
 
-	if err := system.ValidateEosSudoAccess(); err != nil {
+	if err := debian.ValidateEosSudoAccess(); err != nil {
 		return err
 
 	}

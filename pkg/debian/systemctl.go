@@ -1,6 +1,6 @@
 // pkg/system/systemctl.go
 
-package system
+package debian
 
 import (
 	"bytes"

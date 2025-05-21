@@ -12,8 +12,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -24,7 +24,7 @@ import (
 // StartVaultService()
 //  ├── WriteVaultServerSystemdUnit()
 //  ├── ValidateVaultConfig()   [⚠ external, not defined in this file]
-//  ├── system.ReloadDaemonAndEnable()  [⚠ external]
+//  ├── debian.ReloadDaemonAndEnable()  [⚠ external]
 //  ├── ensureVaultDataDir()    [⚠ external, not defined in this file]
 //  ├── startVaultSystemdService()
 //  ├── waitForVaultHealth()
@@ -41,7 +41,7 @@ import (
 //  └── shared.SafeClose()           [⚠ external]
 
 // ValidateCriticalPaths()
-//  └── system.LookupUser()          [⚠ external]
+//  └── debian.LookupUser()          [⚠ external]
 
 // StartVaultService installs, enables, and starts the Vault SERVER (vault.service).
 func StartVaultService() error {
@@ -57,7 +57,7 @@ func StartVaultService() error {
 	}
 
 	zap.L().Info("🔄 Reloading systemd daemon and enabling vault.service")
-	if err := system.ReloadDaemonAndEnable(shared.VaultServiceName); err != nil {
+	if err := debian.ReloadDaemonAndEnable(shared.VaultServiceName); err != nil {
 		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
 
@@ -135,7 +135,7 @@ func ValidateCriticalPaths() error {
 		shared.VaultDataPath, // /opt/vault/data
 	}
 
-	eosUID, eosGID, err := system.LookupUser(shared.EosID)
+	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve eos user UID/GID: %w", err)
 	}

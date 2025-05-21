@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"go.uber.org/zap"
 )
 
@@ -55,7 +55,7 @@ func BuildAndPlaceCaddyfile(spec CaddySpec) error {
 	}
 
 	// Move to /opt/hecate
-	if err := system.CopyFile("Caddyfile", HecateCaddyfile, 0644); err != nil {
+	if err := debian.CopyFile("Caddyfile", HecateCaddyfile, 0644); err != nil {
 		return fmt.Errorf("failed to move Caddyfile: %w", err)
 	}
 
@@ -97,7 +97,7 @@ func GenerateCaddySpecMulti(spec CaddySpec) string {
 // EnsureCaddyDirs ensures required directories exist.
 func EnsureCaddyDirs() error {
 	dirs := []string{HecateCertsDir, HecateAssetsDir, HecateLogsDir}
-	return system.EnsureDirs(dirs)
+	return debian.EnsureDirs(dirs)
 }
 
 // writeFile writes content to a file.

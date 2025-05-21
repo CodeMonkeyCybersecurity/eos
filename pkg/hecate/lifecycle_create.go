@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +22,7 @@ func OrchestrateHecateWizard() error {
 	log.Info("🚀 Welcome to the Hecate setup wizard!")
 
 	// Phase 0: Ensure the base /opt/hecate directory is present
-	if err := system.EnsureDir(BaseDir); err != nil {
+	if err := debian.EnsureDir(BaseDir); err != nil {
 		log.Error("Failed to create /opt/hecate directory", zap.Error(err))
 		return fmt.Errorf("failed to create /opt/hecate directory: %w", err)
 	}

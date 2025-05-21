@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -61,7 +61,7 @@ var CreateHeraCmd = &cobra.Command{
 			for _, file := range composeFiles {
 				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
 				zap.L().Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
-				if err := system.CopyFile(file, destFile, 0); err != nil {
+				if err := debian.CopyFile(file, destFile, 0); err != nil {
 					zap.L().Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}
 			}

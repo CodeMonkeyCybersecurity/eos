@@ -14,7 +14,7 @@ import (
 var DeleteStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Delete storage resources",
-	Long:  `This command allows you to delete storage resources in the system.`,
+	Long:  `This command allows you to delete storage resources in the debian.`,
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			zap.L().Fatal("Please specify the storage details to delete.")

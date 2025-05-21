@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -24,7 +24,7 @@ var CreateDockerCmd = &cobra.Command{
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Assume that 'log' is globally defined or available in context.
-		system.RequireRoot()
+		debian.RequireRoot()
 
 		zap.L().Info("Uninstalling conflicting Docker packages...")
 		docker.UninstallConflictingPackages()
@@ -52,8 +52,8 @@ var CreateDockerCmd = &cobra.Command{
 }
 
 func addDockerRepo() {
-	arch := system.GetArchitecture()
-	codename := system.GetUbuntuCodename()
+	arch := debian.GetArchitecture()
+	codename := debian.GetUbuntuCodename()
 
 	repoLine := fmt.Sprintf(
 		"deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n",

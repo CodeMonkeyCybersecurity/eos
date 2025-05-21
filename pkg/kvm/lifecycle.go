@@ -12,10 +12,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -184,7 +184,7 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 func RunCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("kvm")
 
-	system.RequireRoot()
+	debian.RequireRoot()
 
 	nonInteractive, _ := cmd.Flags().GetBool("yes")
 	isoOverride, _ := cmd.Flags().GetString("iso")

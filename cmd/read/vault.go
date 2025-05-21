@@ -10,12 +10,12 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -42,7 +42,7 @@ var InspectVaultInitCmd = &cobra.Command{
 		}
 
 		// Load eos password credentials
-		eosCreds, err := system.LoadPasswordFromSecrets()
+		eosCreds, err := debian.LoadPasswordFromSecrets()
 		if err != nil {
 			log.Warn("⚠️ Could not load eos password file", zap.Error(err))
 		}

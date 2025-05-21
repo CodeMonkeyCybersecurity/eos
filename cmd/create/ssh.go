@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -76,14 +76,14 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 		fmt.Println("🔑 Key already exists:", keyPath)
 	} else {
 		zap.L().Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
-		if err := system.GenerateFIPSKey(keyPath); err != nil {
+		if err := debian.GenerateFIPSKey(keyPath); err != nil {
 			return fmt.Errorf("failed to generate SSH key: %w", err)
 		}
 	}
 
 	// Copy key to remote host.
 	fmt.Printf("📡 Copying public key to %s...\n", targetLogin)
-	if err := system.CopyKeyToRemote(pubKeyPath, targetLogin); err != nil {
+	if err := debian.CopyKeyToRemote(pubKeyPath, targetLogin); err != nil {
 		return fmt.Errorf("failed to copy key to remote host: %w", err)
 	}
 
@@ -92,7 +92,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	if alias == "" {
 		alias = host
 	}
-	if err := system.AppendToSSHConfig(alias, host, remoteUser, keyPath, configPath); err != nil {
+	if err := debian.AppendToSSHConfig(alias, host, remoteUser, keyPath, configPath); err != nil {
 		return fmt.Errorf("failed to update SSH config: %w", err)
 	}
 

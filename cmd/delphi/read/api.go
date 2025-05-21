@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -44,7 +44,7 @@ var InspectAPICmd = &cobra.Command{
 		}
 
 		// ✅ Step 4: Secret access control
-		if !system.EnforceSecretsAccess(showSecrets) {
+		if !debian.EnforceSecretsAccess(showSecrets) {
 			return err
 		}
 

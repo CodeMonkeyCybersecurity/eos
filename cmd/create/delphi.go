@@ -9,11 +9,11 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 
@@ -119,7 +119,7 @@ func extractWazuhPasswords() error {
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	for _, dir := range searchPaths {
 		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
-		if system.Exists(tarPath) {
+		if debian.Exists(tarPath) {
 			zap.L().Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
 			cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
 			cmd.Stdout = os.Stdout

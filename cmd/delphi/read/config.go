@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -29,7 +29,7 @@ var InspectConfigCmd = &cobra.Command{
 			return err
 		}
 
-		if !system.EnforceSecretsAccess(showSecrets) {
+		if !debian.EnforceSecretsAccess(showSecrets) {
 			return nil
 		}
 

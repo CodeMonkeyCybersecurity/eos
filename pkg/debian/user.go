@@ -1,6 +1,6 @@
 // pkg/system/user.go
 
-package system
+package debian
 
 import (
 	"bufio"

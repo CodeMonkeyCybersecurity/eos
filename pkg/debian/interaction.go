@@ -1,5 +1,5 @@
 // pkg/system/interaction.go
-package system
+package debian
 
 import (
 	"fmt"

@@ -48,7 +48,7 @@ var runCertsCmd = &cobra.Command{
 	}),
 }
 
-// runEosCmd updates the Eos system.
+// runEosCmd updates the Eos debian.
 var runEosCmd = &cobra.Command{
 	Use:   "eos",
 	Short: "Update Eos system",
