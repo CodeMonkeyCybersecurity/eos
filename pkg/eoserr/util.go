@@ -64,10 +64,6 @@ func ExtractSummary(output string, maxCandidates int) string {
 	return "Unknown error."
 }
 
-
-
-
-
 // NewExpectedError wraps an error for softer UX handling.
 func NewExpectedError(err error) error {
 	if err == nil {
