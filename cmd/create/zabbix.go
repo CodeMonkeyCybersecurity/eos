@@ -1,6 +1,7 @@
 package create
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -19,7 +20,7 @@ var CreateZabbixCmd = &cobra.Command{
 	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Info("Starting Zabbix installation...")
 
-		if err := deployZabbix(); err != nil {
+		if err := deployZabbix(ctx.Ctx); err != nil {
 			zap.L().Error("Zabbix installation failed", zap.Error(err))
 			fmt.Println("Zabbix installation failed:", err)
 			os.Exit(1)
@@ -31,15 +32,15 @@ var CreateZabbixCmd = &cobra.Command{
 	}),
 }
 
-func deployZabbix() error {
+func deployZabbix(ctx context.Context) error {
 
 	// Ensure Docker is installed
-	if err := docker.CheckIfDockerInstalled(); err != nil {
+	if err := docker.CheckIfDockerInstalled(ctx); err != nil {
 		return fmt.Errorf("docker check failed: %w", err)
 	}
 
 	// Ensure Docker Compose is installed
-	if err := docker.CheckIfDockerComposeInstalled(); err != nil {
+	if err := docker.CheckIfDockerComposeInstalled(ctx); err != nil {
 		return fmt.Errorf("docker-compose check failed: %w", err)
 	}
 

@@ -62,3 +62,8 @@ func VerifyAll(ctx context.Context, cfg any, schemaPath, yamlPath, policyPath st
 
 	return nil
 }
+
+func ValidateStructWithCUE(schema string, obj interface{}) error {
+    // stub or CUE integration here
+    return nil
+}

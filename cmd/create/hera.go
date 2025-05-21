@@ -122,7 +122,7 @@ var CreateHeraCmd = &cobra.Command{
 		}
 
 		// Ensure external network is present
-		if err := docker.EnsureArachneNetwork(); err != nil {
+		if err := docker.EnsureArachneNetwork(ctx.Ctx); err != nil {
 			zap.L().Fatal("Could not create or verify arachne-net", zap.Error(err))
 		}
 
@@ -140,7 +140,7 @@ var CreateHeraCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		zap.L().Info("🔍 Verifying container status")
-		if err := docker.CheckDockerContainers(); err != nil {
+		if err := docker.CheckDockerContainers(ctx.Ctx); err != nil {
 			zap.L().Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 

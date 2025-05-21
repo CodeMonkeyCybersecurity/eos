@@ -44,3 +44,8 @@ func EnforcePolicy(ctx context.Context, policyPath string, input interface{}) ([
 	}
 	return messages, nil
 }
+
+func EvaluateOPA(policy string, obj interface{}) error {
+    // stub or OPA integration here
+    return nil
+}

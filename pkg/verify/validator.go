@@ -32,3 +32,7 @@ func DescribeValidation(err error) string {
 	}
 	return err.Error()
 }
+
+func ValidateStructWithGoPlayground(obj interface{}) error {
+	return validate.Struct(obj)
+}

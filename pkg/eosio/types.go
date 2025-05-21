@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -21,22 +22,18 @@ var RuntimeContextKey = &contextKey{"eos-runtime-context"}
 
 // RuntimeContext holds runtime state for EOS CLI commands and helpers.
 type RuntimeContext struct {
-	Log       *zap.Logger     // Scoped logger for the current operation
-	Ctx       context.Context // Go context (for timeouts, cancellations)
-	Timestamp time.Time       // When this context was created (for diagnostics)
-	Validate  *verify.Context
-
+	Log        *zap.Logger     // Scoped logger for the current operation
+	Ctx        context.Context // Go context (for timeouts, cancellations)
+	Timestamp  time.Time       // When this context was created (for diagnostics)
+	Validate   *verify.Context
+	Span       trace.Span
+	TraceID    string
+	Command    string            // e.g., "ollama"
+	Component  string            // derived from caller
+	Attributes map[string]string // enriched by span
 	// Optional expansion fields (prepare for future)
 	// VaultAddr string
 	// Username  string
 	// ClusterID string
 	// VaultClient *api.Client
-}
-
-// NewRuntimeContext initializes a RuntimeContext with safe defaults.
-func NewRuntimeContext() *RuntimeContext {
-	return &RuntimeContext{
-		Ctx:       context.Background(),
-		Timestamp: time.Now(),
-	}
 }

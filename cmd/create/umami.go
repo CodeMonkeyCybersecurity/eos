@@ -79,7 +79,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Check if arache-net docker network already exists, create if not
 		// Check if arachne-net docker network exists, creating it if not
-		if err := docker.EnsureArachneNetwork(); err != nil {
+		if err := docker.EnsureArachneNetwork(ctx.Ctx); err != nil {
 			zap.L().Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
 		} else {
 			zap.L().Info("Successfully ensured 'arachne-net' exists")
@@ -97,7 +97,7 @@ var CreateUmamiCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		// Execute "docker ps" to list running containers
-		if err := docker.CheckDockerContainers(); err != nil {
+		if err := docker.CheckDockerContainers(ctx.Ctx); err != nil {
 			zap.L().Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 

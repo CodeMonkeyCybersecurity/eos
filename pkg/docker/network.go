@@ -3,6 +3,7 @@
 package docker
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 )
@@ -12,12 +13,12 @@ import (
 //
 
 // EnsureArachneNetwork checks if the Docker network exists, and creates it if not.
-func EnsureArachneNetwork() error {
+func EnsureArachneNetwork(ctx context.Context) error {
 	networkName := DockerNetworkName
 	ipv4 := DockerIPv4Subnet
 	ipv6 := DockerIPv6Subnet
 
-	if err := CheckIfDockerInstalled(); err != nil {
+	if err := CheckIfDockerInstalled(ctx); err != nil {
 		return fmt.Errorf("docker is not installed or not in PATH: %w", err)
 	}
 

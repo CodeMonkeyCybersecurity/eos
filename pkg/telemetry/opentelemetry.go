@@ -39,6 +39,18 @@ func Init(ctx context.Context) error {
 	return nil
 }
 
+// TraceID extracts the trace ID from a span.
+func TraceID(span trace.Span) string {
+	if span == nil {
+		return ""
+	}
+	spanCtx := span.SpanContext()
+	if !spanCtx.IsValid() {
+		return ""
+	}
+	return spanCtx.TraceID().String()
+}
+
 func TrackCommand(ctx context.Context, name string, success bool, durationMs int64, tags map[string]string) {
 	if !IsEnabled() {
 		return

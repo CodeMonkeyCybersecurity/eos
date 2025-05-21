@@ -6,24 +6,42 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 
 	cerr "github.com/cockroachdb/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 )
 
+var log = zap.L().Named("docker")
+
+type DockerCheckConfig struct {
+	AllowMissingCompose bool `validate:"required"`
+}
+
 // CheckDockerContainers lists running containers using the docker CLI.
-func CheckDockerContainers() error {
-	cmd := exec.Command("docker", "ps", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}")
-	out, err := cmd.Output()
+func CheckDockerContainers(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "docker.CheckDockerContainers")
+	defer span.End()
+
+	log.Info("Checking running Docker containers")
+	out, err := execute.Run(execute.Options{
+		Command: "docker",
+		Args:    []string{"ps", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}"},
+		Capture: true,
+		Ctx:     ctx,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
+		log.Error("Failed to list containers", zap.Error(err))
+		return cerr.WithHint(err, "Ensure Docker is installed and running")
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if len(lines) == 0 || (len(lines) == 1 && lines[0] == "") {
+		log.Info("No running containers")
 		fmt.Println("No running containers.")
 		return nil
 	}
@@ -31,51 +49,71 @@ func CheckDockerContainers() error {
 	for _, line := range lines {
 		parts := strings.Split(line, "\t")
 		if len(parts) >= 3 {
+			log.Info("Container info", zap.String("id", parts[0]), zap.String("image", parts[1]), zap.String("name", parts[2]))
 			fmt.Printf("Container ID: %s\tImage: %s\tName: %s\n", parts[0][:12], parts[1], parts[2])
 		}
 	}
-
 	return nil
 }
 
 // CheckIfDockerInstalled checks if Docker CLI is available and responding.
-func CheckIfDockerInstalled() error {
-	cmd := exec.Command("docker", "version", "--format", "'{{.Server.Version}}'")
-	err := cmd.Run()
+func CheckIfDockerInstalled(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "docker.CheckIfDockerInstalled")
+	defer span.End()
+
+	log.Info("Checking if Docker CLI is installed")
+	_, err := execute.Run(execute.Options{
+		Command: "docker",
+		Args:    []string{"version", "--format", "'{{.Server.Version}}'"},
+		Ctx:     ctx,
+	})
 	if err != nil {
-		return fmt.Errorf("docker CLI not available or not responding: %w", err)
+		log.Error("Docker CLI not available", zap.Error(err))
+		return cerr.WithHint(err, "Install Docker and ensure it’s in your PATH")
 	}
 	return nil
 }
 
-// CheckIfDockerComposeInstalled checks for either 'docker compose' or 'docker-compose' and returns nil if one is found.
-// This still shells out, since Docker SDK doesn't cover Compose.
-func CheckIfDockerComposeInstalled() error {
-	_, err := execute.Run(execute.Options{
-		Command: "docker",
-		Args:    []string{"compose", "version"},
-		Ctx:     context.TODO(),
-	})
-	if err == nil {
-		return nil
-	}
+// CheckIfDockerComposeInstalled verifies docker compose availability.
+func CheckIfDockerComposeInstalled(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "docker.CheckIfDockerComposeInstalled")
+	defer span.End()
 
-	_, err = execute.Run(execute.Options{
-		Command: "docker-compose",
-		Args:    []string{"version"},
-		Ctx:     context.TODO(),
-	})
-	if err == nil {
-		return nil
+	log.Info("Checking for docker compose")
+	commands := [][]string{
+		{"docker", "compose", "version"},
+		{"docker-compose", "version"},
 	}
-
+	for _, cmd := range commands {
+		_, err := execute.Run(execute.Options{
+			Command: cmd[0],
+			Args:    cmd[1:],
+			Ctx:     ctx,
+		})
+		if err == nil {
+			return nil
+		}
+	}
+	log.Warn("Docker Compose not found")
 	return errors.New("docker compose not found")
 }
 
-func CheckRunning() error {
-	cmd := exec.Command("docker", "info")
-	if err := cmd.Run(); err != nil {
-		return cerr.Wrap(err, "Docker daemon is unavailable")
+// CheckRunning ensures Docker daemon is active.
+func CheckRunning(ctx context.Context) error {
+	ctx, span := telemetry.StartSpan(ctx, "docker.CheckRunning")
+	defer span.End()
+
+	log.Info("Checking if Docker daemon is running")
+	_, err := execute.Run(execute.Options{
+		Command: "docker",
+		Args:    []string{"info"},
+		Ctx:     ctx,
+		Capture: true,
+	})
+	if err != nil {
+		log.Error("Docker daemon not running", zap.Error(err))
+		span.SetAttributes(attribute.String("hint", "Start Docker Desktop"))
+		return cerr.WithHint(err, "Docker is not running. Please start Docker Desktop.")
 	}
 	return nil
 }

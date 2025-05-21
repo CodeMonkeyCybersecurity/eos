@@ -28,7 +28,7 @@ var CreateOllamaCmd = &cobra.Command{
 			return errors.New("❌ this command is only supported on macOS")
 		}
 
-		if err := docker.CheckRunning(); err != nil {
+		if err := docker.CheckRunning(ctx.Ctx); err != nil {
 			log.Warn("Docker not running", zap.Error(err))
 			return cerr.WithHint(err, "Please start Docker Desktop before running this command")
 		}
