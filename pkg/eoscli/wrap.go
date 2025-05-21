@@ -18,30 +18,39 @@ import (
 	"go.uber.org/zap"
 )
 
-// Wrap wraps a Cobra command handler, injecting EOS runtime context,
-// structured logging, privilege checks, Vault env setup, and error handling.
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		logger.InitFallback()
 
+		cmd.SilenceUsage = true
+		if cmd.Root() != nil {
+			cmd.Root().SilenceUsage = true
+		}
+
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		eosio.LogRuntimeExecutionContext()
 
-		start := time.Now()
+		// If no logic provided and command is a namespace, show local help
+		if fn == nil {
+			if len(args) == 0 && cmd.HasSubCommands() {
+				return cmd.Usage()
+			}
+			return nil
+		}
 
+		start := time.Now()
 		ctx := &eosio.RuntimeContext{
 			Log:       log,
-			Ctx:       context.Background(), // no internal timeout now
+			Ctx:       context.Background(),
 			Timestamp: start,
 		}
 
-		log.Info("🚀 Command execution started", zap.Time("timestamp", ctx.Timestamp))
-
-		addr, addrErr := vault.EnsureVaultEnv()
-		if addrErr != nil {
-			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(addrErr))
+		vaultAddr, vaultErr := vault.EnsureVaultEnv()
+		if vaultErr != nil {
+			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
+		} else {
+			log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
 		}
-		log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", addr))
 
 		var err error
 		defer func() {
@@ -62,9 +71,9 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 					"os":         runtime.GOOS,
 					"arch":       runtime.GOARCH,
 					"args":       telemetry.TruncateOrHashArgs(args),
-					"vault_addr": addr,
-					"version":    "dev",                              // TODO: replace with shared/version
-					"category":   telemetry.CommandCategory(cmd.Use), // inferred grouping
+					"vault_addr": vaultAddrOrUnavailable(vaultAddr, vaultErr),
+					"version":    shared.Version,
+					"category":   telemetry.CommandCategory(cmd.Use),
 					"error_type": telemetry.ClassifyError(err),
 				},
 			)
@@ -83,7 +92,14 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		}()
 
 		log.Debug("Entering wrapped command function")
-		err = fn(ctx, cmd, args)
-		return err
+		return fn(ctx, cmd, args)
 	}
+}
+
+// vaultAddrOrUnavailable safely reports VAULT_ADDR or a placeholder
+func vaultAddrOrUnavailable(addr string, err error) string {
+	if err != nil || addr == "" {
+		return "(unavailable)"
+	}
+	return addr
 }

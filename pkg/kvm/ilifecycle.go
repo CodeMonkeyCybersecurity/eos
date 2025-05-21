@@ -1,3 +1,5 @@
+// pkg/kvm/lifecycle.go
+
 package kvm
 
 import (
@@ -12,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
@@ -176,10 +179,7 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 func RunCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("kvm")
 
-	if os.Geteuid() != 0 {
-		log.Error("KVM setup must be run as root")
-		return fmt.Errorf("this command must be run as root")
-	}
+	system.RequireRoot()
 
 	nonInteractive, _ := cmd.Flags().GetBool("yes")
 	isoOverride, _ := cmd.Flags().GetString("iso")
@@ -198,17 +198,15 @@ func RunCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []s
 		log.Info("🛠️  Configuring network bridge...")
 		if err := ConfigureKVMBridge(); err != nil {
 			log.Error("Failed to configure network bridge", zap.Error(err))
-			return fmt.Errorf("failed to configure network bridge: %w", err)
+			return err
 		}
 		log.Info("✅ Network bridge configured")
 	}
 
-	log.Info("🔧 Ensuring libvirtd is running...")
 	if err := EnsureLibvirtd(); err != nil {
-		log.Error("libvirtd is not running", zap.Error(err))
+		log.Error("libvirtd failed to start", zap.Error(err))
 		return err
 	}
-	log.Info("✅ libvirtd is active")
 
 	isoDir := resolveIsoDir(log, nonInteractive, isoOverride)
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
@@ -222,7 +220,7 @@ func RunCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []s
 		log.Info("⚙️  Enabling autostart for default libvirt network")
 		SetLibvirtDefaultNetworkAutostart()
 	} else {
-		log.Info("Skipping autostart — you can run 'virsh net-start default' manually if needed.")
+		log.Info("Skipping autostart — run 'virsh net-start default' manually if needed")
 	}
 
 	log.Info("✅ KVM setup completed successfully")
