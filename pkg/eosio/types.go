@@ -1,4 +1,4 @@
-// pkg/eosio/context.go
+// pkg/eosio/types.go
 
 package eosio
 
@@ -6,6 +6,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	"go.uber.org/zap"
 )
 
@@ -23,6 +24,7 @@ type RuntimeContext struct {
 	Log       *zap.Logger     // Scoped logger for the current operation
 	Ctx       context.Context // Go context (for timeouts, cancellations)
 	Timestamp time.Time       // When this context was created (for diagnostics)
+	Validate  *verify.Context
 
 	// Optional expansion fields (prepare for future)
 	// VaultAddr string

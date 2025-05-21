@@ -15,12 +15,11 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	"go.opentelemetry.io/otel/trace" // ✅ THIS LINE FIXES ALL `undefined: trace` ERRORS
 )
 
-// global tracer
 var tracer = otel.Tracer("eos.telemetry")
 
-// Init sets up a basic stdout exporter for local debugging
 func Init(ctx context.Context) error {
 	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
@@ -40,7 +39,6 @@ func Init(ctx context.Context) error {
 	return nil
 }
 
-// TrackCommand records a command invocation
 func TrackCommand(ctx context.Context, name string, success bool, durationMs int64, tags map[string]string) {
 	if !IsEnabled() {
 		return
@@ -65,7 +63,14 @@ func TrackCommand(ctx context.Context, name string, success bool, durationMs int
 	span.SetAttributes(attrs...)
 }
 
-// fallback for hostname field
+func StartSpan(ctx context.Context, name string) (context.Context, trace.Span) {
+	if !IsEnabled() {
+		return ctx, trace.SpanFromContext(context.Background())
+	}
+	return tracer.Start(ctx, name)
+}
+
+// fallback hostname provider
 func hostnameOrFallback() string {
 	h, err := os.Hostname()
 	if err != nil {

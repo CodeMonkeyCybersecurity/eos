@@ -88,7 +88,7 @@ func uninstallMacOS() {
 	scriptPath := "/Library/Ossec/uninstall.sh"
 	if _, err := os.Stat(scriptPath); err == nil {
 		zap.L().Info("Found macOS uninstall script", zap.String("path", scriptPath))
-		cmd := exec.Command( scriptPath)
+		cmd := exec.Command(scriptPath)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -123,7 +123,7 @@ func uninstallLinux() {
 
 func uninstallDeb() {
 	zap.L().Info("Uninstalling with apt-get purge...")
-	cmd := exec.Command( "apt-get", "purge", "-y", "wazuh-agent")
+	cmd := exec.Command("apt-get", "purge", "-y", "wazuh-agent")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -147,7 +147,7 @@ func uninstallRpm() {
 	}
 
 	zap.L().Info("Uninstalling with", zap.String("manager", manager))
-	cmd := exec.Command(manager,  "remove", "-y", "wazuh-agent")
+	cmd := exec.Command(manager, "remove", "-y", "wazuh-agent")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {

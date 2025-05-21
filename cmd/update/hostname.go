@@ -56,21 +56,21 @@ func UpdateHostname() {
 	}
 
 	// Change the hostname temporarily
-	err = exec.Command( "hostname", newHostname).Run()
+	err = exec.Command("hostname", newHostname).Run()
 	if err != nil {
 		fmt.Printf("Error changing hostname temporarily: %v\n", err)
 		return
 	}
 
 	// Change the hostname permanently
-	err = exec.Command( fmt.Sprintf("echo %s > /etc/hostname", newHostname)).Run()
+	err = exec.Command(fmt.Sprintf("echo %s > /etc/hostname", newHostname)).Run()
 	if err != nil {
 		fmt.Printf("Error changing hostname permanently: %v\n", err)
 		return
 	}
 
 	// Update the /etc/hosts file
-	err = exec.Command( "sed", "-i", fmt.Sprintf("s/%s/%s/g", currentHostname, newHostname), "/etc/hosts").Run()
+	err = exec.Command("sed", "-i", fmt.Sprintf("s/%s/%s/g", currentHostname, newHostname), "/etc/hosts").Run()
 	if err != nil {
 		fmt.Printf("Error updating /etc/hosts file: %v\n", err)
 		return

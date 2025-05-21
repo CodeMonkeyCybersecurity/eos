@@ -13,12 +13,11 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
-
-var errStackedMarker = cerr.New("stack already attached")
 
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
@@ -31,11 +30,6 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		eosio.LogRuntimeExecutionContext()
-
-		// Fallback to usage if no function defined
-		if fn == nil && cmd.HasSubCommands() && len(args) == 0 {
-			return cmd.Usage()
-		}
 
 		start := time.Now()
 		ctx := &eosio.RuntimeContext{
@@ -92,6 +86,31 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 
 			shared.SafeSync()
 		}()
+
+		// --- Inject validation logic if enabled via context ---
+		if ctx.Validate != nil {
+			v := ctx.Validate
+			log.Info("🔍 Validating command input")
+			if err := verify.Struct(v.Cfg); err != nil {
+				log.Error("🚫 Struct validation failed", zap.Error(err))
+				return cerr.WithHint(err, "Fix struct-level configuration")
+			}
+			if err := verify.ValidateYAMLWithCUE(v.SchemaPath, v.YAMLPath); err != nil {
+				log.Error("📄 CUE validation failed", zap.String("schema", v.SchemaPath), zap.Error(err))
+				return cerr.WithHint(err, "Fix YAML or schema mismatch")
+			}
+			denies, err := verify.EnforcePolicy(ctx.Ctx, v.PolicyPath, v.PolicyInput())
+			if err != nil {
+				log.Error("🔒 Policy enforcement failed", zap.Error(err))
+				return cerr.Wrap(err, "Policy enforcement failed")
+			}
+			if len(denies) > 0 {
+				for _, d := range denies {
+					log.Warn("🚫 Policy violation", zap.String("reason", d))
+				}
+				return cerr.Newf("Policy denied: %v", denies)
+			}
+		}
 
 		log.Debug("Entering wrapped command function")
 		err = fn(ctx, cmd, args)
