@@ -1,4 +1,4 @@
-//pkg/parse/comma_separated.go
+//pkg/parse/csv.go
 
 package parse
 

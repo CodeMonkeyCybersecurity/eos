@@ -5,11 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/parse"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -58,7 +58,7 @@ var CreateOllamaCmd = &cobra.Command{
 		line := "export OLLAMA_USE_GPU=true"
 		log.Info("⚙️ Enabling GPU usage in: " + rcPath)
 
-		if err := appendIfMissing(rcPath, line); err != nil {
+		if err := parse.AppendIfMissing(rcPath, line); err != nil {
 			return fmt.Errorf("failed to write GPU export line: %w", err)
 		}
 
@@ -70,22 +70,4 @@ var CreateOllamaCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(CreateOllamaCmd)
-}
-
-// appendIfMissing ensures a line is present in a file.
-func appendIfMissing(path, line string) error {
-	content, err := os.ReadFile(path)
-	if err != nil && !os.IsNotExist(err) {
-		return err
-	}
-	if strings.Contains(string(content), line) {
-		return nil
-	}
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	_, err = f.WriteString("\n" + line + "\n")
-	return err
 }
