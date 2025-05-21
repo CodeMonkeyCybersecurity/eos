@@ -53,7 +53,11 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 			}
 
 			duration := time.Since(start)
-			logger.LogCommandLifecycle(cmd.Name())(&err)
+			if err != nil {
+				log.Error("Command failed", zap.Duration("duration", duration), zap.Error(err))
+			} else {
+				log.Info("Command completed", zap.Duration("duration", duration))
+			}
 
 			telemetry.TrackCommand(
 				ctx.Ctx,

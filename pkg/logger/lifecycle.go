@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
@@ -92,17 +93,16 @@ func ResolveLogPath() string {
 	return ""
 }
 
-// LogCommandLifecycle returns a deferred function for consistent start/stop logging.
-func LogCommandLifecycle(cmdName string) func(err *error) {
-	start := time.Now()
-	zap.L().Info("Command started", zap.String("command", cmdName), zap.Time("start_time", start))
-
-	return func(err *error) {
-		duration := time.Since(start)
-		if *err != nil {
-			zap.L().Error("Command failed", zap.String("command", cmdName), zap.Duration("duration", duration), zap.Error(*err))
-		} else {
-			zap.L().Info("Command completed", zap.String("command", cmdName), zap.Duration("duration", duration))
+func TryWritablePath(paths []string) (string, error) {
+	for _, path := range paths {
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			continue
+		}
+		if file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
+			file.Close()
+			return path, nil
 		}
 	}
+	return "", cerr.New("no writable log path found")
 }

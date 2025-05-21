@@ -59,7 +59,12 @@ var CreateOllamaCmd = &cobra.Command{
 			log.Warn("⚠️ Failed to remove container", zap.Error(err), zap.String("output", out))
 		}
 
-		if err := ollama.RunWebUI(log, containerName, port, ollamaDir); err != nil {
+		cfg := ollama.WebUIConfig{
+			Container: containerName,
+			Port:      port,
+			Volume:    ollamaDir,
+		}
+		if err := ollama.RunWebUI(ctx.Ctx, log, cfg); err != nil {
 			return err
 		}
 
