@@ -1,4 +1,4 @@
-// pkg/eoserr/reader.go
+// pkg/eoserr/util.go
 
 package eoserr
 
@@ -64,30 +64,21 @@ func ExtractSummary(output string, maxCandidates int) string {
 	return "Unknown error."
 }
 
-// expectedError marks an error as expected and recoverable by the user.
-type expectedError struct {
-	cause error
-}
 
-func (e *expectedError) Error() string {
-	return e.cause.Error()
-}
 
-func (e *expectedError) Unwrap() error {
-	return e.cause
-}
+
 
 // NewExpectedError wraps an error for softer UX handling.
 func NewExpectedError(err error) error {
 	if err == nil {
 		return nil
 	}
-	return &expectedError{cause: err}
+	return &UserError{cause: err}
 }
 
 // IsExpectedUserError checks if the error is marked as expected.
 func IsExpectedUserError(err error) bool {
-	var e *expectedError
+	var e *UserError
 	return errors.As(err, &e)
 }
 

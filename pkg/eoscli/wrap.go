@@ -4,7 +4,6 @@ package eoscli
 
 import (
 	"context"
-	"fmt"
 	"runtime"
 	"time"
 
@@ -14,9 +13,12 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
+
+var errStackedMarker = cerr.New("stack already attached")
 
 func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
@@ -30,12 +32,9 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		log := eosio.ContextualLogger(2, nil).Named(cmd.Name())
 		eosio.LogRuntimeExecutionContext()
 
-		// If no logic provided and command is a namespace, show local help
-		if fn == nil {
-			if len(args) == 0 && cmd.HasSubCommands() {
-				return cmd.Usage()
-			}
-			return nil
+		// Fallback to usage if no function defined
+		if fn == nil && cmd.HasSubCommands() && len(args) == 0 {
+			return cmd.Usage()
 		}
 
 		start := time.Now()
@@ -55,8 +54,8 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		var err error
 		defer func() {
 			if r := recover(); r != nil {
+				err = cerr.AssertionFailedf("panic recovered: %v", r)
 				log.Error("💥 Panic recovered", zap.Any("panic", r))
-				err = fmt.Errorf("panic: %v", r)
 			}
 
 			duration := time.Since(start)
@@ -82,7 +81,10 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 				if eoserr.IsExpectedUserError(err) {
 					log.Warn("⚠️ EOS user error", zap.Error(err), zap.Duration("duration", duration))
 				} else {
-					log.Error("❌ EOS command failed", zap.Error(err), zap.Duration("duration", duration))
+					log.Error("❌ EOS command failed", zap.String("error", err.Error()), zap.Duration("duration", duration))
+					if cause := cerr.UnwrapAll(err); cause != nil {
+						log.Debug("🔍 Root cause", zap.String("cause", cause.Error()))
+					}
 				}
 			} else {
 				log.Info("✅ EOS command finished successfully", zap.Duration("duration", duration))
@@ -92,11 +94,16 @@ func Wrap(fn func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 		}()
 
 		log.Debug("Entering wrapped command function")
-		return fn(ctx, cmd, args)
+		err = fn(ctx, cmd, args)
+
+		if err != nil && !eoserr.IsExpectedUserError(err) && !cerr.Is(err, errStackedMarker) {
+			err = cerr.Mark(cerr.WithStack(err), errStackedMarker)
+		}
+
+		return err
 	}
 }
 
-// vaultAddrOrUnavailable safely reports VAULT_ADDR or a placeholder
 func vaultAddrOrUnavailable(addr string, err error) string {
 	if err != nil || addr == "" {
 		return "(unavailable)"
