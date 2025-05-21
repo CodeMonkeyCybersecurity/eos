@@ -73,6 +73,7 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 
 	if isWebUIContainerRunningOnPort3000() {
 		log.Info("✅ OpenWebUI is already active — skipping container start")
+		_ = platform.OpenBrowser("http://localhost:3000")
 		return nil
 	}
 
@@ -133,11 +134,13 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 		return cerr.WithHint(runErr, "Docker container failed to start")
 	}
 
-	log.Info("✅ Web UI container started")
-
 	if !waitForBackend(ctx, log, "http://host.docker.internal:11434", 15*time.Second) {
 		return cerr.New("Ollama backend is not reachable — the Web UI may fail to connect")
 	}
+
+	log.Info("✅ Web UI container started")
+	_ = platform.OpenBrowser("http://localhost:3000")
+
 	return nil
 }
 
