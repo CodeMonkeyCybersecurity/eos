@@ -2,16 +2,12 @@
 package platform
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
 	"strings"
-
-	"go.uber.org/zap"
 )
 
 //
@@ -42,59 +38,6 @@ func IsARM() bool     { return strings.HasPrefix(runtime.GOARCH, "arm") }
 func IsCommandAvailable(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
-}
-
-//
-//---------------------------- LINUX DISTRO DETECTION ----------------------------//
-//
-
-func DetectLinuxDistro() string {
-	if !IsLinux() {
-		return "unknown"
-	}
-
-	file, err := os.Open("/etc/os-release")
-	if err != nil {
-		zap.L().Warn("Failed to open /etc/os-release", zap.Error(err))
-		return "unknown"
-	}
-	defer file.Close()
-
-	var distroID string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "ID=") {
-			distroID = strings.Trim(strings.SplitN(line, "=", 2)[1], `"`)
-			break
-		}
-	}
-
-	switch distroID {
-	case "debian", "ubuntu":
-		return "debian"
-	case "rhel", "centos":
-		return "rhel"
-	case "alpine":
-		return "alpine"
-	case "sles", "suse":
-		return "suse"
-	default:
-		return "unknown"
-	}
-}
-
-func RequireLinuxDistro(allowed []string) error {
-	if !IsLinux() {
-		return fmt.Errorf("unsupported platform: %s (Linux required)", GetOSPlatform())
-	}
-	distro := DetectLinuxDistro()
-	for _, allowedDistro := range allowed {
-		if distro == allowedDistro {
-			return nil
-		}
-	}
-	return fmt.Errorf("unsupported Linux distribution: %s (expected one of %v)", distro, allowed)
 }
 
 //
