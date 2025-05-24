@@ -56,15 +56,20 @@ func PrepareEnvironment() error {
 func EnsureVaultEnv() (string, error) {
 	const testTimeout = 500 * time.Millisecond
 
+	// 1. Return if already set
 	if cur := os.Getenv(shared.VaultAddrEnv); cur != "" {
 		zap.L().Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
 		return cur, nil
 	}
 
+	// 2. Use hostname as the default form
 	host := debian.GetInternalHostname()
+	defaultAddr := fmt.Sprintf(shared.VaultDefaultAddr, host)
+
+	// 3. Check preferred candidates in order
 	candidates := []string{
 		fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort),
-		fmt.Sprintf(shared.VaultDefaultAddr, host),
+		defaultAddr,
 	}
 
 	for _, addr := range candidates {
@@ -75,15 +80,17 @@ func EnsureVaultEnv() (string, error) {
 		}
 	}
 
-	zap.L().Warn("⚠️ No Vault listener detected — falling back to internal hostname")
+	// 4. No reachable Vault listener — set hostname-based default anyway
+	zap.L().Warn("⚠️ No Vault listener detected — using hostname-based default")
+	_ = os.Setenv(shared.VaultAddrEnv, defaultAddr)
 
-	_ = os.Setenv(shared.VaultAddrEnv, candidates[1])
+	// 5. Set CA cert path if missing
 	if os.Getenv(shared.VaultCA) == "" {
 		_ = os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath)
 		zap.L().Debug("🔧 Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
 	}
 
-	return candidates[1], nil
+	return defaultAddr, nil
 }
 
 func canConnectTLS(raw string, d time.Duration) bool {
