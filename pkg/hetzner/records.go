@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *HetznerClient) GetRecords(ctx context.Context, zoneID string) ([]DNSRecord, error) {
+func (c *DNSClient) GetRecords(ctx context.Context, zoneID string) ([]DNSRecord, error) {
 	url := fmt.Sprintf("%s?zone_id=%s", recordsBaseURL, zoneID)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -42,7 +42,7 @@ func (c *HetznerClient) GetRecords(ctx context.Context, zoneID string) ([]DNSRec
 	return result.Records, nil
 }
 
-func (c *HetznerClient) CreateRecord(ctx context.Context, record DNSRecord) (*DNSRecord, error) {
+func (c *DNSClient) CreateRecord(ctx context.Context, record DNSRecord) (*DNSRecord, error) {
 	payload, _ := json.Marshal(record)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, recordsBaseURL, bytes.NewReader(payload))
@@ -72,7 +72,7 @@ func (c *HetznerClient) CreateRecord(ctx context.Context, record DNSRecord) (*DN
 	return &result.Record, nil
 }
 
-func (c *HetznerClient) GetRecord(ctx context.Context, id string) (*DNSRecord, error) {
+func (c *DNSClient) GetRecord(ctx context.Context, id string) (*DNSRecord, error) {
 	url := fmt.Sprintf("%s/%s", recordsBaseURL, id)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -100,7 +100,7 @@ func (c *HetznerClient) GetRecord(ctx context.Context, id string) (*DNSRecord, e
 	return &result.Record, nil
 }
 
-func (c *HetznerClient) UpdateRecord(ctx context.Context, id string, updated DNSRecord) (*DNSRecord, error) {
+func (c *DNSClient) UpdateRecord(ctx context.Context, id string, updated DNSRecord) (*DNSRecord, error) {
 	url := fmt.Sprintf("%s/%s", recordsBaseURL, id)
 	payload, _ := json.Marshal(updated)
 
@@ -131,7 +131,7 @@ func (c *HetznerClient) UpdateRecord(ctx context.Context, id string, updated DNS
 	return &result.Record, nil
 }
 
-func (c *HetznerClient) DeleteRecord(ctx context.Context, id string) error {
+func (c *DNSClient) DeleteRecord(ctx context.Context, id string) error {
 	url := fmt.Sprintf("%s/%s", recordsBaseURL, id)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
@@ -155,15 +155,15 @@ func (c *HetznerClient) DeleteRecord(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *HetznerClient) BulkCreateRecords(ctx context.Context, records []DNSRecord) error {
+func (c *DNSClient) BulkCreateRecords(ctx context.Context, records []DNSRecord) error {
 	return c.bulkSend(ctx, "POST", records)
 }
 
-func (c *HetznerClient) BulkUpdateRecords(ctx context.Context, records []DNSRecord) error {
+func (c *DNSClient) BulkUpdateRecords(ctx context.Context, records []DNSRecord) error {
 	return c.bulkSend(ctx, "PUT", records)
 }
 
-func (c *HetznerClient) bulkSend(ctx context.Context, method string, records []DNSRecord) error {
+func (c *DNSClient) bulkSend(ctx context.Context, method string, records []DNSRecord) error {
 	payload, _ := json.Marshal(bulkRecordsPayload{Records: records})
 
 	req, err := http.NewRequestWithContext(ctx, method, recordsBaseURL+"/bulk", bytes.NewReader(payload))

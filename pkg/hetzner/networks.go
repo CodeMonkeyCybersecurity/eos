@@ -1,0 +1,128 @@
+package hetzner
+
+import (
+	"net"
+	"os"
+
+	cerr "github.com/cockroachdb/errors"
+	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"go.uber.org/zap"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+)
+
+func GetAllNetworks(ctx *eosio.RuntimeContext) error {
+	log := ctx.Logger()
+	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
+
+	networks, err := client.Network.All(ctx.Ctx)
+	if err != nil {
+		log.Error("❌ Failed to list networks", zap.Error(err))
+		return cerr.Wrap(err, "failed to list networks")
+	}
+
+	for _, n := range networks {
+		log.Info("🌐 Network", zap.String("name", n.Name), zap.Int64("id", n.ID))
+	}
+	return nil
+}
+
+func CreateANetwork(ctx *eosio.RuntimeContext) error {
+	log := ctx.Logger()
+	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
+
+	result, _, err := client.Network.Create(ctx.Ctx, hcloud.NetworkCreateOpts{
+		ExposeRoutesToVSwitch: false,
+		IPRange: &net.IPNet{
+			IP:   net.ParseIP("10.0.0.0"),
+			Mask: net.CIDRMask(16, 32),
+		},
+		Labels: map[string]string{
+			"environment":    "prod",
+			"example.com/my": "label",
+			"just-a-key":     "",
+		},
+		Name: "mynet",
+		Routes: []hcloud.NetworkRoute{
+			{
+				Destination: &net.IPNet{
+					IP:   net.ParseIP("10.100.1.0"),
+					Mask: net.CIDRMask(24, 32),
+				},
+				Gateway: net.ParseIP("10.0.1.1"),
+			},
+		},
+		Subnets: []hcloud.NetworkSubnet{
+			{
+				IPRange: &net.IPNet{
+					IP:   net.ParseIP("10.0.1.0"),
+					Mask: net.CIDRMask(24, 32),
+				},
+				NetworkZone: hcloud.NetworkZoneEUCentral,
+				Type:        hcloud.NetworkSubnetTypeCloud,
+				VSwitchID:   1000,
+			},
+		},
+	})
+	if err != nil {
+		log.Error("❌ Failed to create network", zap.Error(err))
+		return cerr.Wrap(err, "failed to create network")
+	}
+
+	log.Info("✅ Network created", zap.String("name", result.Name), zap.Int64("id", result.ID))
+	return nil
+}
+
+func GetANetwork(ctx *eosio.RuntimeContext, id int64) error {
+	log := ctx.Logger()
+	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
+
+	network, _, err := client.Network.GetByID(ctx.Ctx, id)
+	if err != nil {
+		log.Error("❌ Failed to get network", zap.Int64("id", id), zap.Error(err))
+		return cerr.Wrap(err, "failed to get network")
+	}
+	if network == nil {
+		log.Warn("⚠️ No network found", zap.Int64("id", id))
+		return nil
+	}
+
+	log.Info("📡 Network info", zap.String("name", network.Name), zap.Int64("id", network.ID))
+	return nil
+}
+
+func UpdateANetwork(ctx *eosio.RuntimeContext, id int64, newName string) error {
+	log := ctx.Logger()
+	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
+
+	updated, _, err := client.Network.Update(ctx.Ctx, &hcloud.Network{ID: id}, hcloud.NetworkUpdateOpts{
+		ExposeRoutesToVSwitch: hcloud.Ptr(false),
+		Name:                  newName,
+		Labels: map[string]string{
+			"environment":    "prod",
+			"example.com/my": "label",
+			"just-a-key":     "",
+		},
+	})
+	if err != nil {
+		log.Error("❌ Failed to update network", zap.Int64("id", id), zap.Error(err))
+		return cerr.Wrap(err, "failed to update network")
+	}
+
+	log.Info("✏️ Network updated", zap.String("name", updated.Name), zap.Int64("id", updated.ID))
+	return nil
+}
+
+func DeleteANetwork(ctx *eosio.RuntimeContext, id int64) error {
+	log := ctx.Logger()
+	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
+
+	_, err := client.Network.Delete(ctx.Ctx, &hcloud.Network{ID: id})
+	if err != nil {
+		log.Error("❌ Failed to delete network", zap.Int64("id", id), zap.Error(err))
+		return cerr.Wrap(err, "failed to delete network")
+	}
+
+	log.Info("🗑️ Network deleted", zap.Int64("id", id))
+	return nil
+}

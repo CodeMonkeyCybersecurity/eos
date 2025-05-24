@@ -13,6 +13,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/consul/api v1.32.1
 	github.com/hashicorp/vault/api v1.16.0
+	github.com/hetznercloud/hcloud-go/v2 v2.21.0
 	github.com/open-policy-agent/opa v1.4.2
 	github.com/spf13/cobra v1.9.1
 	go.opentelemetry.io/otel v1.35.0
@@ -76,6 +77,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
+	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

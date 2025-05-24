@@ -16,19 +16,19 @@ import (
 
 const baseURL = "https://api.hetzner.cloud/v1"
 
-type HetznerClient struct {
+type DNSClient struct {
 	Token string
 	Log   *zap.Logger
 }
 
-func NewClient(token string, log *zap.Logger) *HetznerClient {
-	return &HetznerClient{
+func NewClient(token string, log *zap.Logger) *DNSClient {
+	return &DNSClient{
 		Token: token,
 		Log:   log.Named("hetzner"),
 	}
 }
 
-func (c *HetznerClient) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+func (c *DNSClient) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, body)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating Hetzner API request")
@@ -45,7 +45,7 @@ func (c *HetznerClient) doRequest(ctx context.Context, method, path string, body
 	return resp, nil
 }
 
-func (c *HetznerClient) GetServers(ctx context.Context) ([]map[string]interface{}, error) {
+func (c *DNSClient) GetServers(ctx context.Context) ([]map[string]interface{}, error) {
 	resp, err := c.doRequest(ctx, "GET", "/servers", nil)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func (c *HetznerClient) GetServers(ctx context.Context) ([]map[string]interface{
 	return result.Servers, nil
 }
 
-func (c *HetznerClient) DeleteServer(ctx context.Context, id string) error {
+func (c *DNSClient) DeleteServer(ctx context.Context, id string) error {
 	resp, err := c.doRequest(ctx, "DELETE", fmt.Sprintf("/servers/%s", id), nil)
 	if err != nil {
 		return err
@@ -82,7 +82,7 @@ func (c *HetznerClient) DeleteServer(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *HetznerClient) CreateServer(ctx context.Context, name string, image string, serverType string) (map[string]interface{}, error) {
+func (c *DNSClient) CreateServer(ctx context.Context, name string, image string, serverType string) (map[string]interface{}, error) {
 	payload := fmt.Sprintf(`{"name":"%s","image":"%s","server_type":"%s","location":"nbg1"}`, name, image, serverType)
 	resp, err := c.doRequest(ctx, "POST", "/servers", strings.NewReader(payload))
 	if err != nil {

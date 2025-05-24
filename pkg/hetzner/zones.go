@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *HetznerClient) GetZones(ctx context.Context) ([]DNSZone, error) {
+func (c *DNSClient) GetZones(ctx context.Context) ([]DNSZone, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", zonesBaseURL, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating GET /zones")
@@ -41,7 +41,7 @@ func (c *HetznerClient) GetZones(ctx context.Context) ([]DNSZone, error) {
 	return result.Zones, nil
 }
 
-func (c *HetznerClient) CreateZone(ctx context.Context, zone DNSZone) (*DNSZone, error) {
+func (c *DNSClient) CreateZone(ctx context.Context, zone DNSZone) (*DNSZone, error) {
 	payload, _ := json.Marshal(zone)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", zonesBaseURL, bytes.NewReader(payload))
@@ -71,7 +71,7 @@ func (c *HetznerClient) CreateZone(ctx context.Context, zone DNSZone) (*DNSZone,
 	return &result.Zone, nil
 }
 
-func (c *HetznerClient) GetZone(ctx context.Context, zoneID string) (*DNSZone, error) {
+func (c *DNSClient) GetZone(ctx context.Context, zoneID string) (*DNSZone, error) {
 	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -99,7 +99,7 @@ func (c *HetznerClient) GetZone(ctx context.Context, zoneID string) (*DNSZone, e
 	return &result.Zone, nil
 }
 
-func (c *HetznerClient) UpdateZone(ctx context.Context, zoneID string, updated DNSZone) (*DNSZone, error) {
+func (c *DNSClient) UpdateZone(ctx context.Context, zoneID string, updated DNSZone) (*DNSZone, error) {
 	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
 	payload, _ := json.Marshal(updated)
 
@@ -130,7 +130,7 @@ func (c *HetznerClient) UpdateZone(ctx context.Context, zoneID string, updated D
 	return &result.Zone, nil
 }
 
-func (c *HetznerClient) DeleteZone(ctx context.Context, zoneID string) error {
+func (c *DNSClient) DeleteZone(ctx context.Context, zoneID string) error {
 	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
 
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
@@ -154,7 +154,7 @@ func (c *HetznerClient) DeleteZone(ctx context.Context, zoneID string) error {
 	return nil
 }
 
-func (c *HetznerClient) ImportZoneFilePlain(ctx context.Context, zoneID string, zoneFile string) error {
+func (c *DNSClient) ImportZoneFilePlain(ctx context.Context, zoneID string, zoneFile string) error {
 	url := fmt.Sprintf("%s/%s/import", zonesBaseURL, zoneID)
 	body := strings.NewReader(zoneFile)
 
@@ -180,7 +180,7 @@ func (c *HetznerClient) ImportZoneFilePlain(ctx context.Context, zoneID string, 
 	return nil
 }
 
-func (c *HetznerClient) ExportZoneFile(ctx context.Context, zoneID string) (string, error) {
+func (c *DNSClient) ExportZoneFile(ctx context.Context, zoneID string) (string, error) {
 	url := fmt.Sprintf("%s/%s/export", zonesBaseURL, zoneID)
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -208,7 +208,7 @@ func (c *HetznerClient) ExportZoneFile(ctx context.Context, zoneID string) (stri
 	return string(data), nil
 }
 
-func (c *HetznerClient) ValidateZoneFile(ctx context.Context, zoneFile string) error {
+func (c *DNSClient) ValidateZoneFile(ctx context.Context, zoneFile string) error {
 	url := zonesBaseURL + "/file/validate"
 	body := strings.NewReader(zoneFile)
 

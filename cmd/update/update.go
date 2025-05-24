@@ -26,6 +26,3 @@ var UpdateCmd = &cobra.Command{
 		return nil
 	}),
 }
-
-// Add any subcommands to the UpdateCmd here, if needed
-// For example, you can add a subcommand like this:

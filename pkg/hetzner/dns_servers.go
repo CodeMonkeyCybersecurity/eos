@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *HetznerClient) GetAllPrimaryServers(ctx context.Context, zoneID string) ([]PrimaryServer, error) {
+func (c *DNSClient) GetAllPrimaryServers(ctx context.Context, zoneID string) ([]PrimaryServer, error) {
 	url := hetznerDNSBaseURL + "/primary_servers"
 	if zoneID != "" {
 		url += "?zone_id=" + zoneID
@@ -44,7 +44,7 @@ func (c *HetznerClient) GetAllPrimaryServers(ctx context.Context, zoneID string)
 	return result.PrimaryServers, nil
 }
 
-func (c *HetznerClient) CreatePrimaryServer(ctx context.Context, zoneID, address string, port int) (*PrimaryServer, error) {
+func (c *DNSClient) CreatePrimaryServer(ctx context.Context, zoneID, address string, port int) (*PrimaryServer, error) {
 	payload := map[string]interface{}{
 		"zone_id": zoneID,
 		"address": address,
@@ -79,7 +79,7 @@ func (c *HetznerClient) CreatePrimaryServer(ctx context.Context, zoneID, address
 	return &result.PrimaryServer, nil
 }
 
-func (c *HetznerClient) GetPrimaryServer(ctx context.Context, id string) (*PrimaryServer, error) {
+func (c *DNSClient) GetPrimaryServer(ctx context.Context, id string) (*PrimaryServer, error) {
 	url := hetznerDNSBaseURL + "/primary_servers/" + id
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
@@ -107,7 +107,7 @@ func (c *HetznerClient) GetPrimaryServer(ctx context.Context, id string) (*Prima
 	return &result.PrimaryServer, nil
 }
 
-func (c *HetznerClient) UpdatePrimaryServer(ctx context.Context, id, zoneID, address string, port int) (*PrimaryServer, error) {
+func (c *DNSClient) UpdatePrimaryServer(ctx context.Context, id, zoneID, address string, port int) (*PrimaryServer, error) {
 	payload := map[string]interface{}{
 		"zone_id": zoneID,
 		"address": address,
@@ -142,7 +142,7 @@ func (c *HetznerClient) UpdatePrimaryServer(ctx context.Context, id, zoneID, add
 	return &result.PrimaryServer, nil
 }
 
-func (c *HetznerClient) DeletePrimaryServer(ctx context.Context, id string) error {
+func (c *DNSClient) DeletePrimaryServer(ctx context.Context, id string) error {
 	req, err := http.NewRequestWithContext(ctx, "DELETE", hetznerDNSBaseURL+"/primary_servers/"+id, nil)
 	if err != nil {
 		return errors.Wrap(err, "creating DELETE request")

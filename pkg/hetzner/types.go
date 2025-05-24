@@ -63,3 +63,14 @@ type dnsZoneResponse struct {
 type dnsZoneListResponse struct {
 	Zones []DNSZone `json:"zones"`
 }
+
+type ServerSpec struct {
+	Name        string
+	Image       string
+	Type        string
+	Location    string
+	SSHKeys     []string
+	UserData    string
+	Labels      map[string]string
+	FirewallIDs []int
+}
