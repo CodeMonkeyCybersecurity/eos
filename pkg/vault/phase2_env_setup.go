@@ -62,35 +62,26 @@ func EnsureVaultEnv() (string, error) {
 		return cur, nil
 	}
 
-	// 2. Use hostname as the default form
+	// 2. Always use internal hostname as the Vault address
 	host := debian.GetInternalHostname()
-	defaultAddr := fmt.Sprintf(shared.VaultDefaultAddr, host)
+	addr := fmt.Sprintf(shared.VaultDefaultAddr, host)
 
-	// 3. Check preferred candidates in order
-	candidates := []string{
-		fmt.Sprintf("https://127.0.0.1:%s", shared.VaultDefaultPort),
-		defaultAddr,
+	// 3. Probe TLS before setting
+	if canConnectTLS(addr, testTimeout) {
+		_ = os.Setenv(shared.VaultAddrEnv, addr)
+		zap.L().Info("🔐 VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
+	} else {
+		zap.L().Warn("⚠️ VAULT_ADDR unreachable over TLS — setting anyway", zap.String("addr", addr))
+		_ = os.Setenv(shared.VaultAddrEnv, addr)
 	}
 
-	for _, addr := range candidates {
-		if canConnectTLS(addr, testTimeout) {
-			_ = os.Setenv(shared.VaultAddrEnv, addr)
-			zap.L().Info("🔐 VAULT_ADDR auto-detected", zap.String(shared.VaultAddrEnv, addr))
-			return addr, nil
-		}
-	}
-
-	// 4. No reachable Vault listener — set hostname-based default anyway
-	zap.L().Warn("⚠️ No Vault listener detected — using hostname-based default")
-	_ = os.Setenv(shared.VaultAddrEnv, defaultAddr)
-
-	// 5. Set CA cert path if missing
+	// 4. Set CA cert path if missing
 	if os.Getenv(shared.VaultCA) == "" {
 		_ = os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath)
 		zap.L().Debug("🔧 Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
 	}
 
-	return defaultAddr, nil
+	return addr, nil
 }
 
 func canConnectTLS(raw string, d time.Duration) bool {
