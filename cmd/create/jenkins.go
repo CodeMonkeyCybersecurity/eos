@@ -18,6 +18,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -77,7 +78,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Wait and fetch admin password
 		time.Sleep(5 * time.Second)
-		out, err := docker.ExecCommandInContainer(ctx.Ctx, docker.ExecConfig{
+		out, pwErr := docker.ExecCommandInContainer(ctx.Ctx, docker.ExecConfig{
 			ContainerName: "jenkins",
 			Cmd:           []string{"cat", "/var/jenkins_home/secrets/initialAdminPassword"},
 			Tty:           false, // or true if you need a TTY
@@ -104,7 +105,7 @@ var CreateJenkinsCmd = &cobra.Command{
 		// Step 8: Print Jenkins default admin password
 		cmdOut := exec.Command("docker", "exec", "jenkins", "cat", "/var/jenkins_home/secrets/initialAdminPassword")
 		rawOut, err := cmdOut.CombinedOutput()
-		if err != nil {
+		if pwErr != nil {
 			zap.L().Warn("Could not retrieve initial admin password", zap.Error(err))
 			fmt.Println("⚠️  Could not retrieve admin password automatically. Check with:")
 			fmt.Println("   docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword")
@@ -112,10 +113,21 @@ var CreateJenkinsCmd = &cobra.Command{
 			password := strings.TrimSpace(string(rawOut))
 			fmt.Printf("\n🔐 Jenkins is ready!\nVisit: http://localhost:8059\nUnlock with password:\n\n%s\n\n", password)
 		}
+		vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
+		if err != nil {
+			return fmt.Errorf("failed to create Vault client: %w", err)
+		}
+		if pwErr == nil {
+			// stash in Vault under "secret/jenkins"
+			if err := docker.StoreJenkinsAdminPassword(ctx.Ctx, vaultClient, strings.TrimSpace(out)); err != nil {
+				zap.L().Warn("failed to write Jenkins password to Vault", zap.Error(err))
+			} else {
+				zap.L().Info("Jenkins admin password stored in Vault", zap.String("path", "secret/jenkins"))
+			}
+		}
 
 		zap.L().Info("Jenkins deployment complete",
 			zap.String("url", fmt.Sprintf("http://%s:8059", debian.GetInternalHostname())))
-
 		return nil
 	}),
 }
