@@ -77,8 +77,10 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Wait and fetch admin password
 		time.Sleep(5 * time.Second)
-		out, err := docker.ExecCommandInContainer("jenkins", []string{
-			"cat", "/var/jenkins_home/secrets/initialAdminPassword",
+		out, err := docker.ExecCommandInContainer(ctx.Ctx, docker.ExecConfig{
+			ContainerName: "jenkins",
+			Cmd:           []string{"cat", "/var/jenkins_home/secrets/initialAdminPassword"},
+			Tty:           false, // or true if you need a TTY
 		})
 		if err != nil {
 			fmt.Println("⚠️  Could not get admin password. Run manually:")
