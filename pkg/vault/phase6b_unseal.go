@@ -18,7 +18,7 @@ import (
 func UnsealVault() (*api.Client, error) {
 	zap.L().Info("🚀 Entering UnsealVault")
 
-	client, err := CreateVaultClient()
+	client, err := NewClient()
 	if err != nil {
 		zap.L().Error("❌ Failed to create Vault client", zap.Error(err))
 		return nil, fmt.Errorf("create vault client: %w", err)

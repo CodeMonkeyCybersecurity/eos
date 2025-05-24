@@ -34,3 +34,11 @@ type AppRoleOptions struct {
 func diskFallbackPath() string {
 	return filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 }
+
+type Audit struct {
+	Type        string            `json:"type" mapstructure:"type"`
+	Description string            `json:"description" mapstructure:"description"`
+	Options     map[string]string `json:"options" mapstructure:"options"`
+	Local       bool              `json:"local" mapstructure:"local"`
+	Path        string            `json:"path" mapstructure:"path"`
+}

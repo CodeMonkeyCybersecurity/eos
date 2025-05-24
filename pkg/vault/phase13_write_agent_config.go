@@ -34,7 +34,7 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	}
 
 	// 2) render + write HCL
-	roleID, secretID, err := readAppRoleCredsFromDisk()
+	roleID, secretID, err := readAppRoleCredsFromDisk(client)
 	if err != nil {
 		return fmt.Errorf("read AppRole creds: %w", err)
 	}

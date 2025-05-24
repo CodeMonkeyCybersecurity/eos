@@ -1,5 +1,3 @@
-// pkg/vault/phase7a_enable_api_client.go
-
 package vault
 
 import (
@@ -9,59 +7,52 @@ import (
 	"go.uber.org/zap"
 )
 
-//--------------------------------------------------------------------
-// Phase 8A: Enable API Client Access
+//---------------------------------------------------------
+// Phase 7A: Enable API Client Access for Root-Level Actions
 //
 // Purpose:
-// - Confirm that Vault API client is ready for EOS CLI usage
-// - Validate that token (root token) is active and authorized
-//--------------------------------------------------------------------
+// - Construct and return a privileged Vault API client
+// - Load and verify root token from disk or prompt
+//---------------------------------------------------------
 
-// SetVaultToken sets the Vault token on the provided client.
+// SetVaultToken safely applies the token to the Vault client.
 func SetVaultToken(client *api.Client, token string) {
 	client.SetToken(token)
+	zap.L().Debug("🔐 Vault token set on client", zap.String("token_preview", truncateToken(token)))
 }
 
-// GetRootClient returns a Vault client authenticated with the root token.
-// It bypasses the agent token and ensures the root token is valid.
+// GetRootClient constructs a Vault client authenticated with the root token.
 func GetRootClient() (*api.Client, error) {
-	log := zap.L().Named("GetRootClient")
-	log.Info("🔐 Starting privileged Vault client setup")
+	log := zap.L().Named("vault.rootclient")
+	log.Info("🔐 Initializing privileged Vault client")
 
-	// 1️⃣ Create a Vault API client
-	log.Debug("📡 Creating new Vault API client")
+	// 1️⃣ Create a Vault API client from config
 	client, err := NewClient()
 	if err != nil {
 		log.Error("❌ Failed to create Vault API client", zap.Error(err))
-		return nil, fmt.Errorf("create vault API client: %w", err)
+		return nil, fmt.Errorf("create Vault client: %w", err)
 	}
-	log.Debug("✅ Vault API client created")
+	log.Debug("✅ Vault API client created", zap.String("addr", client.Address()))
 
-	// 2️⃣ Get the root token from vault-init.json or prompt
-	log.Debug("🔑 Retrieving root token from init result or prompt")
-	rootToken, err := tryRootToken(client)
+	// 2️⃣ Load root token from init file or fallback
+	rootToken, err := loadPrivilegedToken()
 	if err != nil {
 		log.Error("❌ Failed to load root token", zap.Error(err))
 		return nil, fmt.Errorf("load root token: %w", err)
 	}
-	log.Debug("✅ Root token retrieved", zap.String("token_preview", truncateToken(rootToken)))
+	SetVaultToken(client, rootToken)
 
-	// 3️⃣ Set the root token on the client
-	log.Debug("🔐 Setting root token on Vault client")
-	client.SetToken(rootToken)
-	log.Debug("✅ Root token set on client")
-
-	// 4️⃣ Verify that the token is valid against Vault
-	log.Debug("🔍 Verifying root token with Vault server")
+	// 3️⃣ Verify token validity against Vault
 	if err := VerifyRootToken(client, rootToken); err != nil {
-		log.Error("❌ Root token validation failed", zap.Error(err))
+		log.Error("❌ Root token is invalid", zap.Error(err))
 		return nil, fmt.Errorf("verify root token: %w", err)
 	}
-	log.Info("✅ Privileged Vault client obtained and verified with root token")
+	log.Info("✅ Root token validated, privileged client ready")
 
 	return client, nil
 }
 
+// truncateToken returns a safe preview string for logging.
 func truncateToken(token string) string {
 	if len(token) <= 6 {
 		return token

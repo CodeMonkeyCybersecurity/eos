@@ -19,7 +19,7 @@ import (
 //--------------------------------------------------------------------
 
 func InitializeVault() error {
-	client, err := CreateVaultClient()
+	client, err := NewClient()
 	if err != nil {
 		return fmt.Errorf("create Vault client: %w", err)
 	}

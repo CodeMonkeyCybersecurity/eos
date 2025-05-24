@@ -2,10 +2,10 @@ package pandora
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 )
 
 // exportCmd represents the `eos pandora export` base command.
@@ -14,26 +14,32 @@ var exportCmd = &cobra.Command{
 	Short: "Export Pandora-related files like TLS certs",
 }
 
-var exportTLSCmd = &cobra.Command{
-	Use:   "--tls-crt",
-	Short: "Export Vault TLS certificate to a remote machine",
+var exportTLSCertCmd = &cobra.Command{
+	Use:   "tls-crt",
+	Short: "Export the Vault TLS client certificate to a remote machine via SSH",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log := zap.L()
-		if !vault.TlsCert {
-			return nil
-		}
 		if vault.User == "" || vault.Host == "" || vault.Path == "" {
 			return fmt.Errorf("user, host, and path are required")
 		}
-		return vault.ExportTLSCert(vault.User, vault.Host, vault.Path, log)
+
+		certPath := os.Getenv("VAULT_CLIENT_CERT")
+		if certPath == "" {
+			return fmt.Errorf("VAULT_CLIENT_CERT env var not set; cannot locate TLS cert")
+		}
+
+		input := vault.TLSExportInput{
+			User: vault.User,
+			Host: vault.Host,
+			Path: vault.Path,
+		}
+		return vault.ExportTLSCert(input)
 	},
 }
 
 func init() {
-	exportTLSCmd.Flags().StringVar(&vault.User, "user", "", "Remote SSH username (required)")
-	exportTLSCmd.Flags().StringVar(&vault.Host, "host", "", "Remote hostname (required)")
-	exportTLSCmd.Flags().StringVar(&vault.Path, "path", "", "Remote path (e.g. ~/Downloads)")
-	exportTLSCmd.Flags().BoolVar(&vault.TlsCert, "tls-crt", false, "Export Vault TLS certificate")
+	exportTLSCertCmd.Flags().StringVar(&vault.User, "user", "", "Remote SSH username (required)")
+	exportTLSCertCmd.Flags().StringVar(&vault.Host, "host", "", "Remote hostname (required)")
+	exportTLSCertCmd.Flags().StringVar(&vault.Path, "path", "", "Remote path (e.g. ~/Downloads)")
 
-	exportCmd.AddCommand(exportTLSCmd)
+	exportCmd.AddCommand(exportTLSCertCmd)
 }

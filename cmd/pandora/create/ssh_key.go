@@ -54,7 +54,7 @@ var SshKeyCmd = &cobra.Command{
 		}
 
 		// Authenticate to Vault
-		client, err := vault.Auth()
+		client, err := vault.Authn()
 		// declare a local flag
 		useVault := (err == nil)
 		if !useVault {

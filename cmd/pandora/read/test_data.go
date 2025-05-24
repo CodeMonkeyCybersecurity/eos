@@ -26,7 +26,7 @@ var InspectTestDataCmd = &cobra.Command{
 		var out map[string]interface{}
 		var vaultReadErr error
 
-		client, err := vault.Auth()
+		client, err := vault.Authn()
 		if err != nil {
 			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
 			client = nil // triggers fallback to disk

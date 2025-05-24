@@ -13,10 +13,6 @@ import (
 	"go.uber.org/zap"
 )
 
-func CreateVaultClient() (*api.Client, error) {
-	return NewClient()
-}
-
 func VaultAddress() string {
 	return os.Getenv(shared.VaultAddrEnv)
 }

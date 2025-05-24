@@ -1,6 +1,7 @@
 package vault
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -8,11 +9,13 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
+	"github.com/hashicorp/vault/api/auth/approle"
 	"go.uber.org/zap"
 )
 
-func Auth() (*api.Client, error) {
+func Authn() (*api.Client, error) {
 	client, err := GetVaultClient()
 	if err != nil {
 		zap.L().Warn("⚠️ Vault client unavailable", zap.Error(err))
@@ -36,7 +39,7 @@ func OrchestrateVaultAuth(client *api.Client) error {
 	}{
 		{"agent token", readTokenFile("/etc/vault-agent-eos.token")},
 		{"AppRole", tryAppRole},
-		{"disk token file", readTokenFile("/var/lib/eos/secrets/vault.token")},
+		{"disk token file", readTokenFile("/var/lib/eos/secrets/token")},
 		{"userpass", tryUserpassWithPrompt},
 		{"root token file", tryRootToken},
 	}
@@ -74,7 +77,7 @@ func readTokenFile(path string) func(*api.Client) (string, error) {
 }
 
 func tryAppRole(client *api.Client) (string, error) {
-	roleID, secretID, err := readAppRoleCredsFromDisk()
+	roleID, secretID, err := readAppRoleCredsFromDisk(client)
 	if err != nil {
 		zap.L().Warn("❌ Failed to read AppRole credentials", zap.Error(err))
 		return "", fmt.Errorf("read AppRole creds: %w", err)
@@ -186,4 +189,57 @@ func VerifyToken(client *api.Client, token string) bool {
 	}
 	zap.L().Debug("✅ Token verified successfully")
 	return true
+}
+
+type AppRoleLoginInput struct {
+	RoleID      string
+	SecretID    string
+	MountPath   string
+	UseWrapping bool // If true, use response-wrapped secret ID token
+}
+
+func buildSecretID(input AppRoleLoginInput) *approle.SecretID {
+	return &approle.SecretID{
+		FromString: input.SecretID,
+	}
+}
+
+func buildAppRoleAuth(input AppRoleLoginInput) (*approle.AppRoleAuth, error) {
+	opts := []approle.LoginOption{}
+
+	if input.MountPath != "" {
+		opts = append(opts, approle.WithMountPath(input.MountPath))
+	}
+	if input.UseWrapping {
+		opts = append(opts, approle.WithWrappingToken())
+	}
+
+	auth, err := approle.NewAppRoleAuth(input.RoleID, buildSecretID(input), opts...)
+	if err != nil {
+		return nil, cerr.Wrap(err, "failed to create AppRoleAuth")
+	}
+	return auth, nil
+}
+
+func LoginWithAppRole(ctx context.Context, client *api.Client, input AppRoleLoginInput) (*api.Secret, error) {
+	log := zap.L()
+
+	auth, err := buildAppRoleAuth(input)
+	if err != nil {
+		log.Error("❌ Failed to build AppRoleAuth", zap.Error(err))
+		return nil, err
+	}
+
+	secret, err := client.Auth().Login(ctx, auth)
+	if err != nil {
+		log.Error("❌ AppRole login failed", zap.Error(err))
+		return nil, cerr.Wrap(err, "Vault AppRole login failed")
+	}
+
+	if secret == nil || secret.Auth == nil {
+		return nil, cerr.New("no secret or auth info returned by Vault")
+	}
+
+	log.Info("✅ Vault AppRole login successful")
+	return secret, nil
 }

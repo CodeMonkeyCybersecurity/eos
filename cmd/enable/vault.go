@@ -19,7 +19,7 @@ AppRole auth, Vault Agent, and API client connectivity.`,
 		log := ctx.Log.Named("cmd/enable/vault")
 
 		// Step 1: Get client
-		client, err := vault.CreateVaultClient()
+		client, err := vault.NewClient()
 		if err != nil {
 			return logger.LogErrAndWrap("create vault client", err)
 		}

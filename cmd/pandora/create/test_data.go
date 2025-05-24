@@ -21,7 +21,7 @@ attempts to upload it into Vault, and falls back to saving locally if Vault is u
 		log := ctx.Log.Named("pandora-create-test-data")
 		data := shared.GenerateTestData()
 
-		client, err := vault.Auth()
+		client, err := vault.Authn()
 		if err != nil {
 			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
 			client = nil // triggers fallback to disk
