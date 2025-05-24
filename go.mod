@@ -9,6 +9,7 @@ require (
 	github.com/Nerzal/gocloak/v13 v13.9.0
 	github.com/cockroachdb/errors v1.12.0
 	github.com/docker/docker v28.1.1+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/go-ldap/ldap/v3 v3.4.11
 	github.com/go-playground/validator/v10 v10.26.0
 	github.com/google/uuid v1.6.0
@@ -45,7 +46,6 @@ require (
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.5 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/emicklei/proto v1.13.4 // indirect
 	github.com/fatih/color v1.18.0 // indirect
