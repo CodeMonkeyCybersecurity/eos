@@ -5,8 +5,8 @@ package read
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -25,7 +25,7 @@ user permissions, versioning data, keepalive status, and other useful insights.
 
 Subcommands are required to specify which type of information to inspect.`,
 	Aliases: []string{"read", "get"},
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Info("'eos delphi inspect' was called without a subcommand")
 
 		fmt.Println("❌ Missing subcommand.")

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -51,7 +51,7 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	}
 
 	// 4) reload & enable
-	if err := debian.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
+	if err := eos_unix.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
 		return fmt.Errorf("reload/enable service: %w", err)
 	}
 
@@ -66,7 +66,7 @@ func prepareTokenSink(tokenPath, user string) error {
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return err
 	}
-	uid, gid, err := debian.LookupUser(user)
+	uid, gid, err := eos_unix.LookupUser(user)
 	if err != nil {
 		return err
 	}

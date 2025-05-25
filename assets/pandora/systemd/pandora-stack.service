@@ -1,8 +1,8 @@
 # /etc/systemd/system/vault-stack.service
 [Unit]
 Description=Vault + Agent + Nginx Stack
-Requires=docker.service
-After=docker.service
+Requires=container.service
+After=container.service
 
 [Service]
 WorkingDirectory=/opt/eos/compose/vault

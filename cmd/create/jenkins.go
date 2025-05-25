@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	vaultapi "github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -32,7 +32,7 @@ var CreateJenkinsCmd = &cobra.Command{
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
 - Informing the user to navigate to :8059 and log in`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Info("Starting Jenkins installation using Eos")
 
 		// Step 1: Ensure the installation directory exists
@@ -67,7 +67,7 @@ var CreateJenkinsCmd = &cobra.Command{
 		}
 
 		// Ensure network
-		if err := docker.EnsureArachneNetwork(ctx.Ctx); err != nil {
+		if err := container.EnsureArachneNetwork(ctx.Ctx); err != nil {
 			return fmt.Errorf("ensure network: %w", err)
 		}
 
@@ -78,7 +78,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Wait and fetch admin password
 		time.Sleep(5 * time.Second)
-		out, pwErr := docker.ExecCommandInContainer(ctx.Ctx, docker.ExecConfig{
+		out, pwErr := container.ExecCommandInContainer(ctx.Ctx, container.ExecConfig{
 			ContainerName: "jenkins",
 			Cmd:           []string{"cat", "/var/jenkins_home/secrets/initialAdminPassword"},
 			Tty:           false, // or true if you need a TTY
@@ -98,7 +98,7 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		time.Sleep(5 * time.Second)
 
-		if err := docker.CheckDockerContainers(ctx.Ctx); err != nil {
+		if err := container.CheckDockerContainers(ctx.Ctx); err != nil {
 			zap.L().Fatal("Error checking containers", zap.Error(err))
 		}
 
@@ -119,7 +119,7 @@ var CreateJenkinsCmd = &cobra.Command{
 		}
 		if pwErr == nil {
 			// stash in Vault under "secret/jenkins"
-			if err := docker.StoreJenkinsAdminPassword(ctx.Ctx, vaultClient, strings.TrimSpace(out)); err != nil {
+			if err := container.StoreJenkinsAdminPassword(ctx.Ctx, vaultClient, strings.TrimSpace(out)); err != nil {
 				zap.L().Warn("failed to write Jenkins password to Vault", zap.Error(err))
 			} else {
 				zap.L().Info("Jenkins admin password stored in Vault", zap.String("path", "secret/jenkins"))
@@ -127,7 +127,7 @@ var CreateJenkinsCmd = &cobra.Command{
 		}
 
 		zap.L().Info("Jenkins deployment complete",
-			zap.String("url", fmt.Sprintf("http://%s:8059", debian.GetInternalHostname())))
+			zap.String("url", fmt.Sprintf("http://%s:8059", eos_unix.GetInternalHostname())))
 		return nil
 	}),
 }

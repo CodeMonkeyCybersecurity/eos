@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -21,11 +21,11 @@ var (
 var InspectAPICmd = &cobra.Command{
 	Use:   "api",
 	Short: "Inspect API details from Delphi (Wazuh)",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		// ✅ Step 2: Toggle ShowSecrets and confirm config
 		delphi.ShowSecrets = showSecrets
-		cfg, err := delphi.ResolveConfig()
+		cfg, err := delphi.ResolveConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
 		}
@@ -38,13 +38,13 @@ var InspectAPICmd = &cobra.Command{
 				os.Exit(1)
 			}
 			cfg.Token = token
-			if err := delphi.WriteConfig(cfg); err != nil {
+			if err := delphi.WriteConfig(rc.Ctx, cfg); err != nil {
 				zap.L().Warn("Failed to write config", zap.Error(err))
 			}
 		}
 
 		// ✅ Step 4: Secret access control
-		if !debian.EnforceSecretsAccess(showSecrets) {
+		if !eos_unix.EnforceSecretsAccess(showSecrets) {
 			return err
 		}
 

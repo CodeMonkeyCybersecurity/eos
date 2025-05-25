@@ -8,10 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +26,7 @@ You can choose from:
   3) Inspect Eos backend web apps configuration
   4) Inspect Nginx defaults
   5) Inspect all configurations`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		runInspectConfig()
 		return nil
 	}),

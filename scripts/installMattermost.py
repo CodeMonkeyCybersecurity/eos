@@ -39,7 +39,7 @@ networks:
 """
 
 def check_docker():
-    """Check if Docker is installed on the debian."""
+    """Check if Docker is installed on the eos_unix."""
     try:
         subprocess.run(["docker", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError:
@@ -47,7 +47,7 @@ def check_docker():
         sys.exit(1)
 
 def check_docker_compose():
-    """Check if Docker Compose is installed on the debian."""
+    """Check if Docker Compose is installed on the eos_unix."""
     try:
         subprocess.run(["docker-compose", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError:

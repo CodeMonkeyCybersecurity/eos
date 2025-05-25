@@ -11,11 +11,11 @@ import (
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllServers(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func GetAllServers(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
 

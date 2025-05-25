@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ollama"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/parse"
@@ -22,13 +22,13 @@ import (
 var CreateOllamaCmd = &cobra.Command{
 	Use:   "ollama",
 	Short: "Install Ollama and Web UI on macOS with GPU support",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Logger()
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log
 		if !platform.IsMacOS() {
 			return errors.New("❌ this command is only supported on macOS")
 		}
 
-		if err := docker.CheckRunning(ctx.Ctx); err != nil {
+		if err := container.CheckRunning(ctx.Ctx); err != nil {
 			log.Warn("Docker not running", zap.Error(err))
 			return cerr.WithHint(err, "Please start Docker Desktop before running this command")
 		}

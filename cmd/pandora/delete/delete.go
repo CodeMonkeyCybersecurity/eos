@@ -2,8 +2,8 @@
 package delete
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 )
 
@@ -12,7 +12,7 @@ var DeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete resources from Pandora (Vault)",
 	Long:  "Delete secrets and test data from Pandora (Vault).",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}),
 }

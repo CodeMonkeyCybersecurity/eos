@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -82,7 +82,7 @@ To confirm that your variable is set correctly, run:
    
 Then, run this command again.
      `,
-		RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			// Basic validation
 			if domain == "" || ip == "" {
 				err := fmt.Errorf("domain and ip are required")

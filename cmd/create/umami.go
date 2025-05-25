@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -30,7 +30,7 @@ var CreateUmamiCmd = &cobra.Command{
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
 - Informing the user to navigate to :8117 and log in with default credentials (admin/umami) and change the password immediately.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("Starting Umami installation using Eos")
 
@@ -79,7 +79,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Check if arache-net docker network already exists, create if not
 		// Check if arachne-net docker network exists, creating it if not
-		if err := docker.EnsureArachneNetwork(ctx.Ctx); err != nil {
+		if err := container.EnsureArachneNetwork(ctx.Ctx); err != nil {
 			zap.L().Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
 		} else {
 			zap.L().Info("Successfully ensured 'arachne-net' exists")
@@ -97,13 +97,13 @@ var CreateUmamiCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		// Execute "docker ps" to list running containers
-		if err := docker.CheckDockerContainers(ctx.Ctx); err != nil {
+		if err := container.CheckDockerContainers(ctx.Ctx); err != nil {
 			zap.L().Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 
 		// Final congratulatory message with instructions
 		zap.L().Info("Umami installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", debian.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", eos_unix.GetInternalHostname())))
 		return nil
 	}),
 }

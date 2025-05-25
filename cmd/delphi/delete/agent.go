@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -31,7 +31,7 @@ Supported OS uninstallers:
 - macOS: /Library/Ossec/uninstall.sh
 - Linux: apt-get, yum, or dnf depending on distribution
 - Windows: wmic + msiexec`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		if agentID == "" {
 			zap.L().Error("Agent ID is required")
@@ -40,7 +40,7 @@ Supported OS uninstallers:
 		}
 
 		zap.L().Info("🔐 Authenticating and loading Delphi config...")
-		config, err := delphi.ResolveConfig()
+		config, err := delphi.ResolveConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Error("Failed to load config", zap.Error(err))
 			os.Exit(1)

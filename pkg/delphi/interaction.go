@@ -3,6 +3,7 @@
 package delphi
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -12,7 +13,7 @@ import (
 )
 
 // ConfirmConfig allows the user to review and optionally edit the current config.
-func ConfirmConfig(cfg *Config) *Config {
+func ConfirmConfig(ctx context.Context, cfg *Config) *Config {
 	fmt.Println("Current configuration:")
 	fmt.Printf("  Protocol:      %s\n", cfg.Protocol)
 	fmt.Printf("  FQDN:          %s\n", cfg.FQDN)
@@ -65,7 +66,7 @@ func ConfirmConfig(cfg *Config) *Config {
 			cfg.LatestVersion = newVal
 		}
 
-		if err := WriteConfig(cfg); err != nil {
+		if err := WriteConfig(ctx, cfg); err != nil {
 			fmt.Printf("❌ Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}

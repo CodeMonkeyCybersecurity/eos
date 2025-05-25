@@ -3,16 +3,16 @@
   hosts: docker_hosts
   become: yes  # run tasks as root
   tasks:
-    - name: Copy deploy_docker.py to remote host
+    - name: Copy deploy_container.py to remote host
       copy:
-        src: deploy_docker.py
-        dest: /tmp/deploy_docker.py
+        src: deploy_container.py
+        dest: /tmp/deploy_container.py
         mode: '0755'
 
-    - name: Execute the deploy_docker.py script
-      command: /tmp/deploy_docker.py
+    - name: Execute the deploy_container.py script
+      command: /tmp/deploy_container.py
       register: deploy_result
 
-    - name: Display output from deploy_docker.py
+    - name: Display output from deploy_container.py
       debug:
         var: deploy_result.stdout_lines

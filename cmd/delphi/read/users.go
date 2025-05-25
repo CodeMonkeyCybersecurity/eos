@@ -4,8 +4,8 @@ package read
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -16,9 +16,9 @@ var UsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "List Wazuh users and their IDs",
 	Long:  "Fetches and displays all Wazuh users along with their associated user IDs from the Delphi (Wazuh) API.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig()
+		cfg, err := delphi.ReadConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Fatal("Failed to load Delphi config", zap.Error(err))
 		}

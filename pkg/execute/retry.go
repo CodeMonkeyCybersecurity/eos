@@ -11,7 +11,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 )
 
 // RetryCommand retries execution with live output and structured logging.
@@ -33,7 +33,7 @@ func RetryCommand(ctx context.Context, maxAttempts int, delay time.Duration, nam
 		}
 
 		output := buf.String()
-		summary := eoserr.ExtractSummary(output, 2)
+		summary := eos_err.ExtractSummary(output, 2)
 		lastErr = fmt.Errorf("❌ attempt %d failed: %w\noutput:\n%s", i, err, summary)
 
 		if i < maxAttempts {

@@ -2,8 +2,8 @@
 package refresh
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -14,7 +14,7 @@ var RefreshCmd = &cobra.Command{
 	Short:   "Refresh EOS system components (e.g., passwords, tokens)",
 	Long:    "Commands to refresh or reload EOS components safely and securely.",
 	Aliases: []string{"reload", "restart", "rescue"},
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("No subcommand provided for refresh command", zap.String("command", cmd.Use))
 		_ = cmd.Help() // fallback to displaying help if no subcommand

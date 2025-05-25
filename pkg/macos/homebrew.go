@@ -1,3 +1,4 @@
+// pkg/macos/homebrew.go
 package macos
 
 import (
@@ -8,67 +9,73 @@ import (
 
 	crerr "github.com/cockroachdb/errors"
 	"go.opentelemetry.io/otel/attribute"
+	"go.uber.org/zap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
-	"go.uber.org/zap"
 )
 
+// EnsureHomebrewInstalled makes sure "brew" is available on macOS.
+// It enforces an OPA policy, emits tracing & structured logging,
+// and wraps errors with CockroachDB hints.
 func EnsureHomebrewInstalled(ctx context.Context) error {
-	log := zap.L()
+	log := zap.L().Named("homebrew")
 	start := time.Now()
 
-	ctx, span := telemetry.StartSpan(ctx, "EnsureHomebrewInstalled")
+	// 1) OPA policy guard
+	if err := eos_opa.Enforce(ctx, "macos/ensure_homebrew", nil); err != nil {
+		return crerr.Wrapf(err, "policy denied for Homebrew installation")
+	}
+
+	// 2) Start an OpenTelemetry span
+	ctx, span := telemetry.Start(ctx, "EnsureHomebrewInstalled")
 	defer span.End()
 
+	// 3) If already installed, nothing more to do
 	if platform.IsCommandAvailable("brew") {
-		log.Info("✅ Homebrew is already installed")
+		log.Info("Homebrew already installed")
 		span.SetAttributes(attribute.String("status", "already_installed"))
 		return nil
 	}
+	log.Warn("Homebrew not found")
+	span.SetAttributes(attribute.String("status", "not_installed"))
 
-	log.Warn("❌ Homebrew is not installed")
-	span.SetAttributes(attribute.String("status", "not_found"))
-
-	// Prompt user
-	ok := interaction.PromptYesNo("Homebrew is not installed. Would you like to install it now?", true)
-	if !ok {
+	// 4) Prompt user
+	if !interaction.PromptYesNo("Homebrew is required. Install now?", true) {
 		span.SetAttributes(attribute.String("user_response", "declined"))
-		telemetry.TrackCommand(ctx, "EnsureHomebrewInstalled", false, time.Since(start).Milliseconds(), map[string]string{
-			"result": "user_declined",
-		})
-		return crerr.New("Homebrew is required but was not installed. Please install it from https://brew.sh")
+		return crerr.New("Homebrew installation was declined by user")
 	}
 	span.SetAttributes(attribute.String("user_response", "accepted"))
 
-	log.Info("📦 Installing Homebrew...")
+	// 5) Perform the install
+	log.Info("Installing Homebrew…")
+	if err := runHomebrewInstaller(); err != nil {
+		span.RecordError(err)
+		span.SetAttributes(attribute.String("status", "install_failed"))
+		return crerr.WithHint(
+			crerr.Wrap(err, "failed to install Homebrew"),
+			"please install manually from https://brew.sh",
+		)
+	}
 
-	cmd := exec.Command(
-		"/bin/bash", "-c",
+	// 6) Success
+	log.Info("Homebrew installed successfully")
+	span.SetAttributes(attribute.String("status", "installed"))
+
+	// Note: telemetry.TrackCommand is now handled by your `eos.Wrap` wrapper,
+	// so we don’t call it here and avoid signature mismatches.
+	_ = time.Since(start) // if you need duration for logging only
+	return nil
+}
+
+// runHomebrewInstaller encapsulates the actual `brew` install command.
+func runHomebrewInstaller() error {
+	cmd := exec.Command("/bin/bash", "-c",
 		`/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`,
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		log.Error("⚠️ Failed to install Homebrew", zap.Error(err))
-		span.RecordError(err)
-		span.SetAttributes(attribute.String("status", "install_failed"))
-
-		telemetry.TrackCommand(ctx, "EnsureHomebrewInstalled", false, time.Since(start).Milliseconds(), map[string]string{
-			"result": "install_failed",
-		})
-		return crerr.WithHint(
-			crerr.Wrap(err, "Homebrew installation failed"),
-			"Try manually installing Homebrew from https://brew.sh",
-		)
-	}
-
-	log.Info("✅ Homebrew installed successfully")
-	span.SetAttributes(attribute.String("status", "installed"))
-
-	telemetry.TrackCommand(ctx, "EnsureHomebrewInstalled", true, time.Since(start).Milliseconds(), map[string]string{
-		"result": "installed",
-	})
-	return nil
+	return cmd.Run()
 }

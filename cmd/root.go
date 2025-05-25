@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -23,9 +23,9 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
@@ -43,7 +43,7 @@ var RootCmd = &cobra.Command{
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
 
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
 		return cmd.Help()
 	}),
@@ -94,7 +94,7 @@ func Execute() {
 	RegisterCommands()
 
 	if err := RootCmd.Execute(); err != nil {
-		if eoserr.IsExpectedUserError(err) {
+		if eos_err.IsExpectedUserError(err) {
 			zap.L().Warn("CLI completed with user error", zap.Error(err))
 			os.Exit(0)
 		} else {

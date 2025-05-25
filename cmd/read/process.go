@@ -9,8 +9,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -23,7 +23,7 @@ var InspectProcessCmd = &cobra.Command{
 	Short: "Retrieve detailed information about running processes",
 	Long: `This command retrieves detailed information about all running processes on the system
 by reading the /proc directory and outputs it in a table format.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("Executing read process command", zap.Strings("args", args))
 

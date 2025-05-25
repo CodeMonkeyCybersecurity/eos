@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hera"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 
@@ -16,7 +16,7 @@ import (
 var SyncUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Create user-specific groups from Keycloak registration events",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Named("delphi.sync.users")
 
 		realm, _ := interaction.PromptIfMissing(cmd, "realm", "Enter Keycloak realm", false)

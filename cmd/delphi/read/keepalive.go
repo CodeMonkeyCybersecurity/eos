@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -17,9 +17,9 @@ import (
 var KeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",
 	Short: "Check disconnected agents from Wazuh API",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ResolveConfig()
+		cfg, err := delphi.ResolveConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
 		}

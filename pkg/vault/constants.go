@@ -49,7 +49,6 @@ const (
 		"where <address> is replaced by the actual address to the server."
 )
 
-
 const (
 	EnvVaultAgentAddress = "VAULT_AGENT_ADDR"
 	EnvVaultInsecure     = "VAULT_SKIP_VERIFY"

@@ -4,9 +4,9 @@ package delete
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
 	"github.com/spf13/cobra"
@@ -19,7 +19,7 @@ var DeleteK3sCmd = &cobra.Command{
 	Short:        "Uninstall K3s from this machine",
 	Long: `Detects whether this machine is running a K3s server or agent,
 and removes it by running the appropriate uninstall scripts in the correct order.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if err := uninstallK3s(); err != nil {
 			zap.L().Error("❌ Failed to uninstall K3s", zap.Error(err))
 			return err
@@ -38,7 +38,7 @@ func uninstallK3s() error {
 
 	var ranAny bool
 	for role, path := range scripts {
-		if debian.Exists(path) {
+		if eos_unix.Exists(path) {
 			zap.L().Info("▶ Detected uninstall script",
 				zap.String("role", role),
 				zap.String("path", path),

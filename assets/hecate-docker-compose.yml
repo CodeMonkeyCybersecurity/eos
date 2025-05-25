@@ -75,7 +75,7 @@ networks:
   arachne-net: 
     driver: bridge
     driver_opts:
-      com.docker.network.bridge.name: br-arachne
+      com.container.network.bridge.name: br-arachne
     enable_ipv6: true
     ipam:
       driver: default

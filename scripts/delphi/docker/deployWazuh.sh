@@ -38,7 +38,7 @@ read -p "Type in the version number of the most recent Wazuh version then press 
 
 echo ""
 echo "Cloning git repo, version ${WZ_VERS}"
-git clone https://github.com/wazuh/wazuh-docker.git -b v${WZ_VERS}
+git clone https://github.com/wazuh/wazuh-container.git -b v${WZ_VERS}
 
 echo ""
 read -p "Do you want to deploy this as a multi-node or single-node install? (type 1 for 'single-node' or 2 for 'multi-node'): " WZ_DEPL_TYPE

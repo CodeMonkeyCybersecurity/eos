@@ -8,8 +8,8 @@ import (
 	read "github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/update"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +21,7 @@ var PandoraCmd = &cobra.Command{
 	Long:    "Commands related to pandora and integrations such as install, remove, and inspect.",
 	Aliases: []string{"p"},
 	// Optionally, you can define a Run function to display help if no subcommand is provided.
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		shared.SafeHelp(cmd)
 		return nil
 	}),

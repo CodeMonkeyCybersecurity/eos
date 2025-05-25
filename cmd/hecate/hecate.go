@@ -3,8 +3,8 @@
 package hecate
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate/backup"
@@ -25,7 +25,7 @@ var HecateCmd = &cobra.Command{
 	Aliases: []string{"h"},
 
 	// You can optionally add a Run function if you want to provide default behavior when no subcommand is used.
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

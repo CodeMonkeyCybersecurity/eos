@@ -2,8 +2,8 @@
 package create
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/packer"
 	"github.com/spf13/cobra"
 )
@@ -11,8 +11,8 @@ import (
 var CreatePackerCmd = &cobra.Command{
 	Use:   "packer",
 	Short: "Install HashiCorp Packer on any supported platform",
-	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Logger()
+	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log
 		log.Info("🚀 Installing Packer")
 		return packer.EnsureInstalled(log)
 	}),

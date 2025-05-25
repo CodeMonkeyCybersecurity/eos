@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -28,13 +28,13 @@ var PasswordCmd = &cobra.Command{
 	Short: "Update a Wazuh user's password",
 	Long: `Update the password of a Wazuh (Delphi) user using their username.
 Supports interactive confirmation and XDG-safe password storage if requested.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		if username == "" {
 			return errors.New("username is required (use --username)")
 		}
 
-		cfg, err := delphi.ReadConfig()
+		cfg, err := delphi.ReadConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Fatal("Failed to load Delphi config", zap.Error(err))
 		}

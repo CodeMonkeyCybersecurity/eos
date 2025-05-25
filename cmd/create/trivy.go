@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"os/exec"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
 // installTrivy installs the Trivy vulnerability scanner.
-func installTrivy(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func installTrivy(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("trivy-installer")
 	log.Info("📦 Starting Trivy installation")
 
@@ -54,7 +54,7 @@ func installTrivy(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) 
 var CreateTrivyCmd = &cobra.Command{
 	Use:   "trivy",
 	Short: "Install Trivy vulnerability scanner",
-	Long: `This command installs the Trivy vulnerability scanner on your debian.
+	Long: `This command installs the Trivy vulnerability scanner on your eos_unix.
  It performs the following steps:
    1. Installs required packages (wget, gnupg)
    2. Imports the Trivy public key and adds the Trivy APT repository

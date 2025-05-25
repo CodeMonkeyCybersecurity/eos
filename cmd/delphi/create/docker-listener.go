@@ -5,12 +5,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ var DockerListenerCmd = &cobra.Command{
 	Use:   "docker-listener",
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",
 	Long:  "Sets up a Python virtual environment and configures Wazuh's DockerListener integration.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Info("🚀 Setting up Delphi DockerListener...")
 
 		steps := []struct {

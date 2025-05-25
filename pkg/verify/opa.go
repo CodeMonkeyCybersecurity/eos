@@ -11,7 +11,7 @@ import (
 )
 
 func EnforcePolicy(ctx context.Context, policyPath string, input interface{}) ([]string, error) {
-	_, span := telemetry.StartSpan(ctx, "verify.EnforcePolicy")
+	_, span := telemetry.Start(ctx, "verify.EnforcePolicy")
 	defer span.End()
 
 	query, err := rego.New(

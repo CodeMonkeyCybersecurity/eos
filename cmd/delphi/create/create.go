@@ -2,6 +2,7 @@
 package create
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -9,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -23,7 +24,7 @@ var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create Delphi resources",
 	Long:  "Create or generate Delphi-related resources, configurations, and mappings.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Info("'eos delphi create' was called without a subcommand")
 		return nil
 	}),
@@ -32,8 +33,8 @@ var CreateCmd = &cobra.Command{
 var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		runMapping()
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		runMapping(rc.Ctx)
 		return nil
 	}),
 }
@@ -70,8 +71,8 @@ type PackageMapping struct {
 	Package      string
 }
 
-func runMapping() {
-	cfg, err := delphi.ResolveConfig()
+func runMapping(ctx context.Context) {
+	cfg, err := delphi.ResolveConfig(ctx)
 	if err != nil {
 		zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
 	}

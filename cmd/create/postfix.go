@@ -8,9 +8,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
@@ -24,8 +24,8 @@ var CreatePostfixCmd = &cobra.Command{
 	Use:   "postfix",
 	Short: "Install and configure Postfix as an SMTP relay",
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		debian.RequireRoot()
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		eos_unix.RequireRoot()
 
 		osType := platform.DetectLinuxDistro()
 		zap.L().Info("Detected OS", zap.String("type", osType))

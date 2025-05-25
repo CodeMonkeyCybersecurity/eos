@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -19,7 +20,9 @@ func VaultAddress() string {
 
 // EnableVault now drives everything interactively.
 func EnableVault(client *api.Client, log *zap.Logger) error {
-	zap.L().Info("🚀 Starting Vault enablement flow")
+	// introduce a context for all phases
+	ctx := context.Background()
+	log.Info("🚀 Starting Vault enablement flow")
 
 	// Step 6b: unseal Vault if needed
 	unsealedClient, err := UnsealVault()
@@ -57,9 +60,10 @@ func EnableVault(client *api.Client, log *zap.Logger) error {
 		}
 	}
 
-	// Step 10b: interactively configure approle auth
+	// Step 10b: interactively configure AppRole auth
 	if interaction.PromptYesNo("Enable AppRole authentication?", false) {
-		if err := PhaseEnableAppRole(client, log, shared.DefaultAppRoleOptions()); err != nil {
+		opts := shared.DefaultAppRoleOptions()
+		if err := PhaseEnableAppRole(ctx, client, log, opts); err != nil {
 			return logger.LogErrAndWrap("enable AppRole", err)
 		}
 	}
@@ -101,7 +105,7 @@ func EnableVault(client *api.Client, log *zap.Logger) error {
 		return logger.LogErrAndWrap("apply core secrets", err)
 	}
 
-	zap.L().Info("🎉 Vault enablement process completed successfully")
+	log.Info("🎉 Vault enablement process completed successfully")
 	PrintEnableNextSteps()
 	return nil
 }

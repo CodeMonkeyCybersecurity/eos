@@ -3,21 +3,22 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 
 	"go.uber.org/zap"
 )
 
-func OrchestrateVaultCreate() error {
+func OrchestrateVaultCreate(ctx context.Context) error {
 	zap.L().Info("🚀 Starting full Vault create lifecycle")
 
 	if err := PhaseInstallVault(); err != nil {
 		return fmt.Errorf("install vault binary: %w", err)
 	}
-	if err := PrepareEnvironment(); err != nil {
+	if err := PrepareEnvironment(ctx); err != nil {
 		return fmt.Errorf("prepare environment: %w", err)
 	}
-	if err := GenerateTLS(); err != nil {
+	if err := GenerateTLS(ctx); err != nil {
 		return fmt.Errorf("generate TLS: %w", err)
 	}
 	if err := WriteAndValidateConfig(); err != nil {

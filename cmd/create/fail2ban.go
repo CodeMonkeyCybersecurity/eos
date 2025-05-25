@@ -5,8 +5,8 @@ package create
 import (
 	"os"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -16,7 +16,7 @@ var CreateFail2banCmd = &cobra.Command{
 	Use:   "fail2ban",
 	Short: "Deploy and configure Fail2Ban",
 	Long:  "Install Fail2Ban, apply secure jail.local settings, and enable basic SSH protection.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		zap.L().Info("🚧 Starting Fail2Ban setup...")
 
 		steps := []struct {

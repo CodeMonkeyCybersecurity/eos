@@ -11,8 +11,8 @@ import (
 	"os"
 	"os/exec"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,7 +24,7 @@ var CreateBackupCmd = &cobra.Command{
 	Short: "Create a new restic backup",
 	Long: `This command initializes a restic repository if not already initialized,
 then creates a backup of specified directories.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		// Step 1: Ensure Restic is Installed
 		zap.L().Info("Ensuring Restic is installed")

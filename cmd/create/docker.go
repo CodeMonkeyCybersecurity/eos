@@ -1,4 +1,4 @@
-// cmd/create/docker.go
+// cmd/create/container.go
 
 package create
 
@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 
@@ -22,15 +22,15 @@ var CreateDockerCmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Install Docker and configure it for non-root usage",
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Assume that 'log' is globally defined or available in context.
-		debian.RequireRoot()
+		eos_unix.RequireRoot()
 
 		zap.L().Info("Uninstalling conflicting Docker packages...")
-		docker.UninstallConflictingPackages()
+		container.UninstallConflictingPackages()
 
 		zap.L().Info("Removing Docker snap package...")
-		docker.UninstallSnapDocker()
+		container.UninstallSnapDocker()
 
 		zap.L().Info("Updating apt repositories...")
 		if err := platform.PackageUpdate(false); err != nil {
@@ -38,7 +38,7 @@ var CreateDockerCmd = &cobra.Command{
 		}
 
 		zap.L().Info("Installing prerequisites and Docker GPG key...")
-		docker.InstallPrerequisitesAndGpg()
+		container.InstallPrerequisitesAndGpg()
 
 		addDockerRepo()
 		installDocker()
@@ -52,14 +52,14 @@ var CreateDockerCmd = &cobra.Command{
 }
 
 func addDockerRepo() {
-	arch := debian.GetArchitecture()
-	codename := debian.GetUbuntuCodename()
+	arch := eos_unix.GetArchitecture()
+	codename := eos_unix.GetUbuntuCodename()
 
 	repoLine := fmt.Sprintf(
-		"deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n",
+		"deb [arch=%s signed-by=/etc/apt/keyrings/container.asc] https://download.container.com/linux/ubuntu %s stable\n",
 		arch, codename,
 	)
-	err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0644)
+	err := os.WriteFile("/etc/apt/sources.list.d/container.list", []byte(repoLine), 0644)
 	if err != nil {
 		zap.L().Fatal("Error writing Docker repo file", zap.Error(err))
 	}

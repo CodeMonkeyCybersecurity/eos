@@ -9,9 +9,9 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
@@ -35,7 +35,7 @@ By default, this checks your system's hardware (4GB RAM, 2+ cores). Use --ignore
 	RunE: eos.Wrap(runDelphiInstall),
 }
 
-func runDelphiInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func runDelphiInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("delphi")
 
 	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}); err != nil {
@@ -119,7 +119,7 @@ func extractWazuhPasswords() error {
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	for _, dir := range searchPaths {
 		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
-		if debian.Exists(tarPath) {
+		if eos_unix.Exists(tarPath) {
 			zap.L().Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
 			cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
 			cmd.Stdout = os.Stdout

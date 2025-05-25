@@ -3,8 +3,8 @@
 package create
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/osquery"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
@@ -16,7 +16,7 @@ var createOsQueryCmd = &cobra.Command{
 	Use:   "osquery",
 	Short: "Install osquery and configure its APT repository",
 	Long:  "Installs osquery on Debian/Ubuntu-based systems by configuring the GPG key and APT repository.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		if err := platform.RequireLinuxDistro([]string{"debian"}); err != nil {
 			zap.L().Fatal("Platform requirement not met", zap.Error(err))

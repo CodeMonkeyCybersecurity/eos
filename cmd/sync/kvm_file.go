@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/kvm"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,7 +24,7 @@ stores it temporarily on the host with a timestamped filename,
 then injects it into a destination VM.
 
 Both VMs must be shut off for virt-copy to work.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		timestamp := time.Now().Format("20060102_150405")
 		filename := filepath.Base(kvm.SourcePath)
 		tempDir := "/var/lib/eos/transfer"

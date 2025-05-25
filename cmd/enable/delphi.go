@@ -4,8 +4,8 @@ package enable
 
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -18,7 +18,7 @@ var EnableDelphiCmd = &cobra.Command{
 This includes 443, 1514, 1515, and 55000.`,
 	Aliases: []string{"wazuh"},
 
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("🔐 Enabling Delphi firewall rules...")
 

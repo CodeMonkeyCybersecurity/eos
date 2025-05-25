@@ -4,8 +4,8 @@ package create
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -14,8 +14,8 @@ import (
 var CreateStorageCmd = &cobra.Command{
 	Use:   "storage",
 	Short: "Create new storage resources",
-	Long:  `This command allows you to create new storage resources in the debian.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	Long:  `This command allows you to create new storage resources in the eos_unix.`,
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			zap.L().Fatal("Please specify the storage details to create.")
 		}

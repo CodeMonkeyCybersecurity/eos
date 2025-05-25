@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -27,7 +27,7 @@ var CreateSSHCmd = &cobra.Command{
 	Short: "Create a FIPS-compliant SSH key and connect it to a remote host",
 	Long: `Generates a 2048-bit RSA key for FIPS compliance, installs it to a remote host using ssh-copy-id,
 and configures it in your ~/.ssh/config for easy reuse.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return runCreateSSH(cmd, args)
 	}),
 }
@@ -76,14 +76,14 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 		fmt.Println("🔑 Key already exists:", keyPath)
 	} else {
 		zap.L().Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
-		if err := debian.GenerateFIPSKey(keyPath); err != nil {
+		if err := eos_unix.GenerateFIPSKey(keyPath); err != nil {
 			return fmt.Errorf("failed to generate SSH key: %w", err)
 		}
 	}
 
 	// Copy key to remote host.
 	fmt.Printf("📡 Copying public key to %s...\n", targetLogin)
-	if err := debian.CopyKeyToRemote(pubKeyPath, targetLogin); err != nil {
+	if err := eos_unix.CopyKeyToRemote(pubKeyPath, targetLogin); err != nil {
 		return fmt.Errorf("failed to copy key to remote host: %w", err)
 	}
 
@@ -92,7 +92,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	if alias == "" {
 		alias = host
 	}
-	if err := debian.AppendToSSHConfig(alias, host, remoteUser, keyPath, configPath); err != nil {
+	if err := eos_unix.AppendToSSHConfig(alias, host, remoteUser, keyPath, configPath); err != nil {
 		return fmt.Errorf("failed to update SSH config: %w", err)
 	}
 

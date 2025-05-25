@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"go.uber.org/zap"
@@ -60,14 +60,14 @@ func SafeReadSecret(path string) (*api.Secret, bool) {
 	return secret, true
 }
 
-// ReadSecret reads a Vault secret or returns eoserr.ErrSecretNotFound.
+// ReadSecret reads a Vault secret or returns eos_err.ErrSecretNotFound.
 func ReadSecret(path string) (*api.Secret, error) {
 	secret, err := readSecret(path)
 	if err != nil {
 		return nil, err
 	}
 	if secret == nil {
-		return nil, eoserr.ErrSecretNotFound
+		return nil, eos_err.ErrSecretNotFound
 	}
 	return secret, nil
 }
@@ -80,7 +80,7 @@ func ReadFallbackJSON[T any](path string, target *T) error {
 // ReadVaultSecureData loads vault_init and userpass fallback files.
 func ReadVaultSecureData(client *api.Client) (*api.InitResponse, shared.UserpassCreds, []string, string) {
 	zap.L().Info("🔐 Starting secure Vault bootstrap sequence")
-	if err := debian.EnsureEosUser(true, false); err != nil {
+	if err := eos_unix.EnsureEosUser(true, false); err != nil {
 		zap.L().Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
 
@@ -94,9 +94,9 @@ func ReadVaultSecureData(client *api.Client) (*api.InitResponse, shared.Userpass
 	return initRes, *creds, crypto.HashStrings(initRes.KeysB64), crypto.HashString(initRes.RootToken)
 }
 
-// IsNotFoundError checks if the error is eoserr.ErrSecretNotFound.
+// IsNotFoundError checks if the error is eos_err.ErrSecretNotFound.
 func IsNotFoundError(err error) bool {
-	return errors.Is(err, eoserr.ErrSecretNotFound)
+	return errors.Is(err, eos_err.ErrSecretNotFound)
 }
 
 // ListUnder lists Vault KV metadata keys under a path.
@@ -143,7 +143,7 @@ func InspectFromDisk() error {
 func readSecret(path string) (*api.Secret, error) {
 	client, err := GetVaultClient()
 	if err != nil || client == nil {
-		return nil, eoserr.NewExpectedError(fmt.Errorf("vault client not ready: %w", err))
+		return nil, eos_err.NewExpectedError(fmt.Errorf("vault client not ready: %w", err))
 	}
 	return client.Logical().ReadWithContext(context.Background(), path)
 }

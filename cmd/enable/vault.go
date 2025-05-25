@@ -2,8 +2,8 @@
 package enable
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -15,7 +15,7 @@ var EnableVaultCmd = &cobra.Command{
 	Short: "Orchestrates minimal secure runtime setup for Vault (server, approle, agent, api)",
 	Long: `Connects to Vault, ensures server readiness, and selectively enables components:
 AppRole auth, Vault Agent, and API client connectivity.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("cmd/enable/vault")
 
 		// Step 1: Get client

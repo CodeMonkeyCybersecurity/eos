@@ -2,8 +2,8 @@
 package create
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -17,7 +17,7 @@ var CreateTestDataCmd = &cobra.Command{
 	Short: "Generate and upload test data into Vault (fallback to disk)",
 	Long: `This command generates realistic test data (e.g., Alice Wonderland, Bob Builder),
 attempts to upload it into Vault, and falls back to saving locally if Vault is unavailable.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-create-test-data")
 		data := shared.GenerateTestData()
 

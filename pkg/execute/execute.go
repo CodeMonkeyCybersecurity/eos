@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	cerr "github.com/cockroachdb/errors"
@@ -36,7 +36,7 @@ func Run(opts Options) (string, error) {
 	defer cancel()
 
 	// 📈 Start telemetry span
-	ctx, span := telemetry.StartSpan(ctx, "execute.Run")
+	ctx, span := telemetry.Start(ctx, "execute.Run")
 	defer span.End()
 	span.SetAttributes(
 		attribute.String("command", opts.Command),
@@ -95,7 +95,7 @@ func Run(opts Options) (string, error) {
 			break
 		}
 
-		summary := eoserr.ExtractSummary(output, 2)
+		summary := eos_err.ExtractSummary(output, 2)
 		span.RecordError(err)
 		logError(logger, "Execution failed", err,
 			zap.Int("attempt", i),

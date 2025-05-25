@@ -10,9 +10,9 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -32,7 +32,7 @@ func init() {
 var InspectVaultInitCmd = &cobra.Command{
 	Use:   "vault-init",
 	Short: "Inspect Vault initialization keys, root token, and eos credentials",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-init")
 
 		// Load Vault Init Result
@@ -42,7 +42,7 @@ var InspectVaultInitCmd = &cobra.Command{
 		}
 
 		// Load eos password credentials
-		eosCreds, err := debian.LoadPasswordFromSecrets()
+		eosCreds, err := eos_unix.LoadPasswordFromSecrets()
 		if err != nil {
 			log.Warn("⚠️ Could not load eos password file", zap.Error(err))
 		}
@@ -101,7 +101,7 @@ var InspectVaultInitCmd = &cobra.Command{
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault")
 
 		log.Info("Listing secrets under secret/eos")
@@ -124,7 +124,7 @@ var InspectVaultCmd = &cobra.Command{
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Check Vault Agent status and basic functionality",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-vault-agent")
 
 		if err := vault.CheckVaultAgentService(); err != nil {
@@ -172,7 +172,7 @@ var InspectVaultLDAPCmd = &cobra.Command{
 var InspectSecretsCmd = &cobra.Command{
 	Use:   "secrets",
 	Short: "List and view EOS secrets (redacted)",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-secrets")
 
 		files, err := os.ReadDir(shared.SecretsDir)

@@ -3,63 +3,63 @@
 package hecate
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"go.uber.org/zap"
 )
 
-// PhaseCaddy sets up the Caddy environment: dirs, Caddyfile, and placement.
-func PhaseCaddy(spec CaddySpec) error {
+func PhaseCaddy(ctx context.Context, spec CaddySpec) error {
 	log := zap.L().Named("hecate-phase-caddy")
-	log.Info("🚀 Starting Phase 2: Caddy setup",
+	log.Info("🚀 Phase 2: Caddy setup",
 		zap.Int("proxy_count", len(spec.Proxies)),
 		zap.String("keycloak_domain", spec.KeycloakDomain),
 	)
 
-	// Always ensure directories
-	if err := EnsureCaddyDirs(); err != nil {
-		log.Error("❌ Failed to ensure Caddy directories", zap.Error(err))
-		return fmt.Errorf("failed to ensure Caddy dirs: %w", err)
+	// 1) Ensure Caddy directories
+	dirs := []string{HecateCertsDir, HecateAssetsDir, HecateLogsDir}
+	for _, d := range dirs {
+		if err := eos_unix.MkdirP(ctx, d, 0o755); err != nil {
+			log.Error("ensure dir failed", zap.String("path", d), zap.Error(err))
+			return fmt.Errorf("ensure caddy dir %s: %w", d, err)
+		}
 	}
 	log.Info("✅ Caddy directories ensured")
 
-	// Skip Caddyfile generation if no proxies & no Keycloak
+	// 2) Skip if nothing to do
 	if len(spec.Proxies) == 0 && spec.KeycloakDomain == "" {
-		log.Info("⚠️ No proxies or Keycloak domain specified; skipping Caddyfile")
+		log.Info("⚠️ No proxies or Keycloak; skipping Caddyfile")
 		return nil
 	}
 
-	// Build, write, and place Caddyfile
-	if err := BuildAndPlaceCaddyfile(spec); err != nil {
-		log.Error("❌ Caddyfile build/deploy failed", zap.Error(err))
+	// 3) Build + deploy Caddyfile
+	if err := buildAndDeployCaddyfile(ctx, spec); err != nil {
+		log.Error("Caddyfile deploy failed", zap.Error(err))
 		return err
 	}
-	log.Info("✅ Caddyfile build/deploy completed")
+	log.Info("✅ Caddyfile deployed")
 	return nil
 }
 
-// BuildAndPlaceCaddyfile generates, writes, and moves the Caddyfile.
-func BuildAndPlaceCaddyfile(spec CaddySpec) error {
+func BuildAndPlaceCaddyfile(ctx context.Context, spec CaddySpec) error {
 	log := zap.L().Named("hecate-caddy-builder")
-	log.Info("🔧 Generating Caddyfile...", zap.Int("proxy_count", len(spec.Proxies)))
-
 	content := GenerateCaddySpecMulti(spec)
-	log.Info("✅ Caddyfile content generated", zap.Int("content_length", len(content)))
+	log.Info("Caddyfile generated", zap.Int("length", len(content)))
 
-	// Write locally
-	if err := writeFile("Caddyfile", content); err != nil {
-		return fmt.Errorf("failed to write Caddyfile: %w", err)
+	// write temp file
+	if err := os.WriteFile("Caddyfile", []byte(content), 0o644); err != nil {
+		log.Error("write temp Caddyfile failed", zap.Error(err))
+		return fmt.Errorf("write Caddyfile: %w", err)
 	}
 
-	// Move to /opt/hecate
-	if err := debian.CopyFile("Caddyfile", HecateCaddyfile, 0644); err != nil {
-		return fmt.Errorf("failed to move Caddyfile: %w", err)
+	// move into place with proper context
+	if err := eos_unix.CopyFile(ctx, "Caddyfile", HecateCaddyfile, 0o644); err != nil {
+		log.Error("move Caddyfile failed", zap.Error(err))
+		return fmt.Errorf("move Caddyfile: %w", err)
 	}
-
-	log.Info("✅ Caddyfile placed at destination", zap.String("destination", HecateCaddyfile))
 	return nil
 }
 
@@ -94,33 +94,6 @@ func GenerateCaddySpecMulti(spec CaddySpec) string {
 	return builder.String()
 }
 
-// EnsureCaddyDirs ensures required directories exist.
-func EnsureCaddyDirs() error {
-	dirs := []string{HecateCertsDir, HecateAssetsDir, HecateLogsDir}
-	return debian.EnsureDirs(dirs)
-}
-
-// writeFile writes content to a file.
-func writeFile(path string, content string) error {
-	log := zap.L().Named("hecate-caddy-writer")
-	log.Info("💾 Writing file", zap.String("path", path))
-
-	file, err := os.Create(path)
-	if err != nil {
-		log.Error("❌ Failed to create file", zap.Error(err))
-		return err
-	}
-	defer file.Close()
-
-	if _, err := file.WriteString(content); err != nil {
-		log.Error("❌ Failed to write content", zap.Error(err))
-		return err
-	}
-
-	log.Info("✅ File written successfully", zap.String("path", path))
-	return nil
-}
-
 // CollateCaddyFragments handles collation + writing of the Caddyfile.
 func CollateCaddyFragments() error {
 	log := zap.L().Named("hecate-caddy-collation")
@@ -137,4 +110,23 @@ func CollateCaddyFragments() error {
 			return frag.CaddyBlock
 		},
 	)
+}
+
+func buildAndDeployCaddyfile(ctx context.Context, spec CaddySpec) error {
+	log := zap.L().Named("hecate-caddy-builder")
+	content := GenerateCaddySpecMulti(spec)
+	log.Info("Caddyfile generated", zap.Int("length", len(content)))
+
+	// write to temp file
+	if err := os.WriteFile("Caddyfile", []byte(content), 0o644); err != nil {
+		log.Error("write temp Caddyfile failed", zap.Error(err))
+		return fmt.Errorf("write Caddyfile: %w", err)
+	}
+
+	// move into place
+	if err := eos_unix.CopyFile(ctx, "Caddyfile", HecateCaddyfile, 0o644); err != nil {
+		log.Error("move Caddyfile failed", zap.Error(err))
+		return fmt.Errorf("move Caddyfile: %w", err)
+	}
+	return nil
 }

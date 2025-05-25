@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
@@ -81,7 +81,7 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 		if strings.Contains(path, "*") {
 			matches, _ := filepath.Glob(path)
 			for _, m := range matches {
-				if err := debian.Rm(ctx, m, owner); err != nil {
+				if err := eos_unix.RmRF(ctx, m, owner); err != nil {
 					// fallback to sudo rm -rf
 					fallbackErr := exec.CommandContext(ctx, "rm", "-rf", m).Run()
 					if fallbackErr != nil {
@@ -97,7 +97,7 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 				}
 			}
 		} else {
-			if err := debian.Rm(ctx, path, owner); err != nil {
+			if err := eos_unix.RmRF(ctx, path, owner); err != nil {
 				fallbackErr := exec.CommandContext(ctx, "rm", "-rf", path).Run()
 				if fallbackErr != nil {
 					errs[path] = fallbackErr
@@ -109,7 +109,7 @@ func Purge(distro string) (removed []string, errs map[string]error) {
 				errs[path] = err
 			} else {
 				removed = append(removed, path)
-				log.Info("✅ Removed with debian.Rm", zap.String("path", path))
+				log.Info("✅ Removed with eos_unix.Rm", zap.String("path", path))
 			}
 		}
 	}

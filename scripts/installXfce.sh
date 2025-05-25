@@ -5,7 +5,7 @@
 echo "Starting XFCE and GNOME Keyring installation script..."
 
 # Update package list and upgrade packages
-echo "Updating debian..."
+echo "Updating eos_unix..."
 sudo apt update && sudo apt upgrade -y
 
 # Install XFCE4 and additional goodies
@@ -43,7 +43,7 @@ echo "Starting LightDM service..."
 sudo systemctl restart lightdm
 
 # Prompt for reboot
-echo "XFCE and GNOME Keyring installation is complete. It is recommended to reboot the debian."
+echo "XFCE and GNOME Keyring installation is complete. It is recommended to reboot the eos_unix."
 read -p "Would you like to reboot now? (y/n): " answer
 if [[ "$answer" =~ ^[Yy]$ ]]; then
     sudo reboot

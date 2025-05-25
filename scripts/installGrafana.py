@@ -19,8 +19,8 @@ def prompt_user(prompt, default=None):
     return response.strip() or default
 
 def install_grafana():
-    """Install Grafana using Docker."""
-    print("Installing Grafana using Docker...")
+    """Install Grafana using container."""
+    print("Installing Grafana using container...")
 
     grafana_version = prompt_user("Enter the Grafana version to install", "latest")
     grafana_port = prompt_user("Enter the port to expose Grafana on", "3000")

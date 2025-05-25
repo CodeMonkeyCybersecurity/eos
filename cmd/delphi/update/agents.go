@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -19,9 +19,9 @@ var UpdateAgentsCmd = &cobra.Command{
 	Use:   "agents",
 	Short: "Upgrade Wazuh agents via the Wazuh API",
 	Long:  "Upgrades one or more Wazuh agents using a remote package (WPK) via the API.",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig()
+		cfg, err := delphi.ReadConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Error("Failed to load Delphi config", zap.Error(err))
 			return err

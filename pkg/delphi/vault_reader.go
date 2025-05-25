@@ -1,6 +1,7 @@
 package delphi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -73,7 +74,7 @@ func promptDelphiAPICreds() (string, string, error) {
 }
 
 /* ReadDelphiConfig loads Delphi config from Vault, then disk, then prompts interactively as a last resort. */
-func ReadConfig() (*Config, error) {
+func ReadConfig(ctx context.Context) (*Config, error) {
 	var cfg Config
 
 	// Try Vault first
@@ -103,7 +104,7 @@ func ReadConfig() (*Config, error) {
 	cfg.APIPassword = pw
 
 	// Optionally save to disk
-	if err := WriteConfig(&cfg); err != nil {
+	if err := WriteConfig(ctx, &cfg); err != nil {
 		zap.L().Warn("⚠️  Failed to write disk config fallback", zap.Error(err))
 	}
 
@@ -117,8 +118,8 @@ func ReadConfig() (*Config, error) {
 	return &cfg, nil
 }
 
-func ReadCreds() (*APICreds, error) {
-	cfg, err := ReadConfig()
+func ReadCreds(ctx context.Context) (*APICreds, error) {
+	cfg, err := ReadConfig(ctx)
 	if err != nil {
 		return nil, err
 	}

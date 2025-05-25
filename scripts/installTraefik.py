@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 def check_docker_installed():
-    """Check if Docker is installed on the debian."""
+    """Check if Docker is installed on the eos_unix."""
     try:
         subprocess.run(['docker', '--version'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError:
@@ -19,7 +19,7 @@ def get_user_input(prompt, default=None):
     return user_input
 
 def install_traefik():
-    """Install Traefik using Docker."""
+    """Install Traefik using container."""
     # Get user input for Traefik configuration
     domain_name = get_user_input("Enter your domain name for Traefik", "example.com")
     email = get_user_input("Enter your email for Let's Encrypt", "admin@example.com")
@@ -47,7 +47,7 @@ def install_traefik():
     address = ":443"
 
 [providers.docker]
-  endpoint = "unix:///var/run/docker.sock"
+  endpoint = "unix:///var/run/container.sock"
   exposedByDefault = false
   network = "{network_name}"
 
@@ -86,7 +86,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/var/run/container.sock:/var/run/container.sock:ro"
       - "./traefik/{domain_name}/traefik.toml:/traefik.toml"
       - "./traefik/{domain_name}/acme.json:/acme.json"
     networks:

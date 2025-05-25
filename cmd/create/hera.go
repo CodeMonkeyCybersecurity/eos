@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
 	"github.com/spf13/cobra"
@@ -31,7 +31,7 @@ var CreateHeraCmd = &cobra.Command{
 - Creating the external Docker network 'arachne-net'
 - Fixing directory ownership for proper volume permissions
 - Running docker compose up -d and displaying service status & access URL`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("🚀 Starting Hera (Authentik) deployment")
 
@@ -61,7 +61,7 @@ var CreateHeraCmd = &cobra.Command{
 			for _, file := range composeFiles {
 				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
 				zap.L().Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
-				if err := debian.CopyFile(file, destFile, 0); err != nil {
+				if err := eos_unix.CopyFile(rc.Ctx, file, destFile, 0); err != nil {
 					zap.L().Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}
 			}
@@ -122,7 +122,7 @@ var CreateHeraCmd = &cobra.Command{
 		}
 
 		// Ensure external network is present
-		if err := docker.EnsureArachneNetwork(ctx.Ctx); err != nil {
+		if err := container.EnsureArachneNetwork(rc.Ctx); err != nil {
 			zap.L().Fatal("Could not create or verify arachne-net", zap.Error(err))
 		}
 
@@ -140,7 +140,7 @@ var CreateHeraCmd = &cobra.Command{
 		time.Sleep(5 * time.Second)
 
 		zap.L().Info("🔍 Verifying container status")
-		if err := docker.CheckDockerContainers(ctx.Ctx); err != nil {
+		if err := container.CheckDockerContainers(rc.Ctx); err != nil {
 			zap.L().Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 

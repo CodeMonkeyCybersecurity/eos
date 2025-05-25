@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoserr"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -41,7 +41,7 @@ func WithCommandLogging(ctx context.Context, name string, fn func(context.Contex
 
 	duration := time.Since(start)
 	if err != nil {
-		if eoserr.IsExpectedUserError(err) {
+		if eos_err.IsExpectedUserError(err) {
 			log.Warn("Command completed with user error", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))
 		} else {
 			log.Error("Command failed", zap.String("command", name), zap.Duration("duration", duration), zap.Error(err))

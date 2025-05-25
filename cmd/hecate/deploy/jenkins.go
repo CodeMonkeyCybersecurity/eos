@@ -5,14 +5,14 @@ package deploy
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -25,11 +25,11 @@ func NewDeployJenkinsCmd() *cobra.Command {
 
 This command stops the Hecate container (if running) and then organizes assets by moving files 
 that are not relevant to Jenkins into the "other" directory at the project root.`,
-		RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+		RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			zap.L().Info("Starting Jenkins deployment")
 
 			// Stop the container if it's running.
-			if err := docker.StopContainersBySubstring("hecate"); err != nil {
+			if err := container.StopContainersBySubstring("hecate"); err != nil {
 				zap.L().Error("Error stopping container", zap.String("substring", "hecate"), zap.Error(err))
 				fmt.Printf("Error stopping container: %v\n", err)
 				return err
@@ -74,7 +74,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			zap.L().Info("Certificate retrieved successfully", zap.String("domain", fullDomain))
 
 			// Uncomment lines in docker-compose.yml relevant to Jenkins.
-			if err := docker.UncommentSegment("uncomment if using Jenkins behind Hecate"); err != nil {
+			if err := container.UncommentSegment("uncomment if using Jenkins behind Hecate"); err != nil {
 				zap.L().Error("Failed to uncomment Jenkins section", zap.Error(err))
 				fmt.Printf("Failed to uncomment Jenkins section: %v\n", err)
 				return err
@@ -82,7 +82,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			zap.L().Info("Successfully uncommented Jenkins lines")
 
 			// Now use the compose file for starting the services.
-			if err := docker.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
+			if err := container.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
 				zap.L().Error("Failed to start Docker services", zap.Error(err))
 				fmt.Printf("Failed to run docker-compose up: %v\n", err)
 				return err

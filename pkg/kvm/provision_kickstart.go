@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"go.uber.org/zap"
 )
 
-func ProvisionKickstartTenantVM(ctx *eosio.RuntimeContext, vmName, pubKeyPath string) error {
+func ProvisionKickstartTenantVM(ctx *eos_io.RuntimeContext, vmName, pubKeyPath string) error {
 	log := ctx.Log.Named("kickstart")
 	diskPath := filepath.Join(ImageDir, vmName+".qcow2")
 

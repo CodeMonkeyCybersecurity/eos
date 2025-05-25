@@ -3,8 +3,8 @@
 package enable
 
 import (
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/postgres"
 
 	"github.com/spf13/cobra"
@@ -14,7 +14,7 @@ import (
 var EnablePostgresCmd = &cobra.Command{
 	Use:   "postgres",
 	Short: "Initialize PostgreSQL schema for EOS",
-	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := zap.L().Named("enable.postgres")
 
 		db, err := postgres.Connect()

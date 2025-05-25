@@ -3,177 +3,60 @@
 package hecate
 
 import (
-	"bufio"
 	"bytes"
-	"errors"
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"go.uber.org/zap"
 )
 
-// OrchestrateHecateWizard runs the full Hecate setup wizard and delegates to phases.
+// OrchestrateHecateWizard runs the Hecate setup phases in order.
 func OrchestrateHecateWizard() error {
 	log := zap.L().Named("hecate-setup-wizard")
-	reader := bufio.NewReader(os.Stdin)
+	ctx := context.Background()
 
 	log.Info("🚀 Welcome to the Hecate setup wizard!")
 
-	// Phase 0: Ensure the base /opt/hecate directory is present
-	if err := debian.EnsureDir(BaseDir); err != nil {
-		log.Error("Failed to create /opt/hecate directory", zap.Error(err))
-		return fmt.Errorf("failed to create /opt/hecate directory: %w", err)
+	// Phase 0: ensure /opt/hecate exists
+	if err := eos_unix.MkdirP(ctx, BaseDir, 0o755); err != nil {
+		log.Error("Failed to create base directory", zap.Error(err))
+		return fmt.Errorf("failed to create %s: %w", BaseDir, err)
 	}
 
-	// === Phase 1: Service selection + setup ===
-	// This phase gathers user input for which services to enable and builds their ServiceBundles.
-	serviceChoices := []struct {
-		name              string
-		prompt            string
-		defaultYes        bool
-		setupFunc         func(*bufio.Reader) ServiceBundle
-		useTemplateRender bool
-	}{
-		{"Keycloak", "Do you want to set up Keycloak?", false, SetupKeycloakWizard, false},
-		{"Nextcloud", "Do you want to set up Nextcloud?", false, SetupNextcloudWizard, true},
-		{"Wazuh", "Do you want to set up Wazuh?", false, SetupWazuhWizard, false},
-		{"Jenkins", "Do you want to set up Jenkins?", false, SetupJenkinsWizard, false},
-	}
+	// ─── STUB: collect your real values here ───
+	keycloakDomain := ""                  // e.g. from user prompts
+	proxies := []CaddyAppProxy{ /* … */ } // build via handleService()
+	backendIP := "127.0.0.1"              // gather from user
+	// ─────────────────────────────────────────────
 
-	enabledServices := []struct {
-		name              string
-		bundle            ServiceBundle
-		useTemplateRender bool
-	}{}
-
-	for _, svc := range serviceChoices {
-		if interaction.PromptYesNo(svc.prompt, svc.defaultYes) {
-			bundle := svc.setupFunc(reader)
-			enabledServices = append(enabledServices, struct {
-				name              string
-				bundle            ServiceBundle
-				useTemplateRender bool
-			}{svc.name, bundle, svc.useTemplateRender})
-		}
-	}
-
-	// Safety check: Exit early if no services selected
-	if len(enabledServices) == 0 {
-		zap.L().Named("hecate-setup-check").Warn("🚫 No services selected. Exiting without making any changes.")
-		return errors.New("no services selected; exiting setup wizard")
-	}
-
-	// === Collect global settings ===
-	backendIP := interaction.PromptInputWithReader("Enter the backend IP address for these services:", "", reader)
-
-	// === Process + build fragments for each selected service ===
-	for _, svc := range enabledServices {
-		if err := handleService(log, svc.name, svc.bundle, backendIP, svc.useTemplateRender); err != nil {
-			return fmt.Errorf("failed to process %s: %w", svc.name, err)
-		}
-	}
-
-	// === Phase 1: Collate, render, write docker-compose.yml ===
-	// NOTE: This now calls the Phase 1 thin wrapper, which handles collation + building.
-	log.Info("⚙️  Running Phase Docker Compose...")
+	// Phase 1: Docker Compose (no context arg)
+	log.Info("⚙️ Running Phase Docker Compose…")
 	if err := PhaseDockerCompose("hecate-compose-orchestrator", HecateDockerCompose); err != nil {
 		log.Error("Phase Docker Compose failed", zap.Error(err))
 		return fmt.Errorf("phase docker compose failed: %w", err)
 	}
 
-	// === Phase 2: Collate, render, write Caddyfile ===
-	// Call the thin wrapper for Caddy
-
-	// === Build CaddySpec ===
-	var proxies []CaddyAppProxy
-	var keycloakDomain string
-
-	for _, svc := range enabledServices {
-		// Handle Keycloak separately
-		if svc.name == "Keycloak" {
-			keycloakDomain = svc.bundle.Domain
-		} else {
-			// Build a CaddyAppProxy for each other service
-			proxies = append(proxies, NewCaddyAppProxy(
-				svc.name,
-				svc.bundle.Domain,
-				backendIP,
-				svc.bundle.BackendPort,
-				"", // ExtraDirectives (leave empty for now)
-			))
-		}
-	}
-
+	// Phase 2: Caddy (this one does take context+spec)
 	spec := CaddySpec{
 		KeycloakDomain: keycloakDomain,
 		Proxies:        proxies,
 	}
-	if err := PhaseCaddy(spec); err != nil {
-		log.Error("Failed in Phase 2: Caddy setup", zap.Error(err))
-		return err
+	log.Info("⚙️ Running Phase Caddy setup…")
+	if err := PhaseCaddy(ctx, spec); err != nil {
+		log.Error("Phase Caddy failed", zap.Error(err))
+		return fmt.Errorf("phase caddy failed: %w", err)
 	}
 
-	// === Phase 4: Collate and write nginx.conf (if needed) ===
-	// (PhaseNginx would handle Nginx collation + writing)
-	// Example:
-	// log.Info("⚙️  Running Phase Nginx...")
-	if err := PhaseNginx(backendIP); err != nil {
-		log.Error("Failed in Phase 3: Nginx setup", zap.Error(err))
-		return err
+	// Phase 3: Nginx (only backendIP)
+	log.Info("⚙️ Running Phase Nginx setup…")
+	if err := PhaseNginx(backendIP, ctx); err != nil {
+		log.Error("Phase Nginx failed", zap.Error(err))
+		return fmt.Errorf("phase nginx failed: %w", err)
 	}
 
 	log.Info("✅ Hecate setup wizard completed successfully!")
-	return nil
-}
-
-// handleService processes the ServiceBundle and appends fragments.
-func handleService(
-	log *zap.Logger,
-	name string,
-	bundle ServiceBundle,
-	backendIP string,
-	useTemplateRender bool,
-) error {
-
-	if bundle.Caddy != nil {
-		frag, err := bundle.Caddy.ToFragment(backendIP)
-		if err != nil {
-			return fmt.Errorf("failed to render Caddy fragment for %s: %w", name, err)
-		}
-		caddyFragments = append(caddyFragments, frag)
-	}
-
-	if bundle.Nginx != nil {
-		frag, err := bundle.Nginx.ToFragment(backendIP)
-		if err != nil {
-			return fmt.Errorf("failed to render Nginx fragment for %s: %w", name, err)
-		}
-		nginxFragments = append(nginxFragments, frag)
-	}
-
-	if bundle.Compose != nil && bundle.Compose.Services != nil {
-		for svcName, svc := range bundle.Compose.Services {
-			if useTemplateRender {
-				rendered, err := renderTemplateFromString(svc.FullServiceYAML, svc.Environment)
-				if err != nil {
-					log.Warn("Failed to render service YAML", zap.String("service", svcName), zap.Error(err))
-					continue
-				}
-				frag := DockerComposeFragment{ServiceYAML: rendered}
-				composeFragments = append(composeFragments, frag)
-			} else {
-				frag, err := svc.ToFragment()
-				if err != nil {
-					log.Warn("Failed to render service fragment", zap.String("service", svcName), zap.Error(err))
-					continue
-				}
-				composeFragments = append(composeFragments, frag)
-			}
-		}
-	}
-
 	return nil
 }
 

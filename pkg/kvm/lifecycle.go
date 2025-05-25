@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
@@ -56,7 +56,7 @@ func EnsureLibvirtd() error {
 	return nil
 }
 
-func RunCreateKvmTenant(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func RunCreateKvmTenant(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("tenant")
 
 	var vmName string
@@ -97,7 +97,7 @@ func checkVMExists(name string) bool {
 	return err == nil // dominfo succeeds → VM exists
 }
 
-func runKickstartProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
+func runKickstartProvisioning(ctx *eos_io.RuntimeContext, vmName string) error {
 	log := ctx.Log.Named("kickstart")
 
 	if err := ConfigureKVMBridge(); err != nil {
@@ -164,7 +164,7 @@ func getNextVMID() (string, error) {
 	return fmt.Sprintf("%03d", id), nil
 }
 
-func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
+func runCloudInitProvisioning(ctx *eos_io.RuntimeContext, vmName string) error {
 	log := ctx.Log.Named("cloudinit")
 
 	cfg := CloudInitConfig{
@@ -181,10 +181,10 @@ func runCloudInitProvisioning(ctx *eosio.RuntimeContext, vmName string) error {
 	return fmt.Errorf("virt-install not yet implemented")
 }
 
-func RunCreateKvmInstall(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func RunCreateKvmInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	log := ctx.Log.Named("kvm")
 
-	debian.RequireRoot()
+	eos_unix.RequireRoot()
 
 	nonInteractive, _ := cmd.Flags().GetBool("yes")
 	isoOverride, _ := cmd.Flags().GetString("iso")
@@ -260,7 +260,7 @@ func resolveAutostart(log *zap.Logger, nonInteractive, explicitlySet bool, value
 	return resp
 }
 
-func RunCreateKvmTemplate(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+func RunCreateKvmTemplate(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	ctx.Log.Info("Stub: KVM template provisioning logic goes here")
 	return nil
 }

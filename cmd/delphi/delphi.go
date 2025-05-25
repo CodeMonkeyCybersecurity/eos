@@ -9,8 +9,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +21,7 @@ var DelphiCmd = &cobra.Command{
 	Short: "Manage Delphi (Wazuh) components",
 	Long:  "Commands related to Wazuh and Delphi integrations such as install, remove, and inspect.",
 	// Optionally, you can define a Run function to display help if no subcommand is provided.
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		shared.SafeHelp(cmd)
 		return nil
 	}),

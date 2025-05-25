@@ -4,6 +4,7 @@ package delphi
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -180,13 +181,13 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 	return nil
 }
 
-func InspectAgentUpgradeResule() {
+func InspectAgentUpgradeResult(ctx context.Context) {
 	cfg, err := LoadConfig()
 	if err != nil {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
-	cfg = ConfirmConfig(cfg)
+	cfg = ConfirmConfig(ctx, cfg)
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"
 	}

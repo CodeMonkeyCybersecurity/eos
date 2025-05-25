@@ -13,8 +13,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -37,7 +37,7 @@ func init() {
 var SshKeyCmd = &cobra.Command{
 	Use:   "ssh-key",
 	Short: "Create and store an SSH key securely",
-	RunE: eoscli.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
 		// our KV-v2 mount + base directory
 		const mount = "secret"

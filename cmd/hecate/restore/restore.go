@@ -8,116 +8,95 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
 var timestampFlag string
 
-// RestoreCmd represents the restore command.
 var RestoreCmd = &cobra.Command{
 	Use:   "restore",
 	Short: "Restore configuration and files from backup",
-	Long: `Restore configuration files, certificates, and docker-compose file from backups.
-
-If --timestamp is provided (e.g. --timestamp 20250325-101010), then restore will look for:
-  conf.d.<timestamp>.bak
-  certs.<timestamp>.bak
-  docker-compose.yml.<timestamp>.bak
-
-If no --timestamp is given, the command enters interactive mode to choose which resources to restore.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-
-		zap.L().Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
-		_ = cmd.Help() // Display help if no subcommand is provided
-		return nil
-	}),
+	RunE:  eos_cli.Wrap(runRestore),
 }
 
 func init() {
-
-	// Define timestamp flag
 	RestoreCmd.Flags().StringVarP(&timestampFlag, "timestamp", "t", "",
-		"Timestamp for backup (format: YYYYMMDD-HHMMSS). If omitted, interactive mode is used.")
+		"Backup timestamp (YYYYMMDD-HHMMSS). Omit for interactive mode.")
 }
 
-// runAutoRestore automatically restores resources using the provided timestamp.
-func RunAutoRestore(ts string) {
-	backupConf := fmt.Sprintf("%s.%s.bak", shared.DefaultConfDir, ts)
-	backupCerts := fmt.Sprintf("%s.%s.bak", shared.DefaultCertsDir, ts)
-	backupCompose := fmt.Sprintf("%s.%s.bak", shared.DefaultComposeYML, ts)
-
-	fmt.Printf("Restoring backups with timestamp %s...\n", ts)
-	debian.RestoreDir(backupConf, shared.DefaultConfDir)
-	debian.RestoreDir(backupCerts, shared.DefaultCertsDir)
-	debian.RestoreFile(backupCompose, shared.DefaultComposeYML)
+func runRestore(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
+	if timestampFlag != "" {
+		return autoRestore(rc, timestampFlag)
+	}
+	return interactiveRestore(rc)
 }
 
-// runInteractiveRestore presents a menu to choose which resource(s) to restore.
-func RunInteractiveRestore() {
+func autoRestore(rc *eos_io.RuntimeContext, ts string) error {
+	resources := []struct{ prefix, dest string }{
+		{fmt.Sprintf("%s.%s.bak", shared.DefaultConfDir, ts), shared.DefaultConfDir},
+		{fmt.Sprintf("%s.%s.bak", shared.DefaultCertsDir, ts), shared.DefaultCertsDir},
+		{fmt.Sprintf("%s.%s.bak", shared.DefaultComposeYML, ts), shared.DefaultComposeYML},
+	}
+	rc.Log.Info("Starting automatic restore", zap.String("timestamp", ts))
+	for _, r := range resources {
+		if err := restoreResource(rc, r.prefix, r.dest); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func interactiveRestore(rc *eos_io.RuntimeContext) error {
+	menu := []struct {
+		label, prefix, dest string
+	}{
+		{"1) Configuration", shared.DefaultConfDir + ".", shared.DefaultConfDir},
+		{"2) Certificates", shared.DefaultCertsDir + ".", shared.DefaultCertsDir},
+		{"3) Compose file", shared.DefaultComposeYML + ".", shared.DefaultComposeYML},
+		{"4) All resources", "", ""},
+	}
+
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("=== Interactive Restore ===")
-	fmt.Println("Select the resource you want to restore:")
-	fmt.Println("1) Restore configuration (conf.d)")
-	fmt.Println("2) Restore certificates (certs)")
-	fmt.Println("3) Restore docker-compose file")
-	fmt.Println("4) Restore all resources")
+	fmt.Println("Select resource to restore:")
+	for _, m := range menu[:3] {
+		fmt.Println(m.label)
+	}
 	fmt.Print("Enter choice (1-4): ")
 	choice, _ := reader.ReadString('\n')
 	choice = strings.TrimSpace(choice)
 
 	switch choice {
-	case "1":
-		RestoreConf()
-	case "2":
-		RestoreCerts()
-	case "3":
-		RestoreCompose()
+	case "1", "2", "3":
+		idx := choice[0] - '1'
+		return restoreResource(rc, menu[idx].prefix, menu[idx].dest)
 	case "4":
-		RestoreConf()
-		RestoreCerts()
-		RestoreCompose()
+		// require timestamp for “all”
+		if timestampFlag == "" {
+			return fmt.Errorf("must provide --timestamp to restore all")
+		}
+		return autoRestore(rc, timestampFlag)
 	default:
-		fmt.Println("Invalid choice. Exiting.")
-		os.Exit(1)
+		return fmt.Errorf("invalid choice %q", choice)
 	}
 }
 
-func RestoreConf() {
-	backupConf, err := debian.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultConfDir))
+func restoreResource(
+	rc *eos_io.RuntimeContext,
+	backupPattern, destDir string,
+) error {
+	backup, err := eos_unix.FindLatestBackup(backupPattern)
 	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultConfDir, err)
-		return
+		return fmt.Errorf("find backup for %s: %w", destDir, err)
 	}
-	fmt.Printf("Restoring configuration from backup: %s\n", backupConf)
-	debian.RestoreDir(backupConf, shared.DefaultConfDir)
-}
-
-func RestoreCerts() {
-	backupCerts, err := debian.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultCertsDir))
-	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultCertsDir, err)
-		return
+	rc.Log.Info("Restoring", zap.String("backup", backup), zap.String("to", destDir))
+	if err := eos_unix.Restore(rc.Ctx, backup, destDir); err != nil {
+		return fmt.Errorf("restore %s: %w", destDir, err)
 	}
-	fmt.Printf("Restoring certificates from backup: %s\n", backupCerts)
-	debian.RestoreDir(backupCerts, shared.DefaultCertsDir)
-}
-
-func RestoreCompose() {
-	backupCompose, err := debian.FindLatestBackup(fmt.Sprintf("%s.", shared.DefaultComposeYML))
-	if err != nil {
-		fmt.Printf("Error finding backup for %s: %v\n", shared.DefaultComposeYML, err)
-		return
-	}
-	fmt.Printf("Restoring docker-compose file from backup: %s\n", backupCompose)
-	debian.RestoreFile(backupCompose, shared.DefaultComposeYML)
-}
-
-func init() {
-	// Initialize the shared logger for the entire deploy package
+	rc.Log.Info("Successfully restored", zap.String("to", destDir))
+	return nil
 }

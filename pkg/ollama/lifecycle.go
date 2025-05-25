@@ -60,7 +60,7 @@ func StartServeProcess(log *zap.Logger, serveLog string) error {
 }
 
 func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
-	ctx, span := telemetry.StartSpan(ctx, "ollama.RunWebUI")
+	ctx, span := telemetry.Start(ctx, "ollama.RunWebUI")
 	defer span.End()
 
 	// Check if container is already running
@@ -86,7 +86,7 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 	runArgs := []string{
 		"run", "-d", "--name", cfg.Container,
 		"-p", fmt.Sprintf("%d:8080", cfg.Port),
-		"--add-host=host.docker.internal:host-gateway",
+		"--add-host=host.container.internal:host-gateway",
 		"-v", "open-webui:/app/backend/data",
 		"--restart", "always",
 		image,
@@ -134,7 +134,7 @@ func RunWebUI(ctx context.Context, log *zap.Logger, cfg WebUIConfig) error {
 		return cerr.WithHint(runErr, "Docker container failed to start")
 	}
 
-	if !waitForBackend(ctx, log, "http://host.docker.internal:11434", 15*time.Second) {
+	if !waitForBackend(ctx, log, "http://host.container.internal:11434", 15*time.Second) {
 		return cerr.New("Ollama backend is not reachable — the Web UI may fail to connect")
 	}
 

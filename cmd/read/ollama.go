@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
@@ -16,8 +16,8 @@ import (
 var InspectOllamaCmd = &cobra.Command{
 	Use:   "ollama",
 	Short: "Inspect Ollama setup (container status, GPU usage, and logs)",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Logger()
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := ctx.Log
 
 		if !platform.IsMacOS() {
 			return fmt.Errorf("❌ Ollama inspection is only supported on macOS")

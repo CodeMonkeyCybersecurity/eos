@@ -32,7 +32,7 @@ func ExportTLSCert(input TLSExportInput) error {
 	log := zap.L()
 	ctx := context.Background()
 
-	ctx, span := telemetry.StartSpan(ctx, "vault.ExportTLSCert")
+	ctx, span := telemetry.Start(ctx, "vault.ExportTLSCert")
 	defer span.End()
 
 	// Validate input using go-playground/validator

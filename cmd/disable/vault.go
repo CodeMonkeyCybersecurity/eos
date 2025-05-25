@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -27,7 +27,7 @@ func init() { DisableCmd.AddCommand(StopVaultCmd) }
 // implementation helpers
 // -----------------------------------------------------------------------------
 
-func runStopVault(ctx *eosio.RuntimeContext, _ *cobra.Command, _ []string) error {
+func runStopVault(ctx *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
 	log := ctx.Log
 	log.Info("🛑 Stopping Vault Agent and cleaning up…")
 

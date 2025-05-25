@@ -5,8 +5,8 @@ package create
 import (
 	"fmt"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -15,8 +15,8 @@ import (
 var CreateProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Create a new process",
-	Long:  `This command allows you to create a new process in the debian.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	Long:  `This command allows you to create a new process in the eos_unix.`,
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			zap.L().Fatal("Please provide details to create a process.")
 		}

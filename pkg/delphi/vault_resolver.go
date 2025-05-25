@@ -1,21 +1,22 @@
 package delphi
 
 import (
+	"context"
 	"errors"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"go.uber.org/zap"
 )
 
-func ResolveConfig() (*Config, error) {
+func ResolveConfig(ctx context.Context) (*Config, error) {
 	// 1. Try Vault
-	cfg, err := ReadConfig()
+	cfg, err := ReadConfig(ctx)
 	if err == nil && cfg.IsValid() {
 		return cfg, nil
 	}
 
 	// 2. Try disk fallback
-	cfg, err = ReadConfig() // fixed arg
+	cfg, err = ReadConfig(ctx) // fixed arg
 	if err == nil && cfg.IsValid() {
 		zap.L().Info("Loaded Delphi config from disk fallback")
 		return cfg, nil
@@ -34,6 +35,6 @@ func ResolveConfig() (*Config, error) {
 	}
 
 	// 5. Save and return
-	_ = WriteConfig(cfg)
+	_ = WriteConfig(ctx, cfg)
 	return cfg, nil
 }

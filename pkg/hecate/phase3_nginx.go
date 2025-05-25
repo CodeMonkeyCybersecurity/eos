@@ -3,22 +3,23 @@
 package hecate
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"go.uber.org/zap"
 )
 
 // PhaseNginx sets up Nginx configs as phase 3 of Hecate.
 // This is the thin wrapper that can be called by the lifecycle orchestrator.
-func PhaseNginx(backendIP string) error {
+func PhaseNginx(backendIP string, ctx context.Context) error {
 	log := zap.L().Named("hecate-phase-nginx")
 	log.Info("🚀 Starting Phase 3: Build and setup Nginx...")
 
 	// Always ensure directory structure first.
-	if err := EnsureNginxDirs(); err != nil {
+	if err := EnsureNginxDirs(ctx); err != nil {
 		return fmt.Errorf("failed to ensure Nginx dirs: %w", err)
 	}
 
@@ -89,13 +90,14 @@ func BuildNginxEnvironment(backendIP string) error {
 }
 
 // EnsureNginxDirs ensures necessary Nginx directories exist.
-func EnsureNginxDirs() error {
+func EnsureNginxDirs(ctx context.Context) error {
 	log := zap.L().Named("hecate-nginx-setup")
 
 	dirs := []string{HecateConfDDir, HecateStreamDir}
-	if err := debian.EnsureDirs(dirs); err != nil {
+	// Create with 0755 permissions
+	if err := eos_unix.MultiMkdirP(ctx, dirs, 0o755); err != nil {
 		log.Error("Failed to ensure Nginx directories", zap.Error(err))
-		return err
+		return fmt.Errorf("ensure nginx dirs: %w", err)
 	}
 
 	log.Info("✅ Nginx directory structure ready")

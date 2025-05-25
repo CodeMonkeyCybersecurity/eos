@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	fmt.Println("instructions https://docs.mattermost.com/install/install-docker.html#deploy-mattermost-on-docker-for-production-use")
+	fmt.Println("instructions https://docs.mattermost.com/install/install-container.html#deploy-mattermost-on-docker-for-production-use")
 
 	// Step 1: Clone the repository and enter the directory.
 	fmt.Println("Cloning the repository and entering the directory...")

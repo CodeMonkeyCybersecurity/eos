@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -21,7 +21,7 @@ var UpdateTestDataCmd = &cobra.Command{
 	Use:   "test-data",
 	Short: "Update test-data in Vault (fallback to disk)",
 	Long:  `Updates the stored test-data in Vault. If Vault is unavailable, updates the fallback local test-data.json.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("pandora-update-test-data")
 
 		client, err := vault.GetVaultClient()

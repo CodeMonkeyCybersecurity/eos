@@ -52,7 +52,7 @@ start_traefik() {
     -p 80:80 \
     -p 443:443 \
     -p 8080:8080 \
-    -v /var/run/docker.sock:/var/run/docker.sock \
+    -v /var/run/container.sock:/var/run/container.sock \
     -v $PWD/traefik.toml:/etc/traefik/traefik.toml \
     traefik:v2.10
   if [ $? -ne 0 ]; then

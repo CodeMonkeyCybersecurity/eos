@@ -9,11 +9,11 @@ import (
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllLocations(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func GetAllLocations(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
 
@@ -29,8 +29,8 @@ func GetAllLocations(ctx *eosio.RuntimeContext) error {
 	return nil
 }
 
-func GetALocation(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func GetALocation(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
 
@@ -44,8 +44,8 @@ func GetALocation(ctx *eosio.RuntimeContext, id int64) error {
 	return nil
 }
 
-func GetAllDatacentres(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func GetAllDatacentres(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
 
@@ -61,8 +61,8 @@ func GetAllDatacentres(ctx *eosio.RuntimeContext) error {
 	return nil
 }
 
-func GetADatacentre(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func GetADatacentre(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
 

@@ -6,8 +6,8 @@ Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
 package read
 
 import (
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,7 +21,7 @@ var ReadCmd = &cobra.Command{
 	Short:   "Inspect resources (e.g., processes, users, storage)",
 	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
 	Aliases: []string{"inspect", "get", "list", "query", "verify"},
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided

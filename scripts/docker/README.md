@@ -6,7 +6,7 @@ sudo snap install docker
 ```
 
 You then need to complete the post install instructions for docker:
-Instructions for the post-install steps for docker are from here https://docs.docker.com/engine/install/linux-postinstall/
+Instructions for the post-install steps for docker are from here https://docs.container.com/engine/install/linux-postinstall/
 ```
 # To create the docker group and add your user:
 # Create the docker group.

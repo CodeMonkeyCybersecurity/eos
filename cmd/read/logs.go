@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 
 	"github.com/spf13/cobra"
@@ -19,10 +19,10 @@ var InspectLogsCmd = &cobra.Command{
 	Short: "Inspect EOS logs (requires root or eos privileges)",
 	Long: `Displays the last 100 lines of recent EOS logs.
 Tries known log file locations first. If none found, falls back to journalctl.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("inspect-logs")
 
-		if !debian.IsPrivilegedUser() {
+		if !eos_unix.IsPrivilegedUser() {
 			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 

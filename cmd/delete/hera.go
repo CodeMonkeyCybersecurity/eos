@@ -6,8 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -17,7 +17,7 @@ var DeleteHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deletes the Hera (Authentik) installation files",
 	Long:  `Deletes all files and directories under /opt/hera, but leaves the /opt/hera directory itself.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if os.Geteuid() != 0 {
 			zap.L().Fatal("This command must be run as root or with sudo.")
 		}

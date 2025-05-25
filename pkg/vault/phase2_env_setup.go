@@ -3,6 +3,7 @@
 package vault
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -13,8 +14,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	cerr "github.com/cockroachdb/errors"
 	"go.uber.org/zap"
 )
 
@@ -37,14 +40,14 @@ import (
 // Phase 2: Ensure Vault Environment and Directories
 //--------------------------------------------------------------------
 
-func PrepareEnvironment() error {
+func PrepareEnvironment(ctx context.Context) error {
 	if _, err := EnsureVaultEnv(); err != nil {
 		return err
 	}
-	if err := debian.EnsureEosUser(true, false); err != nil {
+	if err := eos_unix.EnsureEosUser(true, false); err != nil {
 		return err
 	}
-	if err := EnsureVaultDirs(); err != nil {
+	if err := EnsureVaultDirs(ctx); err != nil {
 		return err
 	}
 	if err := PrepareVaultAgentEnvironment(); err != nil {
@@ -63,7 +66,7 @@ func EnsureVaultEnv() (string, error) {
 	}
 
 	// 2. Always use internal hostname as the Vault address
-	host := debian.GetInternalHostname()
+	host := eos_unix.GetInternalHostname()
 	addr := fmt.Sprintf(shared.VaultDefaultAddr, host)
 
 	// 3. Probe TLS before setting
@@ -100,21 +103,20 @@ func canConnectTLS(raw string, d time.Duration) bool {
 	return true
 }
 
-func EnsureVaultDirs() error {
-	zap.L().Info("🔧 Ensuring Vault directories and ownerships")
-
+func EnsureVaultDirs(ctx context.Context) error {
+	zap.S().Info("Ensuring Vault directories…")
 	if err := createBaseDirs(); err != nil {
 		return err
 	}
-	if err := secureVaultDirOwnership(); err != nil {
+	// ⚠️ now pass ctx
+	if err := secureVaultDirOwnership(ctx); err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func createBaseDirs() error {
-	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
+	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
 		return fmt.Errorf("critical: eos system user not found: %w", err)
@@ -145,15 +147,39 @@ func createBaseDirs() error {
 	return nil
 }
 
-func secureVaultDirOwnership() error {
-	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
+// secureVaultDirOwnership chowns the entire Vault directory tree to eos.
+// It starts a telemetry span, logs via Zap, and wraps errors with cerr.
+func secureVaultDirOwnership(ctx context.Context) error {
+	// start a trace span
+	ctx, span := telemetry.Start(ctx, "vault.secureVaultDirOwnership")
+	defer span.End()
+
+	// find eos UID/GID
+	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
 	if err != nil {
-		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
-		return fmt.Errorf("failed to lookup eos user: %w", err)
+		zap.S().Errorw("lookup eos user failed",
+			"user", shared.EosID, "error", err,
+		)
+		return cerr.Wrapf(err, "lookup user %q", shared.EosID)
 	}
 
-	zap.L().Info("🔧 Recursively fixing Vault directory ownership", zap.String("path", shared.VaultDir))
-	return debian.ChownRecursive(shared.VaultDir, eosUID, eosGID)
+	// log intent
+	zap.S().Infow("fixing Vault directory ownership",
+		"path", shared.VaultDir,
+		"uid", eosUID,
+		"gid", eosGID,
+	)
+
+	// perform recursive chown
+	if err := eos_unix.ChownR(ctx, shared.VaultDir, eosUID, eosGID); err != nil {
+		zap.S().Errorw("chownR failed",
+			"path", shared.VaultDir, "error", err,
+		)
+		return cerr.Wrapf(err, "chownR %s", shared.VaultDir)
+	}
+
+	zap.S().Infow("Vault directory ownership fixed", "path", shared.VaultDir)
+	return nil
 }
 
 func PrepareVaultAgentEnvironment() error {
@@ -181,7 +207,7 @@ func ValidateVaultAgentRuntimeEnvironment() error {
 	zap.L().Info("🔍 Validating Vault Agent runtime environment")
 
 	// Resolve eos user UID and GID safely
-	eosUID, eosGID, err := debian.LookupUser(shared.EosID)
+	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
 	if err != nil {
 		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)

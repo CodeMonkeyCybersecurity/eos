@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/docker"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 )
 
 //
@@ -18,35 +18,39 @@ import (
 
 // DeployApp deploys an application by copying necessary configs and restarting services
 func DeployApp(app string, cmd *cobra.Command) error {
-	zap.L().Info("Starting deployment", zap.String("app", app)) // ✅ Use zap.L().Info directly
-	fmt.Printf("Deploying %s...\n", app)                        // 👈 Added for user visibility
+	ctx := cmd.Context()
+	zap.L().Info("Starting deployment", zap.String("app", app))
+	fmt.Printf("Deploying %s...\n", app)
 
-	// Check if the required HTTP config exists
-	httpConfig := filepath.Join(AssetsPath, "servers", app+".conf")
-	if !debian.Exists(httpConfig) {
-		zap.L().Error("Missing HTTP config file", zap.String("file", httpConfig))
-		return fmt.Errorf("missing Nginx HTTP config for %s", app)
+	// helper to copy *.conf
+	copyConf := func(srcDir, outDir string) error {
+		src := filepath.Join(srcDir, app+".conf")
+		dst := filepath.Join(outDir, app+".conf")
+		return eos_unix.CopyFile(ctx, src, dst, 0o644)
 	}
 
-	// Copy HTTP config
-	if err := debian.CopyFile(httpConfig, filepath.Join(NginxConfPath, app+".conf"), 0); err != nil {
-		return fmt.Errorf("failed to copy HTTP config: %w", err)
+	// HTTP config
+	if err := copyConf(filepath.Join(AssetsPath, "servers"), NginxConfPath); err != nil {
+		if !eos_unix.Exists(filepath.Join(AssetsPath, "servers", app+".conf")) {
+			zap.L().Error("Missing HTTP config", zap.String("file", filepath.Join(AssetsPath, "servers", app+".conf")))
+			return fmt.Errorf("missing Nginx HTTP config for %s", app)
+		}
+		return fmt.Errorf("copy HTTP config: %w", err)
 	}
 
-	// Copy Stream config if available
-	streamConfig := filepath.Join(AssetsPath, "stream", app+".conf")
-	if debian.Exists(streamConfig) {
-		if err := debian.CopyFile(streamConfig, filepath.Join(NginxStreamPath, app+".conf"), 0); err != nil {
-			return fmt.Errorf("failed to copy Stream config: %w", err)
+	// Stream config (optional)
+	if eos_unix.Exists(filepath.Join(AssetsPath, "stream", app+".conf")) {
+		if err := copyConf(filepath.Join(AssetsPath, "stream"), NginxStreamPath); err != nil {
+			return fmt.Errorf("copy Stream config: %w", err)
 		}
 	}
 
-	// Handle NextCloud Coturn deployment
+	// Nextcloud “talk” service
 	if app == "nextcloud" {
 		noTalk, _ := cmd.Flags().GetBool("without-talk")
 		if !noTalk {
 			zap.L().Info("Deploying Coturn for NextCloud Talk")
-			if err := docker.RunDockerComposeAllServices(DefaultComposeYML, "coturn"); err != nil {
+			if err := container.RunDockerComposeAllServices(DefaultComposeYML, "coturn"); err != nil {
 				return fmt.Errorf("failed to deploy Coturn: %w", err)
 			}
 		} else {
@@ -54,11 +58,10 @@ func DeployApp(app string, cmd *cobra.Command) error {
 		}
 	}
 
-	// Validate and restart Nginx
+	// Validate & restart
 	if err := ValidateNginx(); err != nil {
 		return fmt.Errorf("invalid Nginx configuration: %w", err)
 	}
-
 	if err := RestartNginx(); err != nil {
 		return fmt.Errorf("failed to restart Nginx: %w", err)
 	}

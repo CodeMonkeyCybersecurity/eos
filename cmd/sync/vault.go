@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 
@@ -26,7 +26,7 @@ var SyncVaultCmd = &cobra.Command{
 	Short: "Syncs fallback secrets into Vault",
 	Long: `Syncs all fallback secrets stored locally (e.g. from /var/lib/eos/secrets)
 into Vault, then removes them from disk if the sync is successful.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("sync-vault")
 
 		_, err := vault.EnsureVaultEnv()

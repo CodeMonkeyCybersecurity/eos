@@ -8,11 +8,11 @@ import (
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllNetworks(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func GetAllNetworks(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	networks, err := client.Network.All(ctx.Ctx)
@@ -27,8 +27,8 @@ func GetAllNetworks(ctx *eosio.RuntimeContext) error {
 	return nil
 }
 
-func CreateANetwork(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func CreateANetwork(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	result, _, err := client.Network.Create(ctx.Ctx, hcloud.NetworkCreateOpts{
@@ -73,8 +73,8 @@ func CreateANetwork(ctx *eosio.RuntimeContext) error {
 	return nil
 }
 
-func GetANetwork(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func GetANetwork(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	network, _, err := client.Network.GetByID(ctx.Ctx, id)
@@ -91,8 +91,8 @@ func GetANetwork(ctx *eosio.RuntimeContext, id int64) error {
 	return nil
 }
 
-func UpdateANetwork(ctx *eosio.RuntimeContext, id int64, newName string) error {
-	log := ctx.Logger()
+func UpdateANetwork(ctx *eos_io.RuntimeContext, id int64, newName string) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	updated, _, err := client.Network.Update(ctx.Ctx, &hcloud.Network{ID: id}, hcloud.NetworkUpdateOpts{
@@ -113,8 +113,8 @@ func UpdateANetwork(ctx *eosio.RuntimeContext, id int64, newName string) error {
 	return nil
 }
 
-func DeleteANetwork(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func DeleteANetwork(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	_, err := client.Network.Delete(ctx.Ctx, &hcloud.Network{ID: id})

@@ -7,11 +7,11 @@ import (
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllSshKeys(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func GetAllSshKeys(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	keys, err := client.SSHKey.All(ctx.Ctx)
@@ -26,8 +26,8 @@ func GetAllSshKeys(ctx *eosio.RuntimeContext) error {
 	return nil
 }
 
-func CreateSshKey(ctx *eosio.RuntimeContext, name string, publicKey string) error {
-	log := ctx.Logger()
+func CreateSshKey(ctx *eos_io.RuntimeContext, name string, publicKey string) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	key, _, err := client.SSHKey.Create(ctx.Ctx, hcloud.SSHKeyCreateOpts{
@@ -46,8 +46,8 @@ func CreateSshKey(ctx *eosio.RuntimeContext, name string, publicKey string) erro
 	return nil
 }
 
-func GetAnSshKey(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func GetAnSshKey(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	key, _, err := client.SSHKey.GetByID(ctx.Ctx, id)
@@ -64,8 +64,8 @@ func GetAnSshKey(ctx *eosio.RuntimeContext, id int64) error {
 	return nil
 }
 
-func UpdateAnSshKey(ctx *eosio.RuntimeContext, id int64, newName string) error {
-	log := ctx.Logger()
+func UpdateAnSshKey(ctx *eos_io.RuntimeContext, id int64, newName string) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	updated, _, err := client.SSHKey.Update(ctx.Ctx, &hcloud.SSHKey{ID: id}, hcloud.SSHKeyUpdateOpts{
@@ -83,8 +83,8 @@ func UpdateAnSshKey(ctx *eosio.RuntimeContext, id int64, newName string) error {
 	return nil
 }
 
-func DeleteAnSshKey(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func DeleteAnSshKey(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	_, err := client.SSHKey.Delete(ctx.Ctx, &hcloud.SSHKey{ID: id})

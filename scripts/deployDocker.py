@@ -27,7 +27,7 @@ def require_root():
 
 def uninstall_conflicting_packages():
     packages = [
-        "docker.io", "docker-doc", "docker-compose", "docker-compose-v2",
+        "container.io", "docker-doc", "docker-compose", "docker-compose-v2",
         "podman-docker", "containerd", "runc"
     ]
     print("\nUninstalling conflicting packages...")
@@ -49,9 +49,9 @@ def install_prerequisites_and_gpg():
     run_command([ "apt-get", "update"])
     run_command([ "apt-get", "install", "-y", "ca-certificates", "curl"])
     run_command(["install", "-m", "0755", "-d", "/etc/apt/keyrings"])
-    run_command(["curl", "-fsSL", "https://download.docker.com/linux/ubuntu/gpg",
-                 "-o", "/etc/apt/keyrings/docker.asc"])
-    run_command(["chmod", "a+r", "/etc/apt/keyrings/docker.asc"])
+    run_command(["curl", "-fsSL", "https://download.container.com/linux/ubuntu/gpg",
+                 "-o", "/etc/apt/keyrings/container.asc"])
+    run_command(["chmod", "a+r", "/etc/apt/keyrings/container.asc"])
 
 def get_ubuntu_codename():
     """Parse /etc/os-release to get UBUNTU_CODENAME or VERSION_CODENAME."""
@@ -82,10 +82,10 @@ def add_docker_repo():
     codename = get_ubuntu_codename()
     # Build the repository line.
     repo_line = (
-        f"deb [arch={arch} signed-by=/etc/apt/keyrings/docker.asc] "
-        f"https://download.docker.com/linux/ubuntu {codename} stable\n"
+        f"deb [arch={arch} signed-by=/etc/apt/keyrings/container.asc] "
+        f"https://download.container.com/linux/ubuntu {codename} stable\n"
     )
-    repo_file = "/etc/apt/sources.list.d/docker.list"
+    repo_file = "/etc/apt/sources.list.d/container.list"
     try:
         with open(repo_file, "w") as f:
             f.write(repo_line)

@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 
 	"github.com/spf13/cobra"
 )
@@ -23,7 +23,7 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 - roles_mapping.yml updates
 - role sync
 - securityadmin reload`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.PromptLDAPDetails()
 		if err != nil {
 			return fmt.Errorf("failed to collect LDAP details: %w", err)

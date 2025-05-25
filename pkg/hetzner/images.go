@@ -7,11 +7,11 @@ import (
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllImages(ctx *eosio.RuntimeContext) error {
-	log := ctx.Logger()
+func GetAllImages(ctx *eos_io.RuntimeContext) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	images, err := client.Image.All(ctx.Ctx)
@@ -26,8 +26,8 @@ func GetAllImages(ctx *eosio.RuntimeContext) error {
 	return nil
 }
 
-func GetAnImage(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func GetAnImage(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	image, _, err := client.Image.GetByID(ctx.Ctx, id)
@@ -45,8 +45,8 @@ func GetAnImage(ctx *eosio.RuntimeContext, id int64) error {
 	return nil
 }
 
-func UpdateAnImage(ctx *eosio.RuntimeContext, id int64, newDesc string) error {
-	log := ctx.Logger()
+func UpdateAnImage(ctx *eos_io.RuntimeContext, id int64, newDesc string) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	updated, _, err := client.Image.Update(ctx.Ctx, &hcloud.Image{ID: id}, hcloud.ImageUpdateOpts{
@@ -67,8 +67,8 @@ func UpdateAnImage(ctx *eosio.RuntimeContext, id int64, newDesc string) error {
 	return nil
 }
 
-func DeleteAnImage(ctx *eosio.RuntimeContext, id int64) error {
-	log := ctx.Logger()
+func DeleteAnImage(ctx *eos_io.RuntimeContext, id int64) error {
+	log := ctx.Log
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
 	_, err := client.Image.Delete(ctx.Ctx, &hcloud.Image{ID: id})

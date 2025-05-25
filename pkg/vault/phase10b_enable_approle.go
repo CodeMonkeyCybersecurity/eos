@@ -3,10 +3,14 @@
 package vault
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
+	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
 
@@ -24,48 +28,86 @@ import (
 // │    ├── client.Logical().Write(shared.RolePath, roleData)
 // │    ├── vault.refreshAppRoleCreds(client)
 // │    └── vault.WriteAppRoleFiles(roleID, secretID)
-// │         ├── debian.EnsureOwnedDir
-// │         └── debian.WriteOwnedFile(role_id, secret_id)
+// │         ├── eos_unix.EnsureOwnedDir
+// │         └── eos_unix.WriteOwnedFile(role_id, secret_id)
 // └── Done
 
-func PhaseEnableAppRole(_ *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {
-	zap.L().Info("[Phase10b] Setting up Vault AppRole", zap.Any("options", opts))
+// PhaseEnableAppRole provisions (or re-uses) an AppRole and writes its creds to disk.
+func PhaseEnableAppRole(
+	ctx context.Context,
+	client *api.Client,
+	log *zap.Logger,
+	opts shared.AppRoleOptions,
+) error {
+	// 1) Telemetry span
+	ctx, span := telemetry.Start(ctx, "vault.phase_enable_approle",
+		attribute.String("force_recreate", fmt.Sprint(opts.ForceRecreate)),
+		attribute.Bool("refresh_creds", opts.RefreshCreds),
+	)
+	defer span.End()
 
-	client, err := GetRootClient()
+	log.Info("🔑 [Phase10b] Setting up Vault AppRole", zap.Any("options", opts))
+
+	// 2) Ensure the auth method is mounted
+	if err := EnableAppRoleAuth(client); err != nil {
+		log.Error("Failed to enable AppRole auth", zap.Error(err))
+		return cerr.Wrapf(err, "enable approle auth")
+	}
+	log.Info("✅ AppRole auth method is enabled (or already present)")
+
+	// 3) Provision or reuse the role
+	roleID, secretID, err := EnsureAppRole(ctx, client, opts)
 	if err != nil {
-		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
-		return fmt.Errorf("get privileged vault client: %w", err)
+		log.Error("Failed to ensure AppRole credentials", zap.Error(err))
+		return cerr.Wrapf(err, "ensure AppRole")
+	}
+	log.Debug("AppRole credentials obtained",
+		zap.String("role_id", roleID), zap.String("secret_id", secretID),
+	)
+
+	// 4) Persist them to disk
+	if err := WriteAppRoleFiles(ctx, roleID, secretID); err != nil {
+		log.Error("Failed to write AppRole credential files", zap.Error(err))
+		return cerr.Wrapf(err, "write AppRole files")
 	}
 
-	zap.L().Debug("✅ Privileged Vault client obtained; starting AppRole flow")
-	return EnableAppRoleFlow(client, log, opts)
+	log.Info("✅ AppRole setup complete", zap.String("role_id", roleID))
+	return nil
 }
 
 // EnableAppRoleFlow enables AppRole authentication method and provisions EOS-specific AppRole credentials.
-func EnableAppRoleFlow(client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) error {
-	zap.L().Info("🪪 [Enable] Starting AppRole setup flow", zap.Any("options", opts))
+func EnableAppRoleFlow(
+	ctx context.Context,
+	client *api.Client,
+	log *zap.Logger,
+	opts shared.AppRoleOptions,
+) error {
+	// 1) trace
+	ctx, span := telemetry.Start(ctx, "vault.enable_approle_flow")
+	defer span.End()
 
-	zap.L().Info("📡 Checking if AppRole auth method is enabled")
+	log.Info("🪪 [Phase10b] Starting AppRole setup", zap.Any("options", opts))
+
+	// 2) mount auth
 	if err := EnableAppRoleAuth(client); err != nil {
-		zap.L().Error("❌ Failed to enable AppRole auth", zap.Error(err))
-		return fmt.Errorf("enable approle auth: %w", err)
+		log.Error("failed to enable AppRole auth", zap.Error(err))
+		return cerr.Wrapf(err, "enable approle auth")
 	}
-	zap.L().Info("✅ AppRole auth method enabled or already present")
 
-	zap.L().Info("🔑 Creating or reusing AppRole credentials")
-	roleID, secretID, err := EnsureAppRole(client, opts)
+	// 3) provision or reuse
+	roleID, secretID, err := EnsureAppRole(ctx, client, opts)
 	if err != nil {
-		zap.L().Error("❌ Failed to ensure AppRole credentials", zap.Error(err))
-		return fmt.Errorf("ensure AppRole: %w", err)
+		log.Error("failed to ensure AppRole", zap.Error(err))
+		return cerr.Wrapf(err, "ensure AppRole")
 	}
-	zap.L().Debug("✅ AppRole credentials obtained", zap.String("role_id", roleID), zap.String("secret_id", secretID))
+	log.Debug("AppRole credentials", zap.String("role_id", roleID))
 
-	zap.L().Info("✏️ Writing AppRole credentials to disk", zap.String("role_id", roleID), zap.String("secret_id", secretID))
-	if err := WriteAppRoleFiles(roleID, secretID); err != nil {
-		zap.L().Error("❌ Failed to write AppRole credential files", zap.Error(err))
-		return fmt.Errorf("write AppRole files: %w", err)
+	// 4) persist to disk
+	if err := WriteAppRoleFiles(ctx, roleID, secretID); err != nil {
+		log.Error("failed to write AppRole files", zap.Error(err))
+		return cerr.Wrapf(err, "write AppRole files")
 	}
 
-	zap.L().Info("✅ AppRole setup complete", zap.String("role_id", roleID), zap.String("secret_id", secretID))
+	log.Info("✅ AppRole setup complete", zap.String("role_id", roleID))
 	return nil
 }

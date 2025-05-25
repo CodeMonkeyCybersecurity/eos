@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -20,16 +20,16 @@ var InspectConfigCmd = &cobra.Command{
 	Short:   "Inspect the currently loaded Delphi configuration",
 	Long:    "Displays the contents of the delphi.json config file, with sensitive fields masked for safety.",
 	Aliases: []string{"cfg", "settings"},
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig()
+		cfg, err := delphi.ReadConfig(rc.Ctx)
 		if err != nil {
 			zap.L().Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)
 			return err
 		}
 
-		if !debian.EnforceSecretsAccess(showSecrets) {
+		if !eos_unix.EnforceSecretsAccess(showSecrets) {
 			return nil
 		}
 

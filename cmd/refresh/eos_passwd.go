@@ -5,9 +5,9 @@ package refresh
 import (
 	"fmt"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -18,15 +18,15 @@ var RefreshEosPasswdCmd = &cobra.Command{
 	Short: "Refresh the EOS user password and update secrets safely",
 	Long: `Regenerates a strong EOS password,
 updates the system account password, and saves new credentials to disk.`,
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := ctx.Log.Named("refresh-eos-passwd")
 
-		if !debian.UserExists(shared.EosID) {
+		if !eos_unix.UserExists(shared.EosID) {
 			log.Error("eos user not found — cannot refresh password")
 			return fmt.Errorf("eos user does not exist")
 		}
 
-		if err := debian.RepairEosSecrets(); err != nil {
+		if err := eos_unix.RepairEosSecrets(); err != nil {
 			log.Error("Failed to refresh EOS credentials", zap.Error(err))
 			return fmt.Errorf("refresh eos password: %w", err)
 		}

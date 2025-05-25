@@ -4,10 +4,11 @@ package hecate
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/debian"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"go.uber.org/zap"
 )
@@ -209,6 +210,7 @@ func RenderJenkinsNginx(bundle ServiceBundle) error {
 	log := zap.L().Named("hecate-jenkins-nginx-render")
 	log.Info("🔧 Rendering Jenkins NGINX stream block...")
 
+	// Render the stream configuration
 	streamContent, err := RenderStreamBlocks(
 		bundle.Nginx.StreamBlocks[0].BackendIP,
 		bundle.Nginx.StreamBlocks,
@@ -218,23 +220,22 @@ func RenderJenkinsNginx(bundle ServiceBundle) error {
 		return fmt.Errorf("failed to render Jenkins NGINX stream block: %w", err)
 	}
 
+	// Ensure the fragments directory exists
 	targetDir := "./nginx-fragments"
-	if err := debian.EnsureDir(targetDir); err != nil {
+	if err := eos_unix.MkdirP(context.Background(), targetDir, 0o755); err != nil {
 		log.Error("Failed to create NGINX fragments directory", zap.Error(err))
 		return fmt.Errorf("failed to create NGINX fragments directory: %w", err)
 	}
 
-	filePath := fmt.Sprintf("%s/%s.stream", targetDir, "jenkins")
-	err = os.WriteFile(filePath, []byte(streamContent), 0644)
-	if err != nil {
-		log.Error("Failed to write Jenkins NGINX stream fragment", zap.Error(err),
-			zap.String("path", filePath),
+	// Write the block to disk
+	filePath := fmt.Sprintf("%s/jenkins.stream", targetDir)
+	if err := os.WriteFile(filePath, []byte(streamContent), 0o644); err != nil {
+		log.Error("Failed to write Jenkins NGINX stream fragment",
+			zap.Error(err), zap.String("path", filePath),
 		)
 		return fmt.Errorf("failed to write Jenkins NGINX stream block: %w", err)
 	}
 
-	log.Info("📝 Jenkins NGINX stream block written successfully",
-		zap.String("path", filePath),
-	)
+	log.Info("📝 Jenkins NGINX stream block written successfully", zap.String("path", filePath))
 	return nil
 }

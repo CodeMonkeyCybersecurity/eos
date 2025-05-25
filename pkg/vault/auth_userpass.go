@@ -5,63 +5,78 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api/auth/userpass"
 	"go.uber.org/zap"
 )
 
-func EnableVaultUserpass(ctx *eosio.RuntimeContext) error {
-	log := zap.L()
+// EnableVaultUserpass sets up userpass auth, creates the "eos" user, and verifies login.
+func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
+	// 1) Build a Vault API client
 	client, err := NewClient()
 	if err != nil {
-		return fmt.Errorf("failed to create Vault client: %w", err)
+		return cerr.Wrap(err, "create Vault client")
 	}
 
-	// 1. Ensure auth methods (userpass + approle) are enabled
-	if err := EnsureVaultAuthMethods(client); err != nil {
-		return fmt.Errorf("failed to enable auth methods: %w", err)
+	// 2) Enable the userpass & approle auth mounts
+	if err := EnableUserpassAuth(client); err != nil {
+		return cerr.Wrap(err, "enable userpass auth")
 	}
-	log.Info("✅ Userpass and AppRole auth methods ensured")
+	if err := EnableAppRoleAuth(client); err != nil {
+		return cerr.Wrap(err, "enable approle auth")
+	}
+	rc.Log.Info("✅ Auth methods enabled")
 
-	// 2. Ensure the eos-policy exists
+	// 3) Ensure the EOS policy exists
 	if err := EnsurePolicy(); err != nil {
-		return fmt.Errorf("failed to ensure eos-policy: %w", err)
+		return cerr.Wrap(err, "ensure EOS policy")
 	}
-	log.Info("✅ EOS policy ensured")
+	rc.Log.Info("✅ EOS policy ensured")
 
-	// 3. Prompt for EOS user password
-	passStr, err := crypto.PromptPassword("Enter password for Vault 'eos' user")
+	// 4) Prompt for the EOS user’s password
+	pass, err := crypto.PromptPassword("Enter password for Vault 'eos' user: ")
 	if err != nil {
-		return fmt.Errorf("failed to prompt eos password: %w", err)
+		return cerr.Wrap(err, "prompt EOS password")
 	}
-	log.Info("✅ Password captured for EOS user")
+	rc.Log.Info("✅ Password captured")
 
-	// 4. Create user using Logical().Write
+	// 5) Create the 'eos' user under userpass
 	writePath := "auth/userpass/users/eos"
-	userData := map[string]interface{}{
-		"password": passStr,
+	data := map[string]interface{}{
+		"password": pass,
 		"policies": shared.EosDefaultPolicyName,
 	}
-	if _, err := client.Logical().Write(writePath, userData); err != nil {
-		return fmt.Errorf("failed to create eos Vault user: %w", err)
+	if _, err := client.Logical().Write(writePath, data); err != nil {
+		return cerr.Wrapf(err, "create EOS Vault user at %s", writePath)
 	}
-	log.Info("✅ EOS user created", zap.String("path", writePath))
+	rc.Log.Info("✅ EOS user created", zap.String("path", writePath))
 
-	// 5. (Optional) Attempt login with the new user using the typed API
-	auth, err := userpass.NewUserpassAuth("eos", &userpass.Password{FromString: passStr}, userpass.WithMountPath("userpass"))
+	// 6) Validate by logging in as that user
+	upAuth, err := userpass.NewUserpassAuth(
+		"eos",
+		&userpass.Password{FromString: pass},
+		userpass.WithMountPath("userpass"),
+	)
 	if err != nil {
-		return fmt.Errorf("failed to create UserpassAuth object: %w", err)
+		return cerr.Wrap(err, "create UserpassAuth object")
 	}
 
-	secret, err := auth.Login(ctx.Ctx, client)
+	secret, err := upAuth.Login(rc.Ctx, client)
 	if err != nil {
-		return fmt.Errorf("login failed for eos user: %w", err)
+		return cerr.Wrap(err, "login as EOS user failed")
 	}
 	if secret == nil || secret.Auth == nil {
-		return fmt.Errorf("login response missing auth")
+		return fmt.Errorf("login response missing auth data")
 	}
-	log.Info("🔐 Successfully authenticated with EOS Vault user", zap.String("token", secret.Auth.ClientToken[:8]+"..."))
+
+	// Shorten the token for logging
+	tok := secret.Auth.ClientToken
+	if len(tok) > 8 {
+		tok = tok[:8] + "…"
+	}
+	rc.Log.Info("🔐 Authenticated with EOS Vault user", zap.String("token", tok))
 
 	return nil
 }

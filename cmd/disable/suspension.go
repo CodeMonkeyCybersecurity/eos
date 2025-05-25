@@ -11,8 +11,8 @@ import (
 	"runtime"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eoscli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eosio"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,13 +21,13 @@ import (
 var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
-	RunE: eos.Wrap(func(ctx *eosio.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		zap.L().Info("Disabling system suspension and hibernation...")
 
 		if runtime.GOOS != "linux" {
 			zap.L().Warn("System suspension disabling is only supported on Linux.")
-			fmt.Println("❌ This command is not supported on your operating debian.")
+			fmt.Println("❌ This command is not supported on your operating eos_unix.")
 			return nil
 		}
 
