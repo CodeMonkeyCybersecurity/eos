@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -40,7 +41,7 @@ func SetupWazuhWizard(reader *bufio.Reader) ServiceBundle {
 
 	// Prepare NGINX spec
 	nginxSpec := &NginxSpec{
-		StreamBlocks: WazuhStreamBlocks,
+		StreamBlocks: shared.WazuhStreamBlocks,
 		PortsTCP:     []string{"1515", "1514", "55000"},
 		PortsUDP:     []string{"1514"},
 	}

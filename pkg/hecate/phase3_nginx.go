@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -49,22 +50,22 @@ func BuildNginxEnvironment(backendIP string) error {
 	// Step 2: Define services
 	services := []struct {
 		Name       string
-		Blocks     []NginxStreamBlock
+		Blocks     []shared.NginxStreamBlock
 		OutputFile string
 	}{
 		{
 			Name:       "mailcow",
-			Blocks:     MailcowStreamBlocks,
+			Blocks:     shared.MailcowStreamBlocks,
 			OutputFile: filepath.Join(HecateStreamDir, "mailcow.conf"),
 		},
 		{
 			Name:       "jenkins",
-			Blocks:     JenkinsStreamBlocks,
+			Blocks:     shared.JenkinsStreamBlocks,
 			OutputFile: filepath.Join(HecateStreamDir, "jenkins.conf"),
 		},
 		{
 			Name:       "wazuh",
-			Blocks:     WazuhStreamBlocks,
+			Blocks:     shared.WazuhStreamBlocks,
 			OutputFile: filepath.Join(HecateStreamDir, "wazuh.conf"),
 		},
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"go.uber.org/zap"
 )
 
@@ -57,7 +58,7 @@ func SetupJenkinsWizard(reader *bufio.Reader) ServiceBundle {
 
 	// ==== NGINX ====
 	nginxSpec := &NginxSpec{
-		StreamBlocks: []NginxStreamBlock{
+		StreamBlocks: []shared.NginxStreamBlock{
 			{
 				UpstreamName: "jenkins_agent",
 				BackendPort:  "50000",
@@ -187,7 +188,7 @@ func SetupJenkinsNginx(reader *bufio.Reader) *NginxSpec {
 	backendIP := interaction.PromptInputWithReader("Enter backend IP address for Jenkins agent (e.g., 192.168.0.10)", "", reader)
 
 	nginxSpec := &NginxSpec{
-		StreamBlocks: []NginxStreamBlock{
+		StreamBlocks: []shared.NginxStreamBlock{
 			{
 				UpstreamName: "jenkins_agent",
 				BackendPort:  "50000",

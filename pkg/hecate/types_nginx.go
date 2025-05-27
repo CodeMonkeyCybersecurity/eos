@@ -4,35 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
-)
 
-// Centralized port maps (unchanged).
-var (
-	MailcowPorts = ServicePorts{
-		TCP: []string{"25", "587", "465", "110", "995", "143", "993"},
-		UDP: []string{},
-	}
-
-	JenkinsPorts = ServicePorts{
-		TCP: []string{"50000"},
-		UDP: []string{},
-	}
-
-	WazuhPorts = ServicePorts{
-		TCP: []string{"1515", "1514", "55000"},
-		UDP: []string{"1515", "1514"},
-	}
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 var nginxFragments []NginxFragment
-
-// NginxStreamBlock defines the config for one upstream + server block.
-type NginxStreamBlock struct {
-	BackendIP    string
-	UpstreamName string
-	BackendPort  string
-	ListenPort   string
-}
 
 type NginxFragment struct {
 	ServiceName string
@@ -41,15 +17,9 @@ type NginxFragment struct {
 
 type NginxSpec struct {
 	ServiceName  string // Added for context
-	StreamBlocks []NginxStreamBlock
+	StreamBlocks []shared.NginxStreamBlock
 	PortsTCP     []string // To help Docker Compose port injection
 	PortsUDP     []string
-}
-
-// Centralized port configs (TCP/UDP) for quick reference.
-type ServicePorts struct {
-	TCP []string
-	UDP []string
 }
 
 const BaseNginxConf = `worker_processes  1;
@@ -72,29 +42,6 @@ server {
 }
 `
 
-// Centralized service stream blocks.
-var (
-	MailcowStreamBlocks = []NginxStreamBlock{
-		{UpstreamName: "mailcow_smtp", BackendPort: "25", ListenPort: "25"},
-		{UpstreamName: "mailcow_submission", BackendPort: "587", ListenPort: "587"},
-		{UpstreamName: "mailcow_smtps", BackendPort: "465", ListenPort: "465"},
-		{UpstreamName: "mailcow_pop3", BackendPort: "110", ListenPort: "110"},
-		{UpstreamName: "mailcow_pop3s", BackendPort: "995", ListenPort: "995"},
-		{UpstreamName: "mailcow_imap", BackendPort: "143", ListenPort: "143"},
-		{UpstreamName: "mailcow_imaps", BackendPort: "993", ListenPort: "993"},
-	}
-
-	JenkinsStreamBlocks = []NginxStreamBlock{
-		{UpstreamName: "jenkins_agent", BackendPort: "8059", ListenPort: "50000"},
-	}
-
-	WazuhStreamBlocks = []NginxStreamBlock{
-		{UpstreamName: "wazuh_manager_1515", BackendPort: "1515", ListenPort: "1515"},
-		{UpstreamName: "wazuh_manager_1514", BackendPort: "1514", ListenPort: "1514"},
-		{UpstreamName: "wazuh_manager_55000", BackendPort: "55000", ListenPort: "55000"},
-	}
-)
-
 // ToFragment renders the NginxSpec into a usable NginxFragment.
 func (n *NginxSpec) ToFragment(backendIP string) (NginxFragment, error) {
 	if len(n.StreamBlocks) == 0 {
@@ -111,7 +58,7 @@ func (n *NginxSpec) ToFragment(backendIP string) (NginxFragment, error) {
 }
 
 // RenderStreamBlocks renders all stream blocks for a service.
-func RenderStreamBlocks(backendIP string, blocks []NginxStreamBlock) (string, error) {
+func RenderStreamBlocks(backendIP string, blocks []shared.NginxStreamBlock) (string, error) {
 	tmpl, err := template.New("stream").Parse(GenericStreamBlockTemplate)
 	if err != nil {
 		return "", err
