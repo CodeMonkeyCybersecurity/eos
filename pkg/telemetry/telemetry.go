@@ -17,14 +17,17 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+	noop "go.opentelemetry.io/otel/trace/noop"
 )
 
-var tracer trace.Tracer
+var (
+	tracer trace.Tracer = noop.NewTracerProvider().Tracer("") // ✅ default fallback
+)
 
-// Init configures OpenTelemetry; call this early in main().
-func Init() error {
+// Init configures OpenTelemetry; call this once in main().
+func Init(serviceName string) error {
 	if !enabled() {
-		tracer = trace.NewNoopTracerProvider().Tracer("")
+		tracer = noop.NewTracerProvider().Tracer(serviceName)
 		return nil
 	}
 
@@ -35,17 +38,15 @@ func Init() error {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exp),
-		sdktrace.WithResource(
-			sdkresource.NewWithAttributes(
-				semconv.SchemaURL,
-				attribute.String("service.name", "eos"),
-				attribute.String("host.name", hostname()),
-			),
-		),
+		sdktrace.WithResource(sdkresource.NewWithAttributes(
+			semconv.SchemaURL,
+			attribute.String("service.name", serviceName),
+			attribute.String("host.name", hostname()),
+		)),
 	)
 
 	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer("eos")
+	tracer = tp.Tracer(serviceName)
 	return nil
 }
 
@@ -54,7 +55,7 @@ func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) (conte
 	return tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
-// TrackCommand records a command span. It ignores the returned ctx.
+// TrackCommand records a span around a CLI command.
 func TrackCommand(ctx context.Context, name string, success bool, dur time.Duration, args ...string) {
 	_, span := Start(ctx, name,
 		attribute.Bool("success", success),
@@ -65,12 +66,14 @@ func TrackCommand(ctx context.Context, name string, success bool, dur time.Durat
 	defer span.End()
 }
 
+// enabled returns true if ~/.eos/telemetry_on exists.
 func enabled() bool {
 	path := filepath.Join(os.Getenv("HOME"), ".eos", "telemetry_on")
 	_, err := os.Stat(path)
 	return err == nil
 }
 
+// anonymousID returns a persisted or newly generated anonymous ID.
 func anonymousID() string {
 	path := filepath.Join(os.Getenv("HOME"), ".eos", "telemetry_id")
 	if b, err := os.ReadFile(path); err == nil {
