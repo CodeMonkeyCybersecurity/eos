@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/git"
 	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -25,7 +26,8 @@ const (
 
 // OrchestrateMattermostInstall performs the full setup process for Mattermost.
 func OrchestrateMattermostInstall(rc *eos_io.RuntimeContext) error {
-	log := rc.Log.With(zap.String("component", "mattermost"))
+	log := otelzap.Ctx(rc.Ctx)
+
 
 	// Clean up any pre-existing temp clone dir
 	_ = os.RemoveAll(CloneDir)

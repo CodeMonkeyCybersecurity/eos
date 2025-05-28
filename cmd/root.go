@@ -1,4 +1,4 @@
-/* cmd/root.go */
+// cmd/root.go
 
 package cmd
 
