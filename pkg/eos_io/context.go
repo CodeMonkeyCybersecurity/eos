@@ -30,6 +30,7 @@ type RuntimeContext struct {
 	Command    string
 	Component  string
 	Attributes map[string]string
+	Validation *verify.WrapValidation
 }
 
 // NewContext sets up tracing, logging and validation hooks.

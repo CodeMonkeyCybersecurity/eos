@@ -36,3 +36,12 @@ func DescribeValidation(err error) string {
 func ValidateStructWithGoPlayground(obj interface{}) error {
 	return validate.Struct(obj)
 }
+
+type WrapValidation struct {
+	Cfg         any
+	SchemaPath  string
+	YAMLPath    string
+	PolicyPath  string
+	PolicyInput func() any
+	ServiceName string // optional — for telemetry
+}
