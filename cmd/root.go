@@ -106,7 +106,6 @@ func Execute() {
 	}
 }
 
-
 func startGlobalWatchdog(max time.Duration) {
 	go func() {
 		timer := time.NewTimer(max)
