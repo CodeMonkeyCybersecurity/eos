@@ -11,6 +11,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -87,6 +88,7 @@ func RegisterCommands() {
 
 // Execute initializes and runs the root command.
 func Execute() {
+	_ = telemetry.Init("eos")
 
 	zap.L().Info("Eos CLI starting")
 	startGlobalWatchdog(3 * time.Minute)
@@ -104,7 +106,6 @@ func Execute() {
 	}
 }
 
-// cmd/root.go
 
 func startGlobalWatchdog(max time.Duration) {
 	go func() {

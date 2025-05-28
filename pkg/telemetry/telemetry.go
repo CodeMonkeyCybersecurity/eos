@@ -41,14 +41,14 @@ func Init(service string) error {
 		sdktrace.WithResource(
 			sdkresource.NewWithAttributes(
 				semconv.SchemaURL,
-				attribute.String("service.name", "eos"),
+				attribute.String("service.name", service),
 				attribute.String("host.name", hostname()),
 			),
 		),
 	)
 
 	otel.SetTracerProvider(tp)
-	tracer = tp.Tracer("eos")
+	tracer = tp.Tracer(service)
 	return nil
 }
 
