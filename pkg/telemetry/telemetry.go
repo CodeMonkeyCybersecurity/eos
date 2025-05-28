@@ -12,12 +12,12 @@ import (
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace/noop"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	sdkresource "go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 )
 
 var tracer trace.Tracer
@@ -54,6 +54,9 @@ func Init(service string) error {
 
 // Start a telemetry span with optional attributes.
 func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
+	if ctx == nil {
+		ctx = context.Background() // 🔧 Safe fallback
+	}
 	return tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
