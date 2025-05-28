@@ -2,6 +2,10 @@
 
 package eos_cli
 
+import (
+	cerr "github.com/cockroachdb/errors"
+)
+
 type WrapValidation struct {
 	Cfg         any
 	SchemaPath  string
@@ -9,3 +13,5 @@ type WrapValidation struct {
 	PolicyPath  string
 	PolicyInput func() any
 }
+
+var errStackedMarker = cerr.New("stack already attached")
