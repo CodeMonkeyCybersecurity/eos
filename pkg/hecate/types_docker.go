@@ -182,7 +182,6 @@ volumes:
 `
 )
 
-
 // ToFragment renders the ServiceSpec into a DockerComposeFragment.
 func (ss *ServiceSpec) ToFragment() (DockerComposeFragment, error) {
 	rendered, err := renderTemplateFromString(ss.FullServiceYAML, ss.Environment)

@@ -35,26 +35,26 @@ import (
 )
 
 var (
-    helpLogged bool
-    RootCmd    = &cobra.Command{
-        Use:   "eos",
-        Short: "Eos CLI for automation, orchestration, and hardening",
-        Long:  `Eos is a command-line application for managing ….`,
-        PersistentPreRun: func(cmd *cobra.Command, args []string) {
-            // Telemetry + logging
-            if err := telemetry.Init("eos"); err != nil {
-                fmt.Fprintf(os.Stderr, "⚠️ Telemetry disabled: %v\n", err)
-            }
-            zap.L().Info("Eos CLI starting")
+	helpLogged bool
+	RootCmd    = &cobra.Command{
+		Use:   "eos",
+		Short: "Eos CLI for automation, orchestration, and hardening",
+		Long:  `Eos is a command-line application for managing ….`,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			// Telemetry + logging
+			if err := telemetry.Init("eos"); err != nil {
+				fmt.Fprintf(os.Stderr, "⚠️ Telemetry disabled: %v\n", err)
+			}
+			zap.L().Info("Eos CLI starting")
 
-            // Watchdog
-            startGlobalWatchdog(3 * time.Minute)
-        },
-        RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-            fmt.Println("⚠️ No subcommand provided. Try `eos help`.")
-            return cmd.Help()
-        }),
-    }
+			// Watchdog
+			startGlobalWatchdog(3 * time.Minute)
+		},
+		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+			fmt.Println("⚠️ No subcommand provided. Try `eos help`.")
+			return cmd.Help()
+		}),
+	}
 )
 
 func init() {
@@ -90,14 +90,14 @@ func init() {
 
 // Execute runs the CLI and handles exit codes.
 func Execute() {
-    if err := RootCmd.Execute(); err != nil {
-        if eos_err.IsExpectedUserError(err) {
-            zap.L().Warn("User error", zap.Error(err))
-            os.Exit(0)
-        }
-        zap.L().Error("Execution error", zap.Error(err))
-        os.Exit(1)
-    }
+	if err := RootCmd.Execute(); err != nil {
+		if eos_err.IsExpectedUserError(err) {
+			zap.L().Warn("User error", zap.Error(err))
+			os.Exit(0)
+		}
+		zap.L().Error("Execution error", zap.Error(err))
+		os.Exit(1)
+	}
 }
 
 func startGlobalWatchdog(max time.Duration) {

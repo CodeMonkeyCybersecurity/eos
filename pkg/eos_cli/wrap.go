@@ -20,11 +20,6 @@ func Wrap(fn RunE) func(*cobra.Command, []string) error {
 		vaultAddr, vaultErr := vault.EnsureVaultEnv()
 		rc.Attributes["vault_addr"] = eos_io.LogVaultContext(rc.Log, vaultAddr, vaultErr)
 
-		// 2) Validation
-		if err = rc.ValidateAll(); err != nil {
-			return err
-		}
-
 		// 3) Execute
 		err = fn(rc, cmd, args)
 		return err
