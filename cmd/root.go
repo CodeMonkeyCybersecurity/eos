@@ -11,7 +11,6 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -34,32 +33,38 @@ import (
 	// Internal packages
 )
 
-var (
-	helpLogged bool
-	RootCmd    = &cobra.Command{
-		Use:   "eos",
-		Short: "Eos CLI for automation, orchestration, and hardening",
-		Long:  `Eos is a command-line application for managing ….`,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			// Telemetry + logging
-			if err := telemetry.Init("eos"); err != nil {
-				fmt.Fprintf(os.Stderr, "⚠️ Telemetry disabled: %v\n", err)
-			}
-			zap.L().Info("Eos CLI starting")
+var helpLogged bool // global guard to log help only once
 
-			// Watchdog
-			startGlobalWatchdog(3 * time.Minute)
-		},
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			fmt.Println("⚠️ No subcommand provided. Try `eos help`.")
-			return cmd.Help()
-		}),
-	}
-)
+// RootCmd is the base command for eos.
+var RootCmd = &cobra.Command{
+	Use:   "eos",
+	Short: "Eos CLI for automation, orchestration, and hardening",
+	Long: `Eos is a command-line application for managing processes, users, hardware, backups,
+and reverse proxy configurations via Hecate.`,
+	// PersistentPreRun executes before any subcommand.
 
-func init() {
-	// Register every subcommand at import-time
-	for _, c := range []*cobra.Command{
+	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
+		return cmd.Help()
+	}),
+}
+
+// RegisterCommands adds all subcommands to the root command.
+func RegisterCommands() {
+
+	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
+		if !helpLogged {
+			zap.L().Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
+			helpLogged = true
+			defer zap.L().Info("Global help display complete", zap.String("command", cmd.Name()))
+		}
+		if err := cmd.Root().Usage(); err != nil {
+			zap.L().Warn("Failed to print usage", zap.Error(err))
+		}
+	})
+
+	// Group subcommands for cleanliness
+	for _, subCmd := range []*cobra.Command{
 		create.CreateCmd,
 		read.ReadCmd,
 		list.ListCmd,
@@ -76,29 +81,30 @@ func init() {
 		delphi.DelphiCmd,
 		pandora.PandoraCmd,
 	} {
-		RootCmd.AddCommand(c)
+		RootCmd.AddCommand(subCmd)
 	}
-
-	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
-		if !helpLogged {
-			zap.L().Info("Help triggered", zap.String("cmd", cmd.Name()))
-			helpLogged = true
-		}
-		cmd.Root().Usage()
-	})
 }
 
-// Execute runs the CLI and handles exit codes.
+// Execute initializes and runs the root command.
 func Execute() {
+
+	zap.L().Info("Eos CLI starting")
+	startGlobalWatchdog(3 * time.Minute)
+
+	RegisterCommands()
+
 	if err := RootCmd.Execute(); err != nil {
 		if eos_err.IsExpectedUserError(err) {
-			zap.L().Warn("User error", zap.Error(err))
+			zap.L().Warn("CLI completed with user error", zap.Error(err))
 			os.Exit(0)
+		} else {
+			zap.L().Error("CLI execution error", zap.Error(err))
+			os.Exit(1)
 		}
-		zap.L().Error("Execution error", zap.Error(err))
-		os.Exit(1)
 	}
 }
+
+// cmd/root.go
 
 func startGlobalWatchdog(max time.Duration) {
 	go func() {
