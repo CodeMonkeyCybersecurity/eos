@@ -15,9 +15,13 @@ See LICENSE.agpl and LICENSE.dnh for full details.
 package main
 
 import (
+	"context"
+
 	"github.com/CodeMonkeyCybersecurity/eos/cmd"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 func main() {
-	cmd.Execute(nil)
+	rc := eos_io.NewContext(context.Background(), "eos")
+	cmd.Execute(rc)
 }

@@ -23,7 +23,7 @@ func EnsureCertificates(appName, baseDomain, email string) error {
 	// Check if the private key exists.
 	if _, err := os.Stat(privKey); os.IsNotExist(err) {
 		// Execute certbot to obtain a certificate.
-		cmd := exec.Command( "certbot", "certonly", "--standalone",
+		cmd := exec.Command("certbot", "certonly", "--standalone",
 			"--preferred-challenges", "http", "-d", fqdn, "-m", email,
 			"--agree-tos", "--non-interactive")
 		output, err := cmd.CombinedOutput()

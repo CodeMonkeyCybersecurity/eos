@@ -36,7 +36,7 @@ type RuntimeContext struct {
 }
 
 // NewContext sets up tracing, logging and validation hooks.
-func NewContext(rc *RuntimeContext, cmdName string) *RuntimeContext {
+func NewContext(ctx context.Context, cmdName string) *RuntimeContext {
 
 	comp, action := resolveCallContext(3)
 
