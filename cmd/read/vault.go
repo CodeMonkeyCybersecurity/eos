@@ -10,7 +10,6 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
@@ -33,7 +32,7 @@ func init() {
 var InspectVaultInitCmd = &cobra.Command{
 	Use:   "vault-init",
 	Short: "Inspect Vault initialization keys, root token, and eos credentials",
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
 		// Load Vault Init Result
@@ -102,7 +101,7 @@ var InspectVaultInitCmd = &cobra.Command{
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
 		log.Info("Listing secrets under secret/eos")
@@ -125,7 +124,7 @@ var InspectVaultCmd = &cobra.Command{
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Check Vault Agent status and basic functionality",
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
 		if err := vault.CheckVaultAgentService(); err != nil {
@@ -172,7 +171,7 @@ var InspectVaultLDAPCmd = &cobra.Command{
 var InspectSecretsCmd = &cobra.Command{
 	Use:   "secrets",
 	Short: "List and view EOS secrets (redacted)",
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
 		files, err := os.ReadDir(shared.SecretsDir)
