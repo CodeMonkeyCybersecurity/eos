@@ -12,23 +12,19 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
 type RuntimeContext struct {
 	Ctx        context.Context
 	Log        *zap.Logger
-	Verify     *verify.Context
 	Timestamp  time.Time
-	Span       trace.Span
 	Command    string
 	Component  string
 	Attributes map[string]string
@@ -37,14 +33,18 @@ type RuntimeContext struct {
 
 // NewContext sets up tracing, logging and validation hooks.
 func NewContext(ctx context.Context, cmdName string) *RuntimeContext {
-
 	comp, action := resolveCallContext(3)
-
+	baseLogger := zap.L()
+	if baseLogger == nil {
+		baseLogger, _ = zap.NewDevelopment()
+	}
+	log := baseLogger.With(zap.String("component", comp), zap.String("action", action)).Named(cmdName)
 	return &RuntimeContext{
-		Timestamp:  time.Now(), // capture start time
+		Ctx:        ctx,
+		Log:        log,
+		Timestamp:  time.Now(),
 		Component:  comp,
 		Command:    action,
-		Verify:     verify.NewContext(),
 		Attributes: make(map[string]string),
 	}
 }
@@ -59,54 +59,41 @@ func (rc *RuntimeContext) HandlePanic(errPtr *error) {
 
 // ValidateAll runs struct-, CUE-, and OPA-based validation if configured.
 func (rc *RuntimeContext) ValidateAll() error {
-	if rc.Verify == nil {
+	if rc.Validate == nil {
 		return nil
 	}
-	return rc.ValidateConfig(
-		rc.Verify.Cfg,
-		rc.Verify.SchemaPath,
-		rc.Verify.YAMLPath,
-		rc.Verify.PolicyPath,
-	)
-}
-
-// ValidateConfig executes the three-step validation pipeline.
-func (rc *RuntimeContext) ValidateConfig(
-	cfg interface{}, schemaPath, yamlPath, policyPath string,
-) error {
-	if err := rc.Verify.ValidateAll("config", cfg); err != nil {
+	v := rc.Validate
+	if err := verify.Struct(v.Cfg); err != nil {
 		return cerr.WithHint(err, "struct validation failed")
 	}
-	if err := verify.ValidateYAMLWithCUE(schemaPath, yamlPath); err != nil {
+	if err := verify.ValidateYAMLWithCUE(v.SchemaPath, v.YAMLPath); err != nil {
 		return cerr.WithHint(err, "CUE schema validation failed")
 	}
-	if err := eos_opa.Enforce(rc.Ctx, policyPath, cfg); err != nil {
-		return cerr.Wrapf(err, "OPA policy %s denied", policyPath)
+	denies, err := verify.EnforcePolicy(rc.Ctx, v.PolicyPath, v.PolicyInput())
+	if err != nil {
+		return cerr.Wrap(err, "OPA policy error")
+	}
+	if len(denies) > 0 {
+		return cerr.Newf("OPA policy denied: %v", denies)
 	}
 	return nil
 }
 
 // End logs outcome, emits a telemetry span with key attributes, and flushes.
 func (rc *RuntimeContext) End(errPtr *error) {
-	defer rc.Span.End()
-
 	duration := time.Since(rc.Timestamp)
 	success := (*errPtr == nil)
-
-	// 1) user‐facing log
 	if success {
 		rc.Log.Info("Command completed", zap.Duration("duration", duration))
 	} else {
 		rc.Log.Error("Command failed", zap.Duration("duration", duration), zap.Error(*errPtr))
 	}
 
-	// 2) vault_addr was written by the wrapper into Attributes
 	vaultAddr := rc.Attributes["vault_addr"]
 	if vaultAddr == "" {
 		vaultAddr = "(unavailable)"
 	}
 
-	// 3) telemetry attributes
 	attrs := []attribute.KeyValue{
 		attribute.Bool("success", success),
 		attribute.Int64("duration_ms", duration.Milliseconds()),
@@ -118,11 +105,9 @@ func (rc *RuntimeContext) End(errPtr *error) {
 		attribute.String("error_type", classifyError(*errPtr)),
 	}
 
-	// 4) record final span
 	_, span := telemetry.Start(rc.Ctx, rc.Command, attrs...)
 	span.End()
 
-	// 5) ensure logs/telemetry are flushed
 	shared.SafeSync()
 }
 
@@ -181,13 +166,25 @@ func ContextualLogger(rc *RuntimeContext, skipFrames int, base *zap.Logger) *zap
 		skipFrames = 2
 	}
 
+	var logger *zap.Logger
+	if base != nil {
+		logger = base
+	} else if rc != nil && rc.Log != nil {
+		logger = rc.Log
+	} else {
+		logger = zap.L()
+		if logger == nil {
+			logger, _ = zap.NewDevelopment()
+		}
+	}
+
 	component, action, err := getCallContext(skipFrames)
 	if err != nil {
-		base.Warn("🧭 Context resolution failed", zap.Error(err))
+		logger.Warn("🧭 Context resolution failed", zap.Error(err))
 		component, action = "unknown", "unknown"
 	}
 
-	return base.With(
+	return logger.With(
 		zap.String("component", component),
 		zap.String("action", action),
 	).Named(component)
