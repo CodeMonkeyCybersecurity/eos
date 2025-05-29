@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/vault/api"
-	"go.uber.org/zap"
 )
 
 type FallbackMode int
@@ -81,10 +80,8 @@ var (
 // GetVaultAddr returns VAULT_ADDR or falls back to localhost
 func GetVaultAddr() string {
 	if addr := os.Getenv(VaultAddrEnv); addr != "" {
-		zap.L().Debug("✅ Using VAULT_ADDR from environment", zap.String(VaultAddrEnv, addr))
 		return addr
 	}
-	zap.L().Warn("⚠️ VAULT_ADDR not set — falling back to localhost default")
 	return fmt.Sprintf(VaultDefaultAddr, LocalhostSAN)
 }
 
@@ -116,14 +113,11 @@ type VaultConfigParams struct {
 
 func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, error) {
 	if addr == "" {
-		zap.L().Warn("⚠️ Blank address provided — using localhost fallback")
 		addr = VaultDefaultLocalAddr
 	}
 	if _, err := os.Stat(TLSKey); err != nil {
-		zap.L().Warn("⚠️ TLS key missing", zap.String("TLSKey", TLSKey), zap.Error(err))
 	}
 	if _, err := os.Stat(TLSCrt); err != nil {
-		zap.L().Warn("⚠️ TLS cert missing", zap.String("TLSCrt", TLSCrt), zap.Error(err))
 	}
 
 	params := VaultConfigParams{
@@ -147,7 +141,6 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 		return "", err
 	}
 
-	zap.L().Info("📜 Rendering Vault config", zap.String("api_addr", addr))
 	return rendered.String(), nil
 }
 

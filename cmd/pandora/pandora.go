@@ -21,7 +21,7 @@ var PandoraCmd = &cobra.Command{
 	Long:    "Commands related to pandora and integrations such as install, remove, and inspect.",
 	Aliases: []string{"p"},
 	// Optionally, you can define a Run function to display help if no subcommand is provided.
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		shared.SafeHelp(cmd)
 		return nil
 	}),

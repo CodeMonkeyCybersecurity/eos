@@ -1,33 +1,34 @@
 package delphi
 
 import (
-	"context"
 	"errors"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func ResolveConfig(ctx context.Context) (*Config, error) {
+func ResolveConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	// 1. Try Vault
-	cfg, err := ReadConfig(ctx)
+	cfg, err := ReadConfig(rc)
 	if err == nil && cfg.IsValid() {
 		return cfg, nil
 	}
 
 	// 2. Try disk fallback
-	cfg, err = ReadConfig(ctx) // fixed arg
+	cfg, err = ReadConfig(rc) // fixed arg
 	if err == nil && cfg.IsValid() {
-		zap.L().Info("Loaded Delphi config from disk fallback")
+		otelzap.Ctx(rc.Ctx).Info("Loaded Delphi config from disk fallback")
 		return cfg, nil
 	}
 
 	// 3. Prompt interactively
-	cfg = PromptDelphiConfig()
+	cfg = PromptDelphiConfig(rc)
 
 	ok, err := interaction.ResolveObject(cfg)
 	if err != nil {
-		zap.L().Warn("Confirmation failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Confirmation failed", zap.Error(err))
 		return nil, err
 	}
 	if !ok {
@@ -35,6 +36,6 @@ func ResolveConfig(ctx context.Context) (*Config, error) {
 	}
 
 	// 5. Save and return
-	_ = WriteConfig(ctx, cfg)
+	_ = WriteConfig(rc, cfg)
 	return cfg, nil
 }

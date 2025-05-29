@@ -10,44 +10,46 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/xdg"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // Write stores a struct in Vault using the API or falls back to disk if Vault is unavailable.
 // If client is nil, it initializes one automatically.
-func Write(client *api.Client, name string, data any) error {
+func Write(rc *eos_io.RuntimeContext, client *api.Client, name string, data any) error {
 	var err error
 	if client == nil {
-		client, err = NewClient()
+		client, err = NewClient(rc)
 		if err != nil {
-			zap.L().Warn("Vault client creation failed", zap.Error(err))
-			return WriteToDisk(name, data)
+			otelzap.Ctx(rc.Ctx).Warn("Vault client creation failed", zap.Error(err))
+			return WriteToDisk(rc, name, data)
 		}
 	}
 
-	SetVaultClient(client)
-	path := VaultPath(name)
+	SetVaultClient(rc, client)
+	path := VaultPath(rc, name)
 
-	if err := WriteToVault(path, data); err != nil {
-		zap.L().Warn("⚠️ Vault write failed — falling back to disk", zap.String("path", path), zap.Error(err))
-		return WriteToDisk(name, data)
+	if err := WriteToVault(rc, path, data); err != nil {
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault write failed — falling back to disk", zap.String("path", path), zap.Error(err))
+		return WriteToDisk(rc, name, data)
 	}
 
-	zap.L().Info("✅ Vault secret written", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault secret written", zap.String("path", path))
 	return nil
 }
 
 // WriteToVault stores a serializable struct to Vault at a given KV v2 path.
-func WriteToVault(path string, v interface{}) error {
-	return WriteToVaultAt(shared.VaultMountKV, path, v)
+func WriteToVault(rc *eos_io.RuntimeContext, path string, v interface{}) error {
+	return WriteToVaultAt(rc, shared.VaultMountKV, path, v)
 }
 
 // WriteToVaultAt writes a serialized object to a specific Vault mount path using the KVv2 API.
-func WriteToVaultAt(mount, path string, v interface{}) error {
-	client, err := GetVaultClient()
+func WriteToVaultAt(rc *eos_io.RuntimeContext, mount, path string, v interface{}) error {
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		return err
 	}
@@ -65,9 +67,9 @@ func WriteToVaultAt(mount, path string, v interface{}) error {
 }
 
 // WriteFallbackSecrets securely stores secrets as JSON in the XDG config directory for later retrieval.
-func WriteFallbackSecrets(name string, secrets map[string]string) error {
+func WriteFallbackSecrets(rc *eos_io.RuntimeContext, name string, secrets map[string]string) error {
 	path := xdg.XDGConfigPath(shared.EosID, filepath.Join(name, "config.json"))
-	zap.L().Debug("Writing fallback secrets", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Debug("Writing fallback secrets", zap.String("path", path))
 
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
@@ -93,7 +95,7 @@ func WriteSecret(client *api.Client, path string, data map[string]interface{}) e
 //
 
 // WriteFallbackJSON saves any struct as JSON to the given path (used for Vault fallback or CLI secrets).
-func WriteFallbackJSON(path string, data any) error {
+func WriteFallbackJSON(rc *eos_io.RuntimeContext, path string, data any) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("create fallback directory: %w", err)
 	}
@@ -107,22 +109,22 @@ func WriteFallbackJSON(path string, data any) error {
 		return fmt.Errorf("write fallback file: %w", err)
 	}
 
-	zap.L().Info("✅ Fallback data saved", zap.String("path", path))
-	zap.L().Info("💡 Run `eos vault sync` later to upload to Vault")
+	otelzap.Ctx(rc.Ctx).Info("✅ Fallback data saved", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info("💡 Run `eos vault sync` later to upload to Vault")
 	return nil
 }
 
 // is used as a fallback if Vault is unavailable. It saves structured data to a JSON file on disk.
-func WriteToDisk(name string, data any) error {
-	fallbackPath := DiskPath(name)
-	zap.L().Info("💾 Falling back to local disk", zap.String("path", fallbackPath))
-	return WriteFallbackJSON(fallbackPath, data)
+func WriteToDisk(rc *eos_io.RuntimeContext, name string, data any) error {
+	fallbackPath := DiskPath(rc, name)
+	otelzap.Ctx(rc.Ctx).Info("💾 Falling back to local disk", zap.String("path", fallbackPath))
+	return WriteFallbackJSON(rc, fallbackPath, data)
 }
 
 // WriteKVv2 writes a payload to a Vault KV v2 mount at the given logical path.
 // It handles the /data/ prefix required by KVv2 automatically.
-func WriteKVv2(client *api.Client, mount string, path string, data map[string]interface{}) error {
-	zap.L().Info("🔃 Writing KVv2 secret",
+func WriteKVv2(rc *eos_io.RuntimeContext, client *api.Client, mount string, path string, data map[string]interface{}) error {
+	otelzap.Ctx(rc.Ctx).Info("🔃 Writing KVv2 secret",
 		zap.String("mount", mount),
 		zap.String("path", path),
 		zap.Any("data_keys", keysOf(data)),
@@ -130,7 +132,7 @@ func WriteKVv2(client *api.Client, mount string, path string, data map[string]in
 
 	kv := client.KVv2(strings.TrimSuffix(mount, "/"))
 	if _, err := kv.Put(context.Background(), path, data); err != nil {
-		zap.L().Error("❌ Failed to write KVv2 secret",
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to write KVv2 secret",
 			zap.String("mount", mount),
 			zap.String("path", path),
 			zap.Error(err),
@@ -138,7 +140,7 @@ func WriteKVv2(client *api.Client, mount string, path string, data map[string]in
 		return fmt.Errorf("failed to write KVv2 secret at %s/%s: %w", mount, path, err)
 	}
 
-	zap.L().Info("✅ KVv2 secret written successfully",
+	otelzap.Ctx(rc.Ctx).Info("✅ KVv2 secret written successfully",
 		zap.String("mount", mount),
 		zap.String("path", path),
 	)
@@ -156,75 +158,75 @@ func keysOf(m map[string]interface{}) []string {
 
 // Delete removes a secret at the given path in Vault KV v2.
 // It expects a valid client, and a path relative to the KV mount.
-func Delete(client *api.Client, path string) error {
+func Delete(rc *eos_io.RuntimeContext, client *api.Client, path string) error {
 	if client == nil {
 		return fmt.Errorf("vault client is nil")
 	}
 
-	zap.L().Info("🗑️ Deleting secret from Vault", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info("🗑️ Deleting secret from Vault", zap.String("path", path))
 
 	kv := client.KVv2("secret") // Assuming your KV mount is "secret/"
 
 	// ❗ Correct: manually provide context.Background()
 	err := kv.Delete(context.Background(), path)
 	if err != nil {
-		zap.L().Error("❌ Failed to delete Vault secret", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to delete Vault secret", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("vault delete failed: %w", err)
 	}
 
-	zap.L().Info("✅ Vault secret deleted", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault secret deleted", zap.String("path", path))
 	return nil
 }
 
 // writeTestDataToVaultOrFallback writes test data into Vault or falls back to disk storage if Vault is unavailable.
-func WriteTestDataToVaultOrFallback(client *api.Client, data map[string]interface{}) error {
-	zap.L().Info("🔐 Attempting to write test data into Vault...")
+func WriteTestDataToVaultOrFallback(rc *eos_io.RuntimeContext, client *api.Client, data map[string]interface{}) error {
+	otelzap.Ctx(rc.Ctx).Info("🔐 Attempting to write test data into Vault...")
 
 	vaultPath := "test-data" // Adjust if you want "eos/test-data" instead
-	vaultErr := Write(client, vaultPath, data)
+	vaultErr := Write(rc, client, vaultPath, data)
 
 	if vaultErr == nil {
-		zap.L().Info("✅ Uploaded test-data into Vault", zap.String("vault_path", vaultPath))
+		otelzap.Ctx(rc.Ctx).Info("✅ Uploaded test-data into Vault", zap.String("vault_path", vaultPath))
 		PrintStorageSummary("Vault", vaultPath, "SUCCESS", "Disk", "N/A")
 		return nil
 	}
 
-	zap.L().Warn("⚠️ Vault write failed — falling back to disk", zap.Error(vaultErr))
+	otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault write failed — falling back to disk", zap.Error(vaultErr))
 
 	outputPath := diskFallbackPath()
 	if err := os.MkdirAll(filepath.Dir(outputPath), shared.RuntimeDirPerms); err != nil {
-		zap.L().Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(err))
 		PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "FAILED")
 		return fmt.Errorf("vault write failed: %w; fallback mkdir failed: %v", vaultErr, err)
 	}
 
 	raw, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		zap.L().Error("❌ Failed to marshal test data", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to marshal test data", zap.Error(err))
 		PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "FAILED")
 		return fmt.Errorf("vault write failed: %w; fallback marshal failed: %v", vaultErr, err)
 	}
 
 	if err := os.WriteFile(outputPath, raw, shared.RuntimeFilePerms); err != nil {
-		zap.L().Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(err))
 		PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "FAILED")
 		return fmt.Errorf("vault write failed: %w; fallback disk write failed: %v", vaultErr, err)
 	}
 
-	zap.L().Info("💾 Fallback to disk succeeded", zap.String("disk_path", outputPath))
+	otelzap.Ctx(rc.Ctx).Info("💾 Fallback to disk succeeded", zap.String("disk_path", outputPath))
 	PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "SUCCESS")
 	return nil
 }
 
 // WriteUserpassPasswordToVault writes the userpass password to Vault KV
-func WriteUserpassPasswordToVault(client *api.Client, password string) error {
-	return WriteKVv2(client, shared.VaultSecretMount, shared.UserpassKVPath, shared.FallbackSecretsTemplate(password))
+func WriteUserpassPasswordToVault(rc *eos_io.RuntimeContext, client *api.Client, password string) error {
+	return WriteKVv2(rc, client, shared.VaultSecretMount, shared.UserpassKVPath, shared.FallbackSecretsTemplate(password))
 }
 
 // WriteSSHKey stores an SSH key pair in Vault KV-v2 and
 // attaches the fingerprint as custom metadata (v1.16.0 client).
 func WriteSSHKey(
-	ctx context.Context,
+	rc *eos_io.RuntimeContext,
 	client *api.Client,
 	mount, path, pub, priv, fingerprint string,
 ) error {
@@ -235,14 +237,14 @@ func WriteSSHKey(
 	kv := client.KVv2(mount)
 
 	// 1️⃣ Write public/private key data
-	if _, err := kv.Put(ctx, path, map[string]interface{}{
+	if _, err := kv.Put(nil, path, map[string]interface{}{
 		"ssh_public":  pub,
 		"ssh_private": priv,
 	}); err != nil {
 		return fmt.Errorf("failed to write SSH key data at %s/%s: %w",
 			mount, path, err)
 	}
-	zap.L().Info("✅ SSH key data written",
+	otelzap.Ctx(rc.Ctx).Info("✅ SSH key data written",
 		zap.String("mount", mount), zap.String("path", path),
 	)
 
@@ -257,7 +259,7 @@ func WriteSSHKey(
 		return fmt.Errorf("failed to write SSH fingerprint metadata at %s/%s: %w",
 			mount, path, err)
 	}
-	zap.L().Info("✅ SSH fingerprint metadata written",
+	otelzap.Ctx(rc.Ctx).Info("✅ SSH fingerprint metadata written",
 		zap.String("mount", mount), zap.String("path", metaPath),
 	)
 

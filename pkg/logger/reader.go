@@ -5,7 +5,9 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -21,21 +23,21 @@ func ReadLogFile(path string) (string, error) {
 }
 
 // TryReadLogFile safely reads a log file after validating that it exists and is not a directory.
-func TryReadLogFile(path string) (string, error) {
+func TryReadLogFile(rc *eos_io.RuntimeContext, path string) (string, error) {
 	fi, err := os.Stat(path)
 	if err != nil || fi.IsDir() {
-		zap.L().Warn("Invalid log file path", zap.String("path", path))
+		otelzap.Ctx(rc.Ctx).Warn("Invalid log file path", zap.String("path", path))
 		return "", fmt.Errorf("invalid log file path: %s", path)
 	}
 	return ReadLogFile(path)
 }
 
 // TryJournalctl fetches recent EOS logs using journalctl, returning the output.
-func TryJournalctl() (string, error) {
+func TryJournalctl(rc *eos_io.RuntimeContext) (string, error) {
 	cmd := exec.Command("journalctl", "-u", shared.EosID, "--no-pager", "--since", journalSinceDefault)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		zap.L().Warn("Failed to query journalctl", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to query journalctl", zap.Error(err))
 		return "", fmt.Errorf("could not query journalctl: %w", err)
 	}
 	return string(out), nil

@@ -3,7 +3,6 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
@@ -12,8 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -44,36 +45,36 @@ import (
 //  └── eos_unix.LookupUser()          [⚠ external]
 
 // StartVaultService installs, enables, and starts the Vault SERVER (vault.service).
-func StartVaultService() error {
-	zap.L().Info("🛠️ Writing Vault SERVER systemd unit file")
-	if err := WriteVaultServerSystemdUnit(); err != nil {
+func StartVaultService(rc *eos_io.RuntimeContext) error {
+	otelzap.Ctx(rc.Ctx).Info("🛠️ Writing Vault SERVER systemd unit file")
+	if err := WriteVaultServerSystemdUnit(rc); err != nil {
 		return fmt.Errorf("write server systemd unit: %w", err)
 	}
 
-	zap.L().Info("🛠️ Validating Vault server config before starting")
-	if err := ValidateVaultConfig(); err != nil {
-		zap.L().Error("❌ Vault config validation failed", zap.Error(err))
+	otelzap.Ctx(rc.Ctx).Info("🛠️ Validating Vault server config before starting")
+	if err := ValidateVaultConfig(rc); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("❌ Vault config validation failed", zap.Error(err))
 		return fmt.Errorf("vault config validation failed: %w", err)
 	}
 
-	zap.L().Info("🔄 Reloading systemd daemon and enabling vault.service")
-	if err := eos_unix.ReloadDaemonAndEnable(shared.VaultServiceName); err != nil {
+	otelzap.Ctx(rc.Ctx).Info("🔄 Reloading systemd daemon and enabling vault.service")
+	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, shared.VaultServiceName); err != nil {
 		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
 
-	if err := ensureVaultDataDir(); err != nil {
+	if err := ensureVaultDataDir(rc); err != nil {
 		return err
 	}
 
-	zap.L().Info("🚀 Starting Vault systemd service")
-	if err := startVaultSystemdService(); err != nil {
-		zap.L().Error("❌ Failed to start vault.service", zap.Error(err))
-		captureVaultLogsOnFailure()
+	otelzap.Ctx(rc.Ctx).Info("🚀 Starting Vault systemd service")
+	if err := startVaultSystemdService(rc); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to start vault.service", zap.Error(err))
+		captureVaultLogsOnFailure(rc)
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 
-	zap.L().Info("✅ Vault systemd service started, checking health...")
-	if err := waitForVaultHealth(shared.VaultMaxHealthWait); err != nil {
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault systemd service started, checking health...")
+	if err := waitForVaultHealth(rc, shared.VaultMaxHealthWait); err != nil {
 		return err
 	}
 
@@ -83,59 +84,57 @@ func StartVaultService() error {
 	return nil
 }
 
-func WriteVaultServerSystemdUnit() error {
+func WriteVaultServerSystemdUnit(rc *eos_io.RuntimeContext) error {
 	unit := strings.TrimSpace(shared.ServerSystemDUnit) + "\n"
 	err := os.WriteFile(shared.VaultServicePath, []byte(unit), shared.FilePermStandard)
 	if err != nil {
 		return fmt.Errorf("write vault server unit: %w", err)
 	}
-	zap.L().Info("✅ Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
 	return nil
 }
 
 // startVaultSystemdService safely starts the vault.service.
-func startVaultSystemdService() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+func startVaultSystemdService(rc *eos_io.RuntimeContext) error {
 
-	cmd := exec.CommandContext(ctx, "systemctl", "start", shared.VaultServiceName)
+	cmd := exec.CommandContext(rc.Ctx, "systemctl", "start", shared.VaultServiceName)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		zap.L().Error("❌ Failed to start vault.service", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to start vault.service", zap.Error(err))
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 	return nil
 }
 
 // waitForVaultHealth probes Vault's TCP port until healthy or timeout.
-func waitForVaultHealth(maxWait time.Duration) error {
-	zap.L().Info("⏳ Waiting for Vault to start listening on port", zap.Int("port", shared.VaultDefaultPortInt))
+func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error {
+	otelzap.Ctx(rc.Ctx).Info("⏳ Waiting for Vault to start listening on port", zap.Int("port", shared.VaultDefaultPortInt))
 	start := time.Now()
 	for {
 		if time.Since(start) > maxWait {
-			captureVaultLogsOnFailure()
+			captureVaultLogsOnFailure(rc)
 			return fmt.Errorf("vault did not become healthy within %s", maxWait)
 		}
 		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, shared.VaultRetryDelay)
 		if err == nil {
-			defer shared.SafeClose(conn)
-			zap.L().Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
+			defer shared.SafeClose(rc.Ctx, conn)
+			otelzap.Ctx(rc.Ctx).Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
 			return nil
 		}
-		zap.L().Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
+		otelzap.Ctx(rc.Ctx).Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
 		time.Sleep(shared.VaultRetryDelay)
 	}
 }
 
 // ValidateCriticalPaths checks that Vault critical directories are owned and writable by the service user.
-func ValidateCriticalPaths() error {
+func ValidateCriticalPaths(rc *eos_io.RuntimeContext) error {
 	criticalPaths := []string{
 		shared.VaultDataPath, // /opt/vault/data
 	}
 
-	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
+	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
 		return fmt.Errorf("failed to resolve eos user UID/GID: %w", err)
 	}
@@ -161,7 +160,7 @@ func ValidateCriticalPaths() error {
 			return fmt.Errorf("critical path %s is not writable (permissions %#o)", path, info.Mode().Perm())
 		}
 
-		zap.L().Info("✅ Critical path validated", zap.String("path", path))
+		otelzap.Ctx(rc.Ctx).Info("✅ Critical path validated", zap.String("path", path))
 	}
 
 	return nil

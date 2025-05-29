@@ -3,6 +3,7 @@
 package eos_unix
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -24,27 +26,27 @@ func CheckSudo() bool {
 	return err != nil
 }
 
-func IsPrivilegedUser() bool {
+func IsPrivilegedUser(ctx context.Context) bool {
 	current, err := user.Current()
 	if err != nil {
-		zap.L().Warn("🧪 Could not determine current user", zap.Error(err))
+		otelzap.Ctx(ctx).Warn("🧪 Could not determine current user", zap.Error(err))
 		return os.Geteuid() == 0
 	}
 	return current.Username == shared.EosID || os.Geteuid() == 0
 }
 
 /* EnforceSecretsAccess blocks --show-secrets unless run as root */
-func EnforceSecretsAccess(show bool) bool {
-	if show && !IsPrivilegedUser() {
-		zap.L().Warn("Non-root user attempted to use --show-secrets")
+func EnforceSecretsAccess(ctx context.Context, show bool) bool {
+	if show && !IsPrivilegedUser(ctx) {
+		otelzap.Ctx(ctx).Warn("Non-root user attempted to use --show-secrets")
 		fmt.Fprintln(os.Stderr, "🚫 --show-secrets can only be used by root or sudo.")
 		return false
 	}
 	return true
 }
 
-func RequireRoot() {
-	if !IsPrivilegedUser() {
+func RequireRoot(ctx context.Context) {
+	if !IsPrivilegedUser(ctx) {
 		zap.L().Error("Root access required")
 		fmt.Fprintln(os.Stderr, "❌ This command must be run as root (try sudo).")
 		os.Exit(1)
@@ -71,9 +73,9 @@ func RequireRootInteractive() error {
 	return nil
 }
 
-func FailIfPermissionDenied(action, path string, err error) {
+func FailIfPermissionDenied(ctx context.Context, action, path string, err error) {
 	if os.IsPermission(err) {
-		zap.L().Error(fmt.Sprintf("❌ %s failed due to permissions", action),
+		otelzap.Ctx(ctx).Error(fmt.Sprintf("❌ %s failed due to permissions", action),
 			zap.String("path", path),
 			zap.Error(err),
 		)

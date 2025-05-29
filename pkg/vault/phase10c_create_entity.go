@@ -5,17 +5,19 @@ package vault
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func PhaseCreateEosEntity() error {
-	log := zap.L().Named("vault.PhaseCreateEosEntity")
+func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	entityName := shared.EosID
 
 	log.Info("[Phase10c] Ensuring EOS entity and aliases exist")
 
-	client, err := GetRootClient()
+	client, err := GetRootClient(rc)
 	if err != nil {
 		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)

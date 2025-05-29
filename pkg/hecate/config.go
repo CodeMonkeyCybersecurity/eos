@@ -9,7 +9,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +25,7 @@ type HecateConfig struct {
 	Email      string
 }
 
-func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
+func LoadConfig(rc *eos_io.RuntimeContext, defaultSubdomain string) (*HecateConfig, error) {
 	cfg := &HecateConfig{}
 
 	if _, err := os.Stat(shared.HecateLastValuesFile); err == nil {
@@ -34,7 +36,7 @@ func LoadConfig(defaultSubdomain string) (*HecateConfig, error) {
 		}
 		defer func() {
 			if err := file.Close(); err != nil {
-				zap.L().Warn("Failed to close log file", zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Warn("Failed to close log file", zap.Error(err))
 			}
 		}()
 

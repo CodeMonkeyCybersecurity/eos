@@ -3,9 +3,7 @@
 package kvm
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/sys/unix"
 )
@@ -56,8 +55,7 @@ func EnsureLibvirtd() error {
 	return nil
 }
 
-func RunCreateKvmTenant(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	log := ctx.Log.Named("tenant")
+func RunCreateKvmTenant(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 	var vmName string
 	if UserProvidedVMName != "" {
@@ -66,9 +64,9 @@ func RunCreateKvmTenant(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 		}
 		vmName = UserProvidedVMName
 	} else {
-		vmID, err := getNextVMID()
+		vmID, err := getNextVMID(rc)
 		if err != nil {
-			log.Error("failed to determine VM ID", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("failed to determine VM ID", zap.Error(err))
 			return err
 		}
 		vmName = VmPrefix + vmID
@@ -81,11 +79,11 @@ func RunCreateKvmTenant(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	switch TenantDistro {
 	case "centos-stream9":
-		log.Info("Using Kickstart provisioning")
-		return runKickstartProvisioning(ctx, vmName)
+		otelzap.Ctx(rc.Ctx).Info("Using Kickstart provisioning")
+		return runKickstartProvisioning(rc, vmName)
 	case "ubuntu-cloud":
-		log.Info("Using cloud-init provisioning")
-		return runCloudInitProvisioning(ctx, vmName)
+		otelzap.Ctx(rc.Ctx).Info("Using cloud-init provisioning")
+		return runCloudInitProvisioning(rc, vmName)
 	default:
 		return fmt.Errorf("unsupported distro: %s", TenantDistro)
 	}
@@ -97,11 +95,10 @@ func checkVMExists(name string) bool {
 	return err == nil // dominfo succeeds → VM exists
 }
 
-func runKickstartProvisioning(ctx *eos_io.RuntimeContext, vmName string) error {
-	log := ctx.Log.Named("kickstart")
+func runKickstartProvisioning(rc *eos_io.RuntimeContext, vmName string) error {
 
 	if err := ConfigureKVMBridge(); err != nil {
-		log.Warn("Bridge setup failed; VM may not have external networking", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Bridge setup failed; VM may not have external networking", zap.Error(err))
 	}
 
 	pubKeyPath, _, err := PrepareTenantSSHKey(vmName)
@@ -109,22 +106,17 @@ func runKickstartProvisioning(ctx *eos_io.RuntimeContext, vmName string) error {
 		return err
 	}
 
-	// Start ticker
-	ctxWithCancel, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	diskPath := filepath.Join(ImageDir, vmName+".qcow2")
-	go StartInstallStatusTicker(ctxWithCancel, log, vmName, diskPath)
+	go StartInstallStatusTicker(rc.Ctx, zap.L(), vmName, diskPath)
 
 	// Run provisioning
-	err = ProvisionKickstartTenantVM(ctx, vmName, pubKeyPath)
+	err = ProvisionKickstartTenantVM(rc, vmName, pubKeyPath)
 
 	// Stop ticker regardless of success
-	cancel()
 	return err
 }
 
-func getNextVMID() (string, error) {
+func getNextVMID(rc *eos_io.RuntimeContext) (string, error) {
 	fd, err := os.OpenFile(VmBaseIDFile, os.O_RDWR|os.O_CREATE, 0644)
 	if err != nil {
 		return "", fmt.Errorf("cannot open ID file: %w", err)
@@ -137,7 +129,7 @@ func getNextVMID() (string, error) {
 	}
 	defer func() {
 		if err := unix.Flock(int(fd.Fd()), unix.LOCK_UN); err != nil {
-			log.Printf("unlock failed: %v", err)
+			otelzap.Ctx(rc.Ctx)
 		}
 	}()
 
@@ -164,8 +156,7 @@ func getNextVMID() (string, error) {
 	return fmt.Sprintf("%03d", id), nil
 }
 
-func runCloudInitProvisioning(ctx *eos_io.RuntimeContext, vmName string) error {
-	log := ctx.Log.Named("cloudinit")
+func runCloudInitProvisioning(rc *eos_io.RuntimeContext, vmName string) error {
 
 	cfg := CloudInitConfig{
 		VMName:    vmName,
@@ -173,18 +164,17 @@ func runCloudInitProvisioning(ctx *eos_io.RuntimeContext, vmName string) error {
 		PublicKey: SshKeyOverride, // use --ssh-key override path
 	}
 
-	if err := ProvisionCloudInitVM(log, cfg); err != nil {
+	if err := ProvisionCloudInitVM(zap.L(), cfg); err != nil {
 		return err
 	}
 
-	log.Info("💡 TODO: virt-install the VM using cloud image + seed.img")
+	otelzap.Ctx(rc.Ctx).Info("💡 TODO: virt-install the VM using cloud image + seed.img")
 	return fmt.Errorf("virt-install not yet implemented")
 }
 
-func RunCreateKvmInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	log := ctx.Log.Named("kvm")
+func RunCreateKvmInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-	eos_unix.RequireRoot()
+	eos_unix.RequireRoot(rc.Ctx)
 
 	nonInteractive, _ := cmd.Flags().GetBool("yes")
 	isoOverride, _ := cmd.Flags().GetString("iso")
@@ -192,75 +182,75 @@ func RunCreateKvmInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	autostartFlag, _ := cmd.Flags().GetBool("autostart")
 	autostartExplicit := cmd.Flags().Changed("autostart")
 
-	log.Info("📦 Installing KVM and libvirt packages...")
+	otelzap.Ctx(rc.Ctx).Info("📦 Installing KVM and libvirt packages...")
 	if err := InstallKVM(); err != nil {
-		log.Error("Failed to install KVM", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to install KVM", zap.Error(err))
 		return err
 	}
-	log.Info("✅ KVM installation complete")
+	otelzap.Ctx(rc.Ctx).Info("✅ KVM installation complete")
 
 	if enableBridge {
-		log.Info("🛠️  Configuring network bridge...")
+		otelzap.Ctx(rc.Ctx).Info("🛠️  Configuring network bridge...")
 		if err := ConfigureKVMBridge(); err != nil {
-			log.Error("Failed to configure network bridge", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to configure network bridge", zap.Error(err))
 			return err
 		}
-		log.Info("✅ Network bridge configured")
+		otelzap.Ctx(rc.Ctx).Info("✅ Network bridge configured")
 	}
 
 	if err := EnsureLibvirtd(); err != nil {
-		log.Error("libvirtd failed to start", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("libvirtd failed to start", zap.Error(err))
 		return err
 	}
 
-	isoDir := resolveIsoDir(log, nonInteractive, isoOverride)
+	isoDir := resolveIsoDir(rc, nonInteractive, isoOverride)
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
-		log.Info("🔐 Setting ACL for ISO directory", zap.String("path", isoDir))
+		otelzap.Ctx(rc.Ctx).Info("🔐 Setting ACL for ISO directory", zap.String("path", isoDir))
 		SetLibvirtACL(isoDir)
 	} else {
-		log.Warn("⚠️ ISO directory not found or invalid", zap.String("path", isoDir))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ ISO directory not found or invalid", zap.String("path", isoDir))
 	}
 
-	if resolveAutostart(log, nonInteractive, autostartExplicit, autostartFlag) {
-		log.Info("⚙️  Enabling autostart for default libvirt network")
+	if resolveAutostart(rc, nonInteractive, autostartExplicit, autostartFlag) {
+		otelzap.Ctx(rc.Ctx).Info("⚙️  Enabling autostart for default libvirt network")
 		SetLibvirtDefaultNetworkAutostart()
 	} else {
-		log.Info("Skipping autostart — run 'virsh net-start default' manually if needed")
+		otelzap.Ctx(rc.Ctx).Info("Skipping autostart — run 'virsh net-start default' manually if needed")
 	}
 
-	log.Info("✅ KVM setup completed successfully")
+	otelzap.Ctx(rc.Ctx).Info("✅ KVM setup completed successfully")
 	return nil
 }
 
-func resolveIsoDir(log *zap.Logger, nonInteractive bool, isoOverride string) string {
+func resolveIsoDir(rc *eos_io.RuntimeContext, nonInteractive bool, isoOverride string) string {
 	if isoOverride != "" {
-		log.Info("ISO path provided via flag", zap.String("iso_dir", isoOverride))
+		otelzap.Ctx(rc.Ctx).Info("ISO path provided via flag", zap.String("iso_dir", isoOverride))
 		return isoOverride
 	}
 	if nonInteractive {
-		log.Info("Using default ISO directory (non-interactive)", zap.String("iso_dir", "/srv/iso"))
+		otelzap.Ctx(rc.Ctx).Info("Using default ISO directory (non-interactive)", zap.String("iso_dir", "/srv/iso"))
 		return "/srv/iso"
 	}
-	val := interaction.PromptConfirmOrValue("The hypervisor needs access to an ISO directory", "/srv/iso")
-	log.Info("ISO directory selected", zap.String("iso_dir", val))
+	val := interaction.PromptConfirmOrValue(rc.Ctx, "The hypervisor needs access to an ISO directory", "/srv/iso")
+	otelzap.Ctx(rc.Ctx).Info("ISO directory selected", zap.String("iso_dir", val))
 	return val
 }
 
-func resolveAutostart(log *zap.Logger, nonInteractive, explicitlySet bool, value bool) bool {
+func resolveAutostart(rc *eos_io.RuntimeContext, nonInteractive, explicitlySet bool, value bool) bool {
 	if explicitlySet {
-		log.Info("Autostart explicitly provided via flag", zap.Bool("autostart", value))
+		otelzap.Ctx(rc.Ctx).Info("Autostart explicitly provided via flag", zap.Bool("autostart", value))
 		return value
 	}
 	if nonInteractive {
-		log.Info("Assuming 'no' for autostart (non-interactive)")
+		otelzap.Ctx(rc.Ctx).Info("Assuming 'no' for autostart (non-interactive)")
 		return false
 	}
-	resp := interaction.PromptYesNo("Would you like to autostart the default libvirt network?", false)
-	log.Info("User autostart choice", zap.Bool("autostart", resp))
+	resp := interaction.PromptYesNo(rc.Ctx, "Would you like to autostart the default libvirt network?", false)
+	otelzap.Ctx(rc.Ctx).Info("User autostart choice", zap.Bool("autostart", resp))
 	return resp
 }
 
-func RunCreateKvmTemplate(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	ctx.Log.Info("Stub: KVM template provisioning logic goes here")
+func RunCreateKvmTemplate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	otelzap.Ctx(rc.Ctx).Info("Stub: KVM template provisioning logic goes here")
 	return nil
 }

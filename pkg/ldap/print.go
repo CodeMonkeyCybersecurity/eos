@@ -4,11 +4,13 @@ package ldap
 
 import (
 	"fmt"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 // PrintGroup returns detailed info for a single group by CN
-func printGroup(cn string) error {
-	group, err := readGroupByCN(cn)
+func printGroup(rc *eos_io.RuntimeContext, cn string) error {
+	group, err := readGroupByCN(rc, cn)
 	if err != nil {
 		return fmt.Errorf("failed to get group: %w", err)
 	}
@@ -20,8 +22,8 @@ func printGroup(cn string) error {
 }
 
 // PrintUser returns detailed info for a single user by UID
-func printUser(uid string) error {
-	user, err := readUserByUID(uid)
+func printUser(rc *eos_io.RuntimeContext, uid string) error {
+	user, err := readUserByUID(rc, uid)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}

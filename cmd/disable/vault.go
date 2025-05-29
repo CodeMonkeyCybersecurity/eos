@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -27,8 +28,8 @@ func init() { DisableCmd.AddCommand(StopVaultCmd) }
 // implementation helpers
 // -----------------------------------------------------------------------------
 
-func runStopVault(ctx *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
-	log := ctx.Log
+func runStopVault(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🛑 Stopping Vault Agent and cleaning up…")
 
 	// ① stop+disable the systemd unit
@@ -39,12 +40,12 @@ func runStopVault(ctx *eos_io.RuntimeContext, _ *cobra.Command, _ []string) erro
 	}
 
 	// ② kill anything still bound to VaultDefaultPort
-	if killed := killByPort(shared.VaultDefaultPort); killed == 0 {
+	if killed := killByPort(rc, shared.VaultDefaultPort); killed == 0 {
 		log.Info("ℹ️  No process bound to "+shared.VaultDefaultPort, zap.String("port", shared.VaultDefaultPort))
 	}
 
 	// ③ purge runtime/config files via existing helper
-	removed, errs := vault.Purge("rhel") // distro param only matters for repo files
+	removed, errs := vault.Purge(rc, "rhel") // distro param only matters for repo files
 	log.Info("🧹  File purge summary",
 		zap.Int("removed", len(removed)),
 		zap.Int("errors", len(errs)),
@@ -62,7 +63,7 @@ func runStopVault(ctx *eos_io.RuntimeContext, _ *cobra.Command, _ []string) erro
 
 func systemctl(args ...string) error { return exec.Command("systemctl", args...).Run() }
 
-func killByPort(port string) int {
+func killByPort(rc *eos_io.RuntimeContext, port string) int {
 	out, err := exec.Command("lsof", "-i", ":"+port, "-t").Output()
 	if err != nil || len(out) == 0 {
 		return 0
@@ -71,7 +72,7 @@ func killByPort(port string) int {
 	for _, p := range pids {
 		if pid, _ := strconv.Atoi(p); pid != 0 {
 			_ = exec.Command("kill", "-9", strconv.Itoa(pid)).Run()
-			zap.L().Info("🔪 Killed process on port "+port, zap.Int("pid", pid))
+			otelzap.Ctx(rc.Ctx).Info("🔪 Killed process on port "+port, zap.Int("pid", pid))
 		}
 	}
 	return len(pids)

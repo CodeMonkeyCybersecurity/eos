@@ -8,23 +8,24 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/api/auth/approle"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // LoginAppRole authenticates to Vault using stored RoleID and SecretID.
-func LoginAppRole() (*api.Client, error) {
-	client, err := NewClient()
+func LoginAppRole(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	client, err := NewClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create vault client: %w", err)
 	}
 
-	roleID, secretID, err := readAppRoleCredsFromDisk(client)
+	roleID, secretID, err := readAppRoleCredsFromDisk(rc, client)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read AppRole creds: %w", err)
 	}
@@ -45,11 +46,11 @@ func LoginAppRole() (*api.Client, error) {
 	}
 
 	client.SetToken(secret.Auth.ClientToken)
-	zap.L().Info("✅ Successfully authenticated with Vault using AppRole")
+	otelzap.Ctx(rc.Ctx).Info("✅ Successfully authenticated with Vault using AppRole")
 	return client, nil
 }
 
-func readAppRoleCredsFromDisk(client *api.Client) (string, string, error) {
+func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
 	roleIDBytes, err := os.ReadFile(shared.AppRolePaths.RoleID)
 	if err != nil {
 		return "", "", fmt.Errorf("read role_id from disk: %w", err)
@@ -63,7 +64,7 @@ func readAppRoleCredsFromDisk(client *api.Client) (string, string, error) {
 	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
 
 	if strings.HasPrefix(secretIDRaw, "s.") {
-		zap.L().Info("🔐 Detected wrapped SecretID token — unwrapping")
+		otelzap.Ctx(rc.Ctx).Info("🔐 Detected wrapped SecretID token — unwrapping")
 		secret, err := client.Logical().Unwrap(secretIDRaw)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to unwrap secret_id: %w", err)
@@ -78,18 +79,16 @@ func readAppRoleCredsFromDisk(client *api.Client) (string, string, error) {
 		return roleID, sid, nil
 	}
 
-	zap.L().Warn("⚠️ SecretID is stored in plaintext. Consider using response wrapping.")
+	otelzap.Ctx(rc.Ctx).Warn("⚠️ SecretID is stored in plaintext. Consider using response wrapping.")
 	return roleID, secretIDRaw, nil
 }
 
 // PhaseCreateAppRole provisions (or reuses) an AppRole and writes its creds to disk.
-func PhaseCreateAppRole(ctx context.Context, client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
-	ctx, span := telemetry.Start(ctx, "vault.phase_create_approle")
-	defer span.End()
+func PhaseCreateAppRole(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
 
 	log.Info("🔑 [Phase 10] Creating AppRole for EOS")
 
-	roleID, secretID, err := EnsureAppRole(ctx, client, opts)
+	roleID, secretID, err := EnsureAppRole(rc, client, opts)
 	if err != nil {
 		log.Error("❌ Failed to ensure AppRole", zap.Error(err))
 		return "", "", cerr.Wrap(err, "ensure AppRole")
@@ -103,49 +102,47 @@ func PhaseCreateAppRole(ctx context.Context, client *api.Client, log *zap.Logger
 }
 
 // WriteAppRoleFiles writes RoleID & SecretID to disk (with correct owner/perm).
-func WriteAppRoleFiles(ctx context.Context, roleID, secretID string) error {
-	ctx, span := telemetry.Start(ctx, "vault.write_approle_files")
-	defer span.End()
+func WriteAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) error {
 
 	dir := filepath.Dir(shared.AppRolePaths.RoleID)
-	zap.L().Info("📁 Ensuring AppRole directory", zap.String("path", dir))
+	otelzap.Ctx(rc.Ctx).Info("📁 Ensuring AppRole directory", zap.String("path", dir))
 
 	// Lookup eos UID/GID
-	uid, gid, err := eos_unix.LookupUser(shared.EosID)
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		zap.L().Error("lookup eos user failed", zap.String("user", shared.EosID), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("lookup eos user failed", zap.String("user", shared.EosID), zap.Error(err))
 		return cerr.Wrapf(err, "lookup user %q", shared.EosID)
 	}
 
 	// Recursively chown the directory
-	if err := eos_unix.ChownR(ctx, dir, uid, gid); err != nil {
-		zap.L().Error("chownR failed", zap.String("path", dir), zap.Error(err))
+	if err := eos_unix.ChownR(rc.Ctx, dir, uid, gid); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("chownR failed", zap.String("path", dir), zap.Error(err))
 		return cerr.Wrapf(err, "chownR %s", dir)
 	}
 
 	// Write RoleID
 	rolePath := shared.AppRolePaths.RoleID
-	zap.L().Debug("✏️ Writing RoleID", zap.String("path", rolePath))
-	if err := eos_unix.WriteFile(rolePath, []byte(roleID+"\n"), 0o600, shared.EosID); err != nil {
+	otelzap.Ctx(rc.Ctx).Debug("✏️ Writing RoleID", zap.String("path", rolePath))
+	if err := eos_unix.WriteFile(rc.Ctx, rolePath, []byte(roleID+"\n"), 0o600, shared.EosID); err != nil {
 		return cerr.Wrapf(err, "write file %s", rolePath)
 	}
 
 	// Write SecretID
 	secretPath := shared.AppRolePaths.SecretID
-	zap.L().Debug("✏️ Writing SecretID", zap.String("path", secretPath))
-	if err := eos_unix.WriteFile(secretPath, []byte(secretID+"\n"), 0o600, shared.EosID); err != nil {
+	otelzap.Ctx(rc.Ctx).Debug("✏️ Writing SecretID", zap.String("path", secretPath))
+	if err := eos_unix.WriteFile(rc.Ctx, secretPath, []byte(secretID+"\n"), 0o600, shared.EosID); err != nil {
 		return cerr.Wrapf(err, "write file %s", secretPath)
 	}
 
-	zap.L().Info("✅ AppRole credentials written",
+	otelzap.Ctx(rc.Ctx).Info("✅ AppRole credentials written",
 		zap.String("role_file", rolePath),
 		zap.String("secret_file", secretPath),
 	)
 	return nil
 }
 
-func refreshAppRoleCreds(client *api.Client) (string, string, error) {
-	zap.L().Debug("🔑 Requesting fresh AppRole credentials")
+func refreshAppRoleCreds(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
+	otelzap.Ctx(rc.Ctx).Debug("🔑 Requesting fresh AppRole credentials")
 	roleResp, err := client.Logical().Read(shared.AppRoleRoleIDPath)
 	if err != nil {
 		return "", "", fmt.Errorf("read role_id: %w", err)
@@ -167,24 +164,22 @@ func refreshAppRoleCreds(client *api.Client) (string, string, error) {
 }
 
 // EnsureAppRole sets up (or re-uses) the Vault AppRole and writes creds to disk.
-func EnsureAppRole(ctx context.Context, client *api.Client, opts shared.AppRoleOptions) (string, string, error) {
-	ctx, span := telemetry.Start(ctx, "vault.ensure_approle")
-	defer span.End()
-	log := zap.L().Named("vault.ensure_approle")
+func EnsureAppRole(rc *eos_io.RuntimeContext, client *api.Client, opts shared.AppRoleOptions) (string, string, error) {
+	log := otelzap.Ctx(rc.Ctx)
 
 	// If existing and not forced, reuse or refresh
 	if !opts.ForceRecreate {
 		if _, err := os.Stat(shared.AppRolePaths.RoleID); err == nil {
 			log.Info("AppRole creds exist; reusing", zap.String("path", shared.AppRolePaths.RoleID))
 			if opts.RefreshCreds {
-				return refreshAppRoleCreds(client)
+				return refreshAppRoleCreds(rc, client)
 			}
-			return readAppRoleCredsFromDisk(client)
+			return readAppRoleCredsFromDisk(rc, client)
 		}
 	}
 
 	// Enable the mount
-	if err := EnableAppRoleAuth(client); err != nil {
+	if err := EnableAppRoleAuth(rc, client); err != nil {
 		return "", "", cerr.Wrap(err, "enable approle auth")
 	}
 
@@ -194,29 +189,29 @@ func EnsureAppRole(ctx context.Context, client *api.Client, opts shared.AppRoleO
 	}
 
 	// Fetch fresh creds
-	roleID, secretID, err := refreshAppRoleCreds(client)
+	roleID, secretID, err := refreshAppRoleCreds(rc, client)
 	if err != nil {
 		return "", "", cerr.Wrap(err, "fetch AppRole creds")
 	}
 
 	// Persist to disk & honor context for tracing
-	if err := WriteAppRoleFiles(ctx, roleID, secretID); err != nil {
+	if err := WriteAppRoleFiles(rc, roleID, secretID); err != nil {
 		return "", "", cerr.Wrap(err, "persist AppRole files")
 	}
 
 	return roleID, secretID, nil
 }
 
-func EnableAppRoleAuth(client *api.Client) error {
-	zap.L().Info("📡 Enabling AppRole auth method if needed...")
+func EnableAppRoleAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
+	otelzap.Ctx(rc.Ctx).Info("📡 Enabling AppRole auth method if needed...")
 	err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"})
 	if err == nil {
 		return nil
 	}
 	if strings.Contains(err.Error(), "path is already in use") {
-		zap.L().Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
 		return nil
 	}
-	zap.L().Error("❌ Failed to enable AppRole auth method", zap.Error(err))
+	otelzap.Ctx(rc.Ctx).Error("❌ Failed to enable AppRole auth method", zap.Error(err))
 	return fmt.Errorf("enable approle auth: %w", err)
 }

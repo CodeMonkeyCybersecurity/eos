@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -25,10 +27,10 @@ import (
 //            └── readTokenFromSink()
 //            └── SetVaultToken()
 
-func PhaseStartVaultAgentAndValidate(client *api.Client) error {
-	zap.L().Info("🚀 Starting Vault Agent and validating token")
+func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Client) error {
+	otelzap.Ctx(rc.Ctx).Info("🚀 Starting Vault Agent and validating token")
 
-	if err := startVaultAgentService(); err != nil {
+	if err := startVaultAgentService(rc); err != nil {
 		return fmt.Errorf("start agent service: %w", err)
 	}
 
@@ -37,17 +39,17 @@ func PhaseStartVaultAgentAndValidate(client *api.Client) error {
 	if err != nil {
 		return fmt.Errorf("wait for agent token: %w", err)
 	}
-	SetVaultToken(client, token)
+	SetVaultToken(rc, client, token)
 
-	zap.L().Info("✅ Vault Agent token acquired", zap.String("path", tokenPath))
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault Agent token acquired", zap.String("path", tokenPath))
 	return nil
 }
 
 // startVaultAgentService just does one thing: reload → enable & start.
-func startVaultAgentService() error {
+func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 	unit := shared.VaultAgentService
-	zap.L().Info("🔄 Enabling and starting service", zap.String("unit", unit))
-	if err := eos_unix.ReloadDaemonAndEnable(unit); err != nil {
+	otelzap.Ctx(rc.Ctx).Info("🔄 Enabling and starting service", zap.String("unit", unit))
+	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, unit); err != nil {
 		return err
 	}
 	return nil
@@ -66,18 +68,18 @@ func WaitForAgentToken(path string, timeout time.Duration) (string, error) {
 }
 
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
-func readTokenFromSink(path string) (string, error) {
-	zap.L().Debug("Reading Vault Agent token from sink", zap.String("path", path))
+func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
+	otelzap.Ctx(rc.Ctx).Debug("Reading Vault Agent token from sink", zap.String("path", path))
 	if path == "" {
 		path = shared.AgentToken
 	}
 	out, err := exec.Command("cat", path).Output()
 	if err != nil {
-		zap.L().Error("Failed to read token via shell", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to read token via shell", zap.String("path", path), zap.Error(err))
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}
 	token := strings.TrimSpace(string(out))
-	zap.L().Debug("Token read via shell", zap.Int("length", len(token)))
+	otelzap.Ctx(rc.Ctx).Debug("Token read via shell", zap.Int("length", len(token)))
 
 	return token, nil
 }

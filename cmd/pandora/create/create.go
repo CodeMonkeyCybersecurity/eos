@@ -12,7 +12,7 @@ var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create resources in Pandora (Vault)",
 	Long:  "Create secrets and test data in Pandora (Vault) for testing and validation.",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}),
 }

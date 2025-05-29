@@ -5,29 +5,24 @@ package verify
 import (
 	"context"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/open-policy-agent/opa/v1/rego"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 func EnforcePolicy(ctx context.Context, policyPath string, input interface{}) ([]string, error) {
-	_, span := telemetry.Start(ctx, "verify.EnforcePolicy")
-	defer span.End()
 
 	query, err := rego.New(
 		rego.Query("data.eos.tenant.deny"),
 		rego.Load([]string{policyPath}, nil),
 	).PrepareForEval(ctx)
 	if err != nil {
-		zap.L().Error("OPA policy load failed", zap.Error(err))
-		span.RecordError(err)
+		otelzap.Ctx(context.Background())
 		return nil, err
 	}
 
-	rs, err := query.Eval(ctx, rego.EvalInput(input))
+	rs, err := query.Eval(context.Background(), rego.EvalInput(input))
 	if err != nil {
-		zap.L().Error("OPA eval failed", zap.Error(err))
-		span.RecordError(err)
+		otelzap.Ctx(context.Background())
 		return nil, err
 	}
 
@@ -40,7 +35,7 @@ func EnforcePolicy(ctx context.Context, policyPath string, input interface{}) ([
 		}
 	}
 	if len(messages) > 0 {
-		zap.L().Warn("Policy violations", zap.Strings("denies", messages))
+		otelzap.Ctx(context.Background())
 	}
 	return messages, nil
 }

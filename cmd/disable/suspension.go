@@ -13,6 +13,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -21,32 +22,32 @@ import (
 var disableSuspensionCmd = &cobra.Command{
 	Use:   "suspension",
 	Short: "Disable OS-level suspension and hibernation",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		zap.L().Info("Disabling system suspension and hibernation...")
+		otelzap.Ctx(rc.Ctx).Info("Disabling system suspension and hibernation...")
 
 		if runtime.GOOS != "linux" {
-			zap.L().Warn("System suspension disabling is only supported on Linux.")
+			otelzap.Ctx(rc.Ctx).Warn("System suspension disabling is only supported on Linux.")
 			fmt.Println("❌ This command is not supported on your operating eos_unix.")
 			return nil
 		}
 
 		if err := disableSystemdTargets(); err != nil {
-			zap.L().Error("Failed to disable suspend/hibernate targets", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to disable suspend/hibernate targets", zap.Error(err))
 			return fmt.Errorf("failed to disable system targets: %w", err)
 		}
 
 		if err := maskSleepTargets(); err != nil {
-			zap.L().Error("Failed to mask sleep targets", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to mask sleep targets", zap.Error(err))
 			return fmt.Errorf("failed to mask sleep targets: %w", err)
 		}
 
-		if err := disableLogindSleep(); err != nil {
-			zap.L().Error("Failed to patch /etc/systemd/logind.conf", zap.Error(err))
+		if err := disableLogindSleep(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Failed to patch /etc/systemd/logind.conf", zap.Error(err))
 			return fmt.Errorf("failed to modify logind.conf: %w", err)
 		}
 
-		zap.L().Info("✅ System suspension and hibernation disabled successfully.")
+		otelzap.Ctx(rc.Ctx).Info("✅ System suspension and hibernation disabled successfully.")
 		fmt.Println("✅ Suspension/hibernation is now disabled and persistent.")
 		return nil
 	}),
@@ -74,7 +75,7 @@ func maskSleepTargets() error {
 	return cmd.Run()
 }
 
-func disableLogindSleep() error {
+func disableLogindSleep(rc *eos_io.RuntimeContext) error {
 	const configPath = "/etc/systemd/logind.conf"
 	fmt.Println("🔧 Patching", configPath, "to disable sleep options...")
 
@@ -131,7 +132,7 @@ func disableLogindSleep() error {
 	}
 
 	// ✅ Logging fix
-	zap.L().Info("Suspension hardening complete", zap.Strings("modified_units", []string{
+	otelzap.Ctx(rc.Ctx).Info("Suspension hardening complete", zap.Strings("modified_units", []string{
 		"suspend.target", "hibernate.target", "sleep.target", "systemd-logind",
 	}))
 

@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/network"
@@ -29,8 +30,8 @@ For worker nodes, you'll be prompted for the server URL and node token.
 Additional checks for IPv6 and Tailscale are performed.
 The generated install command is previewed and saved to a script file
 for safe, human-approved execution.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		deployK3s()
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		deployK3s(rc)
 		return nil
 	}),
 }
@@ -39,7 +40,7 @@ func init() {
 	CreateCmd.AddCommand(CreateK3sCmd)
 }
 
-func deployK3s() {
+func deployK3s(rc *eos_io.RuntimeContext) {
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -47,7 +48,7 @@ func deployK3s() {
 	fmt.Print("Is this node a server or worker? [server/worker]: ")
 	roleInput, err := reader.ReadString('\n')
 	if err != nil {
-		zap.L().Error("Failed to read input", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to read input", zap.Error(err))
 		os.Exit(1)
 	}
 	role := strings.TrimSpace(strings.ToLower(roleInput))
@@ -58,25 +59,25 @@ func deployK3s() {
 		tailscaleIP, err := network.GetTailscaleIPv6()
 		if err == nil && tailscaleIP != "" {
 			nodeIP = tailscaleIP
-			zap.L().Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
+			otelzap.Ctx(rc.Ctx).Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
 		} else {
-			zap.L().Info("Tailscale IPv6 not detected; proceeding without --node-ip flag")
+			otelzap.Ctx(rc.Ctx).Info("Tailscale IPv6 not detected; proceeding without --node-ip flag")
 		}
 	} else {
-		zap.L().Warn("IPv6 is disabled. Attempting to enable it...")
+		otelzap.Ctx(rc.Ctx).Warn("IPv6 is disabled. Attempting to enable it...")
 		if err := network.EnableIPv6(); err != nil {
-			zap.L().Warn("Could not enable IPv6", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Could not enable IPv6", zap.Error(err))
 		} else {
-			zap.L().Info("IPv6 enabled. Retrying Tailscale detection...")
+			otelzap.Ctx(rc.Ctx).Info("IPv6 enabled. Retrying Tailscale detection...")
 			if ip, err := network.GetTailscaleIPv6(); err == nil && ip != "" {
 				nodeIP = ip
-				zap.L().Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
+				otelzap.Ctx(rc.Ctx).Info("Detected Tailscale IPv6", zap.String("node-ip", nodeIP))
 			}
 		}
 	}
 
 	// 🔥 Unified firewall status check
-	platform.CheckFirewallStatus()
+	platform.CheckFirewallStatus(rc)
 
 	var installCmd string
 
@@ -127,18 +128,18 @@ func deployK3s() {
 	confirmInput, _ := reader.ReadString('\n')
 	confirm := strings.TrimSpace(strings.ToLower(confirmInput))
 	if confirm != "y" && confirm != "yes" {
-		scriptPath := saveScript(installCmd)
+		scriptPath := saveScript(rc, installCmd)
 		fmt.Printf("Installation command not executed. Saved to: %s\n", scriptPath)
 		return
 	}
 
-	scriptPath := saveScript(installCmd)
+	scriptPath := saveScript(rc, installCmd)
 	fmt.Printf("Executing the install script: %s\n", scriptPath)
 	fmt.Println("Check /var/log/eos/k3s-deploy.log for details.")
 	fmt.Println("To monitor logs in real time: tail -f /var/log/eos/k3s-deploy.log")
 
-	if err := execute.RunSimple("sh", scriptPath); err != nil {
-		zap.L().Error("Failed to execute install script", zap.Error(err))
+	if err := execute.RunSimple(rc.Ctx, "sh", scriptPath); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to execute install script", zap.Error(err))
 		fmt.Println("Installation failed. Check logs for details.")
 		os.Exit(1)
 	}
@@ -150,7 +151,7 @@ func deployK3s() {
 }
 
 // saveScript writes the install command to a script file and returns the file path.
-func saveScript(cmdStr string) string {
+func saveScript(rc *eos_io.RuntimeContext, cmdStr string) string {
 	// Ensure the log directory exists
 	if err := os.MkdirAll(shared.EosLogDir, shared.DirPermStandard); err != nil {
 		fmt.Printf("Warning: Could not create log directory %s: %v\n", shared.EosLogDir, err)
@@ -161,7 +162,7 @@ func saveScript(cmdStr string) string {
 	}
 	dir := homeDir + "/.local/state/eos"
 	if err := os.MkdirAll(dir, shared.DirPermStandard); err != nil {
-		zap.L().Warn("Failed to create directory for install script", zap.String("path", dir), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to create directory for install script", zap.String("path", dir), zap.Error(err))
 	}
 	scriptPath := dir + "/k3s-install.sh"
 	// Prepend with set -x for debugging and redirect output to a log file.

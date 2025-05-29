@@ -10,40 +10,42 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // Read tries to load a config from Vault; if unavailable, falls back to disk.
-func Read(client *api.Client, name string, out any) error {
-	if report, checked := Check(client, nil, ""); checked != nil && report.Initialized && !report.Sealed {
-		if err := ReadFromVaultAt(context.Background(), shared.VaultMountKV, name, out); err == nil {
+func Read(rc *eos_io.RuntimeContext, client *api.Client, name string, out any) error {
+	if report, checked := Check(rc, client, nil, ""); checked != nil && report.Initialized && !report.Sealed {
+		if err := ReadFromVaultAt(rc, shared.VaultMountKV, name, out); err == nil {
 			return nil
 		}
-		zap.L().Warn("Vault read failed, falling back", zap.String("path", name))
+		otelzap.Ctx(rc.Ctx).Warn("Vault read failed, falling back", zap.String("path", name))
 	}
-	return readJSONFile(DiskPath(name), out)
+	return readJSONFile(DiskPath(rc, name), out)
 }
 
 // ReadVault reads a Vault secret at a path into a typed struct.
-func ReadVault[T any](path string) (*T, error) {
-	return readAndUnmarshal[T]("secret", path)
+func ReadVault[T any](rc *eos_io.RuntimeContext, path string) (*T, error) {
+	return readAndUnmarshal[T](rc, "secret", path)
 }
 
 // ReadFromVault wraps ReadFromVaultAt using the default mount.
-func ReadFromVault(path string, out any) error {
-	return ReadFromVaultAt(context.Background(), shared.VaultMountKV, path, out)
+func ReadFromVault(rc *eos_io.RuntimeContext, path string, out any) error {
+	return ReadFromVaultAt(rc, shared.VaultMountKV, path, out)
 }
 
 // ReadFromVaultAt reads and unmarshals a Vault KV v2 secret.
-func ReadFromVaultAt(ctx context.Context, mount, path string, out any) error {
-	client, err := GetVaultClient()
+func ReadFromVaultAt(rc *eos_io.RuntimeContext, mount, path string, out any) error {
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		return fmt.Errorf("get Vault client: %w", err)
 	}
-	secret, err := client.KVv2(mount).Get(ctx, path)
+	secret, err := client.KVv2(mount).Get(rc.Ctx, path)
 	if err != nil {
 		return fmt.Errorf("vault API read %q: %w", path, err)
 	}
@@ -51,18 +53,18 @@ func ReadFromVaultAt(ctx context.Context, mount, path string, out any) error {
 }
 
 // SafeReadSecret reads a Vault secret, returning (nil, false) if failed.
-func SafeReadSecret(path string) (*api.Secret, bool) {
-	secret, err := readSecret(path)
+func SafeReadSecret(rc *eos_io.RuntimeContext, path string) (*api.Secret, bool) {
+	secret, err := readSecret(rc, path)
 	if err != nil || secret == nil {
 		return nil, false
 	}
-	zap.L().Info("✅ Vault secret read", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault secret read", zap.String("path", path))
 	return secret, true
 }
 
 // ReadSecret reads a Vault secret or returns eos_err.ErrSecretNotFound.
-func ReadSecret(path string) (*api.Secret, error) {
-	secret, err := readSecret(path)
+func ReadSecret(rc *eos_io.RuntimeContext, path string) (*api.Secret, error) {
+	secret, err := readSecret(rc, path)
 	if err != nil {
 		return nil, err
 	}
@@ -78,17 +80,17 @@ func ReadFallbackJSON[T any](path string, target *T) error {
 }
 
 // ReadVaultSecureData loads vault_init and userpass fallback files.
-func ReadVaultSecureData(client *api.Client) (*api.InitResponse, shared.UserpassCreds, []string, string) {
-	zap.L().Info("🔐 Starting secure Vault bootstrap sequence")
-	if err := eos_unix.EnsureEosUser(true, false); err != nil {
-		zap.L().Fatal("Failed to ensure eos system user", zap.Error(err))
+func ReadVaultSecureData(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse, shared.UserpassCreds, []string, string) {
+	otelzap.Ctx(rc.Ctx).Info("🔐 Starting secure Vault bootstrap sequence")
+	if err := eos_unix.EnsureEosUser(rc.Ctx, true, false); err != nil {
+		otelzap.Ctx(rc.Ctx).Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
 
-	initRes := mustReadTypedFile("vault_init", &api.InitResponse{})
-	creds := mustReadTypedFile(shared.EosUserPassFallback, &shared.UserpassCreds{})
+	initRes := mustReadTypedFile(rc, "vault_init", &api.InitResponse{})
+	creds := mustReadTypedFile(rc, shared.EosUserPassFallback, &shared.UserpassCreds{})
 
 	if creds.Password == "" {
-		zap.L().Fatal("Vault credentials password empty — aborting")
+		otelzap.Ctx(rc.Ctx).Fatal("Vault credentials password empty — aborting")
 	}
 
 	return initRes, *creds, crypto.HashStrings(initRes.KeysB64), crypto.HashString(initRes.RootToken)
@@ -100,8 +102,8 @@ func IsNotFoundError(err error) bool {
 }
 
 // ListUnder lists Vault KV metadata keys under a path.
-func ListUnder(path string) ([]string, error) {
-	client, err := GetRootClient()
+func ListUnder(rc *eos_io.RuntimeContext, path string) ([]string, error) {
+	client, err := GetRootClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("get Vault client: %w", err)
 	}
@@ -120,19 +122,19 @@ func ReadVaultInitResult() (*api.InitResponse, error) {
 }
 
 // InspectFromDisk reads and prints fallback test-data.
-func InspectFromDisk() error {
+func InspectFromDisk(rc *eos_io.RuntimeContext) error {
 	path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 	var out map[string]interface{}
 	if err := readJSONFile(path, &out); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			zap.L().Warn("⚠️ Fallback test-data file not found", zap.String("path", path))
+			otelzap.Ctx(rc.Ctx).Warn("⚠️ Fallback test-data file not found", zap.String("path", path))
 			return fmt.Errorf("no test-data found in Vault or disk")
 		}
-		zap.L().Error("Failed to read fallback test-data", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to read fallback test-data", zap.Error(err))
 		return fmt.Errorf("disk fallback read failed: %w", err)
 	}
 	PrintData(out, "Disk", path)
-	zap.L().Info("✅ Test-data read successfully from fallback")
+	otelzap.Ctx(rc.Ctx).Info("✅ Test-data read successfully from fallback")
 	return nil
 }
 
@@ -140,16 +142,16 @@ func InspectFromDisk() error {
 // INTERNAL HELPERS
 //
 
-func readSecret(path string) (*api.Secret, error) {
-	client, err := GetVaultClient()
+func readSecret(rc *eos_io.RuntimeContext, path string) (*api.Secret, error) {
+	client, err := GetVaultClient(rc)
 	if err != nil || client == nil {
-		return nil, eos_err.NewExpectedError(fmt.Errorf("vault client not ready: %w", err))
+		return nil, eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("vault client not ready: %w", err))
 	}
 	return client.Logical().ReadWithContext(context.Background(), path)
 }
 
-func readAndUnmarshal[T any](mount, path string) (*T, error) {
-	client, err := GetRootClient()
+func readAndUnmarshal[T any](rc *eos_io.RuntimeContext, mount, path string) (*T, error) {
+	client, err := GetRootClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("get root client: %w", err)
 	}
@@ -177,9 +179,9 @@ func readJSONFile(path string, out any) error {
 	return json.Unmarshal(data, out)
 }
 
-func mustReadTypedFile[T any](path string, out *T) *T {
+func mustReadTypedFile[T any](rc *eos_io.RuntimeContext, path string, out *T) *T {
 	if err := ReadFallbackJSON(path, out); err != nil {
-		zap.L().Fatal("Failed to load fallback file", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Fatal("Failed to load fallback file", zap.String("path", path), zap.Error(err))
 	}
 	return out
 }

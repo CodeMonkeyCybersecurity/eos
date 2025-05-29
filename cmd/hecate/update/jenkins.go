@@ -33,7 +33,7 @@ Example configuration:
 
 Usage:
   hecate update jenkins --backendIP <new-ip>`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if backendIP == "" {
 			fmt.Println("Error: please provide a new backend IP using the --backendIP flag")
 			return nil

@@ -4,17 +4,14 @@ package container
 
 import (
 	"bytes"
-	"context"
 	"io"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/cockroachdb/errors"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/go-playground/validator/v10"
 	"github.com/open-policy-agent/opa/rego"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -27,16 +24,7 @@ type ExecConfig struct {
 
 // ExecCommandInContainer runs a command inside a container with full validation,
 // policy enforcement, tracing, logging, and enriched error handling.
-func ExecCommandInContainer(ctx context.Context, cfg ExecConfig) (string, error) {
-	// 1) Tracing
-	tracer := otel.Tracer("container.exec")
-	ctx, span := tracer.Start(ctx, "ExecCommandInContainer",
-		trace.WithAttributes(
-			attribute.String("container", cfg.ContainerName),
-			attribute.StringSlice("cmd", cfg.Cmd),
-		),
-	)
-	defer span.End()
+func ExecCommandInContainer(rc *eos_io.RuntimeContext, cfg ExecConfig) (string, error) {
 
 	// 2) Validation
 	if err := validator.New().Struct(cfg); err != nil {
@@ -52,18 +40,11 @@ func ExecCommandInContainer(ctx context.Context, cfg ExecConfig) (string, error)
 	query, _ := rego.New(
 		rego.Query("data.exec.allow"),
 		rego.Module("policy.rego", policy),
-	).PrepareForEval(ctx)
-	res, err := query.Eval(ctx, rego.EvalInput(cfg))
+	).PrepareForEval(rc.Ctx)
+	res, err := query.Eval(rc.Ctx, rego.EvalInput(cfg))
 	if err != nil || len(res) == 0 || !res[0].Expressions[0].Value.(bool) {
 		return "", errors.New("execution denied by policy")
 	}
-
-	// 4) Logging
-	logger := zap.L().With(
-		zap.String("container", cfg.ContainerName),
-		zap.Strings("cmd", cfg.Cmd),
-	)
-	logger.Info("starting exec")
 
 	// 5) Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -73,7 +54,7 @@ func ExecCommandInContainer(ctx context.Context, cfg ExecConfig) (string, error)
 	defer cli.Close()
 
 	// 6) Create exec instance
-	execResp, err := cli.ContainerExecCreate(ctx, cfg.ContainerName, container.ExecOptions{
+	execResp, err := cli.ContainerExecCreate(rc.Ctx, cfg.ContainerName, container.ExecOptions{
 		Cmd:          cfg.Cmd,
 		AttachStdout: true,
 		AttachStderr: true,
@@ -84,13 +65,13 @@ func ExecCommandInContainer(ctx context.Context, cfg ExecConfig) (string, error)
 	}
 
 	// 7) Attach & Start
-	attachResp, err := cli.ContainerExecAttach(ctx, execResp.ID, container.ExecAttachOptions{Tty: cfg.Tty})
+	attachResp, err := cli.ContainerExecAttach(rc.Ctx, execResp.ID, container.ExecAttachOptions{Tty: cfg.Tty})
 	if err != nil {
 		return "", errors.Wrap(err, "attaching to exec")
 	}
 	defer attachResp.Close()
 
-	if err := cli.ContainerExecStart(ctx, execResp.ID, container.ExecStartOptions{Tty: cfg.Tty}); err != nil {
+	if err := cli.ContainerExecStart(rc.Ctx, execResp.ID, container.ExecStartOptions{Tty: cfg.Tty}); err != nil {
 		return "", errors.Wrap(err, "starting exec")
 	}
 
@@ -101,7 +82,7 @@ func ExecCommandInContainer(ctx context.Context, cfg ExecConfig) (string, error)
 	}
 
 	// 9) Inspect exit code
-	inspect, err := cli.ContainerExecInspect(ctx, execResp.ID)
+	inspect, err := cli.ContainerExecInspect(rc.Ctx, execResp.ID)
 	if err != nil {
 		return "", errors.Wrap(err, "inspecting exec result")
 	}
@@ -109,6 +90,6 @@ func ExecCommandInContainer(ctx context.Context, cfg ExecConfig) (string, error)
 		return buf.String(), errors.Errorf("command exited with code %d", inspect.ExitCode)
 	}
 
-	logger.Info("exec complete", zap.Int("exit_code", inspect.ExitCode))
+	zap.L().Info("exec complete", zap.Int("exit_code", inspect.ExitCode))
 	return buf.String(), nil
 }

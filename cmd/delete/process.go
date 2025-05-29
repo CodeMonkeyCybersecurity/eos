@@ -5,6 +5,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -13,12 +14,12 @@ var DeleteProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Delete process",
 	Long:  `Delete a process by specifying the target process.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			zap.L().Fatal("Please specify the process to delete.")
+			otelzap.Ctx(rc.Ctx).Fatal("Please specify the process to delete.")
 		}
 		process := args[0]
-		zap.L().Info("Deleting process", zap.String("process", process))
+		otelzap.Ctx(rc.Ctx).Info("Deleting process", zap.String("process", process))
 		// Add your delete logic here.
 		return nil
 	}),

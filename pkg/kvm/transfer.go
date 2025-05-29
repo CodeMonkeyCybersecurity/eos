@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -19,9 +21,8 @@ var (
 	DestPath   string
 )
 
-func SyncFileBetweenVMs(sourceVM, guestPath, destVM, destGuestPath string) error {
-	log := zap.L().Named("kvm.sync")
-
+func SyncFileBetweenVMs(rc *eos_io.RuntimeContext, sourceVM, guestPath, destVM, destGuestPath string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	// Derive a predictable temp filename
 	baseName := filepath.Base(guestPath)
 	timestamp := time.Now().Format("20060102_150405")
@@ -39,13 +40,13 @@ func SyncFileBetweenVMs(sourceVM, guestPath, destVM, destGuestPath string) error
 		zap.String("destGuestPath", destGuestPath),
 	)
 
-	if err := CopyOutFromVM(sourceVM, guestPath, hostPath); err != nil {
+	if err := CopyOutFromVM(rc, sourceVM, guestPath, hostPath); err != nil {
 		log.Error("❌ Copy out from source VM failed", zap.Error(err))
 		return fmt.Errorf("extract from %s failed: %w", sourceVM, err)
 	}
 
 	destDir := filepath.Dir(destGuestPath)
-	if err := CopyInToVM(destVM, hostPath, destDir); err != nil {
+	if err := CopyInToVM(rc, destVM, hostPath, destDir); err != nil {
 		log.Error("❌ Copy into destination VM failed", zap.Error(err))
 		return fmt.Errorf("inject to %s failed: %w", destVM, err)
 	}
@@ -60,8 +61,8 @@ func SyncFileBetweenVMs(sourceVM, guestPath, destVM, destGuestPath string) error
 }
 
 // CopyOutFromVM extracts a file from a shut-off VM to the host.
-func CopyOutFromVM(vmName, guestPath, hostFile string) error {
-	log := zap.L().Named("kvm.transfer")
+func CopyOutFromVM(rc *eos_io.RuntimeContext, vmName, guestPath, hostFile string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	hostDir := filepath.Dir(hostFile)
 	tempName := filepath.Base(guestPath)
 
@@ -103,8 +104,8 @@ func CopyOutFromVM(vmName, guestPath, hostFile string) error {
 }
 
 // CopyInToVM injects a file from the host into a shut-off VM.
-func CopyInToVM(vmName, hostPath, guestDir string) error {
-	log := zap.L().Named("kvm.transfer")
+func CopyInToVM(rc *eos_io.RuntimeContext, vmName, hostPath, guestDir string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("📥 Preparing to copy file into VM",
 		zap.String("vm", vmName),

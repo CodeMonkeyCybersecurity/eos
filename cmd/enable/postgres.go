@@ -6,6 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/postgres"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -14,8 +15,8 @@ import (
 var EnablePostgresCmd = &cobra.Command{
 	Use:   "postgres",
 	Short: "Initialize PostgreSQL schema for EOS",
-	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("enable.postgres")
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		db, err := postgres.Connect()
 		if err != nil {

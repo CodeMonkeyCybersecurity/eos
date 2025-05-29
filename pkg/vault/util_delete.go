@@ -9,12 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // ConfirmIrreversibleDeletion gets final consent before wiping unseal material.
-func ConfirmIrreversibleDeletion() error {
+func ConfirmIrreversibleDeletion(rc *eos_io.RuntimeContext) error {
 	fmt.Println("⚠️ Confirm irreversible deletion of unseal materials. This action is final.")
 	fmt.Print("Type 'yes' to proceed: ")
 
@@ -24,14 +26,14 @@ func ConfirmIrreversibleDeletion() error {
 	if resp != "yes" {
 		return fmt.Errorf("user aborted deletion confirmation")
 	}
-	zap.L().Info("🧹 User confirmed deletion of in-memory secrets")
+	otelzap.Ctx(rc.Ctx).Info("🧹 User confirmed deletion of in-memory secrets")
 	return nil
 }
 
-func DeleteTestDataFromDisk() error {
+func DeleteTestDataFromDisk(rc *eos_io.RuntimeContext) error {
 	path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 	if err := os.Remove(path); err != nil {
-		zap.L().Error("❌ Failed to delete fallback test-data file", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to delete fallback test-data file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("delete fallback test-data file: %w", err)
 	}
 
@@ -39,6 +41,6 @@ func DeleteTestDataFromDisk() error {
 	fmt.Println("🗑️  Test Data Deletion Summary")
 	fmt.Println("  💾 Disk: SUCCESS")
 	fmt.Printf("    📂 Path: %s\n\n", path)
-	zap.L().Info("✅ Test-data deleted successfully (fallback)", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info("✅ Test-data deleted successfully (fallback)", zap.String("path", path))
 	return nil
 }

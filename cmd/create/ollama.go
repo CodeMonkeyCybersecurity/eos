@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/parse"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	cerr "github.com/cockroachdb/errors"
@@ -22,18 +23,18 @@ import (
 var CreateOllamaCmd = &cobra.Command{
 	Use:   "ollama",
 	Short: "Install Ollama and Web UI on macOS with GPU support",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 		if !platform.IsMacOS() {
 			return errors.New("❌ this command is only supported on macOS")
 		}
 
-		if err := container.CheckRunning(ctx.Ctx); err != nil {
+		if err := container.CheckRunning(rc); err != nil {
 			log.Warn("Docker not running", zap.Error(err))
 			return cerr.WithHint(err, "Please start Docker Desktop before running this command")
 		}
 
-		if err := ollama.EnsureInstalled(log); err != nil {
+		if err := ollama.EnsureInstalled(rc); err != nil {
 			return err
 		}
 
@@ -44,7 +45,7 @@ var CreateOllamaCmd = &cobra.Command{
 		}
 
 		serveLog := fmt.Sprintf("%s/serve.log", ollamaDir)
-		if err := ollama.StartServeProcess(log, serveLog); err != nil {
+		if err := ollama.StartServeProcess(rc, serveLog); err != nil {
 			log.Warn("⚠️ Ollama serve may not be running", zap.Error(err))
 		}
 
@@ -54,7 +55,7 @@ var CreateOllamaCmd = &cobra.Command{
 			return fmt.Errorf("invalid port: %d", port)
 		}
 		// Remove stale container
-		out, err := execute.RunShell("docker rm -f " + containerName)
+		out, err := execute.RunShell(rc.Ctx, "docker rm -f "+containerName)
 		if err != nil {
 			log.Warn("⚠️ Failed to remove container", zap.Error(err), zap.String("output", out))
 		}
@@ -64,7 +65,7 @@ var CreateOllamaCmd = &cobra.Command{
 			Port:      port,
 			Volume:    ollamaDir,
 		}
-		if err := ollama.RunWebUI(ctx.Ctx, log, cfg); err != nil {
+		if err := ollama.RunWebUI(rc, cfg); err != nil {
 			return err
 		}
 

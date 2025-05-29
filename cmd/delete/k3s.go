@@ -1,4 +1,5 @@
 // cmd/delete/k3s.go
+
 package delete
 
 import (
@@ -8,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -19,17 +21,17 @@ var DeleteK3sCmd = &cobra.Command{
 	Short:        "Uninstall K3s from this machine",
 	Long: `Detects whether this machine is running a K3s server or agent,
 and removes it by running the appropriate uninstall scripts in the correct order.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		if err := uninstallK3s(); err != nil {
-			zap.L().Error("❌ Failed to uninstall K3s", zap.Error(err))
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		if err := uninstallK3s(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("❌ Failed to uninstall K3s", zap.Error(err))
 			return err
 		}
-		zap.L().Info("✅ K3s uninstallation completed.")
+		otelzap.Ctx(rc.Ctx).Info("✅ K3s uninstallation completed.")
 		return nil
 	}),
 }
 
-func uninstallK3s() error {
+func uninstallK3s(rc *eos_io.RuntimeContext) error {
 	scripts := map[string]string{
 		"server": "/usr/local/bin/k3s-uninstall.sh",
 		"agent":  "/usr/local/bin/k3s-agent-uninstall.sh",
@@ -39,19 +41,19 @@ func uninstallK3s() error {
 	var ranAny bool
 	for role, path := range scripts {
 		if eos_unix.Exists(path) {
-			zap.L().Info("▶ Detected uninstall script",
+			otelzap.Ctx(rc.Ctx).Info("▶ Detected uninstall script",
 				zap.String("role", role),
 				zap.String("path", path),
 			)
-			err := execute.RunSimple(path)
+			err := execute.RunSimple(rc.Ctx, path)
 			if err != nil {
-				zap.L().Error("❌ Script execution failed",
+				otelzap.Ctx(rc.Ctx).Error("❌ Script execution failed",
 					zap.String("role", role),
 					zap.Error(err),
 				)
 				return fmt.Errorf("failed to run %s script: %w", role, err)
 			}
-			zap.L().Info("✅ Successfully ran uninstall script",
+			otelzap.Ctx(rc.Ctx).Info("✅ Successfully ran uninstall script",
 				zap.String("role", role),
 			)
 			ranAny = true
@@ -59,7 +61,7 @@ func uninstallK3s() error {
 	}
 
 	if !ranAny {
-		zap.L().Warn("⚠️ No uninstall scripts were found at expected paths. Assuming K3s is not installed.")
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ No uninstall scripts were found at expected paths. Assuming K3s is not installed.")
 		return nil
 	}
 

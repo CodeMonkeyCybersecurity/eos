@@ -35,10 +35,10 @@ func NormalizeDN(dn string) string {
 }
 
 func TryDetectFromContainer() *LDAPConfig {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	rc, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	out, err := exec.CommandContext(ctx, "docker", "ps", "--format", "{{.Names}}").Output()
+	out, err := exec.CommandContext(rc, "docker", "ps", "--format", "{{.Names}}").Output()
 	if err != nil {
 		return nil
 	}

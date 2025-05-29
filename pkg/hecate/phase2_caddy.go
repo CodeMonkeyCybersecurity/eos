@@ -3,17 +3,18 @@
 package hecate
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func PhaseCaddy(ctx context.Context, spec CaddySpec) error {
-	log := zap.L().Named("hecate-phase-caddy")
+func PhaseCaddy(rc *eos_io.RuntimeContext, spec CaddySpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🚀 Phase 2: Caddy setup",
 		zap.Int("proxy_count", len(spec.Proxies)),
 		zap.String("keycloak_domain", spec.KeycloakDomain),
@@ -22,7 +23,7 @@ func PhaseCaddy(ctx context.Context, spec CaddySpec) error {
 	// 1) Ensure Caddy directories
 	dirs := []string{HecateCertsDir, HecateAssetsDir, HecateLogsDir}
 	for _, d := range dirs {
-		if err := eos_unix.MkdirP(ctx, d, 0o755); err != nil {
+		if err := eos_unix.MkdirP(rc.Ctx, d, 0o755); err != nil {
 			log.Error("ensure dir failed", zap.String("path", d), zap.Error(err))
 			return fmt.Errorf("ensure caddy dir %s: %w", d, err)
 		}
@@ -36,7 +37,7 @@ func PhaseCaddy(ctx context.Context, spec CaddySpec) error {
 	}
 
 	// 3) Build + deploy Caddyfile
-	if err := buildAndDeployCaddyfile(ctx, spec); err != nil {
+	if err := buildAndDeployCaddyfile(rc, spec); err != nil {
 		log.Error("Caddyfile deploy failed", zap.Error(err))
 		return err
 	}
@@ -44,9 +45,9 @@ func PhaseCaddy(ctx context.Context, spec CaddySpec) error {
 	return nil
 }
 
-func BuildAndPlaceCaddyfile(ctx context.Context, spec CaddySpec) error {
-	log := zap.L().Named("hecate-caddy-builder")
-	content := GenerateCaddySpecMulti(spec)
+func BuildAndPlaceCaddyfile(rc *eos_io.RuntimeContext, spec CaddySpec) error {
+	log := otelzap.Ctx(rc.Ctx)
+	content := GenerateCaddySpecMulti(rc, spec)
 	log.Info("Caddyfile generated", zap.Int("length", len(content)))
 
 	// write temp file
@@ -56,7 +57,7 @@ func BuildAndPlaceCaddyfile(ctx context.Context, spec CaddySpec) error {
 	}
 
 	// move into place with proper context
-	if err := eos_unix.CopyFile(ctx, "Caddyfile", HecateCaddyfile, 0o644); err != nil {
+	if err := eos_unix.CopyFile(rc.Ctx, "Caddyfile", HecateCaddyfile, 0o644); err != nil {
 		log.Error("move Caddyfile failed", zap.Error(err))
 		return fmt.Errorf("move Caddyfile: %w", err)
 	}
@@ -64,8 +65,8 @@ func BuildAndPlaceCaddyfile(ctx context.Context, spec CaddySpec) error {
 }
 
 // GenerateCaddySpecMulti creates the Caddyfile content from spec.
-func GenerateCaddySpecMulti(spec CaddySpec) string {
-	log := zap.L().Named("hecate-caddy-generator")
+func GenerateCaddySpecMulti(rc *eos_io.RuntimeContext, spec CaddySpec) string {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Starting Caddyfile generation", zap.Int("proxy_count", len(spec.Proxies)), zap.String("keycloak_domain", spec.KeycloakDomain))
 
 	var builder strings.Builder
@@ -95,11 +96,12 @@ func GenerateCaddySpecMulti(spec CaddySpec) string {
 }
 
 // CollateCaddyFragments handles collation + writing of the Caddyfile.
-func CollateCaddyFragments() error {
-	log := zap.L().Named("hecate-caddy-collation")
+func CollateCaddyFragments(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("📦 Collating and writing Caddy fragments", zap.Int("fragment_count", len(caddyFragments)))
 
 	return CollateAndWriteFile(
+		rc,
 		"hecate-caddy-collation",
 		caddyFragments,
 		HecateCaddyfile,
@@ -112,9 +114,9 @@ func CollateCaddyFragments() error {
 	)
 }
 
-func buildAndDeployCaddyfile(ctx context.Context, spec CaddySpec) error {
-	log := zap.L().Named("hecate-caddy-builder")
-	content := GenerateCaddySpecMulti(spec)
+func buildAndDeployCaddyfile(rc *eos_io.RuntimeContext, spec CaddySpec) error {
+	log := otelzap.Ctx(rc.Ctx)
+	content := GenerateCaddySpecMulti(rc, spec)
 	log.Info("Caddyfile generated", zap.Int("length", len(content)))
 
 	// write to temp file
@@ -124,7 +126,7 @@ func buildAndDeployCaddyfile(ctx context.Context, spec CaddySpec) error {
 	}
 
 	// move into place
-	if err := eos_unix.CopyFile(ctx, "Caddyfile", HecateCaddyfile, 0o644); err != nil {
+	if err := eos_unix.CopyFile(rc.Ctx, "Caddyfile", HecateCaddyfile, 0o644); err != nil {
 		log.Error("move Caddyfile failed", zap.Error(err))
 		return fmt.Errorf("move Caddyfile: %w", err)
 	}

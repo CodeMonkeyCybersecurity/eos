@@ -12,6 +12,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -23,19 +24,19 @@ var InspectProcessCmd = &cobra.Command{
 	Short: "Retrieve detailed information about running processes",
 	Long: `This command retrieves detailed information about all running processes on the system
 by reading the /proc directory and outputs it in a table format.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		zap.L().Info("Executing read process command", zap.Strings("args", args))
+		otelzap.Ctx(rc.Ctx).Info("Executing read process command", zap.Strings("args", args))
 
 		// Retrieve process details
-		process, err := getProcessDetails()
+		process, err := getProcessDetails(rc)
 		if err != nil {
-			zap.L().Error("Failed to retrieve process details", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to retrieve process details", zap.Error(err))
 			return err
 		}
 
 		// Log success and print the process table
-		zap.L().Info("Successfully retrieved process details", zap.Int("processCount", len(process)))
+		otelzap.Ctx(rc.Ctx).Info("Successfully retrieved process details", zap.Int("processCount", len(process)))
 		printProcessTable(process)
 		return nil
 	}),
@@ -54,27 +55,27 @@ type ProcessInfo struct {
 }
 
 // getProcessesDetails retrieves process information
-func getProcessDetails() ([]ProcessInfo, error) {
+func getProcessDetails(rc *eos_io.RuntimeContext) ([]ProcessInfo, error) {
 
-	zap.L().Info("Reading processes from /proc directory")
+	otelzap.Ctx(rc.Ctx).Info("Reading processes from /proc directory")
 
 	procDir := "/proc"
 	files, err := os.ReadDir(procDir)
 	if err != nil {
-		zap.L().Error("Failed to read /proc directory", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to read /proc directory", zap.Error(err))
 		return nil, fmt.Errorf("failed to read /proc directory: %w", err)
 	}
 
 	var processes []ProcessInfo
-	uptime := getSystemUptime()
+	uptime := getSystemUptime(rc)
 
 	for _, file := range files {
 		if file.IsDir() {
 			pid := file.Name()
 			if _, err := strconv.Atoi(pid); err == nil {
-				process, err := extractProcessDetails(pid, uptime)
+				process, err := extractProcessDetails(rc, pid, uptime)
 				if err != nil {
-					zap.L().Debug("Skipping process", zap.String("pid", pid), zap.Error(err))
+					otelzap.Ctx(rc.Ctx).Debug("Skipping process", zap.String("pid", pid), zap.Error(err))
 					continue
 				}
 				processes = append(processes, process)
@@ -83,14 +84,14 @@ func getProcessDetails() ([]ProcessInfo, error) {
 		}
 	}
 
-	zap.L().Info("Completed reading processes", zap.Int("processCount", len(processes)))
+	otelzap.Ctx(rc.Ctx).Info("Completed reading processes", zap.Int("processCount", len(processes)))
 	return processes, nil
 }
 
 // extractProcessDetails extracts details about a specific process
-func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
+func extractProcessDetails(rc *eos_io.RuntimeContext, pid string, uptime float64) (ProcessInfo, error) {
 
-	zap.L().Info("Extracting process details", zap.String("pid", pid))
+	otelzap.Ctx(rc.Ctx).Info("Extracting process details", zap.String("pid", pid))
 
 	procDir := fmt.Sprintf("/proc/%s", pid)
 
@@ -98,7 +99,7 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	statPath := fmt.Sprintf("%s/stat", procDir)
 	statContent, err := os.ReadFile(statPath)
 	if err != nil {
-		zap.L().Warn("Unable to read stat file for process", zap.String("pid", pid), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read stat file for process", zap.String("pid", pid), zap.Error(err))
 		return ProcessInfo{}, err
 	}
 
@@ -128,14 +129,14 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 			}
 		}
 	} else {
-		zap.L().Warn("Unable to read status file", zap.String("pid", pid), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read status file", zap.String("pid", pid), zap.Error(err))
 	}
 
 	// Get CPU and memory usage
-	cpuPercent, _ := getCPUPercent(pid)
-	memPercent, _ := getMemoryPercent(pid)
+	cpuPercent, _ := getCPUPercent(rc, pid)
+	memPercent, _ := getMemoryPercent(rc, pid)
 
-	zap.L().Info("Successfully extracted process details", zap.String("pid", pid), zap.String("user", userName))
+	otelzap.Ctx(rc.Ctx).Info("Successfully extracted process details", zap.String("pid", pid), zap.String("user", userName))
 	return ProcessInfo{
 		PID:        pid,
 		Comm:       comm,
@@ -148,12 +149,12 @@ func extractProcessDetails(pid string, uptime float64) (ProcessInfo, error) {
 	}, nil
 }
 
-func getCPUPercent(pid string) (string, error) {
+func getCPUPercent(rc *eos_io.RuntimeContext, pid string) (string, error) {
 
 	statPath := fmt.Sprintf("/proc/%s/stat", pid)
 	data, err := os.ReadFile(statPath)
 	if err != nil {
-		zap.L().Warn("Unable to read stat file for CPU usage", zap.String("pid", pid), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read stat file for CPU usage", zap.String("pid", pid), zap.Error(err))
 		return "Err", nil // Return "Err" if process is not accessible
 	}
 
@@ -164,7 +165,7 @@ func getCPUPercent(pid string) (string, error) {
 	// Get system uptime and total CPU time
 	uptimeData, err := os.ReadFile("/proc/uptime")
 	if err != nil {
-		zap.L().Warn("Unable to read uptime file for CPU calculation; using fallback", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read uptime file for CPU calculation; using fallback", zap.Error(err))
 		return "0.0", nil
 	}
 	uptimeFields := strings.Fields(string(uptimeData))
@@ -174,16 +175,16 @@ func getCPUPercent(pid string) (string, error) {
 	processCPU := (utime + stime) / totalCPU * 100.0
 	cpuPercent := fmt.Sprintf("%.2f", processCPU)
 
-	zap.L().Info("Calculated CPU usage", zap.String("pid", pid), zap.String("cpuPercent", cpuPercent))
+	otelzap.Ctx(rc.Ctx).Info("Calculated CPU usage", zap.String("pid", pid), zap.String("cpuPercent", cpuPercent))
 	return cpuPercent, nil
 }
 
-func getMemoryPercent(pid string) (string, error) {
+func getMemoryPercent(rc *eos_io.RuntimeContext, pid string) (string, error) {
 
 	statusPath := fmt.Sprintf("/proc/%s/status", pid)
 	data, err := os.ReadFile(statusPath)
 	if err != nil {
-		zap.L().Warn("Unable to read status file for memory usage", zap.String("pid", pid), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read status file for memory usage", zap.String("pid", pid), zap.Error(err))
 		return "Err", nil // Return 0.0 if process is not accessible
 	}
 
@@ -199,7 +200,7 @@ func getMemoryPercent(pid string) (string, error) {
 
 	memInfo, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		zap.L().Warn("Unable to read /proc/meminfo for memory calculation", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read /proc/meminfo for memory calculation", zap.Error(err))
 		return "Err", nil
 	}
 
@@ -215,7 +216,7 @@ func getMemoryPercent(pid string) (string, error) {
 
 	// Add the block to handle zero or undefined total memory
 	if totalMem <= 0 {
-		zap.L().Warn("Total memory is zero or undefined; returning 0% for memory usage", zap.String("pid", pid))
+		otelzap.Ctx(rc.Ctx).Warn("Total memory is zero or undefined; returning 0% for memory usage", zap.String("pid", pid))
 		return "0.0", nil
 	}
 
@@ -224,17 +225,17 @@ func getMemoryPercent(pid string) (string, error) {
 		memPercent = fmt.Sprintf("%.2f", (memUsage/totalMem)*100.0)
 	}
 
-	zap.L().Info("Calculated memory usage", zap.String("pid", pid), zap.String("memPercent", memPercent))
+	otelzap.Ctx(rc.Ctx).Info("Calculated memory usage", zap.String("pid", pid), zap.String("memPercent", memPercent))
 	return memPercent, nil
 }
 
 // getSystemUptime retrieves the system uptime
-func getSystemUptime() float64 {
+func getSystemUptime(rc *eos_io.RuntimeContext) float64 {
 
 	uptimeFile := "/proc/uptime"
 	content, err := os.ReadFile(uptimeFile)
 	if err != nil {
-		zap.L().Warn("Unable to read uptime file", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Unable to read uptime file", zap.Error(err))
 		return 0.0
 	}
 	uptime, _ := strconv.ParseFloat(strings.Fields(string(content))[0], 64)

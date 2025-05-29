@@ -4,14 +4,12 @@ package eos_cli
 
 import (
 	"context"
-	"runtime"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	cerr "github.com/cockroachdb/errors"
@@ -19,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Wrap(fn func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
+func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error) func(cmd *cobra.Command, args []string) error {
 	return func(cmd *cobra.Command, args []string) error {
 		logger.InitFallback()
 
@@ -28,17 +26,18 @@ func Wrap(fn func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			cmd.Root().SilenceUsage = true
 		}
 
-		log := eos_io.ContextualLogger(2, nil).Named(cmd.Name())
-		eos_io.LogRuntimeExecutionContext()
-
 		start := time.Now()
 		ctx := &eos_io.RuntimeContext{
-			Log:       log,
 			Ctx:       context.Background(),
 			Timestamp: start,
 		}
 
-		vaultAddr, vaultErr := vault.EnsureVaultEnv()
+		log := eos_io.ContextualLogger(ctx, 2, nil).Named(cmd.Name())
+		ctx.Log = log
+
+		eos_io.LogRuntimeExecutionContext(ctx)
+
+		vaultAddr, vaultErr := vault.EnsureVaultEnv(ctx)
 		if vaultErr != nil {
 			log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
 		} else {
@@ -58,22 +57,6 @@ func Wrap(fn func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 			} else {
 				log.Info("Command completed", zap.Duration("duration", duration))
 			}
-
-			telemetry.TrackCommand(
-				ctx.Ctx,
-				cmd.Use,
-				err == nil,
-				duration.Milliseconds(),
-				map[string]string{
-					"os":         runtime.GOOS,
-					"arch":       runtime.GOARCH,
-					"args":       telemetry.TruncateOrHashArgs(args),
-					"vault_addr": vaultAddrOrUnavailable(vaultAddr, vaultErr),
-					"version":    shared.Version,
-					"category":   telemetry.CommandCategory(cmd.Use),
-					"error_type": telemetry.ClassifyError(err),
-				},
-			)
 
 			if err != nil {
 				if eos_err.IsExpectedUserError(err) {
@@ -125,11 +108,4 @@ func Wrap(fn func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 
 		return err
 	}
-}
-
-func vaultAddrOrUnavailable(addr string, err error) string {
-	if err != nil || addr == "" {
-		return "(unavailable)"
-	}
-	return addr
 }

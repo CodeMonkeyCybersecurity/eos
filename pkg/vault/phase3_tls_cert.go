@@ -3,7 +3,6 @@
 package vault
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -11,11 +10,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -44,26 +44,24 @@ import (
 // PHASE 3 — GenerateVaultTLSCert() + TrustVaultCA()
 
 // GenerateTLS is Phase 3 entry point.
-func GenerateTLS(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "vault.generate_tls")
-	defer span.End()
+func GenerateTLS(rc *eos_io.RuntimeContext) error {
 
-	if _, _, err := ensureTLS(); err != nil {
+	if _, _, err := ensureTLS(rc); err != nil {
 		return cerr.Wrap(err, "ensure Vault TLS")
 	}
-	if err := trustCA(ctx); err != nil {
+	if err := trustCA(rc); err != nil {
 		return cerr.Wrap(err, "trust Vault CA")
 	}
-	return secureOwnership(ctx)
+	return secureOwnership(rc)
 }
 
 // ensureTLS checks/generates cert+key.
-func ensureTLS() (crt, key string, err error) {
+func ensureTLS(rc *eos_io.RuntimeContext) (crt, key string, err error) {
 	crt, key = shared.TLSCrt, shared.TLSKey
 	exists := eos_unix.FileExists(crt) && eos_unix.FileExists(key)
 	hasSAN, _ := checkSAN(crt)
 	if !exists || !hasSAN {
-		zap.L().Warn("regenerating Vault TLS", zap.Bool("exists", exists), zap.Bool("hasSAN", hasSAN))
+		otelzap.Ctx(rc.Ctx).Warn("regenerating Vault TLS", zap.Bool("exists", exists), zap.Bool("hasSAN", hasSAN))
 		if err := removeTLSFiles(); err != nil {
 			return "", "", err
 		}
@@ -75,43 +73,41 @@ func ensureTLS() (crt, key string, err error) {
 }
 
 // trustCA installs our CA system-wide.
-func trustCA(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "vault.trust_ca")
-	defer span.End()
-	distro := platform.DetectLinuxDistro()
+func trustCA(rc *eos_io.RuntimeContext) error {
+	distro := platform.DetectLinuxDistro(rc)
 	var dest, cmdLine string
 	if distro == "debian" || distro == "ubuntu" {
 		dest, cmdLine = "/usr/local/share/ca-certificates/vault-local-ca.crt", "update-ca-certificates"
 	} else {
 		dest, cmdLine = shared.VaultSystemCATrustPath, "update-ca-trust extract"
 	}
-	if err := eos_unix.CopyFile(ctx, shared.TLSCrt, dest, shared.FilePermStandard); err != nil {
+	if err := eos_unix.CopyFile(rc.Ctx, shared.TLSCrt, dest, shared.FilePermStandard); err != nil {
 		return cerr.Wrapf(err, "copy CA to %s", dest)
 	}
 	parts := strings.Split(cmdLine, " ")
 	if err := exec.Command(parts[0], parts[1:]...).Run(); err != nil {
 		return cerr.Wrapf(err, "run %s", cmdLine)
 	}
-	zap.L().Info("trusted Vault CA", zap.String("distro", distro))
+	otelzap.Ctx(rc.Ctx).Info("trusted Vault CA", zap.String("distro", distro))
 	return nil
 }
 
-func TrustVaultCA_RHEL(ctx context.Context) error {
+func TrustVaultCA_RHEL(rc *eos_io.RuntimeContext) error {
 	src := shared.TLSCrt
 	dest := shared.VaultSystemCATrustPath
 
-	zap.L().Info("📥 Installing Vault CA into system trust store",
+	otelzap.Ctx(rc.Ctx).Info("📥 Installing Vault CA into system trust store",
 		zap.String("src", src),
 		zap.String("dest", dest),
 	)
 
 	// copy the file (overwrite if needed)
-	if err := eos_unix.CopyFile(ctx, src, dest, shared.FilePermStandard); err != nil {
+	if err := eos_unix.CopyFile(rc.Ctx, src, dest, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	// ensure root owns it
 	if err := os.Chown(dest, 0, 0); err != nil {
-		zap.L().Warn("could not chown system CA file", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("could not chown system CA file", zap.Error(err))
 	}
 
 	// RHEL9 / CentOS Stream 9
@@ -119,55 +115,54 @@ func TrustVaultCA_RHEL(ctx context.Context) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		zap.L().Error("❌ Failed to update system CA trust", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
-	zap.L().Info("✅ Vault CA is now trusted system‑wide")
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault CA is now trusted system‑wide")
 	return nil
 }
 
 // TrustVaultCADebian installs the Vault CA into Debian/Ubuntu's trust store.
-func TrustVaultCA_Debian(ctx context.Context) error {
+func TrustVaultCA_Debian(rc *eos_io.RuntimeContext) error {
 	src := shared.TLSCrt
 	dest := "/usr/local/share/ca-certificates/vault-local-ca.crt"
 
-	zap.L().Info("📥 Installing Vault CA into Debian trust store",
+	otelzap.Ctx(rc.Ctx).Info("📥 Installing Vault CA into Debian trust store",
 		zap.String("src", src), zap.String("dest", dest))
 
-	if err := eos_unix.CopyFile(ctx, src, dest, shared.FilePermStandard); err != nil {
+	if err := eos_unix.CopyFile(rc.Ctx, src, dest, shared.FilePermStandard); err != nil {
 		return fmt.Errorf("copy CA to %s: %w", dest, err)
 	}
 	if err := os.Chown(dest, 0, 0); err != nil {
-		zap.L().Warn("could not chown CA file", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("could not chown CA file", zap.Error(err))
 	}
 
 	cmd := exec.Command("update-ca-certificates")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		zap.L().Error("❌ Failed to update system CA trust", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
-	zap.L().Info("✅ Vault CA trusted system-wide on Debian/Ubuntu")
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault CA trusted system-wide on Debian/Ubuntu")
 	return nil
 }
 
 // secureOwnership chowns+chmods certs and key for eos:user.
-func secureOwnership(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "vault.secure_tls")
-	defer span.End()
-	uid, gid, err := eos_unix.LookupUser(shared.EosID)
+func secureOwnership(rc *eos_io.RuntimeContext) error {
+
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
 		return cerr.Wrap(err, "lookup eos user")
 	}
 	for _, p := range []string{shared.TLSCrt, shared.TLSKey, shared.TLSDir} {
-		if err := eos_unix.ChownR(ctx, p, uid, gid); err != nil {
-			zap.L().Warn("chown failed", zap.String("path", p), zap.Error(err))
+		if err := eos_unix.ChownR(rc.Ctx, p, uid, gid); err != nil {
+			otelzap.Ctx(rc.Ctx).Warn("chown failed", zap.String("path", p), zap.Error(err))
 		}
-		if err := eos_unix.ChmodR(ctx, p, shared.DirPermStandard); err != nil {
-			zap.L().Warn("chmod failed", zap.String("path", p), zap.Error(err))
+		if err := eos_unix.ChmodR(rc.Ctx, p, shared.DirPermStandard); err != nil {
+			otelzap.Ctx(rc.Ctx).Warn("chmod failed", zap.String("path", p), zap.Error(err))
 		}
 	}
 	return nil
@@ -175,43 +170,40 @@ func secureOwnership(ctx context.Context) error {
 
 // EnsureVaultAgentCAExists ensures the Vault Agent CA cert is present.
 // If missing, it re-copies it from the server’s TLS cert.
-func EnsureVaultAgentCAExists(ctx context.Context) error {
-	// start telemetry span
-	ctx, span := telemetry.Start(ctx, "vault.ensure_agent_ca")
-	defer span.End()
+func EnsureVaultAgentCAExists(rc *eos_io.RuntimeContext) error {
 
 	src := shared.TLSCrt
 	dst := shared.VaultAgentCACopyPath
 
 	// If it already exists, nothing to do
 	if eos_unix.FileExists(dst) {
-		zap.L().Debug("Vault Agent CA cert exists", zap.String("path", dst))
+		otelzap.Ctx(rc.Ctx).Debug("Vault Agent CA cert exists", zap.String("path", dst))
 		return nil
 	}
 
-	zap.L().Warn("Vault Agent CA missing; copying from server TLS",
+	otelzap.Ctx(rc.Ctx).Warn("Vault Agent CA missing; copying from server TLS",
 		zap.String("src", src), zap.String("dst", dst),
 	)
 
-	// CopyFile now takes (ctx, src, dst, mode)
-	if err := eos_unix.CopyFile(ctx, src, dst, shared.FilePermStandard); err != nil {
+	// CopyFile now takes (rc, src, dst, mode)
+	if err := eos_unix.CopyFile(rc.Ctx, src, dst, shared.FilePermStandard); err != nil {
 		return cerr.Wrapf(err, "copy Vault Agent CA cert to %s", dst)
 	}
 
 	// Lookup the EOS user for ownership
-	uid, gid, err := eos_unix.LookupUser(shared.EosID)
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		zap.L().Warn("Could not lookup EOS user", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Could not lookup EOS user", zap.Error(err))
 		return cerr.Wrap(err, "lookup eos user")
 	}
 
 	// Chown and log (don’t fail on chown)
 	if err := os.Chown(dst, uid, gid); err != nil {
-		zap.L().Warn("Failed to chown Vault Agent CA cert",
+		otelzap.Ctx(rc.Ctx).Warn("Failed to chown Vault Agent CA cert",
 			zap.String("path", dst), zap.Error(err),
 		)
 	} else {
-		zap.L().Info("Vault Agent CA cert ownership set",
+		otelzap.Ctx(rc.Ctx).Info("Vault Agent CA cert ownership set",
 			zap.String("path", dst), zap.Int("uid", uid), zap.Int("gid", gid),
 		)
 	}

@@ -9,15 +9,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
-)
-
-var (
-	log = zap.L().Named("filesystem")
 )
 
 // MkdirP ensures path exists with perm bits.
@@ -29,13 +25,13 @@ func MkdirP(ctx context.Context, path string, perm os.FileMode) error {
 
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		zap.L().Error("abs failed", zap.Error(err), zap.String("path", path))
+		otelzap.Ctx(ctx).Error("abs failed", zap.Error(err), zap.String("path", path))
 		return cerr.Wrapf(err, "abs %q", path)
 	}
 
 	info, err := os.Stat(abs)
 	if os.IsNotExist(err) {
-		zap.L().Info("creating directory", zap.String("path", abs))
+		otelzap.Ctx(ctx).Info("creating directory", zap.String("path", abs))
 		if err := os.MkdirAll(abs, perm); err != nil {
 			if os.IsPermission(err) {
 				return cerr.Newf("permission denied creating %s", abs)
@@ -43,7 +39,7 @@ func MkdirP(ctx context.Context, path string, perm os.FileMode) error {
 			return cerr.Wrapf(err, "mkdir %s", abs)
 		}
 	} else if err != nil {
-		zap.L().Error("stat failed", zap.Error(err), zap.String("path", abs))
+		otelzap.Ctx(ctx).Error("stat failed", zap.Error(err), zap.String("path", abs))
 		return cerr.Wrapf(err, "stat %s", abs)
 	} else if !info.IsDir() {
 		return cerr.Newf("%s exists but is not a directory", abs)
@@ -54,14 +50,14 @@ func MkdirP(ctx context.Context, path string, perm os.FileMode) error {
 
 // EnsureOwnership sets the owner of `path`. On Unix, it calls os.Chown;
 // on Windows this could be replaced with ACL calls under a build tag.
-func EnsureOwnership(path, owner string) error {
-	uid, gid, err := LookupUser(owner) // assume elsewhere in eos_unix
+func EnsureOwnership(ctx context.Context, path, owner string) error {
+	uid, gid, err := LookupUser(ctx, owner) // assume elsewhere in eos_unix
 	if err != nil {
-		log.Error("user lookup failed", zap.String("owner", owner), zap.Error(err))
+		otelzap.Ctx(ctx).Error("user lookup failed", zap.String("owner", owner), zap.Error(err))
 		return cerr.Wrapf(err, "lookup user %q", owner)
 	}
 	if err := os.Chown(path, uid, gid); err != nil {
-		log.Error("chown failed", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(ctx).Error("chown failed", zap.String("path", path), zap.Error(err))
 		return cerr.Wrapf(err, "chown %s to %s", path, owner)
 	}
 	return nil
@@ -78,41 +74,32 @@ func MultiMkdirP(ctx context.Context, paths []string, perm os.FileMode) error {
 }
 
 // WriteFile writes data to a file and sets ownership to the given user.
-func WriteFile(path string, data []byte, perm os.FileMode, owner string) error {
-	log := zap.L().Named("system-filesystem")
+func WriteFile(ctx context.Context, path string, data []byte, perm os.FileMode, owner string) error {
 	if err := os.WriteFile(path, data, perm); err != nil {
-		log.Error("Failed to write file", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to write file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("write %s: %w", path, err)
 	}
-	return EnsureOwnership(path, owner)
+	return EnsureOwnership(ctx, path, owner)
 }
 
 // RmRF removes file or dir, with tracing, policy, validation.
 func RmRF(ctx context.Context, path, label string) error {
-	ctx, span := telemetry.Start(ctx, "filesystem.RmRF",
-		attribute.String("path", path),
-		attribute.String("label", label),
-	)
-	defer span.End()
-
-	traceID := logger.TraceIDFromContext(ctx)
-	lg := log.With(zap.String("traceID", traceID), zap.String("label", label))
 
 	abs, err := filepath.Abs(path)
 	if err != nil {
-		lg.Error("abs failed", zap.Error(err))
+		otelzap.Ctx(ctx).Error("abs failed", zap.Error(err))
 		return cerr.Wrapf(err, "abs %q", path)
 	}
 	info, err := os.Stat(abs)
 	if os.IsNotExist(err) {
-		lg.Warn("not found", zap.String("path", abs))
+		otelzap.Ctx(ctx).Warn("not found", zap.String("path", abs))
 		return nil
 	} else if err != nil {
-		lg.Error("stat failed", zap.Error(err))
+		otelzap.Ctx(ctx).Error("stat failed", zap.Error(err))
 		return cerr.Wrapf(err, "stat %s", abs)
 	}
 
-	lg.Info("removing", zap.String("path", abs))
+	otelzap.Ctx(ctx).Info("removing", zap.String("path", abs))
 	var rmErr error
 	if info.IsDir() {
 		rmErr = os.RemoveAll(abs)
@@ -123,20 +110,15 @@ func RmRF(ctx context.Context, path, label string) error {
 		if os.IsPermission(rmErr) {
 			return cerr.Newf("permission denied removing %s", abs)
 		}
-		lg.Error("remove failed", zap.Error(rmErr))
+		otelzap.Ctx(ctx).Error("remove failed", zap.Error(rmErr))
 		return cerr.Wrapf(rmErr, "remove %s", abs)
 	}
-	lg.Info("removed", zap.String("path", abs))
+	otelzap.Ctx(ctx).Info("removed", zap.String("path", abs))
 	return nil
 }
 
 // CopyFile copies one file (ensuring target dir).
 func CopyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
-	ctx, span := telemetry.Start(ctx, "filesystem.CopyFile",
-		attribute.String("src", src),
-		attribute.String("dst", dst),
-	)
-	defer span.End()
 
 	info, err := os.Stat(src)
 	if err != nil {
@@ -169,7 +151,7 @@ func CopyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
 		return cerr.Wrapf(err, "chmod %s", dst)
 	}
 
-	zap.L().Info("copied file", zap.String("src", src), zap.String("dst", dst))
+	otelzap.Ctx(ctx).Info("copied file", zap.String("src", src), zap.String("dst", dst))
 	return nil
 }
 
@@ -204,7 +186,7 @@ func CopyR(ctx context.Context, src, dst string) error {
 		}
 	}
 
-	zap.L().Info("directory copied", zap.String("src", src), zap.String("dst", dst))
+	otelzap.Ctx(ctx).Info("directory copied", zap.String("src", src), zap.String("dst", dst))
 	return nil
 }
 
@@ -219,11 +201,11 @@ func ChownR(ctx context.Context, root string, uid, gid int) error {
 
 	return filepath.Walk(root, func(p string, info os.FileInfo, err error) error {
 		if err != nil {
-			zap.L().Warn("walk failed", zap.String("path", p), zap.Error(err))
+			otelzap.Ctx(ctx).Warn("walk failed", zap.String("path", p), zap.Error(err))
 			return nil // continue
 		}
 		if err := os.Chown(p, uid, gid); err != nil {
-			zap.L().Warn("chown failed", zap.String("path", p), zap.Error(err))
+			otelzap.Ctx(ctx).Warn("chown failed", zap.String("path", p), zap.Error(err))
 		}
 		return nil
 	})

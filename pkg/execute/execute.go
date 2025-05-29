@@ -20,7 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Run(opts Options) (string, error) {
+func Run(ctx context.Context, opts Options) (string, error) {
 	cmdStr := buildCommandString(opts.Command, opts.Args...)
 
 	// Setup logger and context
@@ -28,15 +28,14 @@ func Run(opts Options) (string, error) {
 	if logger == nil {
 		logger = DefaultLogger
 	}
-	ctx := opts.Ctx
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	ctx, cancel := context.WithTimeout(ctx, defaultTimeout(opts.Timeout))
+	rc, cancel := context.WithTimeout(ctx, defaultTimeout(opts.Timeout))
 	defer cancel()
 
 	// 📈 Start telemetry span
-	ctx, span := telemetry.Start(ctx, "execute.Run")
+	rc, span := telemetry.Start(rc, "execute.Run")
 	defer span.End()
 	span.SetAttributes(
 		attribute.String("command", opts.Command),
@@ -74,9 +73,9 @@ func Run(opts Options) (string, error) {
 	for i := 1; i <= max(1, opts.Retries); i++ {
 		var cmd *exec.Cmd
 		if opts.Shell {
-			cmd = exec.CommandContext(ctx, "bash", "-c", opts.Command)
+			cmd = exec.CommandContext(rc, "bash", "-c", opts.Command)
 		} else {
-			cmd = exec.CommandContext(ctx, opts.Command, opts.Args...)
+			cmd = exec.CommandContext(rc, opts.Command, opts.Args...)
 		}
 		if opts.Dir != "" {
 			cmd.Dir = opts.Dir
@@ -95,7 +94,7 @@ func Run(opts Options) (string, error) {
 			break
 		}
 
-		summary := eos_err.ExtractSummary(output, 2)
+		summary := eos_err.ExtractSummary(ctx, output, 2)
 		span.RecordError(err)
 		logError(logger, "Execution failed", err,
 			zap.Int("attempt", i),
@@ -153,9 +152,9 @@ func logError(logger *zap.Logger, msg string, err error, fields ...zap.Field) {
 }
 
 // Cmd returns a function that executes the given command and args with default options.
-func Cmd(cmd string, args ...string) func() error {
+func Cmd(ctx context.Context, cmd string, args ...string) func() error {
 	return func() error {
-		_, err := Run(Options{
+		_, err := Run(ctx, Options{
 			Command: cmd,
 			Args:    args,
 		})
@@ -163,15 +162,16 @@ func Cmd(cmd string, args ...string) func() error {
 	}
 }
 
-func RunShell(cmdStr string) (string, error) {
-	return Run(Options{
-		Command: cmdStr,
-		Shell:   true,
-	})
+func RunShell(ctx context.Context, cmdStr string) (string, error) {
+	return Run(ctx,
+		Options{
+			Command: cmdStr,
+			Shell:   true,
+		})
 }
 
 // RunSimple is a legacy-safe wrapper that drops output.
-func RunSimple(cmd string, args ...string) error {
-	_, err := Run(Options{Command: cmd, Args: args})
+func RunSimple(ctx context.Context, cmd string, args ...string) error {
+	_, err := Run(ctx, Options{Command: cmd, Args: args})
 	return err
 }

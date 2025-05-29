@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -17,18 +18,18 @@ var CreateTestDataCmd = &cobra.Command{
 	Short: "Generate and upload test data into Vault (fallback to disk)",
 	Long: `This command generates realistic test data (e.g., Alice Wonderland, Bob Builder),
 attempts to upload it into Vault, and falls back to saving locally if Vault is unavailable.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("pandora-create-test-data")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 		data := shared.GenerateTestData()
 
-		client, err := vault.Authn()
+		client, err := vault.Authn(rc)
 		if err != nil {
 			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
 			client = nil // triggers fallback to disk
 		}
 
 		// Write to Vault or fallback to disk
-		return vault.WriteTestDataToVaultOrFallback(client, data)
+		return vault.WriteTestDataToVaultOrFallback(rc, client, data)
 	}),
 }
 

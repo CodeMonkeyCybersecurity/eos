@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"errors"
 	"fmt"
@@ -10,7 +11,9 @@ import (
 	"testing"
 	"unicode"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -55,15 +58,15 @@ func TestGeneratePassword(t *testing.T) {
 	}
 }
 
-func TestValidateStrongPassword(t *testing.T) {
+func TestValidateStrongPassword(rc *eos_io.RuntimeContext, t *testing.T) {
 
 	valid := "Astrong!Pass123"
-	if err := ValidateStrongPassword(valid); err != nil {
+	if err := ValidateStrongPassword(rc.Ctx, valid); err != nil {
 		t.Errorf("ValidateStrongPassword rejected valid password: %v", err)
 	}
 
 	invalid := "weakpass"
-	if err := ValidateStrongPassword(invalid); err == nil {
+	if err := ValidateStrongPassword(rc.Ctx, invalid); err == nil {
 		t.Error("ValidateStrongPassword accepted weak password, expected error")
 	}
 }
@@ -103,9 +106,9 @@ func shuffle(b []byte) error {
 }
 
 // ValidateStrongPassword ensures min length and mixed char types.
-func ValidateStrongPassword(input string) error {
+func ValidateStrongPassword(ctx context.Context, input string) error {
 	if len(input) < 12 {
-		zap.L().Warn("password too short", zap.Int("length", len(input)))
+		otelzap.Ctx(ctx).Warn("password too short", zap.Int("length", len(input)))
 		return errors.New(shared.ErrPasswordTooShort)
 	}
 
@@ -124,7 +127,7 @@ func ValidateStrongPassword(input string) error {
 	}
 
 	if !hasUpper || !hasLower || !hasDigit || !hasSymbol {
-		zap.L().Warn("password missing required character classes")
+		otelzap.Ctx(ctx).Warn("password missing required character classes")
 		return errors.New(shared.ErrPasswordMissingClasses)
 	}
 

@@ -17,6 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
 	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
@@ -35,23 +36,11 @@ type RuntimeContext struct {
 }
 
 // NewContext sets up tracing, logging and validation hooks.
-func NewContext(cmdName string) *RuntimeContext {
-	ctx, span := telemetry.Start(context.Background(), cmdName)
-	traceID := span.SpanContext().TraceID().String()
+func NewContext(rc *RuntimeContext, cmdName string) *RuntimeContext {
 
 	comp, action := resolveCallContext(3)
-	logger := zap.L().With(
-		zap.String("component", comp),
-		zap.String("action", action),
-		zap.String("trace_id", traceID),
-	).Named(comp)
-
-	logEnv(logger)
 
 	return &RuntimeContext{
-		Ctx:        ctx,
-		Span:       span,
-		Log:        logger,
 		Timestamp:  time.Now(), // capture start time
 		Component:  comp,
 		Command:    action,
@@ -151,20 +140,6 @@ func LogVaultContext(log *zap.Logger, addr string, err error) string {
 // Helper functions
 // ––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
 
-func logEnv(log *zap.Logger) {
-	if u, err := user.Current(); err == nil {
-		log.Info("user context",
-			zap.String("username", u.Username),
-			zap.String("uid", u.Uid),
-			zap.String("gid", u.Gid),
-			zap.String("home", u.HomeDir),
-		)
-	}
-	if exe, err := os.Executable(); err == nil {
-		log.Info("executable path", zap.String("path", exe))
-	}
-}
-
 func resolveCallContext(skip int) (component, action string) {
 	pc, file, _, ok := runtime.Caller(skip)
 	if !ok {
@@ -200,17 +175,10 @@ func classifyError(err error) string {
 }
 
 // ContextualLogger returns a scoped logger enriched with component and action fields.
-// If base is nil, zap.L() is used. Panics if logging is uninitialized.
-func ContextualLogger(skipFrames int, base *zap.Logger) *zap.Logger {
+// If base is nil, otelzap.Ctx(rc.Ctx) is used. Panics if logging is uninitialized.
+func ContextualLogger(rc *RuntimeContext, skipFrames int, base *zap.Logger) *zap.Logger {
 	if skipFrames <= 0 {
 		skipFrames = 2
-	}
-
-	if base == nil {
-		base = zap.L()
-		if base == nil {
-			panic("ContextualLogger: zap.L() returned nil — logger not initialized?")
-		}
 	}
 
 	component, action, err := getCallContext(skipFrames)
@@ -225,12 +193,12 @@ func ContextualLogger(skipFrames int, base *zap.Logger) *zap.Logger {
 	).Named(component)
 }
 
-func LogRuntimeExecutionContext() {
+func LogRuntimeExecutionContext(rc *RuntimeContext) {
 	currentUser, err := user.Current()
 	if err != nil {
-		zap.L().Warn("⚠️ Failed to get current user", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to get current user", zap.Error(err))
 	} else {
-		zap.L().Info("🔎 User + UID/GID context",
+		otelzap.Ctx(rc.Ctx).Info("🔎 User + UID/GID context",
 			zap.String("username", currentUser.Username),
 			zap.String("uid_str", currentUser.Uid),
 			zap.String("gid_str", currentUser.Gid),
@@ -243,9 +211,9 @@ func LogRuntimeExecutionContext() {
 	}
 
 	if execPath, err := os.Executable(); err != nil {
-		zap.L().Warn("⚠️ Failed to resolve executable path", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to resolve executable path", zap.Error(err))
 	} else {
-		zap.L().Info("🗂️ Executing binary", zap.String("path", execPath))
+		otelzap.Ctx(rc.Ctx).Info("🗂️ Executing binary", zap.String("path", execPath))
 	}
 }
 

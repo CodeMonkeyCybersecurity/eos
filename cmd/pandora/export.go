@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +19,7 @@ var exportCmd = &cobra.Command{
 var exportTLSCertCmd = &cobra.Command{
 	Use:   "tls-crt",
 	Short: "Export the Vault TLS client certificate to a remote machine via SSH",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if vault.User == "" || vault.Host == "" || vault.Path == "" {
 			return fmt.Errorf("user, host, and path are required")
 		}
@@ -32,8 +34,8 @@ var exportTLSCertCmd = &cobra.Command{
 			Host: vault.Host,
 			Path: vault.Path,
 		}
-		return vault.ExportTLSCert(input)
-	},
+		return vault.ExportTLSCert(rc, input)
+	}),
 }
 
 func init() {

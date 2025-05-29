@@ -8,16 +8,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // RemoveVolumes deletes the specified Docker volumes.
-func RemoveVolumes(volumes []string) error {
+func RemoveVolumes(rc *eos_io.RuntimeContext, volumes []string) error {
 	for _, volume := range volumes {
-		if err := execute.RunSimple("docker", "volume", "rm", volume); err != nil {
-			zap.L().Warn("Failed to remove volume", zap.String("volume", volume), zap.Error(err))
+		if err := execute.RunSimple(rc.Ctx, "docker", "volume", "rm", volume); err != nil {
+			otelzap.Ctx(rc.Ctx).Warn("Failed to remove volume", zap.String("volume", volume), zap.Error(err))
 			return fmt.Errorf("failed to remove volume %s: %w", volume, err)
 		}
 	}
@@ -25,7 +27,7 @@ func RemoveVolumes(volumes []string) error {
 }
 
 // BackupVolume creates a tar.gz backup of a single Docker volume.
-func BackupVolume(volumeName, backupDir string) (string, error) {
+func BackupVolume(rc *eos_io.RuntimeContext, volumeName, backupDir string) (string, error) {
 	timestamp := time.Now().Format("20060102_150405")
 	backupFile := fmt.Sprintf("%s_%s.tar.gz", timestamp, volumeName)
 	cmd := []string{
@@ -36,7 +38,7 @@ func BackupVolume(volumeName, backupDir string) (string, error) {
 		"tar", "czf", fmt.Sprintf("/backup/%s", backupFile),
 		"-C", "/volume", ".",
 	}
-	_, err := execute.Run(execute.Options{
+	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    cmd,
 	})
@@ -47,7 +49,7 @@ func BackupVolume(volumeName, backupDir string) (string, error) {
 }
 
 // BackupVolumes backs up all provided Docker volumes to the backupDir.
-func BackupVolumes(volumes []string, backupDir string) (map[string]string, error) {
+func BackupVolumes(rc *eos_io.RuntimeContext, volumes []string, backupDir string) (map[string]string, error) {
 	backupResults := make(map[string]string)
 
 	if err := os.MkdirAll(backupDir, shared.DirPermStandard); err != nil {
@@ -55,9 +57,9 @@ func BackupVolumes(volumes []string, backupDir string) (map[string]string, error
 	}
 
 	for _, vol := range volumes {
-		backupFile, err := BackupVolume(vol, backupDir)
+		backupFile, err := BackupVolume(rc, vol, backupDir)
 		if err != nil {
-			zap.L().Warn("Failed to backup volume", zap.String("volume", vol), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Failed to backup volume", zap.String("volume", vol), zap.Error(err))
 			continue
 		}
 		backupResults[vol] = backupFile

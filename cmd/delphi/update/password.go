@@ -10,6 +10,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -34,24 +35,24 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			return errors.New("username is required (use --username)")
 		}
 
-		cfg, err := delphi.ReadConfig(rc.Ctx)
+		cfg, err := delphi.ReadConfig(rc)
 		if err != nil {
-			zap.L().Fatal("Failed to load Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to load Delphi config", zap.Error(err))
 		}
 
 		// Prompt for current password
-		currentPassword, err := crypto.PromptPassword("Current password")
+		currentPassword, err := crypto.PromptPassword(rc, "Current password")
 		if err != nil {
 			return fmt.Errorf("failed to read current password: %w", err)
 		}
 
-		zap.L().Info("Authenticating with current password...")
+		otelzap.Ctx(rc.Ctx).Info("Authenticating with current password...")
 
-		if _, err := delphi.AuthenticateUser(cfg, username, currentPassword); err != nil {
+		if _, err := delphi.AuthenticateUser(rc, cfg, username, currentPassword); err != nil {
 			return fmt.Errorf("authentication failed: %w", err)
 		}
 
-		userID, err := delphi.GetUserIDByUsername(cfg, username)
+		userID, err := delphi.GetUserIDByUsername(rc, cfg, username)
 		if err != nil {
 			return fmt.Errorf("unable to resolve user ID for username %s: %w", username, err)
 		}
@@ -65,11 +66,11 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 
 		// Prompt for password (if not provided via flag)
 		if password == "" {
-			pw1, err := crypto.PromptPassword("New password")
+			pw1, err := crypto.PromptPassword(rc, "New password")
 			if err != nil {
 				return err
 			}
-			pw2, err := crypto.PromptPassword("Confirm password")
+			pw2, err := crypto.PromptPassword(rc, "Confirm password")
 			if err != nil {
 				return err
 			}
@@ -79,18 +80,18 @@ Supports interactive confirmation and XDG-safe password storage if requested.`,
 			password = pw1
 		}
 
-		if err := delphi.UpdateUserPassword(cfg, userID, password); err != nil {
+		if err := delphi.UpdateUserPassword(rc, cfg, userID, password); err != nil {
 			return fmt.Errorf("failed to update password: %w", err)
 		}
 
-		zap.L().Info("Password updated successfully", zap.String("username", username))
+		otelzap.Ctx(rc.Ctx).Info("Password updated successfully", zap.String("username", username))
 
 		if storePassword {
 			path, err := xdg.SaveCredential("delphi", username, password)
 			if err != nil {
-				zap.L().Warn("Password update succeeded but storing password failed", zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Warn("Password update succeeded but storing password failed", zap.Error(err))
 			} else {
-				zap.L().Info("Password stored securely", zap.String("path", path))
+				otelzap.Ctx(rc.Ctx).Info("Password stored securely", zap.String("path", path))
 			}
 		}
 

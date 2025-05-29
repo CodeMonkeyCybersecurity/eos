@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
@@ -30,19 +31,19 @@ var CreateUmamiCmd = &cobra.Command{
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
 - Informing the user to navigate to :8117 and log in with default credentials (admin/umami) and change the password immediately.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		zap.L().Info("Starting Umami installation using Eos")
+		otelzap.Ctx(rc.Ctx).Info("Starting Umami installation using Eos")
 
 		// Ensure the installation directory exists
 		if _, err := os.Stat(shared.UmamiDir); os.IsNotExist(err) {
-			zap.L().Warn("Installation directory does not exist; creating it",
+			otelzap.Ctx(rc.Ctx).Warn("Installation directory does not exist; creating it",
 				zap.String("path", shared.UmamiDir))
 			if err := os.MkdirAll(shared.UmamiDir, shared.DirPermStandard); err != nil {
-				zap.L().Fatal("Failed to create installation directory", zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Fatal("Failed to create installation directory", zap.Error(err))
 			}
 		} else {
-			zap.L().Info("Installation directory exists",
+			otelzap.Ctx(rc.Ctx).Info("Installation directory exists",
 				zap.String("path", shared.UmamiDir))
 		}
 
@@ -50,59 +51,59 @@ var CreateUmamiCmd = &cobra.Command{
 		sourceComposeFile := "assets/umami-docker-compose.yml"
 		destComposeFile := filepath.Join(shared.UmamiDir, "umami-docker-compose.yml")
 
-		zap.L().Info("Copying and processing Docker Compose file",
+		otelzap.Ctx(rc.Ctx).Info("Copying and processing Docker Compose file",
 			zap.String("source", sourceComposeFile),
 			zap.String("destination", destComposeFile))
 
 		// Read the source Docker Compose file
 		data, err := os.ReadFile(sourceComposeFile)
 		if err != nil {
-			zap.L().Fatal("Failed to read Docker Compose file from assets", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to read Docker Compose file from assets", zap.Error(err))
 		}
 
 		// Generate a strong random alphanumeric password (20 characters)
-		zap.L().Info("Generating strong random password")
+		otelzap.Ctx(rc.Ctx).Info("Generating strong random password")
 		password, err := crypto.GeneratePassword(20)
 		if err != nil {
-			zap.L().Fatal("Failed to generate password", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to generate password", zap.Error(err))
 		}
 
 		// Replace all occurrences of "changeme" with the generated password
 		newData := strings.ReplaceAll(string(data), "changeme", password)
-		zap.L().Info("Replaced 'changeme' with a generated password")
+		otelzap.Ctx(rc.Ctx).Info("Replaced 'changeme' with a generated password")
 
 		// Write the processed Docker Compose file to the destination directory
 		if err := os.WriteFile(destComposeFile, []byte(newData), 0644); err != nil {
-			zap.L().Fatal("Failed to write processed Docker Compose file", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to write processed Docker Compose file", zap.Error(err))
 		}
-		zap.L().Info("Docker Compose file processed and copied successfully")
+		otelzap.Ctx(rc.Ctx).Info("Docker Compose file processed and copied successfully")
 
 		// Check if arache-net docker network already exists, create if not
 		// Check if arachne-net docker network exists, creating it if not
-		if err := container.EnsureArachneNetwork(ctx.Ctx); err != nil {
-			zap.L().Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
+		if err := container.EnsureArachneNetwork(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Fatal("Error checking or creating 'arachne-net'", zap.Error(err))
 		} else {
-			zap.L().Info("Successfully ensured 'arachne-net' exists")
+			otelzap.Ctx(rc.Ctx).Info("Successfully ensured 'arachne-net' exists")
 		}
 
 		// Deploy Umami with Docker Compose using the processed file
-		zap.L().Info("Deploying Umami with Docker Compose",
+		otelzap.Ctx(rc.Ctx).Info("Deploying Umami with Docker Compose",
 			zap.String("directory", shared.UmamiDir))
-		if err := execute.RunSimple(shared.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
-			zap.L().Fatal("Error running 'docker compose up -d'", zap.Error(err))
+		if err := execute.RunSimple(rc.Ctx, shared.UmamiDir, "docker", "compose", "-f", destComposeFile, "up", "-d"); err != nil {
+			otelzap.Ctx(rc.Ctx).Fatal("Error running 'docker compose up -d'", zap.Error(err))
 		}
 
 		// Wait 5 seconds for the containers to start
-		zap.L().Info("Waiting 5 seconds for containers to initialize...")
+		otelzap.Ctx(rc.Ctx).Info("Waiting 5 seconds for containers to initialize...")
 		time.Sleep(5 * time.Second)
 
 		// Execute "docker ps" to list running containers
-		if err := container.CheckDockerContainers(ctx.Ctx); err != nil {
-			zap.L().Fatal("Error checking running Docker containers", zap.Error(err))
+		if err := container.CheckDockerContainers(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Fatal("Error checking running Docker containers", zap.Error(err))
 		}
 
 		// Final congratulatory message with instructions
-		zap.L().Info("Umami installation complete",
+		otelzap.Ctx(rc.Ctx).Info("Umami installation complete",
 			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", eos_unix.GetInternalHostname())))
 		return nil
 	}),

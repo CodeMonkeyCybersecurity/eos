@@ -4,7 +4,6 @@ package execute
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"os"
@@ -12,15 +11,16 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 // RetryCommand retries execution with live output and structured logging.
-func RetryCommand(ctx context.Context, maxAttempts int, delay time.Duration, name string, args ...string) error {
+func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) error {
 	var lastErr error
 	for i := 1; i <= maxAttempts; i++ {
 		fmt.Printf("🔁 Attempt %d: %s %s\n", i, name, joinArgs(args))
 
-		cmd := exec.CommandContext(ctx, name, args...)
+		cmd := exec.CommandContext(rc.Ctx, name, args...)
 
 		var buf bytes.Buffer
 		cmd.Stdout = io.MultiWriter(os.Stdout, &buf)
@@ -33,7 +33,7 @@ func RetryCommand(ctx context.Context, maxAttempts int, delay time.Duration, nam
 		}
 
 		output := buf.String()
-		summary := eos_err.ExtractSummary(output, 2)
+		summary := eos_err.ExtractSummary(rc.Ctx, output, 2)
 		lastErr = fmt.Errorf("❌ attempt %d failed: %w\noutput:\n%s", i, err, summary)
 
 		if i < maxAttempts {
@@ -44,12 +44,12 @@ func RetryCommand(ctx context.Context, maxAttempts int, delay time.Duration, nam
 }
 
 // RetryCaptureOutput runs a command with retries and returns captured output.
-func RetryCaptureOutput(ctx context.Context, retries int, delay time.Duration, name string, args ...string) ([]byte, error) {
+func RetryCaptureOutput(rc *eos_io.RuntimeContext, retries int, delay time.Duration, name string, args ...string) ([]byte, error) {
 	var out []byte
 	var err error
 
 	for i := 1; i <= retries; i++ {
-		cmd := exec.CommandContext(ctx, name, args...)
+		cmd := exec.CommandContext(rc.Ctx, name, args...)
 		fmt.Printf("🔁 Capturing attempt %d: %s %s\n", i, name, joinArgs(args))
 		out, err = cmd.CombinedOutput()
 

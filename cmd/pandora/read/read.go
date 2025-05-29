@@ -12,7 +12,7 @@ var ReadCmd = &cobra.Command{
 	Use:   "read",
 	Short: "Inspect secrets and data in Pandora (Vault)",
 	Long:  "Inspect and view stored secrets or test data in Pandora (Vault).",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}),
 }

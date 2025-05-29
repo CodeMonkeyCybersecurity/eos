@@ -8,25 +8,27 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func IsDebian() bool {
-	return DetectLinuxDistro() == "debian"
+func IsDebian(rc *eos_io.RuntimeContext) bool {
+	return DetectLinuxDistro(rc) == "debian"
 }
 
-func IsRHEL() bool {
-	return DetectLinuxDistro() == "rhel"
+func IsRHEL(rc *eos_io.RuntimeContext) bool {
+	return DetectLinuxDistro(rc) == "rhel"
 }
 
-func DetectLinuxDistro() string {
+func DetectLinuxDistro(rc *eos_io.RuntimeContext) string {
 	if !IsLinux() {
 		return "unknown"
 	}
 
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
-		zap.L().Warn("Failed to open /etc/os-release", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to open /etc/os-release", zap.Error(err))
 		return "unknown"
 	}
 	defer file.Close()
@@ -55,11 +57,11 @@ func DetectLinuxDistro() string {
 	}
 }
 
-func RequireLinuxDistro(allowed []string) error {
+func RequireLinuxDistro(rc *eos_io.RuntimeContext, allowed []string) error {
 	if !IsLinux() {
 		return fmt.Errorf("unsupported platform: %s (Linux required)", GetOSPlatform())
 	}
-	distro := DetectLinuxDistro()
+	distro := DetectLinuxDistro(rc)
 	for _, allowedDistro := range allowed {
 		if distro == allowedDistro {
 			return nil

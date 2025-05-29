@@ -14,7 +14,7 @@ var UpdateProcessCmd = &cobra.Command{
 	Use:   "process",
 	Short: "Update process",
 	Long:  `Use this command to update details about running process.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			fmt.Println("Please specify the process to update.")
 			return nil

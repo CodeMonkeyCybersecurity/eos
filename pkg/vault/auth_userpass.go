@@ -15,28 +15,28 @@ import (
 // EnableVaultUserpass sets up userpass auth, creates the "eos" user, and verifies login.
 func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	// 1) Build a Vault API client
-	client, err := NewClient()
+	client, err := NewClient(rc)
 	if err != nil {
 		return cerr.Wrap(err, "create Vault client")
 	}
 
 	// 2) Enable the userpass & approle auth mounts
-	if err := EnableUserpassAuth(client); err != nil {
+	if err := EnableUserpassAuth(rc, client); err != nil {
 		return cerr.Wrap(err, "enable userpass auth")
 	}
-	if err := EnableAppRoleAuth(client); err != nil {
+	if err := EnableAppRoleAuth(rc, client); err != nil {
 		return cerr.Wrap(err, "enable approle auth")
 	}
 	rc.Log.Info("✅ Auth methods enabled")
 
 	// 3) Ensure the EOS policy exists
-	if err := EnsurePolicy(); err != nil {
+	if err := EnsurePolicy(rc); err != nil {
 		return cerr.Wrap(err, "ensure EOS policy")
 	}
 	rc.Log.Info("✅ EOS policy ensured")
 
 	// 4) Prompt for the EOS user’s password
-	pass, err := crypto.PromptPassword("Enter password for Vault 'eos' user: ")
+	pass, err := crypto.PromptPassword(rc, "Enter password for Vault 'eos' user: ")
 	if err != nil {
 		return cerr.Wrap(err, "prompt EOS password")
 	}

@@ -6,12 +6,13 @@ import (
 	"crypto/tls"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/go-ldap/ldap/v3"
 )
 
 // Connect returns a default LDAP connection using autodiscovered config
-func Connect() (*ldap.Conn, error) {
-	conn, _, err := ConnectWithConfig()
+func Connect(rc *eos_io.RuntimeContext) (*ldap.Conn, error) {
+	conn, _, err := ConnectWithConfig(rc)
 	if err != nil {
 		return nil, fmt.Errorf("Connect() failed: %w", err)
 	}
@@ -19,8 +20,8 @@ func Connect() (*ldap.Conn, error) {
 }
 
 // ConnectWithConfig tries all discovery methods to return an active LDAP connection
-func ConnectWithConfig() (*ldap.Conn, *LDAPConfig, error) {
-	cfg, source, err := ReadConfig()
+func ConnectWithConfig(rc *eos_io.RuntimeContext) (*ldap.Conn, *LDAPConfig, error) {
+	cfg, source, err := ReadConfig(rc)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not load LDAP config: %w", err)
 	}

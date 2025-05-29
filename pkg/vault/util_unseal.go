@@ -5,13 +5,15 @@ package vault
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // loadUnsealKeys loads unseal keys and root token from disk or prompt.
-func loadUnsealKeys() (*api.InitResponse, error) {
-	initRes, err := LoadOrPromptInitResult()
+func loadUnsealKeys(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
+	initRes, err := LoadOrPromptInitResult(rc)
 	if err != nil {
 		return nil, fmt.Errorf("could not load stored unseal keys: %w", err)
 	}
@@ -20,17 +22,17 @@ func loadUnsealKeys() (*api.InitResponse, error) {
 
 // UnsealVaultIfNeeded attempts to unseal Vault if it's currently sealed.
 // It returns true if unsealing was performed, false if not needed.
-func UnsealVaultIfNeeded(client *api.Client) (bool, error) {
+func UnsealVaultIfNeeded(rc *eos_io.RuntimeContext, client *api.Client) (bool, error) {
 	status, err := client.Sys().SealStatus()
 	if err != nil {
 		return false, fmt.Errorf("could not get seal status: %w", err)
 	}
 	if !status.Sealed {
-		zap.L().Info("🔓 Vault is already unsealed")
+		otelzap.Ctx(rc.Ctx).Info("🔓 Vault is already unsealed")
 		return false, nil
 	}
 
-	initRes, err := loadUnsealKeys()
+	initRes, err := loadUnsealKeys(rc)
 	if err != nil {
 		return false, err
 	}
@@ -39,14 +41,14 @@ func UnsealVaultIfNeeded(client *api.Client) (bool, error) {
 	client.SetToken(initRes.RootToken)
 
 	for i, key := range initRes.KeysB64 {
-		zap.L().Debug("🔐 Submitting unseal key", zap.Int("index", i))
+		otelzap.Ctx(rc.Ctx).Debug("🔐 Submitting unseal key", zap.Int("index", i))
 		statusResp, err := client.Sys().Unseal(key)
 		if err != nil {
-			zap.L().Warn("❌ Unseal key submission failed", zap.Int("index", i), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("❌ Unseal key submission failed", zap.Int("index", i), zap.Error(err))
 			continue
 		}
 		if !statusResp.Sealed {
-			zap.L().Info("✅ Vault successfully unsealed", zap.Int("used_keys", i+1))
+			otelzap.Ctx(rc.Ctx).Info("✅ Vault successfully unsealed", zap.Int("used_keys", i+1))
 			return true, nil
 		}
 	}
@@ -56,7 +58,7 @@ func UnsealVaultIfNeeded(client *api.Client) (bool, error) {
 
 // MustUnseal ensures Vault is unsealed or returns an error.
 // Useful for callers that expect (error), not (bool, error).
-func MustUnseal(client *api.Client) error {
-	_, err := UnsealVaultIfNeeded(client)
+func MustUnseal(rc *eos_io.RuntimeContext, client *api.Client) error {
+	_, err := UnsealVaultIfNeeded(rc, client)
 	return err
 }

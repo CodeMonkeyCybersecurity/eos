@@ -2,7 +2,6 @@
 package read
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
@@ -18,6 +18,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -32,17 +33,17 @@ func init() {
 var InspectVaultInitCmd = &cobra.Command{
 	Use:   "vault-init",
 	Short: "Inspect Vault initialization keys, root token, and eos credentials",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("inspect-vault-init")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		// Load Vault Init Result
 		initResult, err := vault.ReadVaultInitResult()
 		if err != nil {
-			return logger.LogErrAndWrap("inspect vault-init: load init result", err)
+			return logger.LogErrAndWrap(rc, "inspect vault-init: load init result", err)
 		}
 
 		// Load eos password credentials
-		eosCreds, err := eos_unix.LoadPasswordFromSecrets()
+		eosCreds, err := eos_unix.LoadPasswordFromSecrets(rc.Ctx)
 		if err != nil {
 			log.Warn("⚠️ Could not load eos password file", zap.Error(err))
 		}
@@ -101,11 +102,11 @@ var InspectVaultInitCmd = &cobra.Command{
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Inspect current Vault paths (requires root or eos)",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("inspect-vault")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		log.Info("Listing secrets under secret/eos")
-		entries, err := vault.ListUnder(shared.EosID)
+		entries, err := vault.ListUnder(rc, shared.EosID)
 		if err != nil {
 			log.Error("Failed to list Vault secrets", zap.Error(err))
 			return fmt.Errorf("could not list Vault contents: %w", err)
@@ -124,8 +125,8 @@ var InspectVaultCmd = &cobra.Command{
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
 	Short: "Check Vault Agent status and basic functionality",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("inspect-vault-agent")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		if err := vault.CheckVaultAgentService(); err != nil {
 			return err
@@ -133,7 +134,7 @@ var InspectVaultAgentCmd = &cobra.Command{
 		if err := vault.CheckVaultTokenFile(); err != nil {
 			return err
 		}
-		if err := vault.RunVaultTestQuery(); err != nil {
+		if err := vault.RunVaultTestQuery(rc); err != nil {
 			return err
 		}
 
@@ -146,17 +147,16 @@ var InspectVaultAgentCmd = &cobra.Command{
 var InspectVaultLDAPCmd = &cobra.Command{
 	Use:   "ldap",
 	Short: "View stored LDAP config in Vault",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		zap.L().Named("inspect-vault-ldap")
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		cfg := &ldap.LDAPConfig{}
 
-		err := vault.ReadFromVaultAt(context.Background(), shared.LDAPVaultMount, shared.LDAPVaultPath, cfg)
+		err := vault.ReadFromVaultAt(rc, shared.LDAPVaultMount, shared.LDAPVaultPath, cfg)
 		if err != nil {
-			zap.L().Error("Failed to load LDAP config from Vault", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to load LDAP config from Vault", zap.Error(err))
 			return fmt.Errorf("could not load LDAP config from Vault: %w", err)
 		}
 
-		zap.L().Info("LDAP Config Retrieved",
+		otelzap.Ctx(rc.Ctx).Info("LDAP Config Retrieved",
 			zap.String("fqdn", cfg.FQDN),
 			zap.String("bind_dn", cfg.BindDN),
 			zap.String("user_base", cfg.UserBase),
@@ -166,18 +166,18 @@ var InspectVaultLDAPCmd = &cobra.Command{
 			zap.String("password", crypto.Redact(cfg.Password)),
 		)
 		return nil
-	},
+	}),
 }
 
 var InspectSecretsCmd = &cobra.Command{
 	Use:   "secrets",
 	Short: "List and view EOS secrets (redacted)",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("inspect-secrets")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		files, err := os.ReadDir(shared.SecretsDir)
 		if err != nil {
-			return logger.LogErrAndWrap("inspect secrets: read secrets dir", err)
+			return logger.LogErrAndWrap(rc, "inspect secrets: read secrets dir", err)
 		}
 
 		if len(files) == 0 {

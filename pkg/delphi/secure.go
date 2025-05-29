@@ -17,7 +17,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
-	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
 
@@ -42,15 +41,11 @@ func RotateWithTool(rc *eos_io.RuntimeContext) error {
 
 // RunPrimary performs API-based rotation via the tool.
 func RunPrimary(rc *eos_io.RuntimeContext, apiPass string) (*bytes.Buffer, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "delphi.primary_rotation",
-		attribute.String("user", "wazuh"),
-	)
-	defer span.End()
 
 	rc.Log.Info("🔐 Running primary password rotation")
 
 	buf := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx,
+	cmd := exec.CommandContext(rc.Ctx,
 		filepath.Base(DelphiPasswdToolPath),
 		"-a", "-A", "-au", "wazuh", "-ap", apiPass,
 	)
@@ -66,8 +61,6 @@ func RunPrimary(rc *eos_io.RuntimeContext, apiPass string) (*bytes.Buffer, error
 
 // RunFallback extracts the UI password, rotates via API, then retries.
 func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "fallback-rotation")
-	defer span.End()
 
 	rc.Log.Info("🔁 Fallback: extracting WUI password")
 	content, err := os.ReadFile("/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml")
@@ -88,25 +81,25 @@ func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 		Port:               "55000",
 		VerifyCertificates: false,
 	}
-	token, err := AuthenticateUser(&cfg, "wazuh-wui", wuiPass)
+	token, err := AuthenticateUser(rc, &cfg, "wazuh-wui", wuiPass)
 	if err != nil {
 		return "", cerr.Wrap(err, "fallback auth failed")
 	}
 	cfg.Token = token
 
-	userID, err := GetUserIDByUsername(&cfg, "wazuh")
+	userID, err := GetUserIDByUsername(rc, &cfg, "wazuh")
 	if err != nil {
 		return "", cerr.Wrap(err, "fallback get user ID")
 	}
 
 	newPass, _ := crypto.GeneratePassword(20)
-	if err := UpdateUserPassword(&cfg, userID, newPass); err != nil {
+	if err := UpdateUserPassword(rc, &cfg, userID, newPass); err != nil {
 		return "", cerr.Wrap(err, "fallback update password")
 	}
 
 	// Retry tool to sync everything
 	rc.Log.Info("🔁 Retrying with new password")
-	retry := exec.CommandContext(ctx, filepath.Base(DelphiPasswdToolPath),
+	retry := exec.CommandContext(rc.Ctx, filepath.Base(DelphiPasswdToolPath),
 		"-a", "-A", "-au", "wazuh", "-ap", newPass,
 	)
 	retry.Stdout = os.Stdout
@@ -143,8 +136,6 @@ func ParseSecrets(rc *eos_io.RuntimeContext, out *bytes.Buffer) map[string]strin
 
 // RestartServices restarts the given services on each OS.
 func RestartServices(rc *eos_io.RuntimeContext, services []string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "delphi.restart_services")
-	defer span.End()
 
 	for _, svc := range services {
 		rc.Log.Info("🔄 Restarting service", zap.String("service", svc))
@@ -152,11 +143,11 @@ func RestartServices(rc *eos_io.RuntimeContext, services []string) error {
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
 		case "windows":
-			cmd = exec.CommandContext(ctx, "sc", "restart", svc)
+			cmd = exec.CommandContext(rc.Ctx, "sc", "restart", svc)
 		case "darwin":
-			cmd = exec.CommandContext(ctx, "brew", "services", "restart", svc)
+			cmd = exec.CommandContext(rc.Ctx, "brew", "services", "restart", svc)
 		default:
-			cmd = exec.CommandContext(ctx, "systemctl", "restart", svc)
+			cmd = exec.CommandContext(rc.Ctx, "systemctl", "restart", svc)
 		}
 
 		out, err := cmd.CombinedOutput()

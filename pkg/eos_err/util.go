@@ -3,11 +3,13 @@
 package eos_err
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -22,7 +24,7 @@ func DebugEnabled() bool {
 }
 
 // ExtractSummary extracts a concise error summary from full output.
-func ExtractSummary(output string, maxCandidates int) string {
+func ExtractSummary(ctx context.Context, output string, maxCandidates int) string {
 	trimmed := strings.TrimSpace(output)
 	if trimmed == "" {
 		return "No output provided."
@@ -65,7 +67,7 @@ func ExtractSummary(output string, maxCandidates int) string {
 }
 
 // NewExpectedError wraps an error for softer UX handling.
-func NewExpectedError(err error) error {
+func NewExpectedError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
 	}
@@ -79,26 +81,26 @@ func IsExpectedUserError(err error) bool {
 }
 
 // PrintError prints a human-readable error message without exiting.
-func PrintError(userMessage string, err error) {
+func PrintError(ctx context.Context, userMessage string, err error) {
 	if DebugEnabled() {
-		zap.L().Fatal(userMessage, zap.Error(err)) // Full structured fatal if debugging
+		otelzap.Ctx(ctx).Fatal(userMessage, zap.Error(err)) // Full structured fatal if debugging
 		return
 	}
 
 	if err != nil {
 		if IsExpectedUserError(err) {
-			zap.L().Warn(userMessage, zap.Error(err))
+			otelzap.Ctx(ctx).Warn(userMessage, zap.Error(err))
 			fmt.Fprintf(os.Stderr, "⚠️  Notice: %s: %v\n", userMessage, err)
 		} else {
-			zap.L().Error(userMessage, zap.Error(err))
+			otelzap.Ctx(ctx).Error(userMessage, zap.Error(err))
 			fmt.Fprintf(os.Stderr, "❌ Error: %s: %v\n", userMessage, err)
 		}
 	}
 }
 
 // ExitWithError prints the error and exits with status 1.
-func ExitWithError(userMessage string, err error) {
-	PrintError(userMessage, err)
+func ExitWithError(ctx context.Context, userMessage string, err error) {
+	PrintError(ctx, userMessage, err)
 	fmt.Fprintln(os.Stderr, "👉 Tip: rerun with --debug for more details.")
 	os.Exit(1)
 }

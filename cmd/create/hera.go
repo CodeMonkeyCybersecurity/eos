@@ -15,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 
@@ -33,13 +34,13 @@ var CreateHeraCmd = &cobra.Command{
 - Running docker compose up -d and displaying service status & access URL`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		zap.L().Info("🚀 Starting Hera (Authentik) deployment")
+		otelzap.Ctx(rc.Ctx).Info("🚀 Starting Hera (Authentik) deployment")
 
 		// Ensure target directory exists
 		if _, err := os.Stat(shared.HeraDir); os.IsNotExist(err) {
-			zap.L().Warn("Hera directory does not exist; creating it", zap.String("path", shared.HeraDir))
+			otelzap.Ctx(rc.Ctx).Warn("Hera directory does not exist; creating it", zap.String("path", shared.HeraDir))
 			if err := os.MkdirAll(shared.HeraDir, shared.DirPermStandard); err != nil {
-				zap.L().Fatal("Failed to create Hera directory", zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Fatal("Failed to create Hera directory", zap.Error(err))
 			}
 		}
 
@@ -47,11 +48,11 @@ var CreateHeraCmd = &cobra.Command{
 		var composeFiles []string
 		localYml, err := filepath.Glob("docker-compose.yml")
 		if err != nil {
-			zap.L().Warn("Error globbing docker-compose.yml", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Error globbing docker-compose.yml", zap.Error(err))
 		}
 		localYaml, err := filepath.Glob("docker-compose.yaml")
 		if err != nil {
-			zap.L().Warn("Error globbing docker-compose.yaml", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Error globbing docker-compose.yaml", zap.Error(err))
 		}
 		composeFiles = append(composeFiles, localYml...)
 		composeFiles = append(composeFiles, localYaml...)
@@ -60,31 +61,31 @@ var CreateHeraCmd = &cobra.Command{
 			// Use local docker-compose file(s)
 			for _, file := range composeFiles {
 				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
-				zap.L().Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
+				otelzap.Ctx(rc.Ctx).Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
 				if err := eos_unix.CopyFile(rc.Ctx, file, destFile, 0); err != nil {
-					zap.L().Fatal("Failed to copy docker-compose file", zap.Error(err))
+					otelzap.Ctx(rc.Ctx).Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}
 			}
 		} else {
 			// Download the latest docker-compose.yml from the remote URL
-			zap.L().Info("📦 Downloading latest docker-compose.yml")
-			if err := execute.RunSimple(shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
-				zap.L().Fatal("Failed to download docker-compose.yml", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Info("📦 Downloading latest docker-compose.yml")
+			if err := execute.RunSimple(rc.Ctx, shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
+				otelzap.Ctx(rc.Ctx).Fatal("Failed to download docker-compose.yml", zap.Error(err))
 			}
 		}
 
 		// Generate secrets
-		zap.L().Info("🔐 Generating secrets for .env file")
+		otelzap.Ctx(rc.Ctx).Info("🔐 Generating secrets for .env file")
 		pgPassCmd := exec.Command("openssl", "rand", "-base64", "36")
 		secretKeyCmd := exec.Command("openssl", "rand", "-base64", "60")
 
 		pgPassBytes, err := pgPassCmd.Output()
 		if err != nil {
-			zap.L().Fatal("Failed to generate PG_PASS", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to generate PG_PASS", zap.Error(err))
 		}
 		secretKeyBytes, err := secretKeyCmd.Output()
 		if err != nil {
-			zap.L().Fatal("Failed to generate AUTHENTIK_SECRET_KEY", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to generate AUTHENTIK_SECRET_KEY", zap.Error(err))
 		}
 
 		pgPass := strings.TrimSpace(string(pgPassBytes))
@@ -108,40 +109,40 @@ var CreateHeraCmd = &cobra.Command{
 
 		envPath := filepath.Join(shared.HeraDir, ".env")
 		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
-			zap.L().Fatal("Failed to write .env file", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to write .env file", zap.Error(err))
 		}
-		zap.L().Info("✅ .env file created", zap.String("path", envPath))
+		otelzap.Ctx(rc.Ctx).Info("✅ .env file created", zap.String("path", envPath))
 
 		// Fix directory ownership so the container can write as needed.
-		zap.L().Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
+		otelzap.Ctx(rc.Ctx).Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
 		chownCmd := exec.Command("chown", "-R", "472:472", shared.HeraDir)
 		chownCmd.Stdout = os.Stdout
 		chownCmd.Stderr = os.Stderr
 		if err := chownCmd.Run(); err != nil {
-			zap.L().Fatal("Error running chown", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Error running chown", zap.Error(err))
 		}
 
 		// Ensure external network is present
-		if err := container.EnsureArachneNetwork(rc.Ctx); err != nil {
-			zap.L().Fatal("Could not create or verify arachne-net", zap.Error(err))
+		if err := container.EnsureArachneNetwork(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Fatal("Could not create or verify arachne-net", zap.Error(err))
 		}
 
 		// Pull images and deploy
-		zap.L().Info("🐳 Pulling docker images")
-		if err := execute.RunSimple(shared.HeraDir, "docker", "compose", "pull"); err != nil {
-			zap.L().Fatal("Failed to pull docker images", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Info("🐳 Pulling docker images")
+		if err := execute.RunSimple(rc.Ctx, shared.HeraDir, "docker", "compose", "pull"); err != nil {
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to pull docker images", zap.Error(err))
 		}
 
-		zap.L().Info("🚀 Launching Hera via docker compose")
-		if err := execute.RunSimple(shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
-			zap.L().Fatal("Failed to run docker compose", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Info("🚀 Launching Hera via docker compose")
+		if err := execute.RunSimple(rc.Ctx, shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to run docker compose", zap.Error(err))
 		}
 
 		time.Sleep(5 * time.Second)
 
-		zap.L().Info("🔍 Verifying container status")
-		if err := container.CheckDockerContainers(rc.Ctx); err != nil {
-			zap.L().Warn("Docker containers may not have started cleanly", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Info("🔍 Verifying container status")
+		if err := container.CheckDockerContainers(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 
 		fmt.Println("\n🎉 Hera (Authentik) is deploying.")

@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -21,24 +22,24 @@ var UpdateAgentsCmd = &cobra.Command{
 	Long:  "Upgrades one or more Wazuh agents using a remote package (WPK) via the API.",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig(rc.Ctx)
+		cfg, err := delphi.ReadConfig(rc)
 		if err != nil {
-			zap.L().Error("Failed to load Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to load Delphi config", zap.Error(err))
 			return err
 		}
 
-		token, err := delphi.Authenticate(cfg)
+		token, err := delphi.Authenticate(rc, cfg)
 		if err != nil {
-			zap.L().Error("Authentication failed", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Authentication failed", zap.Error(err))
 			return fmt.Errorf("authentication failed: %w", err)
 		}
 
-		agentRaw := interaction.PromptInput("Enter agent IDs (comma-separated)", "")
+		agentRaw := interaction.PromptInput(rc.Ctx, "Enter agent IDs (comma-separated)", "")
 		agentIDs := strings.Split(agentRaw, ",")
 
-		version := interaction.PromptInput("Enter version (e.g., v4.6.0)", "")
-		repo := interaction.PromptInput("Enter WPK repo", "packages.wazuh.com/wpk/")
-		packageType := interaction.PromptInput("Enter package type (rpm/deb)", "rpm")
+		version := interaction.PromptInput(rc.Ctx, "Enter version (e.g., v4.6.0)", "")
+		repo := interaction.PromptInput(rc.Ctx, "Enter WPK repo", "packages.wazuh.com/wpk/")
+		packageType := interaction.PromptInput(rc.Ctx, "Enter package type (rpm/deb)", "rpm")
 		force, _ := interaction.Resolve("Force upgrade?")
 		useHTTP, _ := interaction.Resolve("Use HTTP (instead of HTTPS)?")
 
@@ -55,12 +56,12 @@ var UpdateAgentsCmd = &cobra.Command{
 			},
 		}
 
-		if err := delphi.UpgradeAgents(cfg, token, agentIDs, payload); err != nil {
-			zap.L().Error("Upgrade failed", zap.Error(err))
+		if err := delphi.UpgradeAgents(rc, cfg, token, agentIDs, payload); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Upgrade failed", zap.Error(err))
 			return fmt.Errorf("upgrade failed: %w", err)
 		}
 
-		zap.L().Info("✅ Agent upgrade request sent successfully.")
+		otelzap.Ctx(rc.Ctx).Info("✅ Agent upgrade request sent successfully.")
 		return nil
 	}),
 }

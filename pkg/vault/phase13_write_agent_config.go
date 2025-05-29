@@ -8,10 +8,11 @@ import (
 	"path/filepath"
 	"text/template"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 var (
@@ -20,8 +21,8 @@ var (
 	agentServiceTpl = template.Must(template.New("vault-agent-eos.service").Parse(shared.AgentSystemDUnit))
 )
 
-func PhaseRenderVaultAgentConfig(client *api.Client) error {
-	logger := zap.L().Named("vault.PhaseRenderVaultAgentConfig")
+func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	addr := os.Getenv(shared.VaultAddrEnv)
 	if addr == "" {
@@ -29,16 +30,16 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	}
 
 	// 1) prepare /run/eos and the sink file
-	if err := prepareTokenSink(shared.AgentToken, shared.EosID); err != nil {
+	if err := prepareTokenSink(rc, shared.AgentToken, shared.EosID); err != nil {
 		return fmt.Errorf("prepare token sink: %w", err)
 	}
 
 	// 2) render + write HCL
-	roleID, secretID, err := readAppRoleCredsFromDisk(client)
+	roleID, secretID, err := readAppRoleCredsFromDisk(rc, client)
 	if err != nil {
 		return fmt.Errorf("read AppRole creds: %w", err)
 	}
-	if err := writeAgentHCL(addr, roleID, secretID); err != nil {
+	if err := writeAgentHCL(rc, addr, roleID, secretID); err != nil {
 		return fmt.Errorf("write agent HCL: %w", err)
 	}
 
@@ -51,22 +52,22 @@ func PhaseRenderVaultAgentConfig(client *api.Client) error {
 	}
 
 	// 4) reload & enable
-	if err := eos_unix.ReloadDaemonAndEnable(shared.VaultAgentService); err != nil {
+	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, shared.VaultAgentService); err != nil {
 		return fmt.Errorf("reload/enable service: %w", err)
 	}
 
-	logger.Info("✅ Vault Agent config + service installed")
+	log.Info("✅ Vault Agent config + service installed")
 	return nil
 }
 
 // prepareTokenSink ensures the runtime directory exists, ownership is correct,
 // and the sink file is a fresh, zero‐length file owned by `user`.
-func prepareTokenSink(tokenPath, user string) error {
+func prepareTokenSink(rc *eos_io.RuntimeContext, tokenPath, user string) error {
 	runDir := filepath.Dir(tokenPath)
 	if err := os.MkdirAll(runDir, 0o700); err != nil {
 		return err
 	}
-	uid, gid, err := eos_unix.LookupUser(user)
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, user)
 	if err != nil {
 		return err
 	}
@@ -91,15 +92,15 @@ func prepareTokenSink(tokenPath, user string) error {
 	return os.Chown(tokenPath, uid, gid)
 }
 
-func writeAgentHCL(addr, roleID, secretID string) error {
+func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) error {
 	// ensure AppRole files exist
 	if err := shared.EnsureSecretsDir(); err != nil {
 		return err
 	}
-	if err := shared.EnsureFileExists(shared.AppRolePaths.RoleID, roleID, shared.OwnerReadOnly); err != nil {
+	if err := shared.EnsureFileExists(rc.Ctx, shared.AppRolePaths.RoleID, roleID, shared.OwnerReadOnly); err != nil {
 		return err
 	}
-	if err := shared.EnsureFileExists(shared.AppRolePaths.SecretID, secretID, shared.OwnerReadOnly); err != nil {
+	if err := shared.EnsureFileExists(rc.Ctx, shared.AppRolePaths.SecretID, secretID, shared.OwnerReadOnly); err != nil {
 		return err
 	}
 

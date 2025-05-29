@@ -24,7 +24,7 @@ stores it temporarily on the host with a timestamped filename,
 then injects it into a destination VM.
 
 Both VMs must be shut off for virt-copy to work.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		timestamp := time.Now().Format("20060102_150405")
 		filename := filepath.Base(kvm.SourcePath)
 		tempDir := "/var/lib/eos/transfer"
@@ -33,7 +33,7 @@ Both VMs must be shut off for virt-copy to work.`,
 		}
 
 		intermediate := filepath.Join(tempDir, fmt.Sprintf("%s_from-%s_to-%s_%s", timestamp, kvm.SourceVM, kvm.DestVM, filename))
-		ctx.Log.Info("📤 Starting KVM file sync",
+		rc.Log.Info("📤 Starting KVM file sync",
 			zap.String("sourceVM", kvm.SourceVM),
 			zap.String("sourcePath", kvm.SourcePath),
 			zap.String("destVM", kvm.DestVM),
@@ -41,12 +41,12 @@ Both VMs must be shut off for virt-copy to work.`,
 			zap.String("hostTempFile", intermediate),
 		)
 
-		err := kvm.SyncFileBetweenVMs(kvm.SourceVM, kvm.SourcePath, kvm.DestVM, kvm.DestPath)
+		err := kvm.SyncFileBetweenVMs(rc, kvm.SourceVM, kvm.SourcePath, kvm.DestVM, kvm.DestPath)
 		if err != nil {
 			log.Fatal("sync failed", zap.Error(err))
 		}
 
-		ctx.Log.Info("✅ File transferred successfully", zap.String("from", kvm.SourceVM), zap.String("to", kvm.DestVM))
+		rc.Log.Info("✅ File transferred successfully", zap.String("from", kvm.SourceVM), zap.String("to", kvm.DestVM))
 		return nil
 	}),
 }

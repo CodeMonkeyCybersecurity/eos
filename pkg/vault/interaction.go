@@ -6,21 +6,22 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 // PromptForEosPassword securely prompts for and confirms the eos Vault password.
 // Returns an error if input reading fails or confirmation mismatches.
-func PromptForEosPassword() (*shared.UserpassCreds, error) {
-	password, err := interaction.PromptSecret("🔐 Enter eos Vault password")
+func PromptForEosPassword(rc *eos_io.RuntimeContext) (*shared.UserpassCreds, error) {
+	password, err := interaction.PromptSecret(rc.Ctx, "🔐 Enter eos Vault password")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read password: %w", err)
 	}
 
-	confirm, err := interaction.PromptSecret("🔐 Confirm password")
+	confirm, err := interaction.PromptSecret(rc.Ctx, "🔐 Confirm password")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read password confirmation: %w", err)
 	}
@@ -34,11 +35,11 @@ func PromptForEosPassword() (*shared.UserpassCreds, error) {
 
 // PromptForInitResult prompts interactively for unseal keys and a root token.
 // Returns an error if any prompt fails or input is blank.
-func PromptForInitResult() (*api.InitResponse, error) {
-	zap.L().Info("Prompting for unseal keys and root token (fallback path)")
+func PromptForInitResult(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
+	otelzap.Ctx(rc.Ctx).Info("Prompting for unseal keys and root token (fallback path)")
 	fmt.Println("🔐 Please enter 3 unseal keys and the root token")
 
-	keys, err := interaction.PromptSecrets("Unseal Key", 3)
+	keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read unseal keys: %w", err)
 	}
@@ -48,7 +49,7 @@ func PromptForInitResult() (*api.InitResponse, error) {
 		}
 	}
 
-	rootToken, err := interaction.PromptSecret("Root Token")
+	rootToken, err := interaction.PromptSecret(rc.Ctx, "Root Token")
 	if err != nil {
 		return nil, fmt.Errorf("failed to read root token: %w", err)
 	}
@@ -63,7 +64,7 @@ func PromptForInitResult() (*api.InitResponse, error) {
 }
 
 // PromptUnsealKeys requests 3 unseal keys interactively with hidden input.
-func PromptUnsealKeys() ([]string, error) {
-	zap.L().Info("🔐 Please enter 3 base64-encoded unseal keys")
-	return interaction.PromptSecrets("Unseal Key", 3)
+func PromptUnsealKeys(rc *eos_io.RuntimeContext) ([]string, error) {
+	otelzap.Ctx(rc.Ctx).Info("🔐 Please enter 3 base64-encoded unseal keys")
+	return interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 }

@@ -6,9 +6,11 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	crerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -18,8 +20,8 @@ func IsDockerRunning() bool {
 }
 
 // CheckAndInstallDockerIfNeeded ensures Docker is installed and running, or prompts the user to install it.
-func CheckAndInstallDockerIfNeeded() error {
-	log := zap.L()
+func CheckAndInstallDockerIfNeeded(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	// 1. Ensure Homebrew is present
 	if !platform.IsCommandAvailable("brew") {
@@ -36,7 +38,7 @@ func CheckAndInstallDockerIfNeeded() error {
 	log.Warn("❌ Docker is not installed or not running.")
 
 	// 3. Prompt user for installation
-	shouldInstall := interaction.PromptYesNo("Docker Desktop is required but not running. Install it now?", true)
+	shouldInstall := interaction.PromptYesNo(rc.Ctx, "Docker Desktop is required but not running. Install it now?", true)
 	if !shouldInstall {
 		return crerr.WithHint(
 			crerr.New("Docker is required but not installed"),

@@ -2,58 +2,46 @@
 package macos
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"time"
 
 	crerr "github.com/cockroachdb/errors"
-	"go.opentelemetry.io/otel/attribute"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 )
 
 // EnsureHomebrewInstalled makes sure "brew" is available on macOS.
 // It enforces an OPA policy, emits tracing & structured logging,
 // and wraps errors with CockroachDB hints.
-func EnsureHomebrewInstalled(ctx context.Context) error {
-	log := zap.L().Named("homebrew")
+func EnsureHomebrewInstalled(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	start := time.Now()
 
 	// 1) OPA policy guard
-	if err := eos_opa.Enforce(ctx, "macos/ensure_homebrew", nil); err != nil {
+	if err := eos_opa.Enforce(rc.Ctx, "macos/ensure_homebrew", nil); err != nil {
 		return crerr.Wrapf(err, "policy denied for Homebrew installation")
 	}
-
-	// 2) Start an OpenTelemetry span
-	ctx, span := telemetry.Start(ctx, "EnsureHomebrewInstalled")
-	defer span.End()
 
 	// 3) If already installed, nothing more to do
 	if platform.IsCommandAvailable("brew") {
 		log.Info("Homebrew already installed")
-		span.SetAttributes(attribute.String("status", "already_installed"))
 		return nil
 	}
 	log.Warn("Homebrew not found")
-	span.SetAttributes(attribute.String("status", "not_installed"))
 
 	// 4) Prompt user
-	if !interaction.PromptYesNo("Homebrew is required. Install now?", true) {
-		span.SetAttributes(attribute.String("user_response", "declined"))
+	if !interaction.PromptYesNo(rc.Ctx, "Homebrew is required. Install now?", true) {
 		return crerr.New("Homebrew installation was declined by user")
 	}
-	span.SetAttributes(attribute.String("user_response", "accepted"))
 
 	// 5) Perform the install
 	log.Info("Installing Homebrew…")
 	if err := runHomebrewInstaller(); err != nil {
-		span.RecordError(err)
-		span.SetAttributes(attribute.String("status", "install_failed"))
 		return crerr.WithHint(
 			crerr.Wrap(err, "failed to install Homebrew"),
 			"please install manually from https://brew.sh",
@@ -62,7 +50,6 @@ func EnsureHomebrewInstalled(ctx context.Context) error {
 
 	// 6) Success
 	log.Info("Homebrew installed successfully")
-	span.SetAttributes(attribute.String("status", "installed"))
 
 	// Note: telemetry.TrackCommand is now handled by your `eos.Wrap` wrapper,
 	// so we don’t call it here and avoid signature mismatches.

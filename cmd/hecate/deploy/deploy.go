@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/apps"
@@ -40,27 +41,27 @@ Examples:
   hecate deploy nextcloud
   hecate deploy jenkins`,
 	Args: cobra.ExactArgs(1),
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		runDeploy(cmd, args) // Call the helper function with its parameters.
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		runDeploy(rc, cmd, args) // Call the helper function with its parameters.
 		return nil
 	}),
 }
 
 // runDeploy validates the app name and calls deployApplication.
-func runDeploy(_ *cobra.Command, args []string) {
+func runDeploy(rc *eos_io.RuntimeContext, _ *cobra.Command, args []string) {
 	app := strings.ToLower(args[0])
 	if !utils.IsValidApp(app, apps.GetSupportedAppNames()) {
 		fmt.Printf("❌ Invalid application: %s. Supported: %v\n", app, apps.GetSupportedAppNames())
 		return
 	}
 
-	zap.L().Info("Deploying application", zap.String("app", app))
+	otelzap.Ctx(rc.Ctx).Info("Deploying application", zap.String("app", app))
 	if err := deployApplication(app); err != nil {
-		zap.L().Error("Deployment failed", zap.String("app", app), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Deployment failed", zap.String("app", app), zap.Error(err))
 		fmt.Printf("❌ Deployment failed for '%s': %v\n", app, err)
 		return
 	}
-	zap.L().Info("Deployment completed successfully", zap.String("app", app))
+	otelzap.Ctx(rc.Ctx).Info("Deployment completed successfully", zap.String("app", app))
 	fmt.Printf("✅ Deployment completed successfully for %s\n", app)
 }
 

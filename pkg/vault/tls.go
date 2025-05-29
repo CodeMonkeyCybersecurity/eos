@@ -6,8 +6,10 @@ import (
 	"context"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	cerr "github.com/cockroachdb/errors"
 	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
@@ -17,11 +19,11 @@ import (
 // Priority:
 //  1. VAULT_CLIENT_CERT env var
 //  2. vaultapi.Config.TLSConfig.ClientCert (via vaultapi.DefaultConfig)
-func GetTLSCertPath() (string, error) {
+func GetTLSCertPath(rc *eos_io.RuntimeContext) (string, error) {
 	_, span := tracer.Start(context.Background(), "vault.GetTLSCertPath")
 	defer span.End()
 
-	log := zap.L().Named("vault.GetTLSCertPath")
+	log := otelzap.Ctx(rc.Ctx)
 
 	// 1️⃣ Check VAULT_CLIENT_CERT env
 	if path := os.Getenv("VAULT_CLIENT_CERT"); path != "" {

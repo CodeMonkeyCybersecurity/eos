@@ -4,58 +4,60 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func EnsurePolicy() error {
+func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 	policyName := shared.EosDefaultPolicyName
-	zap.L().Info("📝 Preparing to write Vault policy", zap.String("policy", policyName))
+	otelzap.Ctx(rc.Ctx).Info("📝 Preparing to write Vault policy", zap.String("policy", policyName))
 
-	client, err := GetRootClient()
+	client, err := GetRootClient(rc)
 	if err != nil {
-		zap.L().Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)
 	}
 
 	pol, err := shared.RenderEosPolicy("users")
 	if err != nil {
-		zap.L().Error("❌ Failed to render policy template", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to render policy template", zap.Error(err))
 		return fmt.Errorf("render policy template: %w", err)
 	}
 
-	zap.L().Debug("📄 Policy loaded", zap.String("preview", truncatePolicy(pol)), zap.Int("length", len(pol)))
+	otelzap.Ctx(rc.Ctx).Debug("📄 Policy loaded", zap.String("preview", truncatePolicy(pol)), zap.Int("length", len(pol)))
 
-	zap.L().Info("📡 Writing policy to Vault")
+	otelzap.Ctx(rc.Ctx).Info("📡 Writing policy to Vault")
 	if err := client.Sys().PutPolicy(policyName, pol); err != nil {
-		zap.L().Error("❌ Failed to write policy", zap.String("policy", policyName), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to write policy", zap.String("policy", policyName), zap.Error(err))
 		return fmt.Errorf("failed to write eos-policy to Vault: %w", err)
 	}
 
-	zap.L().Info("🔍 Verifying policy write")
+	otelzap.Ctx(rc.Ctx).Info("🔍 Verifying policy write")
 	storedPol, err := client.Sys().GetPolicy(policyName)
 	if err != nil {
-		zap.L().Error("❌ Failed to retrieve policy for verification", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to retrieve policy for verification", zap.Error(err))
 		return fmt.Errorf("failed to verify written policy: %w", err)
 	}
 	if strings.TrimSpace(storedPol) != strings.TrimSpace(pol) {
-		zap.L().Error("🚨 Policy mismatch after write",
+		otelzap.Ctx(rc.Ctx).Error("🚨 Policy mismatch after write",
 			zap.String("expected_preview", truncatePolicy(pol)),
 			zap.String("stored_preview", truncatePolicy(storedPol)))
 		return fmt.Errorf("policy mismatch after write — vault contents are inconsistent")
 	}
 
-	zap.L().Info("✅ Policy successfully written and verified", zap.String("policy", policyName))
+	otelzap.Ctx(rc.Ctx).Info("✅ Policy successfully written and verified", zap.String("policy", policyName))
 
-	if err := AttachPolicyToEosEntity(client, zap.L()); err != nil {
+	if err := AttachPolicyToEosEntity(rc, client, rc.Log); err != nil {
 		return fmt.Errorf("failed to attach eos-policy to eos entity: %w", err)
 	}
 
 	return nil
 }
 
-func AttachPolicyToEosEntity(client *api.Client, log *zap.Logger) error {
+func AttachPolicyToEosEntity(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
 	entityName := shared.EosID
 	entityLookupPath := fmt.Sprintf(shared.EosEntityLookupPath, entityName)
 
@@ -119,9 +121,9 @@ func AttachPolicyToEosEntity(client *api.Client, log *zap.Logger) error {
 	return nil
 }
 
-func ApplyEosPolicy(creds shared.UserpassCreds, client *api.Client) error {
-	zap.L().Info("🔐 Creating full-access policy for eos user")
-	zap.L().Debug("Applying policy to eos user", zap.Int("password_len", len(creds.Password)))
+func ApplyEosPolicy(rc *eos_io.RuntimeContext, creds shared.UserpassCreds, client *api.Client) error {
+	otelzap.Ctx(rc.Ctx).Info("🔐 Creating full-access policy for eos user")
+	otelzap.Ctx(rc.Ctx).Debug("Applying policy to eos user", zap.Int("password_len", len(creds.Password)))
 
 	policyName := shared.EosDefaultPolicyName
 	policy, err := shared.RenderEosPolicy("users")
@@ -129,24 +131,24 @@ func ApplyEosPolicy(creds shared.UserpassCreds, client *api.Client) error {
 		return fmt.Errorf("failed to render policy: %w", err)
 	}
 
-	zap.L().Info("📜 Uploading custom policy to Vault", zap.String("policy", policyName))
+	otelzap.Ctx(rc.Ctx).Info("📜 Uploading custom policy to Vault", zap.String("policy", policyName))
 	if err := client.Sys().PutPolicy(policyName, policy); err != nil {
-		zap.L().Error("❌ Failed to apply policy via API", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to apply policy via API", zap.Error(err))
 		return fmt.Errorf("failed to upload policy %q: %w", policyName, err)
 	}
-	zap.L().Info("✅ Policy applied to Vault", zap.String("policy", policyName))
+	otelzap.Ctx(rc.Ctx).Info("✅ Policy applied to Vault", zap.String("policy", policyName))
 
-	zap.L().Info("🔑 Creating eos user in KVv2")
+	otelzap.Ctx(rc.Ctx).Info("🔑 Creating eos user in KVv2")
 	data := map[string]interface{}{
 		"password": creds.Password,
 		"policies": policyName,
 	}
-	if err := WriteKVv2(client, shared.VaultMountKV, shared.EosVaultUserPath, data); err != nil {
-		zap.L().Error("❌ Failed to create eos user in Vault", zap.Error(err))
+	if err := WriteKVv2(rc, client, shared.VaultMountKV, shared.EosVaultUserPath, data); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to create eos user in Vault", zap.Error(err))
 		return fmt.Errorf("failed to write eos user credentials: %w", err)
 	}
 
-	zap.L().Info("✅ eos user created and policy assigned", zap.String("user", shared.EosID), zap.String("policy", policyName))
+	otelzap.Ctx(rc.Ctx).Info("✅ eos user created and policy assigned", zap.String("user", shared.EosID), zap.String("policy", policyName))
 	return nil
 }
 

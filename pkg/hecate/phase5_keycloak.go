@@ -6,12 +6,14 @@ import (
 	"bufio"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // SetupKeycloakWizard prompts the user for Keycloak setup info and returns a ServiceBundle.
-func SetupKeycloakWizard(reader *bufio.Reader) ServiceBundle {
-	log := zap.L().Named("hecate-keycloak-setup")
+func SetupKeycloakWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting Keycloak setup information...")
 
 	// Define the fields to prompt for.
@@ -64,6 +66,7 @@ func SetupKeycloakWizard(reader *bufio.Reader) ServiceBundle {
 
 	// Build the ServiceBundle using GenericWizard.
 	return GenericWizard(
+		rc,
 		"hecate-keycloak-setup",
 		fields,
 		"keycloak",
@@ -77,12 +80,13 @@ func SetupKeycloakWizard(reader *bufio.Reader) ServiceBundle {
 }
 
 // SetupKeycloak performs the full setup: renders Compose, Caddy, etc.
-func SetupKeycloak(bundle ServiceBundle, targetDir string) error {
-	log := zap.L().Named("hecate-keycloak-setup")
+func SetupKeycloak(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("🚀 Starting Keycloak setup rendering...")
 
 	err := RenderBundleFragments(
+		rc,
 		bundle,
 		fmt.Sprintf("%s/docker-compose.override.yml", targetDir),
 		fmt.Sprintf("%s/Caddy-fragments", targetDir),

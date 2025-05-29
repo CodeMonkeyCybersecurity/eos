@@ -9,6 +9,7 @@ import (
 
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/encoding/yaml"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -43,16 +44,16 @@ func ValidateYAMLWithCUE(schemaPath, yamlPath string) error {
 
 func VerifyAll(ctx context.Context, cfg any, schemaPath, yamlPath, policyPath string, policyInput any) error {
 	if err := Struct(cfg); err != nil {
-		zap.L().Error("Struct validation failed", zap.Error(err))
+		otelzap.Ctx(ctx).Error("Struct validation failed", zap.Error(err))
 		return fmt.Errorf("struct validation failed: %w", err)
 	}
 
 	if err := ValidateYAMLWithCUE(schemaPath, yamlPath); err != nil {
-		zap.L().Error("CUE validation failed", zap.String("schema", schemaPath), zap.Error(err))
+		otelzap.Ctx(ctx).Error("CUE validation failed", zap.String("schema", schemaPath), zap.Error(err))
 		return fmt.Errorf("cue validation failed: %w", err)
 	}
 
-	denies, err := EnforcePolicy(ctx, policyPath, policyInput)
+	denies, err := EnforcePolicy(context.Background(), policyPath, policyInput)
 	if err != nil {
 		return fmt.Errorf("policy evaluation failed: %w", err)
 	}

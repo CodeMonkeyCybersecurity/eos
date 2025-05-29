@@ -8,19 +8,21 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // SetupJenkinsWizard prompts the user for Jenkins setup info and returns a ServiceBundle.
-func SetupJenkinsWizard(reader *bufio.Reader) ServiceBundle {
-	log := zap.L().Named("hecate-jenkins-setup")
+func SetupJenkinsWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting Jenkins setup information...")
 
-	jenkinsDomain := interaction.PromptInputWithReader("Enter Jenkins domain (e.g., ci.domain.com)", "ci.domain.com", reader)
-	backendIP := interaction.PromptInputWithReader("Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
+	jenkinsDomain := interaction.PromptInputWithReader(rc.Ctx, "Enter Jenkins domain (e.g., ci.domain.com)", "ci.domain.com", reader)
+	backendIP := interaction.PromptInputWithReader(rc.Ctx, "Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
 
 	// ==== Compose ====
 	serviceSpec := &ServiceSpec{
@@ -78,8 +80,8 @@ func SetupJenkinsWizard(reader *bufio.Reader) ServiceBundle {
 }
 
 // SetupJenkinsCompose builds and returns the DockerComposeFragment for Jenkins.
-func SetupJenkinsCompose(config DockerConfig) (DockerComposeFragment, error) {
-	log := zap.L().Named("hecate-jenkins-compose-setup")
+func SetupJenkinsCompose(rc *eos_io.RuntimeContext, config DockerConfig) (DockerComposeFragment, error) {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Building Docker Compose fragment for Jenkins (port injection)...")
 
 	// This is only adding port 50000 to the nginx service
@@ -99,8 +101,8 @@ func SetupJenkinsCompose(config DockerConfig) (DockerComposeFragment, error) {
 }
 
 // RenderJenkinsCompose renders and writes the Jenkins Docker Compose block.
-func RenderJenkinsCompose(bundle ServiceBundle) error {
-	log := zap.L().Named("hecate-jenkins-compose-render")
+func RenderJenkinsCompose(rc *eos_io.RuntimeContext, bundle ServiceBundle) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Rendering Jenkins Docker Compose block...")
 	for svcName, svc := range bundle.Compose.Services {
 		log.Info("🔧 Rendering service", zap.String("service", svcName))
@@ -128,12 +130,12 @@ func RenderJenkinsCompose(bundle ServiceBundle) error {
 }
 
 // SetupJenkinsCaddy prompts for domain backend info and returns a CaddySpec fragment.
-func SetupJenkinsCaddy(reader *bufio.Reader) CaddySpec {
-	log := zap.L().Named("hecate-jenkins-caddy-setup")
+func SetupJenkinsCaddy(rc *eos_io.RuntimeContext, reader *bufio.Reader) CaddySpec {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting Jenkins Caddy reverse proxy setup information...")
 
-	jenkinsDomain := interaction.PromptInputWithReader("Enter Jenkins domain (e.g., jenkins.domain.com)", "jenkins.domain.com", reader)
-	backendIP := interaction.PromptInputWithReader("Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
+	jenkinsDomain := interaction.PromptInputWithReader(rc.Ctx, "Enter Jenkins domain (e.g., jenkins.domain.com)", "jenkins.domain.com", reader)
+	backendIP := interaction.PromptInputWithReader(rc.Ctx, "Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
 
 	caddyCfg := CaddySpec{
 		Proxies: []CaddyAppProxy{
@@ -155,8 +157,8 @@ func SetupJenkinsCaddy(reader *bufio.Reader) CaddySpec {
 }
 
 // RenderJenkinsCaddy renders and writes the Caddyfile block for Jenkins.
-func RenderJenkinsCaddy(caddyCfg CaddySpec) error {
-	log := zap.L().Named("hecate-jenkins-caddy-render")
+func RenderJenkinsCaddy(rc *eos_io.RuntimeContext, caddyCfg CaddySpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Rendering Jenkins Caddyfile fragment...")
 
 	content, err := RenderCaddyfileContent(caddyCfg)
@@ -181,11 +183,11 @@ func RenderJenkinsCaddy(caddyCfg CaddySpec) error {
 }
 
 // SetupJenkinsNginx prompts for backend IP and returns an NginxSpec for Jenkins agent port.
-func SetupJenkinsNginx(reader *bufio.Reader) *NginxSpec {
-	log := zap.L().Named("hecate-jenkins-nginx-setup")
+func SetupJenkinsNginx(rc *eos_io.RuntimeContext, reader *bufio.Reader) *NginxSpec {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting Jenkins NGINX stream proxy setup information...")
 
-	backendIP := interaction.PromptInputWithReader("Enter backend IP address for Jenkins agent (e.g., 192.168.0.10)", "", reader)
+	backendIP := interaction.PromptInputWithReader(rc.Ctx, "Enter backend IP address for Jenkins agent (e.g., 192.168.0.10)", "", reader)
 
 	nginxSpec := &NginxSpec{
 		StreamBlocks: []shared.NginxStreamBlock{
@@ -207,8 +209,8 @@ func SetupJenkinsNginx(reader *bufio.Reader) *NginxSpec {
 }
 
 // RenderJenkinsNginx renders and writes the NGINX stream block for Jenkins agent port.
-func RenderJenkinsNginx(bundle ServiceBundle) error {
-	log := zap.L().Named("hecate-jenkins-nginx-render")
+func RenderJenkinsNginx(rc *eos_io.RuntimeContext, bundle ServiceBundle) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Rendering Jenkins NGINX stream block...")
 
 	// Render the stream configuration

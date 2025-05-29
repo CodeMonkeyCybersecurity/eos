@@ -16,7 +16,7 @@ var InspectStorageCmd = &cobra.Command{
 	Short: "Retrieve information about storage devices and filesystem usage",
 	Long: `The read storage command displays detailed information about block devices 
 and the usage of mounted filesystems, combining the functionality of lsblk and df -h.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("Reading storage information...")
 
 		// Run lsblk

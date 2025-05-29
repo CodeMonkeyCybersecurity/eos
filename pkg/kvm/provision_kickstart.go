@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func ProvisionKickstartTenantVM(ctx *eos_io.RuntimeContext, vmName, pubKeyPath string) error {
-	log := ctx.Log.Named("kickstart")
+func ProvisionKickstartTenantVM(rc *eos_io.RuntimeContext, vmName, pubKeyPath string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	diskPath := filepath.Join(ImageDir, vmName+".qcow2")
 
 	ksPath, err := GenerateKickstartWithSSH(vmName, pubKeyPath)
@@ -25,16 +26,16 @@ func ProvisionKickstartTenantVM(ctx *eos_io.RuntimeContext, vmName, pubKeyPath s
 	defer os.Remove(ksPath)
 	log.Info("🟡 Kickstart file generated", zap.String("path", ksPath))
 
-	if err := virtInstall(log, vmName, ksPath, diskPath); err != nil {
+	if err := virtInstall(zap.L(), vmName, ksPath, diskPath); err != nil {
 		return fmt.Errorf("virt-install failed: %w", err)
 	}
 	log.Info("🟡 virt-install finished; checking post-install VM status")
 
-	if err := ensureDomainRunning(vmName, log); err != nil {
+	if err := ensureDomainRunning(vmName, zap.L()); err != nil {
 		log.Warn("⚠️ VM not running post-install", zap.Error(err))
 	}
 
-	ipAddr := waitForIP(vmName, 60*time.Second, log)
+	ipAddr := waitForIP(vmName, 60*time.Second, zap.L())
 	if ipAddr == "" || ipAddr == "unknown" {
 		log.Warn("⚠️ IP not found via qemu-agent; falling back to DHCP lease")
 		if mac := getMACFromDomiflist(vmName); mac != "" {

@@ -4,30 +4,33 @@ package interaction
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // ReadLine prompts the user with a label and returns a trimmed line of input.
-func ReadLine(reader *bufio.Reader, label string) (string, error) {
-	zap.L().Debug("📝 Prompting user for input", zap.String("label", label))
+func ReadLine(ctx context.Context, reader *bufio.Reader, label string) (string, error) {
+	otelzap.Ctx(ctx).Debug("📝 Prompting user for input", zap.String("label", label))
 	fmt.Print(label + ": ")
 
 	text, err := reader.ReadString('\n')
 	if err != nil {
-		zap.L().Error("❌ Failed to read user input", zap.Error(err))
+		otelzap.Ctx(ctx).Error("❌ Failed to read user input", zap.Error(err))
 		return "", err
 	}
 
 	value := strings.TrimSpace(text)
-	zap.L().Debug("📥 User input received", zap.String("value", value))
+	otelzap.Ctx(ctx).Debug("📥 User input received", zap.String("value", value))
 	return value, nil
 }
 
 // ReadLines prompts for multiple labeled inputs.
-func ReadLines(reader *bufio.Reader, label string, count int) ([]string, error) {
+func ReadLines(rc *eos_io.RuntimeContext, reader *bufio.Reader, label string, count int) ([]string, error) {
 	if count <= 0 {
 		return nil, fmt.Errorf("invalid input count: %d", count)
 	}
@@ -37,7 +40,7 @@ func ReadLines(reader *bufio.Reader, label string, count int) ([]string, error) 
 		if count > 1 {
 			prompt = fmt.Sprintf("%s %d", label, i+1)
 		}
-		val, err := ReadLine(reader, prompt)
+		val, err := ReadLine(rc.Ctx, reader, prompt)
 		if err != nil {
 			return values[:i], fmt.Errorf("error reading '%s': %w", prompt, err)
 		}

@@ -29,7 +29,7 @@ var SecureDelphiCmd = &cobra.Command{
 		// 2) Fetch current Wazuh API password
 		rc.Log.Info("🔍 Extracting current Wazuh API password")
 		var apiPass string
-		if apiPass, err = delphi.ExtractWazuhUserPassword(); err != nil {
+		if apiPass, err = delphi.ExtractWazuhUserPassword(rc); err != nil {
 			err = cerr.Wrapf(err, "extract Wazuh API password")
 			return
 		}
@@ -56,7 +56,7 @@ var SecureDelphiCmd = &cobra.Command{
 		}
 
 		// 5) Store to Vault (non-fatal on failure)
-		if storeErr := vault.HandleFallbackOrStore("delphi", secrets); storeErr != nil {
+		if storeErr := vault.HandleFallbackOrStore(rc, "delphi", secrets); storeErr != nil {
 			rc.Log.Warn("Failed to store secrets in Vault; continuing", zap.Error(storeErr))
 		}
 

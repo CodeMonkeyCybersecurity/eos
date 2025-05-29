@@ -6,16 +6,17 @@ import (
 
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllNetworks(ctx *eos_io.RuntimeContext) error {
-	log := ctx.Log
+func GetAllNetworks(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	networks, err := client.Network.All(ctx.Ctx)
+	networks, err := client.Network.All(rc.Ctx)
 	if err != nil {
 		log.Error("❌ Failed to list networks", zap.Error(err))
 		return cerr.Wrap(err, "failed to list networks")
@@ -27,11 +28,11 @@ func GetAllNetworks(ctx *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func CreateANetwork(ctx *eos_io.RuntimeContext) error {
-	log := ctx.Log
+func CreateANetwork(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	result, _, err := client.Network.Create(ctx.Ctx, hcloud.NetworkCreateOpts{
+	result, _, err := client.Network.Create(rc.Ctx, hcloud.NetworkCreateOpts{
 		ExposeRoutesToVSwitch: false,
 		IPRange: &net.IPNet{
 			IP:   net.ParseIP("10.0.0.0"),
@@ -73,11 +74,11 @@ func CreateANetwork(ctx *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func GetANetwork(ctx *eos_io.RuntimeContext, id int64) error {
-	log := ctx.Log
+func GetANetwork(rc *eos_io.RuntimeContext, id int64) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	network, _, err := client.Network.GetByID(ctx.Ctx, id)
+	network, _, err := client.Network.GetByID(rc.Ctx, id)
 	if err != nil {
 		log.Error("❌ Failed to get network", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get network")
@@ -91,11 +92,11 @@ func GetANetwork(ctx *eos_io.RuntimeContext, id int64) error {
 	return nil
 }
 
-func UpdateANetwork(ctx *eos_io.RuntimeContext, id int64, newName string) error {
-	log := ctx.Log
+func UpdateANetwork(rc *eos_io.RuntimeContext, id int64, newName string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	updated, _, err := client.Network.Update(ctx.Ctx, &hcloud.Network{ID: id}, hcloud.NetworkUpdateOpts{
+	updated, _, err := client.Network.Update(rc.Ctx, &hcloud.Network{ID: id}, hcloud.NetworkUpdateOpts{
 		ExposeRoutesToVSwitch: hcloud.Ptr(false),
 		Name:                  newName,
 		Labels: map[string]string{
@@ -113,11 +114,11 @@ func UpdateANetwork(ctx *eos_io.RuntimeContext, id int64, newName string) error 
 	return nil
 }
 
-func DeleteANetwork(ctx *eos_io.RuntimeContext, id int64) error {
-	log := ctx.Log
+func DeleteANetwork(rc *eos_io.RuntimeContext, id int64) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	_, err := client.Network.Delete(ctx.Ctx, &hcloud.Network{ID: id})
+	_, err := client.Network.Delete(rc.Ctx, &hcloud.Network{ID: id})
 	if err != nil {
 		log.Error("❌ Failed to delete network", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to delete network")

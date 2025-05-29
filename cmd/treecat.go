@@ -15,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -22,13 +23,13 @@ var TreecatCmd = &cobra.Command{
 	Use:   "treecat [path]",
 	Short: "Recursively show directory structure and preview file contents",
 	Args:  cobra.ExactArgs(1),
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		root := args[0]
 
 		err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 			if err != nil {
-				zap.L().Warn("Skipping path due to error", zap.String("path", path), zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Warn("Skipping path due to error", zap.String("path", path), zap.Error(err))
 				return nil
 			}
 
@@ -39,9 +40,9 @@ var TreecatCmd = &cobra.Command{
 			fmt.Printf("%s- %s\n", indent, d.Name())
 
 			if d.Type().IsRegular() {
-				preview, err := previewFile(path)
+				preview, err := previewFile(rc, path)
 				if err != nil {
-					zap.L().Warn("Could not preview file", zap.String("file", path), zap.Error(err))
+					otelzap.Ctx(rc.Ctx).Warn("Could not preview file", zap.String("file", path), zap.Error(err))
 					return nil
 				}
 
@@ -53,19 +54,19 @@ var TreecatCmd = &cobra.Command{
 		})
 
 		if err != nil {
-			zap.L().Error("Failed to walk directory", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to walk directory", zap.Error(err))
 			os.Exit(1)
 		}
 		return nil
 	}),
 }
 
-func previewFile(path string) (string, error) {
+func previewFile(rc *eos_io.RuntimeContext, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
-	defer shared.SafeClose(f)
+	defer shared.SafeClose(rc.Ctx, f)
 
 	buf := make([]byte, shared.MaxPreviewSize)
 	n, err := f.Read(buf)

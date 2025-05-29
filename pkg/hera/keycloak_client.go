@@ -1,5 +1,3 @@
-/* pkg/hera/keycloak_client.go */
-
 package hera
 
 import (
@@ -14,7 +12,6 @@ func NewClient(url, clientID, clientSecret string, realm string) (*Client, error
 	ctx := context.Background()
 	kc := gocloak.NewClient(url)
 
-	// ✅ Don't use LoginClientWithScope — most 401s from Keycloak are due to invalid scopes in client_credentials flow
 	token, err := kc.LoginClient(ctx, clientID, clientSecret, realm)
 	if err != nil {
 		return nil, fmt.Errorf("keycloak login failed (check client ID/secret/realm): %w", err)

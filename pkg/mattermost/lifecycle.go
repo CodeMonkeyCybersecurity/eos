@@ -28,7 +28,6 @@ const (
 func OrchestrateMattermostInstall(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-
 	// Clean up any pre-existing temp clone dir
 	_ = os.RemoveAll(CloneDir)
 
@@ -63,7 +62,7 @@ func OrchestrateMattermostInstall(rc *eos_io.RuntimeContext) error {
 	}
 
 	log.Info("🐳 Starting containers")
-	if err := container.ComposeUpInDir(rc.Ctx, MattermostDir); err != nil {
+	if err := container.ComposeUpInDir(rc, MattermostDir); err != nil {
 		return cerr.Wrap(err, "docker compose up")
 	}
 

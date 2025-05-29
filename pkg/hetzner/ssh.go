@@ -5,16 +5,17 @@ import (
 
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllSshKeys(ctx *eos_io.RuntimeContext) error {
-	log := ctx.Log
+func GetAllSshKeys(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	keys, err := client.SSHKey.All(ctx.Ctx)
+	keys, err := client.SSHKey.All(rc.Ctx)
 	if err != nil {
 		log.Error("❌ Failed to list SSH keys", zap.Error(err))
 		return cerr.Wrap(err, "failed to list ssh keys")
@@ -26,11 +27,11 @@ func GetAllSshKeys(ctx *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func CreateSshKey(ctx *eos_io.RuntimeContext, name string, publicKey string) error {
-	log := ctx.Log
+func CreateSshKey(rc *eos_io.RuntimeContext, name string, publicKey string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	key, _, err := client.SSHKey.Create(ctx.Ctx, hcloud.SSHKeyCreateOpts{
+	key, _, err := client.SSHKey.Create(rc.Ctx, hcloud.SSHKeyCreateOpts{
 		Name:      name,
 		PublicKey: publicKey,
 		Labels: map[string]string{
@@ -46,11 +47,11 @@ func CreateSshKey(ctx *eos_io.RuntimeContext, name string, publicKey string) err
 	return nil
 }
 
-func GetAnSshKey(ctx *eos_io.RuntimeContext, id int64) error {
-	log := ctx.Log
+func GetAnSshKey(rc *eos_io.RuntimeContext, id int64) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	key, _, err := client.SSHKey.GetByID(ctx.Ctx, id)
+	key, _, err := client.SSHKey.GetByID(rc.Ctx, id)
 	if err != nil {
 		log.Error("❌ Failed to get SSH key", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get ssh key")
@@ -64,11 +65,11 @@ func GetAnSshKey(ctx *eos_io.RuntimeContext, id int64) error {
 	return nil
 }
 
-func UpdateAnSshKey(ctx *eos_io.RuntimeContext, id int64, newName string) error {
-	log := ctx.Log
+func UpdateAnSshKey(rc *eos_io.RuntimeContext, id int64, newName string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	updated, _, err := client.SSHKey.Update(ctx.Ctx, &hcloud.SSHKey{ID: id}, hcloud.SSHKeyUpdateOpts{
+	updated, _, err := client.SSHKey.Update(rc.Ctx, &hcloud.SSHKey{ID: id}, hcloud.SSHKeyUpdateOpts{
 		Name: newName, // ✅ pass as string, not *string
 		Labels: map[string]string{
 			"environment": "prod",
@@ -83,11 +84,11 @@ func UpdateAnSshKey(ctx *eos_io.RuntimeContext, id int64, newName string) error 
 	return nil
 }
 
-func DeleteAnSshKey(ctx *eos_io.RuntimeContext, id int64) error {
-	log := ctx.Log
+func DeleteAnSshKey(rc *eos_io.RuntimeContext, id int64) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	_, err := client.SSHKey.Delete(ctx.Ctx, &hcloud.SSHKey{ID: id})
+	_, err := client.SSHKey.Delete(rc.Ctx, &hcloud.SSHKey{ID: id})
 	if err != nil {
 		log.Error("❌ Failed to delete SSH key", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to delete ssh key")

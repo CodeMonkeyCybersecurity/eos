@@ -3,6 +3,7 @@
 package shared
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -125,7 +126,7 @@ func WriteAgentConfig(path string, tpl *template.Template, data any) error {
 }
 
 // EnsureFileExists writes value if file is missing.
-func EnsureFileExists(path, value string, perm os.FileMode) error {
+func EnsureFileExists(ctx context.Context, path, value string, perm os.FileMode) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		zap.L().Warn("🔧 File missing — creating", zap.String("path", path))
 		if err := os.WriteFile(path, []byte(value), perm); err != nil {
@@ -153,7 +154,7 @@ func BuildAgentTemplateData(addr string) AgentConfigData {
 }
 
 // WriteRawConfig writes raw string content to a file.
-func WriteRawConfig(path, content string, perm os.FileMode) error {
+func WriteRawConfig(ctx context.Context, path, content string, perm os.FileMode) error {
 	if err := os.WriteFile(path, []byte(content), perm); err != nil {
 		zap.L().Error("❌ Failed to write config file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("write %s: %w", path, err)

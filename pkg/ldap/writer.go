@@ -5,6 +5,7 @@ package ldap
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/go-ldap/ldap/v3"
 )
@@ -35,12 +36,12 @@ func createUser(config *LDAPConfig, user LDAPUser, password string) error {
 }
 
 // CreateGroup adds a new LDAP group (groupOfNames) with no members yet
-func createGroup(config *LDAPConfig, group LDAPGroup) error {
+func createGroup(rc *eos_io.RuntimeContext, config *LDAPConfig, group LDAPGroup) error {
 	conn, err := ConnectWithGivenConfig(config)
 	if err != nil {
 		return err
 	}
-	defer shared.SafeClose(conn)
+	defer shared.SafeClose(rc.Ctx, conn)
 
 	req := ldap.NewAddRequest(group.DN, nil)
 	req.Attribute("objectClass", []string{"groupOfNames", "top"})

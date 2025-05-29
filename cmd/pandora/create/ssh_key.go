@@ -17,6 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/ssh"
 )
@@ -37,7 +38,7 @@ func init() {
 var SshKeyCmd = &cobra.Command{
 	Use:   "ssh-key",
 	Short: "Create and store an SSH key securely",
-	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		keyDir := "/home/eos/.ssh" // TODO: shared.EosUserHome()
 		// our KV-v2 mount + base directory
 		const mount = "secret"
@@ -49,24 +50,24 @@ var SshKeyCmd = &cobra.Command{
 		// Determine base name for key
 		name := nameOverride
 		if name != "" && !isSafeName(name) {
-			zap.L().Warn("Invalid --name provided", zap.String("name", name))
+			otelzap.Ctx(rc.Ctx).Warn("Invalid --name provided", zap.String("name", name))
 			return fmt.Errorf("invalid --name: only alphanumeric, dashes, and underscores allowed")
 		}
 
 		// Authenticate to Vault
-		client, err := vault.Authn()
+		client, err := vault.Authn(rc)
 		// declare a local flag
 		useVault := (err == nil)
 		if !useVault {
-			zap.L().Warn("Vault unavailable — will fallback to disk", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Vault unavailable — will fallback to disk", zap.Error(err))
 		}
 
 		// if Vault is up, pick the first free suffix
 		if useVault {
 			// find the first free leaf under "eos/pandora"
-			leaf, err := vault.FindNextAvailableKVv2Path(client, mount, baseDir, leafBase)
+			leaf, err := vault.FindNextAvailableKVv2Path(rc, client, mount, baseDir, leafBase)
 			if err != nil {
-				zap.L().Error("no available Vault path", zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Error("no available Vault path", zap.Error(err))
 				return err
 			}
 			// leaf == "eos/pandora/ssh-key" or ".../ssh-key-001"
@@ -75,7 +76,7 @@ var SshKeyCmd = &cobra.Command{
 		}
 
 		chosen := fmt.Sprintf("%s/%s", vaultDir, name)
-		zap.L().Info("🔍 Chosen Vault path for new SSH key", zap.String("path", chosen))
+		otelzap.Ctx(rc.Ctx).Info("🔍 Chosen Vault path for new SSH key", zap.String("path", chosen))
 
 		// Generate key
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)
@@ -96,9 +97,8 @@ var SshKeyCmd = &cobra.Command{
 		// Vault Write
 		if useVault {
 			// Extract a real context.Context from your RuntimeContext:
-			vctx := ctx.Ctx
 			if err := vault.WriteSSHKey(
-				vctx,
+				rc,
 				client,
 				mount, // must supply the KV-v2 mount
 				fullVaultPath,
@@ -106,20 +106,20 @@ var SshKeyCmd = &cobra.Command{
 				string(privPEM),
 				fingerprint,
 			); err == nil {
-				zap.L().Info("🔐 SSH key written to Vault",
+				otelzap.Ctx(rc.Ctx).Info("🔐 SSH key written to Vault",
 					zap.String("path", fullVaultPath),
 					zap.String("fingerprint", fingerprint),
 				)
 				return nil
 			} else {
-				zap.L().Warn("Vault write failed, falling back to disk",
+				otelzap.Ctx(rc.Ctx).Warn("Vault write failed, falling back to disk",
 					zap.String("path", fullVaultPath),
 					zap.Error(err),
 				)
 			}
 
 			if !diskFallback {
-				zap.L().Error("Vault write failed and disk fallback is disabled")
+				otelzap.Ctx(rc.Ctx).Error("Vault write failed and disk fallback is disabled")
 				return fmt.Errorf("vault write failed and disk fallback is disabled")
 			}
 		}
@@ -129,19 +129,19 @@ var SshKeyCmd = &cobra.Command{
 		privPath := filepath.Join(keyDir, fmt.Sprintf("id_ed25519-%s", name))
 
 		if err := os.MkdirAll(keyDir, 0700); err != nil {
-			zap.L().Error("Failed to create .ssh directory", zap.String("dir", keyDir), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to create .ssh directory", zap.String("dir", keyDir), zap.Error(err))
 			return fmt.Errorf("mkdir failed: %w", err)
 		}
 		if err := os.WriteFile(pubPath, []byte(pubStr), 0644); err != nil {
-			zap.L().Error("Failed to write public key", zap.String("path", pubPath), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to write public key", zap.String("path", pubPath), zap.Error(err))
 			return fmt.Errorf("write public key failed: %w", err)
 		}
 		if err := os.WriteFile(privPath, privPEM, 0600); err != nil {
-			zap.L().Error("Failed to write private key", zap.String("path", privPath), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to write private key", zap.String("path", privPath), zap.Error(err))
 			return fmt.Errorf("write private key failed: %w", err)
 		}
 
-		zap.L().Info("🔐 SSH key written to disk",
+		otelzap.Ctx(rc.Ctx).Info("🔐 SSH key written to disk",
 			zap.String("private_key_path", privPath),
 			zap.String("public_key_path", pubPath),
 		)

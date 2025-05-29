@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -22,49 +23,49 @@ var DeleteVaultCmd = &cobra.Command{
 	Short: "Deletes the Vault installation",
 	Long:  `Removes the Vault package (via snap, apt, or dnf) and optionally purges all configuration, data, and logs.`,
 
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		zap.L().Info("🧨 Deleting Vault...")
+		otelzap.Ctx(rc.Ctx).Info("🧨 Deleting Vault...")
 
-		distro := platform.DetectLinuxDistro()
+		distro := platform.DetectLinuxDistro(rc)
 		osPlatform := platform.GetOSPlatform()
 		if osPlatform != "linux" {
-			zap.L().Fatal("Vault uninstallation only supported on Linux")
+			otelzap.Ctx(rc.Ctx).Fatal("Vault uninstallation only supported on Linux")
 		}
 
 		// Kill Vault processes if any
-		run("pkill", "-f", "vault server")
+		run(rc, "pkill", "-f", "vault server")
 
 		// Remove Vault depending on platform
 		switch distro {
 		case "debian":
-			run("apt-get", "remove", "-y", "vault")
+			run(rc, "apt-get", "remove", "-y", "vault")
 		case "rhel":
-			run("dnf", "remove", "-y", "vault")
+			run(rc, "dnf", "remove", "-y", "vault")
 		}
 
 		if purge {
-			zap.L().Info("🧹 Purging Vault files and directories...")
+			otelzap.Ctx(rc.Ctx).Info("🧹 Purging Vault files and directories...")
 
 			for _, path := range vault.GetVaultPurgePaths() {
 				if err := os.RemoveAll(path); err != nil {
-					zap.L().Warn("Failed to remove path", zap.String("path", path), zap.Error(err))
+					otelzap.Ctx(rc.Ctx).Warn("Failed to remove path", zap.String("path", path), zap.Error(err))
 				} else {
-					zap.L().Info("Removed path", zap.String("path", path))
+					otelzap.Ctx(rc.Ctx).Info("Removed path", zap.String("path", path))
 				}
 			}
 
 			for _, wildcard := range vault.GetVaultWildcardPurgePaths() {
-				run("sh", "-c", "rm -rf "+wildcard)
+				run(rc, "sh", "-c", "rm -rf "+wildcard)
 			}
 
-			zap.L().Info("Cleaning up Vault repo and keyring...")
-			vault.Purge(distro)
+			otelzap.Ctx(rc.Ctx).Info("Cleaning up Vault repo and keyring...")
+			vault.Purge(rc, distro)
 		} else {
-			zap.L().Info("Skipping purge (--no-purge provided)")
+			otelzap.Ctx(rc.Ctx).Info("Skipping purge (--no-purge provided)")
 		}
 
-		zap.L().Info("✅ Vault deletion complete.")
+		otelzap.Ctx(rc.Ctx).Info("✅ Vault deletion complete.")
 		return nil
 	}),
 }
@@ -75,13 +76,13 @@ func init() {
 	DeleteCmd.AddCommand(DeleteVaultCmd)
 }
 
-func run(name string, args ...string) {
+func run(rc *eos_io.RuntimeContext, name string, args ...string) {
 	cmd := exec.Command(name, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		zap.L().Warn("❌ Command failed", zap.String("cmd", name+" "+strings.Join(args, " ")), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("❌ Command failed", zap.String("cmd", name+" "+strings.Join(args, " ")), zap.Error(err))
 	} else {
-		zap.L().Info("✅ Ran", zap.String("cmd", name+" "+strings.Join(args, " ")))
+		otelzap.Ctx(rc.Ctx).Info("✅ Ran", zap.String("cmd", name+" "+strings.Join(args, " ")))
 	}
 }

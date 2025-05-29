@@ -4,19 +4,19 @@ package hetzner
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/cockroachdb/errors"
 	"go.uber.org/zap"
 )
 
-func (c *DNSClient) GetZones(ctx context.Context) ([]DNSZone, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", zonesBaseURL, nil)
+func (c *DNSClient) GetZones(rc *eos_io.RuntimeContext) ([]DNSZone, error) {
+	req, err := http.NewRequestWithContext(rc.Ctx, "GET", zonesBaseURL, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating GET /zones")
 	}
@@ -41,10 +41,10 @@ func (c *DNSClient) GetZones(ctx context.Context) ([]DNSZone, error) {
 	return result.Zones, nil
 }
 
-func (c *DNSClient) CreateZone(ctx context.Context, zone DNSZone) (*DNSZone, error) {
+func (c *DNSClient) CreateZone(rc *eos_io.RuntimeContext, zone DNSZone) (*DNSZone, error) {
 	payload, _ := json.Marshal(zone)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", zonesBaseURL, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(rc.Ctx, "POST", zonesBaseURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating POST /zones")
 	}
@@ -71,10 +71,10 @@ func (c *DNSClient) CreateZone(ctx context.Context, zone DNSZone) (*DNSZone, err
 	return &result.Zone, nil
 }
 
-func (c *DNSClient) GetZone(ctx context.Context, zoneID string) (*DNSZone, error) {
+func (c *DNSClient) GetZone(rc *eos_io.RuntimeContext, zoneID string) (*DNSZone, error) {
 	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating GET /zones/{id}")
 	}
@@ -99,11 +99,11 @@ func (c *DNSClient) GetZone(ctx context.Context, zoneID string) (*DNSZone, error
 	return &result.Zone, nil
 }
 
-func (c *DNSClient) UpdateZone(ctx context.Context, zoneID string, updated DNSZone) (*DNSZone, error) {
+func (c *DNSClient) UpdateZone(rc *eos_io.RuntimeContext, zoneID string, updated DNSZone) (*DNSZone, error) {
 	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
 	payload, _ := json.Marshal(updated)
 
-	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(rc.Ctx, "PUT", url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating PUT /zones/{id}")
 	}
@@ -130,10 +130,10 @@ func (c *DNSClient) UpdateZone(ctx context.Context, zoneID string, updated DNSZo
 	return &result.Zone, nil
 }
 
-func (c *DNSClient) DeleteZone(ctx context.Context, zoneID string) error {
+func (c *DNSClient) DeleteZone(rc *eos_io.RuntimeContext, zoneID string) error {
 	url := fmt.Sprintf("%s/%s", zonesBaseURL, zoneID)
 
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, "DELETE", url, nil)
 	if err != nil {
 		return errors.Wrap(err, "creating DELETE /zones/{id}")
 	}
@@ -154,11 +154,11 @@ func (c *DNSClient) DeleteZone(ctx context.Context, zoneID string) error {
 	return nil
 }
 
-func (c *DNSClient) ImportZoneFilePlain(ctx context.Context, zoneID string, zoneFile string) error {
+func (c *DNSClient) ImportZoneFilePlain(rc *eos_io.RuntimeContext, zoneID string, zoneFile string) error {
 	url := fmt.Sprintf("%s/%s/import", zonesBaseURL, zoneID)
 	body := strings.NewReader(zoneFile)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
+	req, err := http.NewRequestWithContext(rc.Ctx, "POST", url, body)
 	if err != nil {
 		return errors.Wrap(err, "creating POST /zones/{id}/import")
 	}
@@ -180,10 +180,10 @@ func (c *DNSClient) ImportZoneFilePlain(ctx context.Context, zoneID string, zone
 	return nil
 }
 
-func (c *DNSClient) ExportZoneFile(ctx context.Context, zoneID string) (string, error) {
+func (c *DNSClient) ExportZoneFile(rc *eos_io.RuntimeContext, zoneID string) (string, error) {
 	url := fmt.Sprintf("%s/%s/export", zonesBaseURL, zoneID)
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, "GET", url, nil)
 	if err != nil {
 		return "", errors.Wrap(err, "creating GET /zones/{id}/export")
 	}
@@ -208,11 +208,11 @@ func (c *DNSClient) ExportZoneFile(ctx context.Context, zoneID string) (string, 
 	return string(data), nil
 }
 
-func (c *DNSClient) ValidateZoneFile(ctx context.Context, zoneFile string) error {
+func (c *DNSClient) ValidateZoneFile(rc *eos_io.RuntimeContext, zoneFile string) error {
 	url := zonesBaseURL + "/file/validate"
 	body := strings.NewReader(zoneFile)
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, body)
+	req, err := http.NewRequestWithContext(rc.Ctx, "POST", url, body)
 	if err != nil {
 		return errors.Wrap(err, "creating POST /zones/file/validate")
 	}

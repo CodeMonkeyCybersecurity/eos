@@ -3,6 +3,7 @@
 package eos_unix
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -37,7 +39,7 @@ func CopyKeyToRemote(pubKeyPath, target string) error {
 }
 
 // AppendToSSHConfig appends a Host entry to SSH config if it doesn't already exist
-func AppendToSSHConfig(alias, host, user, identityFile, configPath string) error {
+func AppendToSSHConfig(ctx context.Context, alias, host, user, identityFile, configPath string) error {
 	if configPath == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -58,7 +60,7 @@ Host %s
 	if err != nil {
 		return fmt.Errorf("failed to open SSH config: %w", err)
 	}
-	defer shared.SafeClose(f)
+	defer shared.SafeClose(ctx, f)
 
 	// Skip if already configured
 	data, err := os.ReadFile(configPath)
@@ -76,27 +78,27 @@ Host %s
 }
 
 // CreateSSHKeys creates a 4096-bit SSH key pair for a given Linux user
-func CreateSSHKeys(username string) error {
+func CreateSSHKeys(ctx context.Context, username string) error {
 	home := "/home/" + username
 	sshDir := filepath.Join(home, ".ssh")
 
-	zap.L().Info("Creating SSH key for user", zap.String("username", username))
+	otelzap.Ctx(ctx).Info("Creating SSH key for user", zap.String("username", username))
 
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return fmt.Errorf("mkdir failed: %w", err)
 	}
-	if err := execute.RunSimple("chown", "-R", username+":"+username, sshDir); err != nil {
+	if err := execute.RunSimple(ctx, "chown", "-R", username+":"+username, sshDir); err != nil {
 		return fmt.Errorf("chown ssh dir failed: %w", err)
 	}
 
 	keyPath := filepath.Join(sshDir, "id_rsa")
-	if err := execute.RunSimple("ssh-keygen", "-t", "rsa", "-b", "4096", "-N", "", "-f", keyPath); err != nil {
+	if err := execute.RunSimple(ctx, "ssh-keygen", "-t", "rsa", "-b", "4096", "-N", "", "-f", keyPath); err != nil {
 		return fmt.Errorf("ssh-keygen failed: %w", err)
 	}
-	if err := execute.RunSimple("chmod", "600", keyPath); err != nil {
+	if err := execute.RunSimple(ctx, "chmod", "600", keyPath); err != nil {
 		return fmt.Errorf("chmod private key failed: %w", err)
 	}
-	if err := execute.RunSimple("chown", username+":"+username, keyPath, keyPath+".pub"); err != nil {
+	if err := execute.RunSimple(ctx, "chown", username+":"+username, keyPath, keyPath+".pub"); err != nil {
 		return fmt.Errorf("chown key files failed: %w", err)
 	}
 

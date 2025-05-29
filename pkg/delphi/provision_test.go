@@ -4,10 +4,12 @@ package delphi
 
 import (
 	"testing"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func TestResolveWazuhUserID(t *testing.T) {
-	id, err := ResolveWazuhUserID("alice")
+func TestResolveWazuhUserID(rc *eos_io.RuntimeContext, t *testing.T) {
+	id, err := ResolveWazuhUserID(rc, "alice")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -16,8 +18,8 @@ func TestResolveWazuhUserID(t *testing.T) {
 	}
 }
 
-func TestResolveWazuhRoleID(t *testing.T) {
-	id, err := ResolveWazuhRoleID("role_alice")
+func TestResolveWazuhRoleID(rc *eos_io.RuntimeContext, t *testing.T) {
+	id, err := ResolveWazuhRoleID(rc, "role_alice")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
@@ -26,8 +28,8 @@ func TestResolveWazuhRoleID(t *testing.T) {
 	}
 }
 
-func TestResolveWazuhPolicyID(t *testing.T) {
-	id, err := ResolveWazuhPolicyID("policy_alice")
+func TestResolveWazuhPolicyID(rc *eos_io.RuntimeContext, t *testing.T) {
+	id, err := ResolveWazuhPolicyID(rc, "policy_alice")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}

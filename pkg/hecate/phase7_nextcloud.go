@@ -6,12 +6,14 @@ import (
 	"bufio"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // SetupNextcloudWizard prompts the user for Nextcloud + Coturn setup and returns a ServiceBundle.
-func SetupNextcloudWizard(reader *bufio.Reader) ServiceBundle {
-	log := zap.L().Named("hecate-nextcloud-setup")
+func SetupNextcloudWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting Nextcloud + Coturn setup information...")
 
 	// Define the prompts
@@ -48,6 +50,7 @@ func SetupNextcloudWizard(reader *bufio.Reader) ServiceBundle {
 	nginxSpec := (*NginxSpec)(nil)
 
 	return GenericWizard(
+		rc,
 		"hecate-nextcloud-setup",
 		fields,
 		"coturn",
@@ -61,12 +64,13 @@ func SetupNextcloudWizard(reader *bufio.Reader) ServiceBundle {
 }
 
 // SetupNextcloud performs the full setup: renders Compose + Caddy fragments.
-func SetupNextcloud(bundle ServiceBundle, targetDir string) error {
-	log := zap.L().Named("hecate-nextcloud-setup")
+func SetupNextcloud(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("🚀 Starting Nextcloud + Coturn setup rendering...")
 
 	err := RenderBundleFragments(
+		rc,
 		bundle,
 		fmt.Sprintf("%s/docker-compose.override.yml", targetDir),
 		fmt.Sprintf("%s/Caddy-fragments", targetDir),

@@ -15,8 +15,8 @@ var UpdatePackagesCmd = &cobra.Command{
 	Aliases: []string{"pkgs"},
 	Short:   "Update system packages based on detected OS",
 	Long:    "Detects the host OS and executes the appropriate update and cleanup commands. Supports scheduling via --cron.",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return platform.PackageUpdate(Cron)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		return platform.PackageUpdate(rc, Cron)
 	}),
 }
 

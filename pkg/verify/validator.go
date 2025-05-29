@@ -3,10 +3,12 @@
 package verify
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -16,9 +18,9 @@ func Struct(v interface{}) error {
 	return validate.Struct(v)
 }
 
-func MustValid(v interface{}) {
+func MustValid(ctx context.Context, v interface{}) {
 	if err := validate.Struct(v); err != nil {
-		zap.L().Fatal("🚫 Invalid input", zap.Error(err))
+		otelzap.Ctx(context.Background()).Fatal("🚫 Invalid input", zap.Error(err))
 	}
 }
 

@@ -3,9 +3,10 @@
 package container
 
 import (
-	"context"
 	"fmt"
 	"os/exec"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 //
@@ -13,12 +14,12 @@ import (
 //
 
 // EnsureArachneNetwork checks if the Docker network exists, and creates it if not.
-func EnsureArachneNetwork(ctx context.Context) error {
+func EnsureArachneNetwork(rc *eos_io.RuntimeContext) error {
 	networkName := DockerNetworkName
 	ipv4 := DockerIPv4Subnet
 	ipv6 := DockerIPv6Subnet
 
-	if err := CheckIfDockerInstalled(ctx); err != nil {
+	if err := CheckIfDockerInstalled(rc); err != nil {
 		return fmt.Errorf("docker is not installed or not in PATH: %w", err)
 	}
 

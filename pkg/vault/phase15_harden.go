@@ -6,9 +6,10 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/hashicorp/vault/api"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 // TODO:
@@ -20,19 +21,19 @@ import (
 // 		return fmt.Errorf("failed to revoke root token: %w", err)
 // 	}
 
-// 	zap.L().Info("✅ Root token revoked")
+// 	otelzap.Ctx(rc.Ctx).Info("✅ Root token revoked")
 // 	return nil
 // }
 
 // ConfirmSecureStorage prompts user to re-enter keys to confirm they've been saved.
-func ConfirmSecureStorage(original *api.InitResponse) error {
+func ConfirmSecureStorage(rc *eos_io.RuntimeContext, original *api.InitResponse) error {
 	fmt.Println("🔒 Please re-enter 3 unseal keys and the root token to confirm you've saved them.")
 
-	rekeys, err := interaction.PromptSecrets("Unseal Key", 3)
+	rekeys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 	if err != nil {
 		return err
 	}
-	reroot, err := interaction.PromptSecrets("Root Token", 1)
+	reroot, err := interaction.PromptSecrets(rc.Ctx, "Root Token", 1)
 	if err != nil {
 		return err
 	}
@@ -51,6 +52,6 @@ func ConfirmSecureStorage(original *api.InitResponse) error {
 		return fmt.Errorf("reconfirmation failed: keys or token do not match")
 	}
 
-	zap.L().Info("✅ Reconfirmation of unseal material passed")
+	otelzap.Ctx(rc.Ctx).Info("✅ Reconfirmation of unseal material passed")
 	return nil
 }

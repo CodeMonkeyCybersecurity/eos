@@ -2,20 +2,19 @@
 package hetzner
 
 import (
-	"context"
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
-func GetAllCerts() error {
+func GetAllCerts(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	certs, err := client.Certificate.All(ctx)
+	certs, err := client.Certificate.All(rc.Ctx)
 	if err != nil {
 		return cerr.Wrap(err, "failed to retrieve certificates")
 	}
@@ -25,12 +24,11 @@ func GetAllCerts() error {
 	return nil
 }
 
-func CreateManagedCert() error {
+func CreateManagedCert(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	cert, _, err := client.Certificate.Create(ctx, hcloud.CertificateCreateOpts{
+	cert, _, err := client.Certificate.Create(rc.Ctx, hcloud.CertificateCreateOpts{
 		DomainNames: []string{
 			"example.com",
 			"webmail.example.com",
@@ -46,12 +44,11 @@ func CreateManagedCert() error {
 	return nil
 }
 
-func CreateUploadedCert() error {
+func CreateUploadedCert(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	cert, _, err := client.Certificate.Create(ctx, hcloud.CertificateCreateOpts{
+	cert, _, err := client.Certificate.Create(rc.Ctx, hcloud.CertificateCreateOpts{
 		Certificate: "-----BEGIN CERTIFICATE-----\n...",
 		Name:        "my website cert",
 		PrivateKey:  "-----BEGIN PRIVATE KEY-----\n...",
@@ -64,12 +61,11 @@ func CreateUploadedCert() error {
 	return nil
 }
 
-func GetCert() error {
+func GetCert(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	cert, _, err := client.Certificate.GetByID(ctx, 123)
+	cert, _, err := client.Certificate.GetByID(rc.Ctx, 123)
 	if err != nil {
 		return cerr.Wrap(err, "failed to get certificate")
 	}
@@ -77,12 +73,11 @@ func GetCert() error {
 	return nil
 }
 
-func UpdateCert() error {
+func UpdateCert(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	updated, _, err := client.Certificate.Update(ctx, &hcloud.Certificate{ID: 123}, hcloud.CertificateUpdateOpts{
+	updated, _, err := client.Certificate.Update(rc.Ctx, &hcloud.Certificate{ID: 123}, hcloud.CertificateUpdateOpts{
 		Labels: map[string]string{
 			"environment":    "prod",
 			"example.com/my": "label",
@@ -97,12 +92,11 @@ func UpdateCert() error {
 	return nil
 }
 
-func DeleteCert() error {
+func DeleteCert(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	_, err := client.Certificate.Delete(ctx, &hcloud.Certificate{ID: 123})
+	_, err := client.Certificate.Delete(rc.Ctx, &hcloud.Certificate{ID: 123})
 	if err != nil {
 		return cerr.Wrap(err, "failed to delete certificate")
 	}
@@ -110,12 +104,11 @@ func DeleteCert() error {
 	return nil
 }
 
-func GetAllActions() error {
+func GetAllActions(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	actions, err := client.Certificate.Action.All(ctx, hcloud.ActionListOpts{})
+	actions, err := client.Certificate.Action.All(rc.Ctx, hcloud.ActionListOpts{})
 	if err != nil {
 		return cerr.Wrap(err, "failed to get certificate actions")
 	}
@@ -125,12 +118,11 @@ func GetAllActions() error {
 	return nil
 }
 
-func GetAnAction() error {
+func GetAnAction(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	action, _, err := client.Certificate.Action.GetByID(ctx, 123)
+	action, _, err := client.Certificate.Action.GetByID(rc.Ctx, 123)
 	if err != nil {
 		return cerr.Wrap(err, "failed to get certificate action")
 	}
@@ -138,17 +130,16 @@ func GetAnAction() error {
 	return nil
 }
 
-func RetryRenewal() error {
+func RetryRenewal(rc *eos_io.RuntimeContext) error {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	action, _, err := client.Certificate.RetryIssuance(ctx, &hcloud.Certificate{ID: 123})
+	action, _, err := client.Certificate.RetryIssuance(rc.Ctx, &hcloud.Certificate{ID: 123})
 	if err != nil {
 		return cerr.Wrap(err, "failed to trigger retry")
 	}
 
-	if err := client.Action.WaitFor(ctx, action); err != nil {
+	if err := client.Action.WaitFor(rc.Ctx, action); err != nil {
 		return cerr.Wrap(err, "retry wait failed")
 	}
 

@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/docker/docker/api/types/container"
@@ -145,8 +146,8 @@ func ExtractComposeMetadata(data []byte) ([]string, []string, []string) {
 	return containers, images, volumes
 }
 
-func ComposeUp(path string) error {
-	_, err := execute.Run(execute.Options{
+func ComposeUp(rc *eos_io.RuntimeContext, path string) error {
+	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"compose", "-f", path, "up", "-d"},
 		Ctx:     context.TODO(),
@@ -167,7 +168,7 @@ type ComposeConfig struct {
 	Networks map[string]interface{}    `yaml:"networks"`
 }
 
-func ComposeUpInDir(ctx context.Context, dir string) error {
+func ComposeUpInDir(rc *eos_io.RuntimeContext, dir string) error {
 	yamlPath := filepath.Join(dir, "docker-compose.yml")
 	data, err := os.ReadFile(yamlPath)
 	if err != nil {
@@ -192,7 +193,7 @@ func ComposeUpInDir(ctx context.Context, dir string) error {
 			EnableIPv4: nil,
 			// Optionally fill in IPAM, DNS, etc.
 		}
-		if _, err := cli.NetworkCreate(ctx, netName, opts); err != nil {
+		if _, err := cli.NetworkCreate(rc.Ctx, netName, opts); err != nil {
 			return fmt.Errorf("create network %s: %w", netName, err)
 		}
 	}
@@ -205,7 +206,7 @@ func ComposeUpInDir(ctx context.Context, dir string) error {
 			DriverOpts: nil,
 			Labels:     nil,
 		}
-		if _, err := cli.VolumeCreate(ctx, volReq); err != nil {
+		if _, err := cli.VolumeCreate(rc.Ctx, volReq); err != nil {
 			return fmt.Errorf("create volume %s: %w", volName, err)
 		}
 	}
@@ -232,12 +233,12 @@ func ComposeUpInDir(ctx context.Context, dir string) error {
 			PortBindings: portMap,
 		}
 
-		resp, err := cli.ContainerCreate(ctx, contCfg, hostCfg, &network.NetworkingConfig{}, nil, svcName)
+		resp, err := cli.ContainerCreate(rc.Ctx, contCfg, hostCfg, &network.NetworkingConfig{}, nil, svcName)
 		if err != nil {
 			return fmt.Errorf("create container %s: %w", svcName, err)
 		}
 
-		if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		if err := cli.ContainerStart(rc.Ctx, resp.ID, container.StartOptions{}); err != nil {
 			return fmt.Errorf("start container %s: %w", svcName, err)
 		}
 	}

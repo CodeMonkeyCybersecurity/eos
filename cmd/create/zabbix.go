@@ -1,7 +1,6 @@
 package create
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -9,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -17,30 +17,30 @@ import (
 var CreateZabbixCmd = &cobra.Command{
 	Use:   "zabbix",
 	Short: "Deploy Zabbix monitoring stack using Docker Compose",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		zap.L().Info("Starting Zabbix installation...")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("Starting Zabbix installation...")
 
-		if err := deployZabbix(ctx.Ctx); err != nil {
-			zap.L().Error("Zabbix installation failed", zap.Error(err))
+		if err := deployZabbix(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Zabbix installation failed", zap.Error(err))
 			fmt.Println("Zabbix installation failed:", err)
 			os.Exit(1)
 		}
 
-		zap.L().Info("Zabbix successfully installed")
+		otelzap.Ctx(rc.Ctx).Info("Zabbix successfully installed")
 		fmt.Println("Zabbix successfully deployed at http://localhost:8080")
 		return nil
 	}),
 }
 
-func deployZabbix(ctx context.Context) error {
+func deployZabbix(rc *eos_io.RuntimeContext) error {
 
 	// Ensure Docker is installed
-	if err := container.CheckIfDockerInstalled(ctx); err != nil {
+	if err := container.CheckIfDockerInstalled(rc); err != nil {
 		return fmt.Errorf("docker check failed: %w", err)
 	}
 
 	// Ensure Docker Compose is installed
-	if err := container.CheckIfDockerComposeInstalled(ctx); err != nil {
+	if err := container.CheckIfDockerComposeInstalled(rc); err != nil {
 		return fmt.Errorf("docker-compose check failed: %w", err)
 	}
 
@@ -50,8 +50,8 @@ func deployZabbix(ctx context.Context) error {
 	}
 
 	// Start the stack
-	zap.L().Info("Running docker compose up...")
-	if err := container.ComposeUp(shared.ZabbixComposeYML); err != nil {
+	otelzap.Ctx(rc.Ctx).Info("Running docker compose up...")
+	if err := container.ComposeUp(rc, shared.ZabbixComposeYML); err != nil {
 		return err
 	}
 

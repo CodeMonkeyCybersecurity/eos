@@ -19,9 +19,9 @@ var InspectUsersCmd = &cobra.Command{
 	Short: "Retrieve information about system users",
 	Long: `This command retrieves a list of all system users on the current machine
 by reading the /etc/passwd file.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("Reading users...")
-		users, err := getSystemUsers()
+		users, err := getSystemUsers(rc)
 		if err != nil {
 			fmt.Printf("Error reading users: %v\n", err)
 			return (err)
@@ -36,12 +36,12 @@ by reading the /etc/passwd file.`,
 }
 
 // getSystemUsers reads the /etc/passwd file and returns a list of usernames
-func getSystemUsers() ([]string, error) {
+func getSystemUsers(rc *eos_io.RuntimeContext) ([]string, error) {
 	file, err := os.Open("/etc/passwd")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open /etc/passwd: %w", err)
 	}
-	defer shared.SafeClose(file)
+	defer shared.SafeClose(rc.Ctx, file)
 
 	var users []string
 	scanner := bufio.NewScanner(file)

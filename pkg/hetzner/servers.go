@@ -3,23 +3,23 @@
 package hetzner
 
 import (
-	"context"
 	"os"
 	"time"
 
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllServers(ctx *eos_io.RuntimeContext) error {
-	log := ctx.Log
+func GetAllServers(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
 
-	servers, err := client.Server.All(ctx.Ctx)
+	servers, err := client.Server.All(rc.Ctx)
 	if err != nil {
 		log.Error("Failed to get all servers", zap.Error(err))
 		return cerr.Wrap(err, "failed to get all servers")
@@ -32,8 +32,8 @@ func GetAllServers(ctx *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func ListServersFiltered(ctx context.Context, client *hcloud.Client, log *zap.Logger, opts hcloud.ServerListOpts) ([]*hcloud.Server, error) {
-	servers, _, err := client.Server.List(ctx, opts)
+func ListServersFiltered(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Logger, opts hcloud.ServerListOpts) ([]*hcloud.Server, error) {
+	servers, _, err := client.Server.List(rc.Ctx, opts)
 	if err != nil {
 		log.Error("Failed to list filtered servers", zap.Error(err))
 		return nil, err
@@ -42,8 +42,8 @@ func ListServersFiltered(ctx context.Context, client *hcloud.Client, log *zap.Lo
 	return servers, nil
 }
 
-func CreateServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, opts hcloud.ServerCreateOpts) (*hcloud.Server, *hcloud.Action, error) {
-	result, _, err := client.Server.Create(ctx, opts)
+func CreateServer(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Logger, opts hcloud.ServerCreateOpts) (*hcloud.Server, *hcloud.Action, error) {
+	result, _, err := client.Server.Create(rc.Ctx, opts)
 	if err != nil {
 		log.Error("Failed to create server", zap.Error(err))
 		return nil, nil, err
@@ -52,8 +52,8 @@ func CreateServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, o
 	return result.Server, result.Action, nil
 }
 
-func GetAServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, id int64) (*hcloud.Server, error) {
-	server, _, err := client.Server.GetByID(ctx, id)
+func GetAServer(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Logger, id int64) (*hcloud.Server, error) {
+	server, _, err := client.Server.GetByID(rc.Ctx, id)
 	if err != nil {
 		log.Error("Failed to fetch server by ID", zap.Int64("id", id), zap.Error(err))
 		return nil, err
@@ -64,12 +64,12 @@ func GetAServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, id 
 	return server, nil
 }
 
-func UpdateServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, server *hcloud.Server, name string, labels map[string]string) (*hcloud.Server, error) {
+func UpdateServer(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Logger, server *hcloud.Server, name string, labels map[string]string) (*hcloud.Server, error) {
 	opts := hcloud.ServerUpdateOpts{
 		Name:   name, // fixed: use string, not *string
 		Labels: labels,
 	}
-	updated, _, err := client.Server.Update(ctx, server, opts)
+	updated, _, err := client.Server.Update(rc.Ctx, server, opts)
 	if err != nil {
 		log.Error("Failed to update server", zap.String("name", server.Name), zap.Error(err))
 		return nil, err
@@ -78,8 +78,8 @@ func UpdateServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, s
 	return updated, nil
 }
 
-func DeleteServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, server *hcloud.Server) (*hcloud.ServerDeleteResult, error) {
-	result, _, err := client.Server.DeleteWithResult(ctx, server)
+func DeleteServer(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Logger, server *hcloud.Server) (*hcloud.ServerDeleteResult, error) {
+	result, _, err := client.Server.DeleteWithResult(rc.Ctx, server)
 	if err != nil {
 		log.Error("Failed to delete server", zap.String("name", server.Name), zap.Error(err))
 		return nil, err
@@ -88,13 +88,13 @@ func DeleteServer(ctx context.Context, client *hcloud.Client, log *zap.Logger, s
 	return result, nil
 }
 
-func GetServerMetrics(ctx context.Context, client *hcloud.Client, log *zap.Logger, server *hcloud.Server, metric string, start, end time.Time, step int) (*hcloud.ServerMetrics, error) {
+func GetServerMetrics(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Logger, server *hcloud.Server, metric string, start, end time.Time, step int) (*hcloud.ServerMetrics, error) {
 	opts := hcloud.ServerGetMetricsOpts{
 		Start: start,
 		End:   end,
 		Step:  step,
 	}
-	metrics, _, err := client.Server.GetMetrics(ctx, server, opts)
+	metrics, _, err := client.Server.GetMetrics(rc.Ctx, server, opts)
 	if err != nil {
 		log.Error("Failed to fetch server metrics", zap.String("metric", metric), zap.Error(err))
 		return nil, err

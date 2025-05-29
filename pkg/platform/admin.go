@@ -3,20 +3,22 @@ package platform
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"strings"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func GuessAdminGroup() string {
+func GuessAdminGroup(ctx context.Context) string {
 	file, err := os.Open("/etc/os-release")
 	if err != nil {
 		return "sudo"
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			zap.L().Warn("Failed to close log file", zap.Error(err))
+			otelzap.Ctx(ctx).Warn("Failed to close log file", zap.Error(err))
 		}
 	}()
 

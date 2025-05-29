@@ -3,13 +3,13 @@
 package hetzner
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/cockroachdb/errors"
 	"go.uber.org/zap"
 )
@@ -28,8 +28,8 @@ func NewClient(token string, log *zap.Logger) *DNSClient {
 	}
 }
 
-func (c *DNSClient) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, body)
+func (c *DNSClient) doRequest(rc *eos_io.RuntimeContext, method, path string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(rc.Ctx, method, baseURL+path, body)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating Hetzner API request")
 	}
@@ -45,8 +45,8 @@ func (c *DNSClient) doRequest(ctx context.Context, method, path string, body io.
 	return resp, nil
 }
 
-func (c *DNSClient) GetServers(ctx context.Context) ([]map[string]interface{}, error) {
-	resp, err := c.doRequest(ctx, "GET", "/servers", nil)
+func (c *DNSClient) GetServers(rc *eos_io.RuntimeContext) ([]map[string]interface{}, error) {
+	resp, err := c.doRequest(rc, "GET", "/servers", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +67,8 @@ func (c *DNSClient) GetServers(ctx context.Context) ([]map[string]interface{}, e
 	return result.Servers, nil
 }
 
-func (c *DNSClient) DeleteServer(ctx context.Context, id string) error {
-	resp, err := c.doRequest(ctx, "DELETE", fmt.Sprintf("/servers/%s", id), nil)
+func (c *DNSClient) DeleteServer(rc *eos_io.RuntimeContext, id string) error {
+	resp, err := c.doRequest(rc, "DELETE", fmt.Sprintf("/servers/%s", id), nil)
 	if err != nil {
 		return err
 	}
@@ -82,9 +82,9 @@ func (c *DNSClient) DeleteServer(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *DNSClient) CreateServer(ctx context.Context, name string, image string, serverType string) (map[string]interface{}, error) {
+func (c *DNSClient) CreateServer(rc *eos_io.RuntimeContext, name string, image string, serverType string) (map[string]interface{}, error) {
 	payload := fmt.Sprintf(`{"name":"%s","image":"%s","server_type":"%s","location":"nbg1"}`, name, image, serverType)
-	resp, err := c.doRequest(ctx, "POST", "/servers", strings.NewReader(payload))
+	resp, err := c.doRequest(rc, "POST", "/servers", strings.NewReader(payload))
 	if err != nil {
 		return nil, err
 	}

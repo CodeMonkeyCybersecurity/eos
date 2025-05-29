@@ -3,7 +3,9 @@ package vault
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -16,18 +18,18 @@ import (
 //---------------------------------------------------------
 
 // SetVaultToken safely applies the token to the Vault client.
-func SetVaultToken(client *api.Client, token string) {
+func SetVaultToken(rc *eos_io.RuntimeContext, client *api.Client, token string) {
 	client.SetToken(token)
-	zap.L().Debug("🔐 Vault token set on client", zap.String("token_preview", truncateToken(token)))
+	otelzap.Ctx(rc.Ctx).Debug("🔐 Vault token set on client", zap.String("token_preview", truncateToken(token)))
 }
 
 // GetRootClient constructs a Vault client authenticated with the root token.
-func GetRootClient() (*api.Client, error) {
-	log := zap.L().Named("vault.rootclient")
+func GetRootClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔐 Initializing privileged Vault client")
 
 	// 1️⃣ Create a Vault API client from config
-	client, err := NewClient()
+	client, err := NewClient(rc)
 	if err != nil {
 		log.Error("❌ Failed to create Vault API client", zap.Error(err))
 		return nil, fmt.Errorf("create Vault client: %w", err)
@@ -35,15 +37,15 @@ func GetRootClient() (*api.Client, error) {
 	log.Debug("✅ Vault API client created", zap.String("addr", client.Address()))
 
 	// 2️⃣ Load root token from init file or fallback
-	rootToken, err := loadPrivilegedToken()
+	rootToken, err := loadPrivilegedToken(rc)
 	if err != nil {
 		log.Error("❌ Failed to load root token", zap.Error(err))
 		return nil, fmt.Errorf("load root token: %w", err)
 	}
-	SetVaultToken(client, rootToken)
+	SetVaultToken(rc, client, rootToken)
 
 	// 3️⃣ Verify token validity against Vault
-	if err := VerifyRootToken(client, rootToken); err != nil {
+	if err := VerifyRootToken(rc, client, rootToken); err != nil {
 		log.Error("❌ Root token is invalid", zap.Error(err))
 		return nil, fmt.Errorf("verify root token: %w", err)
 	}

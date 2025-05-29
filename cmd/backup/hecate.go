@@ -7,20 +7,19 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-func init() {
-	BackupCmd.AddCommand(BackupHecateCmd)
-}
 
 // BackupHecateCmd defines the CLI command for backing up /opt/hecate.
 var BackupHecateCmd = &cobra.Command{
 	Use:   "hecate",
 	Short: "Back up the /opt/hecate directory into /opt/mnt with a timestamped archive",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("backup-hecate")
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		// Define source and destination
 		sourceDir := "/opt/hecate"
@@ -69,5 +68,9 @@ var BackupHecateCmd = &cobra.Command{
 
 		log.Info("✅ Backup completed successfully", zap.String("backup_file", backupFilePath))
 		return nil
-	},
+	}),
+}
+
+func init() {
+	BackupCmd.AddCommand(BackupHecateCmd)
 }

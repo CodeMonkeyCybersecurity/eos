@@ -12,22 +12,23 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 var SecureVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Applies hardening and provisioning to a running Vault instance",
-	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("secure-vault")
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		swapOff, _ := cmd.Flags().GetBool("disable-swap")
 		coreDumpOff, _ := cmd.Flags().GetBool("disable-coredump")
 
 		log.Info("🔐 Connecting to Vault")
-		client, err := vault.EnsureVaultReady()
+		client, err := vault.EnsureVaultReady(rc)
 		if err != nil {
-			return logger.LogErrAndWrap("secure vault: connect failed", err)
+			return logger.LogErrAndWrap(rc, "secure vault: connect failed", err)
 		}
 
 		if vault.IsVaultSealed(client) {
@@ -40,23 +41,23 @@ var SecureVaultCmd = &cobra.Command{
 		}
 
 		// 4️⃣ Load init result + confirm secure storage
-		initRes, err := vault.LoadOrPromptInitResult()
+		initRes, err := vault.LoadOrPromptInitResult(rc)
 		if err != nil {
 			return fmt.Errorf("failed to load init result: %w", err)
 		}
-		if err := vault.ConfirmSecureStorage(initRes); err != nil {
+		if err := vault.ConfirmSecureStorage(rc, initRes); err != nil {
 			return fmt.Errorf("secure storage confirmation failed: %w", err)
 		}
 
 		// 5️⃣ Securely erase vault_init.json
-		if err := crypto.SecureErase(shared.VaultInitPath); err != nil {
+		if err := crypto.SecureErase(rc.Ctx, shared.VaultInitPath); err != nil {
 			return fmt.Errorf("failed to erase vault init file: %w", err)
 		}
 		log.Info("✅ Securely erased vault init file")
 
 		// 6️⃣ Disable swap (optional)
 		if swapOff {
-			if err := execute.RunSimple("swapoff", "-a"); err != nil {
+			if err := execute.RunSimple(rc.Ctx, "swapoff", "-a"); err != nil {
 				log.Warn("⚠ Failed to disable swap; you may need root privileges", zap.Error(err))
 			} else {
 				log.Info("✅ Swap disabled")
@@ -65,7 +66,7 @@ var SecureVaultCmd = &cobra.Command{
 
 		// 7️⃣ Disable core dumps (optional)
 		if coreDumpOff {
-			if err := execute.RunSimple("ulimit", "-c", "0"); err != nil {
+			if err := execute.RunSimple(rc.Ctx, "ulimit", "-c", "0"); err != nil {
 				log.Warn("⚠ Failed to disable core dumps; update systemd unit with LimitCORE=0", zap.Error(err))
 			} else {
 				log.Info("✅ Core dumps disabled")

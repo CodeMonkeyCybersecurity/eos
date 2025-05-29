@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func Init(cfg zap.Config) {
+func Init(rc *eos_io.RuntimeContext, cfg zap.Config) {
 	for _, path := range cfg.OutputPaths {
 		if path != "stdout" && path != "stderr" {
 			if err := EnsureLogPermissions(path); err != nil {
@@ -29,17 +31,20 @@ func Init(cfg zap.Config) {
 	}
 
 	zap.ReplaceGlobals(builtLogger)
-	zap.L().Info("Logger initialized", zap.String("log_level", cfg.Level.String()))
+	otelzap.Ctx(rc.Ctx).Info("Logger initialized", zap.String("log_level", cfg.Level.String()))
 }
 
-func Sync(strict ...bool) error {
-	err := zap.L().Sync()
+func Sync(rc *eos_io.RuntimeContext, strict ...bool) error {
+	logger := otelzap.Ctx(rc.Ctx).Logger() // Get underlying *zap.Logger
+	err := logger.Sync()                   // Sync returns error
+
 	if err == nil || (!StrictEnabled(strict) && IsIgnorableSyncError(err)) {
 		return nil
 	}
-	zap.L().Error("Failed to sync logger", zap.Error(err))
+	otelzap.Ctx(rc.Ctx).Error("Failed to sync logger", zap.Error(err))
 	return err
 }
+
 func IsIgnorableSyncError(err error) bool {
 	var pathErr *os.PathError
 	return errors.As(err, &pathErr) || err.Error() == "sync /dev/stdout: invalid argument"
@@ -49,7 +54,7 @@ func StrictEnabled(flags []bool) bool {
 	return len(flags) > 0 && flags[0]
 }
 
-func LogErrAndWrap(msg string, err error) error {
-	zap.L().Error(msg, zap.Error(err))
+func LogErrAndWrap(rc *eos_io.RuntimeContext, msg string, err error) error {
+	otelzap.Ctx(rc.Ctx).Error(msg, zap.Error(err))
 	return fmt.Errorf("%s: %w", msg, err)
 }

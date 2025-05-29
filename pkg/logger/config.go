@@ -6,13 +6,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 // DefaultConfig returns a production-ready Zap config with sensible defaults.
-func DefaultConfig() zap.Config {
-	logPath := ResolveLogPath()
+func DefaultConfig(rc *eos_io.RuntimeContext) zap.Config {
+	logPath := ResolveLogPath(rc)
 	if logPath == "" {
 		logPath = "./eos.log"
 	}

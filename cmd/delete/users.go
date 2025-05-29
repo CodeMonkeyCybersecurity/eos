@@ -5,6 +5,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -13,12 +14,12 @@ var DeleteUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Delete users",
 	Long:  `Delete users by specifying the target user.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
-			zap.L().Fatal("Please specify the user to delete.")
+			otelzap.Ctx(rc.Ctx).Fatal("Please specify the user to delete.")
 		}
 		user := args[0]
-		zap.L().Info("Deleting user", zap.String("user", user))
+		otelzap.Ctx(rc.Ctx).Info("Deleting user", zap.String("user", user))
 		// Add your delete logic here.
 		return nil
 	}),

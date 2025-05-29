@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 )
 
@@ -14,7 +15,7 @@ import (
 //---------------------------- STOP FUNCTIONS ---------------------------- //
 //
 
-func StopContainersBySubstring(substring string) error {
+func StopContainersBySubstring(rc *eos_io.RuntimeContext, substring string) error {
 	out, err := exec.Command("docker", "ps", "--filter", "name="+substring, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
@@ -25,7 +26,7 @@ func StopContainersBySubstring(substring string) error {
 		if name == "" {
 			continue
 		}
-		err := execute.RunSimple("docker", "stop", name)
+		err := execute.RunSimple(rc.Ctx, "docker", "stop", name)
 		if err != nil {
 			fmt.Printf("failed to stop container %s: %v\n", name, err)
 		}
@@ -33,7 +34,7 @@ func StopContainersBySubstring(substring string) error {
 	return nil
 }
 
-func StopContainer(containerName string) error {
+func StopContainer(rc *eos_io.RuntimeContext, containerName string) error {
 	out, err := exec.Command("docker", "ps", "--filter", "name="+containerName, "--format", "{{.Names}}").Output()
 	if err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
@@ -43,25 +44,25 @@ func StopContainer(containerName string) error {
 		return nil
 	}
 
-	err = execute.RunSimple("docker", "stop", containerName)
+	err = execute.RunSimple(rc.Ctx, "docker", "stop", containerName)
 	if err != nil {
 		return fmt.Errorf("failed to stop container %s: %w", containerName, err)
 	}
 	return nil
 }
 
-func StopContainers(containers []string) error {
+func StopContainers(rc *eos_io.RuntimeContext, containers []string) error {
 	args := append([]string{"stop"}, containers...)
-	err := execute.RunSimple("docker", args...)
+	err := execute.RunSimple(rc.Ctx, "docker", args...)
 	if err != nil {
 		return fmt.Errorf("failed to stop containers %v: %w", containers, err)
 	}
 	return nil
 }
 
-func RemoveContainers(containers []string) error {
+func RemoveContainers(rc *eos_io.RuntimeContext, containers []string) error {
 	args := append([]string{"rm"}, containers...)
-	err := execute.RunSimple("docker", args...)
+	err := execute.RunSimple(rc.Ctx, "docker", args...)
 	if err != nil {
 		return fmt.Errorf("failed to remove containers %v: %w", containers, err)
 	}

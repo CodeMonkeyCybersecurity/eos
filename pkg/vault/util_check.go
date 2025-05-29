@@ -10,40 +10,42 @@ import (
 	"strings"
 
 	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 )
 
-func Check(client *api.Client, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
+func Check(rc *eos_io.RuntimeContext, client *api.Client, storedHashes []string, hashedRoot string) (*shared.CheckReport, *api.Client) {
 	_, span := tracer.Start(context.Background(), "vault.Check")
 	defer span.End()
 
 	report := &shared.CheckReport{}
 
 	if os.Getenv(shared.VaultAddrEnv) == "" {
-		return failReport(report, "VAULT_ADDR not set")
+		return failReport(rc, report, "VAULT_ADDR not set")
 	}
 
-	if healthy, err := CheckVaultHealth(); err != nil || !healthy {
+	if healthy, err := CheckVaultHealth(rc); err != nil || !healthy {
 		errMsg := fmt.Sprintf("Vault health check failed: %v", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, errMsg)
-		return failReport(report, errMsg)
+		return failReport(rc, report, errMsg)
 	}
 
 	if !isInstalled() {
-		return failReport(report, "Vault CLI binary not found in PATH")
+		return failReport(rc, report, "Vault CLI binary not found in PATH")
 	}
 	report.Installed = true
 
 	if client == nil {
-		c, err := NewClient()
+		c, err := NewClient(rc)
 		if err != nil {
-			return failReport(report, "Vault client initialization failed")
+			return failReport(rc, report, "Vault client initialization failed")
 		}
 		client = c
 	}
@@ -53,7 +55,7 @@ func Check(client *api.Client, storedHashes []string, hashedRoot string) (*share
 		errMsg := fmt.Sprintf("Init check error: %v", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, errMsg)
-		return failReport(report, errMsg)
+		return failReport(rc, report, errMsg)
 	}
 	report.Initialized = initStatus
 	report.Sealed = IsVaultSealed(client)
@@ -62,7 +64,7 @@ func Check(client *api.Client, storedHashes []string, hashedRoot string) (*share
 		report.Notes = append(report.Notes, "Vault is sealed")
 	}
 
-	if len(storedHashes) > 0 && hashedRoot != "" && !verifyVaultSecrets(storedHashes, hashedRoot) {
+	if len(storedHashes) > 0 && hashedRoot != "" && !verifyVaultSecrets(rc, storedHashes, hashedRoot) {
 		report.Notes = append(report.Notes, "Vault secret mismatch or verification failed")
 	}
 
@@ -70,14 +72,14 @@ func Check(client *api.Client, storedHashes []string, hashedRoot string) (*share
 	return report, client
 }
 
-func failReport(r *shared.CheckReport, msg string) (*shared.CheckReport, *api.Client) {
-	zap.L().Warn("Vault check failed", zap.String("reason", msg))
+func failReport(rc *eos_io.RuntimeContext, r *shared.CheckReport, msg string) (*shared.CheckReport, *api.Client) {
+	otelzap.Ctx(rc.Ctx).Warn("Vault check failed", zap.String("reason", msg))
 	r.Notes = append(r.Notes, msg)
 	return r, nil
 }
 
-func verifyVaultSecrets(storedHashes []string, hashedRoot string) bool {
-	keys, root, err := PromptOrRecallUnsealKeys()
+func verifyVaultSecrets(rc *eos_io.RuntimeContext, storedHashes []string, hashedRoot string) bool {
+	keys, root, err := PromptOrRecallUnsealKeys(rc)
 	if err != nil || !crypto.AllUnique(keys) {
 		return false
 	}
@@ -104,11 +106,11 @@ func IsAlreadyInitialized(err error) bool {
 	return strings.Contains(err.Error(), "Vault is already initialized")
 }
 
-func ListVault(path string) ([]string, error) {
+func ListVault(rc *eos_io.RuntimeContext, path string) ([]string, error) {
 	_, span := tracer.Start(context.Background(), "vault.ListVault")
 	defer span.End()
 
-	client, err := GetRootClient()
+	client, err := GetRootClient(rc)
 	if err != nil {
 		span.RecordError(err)
 		return nil, cerr.Wrap(err, "get root client")
@@ -138,8 +140,8 @@ func CheckVaultTokenFile() error {
 }
 
 // RunVaultTestQuery attempts a simple KVv2 read using the configured client.
-func RunVaultTestQuery() error {
-	client, err := GetVaultClient()
+func RunVaultTestQuery(rc *eos_io.RuntimeContext) error {
+	client, err := GetVaultClient(rc)
 	if err != nil {
 		return fmt.Errorf("get client: %w", err)
 	}
@@ -147,35 +149,34 @@ func RunVaultTestQuery() error {
 	return err
 }
 
-func EnsureVaultReady() (*api.Client, error) {
-	client, err := NewClient()
+func EnsureVaultReady(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	client, err := NewClient(rc)
 	if err != nil {
 		return nil, err
 	}
-	if err := probeVaultHealthUntilReady(client); err == nil {
+	if err := probeVaultHealthUntilReady(rc, client); err == nil {
 		return client, nil
 	}
-	if err := recoverVaultHealth(client); err != nil {
+	if err := recoverVaultHealth(rc, client); err != nil {
 		return nil, fmt.Errorf("vault recovery failed: %w", err)
 	}
 	return client, nil
 }
 
 // PathExistsKVv2 checks if a KV-v2 path has metadata.
-func PathExistsKVv2(client *api.Client, mount, path string) (bool, error) {
+func PathExistsKVv2(rc *eos_io.RuntimeContext, client *api.Client, mount, path string) (bool, error) {
 	if client == nil {
 		return false, fmt.Errorf("nil Vault client")
 	}
-	ctx := context.Background()
-	md, err := client.KVv2(mount).GetMetadata(ctx, path)
+	md, err := client.KVv2(mount).GetMetadata(rc.Ctx, path)
 	switch {
 	case err == nil && md != nil:
-		zap.L().Debug("✅ Metadata found", zap.String("mount", mount), zap.String("path", path))
+		otelzap.Ctx(rc.Ctx).Debug("✅ Metadata found", zap.String("mount", mount), zap.String("path", path))
 		return true, nil
 	case isNotFound(err):
 		return false, nil
 	default:
-		zap.L().Error("❌ Metadata check failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Metadata check failed", zap.Error(err))
 		return false, err
 	}
 }
@@ -191,11 +192,10 @@ func isNotFound(err error) bool {
 }
 
 // FindNextAvailableKVv2Path discovers an unused path under baseDir.
-func FindNextAvailableKVv2Path(client *api.Client, mount, baseDir, leafBase string) (string, error) {
-	ctx := context.Background()
+func FindNextAvailableKVv2Path(rc *eos_io.RuntimeContext, client *api.Client, mount, baseDir, leafBase string) (string, error) {
 	listPath := fmt.Sprintf("%s/metadata/%s", mount, baseDir)
 
-	sec, err := client.Logical().ListWithContext(ctx, listPath)
+	sec, err := client.Logical().ListWithContext(rc.Ctx, listPath)
 	if err != nil {
 		if isNotFound(err) {
 			return fmt.Sprintf("%s/%s", baseDir, leafBase), nil

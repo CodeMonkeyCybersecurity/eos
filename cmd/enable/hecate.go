@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hecate"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -22,8 +23,8 @@ var EnableHecateCmd = &cobra.Command{
 	Short: "Start Hecate services using Docker Compose",
 	Long: `This command starts the full Hecate stack using Docker Compose,
 by running 'docker compose up -d' inside /opt/hecate.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := zap.L().Named("enable-hecate")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 		log.Info("🚀 Starting Hecate stack (docker compose up -d)...")
 
 		composePath := hecate.BaseDir

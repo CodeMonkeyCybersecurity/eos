@@ -3,18 +3,18 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -23,11 +23,9 @@ import (
 //--------------------------------------------------------------------
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
-func PhaseEnableUserpass(_ *api.Client, log *zap.Logger, password string) error {
-	ctx, span := telemetry.Start(context.Background(), "vault.phase10_enable_userpass")
-	defer span.End()
+func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logger, password string) error {
 
-	client, err := GetRootClient()
+	client, err := GetRootClient(rc)
 	if err != nil {
 		log.Error("get privileged Vault client failed", zap.Error(err))
 		return cerr.Wrap(err, "get-root-client")
@@ -35,18 +33,18 @@ func PhaseEnableUserpass(_ *api.Client, log *zap.Logger, password string) error 
 
 	if password == "" {
 		log.Warn("no password provided; prompting interactively")
-		password, err = crypto.PromptPassword("Enter password for EOS Vault user:")
+		password, err = crypto.PromptPassword(rc, "Enter password for EOS Vault user:")
 		if err != nil {
 			return cerr.Wrap(err, "prompt password")
 		}
-	} else if err := crypto.ValidateStrongPassword(password); err != nil {
+	} else if err := crypto.ValidateStrongPassword(rc.Ctx, password); err != nil {
 		return cerr.Wrap(err, "validate provided password")
 	}
 
-	if err := EnableUserpassAuth(client); err != nil {
+	if err := EnableUserpassAuth(rc, client); err != nil {
 		return cerr.Wrap(err, "enable-userpass-auth")
 	}
-	if err := EnsureUserpassUser(client, ctx, password); err != nil {
+	if err := EnsureUserpassUser(client, rc, password); err != nil {
 		return cerr.Wrap(err, "ensure-userpass-user")
 	}
 
@@ -55,26 +53,26 @@ func PhaseEnableUserpass(_ *api.Client, log *zap.Logger, password string) error 
 }
 
 // EnableUserpassAuth enables the userpass auth method if it is not already mounted.
-func EnableUserpassAuth(client *api.Client) error {
-	zap.L().Info("📡 Enabling userpass auth method if needed...")
+func EnableUserpassAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
+	otelzap.Ctx(rc.Ctx).Info("📡 Enabling userpass auth method if needed...")
 
 	err := client.Sys().EnableAuthWithOptions("userpass", &api.EnableAuthOptions{Type: "userpass"})
 	if err == nil {
-		zap.L().Info("✅ Userpass auth method enabled")
+		otelzap.Ctx(rc.Ctx).Info("✅ Userpass auth method enabled")
 		return nil
 	}
 
 	if strings.Contains(err.Error(), "path is already in use") {
-		zap.L().Warn("⚠️ Userpass auth method already enabled", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Userpass auth method already enabled", zap.Error(err))
 		return nil
 	}
 
-	zap.L().Error("❌ Failed to enable userpass auth method", zap.Error(err))
+	otelzap.Ctx(rc.Ctx).Error("❌ Failed to enable userpass auth method", zap.Error(err))
 	return fmt.Errorf("enable userpass auth: %w", err)
 }
 
 // EnsureUserpassUser ensures the eos user exists under userpass auth.
-func EnsureUserpassUser(client *api.Client, ctx context.Context, password string) error {
+func EnsureUserpassUser(client *api.Client, rc *eos_io.RuntimeContext, password string) error {
 	zap.S().Infow("ensuring EOS user exists", "path", shared.EosUserpassPath)
 	if sec, _ := client.Logical().Read(shared.EosUserpassPath); sec != nil {
 		zap.S().Warn("EOS user already exists; skipping")
@@ -86,7 +84,7 @@ func EnsureUserpassUser(client *api.Client, ctx context.Context, password string
 	zap.S().Infow("EOS user created under userpass auth")
 
 	// fallback save
-	if err := WriteUserpassCredentialsFallback(ctx, password); err != nil {
+	if err := WriteUserpassCredentialsFallback(rc, password); err != nil {
 		return cerr.Wrap(err, "write-credentials-fallback")
 	}
 	return nil
@@ -94,9 +92,7 @@ func EnsureUserpassUser(client *api.Client, ctx context.Context, password string
 
 // WriteUserpassCredentialsFallback writes the EOS user’s password to disk and Vault KV,
 // with telemetry, structured logging, and cockroachdb‐style error wrapping.
-func WriteUserpassCredentialsFallback(ctx context.Context, password string) error {
-	ctx, span := telemetry.Start(ctx, "vault.write_userpass_credentials_fallback")
-	defer span.End()
+func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string) error {
 	zap.S().Infow("saving fallback copy")
 
 	dir := filepath.Dir(shared.EosUserPassPasswordFile)
@@ -104,6 +100,7 @@ func WriteUserpassCredentialsFallback(ctx context.Context, password string) erro
 		return cerr.Wrapf(err, "mkdir %s", dir)
 	}
 	if err := eos_unix.WriteFile(
+		rc.Ctx,
 		shared.EosUserPassPasswordFile,
 		[]byte(password+"\n"),
 		0o600,
@@ -113,19 +110,19 @@ func WriteUserpassCredentialsFallback(ctx context.Context, password string) erro
 	}
 	zap.S().Infow("fallback file written", "path", shared.EosUserPassPasswordFile)
 
-	uid, gid, err := eos_unix.LookupUser(shared.EosID)
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
 		return cerr.Wrapf(err, "lookup user %s", shared.EosID)
 	}
-	if err := eos_unix.ChownR(ctx, shared.SecretsDir, uid, gid); err != nil {
+	if err := eos_unix.ChownR(rc.Ctx, shared.SecretsDir, uid, gid); err != nil {
 		zap.S().Warnw("chownR failed; continuing", "dir", shared.SecretsDir, "err", err)
 	}
 
-	client, err := GetRootClient()
+	client, err := GetRootClient(rc)
 	if err != nil {
 		return cerr.Wrap(err, "get-root-client")
 	}
-	if err := WriteKVv2(client, "secret", "eos/userpass-password", shared.FallbackSecretsTemplate(password)); err != nil {
+	if err := WriteKVv2(rc, client, "secret", "eos/userpass-password", shared.FallbackSecretsTemplate(password)); err != nil {
 		return cerr.Wrap(err, "write-kv-v2")
 	}
 	zap.S().Infow("secret written to Vault KV", "path", "secret/eos/userpass-password")

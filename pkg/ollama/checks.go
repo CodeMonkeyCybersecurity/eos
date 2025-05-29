@@ -5,11 +5,12 @@ package ollama
 import (
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 )
 
-func isWebUIContainerRunningOnPort3000() bool {
-	out, err := execute.Run(execute.Options{
+func isWebUIContainerRunningOnPort3000(rc *eos_io.RuntimeContext) bool {
+	out, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"ps", "--format", "{{.Names}} {{.Ports}}"},
 	})

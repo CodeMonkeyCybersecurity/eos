@@ -3,11 +3,11 @@ package container
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/templates"
 	vaultapi "github.com/hashicorp/vault/api"
 )
@@ -29,7 +29,7 @@ type JenkinsOptions struct {
 //  2. Call ComposeUpInDir("/opt/<app>") to bring it up detached.
 //
 // If you want to deploy under /opt/jenkins, simply use appName="jenkins".
-func WriteAndUpJenkins(ctx context.Context, appName string, opts JenkinsOptions) error {
+func WriteAndUpJenkins(rc *eos_io.RuntimeContext, appName string, opts JenkinsOptions) error {
 	// 1) make sure /opt/<appName> exists
 	dir := filepath.Join("/opt", appName)
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -49,7 +49,7 @@ func WriteAndUpJenkins(ctx context.Context, appName string, opts JenkinsOptions)
 	}
 
 	// 4) use your existing ComposeUpInDir
-	return ComposeUpInDir(ctx, dir)
+	return ComposeUpInDir(rc, dir)
 }
 
 // StoreJenkinsAdminPassword writes the Jenkins initial admin password into Vault KV-v2.
@@ -58,7 +58,7 @@ func WriteAndUpJenkins(ctx context.Context, appName string, opts JenkinsOptions)
 // a field "initialAdminPassword".  That makes the secret readable at:
 //
 //	vault kv get secret/jenkins
-func StoreJenkinsAdminPassword(ctx context.Context, client *vaultapi.Client, password string) error {
+func StoreJenkinsAdminPassword(rc *eos_io.RuntimeContext, client *vaultapi.Client, password string) error {
 	// mountPath is the KV-v2 mount (EOS default is "secret")
 	kv := client.KVv2("secret")
 
@@ -69,7 +69,7 @@ func StoreJenkinsAdminPassword(ctx context.Context, client *vaultapi.Client, pas
 		"initialAdminPassword": password,
 	}
 
-	if _, err := kv.Put(ctx, secretPath, data); err != nil {
+	if _, err := kv.Put(rc.Ctx, secretPath, data); err != nil {
 		return fmt.Errorf("failed to store Jenkins admin password in Vault: %w", err)
 	}
 

@@ -10,12 +10,13 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // installTrivy installs the Trivy vulnerability scanner.
-func installTrivy(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	log := ctx.Log.Named("trivy-installer")
+func installTrivy(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("📦 Starting Trivy installation")
 
 	log.Info("🔧 Installing required packages: wget, gnupg")

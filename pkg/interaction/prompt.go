@@ -4,46 +4,48 @@ package interaction
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/term"
 )
 
 // PromptIfMissing returns the value of a CLI flag or prompts the user if it's unset.
 // If `isSecret` is true, the input is hidden (e.g. passwords).
-func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool) (string, error) {
+func PromptIfMissing(ctx context.Context, cmd *cobra.Command, flagName, prompt string, isSecret bool) (string, error) {
 	val, err := cmd.Flags().GetString(flagName)
 	if err != nil {
-		zap.L().Error("Failed to get CLI flag", zap.String("flag", flagName), zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to get CLI flag", zap.String("flag", flagName), zap.Error(err))
 		return "", err
 	}
 	if val != "" {
-		zap.L().Debug("✅ CLI flag provided", zap.String("flag", flagName), zap.String("value", val))
+		otelzap.Ctx(ctx).Debug("✅ CLI flag provided", zap.String("flag", flagName), zap.String("value", val))
 		return val, nil
 	}
 
-	zap.L().Info("📝 Prompting for missing flag", zap.String("flag", flagName), zap.Bool("is_secret", isSecret))
+	otelzap.Ctx(ctx).Info("📝 Prompting for missing flag", zap.String("flag", flagName), zap.Bool("is_secret", isSecret))
 
 	if isSecret {
-		secret, err := PromptSecret(prompt) // <-- capture both values
+		secret, err := PromptSecret(ctx, prompt) // <-- capture both values
 		if err != nil {
-			zap.L().Error("❌ Failed to read secret input", zap.Error(err))
+			otelzap.Ctx(ctx).Error("❌ Failed to read secret input", zap.Error(err))
 			return "", err
 		}
 		if secret == "" {
-			zap.L().Warn("⚠️ Empty input received for secret prompt")
+			otelzap.Ctx(ctx).Warn("⚠️ Empty input received for secret prompt")
 		}
 		return secret, nil
 	}
 
-	input := PromptInput(prompt, "")
+	input := PromptInput(ctx, prompt, "")
 	if input == "" {
-		zap.L().Warn("⚠️ Empty input received for prompt", zap.String("prompt", prompt))
+		otelzap.Ctx(ctx).Warn("⚠️ Empty input received for prompt", zap.String("prompt", prompt))
 	}
 	return input, nil
 }
@@ -51,9 +53,9 @@ func PromptIfMissing(cmd *cobra.Command, flagName, prompt string, isSecret bool)
 // PromptSecret asks the user for a hidden input (no terminal echo).
 // Logs an error if reading fails, returns empty string on failure.
 // Returns trimmed input or warns if no input is provided.
-func PromptSecret(prompt string) (string, error) {
+func PromptSecret(ctx context.Context, prompt string) (string, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		zap.L().Error("❌ Cannot prompt for secret input: not a TTY")
+		otelzap.Ctx(ctx).Error("❌ Cannot prompt for secret input: not a TTY")
 		return "", fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
@@ -61,28 +63,28 @@ func PromptSecret(prompt string) (string, error) {
 	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
-		zap.L().Error("❌ Failed to read secret input", zap.Error(err))
+		otelzap.Ctx(ctx).Error("❌ Failed to read secret input", zap.Error(err))
 		return "", err
 	}
 	secret := strings.TrimSpace(string(bytePassword))
 	if secret == "" {
-		zap.L().Warn("⚠️ No input received for secret", zap.String("prompt", prompt))
+		otelzap.Ctx(ctx).Warn("⚠️ No input received for secret", zap.String("prompt", prompt))
 	}
 	return secret, nil
 }
 
 // PromptSecrets prompts the user for multiple hidden inputs (e.g., unseal keys).
-func PromptSecrets(promptBase string, count int) ([]string, error) {
+func PromptSecrets(ctx context.Context, promptBase string, count int) ([]string, error) {
 
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		zap.L().Error("❌ Cannot prompt for secret input: not a TTY")
+		otelzap.Ctx(ctx).Error("❌ Cannot prompt for secret input: not a TTY")
 		return nil, fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
 	secrets := make([]string, 0, count)
 	for i := 1; i <= count; i++ {
 		prompt := fmt.Sprintf("%s %d", promptBase, i)
-		secret, err := PromptSecret(prompt)
+		secret, err := PromptSecret(ctx, prompt)
 		if err != nil {
 			return nil, fmt.Errorf("error reading %s: %w", prompt, err)
 		}
@@ -92,8 +94,8 @@ func PromptSecrets(promptBase string, count int) ([]string, error) {
 }
 
 // PromptSelect displays numbered options and returns the selected value by index.
-func PromptSelect(prompt string, options []string) string {
-	zap.L().Info("📋 Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
+func PromptSelect(ctx context.Context, prompt string, options []string) string {
+	otelzap.Ctx(ctx).Info("📋 Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
 
 	fmt.Println(prompt)
 	for i, option := range options {
@@ -102,25 +104,25 @@ func PromptSelect(prompt string, options []string) string {
 
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		choice, err := ReadLine(reader, EnterChoicePrompt)
+		choice, err := ReadLine(ctx, reader, EnterChoicePrompt)
 		if err != nil {
-			zap.L().Error("Failed to read choice", zap.Error(err))
+			otelzap.Ctx(ctx).Error("Failed to read choice", zap.Error(err))
 			continue
 		}
 
 		idx, err := strconv.Atoi(choice)
 		if err == nil && idx >= 1 && idx <= len(options) {
-			zap.L().Info("✅ User selected option", zap.Int("index", idx), zap.String("value", options[idx-1]))
+			otelzap.Ctx(ctx).Info("✅ User selected option", zap.Int("index", idx), zap.String("value", options[idx-1]))
 			return options[idx-1]
 		}
 
-		zap.L().Warn("❌ Invalid selection", zap.String("input", choice))
+		otelzap.Ctx(ctx).Warn("❌ Invalid selection", zap.String("input", choice))
 		fmt.Println("Invalid selection. Please try again.")
 	}
 }
 
 // PromptYesNo asks a yes/no question and returns true/false. Falls back to default if unknown.
-func PromptYesNo(prompt string, defaultYes bool) bool {
+func PromptYesNo(ctx context.Context, prompt string, defaultYes bool) bool {
 	defPrompt := DefaultYesPrompt
 	if !defaultYes {
 		defPrompt = DefaultNoPrompt
@@ -128,49 +130,49 @@ func PromptYesNo(prompt string, defaultYes bool) bool {
 	label := fmt.Sprintf("%s [%s]", prompt, defPrompt)
 
 	reader := bufio.NewReader(os.Stdin)
-	input, err := ReadLine(reader, label)
+	input, err := ReadLine(ctx, reader, label)
 	if err != nil {
-		zap.L().Error("Failed to read yes/no input", zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to read yes/no input", zap.Error(err))
 		return defaultYes
 	}
 
 	if answer, ok := NormalizeYesNoInput(input); ok {
-		zap.L().Info("✅ User input parsed", zap.Bool("answer", answer))
+		otelzap.Ctx(ctx).Info("✅ User input parsed", zap.Bool("answer", answer))
 		return answer
 	}
 
-	zap.L().Info("ℹ️ Default applied", zap.String("prompt", prompt), zap.Bool("default_yes", defaultYes))
+	otelzap.Ctx(ctx).Info("ℹ️ Default applied", zap.String("prompt", prompt), zap.Bool("default_yes", defaultYes))
 	return defaultYes
 }
 
 // PromptConfirmOrValue asks the user to accept a default or enter a custom value.
-func PromptConfirmOrValue(prompt, defaultValue string) string {
-	if PromptYesNo(fmt.Sprintf("%s (default: %s)?", prompt, defaultValue), true) {
-		zap.L().Info("✅ Default value confirmed", zap.String("value", defaultValue))
+func PromptConfirmOrValue(ctx context.Context, prompt, defaultValue string) string {
+	if PromptYesNo(ctx, fmt.Sprintf("%s (default: %s)?", prompt, defaultValue), true) {
+		otelzap.Ctx(ctx).Info("✅ Default value confirmed", zap.String("value", defaultValue))
 		return defaultValue
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	input, err := ReadLine(reader, "Enter value")
+	input, err := ReadLine(ctx, reader, "Enter value")
 	if err != nil {
-		zap.L().Error("Failed to read custom value", zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to read custom value", zap.Error(err))
 		return defaultValue
 	}
-	zap.L().Info("✏️ Custom value entered", zap.String("value", input))
+	otelzap.Ctx(ctx).Info("✏️ Custom value entered", zap.String("value", input))
 	return input
 }
 
 // PromptInput asks for user input with an optional default fallback.
 // Logs input events; falls back to default value if input is empty.
-func PromptInput(prompt, defaultVal string) string {
+func PromptInput(ctx context.Context, prompt, defaultVal string) string {
 	reader := bufio.NewReader(os.Stdin)
-	input, err := ReadLine(reader, prompt)
+	input, err := ReadLine(ctx, reader, prompt)
 	if err != nil {
-		zap.L().Error("Failed to read user input", zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to read user input", zap.Error(err))
 		return defaultVal
 	}
 	if input == "" {
-		zap.L().Debug("ℹ️ Using default value", zap.String("default", defaultVal))
+		otelzap.Ctx(ctx).Debug("ℹ️ Using default value", zap.String("default", defaultVal))
 		return defaultVal
 	}
 	return input
@@ -189,14 +191,14 @@ func NormalizeYesNoInput(input string) (bool, bool) {
 	return false, false // unknown
 }
 
-func PromptInputWithReader(prompt, defaultVal string, reader *bufio.Reader) string {
-	input, err := ReadLine(reader, prompt)
+func PromptInputWithReader(ctx context.Context, prompt, defaultVal string, reader *bufio.Reader) string {
+	input, err := ReadLine(ctx, reader, prompt)
 	if err != nil {
-		zap.L().Error("Failed to read user input", zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to read user input", zap.Error(err))
 		return defaultVal
 	}
 	if input == "" {
-		zap.L().Debug("ℹ️ Using default value", zap.String("default", defaultVal))
+		otelzap.Ctx(ctx).Debug("ℹ️ Using default value", zap.String("default", defaultVal))
 		return defaultVal
 	}
 	return input

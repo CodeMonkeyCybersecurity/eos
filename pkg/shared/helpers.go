@@ -4,6 +4,7 @@ package shared
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -18,7 +19,7 @@ func CombineMarkers(additional ...string) []string {
 }
 
 // SafeClose closes an io.Closer and logs a warning if it fails.
-func SafeClose(c io.Closer) {
+func SafeClose(ctx context.Context, c io.Closer) {
 	if err := c.Close(); err != nil {
 		zap.L().Warn("Closing resource failed", zap.String("resource", fmt.Sprintf("%T", c)), zap.Error(err))
 	}

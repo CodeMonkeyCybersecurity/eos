@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -26,13 +27,13 @@ func init() {
 	UpdateCmd.AddCommand(CrontabCmd)
 }
 
-func runCrontabUpdate(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	log := ctx.Log.Named("crontab")
+func runCrontabUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	// Trim and prompt if needed
 	email = strings.TrimSpace(email)
 	if email == "" {
-		email = interaction.PromptInput("📧 Email address for cron failure alerts", "e.g., your@email.com")
+		email = interaction.PromptInput(rc.Ctx, "📧 Email address for cron failure alerts", "e.g., your@email.com")
 	}
 	if email == "" {
 		log.Error("No email address provided. Aborting update.")

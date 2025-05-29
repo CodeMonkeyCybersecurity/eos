@@ -3,24 +3,25 @@
 package hecate
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // PhaseNginx sets up Nginx configs as phase 3 of Hecate.
 // This is the thin wrapper that can be called by the lifecycle orchestrator.
-func PhaseNginx(backendIP string, ctx context.Context) error {
-	log := zap.L().Named("hecate-phase-nginx")
+func PhaseNginx(backendIP string, rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🚀 Starting Phase 3: Build and setup Nginx...")
 
 	// Always ensure directory structure first.
-	if err := EnsureNginxDirs(ctx); err != nil {
+	if err := EnsureNginxDirs(rc); err != nil {
 		return fmt.Errorf("failed to ensure Nginx dirs: %w", err)
 	}
 
@@ -31,13 +32,13 @@ func PhaseNginx(backendIP string, ctx context.Context) error {
 	}
 
 	// Actually build and deploy the Nginx configs.
-	return BuildNginxEnvironment(backendIP)
+	return BuildNginxEnvironment(rc, backendIP)
 }
 
 // BuildNginxEnvironment sets up Nginx configs (stream + include templates).
 // This matches the "build phase" pattern.
-func BuildNginxEnvironment(backendIP string) error {
-	log := zap.L().Named("hecate-nginx-builder")
+func BuildNginxEnvironment(rc *eos_io.RuntimeContext, backendIP string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🚀 Building Nginx configs for Hecate...")
 
 	// Step 1: Render and save StreamIncludeTemplate
@@ -91,12 +92,12 @@ func BuildNginxEnvironment(backendIP string) error {
 }
 
 // EnsureNginxDirs ensures necessary Nginx directories exist.
-func EnsureNginxDirs(ctx context.Context) error {
-	log := zap.L().Named("hecate-nginx-setup")
+func EnsureNginxDirs(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	dirs := []string{HecateConfDDir, HecateStreamDir}
 	// Create with 0755 permissions
-	if err := eos_unix.MultiMkdirP(ctx, dirs, 0o755); err != nil {
+	if err := eos_unix.MultiMkdirP(rc.Ctx, dirs, 0o755); err != nil {
 		log.Error("Failed to ensure Nginx directories", zap.Error(err))
 		return fmt.Errorf("ensure nginx dirs: %w", err)
 	}
@@ -106,11 +107,12 @@ func EnsureNginxDirs(ctx context.Context) error {
 }
 
 // CollateNginxFragments handles collation + writing of nginx.conf (only if fragments exist).
-func CollateNginxFragments() error {
-	log := zap.L().Named("hecate-nginx-collation")
+func CollateNginxFragments(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	if len(nginxFragments) > 0 {
 		return CollateAndWriteFile(
+			rc,
 			"hecate-nginx-collation",
 			nginxFragments,
 			HecateNginxConfig,

@@ -4,23 +4,23 @@ package hecate
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // OrchestrateHecateWizard runs the Hecate setup phases in order.
-func OrchestrateHecateWizard() error {
-	log := zap.L().Named("hecate-setup-wizard")
-	ctx := context.Background()
+func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("🚀 Welcome to the Hecate setup wizard!")
 
 	// Phase 0: ensure /opt/hecate exists
-	if err := eos_unix.MkdirP(ctx, BaseDir, 0o755); err != nil {
+	if err := eos_unix.MkdirP(rc.Ctx, BaseDir, 0o755); err != nil {
 		log.Error("Failed to create base directory", zap.Error(err))
 		return fmt.Errorf("failed to create %s: %w", BaseDir, err)
 	}
@@ -33,7 +33,7 @@ func OrchestrateHecateWizard() error {
 
 	// Phase 1: Docker Compose (no context arg)
 	log.Info("⚙️ Running Phase Docker Compose…")
-	if err := PhaseDockerCompose("hecate-compose-orchestrator", HecateDockerCompose); err != nil {
+	if err := PhaseDockerCompose(rc, "hecate-compose-orchestrator", HecateDockerCompose); err != nil {
 		log.Error("Phase Docker Compose failed", zap.Error(err))
 		return fmt.Errorf("phase docker compose failed: %w", err)
 	}
@@ -44,14 +44,14 @@ func OrchestrateHecateWizard() error {
 		Proxies:        proxies,
 	}
 	log.Info("⚙️ Running Phase Caddy setup…")
-	if err := PhaseCaddy(ctx, spec); err != nil {
+	if err := PhaseCaddy(rc, spec); err != nil {
 		log.Error("Phase Caddy failed", zap.Error(err))
 		return fmt.Errorf("phase caddy failed: %w", err)
 	}
 
 	// Phase 3: Nginx (only backendIP)
 	log.Info("⚙️ Running Phase Nginx setup…")
-	if err := PhaseNginx(backendIP, ctx); err != nil {
+	if err := PhaseNginx(backendIP, rc); err != nil {
 		log.Error("Phase Nginx failed", zap.Error(err))
 		return fmt.Errorf("phase nginx failed: %w", err)
 	}
@@ -61,15 +61,16 @@ func OrchestrateHecateWizard() error {
 }
 
 // ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.
-func ShouldExitNoServicesSelected(keycloak, nextcloud, wazuh, jenkins bool) bool {
+func ShouldExitNoServicesSelected(rc *eos_io.RuntimeContext, keycloak, nextcloud, wazuh, jenkins bool) bool {
 	if !keycloak && !nextcloud && !wazuh && !jenkins {
-		zap.L().Named("hecate-setup-check").Warn("🚫 No services selected. Exiting without making any changes.")
+		otelzap.Ctx(rc.Ctx).Warn("🚫 No services selected. Exiting without making any changes.")
 		return true
 	}
 	return false
 }
 
 func CollateAndWriteFile[T any](
+	rc *eos_io.RuntimeContext,
 	logName string,
 	fragments []T,
 	filePath string,
@@ -77,7 +78,7 @@ func CollateAndWriteFile[T any](
 	footer string,
 	renderFunc func(T) string,
 ) error {
-	log := zap.L().Named(logName)
+	log := otelzap.Ctx(rc.Ctx)
 
 	// Skip file creation if no fragments & no header/footer
 	if len(fragments) == 0 && header == "" && footer == "" {

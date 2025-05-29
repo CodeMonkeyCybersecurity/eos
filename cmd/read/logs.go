@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -19,21 +20,21 @@ var InspectLogsCmd = &cobra.Command{
 	Short: "Inspect EOS logs (requires root or eos privileges)",
 	Long: `Displays the last 100 lines of recent EOS logs.
 Tries known log file locations first. If none found, falls back to journalctl.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("inspect-logs")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
-		if !eos_unix.IsPrivilegedUser() {
+		if !eos_unix.IsPrivilegedUser(rc.Ctx) {
 			return errors.New("you must be root or the 'eos' user to view logs")
 		}
 
 		log.Info("Searching for log files", zap.String("action", "inspect-logs"))
 
 		found := false
-		active := logger.ResolveLogPath()
+		active := logger.ResolveLogPath(rc)
 
 		for _, candidate := range logger.PlatformLogPaths() {
 			path := os.ExpandEnv(candidate)
-			if content, err := logger.TryReadLogFile(path); err == nil {
+			if content, err := logger.TryReadLogFile(rc, path); err == nil {
 				prefix := "📄"
 				if path == active {
 					prefix = "⭐"
@@ -50,7 +51,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 			fmt.Println("\n⚠️")
 			fmt.Println("No log files found. Trying journalctl fallback...")
 			fmt.Println("\n⚠️")
-			out, err := logger.TryJournalctl()
+			out, err := logger.TryJournalctl(rc)
 			if err != nil {
 				return fmt.Errorf("journalctl fallback failed: %w", err)
 			}

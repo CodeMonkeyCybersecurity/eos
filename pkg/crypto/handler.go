@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 )
 
@@ -16,17 +17,17 @@ import (
 // 🔐 Hashing
 // ----------------------------
 
-func ConfirmHashedInputs(reader *bufio.Reader, keyLabel string, count int, tokenLabel string, expectedHashes []string, expectedTokenHash string) error {
+func ConfirmHashedInputs(rc *eos_io.RuntimeContext, reader *bufio.Reader, keyLabel string, count int, tokenLabel string, expectedHashes []string, expectedTokenHash string) error {
 	for {
 		fmt.Printf("Please re-enter %d unique keys and the token to confirm.\n", count)
 
-		keys, err := interaction.ReadLines(reader, keyLabel, count)
+		keys, err := interaction.ReadLines(rc, reader, keyLabel, count)
 		if err != nil {
 			fmt.Println("❌ Error reading keys:", err)
 			continue
 		}
 
-		token, err := interaction.ReadLine(reader, tokenLabel)
+		token, err := interaction.ReadLine(rc.Ctx, reader, tokenLabel)
 		if err != nil {
 			fmt.Println("❌ Error reading token:", err)
 			continue

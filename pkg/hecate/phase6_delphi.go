@@ -6,13 +6,15 @@ import (
 	"bufio"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // SetupWazuhWizard prompts the user for Wazuh setup info and returns a ServiceBundle.
-func SetupWazuhWizard(reader *bufio.Reader) ServiceBundle {
-	log := zap.L().Named("hecate-wazuh-setup")
+func SetupWazuhWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting Wazuh setup information...")
 
 	// Define the fields to prompt for.
@@ -48,6 +50,7 @@ func SetupWazuhWizard(reader *bufio.Reader) ServiceBundle {
 
 	// Build the ServiceBundle using GenericWizard.
 	return GenericWizard(
+		rc,
 		"hecate-wazuh-setup",
 		fields,
 		"wazuh",
@@ -61,12 +64,13 @@ func SetupWazuhWizard(reader *bufio.Reader) ServiceBundle {
 }
 
 // SetupWazuh performs the full setup: renders Compose, Caddy, and Nginx fragments.
-func SetupWazuh(bundle ServiceBundle, targetDir string) error {
-	log := zap.L().Named("hecate-wazuh-setup")
+func SetupWazuh(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("🚀 Starting Wazuh setup rendering...")
 
 	err := RenderBundleFragments(
+		rc,
 		bundle,
 		fmt.Sprintf("%s/docker-compose.override.yml", targetDir),
 		fmt.Sprintf("%s/Caddy-fragments", targetDir),

@@ -3,20 +3,19 @@
 package hetzner
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"os"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
 )
 
-func GetAllFws() {
+func GetAllFws(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	firewalls, err := client.Firewall.All(ctx)
+	firewalls, err := client.Firewall.All(rc.Ctx)
 	if err != nil {
 		fmt.Println("❌ Error retrieving firewalls:", err)
 		return
@@ -26,12 +25,11 @@ func GetAllFws() {
 	}
 }
 
-func CreateAFw() {
+func CreateAFw(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	result, _, err := client.Firewall.Create(ctx, hcloud.FirewallCreateOpts{
+	result, _, err := client.Firewall.Create(rc.Ctx, hcloud.FirewallCreateOpts{
 		ApplyTo: []hcloud.FirewallResource{
 			{
 				Type: hcloud.FirewallResourceTypeServer,
@@ -63,7 +61,7 @@ func CreateAFw() {
 		return
 	}
 
-	err = client.Action.WaitFor(ctx, result.Actions...)
+	err = client.Action.WaitFor(rc.Ctx, result.Actions...)
 	if err != nil {
 		fmt.Println("❌ Error waiting for actions:", err)
 		return
@@ -72,12 +70,11 @@ func CreateAFw() {
 	fmt.Printf("✅ Created firewall: %s (ID: %d)\n", result.Firewall.Name, result.Firewall.ID)
 }
 
-func GetAFw() {
+func GetAFw(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	fw, _, err := client.Firewall.GetByID(ctx, 123)
+	fw, _, err := client.Firewall.GetByID(rc.Ctx, 123)
 	if err != nil {
 		fmt.Println("❌ Error retrieving firewall:", err)
 		return
@@ -85,12 +82,11 @@ func GetAFw() {
 	fmt.Printf("✅ Got firewall: %s (ID: %d)\n", fw.Name, fw.ID)
 }
 
-func UpdateAFw() {
+func UpdateAFw(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	_, _, err := client.Firewall.Update(ctx, &hcloud.Firewall{ID: 123}, hcloud.FirewallUpdateOpts{
+	_, _, err := client.Firewall.Update(rc.Ctx, &hcloud.Firewall{ID: 123}, hcloud.FirewallUpdateOpts{
 		Labels: map[string]string{
 			"environment":    "prod",
 			"example.com/my": "label",
@@ -103,23 +99,21 @@ func UpdateAFw() {
 	}
 }
 
-func DeleteAFw() {
+func DeleteAFw(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	_, err := client.Firewall.Delete(ctx, &hcloud.Firewall{ID: 123})
+	_, err := client.Firewall.Delete(rc.Ctx, &hcloud.Firewall{ID: 123})
 	if err != nil {
 		fmt.Println("❌ Error deleting firewall:", err)
 	}
 }
 
-func ApplyToResources() {
+func ApplyToResources(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	actions, _, err := client.Firewall.ApplyResources(ctx, &hcloud.Firewall{ID: 123}, []hcloud.FirewallResource{
+	actions, _, err := client.Firewall.ApplyResources(rc.Ctx, &hcloud.Firewall{ID: 123}, []hcloud.FirewallResource{
 		{
 			Type: hcloud.FirewallResourceTypeServer,
 			Server: &hcloud.FirewallResourceServer{
@@ -131,15 +125,14 @@ func ApplyToResources() {
 		fmt.Println("❌ Error applying firewall to resources:", err)
 		return
 	}
-	_ = client.Action.WaitFor(ctx, actions...)
+	_ = client.Action.WaitFor(rc.Ctx, actions...)
 }
 
-func RemoveFromResources() {
+func RemoveFromResources(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	actions, _, err := client.Firewall.RemoveResources(ctx, &hcloud.Firewall{ID: 123}, []hcloud.FirewallResource{
+	actions, _, err := client.Firewall.RemoveResources(rc.Ctx, &hcloud.Firewall{ID: 123}, []hcloud.FirewallResource{
 		{
 			Type: hcloud.FirewallResourceTypeServer,
 			Server: &hcloud.FirewallResourceServer{
@@ -151,15 +144,14 @@ func RemoveFromResources() {
 		fmt.Println("❌ Error removing firewall from resources:", err)
 		return
 	}
-	_ = client.Action.WaitFor(ctx, actions...)
+	_ = client.Action.WaitFor(rc.Ctx, actions...)
 }
 
-func SetRules() {
+func SetRules(rc *eos_io.RuntimeContext) {
 	token := os.Getenv("HCLOUD_TOKEN")
 	client := hcloud.NewClient(hcloud.WithToken(token))
-	ctx := context.TODO()
 
-	actions, _, err := client.Firewall.SetRules(ctx, &hcloud.Firewall{ID: 123}, hcloud.FirewallSetRulesOpts{
+	actions, _, err := client.Firewall.SetRules(rc.Ctx, &hcloud.Firewall{ID: 123}, hcloud.FirewallSetRulesOpts{
 		Rules: []hcloud.FirewallRule{
 			{
 				Description: hcloud.Ptr("Allow port 80"),
@@ -178,5 +170,5 @@ func SetRules() {
 		fmt.Println("❌ Error setting firewall rules:", err)
 		return
 	}
-	_ = client.Action.WaitFor(ctx, actions...)
+	_ = client.Action.WaitFor(rc.Ctx, actions...)
 }

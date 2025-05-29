@@ -15,7 +15,7 @@ var UpdateUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "Update users",
 	Long:  `Use this command to update user information.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
 			fmt.Println("Please specify the user to update.")
 			return nil

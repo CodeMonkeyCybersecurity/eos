@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
@@ -121,9 +120,6 @@ func CommandCategory(cmd string) string {
 func ClassifyError(err error) string {
 	if err == nil {
 		return ""
-	}
-	if eos_err.IsExpectedUserError(err) {
-		return "user"
 	}
 	return "system"
 }

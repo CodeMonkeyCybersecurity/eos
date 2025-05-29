@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 
@@ -18,17 +19,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func ReadLDAPConfig() (*LDAPConfig, error) {
+func ReadLDAPConfig(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	err := vault.ReadFromVault(shared.LDAPVaultPath, &cfg)
+	err := vault.ReadFromVault(rc, shared.LDAPVaultPath, &cfg)
 	if err != nil {
 		return nil, err
 	}
 	return &cfg, nil
 }
 
-func PromptLDAPDetails() (*LDAPConfig, error) {
-	existing, _ := ReadLDAPConfig() // best-effort load
+func PromptLDAPDetails(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
+	existing, _ := ReadLDAPConfig(rc) // best-effort load
 
 	cfg := existing
 	if cfg == nil {
@@ -37,23 +38,23 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 
 	// Prompt only if missing
 	if cfg.FQDN == "" {
-		cfg.FQDN = interaction.PromptInput("FQDN", "FQDN of your LDAP server")
+		cfg.FQDN = interaction.PromptInput(rc.Ctx, "FQDN", "FQDN of your LDAP server")
 	}
 	if cfg.BindDN == "" {
-		cfg.BindDN = interaction.PromptInput("BindDN", "Bind DN")
+		cfg.BindDN = interaction.PromptInput(rc.Ctx, "BindDN", "Bind DN")
 	}
 	if cfg.Password == "" {
 		var err error
-		cfg.Password, err = crypto.PromptPassword("Bind password")
+		cfg.Password, err = crypto.PromptPassword(rc, "Bind password")
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	cfg.UserBase = interaction.PromptInput("UserBase", "User base DN (e.g., ou=people,dc=example,dc=org)")
-	cfg.RoleBase = interaction.PromptInput("RoleBase", "Role base DN (e.g., ou=Groups,dc=example,dc=org)")
-	cfg.AdminRole = interaction.PromptInput("AdminRole", "Admin group name (e.g., Administrator)")
-	cfg.ReadonlyRole = interaction.PromptInput("ReadonlyRole", "Readonly group name (e.g., readonly)")
+	cfg.UserBase = interaction.PromptInput(rc.Ctx, "UserBase", "User base DN (e.g., ou=people,dc=example,dc=org)")
+	cfg.RoleBase = interaction.PromptInput(rc.Ctx, "RoleBase", "Role base DN (e.g., ou=Groups,dc=example,dc=org)")
+	cfg.AdminRole = interaction.PromptInput(rc.Ctx, "AdminRole", "Admin group name (e.g., Administrator)")
+	cfg.ReadonlyRole = interaction.PromptInput(rc.Ctx, "ReadonlyRole", "Readonly group name (e.g., readonly)")
 
 	// Validate required fields
 	if cfg.FQDN == "" || cfg.BindDN == "" || cfg.Password == "" || cfg.UserBase == "" || cfg.RoleBase == "" {
@@ -61,7 +62,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 	}
 
 	// 🔐 Save to Vault
-	if err := vault.WriteToVault(shared.LDAPVaultPath, cfg); err != nil {
+	if err := vault.WriteToVault(rc, shared.LDAPVaultPath, cfg); err != nil {
 		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
@@ -70,7 +71,7 @@ func PromptLDAPDetails() (*LDAPConfig, error) {
 
 func DownloadAndPlaceCert(fqdn string) error {
 
-	cmd := exec.Command( "bash", "-c", fmt.Sprintf(
+	cmd := exec.Command("bash", "-c", fmt.Sprintf(
 		`echo -n | openssl s_client -connect %s:636 | sed -ne '/-BEGIN CERTIFICATE-/,/-END CERTIFICATE-/p' > /etc/wazuh-indexer/opensearch-security/ldapcacert.pem`,
 		fqdn,
 	))
@@ -245,7 +246,7 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 func RunSecurityAdmin(filename string) error {
 	path := filepath.Join("/etc/wazuh-indexer/opensearch-security", filename)
 
-	cmd := exec.Command( "bash", "-c", fmt.Sprintf(
+	cmd := exec.Command("bash", "-c", fmt.Sprintf(
 		`export JAVA_HOME=/usr/share/wazuh-indexer/jdk/ && bash /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh -f %s -icl -key /etc/wazuh-indexer/certs/admin-key.pem -cert /etc/wazuh-indexer/certs/admin.pem -cacert /etc/wazuh-indexer/certs/root-ca.pem -h 127.0.0.1 -nhnv`,
 		path,
 	))
@@ -255,7 +256,7 @@ func RunSecurityAdmin(filename string) error {
 }
 
 func RestartDashboard() error {
-	cmd := exec.Command( "systemctl", "restart", "wazuh-dashboard")
+	cmd := exec.Command("systemctl", "restart", "wazuh-dashboard")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()

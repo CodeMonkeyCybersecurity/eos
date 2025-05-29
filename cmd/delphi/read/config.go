@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -22,14 +23,14 @@ var InspectConfigCmd = &cobra.Command{
 	Aliases: []string{"cfg", "settings"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ReadConfig(rc.Ctx)
+		cfg, err := delphi.ReadConfig(rc)
 		if err != nil {
-			zap.L().Error("Failed to load Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to load Delphi config", zap.Error(err))
 			fmt.Println("❌ Error loading Delphi config:", err)
 			return err
 		}
 
-		if !eos_unix.EnforceSecretsAccess(showSecrets) {
+		if !eos_unix.EnforceSecretsAccess(rc.Ctx, showSecrets) {
 			return nil
 		}
 
@@ -41,7 +42,7 @@ var InspectConfigCmd = &cobra.Command{
 
 		cfgJSON, err := json.MarshalIndent(cfg, "", "  ")
 		if err != nil {
-			zap.L().Error("Failed to marshal Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to marshal Delphi config", zap.Error(err))
 			fmt.Println("❌ Error printing config:", err)
 			return err
 		}

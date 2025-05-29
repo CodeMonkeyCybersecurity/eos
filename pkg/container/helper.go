@@ -3,12 +3,12 @@
 package container
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
@@ -19,7 +19,7 @@ import (
 // 3. Searches for local docker-compose.yml or docker-compose.yaml files and copies them to the target directory.
 // 4. Changes the ownership of the target directory to UID/GID 472.
 // 5. Runs "docker compose up -d" in the target directory.
-func DeployCompose(ctx context.Context) error {
+func DeployCompose(rc *eos_io.RuntimeContext) error {
 	// Get the current working directory.
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -55,7 +55,7 @@ func DeployCompose(ctx context.Context) error {
 	for _, file := range composeFiles {
 		destFile := filepath.Join(targetDir, filepath.Base(file))
 		fmt.Printf("Copying %s to %s\n", file, destFile)
-		if err := eos_unix.CopyFile(ctx, file, destFile, 0); err != nil {
+		if err := eos_unix.CopyFile(rc.Ctx, file, destFile, 0); err != nil {
 			return fmt.Errorf("error copying file %s: %v", file, err)
 		}
 	}

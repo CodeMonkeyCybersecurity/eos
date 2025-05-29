@@ -6,38 +6,39 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/go-ldap/ldap/v3"
 )
 
 // --- Read helpers ---
 
-func readUser() ([]LDAPUser, error) {
-	return readUsersWithFilter("(objectClass=inetOrgPerson)")
+func readUser(rc *eos_io.RuntimeContext) ([]LDAPUser, error) {
+	return readUsersWithFilter(rc, "(objectClass=inetOrgPerson)")
 }
 
-func readGroup() ([]LDAPGroup, error) {
-	return readGroupsWithFilter("(objectClass=groupOfNames)")
+func readGroup(rc *eos_io.RuntimeContext) ([]LDAPGroup, error) {
+	return readGroupsWithFilter(rc, "(objectClass=groupOfNames)")
 }
 
-func readUsersWithFilter(filter string) ([]LDAPUser, error) {
-	cfg, _, err := ReadConfig()
+func readUsersWithFilter(rc *eos_io.RuntimeContext, filter string) ([]LDAPUser, error) {
+	cfg, _, err := ReadConfig(rc)
 	if err != nil {
 		return nil, err
 	}
-	return readAndMapUsers(cfg.UserBase, filter)
+	return readAndMapUsers(rc, cfg.UserBase, filter)
 }
 
-func readGroupsWithFilter(filter string) ([]LDAPGroup, error) {
-	cfg, _, err := ReadConfig()
+func readGroupsWithFilter(rc *eos_io.RuntimeContext, filter string) ([]LDAPGroup, error) {
+	cfg, _, err := ReadConfig(rc)
 	if err != nil {
 		return nil, err
 	}
-	return readAndMapGroups(cfg.RoleBase, filter)
+	return readAndMapGroups(rc, cfg.RoleBase, filter)
 }
 
-func readUserByUID(uid string) (*LDAPUser, error) {
-	results, err := readAndMapUsers(defaultBaseDN, fmt.Sprintf("(uid=%s)", uid))
+func readUserByUID(rc *eos_io.RuntimeContext, uid string) (*LDAPUser, error) {
+	results, err := readAndMapUsers(rc, defaultBaseDN, fmt.Sprintf("(uid=%s)", uid))
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +48,8 @@ func readUserByUID(uid string) (*LDAPUser, error) {
 	return &results[0], nil
 }
 
-func readGroupByCN(cn string) (*LDAPGroup, error) {
-	results, err := readAndMapGroups(defaultBaseDN, fmt.Sprintf("(cn=%s)", cn))
+func readGroupByCN(rc *eos_io.RuntimeContext, cn string) (*LDAPGroup, error) {
+	results, err := readAndMapGroups(rc, defaultBaseDN, fmt.Sprintf("(cn=%s)", cn))
 	if err != nil {
 		return nil, err
 	}
@@ -61,8 +62,8 @@ func readGroupByCN(cn string) (*LDAPGroup, error) {
 // --- Internal mappers ---
 
 // readAndMapUsers performs an LDAP search and maps results to LDAPUser structs.
-func readAndMapUsers(baseDN, filter string) ([]LDAPUser, error) {
-	conn, err := Connect()
+func readAndMapUsers(rc *eos_io.RuntimeContext, baseDN, filter string) ([]LDAPUser, error) {
+	conn, err := Connect(rc)
 	if err != nil {
 		return nil, err
 	}
@@ -94,8 +95,8 @@ func readAndMapUsers(baseDN, filter string) ([]LDAPUser, error) {
 	return users, nil
 }
 
-func readAndMapGroups(baseDN, filter string) ([]LDAPGroup, error) {
-	conn, err := Connect()
+func readAndMapGroups(rc *eos_io.RuntimeContext, baseDN, filter string) ([]LDAPGroup, error) {
+	conn, err := Connect(rc)
 	if err != nil {
 		return nil, err
 	}
@@ -125,25 +126,25 @@ func readAndMapGroups(baseDN, filter string) ([]LDAPGroup, error) {
 	return groups, nil
 }
 
-func ReadConfig() (*LDAPConfig, string, error) {
+func ReadConfig(rc *eos_io.RuntimeContext) (*LDAPConfig, string, error) {
 	loaders := []struct {
 		name string
 		load func() (*LDAPConfig, error)
 	}{
 		{"vault", func() (*LDAPConfig, error) {
-			return readFromVault()
+			return readFromVault(rc)
 		}},
 		{"env", func() (*LDAPConfig, error) {
-			return loadFromEnv()
+			return loadFromEnv(rc)
 		}},
 		{"host", func() (*LDAPConfig, error) {
-			return tryDetectFromHost()
+			return tryDetectFromHost(rc)
 		}},
 		{"container", func() (*LDAPConfig, error) {
-			return tryDetectFromContainer()
+			return tryDetectFromContainer(rc)
 		}},
 		{"prompt", func() (*LDAPConfig, error) {
-			return loadFromPrompt()
+			return loadFromPrompt(rc)
 		}},
 	}
 
@@ -160,14 +161,14 @@ func ReadConfig() (*LDAPConfig, string, error) {
 	return cfg, "default", nil
 }
 
-func readFromVault() (*LDAPConfig, error) {
-	client, err := vault.NewClient()
+func readFromVault(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
+	client, err := vault.NewClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Vault client: %w", err)
 	}
 
 	var cfg LDAPConfig
-	if err := vault.Read(client, "ldap", cfg); err != nil || cfg.FQDN == "" {
+	if err := vault.Read(rc, client, "ldap", cfg); err != nil || cfg.FQDN == "" {
 		return nil, errors.New("LDAP config not found in Vault")
 	}
 	return &cfg, nil

@@ -26,7 +26,7 @@ You can choose from:
   3) Inspect Eos backend web apps configuration
   4) Inspect Nginx defaults
   5) Inspect all configurations`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		runInspectConfig()
 		return nil
 	}),

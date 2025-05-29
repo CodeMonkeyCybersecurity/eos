@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -21,24 +22,24 @@ var InspectCredentialsCmd = &cobra.Command{
 	Short: "List all Delphi (Wazuh) user credentials",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		cfg, err := delphi.ResolveConfig(rc.Ctx)
+		cfg, err := delphi.ResolveConfig(rc)
 		if err != nil {
-			zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to resolve Delphi config", zap.Error(err))
 		}
 
-		if !eos_unix.EnforceSecretsAccess(showSecrets) {
+		if !eos_unix.EnforceSecretsAccess(rc.Ctx, showSecrets) {
 			return nil
 		}
 
 		if cfg.Token == "" {
-			token, err := delphi.Authenticate(cfg)
+			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
 				fmt.Printf("❌ Authentication failed: %v\n", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
-			if err := delphi.WriteConfig(rc.Ctx, cfg); err != nil {
-				zap.L().Warn("Failed to write config", zap.Error(err))
+			if err := delphi.WriteConfig(rc, cfg); err != nil {
+				otelzap.Ctx(rc.Ctx).Warn("Failed to write config", zap.Error(err))
 			}
 		}
 
@@ -47,7 +48,7 @@ var InspectCredentialsCmd = &cobra.Command{
 			fmt.Printf("❌ Failed to fetch users: %v\n", err)
 			os.Exit(1)
 		}
-		defer shared.SafeClose(resp.Body)
+		defer shared.SafeClose(rc.Ctx, resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
 			fmt.Printf("❌ Failed with status code: %d\n", resp.StatusCode)

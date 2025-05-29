@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -25,18 +26,18 @@ var VaultRefreshCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Refreshes (restarts) the Vault service",
 	Long:  `Stops and restarts the Vault service cleanly through systemd.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("refresh-vault")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		// Check if we are root or have sudo privileges
-		if err := eos_unix.EnsureEosSudoReady(); err != nil {
+		if err := eos_unix.EnsureEosSudoReady(rc.Ctx); err != nil {
 			log.Error("❌ Required privileges not available", zap.Error(err))
 			fmt.Println("👉 Please run: sudo -v && eos refresh vault --unseal")
 			return fmt.Errorf("insufficient privileges: %w", err)
 		}
 
 		log.Info("🔄 Refreshing Vault service...")
-		if err := eos_unix.RestartSystemdUnitWithRetry("vault", 3, 2); err != nil {
+		if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, "vault", 3, 2); err != nil {
 			return fmt.Errorf("vault restart failed: %w", err)
 		}
 
@@ -46,13 +47,13 @@ var VaultRefreshCmd = &cobra.Command{
 		if shouldUnseal {
 			log.Info("🔐 Attempting unseal because --unseal flag was provided")
 
-			client, err := vault.GetVaultClient()
+			client, err := vault.GetVaultClient(rc)
 			if err != nil {
 				log.Error("❌ Failed to create Vault client", zap.Error(err))
 				return fmt.Errorf("vault client setup failed: %w", err)
 			}
 
-			unsealed, err := vault.UnsealVaultIfNeeded(client)
+			unsealed, err := vault.UnsealVaultIfNeeded(rc, client)
 			if err != nil {
 				return fmt.Errorf("vault unseal failed: %w", err)
 			}

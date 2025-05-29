@@ -15,6 +15,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -24,27 +25,27 @@ var CreatePostfixCmd = &cobra.Command{
 	Use:   "postfix",
 	Short: "Install and configure Postfix as an SMTP relay",
 	Long:  "Installs Postfix, configures it with a relayhost and credentials, and sends a test email.",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		eos_unix.RequireRoot()
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		eos_unix.RequireRoot(rc.Ctx)
 
-		osType := platform.DetectLinuxDistro()
-		zap.L().Info("Detected OS", zap.String("type", osType))
+		osType := platform.DetectLinuxDistro(rc)
+		otelzap.Ctx(rc.Ctx).Info("Detected OS", zap.String("type", osType))
 
-		if err := installPostfix(osType); err != nil {
+		if err := installPostfix(rc, osType); err != nil {
 			return err
 		}
-		if err := restartPostfix(osType); err != nil {
+		if err := restartPostfix(rc, osType); err != nil {
 			return err
 		}
 
-		smtpHost := interaction.PromptInput("Enter your SMTP host", "smtp.gmail.com")
+		smtpHost := interaction.PromptInput(rc.Ctx, "Enter your SMTP host", "smtp.gmail.com")
 		email := interaction.PromptValidated("Enter your email address", interaction.ValidateEmail)
-		password, err := interaction.PromptSecret("Enter your app password")
+		password, err := interaction.PromptSecret(rc.Ctx, "Enter your app password")
 		if err != nil {
 			return err
 		}
 
-		if err := configurePostfixRelay(smtpHost, email, password, osType); err != nil {
+		if err := configurePostfixRelay(rc, smtpHost, email, password, osType); err != nil {
 			return err
 		}
 
@@ -53,24 +54,24 @@ var CreatePostfixCmd = &cobra.Command{
 			return fmt.Errorf("test mail failed: %w", err)
 		}
 
-		zap.L().Info("✅ Postfix SMTP relay setup complete.")
+		otelzap.Ctx(rc.Ctx).Info("✅ Postfix SMTP relay setup complete.")
 		return nil
 	}),
 }
 
-func installPostfix(osType string) error {
+func installPostfix(rc *eos_io.RuntimeContext, osType string) error {
 	switch osType {
 	case "debian":
-		_, err := execute.RunShell(`DEBIAN_FRONTEND=noninteractive apt update && apt install -y postfix bsd-mailx libsasl2-modules`)
+		_, err := execute.RunShell(rc.Ctx, `DEBIAN_FRONTEND=noninteractive apt update && apt install -y postfix bsd-mailx libsasl2-modules`)
 		if err != nil {
 			return fmt.Errorf("debian install failed: %w", err)
 		}
-		return execute.RunSimple("cp", "/usr/share/postfix/main.cf.debian", "/etc/postfix/main.cf")
+		return execute.RunSimple(rc.Ctx, "cp", "/usr/share/postfix/main.cf.debian", "/etc/postfix/main.cf")
 	case "rhel":
-		_, err := execute.RunShell(`yum update -y && yum install -y postfix mailx cyrus-sasl cyrus-sasl-plain`)
+		_, err := execute.RunShell(rc.Ctx, `yum update -y && yum install -y postfix mailx cyrus-sasl cyrus-sasl-plain`)
 		return err
 	default:
-		zap.L().Warn("Unknown OS type; skipping install")
+		otelzap.Ctx(rc.Ctx).Warn("Unknown OS type; skipping install")
 		return nil
 	}
 }
@@ -101,7 +102,7 @@ smtp_use_tls = yes
 `, host)
 }
 
-func configurePostfixRelay(smtpHost, email, password, osType string) error {
+func configurePostfixRelay(rc *eos_io.RuntimeContext, smtpHost, email, password, osType string) error {
 	for _, path := range []string{"/etc/postfix/main.cf", "/etc/postfix/sasl_passwd"} {
 		if err := utils.BackupFile(path); err != nil {
 			return fmt.Errorf("backup failed: %w", err)
@@ -117,25 +118,25 @@ func configurePostfixRelay(smtpHost, email, password, osType string) error {
 		return fmt.Errorf("failed to write sasl_passwd: %w", err)
 	}
 
-	if err := execute.RunSimple("postmap", "/etc/postfix/sasl_passwd"); err != nil {
+	if err := execute.RunSimple(rc.Ctx, "postmap", "/etc/postfix/sasl_passwd"); err != nil {
 		return err
 	}
-	if err := execute.RunSimple("chown", "root:root", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db"); err != nil {
+	if err := execute.RunSimple(rc.Ctx, "chown", "root:root", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db"); err != nil {
 		return err
 	}
-	if err := execute.RunSimple("chmod", "0600", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db"); err != nil {
+	if err := execute.RunSimple(rc.Ctx, "chmod", "0600", "/etc/postfix/sasl_passwd", "/etc/postfix/sasl_passwd.db"); err != nil {
 		return err
 	}
 
-	if err := restartPostfix(osType); err != nil {
+	if err := restartPostfix(rc, osType); err != nil {
 		return err
 	}
 
 	if osType == "rhel" {
-		if err := execute.RunSimple("postconf", "-e", "smtp_tls_fingerprint_digest=sha256"); err != nil {
+		if err := execute.RunSimple(rc.Ctx, "postconf", "-e", "smtp_tls_fingerprint_digest=sha256"); err != nil {
 			return err
 		}
-		if err := execute.RunSimple("postconf", "-e", "smtpd_tls_fingerprint_digest=sha256"); err != nil {
+		if err := execute.RunSimple(rc.Ctx, "postconf", "-e", "smtpd_tls_fingerprint_digest=sha256"); err != nil {
 			return err
 		}
 	}
@@ -157,14 +158,14 @@ func sendTestMail(from, to string) error {
 	return cmd.Run()
 }
 
-func restartPostfix(osType string) error {
+func restartPostfix(rc *eos_io.RuntimeContext, osType string) error {
 	switch osType {
 	case "debian":
-		if err := execute.RunSimple("systemctl", "restart", "postfix"); err != nil {
-			return execute.RunSimple("postfix", "reload")
+		if err := execute.RunSimple(rc.Ctx, "systemctl", "restart", "postfix"); err != nil {
+			return execute.RunSimple(rc.Ctx, "postfix", "reload")
 		}
 	case "rhel":
-		_, err := execute.RunShell("service postfix restart")
+		_, err := execute.RunShell(rc.Ctx, "service postfix restart")
 		return err
 	default:
 		return fmt.Errorf("unsupported OS type: %s", osType)

@@ -12,7 +12,7 @@ import (
 var ListKvmCmd = &cobra.Command{
 	Use:   "kvm --all",
 	Short: "List all KVM VMs with state, network, MAC, protocol, and IP",
-	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return kvm.PrintAllVMsTable()
 	}),
 }

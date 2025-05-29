@@ -8,20 +8,17 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // Restore does a “rm -rf dst && cp -r src dst“ under one roof.
 func Restore(ctx context.Context, src, dst string) error {
-	log := zap.L().With(
-		zap.String("source", src),
-		zap.String("destination", dst),
-	)
-	log.Info("Restoring path")
+	otelzap.Ctx(ctx)
 
 	// Clean destination
 	if err := RmRF(ctx, dst, "restored path"); err != nil {
-		log.Error("Failed to clean destination", zap.Error(err))
+		otelzap.Ctx(ctx).Error("Failed to clean destination", zap.Error(err))
 		return fmt.Errorf("cleanup %q: %w", dst, err)
 	}
 
@@ -33,18 +30,18 @@ func Restore(ctx context.Context, src, dst string) error {
 
 	if info.IsDir() {
 		if err := CopyR(ctx, src, dst); err != nil {
-			log.Error("Failed to copy directory", zap.Error(err))
+			otelzap.Ctx(ctx).Error("Failed to copy directory", zap.Error(err))
 			return fmt.Errorf("copy dir %q→%q: %w", src, dst, err)
 		}
 	} else {
 		// default to a sensible mode
 		if err := CopyFile(ctx, src, dst, 0o600); err != nil {
-			log.Error("Failed to copy file", zap.Error(err))
+			otelzap.Ctx(ctx).Error("Failed to copy file", zap.Error(err))
 			return fmt.Errorf("copy file %q→%q: %w", src, dst, err)
 		}
 	}
 
-	log.Info("Restore completed")
+	otelzap.Ctx(ctx).Info("Restore completed")
 	return nil
 }
 

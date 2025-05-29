@@ -1,4 +1,5 @@
 // cmd/config/telemetry.go
+
 package config
 
 import (
@@ -9,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -16,11 +18,11 @@ var TelemetryCmd = &cobra.Command{
 	Use:   "telemetry [on|off]",
 	Short: "Enable or disable EOS CLI telemetry",
 	Args:  cobra.ExactArgs(1),
-	RunE: eos_cli.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		stateFile := filepath.Join(os.Getenv("HOME"), ".eos", "telemetry_on")
 		action := args[0]
 
-		log := ctx.Log.With(zap.String("action", action), zap.String("file", stateFile))
+		log := otelzap.Ctx(rc.Ctx)
 
 		switch action {
 		case "on":

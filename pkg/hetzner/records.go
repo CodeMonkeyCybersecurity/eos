@@ -4,20 +4,20 @@ package hetzner
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/cockroachdb/errors"
 	"go.uber.org/zap"
 )
 
-func (c *DNSClient) GetRecords(ctx context.Context, zoneID string) ([]DNSRecord, error) {
+func (c *DNSClient) GetRecords(rc *eos_io.RuntimeContext, zoneID string) ([]DNSRecord, error) {
 	url := fmt.Sprintf("%s?zone_id=%s", recordsBaseURL, zoneID)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating GET request for records")
 	}
@@ -42,10 +42,10 @@ func (c *DNSClient) GetRecords(ctx context.Context, zoneID string) ([]DNSRecord,
 	return result.Records, nil
 }
 
-func (c *DNSClient) CreateRecord(ctx context.Context, record DNSRecord) (*DNSRecord, error) {
+func (c *DNSClient) CreateRecord(rc *eos_io.RuntimeContext, record DNSRecord) (*DNSRecord, error) {
 	payload, _ := json.Marshal(record)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, recordsBaseURL, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(rc.Ctx, http.MethodPost, recordsBaseURL, bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating POST request")
 	}
@@ -72,10 +72,10 @@ func (c *DNSClient) CreateRecord(ctx context.Context, record DNSRecord) (*DNSRec
 	return &result.Record, nil
 }
 
-func (c *DNSClient) GetRecord(ctx context.Context, id string) (*DNSRecord, error) {
+func (c *DNSClient) GetRecord(rc *eos_io.RuntimeContext, id string) (*DNSRecord, error) {
 	url := fmt.Sprintf("%s/%s", recordsBaseURL, id)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating GET /records/{id}")
 	}
@@ -100,11 +100,11 @@ func (c *DNSClient) GetRecord(ctx context.Context, id string) (*DNSRecord, error
 	return &result.Record, nil
 }
 
-func (c *DNSClient) UpdateRecord(ctx context.Context, id string, updated DNSRecord) (*DNSRecord, error) {
+func (c *DNSClient) UpdateRecord(rc *eos_io.RuntimeContext, id string, updated DNSRecord) (*DNSRecord, error) {
 	url := fmt.Sprintf("%s/%s", recordsBaseURL, id)
 	payload, _ := json.Marshal(updated)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(rc.Ctx, http.MethodPut, url, bytes.NewReader(payload))
 	if err != nil {
 		return nil, errors.Wrap(err, "creating PUT request")
 	}
@@ -131,10 +131,10 @@ func (c *DNSClient) UpdateRecord(ctx context.Context, id string, updated DNSReco
 	return &result.Record, nil
 }
 
-func (c *DNSClient) DeleteRecord(ctx context.Context, id string) error {
+func (c *DNSClient) DeleteRecord(rc *eos_io.RuntimeContext, id string) error {
 	url := fmt.Sprintf("%s/%s", recordsBaseURL, id)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(rc.Ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		return errors.Wrap(err, "creating DELETE request")
 	}
@@ -155,18 +155,18 @@ func (c *DNSClient) DeleteRecord(ctx context.Context, id string) error {
 	return nil
 }
 
-func (c *DNSClient) BulkCreateRecords(ctx context.Context, records []DNSRecord) error {
-	return c.bulkSend(ctx, "POST", records)
+func (c *DNSClient) BulkCreateRecords(rc *eos_io.RuntimeContext, records []DNSRecord) error {
+	return c.bulkSend(rc, "POST", records)
 }
 
-func (c *DNSClient) BulkUpdateRecords(ctx context.Context, records []DNSRecord) error {
-	return c.bulkSend(ctx, "PUT", records)
+func (c *DNSClient) BulkUpdateRecords(rc *eos_io.RuntimeContext, records []DNSRecord) error {
+	return c.bulkSend(rc, "PUT", records)
 }
 
-func (c *DNSClient) bulkSend(ctx context.Context, method string, records []DNSRecord) error {
+func (c *DNSClient) bulkSend(rc *eos_io.RuntimeContext, method string, records []DNSRecord) error {
 	payload, _ := json.Marshal(bulkRecordsPayload{Records: records})
 
-	req, err := http.NewRequestWithContext(ctx, method, recordsBaseURL+"/bulk", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(rc.Ctx, method, recordsBaseURL+"/bulk", bytes.NewReader(payload))
 	if err != nil {
 		return errors.Wrap(err, "creating bulk request")
 	}

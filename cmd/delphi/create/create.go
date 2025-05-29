@@ -2,7 +2,6 @@
 package create
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -14,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
@@ -24,8 +24,8 @@ var CreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create Delphi resources",
 	Long:  "Create or generate Delphi-related resources, configurations, and mappings.",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		zap.L().Info("'eos delphi create' was called without a subcommand")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("'eos delphi create' was called without a subcommand")
 		return nil
 	}),
 }
@@ -34,7 +34,7 @@ var mappingCmd = &cobra.Command{
 	Use:   "mapping",
 	Short: "Suggest the best agent package for each endpoint",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		runMapping(rc.Ctx)
+		runMapping(rc)
 		return nil
 	}),
 }
@@ -71,21 +71,21 @@ type PackageMapping struct {
 	Package      string
 }
 
-func runMapping(ctx context.Context) {
-	cfg, err := delphi.ResolveConfig(ctx)
+func runMapping(rc *eos_io.RuntimeContext) {
+	cfg, err := delphi.ResolveConfig(rc)
 	if err != nil {
-		zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Fatal("Failed to resolve Delphi config", zap.Error(err))
 	}
 
 	baseURL := fmt.Sprintf("%s://%s:%s", defaultStr(cfg.Protocol, "https"), cfg.FQDN, defaultStr(cfg.Port, "55000"))
-	token, err := delphi.Authenticate(cfg)
+	token, err := delphi.Authenticate(rc, cfg)
 	if err != nil {
-		zap.L().Fatal("Authentication failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Fatal("Authentication failed", zap.Error(err))
 	}
 
-	resp, err := fetchAgents(baseURL, token)
+	resp, err := fetchAgents(rc, baseURL, token)
 	if err != nil {
-		zap.L().Fatal("Failed to fetch agents", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Fatal("Failed to fetch agents", zap.Error(err))
 	}
 
 	for _, agent := range resp.Data.AffectedItems {
@@ -112,7 +112,7 @@ func runMapping(ctx context.Context) {
 	}
 }
 
-func fetchAgents(baseURL, token string) (*AgentsResponse, error) {
+func fetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsResponse, error) {
 	url := strings.TrimRight(baseURL, "/") + "/agents?select=id,os,version"
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -123,7 +123,7 @@ func fetchAgents(baseURL, token string) (*AgentsResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("HTTP error: %w", err)
 	}
-	defer shared.SafeClose(resp.Body)
+	defer shared.SafeClose(rc.Ctx, resp.Body)
 
 	var parsed AgentsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {

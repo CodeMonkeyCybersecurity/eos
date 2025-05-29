@@ -1,6 +1,6 @@
 #!/bin/bash
-# /utilities/zap.L().sh
-# Usage: source zap.L().sh [log_file]
+# /utilities/otelzap.Ctx(rc.Ctx).sh
+# Usage: source otelzap.Ctx(rc.Ctx).sh [log_file]
 mkdir -p "${CYBERMONKEY_LOG_DIR:-/var/log/cyberMonkey}"
 # Redirect all output (stdout and stderr) to the log file
 exec > >(tee -a "$Eos_LOG_FILE") 2>&1

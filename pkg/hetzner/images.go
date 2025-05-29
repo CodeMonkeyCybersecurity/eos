@@ -5,16 +5,17 @@ import (
 
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hetznercloud/hcloud-go/v2/hcloud"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func GetAllImages(ctx *eos_io.RuntimeContext) error {
-	log := ctx.Log
+func GetAllImages(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	images, err := client.Image.All(ctx.Ctx)
+	images, err := client.Image.All(rc.Ctx)
 	if err != nil {
 		log.Error("❌ Failed to retrieve images", zap.Error(err))
 		return cerr.Wrap(err, "failed to retrieve images")
@@ -26,11 +27,11 @@ func GetAllImages(ctx *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func GetAnImage(ctx *eos_io.RuntimeContext, id int64) error {
-	log := ctx.Log
+func GetAnImage(rc *eos_io.RuntimeContext, id int64) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	image, _, err := client.Image.GetByID(ctx.Ctx, id)
+	image, _, err := client.Image.GetByID(rc.Ctx, id)
 	if err != nil {
 		log.Error("❌ Failed to get image", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get image")
@@ -45,11 +46,11 @@ func GetAnImage(ctx *eos_io.RuntimeContext, id int64) error {
 	return nil
 }
 
-func UpdateAnImage(ctx *eos_io.RuntimeContext, id int64, newDesc string) error {
-	log := ctx.Log
+func UpdateAnImage(rc *eos_io.RuntimeContext, id int64, newDesc string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	updated, _, err := client.Image.Update(ctx.Ctx, &hcloud.Image{ID: id}, hcloud.ImageUpdateOpts{
+	updated, _, err := client.Image.Update(rc.Ctx, &hcloud.Image{ID: id}, hcloud.ImageUpdateOpts{
 		Description: hcloud.Ptr(newDesc),
 		Labels: map[string]string{
 			"environment":    "prod",
@@ -67,11 +68,11 @@ func UpdateAnImage(ctx *eos_io.RuntimeContext, id int64, newDesc string) error {
 	return nil
 }
 
-func DeleteAnImage(ctx *eos_io.RuntimeContext, id int64) error {
-	log := ctx.Log
+func DeleteAnImage(rc *eos_io.RuntimeContext, id int64) error {
+	log := otelzap.Ctx(rc.Ctx)
 	client := hcloud.NewClient(hcloud.WithToken(os.Getenv("HCLOUD_TOKEN")))
 
-	_, err := client.Image.Delete(ctx.Ctx, &hcloud.Image{ID: id})
+	_, err := client.Image.Delete(rc.Ctx, &hcloud.Image{ID: id})
 	if err != nil {
 		log.Error("❌ Failed to delete image", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to delete image")

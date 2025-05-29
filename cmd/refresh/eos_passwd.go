@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -18,15 +19,15 @@ var RefreshEosPasswdCmd = &cobra.Command{
 	Short: "Refresh the EOS user password and update secrets safely",
 	Long: `Regenerates a strong EOS password,
 updates the system account password, and saves new credentials to disk.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("refresh-eos-passwd")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		if !eos_unix.UserExists(shared.EosID) {
 			log.Error("eos user not found — cannot refresh password")
 			return fmt.Errorf("eos user does not exist")
 		}
 
-		if err := eos_unix.RepairEosSecrets(); err != nil {
+		if err := eos_unix.RepairEosSecrets(rc.Ctx); err != nil {
 			log.Error("Failed to refresh EOS credentials", zap.Error(err))
 			return fmt.Errorf("refresh eos password: %w", err)
 		}

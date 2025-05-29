@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -35,10 +36,10 @@ By default, this checks your system's hardware (4GB RAM, 2+ cores). Use --ignore
 	RunE: eos.Wrap(runDelphiInstall),
 }
 
-func runDelphiInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	log := ctx.Log.Named("delphi")
+func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	log := otelzap.Ctx(rc.Ctx)
 
-	if err := platform.RequireLinuxDistro([]string{"debian", "rhel"}); err != nil {
+	if err := platform.RequireLinuxDistro(rc, []string{"debian", "rhel"}); err != nil {
 		log.Fatal("Unsupported Linux distro", zap.Error(err))
 	}
 
@@ -75,12 +76,12 @@ func runDelphiInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	log.Info("✅ Wazuh installation completed")
 
 	log.Info("🔐 Attempting to extract Wazuh admin credentials")
-	if err := extractWazuhPasswords(); err != nil {
+	if err := extractWazuhPasswords(rc); err != nil {
 		log.Warn("⚠️ Could not extract Wazuh credentials", zap.Error(err))
 	}
 
 	log.Info("🚫 Disabling Wazuh repo updates")
-	distro := platform.DetectLinuxDistro()
+	distro := platform.DetectLinuxDistro(rc)
 	switch distro {
 	case "debian", "ubuntu":
 		cmd := exec.Command("sed", "-i", "s/^deb /#deb /", "/etc/apt/sources.list.d/wazuh.list")
@@ -115,12 +116,12 @@ func runDelphiInstall(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	return nil
 }
 
-func extractWazuhPasswords() error {
+func extractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	for _, dir := range searchPaths {
 		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
 		if eos_unix.Exists(tarPath) {
-			zap.L().Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
+			otelzap.Ctx(rc.Ctx).Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
 			cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr

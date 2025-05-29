@@ -9,9 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.uber.org/zap"
@@ -24,8 +26,8 @@ var (
 )
 
 // NewClient creates a new Vault API client using EOS-configured defaults.
-func NewClient() (*api.Client, error) {
-	log := zap.L().Named("vault.NewClient")
+func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	log := otelzap.Ctx(rc.Ctx)
 
 	// Fallback to default VAULT_ADDR if not set
 	addr, ok := os.LookupEnv(shared.VaultAddrEnv)
@@ -75,56 +77,52 @@ func NewClient() (*api.Client, error) {
 // ==========================
 
 // GetVaultClient returns a cached or validated Vault client instance.
-func GetVaultClient() (*api.Client, error) {
+func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	vaultClientLock.Lock()
 	defer vaultClientLock.Unlock()
 
 	if shared.VaultClient != nil {
-		zap.L().Debug("📦 Returning cached Vault client")
+		otelzap.Ctx(rc.Ctx).Debug("📦 Returning cached Vault client")
 		return shared.VaultClient, nil
 	}
 
-	zap.L().Warn("⚠️ Vault client not initialized — bootstrapping...")
-	client, err := initializeClient()
+	otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault client not initialized — bootstrapping...")
+	client, err := initializeClient(rc)
 	if err != nil {
 		return nil, err
 	}
 	shared.VaultClient = client
-	zap.L().Info("✅ Vault client cached and ready")
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault client cached and ready")
 	return client, nil
 }
 
 // SetVaultClient explicitly sets the global Vault client.
-func SetVaultClient(client *api.Client) {
+func SetVaultClient(rc *eos_io.RuntimeContext, client *api.Client) {
 	vaultClientLock.Lock()
 	defer vaultClientLock.Unlock()
 	shared.VaultClient = client
-	zap.L().Debug("📦 Global Vault client set")
+	otelzap.Ctx(rc.Ctx).Debug("📦 Global Vault client set")
 }
 
 // ==========================
 // CLIENT INITIALIZATION
 // ==========================
 
-func initializeClient() (*api.Client, error) {
-	ctx, span := tracer.Start(context.Background(), "vault.initializeClient")
-	defer span.End()
+func initializeClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
-	log := zap.L().Named("vault.initializeClient")
+	log := otelzap.Ctx(rc.Ctx)
 
-	client, err := tryEnvOrFallback(ctx)
+	client, err := tryEnvOrFallback(rc)
 	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "client bootstrap failed")
+
 		return nil, cerr.Wrap(err, "bootstrap Vault client failed")
 	}
 
-	validated, report := validateClient(client)
+	validated, report := validateClient(rc, client)
 	if validated == nil {
 		err := cerr.New("vault client failed health check")
 		log.Error("❌ Client validation failed")
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "validation failed")
+
 		return nil, err
 	}
 
@@ -132,18 +130,17 @@ func initializeClient() (*api.Client, error) {
 		log.Warn("📋 Vault validation note", zap.String("note", note))
 	}
 
-	span.SetStatus(codes.Ok, "client ready")
 	log.Info("✅ Vault client validated and ready")
 	return validated, nil
 }
 
-func tryEnvOrFallback(ctx context.Context) (*api.Client, error) {
-	_, span := tracer.Start(ctx, "vault.tryEnvOrFallback")
+func tryEnvOrFallback(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	_, span := tracer.Start(rc.Ctx, "vault.tryEnvOrFallback")
 	defer span.End()
 
-	log := zap.L().Named("vault.tryEnvOrFallback")
+	log := otelzap.Ctx(rc.Ctx)
 
-	if c, err := buildClientFromEnv(); err == nil {
+	if c, err := buildClientFromEnv(rc); err == nil {
 		span.SetStatus(codes.Ok, "client loaded from env")
 		return c, nil
 	} else {
@@ -152,7 +149,7 @@ func tryEnvOrFallback(ctx context.Context) (*api.Client, error) {
 	}
 
 	log.Info("🔐 Falling back to privileged client")
-	client, err := buildPrivilegedClient()
+	client, err := buildPrivilegedClient(rc)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "fallback failed")
@@ -167,28 +164,28 @@ func tryEnvOrFallback(ctx context.Context) (*api.Client, error) {
 // CLIENT CONSTRUCTORS
 // ==========================
 
-func buildClientFromEnv() (*api.Client, error) {
-	client, err := newConfiguredClient()
+func buildClientFromEnv(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	client, err := newConfiguredClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("env client error: %w", err)
 	}
-	zap.L().Info("✅ Vault client constructed from environment")
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault client constructed from environment")
 	return client, nil
 }
 
-func buildPrivilegedClient() (*api.Client, error) {
-	token, err := loadPrivilegedToken()
+func buildPrivilegedClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	token, err := loadPrivilegedToken(rc)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := newConfiguredClient()
+	client, err := newConfiguredClient(rc)
 	if err != nil {
 		return nil, fmt.Errorf("privileged client error: %w", err)
 	}
 	client.SetToken(token)
 
-	zap.L().Info("✅ Vault privileged client constructed")
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault privileged client constructed")
 	return client, nil
 }
 
@@ -196,14 +193,14 @@ func buildPrivilegedClient() (*api.Client, error) {
 // CONFIG + BASE CLIENT
 // ==========================
 
-func newConfiguredClient() (*api.Client, error) {
-	addr, _ := EnsureVaultEnv()
+func newConfiguredClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	addr, _ := EnsureVaultEnv(rc)
 	cfg := api.DefaultConfig()
 	cfg.Address = addr
 	cfg.Timeout = 5 * time.Second
 
 	if err := cfg.ReadEnvironment(); err != nil {
-		zap.L().Warn("⚠️ Could not load Vault env config", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Could not load Vault env config", zap.Error(err))
 	}
 
 	if os.Getenv("VAULT_CACERT") == "" {
@@ -228,11 +225,11 @@ func newConfiguredClient() (*api.Client, error) {
 // TOKEN LOADERS
 // ==========================
 
-func loadPrivilegedToken() (string, error) {
-	if token, err := readTokenFromSink(shared.AgentToken); err == nil {
+func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
+	if token, err := readTokenFromSink(rc, shared.AgentToken); err == nil {
 		return token, nil
 	}
-	zap.L().Warn("⚠️ Agent token missing — fallback to vault_init.json")
+	otelzap.Ctx(rc.Ctx).Warn("⚠️ Agent token missing — fallback to vault_init.json")
 	return readTokenFromInitFile()
 }
 
@@ -258,17 +255,17 @@ func readTokenFromInitFile() (string, error) {
 // VALIDATION
 // ==========================
 
-func validateClient(client *api.Client) (*api.Client, *shared.CheckReport) {
+func validateClient(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client, *shared.CheckReport) {
 	_, span := tracer.Start(context.Background(), "vault.validateClient")
 	defer span.End()
 
-	report, fixedClient := Check(client, nil, "")
+	report, fixedClient := Check(rc, client, nil, "")
 	if fixedClient != nil {
 		client = fixedClient
 	}
 	if report == nil {
 		err := cerr.New("vault client failed health check")
-		zap.L().Warn("⚠️ Vault Check returned nil report", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault Check returned nil report", zap.Error(err))
 		span.SetStatus(codes.Error, "nil report from vault.Check")
 		span.RecordError(err)
 		return nil, nil

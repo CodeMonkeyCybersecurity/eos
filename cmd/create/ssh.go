@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -27,8 +28,8 @@ var CreateSSHCmd = &cobra.Command{
 	Short: "Create a FIPS-compliant SSH key and connect it to a remote host",
 	Long: `Generates a 2048-bit RSA key for FIPS compliance, installs it to a remote host using ssh-copy-id,
 and configures it in your ~/.ssh/config for easy reuse.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runCreateSSH(cmd, args)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		return runCreateSSH(rc, cmd, args)
 	}),
 }
 
@@ -40,7 +41,7 @@ func init() {
 	CreateSSHCmd.Flags().StringVar(&alias, "alias", "", "Custom alias to use in SSH config (default: host)")
 }
 
-func runCreateSSH(_ *cobra.Command, _ []string) error {
+func runCreateSSH(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
 
 	// Resolve user home directory and SSH paths.
 	currentUser, err := user.Current()
@@ -58,7 +59,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 
 	// Prompt for target login if not provided.
 	if targetLogin == "" {
-		targetLogin = interaction.PromptInput("Enter target login (<user@host>)", "")
+		targetLogin = interaction.PromptInput(rc.Ctx, "Enter target login (<user@host>)", "")
 	}
 	parts := strings.Split(strings.TrimSpace(targetLogin), "@")
 	if len(parts) != 2 {
@@ -66,7 +67,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	}
 	remoteUser, host := parts[0], parts[1]
 
-	zap.L().Info("Ensuring ~/.ssh exists", zap.String("path", sshDir))
+	otelzap.Ctx(rc.Ctx).Info("Ensuring ~/.ssh exists", zap.String("path", sshDir))
 	if err := os.MkdirAll(sshDir, 0700); err != nil {
 		return fmt.Errorf("failed to create ~/.ssh: %w", err)
 	}
@@ -75,7 +76,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	if _, err := os.Stat(keyPath); err == nil && !force {
 		fmt.Println("🔑 Key already exists:", keyPath)
 	} else {
-		zap.L().Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
+		otelzap.Ctx(rc.Ctx).Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
 		if err := eos_unix.GenerateFIPSKey(keyPath); err != nil {
 			return fmt.Errorf("failed to generate SSH key: %w", err)
 		}
@@ -92,7 +93,7 @@ func runCreateSSH(_ *cobra.Command, _ []string) error {
 	if alias == "" {
 		alias = host
 	}
-	if err := eos_unix.AppendToSSHConfig(alias, host, remoteUser, keyPath, configPath); err != nil {
+	if err := eos_unix.AppendToSSHConfig(rc.Ctx, alias, host, remoteUser, keyPath, configPath); err != nil {
 		return fmt.Errorf("failed to update SSH config: %w", err)
 	}
 

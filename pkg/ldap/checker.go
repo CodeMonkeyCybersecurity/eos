@@ -10,27 +10,28 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
 )
 
 // TestConnection attempts a bind to verify the LDAP connection works.
-func CheckConnection(cfg *LDAPConfig) error {
+func CheckConnection(rc *eos_io.RuntimeContext, cfg *LDAPConfig) error {
 	conn, err := ConnectWithGivenConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("connection test failed: %w", err)
 	}
-	defer shared.SafeClose(conn)
+	defer shared.SafeClose(rc.Ctx, conn)
 
 	return nil
 }
 
 // TryReadFromVault attempts to load the LDAP config from Vault.
 // It returns nil if not found or incomplete.
-func TryReadFromVault(client *api.Client) (*LDAPConfig, error) {
+func TryReadFromVault(rc *eos_io.RuntimeContext, client *api.Client) (*LDAPConfig, error) {
 	var cfg LDAPConfig
-	if err := vault.Read(client, "secret/ldap/config", &cfg); err != nil {
+	if err := vault.Read(rc, client, "secret/ldap/config", &cfg); err != nil {
 		return nil, err
 	}
 	if cfg.FQDN == "" || cfg.BindDN == "" {

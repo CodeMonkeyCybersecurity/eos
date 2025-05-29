@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/hashicorp/vault/api"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -19,14 +20,14 @@ var InspectTestDataCmd = &cobra.Command{
 	Use:   "test-data",
 	Short: "Inspect test-data from Vault (fallback to disk)",
 	Long:  `Reads and displays the test-data stored in Vault, or falls back to local disk.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("pandora-inspect-test-data")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
 		var client *api.Client
 		var out map[string]interface{}
 		var vaultReadErr error
 
-		client, err := vault.Authn()
+		client, err := vault.Authn(rc)
 		if err != nil {
 			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
 			client = nil // triggers fallback to disk
@@ -34,7 +35,7 @@ var InspectTestDataCmd = &cobra.Command{
 
 		if client != nil {
 			log.Info("🔍 Attempting to read test-data from Vault...")
-			if err := vault.Read(client, shared.TestDataVaultPath, &out); err != nil {
+			if err := vault.Read(rc, client, shared.TestDataVaultPath, &out); err != nil {
 				vaultReadErr = err
 				if vault.IsSecretNotFound(err) {
 					log.Warn("⚠️ Test-data not found in Vault, attempting disk fallback...", zap.Error(err))
@@ -55,7 +56,7 @@ var InspectTestDataCmd = &cobra.Command{
 		// Otherwise fallback to disk
 		log.Info("🔍 Attempting fallback to disk...")
 
-		if fallbackErr := vault.InspectFromDisk(); fallbackErr != nil {
+		if fallbackErr := vault.InspectFromDisk(rc); fallbackErr != nil {
 			log.Error("❌ Both Vault and disk fallback failed",
 				zap.String("vault_path", shared.TestDataVaultPath),
 				zap.Error(vaultReadErr),

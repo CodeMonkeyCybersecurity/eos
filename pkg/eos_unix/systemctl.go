@@ -4,20 +4,22 @@ package eos_unix
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"time"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // ReloadDaemonAndEnable reloads systemd, then enables & starts the given unit.
 // It returns an error if either step fails.
-func ReloadDaemonAndEnable(unit string) error {
+func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 	// 1) reload systemd
 	if out, err := exec.Command("systemctl", "daemon-reload").CombinedOutput(); err != nil {
-		zap.L().Warn("systemd daemon-reload failed",
+		otelzap.Ctx(ctx).Warn("systemd daemon-reload failed",
 			zap.Error(err),
 			zap.ByteString("output", out),
 		)
@@ -26,7 +28,7 @@ func ReloadDaemonAndEnable(unit string) error {
 
 	// 2) enable & start the unit
 	if out, err := exec.Command("systemctl", "enable", "--now", unit).CombinedOutput(); err != nil {
-		zap.L().Warn("failed to enable/start service",
+		otelzap.Ctx(ctx).Warn("failed to enable/start service",
 			zap.String("unit", unit),
 			zap.Error(err),
 			zap.ByteString("output", out),
@@ -34,26 +36,26 @@ func ReloadDaemonAndEnable(unit string) error {
 		return fmt.Errorf("enable --now %s: %w", unit, err)
 	}
 
-	zap.L().Info("✅ systemd unit enabled & started",
+	otelzap.Ctx(ctx).Info("✅ systemd unit enabled & started",
 		zap.String("unit", unit),
 	)
 	return nil
 }
 
-func StartSystemdUnitWithRetry(unit string, retries int, delaySeconds int) error {
-	return RunSystemctlWithRetry("start", unit, retries, delaySeconds)
+func StartSystemdUnitWithRetry(ctx context.Context, unit string, retries int, delaySeconds int) error {
+	return RunSystemctlWithRetry(ctx, "start", unit, retries, delaySeconds)
 }
 
-func StopSystemdUnitWithRetry(unit string, retries int, delaySeconds int) error {
-	return RunSystemctlWithRetry("stop", unit, retries, delaySeconds)
+func StopSystemdUnitWithRetry(ctx context.Context, unit string, retries int, delaySeconds int) error {
+	return RunSystemctlWithRetry(ctx, "stop", unit, retries, delaySeconds)
 }
 
-func RestartSystemdUnitWithRetry(unit string, retries int, delaySeconds int) error {
-	return RunSystemctlWithRetry("restart", unit, retries, delaySeconds)
+func RestartSystemdUnitWithRetry(ctx context.Context, unit string, retries int, delaySeconds int) error {
+	return RunSystemctlWithRetry(ctx, "restart", unit, retries, delaySeconds)
 }
 
-func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error {
-	zap.L().Info("⚙️ systemctl action initiated",
+func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, delaySeconds int) error {
+	otelzap.Ctx(ctx).Info("⚙️ systemctl action initiated",
 		zap.String("action", action),
 		zap.String("unit", unit),
 	)
@@ -62,11 +64,11 @@ func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error
 		if !CanInteractiveSudo() {
 			return fmt.Errorf("❌ eos user missing sudo permissions; please add:\n    eos ALL=(ALL) NOPASSWD: /bin/systemctl")
 		}
-		zap.L().Warn("⚠️ NOPASSWD sudo missing. Attempting interactive sudo...")
+		otelzap.Ctx(ctx).Warn("⚠️ NOPASSWD sudo missing. Attempting interactive sudo...")
 		if err := PromptAndRunInteractiveSystemctl(action, unit); err != nil {
 			return fmt.Errorf("interactive systemctl %s %s failed: %w", action, unit, err)
 		}
-		zap.L().Info("✅ Interactive sudo succeeded; skipping retries")
+		otelzap.Ctx(ctx).Info("✅ Interactive sudo succeeded; skipping retries")
 		return nil
 	}
 
@@ -76,19 +78,19 @@ func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error
 		out, err := cmd.CombinedOutput()
 
 		if bytes.Contains(out, []byte("Authentication is required")) {
-			zap.L().Error("❌ Insufficient sudo privileges. Please add to sudoers...",
+			otelzap.Ctx(ctx).Error("❌ Insufficient sudo privileges. Please add to sudoers...",
 				zap.String("recommendation", "eos ALL=(ALL) NOPASSWD: /bin/systemctl"))
 			return fmt.Errorf("sudo privileges missing; systemctl %s %s requires password", action, unit)
 		}
 
 		if err == nil {
-			zap.L().Info(fmt.Sprintf("✅ systemd unit %s succeeded", action),
+			otelzap.Ctx(ctx).Info(fmt.Sprintf("✅ systemd unit %s succeeded", action),
 				zap.String("unit", unit),
 			)
 			return nil
 		}
 
-		zap.L().Warn(fmt.Sprintf("⚠️ systemctl %s failed", action),
+		otelzap.Ctx(ctx).Warn(fmt.Sprintf("⚠️ systemctl %s failed", action),
 			zap.Int("attempt", i+1),
 			zap.String("unit", unit),
 			zap.Error(err),
@@ -98,11 +100,11 @@ func RunSystemctlWithRetry(action, unit string, retries, delaySeconds int) error
 		time.Sleep(time.Duration(delaySeconds) * time.Second)
 	}
 
-	zap.L().Error(fmt.Sprintf("❌ systemd unit %s failed after retries", action),
+	otelzap.Ctx(ctx).Error(fmt.Sprintf("❌ systemd unit %s failed after retries", action),
 		zap.String("unit", unit),
 		zap.Error(lastErr),
 	)
-	zap.L().Info("🩺 Run `systemctl status " + unit + " -l` or `journalctl -u " + unit + "` to investigate further")
+	otelzap.Ctx(ctx).Info("🩺 Run `systemctl status " + unit + " -l` or `journalctl -u " + unit + "` to investigate further")
 
 	return fmt.Errorf("systemctl %s for unit %q failed: %w", action, unit, lastErr)
 }

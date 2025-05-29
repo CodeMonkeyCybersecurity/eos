@@ -12,6 +12,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -24,14 +25,14 @@ waits for it to stop, and then opens a virt-rescue shell so you can troubleshoot
 Example:
   eos rescue kvm --name centos-stream9-2
 `,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		// Grab the flag
 		vmName, _ := cmd.Flags().GetString("name")
 		if vmName == "" {
 			return fmt.Errorf("❌ You must provide a --name (the libvirt/KVM domain name)")
 		}
 
-		log := ctx.Log.Named("rescue-kvm")
+		log := otelzap.Ctx(rc.Ctx)
 		log.Info("🛠 Starting rescue for KVM VM", zap.String("vm", vmName))
 
 		// Check VM status

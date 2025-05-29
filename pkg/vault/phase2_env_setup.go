@@ -3,7 +3,6 @@
 package vault
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -14,10 +13,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -40,28 +40,28 @@ import (
 // Phase 2: Ensure Vault Environment and Directories
 //--------------------------------------------------------------------
 
-func PrepareEnvironment(ctx context.Context) error {
-	if _, err := EnsureVaultEnv(); err != nil {
+func PrepareEnvironment(rc *eos_io.RuntimeContext) error {
+	if _, err := EnsureVaultEnv(rc); err != nil {
 		return err
 	}
-	if err := eos_unix.EnsureEosUser(true, false); err != nil {
+	if err := eos_unix.EnsureEosUser(rc.Ctx, true, false); err != nil {
 		return err
 	}
-	if err := EnsureVaultDirs(ctx); err != nil {
+	if err := EnsureVaultDirs(rc); err != nil {
 		return err
 	}
-	if err := PrepareVaultAgentEnvironment(); err != nil {
+	if err := PrepareVaultAgentEnvironment(rc); err != nil {
 		return err
 	}
 	return nil
 }
 
-func EnsureVaultEnv() (string, error) {
+func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 	const testTimeout = 500 * time.Millisecond
 
 	// 1. Return if already set
 	if cur := os.Getenv(shared.VaultAddrEnv); cur != "" {
-		zap.L().Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
+		otelzap.Ctx(rc.Ctx).Debug("VAULT_ADDR already set", zap.String(shared.VaultAddrEnv, cur))
 		return cur, nil
 	}
 
@@ -70,55 +70,55 @@ func EnsureVaultEnv() (string, error) {
 	addr := fmt.Sprintf(shared.VaultDefaultAddr, host)
 
 	// 3. Probe TLS before setting
-	if canConnectTLS(addr, testTimeout) {
+	if canConnectTLS(rc, addr, testTimeout) {
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
-		zap.L().Info("🔐 VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
+		otelzap.Ctx(rc.Ctx).Info("🔐 VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
 	} else {
-		zap.L().Warn("⚠️ VAULT_ADDR unreachable over TLS — setting anyway", zap.String("addr", addr))
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ VAULT_ADDR unreachable over TLS — setting anyway", zap.String("addr", addr))
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
 	}
 
 	// 4. Set CA cert path if missing
 	if os.Getenv(shared.VaultCA) == "" {
 		_ = os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath)
-		zap.L().Debug("🔧 Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
+		otelzap.Ctx(rc.Ctx).Debug("🔧 Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
 	}
 
 	return addr, nil
 }
 
-func canConnectTLS(raw string, d time.Duration) bool {
+func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool {
 	u, err := url.Parse(raw)
 	if err != nil {
-		zap.L().Debug("Invalid URL for TLS check", zap.String("raw", raw), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Debug("Invalid URL for TLS check", zap.String("raw", raw), zap.Error(err))
 		return false
 	}
 	dialer := &net.Dialer{Timeout: d}
 	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, &tls.Config{InsecureSkipVerify: true})
 	if err != nil {
-		zap.L().Debug("TLS probe failed", zap.String("host", u.Host), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Debug("TLS probe failed", zap.String("host", u.Host), zap.Error(err))
 		return false
 	}
 	_ = conn.Close()
 	return true
 }
 
-func EnsureVaultDirs(ctx context.Context) error {
+func EnsureVaultDirs(rc *eos_io.RuntimeContext) error {
 	zap.S().Info("Ensuring Vault directories…")
-	if err := createBaseDirs(); err != nil {
+	if err := createBaseDirs(rc); err != nil {
 		return err
 	}
 	// ⚠️ now pass ctx
-	if err := secureVaultDirOwnership(ctx); err != nil {
+	if err := secureVaultDirOwnership(rc); err != nil {
 		return err
 	}
 	return nil
 }
 
-func createBaseDirs() error {
-	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
+func createBaseDirs(rc *eos_io.RuntimeContext) error {
+	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		zap.L().Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
 		return fmt.Errorf("critical: eos system user not found: %w", err)
 	}
 
@@ -136,12 +136,12 @@ func createBaseDirs() error {
 	}
 
 	for _, d := range dirs {
-		zap.L().Debug("🔧 Creating directory", zap.String("path", d.path))
+		otelzap.Ctx(rc.Ctx).Debug("🔧 Creating directory", zap.String("path", d.path))
 		if err := os.MkdirAll(d.path, d.perm); err != nil {
 			return fmt.Errorf("mkdir %s: %w", d.path, err)
 		}
 		if err := os.Chown(d.path, eosUID, eosGID); err != nil {
-			zap.L().Warn("⚠️ Failed to chown directory", zap.String("path", d.path), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to chown directory", zap.String("path", d.path), zap.Error(err))
 		}
 	}
 	return nil
@@ -149,13 +149,10 @@ func createBaseDirs() error {
 
 // secureVaultDirOwnership chowns the entire Vault directory tree to eos.
 // It starts a telemetry span, logs via Zap, and wraps errors with cerr.
-func secureVaultDirOwnership(ctx context.Context) error {
-	// start a trace span
-	ctx, span := telemetry.Start(ctx, "vault.secureVaultDirOwnership")
-	defer span.End()
+func secureVaultDirOwnership(rc *eos_io.RuntimeContext) error {
 
 	// find eos UID/GID
-	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
+	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
 		zap.S().Errorw("lookup eos user failed",
 			"user", shared.EosID, "error", err,
@@ -171,7 +168,7 @@ func secureVaultDirOwnership(ctx context.Context) error {
 	)
 
 	// perform recursive chown
-	if err := eos_unix.ChownR(ctx, shared.VaultDir, eosUID, eosGID); err != nil {
+	if err := eos_unix.ChownR(rc.Ctx, shared.VaultDir, eosUID, eosGID); err != nil {
 		zap.S().Errorw("chownR failed",
 			"path", shared.VaultDir, "error", err,
 		)
@@ -182,61 +179,61 @@ func secureVaultDirOwnership(ctx context.Context) error {
 	return nil
 }
 
-func PrepareVaultAgentEnvironment() error {
+func PrepareVaultAgentEnvironment(rc *eos_io.RuntimeContext) error {
 	if err := os.MkdirAll(shared.EosRunDir, shared.FilePermOwnerRWX); err != nil {
-		zap.L().Error("Failed to create runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to create runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
 		return err
 	}
-	zap.L().Info("Ensured runtime directory", zap.String("path", shared.EosRunDir))
+	otelzap.Ctx(rc.Ctx).Info("Ensured runtime directory", zap.String("path", shared.EosRunDir))
 
 	if err := os.MkdirAll(shared.SecretsDir, shared.FilePermOwnerRWX); err != nil {
-		zap.L().Error("Failed to create secrets directory", zap.String("path", shared.SecretsDir), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("Failed to create secrets directory", zap.String("path", shared.SecretsDir), zap.Error(err))
 		return err
 	}
-	zap.L().Info("Ensured secrets directory", zap.String("path", shared.SecretsDir))
+	otelzap.Ctx(rc.Ctx).Info("Ensured secrets directory", zap.String("path", shared.SecretsDir))
 
 	// ✨ NEW: Validate runtime readiness
-	if err := ValidateVaultAgentRuntimeEnvironment(); err != nil {
+	if err := ValidateVaultAgentRuntimeEnvironment(rc); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func ValidateVaultAgentRuntimeEnvironment() error {
-	zap.L().Info("🔍 Validating Vault Agent runtime environment")
+func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
+	otelzap.Ctx(rc.Ctx).Info("🔍 Validating Vault Agent runtime environment")
 
 	// Resolve eos user UID and GID safely
-	eosUID, eosGID, err := eos_unix.LookupUser(shared.EosID)
+	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		zap.L().Error("❌ Failed to lookup eos user", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)
 	}
 
 	// Check if /run/eos exists and is a directory
 	info, err := os.Stat(shared.EosRunDir)
 	if os.IsNotExist(err) {
-		zap.L().Error("❌ Missing runtime directory", zap.String("path", shared.EosRunDir))
+		otelzap.Ctx(rc.Ctx).Error("❌ Missing runtime directory", zap.String("path", shared.EosRunDir))
 		return fmt.Errorf("missing runtime directory: %s", shared.EosRunDir)
 	}
 	if err != nil {
-		zap.L().Error("❌ Failed to stat runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to stat runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
 		return fmt.Errorf("failed to stat runtime directory: %w", err)
 	}
 	if !info.IsDir() {
-		zap.L().Error("❌ Runtime path is not a directory", zap.String("path", shared.EosRunDir))
+		otelzap.Ctx(rc.Ctx).Error("❌ Runtime path is not a directory", zap.String("path", shared.EosRunDir))
 		return fmt.Errorf("runtime path is not a directory: %s", shared.EosRunDir)
 	}
 
 	// Check ownership of the runtime directory
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
-		zap.L().Warn("⚠️ Unable to get ownership info of runtime directory")
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Unable to get ownership info of runtime directory")
 	} else {
 		currentUID := stat.Uid
 		currentGID := stat.Gid
 		if currentUID != uint32(eosUID) || currentGID != uint32(eosGID) {
-			zap.L().Warn("⚠️ Runtime directory not owned by eos user",
+			otelzap.Ctx(rc.Ctx).Warn("⚠️ Runtime directory not owned by eos user",
 				zap.String("path", shared.EosRunDir),
 				zap.Uint32("current_uid", currentUID),
 				zap.Uint32("current_gid", currentGID),
@@ -249,10 +246,10 @@ func ValidateVaultAgentRuntimeEnvironment() error {
 	// Check if Vault binary exists in PATH
 	vaultPath, err := exec.LookPath("vault")
 	if err != nil {
-		zap.L().Error("❌ Vault binary not found in PATH", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error("❌ Vault binary not found in PATH", zap.Error(err))
 		return fmt.Errorf("vault binary not found in PATH: %w", err)
 	}
-	zap.L().Info("✅ Vault binary found", zap.String("vault_path", vaultPath))
+	otelzap.Ctx(rc.Ctx).Info("✅ Vault binary found", zap.String("vault_path", vaultPath))
 
 	return nil
 }

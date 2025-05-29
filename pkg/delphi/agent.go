@@ -4,7 +4,6 @@ package delphi
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -14,11 +13,12 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"golang.org/x/term"
 )
 
-func DeleteAgent(agentID string, token string, config *Config) (map[string]interface{}, error) {
+func DeleteAgent(rc *eos_io.RuntimeContext, agentID string, token string, config *Config) (map[string]interface{}, error) {
 	url := fmt.Sprintf("%s://%s:%s/agents/%s?pretty=true", config.Protocol, config.FQDN, config.Port, agentID)
 
 	req, _ := http.NewRequest("DELETE", url, nil)
@@ -30,7 +30,7 @@ func DeleteAgent(agentID string, token string, config *Config) (map[string]inter
 	if err != nil {
 		return nil, fmt.Errorf("API request failed: %w", err)
 	}
-	defer shared.SafeClose(resp.Body)
+	defer shared.SafeClose(rc.Ctx, resp.Body)
 
 	var result map[string]interface{}
 	_ = json.NewDecoder(resp.Body).Decode(&result)
@@ -38,7 +38,7 @@ func DeleteAgent(agentID string, token string, config *Config) (map[string]inter
 }
 
 // UpgradeAgents calls the Wazuh API to upgrade a list of agent IDs.
-func UpgradeAgents(cfg *Config, token string, agentIDs []string, payload map[string]interface{}) error {
+func UpgradeAgents(rc *eos_io.RuntimeContext, cfg *Config, token string, agentIDs []string, payload map[string]interface{}) error {
 	url := fmt.Sprintf("%s://%s:%s/agents/upgrade?agents_list=%s&pretty=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port, strings.Join(agentIDs, ","))
 
@@ -65,7 +65,7 @@ func UpgradeAgents(cfg *Config, token string, agentIDs []string, payload map[str
 	if err != nil {
 		return err
 	}
-	defer shared.SafeClose(resp.Body)
+	defer shared.SafeClose(rc.Ctx, resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("upgrade failed: %s", resp.Status)
@@ -134,7 +134,7 @@ func PromptPassword(prompt, defaultVal string) string {
 }
 
 // queryUpgradeResult sends a PUT request to query upgrade task results.
-func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
+func queryUpgradeResult(rc *eos_io.RuntimeContext, apiURL, token string, agentIDs []string) error {
 	// Build query parameter as comma-separated list.
 	agentsQuery := strings.Join(agentIDs, ",")
 	queryURL := fmt.Sprintf("%s/agents/upgrade_result?agents_list=%s&pretty=true", apiURL, agentsQuery)
@@ -168,7 +168,7 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 	if err != nil {
 		return err
 	}
-	defer shared.SafeClose(resp.Body)
+	defer shared.SafeClose(rc.Ctx, resp.Body)
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
@@ -181,13 +181,13 @@ func queryUpgradeResult(apiURL, token string, agentIDs []string) error {
 	return nil
 }
 
-func InspectAgentUpgradeResult(ctx context.Context) {
+func InspectAgentUpgradeResult(rc *eos_io.RuntimeContext) {
 	cfg, err := LoadConfig()
 	if err != nil {
 		fmt.Printf("Error loading configuration: %v\n", err)
 		os.Exit(1)
 	}
-	cfg = ConfirmConfig(ctx, cfg)
+	cfg = ConfirmConfig(rc, cfg)
 	if cfg.Protocol == "" {
 		cfg.Protocol = "https"
 	}
@@ -199,7 +199,7 @@ func InspectAgentUpgradeResult(ctx context.Context) {
 
 	// Authenticate.
 	fmt.Println("\nAuthenticating to the Wazuh API...")
-	token, err := Authenticate(cfg)
+	token, err := Authenticate(rc, cfg)
 	if err != nil {
 		fmt.Printf("Error during authentication: %v\n", err)
 		os.Exit(1)
@@ -223,7 +223,7 @@ func InspectAgentUpgradeResult(ctx context.Context) {
 	}
 
 	// Query upgrade result.
-	err = queryUpgradeResult(apiURL, token, agentIDs)
+	err = queryUpgradeResult(rc, apiURL, token, agentIDs)
 	if err != nil {
 		fmt.Printf("Error querying upgrade result: %v\n", err)
 		os.Exit(1)

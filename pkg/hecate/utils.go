@@ -8,7 +8,9 @@ import (
 	"os"
 	"text/template"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -40,13 +42,14 @@ func renderTemplateFromString(tmplStr string, data interface{}) (string, error) 
 
 // RenderBundleFragments renders and writes Compose, Caddy, and Nginx fragments as needed.
 func RenderBundleFragments(
+	rc *eos_io.RuntimeContext,
 	bundle ServiceBundle,
 	composeOverridePath string,
 	caddyTargetDir string,
 	nginxTargetDir string,
 	serviceKey string,
 ) error {
-	log := zap.L().Named("hecate-generic-render")
+	log := otelzap.Ctx(rc.Ctx)
 
 	// === Compose ===
 	if bundle.Compose != nil {
@@ -117,6 +120,7 @@ func RenderBundleFragments(
 
 // GenericWizard handles user prompts and builds a ServiceBundle.
 func GenericWizard(
+	rc *eos_io.RuntimeContext,
 	logName string,
 	prompts []PromptField,
 	serviceName string,
@@ -127,12 +131,12 @@ func GenericWizard(
 	volumes []string,
 	ports []string,
 ) ServiceBundle {
-	log := zap.L().Named(logName)
+	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔧 Collecting setup information...")
 
 	env := make(map[string]string)
 	for _, field := range prompts {
-		val := interaction.PromptInputWithReader(field.Prompt, field.Default, field.Reader)
+		val := interaction.PromptInputWithReader(rc.Ctx, field.Prompt, field.Default, field.Reader)
 		env[field.EnvVar] = val
 	}
 
@@ -168,12 +172,13 @@ func GenericWizard(
 }
 
 func RenderAndWriteTemplate(
+	rc *eos_io.RuntimeContext,
 	logName string,
 	templateContent string,
 	data any,
 	outputPath string,
 ) error {
-	log := zap.L().Named(logName)
+	log := otelzap.Ctx(rc.Ctx)
 
 	tmpl, err := template.New("template").Parse(templateContent)
 	if err != nil {

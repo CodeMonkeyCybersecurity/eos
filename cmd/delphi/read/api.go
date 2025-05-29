@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -25,35 +26,35 @@ var InspectAPICmd = &cobra.Command{
 
 		// ✅ Step 2: Toggle ShowSecrets and confirm config
 		delphi.ShowSecrets = showSecrets
-		cfg, err := delphi.ResolveConfig(rc.Ctx)
+		cfg, err := delphi.ResolveConfig(rc)
 		if err != nil {
-			zap.L().Fatal("Failed to resolve Delphi config", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Failed to resolve Delphi config", zap.Error(err))
 		}
 
 		// ✅ Step 3: Authenticate if needed
 		if cfg.Token == "" {
-			token, err := delphi.Authenticate(cfg)
+			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
 				fmt.Printf("❌ Authentication failed: %v\n", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
-			if err := delphi.WriteConfig(rc.Ctx, cfg); err != nil {
-				zap.L().Warn("Failed to write config", zap.Error(err))
+			if err := delphi.WriteConfig(rc, cfg); err != nil {
+				otelzap.Ctx(rc.Ctx).Warn("Failed to write config", zap.Error(err))
 			}
 		}
 
 		// ✅ Step 4: Secret access control
-		if !eos_unix.EnforceSecretsAccess(showSecrets) {
+		if !eos_unix.EnforceSecretsAccess(rc.Ctx, showSecrets) {
 			return err
 		}
 
 		// ✅ Step 5: Execute inspection
 		if showPermissions {
-			body, code := delphi.GetUserDetails(cfg)
+			body, code := delphi.GetUserDetails(rc, cfg)
 			delphi.HandleAPIResponse("API User Permissions", []byte(body), code)
 		} else if showVersion {
-			body, code := delphi.AuthenticatedGetJSON(cfg, "/manager/status")
+			body, code := delphi.AuthenticatedGetJSON(rc, cfg, "/manager/status")
 			delphi.HandleAPIResponse("Wazuh Manager Version", []byte(body), code)
 		} else {
 			fmt.Println("⚠️  No flags provided. Use --permissions or --version to query specific information.")

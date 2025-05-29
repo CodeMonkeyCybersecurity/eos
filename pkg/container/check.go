@@ -3,36 +3,31 @@
 package container
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	cerr "github.com/cockroachdb/errors"
-	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
-
-var log = zap.L().Named("docker")
 
 type DockerCheckConfig struct {
 	AllowMissingCompose bool `validate:"required"`
 }
 
 // CheckDockerContainers lists running containers using the docker CLI.
-func CheckDockerContainers(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "container.CheckDockerContainers")
-	defer span.End()
+func CheckDockerContainers(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("Checking running Docker containers")
-	out, err := execute.Run(execute.Options{
+	out, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"ps", "--format", "{{.ID}}\t{{.Image}}\t{{.Names}}"},
 		Capture: true,
-		Ctx:     ctx,
 	})
 	if err != nil {
 		log.Error("Failed to list containers", zap.Error(err))
@@ -57,15 +52,13 @@ func CheckDockerContainers(ctx context.Context) error {
 }
 
 // CheckIfDockerInstalled checks if Docker CLI is available and responding.
-func CheckIfDockerInstalled(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "container.CheckIfDockerInstalled")
-	defer span.End()
+func CheckIfDockerInstalled(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("Checking if Docker CLI is installed")
-	_, err := execute.Run(execute.Options{
+	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"version", "--format", "'{{.Server.Version}}'"},
-		Ctx:     ctx,
 	})
 	if err != nil {
 		log.Error("Docker CLI not available", zap.Error(err))
@@ -75,9 +68,8 @@ func CheckIfDockerInstalled(ctx context.Context) error {
 }
 
 // CheckIfDockerComposeInstalled verifies docker compose availability.
-func CheckIfDockerComposeInstalled(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "container.CheckIfDockerComposeInstalled")
-	defer span.End()
+func CheckIfDockerComposeInstalled(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("Checking for docker compose")
 	commands := [][]string{
@@ -85,10 +77,9 @@ func CheckIfDockerComposeInstalled(ctx context.Context) error {
 		{"docker-compose", "version"},
 	}
 	for _, cmd := range commands {
-		_, err := execute.Run(execute.Options{
+		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: cmd[0],
 			Args:    cmd[1:],
-			Ctx:     ctx,
 		})
 		if err == nil {
 			return nil
@@ -99,20 +90,17 @@ func CheckIfDockerComposeInstalled(ctx context.Context) error {
 }
 
 // CheckRunning ensures Docker daemon is active.
-func CheckRunning(ctx context.Context) error {
-	ctx, span := telemetry.Start(ctx, "container.CheckRunning")
-	defer span.End()
+func CheckRunning(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	log.Info("Checking if Docker daemon is running")
-	_, err := execute.Run(execute.Options{
+	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"info"},
-		Ctx:     ctx,
 		Capture: true,
 	})
 	if err != nil {
 		log.Error("Docker daemon not running", zap.Error(err))
-		span.SetAttributes(attribute.String("hint", "Start Docker Desktop"))
 		return cerr.WithHint(err, "Docker is not running. Please start Docker Desktop.")
 	}
 	return nil

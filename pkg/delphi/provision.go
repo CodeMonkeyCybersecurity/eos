@@ -8,33 +8,35 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-func CreateDelphiTenant(spec TenantSpec) error {
-	if err := EnsureOpensearchTenant(spec); err != nil {
+func CreateDelphiTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	if err := EnsureOpensearchTenant(rc, spec); err != nil {
 		return err
 	}
-	if err := EnsureOpensearchRole(spec); err != nil {
+	if err := EnsureOpensearchRole(rc, spec); err != nil {
 		return err
 	}
-	if err := EnsureOpensearchRoleMapping(spec); err != nil {
+	if err := EnsureOpensearchRoleMapping(rc, spec); err != nil {
 		return err
 	}
-	if err := EnsureWazuhGroup(spec); err != nil {
+	if err := EnsureWazuhGroup(rc, spec); err != nil {
 		return err
 	}
-	if err := EnsureWazuhEnrollmentKey(spec); err != nil {
+	if err := EnsureWazuhEnrollmentKey(rc, spec); err != nil {
 		return err
 	}
-	if err := EnsureWazuhPolicy(spec); err != nil {
+	if err := EnsureWazuhPolicy(rc, spec); err != nil {
 		return err
 	}
-	if err := AttachPolicyToRole(spec); err != nil {
+	if err := AttachPolicyToRole(rc, spec); err != nil {
 		return err
 	}
-	if err := AssignRoleToUser(spec); err != nil {
+	if err := AssignRoleToUser(rc, spec); err != nil {
 		return err
 	}
 	return nil
@@ -47,8 +49,8 @@ type RoleMapping struct {
 	AndBackendRoles []string `json:"and_backend_roles,omitempty"`
 }
 
-func EnsureOpensearchRoleMapping(spec TenantSpec) error {
-	log := zap.L().Named("delphi.mapping")
+func EnsureOpensearchRoleMapping(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	mapping := RoleMapping{
 		BackendRoles: []string{"delphi-readonly"}, // TODO: support dynamic role naming if needed
@@ -84,8 +86,8 @@ func EnsureOpensearchRoleMapping(spec TenantSpec) error {
 	return nil
 }
 
-func EnsureOpensearchTenant(spec TenantSpec) error {
-	log := zap.L().Named("delphi.tenant")
+func EnsureOpensearchTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	payload := map[string]any{
 		"description": fmt.Sprintf("Private tenant for %s", spec.Name),
@@ -122,8 +124,8 @@ func EnsureOpensearchTenant(spec TenantSpec) error {
 	return nil
 }
 
-func EnsureWazuhGroup(spec TenantSpec) error {
-	log := zap.L().Named("delphi.wazuh.group")
+func EnsureWazuhGroup(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	// The group ID to be created for Wazuh agent grouping
 	groupID := spec.GroupID
@@ -166,8 +168,8 @@ func EnsureWazuhGroup(spec TenantSpec) error {
 	return nil
 }
 
-func EnsureWazuhEnrollmentKey(spec TenantSpec) error {
-	log := zap.L().Named("delphi.wazuh.enroll")
+func EnsureWazuhEnrollmentKey(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	groupID := spec.GroupID
 	if groupID == "" {
@@ -213,8 +215,8 @@ func EnsureWazuhEnrollmentKey(spec TenantSpec) error {
 	return nil
 }
 
-func EnsureWazuhPolicy(spec TenantSpec) error {
-	log := zap.L().Named("delphi.wazuh.policy")
+func EnsureWazuhPolicy(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	policyName := fmt.Sprintf("policy_%s", spec.Name)
 	groupID := spec.GroupID
@@ -280,8 +282,8 @@ type OpenSearchRole struct {
 	TenantPermissions  []TenantPermissions `json:"tenant_permissions"`
 }
 
-func EnsureOpensearchRole(spec TenantSpec) error {
-	log := zap.L().Named("delphi.provision")
+func EnsureOpensearchRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	role := OpenSearchRole{
 		ClusterPermissions: []string{"cluster_composite_ops_ro"},
@@ -332,8 +334,8 @@ func EnsureOpensearchRole(spec TenantSpec) error {
 	return nil
 }
 
-func EnsureGlobalReadonlyRole() error {
-	log := zap.L().Named("delphi.globalrole")
+func EnsureGlobalReadonlyRole(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	role := OpenSearchRole{
 		ClusterPermissions: []string{"cluster_composite_ops_ro"},
@@ -379,8 +381,8 @@ func EnsureGlobalReadonlyRole() error {
 	return nil
 }
 
-func ResolveWazuhRoleID(name string) (string, error) {
-	log := zap.L().Named("delphi.resolve.role")
+func ResolveWazuhRoleID(rc *eos_io.RuntimeContext, name string) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
 
 	token := "<vaulted-wazuh-token>" // TODO: secure lookup
 	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/roles?pretty=true", nil)
@@ -417,8 +419,8 @@ func ResolveWazuhRoleID(name string) (string, error) {
 	return "", fmt.Errorf("role not found: %s", name)
 }
 
-func ResolveWazuhUserID(name string) (string, error) {
-	log := zap.L().Named("delphi.resolve.user")
+func ResolveWazuhUserID(rc *eos_io.RuntimeContext, name string) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
 
 	token := "<vaulted-wazuh-token>" // TODO: Retrieve from Vault
 	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/users?pretty=true", nil)
@@ -455,8 +457,8 @@ func ResolveWazuhUserID(name string) (string, error) {
 	return "", fmt.Errorf("user not found: %s", name)
 }
 
-func ResolveWazuhPolicyID(name string) (string, error) {
-	log := zap.L().Named("delphi.resolve.policy")
+func ResolveWazuhPolicyID(rc *eos_io.RuntimeContext, name string) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
 
 	token := "<vaulted-wazuh-token>" // TODO: Retrieve from Vault
 	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/policies?pretty=true", nil)
@@ -490,15 +492,14 @@ func ResolveWazuhPolicyID(name string) (string, error) {
 	return "", fmt.Errorf("policy not found: %s", name)
 }
 
-func AttachPolicyToRole(spec TenantSpec) error {
-	log := zap.L().Named("delphi.wazuh.attach")
-
+func AttachPolicyToRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 	roleID := spec.RoleID
 	policyID := spec.PolicyID
 
 	// 🔁 Fallback to lookup if missing
 	if roleID == "" {
-		resolved, err := ResolveWazuhRoleID(fmt.Sprintf("role_%s", spec.Name))
+		resolved, err := ResolveWazuhRoleID(rc, fmt.Sprintf("role_%s", spec.Name))
 		if err != nil {
 			return fmt.Errorf("cannot resolve role ID: %w", err)
 		}
@@ -506,7 +507,7 @@ func AttachPolicyToRole(spec TenantSpec) error {
 	}
 
 	if policyID == "" {
-		resolved, err := ResolveWazuhPolicyID(fmt.Sprintf("policy_%s", spec.Name))
+		resolved, err := ResolveWazuhPolicyID(rc, fmt.Sprintf("policy_%s", spec.Name))
 		if err != nil {
 			return fmt.Errorf("cannot resolve policy ID: %w", err)
 		}
@@ -539,15 +540,15 @@ func AttachPolicyToRole(spec TenantSpec) error {
 	return nil
 }
 
-func AssignRoleToUser(spec TenantSpec) error {
-	log := zap.L().Named("delphi.wazuh.assign")
+func AssignRoleToUser(rc *eos_io.RuntimeContext, spec TenantSpec) error {
+	log := otelzap.Ctx(rc.Ctx)
 
 	roleID := spec.RoleID
 	userID := ""
 
 	// 🔁 Fallback to lookup if missing
 	if roleID == "" {
-		resolved, err := ResolveWazuhRoleID(fmt.Sprintf("role_%s", spec.Name))
+		resolved, err := ResolveWazuhRoleID(rc, fmt.Sprintf("role_%s", spec.Name))
 		if err != nil {
 			return fmt.Errorf("cannot resolve role ID: %w", err)
 		}
@@ -555,7 +556,7 @@ func AssignRoleToUser(spec TenantSpec) error {
 	}
 
 	if userID == "" {
-		resolved, err := ResolveWazuhUserID(spec.User)
+		resolved, err := ResolveWazuhUserID(rc, spec.User)
 		if err != nil {
 			return fmt.Errorf("cannot resolve user ID: %w", err)
 		}

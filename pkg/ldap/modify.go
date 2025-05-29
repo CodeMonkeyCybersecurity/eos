@@ -5,12 +5,13 @@ package ldap
 import (
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/go-ldap/ldap/v3"
 )
 
 // UpdateUserAttributes updates one or more attributes for a given user UID
-func updateUserAttributes(uid string, attrs map[string][]string) error {
-	conn, err := Connect()
+func updateUserAttributes(rc *eos_io.RuntimeContext, uid string, attrs map[string][]string) error {
+	conn, err := Connect(rc)
 	if err != nil {
 		return err
 	}
@@ -20,7 +21,7 @@ func updateUserAttributes(uid string, attrs map[string][]string) error {
 		}
 	}()
 
-	user, err := readUserByUID(uid)
+	user, err := readUserByUID(rc, uid)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
@@ -37,8 +38,8 @@ func updateUserAttributes(uid string, attrs map[string][]string) error {
 }
 
 // AddUserToGroup adds a user to an LDAP group
-func addUserToGroup(uid, groupCN string) error {
-	conn, err := Connect()
+func addUserToGroup(rc *eos_io.RuntimeContext, uid, groupCN string) error {
+	conn, err := Connect(rc)
 	if err != nil {
 		return err
 	}
@@ -48,11 +49,11 @@ func addUserToGroup(uid, groupCN string) error {
 		}
 	}()
 
-	user, err := readUserByUID(uid)
+	user, err := readUserByUID(rc, uid)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
-	group, err := readGroupByCN(groupCN)
+	group, err := readGroupByCN(rc, groupCN)
 	if err != nil {
 		return fmt.Errorf("group not found: %w", err)
 	}
@@ -67,8 +68,8 @@ func addUserToGroup(uid, groupCN string) error {
 }
 
 // RemoveUserFromGroup removes a user from an LDAP group
-func removeUserFromGroup(uid, groupCN string) error {
-	conn, err := Connect()
+func removeUserFromGroup(rc *eos_io.RuntimeContext, uid, groupCN string) error {
+	conn, err := Connect(rc)
 	if err != nil {
 		return err
 	}
@@ -78,11 +79,11 @@ func removeUserFromGroup(uid, groupCN string) error {
 		}
 	}()
 
-	user, err := readUserByUID(uid)
+	user, err := readUserByUID(rc, uid)
 	if err != nil {
 		return fmt.Errorf("user not found: %w", err)
 	}
-	group, err := readGroupByCN(groupCN)
+	group, err := readGroupByCN(rc, groupCN)
 	if err != nil {
 		return fmt.Errorf("group not found: %w", err)
 	}

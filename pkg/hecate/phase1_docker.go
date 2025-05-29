@@ -4,15 +4,18 @@ package hecate
 
 import (
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 // OrchestrateHecateDockerCompose is a thin wrapper that collates fragments and builds the final docker-compose.yml.
-func PhaseDockerCompose(logName, filePath string) error {
+func PhaseDockerCompose(rc *eos_io.RuntimeContext, logName, filePath string) error {
 	// Step 1: Collate all compose fragments into one string block
 	dynamicServices := CollateComposeFragmentsToString()
 
 	// Step 2: Build the full docker-compose.yml with caddy + dynamic services + networks + volumes
 	return BuildHecateCompose(
+		rc,
 		logName,
 		DockerCaddyService, // always include the Caddy service block
 		dynamicServices,
@@ -22,6 +25,7 @@ func PhaseDockerCompose(logName, filePath string) error {
 
 // BuildHecateCompose assembles and writes the docker-compose.yml file.
 func BuildHecateCompose(
+	rc *eos_io.RuntimeContext,
 	logName string,
 	caddyService string,
 	dynamicServices string,
@@ -40,6 +44,7 @@ func BuildHecateCompose(
 	}
 
 	return RenderAndWriteTemplate(
+		rc,
 		logName,
 		DockerComposeMasterTemplate,
 		data,
@@ -48,10 +53,11 @@ func BuildHecateCompose(
 }
 
 // CollateComposeFragments handles collation + writing of the docker-compose.yml.
-func CollateComposeFragments() error {
+func CollateComposeFragments(rc *eos_io.RuntimeContext) error {
 	footer := GetDockerFooter()
 
 	return CollateAndWriteFile(
+		rc,
 		"hecate-compose-collation",
 		composeFragments,
 		HecateDockerCompose,

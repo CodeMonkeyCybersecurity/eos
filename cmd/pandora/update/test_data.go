@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -21,23 +22,23 @@ var UpdateTestDataCmd = &cobra.Command{
 	Use:   "test-data",
 	Short: "Update test-data in Vault (fallback to disk)",
 	Long:  `Updates the stored test-data in Vault. If Vault is unavailable, updates the fallback local test-data.json.`,
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := ctx.Log.Named("pandora-update-test-data")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
 
-		client, err := vault.GetVaultClient()
+		client, err := vault.GetVaultClient(rc)
 		if err != nil {
 			log.Warn("⚠️ Vault client unavailable, falling back to disk", zap.Error(err))
 			client = nil
 		} else {
-			vault.SetVaultClient(client)
-			vault.ValidateAndCache(client)
+			vault.SetVaultClient(rc, client)
+			vault.ValidateAndCache(rc, client)
 		}
 
 		newData := shared.GenerateUpdatedTestData()
 
 		if client != nil {
 			log.Info("✏️ Attempting to update test-data in Vault...")
-			if err := vault.Write(client, shared.TestDataVaultPath, newData); err == nil {
+			if err := vault.Write(rc, client, shared.TestDataVaultPath, newData); err == nil {
 				fmt.Println()
 				fmt.Println("✏️ Test Data Update Summary")
 				fmt.Println("  🔐 Vault: SUCCESS")

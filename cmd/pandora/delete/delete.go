@@ -12,7 +12,7 @@ var DeleteCmd = &cobra.Command{
 	Use:   "delete",
 	Short: "Delete resources from Pandora (Vault)",
 	Long:  "Delete secrets and test data from Pandora (Vault).",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		return cmd.Help()
 	}),
 }

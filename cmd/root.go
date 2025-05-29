@@ -13,6 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
 	// Subcommands
@@ -44,23 +45,23 @@ var RootCmd = &cobra.Command{
 and reverse proxy configurations via Hecate.`,
 	// PersistentPreRun executes before any subcommand.
 
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		fmt.Println("⚠️  No subcommand provided. Try `eos help`.")
 		return cmd.Help()
 	}),
 }
 
 // RegisterCommands adds all subcommands to the root command.
-func RegisterCommands() {
+func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 	RootCmd.SetHelpFunc(func(cmd *cobra.Command, args []string) {
 		if !helpLogged {
-			zap.L().Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
+			otelzap.Ctx(rc.Ctx).Info("Global help triggered via --help or -h", zap.String("command", cmd.Name()))
 			helpLogged = true
-			defer zap.L().Info("Global help display complete", zap.String("command", cmd.Name()))
+			defer otelzap.Ctx(rc.Ctx).Info("Global help display complete", zap.String("command", cmd.Name()))
 		}
 		if err := cmd.Root().Usage(); err != nil {
-			zap.L().Warn("Failed to print usage", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Failed to print usage", zap.Error(err))
 		}
 	})
 
@@ -87,32 +88,32 @@ func RegisterCommands() {
 }
 
 // Execute initializes and runs the root command.
-func Execute() {
+func Execute(rc *eos_io.RuntimeContext) {
 	_ = telemetry.Init("eos")
 
-	zap.L().Info("Eos CLI starting")
-	startGlobalWatchdog(3 * time.Minute)
+	otelzap.Ctx(rc.Ctx).Info("Eos CLI starting")
+	startGlobalWatchdog(rc, 3*time.Minute)
 
-	RegisterCommands()
+	RegisterCommands(rc)
 
 	if err := RootCmd.Execute(); err != nil {
 		if eos_err.IsExpectedUserError(err) {
-			zap.L().Warn("CLI completed with user error", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("CLI completed with user error", zap.Error(err))
 			os.Exit(0)
 		} else {
-			zap.L().Error("CLI execution error", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("CLI execution error", zap.Error(err))
 			os.Exit(1)
 		}
 	}
 }
 
-func startGlobalWatchdog(max time.Duration) {
+func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
 	go func() {
 		timer := time.NewTimer(max)
 		<-timer.C
 		fmt.Fprintf(os.Stderr, "💣 EOS watchdog: global timeout (%s) exceeded. Forcing shutdown.\n", max)
 		if err := syscall.Kill(syscall.Getpid(), syscall.SIGKILL); err != nil {
-			zap.L().Error("Failed to send SIGKILL to self", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error("Failed to send SIGKILL to self", zap.Error(err))
 		}
 	}()
 }

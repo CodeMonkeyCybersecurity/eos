@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -27,7 +28,7 @@ func MonitorVaultLogs(ctx context.Context, logFilePath, marker string) error {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			zap.L().Warn("Failed to close log file", zap.Error(err))
+			otelzap.Ctx(context.Background()).Warn("Failed to close log file", zap.Error(err))
 		}
 	}()
 

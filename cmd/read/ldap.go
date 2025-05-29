@@ -6,7 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 var InspectLDAPCmd = &cobra.Command{
@@ -14,10 +14,10 @@ var InspectLDAPCmd = &cobra.Command{
 	Aliases: []string{"directory"},
 	Short:   "Auto-discover and inspect LDAP",
 	Long:    "Attempts to auto-discover an LDAP server and show config, users, and groups.",
-	RunE: eos.Wrap(func(ctx *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		zap.L().Info("Launching interactive LDAP query tool")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("Launching interactive LDAP query tool")
 
-		return ldap.InteractiveLDAPQuery()
+		return ldap.InteractiveLDAPQuery(rc)
 	}),
 }
 

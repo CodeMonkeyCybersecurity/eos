@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/google/uuid"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -20,24 +22,15 @@ func GenerateTraceID() string {
 	return uuid.New().String()[:8]
 }
 
-func TraceIDFromContext(ctx context.Context) string {
-	val := ctx.Value(traceIDKey)
-	if str, ok := val.(string); ok {
-		return str
-	}
-	return "unknown"
-}
-
-func WithCommandLogging(ctx context.Context, name string, fn func(context.Context) error) (string, error) {
+func WithCommandLogging(rc *eos_io.RuntimeContext, name string, fn func(context.Context) error) (string, error) {
 	traceID := GenerateTraceID()
-	ctx = WithTraceID(ctx, traceID)
 
-	log := zap.L().With(zap.String("trace_id", traceID))
+	log := otelzap.Ctx(rc.Ctx)
 	start := time.Now()
 
 	log.Info("Command started", zap.String("command", name), zap.Time("start_time", start))
 
-	err := fn(ctx)
+	err := fn(rc.Ctx)
 
 	duration := time.Since(start)
 	if err != nil {
@@ -52,8 +45,8 @@ func WithCommandLogging(ctx context.Context, name string, fn func(context.Contex
 	return traceID, err
 }
 
-func WithTraceID(ctx context.Context, traceID string) context.Context {
-	return context.WithValue(ctx, traceIDKey, traceID)
+func WithTraceID(rc *eos_io.RuntimeContext, traceID string) context.Context {
+	return context.WithValue(rc.Ctx, traceIDKey, traceID)
 }
 
 // LogCommandStart is a CLI fallback for packages without zap/logger context.
@@ -71,7 +64,7 @@ func LogCommandEnd(cmd string, traceID string, start time.Time) {
 }
 
 // ResolveLogPath attempts to find the best writable log file path.
-func ResolveLogPath() string {
+func ResolveLogPath(rc *eos_io.RuntimeContext) string {
 	for _, path := range PlatformLogPaths() {
 		dir := filepath.Dir(path)
 		if err := os.MkdirAll(dir, 0700); err != nil {
@@ -80,16 +73,16 @@ func ResolveLogPath() string {
 		file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 		if err == nil {
 			if cerr := file.Close(); cerr != nil {
-				zap.L().Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
+				otelzap.Ctx(rc.Ctx).Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
 			}
-			zap.L().Info("📝 Using resolved log path", zap.String("log_path", path))
+			otelzap.Ctx(rc.Ctx).Info("📝 Using resolved log path", zap.String("log_path", path))
 			return path
 		} else {
-			zap.L().Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
 		}
 	}
 
-	zap.L().Warn("⚠️ No writable log path could be resolved")
+	otelzap.Ctx(rc.Ctx).Warn("⚠️ No writable log path could be resolved")
 	return ""
 }
 

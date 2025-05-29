@@ -3,34 +3,34 @@
 package vault
 
 import (
-	"context"
 	"fmt"
 
-	"go.uber.org/zap"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
-func OrchestrateVaultCreate(ctx context.Context) error {
-	zap.L().Info("🚀 Starting full Vault create lifecycle")
+func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
+	otelzap.Ctx(rc.Ctx).Info("🚀 Starting full Vault create lifecycle")
 
-	if err := PhaseInstallVault(); err != nil {
+	if err := PhaseInstallVault(rc); err != nil {
 		return fmt.Errorf("install vault binary: %w", err)
 	}
-	if err := PrepareEnvironment(ctx); err != nil {
+	if err := PrepareEnvironment(rc); err != nil {
 		return fmt.Errorf("prepare environment: %w", err)
 	}
-	if err := GenerateTLS(ctx); err != nil {
+	if err := GenerateTLS(rc); err != nil {
 		return fmt.Errorf("generate TLS: %w", err)
 	}
-	if err := WriteAndValidateConfig(); err != nil {
+	if err := WriteAndValidateConfig(rc); err != nil {
 		return fmt.Errorf("write and validate config: %w", err)
 	}
-	if err := StartVaultService(); err != nil {
+	if err := StartVaultService(rc); err != nil {
 		return fmt.Errorf("start vault: %w", err)
 	}
-	if err := InitializeVault(); err != nil {
+	if err := InitializeVault(rc); err != nil {
 		return fmt.Errorf("initialize vault: %w", err)
 	}
 
-	zap.L().Info("🎉 Vault create lifecycle completed successfully")
+	otelzap.Ctx(rc.Ctx).Info("🎉 Vault create lifecycle completed successfully")
 	return nil
 }

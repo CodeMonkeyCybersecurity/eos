@@ -6,8 +6,9 @@ import (
 	"os"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
-	"go.uber.org/zap"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
 func (c *Config) BaseURL() string {
@@ -26,18 +27,18 @@ func (c *Config) IsValid() bool {
 		c.APIPassword != ""
 }
 
-func PromptDelphiConfig() *Config {
-	password, err := crypto.PromptPassword("Enter the API password")
+func PromptDelphiConfig(rc *eos_io.RuntimeContext) *Config {
+	password, err := crypto.PromptPassword(rc, "Enter the API password")
 	if err != nil {
-		zap.L().Error("❌ Failed to read password: %v\n")
+		otelzap.Ctx(rc.Ctx).Error("❌ Failed to read password: %v\n")
 		os.Exit(1)
 	}
 
 	return &Config{
-		FQDN:               interaction.PromptInput("Enter the Wazuh FQDN", "domain.com"),
-		Port:               interaction.PromptInput("Enter the port", "55000"),
-		Protocol:           interaction.PromptInput("Enter the protocol (http or https)", "https"),
-		APIUser:            interaction.PromptInput("Enter the API username", "wazuh-wui"),
+		FQDN:               interaction.PromptInput(rc.Ctx, "Enter the Wazuh FQDN", "domain.com"),
+		Port:               interaction.PromptInput(rc.Ctx, "Enter the port", "55000"),
+		Protocol:           interaction.PromptInput(rc.Ctx, "Enter the protocol (http or https)", "https"),
+		APIUser:            interaction.PromptInput(rc.Ctx, "Enter the API username", "wazuh-wui"),
 		APIPassword:        password,
 		VerifyCertificates: false,
 	}
