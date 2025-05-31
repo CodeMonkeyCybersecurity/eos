@@ -1,4 +1,4 @@
-/* pkg/crypto/handler.go */
+/* pkg/crypto/bcrypt.go */
 
 package crypto
 
@@ -118,13 +118,6 @@ func InjectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, erro
 	}
 
 	return []byte(content), replacements, nil
-}
-
-func Redact(s string) string {
-	if s == "" {
-		return "(empty)"
-	}
-	return strings.Repeat("*", 8)
 }
 
 // SecureZero overwrites a byte slice to reduce the chance of sensitive data lingering in memory.

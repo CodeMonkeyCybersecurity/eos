@@ -1,3 +1,5 @@
+// pkg/crypto/passwd.go
+
 package crypto
 
 import (
@@ -5,113 +7,59 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 	"strings"
-	"testing"
 	"unicode"
+)
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
+// Constants and charsets for password generation
+const MinPasswordLen = 12
+
+// These should come from your shared package or be defined here directly
+var (
+	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
+	upperChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	digitChars  = "0123456789"
+	symbolChars = "!@#$%^&*()-_=+[]{}|;:,.<>?/"
+	allChars    = lowerChars + upperChars + digitChars + symbolChars
 )
 
 // GeneratePassword creates a strong random password with at least 1 of each char class.
 func GeneratePassword(length int) (string, error) {
 	if length < 4 {
-		return "", errors.New(shared.ErrPasswordTooShort)
+		return "", errors.New("password too short: min length 4")
 	}
+	pw := make([]byte, 0, length)
+	groups := []string{lowerChars, upperChars, digitChars, symbolChars}
 
-	var pw []byte
-
-	for _, group := range []string{shared.LowerChars, shared.UpperChars, shared.DigitChars, shared.SymbolChars} {
+	// Guarantee at least one of each
+	for _, group := range groups {
 		c, err := randomChar(group)
 		if err != nil {
-			return "", fmt.Errorf("failed to select random char: %w", err)
+			return "", err
 		}
 		pw = append(pw, c)
 	}
-
-	for i := len(pw); i < length; i++ {
-		c, err := randomChar(shared.AllChars)
+	// Fill rest
+	for i := len(groups); i < length; i++ {
+		c, err := randomChar(allChars)
 		if err != nil {
-			return "", fmt.Errorf("failed to select random filler char: %w", err)
+			return "", err
 		}
 		pw = append(pw, c)
 	}
-
+	// Shuffle
 	if err := shuffle(pw); err != nil {
-		return "", fmt.Errorf("failed to shuffle password: %w", err)
+		return "", err
 	}
-
 	return string(pw), nil
 }
 
-func TestGeneratePassword(t *testing.T) {
-	pw, err := GeneratePassword(16)
-	if err != nil {
-		t.Fatalf("GeneratePassword failed: %v", err)
+// ValidateStrongPassword checks that the password meets security policy.
+func ValidateStrongPassword(_ctx context.Context, input string) error {
+	if len(input) < MinPasswordLen {
+		return errors.New("password too short")
 	}
-	if len(pw) < 16 {
-		t.Errorf("password too short: got %d, want >=16", len(pw))
-	}
-}
-
-func TestValidateStrongPassword(rc *eos_io.RuntimeContext, t *testing.T) {
-
-	valid := "Astrong!Pass123"
-	if err := ValidateStrongPassword(rc.Ctx, valid); err != nil {
-		t.Errorf("ValidateStrongPassword rejected valid password: %v", err)
-	}
-
-	invalid := "weakpass"
-	if err := ValidateStrongPassword(rc.Ctx, invalid); err == nil {
-		t.Error("ValidateStrongPassword accepted weak password, expected error")
-	}
-}
-
-func TestReadPassword(t *testing.T) {
-	input := "testpassword\n"
-	reader := bufio.NewReader(strings.NewReader(input))
-	pw, err := ReadPassword(reader)
-	if err != nil {
-		t.Fatalf("ReadPassword failed: %v", err)
-	}
-	if pw != "testpassword" {
-		t.Errorf("ReadPassword incorrect: got %q, want %q", pw, "testpassword")
-	}
-}
-
-// randomChar selects a random character from a charset using crypto-randomness.
-func randomChar(charset string) (byte, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-	if err != nil {
-		return 0, fmt.Errorf("failed to generate random index: %w", err)
-	}
-	return charset[n.Int64()], nil
-}
-
-// shuffle randomizes a byte slice in place using crypto-random swaps.
-func shuffle(b []byte) error {
-	for i := len(b) - 1; i > 0; i-- {
-		jBig, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
-		if err != nil {
-			return fmt.Errorf("failed to generate random shuffle index: %w", err)
-		}
-		j := int(jBig.Int64())
-		b[i], b[j] = b[j], b[i]
-	}
-	return nil
-}
-
-// ValidateStrongPassword ensures min length and mixed char types.
-func ValidateStrongPassword(ctx context.Context, input string) error {
-	if len(input) < 12 {
-		otelzap.Ctx(ctx).Warn("password too short", zap.Int("length", len(input)))
-		return errors.New(shared.ErrPasswordTooShort)
-	}
-
 	var hasUpper, hasLower, hasDigit, hasSymbol bool
 	for _, r := range input {
 		switch {
@@ -125,20 +73,39 @@ func ValidateStrongPassword(ctx context.Context, input string) error {
 			hasSymbol = true
 		}
 	}
-
 	if !hasUpper || !hasLower || !hasDigit || !hasSymbol {
-		otelzap.Ctx(ctx).Warn("password missing required character classes")
-		return errors.New(shared.ErrPasswordMissingClasses)
+		return errors.New("password missing required character class")
 	}
-
 	return nil
 }
 
-// ReadPassword reads a password from a bufio.Reader (for tests or non-interactive cases).
+// randomChar selects a random character from charset using crypto/rand.
+func randomChar(charset string) (byte, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+	if err != nil {
+		return 0, err
+	}
+	return charset[n.Int64()], nil
+}
+
+// shuffle randomizes a byte slice in place.
+func shuffle(b []byte) error {
+	for i := len(b) - 1; i > 0; i-- {
+		jBig, err := rand.Int(rand.Reader, big.NewInt(int64(i+1)))
+		if err != nil {
+			return err
+		}
+		j := int(jBig.Int64())
+		b[i], b[j] = b[j], b[i]
+	}
+	return nil
+}
+
+// ReadPassword reads a password from a bufio.Reader (e.g., for tests or non-interactive use).
 func ReadPassword(reader *bufio.Reader) (string, error) {
 	pw, err := reader.ReadString('\n')
 	if err != nil {
-		return "", fmt.Errorf("failed to read password: %w", err)
+		return "", err
 	}
 	return strings.TrimSpace(pw), nil
 }

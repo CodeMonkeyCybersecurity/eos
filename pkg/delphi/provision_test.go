@@ -1,5 +1,3 @@
-// pkg/delphi/provision_test.go
-
 package delphi
 
 import (
@@ -8,7 +6,13 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-func TestResolveWazuhUserID(rc *eos_io.RuntimeContext, t *testing.T) {
+// Dummy or mock rc for testing. Adjust as needed for your test context.
+func newTestRuntimeContext() *eos_io.RuntimeContext {
+	return &eos_io.RuntimeContext{}
+}
+
+func TestResolveWazuhUserID(t *testing.T) {
+	rc := newTestRuntimeContext()
 	id, err := ResolveWazuhUserID(rc, "alice")
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -18,7 +22,8 @@ func TestResolveWazuhUserID(rc *eos_io.RuntimeContext, t *testing.T) {
 	}
 }
 
-func TestResolveWazuhRoleID(rc *eos_io.RuntimeContext, t *testing.T) {
+func TestResolveWazuhRoleID(t *testing.T) {
+	rc := newTestRuntimeContext()
 	id, err := ResolveWazuhRoleID(rc, "role_alice")
 	if err != nil {
 		t.Fatalf("error: %v", err)
@@ -28,7 +33,8 @@ func TestResolveWazuhRoleID(rc *eos_io.RuntimeContext, t *testing.T) {
 	}
 }
 
-func TestResolveWazuhPolicyID(rc *eos_io.RuntimeContext, t *testing.T) {
+func TestResolveWazuhPolicyID(t *testing.T) {
+	rc := newTestRuntimeContext()
 	id, err := ResolveWazuhPolicyID(rc, "policy_alice")
 	if err != nil {
 		t.Fatalf("error: %v", err)
