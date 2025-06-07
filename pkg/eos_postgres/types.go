@@ -1,5 +1,5 @@
-// pkg/postgres/types.go
-package postgres
+// pkg/eos_postgres/types.go
+package eos_postgres
 
 import "time"
 

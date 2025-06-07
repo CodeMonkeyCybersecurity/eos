@@ -10,7 +10,8 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	cerr "github.com/cockroachdb/errors"
-	opa "github.com/open-policy-agent/opa/v1/rego"
+	rego "github.com/open-policy-agent/opa/v1/rego"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel/attribute"
 	"go.uber.org/zap"
 )
@@ -40,10 +41,10 @@ func Enforce(ctx context.Context, policyName string, input interface{}) error {
 
 	// — 4) Build & Eval the query
 	query := fmt.Sprintf("data.%s.allow", policyName)
-	r := opa.New(
-		opa.Query(query),
-		opa.Module(policyName+".rego", string(modBytes)),
-		opa.Input(input),
+	r := rego.New(
+		rego.Query(query),
+		rego.Module(policyName+".rego", string(modBytes)),
+		rego.Input(input),
 	)
 	rs, err := r.Eval(ctx)
 	if err != nil {
@@ -65,4 +66,69 @@ func Enforce(ctx context.Context, policyName string, input interface{}) error {
 	}
 
 	return nil
+}
+
+func EnforcePolicy(ctx context.Context, policyPath string, input interface{}) ([]string, error) {
+
+	query, err := rego.New(
+		rego.Query("data.eos.tenant.deny"),
+		rego.Load([]string{policyPath}, nil),
+	).PrepareForEval(ctx)
+	if err != nil {
+		otelzap.Ctx(context.Background())
+		return nil, err
+	}
+
+	rs, err := query.Eval(context.Background(), rego.EvalInput(input))
+	if err != nil {
+		otelzap.Ctx(context.Background())
+		return nil, err
+	}
+
+	var messages []string
+	for _, result := range rs {
+		for _, expr := range result.Expressions {
+			for _, msg := range expr.Value.([]interface{}) {
+				messages = append(messages, msg.(string))
+			}
+		}
+	}
+	if len(messages) > 0 {
+		otelzap.Ctx(context.Background())
+	}
+	return messages, nil
+}
+
+func Evaluate(ctx context.Context, policyName string, input any) (bool, error) {
+	// Placeholder – always allow
+	return true, nil
+}
+
+// compiledPolicy turns Rego source into a PreparedEvalQuery.
+// MustCompile simply panics on error; explicit helper is clearer in prod.
+func CompiledPolicy() rego.PreparedEvalQuery {
+	const src = `package delphi
+		default allow = false
+		allow { input.level > 5 }`
+	r := rego.New(rego.Query("allow"), rego.Module("policy.rego", src))
+	pq, err := r.PrepareForEval(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	return pq
+}
+
+// CompiledPolicyCtx is the context-aware sibling of CompiledPolicy.
+// It returns a PreparedEvalQuery and any compilation error instead of panicking.
+func CompiledPolicyCtx(ctx context.Context) (rego.PreparedEvalQuery, error) {
+	const src = `package delphi
+		default allow = false
+		allow { input.level > 5 }`
+
+	return rego.
+		New(
+			rego.Query("allow"),
+			rego.Module("inline.rego", src),
+		).
+		PrepareForEval(ctx)
 }

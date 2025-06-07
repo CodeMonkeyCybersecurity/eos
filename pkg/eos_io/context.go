@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cue"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
@@ -66,10 +68,10 @@ func (rc *RuntimeContext) ValidateAll() error {
 	if err := verify.Struct(v.Cfg); err != nil {
 		return cerr.WithHint(err, "struct validation failed")
 	}
-	if err := verify.ValidateYAMLWithCUE(v.SchemaPath, v.YAMLPath); err != nil {
+	if err := eos_cue.ValidateYAMLWithCUE(v.SchemaPath, v.YAMLPath); err != nil {
 		return cerr.WithHint(err, "CUE schema validation failed")
 	}
-	denies, err := verify.EnforcePolicy(rc.Ctx, v.PolicyPath, v.PolicyInput())
+	denies, err := eos_opa.EnforcePolicy(rc.Ctx, v.PolicyPath, v.PolicyInput())
 	if err != nil {
 		return cerr.Wrap(err, "OPA policy error")
 	}

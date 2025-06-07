@@ -1,17 +1,29 @@
-// pkg/verify/cue.go
+// pkg/eos_cue/cue.go
 
-package verify
+package eos_cue
 
 import (
 	"context"
 	"fmt"
 	"os"
 
+	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
 	"cuelang.org/go/encoding/yaml"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
+	"github.com/go-playground/validator/v10"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// One global CUE context is fine for pure validation.
+var cueCtx = cuecontext.New()
+
+// Struct validates a Go struct with `validate:` tags (playground/validator).
+// You can rename or extend this as you like.
+func Struct(v any) error {
+	return validator.New().Struct(v)
+}
 
 func ValidateYAMLWithCUE(schemaPath, yamlPath string) error {
 	schemaInst := load.Instances([]string{schemaPath}, nil)
@@ -53,7 +65,7 @@ func VerifyAll(ctx context.Context, cfg any, schemaPath, yamlPath, policyPath st
 		return fmt.Errorf("cue validation failed: %w", err)
 	}
 
-	denies, err := EnforcePolicy(context.Background(), policyPath, policyInput)
+	denies, err := eos_opa.EnforcePolicy(context.Background(), policyPath, policyInput)
 	if err != nil {
 		return fmt.Errorf("policy evaluation failed: %w", err)
 	}

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cue"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
@@ -52,7 +53,7 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		}
 	}
 	if opts.SchemaPath != "" && opts.YAMLPath != "" {
-		if err := verify.ValidateYAMLWithCUE(opts.SchemaPath, opts.YAMLPath); err != nil {
+		if err := eos_cue.ValidateYAMLWithCUE(opts.SchemaPath, opts.YAMLPath); err != nil {
 			span.RecordError(err)
 			logError(logger, "📄 CUE validation failed", err)
 			return "", cerr.WithHint(err, "Schema/YAML mismatch")

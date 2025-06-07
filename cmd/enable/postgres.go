@@ -5,7 +5,7 @@ package enable
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/postgres"
+	postgres "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_postgres"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
