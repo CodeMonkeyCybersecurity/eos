@@ -99,9 +99,15 @@ def main():
                     json.dumps(alert),
                     "new"
                 ))
-        log.info("Alert insert completed (or skipped on duplicate)")
-        print("ok")
+                # Did we actually insert?
+                if cur.rowcount == 1:
+                    log.info("Inserted alert %s", alert_hash)
+                else:
+                    log.info("Skipped duplicate alert %s", alert_hash)
 
+        # always print ok to stdout if no exception
+        print("ok")
+ 
     except Exception:
         log.exception("Unexpected database error")
         sys.exit(1)
