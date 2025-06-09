@@ -131,10 +131,14 @@ signal.signal(signal.SIGTERM, on_signal)
 # ───── CATCH-UP HELPERS ─────
 def fetch_unsent_alerts(conn):
     sql = """
-      SELECT id,
-             prompt_text   AS summary,
-             response_text AS response,
-             response_received_at
+      SELECT
+            id,
+            prompt_text         AS summary,
+            response_text       AS response,
+            response_received_at,
+            alert_hash,
+            agent_id,
+            rule_level
         FROM alerts
        WHERE state = 'summarized'
          AND alert_sent_at IS NULL
