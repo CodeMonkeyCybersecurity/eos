@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# /usr/local/bin/delphi-emailer.py
+# stanley:stanley 0750
 """
 Delphi Emailer – event-driven via Postgres LISTEN/NOTIFY
 """
