@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# /usr/local/bin/delphi-emailer.py
+# 750 stanley:stanley 
 """
 Delphi Emailer – event‐driven via Postgres LISTEN/NOTIFY
 """
@@ -35,17 +37,6 @@ logging.basicConfig(
 )
 log = logging.getLogger("delphi-emailer")
 
-# ───── RATE LIMITER ─────
-sent_timestamps = []
-
-def can_send_email():
-    """Allow MAX_PER_MIN emails per rolling minute."""
-    now = time.time()
-    cutoff = now - 60
-    # drop timestamps older than 60s
-    while sent_timestamps and sent_timestamps[0] < cutoff:
-        sent_timestamps.pop(0)
-    return len(sent_timestamps) < MAX_PER_MIN
 
 # ───── DATABASE HELPERS ─────
 def connect_db():
@@ -56,12 +47,13 @@ def connect_db():
 
 def fetch_alert(conn, alert_id):
     sql = """
-      SELECT prompt_text        AS summary,
-             response_text      AS response,
-             response_received_at,
-             alert_hash,
-             agent_id,
-             rule_level
+      SELECT
+            prompt_text         AS summary,
+            response_text       AS response,
+            response_received_at,
+            alert_hash,
+            agent_id,
+            rule_level
         FROM alerts
        WHERE id = %s
     """
@@ -105,9 +97,6 @@ def build_email(row):
     return subject, plain, html
 
 def send_email(subject, plain, html_body):
-    if not can_send_email():
-        log.warning("Rate limit reached; skipping email")
-        return False
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
@@ -143,12 +132,9 @@ signal.signal(signal.SIGTERM, on_signal)
 def fetch_unsent_alerts(conn):
     sql = """
       SELECT id,
-             prompt_text        AS summary,
-             response_text      AS response,
-             response_received_at,
-             alert_hash,
-             agent_id,
-             rule_level
+             prompt_text   AS summary,
+             response_text AS response,
+             response_received_at
         FROM alerts
        WHERE state = 'summarized'
          AND alert_sent_at IS NULL
@@ -187,12 +173,12 @@ def main():
                 conn.poll()
                 for notify in conn.notifies:
                     alert_id = int(notify.payload)
-                    log.info(f"Received new_response for alert {alert_id}")
+                    log.info(f"Received new_summarized for alert {alert_id}")
                     row = fetch_alert(conn, alert_id)
                     if row:
-                        subj, plain, html_body = build_email(row)
-                        if send_email(subj, plain, html_body):
-                        mark_sent(conn, alert_id)
+                        subj, plain, html = build_email(row)
+                        if send_email(subj, plain, html):
+                            mark_sent(conn, alert_id)
                     else:
                         log.warning(f"Alert {alert_id} not found in DB")
                 # clear out all notifications
