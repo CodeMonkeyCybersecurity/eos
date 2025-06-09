@@ -73,7 +73,7 @@ def setup_logging() -> logging.Logger:
 log = setup_logging()
 
 # ───── 3. TEMPLATE LOADING ──────────────────────────────────
-TEMPLATE_PATH = "/opt/stackstorm/packs/delphi/templates/email.html"
+TEMPLATE_PATH = "/opt/stackstorm/packs/delphi/email.html"
 try:
     with open(TEMPLATE_PATH, encoding="utf-8") as f:
         email_tpl = Template(f.read())
