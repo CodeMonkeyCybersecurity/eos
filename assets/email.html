@@ -5,13 +5,13 @@
   <meta charset="utf-8">
   <title>$subject</title>
   <style>
-    body { font-family: Helvetica, Arial, sans-serif; background: #f8f9fa; padding: 24px; }
+    body { font-family: Helvetica, Arial, sans-serif; background: #f8f9fa; padding: 24px; overflow: auto; }
     .header { background: #fff; color: #099268; padding: 16px 24px;
                border-radius: 8px 8px 0 0; border-bottom: 1.5px solid #e0e0e0; }
     .header h1 { margin: 0; font-size: 1.2em; font-weight: 700; }
     .header .timestamp { font-size: .98em; color: #495057; margin-top: 2px; }
     .content { background: #fff; color: #222; padding: 24px; border-radius: 0 0 8px 8px;
-               box-shadow: 0 4px 12px #0001; }
+               box-shadow: 0 4px 12px #0001; overflow: visible; }
     .content .title { font-size: 1.15em; color: #087f5b; font-weight: 600; margin-bottom: 14px; }
     .content .footer-note { margin: 24px 0 0; padding: 16px 18px; border-radius: 5px;
                              color: #333; font-size: 1.02em; }
@@ -23,6 +23,11 @@
   <div class="header">
     <h1>Code Monkey Cybersecurity</h1>
     <div class="timestamp">Delphi Notify Alert • $sent_at</div>
+  </div>
+
+    <!-- just below .header -->
+  <div class="alert-meta">
+    <strong>Alert ID:</strong> $alert_id
   </div>
 
   <div class="content">

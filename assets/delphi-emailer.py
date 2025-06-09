@@ -4,18 +4,11 @@
 """
 Delphi Emailer – event-driven via Postgres LISTEN/NOTIFY
 """
-import os
-import sys
-import time
-import select
-import signal
-import logging
-from logging.handlers import RotatingFileHandler
-import pytz
-import psycopg2
-import smtplib
+import os, sys, re, time, select, signal, logging, pytz, psycopg2, smtplib
+
 import html as html_lib
 
+from logging.handlers import RotatingFileHandler
 from string import Template
 from typing import Tuple, Dict, List
 from dotenv import load_dotenv
@@ -111,13 +104,18 @@ def fetch_unsent_alerts(conn) -> List[Dict]:
         return cur.fetchall()
 
 def fetch_alert(conn, alert_id: int) -> Dict:
-    """Fetch a single alert by ID."""
     sql = """
-      SELECT id, prompt_text AS summary,
-             response_text AS response,
-             response_received_at,
-             alert_hash, agent_id, rule_level
-      FROM alerts WHERE id = %s
+    SELECT
+      a.id,
+      a.prompt_text   AS summary,
+      a.response_text AS response,
+      a.response_received_at,
+      a.alert_hash,
+      ag.hostname     AS agent_name,
+      a.rule_level
+    FROM alerts a
+    JOIN agents ag ON ag.id = a.agent_id
+    WHERE a.id = %s
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, (alert_id,))
@@ -150,19 +148,59 @@ def format_html(response: str, subject: str, sent_at: str) -> str:
     return email_tpl.safe_substitute(
         subject=subject,
         sent_at=sent_at,
-        body=paras,
+        alert_id=alert_id,
+        body=body_html,
         support_email=SUPPORT_EMAIL
     )
 
+
+def split_sections(text: str) -> Dict[str,str]:
+    """
+    Parses the LLM’s single-string response into a dict:
+      { "What happened": "...", "What to do": "...", "How to check": "..." }
+    """
+    # split on those exact headings (including the colon)
+    parts = re.split(r'(What happened:|What to do:|How to check:)', text)
+    # parts will be: ["", "What happened:", " ...", "How to check:", "...", ...]
+    out = {}
+    for i in range(1, len(parts), 2):
+        key   = parts[i].rstrip(':')
+        value = parts[i+1].strip()
+        out[key] = value
+    return out
+
+def build_body_html(response: str) -> str:
+    """
+    Renders each section as <h2> + paragraphs.
+    """
+    secs = split_sections(response)
+    html_blocks = []
+    for heading in ("What happened", "What to do", "How to check"):
+        content = secs.get(heading, "")
+        # make each paragraph
+        paras = "".join(f"<p>{html_lib.escape(p)}</p>"
+                        for p in content.split("\n\n") if p)
+        html_blocks.append(f"<h2>{heading}:</h2>{paras}")
+    return "\n".join(html_blocks)
+
 def build_email(row: Dict) -> Tuple[str, str, str]:
-    """Return (subject, plain_text, html_body) for a given DB row."""
-    sent_at = row["response_received_at"].astimezone(TIMEZONE) \
-                             .strftime("%A, %d %B %Y %I:%M %p AWST")
+    sent_at = row["response_received_at"] \
+                 .astimezone(TIMEZONE) \
+                 .strftime("%A, %d %B %Y %I:%M %p AWST")
 
     subject   = format_subject(row)
-    plain_txt = format_plain(row["response"], sent_at)
-    html_body = format_html(row["response"], subject, sent_at)
-    return subject, plain_txt, html_body
+    body_html = build_body_html(row["response"])
+
+    alert_id = row["alert_hash"][:8]
+    html_body = format_html(subject, sent_at, alert_id, body_html)
+
+    plain_text = (
+        f"{row['response']}\n\n"
+        f"Sent at {sent_at}\n"
+        f"Alert ID: {alert_id}\n"
+    )
+
+    return subject, plain_text, html_body
 
 # ───── 6. SMTP SENDER ──────────────────────────────────────
 def send_email(subject: str, plain: str, html_body: str) -> bool:
