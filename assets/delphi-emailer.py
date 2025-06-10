@@ -105,15 +105,16 @@ def fetch_unsent_alerts(conn) -> List[Dict]:
 
 def fetch_alert(conn, alert_id: int) -> Dict:
     sql = """
-    SELECT
-      a.id,
-      a.prompt_text   AS summary,
-      a.response_text AS response,
-      a.response_received_at,
-      a.alert_hash,
-      ag.hostname     AS agent_name,
-      a.rule_level
-    FROM alerts a
+        SELECT
+        a.id,
+        a.agent_id,
+        a.prompt_text   AS summary,
+        a.response_text AS response,
+        a.response_received_at,
+        a.alert_hash,
+        ag.hostname     AS agent_name,
+        a.rule_level
+        FROM alerts a
     JOIN agents ag ON ag.id = a.agent_id
     WHERE a.id = %s
     """
@@ -141,10 +142,7 @@ def format_plain(response: str, sent_at: str) -> str:
     """Create the plain-text email body."""
     return f"{response}\n\nSent at {sent_at}\n"
 
-def format_html(response: str, subject: str, sent_at: str) -> str:
-    """Substitute placeholders in the HTML template."""
-    escaped = html_lib.escape(response).strip()
-    paras   = "".join(f"<p>{p}</p>" for p in escaped.split("\n\n"))
+def format_html(subject: str, sent_at: str, alert_id: str, body_html: str) -> str:
     return email_tpl.safe_substitute(
         subject=subject,
         sent_at=sent_at,
@@ -152,7 +150,6 @@ def format_html(response: str, subject: str, sent_at: str) -> str:
         body=body_html,
         support_email=SUPPORT_EMAIL
     )
-
 
 def split_sections(text: str) -> Dict[str,str]:
     """
@@ -282,7 +279,9 @@ def main():
             cur  = conn.cursor()
             cur.execute(f"LISTEN {LISTEN_CHANNEL};")
         except Exception:
-            log.exception("Unexpected error in main loop; continuing")
+            # Fail fast: log full traceback and crash
+            log.exception("Unexpected error in main loop; aborting")
+            raise
 
     log.info("Exiting.")
 
