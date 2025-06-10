@@ -89,15 +89,20 @@ def connect_db() -> psycopg2.extensions.connection:
         sys.exit(1)
 
 def fetch_unsent_alerts(conn) -> List[Dict]:
-    """Fetch all alerts in 'summarized' but not yet sent."""
+    """Fetch all alerts in 'summarized' but not yet sent, including agent_name."""
     sql = """
-      SELECT id, prompt_text AS summary,
-             response_text AS response,
-             response_received_at,
-             alert_hash, agent_id, rule_level
-      FROM alerts
-     WHERE state='summarized' AND alert_sent_at IS NULL
-  ORDER BY response_received_at
+      SELECT
+        a.id,
+        ag.hostname     AS agent_name,
+        a.rule_level,
+        a.prompt_text   AS summary,
+        a.response_text AS response,
+        a.response_received_at,
+        a.alert_hash
+      FROM alerts a
+      JOIN agents ag ON ag.id = a.agent_id
+     WHERE a.state='summarized' AND a.alert_sent_at IS NULL
+  ORDER BY a.response_received_at
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql)
@@ -108,6 +113,7 @@ def fetch_alert(conn, alert_id: int) -> Dict:
         SELECT
         a.id,
         a.agent_id,
+        a.agent_name
         a.prompt_text   AS summary,
         a.response_text AS response,
         a.response_received_at,
@@ -133,10 +139,8 @@ def mark_sent(conn, alert_id: int) -> None:
 
 # ───── 5. EMAIL FORMATTING HELPERS ─────────────────────────
 def format_subject(row: Dict) -> str:
-    """Build the email subject line."""
-    summary = " ".join(row["summary"].split())[:50]
-    suffix  = row["alert_hash"][:8]
-    return f"[Delphi Notify] {row['agent_id']} L{row['rule_level']} A{suffix}: {summary}"
+    """Build the email subject line as [Delphi Notify] <hostname> Level <number>."""
+    return f"[Delphi Notify] {row['agent_name']} Level {row['rule_level']}"
 
 def format_plain(response: str, sent_at: str) -> str:
     """Create the plain-text email body."""
