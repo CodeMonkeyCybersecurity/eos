@@ -89,20 +89,15 @@ def connect_db() -> psycopg2.extensions.connection:
         sys.exit(1)
 
 def fetch_unsent_alerts(conn) -> List[Dict]:
-    """Fetch all alerts in 'summarized' but not yet sent, including agent_name."""
+    """Fetch all alerts in 'summarized' but not yet sent."""
     sql = """
-      SELECT
-        a.id,
-        a.hostname     AS agent_name,
-        a.rule_level,
-        a.prompt_text   AS summary,
-        a.response_text AS response,
-        a.response_received_at,
-        a.alert_hash
-      FROM alerts a
-      JOIN agents ag ON ag.id = a.agent_id
-     WHERE a.state='summarized' AND a.alert_sent_at IS NULL
-  ORDER BY a.response_received_at
+      SELECT id, prompt_text AS summary,
+             response_text AS response,
+             response_received_at,
+             alert_hash, agent_id, rule_level
+      FROM alerts
+     WHERE state='summarized' AND alert_sent_at IS NULL
+  ORDER BY response_received_at
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql)
