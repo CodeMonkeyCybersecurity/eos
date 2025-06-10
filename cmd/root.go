@@ -40,75 +40,74 @@ import (
 
 // RootCmd is the base command for eos.
 var RootCmd = &cobra.Command{
-    Use:   "eos",
-    Short: "Eos CLI for automation, orchestration, and hardening",
-    Long: `Eos is a command-line application for managing processes, users, hardware, backups,
+	Use:   "eos",
+	Short: "Eos CLI for automation, orchestration, and hardening",
+	Long: `Eos is a command-line application for managing processes, users, hardware, backups,
 and reverse proxy configurations via Hecate.
 
 Use "eos [command] --help" for more information about a command.`, // Added standard Cobra advice
 
-    // ⚠️ IMPORTANT CHANGE: Remove the custom SetHelpFunc on RootCmd.
-    // Cobra's default help function is smart enough to show context-specific help.
-    // If you need global logging for help, do it in PersistentPreRun or similar.
+	// ⚠️ IMPORTANT CHANGE: Remove the custom SetHelpFunc on RootCmd.
+	// Cobra's default help function is smart enough to show context-specific help.
+	// If you need global logging for help, do it in PersistentPreRun or similar.
 
-    // RunE for the root command when no subcommand is provided.
-    // This will print the default help for the root command.
-    RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-        // This executes if `eos` is run without any subcommand.
-        // `cmd.Help()` will show the help for the root command by default.
-        return cmd.Help()
-    }),
+	// RunE for the root command when no subcommand is provided.
+	// This will print the default help for the root command.
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// This executes if `eos` is run without any subcommand.
+		// `cmd.Help()` will show the help for the root command by default.
+		return cmd.Help()
+	}),
 }
 
 // RegisterCommands adds all subcommands to the root command.
 // No change needed here, this is good.
 func RegisterCommands(rc *eos_io.RuntimeContext) {
-    // ⚠️ REMOVED: RootCmd.SetHelpFunc. This was the primary cause of generic help.
-    // Cobra's default help generation is hierarchical and contextual.
+	// ⚠️ REMOVED: RootCmd.SetHelpFunc. This was the primary cause of generic help.
+	// Cobra's default help generation is hierarchical and contextual.
 
-    // Group subcommands for cleanliness
-    for _, subCmd := range []*cobra.Command{
-        create.CreateCmd,
-        read.ReadCmd, // This is the top-level 'read'
-        list.ListCmd,
-        update.UpdateCmd,
-        delete.DeleteCmd,
-        config.ConfigCmd,
-        refresh.RefreshCmd,
-        secure.SecureCmd,
-        disable.DisableCmd,
-        backup.BackupCmd,
-        enable.EnableCmd,
-        sync.SyncCmd,
-        hecate.HecateCmd,
-        delphi.DelphiCmd, // This is the top-level 'delphi'
-        pandora.PandoraCmd,
-    } {
-        RootCmd.AddCommand(subCmd)
-    }
+	// Group subcommands for cleanliness
+	for _, subCmd := range []*cobra.Command{
+		create.CreateCmd,
+		read.ReadCmd, // This is the top-level 'read'
+		list.ListCmd,
+		update.UpdateCmd,
+		delete.DeleteCmd,
+		config.ConfigCmd,
+		refresh.RefreshCmd,
+		secure.SecureCmd,
+		disable.DisableCmd,
+		backup.BackupCmd,
+		enable.EnableCmd,
+		sync.SyncCmd,
+		hecate.HecateCmd,
+		delphi.DelphiCmd, // This is the top-level 'delphi'
+		pandora.PandoraCmd,
+	} {
+		RootCmd.AddCommand(subCmd)
+	}
 }
 
 // Execute initializes and runs the root command.
 // No change needed here.
 func Execute(rc *eos_io.RuntimeContext) {
-    _ = telemetry.Init("eos")
+	_ = telemetry.Init("eos")
 
-    otelzap.Ctx(rc.Ctx).Info("Eos CLI starting")
-    startGlobalWatchdog(rc, 3*time.Minute)
+	otelzap.Ctx(rc.Ctx).Info("Eos CLI starting")
+	startGlobalWatchdog(rc, 3*time.Minute)
 
-    RegisterCommands(rc)
+	RegisterCommands(rc)
 
-    if err := RootCmd.Execute(); err != nil {
-        if eos_err.IsExpectedUserError(err) {
-            otelzap.Ctx(rc.Ctx).Warn("CLI completed with user error", zap.Error(err))
-            os.Exit(0)
-        } else {
-            otelzap.Ctx(rc.Ctx).Error("CLI execution error", zap.Error(err))
-            os.Exit(1)
-        }
-    }
+	if err := RootCmd.Execute(); err != nil {
+		if eos_err.IsExpectedUserError(err) {
+			otelzap.Ctx(rc.Ctx).Warn("CLI completed with user error", zap.Error(err))
+			os.Exit(0)
+		} else {
+			otelzap.Ctx(rc.Ctx).Error("CLI execution error", zap.Error(err))
+			os.Exit(1)
+		}
+	}
 }
-
 
 func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
 	go func() {
