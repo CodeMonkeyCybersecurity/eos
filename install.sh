@@ -26,6 +26,10 @@ EOS_BUILD_PATH="$EOS_SRC_DIR/$EOS_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$EOS_BINARY_NAME"
 
 # --- Directories ---
+# These are the *default* system-wide paths.
+# If EOS CLI supports user-specific configs, the Go application
+# should handle XDG Base Directory specification (e.g., ~/.config/eos)
+# when run as a non-root user.
 if $IS_MAC; then
   SECRETS_DIR="$HOME/Library/Application Support/eos/secrets"
   CONFIG_DIR="$HOME/Library/Application Support/eos/config"
@@ -120,27 +124,43 @@ show_new_checksum() {
 }
 
 create_directories() {
-  log INFO "📁 Creating secrets, config, and log directories"
+  log INFO "📁 Creating system-wide secrets, config, and log directories: $SECRETS_DIR, $CONFIG_DIR, $LOG_DIR"
   # Ensure directories are created as root if running with sudo
   mkdir -p "$SECRETS_DIR" "$CONFIG_DIR" "$LOG_DIR" || log ERR "Failed to create directories."
   chmod 700 "$SECRETS_DIR" || log ERR "Failed to set permissions on $SECRETS_DIR."
   chmod 755 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
+
+  # ⚠️ This is where the core logic for user-runnable commands comes in.
+  # If EOS can run certain commands as a regular user, it needs to access
+  # config/log/secret files *owned by that user*.
+  # The recommended approach is for the Go application itself to determine
+  # paths based on the current user and XDG Base Directory spec.
+  # For the shell script, we can at least ensure base permissions are not overly restrictive for other users
+  # while maintaining security for the 'eos' system user.
+
+  # Example: Make config directory readable by others (if configs aren't secrets)
+  # You might want to copy example configs here and make them user-readable
+  # chmod 755 "$CONFIG_DIR" # Only if config files themselves are not sensitive or are templates.
+
+  # Note: The `setup_linux_user` function later changes ownership to `eos:eos`.
+  # This part is installing for the system service user.
 }
 
 setup_linux_user() {
   if $IS_LINUX; then
     if ! id "$EOS_USER" &>/dev/null; then
-      log INFO "👤 Creating system user: $EOS_USER"
+      log INFO "👤 Creating system user: $EOS_USER (for service operations)"
       useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER" || log ERR "Failed to create user $EOS_USER."
     fi
 
     # Check if syslog group exists and user is not already in it
     if getent group syslog >/dev/null && ! id -nG "$EOS_USER" | grep -qw syslog; then
-      log INFO "➕ Adding $EOS_USER to syslog group"
+      log INFO "➕ Adding $EOS_USER to syslog group (for log access)"
       usermod -aG syslog "$EOS_USER" || log ERR "Failed to add user $EOS_USER to syslog group."
     fi
 
-    # Ensure ownership and permissions are correct
+    # Crucial: These directories are now owned by the 'eos' system user.
+    # If the CLI is run by 'ubuntu' user and needs to write here, it will fail.
     chown -R "$EOS_USER:$EOS_USER" /var/lib/eos || log ERR "Failed to change ownership of /var/lib/eos."
     chmod 750 /var/lib/eos || log ERR "Failed to set permissions on /var/lib/eos."
     chown "$EOS_USER:$EOS_USER" "$LOG_DIR" || log ERR "Failed to change ownership of $LOG_DIR."
@@ -150,7 +170,7 @@ setup_linux_user() {
 
 add_sudoers_entry() {
   if $IS_LINUX && [ ! -f /etc/sudoers.d/eos ]; then
-    log INFO "⚙️ Adding sudoers entry for $EOS_USER"
+    log INFO "⚙️ Adding sudoers entry for $EOS_USER (to allow passwordless sudo for the 'eos' system user)"
     echo "$EOS_USER ALL=(ALL) NOPASSWD: $INSTALL_PATH" | tee /etc/sudoers.d/eos > /dev/null \
       || { log ERR "Failed to write sudoers entry."; exit 1; }
     chmod 440 /etc/sudoers.d/eos || { log ERR "Failed to set permissions on sudoers file."; exit 1; }
@@ -173,8 +193,13 @@ main() {
   add_sudoers_entry
   echo
   log INFO "🎉 EOS installation complete!"
-  log INFO "👉 You can now run: sudo $EOS_BINARY_NAME --help (if installed globally for root)"
-  log INFO "👉 Or if your user's PATH is updated: $EOS_BINARY_NAME --help"
+  log INFO "The 'eos' binary has been installed to '$INSTALL_PATH'."
+  log INFO "This path is typically included in your user's PATH."
+  log INFO "You should now be able to run 'eos --help' directly."
+  echo
+  log INFO "NOTE: Commands requiring elevated privileges (e.g., system configuration, user management, service control)"
+  log INFO "      will still require 'sudo eos [command]'. For example: 'sudo eos create user'."
+  log INFO "      Log files are located in '$LOG_DIR' and configuration in '$CONFIG_DIR'."
 }
 
 main "$@"
