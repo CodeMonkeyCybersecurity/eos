@@ -26,9 +26,9 @@ log = logging.getLogger("alert-to-db")
 
 def compute_alert_hash(alert):
     """Generate SHA-256 hash of alert JSON string."""
-    return hashlib.sha256(
-        json.dumps(alert, sort_keys=True).encode("utf-8")
-    ).hexdigest()
+    sorted_items = sorted(alert_data.items())
+    alert_string = json.dumps(sorted_items)
+    return hashlib.sha256(alert_string.encode('utf-8')).hexdigest()
 
 def main():
     log.info("=== alert-to-db.py start ===")
@@ -77,33 +77,41 @@ def main():
                 ))
                 log.info(f"Upserted agent '{agent_id}' (name={agent_name}, ip={agent_ip}, os={agent_os})")
 
-                # 2) Insert the alert
+                # 2) Check for identical alerts in the last 30 minutes
+                thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
+                
                 cur.execute("""
-                    INSERT INTO alerts (
-                      alert_hash,
-                      agent_id,
-                      rule_id,
-                      rule_level,
-                      rule_desc,
-                      raw,
-                      state
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (alert_hash) DO NOTHING
-                """, (
-                    alert_hash,
-                    agent_id,
-                    alert.get("rule", {}).get("id"),
-                    alert.get("rule", {}).get("level"),
-                    alert.get("rule", {}).get("description"),
-                    json.dumps(alert),
-                    "new"
-                ))
-                # Did we actually insert?
-                if cur.rowcount == 1:
-                    log.info("Inserted alert %s", alert_hash)
+                    SELECT 1 FROM alerts
+                    WHERE alert_hash = %s AND timestamp >= %s
+                    LIMIT 1
+                """, (alert_hash, thirty_minutes_ago))
+
+                if cur.fetchone():
+                    log.info(f"Skipped alert {alert_hash}: identical alert found within the last 30 minutes.")
                 else:
-                    log.info("Skipped duplicate alert %s", alert_hash)
+                    # 3) Insert the alert if no identical one was found recently
+                    cur.execute("""
+                        INSERT INTO alerts (
+                          alert_hash,
+                          agent_id,
+                          rule_id,
+                          rule_level,
+                          rule_desc,
+                          raw,
+                          state,
+                          timestamp -- Ensure you have this column in your alerts table
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                    """, (
+                        alert_hash,
+                        agent_id,
+                        alert.get("rule", {}).get("id"),
+                        alert.get("rule", {}).get("level"),
+                        alert.get("rule", {}).get("description"),
+                        json.dumps(alert),
+                        "new"
+                    ))
+                    log.info("Inserted new alert %s", alert_hash)
 
         # always print ok to stdout if no exception
         print("ok")

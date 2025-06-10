@@ -43,7 +43,7 @@ TO_ADDR       = os.getenv("MAILCOW_TO")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL")
 
 TIMEZONE        = pytz.timezone("Australia/Perth")
-LISTEN_CHANNEL  = "new_summarized"
+LISTEN_CHANNEL  = "new_response"
 SMTP_RETRIES    = 3
 SMTP_RETRY_DELAY= 5  # seconds
 
@@ -89,15 +89,20 @@ def connect_db() -> psycopg2.extensions.connection:
         sys.exit(1)
 
 def fetch_unsent_alerts(conn) -> List[Dict]:
-    """Fetch all alerts in 'summarized' but not yet sent."""
     sql = """
-      SELECT id, prompt_text AS summary,
-             response_text AS response,
-             response_received_at,
-             alert_hash, agent_id, rule_level
-      FROM alerts
-     WHERE state='summarized' AND alert_sent_at IS NULL
-  ORDER BY response_received_at
+      SELECT
+        a.id,
+        a.prompt_text         AS summary,
+        a.response_text       AS response,
+        a.response_received_at,
+        a.alert_hash,
+        a.agent_id,
+        a.rule_level
+      FROM alerts a
+      JOIN agents ag ON ag.id = a.agent_id
+     WHERE a.state='summarized'
+       AND a.alert_sent_at IS NULL
+  ORDER BY a.response_received_at
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql)
@@ -112,7 +117,6 @@ def fetch_alert(conn, alert_id: int) -> Dict:
             a.response_text AS response,
             a.response_received_at,
             a.alert_hash,
-            ag.hostname AS agent_name,
             a.rule_level
         FROM alerts a
         JOIN agents ag ON ag.id = a.agent_id
@@ -134,7 +138,7 @@ def mark_sent(conn, alert_id: int) -> None:
 # ───── 5. EMAIL FORMATTING HELPERS ─────────────────────────
 def format_subject(row: Dict) -> str:
     """Build the email subject line as [Delphi Notify] <hostname> Level <number>."""
-    return f"[Delphi Notify] {row['agent_name']} Level {row['rule_level']}"
+    return f"[Delphi Notify] {row['agent_id']} Level {row['rule_level']}"
 
 def format_plain(response: str, sent_at: str) -> str:
     """Create the plain-text email body."""
