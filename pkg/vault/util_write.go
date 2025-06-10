@@ -226,7 +226,7 @@ func WriteUserpassPasswordToVault(rc *eos_io.RuntimeContext, client *api.Client,
 // WriteSSHKey stores an SSH key pair in Vault KV-v2 and
 // attaches the fingerprint as custom metadata (v1.16.0 client).
 func WriteSSHKey(
-	rc *eos_io.RuntimeContext,
+	rc *eos_io.RuntimeContext, // rc contains the context you need!
 	client *api.Client,
 	mount, path, pub, priv, fingerprint string,
 ) error {
@@ -237,7 +237,8 @@ func WriteSSHKey(
 	kv := client.KVv2(mount)
 
 	// 1️⃣ Write public/private key data
-	if _, err := kv.Put(nil, path, map[string]interface{}{
+	// CHANGE THIS LINE: Use rc.Ctx instead of nil
+	if _, err := kv.Put(rc.Ctx, path, map[string]interface{}{
 		"ssh_public":  pub,
 		"ssh_private": priv,
 	}); err != nil {
@@ -250,7 +251,8 @@ func WriteSSHKey(
 
 	// 2️⃣ Write fingerprint into metadata via the logical client
 	metaPath := fmt.Sprintf("%s/metadata/%s", mount, path)
-	_, err := client.Logical().Write(metaPath, map[string]interface{}{
+	// You also need to pass the context here for client.Logical().Write()
+	_, err := client.Logical().WriteWithContext(rc.Ctx, metaPath, map[string]interface{}{ // Use WriteWithContext
 		"custom_metadata": map[string]string{
 			"fingerprint": fingerprint,
 		},
