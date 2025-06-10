@@ -38,7 +38,7 @@ def compute_alert_hash(alert_data):
     except Exception as e:
         log.error(f"Error computing alert hash: {e}")
         return None # Return None on error
-
+        
 def main():
     script_start_time = datetime.now() # Log script start time
     log.info(f"=== alert-to-db.py start at {script_start_time.strftime('%Y-%m-%d %H:%M:%S')} ===")
@@ -113,10 +113,10 @@ def main():
             log.warning(f"Unexpected rowcount ({cur.rowcount}) after upserting agent '{agent_id}'. This should not happen for a single upsert.")
 
 
-        # 2) Check for identical alerts in the last 30 minutes using 'ingest_timestamp'
+        # --- Deduplication Logic: Tier 1 (Python Script / Time-based) ---
         thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
         
-        log.debug(f"Checking for existing alert with hash '{alert_hash}' ingested after {thirty_minutes_ago}...")
+        log.debug(f"Tier 1 Check: Looking for existing alert with hash '{alert_hash}' ingested after {thirty_minutes_ago}...")
         cur.execute("""
             SELECT id, ingest_timestamp FROM alerts
             WHERE alert_hash = %s AND ingest_timestamp >= %s
@@ -128,17 +128,16 @@ def main():
         if existing_alert:
             existing_alert_db_id = existing_alert[0]
             existing_ingest_timestamp = existing_alert[1]
-            # --- MODIFIED LOG MESSAGE HERE ---
             log.info(
-                f"Alert **SKIPPED by logic**: Identical alert (Hash: '{alert_hash}', Rule ID: '{rule_id}', Agent: '{agent_id}') "
+                f"Tier 1 Result: Alert **SKIPPED by business logic**. "
+                f"Reason: Identical alert (Hash: '{alert_hash}', Rule ID: '{rule_id}', Agent: '{agent_id}') "
                 f"found in database (DB ID: {existing_alert_db_id}, Ingested: {existing_ingest_timestamp.isoformat()}) "
-                f"within the last 30 minutes. No new insertion needed."
+                f"within the last 30 minutes. No new insertion needed as per policy."
             )
         else:
-            # 3) Insert the alert if no identical one was found recently
-            log.info(f"No recent identical alert found for hash '{alert_hash}'. Attempting to insert new alert.")
+            log.info(f"Tier 1 Result: No recent identical alert (within 30 min) found for hash '{alert_hash}'. Proceeding to Tier 2 (Database Insert).")
             try:
-                # Use RETURNING clause to get the ID and ingest_timestamp of the newly inserted row
+                # --- Deduplication Logic: Tier 2 (Database Constraint / Race Condition Handler) ---
                 cur.execute("""
                     INSERT INTO alerts (
                       alert_hash,
@@ -151,6 +150,7 @@ def main():
                       ingest_timestamp
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                    ON CONFLICT (alert_hash) DO NOTHING
                     RETURNING id, ingest_timestamp
                 """, (
                     alert_hash,
@@ -166,26 +166,44 @@ def main():
                 if new_alert_data:
                     new_alert_db_id, new_ingest_timestamp = new_alert_data
                     log.info(
-                        f"Alert **inserted successfully**. "
+                        f"Tier 2 Result: Alert **inserted successfully**. "
                         f"DB ID: {new_alert_db_id}, "
                         f"Agent ID: '{agent_id}', "
                         f"Rule ID: '{rule_id}', "
                         f"Alert Hash: '{alert_hash}', "
-                        f"Ingest Timestamp: {new_ingest_timestamp.isoformat()}." # Use isoformat for consistent timestamp
+                        f"Ingest Timestamp: {new_ingest_timestamp.isoformat()}."
                     )
                 else:
-                    log.warning(f"Alert insertion for hash {alert_hash} returned no data despite success. This is unexpected.")
+                    # This branch is taken if ON CONFLICT DO NOTHING happened (i.e., a concurrent insert won the race)
+                    # We can then re-query to get the existing alert's ID and timestamp for better logging.
+                    log.info(
+                        f"Tier 2 Result: Alert **skipped due to database integrity constraint** (Hash: '{alert_hash}'). "
+                        f"Reason: Another process concurrently inserted this exact alert (same hash) into the DB "
+                        f"before this script's transaction could commit. No new insertion needed."
+                    )
+                    # Re-query to get the DB ID of the winning alert for debug logging
+                    cur.execute("""
+                        SELECT id, ingest_timestamp FROM alerts
+                        WHERE alert_hash = %s
+                        LIMIT 1
+                    """, (alert_hash,)) # Removed timestamp filter here, as we know it's in the DB now.
+                    existing_alert_recheck = cur.fetchone()
+                    if existing_alert_recheck:
+                        log.debug(f"Confirmed existing alert DB ID: {existing_alert_recheck[0]}, Ingested: {existing_alert_recheck[1].isoformat()} (from concurrent insert).")
+
+
+            # The psycopg2.IntegrityError exception block will now rarely, if ever, be hit for unique constraint violations
+            # because ON CONFLICT handles it. It might still be useful for other types of integrity errors.
             except psycopg2.IntegrityError as e:
-                conn.rollback() 
-                # This log message already explicitly states it's a DB integrity error.
+                conn.rollback() # Rollback the transaction
                 log.warning(
-                    f"Alert **skipped due to database integrity error** (e.g., unique constraint violation, race condition). "
-                    f"Hash: '{alert_hash}', Rule ID: '{rule_id}', Error: {e}"
+                    f"Tier 2 Error: Alert **skipped due to other database integrity error** (Hash: '{alert_hash}', Rule ID: '{rule_id}'). "
+                    f"Reason: Not a unique constraint violation, but potentially a foreign key or check constraint issue. Error: {e}"
                 )
             except Exception as e:
-                conn.rollback() 
+                conn.rollback() # Rollback the transaction
                 log.error(
-                    f"**Critical error inserting alert** (hash: '{alert_hash}', agent: '{agent_id}', rule: '{rule_id}'): {e}", 
+                    f"Tier 2 Critical Error: **Unhandled exception during alert insertion** (hash: '{alert_hash}', agent: '{agent_id}', rule: '{rule_id}'): {e}",
                     exc_info=True
                 )
                 sys.exit(1)
@@ -194,12 +212,12 @@ def main():
         print("ok") 
 
     except psycopg2.Error as e:
-        log.error(f"**Database error occurred**: {e}", exc_info=True)
+        log.error(f"**Database connection or transaction error occurred**: {e}", exc_info=True)
         if conn:
             conn.rollback()
         sys.exit(1)
     except Exception as e:
-        log.error(f"**An unexpected non-database error occurred**: {e}", exc_info=True)
+        log.error(f"**An unexpected non-database error occurred during main execution**: {e}", exc_info=True)
         if conn:
             conn.rollback()
         sys.exit(1)
