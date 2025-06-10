@@ -106,18 +106,17 @@ def fetch_unsent_alerts(conn) -> List[Dict]:
 def fetch_alert(conn, alert_id: int) -> Dict:
     sql = """
         SELECT
-        a.id,
-        a.agent_id,
-        a.agent_name
-        a.prompt_text   AS summary,
-        a.response_text AS response,
-        a.response_received_at,
-        a.alert_hash,
-        ag.hostname     AS agent_name,
-        a.rule_level
+            a.id,
+            a.agent_id,
+            a.prompt_text AS summary,
+            a.response_text AS response,
+            a.response_received_at,
+            a.alert_hash,
+            ag.hostname AS agent_name,
+            a.rule_level
         FROM alerts a
-    JOIN agents ag ON ag.id = a.agent_id
-    WHERE a.id = %s
+        JOIN agents ag ON ag.id = a.agent_id
+        WHERE a.id = %s
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, (alert_id,))
@@ -257,28 +256,43 @@ def main():
 
     while not shutdown:
         try:
-            if select.select([conn], [], [], 5)[0]:
-                conn.poll()
-                for notify in conn.notifies:
+            # Wait for notifications
+            if not select.select([conn], [], [], 5)[0]:
+                continue  # Timeout, loop again
+
+            conn.poll()
+            
+            # Process each notification individually
+            for notify in conn.notifies:
+                try:
                     alert_id = int(notify.payload)
                     log.info("Got notify for alert %d", alert_id)
+                    
                     row = fetch_alert(conn, alert_id)
                     if not row:
-                        log.warning("Alert %d not found", alert_id)
-                    else:
-                        subj, plain, html = build_email(row)
-                        if send_email(subj, plain, html):
-                            mark_sent(conn, alert_id)
-                conn.notifies.clear()
+                        log.warning("Alert %d not found, skipping.", alert_id)
+                        continue
+
+                    subj, plain, html = build_email(row)
+                    if send_email(subj, plain, html):
+                        mark_sent(conn, alert_id)
+                        
+                except Exception as e:
+                    # Log the error for this specific alert but DON'T crash
+                    log.exception("Failed to process alert from payload %r: %s", notify.payload, e)
+
+            # Clear the notification list after processing all of them
+            conn.notifies.clear()
 
         except psycopg2.OperationalError:
-            log.exception("DB lost; reconnecting in 5s")
+            log.exception("DB connection lost; reconnecting in 5s")
             time.sleep(5)
+            # Re-establish connection and listener
             conn = connect_db()
-            cur  = conn.cursor()
+            cur = conn.cursor()
             cur.execute(f"LISTEN {LISTEN_CHANNEL};")
         except Exception:
-            # Fail fast: log full traceback and crash
+            # A serious error outside of alert processing happened
             log.exception("Unexpected error in main loop; aborting")
             raise
 
