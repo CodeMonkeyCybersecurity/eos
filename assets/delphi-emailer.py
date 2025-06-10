@@ -93,7 +93,7 @@ def fetch_unsent_alerts(conn) -> List[Dict]:
     sql = """
       SELECT
         a.id,
-        ag.hostname     AS agent_name,
+        a.hostname     AS agent_name,
         a.rule_level,
         a.prompt_text   AS summary,
         a.response_text AS response,
