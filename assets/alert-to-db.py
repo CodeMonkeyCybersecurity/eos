@@ -128,10 +128,11 @@ def main():
         if existing_alert:
             existing_alert_db_id = existing_alert[0]
             existing_ingest_timestamp = existing_alert[1]
+            # --- MODIFIED LOG MESSAGE HERE ---
             log.info(
-                f"Alert **skipped**: Identical alert (hash={alert_hash}, rule_id={rule_id}) found recently "
-                f"(DB ID: {existing_alert_db_id}, Ingested: {existing_ingest_timestamp}). "
-                f"Less than 30 minutes since last occurrence."
+                f"Alert **SKIPPED by logic**: Identical alert (Hash: '{alert_hash}', Rule ID: '{rule_id}', Agent: '{agent_id}') "
+                f"found in database (DB ID: {existing_alert_db_id}, Ingested: {existing_ingest_timestamp.isoformat()}) "
+                f"within the last 30 minutes. No new insertion needed."
             )
         else:
             # 3) Insert the alert if no identical one was found recently
@@ -170,20 +171,21 @@ def main():
                         f"Agent ID: '{agent_id}', "
                         f"Rule ID: '{rule_id}', "
                         f"Alert Hash: '{alert_hash}', "
-                        f"Ingest Timestamp: {new_ingest_timestamp}."
+                        f"Ingest Timestamp: {new_ingest_timestamp.isoformat()}." # Use isoformat for consistent timestamp
                     )
                 else:
                     log.warning(f"Alert insertion for hash {alert_hash} returned no data despite success. This is unexpected.")
             except psycopg2.IntegrityError as e:
                 conn.rollback() 
+                # This log message already explicitly states it's a DB integrity error.
                 log.warning(
                     f"Alert **skipped due to database integrity error** (e.g., unique constraint violation, race condition). "
-                    f"Hash: {alert_hash}, Rule ID: {rule_id}, Error: {e}"
+                    f"Hash: '{alert_hash}', Rule ID: '{rule_id}', Error: {e}"
                 )
             except Exception as e:
                 conn.rollback() 
                 log.error(
-                    f"**Critical error inserting alert** (hash: {alert_hash}, agent: '{agent_id}', rule: {rule_id}): {e}", 
+                    f"**Critical error inserting alert** (hash: '{alert_hash}', agent: '{agent_id}', rule: '{rule_id}'): {e}", 
                     exc_info=True
                 )
                 sys.exit(1)
