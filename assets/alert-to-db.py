@@ -9,7 +9,7 @@ import psycopg2
 import hashlib
 import logging
 from dotenv import load_dotenv
-from datetime import datetime, timedelta # Import datetime and timedelta
+from datetime import datetime, timedelta
 
 # ───── Load Environment Variables ─────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
@@ -19,7 +19,7 @@ PG_DSN = os.getenv("PG_DSN")
 LOG_FILE = "/var/log/stackstorm/alert-to-db.log"
 logging.basicConfig(
     filename=LOG_FILE,
-    level=logging.INFO, # Changed to INFO to capture all operational messages
+    level=logging.INFO, # Capture all operational messages
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
@@ -29,6 +29,9 @@ def compute_alert_hash(alert_data):
     """Generate SHA-256 hash of alert JSON string."""
     try:
         # Sort items to ensure consistent hash regardless of key order
+        # Exclude 'id' and 'ingest_timestamp' if they were accidentally included in the raw alert
+        # as they would change the hash on retries/updates, but generally raw data shouldn't have them.
+        # This function should hash the *alert content itself*, not database-assigned metadata.
         sorted_items = sorted(alert_data.items())
         alert_string = json.dumps(sorted_items)
         return hashlib.sha256(alert_string.encode('utf-8')).hexdigest()
@@ -37,22 +40,22 @@ def compute_alert_hash(alert_data):
         return None # Return None on error
 
 def main():
-    log.info("=== alert-to-db.py start ===")
+    script_start_time = datetime.now() # Log script start time
+    log.info(f"=== alert-to-db.py start at {script_start_time.strftime('%Y-%m-%d %H:%M:%S')} ===")
 
-    raw_input = sys.stdin.read() # Use a different variable name to avoid shadowing
+    raw_input = sys.stdin.read()
     if not raw_input.strip():
         log.warning("No input received on stdin. Exiting gracefully.")
         sys.exit(0)
 
     try:
         alert = json.loads(raw_input)
-        # Log the full raw alert for debugging if needed (at DEBUG level)
         log.debug(f"Received raw alert: {json.dumps(alert, indent=2)}") 
     except json.JSONDecodeError as e:
-        log.error(f"Failed to parse JSON from stdin: {e}. Raw input: {raw_input[:200]}...") # Log snippet of raw input
+        log.error(f"Failed to parse JSON from stdin: {e}. Raw input snippet: {raw_input[:500]}...")
         sys.exit(1)
     except Exception as e:
-        log.error(f"An unexpected error occurred during JSON parsing: {e}. Raw input: {raw_input[:200]}...")
+        log.error(f"An unexpected error occurred during JSON parsing: {e}. Raw input snippet: {raw_input[:500]}...")
         sys.exit(1)
 
     agent = alert.get("agent", {})
@@ -61,19 +64,26 @@ def main():
     agent_ip   = agent.get("ip")
     agent_os   = agent.get("os")
 
+    rule_id = alert.get("rule", {}).get("id")
+    rule_level = alert.get("rule", {}).get("level")
+    rule_desc = alert.get("rule", {}).get("description")
+
     if not agent_id:
-        log.error(f"Alert missing 'agent.id'. Cannot process alert. Alert details: {json.dumps(alert.get('rule', {}))}")
+        log.error(f"Alert missing 'agent.id'. Cannot process alert. Rule details: {json.dumps(alert.get('rule', {}))}")
         sys.exit(1)
+    
+    if not rule_id:
+        log.warning(f"Alert for agent '{agent_id}' is missing 'rule.id'. This alert might be harder to trace.")
 
     alert_hash = compute_alert_hash(alert)
     if alert_hash is None:
         log.error(f"Failed to compute alert hash for agent ID '{agent_id}'. Skipping alert insertion.")
         sys.exit(1)
 
-    log.info(f"Processing alert (agent={agent_id}, rule_id={alert.get('rule', {}).get('id')}, hash={alert_hash})")
+    log.info(f"Processing alert (agent={agent_id}, rule_id={rule_id}, hash={alert_hash})")
 
-    conn = None # Initialize conn to None for proper cleanup in finally block
-    cur = None  # Initialize cur to None
+    conn = None
+    cur = None
 
     try:
         conn = psycopg2.connect(PG_DSN)
@@ -95,34 +105,39 @@ def main():
             agent_ip,
             agent_os
         ))
-        # Check rowcount to see if it was an INSERT or UPDATE
         if cur.rowcount == 1:
             log.info(f"Agent '{agent_id}' **inserted** into 'agents' table.")
         elif cur.rowcount == 0:
             log.info(f"Agent '{agent_id}' **updated** (last_seen) in 'agents' table.")
         else:
-            log.warning(f"Unexpected rowcount ({cur.rowcount}) after upserting agent '{agent_id}'.")
+            log.warning(f"Unexpected rowcount ({cur.rowcount}) after upserting agent '{agent_id}'. This should not happen for a single upsert.")
 
 
-        # 2) Check for identical alerts in the last 30 minutes
+        # 2) Check for identical alerts in the last 30 minutes using 'ingest_timestamp'
         thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
         
-        log.debug(f"Checking for existing alert_hash '{alert_hash}' created after {thirty_minutes_ago}...")
+        log.debug(f"Checking for existing alert with hash '{alert_hash}' ingested after {thirty_minutes_ago}...")
         cur.execute("""
-            SELECT timestamp FROM alerts
-            WHERE alert_hash = %s AND timestamp >= %s
+            SELECT id, ingest_timestamp FROM alerts
+            WHERE alert_hash = %s AND ingest_timestamp >= %s
             LIMIT 1
         """, (alert_hash, thirty_minutes_ago))
 
         existing_alert = cur.fetchone()
 
         if existing_alert:
-            existing_timestamp = existing_alert[0]
-            log.info(f"Alert **skipped**: Identical alert (hash={alert_hash}) found recently (timestamp={existing_timestamp}).")
+            existing_alert_db_id = existing_alert[0]
+            existing_ingest_timestamp = existing_alert[1]
+            log.info(
+                f"Alert **skipped**: Identical alert (hash={alert_hash}, rule_id={rule_id}) found recently "
+                f"(DB ID: {existing_alert_db_id}, Ingested: {existing_ingest_timestamp}). "
+                f"Less than 30 minutes since last occurrence."
+            )
         else:
             # 3) Insert the alert if no identical one was found recently
-            log.debug(f"No recent identical alert found for hash '{alert_hash}'. Attempting to insert new alert.")
+            log.info(f"No recent identical alert found for hash '{alert_hash}'. Attempting to insert new alert.")
             try:
+                # Use RETURNING clause to get the ID and ingest_timestamp of the newly inserted row
                 cur.execute("""
                     INSERT INTO alerts (
                       alert_hash,
@@ -132,51 +147,66 @@ def main():
                       rule_desc,
                       raw,
                       state,
-                      timestamp
+                      ingest_timestamp
                     )
                     VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                    RETURNING id, ingest_timestamp
                 """, (
                     alert_hash,
                     agent_id,
-                    alert.get("rule", {}).get("id"),
-                    alert.get("rule", {}).get("level"),
-                    alert.get("rule", {}).get("description"),
+                    rule_id,
+                    rule_level,
+                    rule_desc,
                     json.dumps(alert),
                     "new"
                 ))
-                if cur.rowcount == 1:
-                    log.info(f"Alert **inserted successfully** with hash: {alert_hash} for agent '{agent_id}'.")
+                new_alert_data = cur.fetchone() # Fetch the returned values
+
+                if new_alert_data:
+                    new_alert_db_id, new_ingest_timestamp = new_alert_data
+                    log.info(
+                        f"Alert **inserted successfully**. "
+                        f"DB ID: {new_alert_db_id}, "
+                        f"Agent ID: '{agent_id}', "
+                        f"Rule ID: '{rule_id}', "
+                        f"Alert Hash: '{alert_hash}', "
+                        f"Ingest Timestamp: {new_ingest_timestamp}."
+                    )
                 else:
-                    log.warning(f"Alert insertion for hash {alert_hash} returned {cur.rowcount} rows affected, expected 1. Check for possible issues.")
+                    log.warning(f"Alert insertion for hash {alert_hash} returned no data despite success. This is unexpected.")
             except psycopg2.IntegrityError as e:
-                # This could happen if a race condition allows two identical alerts to try inserting
-                # and the unique constraint on alert_hash (if it exists) kicks in here.
-                conn.rollback() # Rollback the transaction on integrity error
-                log.warning(f"Alert **skipped due to integrity error** (e.g., race condition duplicate insert) for hash {alert_hash}: {e}")
+                conn.rollback() 
+                log.warning(
+                    f"Alert **skipped due to database integrity error** (e.g., unique constraint violation, race condition). "
+                    f"Hash: {alert_hash}, Rule ID: {rule_id}, Error: {e}"
+                )
             except Exception as e:
-                conn.rollback() # Rollback on any other insertion error
-                log.error(f"Error inserting alert {alert_hash} for agent '{agent_id}': {e}", exc_info=True)
+                conn.rollback() 
+                log.error(
+                    f"**Critical error inserting alert** (hash: {alert_hash}, agent: '{agent_id}', rule: {rule_id}): {e}", 
+                    exc_info=True
+                )
                 sys.exit(1)
 
-        conn.commit() # Commit changes if all operations within the try block succeed
-        print("ok") # Always print ok to stdout if no unhandled exception occurred
+        conn.commit()
+        print("ok") 
 
     except psycopg2.Error as e:
-        log.error(f"Database error occurred: {e}", exc_info=True)
+        log.error(f"**Database error occurred**: {e}", exc_info=True)
         if conn:
-            conn.rollback() # Ensure rollback on database errors
+            conn.rollback()
         sys.exit(1)
     except Exception as e:
-        log.error(f"An unexpected error occurred during database operations: {e}", exc_info=True)
+        log.error(f"**An unexpected non-database error occurred**: {e}", exc_info=True)
         if conn:
-            conn.rollback() # Ensure rollback for unexpected errors too
+            conn.rollback()
         sys.exit(1)
     finally:
         if cur:
             cur.close()
         if conn:
             conn.close()
-        log.info("=== alert-to-db.py end ===")
+        log.info(f"=== alert-to-db.py end at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
 
 if __name__ == "__main__":
     main()
