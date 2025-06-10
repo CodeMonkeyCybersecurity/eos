@@ -37,20 +37,36 @@ else
 fi
 
 check_prerequisites() {
-  if ! command -v go >/dev/null; then
-    if [[ -x "$HOME/go/bin/go" ]]; then
-      export PATH="$HOME/go/bin:$PATH"
-      log INFO "🧩 Using fallback Go path: $HOME/go/bin/go"
-    else
-      log ERR "❌ Go not found in PATH"
-      if $IS_MAC; then
-        echo "👉 Install it with: brew install go"
-      else
-        echo "👉 Install it from https://go.dev/dl/"
-      fi
-      exit 1
-    fi
+  local go_found=false
+
+  # 1. Check if 'go' is in the current PATH
+  if command -v go >/dev/null; then
+    log INFO "✅ Go found in current PATH: $(command -v go)"
+    go_found=true
+  # 2. Check the standard /usr/local/go/bin/go location directly
+  elif [[ -x "/usr/local/go/bin/go" ]]; then
+    export PATH="/usr/local/go/bin:$PATH" # Temporarily add to PATH for this script's execution
+    log INFO "✅ Go found at standard installation path: /usr/local/go/bin/go"
+    go_found=true
+  # 3. Check the user's HOME/go/bin/go location directly (as a fallback)
+  elif [[ -x "$HOME/go/bin/go" ]]; then
+    export PATH="$HOME/go/bin:$PATH" # Temporarily add to PATH for this script's execution
+    log INFO "✅ Go found at user home path: $HOME/go/bin/go"
+    go_found=true
   fi
+
+  if ! $go_found; then
+    log ERR "❌ Go executable not found anywhere (PATH, /usr/local/go/bin, $HOME/go/bin)."
+    if $IS_MAC; then
+      echo "👉 Install it with: brew install go"
+    else
+      echo "👉 Install it from https://go.dev/dl/ or run ./setupGo.sh"
+    fi
+    exit 1
+  fi
+
+  # Confirm the detected Go version
+  log INFO "Go detected and ready. Version details: $(go version)"
 
   if $IS_LINUX; then
     for cmd in useradd usermod visudo stat; do
@@ -63,12 +79,14 @@ build_eos_binary() {
   log INFO "⚙️ Building EOS..."
   cd "$EOS_SRC_DIR"
   rm -f "$EOS_BINARY_NAME"
+  # Use the 'go' command which should now be in PATH due to check_prerequisites
   go build -o "$EOS_BINARY_NAME" .
 }
 
 show_existing_checksum() {
   if [ -f "$INSTALL_PATH" ]; then
     log INFO "🔍 Existing installed binary SHA256:"
+    # Use command -v for robustness, or ensure shasum is on Mac
     command -v sha256sum >/dev/null && sha256sum "$INSTALL_PATH" || shasum -a 256 "$INSTALL_PATH"
   else
     log INFO "ℹ️ No existing installed binary to replace"
@@ -78,18 +96,21 @@ show_existing_checksum() {
 install_binary() {
   log INFO "🚚 Installing to $INSTALL_PATH"
   if $IS_MAC; then
-    sudo rm -f "$INSTALL_PATH"
-    sudo cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
-    sudo chmod 755 "$INSTALL_PATH"
+    # On macOS, sudo is typically implied for /usr/local/bin
+    sudo rm -f "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
+    sudo cp "$EOS_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
+    sudo chmod 755 "$INSTALL_PATH" || log ERR "Failed to set permissions on $INSTALL_PATH."
   else
+    # Linux handling: re-run with sudo if not already root
     if [[ "$EUID" -ne 0 ]]; then
-      log INFO "🔐 Re-running with sudo..."
-      exec sudo "$0" "$@"
+      log INFO "🔐 Re-running with sudo to ensure proper permissions..."
+      # Use `bash -c` to ensure the environment is inherited correctly when `sudo` re-runs
+      exec sudo bash -c "export PATH=\"$PATH\"; \"$0\" \"$@\""
     fi
-    rm -f "$INSTALL_PATH"
-    cp "$EOS_BUILD_PATH" "$INSTALL_PATH"
-    chown root:root "$INSTALL_PATH"
-    chmod 755 "$INSTALL_PATH"
+    rm -f "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
+    cp "$EOS_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
+    chown root:root "$INSTALL_PATH" || log ERR "Failed to change ownership of $INSTALL_PATH."
+    chmod 755 "$INSTALL_PATH" || log ERR "Failed to set permissions on $INSTALL_PATH."
   fi
 }
 
@@ -100,36 +121,43 @@ show_new_checksum() {
 
 create_directories() {
   log INFO "📁 Creating secrets, config, and log directories"
-  mkdir -p "$SECRETS_DIR" "$CONFIG_DIR" "$LOG_DIR"
-  chmod 700 "$SECRETS_DIR"
-  chmod 755 "$LOG_DIR"
+  # Ensure directories are created as root if running with sudo
+  mkdir -p "$SECRETS_DIR" "$CONFIG_DIR" "$LOG_DIR" || log ERR "Failed to create directories."
+  chmod 700 "$SECRETS_DIR" || log ERR "Failed to set permissions on $SECRETS_DIR."
+  chmod 755 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
 }
 
 setup_linux_user() {
   if $IS_LINUX; then
     if ! id "$EOS_USER" &>/dev/null; then
       log INFO "👤 Creating system user: $EOS_USER"
-      useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER"
+      useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER" || log ERR "Failed to create user $EOS_USER."
     fi
 
+    # Check if syslog group exists and user is not already in it
     if getent group syslog >/dev/null && ! id -nG "$EOS_USER" | grep -qw syslog; then
       log INFO "➕ Adding $EOS_USER to syslog group"
-      usermod -aG syslog "$EOS_USER"
+      usermod -aG syslog "$EOS_USER" || log ERR "Failed to add user $EOS_USER to syslog group."
     fi
 
-    chown -R "$EOS_USER:$EOS_USER" /var/lib/eos
-    chmod 750 /var/lib/eos
-    chown "$EOS_USER:$EOS_USER" "$LOG_DIR"
-    chmod 750 "$LOG_DIR"
+    # Ensure ownership and permissions are correct
+    chown -R "$EOS_USER:$EOS_USER" /var/lib/eos || log ERR "Failed to change ownership of /var/lib/eos."
+    chmod 750 /var/lib/eos || log ERR "Failed to set permissions on /var/lib/eos."
+    chown "$EOS_USER:$EOS_USER" "$LOG_DIR" || log ERR "Failed to change ownership of $LOG_DIR."
+    chmod 750 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
   fi
 }
 
 add_sudoers_entry() {
   if $IS_LINUX && [ ! -f /etc/sudoers.d/eos ]; then
-    log INFO "⚙️ Adding sudoers entry"
-    echo "eos ALL=(ALL) NOPASSWD: $INSTALL_PATH" > /etc/sudoers.d/eos
-    chmod 440 /etc/sudoers.d/eos
-    visudo -c || { log ERR "❌ Sudoers validation failed"; exit 1; }
+    log INFO "⚙️ Adding sudoers entry for $EOS_USER"
+    echo "$EOS_USER ALL=(ALL) NOPASSWD: $INSTALL_PATH" | tee /etc/sudoers.d/eos > /dev/null \
+      || { log ERR "Failed to write sudoers entry."; exit 1; }
+    chmod 440 /etc/sudoers.d/eos || { log ERR "Failed to set permissions on sudoers file."; exit 1; }
+    visudo -c || { log ERR "❌ Sudoers validation failed. Please check /etc/sudoers.d/eos manually."; exit 1; }
+    log INFO "Sudoers entry validated."
+  else
+    log INFO "Sudoers entry already exists or not applicable for this OS."
   fi
 }
 
@@ -145,7 +173,8 @@ main() {
   add_sudoers_entry
   echo
   log INFO "🎉 EOS installation complete!"
-  log INFO "👉 Run: eos --help"
+  log INFO "👉 You can now run: sudo $EOS_BINARY_NAME --help (if installed globally for root)"
+  log INFO "👉 Or if your user's PATH is updated: $EOS_BINARY_NAME --help"
 }
 
 main "$@"
