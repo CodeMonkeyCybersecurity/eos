@@ -1,6 +1,6 @@
 // cmd/delphi/inspect/config.go
 
-package read
+package inspect
 
 import (
 	"encoding/json"
@@ -54,6 +54,6 @@ var InspectConfigCmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(InspectConfigCmd)
+	InspectCmd.AddCommand(InspectConfigCmd)
 	InspectConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }

@@ -1,5 +1,5 @@
 // cmd/delphi/inspect/users.go
-package read
+package inspect
 
 import (
 	"fmt"
@@ -38,5 +38,5 @@ var UsersCmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(UsersCmd)
+	InspectCmd.AddCommand(UsersCmd)
 }

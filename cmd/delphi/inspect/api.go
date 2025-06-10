@@ -1,5 +1,5 @@
 // cmd/delphi/inspect/api.go
-package read
+package inspect
 
 import (
 	"fmt"
@@ -64,7 +64,7 @@ var InspectAPICmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(InspectAPICmd)
+	InspectCmd.AddCommand(InspectAPICmd)
 	InspectAPICmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 	InspectAPICmd.Flags().BoolVar(&showPermissions, "permissions", false, "Display user permissions")
 	InspectAPICmd.Flags().BoolVar(&showVersion, "version", false, "Display Wazuh manager version")

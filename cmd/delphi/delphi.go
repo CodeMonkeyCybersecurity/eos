@@ -1,17 +1,18 @@
 // cmd/delphi/delphi.go
-
 package delphi
 
 import (
+	"fmt"
+
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect" // This is delphi's 'read' subcommand
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared" // Assuming shared.SafeHelp is here
 	"github.com/spf13/cobra"
 )
 
@@ -20,17 +21,19 @@ var DelphiCmd = &cobra.Command{
 	Use:   "delphi",
 	Short: "Manage Delphi (Wazuh) components",
 	Long:  "Commands related to Wazuh and Delphi integrations such as install, remove, and inspect.",
-	// Optionally, you can define a Run function to display help if no subcommand is provided.
+	// RunE here is good. If 'eos delphi' is called without subcommands,
+	// it will print the specific help for 'delphi' thanks to shared.SafeHelp(cmd).
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		shared.SafeHelp(cmd)
-		return nil
+		fmt.Println("❌ Missing subcommand for 'eos delphi'.") // More specific message
+		shared.SafeHelp(cmd)                                  // This should now correctly print help for DelphiCmd
+		return nil                                            // Return nil so Cobra doesn't print its own generic error/usage
 	}),
 }
 
 func init() {
-	// Register subcommands
+	// Register subcommands to DelphiCmd
 	DelphiCmd.AddCommand(create.CreateCmd)
-	DelphiCmd.AddCommand(read.ReadCmd)
+	DelphiCmd.AddCommand(inspect.InspectCmd) // This 'read' is specific to 'delphi'
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(sync.SyncCmd)
@@ -39,8 +42,7 @@ func init() {
 }
 
 // log is a package-level variable for the Zap logger.
-
+// This init() block seems empty or related to a different concern, keeping it as is.
 func init() {
 	// Initialize the shared logger for the entire deploy package
-
 }
