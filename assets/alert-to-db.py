@@ -24,7 +24,7 @@ logging.basicConfig(
 )
 log = logging.getLogger("alert-to-db")
 
-def compute_alert_hash(alert):
+def compute_alert_hash(alert_data): # Renamed parameter to avoid conflict with outer 'alert'
     """Generate SHA-256 hash of alert JSON string."""
     sorted_items = sorted(alert_data.items())
     alert_string = json.dumps(sorted_items)
