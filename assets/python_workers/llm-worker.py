@@ -310,7 +310,8 @@ def listen_for_enriched_alerts():
 
         while True:
             conn.poll() # Check for new notifications
-            for notify in conn.notifies:
+            while conn.notifies:            # consume queue
+                notify = conn.notifies.pop(0)
                 alert_id_str = notify.payload
                 log.info(f"Received notification on channel '{notify.channel}' with payload: {alert_id_str}")
                 update_heartbeat_file() # Update heartbeat on activity
@@ -325,7 +326,7 @@ def listen_for_enriched_alerts():
                     log.error(f"Invalid alert_id received in notification payload: {alert_id_str}")
                 except Exception as e:
                     log.error(f"Error processing notification for alert ID {alert_id_str}: {e}", exc_info=True)
-            time.sleep(1) # Sleep briefly to avoid busy-waiting
+            time.sleep(0.1) # Sleep briefly to avoid busy-waiting
 
     except psycopg2.Error as db_err:
         log.critical(f"Database error during listener setup or operation: {db_err}", exc_info=True)
