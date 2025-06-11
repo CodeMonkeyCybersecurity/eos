@@ -18,31 +18,32 @@ import urllib3 # For disabling insecure warnings
 
 # --- Configuration & Environment Variable Validation ---
 
-# Load environment variables from specified .env files
-# Ensure these paths are correct for your StackStorm setup.
+# Load environment variables from a single .env file.
+# Ensure this path is correct for your StackStorm setup.
+# This file should contain ALL variables like PG_DSN, WAZUH_API_URL, etc.
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
 # PostgreSQL Database Connection String (DSN)
 AGENTS_PG_DSN = os.getenv("AGENTS_PG_DSN")
 if not AGENTS_PG_DSN:
-    raise ValueError("AGENTS_PG_DSN environment variable not set. Please configure your PostgreSQL DSN.")
+    raise ValueError("AGENTS_PG_DSN environment variable not set. Please configure your PostgreSQL DSN in the .env file.")
 
 # Wazuh API Connection Details
-WAZUH_API_URL = os.environ.get("WAZUH_API_URL", "https://delphi.cybermonkey.net.au:55000")
+WAZUH_API_URL = os.environ.get("WAZUH_API_URL", "https://delphi.cybermonkey.net.au:55000") # Fallback for robustness
 WAZUH_API_USER = os.environ.get("WAZUH_API_USER")
 WAZUH_API_PASSWD = os.environ.get("WAZUH_API_PASSWD")
 
-# Global variable to store JWT token after successful authentication
-# It will be populated by authenticate_wazuh_api if needed, or by env var if pre-set
+# Global variable to store JWT token after successful authentication.
+# It will be populated by authenticate_wazuh_api if not already set in .env.
 WAZUH_JWT_TOKEN = os.environ.get("WAZUH_JWT_TOKEN")
 
-# PostgreSQL LISTEN channel for new alerts
-LISTEN_CHANNEL = "new_response" # Or "new_alert" if you want to trigger on initial insert
+# PostgreSQL LISTEN channel for new alerts (this script's input)
+LISTEN_CHANNEL = "new_alert" # This script explicitly listens to 'new_alert' notifications.
 
 # --- Logger Setup ---
 def setup_logging() -> logging.Logger:
     """Configure a rotating file logger and return it."""
-    logger = logging.getLogger("delphi-emailer")
+    logger = logging.getLogger("delphi-agent-enricher") # Renamed logger for clarity
     logger.setLevel(logging.DEBUG) # Set to INFO for production to reduce verbosity
 
     # Ensure log directory exists
@@ -50,11 +51,10 @@ def setup_logging() -> logging.Logger:
     os.makedirs(log_dir, exist_ok=True)
 
     handler = RotatingFileHandler(
-        os.path.join(log_dir, "delphi-emailer.log"),
+        os.path.join(log_dir, "delphi-agent-enricher.log"), # Log file name changed
         maxBytes=5 * 1024 * 1024, # 5 MB
         backupCount=3
     )
-    # Use a concise formatter
     fmt = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s", "%Y-%m-%d %H:%M:%S")
     handler.setFormatter(fmt)
     logger.addHandler(handler)
@@ -73,14 +73,6 @@ log = setup_logging()
 def authenticate_wazuh_api(api_url: str, user: str, password: str) -> str | None:
     """
     Authenticates with the Wazuh API and returns a JWT token.
-
-    Args:
-        api_url (str): The base URL of the Wazuh API.
-        user (str): Wazuh API username.
-        password (str): Wazuh API password.
-
-    Returns:
-        str | None: The JWT token if authentication is successful, None otherwise.
     """
     if not user or not password:
         log.warning("Wazuh API username or password not provided. Cannot authenticate using user/pass.")
@@ -99,7 +91,7 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> str | None
     log.info("Attempting Wazuh API login...")
     try:
         response = requests.post(login_url, headers=login_headers, verify=False, timeout=10)
-        response.raise_for_status() # Raise HTTPError for bad responses
+        response.raise_for_status()
 
         token_data = response.json()
         token = token_data.get('data', {}).get('token')
@@ -122,35 +114,29 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> str | None
         log.error(f"An unexpected error occurred during Wazuh API login: {e}")
         return None
 
-# --- Wazuh API Interaction Function ---
+# --- Wazuh API Interaction Function (Modified to fetch all agents and filter) ---
 def get_wazuh_agent_info(agent_id: str) -> dict | None:
     """
-    Fetches detailed information about a specific Wazuh agent from the API.
-
-    Args:
-        agent_id (str): The ID of the Wazuh agent (e.g., "000", "001").
-
-    Returns:
-        dict: A dictionary containing the agent's information if successful.
-              Returns None if the API call fails or agent information is not found.
+    Fetches information about a specific Wazuh agent from the API by retrieving
+    all agents and then filtering locally, mimicking 'curl ... | jq'.
     """
     global WAZUH_JWT_TOKEN
 
     # If JWT token is not set, try to authenticate using user/password
     if not WAZUH_JWT_TOKEN:
-        log.warning("JWT token is not set. Attempting to authenticate Wazuh API using user/password.")
+        log.warning("JWT token is not set. Attempting to authenticate Wazuh API using user/password from .env.")
         if WAZUH_API_USER and WAZUH_API_PASSWD:
             WAZUH_JWT_TOKEN = authenticate_wazuh_api(WAZUH_API_URL, WAZUH_API_USER, WAZUH_API_PASSWD)
         else:
-            log.error("Wazuh API user/password are not set, and JWT token is missing. Cannot fetch agent info.")
+            log.error("Wazuh API user/password are not set in .env, and JWT token is missing. Cannot fetch agent info.")
             return None
 
     if not WAZUH_JWT_TOKEN: # If authentication still failed
         log.error("Failed to obtain Wazuh API JWT token. Cannot proceed with agent info fetch.")
         return None
 
-    # Construct the API endpoint for a single agent
-    api_endpoint = f"{WAZUH_API_URL}/agents/{agent_id}"
+    # Construct the API endpoint to get ALL agents (mimicking your curl command)
+    api_endpoint = f"{WAZUH_API_URL}/agents"
 
     headers = {
         "Authorization": f"Bearer {WAZUH_JWT_TOKEN}",
@@ -158,53 +144,52 @@ def get_wazuh_agent_info(agent_id: str) -> dict | None:
     }
 
     try:
-        response = requests.get(api_endpoint, headers=headers, verify=False, timeout=10)
+        response = requests.get(api_endpoint, headers=headers, verify=False, timeout=30) # Increased timeout for potentially larger response
         response.raise_for_status()
 
-        data = response.json()
+        all_agents_data = response.json()
 
-        # The /agents/{agent_id} endpoint typically returns the agent object directly in 'data'
-        if data.get('error') == 0 and data.get('data') and isinstance(data['data'], dict):
-            return data['data']
+        if all_agents_data.get('error') == 0 and all_agents_data.get('data') and 'affected_items' in all_agents_data['data']:
+            affected_items = all_agents_data['data']['affected_items']
+            
+            # Filter locally for the specific agent_id (mimicking jq select)
+            for agent_item in affected_items:
+                if agent_item.get('id') == agent_id:
+                    log.info(f"Successfully found agent {agent_id} from the list of all agents.")
+                    return agent_item # Return the found agent's dictionary
+            
+            log.warning(f"Agent ID '{agent_id}' not found in the list of agents returned by '{api_endpoint}'.")
+            return None # Agent not found in the list
         else:
-            log.warning(f"Wazuh API returned unexpected data for agent {agent_id}. Error: {data.get('error')}, Data: {data.get('data')}")
+            log.warning(f"Wazuh API returned unexpected data structure from '{api_endpoint}'. Response: {all_agents_data}")
             return None
 
     except requests.exceptions.HTTPError as http_err:
-        log.error(f"HTTP error during Wazuh API call for agent {agent_id}: {http_err} - {response.text}")
-        if response.status_code == 401 or response.status_code == 403:
+        log.error(f"HTTP error during Wazuh API call for all agents: {http_err} - {response.text}")
+        if response.status_code in [401, 403]:
             log.warning("JWT token might be expired or invalid. Clearing token for re-authentication attempt.")
             WAZUH_JWT_TOKEN = None # Clear token to force re-authentication on next call
         return None
     except requests.exceptions.ConnectionError as conn_err:
-        log.error(f"Connection error during Wazuh API call for agent {agent_id}: {conn_err}. Is Wazuh API running and accessible at {WAZUH_API_URL}?", exc_info=True)
+        log.error(f"Connection error during Wazuh API call for all agents: {conn_err}. Is Wazuh API running and accessible at {WAZUH_API_URL}?", exc_info=True)
         return None
     except requests.exceptions.Timeout as timeout_err:
-        log.error(f"Timeout error during Wazuh API call for agent {agent_id}: {timeout_err}")
+        log.error(f"Timeout error during Wazuh API call for all agents: {timeout_err}")
         return None
     except requests.exceptions.RequestException as req_err:
-        log.error(f"An unexpected request error occurred during Wazuh API call for agent {agent_id}: {req_err}", exc_info=True)
+        log.error(f"An unexpected request error occurred during Wazuh API call for all agents: {req_err}", exc_info=True)
         return None
     except json.JSONDecodeError as json_err:
-        log.error(f"Failed to decode JSON response from Wazuh API for agent {agent_id}: {json_err}. Response text: {response.text}")
+        log.error(f"Failed to decode JSON response from Wazuh API for all agents: {json_err}. Response text: {response.text}")
         return None
     except Exception as e:
-        log.error(f"An unexpected error occurred in get_wazuh_agent_info for agent {agent_id}: {e}", exc_info=True)
+        log.error(f"An unexpected error occurred in get_wazuh_agent_info: {e}", exc_info=True)
         return None
 
 # --- Database Interaction Function ---
 def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp: datetime) -> bool:
     """
     Updates or inserts agent information into the 'agents' table.
-
-    Args:
-        agent_id (str): The ID of the agent to update/insert.
-        agent_data (dict): The dictionary containing agent information from Wazuh API.
-                           This is the 'data' field directly from the API response for one agent.
-        api_fetch_timestamp (datetime): The timestamp when the API call was made.
-
-    Returns:
-        bool: True if the operation was successful, False otherwise.
     """
     conn = None
     try:
@@ -215,7 +200,6 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
         name = agent_data.get('name')
         ip = agent_data.get('ip')
 
-        # OS information (complex nested object to string)
         os_info = agent_data.get('os')
         os_string = None
         if os_info:
@@ -228,7 +212,6 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             if os_arch:
                 os_string += f" ({os_arch})"
 
-        # Timestamps
         registered_at = None
         if agent_data.get('dateAdd'):
             try:
@@ -253,28 +236,21 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             except ValueError:
                 log.warning(f"Could not parse disconnection_time '{agent_data['disconnection_time']}' for agent {agent_id}")
 
-        # Other new fields
-        agent_version = agent_data.get('version') # Note: API 'version' maps to DB 'agent_version'
+        agent_version = agent_data.get('version')
         register_ip = agent_data.get('registerIP')
         node_name = agent_data.get('node_name')
         config_sum = agent_data.get('configSum')
         merged_sum = agent_data.get('mergedSum')
         group_config_status = agent_data.get('group_config_status')
-        status_text = agent_data.get('status') # API 'status' maps to DB 'status_text'
+        status_text = agent_data.get('status')
         status_code_api = agent_data.get('status_code')
         manager_name = agent_data.get('manager')
-        groups = agent_data.get('group') # API 'group' (array) maps to DB 'groups' (JSONB)
+        groups = agent_data.get('group')
 
-
-        # Ensure api_fetch_timestamp is UTC
         api_fetch_timestamp_utc = api_fetch_timestamp.astimezone(timezone.utc)
-
-        # Convert agent_data dict to JSON string for JSONB column
         agent_data_json = json.dumps(agent_data)
 
         # --- UPSERT Query ---
-        # The order of columns in the INSERT and VALUES clause MUST match.
-        # The order of columns in the SET clause for UPDATE should match for readability.
         upsert_query = """
         INSERT INTO agents (
             id, name, ip, os, registered, last_seen,
@@ -288,7 +264,6 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             name = EXCLUDED.name,
             ip = EXCLUDED.ip,
             os = EXCLUDED.os,
-            -- Only update 'registered' if the existing value is NULL or older than EXCLUDED.registered
             registered = COALESCE(agents.registered, EXCLUDED.registered),
             last_seen = EXCLUDED.last_seen,
             agent_version = EXCLUDED.agent_version,
@@ -345,53 +320,134 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             conn.close()
 
 # --- Main Alert Processing Logic ---
-def process_new_alert(alert: dict) -> dict | None:
+def process_new_alert(alert_id: int) -> dict | None:
     """
     Processes a new alert, fetches agent info, updates the database,
     and returns an enriched alert.
-
-    Args:
-        alert (dict): A dictionary representing a new Wazuh alert.
-                      It MUST contain 'agent_id'.
-
-    Returns:
-        dict | None: An enriched alert dictionary, or None if processing failed.
+    It also updates the alerts table state and sends a notification.
     """
-    agent_id = alert.get('agent_id')
-    if not agent_id:
-        log.error("Incoming alert does not contain 'agent_id'. Skipping enrichment.")
+    conn = None
+    alert_record = None
+    try:
+        conn = psycopg2.connect(AGENTS_PG_DSN)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        # 1. Fetch the full alert record from the alerts table
+        cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
+        alert_record = cur.fetchone()
+
+        if not alert_record:
+            log.error(f"Alert with ID {alert_id} not found in alerts table. Cannot enrich.")
+            return None
+
+        agent_id = alert_record.get('agent_id')
+        if not agent_id:
+            log.error(f"Alert ID {alert_id} does not contain 'agent_id'. Skipping agent enrichment.")
+            # Return alert as dict for consistency if agent_id is missing, but log error
+            return dict(alert_record)
+
+        log.info(f"Processing alert ID: {alert_id} for agent ID: {agent_id}")
+
+        # 2. Fetch agent info from Wazuh API
+        api_fetch_time = datetime.now(timezone.utc)
+        agent_info = get_wazuh_agent_info(agent_id)
+
+        # 3. Update agent info in PostgreSQL database
+        db_updated = False
+        if agent_info:
+            db_updated = update_agent_info_in_db(agent_id, agent_info, api_fetch_time)
+        else:
+            log.warning(f"Could not retrieve agent info for {agent_id} (alert ID {alert_id}). DB update skipped.")
+
+
+        # 4. Update the alerts table state and send notification
+        # Always attempt to update alert state to 'agent_enriched' if it was 'new',
+        # regardless of whether agent_info fetch succeeded, as enrichment was attempted.
+        # This allows the LLM worker to proceed, potentially with less context.
+        if alert_record.get('state') == 'new':
+            log.info(f"Updating alert {alert_id} state to 'agent_enriched' and sending notification.")
+            cur.execute("UPDATE alerts SET state = 'agent_enriched' WHERE id = %s;", (alert_id,))
+            conn.commit()
+            cur.execute("SELECT pg_notify('agent_enriched', %s);", (str(alert_id),))
+            conn.commit()
+            log.info(f"pg_notify('agent_enriched', {alert_id}) sent.")
+        else:
+            log.info(f"Alert {alert_id} state is already '{alert_record.get('state')}', not updating to 'agent_enriched'.")
+
+
+        # Append agent details to the alert record for the next stage (LLM/email)
+        # Only add agent_details if they were successfully fetched
+        enriched_alert = dict(alert_record) # Start with a mutable copy
+        if agent_info:
+            enriched_alert['agent_details'] = agent_info
+            enriched_alert['agent_details_fetch_timestamp'] = api_fetch_time.isoformat()
+            log.info(f"Alert {alert_id} enriched with agent {agent_id} details.")
+        else:
+            log.warning(f"Alert {alert_id} not fully enriched with agent details due to fetch failure.")
+
+        return enriched_alert
+
+    except psycopg2.Error as db_err:
+        log.critical(f"Database error in process_new_alert for alert ID {alert_id}: {db_err}", exc_info=True)
+        if conn:
+            conn.rollback()
         return None
+    except Exception as e:
+        log.critical(f"An unexpected error occurred in process_new_alert for alert ID {alert_id}: {e}", exc_info=True)
+        return None
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
 
-    log.info(f"Processing alert for agent ID: {agent_id}")
+# --- Listener for new_alert notifications (simulated in main) ---
+def listen_for_new_alerts():
+    """
+    Connects to PostgreSQL and listens for 'new_alert' notifications.
+    When a notification is received, it triggers process_new_alert.
+    """
+    log.info(f"Starting PostgreSQL listener for channel '{LISTEN_CHANNEL}'...")
+    conn = None
+    try:
+        conn = psycopg2.connect(AGENTS_PG_DSN)
+        conn.autocommit = True # Important for LISTEN to work without explicit commits
+        cur = conn.cursor()
+        cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+        log.info("Listening for notifications...")
 
-    # 1. Fetch agent info from Wazuh API
-    api_fetch_time = datetime.now(timezone.utc) # Get current UTC time for API fetch
-    agent_info = get_wazuh_agent_info(agent_id)
+        while True:
+            conn.poll() # Check for new notifications
+            for notify in conn.notifies:
+                alert_id_str = notify.payload
+                log.info(f"Received notification on channel '{notify.channel}' with payload: {alert_id_str}")
+                try:
+                    alert_id = int(alert_id_str)
+                    processed_alert = process_new_alert(alert_id)
+                    if processed_alert:
+                        log.info(f"Alert ID {alert_id} processed. Agent details present: {'agent_details' in processed_alert if processed_alert else False}")
+                    else:
+                        log.error(f"Failed to process alert ID {alert_id}.")
+                except ValueError:
+                    log.error(f"Invalid alert_id received in notification payload: {alert_id_str}")
+                except Exception as e:
+                    log.error(f"Error processing notification for alert ID {alert_id_str}: {e}", exc_info=True)
+            time.sleep(1) # Sleep briefly to avoid busy-waiting
 
-    if not agent_info:
-        log.warning(f"Could not retrieve agent info for {agent_id}. Alert will not be enriched with agent details.")
-        return alert # Return original alert if agent info can't be fetched
+    except psycopg2.Error as db_err:
+        log.critical(f"Database error during listener setup or operation: {db_err}", exc_info=True)
+        sys.exit(1)
+    except Exception as e:
+        log.critical(f"An unexpected error occurred in the listener: {e}", exc_info=True)
+        sys.exit(1)
+    finally:
+        if conn:
+            conn.close()
 
-    # 2. Update agent info in PostgreSQL database
-    db_updated = update_agent_info_in_db(agent_id, agent_info, api_fetch_time)
-
-    enriched_alert = alert.copy()
-    if db_updated:
-        # Add the fetched agent info to the alert for further processing (LLM, email)
-        # You can select specific fields from agent_info if you don't want the whole JSON
-        enriched_alert['agent_details'] = agent_info
-        enriched_alert['agent_details_fetch_timestamp'] = api_fetch_time.isoformat()
-        log.info(f"Successfully enriched alert with agent {agent_id} details.")
-    else:
-        log.warning(f"Failed to update database for agent {agent_id}. Alert will still be processed but may lack latest agent details.")
-
-    return enriched_alert
-
-# --- Main function to run the simulation ---
+# --- Main function to run the script ---
 def main():
-    log.info("--- Starting Alert Enrichment Script (Simulation Mode) ---")
+    log.info("--- Starting Alert Enrichment Script ---")
 
-    # Initial authentication attempt
+    # Initial authentication attempt for Wazuh API
     global WAZUH_JWT_TOKEN
     if not WAZUH_JWT_TOKEN:
         WAZUH_JWT_TOKEN = authenticate_wazuh_api(WAZUH_API_URL, WAZUH_API_USER, WAZUH_API_PASSWD)
@@ -405,71 +461,14 @@ def main():
     try:
         conn_test = psycopg2.connect(AGENTS_PG_DSN, connect_timeout=5)
         conn_test.close()
-        log.info("Successfully connected to PostgreSQL database.")
+        log.info("Successfully connected to PostgreSQL database using DSN.")
     except psycopg2.Error as e:
         log.critical(f"ERROR: Could not connect to PostgreSQL database. Please check AGENTS_PG_DSN environment variable. Error: {e}")
-        sys.exit(1) # Exit if DB connection fails at startup
+        sys.exit(1)
 
-    log.info("--- Simulating New Alert Arrivals ---")
+    # Start the listener (this will block and run continuously)
+    listen_for_new_alerts()
 
-    # Example 1: New alert for an existing agent (ID 001)
-    sample_alert_1 = {
-        "id": 12345,
-        "alert_hash": "somehash1",
-        "agent_id": "001", # Corresponds to "cybermonkey-net" in your curl output
-        "rule_id": 500,
-        "rule_level": 7,
-        "rule_desc": "Login failed",
-        "raw": {"full_log": "authentication failed for user root from 192.168.1.5"},
-        "ingest_timestamp": datetime.now(timezone.utc).isoformat(),
-        "state": "new"
-    }
-    log.info(f"\nIncoming Alert (ID: {sample_alert_1['id']}, Agent: {sample_alert_1['agent_id']}):")
-    enriched_alert_1 = process_new_alert(sample_alert_1)
-    if enriched_alert_1:
-        log.info(f"Enriched Alert for LLM/Email (excerpt, agent_details present: {'agent_details' in enriched_alert_1})")
-        # log.debug(json.dumps(enriched_alert_1, indent=2)) # Uncomment to see full enriched alert
-
-    time.sleep(2) # Simulate a delay
-
-    # Example 2: New alert for another existing agent (ID 008)
-    sample_alert_2 = {
-        "id": 12346,
-        "alert_hash": "somehash2",
-        "agent_id": "008", # Corresponds to "vhost3" in your curl output
-        "rule_id": 550,
-        "rule_level": 9,
-        "rule_desc": "Unauthorized access attempt",
-        "raw": {"full_log": "attempted access to /etc/shadow by unauthorized user"},
-        "ingest_timestamp": datetime.now(timezone.utc).isoformat(),
-        "state": "new"
-    }
-    log.info(f"\nIncoming Alert (ID: {sample_alert_2['id']}, Agent: {sample_alert_2['agent_id']}):")
-    enriched_alert_2 = process_new_alert(sample_alert_2)
-    if enriched_alert_2:
-        log.info(f"Enriched Alert for LLM/Email (excerpt, agent_details present: {'agent_details' in enriched_alert_2})")
-
-    time.sleep(2)
-
-    # Example 3: New alert for a non-existent agent (e.g., "999")
-    sample_alert_3 = {
-        "id": 12347,
-        "alert_hash": "somehash3",
-        "agent_id": "999", # Non-existent agent
-        "rule_id": 600,
-        "rule_level": 5,
-        "rule_desc": "Unknown event",
-        "raw": {"full_log": "malformed log received from unknown source"},
-        "ingest_timestamp": datetime.now(timezone.utc).isoformat(),
-        "state": "new"
-    }
-    log.info(f"\nIncoming Alert (ID: {sample_alert_3['id']}, Agent: {sample_alert_3['agent_id']}):")
-    enriched_alert_3 = process_new_alert(sample_alert_3)
-    if enriched_alert_3:
-        log.info(f"Enriched Alert for LLM/Email (excerpt, agent_details present: {'agent_details' in enriched_alert_3})")
-
-    log.info("--- Simulation Complete ---")
 
 if __name__ == "__main__":
     main()
-```
