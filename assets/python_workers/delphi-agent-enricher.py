@@ -2,19 +2,13 @@
 # /usr/local/bin/delphi-agent-enricher.py
 # stanley:stanley 0750
 
-import requests
-import json
-import os
-import psycopg2
+import requests, select, json, os, psycopg2, sys, time, logging, urllib3
+
 from psycopg2 import extras
 from datetime import datetime, timezone
-import sys
-import time
-import logging
 from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 from base64 import b64encode
-import urllib3 # For disabling insecure warnings
 from typing import Union
 
 # --- Configuration & Environment Variable Validation ---
@@ -32,11 +26,11 @@ if not AGENTS_PG_DSN:
 # Wazuh API Connection Details
 WAZUH_API_URL = os.environ.get("WAZUH_API_URL", "https://delphi.cybermonkey.net.au:55000") # Fallback for robustness
 WAZUH_API_USER = os.environ.get("WAZUH_API_USER")
-WAZUH_API_PASSWD = os.environ.get("WAZUH_API_PASSWD")
+WAZUH_API_PASSWD = os.getenv("WAZUH_API_PASSWD") # Use getenv for consistency and safety
 
 # Global variable to store JWT token after successful authentication.
 # It will be populated by authenticate_wazuh_api if not already set in .env.
-WAZUH_JWT_TOKEN = os.environ.get("WAZUH_JWT_TOKEN")
+WAZUH_JWT_TOKEN = os.getenv("WAZUH_JWT_TOKEN") # Use getenv for consistency and safety
 
 # PostgreSQL LISTEN channel for new alerts (this script's input)
 LISTEN_CHANNEL = "new_alert" # This script explicitly listens to 'new_alert' notifications.
@@ -45,7 +39,7 @@ LISTEN_CHANNEL = "new_alert" # This script explicitly listens to 'new_alert' not
 def setup_logging() -> logging.Logger:
     """Configure a rotating file logger and return it."""
     logger = logging.getLogger("delphi-agent-enricher") # Renamed logger for clarity
-    logger.setLevel(logging.DEBUG) # Set to INFO for production to reduce verbosity
+    logger.setLevel(logging.DEBUG) # Set to DEBUG for detailed logs during debugging
 
     # Ensure log directory exists
     log_dir = "/var/log/stackstorm"
@@ -144,22 +138,25 @@ def get_wazuh_agent_info(agent_id: str) -> Union[dict, None]:
         "Content-Type": "application/json"
     }
 
+    log.debug(f"Attempting to fetch all agents from Wazuh API: {api_endpoint}")
     try:
         response = requests.get(api_endpoint, headers=headers, verify=False, timeout=30) # Increased timeout for potentially larger response
         response.raise_for_status()
 
         all_agents_data = response.json()
+        log.debug(f"Received response from Wazuh API for all agents (truncated): {json.dumps(all_agents_data, indent=2)[:500]}...")
 
         if all_agents_data.get('error') == 0 and all_agents_data.get('data') and 'affected_items' in all_agents_data['data']:
             affected_items = all_agents_data['data']['affected_items']
+            log.debug(f"Found {len(affected_items)} agents in Wazuh API response. Filtering for agent ID '{agent_id}'.")
             
             # Filter locally for the specific agent_id (mimicking jq select)
             for agent_item in affected_items:
                 if agent_item.get('id') == agent_id:
-                    log.info(f"Successfully found agent {agent_id} from the list of all agents.")
+                    log.info(f"Successfully found agent {agent_id} from the list of all agents retrieved from Wazuh API.")
                     return agent_item # Return the found agent's dictionary
             
-            log.warning(f"Agent ID '{agent_id}' not found in the list of agents returned by '{api_endpoint}'.")
+            log.warning(f"Agent ID '{agent_id}' not found in the list of agents returned by '{api_endpoint}' after filtering.")
             return None # Agent not found in the list
         else:
             log.warning(f"Wazuh API returned unexpected data structure from '{api_endpoint}'. Response: {all_agents_data}")
@@ -218,7 +215,7 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             try:
                 registered_at = datetime.fromisoformat(agent_data['dateAdd'].replace('Z', '+00:00')).astimezone(timezone.utc)
             except ValueError:
-                log.warning(f"Could not parse dateAdd '{agent_data['dateAdd']}' for agent {agent_id}")
+                log.warning(f"Could not parse dateAdd '{agent_data['dateAdd']}' for agent {agent_id}. Storing as NULL.")
 
         last_seen_at = None
         if agent_data.get('lastKeepAlive'):
@@ -228,14 +225,14 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
                 else:
                     last_seen_at = datetime.fromisoformat(agent_data['lastKeepAlive'].replace('Z', '+00:00')).astimezone(timezone.utc)
             except ValueError:
-                log.warning(f"Could not parse lastKeepAlive '{agent_data['lastKeepAlive']}' for agent {agent_id}")
+                log.warning(f"Could not parse lastKeepAlive '{agent_data['lastKeepAlive']}' for agent {agent_id}. Storing as NULL.")
 
         disconnection_time = None
         if agent_data.get('disconnection_time'):
             try:
                 disconnection_time = datetime.fromisoformat(agent_data['disconnection_time'].replace('Z', '+00:00')).astimezone(timezone.utc)
             except ValueError:
-                log.warning(f"Could not parse disconnection_time '{agent_data['disconnection_time']}' for agent {agent_id}")
+                log.warning(f"Could not parse disconnection_time '{agent_data['disconnection_time']}' for agent {agent_id}. Storing as NULL.")
 
         agent_version = agent_data.get('version')
         register_ip = agent_data.get('registerIP')
@@ -249,7 +246,10 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
         groups = agent_data.get('group')
 
         api_fetch_timestamp_utc = api_fetch_timestamp.astimezone(timezone.utc)
-        agent_data_json = json.dumps(agent_data)
+        # Ensure agent_data is stored as JSON string (or directly as JSONB if column type allows)
+        agent_data_json_to_store = json.dumps(agent_data) 
+
+        log.debug(f"Preparing to UPSERT agent '{agent_id}' with data: Name='{name}', IP='{ip}', OS='{os_string}', Status='{status_text}', Manager='{manager_name}'.")
 
         # --- UPSERT Query ---
         upsert_query = """
@@ -265,7 +265,7 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             name = EXCLUDED.name,
             ip = EXCLUDED.ip,
             os = EXCLUDED.os,
-            registered = COALESCE(agents.registered, EXCLUDED.registered),
+            registered = COALESCE(agents.registered, EXCLUDED.registered), -- Only update if existing is NULL
             last_seen = EXCLUDED.last_seen,
             agent_version = EXCLUDED.agent_version,
             register_ip = EXCLUDED.register_ip,
@@ -300,20 +300,20 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             json.dumps(groups) if groups is not None else None, # Convert Python list to JSON string for JSONB
             disconnection_time,
             manager_name,
-            agent_data_json,
+            agent_data_json_to_store, # Use the JSON string here
             api_fetch_timestamp_utc
         ))
         conn.commit()
-        log.info(f"Agent {agent_id} info updated/inserted in database successfully.")
+        log.info(f"Agent '{agent_id}' info updated/inserted in database successfully. (Name: '{name}', OS: '{os_string}')")
         return True
 
     except psycopg2.Error as db_err:
-        log.error(f"Database error while updating agent {agent_id}: {db_err}", exc_info=True)
+        log.error(f"Database error while updating agent '{agent_id}': {db_err}", exc_info=True)
         if conn:
             conn.rollback()
         return False
     except Exception as e:
-        log.error(f"An unexpected error occurred during DB update for agent {agent_id}: {e}", exc_info=True)
+        log.error(f"An unexpected error occurred during DB update for agent '{agent_id}': {e}", exc_info=True)
         return False
     finally:
         if conn:
@@ -328,63 +328,79 @@ def process_new_alert(alert_id: int) -> Union[dict, None]:
     It also updates the alerts table state and sends a notification.
     """
     conn = None
-    alert_record = None
     try:
         conn = psycopg2.connect(AGENTS_PG_DSN)
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
 
-        # 1. Fetch the full alert record from the alerts table
+        log.debug(f"Attempting to fetch alert ID {alert_id} for processing.")
         cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
         alert_record = cur.fetchone()
 
         if not alert_record:
-            log.error(f"Alert with ID {alert_id} not found in alerts table. Cannot enrich.")
+            log.error(f"Alert with ID {alert_id} not found in alerts table after notification. Skipping.")
             return None
 
-        # MODIFIED: Add early return if state is not 'new'
-        if alert_record.get('state') != 'new':
-            log.info(f"Alert {alert_id} state is already '{alert_record.get('state')}'. Skipping redundant agent enrichment.")
-            return dict(alert_record) # Return the existing alert record, do not re-process
+        current_state = alert_record.get('state')
+        log.debug(f"Alert ID {alert_id} fetched. Current state: '{current_state}'.")
+
+        if current_state != 'new':
+            log.info(f"Alert {alert_id} is in state '{current_state}', not 'new'. Skipping redundant agent enrichment for this notification.")
+            return dict(alert_record) 
 
         agent_id = alert_record.get('agent_id')
         if not agent_id:
-            log.error(f"Alert ID {alert_id} does not contain 'agent_id'. Skipping agent enrichment.")
-            # Return alert as dict for consistency if agent_id is missing, but log error
+            log.error(f"Alert ID {alert_id} does not contain 'agent_id'. Cannot enrich without agent ID. Skipping.")
             return dict(alert_record)
 
-        log.info(f"Processing alert ID: {alert_id} for agent ID: {agent_id}")
+        log.info(f"Alert ID {alert_id} (Agent ID: {agent_id}) is 'new'. Proceeding with agent enrichment.")
 
         # 2. Fetch agent info from Wazuh API
         api_fetch_time = datetime.now(timezone.utc)
+        log.debug(f"Fetching agent info for agent ID '{agent_id}' from Wazuh API at {api_fetch_time.isoformat()}.")
         agent_info = get_wazuh_agent_info(agent_id)
 
         # 3. Update agent info in PostgreSQL database
         db_updated = False
         if agent_info:
             db_updated = update_agent_info_in_db(agent_id, agent_info, api_fetch_time)
+            if db_updated:
+                log.debug(f"Agent details for '{agent_id}' successfully updated/inserted in 'agents' table.")
+            else:
+                log.warning(f"Failed to update/insert agent details for '{agent_id}' in 'agents' table.")
         else:
-            log.warning(f"Could not retrieve agent info for {agent_id} (alert ID {alert_id}). DB update skipped.")
+            log.warning(f"Could not retrieve agent info from Wazuh API for agent ID '{agent_id}' (alert ID {alert_id}). DB update skipped for this agent.")
 
 
         # 4. Update the alerts table state and send notification
-        # The state should always be 'new' at this point due to the early return above
-        log.info(f"Updating alert {alert_id} state to 'agent_enriched' and sending notification.")
-        cur.execute("UPDATE alerts SET state = 'agent_enriched' WHERE id = %s;", (alert_id,))
-        conn.commit()
-        cur.execute("SELECT pg_notify('agent_enriched', %s);", (str(alert_id),))
-        conn.commit()
-        log.info(f"pg_notify('agent_enriched', {alert_id}) sent.")
-
+        log.info(f"Attempting to update alert {alert_id} state from 'new' to 'agent_enriched' and send notification.")
+        # This update is conditional: it only proceeds if the state is still 'new'.
+        cur.execute(
+            """
+            UPDATE alerts
+            SET state = 'agent_enriched'
+            WHERE id = %s
+            AND state = 'new'
+            RETURNING 1;
+            """,
+            (alert_id,),
+        )
+        if cur.rowcount: # row changed → first time we saw it
+            conn.commit() # Commit the state change before notifying
+            cur.execute("SELECT pg_notify('agent_enriched', %s);", (str(alert_id),))
+            conn.commit() # Commit the notification
+            log.info(f"Alert {alert_id} successfully transitioned from 'new' to 'agent_enriched' and 'agent_enriched' notification sent.")
+        else:
+            log.debug(f"Alert {alert_id} was already processed (state was not 'new'). No 'agent_enriched' state update or notification sent from this instance.")
+            conn.rollback() # Rollback if no update happened to release lock/resource if needed, though autocommit makes this less critical
 
         # Append agent details to the alert record for the next stage (LLM/email)
-        # Only add agent_details if they were successfully fetched
         enriched_alert = dict(alert_record) # Start with a mutable copy
         if agent_info:
             enriched_alert['agent_details'] = agent_info
             enriched_alert['agent_details_fetch_timestamp'] = api_fetch_time.isoformat()
-            log.info(f"Alert {alert_id} enriched with agent {agent_id} details.")
+            log.info(f"Alert {alert_id} record prepared for next stage with enriched agent {agent_id} details.")
         else:
-            log.warning(f"Alert {alert_id} not fully enriched with agent details due to fetch failure.")
+            log.warning(f"Alert {alert_id} record passed to next stage without full agent details due to fetch failure.")
 
         return enriched_alert
 
@@ -401,7 +417,7 @@ def process_new_alert(alert_id: int) -> Union[dict, None]:
             cur.close()
             conn.close()
 
-# --- Listener for new_alert notifications (simulated in main) ---
+# --- Listener for new_alert notifications ---
 def listen_for_new_alerts():
     """
     Connects to PostgreSQL and listens for 'new_alert' notifications.
@@ -417,22 +433,32 @@ def listen_for_new_alerts():
         log.info("Listening for notifications...")
 
         while True:
-            conn.poll() # Check for new notifications
-            for notify in conn.notifies:
+            # Poll for new notifications with a faster timeout (0.1s)
+            # This makes the listener more responsive and reduces busy-waiting
+            if not select.select([conn], [], [], 0.1)[0]:
+                continue  # Timeout, loop again
+
+            conn.poll()
+            
+            # Consume the notifications queue, processing each only once
+            while conn.notifies:
+                notify = conn.notifies.pop(0) # Remove notification as we process it
                 alert_id_str = notify.payload
-                log.info(f"Received notification on channel '{notify.channel}' with payload: {alert_id_str}")
+                log.info(f"Received notification on channel '{notify.channel}' with payload: {alert_id_str}. Initiating processing.")
                 try:
                     alert_id = int(alert_id_str)
                     processed_alert = process_new_alert(alert_id)
+                    # The process_new_alert now handles logging success/skipping based on state.
+                    # We just log a final confirmation here.
                     if processed_alert:
-                        log.info(f"Alert ID {alert_id} processed. Agent details present: {'agent_details' in processed_alert if processed_alert else False}")
+                        log.debug(f"Alert ID {alert_id} (from payload) processing cycle completed.")
                     else:
-                        log.error(f"Failed to process alert ID {alert_id}.")
+                        log.error(f"Alert ID {alert_id} (from payload) processing failed or returned None.")
                 except ValueError:
-                    log.error(f"Invalid alert_id received in notification payload: {alert_id_str}")
+                    log.error(f"Invalid alert_id received in notification payload: '{alert_id_str}'. Skipping.")
                 except Exception as e:
-                    log.error(f"Error processing notification for alert ID {alert_id_str}: {e}", exc_info=True)
-            time.sleep(1) # Sleep briefly to avoid busy-waiting
+                    log.error(f"Error processing notification for alert ID '{alert_id_str}': {e}", exc_info=True)
+            # No explicit sleep needed here, as the select.select timeout manages polling frequency.
 
     except psycopg2.Error as db_err:
         log.critical(f"Database error during listener setup or operation: {db_err}", exc_info=True)
