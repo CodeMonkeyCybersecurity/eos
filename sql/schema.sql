@@ -12,13 +12,29 @@ END$$;
 
 -- AGENTS TABLE: Source-of-truth for endpoints
 CREATE TABLE IF NOT EXISTS agents (
-  id          TEXT PRIMARY KEY,                         -- Wazuh agent ID
-  name        TEXT,                                     -- Friendly name (NULLABLE as per d/agents)
-  ip          TEXT,                                     -- Last known IP (NULLABLE as per d/agents)
-  os          TEXT,                                     -- OS type (NULLABLE as per d/agents)
-  registered  TIMESTAMPTZ,                              -- First seen (NULLABLE as per d/agents)
-  last_seen   TIMESTAMPTZ DEFAULT now()                 -- Updated on each heartbeat/event (NULLABLE, with default, as per d/agents)
-  -- Removed 'status' column and 'agent_status' ENUM to match d/agents output
+  id                  TEXT PRIMARY KEY,                             -- Wazuh agent ID
+  name                TEXT,                                         -- Friendly name
+  ip                  TEXT,                                         -- Last known IP
+  os                  TEXT,                                         -- OS type (human-readable string)
+  registered          TIMESTAMPTZ,                                  -- First seen (from API's dateAdd)
+  last_seen           TIMESTAMPTZ DEFAULT now(),                    -- Updated on each heartbeat/event (from API's lastKeepAlive)
+
+  -- New columns from Wazuh Agent API response
+  agent_version       TEXT,                                         -- Wazuh agent software version (e.g., "Wazuh v4.12.0")
+  register_ip         TEXT,                                         -- IP used during agent registration (from API's registerIP)
+  node_name           TEXT,                                         -- Wazuh cluster node name (from API's node_name)
+  config_sum          TEXT,                                         -- Agent configuration checksum (from API's configSum)
+  merged_sum          TEXT,                                         -- Merged configuration checksum (from API's mergedSum)
+  group_config_status TEXT,                                         -- Sync status of group config (from API's group_config_status)
+  status_text         TEXT,                                         -- Agent status (e.g., "active", "disconnected")
+  status_code_api     INTEGER,                                      -- Numeric status code from API (from API's status_code)
+  groups              JSONB,                                        -- JSON array of groups the agent belongs to
+  disconnection_time  TIMESTAMPTZ,                                  -- Timestamp of disconnection (for disconnected agents)
+  manager_name        TEXT,                                         -- Name of the Wazuh manager (from API's manager)
+
+  -- Columns for storing the raw API response and fetch timestamp
+  api_response        JSONB,                                        -- Stores the full JSON response from the Wazuh API for this agent
+  api_fetch_timestamp TIMESTAMPTZ                                   -- Timestamp of the last successful Wazuh API fetch for this agent's data
 );
 
 
