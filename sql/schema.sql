@@ -1,13 +1,9 @@
 -- /opt/schema.sql
 -- 0644 stanley:stanley
 
-
--- ENUM types for status and state
+-- ENUM types for state (Note: 'agent_status' removed to match provided d/agents output)
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'agent_status') THEN
-    CREATE TYPE agent_status AS ENUM ('active', 'inactive', 'retired');
-  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'alert_state') THEN
     CREATE TYPE alert_state AS ENUM ('new', 'summarized', 'sent', 'failed', 'archived');
   END IF;
@@ -16,46 +12,47 @@ END$$;
 
 -- AGENTS TABLE: Source-of-truth for endpoints
 CREATE TABLE IF NOT EXISTS agents (
-  id          TEXT PRIMARY KEY,                       -- Wazuh agent ID, hostname, or UUID
-  name        TEXT NOT NULL,                          -- Friendly name
-  ip          TEXT NOT NULL,                          -- Last known IP
-  os          TEXT,                                   -- OS type
-  registered  TIMESTAMPTZ DEFAULT now() NOT NULL,     -- First seen
-  last_seen   TIMESTAMPTZ DEFAULT now() NOT NULL,     -- Updated on each heartbeat/event
-  status      agent_status DEFAULT 'active' NOT NULL  -- ENUM: active/inactive/retired
+  id          TEXT PRIMARY KEY,                         -- Wazuh agent ID
+  name        TEXT,                                     -- Friendly name (NULLABLE as per d/agents)
+  ip          TEXT,                                     -- Last known IP (NULLABLE as per d/agents)
+  os          TEXT,                                     -- OS type (NULLABLE as per d/agents)
+  registered  TIMESTAMPTZ,                              -- First seen (NULLABLE as per d/agents)
+  last_seen   TIMESTAMPTZ DEFAULT now()                 -- Updated on each heartbeat/event (NULLABLE, with default, as per d/agents)
+  -- Removed 'status' column and 'agent_status' ENUM to match d/agents output
 );
 
 
 -- ALERTS TABLE: Main event log, deduplication & audit trail
 CREATE TABLE IF NOT EXISTS alerts (
   id                   BIGSERIAL PRIMARY KEY,
-  alert_hash           TEXT UNIQUE NOT NULL,   -- SHA-256 for deduplication
+  alert_hash           TEXT UNIQUE NOT NULL,                  -- SHA-256 for deduplication
   agent_id             TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE, -- Source agent
-  rule_id              INT NOT NULL,           -- Wazuh/SIEM rule ID
-  rule_level           INT NOT NULL,           -- Wazuh/SIEM rule severity
-  rule_desc            TEXT NOT NULL,          -- Description of rule
-  raw                  JSONB NOT NULL,         -- Original JSON alert
-
+  rule_id              INT NOT NULL,                          -- Wazuh/SIEM rule ID
+  rule_level           INT NOT NULL,                          -- Wazuh/SIEM rule severity
+  rule_desc            TEXT NOT NULL,                         -- Description of rule
+  raw                  JSONB NOT NULL,                        -- Original JSON alert
 
   -- Pipeline/audit tracking
-  ingest_timestamp     TIMESTAMPTZ DEFAULT now() NOT NULL,   -- Ingested to DB
-  state                alert_state DEFAULT 'new' NOT NULL,   -- ENUM: workflow state
-
+  ingest_timestamp     TIMESTAMPTZ DEFAULT now() NOT NULL,    -- Ingested to DB
+  state                alert_state DEFAULT 'new' NOT NULL,    -- ENUM: workflow state
 
   -- LLM round-trip
-  prompt_sent_at       TIMESTAMPTZ,          -- LLM prompt send time
-  prompt_text          TEXT,                 -- Full LLM prompt text
-  response_received_at TIMESTAMPTZ,          -- LLM response received time
-  response_text        TEXT,                 -- Full LLM response
+  prompt_sent_at       TIMESTAMPTZ,                           -- LLM prompt send time (NULLABLE)
+  prompt_text          TEXT,                                  -- Full LLM prompt text (NULLABLE)
+  response_received_at TIMESTAMPTZ,                           -- LLM response received time (NULLABLE)
+  response_text        TEXT,                                  -- Full LLM response (NULLABLE)
 
+  -- New token columns added from d/alerts output
+  prompt_tokens        INTEGER,                               -- Tokens used for prompt (NULLABLE)
+  completion_tokens    INTEGER,                               -- Tokens used for completion (NULLABLE)
+  total_tokens         INTEGER,                               -- Total tokens (NULLABLE)
 
   -- Notification/audit
-  alert_sent_at        TIMESTAMPTZ,          -- Outbound notification sent time
-  alert_text           TEXT,                 -- Formatted outbound alert
-
+  alert_sent_at        TIMESTAMPTZ,                           -- Outbound notification sent time (NULLABLE)
+  alert_text           TEXT,                                  -- Formatted outbound alert (NULLABLE)
 
   -- Soft-delete/archive (optional)
-  archived_at          TIMESTAMPTZ           -- If set, alert is archived
+  archived_at          TIMESTAMPTZ                            -- If set, alert is archived (NULLABLE)
 );
 
 
@@ -111,7 +108,6 @@ BEGIN
       FOR EACH ROW EXECUTE FUNCTION trg_alert_new_notify();
   END IF;
 
-
   -- After update: new LLM response
   IF NOT EXISTS (
     SELECT 1 FROM pg_trigger WHERE tgname = 'trg_alert_response_notify'
@@ -120,7 +116,6 @@ BEGIN
       AFTER UPDATE OF response_text ON alerts
       FOR EACH ROW EXECUTE FUNCTION trg_alert_response_notify();
   END IF;
-
 
   -- After update: outbound alert sent
   IF NOT EXISTS (

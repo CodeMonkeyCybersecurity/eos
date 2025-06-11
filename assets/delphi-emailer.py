@@ -156,11 +156,11 @@ def format_html(subject: str, sent_at: str, alert_id: str, body_html: str) -> st
 def split_sections(text: str) -> Dict[str,str]:
     """
     Parses the LLM’s single-string response into a dict:
-      { "What happened": "...", "What to do": "...", "How to check": "..." }
+      { "What happened": "...", "Further investigation": "...", "What to do": "...", "How to check": "..." }
     """
     # split on those exact headings (including the colon)
-    parts = re.split(r'(What happened:|What to do:|How to check:)', text)
-    # parts will be: ["", "What happened:", " ...", "How to check:", "...", ...]
+    parts = re.split(r'(What happened:|Further investigation:|What to do:|How to check:)', text)
+    # parts will be: ["", "What happened:", " ...", "Further investigation:", "...", "How to check:", "...", ...]
     out = {}
     for i in range(1, len(parts), 2):
         key   = parts[i].rstrip(':')
@@ -174,7 +174,7 @@ def build_body_html(response: str) -> str:
     """
     secs = split_sections(response)
     html_blocks = []
-    for heading in ("What happened", "What to do", "How to check"):
+    for heading in ("What happened", "Further investigation", "What to do", "How to check"):
         content = secs.get(heading, "")
         # make each paragraph
         paras = "".join(f"<p>{html_lib.escape(p)}</p>"
