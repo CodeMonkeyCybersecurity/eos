@@ -21,7 +21,6 @@ import urllib3 # For disabling insecure warnings
 # Load environment variables from specified .env files
 # Ensure these paths are correct for your StackStorm setup.
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
-load_dotenv("/opt/stackstorm/packs/delphi/.delphi.env") # For Wazuh API specific secrets
 
 # PostgreSQL Database Connection String (DSN)
 AGENTS_PG_DSN = os.getenv("AGENTS_PG_DSN")
