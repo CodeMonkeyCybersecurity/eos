@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# /usr/local/bin/alert-enrichment.py
+# /usr/local/bin/alert-enrichment-agent.py
 # stanley:stanley 0750
 
 import requests
@@ -29,7 +29,7 @@ if not AGENTS_PG_DSN:
     raise ValueError("AGENTS_PG_DSN environment variable not set. Please configure your PostgreSQL DSN in the .env file.")
 
 # Wazuh API Connection Details
-WAZUH_API_URL = os.environ.get("WAZUH_API_URL", "https://delphi.cybermonkey.net.au:55000") # Fallback for robustness
+WAZUH_API_URL = os.environ.get("WAZUH_API_URL") # Fallback for robustness
 WAZUH_API_USER = os.environ.get("WAZUH_API_USER")
 WAZUH_API_PASSWD = os.environ.get("WAZUH_API_PASSWD")
 
