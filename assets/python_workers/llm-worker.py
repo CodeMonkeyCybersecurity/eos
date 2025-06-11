@@ -1,382 +1,360 @@
 #!/usr/bin/env python3
 # /usr/local/bin/llm-worker.py
-# 750 stanley:stanley
+# stanley:stanley 0750
 
-"""
-Wazuh Alert LLM Worker – Azure-native, REST-only, real-time with backlog drain + NOTIFY+POLL
-Enhanced with verbose debug logging to provide deep insight into operations, including LLM token usage.
-"""
-
-import os, select, json, psycopg2, time, requests, hashlib, traceback
-from datetime import datetime
-from dotenv import load_dotenv
-
-# ───── Load Environment Variables ─────
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
-PG_DSN         = os.getenv("PG_DSN")
-API_KEY        = os.getenv("AZURE_OPENAI_API_KEY")
-ENDPOINT       = os.getenv("ENDPOINT_URL")
-DEPLOYMENT     = os.getenv("DEPLOYMENT_NAME")
-API_VERSION    = os.getenv("AZURE_API_VERSION")
-
-PROMPT_FILE    = os.getenv("PROMPT_FILE", "/opt/system-prompt.txt")
-LOG_FILE       = os.getenv("LOG_FILE", "/var/log/stackstorm/llm-worker.log")
-HEARTBEAT_FILE = os.getenv("HEARTBEAT_FILE", "/var/log/stackstorm/llm-worker.heartbeat")
-MAX_LOG_SIZE   = int(os.getenv("MAX_LOG_SIZE", 10 * 1024 * 1024))
-
-# ───── Logging setup ─────
+import os
+import sys
+import json
+import time
 import logging
+from logging.handlers import RotatingFileHandler
+import requests # For interacting with Azure OpenAI API
+import psycopg2
+from psycopg2 import extras # For DictCursor
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+from typing import Union
 
-logging.basicConfig(
-    filename=LOG_FILE,
-    level=logging.INFO, # Default to INFO, change to logging.DEBUG for maximum verbosity
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
-log = logging.getLogger("llm-worker")
+# --- Configuration & Environment Variable Validation ---
 
-def update_heartbeat():
-    """Updates the heartbeat file to indicate the worker is alive."""
-    try:
-        with open(HEARTBEAT_FILE, "w") as f:
-            f.write(str(int(time.time())))
-        log.debug("Heartbeat file updated successfully.")
-    except Exception as e:
-        log.error(f"Heartbeat update failed: {e}", exc_info=True)
+# Load environment variables from a single .env file.
+# This file should contain ALL necessary variables.
+load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
-def load_system_prompt():
-    """Loads the system prompt from the configured file."""
-    log.info(f"Loading system prompt from {PROMPT_FILE!r}")
-    if not os.path.exists(PROMPT_FILE):
-        log.critical(f"ERROR: System prompt file missing at {PROMPT_FILE!r}. Exiting.")
-        exit(2) # Critical exit as prompt is essential
-    txt = open(PROMPT_FILE).read().strip()
-    if not txt:
-        log.critical(f"ERROR: System prompt file at {PROMPT_FILE!r} is empty. Exiting.")
-        exit(2) # Critical exit as prompt is essential
-    log.info(f"Loaded system prompt ({len(txt)} chars).")
-    return txt
+# PostgreSQL Database Connection String (DSN)
+PG_DSN = os.getenv("PG_DSN")
+if not PG_DSN:
+    raise ValueError("PG_DSN environment variable not set. Please configure your PostgreSQL DSN in the .env file.")
 
-def azure_chat(system_prompt, alert_id, alert_raw_json, alert_hash, rule_id, retries=3):
-    """
-    Calls the Azure OpenAI API to get a response for an alert.
-    Includes verbose logging for each step, attempt, and potential failure, and token usage.
-    Returns: prompt_text, prompt_sent_at, response_text, resp_received_at, prompt_tokens, completion_tokens, total_tokens
-    """
-    log.debug(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): Preparing for Azure API call.")
-    url = f"{ENDPOINT}/openai/deployments/{DEPLOYMENT}/chat/completions?api-version={API_VERSION}"
-    headers = {"Content-Type":"application/json", "api-key":API_KEY}
-    
-    user_payload = json.dumps(alert_raw_json) if isinstance(alert_raw_json, dict) else alert_raw_json
+# Azure OpenAI API details
+AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+ENDPOINT_URL = os.getenv("ENDPOINT_URL")
+DEPLOYMENT_NAME = os.getenv("DEPLOYMENT_NAME")
+AZURE_API_VERSION = os.getenv("AZURE_API_VERSION")
 
-    prompt = (
-        system_prompt
-        + "\n\nPlease explain what happened, what to do, and how to check for a non-technical user in one paragraph:\n\n"
-        + user_payload
+if not all([AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSION]):
+    raise ValueError("One or more Azure OpenAI environment variables (AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSION) not set.")
+
+# Paths & Quotas
+PROMPT_FILE = os.environ.get("PROMPT_FILE", "/opt/system-prompt.txt")
+LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/llm-worker.log") # Ensure this is correct
+HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/llm-worker.heartbeat")
+MAX_LOG_SIZE = int(os.environ.get("MAX_LOG_SIZE", 10485760)) # Default 10 MB
+
+# PostgreSQL LISTEN channel for new alerts (MODIFIED: now listens for 'agent_enriched')
+LISTEN_CHANNEL = "agent_enriched" # This script now listens for alerts with enriched agent data
+
+# --- Logger Setup ---
+def setup_logging() -> logging.Logger:
+    """Configure a rotating file logger and return it."""
+    logger = logging.getLogger("delphi-llm-worker") # Renamed logger for clarity
+    logger.setLevel(logging.INFO) # Set to INFO for production, DEBUG for development
+
+    log_dir = os.path.dirname(LOG_FILE)
+    os.makedirs(log_dir, exist_ok=True)
+
+    handler = RotatingFileHandler(
+        LOG_FILE,
+        maxBytes=MAX_LOG_SIZE,
+        backupCount=3
     )
-    prompt_hash = hashlib.sha1(prompt.encode()).hexdigest()
-    log.info(f"Alert {alert_id} (Rule: {rule_id}): Preparing LLM prompt (Prompt Hash: {prompt_hash}, Length: {len(prompt)} chars).")
-    
-    body = {
-        "messages": [
-            {"role":"system","content":system_prompt},
-            {"role":"user","content":prompt}
-        ],
-        "max_tokens":800,
-        "temperature":1.0,
-        "top_p":1.0
-    }
+    fmt = logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s", "%Y-%m-%d %H:%M:%S")
+    handler.setFormatter(fmt)
+    logger.addHandler(handler)
 
-    # Initialize token metrics
-    prompt_tokens = None
-    completion_tokens = None
-    total_tokens = None
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setFormatter(fmt)
+    logger.addHandler(stream_handler)
 
-    for attempt in range(1, retries+1):
-        try:
-            log.info(f"Alert {alert_id} (Rule: {rule_id}): HTTP POST to Azure endpoint (Attempt {attempt}/{retries}). URL: {url}")
-            start = time.time()
-            r = requests.post(url, headers=headers, json=body, timeout=45)
-            response_time = time.time() - start
-            log.info(f"Alert {alert_id} (Rule: {rule_id}): HTTP status={r.status_code} (Time: {response_time:.2f}s).")
-            
-            r.raise_for_status()
+    logger.info("Logger initialized; script starting.")
+    return logger
 
-            response_json = r.json()
-            resp = response_json["choices"][0]["message"]["content"].strip()
-            
-            # Extract token usage
-            if "usage" in response_json:
-                usage = response_json["usage"]
-                prompt_tokens = usage.get("prompt_tokens")
-                completion_tokens = usage.get("completion_tokens")
-                total_tokens = usage.get("total_tokens")
-                log.info(
-                    f"Alert {alert_id} (Rule: {rule_id}): LLM Token Usage: "
-                    f"Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}."
-                )
-            else:
-                log.warning(f"Alert {alert_id} (Rule: {rule_id}): 'usage' field not found in Azure API response.")
+log = setup_logging()
 
-            log.info(f"Alert {alert_id} (Rule: {rule_id}): Successfully received {len(resp)} chars response from Azure.")
-            return prompt, datetime.utcnow(), resp, datetime.utcnow(), prompt_tokens, completion_tokens, total_tokens
+# --- Heartbeat File Management ---
+def update_heartbeat_file():
+    """Updates a heartbeat file with the current timestamp."""
+    try:
+        with open(HEARTBEAT_FILE, 'w') as f:
+            f.write(datetime.now(timezone.utc).isoformat())
+    except IOError as e:
+        log.error(f"Failed to update heartbeat file {HEARTBEAT_FILE}: {e}")
+
+# --- Load System Prompt ---
+def load_system_prompt(file_path: str) -> str:
+    """Loads the system prompt from a file."""
+    try:
+        with open(file_path, 'r') as f:
+            prompt = f.read().strip()
+            log.info(f"System prompt loaded from {file_path}")
+            return prompt
+    except FileNotFoundError:
+        log.critical(f"System prompt file not found at {file_path}. Please ensure it exists.")
+        sys.exit(1)
+    except Exception as e:
+        log.critical(f"Error loading system prompt from {file_path}: {e}")
+        sys.exit(1)
+
+SYSTEM_PROMPT_CONTENT = load_system_prompt(PROMPT_FILE)
+
+# --- LLM Interaction Function ---
+def get_llm_response(raw_alert_json: dict, agent_details_json: dict) -> Union[dict, None]:
+    """
+    Sends the raw alert and agent details to the LLM and returns its response.
+    Returns:
+        dict: A dictionary containing the raw text response from the LLM,
+              and token usage, or None on failure.
+    """
+    try:
+        # Construct the user message combining raw alert and agent details
+        user_message_content = {
+            "alert": raw_alert_json,
+            "agent_details": agent_details_json
+        }
+
+        # Convert to JSON string for the prompt
+        user_message_str = json.dumps(user_message_content, indent=2)
+
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT_CONTENT},
+            {"role": "user", "content": user_message_str}
+        ]
+
+        headers = {
+            "api-key": AZURE_OPENAI_API_KEY,
+            "Content-Type": "application/json"
+        }
+
+        api_url = f"{ENDPOINT_URL}/openai/deployments/{DEPLOYMENT_NAME}/chat/completions?api-version={AZURE_API_VERSION}"
+
+        payload = {
+            "messages": messages,
+            "max_tokens": 1024, # Adjust as needed
+            "temperature": 0.7,
+            "top_p": 0.95,
+            "frequency_penalty": 0,
+            "presence_penalty": 0,
+            "stop": ["<|im_end|>"]
+        }
+
+        log.info("Sending request to Azure OpenAI API...")
+        response = requests.post(api_url, headers=headers, json=payload, timeout=60) # Increased timeout
+        response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
+
+        response_data = response.json()
         
-        except requests.exceptions.RequestException as e:
-            log.error(f"Alert {alert_id} (Rule: {rule_id}): Azure API Request Error on attempt #{attempt}: {e}")
-            log.debug(f"Full traceback for Alert {alert_id} request error:\n{traceback.format_exc()}")
-            if attempt < retries:
-                sleep_for = 5 * attempt
-                log.warning(f"Alert {alert_id} (Rule: {rule_id}): Retrying Azure API call after {sleep_for}s...")
-                time.sleep(sleep_for)
-            else:
-                log.error(f"Alert {alert_id} (Rule: {rule_id}): All {retries} Azure API retries failed. Propagating error.")
-                raise
-        except json.JSONDecodeError as e:
-            log.error(f"Alert {alert_id} (Rule: {rule_id}): Failed to parse JSON response from Azure on attempt #{attempt}: {e}. Response content: {r.text[:500]}...")
-            log.debug(f"Full traceback for Alert {alert_id} JSON decode error:\n{traceback.format_exc()}")
-            if attempt < retries:
-                sleep_for = 5 * attempt
-                log.warning(f"Alert {alert_id} (Rule: {rule_id}): Retrying after {sleep_for}s...")
-                time.sleep(sleep_for)
-            else:
-                log.error(f"Alert {alert_id} (Rule: {rule_id}): All {retries} retries failed due to JSON decode error. Propagating error.")
-                raise
-        except Exception as e:
-            log.error(f"Alert {alert_id} (Rule: {rule_id}): Unexpected error during Azure API call on attempt #{attempt}: {e}")
-            log.debug(f"Full traceback for Alert {alert_id} unexpected error:\n{traceback.format_exc()}")
-            if attempt < retries:
-                sleep_for = 5 * attempt
-                log.warning(f"Alert {alert_id} (Rule: {rule_id}): Retrying after {sleep_for}s...")
-                time.sleep(sleep_for)
-            else:
-                log.error(f"Alert {alert_id} (Rule: {rule_id}): All {retries} retries failed due to unexpected error. Propagating error.")
-                raise
+        # Extract content and token usage
+        completion_content = response_data['choices'][0]['message']['content']
+        prompt_tokens = response_data['usage']['prompt_tokens']
+        completion_tokens = response_data['usage']['completion_tokens']
+        total_tokens = response_data['usage']['total_tokens']
 
-def process_alerts(conn, system_prompt, batch_size=5):
-    """
-    Fetches and processes a batch of new alerts.
-    Includes verbose logging for fetching, parsing, LLM calls, and DB updates.
-    """
-    processed_count = 0
-    with conn.cursor() as curs:
-        log.info(f"Attempting to fetch up to {batch_size} new alerts (state='new').")
-        try:
-            curs.execute("""
-                SELECT id, raw, alert_hash, rule_id
-                  FROM alerts
-                 WHERE state = 'new'
-                 ORDER BY ingest_timestamp
-                 LIMIT %s
-                 FOR UPDATE SKIP LOCKED
-            """, (batch_size,))
-            rows = curs.fetchall()
-            ids_fetched = [r[0] for r in rows]
-            log.info(f"Fetched {len(rows)} new alerts. IDs: {ids_fetched!r}")
-            if not rows:
-                return 0 # No new alerts to process
+        log.info(f"LLM Response received. Tokens: Prompt={prompt_tokens}, Completion={completion_tokens}, Total={total_tokens}")
 
-        except psycopg2.Error as e:
-            log.error(f"Database error during alert fetch: {e}", exc_info=True)
+        # MODIFIED: Do NOT attempt to parse as JSON. Store the raw text.
+        return {
+            "parsed_response": completion_content, # Store raw string, not parsed JSON
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": total_tokens
+        }
+
+    except requests.exceptions.HTTPError as http_err:
+        log.error(f"HTTP error during LLM API call: {http_err} - {response.text}", exc_info=True)
+        return None
+    except requests.exceptions.ConnectionError as conn_err:
+        log.error(f"Connection error during LLM API call: {conn_err}", exc_info=True)
+        return None
+    except requests.exceptions.Timeout as timeout_err:
+        log.error(f"Timeout error during LLM API call: {timeout_err}", exc_info=True)
+        return None
+    except requests.exceptions.RequestException as req_err:
+        log.error(f"An unexpected request error occurred during LLM API call: {req_err}", exc_info=True)
+        return None
+    except KeyError as ke:
+        log.error(f"KeyError in LLM response structure: {ke}. Full response: {response_data}", exc_info=True)
+        return None
+    except Exception as e:
+        log.error(f"An unexpected error occurred in get_llm_response: {e}", exc_info=True)
+        return None
+
+# --- Main Alert Processing Logic ---
+def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
+    """
+    Fetches an alert and its enriched agent details, sends to LLM,
+    and updates the alerts table with the LLM response.
+    """
+    conn = None
+    alert_record = None
+    try:
+        conn = psycopg2.connect(PG_DSN)
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
+        # 1. Fetch the alert record from the alerts table
+        cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
+        alert_record = cur.fetchone()
+
+        if not alert_record:
+            log.error(f"Alert with ID {alert_id} not found in alerts table for LLM processing.")
+            return None
+        
+        # ADDED: Fetch a fresh record to avoid race conditions with state updates
+        # If the state was just updated by alert-enrichment-agent.py, we want the latest.
+        # This will prevent re-processing by this worker if another LLM worker instance
+        # somehow processed it in the interim, or if the notification was delayed.
+        cur.execute("SELECT state FROM alerts WHERE id = %s;", (alert_id,))
+        current_state = cur.fetchone()['state']
+
+        if current_state != 'agent_enriched':
+            log.info(f"Alert ID {alert_id} is in state '{current_state}', not 'agent_enriched'. Skipping LLM processing.")
+            return dict(alert_record) # Return alert as dict for consistency
+
+        agent_id = alert_record.get('agent_id')
+        if not agent_id:
+            log.error(f"Alert ID {alert_id} is missing agent_id. Cannot fetch agent details for LLM.")
+            return dict(alert_record)
+
+        # 2. Fetch the associated agent details from the agents table
+        cur.execute("SELECT api_response FROM agents WHERE id = %s;", (agent_id,))
+        agent_data_from_db = cur.fetchone()
+
+        agent_details_for_llm = {}
+        if agent_data_from_db and agent_data_from_db.get('api_response'):
+            agent_details_for_llm = agent_data_from_db['api_response'] # This is already JSONB, so it's a dict
+            log.info(f"Successfully retrieved agent details for agent {agent_id} from DB for alert {alert_id}.")
+        else:
+            log.warning(f"No detailed agent data found in 'agents' table for agent ID {agent_id}. LLM prompt will lack agent context.")
+            # If no agent data, send an empty dict to LLM to prevent errors
+
+        # 3. Send to LLM
+        raw_alert = alert_record['raw'] # Assuming 'raw' is the JSONB column with original alert
+        llm_response_data = get_llm_response(raw_alert, agent_details_for_llm)
+
+        if not llm_response_data:
+            log.error(f"LLM did not return a valid response for alert ID {alert_id}. Not updating alert table.")
+            # We don't change the state here, so it can be retried later or manually inspected.
+            return dict(alert_record) # Return original alert record
+
+        # 4. Update the alerts table with LLM response and new state
+        log.info(f"Updating alert {alert_id} with LLM response and state 'summarized'.")
+        update_query = """
+        UPDATE alerts
+        SET
+            prompt_sent_at = %s,
+            prompt_text = %s,
+            response_received_at = %s,
+            response_text = %s,
+            prompt_tokens = %s,
+            completion_tokens = %s,
+            total_tokens = %s,
+            state = %s
+        WHERE id = %s;
+        """
+        
+        # Prepare the prompt_text (combine system and user messages sent to LLM)
+        full_prompt_text = json.dumps([
+            {"role": "system", "content": SYSTEM_PROMPT_CONTENT},
+            {"role": "user", "content": json.dumps({"alert": raw_alert, "agent_details": agent_details_for_llm}, indent=2)}
+        ], indent=2)
+
+        cur.execute(update_query, (
+            datetime.now(timezone.utc), # prompt_sent_at (approximate)
+            full_prompt_text,
+            datetime.now(timezone.utc), # response_received_at (approximate)
+            llm_response_data['parsed_response'], # Store raw string directly
+            llm_response_data['prompt_tokens'],
+            llm_response_data['completion_tokens'],
+            llm_response_data['total_tokens'],
+            'summarized', # New state after LLM processing
+            alert_id
+        ))
+        conn.commit()
+        log.info(f"Alert ID {alert_id} successfully updated with LLM response.")
+
+        # 5. Notify the next stage (Emailer)
+        cur.execute("SELECT pg_notify('new_response', %s);", (str(alert_id),))
+        conn.commit()
+        log.info(f"pg_notify('new_response', {alert_id}) sent.")
+
+        # Return the updated alert record with LLM details
+        cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
+        return dict(cur.fetchone())
+
+    except psycopg2.Error as db_err:
+        log.critical(f"Database error in process_alert_for_llm for alert ID {alert_id}: {db_err}", exc_info=True)
+        if conn:
             conn.rollback()
-            return 0
-        except Exception as e:
-            log.error(f"Unexpected error during alert fetch: {e}", exc_info=True)
-            return 0
+        return None
+    except Exception as e:
+        log.critical(f"An unexpected error occurred in process_alert_for_llm for alert ID {alert_id}: {e}", exc_info=True)
+        return None
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
 
-        for alert_id, raw_alert_data, alert_hash, rule_id in rows:
-            log.info(f"--- Processing Alert DB ID: {alert_id} (Hash: {alert_hash}, Rule: {rule_id}) ---")
-            
-            alert_json = None
-            try:
-                alert_json = raw_alert_data if isinstance(raw_alert_data, dict) else json.loads(raw_alert_data)
-                log.debug(f"Alert {alert_id}: Successfully parsed raw JSON data.")
-            except json.JSONDecodeError as e:
-                log.error(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): JSON parse error on raw data: {e}. Raw data snippet: {str(raw_alert_data)[:500]}...")
-                log.debug(f"Full traceback for Alert {alert_id} JSON parse error:\n{traceback.format_exc()}")
-                try:
-                    curs.execute("UPDATE alerts SET state = 'parsing_failed' WHERE id = %s", (alert_id,))
-                    conn.commit()
-                    log.warning(f"Alert {alert_id}: Marked as 'parsing_failed' due to JSON error.")
-                except psycopg2.Error as db_e:
-                    log.critical(f"Alert {alert_id}: Failed to mark as 'parsing_failed' after JSON error: {db_e}. Data might be stuck. Rolling back current transaction.")
-                    conn.rollback()
-                continue
-
-            if alert_json is None:
-                log.error(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): 'raw' alert data was null or invalid after parsing. Skipping LLM call.")
-                continue
-
-            # Modified call to azure_chat to receive token metrics
-            prompt_text, prompt_sent_at, resp_text, resp_received_at, prompt_tokens, completion_tokens, total_tokens = \
-                (None,) * 7 # Initialize all return values
-
-            try:
-                prompt_text, prompt_sent_at, resp_text, resp_received_at, prompt_tokens, completion_tokens, total_tokens = \
-                    azure_chat(system_prompt, alert_id, alert_json, alert_hash, rule_id)
-            except Exception as e:
-                log.error(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): LLM API call failed completely: {e}. Skipping DB update for this alert.")
-                try:
-                    curs.execute("UPDATE alerts SET state = 'llm_failed' WHERE id = %s", (alert_id,))
-                    conn.commit()
-                    log.warning(f"Alert {alert_id}: Marked as 'llm_failed' due to LLM processing error.")
-                except psycopg2.Error as db_e:
-                    log.critical(f"Alert {alert_id}: Failed to mark as 'llm_failed' after LLM error: {db_e}. Data might be stuck. Rolling back current transaction.")
-                    conn.rollback()
-                continue
-
-            try:
-                log.debug(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): Initiating DB transaction for update.")
-                
-                curs.execute("BEGIN")
-                curs.execute("""
-                    UPDATE alerts
-                       SET prompt_sent_at       = %s,
-                           prompt_text          = %s,
-                           response_received_at = %s,
-                           response_text        = %s,
-                           prompt_tokens        = %s,
-                           completion_tokens    = %s,
-                           total_tokens         = %s,
-                           state                = 'summarized'
-                     WHERE id = %s
-                """, (prompt_sent_at, prompt_text, resp_received_at, resp_text,
-                      prompt_tokens, completion_tokens, total_tokens, # New parameters
-                      alert_id))
-                
-                if curs.rowcount == 1:
-                    log.info(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): Successfully updated DB. State set to 'summarized'.")
-                    log.info(f"Alert {alert_id}: Token usage stored - Prompt: {prompt_tokens}, Completion: {completion_tokens}, Total: {total_tokens}.")
-                    curs.execute("COMMIT")
-                    processed_count += 1
-                else:
-                    log.warning(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): DB UPDATE affected {curs.rowcount} rows, expected 1. Rolling back.")
-                    curs.execute("ROLLBACK")
-                    try:
-                        curs.execute("UPDATE alerts SET state = 'update_failed_unexpected_rowcount' WHERE id = %s", (alert_id,))
-                        conn.commit()
-                        log.warning(f"Alert {alert_id}: Marked as 'update_failed_unexpected_rowcount'.")
-                    except psycopg2.Error as db_e:
-                        log.critical(f"Alert {alert_id}: Failed to mark as 'update_failed_unexpected_rowcount': {db_e}. Rolling back current transaction.")
-                        conn.rollback()
-
-            except psycopg2.Error as e:
-                log.error(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): Database update failed (psycopg2.Error): {e}")
-                log.debug(f"Full traceback for Alert {alert_id} DB update error:\n{traceback.format_exc()}")
-                try:
-                    curs.execute("ROLLBACK")
-                    log.warning(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): DB transaction rolled back due to error.")
-                    curs.execute("UPDATE alerts SET state = 'db_update_failed' WHERE id = %s", (alert_id,))
-                    conn.commit()
-                    log.warning(f"Alert {alert_id}: Marked as 'db_update_failed'.")
-                except psycopg2.Error as db_e:
-                    log.critical(f"Alert {alert_id}: Failed to mark as 'db_update_failed' after DB error: {db_e}. Data might be stuck. Rolling back current transaction.")
-                    conn.rollback()
-                except Exception as ex:
-                    log.critical(f"Alert {alert_id}: FATAL: Exception during rollback or marking as failed: {ex}", exc_info=True)
-                    conn.rollback()
-
-            except Exception as e:
-                log.error(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): Unexpected error during DB update: {e}")
-                log.debug(f"Full traceback for Alert {alert_id} unexpected DB update error:\n{traceback.format_exc()}")
-                try:
-                    curs.execute("ROLLBACK")
-                    log.warning(f"Alert {alert_id} (Hash: {alert_hash}, Rule: {rule_id}): DB transaction rolled back due to unexpected error.")
-                    curs.execute("UPDATE alerts SET state = 'unexpected_update_failed' WHERE id = %s", (alert_id,))
-                    conn.commit()
-                    log.warning(f"Alert {alert_id}: Marked as 'unexpected_update_failed'.")
-                except psycopg2.Error as db_e:
-                    log.critical(f"Alert {alert_id}: Failed to mark as 'unexpected_update_failed' after unexpected error: {db_e}. Data might be stuck. Rolling back current transaction.")
-                    conn.rollback()
-                except Exception as ex:
-                    log.critical(f"Alert {alert_id}: FATAL: Exception during rollback or marking as failed: {ex}", exc_info=True)
-                    conn.rollback()
-
-        return processed_count
-
-def main():
-    log.info(f"--- LLM Worker Script Started at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
-    
-    system_prompt_content = load_system_prompt()
-    if not system_prompt_content:
-        log.critical("System prompt is empty or failed to load. Exiting.")
-        exit(2)
-
+# --- Listener for agent_enriched notifications ---
+def listen_for_enriched_alerts():
+    """
+    Connects to PostgreSQL and listens for 'agent_enriched' notifications.
+    When a notification is received, it triggers process_alert_for_llm.
+    """
+    log.info(f"Starting PostgreSQL listener for channel '{LISTEN_CHANNEL}'...")
     conn = None
     try:
         conn = psycopg2.connect(PG_DSN)
-        log.info("Successfully connected to PostgreSQL database.")
-    except psycopg2.Error as e:
-        log.critical(f"FATAL: Database connection failed: {e}", exc_info=True)
-        exit(1)
+        conn.autocommit = True # Important for LISTEN to work without explicit commits
+        cur = conn.cursor()
+        cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+        log.info("Listening for notifications...")
+
+        while True:
+            conn.poll() # Check for new notifications
+            for notify in conn.notifies:
+                alert_id_str = notify.payload
+                log.info(f"Received notification on channel '{notify.channel}' with payload: {alert_id_str}")
+                update_heartbeat_file() # Update heartbeat on activity
+                try:
+                    alert_id = int(alert_id_str)
+                    processed_alert = process_alert_for_llm(alert_id)
+                    if processed_alert:
+                        log.info(f"Alert ID {alert_id} LLM processing complete.")
+                    else:
+                        log.error(f"Failed to LLM process alert ID {alert_id}.")
+                except ValueError:
+                    log.error(f"Invalid alert_id received in notification payload: {alert_id_str}")
+                except Exception as e:
+                    log.error(f"Error processing notification for alert ID {alert_id_str}: {e}", exc_info=True)
+            time.sleep(1) # Sleep briefly to avoid busy-waiting
+
+    except psycopg2.Error as db_err:
+        log.critical(f"Database error during listener setup or operation: {db_err}", exc_info=True)
+        sys.exit(1)
     except Exception as e:
-        log.critical(f"FATAL: An unexpected error occurred during database connection: {e}", exc_info=True)
-        exit(1)
+        log.critical(f"An unexpected error occurred in the listener: {e}", exc_info=True)
+        sys.exit(1)
+    finally:
+        if conn:
+            conn.close()
 
-    log.info("Initiating initial backlog drain...")
-    drained_count = process_alerts(conn, system_prompt_content, batch_size=1000)
-    log.info(f"Initial backlog drain complete: {drained_count} alerts processed.")
+# --- Main function to run the script ---
+def main():
+    log.info("--- Starting LLM Worker Script ---")
 
+    # Test database connection immediately
     try:
-        with conn.cursor() as curs:
-            curs.execute("LISTEN new_alert;")
-            log.info("Listening for 'new_alert' notifications from PostgreSQL.")
+        conn_test = psycopg2.connect(PG_DSN, connect_timeout=5)
+        conn_test.close()
+        log.info("Successfully connected to PostgreSQL database using DSN.")
     except psycopg2.Error as e:
-        log.critical(f"FATAL: Failed to establish LISTEN on 'new_alert': {e}", exc_info=True)
-        conn.close()
-        exit(1)
-    except Exception as e:
-        log.critical(f"FATAL: Unexpected error while setting up LISTEN: {e}", exc_info=True)
-        conn.close()
-        exit(1)
+        log.critical(f"ERROR: Could not connect to PostgreSQL database. Please check PG_DSN environment variable. Error: {e}")
+        sys.exit(1)
 
+    # Initial heartbeat update
+    update_heartbeat_file()
 
-    while True:
-        update_heartbeat()
-        log.info("Waiting for NOTIFY or timeout (30 seconds)...")
-        try:
-            r,_,_ = select.select([conn], [], [], 30)
-            if r:
-                conn.poll()
-                notifies = [n.payload for n in conn.notifies]
-                log.info(f"Woke on NOTIFY. Payloads received: {notifies!r}. Clearing notifications.")
-                conn.notifies.clear()
-            else:
-                log.info("Notify timeout reached. Falling back to manual poll to check for new alerts.")
-
-            alerts_processed_this_cycle = process_alerts(conn, system_prompt_content, batch_size=5)
-            log.info(f"Cycle complete: {alerts_processed_this_cycle} alerts processed.")
-
-        except psycopg2.Error as e:
-            log.error(f"Database error during main loop (LISTEN/POLL/process_alerts): {e}. Attempting to reconnect...", exc_info=True)
-            if conn:
-                try:
-                    conn.close()
-                    log.info("Closed broken DB connection.")
-                except Exception as close_e:
-                    log.error(f"Error closing broken DB connection: {close_e}")
-            
-            for i in range(5):
-                log.info(f"Attempting to reconnect to DB (attempt {i+1}/5)...")
-                time.sleep(5)
-                try:
-                    conn = psycopg2.connect(PG_DSN)
-                    with conn.cursor() as curs: # Re-listen after reconnect
-                        curs.execute("LISTEN new_alert;")
-                    log.info("Successfully reconnected and re-established LISTEN.")
-                    break
-                except psycopg2.Error as reconnect_e:
-                    log.error(f"Reconnect attempt failed: {reconnect_e}")
-                except Exception as reconnect_e:
-                    log.error(f"Unexpected error during reconnect: {reconnect_e}")
-            else:
-                log.critical("FATAL: Failed to reconnect to database after multiple attempts. Exiting.")
-                exit(1)
-            
-        except Exception as e:
-            log.critical(f"FATAL: An unexpected error occurred in the main loop: {e}", exc_info=True)
-            if conn:
-                conn.close()
-            exit(1)
+    # Start the listener (this will block and run continuously)
+    listen_for_enriched_alerts()
 
 if __name__ == "__main__":
     main()

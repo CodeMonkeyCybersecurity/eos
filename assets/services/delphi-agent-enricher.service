@@ -1,0 +1,18 @@
+# /etc/systemd/system/delphi-agent-enricher.service
+[Unit]
+Description=Delphi Emailer Service
+After=network.target
+
+[Service]
+Type=simple
+User=stanley
+ExecStart=/usr/bin/python3 /usr/local/bin/delphi-agent-enricher.py
+WorkingDirectory=/home/ubuntu
+Restart=always
+Environment="PYTHONUNBUFFERED=1"
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+
+[Install]
+WantedBy=multi-user.target

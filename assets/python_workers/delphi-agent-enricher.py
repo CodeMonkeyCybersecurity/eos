@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# /usr/local/bin/alert-enrichment-agent.py
+# /usr/local/bin/delphi-agent-enricher.py
 # stanley:stanley 0750
 
 import requests
@@ -15,6 +15,7 @@ from logging.handlers import RotatingFileHandler
 from dotenv import load_dotenv
 from base64 import b64encode
 import urllib3 # For disabling insecure warnings
+from typing import Union
 
 # --- Configuration & Environment Variable Validation ---
 
@@ -29,7 +30,7 @@ if not AGENTS_PG_DSN:
     raise ValueError("AGENTS_PG_DSN environment variable not set. Please configure your PostgreSQL DSN in the .env file.")
 
 # Wazuh API Connection Details
-WAZUH_API_URL = os.environ.get("WAZUH_API_URL") # Fallback for robustness
+WAZUH_API_URL = os.environ.get("WAZUH_API_URL", "https://delphi.cybermonkey.net.au:55000") # Fallback for robustness
 WAZUH_API_USER = os.environ.get("WAZUH_API_USER")
 WAZUH_API_PASSWD = os.environ.get("WAZUH_API_PASSWD")
 
@@ -70,7 +71,7 @@ def setup_logging() -> logging.Logger:
 log = setup_logging()
 
 # --- Wazuh API Authentication Function ---
-def authenticate_wazuh_api(api_url: str, user: str, password: str) -> str | None:
+def authenticate_wazuh_api(api_url: str, user: str, password: str) -> Union[str, None]:
     """
     Authenticates with the Wazuh API and returns a JWT token.
     """
@@ -115,7 +116,7 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> str | None
         return None
 
 # --- Wazuh API Interaction Function (Modified to fetch all agents and filter) ---
-def get_wazuh_agent_info(agent_id: str) -> dict | None:
+def get_wazuh_agent_info(agent_id: str) -> Union[dict, None]:
     """
     Fetches information about a specific Wazuh agent from the API by retrieving
     all agents and then filtering locally, mimicking 'curl ... | jq'.
@@ -320,7 +321,7 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
             conn.close()
 
 # --- Main Alert Processing Logic ---
-def process_new_alert(alert_id: int) -> dict | None:
+def process_new_alert(alert_id: int) -> Union[dict, None]:
     """
     Processes a new alert, fetches agent info, updates the database,
     and returns an enriched alert.
@@ -339,6 +340,11 @@ def process_new_alert(alert_id: int) -> dict | None:
         if not alert_record:
             log.error(f"Alert with ID {alert_id} not found in alerts table. Cannot enrich.")
             return None
+
+        # MODIFIED: Add early return if state is not 'new'
+        if alert_record.get('state') != 'new':
+            log.info(f"Alert {alert_id} state is already '{alert_record.get('state')}'. Skipping redundant agent enrichment.")
+            return dict(alert_record) # Return the existing alert record, do not re-process
 
         agent_id = alert_record.get('agent_id')
         if not agent_id:
@@ -361,18 +367,13 @@ def process_new_alert(alert_id: int) -> dict | None:
 
 
         # 4. Update the alerts table state and send notification
-        # Always attempt to update alert state to 'agent_enriched' if it was 'new',
-        # regardless of whether agent_info fetch succeeded, as enrichment was attempted.
-        # This allows the LLM worker to proceed, potentially with less context.
-        if alert_record.get('state') == 'new':
-            log.info(f"Updating alert {alert_id} state to 'agent_enriched' and sending notification.")
-            cur.execute("UPDATE alerts SET state = 'agent_enriched' WHERE id = %s;", (alert_id,))
-            conn.commit()
-            cur.execute("SELECT pg_notify('agent_enriched', %s);", (str(alert_id),))
-            conn.commit()
-            log.info(f"pg_notify('agent_enriched', {alert_id}) sent.")
-        else:
-            log.info(f"Alert {alert_id} state is already '{alert_record.get('state')}', not updating to 'agent_enriched'.")
+        # The state should always be 'new' at this point due to the early return above
+        log.info(f"Updating alert {alert_id} state to 'agent_enriched' and sending notification.")
+        cur.execute("UPDATE alerts SET state = 'agent_enriched' WHERE id = %s;", (alert_id,))
+        conn.commit()
+        cur.execute("SELECT pg_notify('agent_enriched', %s);", (str(alert_id),))
+        conn.commit()
+        log.info(f"pg_notify('agent_enriched', {alert_id}) sent.")
 
 
         # Append agent details to the alert record for the next stage (LLM/email)

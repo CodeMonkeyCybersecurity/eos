@@ -9,7 +9,7 @@ import psycopg2
 import hashlib
 import logging
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone # Import timezone
 
 # ───── Load Environment Variables ─────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
@@ -40,7 +40,7 @@ def compute_alert_hash(alert_data):
         return None # Return None on error
         
 def main():
-    script_start_time = datetime.now() # Log script start time
+    script_start_time = datetime.now(timezone.utc) # Log script start time in UTC
     log.info(f"=== alert-to-db.py start at {script_start_time.strftime('%Y-%m-%d %H:%M:%S')} ===")
 
     raw_input = sys.stdin.read()
@@ -62,7 +62,9 @@ def main():
     agent_id   = agent.get("id")
     agent_name = agent.get("name")
     agent_ip   = agent.get("ip")
-    agent_os   = agent.get("os")
+    # For OS, use the 'os' field as a dictionary and let the agents table handle its parsing
+    # as the agent_enrichment_agent.py will handle the string conversion for the DB
+    agent_os   = agent.get("os") 
 
     rule_id = alert.get("rule", {}).get("id")
     rule_level = alert.get("rule", {}).get("level")
@@ -90,23 +92,23 @@ def main():
         cur = conn.cursor()
 
         # 1) Upsert agent into agents table
-        log.debug(f"Attempting to upsert agent '{agent_id}' (name={agent_name}, ip={agent_ip}, os={agent_os})")
+        # We don't set 'os' here because the agent_enrichment_agent.py will provide a full JSON representation
+        # and more detailed breakdown of OS. This initial insert is minimal for FK constraint.
+        log.debug(f"Attempting to upsert agent '{agent_id}' (name={agent_name}, ip={agent_ip}) for initial record.")
         cur.execute("""
-            INSERT INTO agents (id, name, ip, os, registered)
-            VALUES (%s, %s, %s, %s, now())
+            INSERT INTO agents (id, name, ip, registered, last_seen)
+            VALUES (%s, %s, %s, now(), now())
             ON CONFLICT (id) DO UPDATE
               SET name       = EXCLUDED.name,
                   ip         = EXCLUDED.ip,
-                  os         = EXCLUDED.os,
                   last_seen  = now()
         """, (
             agent_id,
             agent_name,
-            agent_ip,
-            agent_os
+            agent_ip
         ))
         if cur.rowcount == 1:
-            log.info(f"Agent '{agent_id}' **inserted** into 'agents' table.")
+            log.info(f"Agent '{agent_id}' **inserted** into 'agents' table (minimal record).")
         elif cur.rowcount == 0:
             log.info(f"Agent '{agent_id}' **updated** (last_seen) in 'agents' table.")
         else:
@@ -114,9 +116,9 @@ def main():
 
 
         # --- Deduplication Logic: Tier 1 (Python Script / Time-based) ---
-        thirty_minutes_ago = datetime.now() - timedelta(minutes=30)
+        thirty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=30) # Use UTC for comparison
         
-        log.debug(f"Tier 1 Check: Looking for existing alert with hash '{alert_hash}' ingested after {thirty_minutes_ago}...")
+        log.debug(f"Tier 1 Check: Looking for existing alert with hash '{alert_hash}' ingested after {thirty_minutes_ago.isoformat()}...")
         cur.execute("""
             SELECT id, ingest_timestamp FROM alerts
             WHERE alert_hash = %s AND ingest_timestamp >= %s
@@ -136,6 +138,8 @@ def main():
             )
         else:
             log.info(f"Tier 1 Result: No recent identical alert (within 30 min) found for hash '{alert_hash}'. Proceeding to Tier 2 (Database Insert).")
+            new_alert_db_id = None # Initialize to None
+
             try:
                 # --- Deduplication Logic: Tier 2 (Database Constraint / Race Condition Handler) ---
                 cur.execute("""
@@ -159,7 +163,7 @@ def main():
                     rule_level,
                     rule_desc,
                     json.dumps(alert),
-                    "new"
+                    "new" # Initial state for new alerts
                 ))
                 new_alert_data = cur.fetchone() # Fetch the returned values
 
@@ -173,9 +177,17 @@ def main():
                         f"Alert Hash: '{alert_hash}', "
                         f"Ingest Timestamp: {new_ingest_timestamp.isoformat()}."
                     )
+                    # --- ADDED: pg_notify for 'new_alert' channel ---
+                    try:
+                        cur.execute("SELECT pg_notify('new_alert', %s);", (str(new_alert_db_id),))
+                        # The conn.commit() below will also commit this notification
+                        log.info(f"Queued pg_notify('new_alert', {new_alert_db_id}) for alert-enrichment-agent.py.")
+                    except Exception as notify_err:
+                        log.error(f"Failed to queue pg_notify for alert ID {new_alert_db_id}: {notify_err}", exc_info=True)
+                        # Don't rollback the main alert insertion if notification fails, just log.
+                    # --- END ADDED ---
                 else:
                     # This branch is taken if ON CONFLICT DO NOTHING happened (i.e., a concurrent insert won the race)
-                    # We can then re-query to get the existing alert's ID and timestamp for better logging.
                     log.info(
                         f"Tier 2 Result: Alert **skipped due to database integrity constraint** (Hash: '{alert_hash}'). "
                         f"Reason: Another process concurrently inserted this exact alert (same hash) into the DB "
@@ -190,7 +202,8 @@ def main():
                     existing_alert_recheck = cur.fetchone()
                     if existing_alert_recheck:
                         log.debug(f"Confirmed existing alert DB ID: {existing_alert_recheck[0]}, Ingested: {existing_alert_recheck[1].isoformat()} (from concurrent insert).")
-
+                        # If a concurrent insert occurred, get its ID to potentially notify if the process chain allows for existing IDs
+                        new_alert_db_id = existing_alert_recheck[0] # Set new_alert_db_id to the existing one
 
             # The psycopg2.IntegrityError exception block will now rarely, if ever, be hit for unique constraint violations
             # because ON CONFLICT handles it. It might still be useful for other types of integrity errors.
@@ -208,8 +221,8 @@ def main():
                 )
                 sys.exit(1)
 
-        conn.commit()
-        print("ok") 
+        conn.commit() # Commit the main transaction (including the notification)
+        # Removed print("ok")
 
     except psycopg2.Error as e:
         log.error(f"**Database connection or transaction error occurred**: {e}", exc_info=True)
@@ -226,7 +239,7 @@ def main():
             cur.close()
         if conn:
             conn.close()
-        log.info(f"=== alert-to-db.py end at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
+        log.info(f"=== alert-to-db.py end at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} ===") # Use UTC for end time
 
 if __name__ == "__main__":
     main()
