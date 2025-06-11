@@ -1,0 +1,17 @@
+# /etc/systemd/system/llm-worker.service
+[Unit]
+Description=LLM Worker for Summarizing Security Alerts
+After=network.target postgresql.service
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/llm-worker.py
+Restart=always
+Type=simple
+User=stanley
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+WorkingDirectory=/usr/local/bin
+
+[Install]
+WantedBy=multi-user.target

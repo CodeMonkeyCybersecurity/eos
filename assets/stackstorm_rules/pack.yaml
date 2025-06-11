@@ -1,0 +1,6 @@
+# /opt/stackstorm/packs/delphi/pack.yaml
+name: delphi
+description: "Delphi alert processing pack"
+version: "0.1.0"
+author: Code Monkey Cybersecurity
+email: main@cybermonkey.net.au

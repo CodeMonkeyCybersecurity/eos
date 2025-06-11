@@ -1,0 +1,18 @@
+# /etc/systemd/system/delphi-emailer.service
+[Unit]
+Description=Delphi Emailer Service
+After=network.target
+
+[Service]
+Type=simple
+User=stanley
+ExecStart=/usr/bin/python3 /usr/local/bin/delphi-emailer.py
+WorkingDirectory=/home/ubuntu
+Restart=always
+Environment="PYTHONUNBUFFERED=1"
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+
+[Install]
+WantedBy=multi-user.target
