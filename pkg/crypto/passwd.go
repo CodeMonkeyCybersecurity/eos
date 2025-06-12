@@ -7,27 +7,28 @@ import (
 	"context"
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"unicode"
 )
 
 // Constants and charsets for password generation
-const MinPasswordLen = 12
+const MinPasswordLen = 14
 
 // These should come from your shared package or be defined here directly
 var (
 	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
 	upperChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digitChars  = "0123456789"
-	symbolChars = "!@#$%^&*()-_=+[]{}|;:,.<>?/"
+	symbolChars = "!@#%^&*()-_=+[]{}|;:,.<>?/"  // Removed $ to prevent shell injection
 	allChars    = lowerChars + upperChars + digitChars + symbolChars
 )
 
 // GeneratePassword creates a strong random password with at least 1 of each char class.
 func GeneratePassword(length int) (string, error) {
-	if length < 4 {
-		return "", errors.New("password too short: min length 4")
+	if length < MinPasswordLen {
+		return "", errors.New("password too short: min length " + fmt.Sprintf("%d", MinPasswordLen))
 	}
 	pw := make([]byte, 0, length)
 	groups := []string{lowerChars, upperChars, digitChars, symbolChars}

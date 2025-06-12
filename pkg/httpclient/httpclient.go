@@ -24,3 +24,8 @@ var defaultClient = &http.Client{
 func DefaultClient() *http.Client {
 	return defaultClient
 }
+
+// SetDefaultClient allows replacing the default client for testing purposes
+func SetDefaultClient(client *http.Client) {
+	defaultClient = client
+}

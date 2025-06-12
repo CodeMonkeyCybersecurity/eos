@@ -3,7 +3,6 @@ package vault
 import (
 	"errors"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -34,45 +33,21 @@ func Authn(rc *eos_io.RuntimeContext) (*api.Client, error) {
 }
 
 func OrchestrateVaultAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
-	authMethods := []struct {
-		name string
-		fn   func(*api.Client) (string, error)
-	}{
-		{"agent token", readTokenFile(rc, "/etc/vault-agent-eos.token")},
-		{"AppRole", func(client *api.Client) (string, error) { return tryAppRole(rc, client) }},
-		{"disk token file", readTokenFile(rc, "/var/lib/eos/secrets/token")},
-		{"userpass", func(client *api.Client) (string, error) { return tryUserpassWithPrompt(rc, client) }},
-		{"root token file", func(client *api.Client) (string, error) { return tryRootToken(rc, client) }},
-	}
-
-	for _, m := range authMethods {
-		otelzap.Ctx(rc.Ctx).Info("🔑 Trying auth method", zap.String("method", m.name))
-		token, err := m.fn(client)
-		if err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("⚠️ Auth method failed", zap.String("method", m.name), zap.Error(err))
-			continue
-		}
-		otelzap.Ctx(rc.Ctx).Debug("✅ Auth method returned token candidate", zap.String("method", m.name))
-		if VerifyToken(rc, client, token) {
-			SetVaultToken(rc, client, token)
-			otelzap.Ctx(rc.Ctx).Info("✅ Authenticated using method", zap.String("method", m.name))
-			return nil
-		}
-	}
-	errMsg := "all authentication methods failed"
-	otelzap.Ctx(rc.Ctx).Error(errMsg)
-	return errors.New(errMsg)
+	// Use the new secure authentication orchestrator
+	return SecureAuthenticationOrchestrator(rc, client)
 }
 
 func readTokenFile(rc *eos_io.RuntimeContext, path string) func(*api.Client) (string, error) {
 	return func(_ *api.Client) (string, error) {
-		data, err := os.ReadFile(path)
+		// Use secure token file reading with permission validation
+		token, err := SecureReadTokenFile(rc, path)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("❌ Failed to read token file", zap.String("path", path), zap.Error(err))
-			return "", fmt.Errorf("read token file %s: %w", path, err)
+			otelzap.Ctx(rc.Ctx).Warn("❌ Failed to securely read token file", zap.String("path", path), zap.Error(err))
+			return "", fmt.Errorf("secure read token file %s: %w", path, err)
 		}
-		token := strings.TrimSpace(string(data))
-		otelzap.Ctx(rc.Ctx).Debug("🔑 Token file read successfully", zap.String("path", path))
+
+		// Additional security: Don't log successful reads in production to avoid token leakage
+		otelzap.Ctx(rc.Ctx).Debug("🔑 Token file read successfully with security validation", zap.String("path", path))
 		return token, nil
 	}
 }

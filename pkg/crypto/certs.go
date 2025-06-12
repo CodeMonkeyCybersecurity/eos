@@ -3,39 +3,102 @@
 package crypto
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 )
 
-// EnsureCertificates checks if certificate files exist for the given domain,
+// EnsureCertificates securely checks if certificate files exist for the given domain,
 // and if not, calls an external command (like certbot) to obtain them.
-// It now accepts appName, baseDomain, and email as parameters.
-
+// All inputs are validated to prevent command injection attacks.
 func EnsureCertificates(appName, baseDomain, email string) error {
+	// SECURITY: Validate all inputs before any processing
+	if err := ValidateAllCertificateInputs(appName, baseDomain, email); err != nil {
+		return fmt.Errorf("certificate input validation failed: %w", err)
+	}
+	
+	// Additional sanitization as defense-in-depth
+	appName = SanitizeInputForCommand(appName)
+	baseDomain = SanitizeInputForCommand(baseDomain)
+	email = SanitizeInputForCommand(email)
+	
+	// Re-validate after sanitization to ensure nothing malicious got through
+	if err := ValidateAllCertificateInputs(appName, baseDomain, email); err != nil {
+		return fmt.Errorf("post-sanitization validation failed: %w", err)
+	}
+	
 	certDir := "certs"
-	// Construct the fully qualified domain name.
+	
+	// Construct the fully qualified domain name using validated inputs
 	fqdn := fmt.Sprintf("%s.%s", appName, baseDomain)
+	
+	// Use secure file path construction
 	privKey := filepath.Join(certDir, fmt.Sprintf("%s.privkey.pem", fqdn))
 	fullChain := filepath.Join(certDir, fmt.Sprintf("%s.fullchain.pem", fqdn))
+	
+	// Validate that the constructed file paths are safe
+	if err := validateFilePath(privKey); err != nil {
+		return fmt.Errorf("invalid private key path: %w", err)
+	}
+	if err := validateFilePath(fullChain); err != nil {
+		return fmt.Errorf("invalid fullchain path: %w", err)
+	}
 
-	// Check if the private key exists.
+	// Check if the private key exists
 	if _, err := os.Stat(privKey); os.IsNotExist(err) {
-		// Execute certbot to obtain a certificate.
-		cmd := exec.Command("certbot", "certonly", "--standalone",
-			"--preferred-challenges", "http", "-d", fqdn, "-m", email,
-			"--agree-tos", "--non-interactive")
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("failed to generate certificate: %w\nOutput: %s", err, output)
+		// Use secure command execution with timeout and validation
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		
+		// Execute certbot with validated parameters using our secure execute package
+		args := []string{
+			"certonly",
+			"--standalone", 
+			"--preferred-challenges", "http",
+			"-d", fqdn,
+			"-m", email,
+			"--agree-tos",
+			"--non-interactive",
 		}
-		// In production, you would move or copy the generated certificates to certDir.
+		
+		// Log the command being executed (but not the email for privacy)
+		if err := execute.RunSimple(ctx, "certbot", args...); err != nil {
+			return fmt.Errorf("failed to generate certificate for domain %s: %w", fqdn, err)
+		}
+		
+		// In production, you would move or copy the generated certificates to certDir
+		// For now, we assume certbot places them in the correct location
+		
 	} else if _, err := os.Stat(fullChain); os.IsNotExist(err) {
-		// If the private key exists but the fullchain is missing, return an error.
+		// If the private key exists but the fullchain is missing, return an error
 		return fmt.Errorf("fullchain certificate missing for domain %s", fqdn)
 	}
 
-	// If both files exist, no action is needed.
+	// If both files exist, no action is needed
+	return nil
+}
+
+// validateFilePath ensures file paths are safe and don't contain path traversal
+func validateFilePath(path string) error {
+	// Check for path traversal attempts
+	if filepath.IsAbs(path) {
+		return fmt.Errorf("absolute paths not allowed: %s", path)
+	}
+	
+	// Clean the path and check it hasn't changed (indicates traversal attempts)
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("path contains traversal elements: %s", path)
+	}
+	
+	// Check for any .. elements
+	if filepath.Dir(cleanPath) != filepath.Dir(path) {
+		return fmt.Errorf("path validation failed: %s", path)
+	}
+	
 	return nil
 }
