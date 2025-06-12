@@ -69,7 +69,7 @@ check_prerequisites() {
     exit 1
   fi
 
-  # Confirm the detected Go version
+  # Confithe detected Go version
   log INFO "Go detected and ready. Version details: $(go version)"
 
   if $IS_LINUX; then
@@ -82,7 +82,7 @@ check_prerequisites() {
 build_eos_binary() {
   log INFO "⚙️ Building EOS..."
   cd "$EOS_SRC_DIR"
-  rm -f "$EOS_BINARY_NAME"
+  -f "$EOS_BINARY_NAME"
   # Use the 'go' command which should now be in PATH due to check_prerequisites
   go build -o "$EOS_BINARY_NAME" .
 }
@@ -101,7 +101,7 @@ install_binary() {
   log INFO "🚚 Installing to $INSTALL_PATH"
   if $IS_MAC; then
     # On macOS, sudo is typically implied for /usr/local/bin
-    sudo rm -f "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
+    sudo rm -rf "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
     sudo cp "$EOS_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
     sudo chmod 755 "$INSTALL_PATH" || log ERR "Failed to set permissions on $INSTALL_PATH."
   else
