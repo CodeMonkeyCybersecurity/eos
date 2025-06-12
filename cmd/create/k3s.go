@@ -166,11 +166,12 @@ func saveScript(rc *eos_io.RuntimeContext, cmdStr string) string {
 	}
 	scriptPath := dir + "/k3s-install.sh"
 	// Prepend with set -x for debugging and redirect output to a log file.
-	scriptContent := fmt.Sprintf(`#!/bin/sh
-set -x
-exec > >(tee -a %s/k3s-deploy.log) 2>&1
-%s
-`, shared.EosLogDir, cmdStr)
+	// Use Bash so process-substitution works everywhere Ubuntu ships it.
+	scriptContent := fmt.Sprintf(`#!/usr/bin/env bash
+ set -euo pipefail
+ exec > >(tee -a %s/k3s-deploy.log) 2>&1
+ %s
+ `, shared.EosLogDir, cmdStr)
 	err = os.WriteFile(scriptPath, []byte(scriptContent), shared.DirPermStandard)
 	if err != nil {
 		fmt.Printf("Warning: Failed to write script file: %v\n", err)
