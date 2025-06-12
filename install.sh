@@ -82,7 +82,7 @@ check_prerequisites() {
 build_eos_binary() {
   log INFO "⚙️ Building EOS..."
   cd "$EOS_SRC_DIR"
-  -f "$EOS_BINARY_NAME"
+  rm -rf "$EOS_BINARY_NAME"
   # Use the 'go' command which should now be in PATH due to check_prerequisites
   go build -o "$EOS_BINARY_NAME" .
 }
