@@ -84,7 +84,7 @@ func deployK3s(rc *eos_io.RuntimeContext) {
 
 	switch role {
 	case "server":
-		fmt.Printf("enter TLS SAN (default: %s): ", eos_unix.GetInternalHostname)
+		fmt.Printf("enter TLS SAN (default: %s): ", eos_unix.GetInternalHostname())
 		tlsSANInput, _ := reader.ReadString('\n')
 		tlsSAN := strings.TrimSpace(tlsSANInput)
 		if tlsSAN == "" { // user hit <Enter> → use auto-detected default
