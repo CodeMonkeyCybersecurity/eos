@@ -225,6 +225,16 @@ func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) erro
 
 	token, err := tryRootToken(rc, client)
 	attempt.EndTime = time.Now()
+	
+	// Log the attempt for security monitoring
+	defer func() {
+		log.Info("🚨 Emergency root token attempt completed",
+			zap.String("method", attempt.Method),
+			zap.Bool("success", attempt.Success),
+			zap.String("error_type", attempt.ErrorType),
+			zap.Duration("duration", attempt.EndTime.Sub(attempt.StartTime)),
+		)
+	}()
 
 	if err != nil {
 		attempt.Success = false

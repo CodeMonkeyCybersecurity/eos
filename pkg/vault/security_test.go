@@ -9,6 +9,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
+
 // TestTokenFileSecurityPermissions validates that token files have secure permissions
 func TestTokenFileSecurityPermissions(t *testing.T) {
 	tests := []struct {
@@ -52,6 +53,7 @@ func TestTokenFileSecurityPermissions(t *testing.T) {
 
 // TestAuthenticationFallbackSecurity ensures auth fallback doesn't leak sensitive info
 func TestAuthenticationFallbackSecurity(t *testing.T) {
+	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
 	
 	// Create temp directory for test token files
@@ -126,6 +128,7 @@ func TestAuthenticationFallbackSecurity(t *testing.T) {
 
 // TestVaultClientCacheSecurity tests the global vault client cache for race conditions
 func TestVaultClientCacheSecurity(t *testing.T) {
+	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
 	
 	// Test concurrent access to vault client cache
@@ -162,6 +165,7 @@ func TestVaultClientCacheSecurity(t *testing.T) {
 
 // TestTLSConfigurationSecurity validates TLS setup security
 func TestTLSConfigurationSecurity(t *testing.T) {
+	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
 	
 	tests := []struct {
@@ -201,6 +205,7 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 
 // TestTokenValidationSecurity ensures token validation is secure
 func TestTokenValidationSecurity(t *testing.T) {
+	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
 	
 	tests := []struct {
@@ -278,6 +283,7 @@ func TestTokenValidationSecurity(t *testing.T) {
 
 // TestAppRoleAuthenticationSecurity tests AppRole auth security
 func TestAppRoleAuthenticationSecurity(t *testing.T) {
+	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
 	
 	t.Run("invalid_credentials_no_leak", func(t *testing.T) {

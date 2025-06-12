@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
@@ -18,6 +19,22 @@ func TestRuntimeContext(t *testing.T) *eos_io.RuntimeContext {
 	t.Helper()
 	ctx := context.Background()
 	return eos_io.NewContext(ctx, "test")
+}
+
+// TestRuntimeContextWithTimeout creates a test context with a specific timeout
+func TestRuntimeContextWithTimeout(t *testing.T, timeout time.Duration) (*eos_io.RuntimeContext, context.CancelFunc) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	rc := eos_io.NewContext(ctx, "test")
+	return rc, cancel
+}
+
+// TestRuntimeContextWithCancel creates a test context that can be cancelled
+func TestRuntimeContextWithCancel(t *testing.T) (*eos_io.RuntimeContext, context.CancelFunc) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	rc := eos_io.NewContext(ctx, "test")
+	return rc, cancel
 }
 
 // MockHTTPTransport provides a customizable HTTP transport for testing
@@ -103,11 +120,11 @@ func (m *mockResponseBody) Close() error {
 // WithMockHTTPClient replaces the default HTTP client for the duration of the test
 func WithMockHTTPClient(t *testing.T, transport *MockHTTPTransport) func() {
 	t.Helper()
-	
+
 	originalClient := httpclient.DefaultClient()
 	mockClient := &http.Client{Transport: transport}
 	httpclient.SetDefaultClient(mockClient)
-	
+
 	return func() {
 		httpclient.SetDefaultClient(originalClient)
 	}
@@ -279,7 +296,7 @@ type TableTest[T any] struct {
 // RunTableTests runs table-driven tests with the provided test function
 func RunTableTests[T any](t *testing.T, tests []TableTest[T], testFunc func(t *testing.T, input T) (any, error)) {
 	t.Helper()
-	
+
 	for _, tt := range tests {
 		t.Run(tt.Name, func(t *testing.T) {
 			if tt.Setup != nil {
@@ -288,9 +305,9 @@ func RunTableTests[T any](t *testing.T, tests []TableTest[T], testFunc func(t *t
 			if tt.Cleanup != nil {
 				defer tt.Cleanup()
 			}
-			
+
 			result, err := testFunc(t, tt.Input)
-			
+
 			if tt.Error != "" {
 				AssertErrorContains(t, err, tt.Error)
 			} else {
@@ -301,4 +318,9 @@ func RunTableTests[T any](t *testing.T, tests []TableTest[T], testFunc func(t *t
 			}
 		})
 	}
+}
+
+// Contains checks if a string contains a substring (helper for integration tests)
+func Contains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }
