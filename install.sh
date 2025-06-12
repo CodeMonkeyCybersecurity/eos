@@ -111,7 +111,7 @@ install_binary() {
       # Use `bash -c` to ensure the environment is inherited correctly when `sudo` re-runs
       exec sudo bash -c "export PATH=\"$PATH\"; \"$0\" \"$@\""
     fi
-    rm -f "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
+    rm -rf "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
     cp "$EOS_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
     chown root:root "$INSTALL_PATH" || log ERR "Failed to change ownership of $INSTALL_PATH."
     chmod 755 "$INSTALL_PATH" || log ERR "Failed to set permissions on $INSTALL_PATH."
