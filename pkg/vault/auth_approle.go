@@ -86,7 +86,7 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 // PhaseCreateAppRole provisions (or reuses) an AppRole and writes its creds to disk.
 func PhaseCreateAppRole(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
 
-	log.Info("🔑 [Phase 10] Creating AppRole for EOS")
+	log.Info("🔑 [Phase 10] Creating AppRole for Eos")
 
 	roleID, secretID, err := EnsureAppRole(rc, client, opts)
 	if err != nil {

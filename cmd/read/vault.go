@@ -58,18 +58,18 @@ var InspectVaultInitCmd = &cobra.Command{
 		}
 
 		// ---------------------------------------
-		// Print EOS Credentials
+		// Print Eos Credentials
 		// ---------------------------------------
 		if eosCreds != nil {
-			log.Info("👤 EOS User Credentials printed")
-			fmt.Println("\n👤 EOS User Credentials")
+			log.Info("👤 Eos User Credentials printed")
+			fmt.Println("\n👤 Eos User Credentials")
 			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 			fmt.Printf("Username: %s\n", eosCreds.Username)
 			fmt.Printf("Password: %s\n", eosCreds.Password)
 		} else {
-			log.Info("⚠️  EOS credentials not found (expected in secrets dir)")
-			fmt.Println("\n ⚠️  EOS credentials not found (expected in secrets dir)")
-			fmt.Println("👉  You can refresh EOS credentials safely by running:")
+			log.Info("⚠️  Eos credentials not found (expected in secrets dir)")
+			fmt.Println("\n ⚠️  Eos credentials not found (expected in secrets dir)")
+			fmt.Println("👉  You can refresh Eos credentials safely by running:")
 			fmt.Println("    eos refresh eos-passwd")
 			fmt.Println("   (This will regenerate a strong password and save it securely.)")
 		}
@@ -87,7 +87,7 @@ var InspectVaultInitCmd = &cobra.Command{
 			log.Info("Unseal Key loaded", zap.Int("key_number", i+1))
 		}
 		if eosCreds != nil {
-			log.Info("EOS credentials loaded", zap.String("username", eosCreds.Username))
+			log.Info("Eos credentials loaded", zap.String("username", eosCreds.Username))
 		}
 
 		log.Warn("⚡ Please back up your Vault credentials securely")
@@ -170,7 +170,7 @@ var InspectVaultLDAPCmd = &cobra.Command{
 
 var InspectSecretsCmd = &cobra.Command{
 	Use:   "secrets",
-	Short: "List and view EOS secrets (redacted)",
+	Short: "List and view Eos secrets (redacted)",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
@@ -184,7 +184,7 @@ var InspectSecretsCmd = &cobra.Command{
 			return nil
 		}
 
-		fmt.Println("\n🔐 EOS Secrets Directory")
+		fmt.Println("\n🔐 Eos Secrets Directory")
 		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 		for _, file := range files {

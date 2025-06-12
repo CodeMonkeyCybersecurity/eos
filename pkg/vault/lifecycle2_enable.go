@@ -69,7 +69,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		}
 	}
 
-	// Step 10c: Create EOS entity and aliases
+	// Step 10c: Create Eos entity and aliases
 	if err := PhaseCreateEosEntity(rc); err != nil {
 		return logger.LogErrAndWrap(rc, "create eos entity", err)
 	}

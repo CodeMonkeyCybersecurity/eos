@@ -11,7 +11,7 @@ import (
 )
 
 //--------------------------------------------------------------------
-// 10. Create AppRole for EOS
+// 10. Create AppRole for Eos
 //--------------------------------------------------------------------
 
 // EnableAppRoleFlow(client, log, opts)
@@ -65,7 +65,7 @@ func PhaseEnableAppRole(
 	return nil
 }
 
-// EnableAppRoleFlow enables AppRole authentication method and provisions EOS-specific AppRole credentials.
+// EnableAppRoleFlow enables AppRole authentication method and provisions Eos-specific AppRole credentials.
 func EnableAppRoleFlow(
 	rc *eos_io.RuntimeContext,
 	client *api.Client,

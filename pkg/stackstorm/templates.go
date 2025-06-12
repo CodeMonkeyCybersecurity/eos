@@ -1,5 +1,5 @@
 // Package delphi contains embedded YAML templates for the “delphi” pack
-// and its StackStorm rule. These can be referenced by the EOS CLI when
+// and its StackStorm rule. These can be referenced by the Eos CLI when
 // scaffolding or installing the pack.
 package stackstorm
 

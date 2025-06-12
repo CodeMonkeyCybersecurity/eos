@@ -16,7 +16,7 @@ import (
 
 var TelemetryCmd = &cobra.Command{
 	Use:   "telemetry [on|off]",
-	Short: "Enable or disable EOS CLI telemetry",
+	Short: "Enable or disable Eos CLI telemetry",
 	Args:  cobra.ExactArgs(1),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		stateFile := filepath.Join(os.Getenv("HOME"), ".eos", "telemetry_on")

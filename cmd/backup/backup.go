@@ -12,7 +12,7 @@ import (
 
 var BackupCmd = &cobra.Command{
 	Use:   "backup",
-	Short: "Backup utilities for EOS",
+	Short: "Backup utilities for Eos",
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 

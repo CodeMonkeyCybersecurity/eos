@@ -10,7 +10,7 @@ function Log {
 # Globals
 $EosBinaryName = "eos.exe"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$EOSBuildPath = Join-Path $ScriptDir $EosBinaryName
+$EosBuildPath = Join-Path $ScriptDir $EosBinaryName
 $InstallDir = Join-Path $Env:ProgramFiles "eos"
 $InstallPath = Join-Path $InstallDir $EosBinaryName
 $SecretsDir = Join-Path $Env:APPDATA "eos\Secrets"
@@ -31,7 +31,7 @@ if (-not $GoCmd) {
 }
 
 # --- Build ---
-Log INFO "📦 Building EOS..."
+Log INFO "📦 Building Eos..."
 try {
     Push-Location $ScriptDir
     if (Test-Path $EosBinaryName) { Remove-Item $EosBinaryName -Force }
@@ -57,7 +57,7 @@ Show-Hash "🔍 Existing binary SHA256:" $InstallPath
 # --- Install Binary ---
 Log INFO "🚚 Installing to $InstallPath"
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-Copy-Item -Force $EOSBuildPath $InstallPath
+Copy-Item -Force $EosBuildPath $InstallPath
 
 Show-Hash "🔍 New binary SHA256:" $InstallPath
 

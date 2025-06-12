@@ -82,7 +82,7 @@ func EnsureEosUser(ctx context.Context, auto bool, loginShell bool) error {
 
 	userExists := UserExists(shared.EosID)
 	if userExists && !SecretsExist() {
-		otelzap.Ctx(ctx).Warn("EOS password file missing — generating replacement password")
+		otelzap.Ctx(ctx).Warn("Eos password file missing — generating replacement password")
 
 		newPass, err := crypto.GeneratePassword(20)
 		if err != nil {

@@ -20,7 +20,7 @@ var defaultClient = &http.Client{
 	},
 }
 
-// DefaultClient returns a preconfigured HTTP client used across EOS
+// DefaultClient returns a preconfigured HTTP client used across Eos
 func DefaultClient() *http.Client {
 	return defaultClient
 }

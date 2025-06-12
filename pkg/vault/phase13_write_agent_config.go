@@ -120,7 +120,7 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 
 func writeAgentUnit() error {
 	data := shared.AgentSystemdData{
-		Description: "Vault Agent (EOS)",
+		Description: "Vault Agent (Eos)",
 		User:        shared.EosID,
 		Group:       shared.EosID,
 		RuntimeDir:  shared.EosID,

@@ -25,7 +25,7 @@ var (
 	vaultClientLock sync.Mutex
 )
 
-// NewClient creates a new Vault API client using EOS-configured defaults.
+// NewClient creates a new Vault API client using Eos-configured defaults.
 func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -45,7 +45,7 @@ func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		log.Warn("Unable to read Vault env vars", zap.Error(err))
 	}
 
-	// If no VAULT_CACERT, use the EOS default cert path
+	// If no VAULT_CACERT, use the Eos default cert path
 	if os.Getenv("VAULT_CACERT") == "" {
 		err := cfg.ConfigureTLS(&api.TLSConfig{
 			CACert: shared.TLSCrt,

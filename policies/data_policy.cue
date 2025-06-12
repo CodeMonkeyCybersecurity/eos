@@ -65,7 +65,7 @@ policies: [RetentionPolicy, ...] & [
     {
         name:               "System Logs"
         description:        "Infrastructure logs (e.g. Docker, nginx)"
-        appliesTo:          ["Core", "EOS"]
+        appliesTo:          ["Core", "Eos"]
         defaultRetention:   "90d"
         maxRetention:       "180d"
         minRetention:       "30d"

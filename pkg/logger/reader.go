@@ -32,7 +32,7 @@ func TryReadLogFile(rc *eos_io.RuntimeContext, path string) (string, error) {
 	return ReadLogFile(path)
 }
 
-// TryJournalctl fetches recent EOS logs using journalctl, returning the output.
+// TryJournalctl fetches recent Eos logs using journalctl, returning the output.
 func TryJournalctl(rc *eos_io.RuntimeContext) (string, error) {
 	cmd := exec.Command("journalctl", "-u", shared.EosID, "--no-pager", "--since", journalSinceDefault)
 	out, err := cmd.CombinedOutput()

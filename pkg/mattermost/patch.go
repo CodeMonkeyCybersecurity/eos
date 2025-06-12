@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// PatchMattermostEnv copies and updates the .env file with EOS-standard values.
+// PatchMattermostEnv copies and updates the .env file with Eos-standard values.
 func PatchMattermostEnv(cloneDir string) error {
 	src := filepath.Join(cloneDir, "env.example")
 	dst := filepath.Join(cloneDir, ".env")

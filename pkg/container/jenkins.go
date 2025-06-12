@@ -59,7 +59,7 @@ func WriteAndUpJenkins(rc *eos_io.RuntimeContext, appName string, opts JenkinsOp
 //
 //	vault kv get secret/jenkins
 func StoreJenkinsAdminPassword(rc *eos_io.RuntimeContext, client *vaultapi.Client, password string) error {
-	// mountPath is the KV-v2 mount (EOS default is "secret")
+	// mountPath is the KV-v2 mount (Eos default is "secret")
 	kv := client.KVv2("secret")
 
 	// path under the mount.  We'll store all Jenkins data here.

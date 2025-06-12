@@ -15,7 +15,7 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	entityName := shared.EosID
 
-	log.Info("[Phase10c] Ensuring EOS entity and aliases exist")
+	log.Info("[Phase10c] Ensuring Eos entity and aliases exist")
 
 	client, err := GetRootClient(rc)
 	if err != nil {

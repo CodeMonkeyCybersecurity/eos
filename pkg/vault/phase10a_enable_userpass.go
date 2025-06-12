@@ -19,7 +19,7 @@ import (
 )
 
 //--------------------------------------------------------------------
-// 10. Create Userpass Auth for EOS User
+// 10. Create Userpass Auth for Eos User
 //--------------------------------------------------------------------
 
 // PhaseEnableUserpass sets up the userpass auth method and creates the eos user.
@@ -33,7 +33,7 @@ func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logg
 
 	if password == "" {
 		log.Warn("no password provided; prompting interactively")
-		password, err = crypto.PromptPassword(rc, "Enter password for EOS Vault user:")
+		password, err = crypto.PromptPassword(rc, "Enter password for Eos Vault user:")
 		if err != nil {
 			return cerr.Wrap(err, "prompt password")
 		}
@@ -48,7 +48,7 @@ func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logg
 		return cerr.Wrap(err, "ensure-userpass-user")
 	}
 
-	log.Info("userpass auth and EOS user configured")
+	log.Info("userpass auth and Eos user configured")
 	return nil
 }
 
@@ -73,15 +73,15 @@ func EnableUserpassAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 // EnsureUserpassUser ensures the eos user exists under userpass auth.
 func EnsureUserpassUser(client *api.Client, rc *eos_io.RuntimeContext, password string) error {
-	zap.S().Infow("ensuring EOS user exists", "path", shared.EosUserpassPath)
+	zap.S().Infow("ensuring Eos user exists", "path", shared.EosUserpassPath)
 	if sec, _ := client.Logical().Read(shared.EosUserpassPath); sec != nil {
-		zap.S().Warn("EOS user already exists; skipping")
+		zap.S().Warn("Eos user already exists; skipping")
 		return nil
 	}
 	if _, err := client.Logical().Write(shared.EosUserpassPath, shared.UserDataTemplate(password)); err != nil {
 		return cerr.Wrap(err, "create-userpass-user")
 	}
-	zap.S().Infow("EOS user created under userpass auth")
+	zap.S().Infow("Eos user created under userpass auth")
 
 	// fallback save
 	if err := WriteUserpassCredentialsFallback(rc, password); err != nil {
@@ -90,7 +90,7 @@ func EnsureUserpassUser(client *api.Client, rc *eos_io.RuntimeContext, password 
 	return nil
 }
 
-// WriteUserpassCredentialsFallback writes the EOS user’s password to disk and Vault KV,
+// WriteUserpassCredentialsFallback writes the Eos user’s password to disk and Vault KV,
 // with telemetry, structured logging, and cockroachdb‐style error wrapping.
 func WriteUserpassCredentialsFallback(rc *eos_io.RuntimeContext, password string) error {
 	zap.S().Infow("saving fallback copy")

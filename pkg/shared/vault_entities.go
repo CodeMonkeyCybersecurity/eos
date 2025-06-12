@@ -4,7 +4,7 @@ package shared
 
 const (
 	// Vault entity and alias constants
-	EosEntityPurpose = "EOS CLI unified identity"
+	EosEntityPurpose = "Eos CLI unified identity"
 )
 
 type VaultEntity struct {

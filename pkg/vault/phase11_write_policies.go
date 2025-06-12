@@ -74,7 +74,7 @@ func AttachPolicyToEosEntity(rc *eos_io.RuntimeContext, client *api.Client, log 
 		// Create the entity
 		entityData := map[string]interface{}{
 			"name":     entityName,
-			"metadata": map[string]interface{}{"purpose": "EOS CLI unified identity"},
+			"metadata": map[string]interface{}{"purpose": "Eos CLI unified identity"},
 			"policies": []string{shared.EosDefaultPolicyName},
 		}
 		resp, err := client.Logical().Write(shared.EosEntityPath, entityData)

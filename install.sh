@@ -19,15 +19,15 @@ detect_platform() {
 }
 
 # --- Globals ---
-EOS_USER="eos"
-EOS_BINARY_NAME="eos"
-EOS_SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
-EOS_BUILD_PATH="$EOS_SRC_DIR/$EOS_BINARY_NAME"
-INSTALL_PATH="/usr/local/bin/$EOS_BINARY_NAME"
+Eos_USER="eos"
+Eos_BINARY_NAME="eos"
+Eos_SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
+Eos_BUILD_PATH="$Eos_SRC_DIR/$Eos_BINARY_NAME"
+INSTALL_PATH="/usr/local/bin/$Eos_BINARY_NAME"
 
 # --- Directories ---
 # These are the *default* system-wide paths.
-# If EOS CLI supports user-specific configs, the Go application
+# If Eos CLI supports user-specific configs, the Go application
 # should handle XDG Base Directory specification (e.g., ~/.config/eos)
 # when run as a non-root user.
 if $IS_MAC; then
@@ -80,11 +80,11 @@ check_prerequisites() {
 }
 
 build_eos_binary() {
-  log INFO "⚙️ Building EOS..."
-  cd "$EOS_SRC_DIR"
-  rm -rf "$EOS_BINARY_NAME"
+  log INFO "⚙️ Building Eos..."
+  cd "$Eos_SRC_DIR"
+  rm -rf "$Eos_BINARY_NAME"
   # Use the 'go' command which should now be in PATH due to check_prerequisites
-  go build -o "$EOS_BINARY_NAME" .
+  go build -o "$Eos_BINARY_NAME" .
 }
 
 show_existing_checksum() {
@@ -102,7 +102,7 @@ install_binary() {
   if $IS_MAC; then
     # On macOS, sudo is typically implied for /usr/local/bin
     sudo rm -rf "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
-    sudo cp "$EOS_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
+    sudo cp "$Eos_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
     sudo chmod 755 "$INSTALL_PATH" || log ERR "Failed to set permissions on $INSTALL_PATH."
   else
     # Linux handling: re-run with sudo if not already root
@@ -112,7 +112,7 @@ install_binary() {
       exec sudo bash -c "export PATH=\"$PATH\"; \"$0\" \"$@\""
     fi
     rm -rf "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
-    cp "$EOS_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
+    cp "$Eos_BUILD_PATH" "$INSTALL_PATH" || log ERR "Failed to copy binary to $INSTALL_PATH. Permissions issue?"
     chown root:root "$INSTALL_PATH" || log ERR "Failed to change ownership of $INSTALL_PATH."
     chmod 755 "$INSTALL_PATH" || log ERR "Failed to set permissions on $INSTALL_PATH."
   fi
@@ -131,7 +131,7 @@ create_directories() {
   chmod 755 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
 
   # ⚠️ This is where the core logic for user-runnable commands comes in.
-  # If EOS can run certain commands as a regular user, it needs to access
+  # If Eos can run certain commands as a regular user, it needs to access
   # config/log/secret files *owned by that user*.
   # The recommended approach is for the Go application itself to determine
   # paths based on the current user and XDG Base Directory spec.
@@ -148,30 +148,30 @@ create_directories() {
 
 setup_linux_user() {
   if $IS_LINUX; then
-    if ! id "$EOS_USER" &>/dev/null; then
-      log INFO "👤 Creating system user: $EOS_USER (for service operations)"
-      useradd --system --no-create-home --shell /usr/sbin/nologin "$EOS_USER" || log ERR "Failed to create user $EOS_USER."
+    if ! id "$Eos_USER" &>/dev/null; then
+      log INFO "👤 Creating system user: $Eos_USER (for service operations)"
+      useradd --system --no-create-home --shell /usr/sbin/nologin "$Eos_USER" || log ERR "Failed to create user $Eos_USER."
     fi
 
     # Check if syslog group exists and user is not already in it
-    if getent group syslog >/dev/null && ! id -nG "$EOS_USER" | grep -qw syslog; then
-      log INFO "➕ Adding $EOS_USER to syslog group (for log access)"
-      usermod -aG syslog "$EOS_USER" || log ERR "Failed to add user $EOS_USER to syslog group."
+    if getent group syslog >/dev/null && ! id -nG "$Eos_USER" | grep -qw syslog; then
+      log INFO "➕ Adding $Eos_USER to syslog group (for log access)"
+      usermod -aG syslog "$Eos_USER" || log ERR "Failed to add user $Eos_USER to syslog group."
     fi
 
     # Crucial: These directories are now owned by the 'eos' system user.
     # If the CLI is run by 'ubuntu' user and needs to write here, it will fail.
-    chown -R "$EOS_USER:$EOS_USER" /var/lib/eos || log ERR "Failed to change ownership of /var/lib/eos."
+    chown -R "$Eos_USER:$Eos_USER" /var/lib/eos || log ERR "Failed to change ownership of /var/lib/eos."
     chmod 750 /var/lib/eos || log ERR "Failed to set permissions on /var/lib/eos."
-    chown "$EOS_USER:$EOS_USER" "$LOG_DIR" || log ERR "Failed to change ownership of $LOG_DIR."
+    chown "$Eos_USER:$Eos_USER" "$LOG_DIR" || log ERR "Failed to change ownership of $LOG_DIR."
     chmod 750 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
   fi
 }
 
 add_sudoers_entry() {
   if $IS_LINUX && [ ! -f /etc/sudoers.d/eos ]; then
-    log INFO "⚙️ Adding sudoers entry for $EOS_USER (to allow passwordless sudo for the 'eos' system user)"
-    echo "$EOS_USER ALL=(ALL) NOPASSWD: $INSTALL_PATH" | tee /etc/sudoers.d/eos > /dev/null \
+    log INFO "⚙️ Adding sudoers entry for $Eos_USER (to allow passwordless sudo for the 'eos' system user)"
+    echo "$Eos_USER ALL=(ALL) NOPASSWD: $INSTALL_PATH" | tee /etc/sudoers.d/eos > /dev/null \
       || { log ERR "Failed to write sudoers entry."; exit 1; }
     chmod 440 /etc/sudoers.d/eos || { log ERR "Failed to set permissions on sudoers file."; exit 1; }
     visudo -c || { log ERR "❌ Sudoers validation failed. Please check /etc/sudoers.d/eos manually."; exit 1; }
@@ -192,7 +192,7 @@ main() {
   setup_linux_user
   add_sudoers_entry
   echo
-  log INFO "🎉 EOS installation complete!"
+  log INFO "🎉 Eos installation complete!"
   log INFO "The 'eos' binary has been installed to '$INSTALL_PATH'."
   log INFO "This path is typically included in your user's PATH."
   log INFO "You should now be able to run 'eos --help' directly."

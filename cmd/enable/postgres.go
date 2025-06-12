@@ -14,7 +14,7 @@ import (
 
 var EnablePostgresCmd = &cobra.Command{
 	Use:   "postgres",
-	Short: "Initialize PostgreSQL schema for EOS",
+	Short: "Initialize PostgreSQL schema for Eos",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 

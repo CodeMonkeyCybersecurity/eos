@@ -24,7 +24,7 @@ policies:
     rotationSupported: true
 
   - name: "System Logs"
-    appliesTo: ["EOS", "KVM", "Docker"]
+    appliesTo: ["Eos", "KVM", "Docker"]
     retention:
       default: 90d
       min: 30d

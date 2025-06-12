@@ -16,8 +16,8 @@ import (
 
 var RefreshEosPasswdCmd = &cobra.Command{
 	Use:   "eos-passwd",
-	Short: "Refresh the EOS user password and update secrets safely",
-	Long: `Regenerates a strong EOS password,
+	Short: "Refresh the Eos user password and update secrets safely",
+	Long: `Regenerates a strong Eos password,
 updates the system account password, and saves new credentials to disk.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
@@ -28,12 +28,12 @@ updates the system account password, and saves new credentials to disk.`,
 		}
 
 		if err := eos_unix.RepairEosSecrets(rc.Ctx); err != nil {
-			log.Error("Failed to refresh EOS credentials", zap.Error(err))
+			log.Error("Failed to refresh Eos credentials", zap.Error(err))
 			return fmt.Errorf("refresh eos password: %w", err)
 		}
 
-		log.Info("✅ EOS password refreshed successfully")
-		fmt.Println("✅ EOS password refreshed and secrets updated.")
+		log.Info("✅ Eos password refreshed successfully")
+		fmt.Println("✅ Eos password refreshed and secrets updated.")
 		return nil
 	}),
 }

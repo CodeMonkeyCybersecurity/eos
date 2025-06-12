@@ -23,7 +23,7 @@ const (
 	VaultTestPath        = "bootstrap/test" // Used to verify KV functionality
 
 	// ----------------------
-	// EOS-specific Vault paths
+	// Eos-specific Vault paths
 	// ----------------------
 
 	KVNamespaceUsers = "users/"

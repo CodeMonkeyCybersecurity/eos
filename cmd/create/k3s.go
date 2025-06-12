@@ -10,6 +10,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -83,11 +84,11 @@ func deployK3s(rc *eos_io.RuntimeContext) {
 
 	switch role {
 	case "server":
-		fmt.Print("Enter TLS SAN (default: cluster.k3s.domain.com): ")
+		fmt.Printf("enter TLS SAN (default: %s): ", eos_unix.GetInternalHostname)
 		tlsSANInput, _ := reader.ReadString('\n')
 		tlsSAN := strings.TrimSpace(tlsSANInput)
-		if tlsSAN == "" {
-			tlsSAN = "cluster.k3s.domain.com"
+		if tlsSAN == "" { // user hit <Enter> → use auto-detected default
+			tlsSAN = eos_unix.GetInternalHostname()
 		}
 		installCmd = fmt.Sprintf("curl -sfL https://get.k3s.io | sh -s - server --tls-san %s", tlsSAN)
 		if nodeIP != "" {

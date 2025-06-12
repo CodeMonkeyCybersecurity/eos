@@ -17,8 +17,8 @@ import (
 
 var InspectLogsCmd = &cobra.Command{
 	Use:   "logs",
-	Short: "Inspect EOS logs (requires root or eos privileges)",
-	Long: `Displays the last 100 lines of recent EOS logs.
+	Short: "Inspect Eos logs (requires root or eos privileges)",
+	Long: `Displays the last 100 lines of recent Eos logs.
 Tries known log file locations first. If none found, falls back to journalctl.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)

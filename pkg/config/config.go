@@ -106,7 +106,7 @@ func WatchAndHotReload(fn func()) (func(), error) {
 	return func() { Config.OnConfigChange(nil) }, nil
 }
 
-// SetDefaultEnvPrefix sets a prefix for environment variables (e.g., "EOS_").
+// SetDefaultEnvPrefix sets a prefix for environment variables (e.g., "Eos_").
 func SetDefaultEnvPrefix(prefix string) {
 	Config.SetEnvPrefix(prefix)
 	Config.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))

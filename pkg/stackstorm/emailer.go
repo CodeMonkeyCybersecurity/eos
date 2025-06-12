@@ -96,7 +96,7 @@ type SMTPSender interface {
 	Send(ctx context.Context, subj, html, txt string) error
 }
 
-// ───────── Emailer – EOS style ───────────
+// ───────── Emailer – Eos style ───────────
 type Emailer struct {
 	cfg      *Config
 	tracer   trace.Tracer

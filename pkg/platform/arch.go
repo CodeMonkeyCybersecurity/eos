@@ -69,7 +69,7 @@ func GetHomeDir() string {
 }
 
 func GetShellInitFile() string {
-	if override := os.Getenv("EOS_SHELL_RC"); override != "" {
+	if override := os.Getenv("Eos_SHELL_RC"); override != "" {
 		return override
 	}
 

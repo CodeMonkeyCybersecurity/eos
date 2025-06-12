@@ -18,7 +18,7 @@ var CreateHecateCmd = &cobra.Command{
 	Use:   "hecate",
 	Short: "Fetch and set up Hecate reverse proxy framework",
 	Long: `This command downloads the Hecate reverse proxy framework from its repository,
-places it in /opt/hecate, and prepares it for use with EOS.`,
+places it in /opt/hecate, and prepares it for use with Eos.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 		log.Info("🚀 Starting full Hecate setup wizard...")

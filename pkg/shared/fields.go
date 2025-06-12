@@ -1,7 +1,7 @@
 // pkg/shared/fields.go
 
 // Package shared defines common field names used across identity systems
-// such as Vault, LDAP, SCIM, and internal EOS protocols.
+// such as Vault, LDAP, SCIM, and internal Eos protocols.
 package shared
 
 const (

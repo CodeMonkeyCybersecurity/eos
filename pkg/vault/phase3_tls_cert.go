@@ -190,10 +190,10 @@ func EnsureVaultAgentCAExists(rc *eos_io.RuntimeContext) error {
 		return cerr.Wrapf(err, "copy Vault Agent CA cert to %s", dst)
 	}
 
-	// Lookup the EOS user for ownership
+	// Lookup the Eos user for ownership
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("Could not lookup EOS user", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Could not lookup Eos user", zap.Error(err))
 		return cerr.Wrap(err, "lookup eos user")
 	}
 

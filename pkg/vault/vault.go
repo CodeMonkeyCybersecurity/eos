@@ -9,7 +9,7 @@ import (
 )
 
 func Get(key string) (string, error) {
-	envVar := "EOS_SECRET_" + sanitizeKey(key)
+	envVar := "Eos_SECRET_" + sanitizeKey(key)
 	if val := os.Getenv(envVar); val != "" {
 		return val, nil
 	}
