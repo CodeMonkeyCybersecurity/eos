@@ -191,6 +191,7 @@ func RuntimeContextLifecycleScenario() TestScenario {
 						"component":    "integration-test",
 					}
 					
+					// Copy attributes to runtime context
 					for key, value := range testAttributes {
 						rc.Attributes[key] = value
 					}
@@ -392,16 +393,16 @@ func ConcurrencyPattern(numWorkers int, operation func(workerID int, s *Integrat
 		Execute: func(s *IntegrationTestSuite) error {
 			errors := make(chan error, numWorkers)
 			
-			for i := 0; i < numWorkers; i++ {
+			for i := range numWorkers {
 				go func(workerID int) {
 					errors <- operation(workerID, s)
 				}(i)
 			}
 			
 			// Collect results
-			for i := 0; i < numWorkers; i++ {
+			for range numWorkers {
 				if err := <-errors; err != nil {
-					return fmt.Errorf("worker %d failed: %w", i, err)
+					return fmt.Errorf("worker failed: %w", err)
 				}
 			}
 			

@@ -1,0 +1,45 @@
+name: Validate Workflows
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate YAML syntax
+        run: |
+          echo "Validating workflow YAML files..."
+          # Install yq for YAML validation
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+          for file in .github/workflows/*.yml; do
+            echo "Checking $file"
+            yq eval '.' "$file" > /dev/null || exit 1
+          done
+          echo "All workflow files are valid YAML"
+
+      - name: Check workflow structure
+        run: |
+          echo "Checking basic workflow structure..."
+          for file in .github/workflows/*.yml; do
+            if ! grep -q "^name:" "$file"; then
+              echo "Error: $file missing 'name' field"
+              exit 1
+            fi
+            if ! grep -q "^on:" "$file"; then
+              echo "Error: $file missing 'on' field"
+              exit 1
+            fi
+            if ! grep -q "^jobs:" "$file"; then
+              echo "Error: $file missing 'jobs' field"
+              exit 1
+            fi
+          done
+          echo "All workflow files have required structure"

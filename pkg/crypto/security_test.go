@@ -33,7 +33,7 @@ func TestPasswordSecurityRequirements(t *testing.T) {
 		// Generate multiple passwords and ensure they're different
 		passwords := make(map[string]bool)
 		
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			pwd, err := GeneratePassword(20)
 			testutil.AssertNoError(t, err)
 			

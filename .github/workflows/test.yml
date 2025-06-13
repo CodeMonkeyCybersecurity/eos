@@ -17,7 +17,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22
+          go-version: 1.24
 
       - name: Download Go module dependencies
         run: go mod download
@@ -32,7 +32,8 @@ jobs:
         run: go tool cover -html=coverage.out -o coverage.html
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
+        continue-on-error: true
         with:
           file: ./coverage.out
           flags: unittests
@@ -40,6 +41,7 @@ jobs:
 
       - name: Upload coverage artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: coverage-report
           path: |

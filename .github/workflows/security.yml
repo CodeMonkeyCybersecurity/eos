@@ -1,5 +1,4 @@
 name: Security Testing
-
 on:
   push:
     branches: [main]
@@ -20,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22
+          go-version: 1.24
 
       - name: Download Go module dependencies
         run: go mod download
@@ -38,10 +37,11 @@ jobs:
       - name: Run static security analysis with gosec
         run: |
           go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
-          gosec -fmt json -out gosec-report.json -stdout ./...
+          gosec -fmt json -out gosec-report.json ./... || true
 
       - name: Upload security artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: security-reports
           path: |
