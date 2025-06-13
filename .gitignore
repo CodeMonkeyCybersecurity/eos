@@ -59,4 +59,3 @@ apps/mattermost/docker*
 # Other 
 *.deb
 *.rpm
-*eos*
