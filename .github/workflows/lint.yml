@@ -19,10 +19,28 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.24
+          go-version: 1.22
+
+      - name: Download Go module dependencies
+        run: go mod download
 
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
           version: latest
-          args: --out-format colored-line-number
+          args: --timeout=5m --out-format colored-line-number
+
+      - name: Check code formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "::warning::The following files are not properly formatted:"
+            gofmt -s -l .
+          fi
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Check for inefficient assignments
+        run: |
+          go install github.com/gordonklaus/ineffassign@latest
+          ineffassign ./...

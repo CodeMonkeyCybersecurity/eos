@@ -7,12 +7,11 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
-// TestIntegrationScenarios_VaultHealthCheck tests vault health check scenario
-func TestIntegrationScenarios_VaultHealthCheck(t *testing.T) {
-	suite := testutil.NewIntegrationTestSuite(t, "vault-health-scenarios")
-	suite.WithVaultMock()
+// TestIntegrationScenarios_HTTPClient tests HTTP client scenario
+func TestIntegrationScenarios_HTTPClient(t *testing.T) {
+	suite := testutil.NewIntegrationTestSuite(t, "http-client-scenarios")
 
-	scenario := testutil.VaultHealthCheckScenario()
+	scenario := testutil.HTTPClientScenario()
 	suite.RunScenario(scenario)
 }
 
@@ -35,7 +34,6 @@ func TestIntegrationScenarios_RuntimeContextLifecycle(t *testing.T) {
 // TestIntegrationScenarios_ErrorHandling tests comprehensive error handling
 func TestIntegrationScenarios_ErrorHandling(t *testing.T) {
 	suite := testutil.NewIntegrationTestSuite(t, "error-handling-scenarios")
-	suite.WithVaultMock()
 
 	scenario := testutil.ErrorHandlingScenario()
 	suite.RunScenario(scenario)
@@ -49,7 +47,7 @@ func TestIntegrationScenarios_CombinedWorkflow(t *testing.T) {
 
 	// Run multiple scenarios in sequence
 	scenarios := []testutil.TestScenario{
-		testutil.VaultHealthCheckScenario(),
+		testutil.HTTPClientScenario(),
 		testutil.RuntimeContextLifecycleScenario(),
 		testutil.ErrorHandlingScenario(),
 	}

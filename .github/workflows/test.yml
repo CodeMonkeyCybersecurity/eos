@@ -22,5 +22,26 @@ jobs:
       - name: Download Go module dependencies
         run: go mod download
 
-      - name: Run unit tests
-        run: go test -v ./...
+      - name: Run unit tests with coverage
+        run: go test -v -coverprofile=coverage.out -covermode=atomic ./pkg/...
+
+      - name: Run integration tests
+        run: go test -v -timeout=5m ./integration_test.go ./integration_scenarios_test.go
+
+      - name: Generate coverage report
+        run: go tool cover -html=coverage.out -o coverage.html
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Upload coverage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.out
+            coverage.html

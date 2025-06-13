@@ -25,14 +25,27 @@ sudo cp eos /usr/local/bin/
 
 ### Testing
 ```bash
-# Run all tests
-go test ./...
+# Run all unit tests with coverage
+go test -v -coverprofile=coverage.out -covermode=atomic ./pkg/...
 
-# Specific test files exist in:
-# - pkg/crypto/fuzz_test.go
-# - pkg/parse/fuzz_test.go 
-# - pkg/delphi/provision_test.go
-# - pkg/interaction/fuzz_test.go
+# Run integration tests
+go test -v -timeout=5m ./integration_test.go ./integration_scenarios_test.go
+
+# Generate coverage report
+go tool cover -html=coverage.out -o coverage.html
+
+# Run security-focused tests
+go test -v -run "Security|Validation|Auth" ./pkg/...
+
+# Run specific test files:
+# - pkg/crypto/fuzz_test.go - Cryptographic fuzzing tests
+# - pkg/parse/fuzz_test.go - Input parsing fuzzing tests
+# - pkg/delphi/provision_test.go - Delphi provisioning tests
+# - pkg/interaction/fuzz_test.go - User interaction fuzzing tests
+# - pkg/eos_io/context_test.go - Runtime context tests
+# - pkg/eos_cli/wrap_test.go - CLI wrapper tests
+# - integration_test.go - End-to-end integration tests
+# - integration_scenarios_test.go - Scenario-based integration tests
 ```
 
 ## Architecture
@@ -103,3 +116,33 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Follow Go module structure with clear package separation
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
+
+## CI/CD Pipeline
+
+The project includes comprehensive GitHub Actions workflows for automated testing and quality assurance:
+
+### Workflows
+- **`.github/workflows/test.yml`** - Main testing pipeline with coverage reporting
+- **`.github/workflows/lint.yml`** - Code linting and formatting checks
+- **`.github/workflows/security.yml`** - Security testing and vulnerability scanning
+- **`.github/workflows/quality-gates.yml`** - Quality gates for pull requests
+
+### Testing Infrastructure
+- **Unit Tests**: Comprehensive coverage for all core packages (pkg/eos_io, pkg/eos_cli, pkg/crypto, etc.)
+- **Integration Tests**: End-to-end scenario testing with realistic workflows
+- **Security Tests**: Validation of security improvements and input sanitization
+- **Fuzz Tests**: Robust testing of input handling and cryptographic functions
+
+### Quality Standards
+- Minimum 70% test coverage required
+- All tests must pass before merge
+- Code must pass golangci-lint checks
+- Security scans must complete without critical issues
+- Integration tests validate real-world usage scenarios
+
+### Test Framework
+The project uses a custom integration testing framework in `pkg/testutil/` providing:
+- Test environment orchestration
+- Mock service management
+- Scenario-based testing patterns
+- Comprehensive error handling validation
