@@ -30,6 +30,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read" // NOTE: This `read` is a TOP-LEVEL command, not delphi/read
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	// Internal packages
@@ -76,6 +77,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		config.ConfigCmd,
 		refresh.RefreshCmd,
 		secure.SecureCmd,
+		self.SelfCmd,
 		disable.DisableCmd,
 		backup.BackupCmd,
 		enable.EnableCmd,

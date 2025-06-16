@@ -57,6 +57,13 @@ The application uses Cobra CLI with the following command hierarchy:
 - **Security Tools**: delphi (monitoring), hecate (reverse proxy)
 - **System Operations**: backup, sync, refresh, secure, config
 
+#### HashiCorp Tools (HCL Command)
+Install HashiCorp tools with official repository integration:
+```bash
+eos create hcl [terraform|vault|consul|nomad|packer|all]
+```
+See [docs/commands/hcl.md](docs/commands/hcl.md) for detailed documentation.
+
 ### Core Packages (`pkg/`)
 - **eos_cli/**: CLI wrapper utilities and command execution
 - **eos_io/**: I/O operations and runtime context management
@@ -116,6 +123,14 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Follow Go module structure with clear package separation
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
+
+### Documentation Maintenance
+When making changes to Eos functionality:
+1. **Update CLAUDE.md** - Always update this file when adding new commands, packages, or workflows
+2. **Create command documentation** - For new commands, create simple documentation explaining usage and examples
+3. **Update CLI help text** - Ensure command descriptions and examples in code match actual functionality
+4. **Document new dependencies** - Add any new external tools or libraries to the relevant sections
+5. **Keep examples current** - Update code examples when command syntax or behavior changes
 
 ## CI/CD Pipeline
 

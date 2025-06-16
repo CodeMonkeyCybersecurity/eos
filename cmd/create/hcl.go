@@ -227,6 +227,18 @@ func installSpecificHCLTool(rc *eos_io.RuntimeContext, tool string) error {
 		return fmt.Errorf("failed to install %s: %w", tool, err)
 	}
 
+	// Install Packer QEMU plugin if installing Packer
+	if tool == "packer" {
+		logger.Info("Installing Packer QEMU plugin")
+		cmd = exec.CommandContext(rc.Ctx, "packer", "plugins", "install", "github.com/hashicorp/qemu")
+		if err := cmd.Run(); err != nil {
+			logger.Warn("Failed to install Packer QEMU plugin", zap.Error(err))
+			// Don't fail the entire installation if plugin installation fails
+		} else {
+			logger.Info("Packer QEMU plugin installed successfully")
+		}
+	}
+
 	return nil
 }
 
