@@ -59,14 +59,6 @@ path "secret/data/shared/*" {
 # Emergency access (highly restricted)
 path "secret/data/emergency/*" { 
   capabilities = ["read"]
-  control_group = {
-    max_ttl = "4h"
-    factor "authorizer" {
-      identity {
-        group_names = ["emergency-responders"]
-      }
-    }
-  }
 }
 
 # Self-service user management (limited)
@@ -151,27 +143,11 @@ const EosEmergencyPolicyTemplate = `
 # Full read access to troubleshoot issues
 path "*" { 
   capabilities = ["read", "list"]
-  control_group = {
-    max_ttl = "2h"
-    factor "authorizer" {
-      identity {
-        group_names = ["emergency-authorizers"]
-      }
-    }
-  }
 }
 
 # Limited write access for emergency fixes
 path "secret/data/emergency/*" { 
   capabilities = ["create", "read", "update", "delete", "list"]
-  control_group = {
-    max_ttl = "1h"
-    factor "authorizer" {
-      identity {
-        group_names = ["emergency-authorizers"]
-      }
-    }
-  }
 }
 
 # Essential system operations
@@ -200,7 +176,6 @@ const EosReadOnlyPolicyTemplate = `
 # Read-only access to secrets (with audit trail)
 path "secret/data/*" { 
   capabilities = ["read", "list"]
-  max_ttl = "15m"
 }
 path "secret/metadata/*" { capabilities = ["read", "list"] }
 
@@ -227,10 +202,6 @@ path "cubbyhole/*" { capabilities = ["create", "read", "update", "delete", "list
 path "sys/auth/*" { capabilities = ["deny"] }
 path "sys/mounts/*" { capabilities = ["deny"] }
 path "sys/policy/*" { capabilities = ["deny"] }
-path "secret/data/*" { 
-  capabilities = ["create", "update", "delete"]
-  capabilities = ["deny"]
-}
 `
 
 func RenderEosPolicy(kvPath string) (string, error) {
