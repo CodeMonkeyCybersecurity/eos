@@ -42,10 +42,9 @@ path "sys/control-group/request" { capabilities = ["update"] }
 # OIDC authorize (restricted)
 path "identity/oidc/provider/+/authorize" { capabilities = ["read"] }
 
-# Secrets – user-specific access with time-bound leases
+# Secrets – user-specific access
 path "secret/data/eos/{{"{{"}}identity.entity.name{{"}}"}}/*" { 
   capabilities = ["create", "read", "update", "delete", "list"]
-  max_ttl = "24h"
   required_parameters = ["version"]
 }
 path "secret/metadata/eos/{{"{{"}}identity.entity.name{{"}}"}}/*" { 
@@ -55,7 +54,6 @@ path "secret/metadata/eos/{{"{{"}}identity.entity.name{{"}}"}}/*" {
 # Shared secrets (read-only)
 path "secret/data/shared/*" { 
   capabilities = ["read", "list"]
-  max_ttl = "1h"
 }
 
 # Emergency access (highly restricted)

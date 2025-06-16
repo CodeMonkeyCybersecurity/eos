@@ -40,6 +40,19 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("render policy template %s: %w", policy.name, err)
 		}
 
+		// Validate and fix common HCL issues
+		fixedPolicy, err := ValidateAndFixCommonIssues(rc, policy.name, pol)
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Warn("⚠️ Policy validation failed, using original", 
+				zap.String("policy", policy.name), 
+				zap.Error(err))
+			fixedPolicy = pol
+		} else if fixedPolicy != pol {
+			otelzap.Ctx(rc.Ctx).Info("🔧 Policy automatically fixed", 
+				zap.String("policy", policy.name))
+			pol = fixedPolicy
+		}
+
 		otelzap.Ctx(rc.Ctx).Debug("📄 Policy loaded", zap.String("policy", policy.name), zap.String("preview", truncatePolicy(pol)), zap.Int("length", len(pol)))
 
 		otelzap.Ctx(rc.Ctx).Info("📡 Writing policy to Vault", zap.String("policy", policy.name))

@@ -1,4 +1,4 @@
-// cmd/inspect/vault.go
+// cmd/read/vault.go
 package read
 
 import (
@@ -11,7 +11,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ldap"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -26,74 +25,85 @@ func init() {
 	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
 	ReadCmd.AddCommand(InspectVaultCmd)
 	ReadCmd.AddCommand(InspectVaultInitCmd)
+	
+	// Add flags for enhanced vault-init command
+	InspectVaultInitCmd.Flags().Bool("no-redact", false, "Show sensitive data in plaintext (requires confirmation)")
+	InspectVaultInitCmd.Flags().String("export", "console", "Export format: console, json, secure")
+	InspectVaultInitCmd.Flags().Bool("status-only", false, "Show only Vault status information (no sensitive data)")
+	InspectVaultInitCmd.Flags().String("output", "", "Output file path for export formats")
+	InspectVaultInitCmd.Flags().String("reason", "", "Access reason for audit logging")
+	InspectVaultInitCmd.Flags().Bool("no-confirm", false, "Skip confirmation prompts (use with caution)")
 }
 
-// InspectVaultInitCmd displays Vault initialization keys, root token, and eos user credentials.
+// InspectVaultInitCmd displays Vault initialization keys, root token, and eos user credentials with enhanced security.
 var InspectVaultInitCmd = &cobra.Command{
 	Use:   "vault-init",
-	Short: "Inspect Vault initialization keys, root token, and eos credentials",
+	Short: "Securely inspect Vault initialization data with comprehensive status",
+	Long: `Securely reads and displays Vault initialization data including root token, unseal keys, 
+and eos credentials with comprehensive status information, integrity verification, and audit logging.
+
+Security Features:
+  • Access control and user verification
+  • Optional sensitive data redaction
+  • Comprehensive audit logging
+  • File integrity verification
+  • Current Vault status integration
+
+Examples:
+  sudo eos read vault-init                    # Secure read with redaction
+  sudo eos read vault-init --no-redact        # Show plaintext (requires confirmation)
+  sudo eos read vault-init --export json      # Export to JSON format
+  sudo eos read vault-init --status-only      # Show only status information`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
-		// Load Vault Init Result
-		initResult, err := vault.ReadVaultInitResult()
+		// Parse command flags
+		noRedact, _ := cmd.Flags().GetBool("no-redact")
+		exportFormat, _ := cmd.Flags().GetString("export")
+		statusOnly, _ := cmd.Flags().GetBool("status-only")
+		outputPath, _ := cmd.Flags().GetString("output")
+		accessReason, _ := cmd.Flags().GetString("reason")
+		noConfirm, _ := cmd.Flags().GetBool("no-confirm")
+
+		// Configure read options
+		options := vault.DefaultReadInitOptions()
+		options.RedactSensitive = !noRedact
+		options.ExportFormat = exportFormat
+		options.OutputPath = outputPath
+		options.AccessReason = accessReason
+		options.RequireConfirm = !noConfirm
+		options.IncludeStatus = true
+
+		// Handle status-only mode
+		if statusOnly {
+			options.RedactSensitive = true
+			options.RequireConfirm = false
+		}
+
+		log.Info("🔍 Starting secure vault init inspection",
+			zap.Bool("redacted", options.RedactSensitive),
+			zap.String("format", options.ExportFormat),
+			zap.Bool("status_only", statusOnly))
+
+		// Perform secure read
+		info, err := vault.SecureReadVaultInit(rc, options)
 		if err != nil {
-			return logger.LogErrAndWrap(rc, "inspect vault-init: load init result", err)
+			return logger.LogErrAndWrap(rc, "secure vault init read failed", err)
 		}
 
-		// Load eos password credentials
-		eosCreds, err := eos_unix.LoadPasswordFromSecrets(rc.Ctx)
-		if err != nil {
-			log.Warn("⚠️ Could not load eos password file", zap.Error(err))
+		// Handle different output formats
+		switch options.ExportFormat {
+		case "json":
+			return exportToJSON(info, options)
+		case "secure":
+			return exportToSecureFile(info, options)
+		default:
+			// Display to console
+			if statusOnly {
+				return displayStatusOnly(info)
+			}
+			return vault.DisplayVaultInitInfo(info, options)
 		}
-
-		// ---------------------------------------
-		// Print Vault Initialization Data
-		// ---------------------------------------
-		fmt.Println("\n🔑 Vault Initialization Result")
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-		fmt.Printf("Root Token:  %s\n", initResult.RootToken)
-		for i, key := range initResult.KeysB64 {
-			fmt.Printf("Unseal Key %d: %s\n", i+1, key)
-		}
-
-		// ---------------------------------------
-		// Print Eos Credentials
-		// ---------------------------------------
-		if eosCreds != nil {
-			log.Info("👤 Eos User Credentials printed")
-			fmt.Println("\n👤 Eos User Credentials")
-			fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-			fmt.Printf("Username: %s\n", eosCreds.Username)
-			fmt.Printf("Password: %s\n", eosCreds.Password)
-		} else {
-			log.Info("⚠️  Eos credentials not found (expected in secrets dir)")
-			fmt.Println("\n ⚠️  Eos credentials not found (expected in secrets dir)")
-			fmt.Println("👉  You can refresh Eos credentials safely by running:")
-			fmt.Println("    eos refresh eos-passwd")
-			fmt.Println("   (This will regenerate a strong password and save it securely.)")
-		}
-
-		// ---------------------------------------
-		// Reminders
-		// ---------------------------------------
-		fmt.Println("\n⚡ Please back up these credentials securely.")
-		fmt.Println("👉 Next: run 'eos enable vault' to unseal Vault.")
-
-		// Structured logs
-		log.Info("Vault Initialization Result Retrieved")
-		log.Info("Root Token", zap.String("root_token", crypto.Redact(initResult.RootToken)))
-		for i := range initResult.KeysB64 {
-			log.Info("Unseal Key loaded", zap.Int("key_number", i+1))
-		}
-		if eosCreds != nil {
-			log.Info("Eos credentials loaded", zap.String("username", eosCreds.Username))
-		}
-
-		log.Warn("⚡ Please back up your Vault credentials securely")
-		log.Info("👉 Next step: run 'eos enable vault' to unseal")
-
-		return nil
 	}),
 }
 
@@ -216,4 +226,85 @@ var InspectSecretsCmd = &cobra.Command{
 		fmt.Println("\n✅ Secrets inspection complete.")
 		return nil
 	}),
+}
+
+// Helper functions for the new export features
+
+func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
+	data, err := json.MarshalIndent(info, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	if options.OutputPath != "" {
+		return os.WriteFile(options.OutputPath, data, 0600)
+	}
+	
+	fmt.Print(string(data))
+	return nil
+}
+
+func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
+	if options.OutputPath == "" {
+		return fmt.Errorf("output path required for secure export")
+	}
+
+	// Create secure directory
+	dir := filepath.Dir(options.OutputPath)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("failed to create output directory: %w", err)
+	}
+
+	// Marshal with indentation
+	data, err := json.MarshalIndent(info, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	// Write with secure permissions
+	if err := os.WriteFile(options.OutputPath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write secure file: %w", err)
+	}
+
+	fmt.Printf("✅ Vault init data exported securely to: %s\n", options.OutputPath)
+	return nil
+}
+
+func displayStatusOnly(info *vault.VaultInitInfo) error {
+	fmt.Println("\n🔍 Vault Status Overview")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Display file information
+	if info.FileInfo != nil {
+		fmt.Printf("\n📄 Init File: %s\n", info.FileInfo.Path)
+		fmt.Printf("   Exists: %v\n", info.FileInfo.Exists)
+		fmt.Printf("   Readable: %v\n", info.FileInfo.Readable)
+		if info.FileInfo.Exists {
+			fmt.Printf("   Size: %d bytes\n", info.FileInfo.Size)
+			fmt.Printf("   Modified: %s\n", info.FileInfo.ModTime.Format("2006-01-02 15:04:05"))
+		}
+	}
+
+	// Display Vault status
+	if info.VaultStatus != nil {
+		fmt.Printf("\n🏛️ Vault Status\n")
+		fmt.Printf("   Address: %s\n", info.VaultStatus.Address)
+		fmt.Printf("   Running: %v\n", info.VaultStatus.Running)
+		fmt.Printf("   Reachable: %v\n", info.VaultStatus.Reachable)
+		fmt.Printf("   Initialized: %v\n", info.VaultStatus.Initialized)
+		fmt.Printf("   Sealed: %v\n", info.VaultStatus.Sealed)
+		fmt.Printf("   Health: %s\n", info.VaultStatus.HealthStatus)
+	}
+
+	// Display security status
+	if info.SecurityStatus != nil {
+		fmt.Printf("\n🛡️ Security Status\n")
+		fmt.Printf("   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled)
+		fmt.Printf("   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled)
+		fmt.Printf("   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied)
+		fmt.Printf("   Auth Methods: %d\n", len(info.SecurityStatus.AuthMethods))
+	}
+
+	fmt.Println("\n💡 Use --no-redact flag to view sensitive initialization data")
+	return nil
 }

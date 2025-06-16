@@ -156,13 +156,24 @@ eos secure vault    # Apply comprehensive security hardening
 - Safe root token revocation with alternative auth verification
 - Network security and rate limiting configurations
 
+For detailed Vault functionality including secure init data access, policy validation, and security features, see `pkg/vault/README.md`.
+
 ### Documentation Maintenance
 When making changes to Eos functionality:
-1. **Update CLAUDE.md** - Always update this file when adding new commands, packages, or workflows
-2. **Create command documentation** - For new commands, create simple documentation explaining usage and examples
+1. **Update CLAUDE.md** - Always update this file when adding new commands, packages, or workflows that affect the entire project
+2. **Create modular documentation** - For specific functionality, create README.md files in the relevant directories:
+   - File/function-specific documentation goes in local README.md files
+   - User guides and specific design notes belong in their respective directories
+   - Only project-wide architectural changes belong in CLAUDE.md
 3. **Update CLI help text** - Ensure command descriptions and examples in code match actual functionality
 4. **Document new dependencies** - Add any new external tools or libraries to the relevant sections
 5. **Keep examples current** - Update code examples when command syntax or behavior changes
+
+#### Documentation Structure Guidelines
+- **CLAUDE.md**: Project-wide architecture, development commands, and global patterns
+- **Directory README.md**: Specific to functionality within that directory
+- **Function documentation**: In-code comments and local README files
+- **User guides**: In the most relevant directory (e.g., `cmd/` for command usage)
 
 ## CI/CD Pipeline
 
