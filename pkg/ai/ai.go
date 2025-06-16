@@ -215,24 +215,44 @@ type LogEntry struct {
 }
 
 // NewAIAssistant creates a new AI assistant instance
-func NewAIAssistant(rc *eos_io.RuntimeContext) *AIAssistant {
-	apiKey := os.Getenv("ANTHROPIC_API_KEY")
-	if apiKey == "" {
-		// Try alternative environment variables
-		apiKey = os.Getenv("CLAUDE_API_KEY")
+func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Load configuration
+	configManager := NewConfigManager()
+	if err := configManager.LoadConfig(); err != nil {
+		logger.Warn("Failed to load AI config", zap.Error(err))
 	}
-	if apiKey == "" {
-		apiKey = os.Getenv("AI_API_KEY")
+	
+	// Get API key
+	apiKey, err := configManager.GetAPIKey(rc)
+	if err != nil {
+		// Don't fail here, let Chat method handle the error
+		logger.Debug("API key not available", zap.Error(err))
+		apiKey = ""
 	}
-
-	baseURL := os.Getenv("ANTHROPIC_BASE_URL")
-	if baseURL == "" {
-		baseURL = "https://api.anthropic.com/v1"
+	
+	config := configManager.GetConfig()
+	
+	// Use environment variables as overrides
+	baseURL := config.BaseURL
+	if envURL := os.Getenv("ANTHROPIC_BASE_URL"); envURL != "" {
+		baseURL = envURL
 	}
-
-	model := os.Getenv("ANTHROPIC_MODEL")
-	if model == "" {
-		model = "claude-3-sonnet-20240229"
+	
+	model := config.Model
+	if envModel := os.Getenv("ANTHROPIC_MODEL"); envModel != "" {
+		model = envModel
+	}
+	
+	maxTokens := config.MaxTokens
+	if maxTokens == 0 {
+		maxTokens = 4096
+	}
+	
+	timeout := time.Duration(config.Timeout) * time.Second
+	if timeout == 0 {
+		timeout = 60 * time.Second
 	}
 
 	return &AIAssistant{
@@ -240,10 +260,10 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) *AIAssistant {
 		baseURL: baseURL,
 		model:   model,
 		client: &http.Client{
-			Timeout: 60 * time.Second,
+			Timeout: timeout,
 		},
-		maxTokens: 4096,
-	}
+		maxTokens: maxTokens,
+	}, nil
 }
 
 // Chat sends a message to the AI and returns the response
@@ -251,7 +271,7 @@ func (ai *AIAssistant) Chat(rc *eos_io.RuntimeContext, ctx *ConversationContext,
 	logger := otelzap.Ctx(rc.Ctx)
 
 	if ai.apiKey == "" {
-		return nil, fmt.Errorf("AI API key not configured. Set ANTHROPIC_API_KEY environment variable")
+		return nil, fmt.Errorf("AI API key not configured. Run 'eos ai configure' to set it up")
 	}
 
 	// Build conversation messages

@@ -74,7 +74,10 @@ Examples:
 			zap.Bool("analyze", analyze))
 
 		// Initialize AI assistant
-		assistant := ai.NewAIAssistant(rc)
+		assistant, err := ai.NewAIAssistant(rc)
+		if err != nil {
+			return fmt.Errorf("failed to initialize AI assistant: %w", err)
+		}
 
 		// Create conversation context
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
@@ -194,7 +197,11 @@ Examples:
 		if askAI {
 			fmt.Println("\n🤖 Getting AI analysis...")
 			
-			assistant := ai.NewAIAssistant(rc)
+			assistant, err := ai.NewAIAssistant(rc)
+			if err != nil {
+				logger.Warn("AI assistant initialization failed", zap.Error(err))
+				return nil
+			}
 			ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 			ctx.Environment = env
 
@@ -245,7 +252,10 @@ Examples:
 		fmt.Printf("🔧 Analyzing issue: %s\n\n", issue)
 
 		// Initialize AI assistant
-		assistant := ai.NewAIAssistant(rc)
+		assistant, err := ai.NewAIAssistant(rc)
+		if err != nil {
+			return fmt.Errorf("failed to initialize AI assistant: %w", err)
+		}
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Always analyze environment for fix requests
@@ -338,7 +348,10 @@ Example:
 		fmt.Println(strings.Repeat("-", 60))
 
 		// Initialize AI assistant
-		assistant := ai.NewAIAssistant(rc)
+		assistant, err := ai.NewAIAssistant(rc)
+		if err != nil {
+			return fmt.Errorf("failed to initialize AI assistant: %w", err)
+		}
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Initial environment analysis
@@ -410,6 +423,169 @@ Examples:
 
 		// This line is unreachable due to return above, but kept for future implementation
 		// return implementActions(rc, actions, workingDir, dryRun)
+	}),
+}
+
+var aiConfigureCmd = &cobra.Command{
+	Use:   "configure",
+	Short: "Configure AI assistant settings",
+	Long: `Configure the AI assistant settings including API key, model, and other options.
+	
+This command allows you to:
+- Set your API key (stored securely in config file)
+- Configure Vault integration for API key storage
+- Select AI model
+- Adjust other settings
+
+Examples:
+  eos ai configure
+  eos ai configure --api-key "sk-..."
+  eos ai configure --vault-path "secret/ai/api-key"
+  eos ai configure --model "claude-3-opus-20240229"`,
+
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		// Get flags
+		apiKey, _ := cmd.Flags().GetString("api-key")
+		vaultPath, _ := cmd.Flags().GetString("vault-path")
+		model, _ := cmd.Flags().GetString("model")
+		baseURL, _ := cmd.Flags().GetString("base-url")
+		showConfig, _ := cmd.Flags().GetBool("show")
+
+		// Load configuration manager
+		configManager := ai.NewConfigManager()
+		if err := configManager.LoadConfig(); err != nil {
+			logger.Warn("Failed to load existing config", zap.Error(err))
+		}
+
+		// Show current configuration if requested
+		if showConfig {
+			config := configManager.GetConfig()
+			fmt.Println("🔧 Current AI Configuration")
+			fmt.Println(strings.Repeat("-", 40))
+			fmt.Printf("Config file: %s\n", configManager.GetConfigPath())
+			fmt.Printf("API Key: %s\n", maskAPIKey(config.APIKey))
+			if config.APIKeyVault != "" {
+				fmt.Printf("API Key Vault Path: %s\n", config.APIKeyVault)
+			}
+			fmt.Printf("Base URL: %s\n", config.BaseURL)
+			fmt.Printf("Model: %s\n", config.Model)
+			fmt.Printf("Max Tokens: %d\n", config.MaxTokens)
+			fmt.Printf("Timeout: %d seconds\n", config.Timeout)
+			return nil
+		}
+
+		// Interactive mode if no flags provided
+		if apiKey == "" && vaultPath == "" && model == "" && baseURL == "" {
+			fmt.Println("🔧 AI Assistant Configuration")
+			fmt.Println(strings.Repeat("-", 40))
+			fmt.Printf("Config file: %s\n\n", configManager.GetConfigPath())
+
+			reader := bufio.NewReader(os.Stdin)
+
+			// API Key configuration
+			fmt.Println("1. API Key Configuration")
+			fmt.Println("   Choose how to provide your API key:")
+			fmt.Println("   a) Enter API key directly (stored in config file)")
+			fmt.Println("   b) Use Vault path (recommended for production)")
+			fmt.Println("   c) Skip (use environment variable)")
+			fmt.Print("\nYour choice [a/b/c]: ")
+			
+			choice, _ := reader.ReadString('\n')
+			choice = strings.TrimSpace(strings.ToLower(choice))
+
+			switch choice {
+			case "a":
+				fmt.Print("\nEnter your Anthropic API key: ")
+				apiKeyInput, _ := reader.ReadString('\n')
+				apiKeyInput = strings.TrimSpace(apiKeyInput)
+				
+				if apiKeyInput != "" {
+					if err := ai.ValidateAPIKey(apiKeyInput); err != nil {
+						fmt.Printf("⚠️  Warning: %v\n", err)
+					}
+					if err := configManager.SetAPIKey(apiKeyInput); err != nil {
+						return fmt.Errorf("failed to save API key: %w", err)
+					}
+					fmt.Println("✅ API key saved to config file")
+				}
+
+			case "b":
+				fmt.Print("\nEnter Vault path for API key (e.g., secret/ai/api-key): ")
+				vaultInput, _ := reader.ReadString('\n')
+				vaultInput = strings.TrimSpace(vaultInput)
+				
+				if vaultInput != "" {
+					if err := configManager.SetAPIKeyVault(vaultInput); err != nil {
+						return fmt.Errorf("failed to save Vault path: %w", err)
+					}
+					fmt.Println("✅ Vault path saved to config file")
+					fmt.Println("📝 Note: Make sure to store your API key at this Vault path")
+				}
+
+			case "c":
+				fmt.Println("📝 Skipping API key configuration")
+				fmt.Println("   Set one of these environment variables:")
+				fmt.Println("   - ANTHROPIC_API_KEY")
+				fmt.Println("   - CLAUDE_API_KEY")
+				fmt.Println("   - AI_API_KEY")
+			}
+
+			// Model selection
+			fmt.Print("\nSelect AI model (press Enter for default): ")
+			modelInput, _ := reader.ReadString('\n')
+			modelInput = strings.TrimSpace(modelInput)
+			
+			if modelInput != "" {
+				updates := map[string]interface{}{"model": modelInput}
+				if err := configManager.UpdateConfig(updates); err != nil {
+					return fmt.Errorf("failed to update model: %w", err)
+				}
+				fmt.Printf("✅ Model set to: %s\n", modelInput)
+			}
+
+			fmt.Println("\n✅ Configuration complete!")
+			fmt.Println("You can now use 'eos ai ask' and other AI commands.")
+			return nil
+		}
+
+		// Non-interactive mode - apply flags
+		updates := make(map[string]interface{})
+		
+		if apiKey != "" {
+			if err := ai.ValidateAPIKey(apiKey); err != nil {
+				fmt.Printf("⚠️  Warning: %v\n", err)
+			}
+			if err := configManager.SetAPIKey(apiKey); err != nil {
+				return fmt.Errorf("failed to save API key: %w", err)
+			}
+			fmt.Println("✅ API key saved")
+		}
+
+		if vaultPath != "" {
+			if err := configManager.SetAPIKeyVault(vaultPath); err != nil {
+				return fmt.Errorf("failed to save Vault path: %w", err)
+			}
+			fmt.Println("✅ Vault path saved")
+		}
+
+		if model != "" {
+			updates["model"] = model
+		}
+
+		if baseURL != "" {
+			updates["base_url"] = baseURL
+		}
+
+		if len(updates) > 0 {
+			if err := configManager.UpdateConfig(updates); err != nil {
+				return fmt.Errorf("failed to update configuration: %w", err)
+			}
+			fmt.Println("✅ Configuration updated")
+		}
+
+		return nil
 	}),
 }
 
@@ -618,6 +794,25 @@ func min(a, b int) int {
 	return b
 }
 
+// maskAPIKey masks an API key for display purposes
+func maskAPIKey(apiKey string) string {
+	if apiKey == "" {
+		return "[not configured]"
+	}
+	
+	// Show first few characters and last few characters
+	if len(apiKey) > 10 {
+		return apiKey[:6] + "..." + apiKey[len(apiKey)-4:]
+	}
+	
+	// For shorter keys, just show partial
+	if len(apiKey) > 4 {
+		return apiKey[:3] + "..."
+	}
+	
+	return "***"
+}
+
 func init() {
 	// AI ask command flags
 	aiAskCmd.Flags().String("directory", "", "Working directory to analyze (default: current)")
@@ -642,10 +837,18 @@ func init() {
 	aiImplementCmd.Flags().Bool("confirm-all", false, "Skip individual confirmations")
 	aiImplementCmd.Flags().String("action-file", "", "Load actions from JSON file")
 
+	// AI configure command flags
+	aiConfigureCmd.Flags().String("api-key", "", "Anthropic API key")
+	aiConfigureCmd.Flags().String("vault-path", "", "Vault path for API key storage")
+	aiConfigureCmd.Flags().String("model", "", "AI model to use")
+	aiConfigureCmd.Flags().String("base-url", "", "API base URL")
+	aiConfigureCmd.Flags().Bool("show", false, "Show current configuration")
+
 	// Add subcommands
 	AICmd.AddCommand(aiAskCmd)
 	AICmd.AddCommand(aiAnalyzeCmd)
 	AICmd.AddCommand(aiFixCmd)
 	AICmd.AddCommand(aiChatCmd)
 	AICmd.AddCommand(aiImplementCmd)
+	AICmd.AddCommand(aiConfigureCmd)
 }
