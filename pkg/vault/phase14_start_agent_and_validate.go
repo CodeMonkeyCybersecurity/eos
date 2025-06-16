@@ -30,6 +30,11 @@ import (
 func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Client) error {
 	otelzap.Ctx(rc.Ctx).Info("🚀 Starting Vault Agent and validating token")
 
+	// Ensure runtime directory exists before starting service
+	if err := ensureRuntimeDirectory(rc); err != nil {
+		return fmt.Errorf("ensure runtime directory: %w", err)
+	}
+
 	if err := startVaultAgentService(rc); err != nil {
 		return fmt.Errorf("start agent service: %w", err)
 	}
@@ -82,4 +87,29 @@ func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 	otelzap.Ctx(rc.Ctx).Debug("Token read via shell", zap.Int("length", len(token)))
 
 	return token, nil
+}
+
+// ensureRuntimeDirectory creates /run/eos directory with proper permissions before starting Vault Agent
+func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
+	runDir := "/run/eos"
+	
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		return fmt.Errorf("create runtime directory %s: %w", runDir, err)
+	}
+	
+	// Set proper ownership (eos user)
+	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Could not lookup eos user, using root ownership", zap.Error(err))
+		return nil // Continue with root ownership rather than failing
+	}
+	
+	if err := os.Chown(runDir, uid, gid); err != nil {
+		otelzap.Ctx(rc.Ctx).Warn("⚠️ Could not change ownership of runtime directory", zap.String("dir", runDir), zap.Error(err))
+		return nil // Continue rather than failing
+	}
+	
+	otelzap.Ctx(rc.Ctx).Info("✅ Runtime directory prepared", zap.String("path", runDir))
+	return nil
 }

@@ -84,7 +84,7 @@ func BuildAppRoleLoginPayload(roleID, secretID string) map[string]interface{} {
 // DefaultAppRoleOptions returns the default settings used when creating the eos-approle in Vault.
 func DefaultAppRoleOptions() AppRoleOptions {
 	return AppRoleOptions{
-		RoleName:      EosID,
+		RoleName:      AppRoleName, // fix: use AppRoleName ("eos-approle") instead of EosID ("eos")
 		Policies:      []string{EosDefaultPolicyName},
 		TokenTTL:      "1h",
 		TokenMaxTTL:   "4h",

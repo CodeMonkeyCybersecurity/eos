@@ -148,7 +148,7 @@ func BuildAgentTemplateData(addr string) AgentConfigData {
 		SecretFile:   AppRolePaths.SecretID,
 		SinkType:     "file",           // set explicitly
 		SinkPath:     AgentToken,       // fix: use AgentToken, not undefined VaultAgentTokenPath
-		ListenerAddr: "127.0.0.1:8179", // example or pass dynamically
+		ListenerAddr: "127.0.0.1:8180", // fix: use different port from Vault server (8179)
 		EnableCache:  true,             // example or pass dynamically
 	}
 }
