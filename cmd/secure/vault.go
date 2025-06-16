@@ -88,5 +88,6 @@ var SecureVaultCmd = &cobra.Command{
 func init() {
 	SecureVaultCmd.Flags().Bool("disable-swap", false, "Disable swap on the system")
 	SecureVaultCmd.Flags().Bool("disable-coredump", false, "Disable core dumps on the system")
+	SecureVaultCmd.Flags().Bool("comprehensive", true, "Apply comprehensive security hardening (recommended)")
 	SecureCmd.AddCommand(SecureVaultCmd)
 }

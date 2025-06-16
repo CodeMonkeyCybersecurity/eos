@@ -8,10 +8,15 @@ import (
 	"text/template"
 )
 
-const EosDefaultPolicyName = "eos-default-policy"
+const (
+	EosDefaultPolicyName    = "eos-default-policy"
+	EosAdminPolicyName      = "eos-admin-policy"
+	EosEmergencyPolicyName  = "eos-emergency-policy"
+	EosReadOnlyPolicyName   = "eos-readonly-policy"
+)
 
 const EosDefaultPolicyTemplate = `
-# Vault token and identity permissions
+# Vault token and identity permissions (read-only where possible)
 path "auth/token/lookup-self" { capabilities = ["read"] }
 path "auth/token/renew-self" { capabilities = ["update"] }
 path "auth/token/revoke-self" { capabilities = ["update"] }
@@ -23,34 +28,235 @@ path "sys/renew" { capabilities = ["update"] }
 path "sys/leases/renew" { capabilities = ["update"] }
 path "sys/leases/lookup" { capabilities = ["update"] }
 
-# Cubbyhole and tools
+# Personal cubbyhole only
 path "cubbyhole/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 path "sys/wrapping/wrap" { capabilities = ["update"] }
 path "sys/wrapping/lookup" { capabilities = ["update"] }
 path "sys/wrapping/unwrap" { capabilities = ["update"] }
+
+# Essential tools only
 path "sys/tools/hash" { capabilities = ["update"] }
-path "sys/tools/hash/*" { capabilities = ["update"] }
+path "sys/tools/random" { capabilities = ["update"] }
 path "sys/control-group/request" { capabilities = ["update"] }
 
-# OIDC authorize
-path "identity/oidc/provider/+/authorize" { capabilities = ["read", "update"] }
+# OIDC authorize (restricted)
+path "identity/oidc/provider/+/authorize" { capabilities = ["read"] }
 
-# Secrets – dynamic KV mount path
-path "secret/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "secret/data/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "secret/metadata/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+# Secrets – user-specific access with time-bound leases
+path "secret/data/eos/{{"{{"}}identity.entity.name{{"}}"}}/*" { 
+  capabilities = ["create", "read", "update", "delete", "list"]
+  max_ttl = "24h"
+  required_parameters = ["version"]
+}
+path "secret/metadata/eos/{{"{{"}}identity.entity.name{{"}}"}}/*" { 
+  capabilities = ["read", "list", "delete"] 
+}
 
-# Auth methods
-path "auth/userpass/users/*" { capabilities = ["create", "read", "update", "delete", "list"] }
-path "auth/approle/role/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+# Shared secrets (read-only)
+path "secret/data/shared/*" { 
+  capabilities = ["read", "list"]
+  max_ttl = "1h"
+}
+
+# Emergency access (highly restricted)
+path "secret/data/emergency/*" { 
+  capabilities = ["read"]
+  control_group = {
+    max_ttl = "4h"
+    factor "authorizer" {
+      identity {
+        group_names = ["emergency-responders"]
+      }
+    }
+  }
+}
+
+# Self-service user management (limited)
+path "auth/userpass/users/{{"{{"}}identity.entity.name{{"}}"}}" { 
+  capabilities = ["read", "update"]
+  denied_parameters = ["policies", "token_policies", "token_ttl", "token_max_ttl"] 
+}
+
+# MFA management
+path "auth/totp/keys/{{"{{"}}identity.entity.name{{"}}"}}" { capabilities = ["create", "read", "update", "delete"] }
+path "auth/totp/code/{{"{{"}}identity.entity.name{{"}}"}}" { capabilities = ["update"] }
+
+# Deny dangerous operations
+path "sys/raw/*" { capabilities = ["deny"] }
+path "sys/unseal" { capabilities = ["deny"] }
+path "sys/seal" { capabilities = ["deny"] }
+path "sys/step-down" { capabilities = ["deny"] }
+path "sys/rekey/*" { capabilities = ["deny"] }
+path "auth/token/create-orphan" { capabilities = ["deny"] }
+path "auth/token/create/*" { capabilities = ["deny"] }
+path "sys/auth/*" { capabilities = ["deny"] }
+path "sys/mounts/*" { capabilities = ["deny"] }
+path "sys/policy/*" { capabilities = ["deny"] }
+`
+
+const EosAdminPolicyTemplate = `
+# Administrative policy for Eos infrastructure management
+# This policy provides elevated privileges for infrastructure administration
+
+# Full token management
+path "auth/token/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/capabilities" { capabilities = ["update"] }
+path "sys/capabilities-self" { capabilities = ["update"] }
+
+# Identity management
+path "identity/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# System administration (restricted)
+path "sys/auth/*" { 
+  capabilities = ["create", "read", "update", "delete", "list"]
+  denied_parameters = ["root"]
+}
+path "sys/mounts/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/policy/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/policies/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# Audit and monitoring
+path "sys/audit" { capabilities = ["read", "list"] }
+path "sys/audit/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/health" { capabilities = ["read"] }
+path "sys/host-info" { capabilities = ["read"] }
+path "sys/key-status" { capabilities = ["read"] }
+path "sys/leader" { capabilities = ["read"] }
+path "sys/seal-status" { capabilities = ["read"] }
+
+# Secrets engines management
+path "secret/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "sys/mounts" { capabilities = ["read", "list"] }
+
+# Lease management
+path "sys/leases/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# Cubbyhole access
+path "cubbyhole/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# MFA administration
+path "auth/totp/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+path "auth/mfa/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# Deny dangerous root operations
+path "sys/raw/*" { capabilities = ["deny"] }
+path "sys/rekey/*" { capabilities = ["deny"] }
+path "sys/rotate" { capabilities = ["deny"] }
+path "sys/seal" { capabilities = ["deny"] }
+path "sys/step-down" { capabilities = ["deny"] }
+`
+
+const EosEmergencyPolicyTemplate = `
+# Emergency access policy for critical situations
+# This policy provides broad access for emergency response
+
+# Full read access to troubleshoot issues
+path "*" { 
+  capabilities = ["read", "list"]
+  control_group = {
+    max_ttl = "2h"
+    factor "authorizer" {
+      identity {
+        group_names = ["emergency-authorizers"]
+      }
+    }
+  }
+}
+
+# Limited write access for emergency fixes
+path "secret/data/emergency/*" { 
+  capabilities = ["create", "read", "update", "delete", "list"]
+  control_group = {
+    max_ttl = "1h"
+    factor "authorizer" {
+      identity {
+        group_names = ["emergency-authorizers"]
+      }
+    }
+  }
+}
+
+# Essential system operations
+path "sys/health" { capabilities = ["read"] }
+path "sys/seal-status" { capabilities = ["read"] }
+path "sys/leader" { capabilities = ["read"] }
+path "auth/token/lookup-self" { capabilities = ["read"] }
+path "auth/token/renew-self" { capabilities = ["update"] }
+
+# Cubbyhole for temporary storage
+path "cubbyhole/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# Deny destructive operations
+path "sys/raw/*" { capabilities = ["deny"] }
+path "sys/rekey/*" { capabilities = ["deny"] }
+path "sys/rotate" { capabilities = ["deny"] }
+path "sys/seal" { capabilities = ["deny"] }
+path "sys/step-down" { capabilities = ["deny"] }
+path "auth/token/create-orphan" { capabilities = ["deny"] }
+`
+
+const EosReadOnlyPolicyTemplate = `
+# Read-only policy for monitoring and auditing
+# This policy provides read-only access for monitoring systems
+
+# Read-only access to secrets (with audit trail)
+path "secret/data/*" { 
+  capabilities = ["read", "list"]
+  max_ttl = "15m"
+}
+path "secret/metadata/*" { capabilities = ["read", "list"] }
+
+# System status monitoring
+path "sys/health" { capabilities = ["read"] }
+path "sys/seal-status" { capabilities = ["read"] }
+path "sys/leader" { capabilities = ["read"] }
+path "sys/key-status" { capabilities = ["read"] }
+path "sys/host-info" { capabilities = ["read"] }
+
+# Auth methods (read-only)
+path "sys/auth" { capabilities = ["read", "list"] }
+path "sys/mounts" { capabilities = ["read", "list"] }
+path "sys/policies" { capabilities = ["read", "list"] }
+
+# Token management (self only)
+path "auth/token/lookup-self" { capabilities = ["read"] }
+path "auth/token/renew-self" { capabilities = ["update"] }
+
+# Personal cubbyhole only
+path "cubbyhole/*" { capabilities = ["create", "read", "update", "delete", "list"] }
+
+# Deny all write operations to critical paths
+path "sys/auth/*" { capabilities = ["deny"] }
+path "sys/mounts/*" { capabilities = ["deny"] }
+path "sys/policy/*" { capabilities = ["deny"] }
+path "secret/data/*" { 
+  capabilities = ["create", "update", "delete"]
+  capabilities = ["deny"]
+}
 `
 
 func RenderEosPolicy(kvPath string) (string, error) {
-	tmpl, err := template.New(EosDefaultPolicyName).
+	return renderPolicyTemplate(EosDefaultPolicyName, EosDefaultPolicyTemplate, kvPath)
+}
+
+func RenderEosAdminPolicy(kvPath string) (string, error) {
+	return renderPolicyTemplate(EosAdminPolicyName, EosAdminPolicyTemplate, kvPath)
+}
+
+func RenderEosEmergencyPolicy(kvPath string) (string, error) {
+	return renderPolicyTemplate(EosEmergencyPolicyName, EosEmergencyPolicyTemplate, kvPath)
+}
+
+func RenderEosReadOnlyPolicy(kvPath string) (string, error) {
+	return renderPolicyTemplate(EosReadOnlyPolicyName, EosReadOnlyPolicyTemplate, kvPath)
+}
+
+func renderPolicyTemplate(name, templateStr, kvPath string) (string, error) {
+	tmpl, err := template.New(name).
 		Option("missingkey=error").
-		Parse(EosDefaultPolicyTemplate)
+		Parse(templateStr)
 	if err != nil {
-		return "", fmt.Errorf("parse policy template: %w", err)
+		return "", fmt.Errorf("parse policy template %s: %w", name, err)
 	}
 
 	var buf bytes.Buffer
@@ -58,7 +264,7 @@ func RenderEosPolicy(kvPath string) (string, error) {
 		"KVPath": kvPath,
 	})
 	if err != nil {
-		return "", fmt.Errorf("execute policy template: %w", err)
+		return "", fmt.Errorf("execute policy template %s: %w", name, err)
 	}
 
 	return buf.String(), nil

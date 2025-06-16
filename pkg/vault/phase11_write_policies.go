@@ -12,8 +12,7 @@ import (
 )
 
 func EnsurePolicy(rc *eos_io.RuntimeContext) error {
-	policyName := shared.EosDefaultPolicyName
-	otelzap.Ctx(rc.Ctx).Info("📝 Preparing to write Vault policy", zap.String("policy", policyName))
+	otelzap.Ctx(rc.Ctx).Info("📝 Preparing to write all Vault policies")
 
 	client, err := GetRootClient(rc)
 	if err != nil {
@@ -21,34 +20,50 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("get privileged vault client: %w", err)
 	}
 
-	pol, err := shared.RenderEosPolicy("users")
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to render policy template", zap.Error(err))
-		return fmt.Errorf("render policy template: %w", err)
+	// Create all role-based policies
+	policies := []struct {
+		name     string
+		renderer func(string) (string, error)
+	}{
+		{shared.EosDefaultPolicyName, shared.RenderEosPolicy},
+		{shared.EosAdminPolicyName, shared.RenderEosAdminPolicy},
+		{shared.EosEmergencyPolicyName, shared.RenderEosEmergencyPolicy},
+		{shared.EosReadOnlyPolicyName, shared.RenderEosReadOnlyPolicy},
 	}
 
-	otelzap.Ctx(rc.Ctx).Debug("📄 Policy loaded", zap.String("preview", truncatePolicy(pol)), zap.Int("length", len(pol)))
+	for _, policy := range policies {
+		otelzap.Ctx(rc.Ctx).Info("📝 Writing Vault policy", zap.String("policy", policy.name))
+		
+		pol, err := policy.renderer("users")
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Error("❌ Failed to render policy template", zap.String("policy", policy.name), zap.Error(err))
+			return fmt.Errorf("render policy template %s: %w", policy.name, err)
+		}
 
-	otelzap.Ctx(rc.Ctx).Info("📡 Writing policy to Vault")
-	if err := client.Sys().PutPolicy(policyName, pol); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to write policy", zap.String("policy", policyName), zap.Error(err))
-		return fmt.Errorf("failed to write eos-policy to Vault: %w", err)
-	}
+		otelzap.Ctx(rc.Ctx).Debug("📄 Policy loaded", zap.String("policy", policy.name), zap.String("preview", truncatePolicy(pol)), zap.Int("length", len(pol)))
 
-	otelzap.Ctx(rc.Ctx).Info("🔍 Verifying policy write")
-	storedPol, err := client.Sys().GetPolicy(policyName)
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to retrieve policy for verification", zap.Error(err))
-		return fmt.Errorf("failed to verify written policy: %w", err)
-	}
-	if strings.TrimSpace(storedPol) != strings.TrimSpace(pol) {
-		otelzap.Ctx(rc.Ctx).Error("🚨 Policy mismatch after write",
-			zap.String("expected_preview", truncatePolicy(pol)),
-			zap.String("stored_preview", truncatePolicy(storedPol)))
-		return fmt.Errorf("policy mismatch after write — vault contents are inconsistent")
-	}
+		otelzap.Ctx(rc.Ctx).Info("📡 Writing policy to Vault", zap.String("policy", policy.name))
+		if err := client.Sys().PutPolicy(policy.name, pol); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("❌ Failed to write policy", zap.String("policy", policy.name), zap.Error(err))
+			return fmt.Errorf("failed to write policy %s to Vault: %w", policy.name, err)
+		}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Policy successfully written and verified", zap.String("policy", policyName))
+		otelzap.Ctx(rc.Ctx).Info("🔍 Verifying policy write", zap.String("policy", policy.name))
+		storedPol, err := client.Sys().GetPolicy(policy.name)
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Error("❌ Failed to retrieve policy for verification", zap.String("policy", policy.name), zap.Error(err))
+			return fmt.Errorf("failed to verify written policy %s: %w", policy.name, err)
+		}
+		if strings.TrimSpace(storedPol) != strings.TrimSpace(pol) {
+			otelzap.Ctx(rc.Ctx).Error("🚨 Policy mismatch after write",
+				zap.String("policy", policy.name),
+				zap.String("expected_preview", truncatePolicy(pol)),
+				zap.String("stored_preview", truncatePolicy(storedPol)))
+			return fmt.Errorf("policy mismatch after write for %s — vault contents are inconsistent", policy.name)
+		}
+
+		otelzap.Ctx(rc.Ctx).Info("✅ Policy successfully written and verified", zap.String("policy", policy.name))
+	}
 
 	if err := AttachPolicyToEosEntity(rc, client, rc.Log); err != nil {
 		return fmt.Errorf("failed to attach eos-policy to eos entity: %w", err)

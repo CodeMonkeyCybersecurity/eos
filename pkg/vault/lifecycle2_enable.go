@@ -79,31 +79,44 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		return logger.LogErrAndWrap(rc, "write policies", err)
 	}
 
-	// Step 12: Enable audit backend
+	// Step 12: Enable comprehensive audit logging
 	if err := EnableFileAudit(rc, client); err != nil {
 		return logger.LogErrAndWrap(rc, "enable audit backend", err)
 	}
 
-	// // Step 9: interactively configure Vault Agent
-	// if interaction.PromptYesNo("Enable Vault Agent service?", false) {
-	// 	// Agent requires AppRole to already be enabled above.
-	// 	if err := PhaseRenderVaultAgentConfig(client); err != nil {
-	// 		return logger.LogErrAndWrap("render Vault Agent config", err)
-	// 	}
-	// 	if err := PhaseStartVaultAgentAndValidate(client); err != nil {
-	// 		return logger.LogErrAndWrap("start Vault Agent", err)
-	// 	}
-	// }
+	// Step 13: Configure Multi-Factor Authentication
+	if interaction.PromptYesNo(rc.Ctx, "Enable Multi-Factor Authentication (MFA)?", true) {
+		mfaConfig := DefaultMFAConfig()
+		if err := EnableMFAMethods(rc, client, mfaConfig); err != nil {
+			return logger.LogErrAndWrap(rc, "enable MFA", err)
+		}
+		log.Info("✅ MFA configuration completed")
+	} else {
+		log.Warn("⚠️ MFA was not enabled - this reduces security")
+	}
 
-	// Step 13-14: placeholder for Vault Agent
+	// Step 14: Vault Agent configuration (placeholder)
 	if interaction.PromptYesNo(rc.Ctx, "Enable Vault Agent service?", false) {
 		otelzap.Ctx(rc.Ctx).Warn("⚠ Vault Agent enablement is not yet implemented — skipping this step")
 		fmt.Println("⚠ Vault Agent logic is not yet ready. Please skip this step or follow manual setup instructions.")
 	}
 
-	// Step 10: Apply core secrets and verify readiness
+	// Step 15: Apply core secrets and verify readiness
 	if err := PhaseWriteBootstrapSecretAndRecheck(rc, client); err != nil {
 		return logger.LogErrAndWrap(rc, "apply core secrets", err)
+	}
+
+	// Step 16: Optional root token revocation
+	if interaction.PromptYesNo(rc.Ctx, "Revoke root token for enhanced security? (Ensure alternative auth methods work first)", false) {
+		if err := revokeRootTokenSafely(rc, client); err != nil {
+			log.Warn("⚠️ Root token revocation failed", zap.Error(err))
+			fmt.Println("⚠️ Root token revocation failed. You can revoke it later using 'eos secure vault --comprehensive'")
+		} else {
+			log.Info("✅ Root token revoked successfully")
+			fmt.Println("✅ Root token has been revoked. Use alternative authentication methods for future access.")
+		}
+	} else {
+		log.Info("📝 Root token kept active - remember to revoke it after setting up alternative auth")
 	}
 
 	log.Info("🎉 Vault enablement process completed successfully")
