@@ -223,8 +223,62 @@ func removeTLSFiles() error {
 
 // generateSelfSigned invokes openssl to create a self-signed cert.
 func generateSelfSigned() error {
-	// build config, call openssl – omitted for brevity
-	// then use eos_unix.CopyFile / MkdirP / etc.
+	// Ensure TLS directory exists
+	if err := os.MkdirAll(shared.TLSDir, 0o755); err != nil {
+		return cerr.Wrapf(err, "create TLS directory %s", shared.TLSDir)
+	}
+
+	// Generate private key
+	keyCmd := exec.Command("openssl", "genrsa", "-out", shared.TLSKey, "2048")
+	if err := keyCmd.Run(); err != nil {
+		return cerr.Wrapf(err, "generate private key")
+	}
+
+	// Get hostname for certificate
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "localhost"
+	}
+
+	// Generate self-signed certificate with SAN extensions
+	certCmd := exec.Command("openssl", "req", "-new", "-x509", "-key", shared.TLSKey,
+		"-out", shared.TLSCrt, "-days", "365",
+		"-subj", fmt.Sprintf("/C=AU/ST=NSW/L=Sydney/O=CodeMonkey/OU=Eos/CN=%s", hostname),
+		"-extensions", "v3_req",
+		"-config", "/dev/stdin")
+	
+	// Provide OpenSSL config with SAN extensions via stdin
+	opensslConfig := fmt.Sprintf(`[req]
+distinguished_name = req_distinguished_name
+req_extensions = v3_req
+prompt = no
+
+[req_distinguished_name]
+C = AU
+ST = NSW
+L = Sydney
+O = CodeMonkey
+OU = Eos
+CN = %s
+
+[v3_req]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+
+[alt_names]
+DNS.1 = %s
+DNS.2 = localhost
+DNS.3 = vhost1
+IP.1 = 127.0.0.1
+IP.2 = ::1
+`, hostname, hostname)
+
+	certCmd.Stdin = strings.NewReader(opensslConfig)
+	if err := certCmd.Run(); err != nil {
+		return cerr.Wrapf(err, "generate certificate")
+	}
+
 	return nil
 }
 
