@@ -123,7 +123,7 @@ func writeAgentUnit() error {
 		Description: "Vault Agent (Eos)",
 		User:        shared.EosID,
 		Group:       shared.EosID,
-		RuntimeDir:  shared.EosID,
+		RuntimeDir:  "eos", // fix: use relative path for RuntimeDirectory, not absolute
 		ExecStart:   fmt.Sprintf("vault agent -config=%s", shared.VaultAgentConfigPath),
 		RuntimeMode: "0700",
 	}

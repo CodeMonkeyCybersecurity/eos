@@ -60,8 +60,7 @@ type AgentConfigData struct {
 }
 
 // AgentSystemDUnit is the systemd unit template for running Vault Agent under eos.
-const AgentSystemDUnit = `
-[Unit]
+const AgentSystemDUnit = `[Unit]
 Description={{ .Description }}
 After=network.target
 
@@ -70,8 +69,11 @@ User={{ .User }}
 Group={{ .Group }}
 RuntimeDirectory={{ .RuntimeDir }}
 RuntimeDirectoryMode={{ .RuntimeMode }}
+Environment=VAULT_SKIP_HCP=true
+Environment=VAULT_SKIP_TLS_VERIFY=false
 ExecStart={{ .ExecStart }}
 Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -149,7 +151,7 @@ func BuildAgentTemplateData(addr string) AgentConfigData {
 		SinkType:     "file",           // set explicitly
 		SinkPath:     AgentToken,       // fix: use AgentToken, not undefined VaultAgentTokenPath
 		ListenerAddr: "127.0.0.1:8180", // fix: use different port from Vault server (8179)
-		EnableCache:  true,             // example or pass dynamically
+		EnableCache:  false,            // fix: disable cache to avoid listener requirement
 	}
 }
 
