@@ -167,7 +167,8 @@ func getAppRoleCredentialsFromVault(rc *eos_io.RuntimeContext, client *api.Clien
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Get role ID
-	roleIDResp, err := client.Logical().Read("auth/approle/role/eos/role-id")
+	roleIDPath := fmt.Sprintf("auth/approle/role/%s/role-id", shared.AppRoleName)
+	roleIDResp, err := client.Logical().Read(roleIDPath)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to read role ID: %w", err)
 	}
@@ -177,7 +178,8 @@ func getAppRoleCredentialsFromVault(rc *eos_io.RuntimeContext, client *api.Clien
 	roleID := roleIDResp.Data["role_id"].(string)
 
 	// Generate new secret ID
-	secretIDResp, err := client.Logical().Write("auth/approle/role/eos/secret-id", nil)
+	secretIDPath := fmt.Sprintf("auth/approle/role/%s/secret-id", shared.AppRoleName)
+	secretIDResp, err := client.Logical().Write(secretIDPath, nil)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to generate secret ID: %w", err)
 	}
