@@ -64,7 +64,12 @@ path "secret/data/emergency/*" {
 # Self-service user management (limited)
 path "auth/userpass/users/{{"{{"}}identity.entity.name{{"}}"}}" { 
   capabilities = ["read", "update"]
-  denied_parameters = ["policies", "token_policies", "token_ttl", "token_max_ttl"] 
+  denied_parameters = {
+    "policies" = []
+    "token_policies" = []
+    "token_ttl" = []
+    "token_max_ttl" = []
+  }
 }
 
 # MFA management
@@ -99,7 +104,9 @@ path "identity/*" { capabilities = ["create", "read", "update", "delete", "list"
 # System administration (restricted)
 path "sys/auth/*" { 
   capabilities = ["create", "read", "update", "delete", "list"]
-  denied_parameters = ["root"]
+  denied_parameters = {
+    "root" = []
+  }
 }
 path "sys/mounts/*" { capabilities = ["create", "read", "update", "delete", "list"] }
 path "sys/policy/*" { capabilities = ["create", "read", "update", "delete", "list"] }
