@@ -124,6 +124,38 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
 
+### System Directory Structure
+Eos creates and manages the following system directories during installation:
+
+#### Core System Directories
+- **`/var/lib/eos/secrets`** - Local secrets storage (fallback when Vault is unavailable)
+- **`/etc/eos`** - Configuration files and system settings
+- **`/var/log/eos`** - Application logs and audit trails
+- **`/usr/local/bin/eos`** - Main executable binary location
+
+#### Directory Usage Patterns
+- **Secrets Management**: Primary secrets are stored in HashiCorp Vault when available. The `/var/lib/eos/secrets` directory serves as a secure fallback for local secrets storage when Vault is inaccessible or not yet configured.
+- **Configuration**: System-wide configuration files are stored in `/etc/eos` with appropriate permissions
+- **Logging**: All Eos operations log to `/var/log/eos` with structured logging format
+- **Permissions**: System directories are created with secure permissions (750/640) and appropriate ownership
+
+#### Vault Integration
+Eos provides comprehensive HashiCorp Vault integration with enhanced security:
+```bash
+# Complete Vault deployment with security hardening
+eos create vault    # Install Vault
+eos enable vault    # Interactive setup with MFA
+eos secure vault    # Apply comprehensive security hardening
+```
+
+**Vault Security Features**:
+- Multi-Factor Authentication (TOTP, Duo, PingID, Okta)
+- Role-based access control with principle of least privilege
+- Comprehensive system hardening (swap disable, firewall, SSH hardening)
+- Automated audit logging and backup procedures
+- Safe root token revocation with alternative auth verification
+- Network security and rate limiting configurations
+
 ### Documentation Maintenance
 When making changes to Eos functionality:
 1. **Update CLAUDE.md** - Always update this file when adding new commands, packages, or workflows
