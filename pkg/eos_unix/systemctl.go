@@ -132,3 +132,27 @@ func PromptAndRunInteractiveSystemctl(action, unit string) error {
 
 	return cmd.Run()
 }
+
+// CheckServiceStatus checks if a systemd service is active
+func CheckServiceStatus(ctx context.Context, unit string) error {
+	otelzap.Ctx(ctx).Debug("Checking service status", zap.String("unit", unit))
+
+	cmd := exec.Command("systemctl", "is-active", unit)
+	output, err := cmd.CombinedOutput()
+	
+	if err != nil {
+		otelzap.Ctx(ctx).Debug("Service status check failed",
+			zap.String("unit", unit),
+			zap.Error(err),
+			zap.ByteString("output", output))
+		return fmt.Errorf("service %s is not active: %w", unit, err)
+	}
+
+	outputStr := string(bytes.TrimSpace(output))
+	if outputStr != "active" {
+		return fmt.Errorf("service %s is not active (status: %s)", unit, outputStr)
+	}
+
+	otelzap.Ctx(ctx).Debug("Service is active", zap.String("unit", unit))
+	return nil
+}

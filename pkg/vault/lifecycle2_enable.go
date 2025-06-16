@@ -95,10 +95,18 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Warn("⚠️ MFA was not enabled - this reduces security")
 	}
 
-	// Step 14: Vault Agent configuration (placeholder)
-	if interaction.PromptYesNo(rc.Ctx, "Enable Vault Agent service?", false) {
-		otelzap.Ctx(rc.Ctx).Warn("⚠ Vault Agent enablement is not yet implemented — skipping this step")
-		fmt.Println("⚠ Vault Agent logic is not yet ready. Please skip this step or follow manual setup instructions.")
+	// Step 14: Vault Agent comprehensive enablement
+	if interaction.PromptYesNo(rc.Ctx, "Enable Vault Agent service?", true) {
+		log.Info("🤖 Starting Vault Agent enablement")
+		config := DefaultVaultAgentConfig()
+		if err := PhaseEnableVaultAgent(rc, client, config); err != nil {
+			return logger.LogErrAndWrap(rc, "enable Vault Agent", err)
+		}
+		log.Info("✅ Vault Agent enabled successfully")
+		fmt.Println("✅ Vault Agent is now running and configured for automatic authentication")
+	} else {
+		log.Info("⏭️ Vault Agent enablement skipped by user")
+		fmt.Println("ℹ️ Vault Agent not enabled. You can enable it later with manual configuration.")
 	}
 
 	// Step 15: Apply core secrets and verify readiness
@@ -128,5 +136,6 @@ func PrintEnableNextSteps() {
 	fmt.Println("\n🔔 Vault setup is now complete!")
 	fmt.Println("👉 Next steps:")
 	fmt.Println("   1. Run: eos secure vault   (to finalize hardening and cleanup)")
-	fmt.Println("   2. Optionally onboard new users, configure roles, or deploy agents.")
+	fmt.Println("   2. Test Vault Agent: eos read vault agent")
+	fmt.Println("   3. Optionally onboard new users, configure roles, or deploy additional services.")
 }

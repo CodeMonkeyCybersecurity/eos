@@ -33,6 +33,9 @@ func init() {
 	InspectVaultInitCmd.Flags().String("output", "", "Output file path for export formats")
 	InspectVaultInitCmd.Flags().String("reason", "", "Access reason for audit logging")
 	InspectVaultInitCmd.Flags().Bool("no-confirm", false, "Skip confirmation prompts (use with caution)")
+	
+	// Add flags for vault agent command
+	InspectVaultAgentCmd.Flags().Bool("json", false, "Output status in JSON format for automation")
 }
 
 // InspectVaultInitCmd displays Vault initialization keys, root token, and eos user credentials with enhanced security.
@@ -130,24 +133,49 @@ var InspectVaultCmd = &cobra.Command{
 	}),
 }
 
-// InspectVaultAgentCmd checks Vault Agent service and token
+// InspectVaultAgentCmd checks Vault Agent status and basic functionality
 var InspectVaultAgentCmd = &cobra.Command{
 	Use:   "agent",
-	Short: "Check Vault Agent status and basic functionality",
+	Short: "Check Vault Agent comprehensive status and functionality",
+	Long: `Provides comprehensive status information about Vault Agent including:
+  • Service status and health
+  • Token availability and validity
+  • Configuration validation
+  • Monitoring status
+
+Examples:
+  eos read vault agent          # Full status check
+  eos read vault agent --json   # JSON output for automation`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
+		jsonOutput, _ := cmd.Flags().GetBool("json")
 
-		if err := vault.CheckVaultAgentService(); err != nil {
-			return err
-		}
-		if err := vault.CheckVaultTokenFile(); err != nil {
-			return err
-		}
-		if err := vault.RunVaultTestQuery(rc); err != nil {
-			return err
+		// Get comprehensive agent status
+		status, err := vault.GetAgentStatus(rc)
+		if err != nil {
+			return fmt.Errorf("failed to get agent status: %w", err)
 		}
 
-		log.Info("Vault Agent inspection complete and healthy")
+		if jsonOutput {
+			// Output JSON for automation
+			data, err := json.MarshalIndent(status, "", "  ")
+			if err != nil {
+				return fmt.Errorf("failed to marshal status: %w", err)
+			}
+			fmt.Print(string(data))
+			return nil
+		}
+
+		// Display human-readable status
+		displayAgentStatus(status)
+
+		if status.HealthStatus == "healthy" {
+			log.Info("✅ Vault Agent is healthy and functioning correctly")
+		} else {
+			log.Warn("⚠️ Vault Agent has issues", zap.String("status", status.HealthStatus))
+			return fmt.Errorf("vault agent status: %s", status.HealthStatus)
+		}
+
 		return nil
 	}),
 }
@@ -307,4 +335,66 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 
 	fmt.Println("\n💡 Use --no-redact flag to view sensitive initialization data")
 	return nil
+}
+
+// displayAgentStatus provides human-readable display of Vault Agent status
+func displayAgentStatus(status *vault.AgentStatus) {
+	fmt.Println("\n🤖 Vault Agent Status")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+	// Service status
+	if status.ServiceRunning {
+		fmt.Println("✅ Service: Running")
+	} else {
+		fmt.Println("❌ Service: Not Running")
+	}
+
+	// Token status
+	if status.TokenAvailable {
+		fmt.Println("✅ Token: Available")
+		if !status.LastTokenTime.IsZero() {
+			fmt.Printf("   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
+		}
+		if status.TokenValid {
+			fmt.Println("✅ Token: Valid")
+		} else {
+			fmt.Println("⚠️ Token: Invalid or Empty")
+		}
+	} else {
+		fmt.Println("❌ Token: Not Available")
+	}
+
+	// Configuration status
+	if status.ConfigValid {
+		fmt.Println("✅ Configuration: Valid")
+	} else {
+		fmt.Println("❌ Configuration: Missing or Invalid")
+	}
+
+	// Overall health
+	fmt.Printf("\n🏥 Overall Health: ")
+	switch status.HealthStatus {
+	case "healthy":
+		fmt.Println("✅ Healthy")
+	case "degraded":
+		fmt.Println("⚠️ Degraded")
+	case "unhealthy":
+		fmt.Println("❌ Unhealthy")
+	default:
+		fmt.Printf("❓ Unknown (%s)\n", status.HealthStatus)
+	}
+
+	// Recommendations
+	if status.HealthStatus != "healthy" {
+		fmt.Println("\n💡 Recommendations:")
+		if !status.ServiceRunning {
+			fmt.Println("   • Start the service: sudo systemctl start vault-agent")
+		}
+		if !status.TokenAvailable || !status.TokenValid {
+			fmt.Println("   • Check agent authentication: journalctl -u vault-agent")
+		}
+		if !status.ConfigValid {
+			fmt.Println("   • Verify configuration: eos enable vault")
+		}
+	}
 }
