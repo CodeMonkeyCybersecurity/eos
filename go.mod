@@ -20,6 +20,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/consul/api v1.32.1
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/hashicorp/hcl/v2 v2.23.0
 	github.com/hashicorp/vault/api v1.16.0
 	github.com/hashicorp/vault/api/auth/approle v0.9.0
 	github.com/hashicorp/vault/api/auth/userpass v0.9.0
@@ -31,6 +32,7 @@ require (
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
 	github.com/uptrace/opentelemetry-go-extra/otelzap v0.3.2
+	github.com/zclconf/go-cty v1.13.0
 	go.opentelemetry.io/otel v1.35.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.35.0
 	go.opentelemetry.io/otel/sdk v1.35.0
@@ -87,6 +89,7 @@ require (
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -100,7 +103,6 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.7 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hashicorp/hcl/v2 v2.23.0 // indirect
 	github.com/hashicorp/serf v0.10.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -153,7 +155,6 @@ require (
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
 	github.com/yashtewari/glob-intersection v0.2.0 // indirect
-	github.com/zclconf/go-cty v1.13.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
 	go.opentelemetry.io/otel/log v0.6.0 // indirect

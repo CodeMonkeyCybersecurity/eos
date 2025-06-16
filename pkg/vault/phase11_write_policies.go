@@ -20,24 +20,24 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("get privileged vault client: %w", err)
 	}
 
-	// Create all role-based policies
+	// Create all role-based policies using programmatic builders
 	policies := []struct {
-		name     string
-		renderer func(string) (string, error)
+		name    string
+		builder func(*eos_io.RuntimeContext) (string, error)
 	}{
-		{shared.EosDefaultPolicyName, shared.RenderEosPolicy},
-		{shared.EosAdminPolicyName, shared.RenderEosAdminPolicy},
-		{shared.EosEmergencyPolicyName, shared.RenderEosEmergencyPolicy},
-		{shared.EosReadOnlyPolicyName, shared.RenderEosReadOnlyPolicy},
+		{shared.EosDefaultPolicyName, BuildEosDefaultPolicy},
+		{shared.EosAdminPolicyName, BuildEosAdminPolicy},
+		{shared.EosEmergencyPolicyName, BuildEosEmergencyPolicy},
+		{shared.EosReadOnlyPolicyName, BuildEosReadOnlyPolicy},
 	}
 
 	for _, policy := range policies {
 		otelzap.Ctx(rc.Ctx).Info("📝 Writing Vault policy", zap.String("policy", policy.name))
 		
-		pol, err := policy.renderer("users")
+		pol, err := policy.builder(rc)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error("❌ Failed to render policy template", zap.String("policy", policy.name), zap.Error(err))
-			return fmt.Errorf("render policy template %s: %w", policy.name, err)
+			otelzap.Ctx(rc.Ctx).Error("❌ Failed to build policy", zap.String("policy", policy.name), zap.Error(err))
+			return fmt.Errorf("build policy %s: %w", policy.name, err)
 		}
 
 		// Validate and fix common HCL issues
