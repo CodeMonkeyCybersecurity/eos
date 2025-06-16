@@ -52,6 +52,9 @@ func GenerateTLS(rc *eos_io.RuntimeContext) error {
 	if err := trustCA(rc); err != nil {
 		return cerr.Wrap(err, "trust Vault CA")
 	}
+	if err := EnsureVaultAgentCAExists(rc); err != nil {
+		return cerr.Wrap(err, "ensure Vault Agent CA")
+	}
 	return secureOwnership(rc)
 }
 
