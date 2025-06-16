@@ -182,7 +182,7 @@ func (m *Manager) SyncTerraformOutputsToVault(rc *eos_io.RuntimeContext, vaultPa
 		return fmt.Errorf("failed to get vault client: %w", err)
 	}
 
-	secrets := make(map[string]interface{})
+	secrets := make(map[string]any)
 
 	// Retrieve all specified outputs
 	for _, outputName := range outputNames {
@@ -289,7 +289,7 @@ func (m *Manager) setupSecretReferences(rc *eos_io.RuntimeContext, config VaultI
 }
 
 // retrieveVaultSecret fetches a secret from Vault
-func (m *Manager) retrieveVaultSecret(rc *eos_io.RuntimeContext, client *api.Client, ref VaultSecretReference) (interface{}, error) {
+func (m *Manager) retrieveVaultSecret(rc *eos_io.RuntimeContext, client *api.Client, ref VaultSecretReference) (any, error) {
 	secret, err := client.KVv2(ref.Path).Get(rc.Ctx, ref.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read secret: %w", err)
@@ -308,7 +308,7 @@ func (m *Manager) retrieveVaultSecret(rc *eos_io.RuntimeContext, client *api.Cli
 }
 
 // storeSecretsInVault stores key-value pairs in Vault
-func (m *Manager) storeSecretsInVault(rc *eos_io.RuntimeContext, client *api.Client, path string, secrets map[string]interface{}) error {
+func (m *Manager) storeSecretsInVault(rc *eos_io.RuntimeContext, client *api.Client, path string, secrets map[string]any) error {
 	// Extract mount path and secret path
 	parts := strings.SplitN(path, "/", 2)
 	if len(parts) != 2 {

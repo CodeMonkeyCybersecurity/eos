@@ -17,6 +17,7 @@ import (
 	"go.uber.org/zap"
 
 	// Subcommands
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/ai"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/config"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
@@ -69,6 +70,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 	// Group subcommands for cleanliness
 	for _, subCmd := range []*cobra.Command{
+		ai.AICmd,
 		create.CreateCmd,
 		read.ReadCmd, // This is the top-level 'read'
 		list.ListCmd,
