@@ -432,25 +432,32 @@ var aiConfigureCmd = &cobra.Command{
 	Long: `Configure the AI assistant settings including API key, model, and other options.
 	
 This command allows you to:
+- Choose AI provider (Anthropic Claude or Azure OpenAI)
 - Set your API key (stored securely in config file)
 - Configure Vault integration for API key storage
 - Select AI model
+- Configure Azure OpenAI specific settings
 - Adjust other settings
 
 Examples:
   eos ai configure
-  eos ai configure --api-key "sk-..."
+  eos ai configure --provider anthropic --api-key "sk-..."
+  eos ai configure --provider azure-openai --azure-endpoint "https://myresource.openai.azure.com"
   eos ai configure --vault-path "secret/ai/api-key"
-  eos ai configure --model "claude-3-opus-20240229"`,
+  eos ai configure --model "gpt-4"`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
 		// Get flags
+		provider, _ := cmd.Flags().GetString("provider")
 		apiKey, _ := cmd.Flags().GetString("api-key")
 		vaultPath, _ := cmd.Flags().GetString("vault-path")
 		model, _ := cmd.Flags().GetString("model")
 		baseURL, _ := cmd.Flags().GetString("base-url")
+		azureEndpoint, _ := cmd.Flags().GetString("azure-endpoint")
+		azureAPIVersion, _ := cmd.Flags().GetString("azure-api-version")
+		azureDeployment, _ := cmd.Flags().GetString("azure-deployment")
 		showConfig, _ := cmd.Flags().GetBool("show")
 
 		// Load configuration manager
@@ -465,11 +472,34 @@ Examples:
 			fmt.Println("🔧 Current AI Configuration")
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Printf("Config file: %s\n", configManager.GetConfigPath())
+			
+			provider := config.Provider
+			if provider == "" {
+				provider = "anthropic"
+			}
+			fmt.Printf("Provider: %s\n", provider)
+			
 			fmt.Printf("API Key: %s\n", maskAPIKey(config.APIKey))
 			if config.APIKeyVault != "" {
 				fmt.Printf("API Key Vault Path: %s\n", config.APIKeyVault)
 			}
-			fmt.Printf("Base URL: %s\n", config.BaseURL)
+			
+			if provider == "azure-openai" {
+				if config.AzureEndpoint != "" {
+					fmt.Printf("Azure Endpoint: %s\n", config.AzureEndpoint)
+				}
+				if config.AzureAPIVersion != "" {
+					fmt.Printf("Azure API Version: %s\n", config.AzureAPIVersion)
+				}
+				if config.AzureDeployment != "" {
+					fmt.Printf("Azure Deployment: %s\n", config.AzureDeployment)
+				}
+			} else {
+				if config.BaseURL != "" {
+					fmt.Printf("Base URL: %s\n", config.BaseURL)
+				}
+			}
+			
 			fmt.Printf("Model: %s\n", config.Model)
 			fmt.Printf("Max Tokens: %d\n", config.MaxTokens)
 			fmt.Printf("Timeout: %d seconds\n", config.Timeout)
@@ -477,15 +507,36 @@ Examples:
 		}
 
 		// Interactive mode if no flags provided
-		if apiKey == "" && vaultPath == "" && model == "" && baseURL == "" {
+		if provider == "" && apiKey == "" && vaultPath == "" && model == "" && baseURL == "" && azureEndpoint == "" {
 			fmt.Println("🔧 AI Assistant Configuration")
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Printf("Config file: %s\n\n", configManager.GetConfigPath())
 
 			reader := bufio.NewReader(os.Stdin)
 
+			// Provider selection
+			fmt.Println("1. Provider Selection")
+			fmt.Println("   Choose your AI provider:")
+			fmt.Println("   a) Anthropic Claude (default)")
+			fmt.Println("   b) Azure OpenAI")
+			fmt.Print("\nYour choice [a/b]: ")
+			
+			providerChoice, _ := reader.ReadString('\n')
+			providerChoice = strings.TrimSpace(strings.ToLower(providerChoice))
+			
+			selectedProvider := "anthropic"
+			if providerChoice == "b" {
+				selectedProvider = "azure-openai"
+			}
+			
+			// Apply provider defaults
+			updates := map[string]any{"provider": selectedProvider}
+			if err := configManager.UpdateConfig(updates); err != nil {
+				return fmt.Errorf("failed to set provider: %w", err)
+			}
+
 			// API Key configuration
-			fmt.Println("1. API Key Configuration")
+			fmt.Printf("\n2. API Key Configuration (%s)\n", selectedProvider)
 			fmt.Println("   Choose how to provide your API key:")
 			fmt.Println("   a) Enter API key directly (stored in config file)")
 			fmt.Println("   b) Use Vault path (recommended for production)")
@@ -497,7 +548,11 @@ Examples:
 
 			switch choice {
 			case "a":
-				fmt.Print("\nEnter your Anthropic API key: ")
+				if selectedProvider == "azure-openai" {
+					fmt.Print("\nEnter your Azure OpenAI API key: ")
+				} else {
+					fmt.Print("\nEnter your Anthropic API key: ")
+				}
 				apiKeyInput, _ := reader.ReadString('\n')
 				apiKeyInput = strings.TrimSpace(apiKeyInput)
 				
@@ -527,9 +582,55 @@ Examples:
 			case "c":
 				fmt.Println("📝 Skipping API key configuration")
 				fmt.Println("   Set one of these environment variables:")
-				fmt.Println("   - ANTHROPIC_API_KEY")
-				fmt.Println("   - CLAUDE_API_KEY")
+				if selectedProvider == "azure-openai" {
+					fmt.Println("   - AZURE_OPENAI_API_KEY")
+					fmt.Println("   - OPENAI_API_KEY")
+				} else {
+					fmt.Println("   - ANTHROPIC_API_KEY")
+					fmt.Println("   - CLAUDE_API_KEY")
+				}
 				fmt.Println("   - AI_API_KEY")
+			}
+
+			// Azure OpenAI specific configuration
+			if selectedProvider == "azure-openai" {
+				fmt.Println("\n3. Azure OpenAI Configuration")
+				
+				fmt.Print("Enter your Azure OpenAI endpoint (e.g., https://myresource.openai.azure.com): ")
+				endpointInput, _ := reader.ReadString('\n')
+				endpointInput = strings.TrimSpace(endpointInput)
+				
+				if endpointInput != "" {
+					updates := map[string]any{"azure_endpoint": endpointInput}
+					if err := configManager.UpdateConfig(updates); err != nil {
+						return fmt.Errorf("failed to save Azure endpoint: %w", err)
+					}
+					fmt.Println("✅ Azure endpoint saved")
+				}
+				
+				fmt.Print("Enter your deployment name (e.g., gpt-4): ")
+				deploymentInput, _ := reader.ReadString('\n')
+				deploymentInput = strings.TrimSpace(deploymentInput)
+				
+				if deploymentInput != "" {
+					updates := map[string]any{"azure_deployment": deploymentInput}
+					if err := configManager.UpdateConfig(updates); err != nil {
+						return fmt.Errorf("failed to save Azure deployment: %w", err)
+					}
+					fmt.Println("✅ Azure deployment saved")
+				}
+				
+				fmt.Print("Enter API version (press Enter for default 2024-02-15-preview): ")
+				versionInput, _ := reader.ReadString('\n')
+				versionInput = strings.TrimSpace(versionInput)
+				
+				if versionInput != "" {
+					updates := map[string]any{"azure_api_version": versionInput}
+					if err := configManager.UpdateConfig(updates); err != nil {
+						return fmt.Errorf("failed to save Azure API version: %w", err)
+					}
+					fmt.Printf("✅ Azure API version set to: %s\n", versionInput)
+				}
 			}
 
 			// Model selection
@@ -538,7 +639,7 @@ Examples:
 			modelInput = strings.TrimSpace(modelInput)
 			
 			if modelInput != "" {
-				updates := map[string]interface{}{"model": modelInput}
+				updates := map[string]any{"model": modelInput}
 				if err := configManager.UpdateConfig(updates); err != nil {
 					return fmt.Errorf("failed to update model: %w", err)
 				}
@@ -551,7 +652,12 @@ Examples:
 		}
 
 		// Non-interactive mode - apply flags
-		updates := make(map[string]interface{})
+		updates := make(map[string]any)
+		
+		if provider != "" {
+			updates["provider"] = provider
+			fmt.Printf("✅ Provider set to: %s\n", provider)
+		}
 		
 		if apiKey != "" {
 			if err := ai.ValidateAPIKey(apiKey); err != nil {
@@ -576,6 +682,18 @@ Examples:
 
 		if baseURL != "" {
 			updates["base_url"] = baseURL
+		}
+		
+		if azureEndpoint != "" {
+			updates["azure_endpoint"] = azureEndpoint
+		}
+		
+		if azureAPIVersion != "" {
+			updates["azure_api_version"] = azureAPIVersion
+		}
+		
+		if azureDeployment != "" {
+			updates["azure_deployment"] = azureDeployment
 		}
 
 		if len(updates) > 0 {
@@ -838,10 +956,14 @@ func init() {
 	aiImplementCmd.Flags().String("action-file", "", "Load actions from JSON file")
 
 	// AI configure command flags
-	aiConfigureCmd.Flags().String("api-key", "", "Anthropic API key")
+	aiConfigureCmd.Flags().String("provider", "", "AI provider: anthropic or azure-openai")
+	aiConfigureCmd.Flags().String("api-key", "", "API key for the selected provider")
 	aiConfigureCmd.Flags().String("vault-path", "", "Vault path for API key storage")
 	aiConfigureCmd.Flags().String("model", "", "AI model to use")
-	aiConfigureCmd.Flags().String("base-url", "", "API base URL")
+	aiConfigureCmd.Flags().String("base-url", "", "API base URL (Anthropic only)")
+	aiConfigureCmd.Flags().String("azure-endpoint", "", "Azure OpenAI endpoint")
+	aiConfigureCmd.Flags().String("azure-api-version", "", "Azure OpenAI API version")
+	aiConfigureCmd.Flags().String("azure-deployment", "", "Azure OpenAI deployment name")
 	aiConfigureCmd.Flags().Bool("show", false, "Show current configuration")
 
 	// Add subcommands

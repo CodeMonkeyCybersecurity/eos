@@ -19,11 +19,17 @@ import (
 
 // AIAssistant represents the AI assistant for infrastructure management
 type AIAssistant struct {
-	apiKey   string
-	baseURL  string
-	model    string
-	client   *http.Client
-	maxTokens int
+	provider     string
+	apiKey       string
+	baseURL      string
+	model        string
+	client       *http.Client
+	maxTokens    int
+	
+	// Azure OpenAI specific fields
+	azureEndpoint   string
+	azureAPIVersion string
+	azureDeployment string
 }
 
 // AIRequest represents a request to the AI service
@@ -234,15 +240,65 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 	
 	config := configManager.GetConfig()
 	
-	// Use environment variables as overrides
-	baseURL := config.BaseURL
-	if envURL := os.Getenv("ANTHROPIC_BASE_URL"); envURL != "" {
-		baseURL = envURL
+	// Determine provider
+	provider := config.Provider
+	if provider == "" {
+		provider = "anthropic" // Default to Anthropic
 	}
 	
-	model := config.Model
-	if envModel := os.Getenv("ANTHROPIC_MODEL"); envModel != "" {
-		model = envModel
+	var baseURL, model string
+	var azureEndpoint, azureAPIVersion, azureDeployment string
+	
+	// Configure based on provider
+	if provider == "azure-openai" {
+		// Azure OpenAI configuration
+		azureEndpoint = config.AzureEndpoint
+		if envEndpoint := os.Getenv("AZURE_OPENAI_ENDPOINT"); envEndpoint != "" {
+			azureEndpoint = envEndpoint
+		}
+		
+		azureAPIVersion = config.AzureAPIVersion
+		if azureAPIVersion == "" {
+			azureAPIVersion = "2024-02-15-preview"
+		}
+		if envVersion := os.Getenv("AZURE_OPENAI_API_VERSION"); envVersion != "" {
+			azureAPIVersion = envVersion
+		}
+		
+		azureDeployment = config.AzureDeployment
+		if envDeployment := os.Getenv("AZURE_OPENAI_DEPLOYMENT"); envDeployment != "" {
+			azureDeployment = envDeployment
+		}
+		
+		model = config.Model
+		if model == "" {
+			model = "gpt-4"
+		}
+		if envModel := os.Getenv("AZURE_OPENAI_MODEL"); envModel != "" {
+			model = envModel
+		}
+		
+		// Construct Azure OpenAI URL
+		if azureEndpoint != "" && azureDeployment != "" {
+			baseURL = fmt.Sprintf("%s/openai/deployments/%s", azureEndpoint, azureDeployment)
+		}
+	} else {
+		// Anthropic configuration
+		baseURL = config.BaseURL
+		if baseURL == "" {
+			baseURL = "https://api.anthropic.com/v1"
+		}
+		if envURL := os.Getenv("ANTHROPIC_BASE_URL"); envURL != "" {
+			baseURL = envURL
+		}
+		
+		model = config.Model
+		if model == "" {
+			model = "claude-3-sonnet-20240229"
+		}
+		if envModel := os.Getenv("ANTHROPIC_MODEL"); envModel != "" {
+			model = envModel
+		}
 	}
 	
 	maxTokens := config.MaxTokens
@@ -256,9 +312,13 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 	}
 
 	return &AIAssistant{
-		apiKey:  apiKey,
-		baseURL: baseURL,
-		model:   model,
+		provider:        provider,
+		apiKey:          apiKey,
+		baseURL:         baseURL,
+		model:           model,
+		azureEndpoint:   azureEndpoint,
+		azureAPIVersion: azureAPIVersion,
+		azureDeployment: azureDeployment,
 		client: &http.Client{
 			Timeout: timeout,
 		},
@@ -330,22 +390,49 @@ func (ai *AIAssistant) Chat(rc *eos_io.RuntimeContext, ctx *ConversationContext,
 
 // sendRequest sends the HTTP request to the AI service
 func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest) (*AIResponse, error) {
-	// Convert request to JSON
-	requestBody, err := json.Marshal(request)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	var requestBody []byte
+	var err error
+	var url string
+	
+	if ai.provider == "azure-openai" {
+		// Azure OpenAI uses a different request format
+		azureRequest := map[string]any{
+			"messages":    request.Messages,
+			"max_tokens":  request.MaxTokens,
+			"temperature": 0.7,
+			"stream":      false,
+		}
+		requestBody, err = json.Marshal(azureRequest)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal Azure request: %w", err)
+		}
+		
+		// Azure OpenAI URL format
+		url = fmt.Sprintf("%s/chat/completions?api-version=%s", ai.baseURL, ai.azureAPIVersion)
+	} else {
+		// Anthropic request format
+		requestBody, err = json.Marshal(request)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal request: %w", err)
+		}
+		
+		url = ai.baseURL + "/messages"
 	}
 
 	// Create HTTP request
-	req, err := http.NewRequestWithContext(rc.Ctx, "POST", ai.baseURL+"/messages", bytes.NewBuffer(requestBody))
+	req, err := http.NewRequestWithContext(rc.Ctx, "POST", url, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set headers
+	// Set headers based on provider
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+ai.apiKey)
-	req.Header.Set("anthropic-version", "2023-06-01")
+	if ai.provider == "azure-openai" {
+		req.Header.Set("api-key", ai.apiKey)
+	} else {
+		req.Header.Set("Authorization", "Bearer "+ai.apiKey)
+		req.Header.Set("anthropic-version", "2023-06-01")
+	}
 
 	// Send request
 	resp, err := ai.client.Do(req)
@@ -365,10 +452,18 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(responseBody))
 	}
 
-	// Parse response
+	// Parse response based on provider
 	var aiResponse AIResponse
-	if err := json.Unmarshal(responseBody, &aiResponse); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+	if ai.provider == "azure-openai" {
+		// Azure OpenAI response format is compatible with OpenAI format
+		if err := json.Unmarshal(responseBody, &aiResponse); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal Azure response: %w", err)
+		}
+	} else {
+		// Anthropic response format
+		if err := json.Unmarshal(responseBody, &aiResponse); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal response: %w", err)
+		}
 	}
 
 	return &aiResponse, nil

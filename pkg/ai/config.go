@@ -16,12 +16,21 @@ import (
 
 // AIConfig represents the AI assistant configuration
 type AIConfig struct {
+	// Provider selection
+	Provider string `yaml:"provider,omitempty"` // "anthropic" or "azure-openai"
+	
+	// Common configuration
 	APIKey      string `yaml:"api_key,omitempty"`
 	APIKeyVault string `yaml:"api_key_vault,omitempty"` // Vault path for API key
 	BaseURL     string `yaml:"base_url,omitempty"`
 	Model       string `yaml:"model,omitempty"`
 	MaxTokens   int    `yaml:"max_tokens,omitempty"`
 	Timeout     int    `yaml:"timeout,omitempty"`
+	
+	// Azure OpenAI specific configuration
+	AzureEndpoint    string `yaml:"azure_endpoint,omitempty"`
+	AzureAPIVersion  string `yaml:"azure_api_version,omitempty"`
+	AzureDeployment  string `yaml:"azure_deployment,omitempty"`
 }
 
 // ConfigManager manages AI configuration
@@ -56,8 +65,9 @@ func (cm *ConfigManager) LoadConfig() error {
 
 	// Check if config file exists
 	if _, err := os.Stat(cm.configPath); os.IsNotExist(err) {
-		// Create default config
+		// Create default config (Anthropic Claude)
 		cm.config = &AIConfig{
+			Provider:  "anthropic",
 			BaseURL:   "https://api.anthropic.com/v1",
 			Model:     "claude-3-sonnet-20240229",
 			MaxTokens: 4096,
@@ -111,15 +121,35 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 	// 2. Vault (if configured)
 	// 3. Config file
 	
-	// Check environment variables
-	if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
-		logger.Debug("Using API key from ANTHROPIC_API_KEY environment variable")
-		return apiKey, nil
+	// Check provider-specific environment variables first
+	provider := cm.config.Provider
+	if provider == "" {
+		provider = "anthropic" // Default to Anthropic
 	}
-	if apiKey := os.Getenv("CLAUDE_API_KEY"); apiKey != "" {
-		logger.Debug("Using API key from CLAUDE_API_KEY environment variable")
-		return apiKey, nil
+	
+	// Provider-specific environment variables
+	if provider == "azure-openai" {
+		if apiKey := os.Getenv("AZURE_OPENAI_API_KEY"); apiKey != "" {
+			logger.Debug("Using API key from AZURE_OPENAI_API_KEY environment variable")
+			return apiKey, nil
+		}
+		if apiKey := os.Getenv("OPENAI_API_KEY"); apiKey != "" {
+			logger.Debug("Using API key from OPENAI_API_KEY environment variable")
+			return apiKey, nil
+		}
+	} else {
+		// Anthropic/Claude environment variables
+		if apiKey := os.Getenv("ANTHROPIC_API_KEY"); apiKey != "" {
+			logger.Debug("Using API key from ANTHROPIC_API_KEY environment variable")
+			return apiKey, nil
+		}
+		if apiKey := os.Getenv("CLAUDE_API_KEY"); apiKey != "" {
+			logger.Debug("Using API key from CLAUDE_API_KEY environment variable")
+			return apiKey, nil
+		}
 	}
+	
+	// Generic AI API key (works for both)
 	if apiKey := os.Getenv("AI_API_KEY"); apiKey != "" {
 		logger.Debug("Using API key from AI_API_KEY environment variable")
 		return apiKey, nil
@@ -163,9 +193,13 @@ func (cm *ConfigManager) GetConfig() *AIConfig {
 }
 
 // UpdateConfig updates configuration fields
-func (cm *ConfigManager) UpdateConfig(updates map[string]interface{}) error {
+func (cm *ConfigManager) UpdateConfig(updates map[string]any) error {
 	for key, value := range updates {
 		switch strings.ToLower(key) {
+		case "provider":
+			if v, ok := value.(string); ok {
+				cm.config.Provider = v
+			}
 		case "api_key", "apikey":
 			if v, ok := value.(string); ok {
 				cm.config.APIKey = v
@@ -189,6 +223,18 @@ func (cm *ConfigManager) UpdateConfig(updates map[string]interface{}) error {
 		case "timeout":
 			if v, ok := value.(int); ok {
 				cm.config.Timeout = v
+			}
+		case "azure_endpoint", "azureendpoint":
+			if v, ok := value.(string); ok {
+				cm.config.AzureEndpoint = v
+			}
+		case "azure_api_version", "azureapiversion":
+			if v, ok := value.(string); ok {
+				cm.config.AzureAPIVersion = v
+			}
+		case "azure_deployment", "azuredeployment":
+			if v, ok := value.(string); ok {
+				cm.config.AzureDeployment = v
 			}
 		}
 	}
@@ -215,10 +261,34 @@ func ValidateAPIKey(apiKey string) error {
 	
 	// Check for common patterns
 	if strings.HasPrefix(apiKey, "sk-") || strings.HasPrefix(apiKey, "claude-") {
-		// Looks like a valid key pattern
+		// OpenAI/Anthropic style key
 		return nil
 	}
 	
-	// Warn but don't fail for unknown patterns
+	// Warn but don't fail for unknown patterns (could be Azure OpenAI)
 	return nil
+}
+
+// GetProviderDefaults returns default configuration for a provider
+func GetProviderDefaults(provider string) *AIConfig {
+	switch provider {
+	case "azure-openai":
+		return &AIConfig{
+			Provider:         "azure-openai",
+			AzureAPIVersion:  "2024-02-15-preview",
+			Model:           "gpt-4",
+			MaxTokens:       4096,
+			Timeout:         60,
+		}
+	case "anthropic":
+		fallthrough
+	default:
+		return &AIConfig{
+			Provider:  "anthropic",
+			BaseURL:   "https://api.anthropic.com/v1",
+			Model:     "claude-3-sonnet-20240229",
+			MaxTokens: 4096,
+			Timeout:   60,
+		}
+	}
 }
