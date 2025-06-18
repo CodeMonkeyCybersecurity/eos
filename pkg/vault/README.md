@@ -130,6 +130,8 @@ Environment=VAULT_SKIP_TLS_VERIFY=false
 ExecStart=vault agent -config=/etc/vault-agent-eos.hcl
 Restart=on-failure
 RestartSec=5
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target

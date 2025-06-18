@@ -69,10 +69,13 @@ func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 }
 
 // waitForAgentToken polls until the sink file contains non-empty content.
+// Runs as the eos user to avoid permission issues with /run/eos directory.
 func WaitForAgentToken(path string, timeout time.Duration) (string, error) {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if data, err := os.ReadFile(path); err == nil && len(data) > 0 {
+		// Use sudo -u eos to read the token file since /run/eos is owned by eos user
+		cmd := exec.Command("sudo", "-u", shared.EosID, "cat", path)
+		if data, err := cmd.Output(); err == nil && len(data) > 0 {
 			return strings.TrimSpace(string(data)), nil
 		}
 		time.Sleep(shared.Interval)
