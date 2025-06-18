@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -45,38 +46,62 @@ func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFA
 		config = DefaultMFAConfig()
 	}
 
+	// Get privileged client with root token for MFA configuration
+	log.Info("🔑 Getting privileged client for MFA setup")
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Error("❌ Failed to get privileged Vault client for MFA setup", zap.Error(err))
+		return cerr.Wrap(err, "get privileged client for MFA")
+	}
+	
+	// Log what token the privileged client is using
+	if privToken := privilegedClient.Token(); privToken != "" {
+		log.Info("✅ Using privileged client for MFA operations", 
+			zap.String("token_prefix", privToken[:12]+"..."))
+	}
+
 	// Enable TOTP MFA if requested
 	if config.TOTPEnabled {
-		if err := enableTOTPMFA(rc, client); err != nil {
-			return fmt.Errorf("failed to enable TOTP MFA: %w", err)
+		log.Info("📱 Enabling TOTP MFA")
+		if err := enableTOTPMFA(rc, privilegedClient); err != nil {
+			log.Error("❌ Failed to enable TOTP MFA", zap.Error(err))
+			return cerr.Wrap(err, "failed to enable TOTP MFA")
 		}
 	}
 
 	// Enable Duo MFA if requested
 	if config.DuoEnabled {
-		if err := enableDuoMFA(rc, client); err != nil {
-			return fmt.Errorf("failed to enable Duo MFA: %w", err)
+		log.Info("🔐 Enabling Duo MFA")
+		if err := enableDuoMFA(rc, privilegedClient); err != nil {
+			log.Error("❌ Failed to enable Duo MFA", zap.Error(err))
+			return cerr.Wrap(err, "failed to enable Duo MFA")
 		}
 	}
 
 	// Enable PingID MFA if requested
 	if config.PingIDEnabled {
-		if err := enablePingIDMFA(rc, client); err != nil {
-			return fmt.Errorf("failed to enable PingID MFA: %w", err)
+		log.Info("🔐 Enabling PingID MFA")
+		if err := enablePingIDMFA(rc, privilegedClient); err != nil {
+			log.Error("❌ Failed to enable PingID MFA", zap.Error(err))
+			return cerr.Wrap(err, "failed to enable PingID MFA")
 		}
 	}
 
 	// Enable Okta MFA if requested
 	if config.OktaEnabled {
-		if err := enableOktaMFA(rc, client); err != nil {
-			return fmt.Errorf("failed to enable Okta MFA: %w", err)
+		log.Info("🔐 Enabling Okta MFA")
+		if err := enableOktaMFA(rc, privilegedClient); err != nil {
+			log.Error("❌ Failed to enable Okta MFA", zap.Error(err))
+			return cerr.Wrap(err, "failed to enable Okta MFA")
 		}
 	}
 
 	// Apply MFA enforcement policies
 	if config.EnforceForAll {
-		if err := enforceMFAForAllUsers(rc, client, config); err != nil {
-			return fmt.Errorf("failed to enforce MFA for all users: %w", err)
+		log.Info("🛡️ Enforcing MFA for all users")
+		if err := enforceMFAForAllUsers(rc, privilegedClient, config); err != nil {
+			log.Error("❌ Failed to enforce MFA for all users", zap.Error(err))
+			return cerr.Wrap(err, "failed to enforce MFA for all users")
 		}
 	}
 
@@ -102,11 +127,16 @@ func enableTOTPMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Create the TOTP MFA method using the Identity API
 	resp, err := client.Logical().Write("identity/mfa/method/totp", totpConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create TOTP MFA method: %w", err)
+		log.Error("❌ Failed to create TOTP MFA method",
+			zap.Error(err),
+			zap.String("vault_addr", client.Address()))
+		return cerr.Wrap(err, "failed to create TOTP MFA method")
 	}
 
 	if resp == nil || resp.Data == nil || resp.Data["method_id"] == nil {
-		return fmt.Errorf("TOTP MFA method creation did not return method_id")
+		log.Error("❌ TOTP MFA method creation did not return method_id",
+		zap.Any("response", resp))
+	return cerr.New("TOTP MFA method creation did not return method_id")
 	}
 
 	methodID := resp.Data["method_id"].(string)
@@ -126,6 +156,9 @@ func storeMFAMethodID(rc *eos_io.RuntimeContext, methodType, methodID string) er
 	
 	// Store in a simple key-value structure in Vault
 	secretPath := fmt.Sprintf("secret/data/eos/mfa-methods/%s", methodType)
+	log.Info("💾 Storing MFA method ID in Vault", 
+		zap.String("path", secretPath),
+		zap.String("method_type", methodType))
 	data := map[string]interface{}{
 		"data": map[string]interface{}{
 			"method_id":    methodID,
@@ -137,12 +170,12 @@ func storeMFAMethodID(rc *eos_io.RuntimeContext, methodType, methodID string) er
 	
 	client, err := GetRootClient(rc)
 	if err != nil {
-		return fmt.Errorf("failed to get root client: %w", err)
+		return cerr.Wrap(err, "failed to get root client")
 	}
 	
 	_, err = client.Logical().Write(secretPath, data)
 	if err != nil {
-		return fmt.Errorf("failed to store MFA method ID: %w", err)
+		return cerr.Wrap(err, "failed to store MFA method ID")
 	}
 	
 	log.Info("📝 MFA method ID stored", 
@@ -165,7 +198,8 @@ func enableDuoMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Prompt for Duo configuration
 	duoConfig, err := promptDuoConfig(rc)
 	if err != nil {
-		return fmt.Errorf("failed to get Duo configuration: %w", err)
+		log.Error("❌ Failed to get Duo configuration", zap.Error(err))
+		return cerr.Wrap(err, "failed to get Duo configuration")
 	}
 
 	// Enable Duo auth method
@@ -175,13 +209,19 @@ func enableDuoMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 		Description: "Duo Security Multi-Factor Authentication",
 	})
 	if err != nil && !strings.Contains(err.Error(), "path is already in use") {
-		return fmt.Errorf("failed to enable Duo auth method: %w", err)
+		log.Error("❌ Failed to enable Duo auth method",
+			zap.Error(err),
+			zap.String("auth_path", authPath))
+		return cerr.Wrap(err, "failed to enable Duo auth method")
 	}
 
 	// Configure Duo method
 	_, err = client.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), duoConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure Duo method: %w", err)
+		log.Error("❌ Failed to configure Duo method",
+			zap.Error(err),
+			zap.String("path", fmt.Sprintf("auth/%s/config", authPath)))
+		return cerr.Wrap(err, "failed to configure Duo method")
 	}
 
 	log.Info("✅ Duo MFA method enabled and configured")
@@ -201,7 +241,8 @@ func enablePingIDMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Prompt for PingID configuration
 	pingConfig, err := promptPingIDConfig(rc)
 	if err != nil {
-		return fmt.Errorf("failed to get PingID configuration: %w", err)
+		log.Error("❌ Failed to get PingID configuration", zap.Error(err))
+		return cerr.Wrap(err, "failed to get PingID configuration")
 	}
 
 	// Enable PingID auth method
@@ -211,13 +252,19 @@ func enablePingIDMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 		Description: "PingID Multi-Factor Authentication",
 	})
 	if err != nil && !strings.Contains(err.Error(), "path is already in use") {
-		return fmt.Errorf("failed to enable PingID auth method: %w", err)
+		log.Error("❌ Failed to enable PingID auth method",
+			zap.Error(err),
+			zap.String("auth_path", authPath))
+		return cerr.Wrap(err, "failed to enable PingID auth method")
 	}
 
 	// Configure PingID method
 	_, err = client.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), pingConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure PingID method: %w", err)
+		log.Error("❌ Failed to configure PingID method",
+			zap.Error(err),
+			zap.String("path", fmt.Sprintf("auth/%s/config", authPath)))
+		return cerr.Wrap(err, "failed to configure PingID method")
 	}
 
 	log.Info("✅ PingID MFA method enabled and configured")
@@ -237,7 +284,8 @@ func enableOktaMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Prompt for Okta configuration
 	oktaConfig, err := promptOktaConfig(rc)
 	if err != nil {
-		return fmt.Errorf("failed to get Okta configuration: %w", err)
+		log.Error("❌ Failed to get Okta configuration", zap.Error(err))
+		return cerr.Wrap(err, "failed to get Okta configuration")
 	}
 
 	// Enable Okta auth method
@@ -247,13 +295,19 @@ func enableOktaMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 		Description: "Okta Multi-Factor Authentication",
 	})
 	if err != nil && !strings.Contains(err.Error(), "path is already in use") {
-		return fmt.Errorf("failed to enable Okta auth method: %w", err)
+		log.Error("❌ Failed to enable Okta auth method",
+			zap.Error(err),
+			zap.String("auth_path", authPath))
+		return cerr.Wrap(err, "failed to enable Okta auth method")
 	}
 
 	// Configure Okta method
 	_, err = client.Logical().Write(fmt.Sprintf("auth/%s/config", authPath), oktaConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure Okta method: %w", err)
+		log.Error("❌ Failed to configure Okta method",
+			zap.Error(err),
+			zap.String("path", fmt.Sprintf("auth/%s/config", authPath)))
+		return cerr.Wrap(err, "failed to configure Okta method")
 	}
 
 	log.Info("✅ Okta MFA method enabled and configured")
@@ -338,7 +392,10 @@ func configureMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, auth
 	cleanPath := strings.TrimSuffix(authPath, "/")
 	_, err := client.Logical().Write(fmt.Sprintf("auth/%s/mfa_config", cleanPath), mfaConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure MFA for userpass: %w", err)
+		log.Error("❌ Failed to configure MFA for userpass",
+			zap.Error(err),
+			zap.String("path", fmt.Sprintf("auth/%s/mfa_config", cleanPath)))
+		return cerr.Wrap(err, "failed to configure MFA for userpass")
 	}
 
 	log.Info("✅ MFA configured for userpass authentication")
@@ -359,7 +416,10 @@ func configureMFAForLDAP(rc *eos_io.RuntimeContext, client *api.Client, authPath
 	cleanPath := strings.TrimSuffix(authPath, "/")
 	_, err := client.Logical().Write(fmt.Sprintf("auth/%s/mfa_config", cleanPath), mfaConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure MFA for LDAP: %w", err)
+		log.Error("❌ Failed to configure MFA for LDAP",
+			zap.Error(err),
+			zap.String("path", fmt.Sprintf("auth/%s/mfa_config", cleanPath)))
+		return cerr.Wrap(err, "failed to configure MFA for LDAP")
 	}
 
 	log.Info("✅ MFA configured for LDAP authentication")
@@ -380,7 +440,10 @@ func configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPath
 	cleanPath := strings.TrimSuffix(authPath, "/")
 	_, err := client.Logical().Write(fmt.Sprintf("auth/%s/mfa_config", cleanPath), mfaConfig)
 	if err != nil {
-		return fmt.Errorf("failed to configure MFA for OIDC: %w", err)
+		log.Error("❌ Failed to configure MFA for OIDC",
+			zap.Error(err),
+			zap.String("path", fmt.Sprintf("auth/%s/mfa_config", cleanPath)))
+		return cerr.Wrap(err, "failed to configure MFA for OIDC")
 	}
 
 	log.Info("✅ MFA configured for OIDC authentication")
@@ -429,8 +492,8 @@ path "auth/totp/code/*" {
 // Helper functions for prompting MFA configurations
 
 func promptDuoConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
-	fmt.Println("📋 Duo Security Configuration")
-	fmt.Println("Please provide your Duo Security integration details:")
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("📋 Duo Security Configuration - prompting for integration details")
 
 	integrationKey, err := interaction.PromptSecrets(rc.Ctx, "Integration Key", 1)
 	if err != nil {
@@ -456,8 +519,8 @@ func promptDuoConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error) 
 }
 
 func promptPingIDConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
-	fmt.Println("📋 PingID Configuration")
-	fmt.Println("Please provide your PingID integration details:")
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("📋 PingID Configuration - prompting for integration details")
 
 	adminUrl, err := interaction.PromptSecrets(rc.Ctx, "Admin URL", 1)
 	if err != nil {
@@ -483,8 +546,8 @@ func promptPingIDConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, erro
 }
 
 func promptOktaConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
-	fmt.Println("📋 Okta Configuration")
-	fmt.Println("Please provide your Okta integration details:")
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("📋 Okta Configuration - prompting for integration details")
 
 	orgName, err := interaction.PromptSecrets(rc.Ctx, "Organization Name", 1)
 	if err != nil {
@@ -523,29 +586,37 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	secret, err := client.Logical().Write(fmt.Sprintf("auth/totp/keys/%s", username), keyData)
 	if err != nil {
-		return fmt.Errorf("failed to generate TOTP key: %w", err)
+		log.Error("❌ Failed to generate TOTP key",
+		zap.Error(err),
+		zap.String("username", username))
+	return cerr.Wrap(err, "failed to generate TOTP key")
 	}
 
 	if secret == nil || secret.Data == nil {
-		return fmt.Errorf("no TOTP key data returned")
+		log.Error("❌ No TOTP key data returned from Vault", zap.String("username", username))
+	return cerr.New("no TOTP key data returned")
 	}
 
 	// Display QR code and backup key
 	qrCode, ok := secret.Data["qr_code"].(string)
 	if ok && qrCode != "" {
+		log.Info("📱 QR code available for authenticator app", zap.String("qr_code_prefix", qrCode[:50]+"..."))
 		fmt.Printf("\n📱 Scan this QR code with your authenticator app:\n%s\n", qrCode)
 	}
 
 	url, ok := secret.Data["url"].(string)
 	if ok && url != "" {
+		log.Info("🔗 Manual URL available for authenticator app", zap.String("url_prefix", url[:50]+"..."))
 		fmt.Printf("\n🔗 Or manually enter this URL in your authenticator app:\n%s\n", url)
 	}
 
 	key, ok := secret.Data["key"].(string)
 	if ok && key != "" {
+		log.Info("🔑 Backup key generated for TOTP", zap.String("backup_key_prefix", key[:8]+"..."))
 		fmt.Printf("\n🔑 Backup key (store securely): %s\n", key)
 	}
 
+	log.Info("✅ TOTP MFA setup completed - prompting for test code")
 	fmt.Println("\n✅ TOTP MFA setup completed!")
 	fmt.Println("📝 Please test your TOTP code before completing the setup.")
 
@@ -553,7 +624,8 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	if interaction.PromptYesNo(rc.Ctx, "Do you want to test your TOTP code now?", true) {
 		testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter TOTP code from your authenticator app", 1)
 		if err != nil {
-			return fmt.Errorf("failed to get test code: %w", err)
+			log.Error("❌ Failed to get test code from user", zap.Error(err))
+		return cerr.Wrap(err, "failed to get test code")
 		}
 
 		// Verify the test code
@@ -564,10 +636,12 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		_, err = client.Logical().Write(fmt.Sprintf("auth/totp/code/%s", username), verifyData)
 		if err != nil {
 			log.Warn("⚠️ TOTP code verification failed", zap.Error(err))
+			log.Error("❌ TOTP code verification failed - user needs to check authenticator app")
 			fmt.Println("❌ TOTP code verification failed. Please check your authenticator app setup.")
-			return fmt.Errorf("TOTP verification failed: %w", err)
+			return cerr.Wrap(err, "TOTP verification failed")
 		}
 
+		log.Info("✅ TOTP code verified successfully")
 		fmt.Println("✅ TOTP code verified successfully!")
 	}
 
