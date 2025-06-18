@@ -3,13 +3,13 @@
 package vault
 
 import (
-	"fmt"
 	"os"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -17,13 +17,13 @@ import (
 
 // VaultAgentConfig represents configuration options for Vault Agent
 type VaultAgentConfig struct {
-	EnableCache      bool   `json:"enable_cache"`
-	ListenerAddress  string `json:"listener_address"`
-	EnableAutoAuth   bool   `json:"enable_auto_auth"`
-	CacheTemplates   bool   `json:"cache_templates"`
-	LogLevel         string `json:"log_level"`
-	MaxRetries       int    `json:"max_retries"`
-	RetryDelay       string `json:"retry_delay"`
+	EnableCache     bool   `json:"enable_cache"`
+	ListenerAddress string `json:"listener_address"`
+	EnableAutoAuth  bool   `json:"enable_auto_auth"`
+	CacheTemplates  bool   `json:"cache_templates"`
+	LogLevel        string `json:"log_level"`
+	MaxRetries      int    `json:"max_retries"`
+	RetryDelay      string `json:"retry_delay"`
 }
 
 // DefaultVaultAgentConfig returns secure defaults for Vault Agent
@@ -49,28 +49,38 @@ func PhaseEnableVaultAgent(rc *eos_io.RuntimeContext, client *api.Client, config
 	}
 
 	// Step 1: Verify prerequisites
+	log.Info("📋 Verifying Vault Agent prerequisites")
 	if err := verifyAgentPrerequisites(rc, client); err != nil {
-		return fmt.Errorf("agent prerequisites check failed: %w", err)
+		log.Error("❌ Agent prerequisites check failed", zap.Error(err))
+		return cerr.Wrap(err, "agent prerequisites check failed")
 	}
 
 	// Step 2: Ensure AppRole credentials exist
+	log.Info("🔑 Ensuring AppRole credentials exist")
 	if err := ensureAppRoleCredentials(rc, client); err != nil {
-		return fmt.Errorf("AppRole credentials setup failed: %w", err)
+		log.Error("❌ AppRole credentials setup failed", zap.Error(err))
+		return cerr.Wrap(err, "AppRole credentials setup failed")
 	}
 
 	// Step 3: Configure Vault Agent
+	log.Info("⚙️ Configuring Vault Agent")
 	if err := PhaseRenderVaultAgentConfig(rc, client); err != nil {
-		return fmt.Errorf("agent configuration failed: %w", err)
+		log.Error("❌ Agent configuration failed", zap.Error(err))
+		return cerr.Wrap(err, "agent configuration failed")
 	}
 
 	// Step 4: Start and validate Vault Agent
+	log.Info("🚀 Starting and validating Vault Agent")
 	if err := PhaseStartVaultAgentAndValidate(rc, client); err != nil {
-		return fmt.Errorf("agent start and validation failed: %w", err)
+		log.Error("❌ Agent start and validation failed", zap.Error(err))
+		return cerr.Wrap(err, "agent start and validation failed")
 	}
 
 	// Step 5: Verify agent functionality
+	log.Info("🧪 Verifying agent functionality")
 	if err := verifyAgentFunctionality(rc, client); err != nil {
-		return fmt.Errorf("agent functionality verification failed: %w", err)
+		log.Error("❌ Agent functionality verification failed", zap.Error(err))
+		return cerr.Wrap(err, "agent functionality verification failed")
 	}
 
 	// Step 6: Configure agent monitoring
@@ -89,22 +99,32 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 
 	// Check Vault is accessible
 	if IsVaultSealed(client) {
-		return fmt.Errorf("Vault is sealed - cannot configure agent")
+		log.Error("❌ Vault is sealed - cannot configure agent")
+		return cerr.New("Vault is sealed - cannot configure agent")
 	}
 
 	// Verify Vault is healthy
+	log.Info("🏥 Checking Vault health status")
 	health, err := client.Sys().Health()
 	if err != nil {
-		return fmt.Errorf("failed to check Vault health: %w", err)
+		log.Error("❌ Failed to check Vault health", zap.Error(err))
+		return cerr.Wrap(err, "failed to check Vault health")
 	}
 	if !health.Initialized {
-		return fmt.Errorf("Vault is not initialized")
+		log.Error("❌ Vault is not initialized")
+		return cerr.New("Vault is not initialized")
 	}
+	log.Info("✅ Vault is healthy",
+		zap.Bool("initialized", health.Initialized),
+		zap.Bool("sealed", health.Sealed),
+		zap.String("version", health.Version))
 
 	// Check AppRole auth method is enabled
+	log.Info("🔍 Checking for AppRole auth method")
 	authMethods, err := client.Sys().ListAuth()
 	if err != nil {
-		return fmt.Errorf("failed to list auth methods: %w", err)
+		log.Error("❌ Failed to list auth methods", zap.Error(err))
+		return cerr.Wrap(err, "failed to list auth methods")
 	}
 
 	approleFound := false
@@ -117,12 +137,17 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	if !approleFound {
-		return fmt.Errorf("AppRole auth method is required but not enabled")
+		log.Error("❌ AppRole auth method is required but not enabled")
+		return cerr.New("AppRole auth method is required but not enabled")
 	}
 
 	// Verify eos user exists
+	log.Info("👤 Verifying eos system user exists")
 	if _, _, err := eos_unix.LookupUser(rc.Ctx, shared.EosID); err != nil {
-		return fmt.Errorf("eos system user not found: %w", err)
+		log.Error("❌ eos system user not found",
+			zap.String("user", shared.EosID),
+			zap.Error(err))
+		return cerr.Wrap(err, "eos system user not found")
 	}
 
 	log.Info("✅ All prerequisites verified")
@@ -141,14 +166,18 @@ func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	// Try to retrieve from Vault
+	log.Info("📥 Retrieving AppRole credentials from Vault")
 	roleID, secretID, err := getAppRoleCredentialsFromVault(rc, client)
 	if err != nil {
-		return fmt.Errorf("failed to get AppRole credentials: %w", err)
+		log.Error("❌ Failed to get AppRole credentials from Vault", zap.Error(err))
+		return cerr.Wrap(err, "failed to get AppRole credentials")
 	}
 
 	// Write credentials to disk
+	log.Info("💾 Writing AppRole credentials to disk")
 	if err := writeAppRoleCredentialsToDisk(rc, roleID, secretID); err != nil {
-		return fmt.Errorf("failed to write AppRole credentials: %w", err)
+		log.Error("❌ Failed to write AppRole credentials", zap.Error(err))
+		return cerr.Wrap(err, "failed to write AppRole credentials")
 	}
 
 	log.Info("✅ AppRole credentials configured")
@@ -167,24 +196,37 @@ func getAppRoleCredentialsFromVault(rc *eos_io.RuntimeContext, client *api.Clien
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Get role ID
-	roleIDPath := fmt.Sprintf("auth/approle/role/%s/role-id", shared.AppRoleName)
+	roleIDPath := "auth/approle/role/" + shared.AppRoleName + "/role-id"
+	log.Info("📞 Reading RoleID from Vault", zap.String("path", roleIDPath))
 	roleIDResp, err := client.Logical().Read(roleIDPath)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to read role ID: %w", err)
+		log.Error("❌ Failed to read role ID",
+			zap.String("path", roleIDPath),
+			zap.Error(err))
+		return "", "", cerr.Wrap(err, "failed to read role ID")
 	}
 	if roleIDResp == nil || roleIDResp.Data["role_id"] == nil {
-		return "", "", fmt.Errorf("role ID not found in response")
+		log.Error("❌ Role ID not found in response",
+			zap.Any("response", roleIDResp))
+		return "", "", cerr.New("role ID not found in response")
 	}
 	roleID := roleIDResp.Data["role_id"].(string)
+	log.Info("✅ RoleID retrieved", zap.String("role_id_prefix", roleID[:12]+"..."))
 
 	// Generate new secret ID
-	secretIDPath := fmt.Sprintf("auth/approle/role/%s/secret-id", shared.AppRoleName)
+	secretIDPath := "auth/approle/role/" + shared.AppRoleName + "/secret-id"
+	log.Info("📞 Generating new SecretID from Vault", zap.String("path", secretIDPath))
 	secretIDResp, err := client.Logical().Write(secretIDPath, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to generate secret ID: %w", err)
+		log.Error("❌ Failed to generate secret ID",
+			zap.String("path", secretIDPath),
+			zap.Error(err))
+		return "", "", cerr.Wrap(err, "failed to generate secret ID")
 	}
 	if secretIDResp == nil || secretIDResp.Data["secret_id"] == nil {
-		return "", "", fmt.Errorf("secret ID not found in response")
+		log.Error("❌ Secret ID not found in response",
+			zap.Any("response", secretIDResp))
+		return "", "", cerr.New("secret ID not found in response")
 	}
 	secretID := secretIDResp.Data["secret_id"].(string)
 
@@ -197,24 +239,38 @@ func writeAppRoleCredentialsToDisk(rc *eos_io.RuntimeContext, roleID, secretID s
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Ensure secrets directory exists
+	log.Info("📁 Ensuring secrets directory exists")
 	if err := shared.EnsureSecretsDir(); err != nil {
-		return fmt.Errorf("failed to create secrets directory: %w", err)
+		log.Error("❌ Failed to create secrets directory", zap.Error(err))
+		return cerr.Wrap(err, "failed to create secrets directory")
 	}
 
 	// Write role ID
+	log.Info("💾 Writing RoleID to disk", zap.String("path", shared.AppRolePaths.RoleID))
 	if err := os.WriteFile(shared.AppRolePaths.RoleID, []byte(roleID), shared.OwnerReadOnly); err != nil {
-		return fmt.Errorf("failed to write role ID: %w", err)
+		log.Error("❌ Failed to write role ID",
+			zap.String("path", shared.AppRolePaths.RoleID),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to write role ID")
 	}
 
 	// Write secret ID
+	log.Info("💾 Writing SecretID to disk", zap.String("path", shared.AppRolePaths.SecretID))
 	if err := os.WriteFile(shared.AppRolePaths.SecretID, []byte(secretID), shared.OwnerReadOnly); err != nil {
-		return fmt.Errorf("failed to write secret ID: %w", err)
+		log.Error("❌ Failed to write secret ID",
+			zap.String("path", shared.AppRolePaths.SecretID),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to write secret ID")
 	}
 
 	// Set proper ownership
+	log.Info("🔒 Setting proper ownership for credential files")
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		return fmt.Errorf("failed to lookup eos user: %w", err)
+		log.Error("❌ Failed to lookup eos user",
+			zap.String("user", shared.EosID),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to lookup eos user")
 	}
 
 	if err := os.Chown(shared.AppRolePaths.RoleID, uid, gid); err != nil {
@@ -238,37 +294,65 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 
 	// Check if agent token file exists and is readable
 	tokenPath := shared.AgentToken
-	if _, err := os.Stat(tokenPath); err != nil {
-		return fmt.Errorf("agent token file not found: %w", err)
+	log.Info("📄 Checking agent token file", zap.String("path", tokenPath))
+	if stat, err := os.Stat(tokenPath); err != nil {
+		if os.IsNotExist(err) {
+			log.Error("❌ Agent token file not found",
+				zap.String("path", tokenPath),
+				zap.Error(err))
+		} else {
+			log.Error("❌ Cannot stat agent token file",
+				zap.String("path", tokenPath),
+				zap.Error(err))
+		}
+		return cerr.Wrap(err, "agent token file not found")
+	} else {
+		log.Info("✅ Agent token file exists",
+			zap.String("path", tokenPath),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()))
 	}
 
 	// Read the token
+	log.Info("📖 Reading agent token")
 	tokenData, err := os.ReadFile(tokenPath)
 	if err != nil {
-		return fmt.Errorf("failed to read agent token: %w", err)
+		log.Error("❌ Failed to read agent token",
+			zap.String("path", tokenPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to read agent token")
 	}
 	if len(tokenData) == 0 {
-		return fmt.Errorf("agent token file is empty")
+		log.Error("❌ Agent token file is empty", zap.String("path", tokenPath))
+		return cerr.New("agent token file is empty")
 	}
+	log.Info("✅ Agent token read successfully", zap.Int("token_length", len(tokenData)))
 
 	// Test token validity by making a simple API call
+	log.Info("🔐 Creating test client with agent token")
 	agentClient, err := api.NewClient(api.DefaultConfig())
 	if err != nil {
-		return fmt.Errorf("failed to create agent client: %w", err)
+		log.Error("❌ Failed to create agent client", zap.Error(err))
+		return cerr.Wrap(err, "failed to create agent client")
 	}
-	
+
 	agentClient.SetToken(string(tokenData))
 	agentClient.SetAddress(client.Address())
 
 	// Simple test - lookup self
+	log.Info("🧪 Validating agent token with lookup-self")
 	_, err = agentClient.Auth().Token().LookupSelf()
 	if err != nil {
-		return fmt.Errorf("agent token validation failed: %w", err)
+		log.Error("❌ Agent token validation failed", zap.Error(err))
+		return cerr.Wrap(err, "agent token validation failed")
 	}
+	log.Info("✅ Agent token is valid")
 
 	// Check agent service status
+	log.Info("🔍 Checking agent service status")
 	if err := checkAgentServiceStatus(rc); err != nil {
-		return fmt.Errorf("agent service check failed: %w", err)
+		log.Error("❌ Agent service check failed", zap.Error(err))
+		return cerr.Wrap(err, "agent service check failed")
 	}
 
 	log.Info("✅ Vault Agent functionality verified")
@@ -280,11 +364,15 @@ func checkAgentServiceStatus(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Check if service is active
+	log.Info("🔍 Checking systemd service status", zap.String("service", shared.VaultAgentService))
 	if err := eos_unix.CheckServiceStatus(rc.Ctx, shared.VaultAgentService); err != nil {
-		return fmt.Errorf("agent service not running: %w", err)
+		log.Error("❌ Agent service not running",
+			zap.String("service", shared.VaultAgentService),
+			zap.Error(err))
+		return cerr.Wrap(err, "agent service not running")
 	}
 
-	log.Info("✅ Vault Agent service is running")
+	log.Info("✅ Vault Agent service is running", zap.String("service", shared.VaultAgentService))
 	return nil
 }
 
@@ -331,8 +419,12 @@ exit 0
 `
 
 	healthCheckPath := "/usr/local/bin/vault-agent-health-check.sh"
+	log.Info("📝 Writing health check script", zap.String("path", healthCheckPath))
 	if err := os.WriteFile(healthCheckPath, []byte(healthCheckScript), 0755); err != nil {
-		return fmt.Errorf("failed to write health check script: %w", err)
+		log.Error("❌ Failed to write health check script",
+			zap.String("path", healthCheckPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to write health check script")
 	}
 
 	// Create systemd timer for monitoring
@@ -363,12 +455,20 @@ Group=eos
 	timerPath := "/etc/systemd/system/vault-agent-health-check.timer"
 	servicePath := "/etc/systemd/system/vault-agent-health-check.service"
 
+	log.Info("📝 Writing systemd timer", zap.String("path", timerPath))
 	if err := os.WriteFile(timerPath, []byte(timerContent), 0644); err != nil {
-		return fmt.Errorf("failed to write health check timer: %w", err)
+		log.Error("❌ Failed to write health check timer",
+			zap.String("path", timerPath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to write health check timer")
 	}
 
+	log.Info("📝 Writing systemd service", zap.String("path", servicePath))
 	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
-		return fmt.Errorf("failed to write health check service: %w", err)
+		log.Error("❌ Failed to write health check service",
+			zap.String("path", servicePath),
+			zap.Error(err))
+		return cerr.Wrap(err, "failed to write health check service")
 	}
 
 	// Enable the health check timer
@@ -425,7 +525,7 @@ func GetAgentStatus(rc *eos_io.RuntimeContext) (*AgentStatus, error) {
 		status.HealthStatus = "unhealthy"
 	}
 
-	log.Debug("Agent status checked", 
+	log.Debug("Agent status checked",
 		zap.Bool("service_running", status.ServiceRunning),
 		zap.Bool("token_available", status.TokenAvailable),
 		zap.Bool("token_valid", status.TokenValid),

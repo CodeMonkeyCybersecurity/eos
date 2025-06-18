@@ -3,7 +3,6 @@ package vault
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,66 +19,93 @@ import (
 
 // LoginAppRole authenticates to Vault using stored RoleID and SecretID.
 func LoginAppRole(rc *eos_io.RuntimeContext) (*api.Client, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Info("🔐 Creating Vault client for AppRole login")
 	client, err := NewClient(rc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vault client: %w", err)
+		log.Error("❌ Failed to create vault client", zap.Error(err))
+		return nil, cerr.Wrap(err, "failed to create vault client")
 	}
 
+	log.Info("📄 Reading AppRole credentials from disk")
 	roleID, secretID, err := readAppRoleCredsFromDisk(rc, client)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read AppRole creds: %w", err)
+		log.Error("❌ Failed to read AppRole credentials", zap.Error(err))
+		return nil, cerr.Wrap(err, "failed to read AppRole creds")
 	}
 
+	log.Info("🔑 Creating AppRole auth method")
 	auth, err := approle.NewAppRoleAuth(roleID, &approle.SecretID{
 		FromString: secretID,
 	}, approle.WithMountPath("auth/approle"))
 	if err != nil {
-		return nil, fmt.Errorf("create approle auth: %w", err)
+		log.Error("❌ Failed to create AppRole auth", zap.Error(err))
+		return nil, cerr.Wrap(err, "create approle auth")
 	}
 
+	log.Info("🔐 Performing AppRole login")
 	secret, err := client.Auth().Login(context.Background(), auth)
 	if err != nil {
-		return nil, fmt.Errorf("approle login failed: %w", err)
+		log.Error("❌ AppRole login failed", zap.Error(err))
+		return nil, cerr.Wrap(err, "approle login failed")
 	}
 	if secret == nil || secret.Auth == nil {
-		return nil, fmt.Errorf("no auth info returned from Vault approle login")
+		log.Error("❌ No auth info returned from Vault AppRole login")
+		return nil, cerr.New("no auth info returned from Vault approle login")
 	}
 
 	client.SetToken(secret.Auth.ClientToken)
-	otelzap.Ctx(rc.Ctx).Info("✅ Successfully authenticated with Vault using AppRole")
+	log.Info("✅ Successfully authenticated with Vault using AppRole",
+		zap.String("token_accessor", secret.Auth.Accessor))
 	return client, nil
 }
 
 func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
+	log := otelzap.Ctx(rc.Ctx)
+
+	log.Info("📄 Reading RoleID from disk", zap.String("path", shared.AppRolePaths.RoleID))
 	roleIDBytes, err := os.ReadFile(shared.AppRolePaths.RoleID)
 	if err != nil {
-		return "", "", fmt.Errorf("read role_id from disk: %w", err)
+		log.Error("❌ Failed to read role_id from disk",
+			zap.String("path", shared.AppRolePaths.RoleID),
+			zap.Error(err))
+		return "", "", cerr.Wrap(err, "read role_id from disk")
 	}
 	roleID := strings.TrimSpace(string(roleIDBytes))
+	log.Info("✅ RoleID read successfully", zap.String("role_id_prefix", roleID[:12]+"..."))
 
+	log.Info("📄 Reading SecretID from disk", zap.String("path", shared.AppRolePaths.SecretID))
 	secretIDBytes, err := os.ReadFile(shared.AppRolePaths.SecretID)
 	if err != nil {
-		return "", "", fmt.Errorf("read secret_id from disk: %w", err)
+		log.Error("❌ Failed to read secret_id from disk",
+			zap.String("path", shared.AppRolePaths.SecretID),
+			zap.Error(err))
+		return "", "", cerr.Wrap(err, "read secret_id from disk")
 	}
 	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
 
 	if strings.HasPrefix(secretIDRaw, "s.") {
-		otelzap.Ctx(rc.Ctx).Info("🔐 Detected wrapped SecretID token — unwrapping")
+		log.Info("🔐 Detected wrapped SecretID token — unwrapping")
 		secret, err := client.Logical().Unwrap(secretIDRaw)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to unwrap secret_id: %w", err)
+			log.Error("❌ Failed to unwrap secret_id", zap.Error(err))
+			return "", "", cerr.Wrap(err, "failed to unwrap secret_id")
 		}
 		if secret == nil || secret.Data == nil {
-			return "", "", fmt.Errorf("unwrapped SecretID is empty")
+			log.Error("❌ Unwrapped SecretID is empty")
+			return "", "", cerr.New("unwrapped SecretID is empty")
 		}
 		sid, ok := secret.Data["secret_id"].(string)
 		if !ok {
-			return "", "", fmt.Errorf("unwrapped SecretID is malformed")
+			log.Error("❌ Unwrapped SecretID is malformed", zap.Any("data", secret.Data))
+			return "", "", cerr.New("unwrapped SecretID is malformed")
 		}
+		log.Info("✅ SecretID unwrapped successfully")
 		return roleID, sid, nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Warn("⚠️ SecretID is stored in plaintext. Consider using response wrapping.")
+	log.Warn("⚠️ SecretID is stored in plaintext. Consider using response wrapping.")
 	return roleID, secretIDRaw, nil
 }
 
@@ -142,24 +168,38 @@ func WriteAppRoleFiles(rc *eos_io.RuntimeContext, roleID, secretID string) error
 }
 
 func refreshAppRoleCreds(rc *eos_io.RuntimeContext, client *api.Client) (string, string, error) {
-	otelzap.Ctx(rc.Ctx).Debug("🔑 Requesting fresh AppRole credentials")
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("🔑 Requesting fresh AppRole credentials")
+
+	log.Info("📞 Reading RoleID from Vault", zap.String("path", shared.AppRoleRoleIDPath))
 	roleResp, err := client.Logical().Read(shared.AppRoleRoleIDPath)
 	if err != nil {
-		return "", "", fmt.Errorf("read role_id: %w", err)
+		log.Error("❌ Failed to read role_id from Vault",
+			zap.String("path", shared.AppRoleRoleIDPath),
+			zap.Error(err))
+		return "", "", cerr.Wrap(err, "read role_id")
 	}
 	roleID, ok := roleResp.Data["role_id"].(string)
 	if !ok || roleID == "" {
-		return "", "", fmt.Errorf("invalid role_id in Vault response")
+		log.Error("❌ Invalid role_id in Vault response", zap.Any("data", roleResp.Data))
+		return "", "", cerr.New("invalid role_id in Vault response")
 	}
+	log.Info("✅ RoleID retrieved", zap.String("role_id_prefix", roleID[:12]+"..."))
 
+	log.Info("📞 Generating new SecretID from Vault", zap.String("path", shared.AppRoleSecretIDPath))
 	secretResp, err := client.Logical().Write(shared.AppRoleSecretIDPath, nil)
 	if err != nil {
-		return "", "", fmt.Errorf("generate secret_id: %w", err)
+		log.Error("❌ Failed to generate secret_id",
+			zap.String("path", shared.AppRoleSecretIDPath),
+			zap.Error(err))
+		return "", "", cerr.Wrap(err, "generate secret_id")
 	}
 	secretID, ok := secretResp.Data["secret_id"].(string)
 	if !ok || secretID == "" {
-		return "", "", fmt.Errorf("invalid secret_id in Vault response")
+		log.Error("❌ Invalid secret_id in Vault response", zap.Any("data", secretResp.Data))
+		return "", "", cerr.New("invalid secret_id in Vault response")
 	}
+	log.Info("✅ SecretID generated successfully")
 	return roleID, secretID, nil
 }
 
@@ -203,15 +243,31 @@ func EnsureAppRole(rc *eos_io.RuntimeContext, client *api.Client, opts shared.Ap
 }
 
 func EnableAppRoleAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info("📡 Enabling AppRole auth method if needed...")
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("📡 Enabling AppRole auth method if needed...")
+
+	// Log client details before making API call
+	if token := client.Token(); token != "" {
+		log.Info("🔍 Making API call to enable AppRole auth",
+			zap.String("token_prefix", token[:12]+"..."),
+			zap.String("vault_addr", client.Address()),
+			zap.String("api_endpoint", "POST /v1/sys/auth/approle"))
+	} else {
+		log.Error("❌ No token set on client for AppRole auth enablement")
+		return cerr.New("no token set on Vault client")
+	}
+
 	err := client.Sys().EnableAuthWithOptions("approle", &api.EnableAuthOptions{Type: "approle"})
 	if err == nil {
+		log.Info("✅ AppRole auth method enabled successfully")
 		return nil
 	}
 	if strings.Contains(err.Error(), "path is already in use") {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ AppRole auth method may already be enabled", zap.Error(err))
+		log.Info("✅ AppRole auth method already enabled", zap.Error(err))
 		return nil
 	}
-	otelzap.Ctx(rc.Ctx).Error("❌ Failed to enable AppRole auth method", zap.Error(err))
-	return fmt.Errorf("enable approle auth: %w", err)
+	log.Error("❌ Failed to enable AppRole auth method",
+		zap.Error(err),
+		zap.String("vault_addr", client.Address()))
+	return cerr.Wrap(err, "enable approle auth")
 }

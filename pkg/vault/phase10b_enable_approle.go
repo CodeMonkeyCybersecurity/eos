@@ -38,17 +38,31 @@ func PhaseEnableAppRole(
 
 	log.Info("🔑 [Phase10b] Setting up Vault AppRole", zap.Any("options", opts))
 
+	// Get privileged client with root token for auth method management
+	log.Info("🔐 Getting privileged client for AppRole setup")
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Error("❌ Failed to get privileged Vault client for AppRole setup", zap.Error(err))
+		return cerr.Wrap(err, "get privileged client")
+	}
+	
+	// Log what token the privileged client is using
+	if privToken := privilegedClient.Token(); privToken != "" {
+		log.Info("✅ Using privileged client for AppRole operations", 
+			zap.String("token_prefix", privToken[:12]+"..."))
+	}
+
 	// 2) Ensure the auth method is mounted
-	if err := EnableAppRoleAuth(rc, client); err != nil {
-		log.Error("Failed to enable AppRole auth", zap.Error(err))
+	if err := EnableAppRoleAuth(rc, privilegedClient); err != nil {
+		log.Error("❌ Failed to enable AppRole auth method", zap.Error(err))
 		return cerr.Wrapf(err, "enable approle auth")
 	}
 	log.Info("✅ AppRole auth method is enabled (or already present)")
 
-	// 3) Provision or reuse the role
-	roleID, secretID, err := EnsureAppRole(rc, client, opts)
+	// 3) Provision or reuse the role (using privileged client)
+	roleID, secretID, err := EnsureAppRole(rc, privilegedClient, opts)
 	if err != nil {
-		log.Error("Failed to ensure AppRole credentials", zap.Error(err))
+		log.Error("❌ Failed to ensure AppRole credentials", zap.Error(err))
 		return cerr.Wrapf(err, "ensure AppRole")
 	}
 	log.Debug("AppRole credentials obtained",
