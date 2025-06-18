@@ -43,6 +43,10 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 		return fmt.Errorf("start agent service: %w", err)
 	}
 
+	// Wait a moment for the service to fully start and begin authentication
+	otelzap.Ctx(rc.Ctx).Info("⏳ Allowing time for Vault Agent service to start and authenticate")
+	time.Sleep(3 * time.Second)
+
 	tokenPath := shared.AgentToken
 	token, err := WaitForAgentToken(rc, tokenPath, shared.MaxWait)
 	if err != nil {
@@ -61,10 +65,25 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 // startVaultAgentService just does one thing: reload → enable & start.
 func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 	unit := shared.VaultAgentService
-	otelzap.Ctx(rc.Ctx).Info("🔄 Enabling and starting service", zap.String("unit", unit))
+	log := otelzap.Ctx(rc.Ctx)
+	
+	log.Info("🔄 Reloading systemd daemon and enabling Vault Agent service", zap.String("unit", unit))
+	
+	// Check current service status before restart
+	if statusCmd := exec.Command("systemctl", "is-active", unit); statusCmd.Run() == nil {
+		log.Info("🔄 Service is currently active - it will be restarted", zap.String("unit", unit))
+	} else {
+		log.Info("🔄 Service is not currently active - it will be started", zap.String("unit", unit))
+	}
+	
 	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, unit); err != nil {
+		log.Error("❌ Failed to reload daemon and enable service", 
+			zap.String("unit", unit),
+			zap.Error(err))
 		return err
 	}
+	
+	log.Info("✅ Service reload and enable completed", zap.String("unit", unit))
 	return nil
 }
 
@@ -85,27 +104,32 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 		// Check file and directory status on each attempt for detailed debugging
 		parentDir := "/run/eos"
 		if dirStat, err := os.Stat(parentDir); err != nil {
-			if os.IsNotExist(err) && attempt%5 == 1 { // Log every 5th attempt to avoid spam
+			if os.IsNotExist(err) {
 				log.Warn("📁 Parent directory does not exist", 
 					zap.Int("attempt", attempt),
 					zap.String("dir", parentDir),
 					zap.Error(err))
 			}
-		} else if attempt%5 == 1 {
-			log.Info("📁 Parent directory status", 
+		} else {
+			log.Debug("📁 Parent directory status", 
 				zap.Int("attempt", attempt),
 				zap.String("dir", parentDir),
 				zap.String("mode", dirStat.Mode().String()))
 		}
 		
 		if stat, err := os.Stat(path); err != nil {
-			if os.IsNotExist(err) && attempt%5 == 1 {
-				log.Warn("📄 Token file does not exist yet", 
+			if os.IsNotExist(err) {
+				log.Debug("📄 Token file does not exist yet", 
+					zap.Int("attempt", attempt),
+					zap.String("path", path),
+					zap.Error(err))
+			} else {
+				log.Warn("📄 Cannot stat token file", 
 					zap.Int("attempt", attempt),
 					zap.String("path", path),
 					zap.Error(err))
 			}
-		} else if attempt%5 == 1 {
+		} else {
 			log.Info("📄 Token file found", 
 				zap.Int("attempt", attempt),
 				zap.String("path", path),
@@ -121,11 +145,13 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 				zap.String("path", path),
 				zap.Int("token_length", len(data)))
 			return strings.TrimSpace(string(data)), nil
-		} else if attempt%5 == 1 {
-			log.Warn("🔍 Failed to read token", 
-				zap.Int("attempt", attempt),
-				zap.String("path", path),
-				zap.Error(err))
+		} else {
+			if attempt%10 == 1 || attempt <= 5 { // Log first 5 attempts and every 10th after
+				log.Warn("🔍 Failed to read token", 
+					zap.Int("attempt", attempt),
+					zap.String("path", path),
+					zap.Error(err))
+			}
 		}
 		
 		time.Sleep(shared.Interval)
