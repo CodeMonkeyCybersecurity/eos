@@ -11,6 +11,7 @@ The `eos create hcl` command installs HashiCorp tools using their official APT r
 - **consul** - Service discovery and configuration
 - **nomad** - Workload orchestration
 - **packer** - Machine image builder (includes QEMU plugin)
+- **boundary** - Identity-based access management
 
 ## Usage
 
@@ -23,6 +24,7 @@ eos create hcl vault
 eos create hcl consul
 eos create hcl nomad
 eos create hcl packer
+eos create hcl boundary
 
 # Install all tools at once
 eos create hcl all
@@ -38,6 +40,7 @@ eos create vault
 eos create consul
 eos create nomad
 eos create packer
+eos create boundary
 ```
 
 ## Special Features

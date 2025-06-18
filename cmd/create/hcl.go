@@ -15,14 +15,14 @@ import (
 )
 
 // SupportedHCLTools defines the HashiCorp tools that can be installed
-var SupportedHCLTools = []string{"terraform", "vault", "consul", "nomad", "packer"}
+var SupportedHCLTools = []string{"terraform", "vault", "consul", "nomad", "packer", "boundary"}
 
 var hclCmd = &cobra.Command{
 	Use:   "hcl [tool]",
-	Short: "Install HashiCorp tools (terraform, vault, consul, nomad, packer)",
+	Short: "Install HashiCorp tools (terraform, vault, consul, nomad, packer, boundary)",
 	Long: `Install HashiCorp tools using their official APT repository.
 
-Supported tools: terraform, vault, consul, nomad, packer
+Supported tools: terraform, vault, consul, nomad, packer, boundary
 
 Examples:
   eos create hcl terraform
@@ -73,12 +73,21 @@ var packerCmd = &cobra.Command{
 	}),
 }
 
+var boundaryCmd = &cobra.Command{
+	Use:   "boundary",
+	Short: "Install Boundary",
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		return installHCLTool(rc, "boundary")
+	}),
+}
+
 func init() {
 	CreateCmd.AddCommand(hclCmd)
 	CreateCmd.AddCommand(terraformCmd)
 	CreateCmd.AddCommand(consulCmd)
 	CreateCmd.AddCommand(nomadCmd)
 	CreateCmd.AddCommand(packerCmd)
+	CreateCmd.AddCommand(boundaryCmd)
 }
 
 func installHCLTool(rc *eos_io.RuntimeContext, tool string) error {
