@@ -119,9 +119,23 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 		zap.Bool("sealed", health.Sealed),
 		zap.String("version", health.Version))
 
+	// Get privileged client with root token for auth method listing
+	log.Info("🔑 Getting privileged client to check AppRole auth method")
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Error("❌ Failed to get privileged Vault client for prerequisites check", zap.Error(err))
+		return cerr.Wrap(err, "get privileged client for prerequisites")
+	}
+	
+	// Log what token the privileged client is using
+	if privToken := privilegedClient.Token(); privToken != "" {
+		log.Info("✅ Using privileged client for auth method verification", 
+			zap.String("token_prefix", privToken[:12]+"..."))
+	}
+
 	// Check AppRole auth method is enabled
 	log.Info("🔍 Checking for AppRole auth method")
-	authMethods, err := client.Sys().ListAuth()
+	authMethods, err := privilegedClient.Sys().ListAuth()
 	if err != nil {
 		log.Error("❌ Failed to list auth methods", zap.Error(err))
 		return cerr.Wrap(err, "failed to list auth methods")
@@ -165,9 +179,23 @@ func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, client *api.Client) err
 		return nil
 	}
 
+	// Get privileged client with root token for AppRole operations
+	log.Info("🔑 Getting privileged client for AppRole credential retrieval")
+	privilegedClient, err := GetRootClient(rc)
+	if err != nil {
+		log.Error("❌ Failed to get privileged Vault client for AppRole credentials", zap.Error(err))
+		return cerr.Wrap(err, "get privileged client for AppRole credentials")
+	}
+	
+	// Log what token the privileged client is using
+	if privToken := privilegedClient.Token(); privToken != "" {
+		log.Info("✅ Using privileged client for AppRole credential operations", 
+			zap.String("token_prefix", privToken[:12]+"..."))
+	}
+
 	// Try to retrieve from Vault
 	log.Info("📥 Retrieving AppRole credentials from Vault")
-	roleID, secretID, err := getAppRoleCredentialsFromVault(rc, client)
+	roleID, secretID, err := getAppRoleCredentialsFromVault(rc, privilegedClient)
 	if err != nil {
 		log.Error("❌ Failed to get AppRole credentials from Vault", zap.Error(err))
 		return cerr.Wrap(err, "failed to get AppRole credentials")
