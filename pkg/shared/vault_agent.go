@@ -31,11 +31,11 @@ vault {
   {{- end }}
 }
 
+{{- if .EnableCache }}
 listener "tcp" {
   address = "{{ .ListenerAddr }}"
 }
 
-{{- if .EnableCache }}
 cache {
   use_auto_auth_token = true
 }
@@ -46,6 +46,7 @@ auto_auth {
     config = {
       role_id_file_path   = "{{ .RoleFile }}"
       secret_id_file_path = "{{ .SecretFile }}"
+      remove_secret_id_file_after_reading = false
     }
   }
   sink "{{ .SinkType }}" { config = { path = "{{ .SinkPath }}" } }

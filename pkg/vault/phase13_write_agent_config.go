@@ -5,6 +5,7 @@ package vault
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"text/template"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var (
@@ -27,6 +29,11 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 	addr := os.Getenv(shared.VaultAddrEnv)
 	if addr == "" {
 		return fmt.Errorf("VAULT_ADDR not set")
+	}
+
+	// 0) create systemd tmpfiles configuration for runtime directory persistence
+	if err := createTmpfilesConfig(rc); err != nil {
+		return fmt.Errorf("create tmpfiles config: %w", err)
 	}
 
 	// 1) prepare /run/eos and the sink file
@@ -139,4 +146,28 @@ func writeAgentUnit() error {
 		return err
 	}
 	return os.Chmod(path, 0o644)
+}
+
+// createTmpfilesConfig creates systemd tmpfiles configuration to ensure /run/eos persists across reboots
+func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+	
+	tmpfilesPath := "/etc/tmpfiles.d/eos.conf"
+	tmpfilesContent := "d /run/eos 0755 eos eos -\n"
+	
+	log.Info("📁 Creating systemd tmpfiles configuration", zap.String("path", tmpfilesPath))
+	
+	if err := os.WriteFile(tmpfilesPath, []byte(tmpfilesContent), 0o644); err != nil {
+		return fmt.Errorf("write tmpfiles config %s: %w", tmpfilesPath, err)
+	}
+	
+	// Apply tmpfiles configuration immediately
+	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", tmpfilesPath)
+	if err := cmd.Run(); err != nil {
+		log.Warn("⚠️ Failed to apply tmpfiles config immediately", zap.Error(err))
+		// Don't fail the entire process as the config will be applied on next boot
+	}
+	
+	log.Info("✅ Systemd tmpfiles configuration created", zap.String("path", tmpfilesPath))
+	return nil
 }

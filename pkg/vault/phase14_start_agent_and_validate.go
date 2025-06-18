@@ -36,12 +36,20 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 	}
 
 	if err := startVaultAgentService(rc); err != nil {
+		// Enhanced error handling - get systemd logs to help with troubleshooting
+		if logErr := logSystemdServiceStatus(rc, shared.VaultAgentService); logErr != nil {
+			otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to retrieve service logs", zap.Error(logErr))
+		}
 		return fmt.Errorf("start agent service: %w", err)
 	}
 
 	tokenPath := shared.AgentToken
 	token, err := WaitForAgentToken(tokenPath, shared.MaxWait)
 	if err != nil {
+		// Enhanced error handling - get systemd logs when token acquisition fails
+		if logErr := logSystemdServiceStatus(rc, shared.VaultAgentService); logErr != nil {
+			otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to retrieve service logs for token wait failure", zap.Error(logErr))
+		}
 		return fmt.Errorf("wait for agent token: %w", err)
 	}
 	SetVaultToken(rc, client, token)
@@ -111,5 +119,36 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 	}
 	
 	otelzap.Ctx(rc.Ctx).Info("✅ Runtime directory prepared", zap.String("path", runDir))
+	return nil
+}
+
+// logSystemdServiceStatus retrieves and logs systemd service status and recent journal entries for troubleshooting
+func logSystemdServiceStatus(rc *eos_io.RuntimeContext, serviceName string) error {
+	log := otelzap.Ctx(rc.Ctx)
+	
+	// Get service status
+	statusCmd := exec.CommandContext(rc.Ctx, "systemctl", "status", serviceName, "--no-pager")
+	statusOutput, statusErr := statusCmd.CombinedOutput()
+	if statusErr != nil {
+		log.Info("🔍 Service status (may be failing)", 
+			zap.String("service", serviceName),
+			zap.String("output", string(statusOutput)))
+	} else {
+		log.Info("🔍 Service status", 
+			zap.String("service", serviceName),
+			zap.String("output", string(statusOutput)))
+	}
+	
+	// Get recent journal entries
+	journalCmd := exec.CommandContext(rc.Ctx, "journalctl", "-u", serviceName, "--no-pager", "-n", "20")
+	journalOutput, journalErr := journalCmd.CombinedOutput()
+	if journalErr != nil {
+		log.Warn("⚠️ Failed to get journal logs", zap.String("service", serviceName), zap.Error(journalErr))
+	} else {
+		log.Info("📋 Recent journal entries", 
+			zap.String("service", serviceName),
+			zap.String("logs", string(journalOutput)))
+	}
+	
 	return nil
 }
