@@ -22,6 +22,12 @@ func VaultAddress() string {
 // EnableVault now drives everything interactively.
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
 	log.Info("🚀 Starting Vault enablement flow")
+	
+	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
+	if token := os.Getenv("VAULT_TOKEN"); token != "" {
+		log.Info("🧹 Clearing existing VAULT_TOKEN environment variable for fresh setup")
+		os.Unsetenv("VAULT_TOKEN")
+	}
 
 	unsealedClient, err := UnsealVault(rc)
 	if err != nil {
