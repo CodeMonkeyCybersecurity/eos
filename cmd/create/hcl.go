@@ -255,14 +255,46 @@ func verifyHCLInstallation(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Verifying installation", zap.String("tool", tool))
 
-	cmd := exec.CommandContext(rc.Ctx, tool, "-help")
+	// Boundary uses different command line flags
+	var cmd *exec.Cmd
+	if tool == "boundary" {
+		cmd = exec.CommandContext(rc.Ctx, tool, "version")
+	} else {
+		cmd = exec.CommandContext(rc.Ctx, tool, "-help")
+	}
+	
 	output, err := cmd.Output()
 	if err != nil {
-		return fmt.Errorf("failed to verify %s installation: %w", tool, err)
+		// Some tools exit with non-zero even when showing help/version successfully
+		// Check if we got output anyway
+		if exitErr, ok := err.(*exec.ExitError); ok && len(exitErr.Stderr) == 0 && len(output) > 0 {
+			// Got output, so tool is likely installed
+			logger.Debug("Tool exited with non-zero but produced output", zap.String("tool", tool))
+		} else {
+			return fmt.Errorf("failed to verify %s installation: %w", tool, err)
+		}
 	}
 
 	helpOutput := string(output)
-	if !strings.Contains(helpOutput, "Usage:") {
+	
+	// Different tools have different output formats
+	validOutputs := []string{
+		"Usage:",      // Most HashiCorp tools
+		"usage:",      // Alternative casing
+		"Version",     // Boundary version output
+		"version",     // Alternative casing
+		tool,          // Tool name should appear in output
+	}
+	
+	foundValid := false
+	for _, valid := range validOutputs {
+		if strings.Contains(helpOutput, valid) {
+			foundValid = true
+			break
+		}
+	}
+	
+	if !foundValid {
 		return fmt.Errorf("%s installation verification failed: unexpected help output", tool)
 	}
 
