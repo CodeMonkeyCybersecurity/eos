@@ -25,15 +25,21 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
-		log.Info("🧹 Clearing existing VAULT_TOKEN environment variable for fresh setup")
+		log.Info("🧹 Clearing existing VAULT_TOKEN environment variable for fresh setup", 
+			zap.String("old_token_prefix", token[:12]+"..."))
 		os.Unsetenv("VAULT_TOKEN")
+		log.Info("✅ VAULT_TOKEN cleared successfully")
+	} else {
+		log.Info("✅ No existing VAULT_TOKEN found - proceeding with fresh setup")
 	}
 
+	log.Info("🔓 Starting Vault initialization and unseal process")
 	unsealedClient, err := UnsealVault(rc)
 	if err != nil {
 		return logger.LogErrAndWrap(rc, "initialize and unseal vault", err)
 	}
 	client = unsealedClient
+	log.Info("✅ Vault client initialized and unsealed successfully")
 
 	steps := []struct {
 		name string
@@ -55,9 +61,12 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 
 	// Step 9a: Enable KV v2
+	log.Info("🗂️ Enabling KV v2 secrets engine")
 	if err := PhaseEnableKVv2(rc, client); err != nil {
+		log.Error("❌ Failed to enable KV v2 secrets engine", zap.Error(err))
 		return logger.LogErrAndWrap(rc, "enable KV v2", err)
 	}
+	log.Info("✅ KV v2 secrets engine enabled successfully")
 
 	// Step 10a: interactively configure userpass auth
 	if interaction.PromptYesNo(rc.Ctx, "Enable Userpass authentication?", false) {

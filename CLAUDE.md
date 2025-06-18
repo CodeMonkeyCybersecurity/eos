@@ -119,10 +119,13 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Contact: main@cybermonkey.net.au
 
 ### Code Conventions
-- Use structured logging with `otelzap.Ctx(rc.Ctx)`
+- **CRITICAL**: Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, or similar
+- **CRITICAL**: This is a developer tool - prioritize debugging information over pretty output formatting
+- **CRITICAL**: Use zap.Error(), zap.String(), zap.Any() etc. for all log fields - structured logging is mandatory
 - Follow Go module structure with clear package separation
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
+- Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 
 ### System Directory Structure
 Eos creates and manages the following system directories during installation:

@@ -44,7 +44,7 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 	}
 
 	tokenPath := shared.AgentToken
-	token, err := WaitForAgentToken(tokenPath, shared.MaxWait)
+	token, err := WaitForAgentToken(rc, tokenPath, shared.MaxWait)
 	if err != nil {
 		// Enhanced error handling - get systemd logs when token acquisition fails
 		if logErr := logSystemdServiceStatus(rc, shared.VaultAgentService); logErr != nil {
@@ -70,32 +70,126 @@ func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 
 // waitForAgentToken polls until the sink file contains non-empty content.
 // Runs as the eos user to avoid permission issues with /run/eos directory.
-func WaitForAgentToken(path string, timeout time.Duration) (string, error) {
+func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Duration) (string, error) {
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("⏳ Waiting for Vault Agent token", 
+		zap.String("path", path),
+		zap.Duration("timeout", timeout))
+		
 	deadline := time.Now().Add(timeout)
+	attempt := 0
+	
 	for time.Now().Before(deadline) {
+		attempt++
+		
+		// Check file and directory status on each attempt for detailed debugging
+		parentDir := "/run/eos"
+		if dirStat, err := os.Stat(parentDir); err != nil {
+			if os.IsNotExist(err) && attempt%5 == 1 { // Log every 5th attempt to avoid spam
+				log.Warn("📁 Parent directory does not exist", 
+					zap.Int("attempt", attempt),
+					zap.String("dir", parentDir),
+					zap.Error(err))
+			}
+		} else if attempt%5 == 1 {
+			log.Info("📁 Parent directory status", 
+				zap.Int("attempt", attempt),
+				zap.String("dir", parentDir),
+				zap.String("mode", dirStat.Mode().String()))
+		}
+		
+		if stat, err := os.Stat(path); err != nil {
+			if os.IsNotExist(err) && attempt%5 == 1 {
+				log.Warn("📄 Token file does not exist yet", 
+					zap.Int("attempt", attempt),
+					zap.String("path", path),
+					zap.Error(err))
+			}
+		} else if attempt%5 == 1 {
+			log.Info("📄 Token file found", 
+				zap.Int("attempt", attempt),
+				zap.String("path", path),
+				zap.String("mode", stat.Mode().String()),
+				zap.Int64("size", stat.Size()))
+		}
+		
 		// Use sudo -u eos to read the token file since /run/eos is owned by eos user
 		cmd := exec.Command("sudo", "-u", shared.EosID, "cat", path)
 		if data, err := cmd.Output(); err == nil && len(data) > 0 {
+			log.Info("✅ Token acquired successfully", 
+				zap.Int("attempt", attempt),
+				zap.String("path", path),
+				zap.Int("token_length", len(data)))
 			return strings.TrimSpace(string(data)), nil
+		} else if attempt%5 == 1 {
+			log.Warn("🔍 Failed to read token", 
+				zap.Int("attempt", attempt),
+				zap.String("path", path),
+				zap.Error(err))
 		}
+		
 		time.Sleep(shared.Interval)
 	}
+	
+	log.Error("❌ Timeout waiting for token", 
+		zap.String("path", path),
+		zap.Duration("timeout", timeout),
+		zap.Int("total_attempts", attempt))
 	return "", fmt.Errorf("token not found at %s after %s", path, timeout)
 }
 
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
 func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
-	otelzap.Ctx(rc.Ctx).Debug("Reading Vault Agent token from sink", zap.String("path", path))
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("📄 Reading Vault Agent token from sink", zap.String("path", path))
+	
 	if path == "" {
 		path = shared.AgentToken
 	}
+	
+	// Check file existence and permissions before attempting to read
+	if stat, err := os.Stat(path); err != nil {
+		if os.IsNotExist(err) {
+			log.Error("❌ Token file does not exist", 
+				zap.String("path", path),
+				zap.Error(err))
+		} else {
+			log.Error("❌ Cannot stat token file", 
+				zap.String("path", path),
+				zap.Error(err))
+		}
+		return "", fmt.Errorf("token file not accessible at %s: %w", path, err)
+	} else {
+		log.Info("✅ Token file exists", 
+			zap.String("path", path),
+			zap.String("mode", stat.Mode().String()),
+			zap.Int64("size", stat.Size()),
+			zap.Time("mod_time", stat.ModTime()))
+	}
+	
+	// Check parent directory permissions
+	parentDir := "/run/eos"
+	if dirStat, err := os.Stat(parentDir); err != nil {
+		log.Error("❌ Cannot stat parent directory", 
+			zap.String("dir", parentDir),
+			zap.Error(err))
+	} else {
+		log.Info("📁 Parent directory status", 
+			zap.String("dir", parentDir),
+			zap.String("mode", dirStat.Mode().String()))
+	}
+	
 	out, err := exec.Command("cat", path).Output()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("Failed to read token via shell", zap.String("path", path), zap.Error(err))
+		log.Error("❌ Failed to read token via shell", 
+			zap.String("path", path), 
+			zap.Error(err))
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}
 	token := strings.TrimSpace(string(out))
-	otelzap.Ctx(rc.Ctx).Debug("Token read via shell", zap.Int("length", len(token)))
+	log.Info("✅ Token read successfully via shell", 
+		zap.String("path", path),
+		zap.Int("token_length", len(token)))
 
 	return token, nil
 }
