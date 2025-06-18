@@ -30,6 +30,25 @@ func TestVaultHealthCheck(t *testing.T) {
 }
 ```
 
+**Testing Vault Agent Integration:**
+```go
+func TestVaultAgentConfiguration(t *testing.T) {
+    rc := testutil.TestRuntimeContext(t)
+    tempDir := testutil.CreateTempDir(t)
+    defer testutil.CleanupTempDir(t, tempDir)
+    
+    // Test agent config generation
+    config, err := vault.GenerateAgentConfig(rc, "test-role", tempDir)
+    testutil.AssertNoError(t, err)
+    testutil.AssertContains(t, config, "auto_auth")
+    testutil.AssertContains(t, config, "approle")
+    
+    // Test systemd integration paths
+    testutil.AssertFileExists(t, "/etc/tmpfiles.d/vault-agent.conf")
+    testutil.AssertDirectoryPermissions(t, "/run/vault-agent", 0750)
+}
+```
+
 ### Priority 2: External Service Integration (Target: 80%+ coverage)
 
 **Packages to test next:**

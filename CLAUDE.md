@@ -132,6 +132,7 @@ Eos creates and manages the following system directories during installation:
 - **`/etc/eos`** - Configuration files and system settings
 - **`/var/log/eos`** - Application logs and audit trails
 - **`/usr/local/bin/eos`** - Main executable binary location
+- **`/run/eos`** - Runtime directory for Vault Agent tokens and temporary files (managed by `/etc/tmpfiles.d/eos.conf`)
 
 #### Directory Usage Patterns
 - **Secrets Management**: Primary secrets are stored in HashiCorp Vault when available. The `/var/lib/eos/secrets` directory serves as a secure fallback for local secrets storage when Vault is inaccessible or not yet configured.
@@ -156,7 +157,15 @@ eos secure vault    # Apply comprehensive security hardening
 - Safe root token revocation with alternative auth verification
 - Network security and rate limiting configurations
 
-For detailed Vault functionality including secure init data access, policy validation, and security features, see `pkg/vault/README.md`.
+**Vault Agent Integration**:
+- Automatic token renewal and authentication (no caching by default for security)
+- AppRole authentication with secure credential handling (no trailing newlines in credential files)
+- Systemd integration with tmpfiles.d runtime directory management (`/etc/tmpfiles.d/eos.conf`)
+- Secure agent configuration generation without unnecessary TCP listeners
+- Enhanced error handling with automatic systemd log collection for troubleshooting
+- Persistent credential configuration (`remove_secret_id_file_after_reading = false`)
+
+For detailed Vault functionality including Vault Agent configuration, secure init data access, policy validation, and security features, see `pkg/vault/README.md`.
 
 ### Documentation Maintenance
 When making changes to Eos functionality:
