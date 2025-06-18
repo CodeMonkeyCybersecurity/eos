@@ -168,9 +168,19 @@ func VerifyRootToken(rc *eos_io.RuntimeContext, client *api.Client, token string
 		return fmt.Errorf("token validation failed: nil secret returned")
 	}
 	
+	// Extract token metadata safely
+	tokenType := "unknown"
+	if typeVal, ok := secret.Data["type"]; ok && typeVal != nil {
+		tokenType = typeVal.(string)
+	}
+	
 	log.Info("✅ Token validated successfully", 
-		zap.String("token_type", secret.Data["type"].(string)),
-		zap.Any("policies", secret.Data["policies"]))
+		zap.String("token_type", tokenType),
+		zap.Any("policies", secret.Data["policies"]),
+		zap.Any("path", secret.Data["path"]),
+		zap.Any("accessor", secret.Data["accessor"]),
+		zap.Bool("renewable", secret.Renewable),
+		zap.Any("ttl", secret.Data["ttl"]))
 	return nil
 }
 

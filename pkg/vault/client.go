@@ -62,10 +62,14 @@ func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		return nil, fmt.Errorf("vault client creation failed: %w", err)
 	}
 
-	// Automatically use VAULT_TOKEN if available
+	// Check for VAULT_TOKEN but log it for debugging
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
+		log.Warn("⚠️ VAULT_TOKEN found in environment during client creation", 
+			zap.String("token_prefix", token[:12]+"..."))
 		client.SetToken(token)
-		log.Debug("Vault token loaded from VAULT_TOKEN")
+		log.Info("🔑 Vault token loaded from VAULT_TOKEN environment variable")
+	} else {
+		log.Info("✅ No VAULT_TOKEN in environment - client created without token")
 	}
 
 	log.Info("✅ Vault client created", zap.String("addr", cfg.Address))
@@ -229,23 +233,30 @@ func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔑 Loading privileged token for Vault authentication")
 	
-	log.Info("🎯 Attempting to read Vault Agent token", zap.String("path", shared.AgentToken))
-	if token, err := readTokenFromSink(rc, shared.AgentToken); err == nil {
-		log.Info("✅ Successfully loaded Vault Agent token", zap.String("token_prefix", token[:12]+"..."))
-		return token, nil
-	} else {
-		log.Warn("⚠️ Failed to read Vault Agent token", 
-			zap.Error(err),
-			zap.String("path", shared.AgentToken))
-	}
+	// For enable command, we should ALWAYS use the root token from vault_init.json
+	// The Vault Agent token won't have permissions to create mounts and manage auth methods
+	log.Info("📌 Loading root token from vault_init.json for provisioning operations")
 	
-	log.Info("🔄 Falling back to vault_init.json root token")
+	// Skip agent token check - go directly to root token for enable operations
+	log.Info("🔐 Reading root token from vault_init.json")
 	token, err := readTokenFromInitFile(rc)
 	if err != nil {
 		log.Error("❌ Failed to read root token from init file", zap.Error(err))
-		return "", err
+		
+		// Only try agent token as last resort
+		log.Warn("🔄 Attempting to read Vault Agent token as fallback")
+		if agentToken, agentErr := readTokenFromSink(rc, shared.AgentToken); agentErr == nil {
+			log.Warn("⚠️ Using Vault Agent token - this may not have sufficient privileges", 
+				zap.String("token_prefix", agentToken[:12]+"..."))
+			return agentToken, nil
+		}
+		
+		return "", fmt.Errorf("failed to load any privileged token: %w", err)
 	}
-	log.Info("✅ Successfully loaded root token from init file", zap.String("token_prefix", token[:12]+"..."))
+	
+	log.Info("✅ Successfully loaded root token from init file", 
+		zap.String("token_prefix", token[:12]+"..."),
+		zap.String("source", "/var/lib/eos/secrets/vault_init.json"))
 	return token, nil
 }
 

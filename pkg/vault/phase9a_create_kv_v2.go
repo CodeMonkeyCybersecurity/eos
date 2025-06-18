@@ -30,15 +30,33 @@ import (
 //           └── EnableFileAudit()
 
 func PhaseEnableKVv2(rc *eos_io.RuntimeContext, client *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info("🔒 [Phase 9a] Enabling Vault KV engine")
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("🔒 [Phase 9a] Enabling Vault KV engine")
+
+	// Log what token the current client is using
+	if currentToken := client.Token(); currentToken != "" {
+		log.Info("🔍 Current client token info", 
+			zap.String("token_prefix", currentToken[:12]+"..."))
+	} else {
+		log.Warn("⚠️ Current client has no token set")
+	}
 
 	// ✅ Get privileged client (root or agent token, validated)
+	log.Info("🔑 Requesting privileged Vault client")
 	privilegedClient, err := GetRootClient(rc)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Privileged Vault client ready")
+	
+	// Log what token the privileged client is using
+	if privToken := privilegedClient.Token(); privToken != "" {
+		log.Info("✅ Privileged Vault client ready", 
+			zap.String("privileged_token_prefix", privToken[:12]+"..."))
+	} else {
+		log.Error("❌ Privileged client has no token set")
+		return fmt.Errorf("privileged client has no token")
+	}
 
 	// ✅ Run privileged operations
 	otelzap.Ctx(rc.Ctx).Info("🔨 Ensuring KV‑v2 secrets engine")
@@ -106,15 +124,33 @@ func UpdateVault(rc *eos_io.RuntimeContext, path string, update map[string]inter
 
 // EnsureKVv2Enabled makes sure the KV‑v2 secrets engine is mounted at mountPath.
 func EnsureKVv2Enabled(rc *eos_io.RuntimeContext, client *api.Client, mountPath string) error {
-	otelzap.Ctx(rc.Ctx).Info("➕ Ensuring KV‑v2 secrets engine", zap.String("path", mountPath))
+	log := otelzap.Ctx(rc.Ctx)
+	log.Info("➕ Ensuring KV‑v2 secrets engine", zap.String("path", mountPath))
+
+	// Log client details before making API call
+	if token := client.Token(); token != "" {
+		log.Info("🔍 Making API call with token", 
+			zap.String("token_prefix", token[:12]+"..."),
+			zap.String("vault_addr", client.Address()),
+			zap.String("api_endpoint", "GET /v1/sys/mounts"))
+	} else {
+		log.Error("❌ No token set on client for API call")
+		return fmt.Errorf("no token set on Vault client")
+	}
 
 	normalized := strings.TrimSuffix(mountPath, "/") + "/"
 
+	log.Info("📞 Calling Vault API: sys/mounts")
 	mounts, err := client.Sys().ListMounts()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Could not list mounts", zap.Error(err))
+		log.Error("❌ Could not list mounts - API call failed", 
+			zap.Error(err),
+			zap.String("vault_addr", client.Address()),
+			zap.String("token_prefix", client.Token()[:12]+"..."))
 		return fmt.Errorf("could not list mounts: %w", err)
 	}
+	log.Info("✅ Successfully listed mounts", 
+		zap.Int("mount_count", len(mounts)))
 	if m, ok := mounts[normalized]; ok {
 		otelzap.Ctx(rc.Ctx).Debug("ℹ️ Existing mount found", zap.String("type", m.Type), zap.Any("options", m.Options))
 		if m.Type == "kv" && m.Options["version"] == "2" {
