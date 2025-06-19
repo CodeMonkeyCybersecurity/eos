@@ -4,11 +4,10 @@ package delete
 
 import (
 	"os"
-	"os/exec"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
@@ -33,15 +32,33 @@ var DeleteVaultCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Fatal("Vault uninstallation only supported on Linux")
 		}
 
-		// Kill Vault processes if any
-		run(rc, "pkill", "-f", "vault server")
+		// Stop services before removal
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Stopping Vault services")
+		if err := execute.RunSimple(rc.Ctx, "systemctl", "stop", "vault.service"); err != nil {
+			logger.Warn("Failed to stop vault service", zap.Error(err))
+		}
+		if err := execute.RunSimple(rc.Ctx, "systemctl", "stop", "vault-agent-eos.service"); err != nil {
+			logger.Warn("Failed to stop vault agent service", zap.Error(err))
+		}
+
+		// Kill any remaining Vault processes
+		if err := execute.RunSimple(rc.Ctx, "pkill", "-f", "vault server"); err != nil {
+			logger.Info("No vault server processes found")
+		}
 
 		// Remove Vault depending on platform
 		switch distro {
 		case "debian":
-			run(rc, "apt-get", "remove", "-y", "vault")
+			if err := execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", "vault"); err != nil {
+				logger.Error("Failed to remove vault package", zap.Error(err))
+				return err
+			}
 		case "rhel":
-			run(rc, "dnf", "remove", "-y", "vault")
+			if err := execute.RunSimple(rc.Ctx, "dnf", "remove", "-y", "vault"); err != nil {
+				logger.Error("Failed to remove vault package", zap.Error(err))
+				return err
+			}
 		}
 
 		if purge {
@@ -56,7 +73,11 @@ var DeleteVaultCmd = &cobra.Command{
 			}
 
 			for _, wildcard := range vault.GetVaultWildcardPurgePaths() {
-				run(rc, "sh", "-c", "rm -rf "+wildcard)
+				if err := execute.RunSimple(rc.Ctx, "rm", "-rf", wildcard); err != nil {
+					otelzap.Ctx(rc.Ctx).Warn("Failed to remove wildcard path", zap.String("path", wildcard), zap.Error(err))
+				} else {
+					otelzap.Ctx(rc.Ctx).Info("Removed wildcard path", zap.String("path", wildcard))
+				}
 			}
 
 			otelzap.Ctx(rc.Ctx).Info("Cleaning up Vault repo and keyring...")
@@ -76,13 +97,4 @@ func init() {
 	DeleteCmd.AddCommand(DeleteVaultCmd)
 }
 
-func run(rc *eos_io.RuntimeContext, name string, args ...string) {
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("❌ Command failed", zap.String("cmd", name+" "+strings.Join(args, " ")), zap.Error(err))
-	} else {
-		otelzap.Ctx(rc.Ctx).Info("✅ Ran", zap.String("cmd", name+" "+strings.Join(args, " ")))
-	}
-}
+// run function removed - replaced with secure execute.RunSimple calls
