@@ -162,18 +162,25 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("failed to marshal status: %w", err)
 			}
-			fmt.Print(string(data))
+			log.Info("Vault Agent Status JSON", zap.String("json", string(data)))
 			return nil
 		}
 
 		// Display human-readable status
 		displayAgentStatus(status)
 
-		if status.HealthStatus == "healthy" {
+		// Handle different health statuses appropriately
+		switch status.HealthStatus {
+		case "healthy":
 			log.Info("✅ Vault Agent is healthy and functioning correctly")
-		} else {
-			log.Warn("⚠️ Vault Agent has issues", zap.String("status", status.HealthStatus))
+		case "degraded":
+			log.Warn("⚠️ Vault Agent is degraded but operational", zap.String("status", status.HealthStatus))
+			// Degraded is informational - agent is running but has minor issues
+		case "unhealthy":
+			log.Error("❌ Vault Agent is unhealthy", zap.String("status", status.HealthStatus))
 			return fmt.Errorf("vault agent status: %s", status.HealthStatus)
+		default:
+			log.Warn("❓ Vault Agent has unknown status", zap.String("status", status.HealthStatus))
 		}
 
 		return nil
@@ -218,12 +225,11 @@ var InspectSecretsCmd = &cobra.Command{
 		}
 
 		if len(files) == 0 {
-			fmt.Println("❌ No secrets found in", shared.SecretsDir)
+			log.Info("No secrets found", zap.String("directory", shared.SecretsDir))
 			return nil
 		}
 
-		fmt.Println("\n🔐 Eos Secrets Directory")
-		fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		log.Info("🔐 Eos Secrets Directory", zap.String("directory", shared.SecretsDir))
 
 		for _, file := range files {
 			path := filepath.Join(shared.SecretsDir, file.Name())
@@ -234,30 +240,31 @@ var InspectSecretsCmd = &cobra.Command{
 				continue
 			}
 
-			var content map[string]interface{}
+			var content map[string]any
 			if err := json.Unmarshal(data, &content); err != nil {
 				log.Warn("❌ Failed to parse JSON secret", zap.String("path", path), zap.Error(err))
-				fmt.Printf("- %s (Unreadable JSON)\n", file.Name())
+				log.Warn("Unreadable JSON file", zap.String("file", file.Name()))
 				continue
 			}
 
-			fmt.Printf("\n📄 File: %s\n", file.Name())
+			log.Info("📄 Secret file", zap.String("file", file.Name()))
 			for k, v := range content {
 				valStr := fmt.Sprintf("%v", v)
 				if strings.Contains(strings.ToLower(k), "password") || strings.Contains(strings.ToLower(k), "token") || strings.Contains(strings.ToLower(k), "key") {
 					valStr = crypto.Redact(valStr)
 				}
-				fmt.Printf("    %s: %s\n", k, valStr)
+				log.Info("Secret field", zap.String("key", k), zap.String("value", valStr))
 			}
 		}
 
-		fmt.Println("\n✅ Secrets inspection complete.")
+		log.Info("✅ Secrets inspection complete")
 		return nil
 	}),
 }
 
 // Helper functions for the new export features
 
+// TODO: Convert to structured logging when RuntimeContext is available
 func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
 	data, err := json.MarshalIndent(info, "", "  ")
 	if err != nil {
@@ -272,6 +279,7 @@ func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) err
 	return nil
 }
 
+// TODO: Convert to structured logging when RuntimeContext is available  
 func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
 	if options.OutputPath == "" {
 		return fmt.Errorf("output path required for secure export")
@@ -299,6 +307,8 @@ func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOption
 }
 
 func displayStatusOnly(info *vault.VaultInitInfo) error {
+	// Note: This function doesn't have access to RuntimeContext, so we'll use a fallback logger
+	// In a proper implementation, this function should accept RuntimeContext as parameter
 	fmt.Println("\n🔍 Vault Status Overview")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
@@ -315,6 +325,7 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 
 	// Display Vault status
 	if info.VaultStatus != nil {
+		// TODO: Convert to structured logging when RuntimeContext is available
 		fmt.Printf("\n🏛️ Vault Status\n")
 		fmt.Printf("   Address: %s\n", info.VaultStatus.Address)
 		fmt.Printf("   Running: %v\n", info.VaultStatus.Running)
@@ -338,6 +349,7 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 }
 
 // displayAgentStatus provides human-readable display of Vault Agent status
+// TODO: Convert to structured logging when RuntimeContext is available
 func displayAgentStatus(status *vault.AgentStatus) {
 	fmt.Println("\n🤖 Vault Agent Status")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

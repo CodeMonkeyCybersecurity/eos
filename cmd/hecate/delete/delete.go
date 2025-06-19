@@ -93,7 +93,7 @@ func runDeleteConfig() {
 
 func deleteCertificates() {
 	fmt.Println("\n--- Deleting Certificates ---")
-	certsDir := "certs"
+	certsDir := "/opt/hecate/certs"
 	err := os.RemoveAll(certsDir)
 	if err != nil {
 		fmt.Printf("Error deleting certificates directory: %v\n", err)
@@ -104,7 +104,7 @@ func deleteCertificates() {
 
 func deleteDockerCompose() {
 	fmt.Println("\n--- Deleting docker-compose modifications/backups ---")
-	matches, err := filepath.Glob("*_docker-compose.yml.bak")
+	matches, err := filepath.Glob("/opt/hecate/*_docker-compose.yml.bak")
 	if err != nil {
 		fmt.Printf("Error searching for backups: %v\n", err)
 		return
@@ -116,23 +116,31 @@ func deleteDockerCompose() {
 			fmt.Printf("Removed backup file: %s\n", file)
 		}
 	}
+	
+	// Also remove the main docker-compose.yml file
+	mainCompose := "/opt/hecate/docker-compose.yml"
+	if err := os.Remove(mainCompose); err != nil {
+		fmt.Printf("Error removing %s: %v\n", mainCompose, err)
+	} else {
+		fmt.Printf("Removed main docker-compose file: %s\n", mainCompose)
+	}
 }
 
 func deleteEosConfig() {
 	fmt.Println("\n--- Deleting Eos backend web apps configuration files ---")
-	confDir := "conf.d"
+	confDir := "/opt/hecate/assets/conf.d"
 	err := os.RemoveAll(confDir)
 	if err != nil {
 		fmt.Printf("Error deleting Eos configuration directory %s: %v\n", confDir, err)
 	} else {
-		fmt.Printf("github.com/CodeMonkeyCybersecurity/eos backend configuration files deleted (directory '%s' removed).\n", confDir)
+		fmt.Printf("Eos backend configuration files deleted (directory '%s' removed).\n", confDir)
 	}
 }
 
 func deleteNginxDefaults() {
 	fmt.Println("\n--- Deleting (or reverting) Nginx defaults ---")
-	configFile := "http.conf"
-	backupFile := "http.conf.bak"
+	configFile := "/opt/hecate/nginx.conf"
+	backupFile := "/opt/hecate/nginx.conf.bak"
 	if _, err := os.Stat(backupFile); err == nil {
 		if err := os.Remove(configFile); err != nil {
 			fmt.Printf("Error removing current %s: %v\n", configFile, err)

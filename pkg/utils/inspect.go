@@ -9,7 +9,7 @@ import (
 )
 
 func InspectCertificates() {
-	certsDir := "certs"
+	certsDir := "/opt/hecate/certs"
 	fmt.Printf("\n--- Inspecting Certificates in '%s' ---\n", certsDir)
 	files, err := os.ReadDir(certsDir)
 	if err != nil {
@@ -26,7 +26,7 @@ func InspectCertificates() {
 }
 
 func InspectDockerCompose() {
-	configFile := "docker-compose.yml"
+	configFile := "/opt/hecate/docker-compose.yml"
 	fmt.Printf("\n--- Inspecting docker-compose file: %s ---\n", configFile)
 	data, err := os.ReadFile(configFile)
 	if err != nil {
@@ -37,7 +37,7 @@ func InspectDockerCompose() {
 }
 
 func InspectEosConfig() {
-	confDir := "conf.d"
+	confDir := "/opt/hecate/assets/conf.d"
 	fmt.Printf("\n--- Inspecting Eos backend web apps configuration in '%s' ---\n", confDir)
 	files, err := os.ReadDir(confDir)
 	if err != nil {
@@ -57,7 +57,7 @@ func InspectEosConfig() {
 }
 
 func InspectNginxDefaults() {
-	configFile := "http.conf"
+	configFile := "/opt/hecate/nginx.conf"
 	fmt.Printf("\n--- Inspecting Nginx defaults in %s ---\n", configFile)
 	data, err := os.ReadFile(configFile)
 	if err != nil {
