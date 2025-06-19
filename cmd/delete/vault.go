@@ -24,69 +24,150 @@ var DeleteVaultCmd = &cobra.Command{
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		otelzap.Ctx(rc.Ctx).Info("🧨 Deleting Vault...")
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Starting Vault deletion process",
+			zap.String("operation", "vault_deletion"),
+			zap.Bool("purge_enabled", purge))
 
 		distro := platform.DetectLinuxDistro(rc)
 		osPlatform := platform.GetOSPlatform()
+		logger.Info("Detected platform information",
+			zap.String("distro", distro),
+			zap.String("os_platform", osPlatform))
+
 		if osPlatform != "linux" {
-			otelzap.Ctx(rc.Ctx).Fatal("Vault uninstallation only supported on Linux")
+			logger.Fatal("Vault uninstallation only supported on Linux",
+				zap.String("detected_platform", osPlatform))
 		}
 
 		// Stop services before removal
-		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("Stopping Vault services")
-		if err := execute.RunSimple(rc.Ctx, "systemctl", "stop", "vault.service"); err != nil {
-			logger.Warn("Failed to stop vault service", zap.Error(err))
+		logger.Info("Stopping Vault services before removal")
+
+		logger.Debug("Attempting to stop vault.service")
+		if _, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"stop", "vault.service"},
+			Logger:  logger.ZapLogger(),
+		}); err != nil {
+			logger.Warn("Failed to stop vault service",
+				zap.Error(err),
+				zap.String("service", "vault.service"))
+		} else {
+			logger.Info("Successfully stopped vault service")
 		}
-		if err := execute.RunSimple(rc.Ctx, "systemctl", "stop", "vault-agent-eos.service"); err != nil {
-			logger.Warn("Failed to stop vault agent service", zap.Error(err))
+
+		logger.Debug("Attempting to stop vault-agent-eos.service")
+		if _, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"stop", "vault-agent-eos.service"},
+			Logger:  logger.ZapLogger(),
+		}); err != nil {
+			logger.Warn("Failed to stop vault agent service",
+				zap.Error(err),
+				zap.String("service", "vault-agent-eos.service"))
+		} else {
+			logger.Info("Successfully stopped vault agent service")
 		}
 
 		// Kill any remaining Vault processes
-		if err := execute.RunSimple(rc.Ctx, "pkill", "-f", "vault server"); err != nil {
-			logger.Info("No vault server processes found")
+		logger.Debug("Checking for remaining Vault server processes")
+		if _, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "pkill",
+			Args:    []string{"-f", "vault server"},
+			Logger:  logger.ZapLogger(),
+		}); err != nil {
+			logger.Debug("No vault server processes found to kill", zap.Error(err))
+		} else {
+			logger.Info("Killed remaining vault server processes")
 		}
 
 		// Remove Vault depending on platform
+		logger.Info("Removing Vault package", zap.String("distro", distro))
 		switch distro {
 		case "debian":
-			if err := execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", "vault"); err != nil {
-				logger.Error("Failed to remove vault package", zap.Error(err))
+			logger.Debug("Using apt-get to remove vault package")
+			if _, err := execute.Run(rc.Ctx, execute.Options{
+				Command: "apt-get",
+				Args:    []string{"remove", "-y", "vault"},
+				Logger:  logger.ZapLogger(),
+			}); err != nil {
+				logger.Error("Failed to remove vault package via apt-get",
+					zap.Error(err),
+					zap.String("package_manager", "apt-get"))
 				return err
 			}
+			logger.Info("Successfully removed vault package via apt-get")
 		case "rhel":
-			if err := execute.RunSimple(rc.Ctx, "dnf", "remove", "-y", "vault"); err != nil {
-				logger.Error("Failed to remove vault package", zap.Error(err))
+			logger.Debug("Using dnf to remove vault package")
+			if _, err := execute.Run(rc.Ctx, execute.Options{
+				Command: "dnf",
+				Args:    []string{"remove", "-y", "vault"},
+				Logger:  logger.ZapLogger(),
+			}); err != nil {
+				logger.Error("Failed to remove vault package via dnf",
+					zap.Error(err),
+					zap.String("package_manager", "dnf"))
 				return err
 			}
+			logger.Info("Successfully removed vault package via dnf")
+		default:
+			logger.Warn("Unknown distribution for package removal",
+				zap.String("distro", distro))
 		}
 
 		if purge {
-			otelzap.Ctx(rc.Ctx).Info("🧹 Purging Vault files and directories...")
+			logger.Info("Starting Vault purge process",
+				zap.String("operation", "purge_vault_data"))
 
-			for _, path := range vault.GetVaultPurgePaths() {
+			purgePaths := vault.GetVaultPurgePaths()
+			logger.Debug("Removing Vault directories",
+				zap.Int("path_count", len(purgePaths)),
+				zap.Strings("paths", purgePaths))
+
+			for _, path := range purgePaths {
+				logger.Debug("Attempting to remove path", zap.String("path", path))
 				if err := os.RemoveAll(path); err != nil {
-					otelzap.Ctx(rc.Ctx).Warn("Failed to remove path", zap.String("path", path), zap.Error(err))
+					logger.Warn("Failed to remove path",
+						zap.String("path", path),
+						zap.Error(err))
 				} else {
-					otelzap.Ctx(rc.Ctx).Info("Removed path", zap.String("path", path))
+					logger.Info("Successfully removed path", zap.String("path", path))
 				}
 			}
 
-			for _, wildcard := range vault.GetVaultWildcardPurgePaths() {
-				if err := execute.RunSimple(rc.Ctx, "rm", "-rf", wildcard); err != nil {
-					otelzap.Ctx(rc.Ctx).Warn("Failed to remove wildcard path", zap.String("path", wildcard), zap.Error(err))
+			wildcardPaths := vault.GetVaultWildcardPurgePaths()
+			logger.Debug("Removing Vault wildcard paths",
+				zap.Int("wildcard_count", len(wildcardPaths)),
+				zap.Strings("wildcards", wildcardPaths))
+
+			for _, wildcard := range wildcardPaths {
+				logger.Debug("Attempting to remove wildcard path", zap.String("path", wildcard))
+				if _, err := execute.Run(rc.Ctx, execute.Options{
+					Command: "rm",
+					Args:    []string{"-rf", wildcard},
+					Logger:  logger.ZapLogger(),
+				}); err != nil {
+					logger.Warn("Failed to remove wildcard path",
+						zap.String("path", wildcard),
+						zap.Error(err))
 				} else {
-					otelzap.Ctx(rc.Ctx).Info("Removed wildcard path", zap.String("path", wildcard))
+					logger.Info("Successfully removed wildcard path", zap.String("path", wildcard))
 				}
 			}
 
-			otelzap.Ctx(rc.Ctx).Info("Cleaning up Vault repo and keyring...")
+			logger.Info("Cleaning up Vault repository and keyring",
+				zap.String("distro", distro))
 			vault.Purge(rc, distro)
+			logger.Info("Vault purge process completed")
 		} else {
-			otelzap.Ctx(rc.Ctx).Info("Skipping purge (--no-purge provided)")
+			logger.Info("Skipping purge operation",
+				zap.Bool("purge_flag", purge),
+				zap.String("reason", "purge disabled via flag"))
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Vault deletion complete.")
+		logger.Info("Vault deletion process completed successfully",
+			zap.String("operation", "vault_deletion"),
+			zap.String("status", "success"))
 		return nil
 	}),
 }

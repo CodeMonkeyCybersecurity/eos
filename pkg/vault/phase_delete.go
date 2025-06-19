@@ -55,71 +55,145 @@ func GetVaultPurgePaths() []string {
 func Purge(rc *eos_io.RuntimeContext, distro string) (removed []string, errs map[string]error) {
 	errs = make(map[string]error)
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🧹 Starting full Vault purge sequence", zap.String("distro", distro))
+	log.Info("Starting comprehensive Vault purge sequence", 
+		zap.String("distro", distro),
+		zap.String("operation", "vault_purge"))
 
 	pathsToRemove := []string{}
 
 	switch distro {
 	case "debian":
 		pathsToRemove = append(pathsToRemove, shared.AptKeyringPath, shared.AptListPath)
+		log.Debug("Added Debian-specific cleanup paths", 
+			zap.Strings("debian_paths", []string{shared.AptKeyringPath, shared.AptListPath}))
 	case "rhel":
 		pathsToRemove = append(pathsToRemove, shared.DnfRepoFilePath)
+		log.Debug("Added RHEL-specific cleanup paths", 
+			zap.Strings("rhel_paths", []string{shared.DnfRepoFilePath}))
 	default:
-		log.Warn("⚠️ No package manager cleanup defined for distro", zap.String("distro", distro))
+		log.Warn("No package manager cleanup defined for distribution", 
+			zap.String("distro", distro),
+			zap.String("reason", "unsupported_distro"))
 	}
 
 	// Combine both wildcard and direct purge paths, plus distro-specific
 	allPaths := append(GetVaultWildcardPurgePaths(), GetVaultPurgePaths()...)
 	allPaths = append(allPaths, pathsToRemove...)
+	
+	log.Debug("Assembled path list for purge operation",
+		zap.Int("total_paths", len(allPaths)),
+		zap.Int("wildcard_paths", len(GetVaultWildcardPurgePaths())),
+		zap.Int("direct_paths", len(GetVaultPurgePaths())),
+		zap.Int("distro_specific_paths", len(pathsToRemove)))
 
 	owner := "vault-purge"
 
-	for _, path := range allPaths {
+	for i, path := range allPaths {
+		log.Debug("Processing path for removal", 
+			zap.Int("path_index", i+1),
+			zap.Int("total_paths", len(allPaths)),
+			zap.String("path", path),
+			zap.Bool("is_wildcard", strings.Contains(path, "*")))
+			
 		if strings.Contains(path, "*") {
-			matches, _ := filepath.Glob(path)
+			matches, globErr := filepath.Glob(path)
+			if globErr != nil {
+				log.Warn("Failed to expand wildcard path", 
+					zap.String("path", path), 
+					zap.Error(globErr))
+				continue
+			}
+			
+			log.Debug("Wildcard expanded to matches", 
+				zap.String("wildcard", path),
+				zap.Int("match_count", len(matches)),
+				zap.Strings("matches", matches))
+				
 			for _, m := range matches {
+				log.Debug("Attempting to remove wildcard match", zap.String("path", m))
 				if err := eos_unix.RmRF(rc.Ctx, m, owner); err != nil {
+					log.Debug("Primary removal failed, attempting fallback", 
+						zap.String("path", m), 
+						zap.Error(err))
 					// fallback to sudo rm -rf
 					fallbackErr := exec.CommandContext(rc.Ctx, "rm", "-rf", m).Run()
 					if fallbackErr != nil {
 						errs[m] = fallbackErr
-						log.Warn("❌ Failed to remove path (even with sudo)", zap.String("path", m), zap.Error(fallbackErr))
+						log.Warn("Failed to remove path with both methods", 
+							zap.String("path", m), 
+							zap.Error(err),
+							zap.Error(fallbackErr))
 					} else {
 						removed = append(removed, m)
-						log.Info("✅ Removed with sudo rm -rf", zap.String("path", m))
+						log.Info("Successfully removed path with fallback method", 
+							zap.String("path", m),
+							zap.String("method", "sudo_rm"))
 					}
 					errs[m] = err
 				} else {
 					removed = append(removed, m)
+					log.Info("Successfully removed path with primary method", 
+						zap.String("path", m),
+						zap.String("method", "eos_unix"))
 				}
 			}
 		} else {
+			log.Debug("Attempting to remove direct path", zap.String("path", path))
 			if err := eos_unix.RmRF(rc.Ctx, path, owner); err != nil {
+				log.Debug("Primary removal failed, attempting fallback", 
+					zap.String("path", path), 
+					zap.Error(err))
 				fallbackErr := exec.CommandContext(rc.Ctx, "rm", "-rf", path).Run()
 				if fallbackErr != nil {
 					errs[path] = fallbackErr
-					log.Warn("❌ Failed to remove path (even with sudo)", zap.String("path", path), zap.Error(fallbackErr))
+					log.Warn("Failed to remove path with both methods", 
+						zap.String("path", path), 
+						zap.Error(err),
+						zap.Error(fallbackErr))
 				} else {
 					removed = append(removed, path)
-					log.Info("✅ Removed with sudo rm -rf", zap.String("path", path))
+					log.Info("Successfully removed path with fallback method", 
+						zap.String("path", path),
+						zap.String("method", "sudo_rm"))
 				}
 				errs[path] = err
 			} else {
 				removed = append(removed, path)
-				log.Info("✅ Removed with eos_unix.Rm", zap.String("path", path))
+				log.Info("Successfully removed path with primary method", 
+					zap.String("path", path),
+					zap.String("method", "eos_unix"))
 			}
 		}
 	}
 
 	// Safe systemd reload
+	log.Debug("Performing systemd daemon reload after purge")
 	if err := exec.CommandContext(rc.Ctx, "systemctl", "daemon-reexec").Run(); err != nil {
-		log.Warn("⚠️ Failed daemon-reexec", zap.Error(err))
+		log.Warn("Failed systemd daemon-reexec during cleanup", 
+			zap.Error(err),
+			zap.String("operation", "daemon-reexec"))
+	} else {
+		log.Debug("Successfully completed systemd daemon-reexec")
 	}
+	
 	if err := exec.CommandContext(rc.Ctx, "systemctl", "daemon-reload").Run(); err != nil {
-		log.Warn("⚠️ Failed daemon-reload", zap.Error(err))
+		log.Warn("Failed systemd daemon-reload during cleanup", 
+			zap.Error(err),
+			zap.String("operation", "daemon-reload"))
+	} else {
+		log.Debug("Successfully completed systemd daemon-reload")
 	}
 
-	log.Info("✅ Vault purge complete", zap.Int("paths_removed", len(removed)), zap.Int("errors", len(errs)))
+	log.Info("Vault purge operation completed", 
+		zap.Int("paths_removed", len(removed)), 
+		zap.Int("errors", len(errs)),
+		zap.String("operation", "vault_purge"),
+		zap.String("status", "completed"))
+		
+	if len(errs) > 0 {
+		log.Debug("Purge completed with errors", zap.Any("error_details", errs))
+	}
+	
 	return removed, errs
 }
 
