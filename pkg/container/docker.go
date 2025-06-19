@@ -1,10 +1,16 @@
-// pkg/docker/container.go
+// pkg/container/docker.go
 
 package container
 
 import (
+	"fmt"
+	"os"
+	"strings"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -21,35 +27,266 @@ func RunDockerAction(rc *eos_io.RuntimeContext, action string, args ...string) e
 
 // UninstallConflictingPackages removes any preinstalled Docker versions or conflicts
 func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🗑️ Removing conflicting Docker packages")
+	
 	packages := []string{
-		"container.io", "docker-doc", "docker-compose", "docker-compose-v2",
+		"docker.io", "docker-doc", "docker-compose", "docker-compose-v2",
 		"podman-docker", "containerd", "runc",
 	}
+	
 	for _, pkg := range packages {
+		logger.Debug("🗑️ Attempting to remove package", zap.String("package", pkg))
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", pkg); err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("Failed to remove conflicting package", zap.String("package", pkg), zap.Error(err))
+			logger.Debug("Package removal failed (likely not installed)", 
+				zap.String("package", pkg), 
+				zap.Error(err))
+		} else {
+			logger.Debug("✅ Package removed successfully", zap.String("package", pkg))
 		}
 	}
+	
+	logger.Info("✅ Conflicting package removal completed")
 }
 
 // UninstallSnapDocker removes the Snap version of Docker
 func UninstallSnapDocker(rc *eos_io.RuntimeContext) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🗑️ Removing Docker snap package")
+	
 	if err := execute.RunSimple(rc.Ctx, "snap", "remove", "docker"); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("Failed to remove Snap Docker", zap.Error(err))
+		logger.Debug("Docker snap removal failed (likely not installed)", zap.Error(err))
+	} else {
+		logger.Info("✅ Docker snap package removed successfully")
 	}
 }
 
 // InstallPrerequisitesAndGpg sets up apt and Docker GPG keys
-func InstallPrerequisitesAndGpg(rc *eos_io.RuntimeContext) {
+func InstallPrerequisitesAndGpg(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🔧 Installing Docker prerequisites and GPG keys")
+
 	steps := []execute.Options{
 		{Command: "apt-get", Args: []string{"install", "-y", "ca-certificates", "curl"}},
 		{Command: "install", Args: []string{"-m", "0755", "-d", "/etc/apt/keyrings"}},
-		{Command: "curl", Args: []string{"-fsSL", "https://download.container.com/linux/ubuntu/gpg", "-o", "/etc/apt/keyrings/container.asc"}},
-		{Command: "chmod", Args: []string{"a+r", "/etc/apt/keyrings/container.asc"}},
+		{Command: "curl", Args: []string{"-fsSL", "https://download.docker.com/linux/ubuntu/gpg", "-o", "/etc/apt/keyrings/docker.asc"}},
+		{Command: "chmod", Args: []string{"a+r", "/etc/apt/keyrings/docker.asc"}},
 	}
-	for _, step := range steps {
+
+	for i, step := range steps {
+		logger.Debug("🔧 Executing prerequisite step",
+			zap.Int("step", i+1),
+			zap.String("command", step.Command),
+			zap.Strings("args", step.Args))
+
 		if _, err := execute.Run(rc.Ctx, step); err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("Step failed", zap.String("cmd", step.Command), zap.Error(err))
+			logger.Error("❌ Prerequisite step failed",
+				zap.Int("step", i+1),
+				zap.String("command", step.Command),
+				zap.Error(err))
+			return cerr.Wrapf(err, "execute prerequisite step %d: %s", i+1, step.Command)
 		}
 	}
+
+	logger.Info("✅ Docker prerequisites and GPG keys installed successfully")
+	return nil
+}
+
+// AddDockerRepository adds the official Docker repository to APT sources
+func AddDockerRepository(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("📦 Adding Docker repository to APT sources")
+
+	arch := eos_unix.GetArchitecture()
+	codename := eos_unix.GetUbuntuCodename(rc)
+
+	logger.Debug("🔍 Detected system information",
+		zap.String("architecture", arch),
+		zap.String("codename", codename))
+
+	repoLine := fmt.Sprintf(
+		"deb [arch=%s signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu %s stable\n",
+		arch, codename,
+	)
+
+	logger.Debug("📝 Writing Docker repository configuration",
+		zap.String("repo_line", strings.TrimSpace(repoLine)),
+		zap.String("file_path", "/etc/apt/sources.list.d/docker.list"))
+
+	if err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0644); err != nil {
+		logger.Error("❌ Failed to write Docker repository file", zap.Error(err))
+		return cerr.Wrap(err, "write Docker repository file")
+	}
+
+	logger.Info("🔄 Updating APT repositories")
+	if _, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "apt-get",
+		Args:    []string{"update"},
+	}); err != nil {
+		logger.Error("❌ Failed to update APT repositories", zap.Error(err))
+		return cerr.Wrap(err, "update APT repositories")
+	}
+
+	logger.Info("✅ Docker repository added and APT updated successfully")
+	return nil
+}
+
+// InstallDockerEngine installs Docker CE and related components
+func InstallDockerEngine(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🐳 Installing Docker engine and components")
+
+	packages := []string{
+		"docker-ce",
+		"docker-ce-cli",
+		"containerd.io",
+		"docker-buildx-plugin",
+		"docker-compose-plugin",
+	}
+
+	logger.Debug("📦 Installing Docker packages",
+		zap.Strings("packages", packages))
+
+	args := append([]string{"install", "-y"}, packages...)
+
+	if _, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "apt",
+		Args:    args,
+	}); err != nil {
+		logger.Error("❌ Docker installation failed", zap.Error(err))
+		return cerr.Wrap(err, "install Docker packages")
+	}
+
+	logger.Info("✅ Docker engine and components installed successfully")
+	return nil
+}
+
+// VerifyDockerInstallation verifies Docker installation by running hello-world
+func VerifyDockerInstallation(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🧪 Verifying Docker installation with hello-world container")
+
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "docker",
+		Args:    []string{"run", "--rm", "hello-world"},
+	})
+	if err != nil {
+		logger.Error("❌ Docker hello-world verification failed", zap.Error(err))
+		return cerr.Wrap(err, "run Docker hello-world")
+	}
+
+	logger.Debug("📄 Docker hello-world output",
+		zap.String("output", strings.TrimSpace(output)))
+
+	if !strings.Contains(output, "Hello from Docker!") {
+		logger.Error("❌ Docker hello-world output doesn't contain expected message")
+		return cerr.New("Docker hello-world verification failed - unexpected output")
+	}
+
+	logger.Info("✅ Docker installation verified successfully")
+	return nil
+}
+
+// SetupDockerNonRoot configures Docker for non-root user access
+func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("👥 Setting up Docker for non-root user access")
+
+	// Create docker group (may already exist)
+	logger.Debug("🔧 Creating docker group")
+	if _, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "groupadd",
+		Args:    []string{"docker"},
+	}); err != nil {
+		logger.Debug("⚠️ Docker group creation failed (likely already exists)", zap.Error(err))
+		// This is not a critical error as the group might already exist
+	}
+
+	// Determine the user to add to docker group
+	user := os.Getenv("SUDO_USER")
+	if user == "" {
+		user = os.Getenv("USER")
+	}
+
+	logger.Debug("🔍 Detected user information",
+		zap.String("sudo_user", os.Getenv("SUDO_USER")),
+		zap.String("user", os.Getenv("USER")),
+		zap.String("selected_user", user))
+
+	if user == "" || user == "root" {
+		logger.Warn("⚠️ No non-root user detected; skipping usermod step",
+			zap.String("user", user))
+		return nil
+	}
+
+	// Add user to docker group
+	logger.Info("👤 Adding user to docker group", zap.String("user", user))
+	if _, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "usermod",
+		Args:    []string{"-aG", "docker", user},
+	}); err != nil {
+		logger.Error("❌ Failed to add user to docker group",
+			zap.String("user", user),
+			zap.Error(err))
+		return cerr.Wrapf(err, "add user %s to docker group", user)
+	}
+
+	logger.Info("✅ User added to docker group successfully",
+		zap.String("user", user))
+	logger.Info("📋 Note: Log out and log back in or run 'newgrp docker' to apply group membership")
+
+	return nil
+}
+
+// InstallDocker performs a complete Docker installation with all steps
+func InstallDocker(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🐳 Starting complete Docker installation process")
+
+	// Step 1: Uninstall conflicting packages
+	logger.Info("🗑️ Removing conflicting Docker packages")
+	UninstallConflictingPackages(rc)
+
+	// Step 2: Remove Docker snap
+	logger.Info("🗑️ Removing Docker snap package")
+	UninstallSnapDocker(rc)
+
+	// Step 3: Install prerequisites and GPG keys
+	if err := InstallPrerequisitesAndGpg(rc); err != nil {
+		return cerr.Wrap(err, "install prerequisites and GPG keys")
+	}
+
+	// Step 4: Add Docker repository
+	if err := AddDockerRepository(rc); err != nil {
+		return cerr.Wrap(err, "add Docker repository")
+	}
+
+	// Step 5: Install Docker engine
+	if err := InstallDockerEngine(rc); err != nil {
+		return cerr.Wrap(err, "install Docker engine")
+	}
+
+	// Step 6: Verify installation as root
+	logger.Info("🧪 Verifying Docker installation as root")
+	if err := VerifyDockerInstallation(rc); err != nil {
+		return cerr.Wrap(err, "verify Docker installation as root")
+	}
+
+	// Step 7: Setup non-root access
+	if err := SetupDockerNonRoot(rc); err != nil {
+		return cerr.Wrap(err, "setup Docker non-root access")
+	}
+
+	// Step 8: Verify installation as non-root (if possible)
+	logger.Info("🧪 Attempting to verify Docker installation for non-root user")
+	if err := VerifyDockerInstallation(rc); err != nil {
+		logger.Warn("⚠️ Non-root Docker verification failed (user may need to log out/in)",
+			zap.Error(err))
+		// Don't return error here as this is expected until user logs out/in
+	}
+
+	logger.Info("✅ Docker installation completed successfully")
+	logger.Info("📋 Remember: Users need to log out and back in to use Docker without sudo")
+
+	return nil
 }

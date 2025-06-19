@@ -12,7 +12,7 @@ import (
 )
 
 // SecureUbuntu performs comprehensive security hardening for Ubuntu systems
-func SecureUbuntu(rc *eos_io.RuntimeContext) error {
+func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("🛡️ Starting Ubuntu security hardening process")
 
@@ -90,6 +90,22 @@ func SecureUbuntu(rc *eos_io.RuntimeContext) error {
 	logger.Info("📊 Creating security report script")
 	if err := createSecurityReportScript(rc); err != nil {
 		return fmt.Errorf("create security report script: %w", err)
+	}
+
+	// 11. Configure MFA if requested
+	if enableMFA {
+		logger.Info("🔐 Configuring Multi-Factor Authentication")
+		if err := configureMFA(rc); err != nil {
+			return fmt.Errorf("configure MFA: %w", err)
+		}
+	}
+
+	// Handle MFA disable request
+	if disableMFA {
+		logger.Info("🔓 Disabling Multi-Factor Authentication")
+		if err := disableMFAFunction(rc); err != nil {
+			return fmt.Errorf("disable MFA: %w", err)
+		}
 	}
 
 	logger.Info("✅ Ubuntu security hardening completed successfully",

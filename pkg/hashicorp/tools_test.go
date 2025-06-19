@@ -74,7 +74,7 @@ func TestIsToolSupported(t *testing.T) {
 
 func TestGetSupportedToolsString(t *testing.T) {
 	result := GetSupportedToolsString()
-	
+
 	// Should contain all supported tools
 	assert.Contains(t, result, "terraform")
 	assert.Contains(t, result, "vault")
@@ -82,10 +82,10 @@ func TestGetSupportedToolsString(t *testing.T) {
 	assert.Contains(t, result, "nomad")
 	assert.Contains(t, result, "packer")
 	assert.Contains(t, result, "boundary")
-	
+
 	// Should be comma-separated
 	assert.Contains(t, result, ", ")
-	
+
 	// Should not be empty
 	assert.NotEmpty(t, result)
 }
@@ -93,9 +93,9 @@ func TestGetSupportedToolsString(t *testing.T) {
 func TestSupportedHCLToolsConstant(t *testing.T) {
 	// Verify that all expected tools are in the list
 	expectedTools := []string{"terraform", "vault", "consul", "nomad", "packer", "boundary"}
-	
+
 	assert.Equal(t, len(expectedTools), len(SupportedHCLTools), "Number of supported tools should match expected")
-	
+
 	for _, expectedTool := range expectedTools {
 		assert.Contains(t, SupportedHCLTools, expectedTool, "Expected tool %s should be in supported tools list", expectedTool)
 	}
@@ -105,12 +105,12 @@ func TestSupportedHCLToolsConstant(t *testing.T) {
 func TestInstallToolValidation(t *testing.T) {
 	ctx := context.Background()
 	rc := eos_io.NewContext(ctx, "test")
-	
+
 	// Test with unsupported tool
 	err := InstallTool(rc, "unsupported-tool")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported HashiCorp tool")
-	
+
 	// Test with empty tool name
 	err = InstallTool(rc, "")
 	require.Error(t, err)
@@ -126,7 +126,7 @@ func TestVerificationResult(t *testing.T) {
 		Path:        "/usr/bin/terraform",
 		PluginCount: 5,
 	}
-	
+
 	assert.Equal(t, "terraform", result.Tool)
 	assert.True(t, result.Installed)
 	assert.Equal(t, "1.5.0", result.Version)
@@ -172,10 +172,10 @@ func TestInstallToolInputValidation(t *testing.T) {
 			errorMsg:    "unsupported HashiCorp tool",
 		},
 	}
-	
+
 	ctx := context.Background()
 	rc := eos_io.NewContext(ctx, "test")
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// We can't actually install tools in tests, but we can test validation

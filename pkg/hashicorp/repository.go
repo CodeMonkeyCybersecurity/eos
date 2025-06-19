@@ -46,7 +46,7 @@ func InstallGPGKey(rc *eos_io.RuntimeContext) error {
 }
 
 // installDebianGPGKey installs GPG key for Debian/Ubuntu systems
-func installDebianGPGKey(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx) error {
+func installDebianGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
 	logger.Info("📥 Downloading HashiCorp GPG key for Debian/Ubuntu")
 
 	// Check if key already exists
@@ -78,7 +78,7 @@ func installDebianGPGKey(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCt
 }
 
 // installRHELGPGKey installs GPG key for RHEL/CentOS systems
-func installRHELGPGKey(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx) error {
+func installRHELGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
 	logger.Info("📥 Installing HashiCorp GPG key for RHEL/CentOS")
 
 	// For RHEL systems, the GPG key is typically handled by the repository configuration
@@ -117,7 +117,7 @@ func AddRepository(rc *eos_io.RuntimeContext) error {
 }
 
 // addDebianRepository adds HashiCorp repository for Debian/Ubuntu systems
-func addDebianRepository(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx) error {
+func addDebianRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
 	logger.Info("📝 Configuring HashiCorp repository for Debian/Ubuntu",
 		zap.String("repo_file", debianRepoPath))
 
@@ -169,7 +169,7 @@ func addDebianRepository(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCt
 }
 
 // addRHELRepository adds HashiCorp repository for RHEL/CentOS systems
-func addRHELRepository(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx) error {
+func addRHELRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
 	logger.Info("📝 Configuring HashiCorp repository for RHEL/CentOS",
 		zap.String("repo_file", rhelRepoPath))
 

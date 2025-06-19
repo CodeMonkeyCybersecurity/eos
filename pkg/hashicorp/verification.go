@@ -3,7 +3,6 @@
 package hashicorp
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -34,7 +33,7 @@ func VerifyInstallation(rc *eos_io.RuntimeContext, tool string) error {
 
 	// Check if binary is available
 	if err := verifyBinaryExists(rc, tool, result); err != nil {
-		logger.Error("❌ Binary verification failed", 
+		logger.Error("❌ Binary verification failed",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "verify %s binary", tool)
@@ -42,7 +41,7 @@ func VerifyInstallation(rc *eos_io.RuntimeContext, tool string) error {
 
 	// Get version information
 	if err := verifyVersion(rc, tool, result); err != nil {
-		logger.Error("❌ Version verification failed", 
+		logger.Error("❌ Version verification failed",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "verify %s version", tool)
@@ -50,13 +49,13 @@ func VerifyInstallation(rc *eos_io.RuntimeContext, tool string) error {
 
 	// Tool-specific verifications
 	if err := verifyToolSpecific(rc, tool, result); err != nil {
-		logger.Error("❌ Tool-specific verification failed", 
+		logger.Error("❌ Tool-specific verification failed",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "verify %s specific features", tool)
 	}
 
-	logger.Info("✅ Tool verification completed successfully", 
+	logger.Info("✅ Tool verification completed successfully",
 		zap.String("tool", result.Tool),
 		zap.String("version", result.Version),
 		zap.String("path", result.Path),
@@ -72,7 +71,7 @@ func VerifyAllInstallations(rc *eos_io.RuntimeContext) ([]VerificationResult, er
 		zap.Strings("tools", SupportedHCLTools))
 
 	results := make([]VerificationResult, 0, len(SupportedHCLTools))
-	
+
 	for _, tool := range SupportedHCLTools {
 		result := VerificationResult{
 			Tool: tool,
@@ -84,21 +83,21 @@ func VerifyAllInstallations(rc *eos_io.RuntimeContext) ([]VerificationResult, er
 		if err := verifyBinaryExists(rc, tool, &result); err != nil {
 			result.Error = err.Error()
 			result.Installed = false
-			logger.Warn("⚠️ Tool not found or not working", 
+			logger.Warn("⚠️ Tool not found or not working",
 				zap.String("tool", tool),
 				zap.Error(err))
 		} else {
 			// Get version information
 			if err := verifyVersion(rc, tool, &result); err != nil {
 				result.Error = err.Error()
-				logger.Warn("⚠️ Could not get version", 
+				logger.Warn("⚠️ Could not get version",
 					zap.String("tool", tool),
 					zap.Error(err))
 			}
 
 			// Tool-specific verification
 			if err := verifyToolSpecific(rc, tool, &result); err != nil {
-				logger.Warn("⚠️ Tool-specific verification had issues", 
+				logger.Warn("⚠️ Tool-specific verification had issues",
 					zap.String("tool", tool),
 					zap.Error(err))
 			}
@@ -134,7 +133,7 @@ func verifyBinaryExists(rc *eos_io.RuntimeContext, tool string, result *Verifica
 		Args:    []string{tool},
 	})
 	if err != nil {
-		logger.Debug("❌ Binary not found in PATH", 
+		logger.Debug("❌ Binary not found in PATH",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "binary not found: %s", tool)
@@ -143,7 +142,7 @@ func verifyBinaryExists(rc *eos_io.RuntimeContext, tool string, result *Verifica
 	result.Path = strings.TrimSpace(output)
 	result.Installed = true
 
-	logger.Debug("✅ Binary found", 
+	logger.Debug("✅ Binary found",
 		zap.String("tool", tool),
 		zap.String("path", result.Path))
 
@@ -166,7 +165,7 @@ func verifyVersion(rc *eos_io.RuntimeContext, tool string, result *VerificationR
 		Args:    versionArgs,
 	})
 	if err != nil {
-		logger.Debug("❌ Failed to get version", 
+		logger.Debug("❌ Failed to get version",
 			zap.String("tool", tool),
 			zap.Strings("args", versionArgs),
 			zap.Error(err))
@@ -179,7 +178,7 @@ func verifyVersion(rc *eos_io.RuntimeContext, tool string, result *VerificationR
 		result.Version = strings.TrimSpace(lines[0])
 	}
 
-	logger.Debug("✅ Version information obtained", 
+	logger.Debug("✅ Version information obtained",
 		zap.String("tool", tool),
 		zap.String("version", result.Version))
 
@@ -211,7 +210,7 @@ func verifyToolSpecific(rc *eos_io.RuntimeContext, tool string, result *Verifica
 }
 
 // verifyTerraform performs Terraform-specific verification
-func verifyTerraform(rc *eos_io.RuntimeContext, result *VerificationResult, logger *otelzap.LoggerWithCtx) error {
+func verifyTerraform(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("🔍 Verifying Terraform configuration")
 
 	// Check providers
@@ -233,7 +232,7 @@ func verifyTerraform(rc *eos_io.RuntimeContext, result *VerificationResult, logg
 }
 
 // verifyVault performs Vault-specific verification
-func verifyVault(rc *eos_io.RuntimeContext, result *VerificationResult, logger *otelzap.LoggerWithCtx) error {
+func verifyVault(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("🔍 Verifying Vault configuration")
 
 	// Check if Vault can show help (basic functionality test)
@@ -251,7 +250,7 @@ func verifyVault(rc *eos_io.RuntimeContext, result *VerificationResult, logger *
 }
 
 // verifyConsul performs Consul-specific verification
-func verifyConsul(rc *eos_io.RuntimeContext, result *VerificationResult, logger *otelzap.LoggerWithCtx) error {
+func verifyConsul(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("🔍 Verifying Consul configuration")
 
 	// Check Consul members command (basic functionality)
@@ -269,7 +268,7 @@ func verifyConsul(rc *eos_io.RuntimeContext, result *VerificationResult, logger 
 }
 
 // verifyNomad performs Nomad-specific verification
-func verifyNomad(rc *eos_io.RuntimeContext, result *VerificationResult, logger *otelzap.LoggerWithCtx) error {
+func verifyNomad(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("🔍 Verifying Nomad configuration")
 
 	// Check Nomad help
@@ -287,7 +286,7 @@ func verifyNomad(rc *eos_io.RuntimeContext, result *VerificationResult, logger *
 }
 
 // verifyPacker performs Packer-specific verification
-func verifyPacker(rc *eos_io.RuntimeContext, result *VerificationResult, logger *otelzap.LoggerWithCtx) error {
+func verifyPacker(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("🔍 Verifying Packer configuration")
 
 	// Check Packer plugins
@@ -310,7 +309,7 @@ func verifyPacker(rc *eos_io.RuntimeContext, result *VerificationResult, logger 
 }
 
 // verifyBoundary performs Boundary-specific verification
-func verifyBoundary(rc *eos_io.RuntimeContext, result *VerificationResult, logger *otelzap.LoggerWithCtx) error {
+func verifyBoundary(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("🔍 Verifying Boundary configuration")
 
 	// Check Boundary help
