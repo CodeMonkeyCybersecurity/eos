@@ -73,7 +73,7 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 		return "", "", cerr.Wrap(err, "read role_id from disk")
 	}
 	roleID := strings.TrimSpace(string(roleIDBytes))
-	log.Info("✅ RoleID read successfully", zap.String("role_id_prefix", roleID[:12]+"..."))
+	log.Info("✅ RoleID read successfully")
 
 	log.Info("📄 Reading SecretID from disk", zap.String("path", shared.AppRolePaths.SecretID))
 	secretIDBytes, err := os.ReadFile(shared.AppRolePaths.SecretID)
@@ -120,10 +120,7 @@ func PhaseCreateAppRole(rc *eos_io.RuntimeContext, client *api.Client, log *zap.
 		return "", "", cerr.Wrap(err, "ensure AppRole")
 	}
 
-	log.Info("✅ AppRole provisioning complete 🎉",
-		zap.String("role_id", roleID),
-		zap.String("secret_id", secretID),
-	)
+	log.Info("✅ AppRole provisioning complete 🎉")
 	return roleID, secretID, nil
 }
 
@@ -184,7 +181,7 @@ func refreshAppRoleCreds(rc *eos_io.RuntimeContext, client *api.Client) (string,
 		log.Error("❌ Invalid role_id in Vault response", zap.Any("data", roleResp.Data))
 		return "", "", cerr.New("invalid role_id in Vault response")
 	}
-	log.Info("✅ RoleID retrieved", zap.String("role_id_prefix", roleID[:12]+"..."))
+	log.Info("✅ RoleID retrieved")
 
 	log.Info("📞 Generating new SecretID from Vault", zap.String("path", shared.AppRoleSecretIDPath))
 	secretResp, err := client.Logical().Write(shared.AppRoleSecretIDPath, nil)
@@ -249,7 +246,6 @@ func EnableAppRoleAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Log client details before making API call
 	if token := client.Token(); token != "" {
 		log.Info("🔍 Making API call to enable AppRole auth",
-			zap.String("token_prefix", token[:12]+"..."),
 			zap.String("vault_addr", client.Address()),
 			zap.String("api_endpoint", "POST /v1/sys/auth/approle"))
 	} else {

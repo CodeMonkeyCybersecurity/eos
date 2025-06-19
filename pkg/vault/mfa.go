@@ -56,8 +56,7 @@ func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFA
 	
 	// Log what token the privileged client is using
 	if privToken := privilegedClient.Token(); privToken != "" {
-		log.Info("✅ Using privileged client for MFA operations", 
-			zap.String("token_prefix", privToken[:12]+"..."))
+		log.Info("✅ Using privileged client for MFA operations")
 	}
 
 	// Enable TOTP MFA if requested
@@ -600,19 +599,19 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 	// Display QR code and backup key
 	qrCode, ok := secret.Data["qr_code"].(string)
 	if ok && qrCode != "" {
-		log.Info("📱 QR code available for authenticator app", zap.String("qr_code_prefix", qrCode[:50]+"..."))
+		log.Info("📱 QR code available for authenticator app")
 		fmt.Printf("\n📱 Scan this QR code with your authenticator app:\n%s\n", qrCode)
 	}
 
 	url, ok := secret.Data["url"].(string)
 	if ok && url != "" {
-		log.Info("🔗 Manual URL available for authenticator app", zap.String("url_prefix", url[:50]+"..."))
+		log.Info("🔗 Manual URL available for authenticator app")
 		fmt.Printf("\n🔗 Or manually enter this URL in your authenticator app:\n%s\n", url)
 	}
 
 	key, ok := secret.Data["key"].(string)
 	if ok && key != "" {
-		log.Info("🔑 Backup key generated for TOTP", zap.String("backup_key_prefix", key[:8]+"..."))
+		log.Info("🔑 Backup key generated for TOTP")
 		fmt.Printf("\n🔑 Backup key (store securely): %s\n", key)
 	}
 

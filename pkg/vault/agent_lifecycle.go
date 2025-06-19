@@ -127,10 +127,9 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 		return cerr.Wrap(err, "get privileged client for prerequisites")
 	}
 	
-	// Log what token the privileged client is using
+	// Log that we have a privileged client ready
 	if privToken := privilegedClient.Token(); privToken != "" {
-		log.Info("✅ Using privileged client for auth method verification", 
-			zap.String("token_prefix", privToken[:12]+"..."))
+		log.Info("✅ Using privileged client for auth method verification")
 	}
 
 	// Check AppRole auth method is enabled
@@ -187,10 +186,9 @@ func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, client *api.Client) err
 		return cerr.Wrap(err, "get privileged client for AppRole credentials")
 	}
 	
-	// Log what token the privileged client is using
+	// Log that we have a privileged client ready
 	if privToken := privilegedClient.Token(); privToken != "" {
-		log.Info("✅ Using privileged client for AppRole credential operations", 
-			zap.String("token_prefix", privToken[:12]+"..."))
+		log.Info("✅ Using privileged client for AppRole credential operations")
 	}
 
 	// Try to retrieve from Vault
@@ -239,7 +237,7 @@ func getAppRoleCredentialsFromVault(rc *eos_io.RuntimeContext, client *api.Clien
 		return "", "", cerr.New("role ID not found in response")
 	}
 	roleID := roleIDResp.Data["role_id"].(string)
-	log.Info("✅ RoleID retrieved", zap.String("role_id_prefix", roleID[:12]+"..."))
+	log.Info("✅ RoleID retrieved")
 
 	// Generate new secret ID
 	secretIDPath := "auth/approle/role/" + shared.AppRoleName + "/secret-id"

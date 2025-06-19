@@ -52,8 +52,7 @@ func GetRootClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		return nil, fmt.Errorf("load root token: %w", err)
 	}
 	
-	log.Info("🔄 Setting privileged token on client", 
-		zap.String("token_prefix", rootToken[:12]+"..."))
+	log.Info("🔄 Setting privileged token on client")
 	SetVaultToken(rc, client, rootToken)
 
 	// 3️⃣ Verify token validity against Vault

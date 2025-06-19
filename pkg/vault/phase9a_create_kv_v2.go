@@ -33,10 +33,9 @@ func PhaseEnableKVv2(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔒 [Phase 9a] Enabling Vault KV engine")
 
-	// Log what token the current client is using
+	// Log if current client has token
 	if currentToken := client.Token(); currentToken != "" {
-		log.Info("🔍 Current client token info", 
-			zap.String("token_prefix", currentToken[:12]+"..."))
+		log.Info("🔍 Current client has token set")
 	} else {
 		log.Warn("⚠️ Current client has no token set")
 	}
@@ -51,8 +50,7 @@ func PhaseEnableKVv2(rc *eos_io.RuntimeContext, client *api.Client) error {
 	
 	// Log what token the privileged client is using
 	if privToken := privilegedClient.Token(); privToken != "" {
-		log.Info("✅ Privileged Vault client ready", 
-			zap.String("privileged_token_prefix", privToken[:12]+"..."))
+		log.Info("✅ Privileged Vault client ready")
 	} else {
 		log.Error("❌ Privileged client has no token set")
 		return fmt.Errorf("privileged client has no token")
@@ -130,7 +128,6 @@ func EnsureKVv2Enabled(rc *eos_io.RuntimeContext, client *api.Client, mountPath 
 	// Log client details before making API call
 	if token := client.Token(); token != "" {
 		log.Info("🔍 Making API call with token", 
-			zap.String("token_prefix", token[:12]+"..."),
 			zap.String("vault_addr", client.Address()),
 			zap.String("api_endpoint", "GET /v1/sys/mounts"))
 	} else {
@@ -145,8 +142,7 @@ func EnsureKVv2Enabled(rc *eos_io.RuntimeContext, client *api.Client, mountPath 
 	if err != nil {
 		log.Error("❌ Could not list mounts - API call failed", 
 			zap.Error(err),
-			zap.String("vault_addr", client.Address()),
-			zap.String("token_prefix", client.Token()[:12]+"..."))
+			zap.String("vault_addr", client.Address()))
 		return fmt.Errorf("could not list mounts: %w", err)
 	}
 	log.Info("✅ Successfully listed mounts", 

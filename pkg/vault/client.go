@@ -64,8 +64,7 @@ func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	// Check for VAULT_TOKEN but log it for debugging
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
-		log.Warn("⚠️ VAULT_TOKEN found in environment during client creation", 
-			zap.String("token_prefix", token[:12]+"..."))
+		log.Warn("⚠️ VAULT_TOKEN found in environment during client creation")
 		client.SetToken(token)
 		log.Info("🔑 Vault token loaded from VAULT_TOKEN environment variable")
 	} else {
@@ -246,8 +245,7 @@ func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
 		// Only try agent token as last resort
 		log.Warn("🔄 Attempting to read Vault Agent token as fallback")
 		if agentToken, agentErr := readTokenFromSink(rc, shared.AgentToken); agentErr == nil {
-			log.Warn("⚠️ Using Vault Agent token - this may not have sufficient privileges", 
-				zap.String("token_prefix", agentToken[:12]+"..."))
+			log.Warn("⚠️ Using Vault Agent token - this may not have sufficient privileges")
 			return agentToken, nil
 		}
 		
@@ -255,7 +253,6 @@ func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
 	}
 	
 	log.Info("✅ Successfully loaded root token from init file", 
-		zap.String("token_prefix", token[:12]+"..."),
 		zap.String("source", "/var/lib/eos/secrets/vault_init.json"))
 	return token, nil
 }
@@ -330,8 +327,7 @@ func readTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
 	}
 	
 	log.Info("✅ Root token extracted from vault_init.json", 
-		zap.String("path", path),
-		zap.String("token_prefix", init.RootToken[:12]+"..."))
+		zap.String("path", path))
 	return init.RootToken, nil
 }
 

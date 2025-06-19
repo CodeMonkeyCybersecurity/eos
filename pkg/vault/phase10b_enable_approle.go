@@ -46,10 +46,9 @@ func PhaseEnableAppRole(
 		return cerr.Wrap(err, "get privileged client")
 	}
 	
-	// Log what token the privileged client is using
+	// Log that we have a privileged client ready
 	if privToken := privilegedClient.Token(); privToken != "" {
-		log.Info("✅ Using privileged client for AppRole operations", 
-			zap.String("token_prefix", privToken[:12]+"..."))
+		log.Info("✅ Using privileged client for AppRole operations")
 	}
 
 	// 2) Ensure the auth method is mounted
@@ -65,9 +64,7 @@ func PhaseEnableAppRole(
 		log.Error("❌ Failed to ensure AppRole credentials", zap.Error(err))
 		return cerr.Wrapf(err, "ensure AppRole")
 	}
-	log.Debug("AppRole credentials obtained",
-		zap.String("role_id", roleID), zap.String("secret_id", secretID),
-	)
+	log.Debug("AppRole credentials obtained successfully")
 
 	// 4) Persist them to disk
 	if err := WriteAppRoleFiles(rc, roleID, secretID); err != nil {

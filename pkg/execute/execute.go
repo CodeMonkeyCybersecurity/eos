@@ -74,7 +74,11 @@ func Run(ctx context.Context, opts Options) (string, error) {
 	for i := 1; i <= max(1, opts.Retries); i++ {
 		var cmd *exec.Cmd
 		if opts.Shell {
-			cmd = exec.CommandContext(rc, "bash", "-c", opts.Command)
+			// SECURITY: Shell mode is dangerous and should be avoided
+			// If absolutely necessary, validate and sanitize the command string
+			logger.Warn("⚠️ Shell execution mode is deprecated due to security risks",
+				zap.String("command", opts.Command))
+			return "", fmt.Errorf("shell execution mode disabled for security - use Args instead")
 		} else {
 			cmd = exec.CommandContext(rc, opts.Command, opts.Args...)
 		}
@@ -164,11 +168,8 @@ func Cmd(ctx context.Context, cmd string, args ...string) func() error {
 }
 
 func RunShell(ctx context.Context, cmdStr string) (string, error) {
-	return Run(ctx,
-		Options{
-			Command: cmdStr,
-			Shell:   true,
-		})
+	// SECURITY: RunShell is deprecated due to command injection risks
+	return "", fmt.Errorf("RunShell is disabled for security - use RunSimple with explicit args instead")
 }
 
 // RunSimple is a legacy-safe wrapper that drops output.

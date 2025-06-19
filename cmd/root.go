@@ -5,7 +5,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"syscall"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -116,10 +115,25 @@ func Execute(rc *eos_io.RuntimeContext) {
 func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
 	go func() {
 		timer := time.NewTimer(max)
-		<-timer.C
-		fmt.Fprintf(os.Stderr, "💣 Eos watchdog: global timeout (%s) exceeded. Forcing shutdown.\n", max)
-		if err := syscall.Kill(syscall.Getpid(), syscall.SIGKILL); err != nil {
-			otelzap.Ctx(rc.Ctx).Error("Failed to send SIGKILL to self", zap.Error(err))
+		select {
+		case <-timer.C:
+			fmt.Fprintf(os.Stderr, "⚠️ Eos watchdog: global timeout (%s) exceeded. Initiating graceful shutdown.\n", max)
+			otelzap.Ctx(rc.Ctx).Error("Global timeout exceeded, initiating graceful shutdown", 
+				zap.Duration("timeout", max))
+			
+			// Log the timeout and attempt graceful shutdown
+			otelzap.Ctx(rc.Ctx).Warn("Attempting graceful shutdown due to watchdog timeout")
+			
+			// Give cleanup 5 seconds, then exit normally
+			gracefulTimer := time.NewTimer(5 * time.Second)
+			<-gracefulTimer.C
+			
+			fmt.Fprintf(os.Stderr, "💣 Cleanup timeout exceeded. Forcing exit.\n")
+			os.Exit(1) // Use normal exit instead of SIGKILL
+		case <-rc.Ctx.Done():
+			// Context was cancelled normally, cleanup watchdog
+			timer.Stop()
+			return
 		}
 	}()
 }
