@@ -151,23 +151,23 @@ func writeAgentUnit() error {
 // createTmpfilesConfig creates systemd tmpfiles configuration to ensure /run/eos persists across reboots
 func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	tmpfilesPath := "/etc/tmpfiles.d/eos.conf"
 	tmpfilesContent := "d /run/eos 0755 eos eos -\n"
-	
+
 	log.Info("📁 Creating systemd tmpfiles configuration", zap.String("path", tmpfilesPath))
-	
+
 	if err := os.WriteFile(tmpfilesPath, []byte(tmpfilesContent), 0o644); err != nil {
 		return fmt.Errorf("write tmpfiles config %s: %w", tmpfilesPath, err)
 	}
-	
+
 	// Apply tmpfiles configuration immediately
 	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", tmpfilesPath)
 	if err := cmd.Run(); err != nil {
 		log.Warn("⚠️ Failed to apply tmpfiles config immediately", zap.Error(err))
 		// Don't fail the entire process as the config will be applied on next boot
 	}
-	
+
 	log.Info("✅ Systemd tmpfiles configuration created", zap.String("path", tmpfilesPath))
 	return nil
 }

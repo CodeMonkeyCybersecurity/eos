@@ -13,6 +13,8 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // inspectConfigCmd represents the "inspect config" subcommand
@@ -27,41 +29,45 @@ You can choose from:
   4) Inspect Nginx defaults
   5) Inspect all configurations`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		runInspectConfig()
-		return nil
+		return runInspectConfig(rc)
 	}),
 }
 
 // runInspectConfig presents an interactive menu for inspection
-func runInspectConfig() {
+func runInspectConfig(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("🔍 Inspect Configurations Menu")
+	logger.Info("Select the resource you want to inspect:")
+	logger.Info("1) Inspect Certificates")
+	logger.Info("2) Inspect docker-compose file")
+	logger.Info("3) Inspect Eos backend web apps configuration")  
+	logger.Info("4) Inspect Nginx defaults")
+	logger.Info("5) Inspect all configurations")
+	logger.Info("Enter choice (1-5): ")
+	
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("=== Inspect Configurations ===")
-	fmt.Println("Select the resource you want to inspect:")
-	fmt.Println("1) Inspect Certificates")
-	fmt.Println("2) Inspect docker-compose file")
-	fmt.Println("3) Inspect Eos backend web apps configuration")
-	fmt.Println("4) Inspect Nginx defaults")
-	fmt.Println("5) Inspect all configurations")
-	fmt.Print("Enter choice (1-5): ")
 	choice, _ := reader.ReadString('\n')
 	choice = strings.ToLower(strings.TrimSpace(choice))
 
 	switch choice {
 	case "1", "certificates", "certs":
-		utils.InspectCertificates()
+		utils.InspectCertificates(rc.Ctx)
 	case "2", "compose", "docker-compose":
-		utils.InspectDockerCompose()
+		utils.InspectDockerCompose(rc.Ctx)
 	case "3", "github.com/CodeMonkeyCybersecurity/eos":
-		utils.InspectEosConfig()
+		utils.InspectEosConfig(rc.Ctx)
 	case "4", "nginx":
-		utils.InspectNginxDefaults()
+		utils.InspectNginxDefaults(rc.Ctx)
 	case "5", "all":
-		utils.InspectCertificates()
-		utils.InspectDockerCompose()
-		utils.InspectEosConfig()
-		utils.InspectNginxDefaults()
+		utils.InspectCertificates(rc.Ctx)
+		utils.InspectDockerCompose(rc.Ctx)
+		utils.InspectEosConfig(rc.Ctx)
+		utils.InspectNginxDefaults(rc.Ctx)
 	default:
-		fmt.Println("Invalid choice. Exiting.")
-		os.Exit(1)
+		logger.Error("❌ Invalid choice provided", zap.String("choice", choice))
+		return fmt.Errorf("invalid choice: %s", choice)
 	}
+	
+	return nil
 }

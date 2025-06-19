@@ -249,7 +249,7 @@ func generateSelfSigned() error {
 		"-subj", fmt.Sprintf("/C=AU/ST=NSW/L=Sydney/O=CodeMonkey/OU=Eos/CN=%s", hostname),
 		"-extensions", "v3_req",
 		"-config", "/dev/stdin")
-	
+
 	// Provide OpenSSL config with SAN extensions via stdin
 	opensslConfig := fmt.Sprintf(`[req]
 distinguished_name = req_distinguished_name

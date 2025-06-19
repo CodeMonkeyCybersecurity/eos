@@ -6,6 +6,7 @@ toolchain go1.24.2
 
 require (
 	cuelang.org/go v0.12.1
+	filippo.io/mlkem768 v0.0.0-20241021091500-d85de16e2039
 	github.com/Nerzal/gocloak/v13 v13.9.0
 	github.com/cockroachdb/errors v1.12.0
 	github.com/docker/docker v28.1.1+incompatible

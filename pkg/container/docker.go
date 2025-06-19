@@ -29,23 +29,23 @@ func RunDockerAction(rc *eos_io.RuntimeContext, action string, args ...string) e
 func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("🗑️ Removing conflicting Docker packages")
-	
+
 	packages := []string{
 		"docker.io", "docker-doc", "docker-compose", "docker-compose-v2",
 		"podman-docker", "containerd", "runc",
 	}
-	
+
 	for _, pkg := range packages {
 		logger.Debug("🗑️ Attempting to remove package", zap.String("package", pkg))
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", pkg); err != nil {
-			logger.Debug("Package removal failed (likely not installed)", 
-				zap.String("package", pkg), 
+			logger.Debug("Package removal failed (likely not installed)",
+				zap.String("package", pkg),
 				zap.Error(err))
 		} else {
 			logger.Debug("✅ Package removed successfully", zap.String("package", pkg))
 		}
 	}
-	
+
 	logger.Info("✅ Conflicting package removal completed")
 }
 
@@ -53,7 +53,7 @@ func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
 func UninstallSnapDocker(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("🗑️ Removing Docker snap package")
-	
+
 	if err := execute.RunSimple(rc.Ctx, "snap", "remove", "docker"); err != nil {
 		logger.Debug("Docker snap removal failed (likely not installed)", zap.Error(err))
 	} else {

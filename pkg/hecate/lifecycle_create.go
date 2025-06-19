@@ -3,9 +3,11 @@
 package hecate
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
@@ -25,11 +27,12 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to create %s: %w", BaseDir, err)
 	}
 
-	// ─── STUB: collect your real values here ───
-	keycloakDomain := ""                  // e.g. from user prompts
-	proxies := []CaddyAppProxy{ /* … */ } // build via handleService()
-	backendIP := "127.0.0.1"              // gather from user
-	// ─────────────────────────────────────────────
+	// Collect configuration from user interactively
+	config, err := collectHecateConfiguration(rc)
+	if err != nil {
+		log.Error("Failed to collect configuration", zap.Error(err))
+		return fmt.Errorf("configuration collection failed: %w", err)
+	}
 
 	// Phase 1: Docker Compose (no context arg)
 	log.Info("⚙️ Running Phase Docker Compose…")
@@ -40,8 +43,8 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 
 	// Phase 2: Caddy (this one does take context+spec)
 	spec := CaddySpec{
-		KeycloakDomain: keycloakDomain,
-		Proxies:        proxies,
+		KeycloakDomain: config.KeycloakDomain,
+		Proxies:        config.Proxies,
 	}
 	log.Info("⚙️ Running Phase Caddy setup…")
 	if err := PhaseCaddy(rc, spec); err != nil {
@@ -51,7 +54,7 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 
 	// Phase 3: Nginx (only backendIP)
 	log.Info("⚙️ Running Phase Nginx setup…")
-	if err := PhaseNginx(backendIP, rc); err != nil {
+	if err := PhaseNginx(config.BackendIP, rc); err != nil {
 		log.Error("Phase Nginx failed", zap.Error(err))
 		return fmt.Errorf("phase nginx failed: %w", err)
 	}
@@ -112,4 +115,65 @@ func CollateAndWriteFile[T any](
 
 	log.Info("✅ Final file written successfully", zap.String("path", filePath))
 	return nil
+}
+
+// HecateConfiguration holds the user-provided configuration for Hecate setup
+type HecateConfiguration struct {
+	DomainName     string
+	KeycloakDomain string
+	BackendIP      string
+	Proxies        []CaddyAppProxy
+	EnabledServices map[string]bool
+}
+
+// collectHecateConfiguration interactively collects configuration from the user
+func collectHecateConfiguration(rc *eos_io.RuntimeContext) (*HecateConfiguration, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	reader := bufio.NewReader(os.Stdin)
+	
+	config := &HecateConfiguration{
+		EnabledServices: make(map[string]bool),
+		Proxies:        []CaddyAppProxy{},
+	}
+	
+	logger.Info("🚀 Welcome to Hecate Setup Wizard")
+	logger.Info("This wizard will help you set up a reverse proxy for your applications")
+	logger.Info("")
+	
+	// Collect domain name
+	logger.Info("📋 Enter your primary domain name (e.g., example.com):")
+	domain, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read domain: %w", err)
+	}
+	config.DomainName = strings.TrimSpace(domain)
+	
+	if config.DomainName == "" {
+		config.DomainName = "localhost"
+		logger.Info("🔧 Using default domain: localhost")
+	}
+	
+	// Collect backend IP
+	logger.Info("📋 Enter your backend server IP (default: 127.0.0.1):")
+	backendIP, err := reader.ReadString('\n')
+	if err != nil {
+		return nil, fmt.Errorf("failed to read backend IP: %w", err)
+	}
+	config.BackendIP = strings.TrimSpace(backendIP)
+	
+	if config.BackendIP == "" {
+		config.BackendIP = "127.0.0.1"
+		logger.Info("🔧 Using default backend IP: 127.0.0.1")
+	}
+	
+	// For now, we'll set up a basic vanilla reverse proxy
+	// Future versions can add more service selection
+	config.KeycloakDomain = ""  // No Keycloak for vanilla setup
+	
+	logger.Info("✅ Configuration collected successfully", 
+		zap.String("domain", config.DomainName),
+		zap.String("backend_ip", config.BackendIP),
+	)
+	
+	return config, nil
 }

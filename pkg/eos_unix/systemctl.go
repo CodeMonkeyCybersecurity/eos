@@ -139,7 +139,7 @@ func CheckServiceStatus(ctx context.Context, unit string) error {
 
 	cmd := exec.Command("systemctl", "is-active", unit)
 	output, err := cmd.CombinedOutput()
-	
+
 	if err != nil {
 		otelzap.Ctx(ctx).Debug("Service status check failed",
 			zap.String("unit", unit),

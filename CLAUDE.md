@@ -119,13 +119,31 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Contact: main@cybermonkey.net.au
 
 ### Code Conventions
-- **CRITICAL**: Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, or similar
+- **CRITICAL**: Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, fmt.Fprintf, fmt.Print, or any fmt package output functions
+- **CRITICAL**: ALL user-facing output MUST go through structured logging - no exceptions
 - **CRITICAL**: This is a developer tool - prioritize debugging information over pretty output formatting
-- **CRITICAL**: Use zap.Error(), zap.String(), zap.Any() etc. for all log fields - structured logging is mandatory
+- **CRITICAL**: Use zap.Error(), zap.String(), zap.Any(), zap.Int(), zap.Bool() etc. for all log fields - structured logging is mandatory
+- **CRITICAL**: Interactive prompts and user input should use appropriate logging levels (Info for prompts, Warn for important notices)
+- **CRITICAL**: Status updates, progress information, and results MUST use structured logging with appropriate fields
 - Follow Go module structure with clear package separation
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
+
+#### Structured Logging Examples
+```go
+// ✅ CORRECT - Use structured logging for all output
+logger := otelzap.Ctx(rc.Ctx)
+logger.Info("🔄 Starting certificate renewal process")
+logger.Info("✅ Certificate renewal completed", zap.String("method", "k3s"), zap.Duration("duration", time.Since(start)))
+logger.Warn("⚠️ Configuration file not found", zap.String("path", configPath), zap.Error(err))
+logger.Error("❌ Operation failed", zap.String("operation", "deploy"), zap.Error(err))
+
+// ❌ WRONG - Never use fmt package for output
+fmt.Println("Starting process...")
+fmt.Printf("Error: %v\n", err)
+fmt.Fprintf(os.Stderr, "Warning: %s\n", message)
+```
 
 ### System Directory Structure
 Eos creates and manages the following system directories during installation:
