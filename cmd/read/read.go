@@ -20,7 +20,7 @@ import (
 var ReadCmd = &cobra.Command{
 	Use:     "read",
 	Short:   "Inspect resources (e.g., processes, users, storage)",
-	Long:    `The inspect command retrieves information about various resources such as processes, users, or storage.`,
+	Long:    `The read command retrieves information about various resources such as processes, users, or storage.`,
 	Aliases: []string{"inspect", "get", "list", "query", "verify"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
