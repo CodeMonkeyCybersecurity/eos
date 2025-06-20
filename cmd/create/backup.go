@@ -10,9 +10,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 
 	"github.com/spf13/cobra"
@@ -20,12 +23,39 @@ import (
 )
 
 // CreateBackupCmd represents the create backup command
+type backupOptions struct {
+	Host         string
+	User         string
+	RepoDir      string
+	PasswordFile string
+	Paths        []string
+}
+
+var (
+	backupOpts backupOptions
+	pathsFlag  string
+)
+
 var CreateBackupCmd = &cobra.Command{
 	Use:   "backup",
 	Short: "Create a new restic backup",
 	Long: `This command initializes a restic repository if not already initialized,
 then creates a backup of specified directories.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+
+		backupOpts.Host, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "host", "Enter backup host", false)
+		backupOpts.User, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "user", "Enter backup user", false)
+		backupOpts.RepoDir, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "repo-dir", "Enter remote restic repo directory", false)
+		backupOpts.PasswordFile, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "password-file", "Enter restic password file", false)
+		pathsFlag, _ = interaction.PromptIfMissing(rc.Ctx, cmd, "paths", "Enter paths to backup (comma separated)", false)
+		if pathsFlag != "" {
+			for _, p := range strings.Split(pathsFlag, ",") {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					backupOpts.Paths = append(backupOpts.Paths, p)
+				}
+			}
+		}
 
 		// Step 1: Ensure Restic is Installed
 		otelzap.Ctx(rc.Ctx).Info("Ensuring Restic is installed")
@@ -87,8 +117,8 @@ func ensureResticInstalled(rc *eos_io.RuntimeContext) error {
 
 // generateSSHKeys generates SSH keys for accessing the backup server
 func generateSSHKeys() error {
-	// You may want to add checks to avoid overwriting existing keys.
-	cmd := exec.Command("ssh-keygen", "-q", "-N", "", "-f", "/home/eos_user/.ssh/id_rsa")
+	keyPath := filepath.Join("/home", backupOpts.User, ".ssh", "id_rsa")
+	cmd := exec.Command("ssh-keygen", "-q", "-N", "", "-f", keyPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -96,8 +126,8 @@ func generateSSHKeys() error {
 
 // copySSHKeys copies the generated SSH keys to the backup server
 func copySSHKeys() error {
-	// Use standard "user@host" syntax; adjust if needed.
-	cmd := exec.Command("ssh-copy-id", "eos_user@backup")
+	target := fmt.Sprintf("%s@%s", backupOpts.User, backupOpts.Host)
+	cmd := exec.Command("ssh-copy-id", target)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
@@ -105,7 +135,7 @@ func copySSHKeys() error {
 
 // initializeResticRepo initializes the Restic repository
 func initializeResticRepo(rc *eos_io.RuntimeContext) error {
-	repoPath := fmt.Sprintf("sftp:eos_user@backup:/srv/restic-repos/%s", hostname(rc))
+	repoPath := buildRepoPath(rc)
 	cmd := exec.Command("restic", "-r", repoPath, "init")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -114,16 +144,12 @@ func initializeResticRepo(rc *eos_io.RuntimeContext) error {
 
 // performResticBackup performs the Restic backup
 func performResticBackup(rc *eos_io.RuntimeContext) error {
-	repoPath := fmt.Sprintf("sftp:eos_user@backup:/srv/restic-repos/%s", hostname(rc))
-	password := getResticPassword(rc)
+	repoPath := buildRepoPath(rc)
+	password := getResticPassword(rc, backupOpts.PasswordFile)
 
-	cmd := exec.Command(
-
-		"restic", "-r", repoPath,
-		"--password-file=/home/eos_user/.restic-password",
-		"--verbose", "backup",
-		"/home", "/var", "/etc", "/srv", "/usr", "/opt",
-	)
+	args := []string{"-r", repoPath, "--password-file=" + backupOpts.PasswordFile, "--verbose", "backup"}
+	args = append(args, backupOpts.Paths...)
+	cmd := exec.Command("restic", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), "RESTIC_PASSWORD="+password)
@@ -132,17 +158,16 @@ func performResticBackup(rc *eos_io.RuntimeContext) error {
 }
 
 // getResticPassword retrieves and stores the Restic repository password
-func getResticPassword(rc *eos_io.RuntimeContext) string {
+func getResticPassword(rc *eos_io.RuntimeContext, file string) string {
 
 	var password string
-	fmt.Print("Enter your Restic repository password: ")
-	_, err := fmt.Scanln(&password)
+	var err error
+	password, err = interaction.PromptSecret(rc.Ctx, "Enter your Restic repository password")
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to retrieve password", zap.Error(err))
 		os.Exit(1)
 	}
 
-	file := "/home/eos_user/.restic-password" // Updated path
 	err = os.WriteFile(file, []byte(password), 0600)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to write password file", zap.Error(err))
@@ -162,7 +187,17 @@ func hostname(rc *eos_io.RuntimeContext) string {
 	return name
 }
 
+func buildRepoPath(rc *eos_io.RuntimeContext) string {
+	hostName := hostname(rc)
+	return fmt.Sprintf("sftp:%s@%s:%s/%s", backupOpts.User, backupOpts.Host, backupOpts.RepoDir, hostName)
+}
+
 func init() {
 	// Register this backup command under the create command
 	CreateCmd.AddCommand(CreateBackupCmd)
+	CreateBackupCmd.Flags().StringVar(&backupOpts.Host, "host", "", "Backup server host")
+	CreateBackupCmd.Flags().StringVar(&backupOpts.User, "user", "", "SSH user for backup host")
+	CreateBackupCmd.Flags().StringVar(&backupOpts.RepoDir, "repo-dir", "", "Remote restic repository directory")
+	CreateBackupCmd.Flags().StringVar(&backupOpts.PasswordFile, "password-file", "", "Path to restic password file")
+	CreateBackupCmd.Flags().StringVar(&pathsFlag, "paths", "", "Comma-separated list of paths to backup")
 }
