@@ -50,7 +50,7 @@ func (c *DNSClient) GetServers(rc *eos_io.RuntimeContext) ([]map[string]interfac
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("unexpected status %d from Hetzner API", resp.StatusCode)
@@ -72,7 +72,7 @@ func (c *DNSClient) DeleteServer(rc *eos_io.RuntimeContext, id string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		return errors.Errorf("failed to delete server %s, status %d", id, resp.StatusCode)
@@ -88,7 +88,7 @@ func (c *DNSClient) CreateServer(rc *eos_io.RuntimeContext, name string, image s
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusCreated {
 		return nil, errors.Errorf("failed to create server, status %d", resp.StatusCode)

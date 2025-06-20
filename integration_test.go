@@ -40,7 +40,7 @@ func TestEosIntegration_VaultAuthenticationWorkflow(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					
+
 					// This should fail gracefully with mocked responses
 					err = vault.SecureAuthenticationOrchestrator(rc, client)
 					if err == nil {
@@ -59,7 +59,7 @@ func TestEosIntegration_VaultAuthenticationWorkflow(t *testing.T) {
 					if err != nil {
 						return err
 					}
-					
+
 					err = vault.SecureAuthenticationOrchestrator(rc, client)
 					if err != nil {
 						// Check that error doesn't contain sensitive paths
@@ -159,7 +159,7 @@ vault_addr: http://127.0.0.1:8200
 					rc := s.CreateTestContext("config-test")
 					rc.Attributes["config_file"] = "test.yaml"
 					rc.Attributes["log_level"] = "debug"
-					
+
 					if rc.Attributes["config_file"] != "test.yaml" {
 						return errors.New("runtime context attribute storage failed")
 					}
@@ -186,15 +186,15 @@ func TestEosIntegration_ErrorHandlingFlow(t *testing.T) {
 				Description: "Verify user errors are properly categorized",
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("user-error-test")
-					
+
 					// Simulate creating a user error
 					userErr := errors.New("user provided invalid input")
 					wrappedErr := fmt.Errorf("command failed: %w", userErr)
-					
+
 					// Test error handling
-					var finalErr error = wrappedErr
+					finalErr := wrappedErr
 					rc.HandlePanic(&finalErr)
-					
+
 					return nil // Success if no panic
 				},
 				Timeout: 5 * time.Second,
@@ -205,17 +205,17 @@ func TestEosIntegration_ErrorHandlingFlow(t *testing.T) {
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc, cancel := testutil.TestRuntimeContextWithCancel(t)
 					defer cancel()
-					
+
 					// Start a goroutine that waits for cancellation
 					done := make(chan bool, 1)
 					go func() {
 						<-rc.Ctx.Done()
 						done <- true
 					}()
-					
+
 					// Cancel the context
 					cancel()
-					
+
 					// Should receive cancellation signal
 					select {
 					case <-done:
@@ -245,14 +245,14 @@ func TestEosIntegration_TelemetryAndLogging(t *testing.T) {
 				Description: "Verify runtime context creates proper telemetry spans",
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("telemetry-test")
-					
+
 					// Simulate some work
 					time.Sleep(10 * time.Millisecond)
-					
+
 					// End the context (this creates telemetry)
 					var err error
 					rc.End(&err)
-					
+
 					return nil
 				},
 				Timeout: 10 * time.Second,
@@ -262,17 +262,17 @@ func TestEosIntegration_TelemetryAndLogging(t *testing.T) {
 				Description: "Verify contextual logging works correctly",
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("logging-test")
-					
+
 					// Test contextual logger creation
 					logger := rc.Log
 					if logger == nil {
 						return errors.New("contextual logger was nil")
 					}
-					
+
 					// Log some test messages
 					logger.Info("Test log message for integration test")
 					logger.Debug("Debug message with context")
-					
+
 					return nil
 				},
 				Timeout: 5 * time.Second,
@@ -298,21 +298,21 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 				Description: "Initialize vault, runtime context, and other components",
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("multi-component-init")
-					
+
 					// Test vault client creation
 					vaultClient, err := vault.NewClient(rc)
 					if err != nil {
 						return fmt.Errorf("vault client creation failed: %w", err)
 					}
-					
+
 					// Store vault client reference for later steps
 					rc.Attributes["vault_client_created"] = "true"
 					rc.Attributes["vault_addr"] = "http://127.0.0.1:8200"
-					
+
 					if vaultClient == nil {
 						return errors.New("vault client was nil")
 					}
-					
+
 					return nil
 				},
 				Timeout: 15 * time.Second,
@@ -322,23 +322,23 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 				Description: "Test interaction between components under various scenarios",
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("component-interaction")
-					
+
 					// Test authentication status checking
 					vaultClient, err := vault.NewClient(rc)
 					if err != nil {
 						return err
 					}
-					
+
 					status := vault.GetAuthenticationStatus(rc, vaultClient)
 					if status == nil {
 						return errors.New("authentication status was nil")
 					}
-					
+
 					// Verify status structure
 					if _, ok := status["authenticated"]; !ok {
 						return errors.New("authentication status missing 'authenticated' field")
 					}
-					
+
 					return nil
 				},
 				Timeout: 10 * time.Second,
@@ -348,25 +348,25 @@ func TestEosIntegration_MultiComponentWorkflow(t *testing.T) {
 				Description: "Test system resilience under failure conditions",
 				Action: func(s *testutil.IntegrationTestSuite) error {
 					rc := s.CreateTestContext("resilience-test")
-					
+
 					// Test that system handles failures gracefully
 					vaultClient, err := vault.NewClient(rc)
 					if err != nil {
 						return err
 					}
-					
+
 					// Try authentication (should fail gracefully)
 					err = vault.SecureAuthenticationOrchestrator(rc, vaultClient)
 					if err == nil {
 						return errors.New("expected authentication to fail in test environment")
 					}
-					
+
 					// System should still be functional after auth failure
 					status := vault.GetAuthenticationStatus(rc, vaultClient)
 					if status == nil {
 						return errors.New("system became non-functional after auth failure")
 					}
-					
+
 					return nil
 				},
 				Timeout: 20 * time.Second,
