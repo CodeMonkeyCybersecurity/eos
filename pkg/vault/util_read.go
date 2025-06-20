@@ -133,7 +133,7 @@ func InspectFromDisk(rc *eos_io.RuntimeContext) error {
 		otelzap.Ctx(rc.Ctx).Error("Failed to read fallback test-data", zap.Error(err))
 		return fmt.Errorf("disk fallback read failed: %w", err)
 	}
-	PrintData(out, "Disk", path)
+	PrintData(rc.Ctx, out, "Disk", path)
 	otelzap.Ctx(rc.Ctx).Info("✅ Test-data read successfully from fallback")
 	return nil
 }

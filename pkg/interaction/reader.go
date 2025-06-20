@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -15,8 +16,11 @@ import (
 
 // ReadLine prompts the user with a label and returns a trimmed line of input.
 func ReadLine(ctx context.Context, reader *bufio.Reader, label string) (string, error) {
-	otelzap.Ctx(ctx).Debug("📝 Prompting user for input", zap.String("label", label))
-	fmt.Print(label + ": ")
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("📝 Prompting user for input", zap.String("label", label))
+	
+	// Use os.Stderr for user-facing prompts to preserve stdout for automation
+	_, _ = fmt.Fprint(os.Stderr, label+": ")
 
 	text, err := reader.ReadString('\n')
 	if err != nil {

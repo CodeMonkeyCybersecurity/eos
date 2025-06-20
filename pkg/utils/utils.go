@@ -4,14 +4,17 @@ package utils
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 //
@@ -19,24 +22,44 @@ import (
 //
 
 // DeployApp deploys the application by copying necessary config files and restarting services
-func DeployApp(app string, force bool) error {
+// DEPRECATED: This function should be moved to a more appropriate package with proper context handling
+func DeployApp(ctx context.Context, app string, force bool) error {
+	logger := otelzap.Ctx(ctx)
+	logger.Info("🚀 Starting application deployment", 
+		zap.String("app", app), 
+		zap.Bool("force", force))
 
 	if err := ValidateConfigPaths(app); err != nil {
 		return fmt.Errorf("failed to validate config paths: %w", err)
 	}
 
-	// Test Nginx configuration
-	cmdTest := exec.Command("nginx", "-t")
-	if output, err := cmdTest.CombinedOutput(); err != nil {
-		return fmt.Errorf("nginx config test failed: %s", string(output))
+	// Test Nginx configuration using execute package
+	logger.Info("🔧 Testing Nginx configuration")
+	_, err := execute.Run(ctx, execute.Options{
+		Ctx:     ctx,
+		Command: "nginx",
+		Args:    []string{"-t"},
+		Capture: true,
+	})
+	if err != nil {
+		logger.Error("❌ Nginx config test failed", zap.Error(err))
+		return fmt.Errorf("nginx config test failed: %w", err)
 	}
 
-	// Restart Nginx
-	cmdRestart := exec.Command( "systemctl", "restart", "nginx")
-	if err := cmdRestart.Run(); err != nil {
+	// Restart Nginx using execute package
+	logger.Info("🔄 Restarting Nginx service")
+	_, err = execute.Run(ctx, execute.Options{
+		Ctx:     ctx,
+		Command: "systemctl",
+		Args:    []string{"restart", "nginx"},
+		Capture: false,
+	})
+	if err != nil {
+		logger.Error("❌ Failed to restart nginx", zap.Error(err))
 		return fmt.Errorf("failed to restart nginx: %w", err)
 	}
 
+	logger.Info("✅ Application deployment completed successfully", zap.String("app", app))
 	return nil
 }
 

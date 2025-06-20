@@ -3,36 +3,42 @@
 package utils
 
 import (
-	"bytes"
-	"os/exec"
+	"context"
+	"fmt"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // GrepProcess returns a list of running processes matching the keyword (case-insensitive).
-func grepProcess(keyword string) (string, error) {
-	ps := exec.Command("ps", "aux")
-	grep := exec.Command("grep", "-i", keyword)
+// DEPRECATED: Use pkg/eos_unix for process management operations
+func GrepProcess(ctx context.Context, keyword string) (string, error) {
+	logger := otelzap.Ctx(ctx)
+	logger.Debug("🔍 Searching for processes", zap.String("keyword", keyword))
 
-	pipe, err := ps.StdoutPipe()
+	// Use shell mode for piping - but this is inherently less secure
+	// Better approach would be to use eos_unix package which has proper process handling
+	command := fmt.Sprintf("ps aux | grep -i %q", keyword)
+	
+	output, err := execute.Run(ctx, execute.Options{
+		Ctx:     ctx,
+		Command: "sh",
+		Args:    []string{"-c", command},
+		Shell:   true, // Required for piping
+		Capture: true,
+	})
+	
 	if err != nil {
-		return "", err
-	}
-	grep.Stdin = pipe
-
-	var output bytes.Buffer
-	grep.Stdout = &output
-
-	if err := ps.Start(); err != nil {
-		return "", err
-	}
-	if err := grep.Start(); err != nil {
-		return "", err
-	}
-	if err := ps.Wait(); err != nil {
-		return "", err
-	}
-	if err := grep.Wait(); err != nil {
-		return "", err
+		logger.Error("❌ Failed to search processes", 
+			zap.String("keyword", keyword),
+			zap.Error(err))
+		return "", fmt.Errorf("process search failed: %w", err)
 	}
 
-	return output.String(), nil
+	logger.Debug("✅ Process search completed", 
+		zap.String("keyword", keyword),
+		zap.Int("output_length", len(output)))
+	
+	return output, nil
 }

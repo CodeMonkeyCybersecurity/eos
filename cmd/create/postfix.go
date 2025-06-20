@@ -104,7 +104,7 @@ smtp_use_tls = yes
 
 func configurePostfixRelay(rc *eos_io.RuntimeContext, smtpHost, email, password, osType string) error {
 	for _, path := range []string{"/etc/postfix/main.cf", "/etc/postfix/sasl_passwd"} {
-		if err := utils.BackupFile(path); err != nil {
+		if err := utils.BackupFile(rc.Ctx, path); err != nil {
 			return fmt.Errorf("backup failed: %w", err)
 		}
 	}

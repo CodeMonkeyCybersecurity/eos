@@ -56,7 +56,7 @@ func runDeploy(rc *eos_io.RuntimeContext, _ *cobra.Command, args []string) {
 	}
 
 	otelzap.Ctx(rc.Ctx).Info("Deploying application", zap.String("app", app))
-	if err := deployApplication(app); err != nil {
+	if err := deployApplication(rc, app); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Deployment failed", zap.String("app", app), zap.Error(err))
 		fmt.Printf("❌ Deployment failed for '%s': %v\n", app, err)
 		return
@@ -66,8 +66,8 @@ func runDeploy(rc *eos_io.RuntimeContext, _ *cobra.Command, args []string) {
 }
 
 // deployApplication calls the deployment function from the utils package.
-func deployApplication(app string) error {
-	if err := utils.DeployApp(app, false); err != nil {
+func deployApplication(rc *eos_io.RuntimeContext, app string) error {
+	if err := utils.DeployApp(rc.Ctx, app, false); err != nil {
 		return fmt.Errorf("deployment failed for '%s': %w", app, err)
 	}
 	return nil

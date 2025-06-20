@@ -59,9 +59,13 @@ func PromptSecret(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
-	fmt.Print(prompt + ": ")
+	logger := otelzap.Ctx(ctx)
+	logger.Info("🔐 Prompting for secret input", zap.String("prompt", prompt))
+	
+	// Use os.Stderr for user-facing prompts to preserve stdout for automation
+	_, _ = fmt.Fprint(os.Stderr, prompt+": ")
 	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
-	fmt.Println()
+	_, _ = fmt.Fprintln(os.Stderr)
 	if err != nil {
 		otelzap.Ctx(ctx).Error("❌ Failed to read secret input", zap.Error(err))
 		return "", err
@@ -97,9 +101,13 @@ func PromptSecrets(ctx context.Context, promptBase string, count int) ([]string,
 func PromptSelect(ctx context.Context, prompt string, options []string) string {
 	otelzap.Ctx(ctx).Info("📋 Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
 
-	fmt.Println(prompt)
+	logger := otelzap.Ctx(ctx)
+	logger.Info("📋 Displaying selection menu", zap.String("prompt", prompt), zap.Strings("options", options))
+	
+	// Use os.Stderr for user-facing prompts to preserve stdout for automation
+	_, _ = fmt.Fprintln(os.Stderr, prompt)
 	for i, option := range options {
-		fmt.Printf("  %d) %s\n", i+1, option)
+		_, _ = fmt.Fprintf(os.Stderr, "  %d) %s\n", i+1, option)
 	}
 
 	reader := bufio.NewReader(os.Stdin)
@@ -116,8 +124,9 @@ func PromptSelect(ctx context.Context, prompt string, options []string) string {
 			return options[idx-1]
 		}
 
-		otelzap.Ctx(ctx).Warn("❌ Invalid selection", zap.String("input", choice))
-		fmt.Println("Invalid selection. Please try again.")
+		logger := otelzap.Ctx(ctx)
+		logger.Warn("❌ Invalid selection", zap.String("input", choice))
+		_, _ = fmt.Fprintln(os.Stderr, "Invalid selection. Please try again.")
 	}
 }
 

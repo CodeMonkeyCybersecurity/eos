@@ -187,7 +187,7 @@ func WriteTestDataToVaultOrFallback(rc *eos_io.RuntimeContext, client *api.Clien
 
 	if vaultErr == nil {
 		otelzap.Ctx(rc.Ctx).Info("✅ Uploaded test-data into Vault", zap.String("vault_path", vaultPath))
-		PrintStorageSummary("Vault", vaultPath, "SUCCESS", "Disk", "N/A")
+		PrintStorageSummary(rc.Ctx, "Vault", vaultPath, "SUCCESS", "Disk", "N/A")
 		return nil
 	}
 
@@ -196,25 +196,25 @@ func WriteTestDataToVaultOrFallback(rc *eos_io.RuntimeContext, client *api.Clien
 	outputPath := diskFallbackPath()
 	if err := os.MkdirAll(filepath.Dir(outputPath), shared.RuntimeDirPerms); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("❌ Failed to create output directory", zap.String("path", outputPath), zap.Error(err))
-		PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "FAILED")
+		PrintStorageSummary(rc.Ctx, "Vault", vaultPath, "FAILED", "Disk", "FAILED")
 		return fmt.Errorf("vault write failed: %w; fallback mkdir failed: %v", vaultErr, err)
 	}
 
 	raw, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error("❌ Failed to marshal test data", zap.Error(err))
-		PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "FAILED")
+		PrintStorageSummary(rc.Ctx, "Vault", vaultPath, "FAILED", "Disk", "FAILED")
 		return fmt.Errorf("vault write failed: %w; fallback marshal failed: %v", vaultErr, err)
 	}
 
 	if err := os.WriteFile(outputPath, raw, shared.RuntimeFilePerms); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("❌ Failed to write fallback test data", zap.String("path", outputPath), zap.Error(err))
-		PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "FAILED")
+		PrintStorageSummary(rc.Ctx, "Vault", vaultPath, "FAILED", "Disk", "FAILED")
 		return fmt.Errorf("vault write failed: %w; fallback disk write failed: %v", vaultErr, err)
 	}
 
 	otelzap.Ctx(rc.Ctx).Info("💾 Fallback to disk succeeded", zap.String("disk_path", outputPath))
-	PrintStorageSummary("Vault", vaultPath, "FAILED", "Disk", "SUCCESS")
+	PrintStorageSummary(rc.Ctx, "Vault", vaultPath, "FAILED", "Disk", "SUCCESS")
 	return nil
 }
 

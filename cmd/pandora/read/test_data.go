@@ -48,7 +48,7 @@ var InspectTestDataCmd = &cobra.Command{
 
 		// If Vault read succeeded
 		if vaultReadErr == nil && client != nil {
-			vault.PrintData(out, "Vault", "secret/data/"+shared.TestDataVaultPath)
+			vault.PrintData(rc.Ctx, out, "Vault", "secret/data/"+shared.TestDataVaultPath)
 			log.Info("✅ Test-data read successfully from Vault")
 			return nil
 		}
