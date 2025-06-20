@@ -121,7 +121,7 @@ func getNextVMID(rc *eos_io.RuntimeContext) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("cannot open ID file: %w", err)
 	}
-	defer fd.Close()
+	defer func() { _ = fd.Close() }()
 
 	// Apply exclusive lock (blocks until available)
 	if err := unix.Flock(int(fd.Fd()), unix.LOCK_EX); err != nil {

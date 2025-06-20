@@ -88,7 +88,9 @@ func (s *smtpSender) Send(ctx context.Context, subj, htmlBody, txtBody string) e
 		recordFail(err)
 		return cerr.Wrap(err, "starttls")
 	}
-	defer c.Quit()
+	defer func() {
+		_ = c.Quit()
+	}()
 
 	// 4. EHLO
 	if err := c.Hello(s.host); err != nil {

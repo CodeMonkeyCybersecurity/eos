@@ -51,7 +51,7 @@ func ExecCommandInContainer(rc *eos_io.RuntimeContext, cfg ExecConfig) (string, 
 	if err != nil {
 		return "", errors.Wrap(err, "creating docker client")
 	}
-	defer cli.Close()
+	defer func() { _ = cli.Close() }()
 
 	// 6) Create exec instance
 	execResp, err := cli.ContainerExecCreate(rc.Ctx, cfg.ContainerName, container.ExecOptions{

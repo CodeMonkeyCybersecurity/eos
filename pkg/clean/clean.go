@@ -24,8 +24,6 @@ var reserved = map[string]bool{
 // Sanitiser helpers
 // -----------------------------------------------------------------------------
 
-var invalidRE = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
-
 // Sanitize a single file/directory name for Windows
 func SanitizeName(name string) string {
 	// Remove forbidden characters

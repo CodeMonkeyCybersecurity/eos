@@ -36,9 +36,9 @@ func StartWatcher(ctx context.Context, cfg *Config, log *zap.Logger, store HashS
 // -----------------------------------------------------------------------------
 
 var (
-	reSplit       = regexp.MustCompile(`\| chatgpt_response:`)
-	failTimes     []time.Time
-	maxFailsPM    = 3
+	reSplit    = regexp.MustCompile(`\| chatgpt_response:`)
+	failTimes  []time.Time
+	maxFailsPM = 3
 )
 
 func runWatcher(ctx context.Context, cfg *Config, log *zap.Logger, w *fsnotify.Watcher, store HashStore, sender SMTPSender) {
@@ -65,8 +65,10 @@ func consume(ctx context.Context, path string, pos *int64, log *zap.Logger, stor
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	f.Seek(*pos, io.SeekStart)
+	defer func() { _ = f.Close() }()
+	if _, err := f.Seek(*pos, io.SeekStart); err != nil {
+		return err
+	}
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := sc.Text()
@@ -82,17 +84,17 @@ func consume(ctx context.Context, path string, pos *int64, log *zap.Logger, stor
 			continue
 		}
 
-        // Render
-        rendered, err := alerts.RenderEmail(alerts.Alert{
-            Time:        time.Now(),
-            Severity:    5,
-            Title:       alert,
-            Description: reply,
-        })
-        if err != nil {
-            log.Error("render email", zap.Error(err))
-            continue
-        }
+		// Render
+		rendered, err := alerts.RenderEmail(alerts.Alert{
+			Time:        time.Now(),
+			Severity:    5,
+			Title:       alert,
+			Description: reply,
+		})
+		if err != nil {
+			log.Error("render email", zap.Error(err))
+			continue
+		}
 
 		// Rate-limit on recent failures
 		if !canSend() {

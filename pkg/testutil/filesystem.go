@@ -8,7 +8,7 @@ import (
 )
 
 // =====================================
-// File System Testing Utilities  
+// File System Testing Utilities
 // =====================================
 
 // TempDir creates a temporary directory for testing and ensures cleanup
@@ -79,12 +79,18 @@ func AssertFileContent(t *testing.T, path, expected string) {
 func WithEnvVar(t *testing.T, key, value string) func() {
 	t.Helper()
 	original := os.Getenv(key)
-	os.Setenv(key, value)
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("setenv %s: %v", key, err)
+	}
 	return func() {
 		if original == "" {
-			os.Unsetenv(key)
+			if err := os.Unsetenv(key); err != nil {
+				t.Fatalf("unsetenv %s: %v", key, err)
+			}
 		} else {
-			os.Setenv(key, original)
+			if err := os.Setenv(key, original); err != nil {
+				t.Fatalf("setenv %s: %v", key, err)
+			}
 		}
 	}
 }
@@ -93,10 +99,14 @@ func WithEnvVar(t *testing.T, key, value string) func() {
 func WithoutEnvVar(t *testing.T, key string) func() {
 	t.Helper()
 	original := os.Getenv(key)
-	os.Unsetenv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("unsetenv %s: %v", key, err)
+	}
 	return func() {
 		if original != "" {
-			os.Setenv(key, original)
+			if err := os.Setenv(key, original); err != nil {
+				t.Fatalf("setenv %s: %v", key, err)
+			}
 		}
 	}
 }
@@ -105,19 +115,19 @@ func WithoutEnvVar(t *testing.T, key string) func() {
 func SetupTestEnvironment(t *testing.T) func() {
 	t.Helper()
 	cleanups := []func(){}
-	
+
 	// Set test environment variables
 	testVars := map[string]string{
 		"EOS_TEST_MODE":     "true",
 		"VAULT_ADDR":        "http://127.0.0.1:8200",
 		"VAULT_SKIP_VERIFY": "true",
 	}
-	
+
 	for key, value := range testVars {
 		cleanup := WithEnvVar(t, key, value)
 		cleanups = append(cleanups, cleanup)
 	}
-	
+
 	return func() {
 		for _, cleanup := range cleanups {
 			cleanup()
@@ -133,14 +143,14 @@ func SetupTestEnvironment(t *testing.T) func() {
 func Eventually(t *testing.T, condition func() bool, timeout time.Duration, interval time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
-	
+
 	for time.Now().Before(deadline) {
 		if condition() {
 			return
 		}
 		time.Sleep(interval)
 	}
-	
+
 	t.Fatalf("condition was not met within %v", timeout)
 }
 
@@ -148,7 +158,7 @@ func Eventually(t *testing.T, condition func() bool, timeout time.Duration, inte
 func Consistently(t *testing.T, condition func() bool, duration time.Duration, interval time.Duration) {
 	t.Helper()
 	deadline := time.Now().Add(duration)
-	
+
 	for time.Now().Before(deadline) {
 		if !condition() {
 			t.Fatal("condition failed during consistency check")
@@ -161,16 +171,16 @@ func Consistently(t *testing.T, condition func() bool, duration time.Duration, i
 func ParallelTest(t *testing.T, numGoroutines int, testFunc func(t *testing.T, workerID int)) {
 	t.Helper()
 	t.Parallel()
-	
+
 	done := make(chan bool, numGoroutines)
-	
+
 	for i := 0; i < numGoroutines; i++ {
 		go func(workerID int) {
 			defer func() { done <- true }()
 			testFunc(t, workerID)
 		}(i)
 	}
-	
+
 	// Wait for all goroutines to complete
 	for i := 0; i < numGoroutines; i++ {
 		<-done
