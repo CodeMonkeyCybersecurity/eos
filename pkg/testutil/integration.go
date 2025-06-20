@@ -28,7 +28,7 @@ type IntegrationTestSuite struct {
 // NewIntegrationTestSuite creates a new integration testing environment
 func NewIntegrationTestSuite(t *testing.T, suiteName string) *IntegrationTestSuite {
 	t.Helper()
-	
+
 	// Initialize telemetry for integration tests
 	err := telemetry.Init("eos-integration-test-" + suiteName)
 	if err != nil {
@@ -60,7 +60,7 @@ func (s *IntegrationTestSuite) setupEnvironment() {
 	// Create directory structure
 	dirs := []string{
 		"vault/tls",
-		"vault/data", 
+		"vault/data",
 		"eos/secrets",
 		"eos/config",
 		"logs",
@@ -120,13 +120,13 @@ func (s *IntegrationTestSuite) setTestEnvironment() {
 
 	// Store original values for cleanup
 	envVars := map[string]string{
-		"EOS_TEST_MODE":      "true",
-		"VAULT_SKIP_VERIFY":  "true",
-		"VAULT_CACERT":       filepath.Join(s.tempDir, "vault/tls/tls.crt"),
-		shared.VaultAddrEnv:  "http://127.0.0.1:8200",
-		"EOS_DATA_DIR":       filepath.Join(s.tempDir, "eos"),
-		"EOS_LOG_LEVEL":      "debug",
-		"EOS_LOG_PATH":       filepath.Join(s.tempDir, "logs/eos.log"),
+		"EOS_TEST_MODE":     "true",
+		"VAULT_SKIP_VERIFY": "true",
+		"VAULT_CACERT":      filepath.Join(s.tempDir, "vault/tls/tls.crt"),
+		shared.VaultAddrEnv: "http://127.0.0.1:8200",
+		"EOS_DATA_DIR":      filepath.Join(s.tempDir, "eos"),
+		"EOS_LOG_LEVEL":     "debug",
+		"EOS_LOG_PATH":      filepath.Join(s.tempDir, "logs/eos.log"),
 	}
 
 	originalValues := make(map[string]string)
@@ -139,9 +139,9 @@ func (s *IntegrationTestSuite) setTestEnvironment() {
 	s.AddCleanup(func() {
 		for key, originalValue := range originalValues {
 			if originalValue == "" {
-				os.Unsetenv(key)
+				_ = os.Unsetenv(key)
 			} else {
-				os.Setenv(key, originalValue)
+				_ = os.Setenv(key, originalValue)
 			}
 		}
 	})
@@ -155,10 +155,10 @@ func (s *IntegrationTestSuite) CreateTestContext(commandName string) *eos_io.Run
 
 	ctx := context.Background()
 	rc := eos_io.NewContext(ctx, commandName)
-	
+
 	// Track for cleanup
 	s.contexts = append(s.contexts, rc)
-	
+
 	return rc
 }
 
@@ -175,7 +175,7 @@ func (s *IntegrationTestSuite) WithVaultMock() {
 	s.WithMockTransport(VaultMockTransport())
 }
 
-// WithDockerMock sets up a complete mock Docker environment  
+// WithDockerMock sets up a complete mock Docker environment
 func (s *IntegrationTestSuite) WithDockerMock() {
 	s.t.Helper()
 	s.WithMockTransport(DockerMockTransport())
@@ -241,7 +241,7 @@ func (s *IntegrationTestSuite) RunScenario(scenario TestScenario) {
 	s.t.Helper()
 	s.t.Run(scenario.Name, func(t *testing.T) {
 		t.Helper()
-		
+
 		// Run setup if provided
 		if scenario.Setup != nil {
 			scenario.Setup(s)
@@ -314,7 +314,7 @@ func (s *IntegrationTestSuite) ExecuteCommand(cmd *cobra.Command, args []string)
 
 	// Set up command args
 	cmd.SetArgs(args)
-	
+
 	// Capture output
 	cmd.SetOut(os.Stdout)
 	cmd.SetErr(os.Stderr)

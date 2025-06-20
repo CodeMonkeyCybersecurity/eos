@@ -6,11 +6,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/cockroachdb/errors"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/zap"
 )
-
-var tracer = otel.Tracer("eos/pkg/packer")
 
 // EnsureInstalled installs Packer cross-platform with full logging, tracing, and error wrapping
 func EnsureInstalled(rc *eos_io.RuntimeContext, log *zap.Logger) error {

@@ -63,12 +63,14 @@ func TestIntegrationPatterns_MockServices(t *testing.T) {
 
 	// Test Vault mock pattern
 	vaultPattern := testutil.MockServicePattern("vault", testutil.VaultMockTransport())
-	
+
 	scenario := testutil.TestScenario{
 		Name:        "vault_mock_pattern_test",
 		Description: "Test vault mock service pattern",
 		Setup: func(s *testutil.IntegrationTestSuite) {
-			vaultPattern.Setup(s)
+			if err := vaultPattern.Setup(s); err != nil {
+				t.Fatalf("setup vault pattern: %v", err)
+			}
 		},
 		Steps: []testutil.TestStep{
 			{
@@ -96,12 +98,14 @@ func TestIntegrationPatterns_FileSystem(t *testing.T) {
 	suite := testutil.NewIntegrationTestSuite(t, "filesystem-patterns")
 
 	fsPattern := testutil.FileSystemPattern("test/data")
-	
+
 	scenario := testutil.TestScenario{
 		Name:        "filesystem_pattern_test",
 		Description: "Test file system operation patterns",
 		Setup: func(s *testutil.IntegrationTestSuite) {
-			fsPattern.Setup(s)
+			if err := fsPattern.Setup(s); err != nil {
+				t.Fatalf("setup fs pattern: %v", err)
+			}
 		},
 		Steps: []testutil.TestStep{
 			{
@@ -133,7 +137,7 @@ func TestIntegrationPatterns_Concurrency(t *testing.T) {
 	concurrentOperation := func(workerID int, s *testutil.IntegrationTestSuite) error {
 		rc := s.CreateTestContext("concurrent-worker")
 		rc.Attributes["worker_id"] = string(rune(workerID + '0'))
-		
+
 		// Simulate some work
 		return nil
 	}
@@ -141,7 +145,7 @@ func TestIntegrationPatterns_Concurrency(t *testing.T) {
 	concurrencyPattern := testutil.ConcurrencyPattern(5, concurrentOperation)
 
 	scenario := testutil.TestScenario{
-		Name:        "concurrency_pattern_test", 
+		Name:        "concurrency_pattern_test",
 		Description: "Test concurrent operations pattern",
 		Steps: []testutil.TestStep{
 			{
