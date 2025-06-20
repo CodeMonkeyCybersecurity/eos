@@ -132,7 +132,7 @@ func CopyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
 	if err != nil {
 		return cerr.Wrapf(err, "open %s", src)
 	}
-	defer in.Close()
+	defer func() { _ = in.Close() }()
 
 	if err := MkdirP(ctx, filepath.Dir(dst), 0o755); err != nil {
 		return cerr.Wrapf(err, "ensure dir for %s", dst)
@@ -142,7 +142,7 @@ func CopyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
 	if err != nil {
 		return cerr.Wrapf(err, "create %s", dst)
 	}
-	defer out.Close()
+	defer func() { _ = out.Close() }()
 
 	if _, err := io.Copy(out, in); err != nil {
 		return cerr.Wrapf(err, "copy %s→%s", src, dst)

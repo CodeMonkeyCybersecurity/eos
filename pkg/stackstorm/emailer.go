@@ -176,7 +176,7 @@ func (e *Emailer) Run(ctx context.Context) error {
 		case ev := <-e.fs.Events:
 			if ev.Op&(fsnotify.Write|fsnotify.Create) != 0 {
 				if err := e.consume(ctx, &pos); err != nil {
-					e.log.Logger.Warn("consume", zap.Error(err))
+					e.log.Warn("consume", zap.Error(err))
 				}
 			}
 		case err := <-e.fs.Errors:

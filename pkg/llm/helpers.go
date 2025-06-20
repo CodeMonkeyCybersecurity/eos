@@ -22,14 +22,13 @@ import (
 // ───────────────────────── Config (env driven) ────────────────────────────
 
 var (
-	apiKey        = env("AZURE_API_KEY", "")
-	endpoint      = env("AZURE_ENDPOINT", "https://languageatcodemonkey.openai.azure.com")
-	deployment    = env("AZURE_DEPLOYMENT", "gpt-4.1")
-	apiVersion    = env("AZURE_API_VERSION", "2025-01-01-preview")
-	promptFile    = env("PROMPT_FILE", "/opt/system-prompt.txt")
-	debugLogFile  = env("DEBUG_LOG", "/var/log/stackstorm/llm-debug.log")
-	promptDbgFile = env("PROMPT_DEBUG", "/var/log/stackstorm/prompt-debug.log")
-	maxLogBytes   = int64(10 * 1024 * 1024)
+	apiKey       = env("AZURE_API_KEY", "")
+	endpoint     = env("AZURE_ENDPOINT", "https://languageatcodemonkey.openai.azure.com")
+	deployment   = env("AZURE_DEPLOYMENT", "gpt-4.1")
+	apiVersion   = env("AZURE_API_VERSION", "2025-01-01-preview")
+	promptFile   = env("PROMPT_FILE", "/opt/system-prompt.txt")
+	debugLogFile = env("DEBUG_LOG", "/var/log/stackstorm/llm-debug.log")
+	maxLogBytes  = int64(10 * 1024 * 1024)
 )
 
 func env(key, def string) string {
@@ -54,7 +53,7 @@ func appendLine(path, s string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	_, err = f.WriteString(s)
 	return err
 }
@@ -195,7 +194,7 @@ func CallAzure(ctx context.Context, payload map[string]any, retries int, delay t
 }
 
 func ExtractResponseText(resp *http.Response) (string, error) {
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var data struct {
 		Choices []struct {
 			Message struct {
@@ -222,7 +221,7 @@ func ReopenLog(ctx context.Context, path string) (<-chan string, error) {
 		return nil, err
 	}
 	go func() {
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		r := bufio.NewReader(f)
 		for {
 			select {
