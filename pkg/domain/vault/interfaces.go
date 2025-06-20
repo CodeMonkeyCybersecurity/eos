@@ -3,7 +3,6 @@ package vault
 
 import (
 	"context"
-	"time"
 )
 
 // SecretStore defines the core secret management operations

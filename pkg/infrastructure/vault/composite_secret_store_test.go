@@ -1,0 +1,468 @@
+package vault
+
+import (
+	"context"
+	"fmt"
+	"testing"
+
+	domain "github.com/CodeMonkeyCybersecurity/eos/pkg/domain/vault"
+	"go.uber.org/zap/zaptest"
+)
+
+// MockSecretStore for testing infrastructure layer
+type MockSecretStore struct {
+	secrets map[string]*domain.Secret
+	errors  map[string]error
+	name    string // For identifying which store in logs
+}
+
+func NewMockSecretStore(name string) *MockSecretStore {
+	return &MockSecretStore{
+		secrets: make(map[string]*domain.Secret),
+		errors:  make(map[string]error),
+		name:    name,
+	}
+}
+
+func (m *MockSecretStore) Get(ctx context.Context, key string) (*domain.Secret, error) {
+	if err, ok := m.errors["get:"+key]; ok {
+		return nil, err
+	}
+	if secret, ok := m.secrets[key]; ok {
+		return secret, nil
+	}
+	return nil, fmt.Errorf("secret not found: %s", key)
+}
+
+func (m *MockSecretStore) Set(ctx context.Context, key string, secret *domain.Secret) error {
+	if err, ok := m.errors["set:"+key]; ok {
+		return err
+	}
+	m.secrets[key] = secret
+	return nil
+}
+
+func (m *MockSecretStore) Delete(ctx context.Context, key string) error {
+	if err, ok := m.errors["delete:"+key]; ok {
+		return err
+	}
+	delete(m.secrets, key)
+	return nil
+}
+
+func (m *MockSecretStore) List(ctx context.Context, prefix string) ([]*domain.Secret, error) {
+	if err, ok := m.errors["list:"+prefix]; ok {
+		return nil, err
+	}
+	var secrets []*domain.Secret
+	for key, secret := range m.secrets {
+		if prefix == "" || len(key) >= len(prefix) && key[:len(prefix)] == prefix {
+			secrets = append(secrets, secret)
+		}
+	}
+	return secrets, nil
+}
+
+func (m *MockSecretStore) Exists(ctx context.Context, key string) (bool, error) {
+	if err, ok := m.errors["exists:"+key]; ok {
+		return false, err
+	}
+	_, exists := m.secrets[key]
+	return exists, nil
+}
+
+func (m *MockSecretStore) SetError(operation, key string, err error) {
+	m.errors[operation+":"+key] = err
+}
+
+func (m *MockSecretStore) AddSecret(secret *domain.Secret) {
+	m.secrets[secret.Key] = secret
+}
+
+func (m *MockSecretStore) GetStoredSecrets() map[string]*domain.Secret {
+	return m.secrets
+}
+
+// Test CompositeSecretStore.Get with primary success
+func TestCompositeSecretStore_Get_PrimarySuccess(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup secret in primary store
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "test-value",
+	}
+	primary.AddSecret(secret)
+
+	// Execute
+	ctx := context.Background()
+	result, err := composite.Get(ctx, "test-key")
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Errorf("expected secret but got nil")
+	}
+	if result.Value != "test-value" {
+		t.Errorf("expected value 'test-value' but got '%s'", result.Value)
+	}
+	if result.Metadata["retrieved_from"] == "fallback" {
+		t.Errorf("secret should not be marked as from fallback")
+	}
+}
+
+// Test CompositeSecretStore.Get with fallback success
+func TestCompositeSecretStore_Get_FallbackSuccess(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup primary to fail
+	primary.SetError("get", "test-key", fmt.Errorf("primary store error"))
+
+	// Setup secret in fallback store
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "fallback-value",
+	}
+	fallback.AddSecret(secret)
+
+	// Execute
+	ctx := context.Background()
+	result, err := composite.Get(ctx, "test-key")
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Errorf("expected secret but got nil")
+	}
+	if result.Value != "fallback-value" {
+		t.Errorf("expected value 'fallback-value' but got '%s'", result.Value)
+	}
+	if result.Metadata["retrieved_from"] != "fallback" {
+		t.Errorf("secret should be marked as from fallback")
+	}
+}
+
+// Test CompositeSecretStore.Get with both stores failing
+func TestCompositeSecretStore_Get_BothFail(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup both stores to fail
+	primary.SetError("get", "test-key", fmt.Errorf("primary store error"))
+	fallback.SetError("get", "test-key", fmt.Errorf("fallback store error"))
+
+	// Execute
+	ctx := context.Background()
+	result, err := composite.Get(ctx, "test-key")
+
+	// Verify
+	if err == nil {
+		t.Errorf("expected error but got none")
+	}
+	if result != nil {
+		t.Errorf("expected nil result but got: %v", result)
+	}
+}
+
+// Test CompositeSecretStore.Set with primary success
+func TestCompositeSecretStore_Set_PrimarySuccess(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "test-value",
+	}
+
+	// Execute
+	ctx := context.Background()
+	err := composite.Set(ctx, "test-key", secret)
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check primary store
+	primarySecrets := primary.GetStoredSecrets()
+	if _, exists := primarySecrets["test-key"]; !exists {
+		t.Errorf("secret not stored in primary store")
+	}
+
+	// Check fallback store (should be synced)
+	fallbackSecrets := fallback.GetStoredSecrets()
+	if _, exists := fallbackSecrets["test-key"]; !exists {
+		t.Errorf("secret not synced to fallback store")
+	}
+}
+
+// Test CompositeSecretStore.Set with primary failure, fallback success
+func TestCompositeSecretStore_Set_PrimaryFailFallbackSuccess(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup primary to fail
+	primary.SetError("set", "test-key", fmt.Errorf("primary store error"))
+
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "test-value",
+	}
+
+	// Execute
+	ctx := context.Background()
+	err := composite.Set(ctx, "test-key", secret)
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check primary store (should be empty)
+	primarySecrets := primary.GetStoredSecrets()
+	if _, exists := primarySecrets["test-key"]; exists {
+		t.Errorf("secret should not be stored in primary store")
+	}
+
+	// Check fallback store (should have the secret)
+	fallbackSecrets := fallback.GetStoredSecrets()
+	if _, exists := fallbackSecrets["test-key"]; !exists {
+		t.Errorf("secret not stored in fallback store")
+	}
+}
+
+// Test CompositeSecretStore.Delete
+func TestCompositeSecretStore_Delete(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup secrets in both stores
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "test-value",
+	}
+	primary.AddSecret(secret)
+	fallback.AddSecret(secret)
+
+	// Execute
+	ctx := context.Background()
+	err := composite.Delete(ctx, "test-key")
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check both stores (should be empty)
+	primarySecrets := primary.GetStoredSecrets()
+	if _, exists := primarySecrets["test-key"]; exists {
+		t.Errorf("secret not deleted from primary store")
+	}
+
+	fallbackSecrets := fallback.GetStoredSecrets()
+	if _, exists := fallbackSecrets["test-key"]; exists {
+		t.Errorf("secret not deleted from fallback store")
+	}
+}
+
+// Test CompositeSecretStore.Delete with partial failure
+func TestCompositeSecretStore_Delete_PartialFailure(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup secret in primary store
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "test-value",
+	}
+	primary.AddSecret(secret)
+
+	// Setup fallback to fail
+	fallback.SetError("delete", "test-key", fmt.Errorf("fallback delete error"))
+
+	// Execute
+	ctx := context.Background()
+	err := composite.Delete(ctx, "test-key")
+
+	// Verify - should succeed if at least one deletion succeeds
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	// Check primary store (should be empty)
+	primarySecrets := primary.GetStoredSecrets()
+	if _, exists := primarySecrets["test-key"]; exists {
+		t.Errorf("secret not deleted from primary store")
+	}
+}
+
+// Test CompositeSecretStore.List
+func TestCompositeSecretStore_List(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup secrets in primary store
+	secrets := []*domain.Secret{
+		{Key: "app/secret1", Value: "value1"},
+		{Key: "app/secret2", Value: "value2"},
+	}
+
+	for _, secret := range secrets {
+		primary.AddSecret(secret)
+	}
+
+	// Execute
+	ctx := context.Background()
+	results, err := composite.List(ctx, "app/")
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 secrets but got %d", len(results))
+	}
+}
+
+// Test CompositeSecretStore.List with fallback
+func TestCompositeSecretStore_List_Fallback(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup primary to fail
+	primary.SetError("list", "app/", fmt.Errorf("primary list error"))
+
+	// Setup secrets in fallback store
+	secrets := []*domain.Secret{
+		{Key: "app/secret1", Value: "value1"},
+		{Key: "app/secret2", Value: "value2"},
+	}
+
+	for _, secret := range secrets {
+		fallback.AddSecret(secret)
+	}
+
+	// Execute
+	ctx := context.Background()
+	results, err := composite.List(ctx, "app/")
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Errorf("expected 2 secrets but got %d", len(results))
+	}
+
+	// Check that secrets are marked as from fallback
+	for _, secret := range results {
+		if secret.Metadata["listed_from"] != "fallback" {
+			t.Errorf("secret should be marked as listed from fallback")
+		}
+	}
+}
+
+// Test CompositeSecretStore.Exists
+func TestCompositeSecretStore_Exists(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Setup secret in primary store
+	secret := &domain.Secret{
+		Key:   "test-key",
+		Value: "test-value",
+	}
+	primary.AddSecret(secret)
+
+	// Execute
+	ctx := context.Background()
+	exists, err := composite.Exists(ctx, "test-key")
+
+	// Verify
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if !exists {
+		t.Errorf("expected secret to exist")
+	}
+
+	// Test non-existent secret
+	exists, err = composite.Exists(ctx, "non-existent")
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if exists {
+		t.Errorf("expected secret to not exist")
+	}
+}
+
+// Test CompositeSecretStore.HealthCheck
+func TestCompositeSecretStore_HealthCheck(t *testing.T) {
+	primary := NewMockSecretStore("primary")
+	fallback := NewMockSecretStore("fallback")
+	logger := zaptest.NewLogger(t)
+
+	composite := NewCompositeSecretStore(primary, fallback, logger)
+
+	// Execute
+	ctx := context.Background()
+	health := composite.HealthCheck(ctx)
+
+	// Verify
+	if len(health) != 2 {
+		t.Errorf("expected 2 health entries but got %d", len(health))
+	}
+
+	if _, exists := health["primary"]; !exists {
+		t.Errorf("expected primary health entry")
+	}
+
+	if _, exists := health["fallback"]; !exists {
+		t.Errorf("expected fallback health entry")
+	}
+
+	// Both should be healthy (no errors)
+	if health["primary"] != nil {
+		t.Errorf("expected primary to be healthy but got error: %v", health["primary"])
+	}
+
+	if health["fallback"] != nil {
+		t.Errorf("expected fallback to be healthy but got error: %v", health["fallback"])
+	}
+}

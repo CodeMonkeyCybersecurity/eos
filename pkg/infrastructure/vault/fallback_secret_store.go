@@ -1,0 +1,375 @@
+// Package vault implements fallback secret store for when vault is unavailable
+package vault
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	domain "github.com/CodeMonkeyCybersecurity/eos/pkg/domain/vault"
+	"go.uber.org/zap"
+)
+
+// FallbackSecretStore implements domain.SecretStore using environment variables and local files
+type FallbackSecretStore struct {
+	fallbackDir string
+	logger      *zap.Logger
+}
+
+// NewFallbackSecretStore creates a fallback secret store
+func NewFallbackSecretStore(fallbackDir string, logger *zap.Logger) *FallbackSecretStore {
+	if fallbackDir == "" {
+		fallbackDir = "/var/lib/eos/secrets" // Default fallback directory
+	}
+	return &FallbackSecretStore{
+		fallbackDir: fallbackDir,
+		logger:      logger,
+	}
+}
+
+// Get implements domain.SecretStore interface using environment variables and files
+func (f *FallbackSecretStore) Get(ctx context.Context, key string) (*domain.Secret, error) {
+	f.logger.Debug("Getting secret from fallback store", zap.String("key", key))
+
+	// First try environment variable
+	envVar := f.keyToEnvVar(key)
+	if value := os.Getenv(envVar); value != "" {
+		f.logger.Debug("Secret found in environment", 
+			zap.String("key", key), 
+			zap.String("env_var", envVar))
+		
+		return &domain.Secret{
+			Key:   key,
+			Value: value,
+			Metadata: map[string]string{
+				"source": "environment",
+				"env_var": envVar,
+			},
+			CreatedAt: time.Now(), // We don't know actual creation time
+			UpdatedAt: time.Now(),
+		}, nil
+	}
+
+	// Try file-based fallback
+	filePath := f.keyToFilePath(key)
+	if data, err := os.ReadFile(filePath); err == nil {
+		f.logger.Debug("Secret found in file", 
+			zap.String("key", key), 
+			zap.String("file_path", filePath))
+
+		// Try to parse as JSON first
+		var secretData map[string]interface{}
+		if json.Unmarshal(data, &secretData) == nil {
+			return f.parseJSONSecret(key, secretData, filePath)
+		}
+
+		// Treat as plain text
+		return &domain.Secret{
+			Key:   key,
+			Value: string(data),
+			Metadata: map[string]string{
+				"source":    "file",
+				"file_path": filePath,
+			},
+			CreatedAt: f.getFileCreatedTime(filePath),
+			UpdatedAt: f.getFileModifiedTime(filePath),
+		}, nil
+	}
+
+	f.logger.Debug("Secret not found in fallback store", 
+		zap.String("key", key),
+		zap.String("env_var", envVar),
+		zap.String("file_path", filePath))
+
+	return nil, fmt.Errorf("secret not found in fallback store: %s", key)
+}
+
+// Set implements domain.SecretStore interface (limited support)
+func (f *FallbackSecretStore) Set(ctx context.Context, key string, secret *domain.Secret) error {
+	f.logger.Debug("Setting secret in fallback store", zap.String("key", key))
+
+	// Ensure fallback directory exists
+	if err := os.MkdirAll(f.fallbackDir, 0750); err != nil {
+		f.logger.Error("Failed to create fallback directory", 
+			zap.String("dir", f.fallbackDir), 
+			zap.Error(err))
+		return fmt.Errorf("failed to create fallback directory: %w", err)
+	}
+
+	// Prepare secret data for storage
+	secretData := map[string]interface{}{
+		"value":      secret.Value,
+		"created_at": secret.CreatedAt.Format(time.RFC3339),
+		"updated_at": secret.UpdatedAt.Format(time.RFC3339),
+	}
+
+	// Add metadata
+	if len(secret.Metadata) > 0 {
+		secretData["metadata"] = secret.Metadata
+	}
+
+	// Add expiry if present
+	if secret.ExpiresAt != nil {
+		secretData["expires_at"] = secret.ExpiresAt.Format(time.RFC3339)
+	}
+
+	// Add version if present
+	if secret.Version > 0 {
+		secretData["version"] = secret.Version
+	}
+
+	// Write to file
+	filePath := f.keyToFilePath(key)
+	data, err := json.MarshalIndent(secretData, "", "  ")
+	if err != nil {
+		f.logger.Error("Failed to marshal secret data", 
+			zap.String("key", key), 
+			zap.Error(err))
+		return fmt.Errorf("failed to marshal secret data: %w", err)
+	}
+
+	// Ensure parent directory exists
+	parentDir := filepath.Dir(filePath)
+	if err := os.MkdirAll(parentDir, 0750); err != nil {
+		f.logger.Error("Failed to create parent directory", 
+			zap.String("dir", parentDir), 
+			zap.Error(err))
+		return fmt.Errorf("failed to create parent directory: %w", err)
+	}
+
+	// Write with secure permissions
+	if err := os.WriteFile(filePath, data, 0640); err != nil {
+		f.logger.Error("Failed to write secret file", 
+			zap.String("file_path", filePath), 
+			zap.Error(err))
+		return fmt.Errorf("failed to write secret file: %w", err)
+	}
+
+	f.logger.Debug("Secret stored successfully in fallback store", 
+		zap.String("key", key),
+		zap.String("file_path", filePath))
+
+	return nil
+}
+
+// Delete implements domain.SecretStore interface
+func (f *FallbackSecretStore) Delete(ctx context.Context, key string) error {
+	f.logger.Debug("Deleting secret from fallback store", zap.String("key", key))
+
+	filePath := f.keyToFilePath(key)
+	if err := os.Remove(filePath); err != nil {
+		if os.IsNotExist(err) {
+			f.logger.Debug("Secret file not found for deletion", 
+				zap.String("key", key),
+				zap.String("file_path", filePath))
+			return nil // Not an error if file doesn't exist
+		}
+		f.logger.Error("Failed to delete secret file", 
+			zap.String("file_path", filePath), 
+			zap.Error(err))
+		return fmt.Errorf("failed to delete secret file: %w", err)
+	}
+
+	f.logger.Debug("Secret deleted successfully from fallback store", 
+		zap.String("key", key),
+		zap.String("file_path", filePath))
+
+	return nil
+}
+
+// List implements domain.SecretStore interface
+func (f *FallbackSecretStore) List(ctx context.Context, prefix string) ([]*domain.Secret, error) {
+	f.logger.Debug("Listing secrets from fallback store", zap.String("prefix", prefix))
+
+	prefixDir := filepath.Join(f.fallbackDir, f.sanitizePath(prefix))
+	var secrets []*domain.Secret
+
+	err := filepath.Walk(prefixDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // Skip errors, continue walking
+		}
+
+		// Only process .json files
+		if info.IsDir() || !strings.HasSuffix(path, ".json") {
+			return nil
+		}
+
+		// Convert file path back to key
+		relPath, err := filepath.Rel(f.fallbackDir, path)
+		if err != nil {
+			f.logger.Warn("Failed to get relative path", 
+				zap.String("path", path), 
+				zap.Error(err))
+			return nil
+		}
+
+		key := f.filePathToKey(relPath)
+		secret, err := f.Get(ctx, key)
+		if err != nil {
+			f.logger.Warn("Failed to get secret during list", 
+				zap.String("key", key), 
+				zap.Error(err))
+			return nil // Continue walking
+		}
+
+		secrets = append(secrets, secret)
+		return nil
+	})
+
+	if err != nil {
+		f.logger.Error("Failed to walk fallback directory", 
+			zap.String("prefix_dir", prefixDir), 
+			zap.Error(err))
+		return nil, fmt.Errorf("failed to list secrets: %w", err)
+	}
+
+	f.logger.Debug("Secrets listed successfully from fallback store", 
+		zap.String("prefix", prefix), 
+		zap.Int("count", len(secrets)))
+
+	return secrets, nil
+}
+
+// Exists implements domain.SecretStore interface
+func (f *FallbackSecretStore) Exists(ctx context.Context, key string) (bool, error) {
+	f.logger.Debug("Checking if secret exists in fallback store", zap.String("key", key))
+
+	// Check environment variable
+	envVar := f.keyToEnvVar(key)
+	if os.Getenv(envVar) != "" {
+		f.logger.Debug("Secret exists in environment", 
+			zap.String("key", key), 
+			zap.String("env_var", envVar))
+		return true, nil
+	}
+
+	// Check file
+	filePath := f.keyToFilePath(key)
+	if _, err := os.Stat(filePath); err == nil {
+		f.logger.Debug("Secret exists in file", 
+			zap.String("key", key), 
+			zap.String("file_path", filePath))
+		return true, nil
+	}
+
+	f.logger.Debug("Secret does not exist in fallback store", zap.String("key", key))
+	return false, nil
+}
+
+// keyToEnvVar converts a secret key to environment variable name
+func (f *FallbackSecretStore) keyToEnvVar(key string) string {
+	// Convert to uppercase and replace path separators with underscores
+	envVar := strings.ToUpper(key)
+	envVar = strings.ReplaceAll(envVar, "/", "_")
+	envVar = strings.ReplaceAll(envVar, "-", "_")
+	envVar = strings.ReplaceAll(envVar, ".", "_")
+	return "EOS_SECRET_" + envVar
+}
+
+// keyToFilePath converts a secret key to file path
+func (f *FallbackSecretStore) keyToFilePath(key string) string {
+	safePath := f.sanitizePath(key)
+	return filepath.Join(f.fallbackDir, safePath+".json")
+}
+
+// filePathToKey converts file path back to secret key
+func (f *FallbackSecretStore) filePathToKey(filePath string) string {
+	// Remove .json extension
+	key := strings.TrimSuffix(filePath, ".json")
+	// Convert back to forward slashes
+	key = strings.ReplaceAll(key, string(filepath.Separator), "/")
+	return key
+}
+
+// sanitizePath sanitizes a path for safe file system usage
+func (f *FallbackSecretStore) sanitizePath(path string) string {
+	// Remove dangerous path elements
+	clean := strings.ReplaceAll(path, "..", "")
+	clean = strings.ReplaceAll(clean, "//", "/")
+	clean = strings.Trim(clean, "/")
+	
+	// Convert to OS-specific path
+	return filepath.FromSlash(clean)
+}
+
+// parseJSONSecret parses JSON secret data
+func (f *FallbackSecretStore) parseJSONSecret(key string, data map[string]interface{}, filePath string) (*domain.Secret, error) {
+	secret := &domain.Secret{
+		Key: key,
+		Metadata: map[string]string{
+			"source":    "file",
+			"file_path": filePath,
+		},
+	}
+
+	// Extract value
+	if value, ok := data["value"].(string); ok {
+		secret.Value = value
+	} else {
+		return nil, fmt.Errorf("missing or invalid 'value' field in secret file")
+	}
+
+	// Extract timestamps
+	if createdAtStr, ok := data["created_at"].(string); ok {
+		if createdAt, err := time.Parse(time.RFC3339, createdAtStr); err == nil {
+			secret.CreatedAt = createdAt
+		}
+	}
+
+	if updatedAtStr, ok := data["updated_at"].(string); ok {
+		if updatedAt, err := time.Parse(time.RFC3339, updatedAtStr); err == nil {
+			secret.UpdatedAt = updatedAt
+		}
+	}
+
+	// Extract expiry
+	if expiresAtStr, ok := data["expires_at"].(string); ok {
+		if expiresAt, err := time.Parse(time.RFC3339, expiresAtStr); err == nil {
+			secret.ExpiresAt = &expiresAt
+		}
+	}
+
+	// Extract version
+	if version, ok := data["version"].(float64); ok {
+		secret.Version = int(version)
+	}
+
+	// Extract metadata
+	if metadata, ok := data["metadata"].(map[string]interface{}); ok {
+		for k, v := range metadata {
+			if str, ok := v.(string); ok {
+				secret.Metadata[k] = str
+			}
+		}
+	}
+
+	// Set default timestamps if not present
+	if secret.CreatedAt.IsZero() {
+		secret.CreatedAt = f.getFileCreatedTime(filePath)
+	}
+	if secret.UpdatedAt.IsZero() {
+		secret.UpdatedAt = f.getFileModifiedTime(filePath)
+	}
+
+	return secret, nil
+}
+
+// getFileCreatedTime gets file creation time (fallback to modified time)
+func (f *FallbackSecretStore) getFileCreatedTime(filePath string) time.Time {
+	if info, err := os.Stat(filePath); err == nil {
+		return info.ModTime() // Use modification time as fallback
+	}
+	return time.Now()
+}
+
+// getFileModifiedTime gets file modification time
+func (f *FallbackSecretStore) getFileModifiedTime(filePath string) time.Time {
+	if info, err := os.Stat(filePath); err == nil {
+		return info.ModTime()
+	}
+	return time.Now()
+}
