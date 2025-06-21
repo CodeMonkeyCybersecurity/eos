@@ -88,9 +88,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 		return containers, nil
 	}
 
-	containerIDs := strings.Split(output, "\n")
-	
-	for _, id := range containerIDs {
+	for id := range strings.SplitSeq(output, "\n") {
 		if id == "" {
 			continue
 		}
@@ -120,7 +118,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 				Cmd    []string          `json:"Cmd"`
 			} `json:"Config"`
 			NetworkSettings struct {
-				Networks map[string]interface{} `json:"Networks"`
+				Networks map[string]any `json:"Networks"`
 				Ports    map[string][]struct {
 					HostIP   string `json:"HostIp"`
 					HostPort string `json:"HostPort"`
@@ -191,11 +189,9 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 
 			// Parse ports
 			for port, bindings := range data.NetworkSettings.Ports {
-				if bindings != nil {
-					for _, binding := range bindings {
-						portStr := fmt.Sprintf("%s:%s->%s", binding.HostIP, binding.HostPort, port)
-						container.Ports = append(container.Ports, portStr)
-					}
+				for _, binding := range bindings {
+					portStr := fmt.Sprintf("%s:%s->%s", binding.HostIP, binding.HostPort, port)
+					container.Ports = append(container.Ports, portStr)
 				}
 			}
 
@@ -221,8 +217,7 @@ func (i *Inspector) discoverImages() ([]DockerImage, error) {
 		return nil, err
 	}
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(output, "\n") {
 		if line == "" {
 			continue
 		}
@@ -279,8 +274,7 @@ func (i *Inspector) discoverNetworks() ([]DockerNetwork, error) {
 		return nil, err
 	}
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(output, "\n") {
 		if line == "" {
 			continue
 		}
@@ -329,8 +323,7 @@ func (i *Inspector) discoverVolumes() ([]DockerVolume, error) {
 		return nil, err
 	}
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	for line := range strings.SplitSeq(output, "\n") {
 		if line == "" {
 			continue
 		}
@@ -398,8 +391,7 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 			continue
 		}
 
-		paths := strings.Split(output, "\n")
-		for _, path := range paths {
+		for path := range strings.SplitSeq(output, "\n") {
 			if path == "" {
 				continue
 			}
@@ -418,7 +410,7 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 				continue
 			}
 
-			var composeData map[string]interface{}
+			var composeData map[string]any
 			if err := yaml.Unmarshal(content, &composeData); err != nil {
 				logger := otelzap.Ctx(i.rc.Ctx)
 				logger.Warn("⚠️ Failed to parse compose file",
@@ -428,7 +420,7 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 			}
 
 			// Extract services
-			if services, ok := composeData["services"].(map[string]interface{}); ok {
+			if services, ok := composeData["services"].(map[string]any); ok {
 				composeFile.Services = services
 			}
 

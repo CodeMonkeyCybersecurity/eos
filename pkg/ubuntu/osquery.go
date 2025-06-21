@@ -47,26 +47,50 @@ const osqueryConfig = `{
 func installOsquery(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Download osquery package
-	osqueryURL := "https://github.com/osquery/osquery/releases/download/5.11.0/osquery_5.11.0-1.linux_amd64.deb"
-	osqueryPath := "/tmp/osquery.deb"
-
-	logger.Info("Downloading osquery", zap.String("url", osqueryURL))
-	if err := execute.RunSimple(rc.Ctx, "curl", "-L", osqueryURL, "-o", osqueryPath); err != nil {
-		return fmt.Errorf("download osquery: %w", err)
+	// Add osquery official repository GPG key
+	logger.Info("📝 Adding osquery repository GPG key")
+	
+	// Download GPG key to temporary file first
+	keyPath := "/tmp/osquery-key.gpg"
+	if err := execute.RunSimple(rc.Ctx, "curl", "-fsSL", "https://pkg.osquery.io/deb/pubkey.gpg", "-o", keyPath); err != nil {
+		return fmt.Errorf("download osquery GPG key: %w", err)
 	}
-
-	// Install osquery
-	if err := execute.RunSimple(rc.Ctx, "dpkg", "-i", osqueryPath); err != nil {
-		// Try to fix dependencies if installation fails
-		logger.Warn("dpkg install failed, attempting to fix dependencies")
-		if fixErr := execute.RunSimple(rc.Ctx, "apt-get", "install", "-f", "-y"); fixErr != nil {
-			return fmt.Errorf("fix dependencies: %w", fixErr)
+	defer os.Remove(keyPath)
+	
+	// Convert and install GPG key
+	keyringPath := "/usr/share/keyrings/osquery-keyring.gpg"
+	if err := execute.RunSimple(rc.Ctx, "gpg", "--dearmor", "--output", keyringPath, keyPath); err != nil {
+		// Fallback: use apt-key (deprecated but more reliable)
+		logger.Warn("GPG keyring method failed, trying apt-key fallback")
+		if err := execute.RunSimple(rc.Ctx, "apt-key", "add", keyPath); err != nil {
+			return fmt.Errorf("add osquery GPG key: %w", err)
+		}
+		// Use legacy repository line for apt-key
+		repoLine := "deb https://pkg.osquery.io/deb deb main"
+		repoPath := "/etc/apt/sources.list.d/osquery.list"
+		if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), 0644); err != nil {
+			return fmt.Errorf("create osquery repo file: %w", err)
+		}
+	} else {
+		// Use modern signed-by syntax
+		repoLine := "deb [signed-by=/usr/share/keyrings/osquery-keyring.gpg] https://pkg.osquery.io/deb deb main"
+		repoPath := "/etc/apt/sources.list.d/osquery.list"
+		if err := os.WriteFile(repoPath, []byte(repoLine+"\n"), 0644); err != nil {
+			return fmt.Errorf("create osquery repo file: %w", err)
 		}
 	}
 
-	// Clean up
-	os.Remove(osqueryPath)
+	// Update package lists
+	logger.Info("🔄 Updating package lists")
+	if err := execute.RunSimple(rc.Ctx, "apt-get", "update"); err != nil {
+		return fmt.Errorf("update package lists: %w", err)
+	}
+
+	// Install osquery via apt
+	logger.Info("📦 Installing osquery from repository")
+	if err := execute.RunSimple(rc.Ctx, "apt-get", "install", "-y", "osquery"); err != nil {
+		return fmt.Errorf("install osquery: %w", err)
+	}
 
 	// Create osquery configuration directory if it doesn't exist
 	configDir := "/etc/osquery"
