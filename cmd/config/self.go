@@ -1,4 +1,4 @@
-// cmd/config/update.go
+// cmd/config/self.go
 
 package config
 
@@ -39,7 +39,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 		// Check if we're already running as root
 		if os.Geteuid() != 0 {
-			return eos_err.NewExpectedError(rc.Ctx, errors.New("self-update must be run as root. Please run: sudo eos self update"))
+			return eos_err.NewExpectedError(rc.Ctx, errors.New("self-update must be run as root. Please run: sudo eos self update (or sudo eos config self update)"))
 		}
 
 		// Check if /opt/eos directory exists
@@ -86,4 +86,6 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 func init() {
 	SelfCmd.AddCommand(updateCmd)
+	// Add SelfCmd to ConfigCmd so 'eos config self' works
+	ConfigCmd.AddCommand(SelfCmd)
 }

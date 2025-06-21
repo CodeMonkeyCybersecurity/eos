@@ -6,7 +6,8 @@ import (
 )
 
 var ConfigCmd = &cobra.Command{
-	Use:   "config",
-	Short: "Manage Eos CLI settings",
-	Long:  `Configure telemetry, authentication, environment defaults, and other Eos behaviors.`,
+	Use:     "config",
+	Short:   "Manage Eos CLI settings",
+	Aliases: []string{"self"},
+	Long:    `Configure telemetry, authentication, environment defaults, and other Eos behaviors.`,
 }
