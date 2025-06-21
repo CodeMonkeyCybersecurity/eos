@@ -35,7 +35,8 @@ var updateCmd = &cobra.Command{
 This command performs the equivalent of: su, cd /opt/eos && git pull && ./install.sh && exit`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		otelzap.Ctx(rc.Ctx).Info("Starting Eos self-update process")
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("🔄 Starting Eos self-update process")
 
 		// Check if we're already running as root
 		if os.Geteuid() != 0 {
@@ -49,17 +50,21 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 		// Change to /opt/eos directory
 		if err := os.Chdir("/opt/eos"); err != nil {
+			logger.Error("❌ Failed to change directory", 
+				zap.String("directory", "/opt/eos"), 
+				zap.Error(err))
 			return fmt.Errorf("failed to change to /opt/eos directory: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("Changed to /opt/eos directory")
+		logger.Info("📁 Changed to /opt/eos directory")
 
 		// Execute git pull
-		otelzap.Ctx(rc.Ctx).Info("Pulling latest changes from git repository")
+		logger.Info("🔄 Pulling latest changes from git repository")
 		gitCmd := exec.Command("git", "pull")
 		gitCmd.Stdout = os.Stdout
 		gitCmd.Stderr = os.Stderr
 		if err := gitCmd.Run(); err != nil {
+			logger.Error("❌ Git pull failed", zap.Error(err))
 			return fmt.Errorf("failed to pull latest changes: %w", err)
 		}
 
@@ -69,16 +74,17 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 		}
 
 		// Execute install.sh
-		otelzap.Ctx(rc.Ctx).Info("Running installation script")
+		logger.Info("🚀 Running installation script")
 		installCmd := exec.Command("./install.sh")
 		installCmd.Stdout = os.Stdout
 		installCmd.Stderr = os.Stderr
 		if err := installCmd.Run(); err != nil {
+			logger.Error("❌ Installation script failed", zap.Error(err))
 			return fmt.Errorf("failed to run installation script: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("Eos self-update completed successfully")
-		fmt.Println("✅ Eos has been successfully updated to the latest version")
+		otelzap.Ctx(rc.Ctx).Info("✅ Eos self-update completed successfully")
+		otelzap.Ctx(rc.Ctx).Info("✅ Eos has been successfully updated to the latest version")
 
 		return nil
 	}),
