@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto/pq"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto/pq"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -98,39 +98,39 @@ Takes a private key and ciphertext (both in hex format) and recovers
 the original shared secret that was established during encapsulation.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		privateKeyHex := args[0]
 		ciphertextHex := args[1]
-		
+
 		privateKey, err := hex.DecodeString(privateKeyHex)
 		if err != nil {
 			logger.Error("❌ Invalid private key format", zap.Error(err))
 			return fmt.Errorf("invalid hex private key: %w", err)
 		}
-		
+
 		ciphertext, err := hex.DecodeString(ciphertextHex)
 		if err != nil {
 			logger.Error("❌ Invalid ciphertext format", zap.Error(err))
 			return fmt.Errorf("invalid hex ciphertext: %w", err)
 		}
-		
+
 		logger.Info("🔐 Performing ML-KEM decapsulation",
 			zap.Int("private_key_size", len(privateKey)),
 			zap.Int("ciphertext_size", len(ciphertext)),
 		)
-		
+
 		sharedSecret, err := pq.DecapsulateSecret(rc, privateKey, ciphertext)
 		if err != nil {
 			logger.Error("❌ Decapsulation failed", zap.Error(err))
 			return fmt.Errorf("decapsulation failed: %w", err)
 		}
-		
+
 		logger.Info("✅ ML-KEM Decapsulation Completed")
 		logger.Info("🔑 Recovered Shared Secret (hex)",
 			zap.String("shared_secret", hex.EncodeToString(sharedSecret)),
 			zap.Int("size_bytes", len(sharedSecret)),
 		)
-		
+
 		return nil
 	}),
 }
@@ -144,16 +144,16 @@ var validateCmd = &cobra.Command{
 Key types: 'public' or 'private'`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		keyType := args[0]
 		keyHex := args[1]
-		
+
 		keyBytes, err := hex.DecodeString(keyHex)
 		if err != nil {
 			logger.Error("❌ Invalid key format", zap.Error(err))
 			return fmt.Errorf("invalid hex key: %w", err)
 		}
-		
+
 		switch keyType {
 		case "public":
 			err = pq.ValidateMLKEMPublicKey(rc, keyBytes)
@@ -163,17 +163,17 @@ Key types: 'public' or 'private'`,
 			logger.Error("❌ Invalid key type", zap.String("key_type", keyType))
 			return fmt.Errorf("invalid key type: must be 'public' or 'private'")
 		}
-		
+
 		if err != nil {
 			logger.Error("❌ Key validation failed", zap.Error(err))
 			return fmt.Errorf("key validation failed: %w", err)
 		}
-		
+
 		logger.Info("✅ Key validation successful",
 			zap.String("key_type", keyType),
 			zap.Int("key_size", len(keyBytes)),
 		)
-		
+
 		return nil
 	}),
 }
@@ -186,27 +186,27 @@ var infoCmd = &cobra.Command{
 and implementations available in Eos, including post-quantum algorithms.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		logger.Info("🔐 Eos Cryptographic Information")
-		
+
 		// ML-KEM Information
 		mlkemInfo := pq.GetMLKEMInfo()
 		logger.Info("📋 ML-KEM-768 Information",
 			zap.Any("details", mlkemInfo),
 		)
-		
+
 		logger.Info("🛡️ Quantum Resistance Status",
 			zap.Bool("ml_kem_available", true),
 			zap.String("ml_kem_library", "filippo.io/mlkem768"),
 			zap.Bool("quantum_resistant", true),
 		)
-		
+
 		logger.Info("📊 Performance Characteristics",
 			zap.String("keygen_time", "~0.1ms"),
 			zap.String("encaps_time", "~0.2ms"),
 			zap.String("decaps_time", "~0.2ms"),
 		)
-		
+
 		return nil
 	}),
 }
