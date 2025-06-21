@@ -163,7 +163,11 @@ func (r *FileConfigRepository) saveToFile() error {
 	// Atomic rename
 	if err := os.Rename(tempFile, configFile); err != nil {
 		// Cleanup temp file on failure
-		os.Remove(tempFile)
+		if removeErr := os.Remove(tempFile); removeErr != nil {
+			r.logger.Warn("Failed to remove temp file after rename error",
+				zap.String("temp_file", tempFile),
+				zap.Error(removeErr))
+		}
 		return fmt.Errorf("failed to rename config file: %w", err)
 	}
 

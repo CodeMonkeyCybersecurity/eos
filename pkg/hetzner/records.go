@@ -27,7 +27,12 @@ func (c *DNSClient) GetRecords(rc *eos_io.RuntimeContext, zoneID string) ([]DNSR
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /records")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("unexpected status code: %d", resp.StatusCode)
@@ -56,7 +61,12 @@ func (c *DNSClient) CreateRecord(rc *eos_io.RuntimeContext, record DNSRecord) (*
 	if err != nil {
 		return nil, errors.Wrap(err, "performing POST /records")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
 		raw, _ := io.ReadAll(resp.Body)
@@ -85,7 +95,12 @@ func (c *DNSClient) GetRecord(rc *eos_io.RuntimeContext, id string) (*DNSRecord,
 	if err != nil {
 		return nil, errors.Wrap(err, "executing GET /records/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("get record failed: status %d", resp.StatusCode)
@@ -115,7 +130,12 @@ func (c *DNSClient) UpdateRecord(rc *eos_io.RuntimeContext, id string, updated D
 	if err != nil {
 		return nil, errors.Wrap(err, "executing PUT /records/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
@@ -144,7 +164,12 @@ func (c *DNSClient) DeleteRecord(rc *eos_io.RuntimeContext, id string) error {
 	if err != nil {
 		return errors.Wrap(err, "executing DELETE /records/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
@@ -177,7 +202,12 @@ func (c *DNSClient) bulkSend(rc *eos_io.RuntimeContext, method string, records [
 	if err != nil {
 		return errors.Wrap(err, "performing bulk request")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		raw, _ := io.ReadAll(resp.Body)

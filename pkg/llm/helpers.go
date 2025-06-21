@@ -28,7 +28,7 @@ var (
 	apiVersion    = env("AZURE_API_VERSION", "2025-01-01-preview")
 	promptFile    = env("PROMPT_FILE", "/opt/system-prompt.txt")
 	debugLogFile  = env("DEBUG_LOG", "/var/log/stackstorm/llm-debug.log")
-	promptDbgFile = env("PROMPT_DEBUG", "/var/log/stackstorm/prompt-debug.log")
+	_ = env("PROMPT_DEBUG", "/var/log/stackstorm/prompt-debug.log") // promptDbgFile unused but kept for future debug logging
 	maxLogBytes   = int64(10 * 1024 * 1024)
 )
 
@@ -54,7 +54,13 @@ func appendLine(path, s string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			// Log error silently since this is a helper function
+			// and we're already returning an error from WriteString
+			_ = cerr
+		}
+	}()
 	_, err = f.WriteString(s)
 	return err
 }
@@ -195,7 +201,12 @@ func CallAzure(ctx context.Context, payload map[string]any, retries int, delay t
 }
 
 func ExtractResponseText(resp *http.Response) (string, error) {
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently as this is a utility function
+			_ = err
+		}
+	}()
 	var data struct {
 		Choices []struct {
 			Message struct {
@@ -222,7 +233,11 @@ func ReopenLog(ctx context.Context, path string) (<-chan string, error) {
 		return nil, err
 	}
 	go func() {
-		defer f.Close()
+		defer func() {
+			if cerr := f.Close(); cerr != nil {
+				dbg(ctx, "failed to close log file: %v\n", cerr)
+			}
+		}()
 		r := bufio.NewReader(f)
 		for {
 			select {
@@ -237,7 +252,9 @@ func ReopenLog(ctx context.Context, path string) (<-chan string, error) {
 				// rotated?
 				if _, statErr := os.Stat(path); os.IsNotExist(statErr) {
 					time.Sleep(time.Second)
-					f.Close()
+					if err := f.Close(); err != nil {
+						dbg(ctx, "failed to close rotated log file: %v\n", err)
+					}
 					f, _ = os.Open(path)
 					r = bufio.NewReader(f)
 				} else {

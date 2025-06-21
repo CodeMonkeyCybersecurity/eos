@@ -31,7 +31,9 @@ var KeycloakCmd = &cobra.Command{
 
 func init() {
 	KeycloakCmd.Flags().StringVar(&realm, "realm", "", "Realm name (required)")
-	KeycloakCmd.MarkFlagRequired("realm")
+	if err := KeycloakCmd.MarkFlagRequired("realm"); err != nil {
+		panic(fmt.Sprintf("Failed to mark realm flag as required: %v", err))
+	}
 
 	KeycloakCmd.Flags().BoolVar(&withClients, "clients", true, "Include clients")
 	KeycloakCmd.Flags().BoolVar(&withGroupsAndRoles, "groups-roles", true, "Include groups & roles")
@@ -60,7 +62,11 @@ func runKeycloakExport(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			l.Warn("Failed to close response body", zap.Error(err))
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		buf, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("keycloak export failed: %s – %s", resp.Status, string(buf))
@@ -79,7 +85,11 @@ func runKeycloakExport(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) 
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
+	defer func() {
+		if err := fd.Close(); err != nil {
+			l.Warn("Failed to close file", zap.String("file", outFile), zap.Error(err))
+		}
+	}()
 	n, err := io.Copy(fd, resp.Body)
 	if err != nil {
 		return err

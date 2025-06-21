@@ -363,7 +363,10 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	agentClient.SetToken(string(tokenData))
-	agentClient.SetAddress(client.Address())
+	if err := agentClient.SetAddress(client.Address()); err != nil {
+		log.Error("❌ Failed to set agent client address", zap.Error(err))
+		return cerr.Wrap(err, "failed to set agent client address")
+	}
 
 	// Simple test - lookup self
 	log.Info("🧪 Validating agent token with lookup-self")

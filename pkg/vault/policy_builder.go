@@ -209,10 +209,9 @@ func (pb *PolicyBuilder) addPathToBody(path *PolicyPath) error {
 	}
 
 	// Add control group (if needed in the future)
-	if path.ControlGroup != nil {
-		// Control groups require careful implementation due to their complexity
-		// For now, we'll skip them to avoid the parsing issues we encountered
-	}
+	// Control groups require careful implementation due to their complexity
+	// For now, we'll skip them to avoid the parsing issues we encountered
+	_ = path.ControlGroup // acknowledge we're not using this field yet
 
 	return nil
 }

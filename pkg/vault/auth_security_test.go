@@ -54,28 +54,46 @@ aRb6WpY/8lQZd+gx109OS2I6tKn9DyYw+fwZ+k+lMMS4lF1YnJuTU5LTRTOfDrOJ
 	originalVaultSkipVerify := os.Getenv("VAULT_SKIP_VERIFY")
 	
 	// For tests, disable TLS verification to avoid certificate issues
-	os.Setenv("VAULT_SKIP_VERIFY", "true")
+	if err := os.Setenv("VAULT_SKIP_VERIFY", "true"); err != nil {
+		t.Fatalf("Failed to set VAULT_SKIP_VERIFY: %v", err)
+	}
 	// Set a test vault address without TLS
-	os.Setenv(shared.VaultAddrEnv, "http://127.0.0.1:8200")
+	if err := os.Setenv(shared.VaultAddrEnv, "http://127.0.0.1:8200"); err != nil {
+		t.Fatalf("Failed to set %s: %v", shared.VaultAddrEnv, err)
+	}
 	// Use the mock certificate file we created
-	os.Setenv("VAULT_CACERT", tlsCrtPath)
+	if err := os.Setenv("VAULT_CACERT", tlsCrtPath); err != nil {
+		t.Fatalf("Failed to set VAULT_CACERT: %v", err)
+	}
 	
 	// Cleanup function
 	t.Cleanup(func() {
 		if originalVaultCACert == "" {
-			os.Unsetenv("VAULT_CACERT")
+			if err := os.Unsetenv("VAULT_CACERT"); err != nil {
+				t.Logf("Failed to unset VAULT_CACERT: %v", err)
+			}
 		} else {
-			os.Setenv("VAULT_CACERT", originalVaultCACert)
+			if err := os.Setenv("VAULT_CACERT", originalVaultCACert); err != nil {
+				t.Logf("Failed to restore VAULT_CACERT: %v", err)
+			}
 		}
 		if originalVaultAddr == "" {
-			os.Unsetenv(shared.VaultAddrEnv)
+			if err := os.Unsetenv(shared.VaultAddrEnv); err != nil {
+				t.Logf("Failed to unset %s: %v", shared.VaultAddrEnv, err)
+			}
 		} else {
-			os.Setenv(shared.VaultAddrEnv, originalVaultAddr)
+			if err := os.Setenv(shared.VaultAddrEnv, originalVaultAddr); err != nil {
+				t.Logf("Failed to restore %s: %v", shared.VaultAddrEnv, err)
+			}
 		}
 		if originalVaultSkipVerify == "" {
-			os.Unsetenv("VAULT_SKIP_VERIFY")
+			if err := os.Unsetenv("VAULT_SKIP_VERIFY"); err != nil {
+				t.Logf("Failed to unset VAULT_SKIP_VERIFY: %v", err)
+			}
 		} else {
-			os.Setenv("VAULT_SKIP_VERIFY", originalVaultSkipVerify)
+			if err := os.Setenv("VAULT_SKIP_VERIFY", originalVaultSkipVerify); err != nil {
+				t.Logf("Failed to restore VAULT_SKIP_VERIFY: %v", err)
+			}
 		}
 	})
 }

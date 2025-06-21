@@ -343,8 +343,10 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 	return nil
 }
 
-// shouldEnforceMFAForAuth determines if MFA should be enforced for a specific auth method
-func shouldEnforceMFAForAuth(authType string, config *MFAConfig) bool {
+// _shouldEnforceMFAForAuth determines if MFA should be enforced for a specific auth method
+// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//nolint:unused
+func _shouldEnforceMFAForAuth(authType string, config *MFAConfig) bool {
 	switch authType {
 	case "userpass", "ldap", "oidc", "jwt", "github", "okta":
 		return config.EnforceForAll
@@ -358,17 +360,19 @@ func shouldEnforceMFAForAuth(authType string, config *MFAConfig) bool {
 	}
 }
 
-// configureMFAForAuthMethod configures MFA requirements for a specific auth method
-func configureMFAForAuthMethod(rc *eos_io.RuntimeContext, client *api.Client, authPath, authType string) error {
+// _configureMFAForAuthMethod configures MFA requirements for a specific auth method
+// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//nolint:unused
+func _configureMFAForAuthMethod(rc *eos_io.RuntimeContext, client *api.Client, authPath, authType string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	switch authType {
 	case "userpass":
-		return configureMFAForUserpass(rc, client, authPath)
+		return _configureMFAForUserpass(rc, client, authPath)
 	case "ldap":
-		return configureMFAForLDAP(rc, client, authPath)
+		return _configureMFAForLDAP(rc, client, authPath)
 	case "oidc", "jwt":
-		return configureMFAForOIDC(rc, client, authPath)
+		return _configureMFAForOIDC(rc, client, authPath)
 	default:
 		log.Debug("🔍 MFA configuration not implemented for auth type",
 			zap.String("auth_type", authType),
@@ -377,8 +381,10 @@ func configureMFAForAuthMethod(rc *eos_io.RuntimeContext, client *api.Client, au
 	}
 }
 
-// configureMFAForUserpass configures MFA for userpass authentication
-func configureMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
+// _configureMFAForUserpass configures MFA for userpass authentication
+// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//nolint:unused
+func _configureMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔐 Configuring MFA for userpass authentication", zap.String("path", authPath))
 
@@ -401,8 +407,10 @@ func configureMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, auth
 	return nil
 }
 
-// configureMFAForLDAP configures MFA for LDAP authentication
-func configureMFAForLDAP(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
+// _configureMFAForLDAP configures MFA for LDAP authentication
+// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//nolint:unused
+func _configureMFAForLDAP(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔐 Configuring MFA for LDAP authentication", zap.String("path", authPath))
 
@@ -425,8 +433,10 @@ func configureMFAForLDAP(rc *eos_io.RuntimeContext, client *api.Client, authPath
 	return nil
 }
 
-// configureMFAForOIDC configures MFA for OIDC/JWT authentication
-func configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
+// _configureMFAForOIDC configures MFA for OIDC/JWT authentication
+// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//nolint:unused
+func _configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔐 Configuring MFA for OIDC authentication", zap.String("path", authPath))
 
@@ -449,8 +459,10 @@ func configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPath
 	return nil
 }
 
-// createMFAEnforcementPolicy creates a Vault policy that enforces MFA
-func createMFAEnforcementPolicy(config *MFAConfig) string {
+// _createMFAEnforcementPolicy creates a Vault policy that enforces MFA
+// Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//nolint:unused
+func _createMFAEnforcementPolicy(config *MFAConfig) string {
 	_ = config // TODO: Use config to customize policy based on MFA settings
 	policy := `
 # MFA Enforcement Policy

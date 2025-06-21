@@ -223,7 +223,10 @@ var terraformFullWorkflowCmd = &cobra.Command{
 		if !autoApprove {
 			fmt.Print("\nDo you want to apply these changes? [y/N]: ")
 			var response string
-			fmt.Scanln(&response)
+			if _, err := fmt.Scanln(&response); err != nil {
+				logger.Warn("Failed to read user input, cancelling deployment", zap.Error(err))
+				return nil
+			}
 			if response != "y" && response != "yes" && response != "Y" && response != "YES" {
 				logger.Info("Deployment cancelled by user")
 				return nil

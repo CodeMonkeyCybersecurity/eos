@@ -62,7 +62,11 @@ var CreateJenkinsCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("create compose file: %w", err)
 		}
-		defer f.Close()
+		defer func() {
+			if cerr := f.Close(); cerr != nil {
+				otelzap.Ctx(rc.Ctx).Error("failed to close compose file", zap.Error(cerr))
+			}
+		}()
 		if err := templates.JenkinsComposeTemplate.Execute(f, data); err != nil {
 			return fmt.Errorf("render template: %w", err)
 		}

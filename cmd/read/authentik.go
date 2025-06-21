@@ -51,7 +51,11 @@ func runAuthentikExport(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			l.Warn("Failed to close response body", zap.Error(err))
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		buf, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 		return fmt.Errorf("authentik export failed: %s – %s", resp.Status, string(buf))
@@ -70,7 +74,11 @@ func runAuthentikExport(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string)
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
+	defer func() {
+		if err := fd.Close(); err != nil {
+			l.Warn("Failed to close file", zap.String("file", akOut), zap.Error(err))
+		}
+	}()
 	n, err := io.Copy(fd, resp.Body)
 	if err != nil {
 		return err

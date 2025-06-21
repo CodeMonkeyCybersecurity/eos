@@ -2,15 +2,16 @@
 package update
 
 import (
-	"bufio"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var UpdateHostnameCmd = &cobra.Command{
@@ -18,65 +19,98 @@ var UpdateHostnameCmd = &cobra.Command{
 	Short: "Update the system hostname",
 	Long:  `Update the system hostname by modifying /etc/hostname and /etc/hosts.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		UpdateHostname()
-		return nil
+		return UpdateHostname(rc)
 	}),
 }
 
 // UpdateHostname updates the system hostname
-func UpdateHostname() {
+func UpdateHostname(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🔍 Starting hostname update",
+		zap.String("user", os.Getenv("USER")),
+		zap.String("function", "UpdateHostname"))
+
 	// Get the current hostname
 	currentHostname, err := os.Hostname()
 	if err != nil {
-		fmt.Printf("Error retrieving current hostname: %v\n", err)
-		return
+		logger.Error("❌ Failed to retrieve current hostname",
+			zap.Error(err),
+			zap.String("troubleshooting", "Check system configuration"))
+		return err
 	}
-	fmt.Printf("The current hostname is: %s\n", currentHostname)
+	logger.Info("📋 Current hostname retrieved",
+		zap.String("hostname", currentHostname))
 
-	// Ask for confirmation to proceed
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Do you want to change the hostname? (yes/no): ")
-	confirm, _ := reader.ReadString('\n')
-	confirm = strings.TrimSpace(strings.ToLower(confirm))
-
-	if confirm != "yes" {
-		fmt.Println("Hostname change aborted.")
-		return
+	// Ask for confirmation to proceed using default No
+	if !interaction.PromptYesNo(rc.Ctx, "Do you want to change the hostname?", false) {
+		logger.Info("ℹ️ Hostname change aborted by user")
+		return nil
 	}
 
 	// Ask for the new hostname
-	fmt.Print("Enter the new hostname: ")
-	newHostname, _ := reader.ReadString('\n')
+	newHostname := interaction.PromptInput(rc.Ctx, "Enter the new hostname", "")
 	newHostname = strings.TrimSpace(newHostname)
 
 	// Check if the input is not empty
 	if newHostname == "" {
-		fmt.Println("The hostname cannot be empty!")
-		return
+		logger.Error("❌ Empty hostname provided",
+			zap.String("troubleshooting", "Hostname cannot be empty"))
+		return nil
 	}
+
+	logger.Info("🔧 Changing hostname",
+		zap.String("old_hostname", currentHostname),
+		zap.String("new_hostname", newHostname))
 
 	// Change the hostname temporarily
+	logger.Info("🔧 Executing command",
+		zap.String("command", "hostname"),
+		zap.Strings("args", []string{newHostname}))
 	err = exec.Command("hostname", newHostname).Run()
 	if err != nil {
-		fmt.Printf("Error changing hostname temporarily: %v\n", err)
-		return
+		logger.Error("❌ Failed to change hostname temporarily",
+			zap.Error(err),
+			zap.String("command", "hostname"),
+			zap.String("new_hostname", newHostname),
+			zap.String("troubleshooting", "Check permissions and system state"))
+		return err
 	}
+	logger.Info("✅ Temporary hostname change completed")
 
 	// Change the hostname permanently
-	err = exec.Command(fmt.Sprintf("echo %s > /etc/hostname", newHostname)).Run()
+	logger.Info("🔧 Writing new hostname to /etc/hostname",
+		zap.String("file_path", "/etc/hostname"),
+		zap.String("new_hostname", newHostname))
+	err = os.WriteFile("/etc/hostname", []byte(newHostname+"\n"), 0644)
 	if err != nil {
-		fmt.Printf("Error changing hostname permanently: %v\n", err)
-		return
+		logger.Error("❌ Failed to write /etc/hostname",
+			zap.Error(err),
+			zap.String("file_path", "/etc/hostname"),
+			zap.String("troubleshooting", "Check permissions for /etc/hostname"))
+		return err
 	}
+	logger.Info("✅ Permanent hostname file updated")
 
 	// Update the /etc/hosts file
-	err = exec.Command("sed", "-i", fmt.Sprintf("s/%s/%s/g", currentHostname, newHostname), "/etc/hosts").Run()
+	logger.Info("🔧 Executing command",
+		zap.String("command", "sed"),
+		zap.Strings("args", []string{"-i", "s/" + currentHostname + "/" + newHostname + "/g", "/etc/hosts"}))
+	err = exec.Command("sed", "-i", "s/"+currentHostname+"/"+newHostname+"/g", "/etc/hosts").Run()
 	if err != nil {
-		fmt.Printf("Error updating /etc/hosts file: %v\n", err)
-		return
+		logger.Error("❌ Failed to update /etc/hosts",
+			zap.Error(err),
+			zap.String("file_path", "/etc/hosts"),
+			zap.String("old_hostname", currentHostname),
+			zap.String("new_hostname", newHostname),
+			zap.String("troubleshooting", "Check permissions for /etc/hosts"))
+		return err
 	}
+	logger.Info("✅ /etc/hosts file updated")
 
-	fmt.Printf("Hostname changed successfully to %s\n", newHostname)
+	logger.Info("✨ Hostname change complete",
+		zap.String("old_hostname", currentHostname),
+		zap.String("new_hostname", newHostname))
+	return nil
 }
 
 // init registers subcommands for the update command

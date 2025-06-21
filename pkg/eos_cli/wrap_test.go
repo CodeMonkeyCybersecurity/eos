@@ -1,6 +1,7 @@
 package eos_cli
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -14,7 +15,9 @@ import (
 
 func TestWrap(t *testing.T) {
 	// Initialize telemetry for tests
-	telemetry.Init("test")
+	if err := telemetry.Init("test"); err != nil {
+		t.Fatalf("Failed to initialize telemetry: %v", err)
+	}
 
 	t.Run("successful_command_execution", func(t *testing.T) {
 		// Create a simple command function that succeeds
@@ -22,6 +25,7 @@ func TestWrap(t *testing.T) {
 			// Verify runtime context is properly initialized
 			if rc == nil {
 				t.Error("expected non-nil runtime context")
+				return nil
 			}
 			if rc.Ctx == nil {
 				t.Error("expected non-nil context")
@@ -69,7 +73,7 @@ func TestWrap(t *testing.T) {
 	})
 
 	t.Run("expected_user_error_not_wrapped", func(t *testing.T) {
-		userErr := eos_err.NewExpectedError(nil, errors.New("user did something wrong"))
+		userErr := eos_err.NewExpectedError(context.Background(), errors.New("user did something wrong"))
 		
 		userErrorFunc := func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			return userErr
@@ -117,13 +121,19 @@ func TestWrap(t *testing.T) {
 		originalVaultAddr := os.Getenv("VAULT_ADDR")
 		defer func() {
 			if originalVaultAddr == "" {
-				os.Unsetenv("VAULT_ADDR")
+				if err := os.Unsetenv("VAULT_ADDR"); err != nil {
+					t.Logf("Failed to unset VAULT_ADDR: %v", err)
+				}
 			} else {
-				os.Setenv("VAULT_ADDR", originalVaultAddr)
+				if err := os.Setenv("VAULT_ADDR", originalVaultAddr); err != nil {
+					t.Logf("Failed to restore VAULT_ADDR: %v", err)
+				}
 			}
 		}()
 		
-		os.Setenv("VAULT_ADDR", "http://test:8200")
+		if err := os.Setenv("VAULT_ADDR", "http://test:8200"); err != nil {
+			t.Fatalf("Failed to set VAULT_ADDR: %v", err)
+		}
 
 		vaultFunc := func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			// Check that vault_addr attribute was set

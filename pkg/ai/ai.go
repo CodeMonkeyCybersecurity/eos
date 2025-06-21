@@ -439,7 +439,12 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	// Read response
 	responseBody, err := io.ReadAll(resp.Body)

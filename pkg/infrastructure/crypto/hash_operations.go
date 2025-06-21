@@ -72,7 +72,11 @@ func (h *HashOperationsImpl) HashFile(ctx context.Context, path string, algorith
 	if err != nil {
 		return "", fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			h.logger.Error("failed to close file", zap.String("path", path), zap.Error(cerr))
+		}
+	}()
 
 	var hasher hash.Hash
 	switch algorithm {

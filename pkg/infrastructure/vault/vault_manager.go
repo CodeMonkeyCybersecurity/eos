@@ -178,11 +178,7 @@ func (v *VaultManagerImpl) EnableAuth(ctx context.Context, method string, config
 	v.logger.Info("Enabling authentication method", zap.String("method", method))
 
 	authPath := method
-	if authPath == "userpass" || authPath == "approle" {
-		// Use default paths for common methods
-	} else {
-		// For other methods, use the method name as the path
-	}
+	// Use the method name as the path for all methods
 
 	// Check if auth method is already enabled
 	auths, err := v.client.Sys().ListAuthWithContext(ctx)
@@ -205,8 +201,7 @@ func (v *VaultManagerImpl) EnableAuth(ctx context.Context, method string, config
 	}
 
 	// Apply configuration if provided
-	if config != nil {
-		for key, value := range config {
+	for key, value := range config {
 			switch key {
 			case "default_lease_ttl":
 				if ttl, ok := value.(string); ok {
@@ -222,7 +217,6 @@ func (v *VaultManagerImpl) EnableAuth(ctx context.Context, method string, config
 				}
 			}
 		}
-	}
 
 	err = v.client.Sys().EnableAuthWithOptionsWithContext(ctx, authPath, authOptions)
 	if err != nil {
@@ -255,13 +249,11 @@ func (v *VaultManagerImpl) EnableAudit(ctx context.Context, auditType string, co
 
 	// Prepare audit options
 	options := make(map[string]string)
-	if config != nil {
-		for key, value := range config {
+	for key, value := range config {
 			if str, ok := value.(string); ok {
 				options[key] = str
 			}
 		}
-	}
 
 	// Set default file path for file audit device
 	if auditType == "file" && options["file_path"] == "" {

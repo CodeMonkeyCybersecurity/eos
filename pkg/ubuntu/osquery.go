@@ -55,7 +55,11 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 	if err := execute.RunSimple(rc.Ctx, "curl", "-fsSL", "https://pkg.osquery.io/deb/pubkey.gpg", "-o", keyPath); err != nil {
 		return fmt.Errorf("download osquery GPG key: %w", err)
 	}
-	defer os.Remove(keyPath)
+	defer func() {
+		if err := os.Remove(keyPath); err != nil {
+			logger.Warn("Failed to remove temporary GPG key file", zap.String("path", keyPath), zap.Error(err))
+		}
+	}()
 	
 	// Convert and install GPG key
 	keyringPath := "/usr/share/keyrings/osquery-keyring.gpg"

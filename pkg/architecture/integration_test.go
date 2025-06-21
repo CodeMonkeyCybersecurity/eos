@@ -68,7 +68,11 @@ func TestContainerBuilder(t *testing.T) {
 	// Start container
 	err = container.Start(ctx)
 	require.NoError(t, err)
-	defer container.Stop(ctx)
+	defer func() {
+		if err := container.Stop(ctx); err != nil {
+			t.Errorf("Failed to stop container: %v", err)
+		}
+	}()
 	
 	// Test all services are available
 	service1, err := container.Get("service1")
@@ -152,7 +156,11 @@ func TestConcurrentAccess(t *testing.T) {
 	
 	err := container.Start(ctx)
 	require.NoError(t, err)
-	defer container.Stop(ctx)
+	defer func() {
+		if err := container.Stop(ctx); err != nil {
+			t.Errorf("Failed to stop container: %v", err)
+		}
+	}()
 	
 	// Test concurrent access
 	done := make(chan bool, 10)
@@ -188,7 +196,11 @@ func TestContainerMetrics(t *testing.T) {
 	
 	err := container.Start(ctx)
 	require.NoError(t, err)
-	defer container.Stop(ctx)
+	defer func() {
+		if err := container.Stop(ctx); err != nil {
+			t.Errorf("Failed to stop container: %v", err)
+		}
+	}()
 	
 	// Test service info collection
 	info, err := container.GetServiceInfo("testService")
@@ -282,7 +294,11 @@ func TestMigrationPatterns(t *testing.T) {
 	
 	err := newContainer.Start(ctx)
 	require.NoError(t, err)
-	defer newContainer.Stop(ctx)
+	defer func() {
+		if err := newContainer.Stop(ctx); err != nil {
+			t.Errorf("Failed to stop container: %v", err)
+		}
+	}()
 	
 	// Test that new container works
 	service, err := GetTyped[*TestService](newContainer, "modernService")
@@ -304,8 +320,14 @@ func BenchmarkContainerPerformance(b *testing.B) {
 		WithSingleton("service2", createAnotherTestService).
 		MustBuild()
 	
-	container.Start(ctx)
-	defer container.Stop(ctx)
+	if err := container.Start(ctx); err != nil {
+		b.Fatalf("Failed to start container: %v", err)
+	}
+	defer func() {
+		if err := container.Stop(ctx); err != nil {
+			b.Errorf("Failed to stop container: %v", err)
+		}
+	}()
 	
 	b.ResetTimer()
 	

@@ -115,10 +115,8 @@ func RenderVaultConfig(addr string, logLevel string, logFormat string) (string, 
 	if addr == "" {
 		addr = VaultDefaultLocalAddr
 	}
-	if _, err := os.Stat(TLSKey); err != nil {
-	}
-	if _, err := os.Stat(TLSCrt); err != nil {
-	}
+	// TLS key and certificate files are expected to exist
+	// These will be handled by the vault configuration
 
 	params := VaultConfigParams{
 		Port:          VaultDefaultPort,

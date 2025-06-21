@@ -176,7 +176,7 @@ func (e *Emailer) Run(ctx context.Context) error {
 		case ev := <-e.fs.Events:
 			if ev.Op&(fsnotify.Write|fsnotify.Create) != 0 {
 				if err := e.consume(ctx, &pos); err != nil {
-					e.log.Logger.Warn("consume", zap.Error(err))
+					e.log.Warn("consume", zap.Error(err))
 				}
 			}
 		case err := <-e.fs.Errors:
@@ -192,8 +192,14 @@ func (e *Emailer) consume(ctx context.Context, pos *int64) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	f.Seek(*pos, io.SeekStart)
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			e.log.Warn("Failed to close log file", zap.Error(closeErr))
+		}
+	}()
+	if _, err := f.Seek(*pos, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek to position %d: %w", *pos, err)
+	}
 	sc := bufio.NewScanner(f)
 
 	for sc.Scan() {

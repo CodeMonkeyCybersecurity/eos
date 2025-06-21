@@ -417,18 +417,33 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	
 	// Interactive prompts for missing values
 	if domain == "" {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("🔤 Domain name required for mail server configuration")
 		fmt.Print("Enter domain name for mail server: ")
-		fmt.Scanln(&domain)
+		if _, err := fmt.Scanln(&domain); err != nil {
+			logger.Error("❌ Failed to read domain input", zap.Error(err))
+			return fmt.Errorf("failed to read domain: %w", err)
+		}
+		logger.Info("✅ Domain configured", zap.String("domain", domain))
 	}
 	
 	serverName := "hecate-mail"
 	if useCloud {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("🔤 Server name configuration for cloud deployment")
 		fmt.Printf("Enter server name [%s]: ", serverName)
 		var input string
-		fmt.Scanln(&input)
+		if _, err := fmt.Scanln(&input); err != nil {
+			// Empty input is acceptable (use default), but actual read errors should be handled
+			if err.Error() != "unexpected newline" {
+				logger.Error("❌ Failed to read server name input", zap.Error(err))
+				return fmt.Errorf("failed to read server name: %w", err)
+			}
+		}
 		if input != "" {
 			serverName = input
 		}
+		logger.Info("✅ Server name configured", zap.String("server_name", serverName))
 	}
 	
 	config := HecateConfig{
@@ -481,7 +496,10 @@ location = "%s"`, serverType, location)
 			content, err := os.ReadFile(file)
 			if err == nil {
 				destPath := filepath.Join(outputDir, file)
-				os.WriteFile(destPath, content, 0644)
+				if err := os.WriteFile(destPath, content, 0644); err != nil {
+					logger.Error("Failed to write configuration file", zap.String("file", file), zap.Error(err))
+					return fmt.Errorf("failed to copy %s: %w", file, err)
+				}
 				logger.Info("Copied configuration file", zap.String("file", file))
 			}
 		}

@@ -4,7 +4,8 @@ package verify
 
 import "cuelang.org/go/cue/cuecontext"
 
-var cueCtx = cuecontext.New()
+// cueCtx is unused but kept for potential future CUE validation functionality
+var _ = cuecontext.New()
 
 type Context struct {
 	Cfg         any

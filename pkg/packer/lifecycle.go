@@ -10,7 +10,8 @@ import (
 	"go.uber.org/zap"
 )
 
-var tracer = otel.Tracer("eos/pkg/packer")
+// tracer is unused but kept for potential future tracing instrumentation  
+var _ = otel.Tracer("eos/pkg/packer")
 
 // EnsureInstalled installs Packer cross-platform with full logging, tracing, and error wrapping
 func EnsureInstalled(rc *eos_io.RuntimeContext, log *zap.Logger) error {

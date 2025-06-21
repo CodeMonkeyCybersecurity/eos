@@ -29,7 +29,11 @@ func ExampleUsage() {
 	if err := container.Start(ctx); err != nil {
 		logger.Fatal("Failed to start container", zap.Error(err))
 	}
-	defer container.Stop(ctx)
+	defer func() {
+		if err := container.Stop(ctx); err != nil {
+			logger.Error("Failed to stop container", zap.Error(err))
+		}
+	}()
 
 	// Use services with type safety
 	infraService, err := GetTyped[*EnhancedInfrastructureService](container, "infraService")
@@ -165,7 +169,11 @@ func AfterMigration() {
 	if err := container.Start(ctx); err != nil {
 		logger.Fatal("Failed to start container", zap.Error(err))
 	}
-	defer container.Stop(ctx)
+	defer func() {
+		if err := container.Stop(ctx); err != nil {
+			logger.Error("Failed to stop container", zap.Error(err))
+		}
+	}()
 
 	// Get service with type safety
 	service, err := GetTyped[*EnhancedInfrastructureService](container, "infraService")
@@ -214,7 +222,11 @@ func CommandLayerMigration() {
 	if err := appContainer.Start(ctx); err != nil {
 		logger.Fatal("Failed to start application", zap.Error(err))
 	}
-	defer appContainer.Stop(ctx)
+	defer func() {
+		if err := appContainer.Stop(ctx); err != nil {
+			logger.Error("Failed to stop application", zap.Error(err))
+		}
+	}()
 
 	// Example command handler
 	createServerCommand := func(serverName, serverType string) error {

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -65,8 +66,14 @@ func consume(ctx context.Context, path string, pos *int64, log *zap.Logger, stor
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	f.Seek(*pos, io.SeekStart)
+	defer func() {
+		if closeErr := f.Close(); closeErr != nil {
+			log.Warn("Failed to close log file", zap.Error(closeErr))
+		}
+	}()
+	if _, err := f.Seek(*pos, io.SeekStart); err != nil {
+		return fmt.Errorf("failed to seek to position %d: %w", *pos, err)
+	}
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		line := sc.Text()

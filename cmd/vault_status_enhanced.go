@@ -13,8 +13,10 @@ import (
 	vaultpkg "github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
-// vaultStatusEnhancedCmd demonstrates using enhanced vault container for status operations
-var vaultStatusEnhancedCmd = &cobra.Command{
+// _vaultStatusEnhancedCmd demonstrates using enhanced vault container for status operations
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+var _vaultStatusEnhancedCmd = &cobra.Command{
 	Use:   "vault-status-enhanced",
 	Short: "Get vault status using enhanced container pattern",
 	Long: `Demonstrates the new clean architecture pattern for vault operations.
@@ -25,10 +27,13 @@ This command uses:
 - Infrastructure abstractions for vault operations
 - Proper error handling and logging
 - Graceful fallback when vault is unavailable`,
-	RunE: eos_cli.Wrap(vaultStatusEnhanced),
+	RunE: eos_cli.Wrap(_vaultStatusEnhanced),
 }
 
-func vaultStatusEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+// _vaultStatusEnhanced demonstrates enhanced vault status checking
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _vaultStatusEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := rc.Log.Named("vault.status.enhanced")
 	
 	logger.Info("🚀 Starting enhanced vault status check")
@@ -56,13 +61,13 @@ func vaultStatusEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	logger.Info("✅ Enhanced vault container started successfully")
 	
 	// Perform comprehensive status check
-	if err := performStatusChecks(rc, vaultContainer, logger); err != nil {
+	if err := _performStatusChecks(rc, vaultContainer, logger); err != nil {
 		// Log error but don't fail - status checks should be informational
 		logger.Error("⚠️ Status checks encountered issues", zap.Error(err))
 	}
 	
 	// Demonstrate various vault operations
-	if err := demonstrateVaultOperations(rc, vaultContainer, logger); err != nil {
+	if err := _demonstrateVaultOperations(rc, vaultContainer, logger); err != nil {
 		logger.Error("❌ Vault operations demonstration failed", zap.Error(err))
 		return err
 	}
@@ -71,8 +76,10 @@ func vaultStatusEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	return nil
 }
 
-// performStatusChecks demonstrates status checking using domain services
-func performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
+// _performStatusChecks demonstrates status checking using domain services
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
 	logger.Info("🔍 Performing comprehensive status checks")
 	
 	// Check container health
@@ -118,8 +125,10 @@ func performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.Enhanced
 	return nil
 }
 
-// demonstrateVaultOperations shows various vault operations using clean architecture
-func demonstrateVaultOperations(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
+// _demonstrateVaultOperations shows various vault operations using clean architecture
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
 	logger.Info("🔧 Demonstrating vault operations with clean architecture")
 	
 	// Get services from container

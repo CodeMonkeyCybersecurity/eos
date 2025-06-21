@@ -121,7 +121,12 @@ func getNextVMID(rc *eos_io.RuntimeContext) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("cannot open ID file: %w", err)
 	}
-	defer fd.Close()
+	defer func() {
+		if cerr := fd.Close(); cerr != nil {
+			logger := otelzap.Ctx(rc.Ctx)
+			logger.Error("failed to close vmid file", zap.String("path", VmBaseIDFile), zap.Error(cerr))
+		}
+	}()
 
 	// Apply exclusive lock (blocks until available)
 	if err := unix.Flock(int(fd.Fd()), unix.LOCK_EX); err != nil {

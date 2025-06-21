@@ -132,16 +132,24 @@ func (s *IntegrationTestSuite) setTestEnvironment() {
 	originalValues := make(map[string]string)
 	for key, value := range envVars {
 		originalValues[key] = os.Getenv(key)
-		os.Setenv(key, value)
+		if err := os.Setenv(key, value); err != nil {
+			s.t.Fatalf("Failed to set environment variable %s: %v", key, err)
+		}
 	}
 
 	// Register cleanup to restore original environment
 	s.AddCleanup(func() {
 		for key, originalValue := range originalValues {
 			if originalValue == "" {
-				os.Unsetenv(key)
+				if err := os.Unsetenv(key); err != nil {
+					// Log the error but don't fail cleanup
+					s.t.Logf("Failed to unset environment variable %s: %v", key, err)
+				}
 			} else {
-				os.Setenv(key, originalValue)
+				if err := os.Setenv(key, originalValue); err != nil {
+					// Log the error but don't fail cleanup
+					s.t.Logf("Failed to restore environment variable %s: %v", key, err)
+				}
 			}
 		}
 	})

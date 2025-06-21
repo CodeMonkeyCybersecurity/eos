@@ -4,6 +4,7 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -15,7 +16,11 @@ import (
 // TestMain initializes telemetry for all tests in this package
 func TestMain(m *testing.M) {
 	// Initialize telemetry to prevent nil pointer dereference in tests
-	telemetry.Init("test")
+	if err := telemetry.Init("test"); err != nil {
+		// Log to stderr as telemetry is not available
+		fmt.Fprintf(os.Stderr, "Failed to initialize telemetry: %v\n", err)
+		os.Exit(1)
+	}
 	
 	// Run tests
 	code := m.Run()
@@ -189,7 +194,7 @@ func TestDockerFunctionSignatures(t *testing.T) {
 
 	// Test error handling with nil context (should panic or handle gracefully)
 	assert.Panics(t, func() {
-		RunDockerAction(nil, "version")
+		_ = RunDockerAction(nil, "version")
 	})
 }
 

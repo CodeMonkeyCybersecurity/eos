@@ -26,7 +26,12 @@ func (c *DNSClient) GetZones(rc *eos_io.RuntimeContext) ([]DNSZone, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /zones")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("unexpected status %d", resp.StatusCode)
@@ -55,7 +60,12 @@ func (c *DNSClient) CreateZone(rc *eos_io.RuntimeContext, zone DNSZone) (*DNSZon
 	if err != nil {
 		return nil, errors.Wrap(err, "executing POST /zones")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
 		raw, _ := io.ReadAll(resp.Body)
@@ -84,7 +94,12 @@ func (c *DNSClient) GetZone(rc *eos_io.RuntimeContext, zoneID string) (*DNSZone,
 	if err != nil {
 		return nil, errors.Wrap(err, "executing GET /zones/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("get zone failed (%d)", resp.StatusCode)
@@ -114,7 +129,12 @@ func (c *DNSClient) UpdateZone(rc *eos_io.RuntimeContext, zoneID string, updated
 	if err != nil {
 		return nil, errors.Wrap(err, "executing PUT /zones/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
@@ -143,7 +163,12 @@ func (c *DNSClient) DeleteZone(rc *eos_io.RuntimeContext, zoneID string) error {
 	if err != nil {
 		return errors.Wrap(err, "executing DELETE /zones/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
@@ -169,7 +194,12 @@ func (c *DNSClient) ImportZoneFilePlain(rc *eos_io.RuntimeContext, zoneID string
 	if err != nil {
 		return errors.Wrap(err, "executing POST /zones/{id}/import")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
@@ -193,7 +223,12 @@ func (c *DNSClient) ExportZoneFile(rc *eos_io.RuntimeContext, zoneID string) (st
 	if err != nil {
 		return "", errors.Wrap(err, "executing GET /zones/{id}/export")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", errors.Errorf("export failed (%d)", resp.StatusCode)
@@ -223,7 +258,12 @@ func (c *DNSClient) ValidateZoneFile(rc *eos_io.RuntimeContext, zoneFile string)
 	if err != nil {
 		return errors.Wrap(err, "executing POST /zones/file/validate")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)

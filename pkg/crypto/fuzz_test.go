@@ -119,12 +119,12 @@ func TestGeneratePassword(t *testing.T) {
 
 func TestValidateStrongPassword(t *testing.T) {
 	valid := "Astrong!Pass123"
-	if err := ValidateStrongPassword(nil, valid); err != nil {
+	if err := ValidateStrongPassword(context.Background(), valid); err != nil {
 		t.Errorf("ValidateStrongPassword rejected valid password: %v", err)
 	}
 
 	invalid := "weakpass"
-	if err := ValidateStrongPassword(nil, invalid); err == nil {
+	if err := ValidateStrongPassword(context.Background(), invalid); err == nil {
 		t.Error("ValidateStrongPassword accepted weak password, expected error")
 	}
 }

@@ -15,8 +15,10 @@ import (
 	vaultpkg "github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 )
 
-// vaultEnhancedCmd demonstrates the enhanced vault container usage
-var vaultEnhancedCmd = &cobra.Command{
+// _vaultEnhancedCmd demonstrates the enhanced vault container usage
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+var _vaultEnhancedCmd = &cobra.Command{
 	Use:   "vault-enhanced",
 	Short: "Example command using enhanced vault container",
 	Long: `Demonstrates how to use the enhanced vault container with:
@@ -25,12 +27,14 @@ var vaultEnhancedCmd = &cobra.Command{
 - Graceful error handling
 - Structured logging`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return eos_cli.Wrap(vaultEnhancedExample)(cmd, args)
+		return eos_cli.Wrap(_vaultEnhancedExample)(cmd, args)
 	},
 }
 
-// vaultEnhancedExample shows enhanced vault container usage patterns
-func vaultEnhancedExample(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+// _vaultEnhancedExample shows enhanced vault container usage patterns
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _vaultEnhancedExample(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := rc.Log.Named("vault.enhanced.example")
 
 	logger.Info("🚀 Starting enhanced vault container example")
@@ -80,19 +84,19 @@ func vaultEnhancedExample(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	}
 
 	// Example 1: Test secret operations with timeout
-	if err := demonstrateSecretOperations(rc, secretStore, logger); err != nil {
+	if err := _demonstrateSecretOperations(rc, secretStore, logger); err != nil {
 		logger.Error("❌ Secret operations demonstration failed", zap.Error(err))
 		return err
 	}
 
 	// Example 2: Show service-level operations
-	if err := demonstrateServiceOperations(rc, vaultService, logger); err != nil {
+	if err := _demonstrateServiceOperations(rc, vaultService, logger); err != nil {
 		logger.Error("❌ Service operations demonstration failed", zap.Error(err))
 		return err
 	}
 
 	// Example 3: Demonstrate error handling and fallback
-	if err := demonstrateErrorHandling(rc, secretStore, logger); err != nil {
+	if err := _demonstrateErrorHandling(rc, secretStore, logger); err != nil {
 		logger.Error("❌ Error handling demonstration failed", zap.Error(err))
 		return err
 	}
@@ -101,8 +105,10 @@ func vaultEnhancedExample(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 	return nil
 }
 
-// demonstrateSecretOperations shows secret store operations with proper error handling
-func demonstrateSecretOperations(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
+// _demonstrateSecretOperations shows secret store operations with proper error handling
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _demonstrateSecretOperations(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
 	logger.Info("🔐 Demonstrating secret operations")
 
 	// Create context with timeout for operations
@@ -163,8 +169,10 @@ func demonstrateSecretOperations(rc *eos_io.RuntimeContext, secretStore vault.Se
 	return nil
 }
 
-// demonstrateServiceOperations shows domain service level operations
-func demonstrateServiceOperations(_ *eos_io.RuntimeContext, vaultService *vault.Service, logger *zap.Logger) error {
+// _demonstrateServiceOperations shows domain service level operations
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _demonstrateServiceOperations(_ *eos_io.RuntimeContext, vaultService *vault.Service, logger *zap.Logger) error {
 	logger.Info("🏗️ Demonstrating service-level operations")
 
 	if vaultService == nil {
@@ -182,8 +190,10 @@ func demonstrateServiceOperations(_ *eos_io.RuntimeContext, vaultService *vault.
 	return nil
 }
 
-// demonstrateErrorHandling shows proper error handling patterns
-func demonstrateErrorHandling(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
+// _demonstrateErrorHandling shows proper error handling patterns
+// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//nolint:unused
+func _demonstrateErrorHandling(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
 	logger.Info("🚨 Demonstrating error handling and fallback behavior")
 
 	// Create context with very short timeout to trigger timeout errors
@@ -248,7 +258,11 @@ func MigrateExistingVaultCommand() {
 		if err := vaultContainer.Start(); err != nil {
 			return fmt.Errorf("failed to start vault container: %w", err)
 		}
-		defer vaultContainer.Stop()
+		defer func() {
+			if err := vaultContainer.Stop(); err != nil {
+				rc.Log.Named("vault.enhanced.example").Error("Failed to stop vault container", zap.Error(err))
+			}
+		}()
 
 		// Get services with type safety
 		vaultService, err := vaultContainer.GetVaultService()

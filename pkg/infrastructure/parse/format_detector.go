@@ -129,8 +129,8 @@ func (f *FormatDetectorImpl) detectJSON(input string) float64 {
 	input = strings.TrimSpace(input)
 	
 	// Quick structural checks
-	if !(strings.HasPrefix(input, "{") && strings.HasSuffix(input, "}")) &&
-		!(strings.HasPrefix(input, "[") && strings.HasSuffix(input, "]")) {
+	if (!strings.HasPrefix(input, "{") || !strings.HasSuffix(input, "}")) &&
+		(!strings.HasPrefix(input, "[") || !strings.HasSuffix(input, "]")) {
 		return 0.0
 	}
 	

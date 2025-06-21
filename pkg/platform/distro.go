@@ -31,7 +31,11 @@ func DetectLinuxDistro(rc *eos_io.RuntimeContext) string {
 		otelzap.Ctx(rc.Ctx).Warn("Failed to open /etc/os-release", zap.Error(err))
 		return "unknown"
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			otelzap.Ctx(rc.Ctx).Warn("Failed to close /etc/os-release", zap.Error(err))
+		}
+	}()
 
 	var distroID string
 	scanner := bufio.NewScanner(file)

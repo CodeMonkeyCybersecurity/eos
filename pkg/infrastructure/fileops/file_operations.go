@@ -73,7 +73,11 @@ func (f *FileSystemOperations) CopyFile(ctx context.Context, src, dst string, pe
 		)
 		return fmt.Errorf("failed to open source file %s: %w", src, err)
 	}
-	defer srcFile.Close()
+	defer func() {
+		if cerr := srcFile.Close(); cerr != nil {
+			f.logger.Error("failed to close source file", zap.String("src", src), zap.Error(cerr))
+		}
+	}()
 
 	// Get source file info
 	srcInfo, err := srcFile.Stat()
@@ -95,7 +99,11 @@ func (f *FileSystemOperations) CopyFile(ctx context.Context, src, dst string, pe
 		)
 		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 	}
-	defer dstFile.Close()
+	defer func() {
+		if cerr := dstFile.Close(); cerr != nil {
+			f.logger.Error("failed to close destination file", zap.String("dst", dst), zap.Error(cerr))
+		}
+	}()
 
 	// Copy contents
 	written, err := io.Copy(dstFile, srcFile)

@@ -439,8 +439,14 @@ func auditVaultInitAccess(rc *eos_io.RuntimeContext, audit *AccessAuditInfo) {
 		
 		f, err := os.OpenFile(auditFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0640)
 		if err == nil {
-			f.WriteString(auditEntry)
-			f.Close()
+			if _, err := f.WriteString(auditEntry); err != nil {
+				// Log silently as this is audit logging and shouldn't fail the main operation
+				_ = err
+			}
+			if err := f.Close(); err != nil {
+				// Log silently as well
+				_ = err
+			}
 		}
 	}
 }

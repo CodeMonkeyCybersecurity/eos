@@ -108,6 +108,7 @@ func TestCompositeSecretStore_Get_PrimarySuccess(t *testing.T) {
 	}
 	if result == nil {
 		t.Errorf("expected secret but got nil")
+		return
 	}
 	if result.Value != "test-value" {
 		t.Errorf("expected value 'test-value' but got '%s'", result.Value)
@@ -145,6 +146,7 @@ func TestCompositeSecretStore_Get_FallbackSuccess(t *testing.T) {
 	}
 	if result == nil {
 		t.Errorf("expected secret but got nil")
+		return
 	}
 	if result.Value != "fallback-value" {
 		t.Errorf("expected value 'fallback-value' but got '%s'", result.Value)

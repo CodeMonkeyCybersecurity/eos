@@ -29,7 +29,12 @@ func (c *DNSClient) GetAllPrimaryServers(rc *eos_io.RuntimeContext, zoneID strin
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /primary_servers")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("unexpected status %d", resp.StatusCode)
@@ -63,7 +68,12 @@ func (c *DNSClient) CreatePrimaryServer(rc *eos_io.RuntimeContext, zoneID, addre
 	if err != nil {
 		return nil, errors.Wrap(err, "performing POST /primary_servers")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusCreated {
 		raw, _ := io.ReadAll(resp.Body)
@@ -92,7 +102,12 @@ func (c *DNSClient) GetPrimaryServer(rc *eos_io.RuntimeContext, id string) (*Pri
 	if err != nil {
 		return nil, errors.Wrap(err, "performing GET /primary_servers/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("unexpected status %d", resp.StatusCode)
@@ -126,7 +141,12 @@ func (c *DNSClient) UpdatePrimaryServer(rc *eos_io.RuntimeContext, id, zoneID, a
 	if err != nil {
 		return nil, errors.Wrap(err, "performing PUT /primary_servers/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
@@ -153,7 +173,12 @@ func (c *DNSClient) DeletePrimaryServer(rc *eos_io.RuntimeContext, id string) er
 	if err != nil {
 		return errors.Wrap(err, "performing DELETE /primary_servers/{id}")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)

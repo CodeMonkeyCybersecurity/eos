@@ -26,7 +26,9 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
 		log.Info("🧹 Clearing existing VAULT_TOKEN environment variable for fresh setup")
-		os.Unsetenv("VAULT_TOKEN")
+		if err := os.Unsetenv("VAULT_TOKEN"); err != nil {
+			log.Warn("Failed to unset VAULT_TOKEN", zap.Error(err))
+		}
 		log.Info("✅ VAULT_TOKEN cleared successfully")
 	} else {
 		log.Info("✅ No existing VAULT_TOKEN found - proceeding with fresh setup")

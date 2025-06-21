@@ -11,7 +11,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/go-playground/validator/v10"
-	"github.com/open-policy-agent/opa/rego"
+	"github.com/open-policy-agent/opa/v1/rego"
 	"go.uber.org/zap"
 )
 
@@ -51,7 +51,11 @@ func ExecCommandInContainer(rc *eos_io.RuntimeContext, cfg ExecConfig) (string, 
 	if err != nil {
 		return "", errors.Wrap(err, "creating docker client")
 	}
-	defer cli.Close()
+	defer func() {
+		if cerr := cli.Close(); cerr != nil {
+			zap.L().Error("failed to close docker client", zap.Error(cerr))
+		}
+	}()
 
 	// 6) Create exec instance
 	execResp, err := cli.ContainerExecCreate(rc.Ctx, cfg.ContainerName, container.ExecOptions{

@@ -192,7 +192,7 @@ func TestEosIntegration_ErrorHandlingFlow(t *testing.T) {
 					wrappedErr := fmt.Errorf("command failed: %w", userErr)
 					
 					// Test error handling
-					var finalErr error = wrappedErr
+					var finalErr = wrappedErr
 					rc.HandlePanic(&finalErr)
 					
 					return nil // Success if no panic

@@ -55,7 +55,7 @@ This is the preferred method for managing Hecate containers.`,
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate"); os.IsNotExist(err) {
 			logger.Error("Hecate installation not found")
-			return fmt.Errorf("Hecate not installed - run 'eos create hecate' first")
+			return fmt.Errorf("hecate not installed - run 'eos create hecate' first")
 		}
 
 		// Check if k3s is running
@@ -98,7 +98,7 @@ var runCertsCmd = &cobra.Command{
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate"); os.IsNotExist(err) {
 			logger.Error("Hecate installation not found")
-			return fmt.Errorf("Hecate not installed - run 'eos create hecate' first")
+			return fmt.Errorf("hecate not installed - run 'eos create hecate' first")
 		}
 
 		// Try k3s first (preferred method)
@@ -142,7 +142,7 @@ var runEosCmd = &cobra.Command{
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate/docker-compose.yml"); os.IsNotExist(err) {
 			logger.Error("Hecate installation not found")
-			return fmt.Errorf("Hecate not installed - run 'eos create hecate' first")
+			return fmt.Errorf("hecate not installed - run 'eos create hecate' first")
 		}
 
 		logger.Info("🔄 Pulling latest container images")
@@ -179,7 +179,7 @@ var runHttpCmd = &cobra.Command{
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate/docker-compose.yml"); os.IsNotExist(err) {
 			logger.Error("Hecate installation not found")
-			return fmt.Errorf("Hecate not installed - run 'eos create hecate' first")
+			return fmt.Errorf("hecate not installed - run 'eos create hecate' first")
 		}
 
 		logger.Info("🔄 Reloading Caddy configuration")

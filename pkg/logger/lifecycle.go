@@ -93,7 +93,10 @@ func TryWritablePath(paths []string) (string, error) {
 			continue
 		}
 		if file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600); err == nil {
-			file.Close()
+			if err := file.Close(); err != nil {
+				// Continue to next path if we can't close the file
+				continue
+			}
 			return path, nil
 		}
 	}

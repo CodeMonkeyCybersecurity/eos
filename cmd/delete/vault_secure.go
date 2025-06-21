@@ -45,7 +45,7 @@ var DeleteVaultSecureCmd = &cobra.Command{
 		distro := platform.DetectLinuxDistro(rc)
 		osPlatform := platform.GetOSPlatform()
 		if osPlatform != "linux" {
-			return fmt.Errorf("Vault uninstallation only supported on Linux")
+			return fmt.Errorf("vault uninstallation only supported on Linux")
 		}
 
 		// Phase 1: Stop and disable services

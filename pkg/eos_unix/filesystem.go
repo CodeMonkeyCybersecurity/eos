@@ -132,7 +132,12 @@ func CopyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
 	if err != nil {
 		return cerr.Wrapf(err, "open %s", src)
 	}
-	defer in.Close()
+	defer func() {
+		if cerr := in.Close(); cerr != nil {
+			logger := otelzap.Ctx(ctx)
+			logger.Error("failed to close source file", zap.String("file", src), zap.Error(cerr))
+		}
+	}()
 
 	if err := MkdirP(ctx, filepath.Dir(dst), 0o755); err != nil {
 		return cerr.Wrapf(err, "ensure dir for %s", dst)
@@ -142,7 +147,12 @@ func CopyFile(ctx context.Context, src, dst string, perm os.FileMode) error {
 	if err != nil {
 		return cerr.Wrapf(err, "create %s", dst)
 	}
-	defer out.Close()
+	defer func() {
+		if cerr := out.Close(); cerr != nil {
+			logger := otelzap.Ctx(ctx)
+			logger.Error("failed to close destination file", zap.String("file", dst), zap.Error(cerr))
+		}
+	}()
 
 	if _, err := io.Copy(out, in); err != nil {
 		return cerr.Wrapf(err, "copy %s→%s", src, dst)

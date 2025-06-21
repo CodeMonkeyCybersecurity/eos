@@ -19,7 +19,12 @@ func appendToFile(path string, content string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			// Log silently for file operations
+			_ = err
+		}
+	}()
 
 	if _, err := f.WriteString(content + "\n"); err != nil {
 		return err

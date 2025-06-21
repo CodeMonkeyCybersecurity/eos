@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
@@ -68,7 +69,9 @@ func TestIntegrationPatterns_MockServices(t *testing.T) {
 		Name:        "vault_mock_pattern_test",
 		Description: "Test vault mock service pattern",
 		Setup: func(s *testutil.IntegrationTestSuite) {
-			vaultPattern.Setup(s)
+			if err := vaultPattern.Setup(s); err != nil {
+				panic(fmt.Sprintf("Failed to setup vault pattern: %v", err))
+			}
 		},
 		Steps: []testutil.TestStep{
 			{
@@ -101,7 +104,9 @@ func TestIntegrationPatterns_FileSystem(t *testing.T) {
 		Name:        "filesystem_pattern_test",
 		Description: "Test file system operation patterns",
 		Setup: func(s *testutil.IntegrationTestSuite) {
-			fsPattern.Setup(s)
+			if err := fsPattern.Setup(s); err != nil {
+				panic(fmt.Sprintf("Failed to setup filesystem pattern: %v", err))
+			}
 		},
 		Steps: []testutil.TestStep{
 			{

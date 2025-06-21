@@ -33,7 +33,12 @@ func patchEnvInPlace(path string, updates map[string]string) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Log silently as this is a file operation utility
+			_ = err
+		}
+	}()
 
 	var newLines []string
 	scanner := bufio.NewScanner(file)

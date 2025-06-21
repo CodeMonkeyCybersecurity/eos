@@ -76,7 +76,12 @@ func EnsureOpensearchRoleMapping(rc *eos_io.RuntimeContext, spec TenantSpec) err
 	if err != nil {
 		return fmt.Errorf("role mapping request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status from OpenSearch: %s", resp.Status)
@@ -114,7 +119,12 @@ func EnsureOpensearchTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err != nil {
 		return fmt.Errorf("failed to make tenant creation request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status creating tenant: %s", resp.Status)
@@ -158,7 +168,12 @@ func EnsureWazuhGroup(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err != nil {
 		return fmt.Errorf("wazuh group creation request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status from Wazuh API: %s", resp.Status)
@@ -205,7 +220,12 @@ func EnsureWazuhEnrollmentKey(rc *eos_io.RuntimeContext, spec TenantSpec) error 
 	if err != nil {
 		return fmt.Errorf("enrollment request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status creating enrollment key: %s", resp.Status)
@@ -255,7 +275,12 @@ func EnsureWazuhPolicy(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err != nil {
 		return fmt.Errorf("wazuh policy creation request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status from Wazuh policy API: %s", resp.Status)
@@ -324,7 +349,12 @@ func EnsureOpensearchRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err != nil {
 		return fmt.Errorf("failed to send role creation request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected response: %s", resp.Status)
@@ -371,7 +401,12 @@ func EnsureGlobalReadonlyRole(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create global role: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected response from OpenSearch: %s", resp.Status)
@@ -395,7 +430,12 @@ func ResolveWazuhRoleID(rc *eos_io.RuntimeContext, name string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch roles: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	var result struct {
 		Data []struct {
@@ -433,7 +473,12 @@ func ResolveWazuhUserID(rc *eos_io.RuntimeContext, name string) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Wazuh users: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	var result struct {
 		Data []struct {
@@ -471,7 +516,12 @@ func ResolveWazuhPolicyID(rc *eos_io.RuntimeContext, name string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch Wazuh policies: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	var result struct {
 		Data []struct {
@@ -527,7 +577,12 @@ func AttachPolicyToRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err != nil {
 		return fmt.Errorf("attach policy request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status attaching policy: %s", resp.Status)
@@ -576,7 +631,12 @@ func AssignRoleToUser(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	if err != nil {
 		return fmt.Errorf("assign role to user request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			// Log silently for HTTP response cleanup
+			_ = err
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("unexpected status assigning role to user: %s", resp.Status)

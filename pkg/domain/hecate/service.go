@@ -324,7 +324,11 @@ func (s *HecateService) UpdateReverseProxyWithValidation(ctx context.Context, us
 			Severity: EventSeverityInfo,
 		}
 		
-		s.eventBus.PublishAsync(ctx, event)
+		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
+			s.logger.Warn("Failed to publish proxy update event", 
+				zap.Error(err),
+				zap.String("deployment_id", deploymentID))
+		}
 	}
 
 	s.auditDeploymentOperation(ctx, userID, "proxy.update", deploymentID, start, nil)
@@ -459,7 +463,11 @@ func (s *HecateService) DeployStackWithOrchestration(ctx context.Context, userID
 			Severity: EventSeverityInfo,
 		}
 		
-		s.eventBus.PublishAsync(ctx, event)
+		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
+			s.logger.Warn("Failed to publish stack deploy event", 
+				zap.Error(err),
+				zap.String("stack_id", deployment.ID))
+		}
 	}
 
 	s.auditStackOperation(ctx, userID, "stack.deploy", spec.Name, start, nil)
@@ -531,7 +539,11 @@ func (s *HecateService) RequestCertificateWithValidation(ctx context.Context, us
 			Severity: EventSeverityInfo,
 		}
 		
-		s.eventBus.PublishAsync(ctx, event)
+		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
+			s.logger.Warn("Failed to publish certificate request event", 
+				zap.Error(err),
+				zap.String("certificate_id", certificate.ID))
+		}
 	}
 
 	s.auditCertificateOperation(ctx, userID, "certificate.request", spec.CommonName, start, nil)

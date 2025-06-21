@@ -50,18 +50,33 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 	
 	// Interactive prompts for missing values
 	if domain == "" {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("🔤 Primary domain required for cluster configuration")
 		fmt.Print("Enter primary domain for the cluster: ")
-		fmt.Scanln(&domain)
+		if _, err := fmt.Scanln(&domain); err != nil {
+			logger.Error("❌ Failed to read domain input", zap.Error(err))
+			return fmt.Errorf("failed to read domain: %w", err)
+		}
+		logger.Info("✅ Domain configured", zap.String("domain", domain))
 	}
 	
 	if clusterName == "" {
+		logger := otelzap.Ctx(rc.Ctx)
 		clusterName = "k3s-cluster"
+		logger.Info("🔤 Cluster name configuration")
 		fmt.Printf("Enter cluster name [%s]: ", clusterName)
 		var input string
-		fmt.Scanln(&input)
+		if _, err := fmt.Scanln(&input); err != nil {
+			// Empty input is acceptable (use default), but actual read errors should be handled
+			if err.Error() != "unexpected newline" {
+				logger.Error("❌ Failed to read cluster name input", zap.Error(err))
+				return fmt.Errorf("failed to read cluster name: %w", err)
+			}
+		}
 		if input != "" {
 			clusterName = input
 		}
+		logger.Info("✅ Cluster name configured", zap.String("cluster_name", clusterName))
 	}
 	
 	// Configure mail ports

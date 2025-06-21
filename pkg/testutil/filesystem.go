@@ -79,12 +79,18 @@ func AssertFileContent(t *testing.T, path, expected string) {
 func WithEnvVar(t *testing.T, key, value string) func() {
 	t.Helper()
 	original := os.Getenv(key)
-	os.Setenv(key, value)
+	if err := os.Setenv(key, value); err != nil {
+		t.Fatalf("Failed to set environment variable %s: %v", key, err)
+	}
 	return func() {
 		if original == "" {
-			os.Unsetenv(key)
+			if err := os.Unsetenv(key); err != nil {
+				t.Logf("Failed to unset environment variable %s: %v", key, err)
+			}
 		} else {
-			os.Setenv(key, original)
+			if err := os.Setenv(key, original); err != nil {
+				t.Logf("Failed to restore environment variable %s: %v", key, err)
+			}
 		}
 	}
 }
@@ -93,10 +99,14 @@ func WithEnvVar(t *testing.T, key, value string) func() {
 func WithoutEnvVar(t *testing.T, key string) func() {
 	t.Helper()
 	original := os.Getenv(key)
-	os.Unsetenv(key)
+	if err := os.Unsetenv(key); err != nil {
+		t.Fatalf("Failed to unset environment variable %s: %v", key, err)
+	}
 	return func() {
 		if original != "" {
-			os.Setenv(key, original)
+			if err := os.Setenv(key, original); err != nil {
+				t.Logf("Failed to restore environment variable %s: %v", key, err)
+			}
 		}
 	}
 }

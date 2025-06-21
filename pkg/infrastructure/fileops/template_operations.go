@@ -145,7 +145,11 @@ func (t *TemplateOperationsImpl) ProcessTemplate(ctx context.Context, templatePa
 	if err != nil {
 		return fmt.Errorf("failed to create output file %s: %w", outputPath, err)
 	}
-	defer file.Close()
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			t.logger.Error("failed to close template output file", zap.String("outputPath", outputPath), zap.Error(cerr))
+		}
+	}()
 
 	// Execute template
 	if err := tmpl.Execute(file, data); err != nil {

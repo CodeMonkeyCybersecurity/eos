@@ -23,7 +23,11 @@ func ProvisionKickstartTenantVM(rc *eos_io.RuntimeContext, vmName, pubKeyPath st
 	if err != nil {
 		return fmt.Errorf("failed to generate kickstart: %w", err)
 	}
-	defer os.Remove(ksPath)
+	defer func() {
+		if err := os.Remove(ksPath); err != nil {
+			log.Warn("Failed to remove kickstart file", zap.String("path", ksPath), zap.Error(err))
+		}
+	}()
 	log.Info("🟡 Kickstart file generated", zap.String("path", ksPath))
 
 	if err := virtInstall(zap.L(), vmName, ksPath, diskPath); err != nil {

@@ -117,7 +117,12 @@ func writeAgentHCL(rc *eos_io.RuntimeContext, addr, roleID, secretID string) err
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			// Log silently as this is a file write operation
+			_ = err
+		}
+	}()
 
 	if err := agentHCLTpl.Execute(f, data); err != nil {
 		return err
@@ -140,7 +145,12 @@ func writeAgentUnit() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			// Log silently as this is a file write operation
+			_ = err
+		}
+	}()
 
 	if err := agentServiceTpl.Execute(f, data); err != nil {
 		return err

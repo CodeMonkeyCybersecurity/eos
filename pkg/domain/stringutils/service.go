@@ -266,7 +266,7 @@ func (s *Service) ToLower(ctx context.Context, input string) (string, error) {
 func (s *Service) ToTitle(ctx context.Context, input string) (string, error) {
 	start := time.Now()
 	
-	result := strings.Title(input)
+	result := strings.ToTitle(input)
 	
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to title completed", zap.Duration("duration", time.Since(start)))

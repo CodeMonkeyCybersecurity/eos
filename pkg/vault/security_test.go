@@ -188,8 +188,14 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.caCertPath != "" {
-				os.Setenv("VAULT_CACERT", tt.caCertPath)
-				defer os.Unsetenv("VAULT_CACERT")
+				if err := os.Setenv("VAULT_CACERT", tt.caCertPath); err != nil {
+					t.Fatalf("Failed to set VAULT_CACERT: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv("VAULT_CACERT"); err != nil {
+						t.Logf("Failed to unset VAULT_CACERT: %v", err)
+					}
+				}()
 			}
 			
 			client, err := NewClient(rc)

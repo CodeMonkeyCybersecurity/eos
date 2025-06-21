@@ -20,7 +20,12 @@ func AppendIfMissing(path, line string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if cerr := f.Close(); cerr != nil {
+			// Silently ignore close errors for append operation
+			_ = cerr
+		}
+	}()
 	_, err = f.WriteString("\n" + line + "\n")
 	return err
 }

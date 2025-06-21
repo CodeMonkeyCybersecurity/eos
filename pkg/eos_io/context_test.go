@@ -132,7 +132,9 @@ func containsInner(s, substr string) bool {
 
 func TestRuntimeContext_End(t *testing.T) {
 	// Initialize telemetry to prevent nil pointer dereference
-	telemetry.Init("test")
+	if err := telemetry.Init("test"); err != nil {
+		t.Fatalf("Failed to initialize telemetry: %v", err)
+	}
 	
 	t.Run("logs_successful_completion", func(t *testing.T) {
 		ctx := context.Background()

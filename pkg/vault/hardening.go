@@ -278,7 +278,9 @@ func disableSwap(rc *eos_io.RuntimeContext) error {
 		
 		newContent := strings.Join(newLines, "\n")
 		if err := os.WriteFile(fstabPath+".eos-backup", content, 0644); err == nil {
-			os.WriteFile(fstabPath, []byte(newContent), 0644)
+			if err := os.WriteFile(fstabPath, []byte(newContent), 0644); err != nil {
+				log.Warn("Failed to update fstab file", zap.String("path", fstabPath), zap.Error(err))
+			}
 		}
 	}
 
@@ -306,8 +308,12 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/vault
 `
-		os.WriteFile(filepath.Join(vaultServiceDir, "security.conf"), []byte(overrideContent), 0644)
-		execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
+		if err := os.WriteFile(filepath.Join(vaultServiceDir, "security.conf"), []byte(overrideContent), 0644); err != nil {
+			log.Warn("Failed to write vault security override", zap.Error(err))
+		}
+		if err := execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload"); err != nil {
+			log.Warn("Failed to reload systemd", zap.Error(err))
+		}
 	}
 
 	// Configure system-wide core dump limits
@@ -317,7 +323,9 @@ ReadWritePaths=/opt/vault
 vault hard core 0
 vault soft core 0
 `
-	os.WriteFile("/etc/security/limits.d/vault-hardening.conf", []byte(limitsContent), 0644)
+	if err := os.WriteFile("/etc/security/limits.d/vault-hardening.conf", []byte(limitsContent), 0644); err != nil {
+		log.Warn("Failed to write vault hardening limits", zap.Error(err))
+	}
 
 	log.Info("✅ Core dumps disabled successfully")
 	return nil
@@ -461,7 +469,9 @@ func hardenSSH(rc *eos_io.RuntimeContext) error {
 	// Test SSH config
 	if err := execute.RunSimple(rc.Ctx, "sshd", "-t"); err != nil {
 		log.Warn("⚠️ SSH config test failed, restoring backup", zap.Error(err))
-		execute.RunSimple(rc.Ctx, "cp", sshConfigPath+".eos-backup", sshConfigPath)
+		if err := execute.RunSimple(rc.Ctx, "cp", sshConfigPath+".eos-backup", sshConfigPath); err != nil {
+			log.Error("Failed to restore SSH config backup", zap.Error(err))
+		}
 		return fmt.Errorf("SSH config test failed: %w", err)
 	}
 
@@ -480,7 +490,9 @@ func enableComprehensiveAuditLogging(rc *eos_io.RuntimeContext, client *api.Clie
 	}
 
 	// Change ownership to vault user
-	execute.RunSimple(rc.Ctx, "chown", "vault:vault", auditDir)
+	if err := execute.RunSimple(rc.Ctx, "chown", "vault:vault", auditDir); err != nil {
+		log.Warn("Failed to set audit directory ownership", zap.Error(err))
+	}
 
 	// Enable file audit backend
 	auditOptions := &api.EnableAuditOptions{
@@ -671,13 +683,23 @@ ExecStart=/usr/local/bin/vault-backup.sh
 Environment=VAULT_ADDR=https://127.0.0.1:8200
 `
 
-	os.WriteFile("/etc/systemd/system/vault-backup.timer", []byte(timerContent), 0644)
-	os.WriteFile("/etc/systemd/system/vault-backup.service", []byte(serviceContent), 0644)
+	if err := os.WriteFile("/etc/systemd/system/vault-backup.timer", []byte(timerContent), 0644); err != nil {
+		log.Warn("Failed to write vault backup timer", zap.Error(err))
+	}
+	if err := os.WriteFile("/etc/systemd/system/vault-backup.service", []byte(serviceContent), 0644); err != nil {
+		log.Warn("Failed to write vault backup service", zap.Error(err))
+	}
 
 	// Enable the timer
-	execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload")
-	execute.RunSimple(rc.Ctx, "systemctl", "enable", "vault-backup.timer")
-	execute.RunSimple(rc.Ctx, "systemctl", "start", "vault-backup.timer")
+	if err := execute.RunSimple(rc.Ctx, "systemctl", "daemon-reload"); err != nil {
+		log.Warn("Failed to reload systemd for backup services", zap.Error(err))
+	}
+	if err := execute.RunSimple(rc.Ctx, "systemctl", "enable", "vault-backup.timer"); err != nil {
+		log.Warn("Failed to enable vault backup timer", zap.Error(err))
+	}
+	if err := execute.RunSimple(rc.Ctx, "systemctl", "start", "vault-backup.timer"); err != nil {
+		log.Warn("Failed to start vault backup timer", zap.Error(err))
+	}
 
 	log.Info("✅ Vault backup configured successfully")
 	return nil

@@ -183,7 +183,12 @@ func (m *Manager) GenerateFromTemplate(templatePath string, outputPath string, d
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			// Log error silently as we don't have access to RuntimeContext
+			_ = closeErr
+		}
+	}()
 	
 	if err := tmpl.Execute(file, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
@@ -206,7 +211,12 @@ func (m *Manager) GenerateFromString(templateStr string, outputPath string, data
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			// Log error silently as we don't have access to RuntimeContext
+			_ = closeErr
+		}
+	}()
 	
 	if err := tmpl.Execute(file, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)

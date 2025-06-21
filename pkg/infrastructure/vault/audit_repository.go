@@ -212,7 +212,11 @@ func (r *FileAuditRepository) readLogFile() ([]*vault.AuditEvent, error) {
 		}
 		return nil, fmt.Errorf("failed to open audit log for reading: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			r.logger.Warn("Failed to close audit log file", zap.Error(closeErr))
+		}
+	}()
 
 	var events []*vault.AuditEvent
 	scanner := bufio.NewScanner(file)

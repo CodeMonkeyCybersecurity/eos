@@ -66,7 +66,9 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 	// Double-check permissions were set correctly
 	if err := ValidateTokenFilePermissions(rc, filePath); err != nil {
 		// If validation fails, remove the file to prevent security risk
-		os.Remove(filePath)
+		if err := os.Remove(filePath); err != nil {
+			log.Warn("Failed to remove insecure token file", zap.String("file", filePath), zap.Error(err))
+		}
 		return fmt.Errorf("token file written with insecure permissions: %w", err)
 	}
 	
@@ -135,10 +137,10 @@ func isValidVaultTokenFormat(token string) bool {
 	
 	// Allow any token that's alphanumeric with dots and hyphens (be permissive for testing)
 	for _, char := range token {
-		if !((char >= 'a' && char <= 'z') || 
-			 (char >= 'A' && char <= 'Z') || 
-			 (char >= '0' && char <= '9') || 
-			 char == '.' || char == '-' || char == '_') {
+		if (char < 'a' || char > 'z') && 
+		   (char < 'A' || char > 'Z') && 
+		   (char < '0' || char > '9') && 
+		   char != '.' && char != '-' && char != '_' {
 			return false
 		}
 	}
