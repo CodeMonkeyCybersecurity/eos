@@ -67,10 +67,10 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 	log.Info("📄 Reading RoleID from disk", zap.String("path", shared.AppRolePaths.RoleID))
 	roleIDBytes, err := os.ReadFile(shared.AppRolePaths.RoleID)
 	if err != nil {
-		log.Error("❌ Failed to read role_id from disk",
+		log.Error("❌ Failed to read first credential from disk",
 			zap.String("path", shared.AppRolePaths.RoleID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read role identifier from disk")
+		return "", "", cerr.Wrap(err, "read credential from disk")
 	}
 	roleID := strings.TrimSpace(string(roleIDBytes))
 	log.Info("✅ RoleID read successfully")
@@ -78,10 +78,10 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 	log.Info("📄 Reading SecretID from disk", zap.String("path", shared.AppRolePaths.SecretID))
 	secretIDBytes, err := os.ReadFile(shared.AppRolePaths.SecretID)
 	if err != nil {
-		log.Error("❌ Failed to read secret_id from disk",
+		log.Error("❌ Failed to read second credential from disk",
 			zap.String("path", shared.AppRolePaths.SecretID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read secret identifier from disk")
+		return "", "", cerr.Wrap(err, "read credential from disk")
 	}
 	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
 
@@ -90,16 +90,16 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 		secret, err := client.Logical().Unwrap(secretIDRaw)
 		if err != nil {
 			log.Error("❌ Failed to unwrap secret_id", zap.Error(err))
-			return "", "", cerr.Wrap(err, "failed to unwrap secret_id")
+			return "", "", cerr.Wrap(err, "failed to unwrap credential")
 		}
 		if secret == nil || secret.Data == nil {
 			log.Error("❌ Unwrapped SecretID is empty")
-			return "", "", cerr.New("unwrapped SecretID is empty")
+			return "", "", cerr.New("unwrapped credential is empty")
 		}
 		sid, ok := secret.Data["secret_id"].(string)
 		if !ok {
 			log.Error("❌ Unwrapped SecretID is malformed", zap.Any("data", secret.Data))
-			return "", "", cerr.New("unwrapped SecretID is malformed")
+			return "", "", cerr.New("unwrapped credential is malformed")
 		}
 		log.Info("✅ SecretID unwrapped successfully")
 		return roleID, sid, nil
@@ -174,12 +174,12 @@ func refreshAppRoleCreds(rc *eos_io.RuntimeContext, client *api.Client) (string,
 		log.Error("❌ Failed to read role_id from Vault",
 			zap.String("path", shared.AppRoleRoleIDPath),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read role_id")
+		return "", "", cerr.Wrap(err, "read credential from vault")
 	}
 	roleID, ok := roleResp.Data["role_id"].(string)
 	if !ok || roleID == "" {
 		log.Error("❌ Invalid role_id in Vault response", zap.Any("data", roleResp.Data))
-		return "", "", cerr.New("invalid role_id in Vault response")
+		return "", "", cerr.New("invalid credential in vault response")
 	}
 	log.Info("✅ RoleID retrieved")
 
@@ -189,12 +189,12 @@ func refreshAppRoleCreds(rc *eos_io.RuntimeContext, client *api.Client) (string,
 		log.Error("❌ Failed to generate secret_id",
 			zap.String("path", shared.AppRoleSecretIDPath),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "generate secret_id")
+		return "", "", cerr.Wrap(err, "generate credential")
 	}
 	secretID, ok := secretResp.Data["secret_id"].(string)
 	if !ok || secretID == "" {
 		log.Error("❌ Invalid secret_id in Vault response", zap.Any("data", secretResp.Data))
-		return "", "", cerr.New("invalid secret_id in Vault response")
+		return "", "", cerr.New("invalid credential in vault response")
 	}
 	log.Info("✅ SecretID generated successfully")
 	return roleID, secretID, nil

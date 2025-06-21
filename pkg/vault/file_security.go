@@ -98,7 +98,7 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 		return "", fmt.Errorf("failed to read token file %s: %w", filePath, err)
 	}
 
-	token := string(data)
+	token := trimWhitespace(string(data))
 
 	// Basic token format validation (Vault tokens start with hvs. or s.)
 	if token != "" && !isValidVaultTokenFormat(token) {
