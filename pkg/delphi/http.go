@@ -17,7 +17,7 @@ import (
 func GetJSON(rc *eos_io.RuntimeContext, url string, headers map[string]string) (map[string]interface{}, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // for unauthenticated GETs
+			TLSClientConfig: getHTTPTLSConfig(),
 		},
 	}
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -118,7 +119,7 @@ func fetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: getAgentFetchTLSConfig()}}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP error: %w", err)
@@ -151,6 +152,29 @@ func defaultStr(val, fallback string) string {
 		return fallback
 	}
 	return val
+}
+
+// getAgentFetchTLSConfig returns TLS configuration with proper security settings for agent fetching
+func getAgentFetchTLSConfig() *tls.Config {
+	// Allow insecure TLS only in development/testing environments
+	if os.Getenv("EOS_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
+		return &tls.Config{
+			InsecureSkipVerify: true,
+			MinVersion:         tls.VersionTLS12,
+		}
+	}
+	
+	// Secure TLS configuration for production agent fetching
+	return &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+		},
+		PreferServerCipherSuites: true,
+	}
 }
 
 func getMappings(distribution string) []PackageMapping {

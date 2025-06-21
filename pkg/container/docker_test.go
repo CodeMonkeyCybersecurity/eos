@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"runtime"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -200,6 +201,11 @@ func TestDockerFunctionSignatures(t *testing.T) {
 
 // TestDockerInstallationFlow tests the logical flow of Docker installation
 func TestDockerInstallationFlow(t *testing.T) {
+	// Skip this test on non-Linux systems as Docker installation is Linux-specific
+	if runtime.GOOS != "linux" {
+		t.Skip("Skipping Docker installation flow test on non-Linux system")
+	}
+	
 	// This test verifies the logical flow without actually executing commands
 	// In a real implementation, we'd use dependency injection to mock execute.Run
 

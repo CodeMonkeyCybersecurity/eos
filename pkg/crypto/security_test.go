@@ -3,6 +3,7 @@ package crypto
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -225,6 +226,11 @@ func TestSecureEraseEffectiveness(t *testing.T) {
 		// Skip this test in CI environments that may not have shred command
 		if os.Getenv("CI") != "" {
 			t.Skip("Skipping secure erase test in CI environment")
+		}
+		
+		// Skip this test if shred command is not available (e.g., on macOS)
+		if _, err := exec.LookPath("shred"); err != nil {
+			t.Skip("Skipping secure erase test - shred command not available")
 		}
 
 		// Create a test file with sensitive content

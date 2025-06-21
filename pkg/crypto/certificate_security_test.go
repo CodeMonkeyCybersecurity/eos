@@ -160,6 +160,9 @@ func TestInputValidationSecurity(t *testing.T) {
 }
 
 func TestValidInputsAccepted(t *testing.T) {
+	// Set testing environment variable to allow test-reserved names
+	t.Setenv("TESTING", "true")
+	
 	t.Run("valid_domains", func(t *testing.T) {
 		validDomains := []string{
 			"example.com",

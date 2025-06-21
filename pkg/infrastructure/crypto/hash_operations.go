@@ -49,6 +49,10 @@ func (h *HashOperationsImpl) HashBytes(ctx context.Context, input []byte, algori
 	case "sha512":
 		hasher = sha512.New()
 	case "md5":
+		// MD5 is cryptographically broken and should not be used for security purposes
+		h.logger.Warn("MD5 hash algorithm is deprecated and insecure",
+			zap.String("algorithm", algorithm),
+			zap.String("recommendation", "use SHA-256 or higher"))
 		hasher = md5.New()
 	default:
 		return nil, fmt.Errorf("unsupported hash algorithm: %s", algorithm)
@@ -87,6 +91,10 @@ func (h *HashOperationsImpl) HashFile(ctx context.Context, path string, algorith
 	case "sha512":
 		hasher = sha512.New()
 	case "md5":
+		// MD5 is cryptographically broken and should not be used for security purposes
+		h.logger.Warn("MD5 hash algorithm is deprecated and insecure",
+			zap.String("algorithm", algorithm),
+			zap.String("recommendation", "use SHA-256 or higher"))
 		hasher = md5.New()
 	default:
 		return "", fmt.Errorf("unsupported hash algorithm: %s", algorithm)

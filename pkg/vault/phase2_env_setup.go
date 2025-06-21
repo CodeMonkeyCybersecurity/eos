@@ -94,7 +94,19 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 		return false
 	}
 	dialer := &net.Dialer{Timeout: d}
-	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, &tls.Config{InsecureSkipVerify: true})
+	
+	// Use secure TLS configuration for production, allow insecure only for testing
+	tlsConfig := &tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
+	
+	// Only skip verification in development/testing environments
+	if os.Getenv("EOS_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
+		tlsConfig.InsecureSkipVerify = true
+		otelzap.Ctx(rc.Ctx).Debug("Using insecure TLS for development/testing", zap.String("host", u.Host))
+	}
+	
+	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, tlsConfig)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Debug("TLS probe failed", zap.String("host", u.Host), zap.Error(err))
 		return false

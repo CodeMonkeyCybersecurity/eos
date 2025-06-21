@@ -3,11 +3,11 @@
 package platform
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"os/exec"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -17,10 +17,20 @@ import (
 
 // scheduleCron sets up a scheduled task (cron for Linux/macOS; schtasks for Windows) to run the update command.
 func scheduleCron(rc *eos_io.RuntimeContext, cmd string, osPlatform string) error {
-	// Generate a random time.
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	hour := r.Intn(24)
-	minute := r.Intn(60)
+	// Generate a cryptographically secure random time.
+	hourBig, err := rand.Int(rand.Reader, big.NewInt(24))
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to generate random hour", zap.Error(err))
+		return fmt.Errorf("failed to generate random hour: %w", err)
+	}
+	hour := int(hourBig.Int64())
+	
+	minuteBig, err := rand.Int(rand.Reader, big.NewInt(60))
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to generate random minute", zap.Error(err))
+		return fmt.Errorf("failed to generate random minute: %w", err)
+	}
+	minute := int(minuteBig.Int64())
 
 	// Create a cron schedule string: "minute hour * * * command"
 	schedule := fmt.Sprintf("%d %d * * * %s", minute, hour, cmd)
