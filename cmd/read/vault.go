@@ -110,25 +110,67 @@ Examples:
 	}),
 }
 
-// InspectVaultCmd lists secrets stored in Vault
+// InspectVaultCmd lists secrets stored in Vault using enhanced container pattern
 var InspectVaultCmd = &cobra.Command{
 	Use:   "vault",
-	Short: "Inspect current Vault paths (requires root or eos)",
+	Short: "Inspect current Vault paths using enhanced architecture",
+	Long: `Lists secrets stored in Vault using the new clean architecture pattern.
+
+This command demonstrates:
+- Enhanced dependency injection container
+- Domain services for secret operations
+- Graceful fallback when vault is unavailable
+- Proper error handling and structured logging`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		log := otelzap.Ctx(rc.Ctx)
+		logger := rc.Log.Named("vault.inspect")
 
-		log.Info("Listing secrets under secret/eos")
-		entries, err := vault.ListUnder(rc, shared.EosID)
+		logger.Info("🔍 Starting vault secrets inspection with enhanced architecture")
+
+		// Create enhanced vault container
+		vaultContainer, err := vault.NewEnhancedVaultContainer(rc)
 		if err != nil {
-			log.Error("Failed to list Vault secrets", zap.Error(err))
-			return fmt.Errorf("could not list Vault contents: %w", err)
+			logger.Error("❌ Failed to create enhanced vault container", zap.Error(err))
+			return fmt.Errorf("failed to create vault container: %w", err)
 		}
 
-		for _, entry := range entries {
-			log.Info("Found Vault entry", zap.String("entry", "secret/eos/"+strings.TrimSuffix(entry, "/")))
+		// Start container
+		if err := vaultContainer.Start(); err != nil {
+			logger.Error("❌ Failed to start vault container", zap.Error(err))
+			return fmt.Errorf("failed to start vault container: %w", err)
 		}
 
-		log.Info("Vault entries inspection complete", zap.Int("count", len(entries)))
+		// Ensure proper cleanup
+		defer func() {
+			if err := vaultContainer.Stop(); err != nil {
+				logger.Error("❌ Failed to stop vault container", zap.Error(err))
+			}
+		}()
+
+		logger.Info("✅ Enhanced vault container started successfully")
+
+		// Get secret store for operations
+		secretStore, err := vaultContainer.GetSecretStore()
+		if err != nil {
+			logger.Error("❌ Failed to get secret store", zap.Error(err))
+			return fmt.Errorf("failed to get secret store: %w", err)
+		}
+
+		// List secrets under eos prefix
+		logger.Info("📋 Listing secrets under secret/eos")
+		secrets, err := secretStore.List(rc.Ctx, shared.EosID+"/")
+		if err != nil {
+			logger.Error("❌ Failed to list vault secrets", zap.Error(err))
+			return fmt.Errorf("could not list vault contents: %w", err)
+		}
+
+		// Display results
+		for _, secret := range secrets {
+			// Only show the key, not the value for security
+			secretPath := "secret/eos/" + strings.TrimPrefix(secret.Key, shared.EosID+"/")
+			logger.Info("📄 Found vault entry", zap.String("entry", secretPath))
+		}
+
+		logger.Info("✅ Vault entries inspection complete", zap.Int("count", len(secrets)))
 		return nil
 	}),
 }

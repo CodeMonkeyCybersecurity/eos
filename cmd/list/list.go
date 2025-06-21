@@ -14,9 +14,10 @@ import (
 
 // ReadCmd is the root command for read operations
 var ListCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List resources (e.g., processes, users, storage)",
-	Long:  `The list command list 'metadata' about various resources such as processes, users, or storage.`,
+	Use:     "list",
+	Short:   "List resources (e.g., processes, users, storage)",
+	Long:    `The list command list 'metadata' about various resources such as processes, users, or storage.`,
+	Aliases: []string{"ls"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))

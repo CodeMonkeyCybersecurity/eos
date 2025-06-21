@@ -9,14 +9,14 @@ import (
 
 // ReverseProxySpec defines the specification for reverse proxy deployment
 type ReverseProxySpec struct {
-	Name          string            `json:"name"`
-	Version       string            `json:"version"`
-	Domain        string            `json:"domain"`
-	Subdomains    []string          `json:"subdomains,omitempty"`
-	ProxyType     ProxyType         `json:"proxy_type"`
+	Name          string              `json:"name"`
+	Version       string              `json:"version"`
+	Domain        string              `json:"domain"`
+	Subdomains    []string            `json:"subdomains,omitempty"`
+	ProxyType     ProxyType           `json:"proxy_type"`
 	Configuration *ProxyConfiguration `json:"configuration"`
-	Labels        map[string]string `json:"labels,omitempty"`
-	Annotations   map[string]string `json:"annotations,omitempty"`
+	Labels        map[string]string   `json:"labels,omitempty"`
+	Annotations   map[string]string   `json:"annotations,omitempty"`
 }
 
 // Deployment represents a reverse proxy deployment instance
@@ -46,24 +46,24 @@ type DeploymentVersion struct {
 
 // ProxyConfiguration defines reverse proxy configuration
 type ProxyConfiguration struct {
-	ID                string                     `json:"id"`
-	DeploymentID      string                     `json:"deployment_id"`
-	Type              ConfigurationType          `json:"type"`
-	Status            ConfigurationStatus        `json:"status"`
-	ListenPorts       []ProxyPort                `json:"listen_ports"`
-	Routes            []ProxyRoute               `json:"routes"`
-	Backends          []Backend                  `json:"backends"`
-	LoadBalancing     *LoadBalancingConfig       `json:"load_balancing,omitempty"`
-	SSL               *SSLConfiguration          `json:"ssl,omitempty"`
-	Authentication    *AuthenticationConfig      `json:"authentication,omitempty"`
-	RateLimiting      *RateLimitingConfig        `json:"rate_limiting,omitempty"`
-	Caching           *CachingConfig             `json:"caching,omitempty"`
-	Headers           *HeaderManipulationConfig  `json:"headers,omitempty"`
-	HealthChecks      []HealthCheckConfig        `json:"health_checks,omitempty"`
-	Middleware        []MiddlewareConfig         `json:"middleware,omitempty"`
-	CustomConfig      map[string]interface{}     `json:"custom_config,omitempty"`
-	CreatedAt         time.Time                  `json:"created_at"`
-	UpdatedAt         time.Time                  `json:"updated_at"`
+	ID             string                    `json:"id"`
+	DeploymentID   string                    `json:"deployment_id"`
+	Type           ConfigurationType         `json:"type"`
+	Status         ConfigurationStatus       `json:"status"`
+	ListenPorts    []ProxyPort               `json:"listen_ports"`
+	Routes         []ProxyRoute              `json:"routes"`
+	Backends       []Backend                 `json:"backends"`
+	LoadBalancing  *LoadBalancingConfig      `json:"load_balancing,omitempty"`
+	SSL            *SSLConfiguration         `json:"ssl,omitempty"`
+	Authentication *AuthenticationConfig     `json:"authentication,omitempty"`
+	RateLimiting   *RateLimitingConfig       `json:"rate_limiting,omitempty"`
+	Caching        *CachingConfig            `json:"caching,omitempty"`
+	Headers        *HeaderManipulationConfig `json:"headers,omitempty"`
+	HealthChecks   []HealthCheckConfig       `json:"health_checks,omitempty"`
+	Middleware     []MiddlewareConfig        `json:"middleware,omitempty"`
+	CustomConfig   map[string]interface{}    `json:"custom_config,omitempty"`
+	CreatedAt      time.Time                 `json:"created_at"`
+	UpdatedAt      time.Time                 `json:"updated_at"`
 }
 
 // ProxyPort defines a listening port configuration
@@ -91,21 +91,21 @@ type ProxyRoute struct {
 
 // Backend defines a backend service
 type Backend struct {
-	ID              string            `json:"id"`
-	Name            string            `json:"name"`
-	Type            BackendType       `json:"type"`
-	Targets         []BackendTarget   `json:"targets"`
-	HealthCheck     *HealthCheck      `json:"health_check,omitempty"`
-	LoadBalancing   LoadBalancePolicy `json:"load_balancing"`
-	CircuitBreaker  *CircuitBreakerConfig `json:"circuit_breaker,omitempty"`
-	RetryPolicy     *RetryPolicy      `json:"retry_policy,omitempty"`
-	Timeout         time.Duration     `json:"timeout"`
-	MaxConnections  int               `json:"max_connections,omitempty"`
-	Weight          int               `json:"weight"`
-	Enabled         bool              `json:"enabled"`
-	Labels          map[string]string `json:"labels,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	Type           BackendType           `json:"type"`
+	Targets        []BackendTarget       `json:"targets"`
+	HealthCheck    *HealthCheck          `json:"health_check,omitempty"`
+	LoadBalancing  LoadBalancePolicy     `json:"load_balancing"`
+	CircuitBreaker *CircuitBreakerConfig `json:"circuit_breaker,omitempty"`
+	RetryPolicy    *RetryPolicy          `json:"retry_policy,omitempty"`
+	Timeout        time.Duration         `json:"timeout"`
+	MaxConnections int                   `json:"max_connections,omitempty"`
+	Weight         int                   `json:"weight"`
+	Enabled        bool                  `json:"enabled"`
+	Labels         map[string]string     `json:"labels,omitempty"`
+	CreatedAt      time.Time             `json:"created_at"`
+	UpdatedAt      time.Time             `json:"updated_at"`
 }
 
 // BackendTarget defines a backend target endpoint
@@ -133,72 +133,72 @@ type ProxyEndpoint struct {
 
 // ProxyStatus represents current proxy status
 type ProxyStatus struct {
-	DeploymentID     string               `json:"deployment_id"`
-	Status           DeploymentStatus     `json:"status"`
-	Health           HealthStatusType     `json:"health"`
-	Uptime           time.Duration        `json:"uptime"`
-	ActiveConnections int                 `json:"active_connections"`
-	TotalRequests    int64                `json:"total_requests"`
-	ErrorRate        float64              `json:"error_rate"`
-	ResponseTime     time.Duration        `json:"avg_response_time"`
-	BackendStatus    []BackendStatus      `json:"backend_status"`
-	LastUpdate       time.Time            `json:"last_update"`
-	Version          int                  `json:"version"`
+	DeploymentID      string           `json:"deployment_id"`
+	Status            DeploymentStatus `json:"status"`
+	Health            HealthStatusType `json:"health"`
+	Uptime            time.Duration    `json:"uptime"`
+	ActiveConnections int              `json:"active_connections"`
+	TotalRequests     int64            `json:"total_requests"`
+	ErrorRate         float64          `json:"error_rate"`
+	ResponseTime      time.Duration    `json:"avg_response_time"`
+	BackendStatus     []BackendStatus  `json:"backend_status"`
+	LastUpdate        time.Time        `json:"last_update"`
+	Version           int              `json:"version"`
 }
 
 // BackendStatus represents backend health status
 type BackendStatus struct {
-	BackendID        string           `json:"backend_id"`
-	Name             string           `json:"name"`
-	Health           HealthStatusType `json:"health"`
-	ActiveTargets    int              `json:"active_targets"`
-	TotalTargets     int              `json:"total_targets"`
-	ResponseTime     time.Duration    `json:"avg_response_time"`
-	RequestCount     int64            `json:"request_count"`
-	ErrorCount       int64            `json:"error_count"`
-	LastHealthCheck  *time.Time       `json:"last_health_check,omitempty"`
+	BackendID       string           `json:"backend_id"`
+	Name            string           `json:"name"`
+	Health          HealthStatusType `json:"health"`
+	ActiveTargets   int              `json:"active_targets"`
+	TotalTargets    int              `json:"total_targets"`
+	ResponseTime    time.Duration    `json:"avg_response_time"`
+	RequestCount    int64            `json:"request_count"`
+	ErrorCount      int64            `json:"error_count"`
+	LastHealthCheck *time.Time       `json:"last_health_check,omitempty"`
 }
 
 // ProxyMetrics represents proxy performance metrics
 type ProxyMetrics struct {
-	DeploymentID      string                    `json:"deployment_id"`
-	Timestamp         time.Time                 `json:"timestamp"`
-	RequestRate       float64                   `json:"request_rate"`      // requests per second
-	ErrorRate         float64                   `json:"error_rate"`        // percentage
-	ResponseTime      *ResponseTimeMetrics      `json:"response_time"`
-	Throughput        *ThroughputMetrics        `json:"throughput"`
-	ConnectionMetrics *ConnectionMetrics        `json:"connections"`
-	BackendMetrics    []BackendMetrics          `json:"backend_metrics"`
-	StatusCodes       map[string]int64          `json:"status_codes"`
-	TopPaths          []PathMetrics             `json:"top_paths"`
+	DeploymentID      string               `json:"deployment_id"`
+	Timestamp         time.Time            `json:"timestamp"`
+	RequestRate       float64              `json:"request_rate"` // requests per second
+	ErrorRate         float64              `json:"error_rate"`   // percentage
+	ResponseTime      *ResponseTimeMetrics `json:"response_time"`
+	Throughput        *ThroughputMetrics   `json:"throughput"`
+	ConnectionMetrics *ConnectionMetrics   `json:"connections"`
+	BackendMetrics    []BackendMetrics     `json:"backend_metrics"`
+	StatusCodes       map[string]int64     `json:"status_codes"`
+	TopPaths          []PathMetrics        `json:"top_paths"`
 }
 
 // ResponseTimeMetrics represents response time statistics
 type ResponseTimeMetrics struct {
-	Average     time.Duration `json:"average"`
-	P50         time.Duration `json:"p50"`
-	P90         time.Duration `json:"p90"`
-	P95         time.Duration `json:"p95"`
-	P99         time.Duration `json:"p99"`
-	Min         time.Duration `json:"min"`
-	Max         time.Duration `json:"max"`
+	Average time.Duration `json:"average"`
+	P50     time.Duration `json:"p50"`
+	P90     time.Duration `json:"p90"`
+	P95     time.Duration `json:"p95"`
+	P99     time.Duration `json:"p99"`
+	Min     time.Duration `json:"min"`
+	Max     time.Duration `json:"max"`
 }
 
 // ThroughputMetrics represents throughput statistics
 type ThroughputMetrics struct {
-	BytesIn      int64   `json:"bytes_in"`
-	BytesOut     int64   `json:"bytes_out"`
-	RequestsIn   int64   `json:"requests_in"`
-	RequestsOut  int64   `json:"requests_out"`
-	Bandwidth    float64 `json:"bandwidth_mbps"`
+	BytesIn     int64   `json:"bytes_in"`
+	BytesOut    int64   `json:"bytes_out"`
+	RequestsIn  int64   `json:"requests_in"`
+	RequestsOut int64   `json:"requests_out"`
+	Bandwidth   float64 `json:"bandwidth_mbps"`
 }
 
 // ConnectionMetrics represents connection statistics
 type ConnectionMetrics struct {
-	Active      int     `json:"active"`
-	Total       int64   `json:"total"`
-	Failed      int64   `json:"failed"`
-	Rate        float64 `json:"connection_rate"`
+	Active      int           `json:"active"`
+	Total       int64         `json:"total"`
+	Failed      int64         `json:"failed"`
+	Rate        float64       `json:"connection_rate"`
 	AvgDuration time.Duration `json:"avg_duration"`
 }
 
@@ -221,78 +221,78 @@ type PathMetrics struct {
 
 // ProxyEvent represents proxy-related events
 type ProxyEvent struct {
-	ID           string            `json:"id"`
-	DeploymentID string            `json:"deployment_id"`
-	Type         EventType         `json:"type"`
-	Timestamp    time.Time         `json:"timestamp"`
-	Source       string            `json:"source"`
-	Message      string            `json:"message"`
+	ID           string                 `json:"id"`
+	DeploymentID string                 `json:"deployment_id"`
+	Type         EventType              `json:"type"`
+	Timestamp    time.Time              `json:"timestamp"`
+	Source       string                 `json:"source"`
+	Message      string                 `json:"message"`
 	Data         map[string]interface{} `json:"data,omitempty"`
-	Severity     EventSeverity     `json:"severity"`
+	Severity     EventSeverity          `json:"severity"`
 }
 
 // Service orchestration entities
 
 // ServiceProvider defines a pluggable service implementation
 type ServiceProvider struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Type         ServiceType       `json:"type"`
-	Version      string            `json:"version"`
-	Description  string            `json:"description"`
-	Dependencies []string          `json:"dependencies"`
-	Capabilities []string          `json:"capabilities"`
+	ID            string                `json:"id"`
+	Name          string                `json:"name"`
+	Type          ServiceType           `json:"type"`
+	Version       string                `json:"version"`
+	Description   string                `json:"description"`
+	Dependencies  []string              `json:"dependencies"`
+	Capabilities  []string              `json:"capabilities"`
 	Configuration *ServiceConfiguration `json:"configuration"`
-	Labels       map[string]string `json:"labels,omitempty"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
+	Labels        map[string]string     `json:"labels,omitempty"`
+	CreatedAt     time.Time             `json:"created_at"`
+	UpdatedAt     time.Time             `json:"updated_at"`
 }
 
 // ServiceRegistration represents service registration information
 type ServiceRegistration struct {
-	ID          string            `json:"id"`
-	ServiceID   string            `json:"service_id"`
-	Name        string            `json:"name"`
-	Type        ServiceType       `json:"type"`
-	Address     string            `json:"address"`
-	Port        int               `json:"port"`
-	Health      HealthStatusType  `json:"health"`
-	Tags        []string          `json:"tags,omitempty"`
-	Metadata    map[string]string `json:"metadata,omitempty"`
-	RegisteredAt time.Time        `json:"registered_at"`
-	LastSeen    time.Time         `json:"last_seen"`
-	TTL         time.Duration     `json:"ttl"`
+	ID           string            `json:"id"`
+	ServiceID    string            `json:"service_id"`
+	Name         string            `json:"name"`
+	Type         ServiceType       `json:"type"`
+	Address      string            `json:"address"`
+	Port         int               `json:"port"`
+	Health       HealthStatusType  `json:"health"`
+	Tags         []string          `json:"tags,omitempty"`
+	Metadata     map[string]string `json:"metadata,omitempty"`
+	RegisteredAt time.Time         `json:"registered_at"`
+	LastSeen     time.Time         `json:"last_seen"`
+	TTL          time.Duration     `json:"ttl"`
 }
 
 // StackSpec defines a multi-service stack specification
 type StackSpec struct {
-	Name         string                        `json:"name"`
-	Version      string                        `json:"version"`
-	Description  string                        `json:"description"`
-	Services     map[string]*ServiceSpec       `json:"services"`
-	Networks     map[string]*NetworkSpec       `json:"networks,omitempty"`
-	Volumes      map[string]*VolumeSpec        `json:"volumes,omitempty"`
-	Configs      map[string]*ConfigSpec        `json:"configs,omitempty"`
-	Secrets      map[string]*SecretSpec        `json:"secrets,omitempty"`
-	Dependencies []string                      `json:"dependencies,omitempty"`
-	Labels       map[string]string             `json:"labels,omitempty"`
+	Name         string                  `json:"name"`
+	Version      string                  `json:"version"`
+	Description  string                  `json:"description"`
+	Services     map[string]*ServiceSpec `json:"services"`
+	Networks     map[string]*NetworkSpec `json:"networks,omitempty"`
+	Volumes      map[string]*VolumeSpec  `json:"volumes,omitempty"`
+	Configs      map[string]*ConfigSpec  `json:"configs,omitempty"`
+	Secrets      map[string]*SecretSpec  `json:"secrets,omitempty"`
+	Dependencies []string                `json:"dependencies,omitempty"`
+	Labels       map[string]string       `json:"labels,omitempty"`
 }
 
 // ServiceSpec defines an individual service specification
 type ServiceSpec struct {
-	Name         string                 `json:"name"`
-	Image        string                 `json:"image"`
-	Replicas     int                    `json:"replicas"`
-	Ports        []ServicePort          `json:"ports,omitempty"`
-	Environment  map[string]string      `json:"environment,omitempty"`
-	Volumes      []ServiceVolume        `json:"volumes,omitempty"`
-	Networks     []string               `json:"networks,omitempty"`
-	Dependencies []string               `json:"depends_on,omitempty"`
-	HealthCheck  *HealthCheckConfig     `json:"health_check,omitempty"`
-	Resources    *ResourceConstraints   `json:"resources,omitempty"`
-	Security     *SecurityConfig        `json:"security,omitempty"`
-	Labels       map[string]string      `json:"labels,omitempty"`
-	Annotations  map[string]string      `json:"annotations,omitempty"`
+	Name         string               `json:"name"`
+	Image        string               `json:"image"`
+	Replicas     int                  `json:"replicas"`
+	Ports        []ServicePort        `json:"ports,omitempty"`
+	Environment  map[string]string    `json:"environment,omitempty"`
+	Volumes      []ServiceVolume      `json:"volumes,omitempty"`
+	Networks     []string             `json:"networks,omitempty"`
+	Dependencies []string             `json:"depends_on,omitempty"`
+	HealthCheck  *HealthCheckConfig   `json:"health_check,omitempty"`
+	Resources    *ResourceConstraints `json:"resources,omitempty"`
+	Security     *SecurityConfig      `json:"security,omitempty"`
+	Labels       map[string]string    `json:"labels,omitempty"`
+	Annotations  map[string]string    `json:"annotations,omitempty"`
 }
 
 // ServicePort defines service port configuration
@@ -305,63 +305,63 @@ type ServicePort struct {
 
 // ServiceVolume defines service volume mount
 type ServiceVolume struct {
-	Type   string `json:"type"`   // bind, volume, tmpfs
-	Source string `json:"source"` // host path or volume name
-	Target string `json:"target"` // container path
-	ReadOnly bool `json:"read_only,omitempty"`
+	Type     string `json:"type"`   // bind, volume, tmpfs
+	Source   string `json:"source"` // host path or volume name
+	Target   string `json:"target"` // container path
+	ReadOnly bool   `json:"read_only,omitempty"`
 }
 
 // StackDeployment represents a deployed stack
 type StackDeployment struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Spec         *StackSpec        `json:"spec"`
-	Status       DeploymentStatus  `json:"status"`
-	Services     []ServiceInstance `json:"services"`
-	Networks     []Network         `json:"networks,omitempty"`
-	Volumes      []Volume          `json:"volumes,omitempty"`
-	CreatedAt    time.Time         `json:"created_at"`
-	UpdatedAt    time.Time         `json:"updated_at"`
-	DeployedAt   *time.Time        `json:"deployed_at,omitempty"`
-	Version      int               `json:"version"`
-	Labels       map[string]string `json:"labels,omitempty"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Spec       *StackSpec        `json:"spec"`
+	Status     DeploymentStatus  `json:"status"`
+	Services   []ServiceInstance `json:"services"`
+	Networks   []Network         `json:"networks,omitempty"`
+	Volumes    []Volume          `json:"volumes,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
+	DeployedAt *time.Time        `json:"deployed_at,omitempty"`
+	Version    int               `json:"version"`
+	Labels     map[string]string `json:"labels,omitempty"`
 }
 
 // StackStatus represents stack deployment status
 type StackStatus struct {
-	StackID       string              `json:"stack_id"`
-	Name          string              `json:"name"`
-	Status        DeploymentStatus    `json:"status"`
-	Health        HealthStatusType    `json:"health"`
-	ServiceCount  int                 `json:"service_count"`
-	RunningCount  int                 `json:"running_services"`
-	Services      []ServiceStatus     `json:"services"`
-	LastUpdate    time.Time           `json:"last_update"`
-	Version       int                 `json:"version"`
+	StackID      string           `json:"stack_id"`
+	Name         string           `json:"name"`
+	Status       DeploymentStatus `json:"status"`
+	Health       HealthStatusType `json:"health"`
+	ServiceCount int              `json:"service_count"`
+	RunningCount int              `json:"running_services"`
+	Services     []ServiceStatus  `json:"services"`
+	LastUpdate   time.Time        `json:"last_update"`
+	Version      int              `json:"version"`
 }
 
 // ServiceInstance represents a running service instance
 type ServiceInstance struct {
-	ID           string               `json:"id"`
-	ServiceID    string               `json:"service_id"`
-	Name         string               `json:"name"`
-	Type         ServiceType          `json:"type"`
-	Status       ServiceStatus        `json:"status"`
-	Health       HealthStatusType     `json:"health"`
-	Address      string               `json:"address"`
-	Port         int                  `json:"port"`
-	Endpoints    []ServiceEndpoint    `json:"endpoints,omitempty"`
-	Labels       map[string]string    `json:"labels,omitempty"`
-	CreatedAt    time.Time            `json:"created_at"`
-	UpdatedAt    time.Time            `json:"updated_at"`
-	StartedAt    *time.Time           `json:"started_at,omitempty"`
+	ID        string            `json:"id"`
+	ServiceID string            `json:"service_id"`
+	Name      string            `json:"name"`
+	Type      ServiceType       `json:"type"`
+	Status    ServiceStatus     `json:"status"`
+	Health    HealthStatusType  `json:"health"`
+	Address   string            `json:"address"`
+	Port      int               `json:"port"`
+	Endpoints []ServiceEndpoint `json:"endpoints,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
+	CreatedAt time.Time         `json:"created_at"`
+	UpdatedAt time.Time         `json:"updated_at"`
+	StartedAt *time.Time        `json:"started_at,omitempty"`
 }
 
 // ServiceEndpoint represents a service endpoint
 type ServiceEndpoint struct {
-	URL      string `json:"url"`
-	Port     int    `json:"port"`
-	Protocol string `json:"protocol"`
+	URL      string           `json:"url"`
+	Port     int              `json:"port"`
+	Protocol string           `json:"protocol"`
 	Health   HealthStatusType `json:"health"`
 }
 
@@ -380,19 +380,19 @@ type ServiceStatus struct {
 
 // ServiceConfiguration represents service configuration
 type ServiceConfiguration struct {
-	ID           string                 `json:"id"`
-	ServiceID    string                 `json:"service_id"`
-	Name         string                 `json:"name"`
-	Type         ConfigurationType      `json:"type"`
-	Status       ConfigurationStatus    `json:"status"`
-	Data         map[string]interface{} `json:"data"`
-	Schema       *ConfigurationSchema   `json:"schema,omitempty"`
-	Version      int                    `json:"version"`
-	Description  string                 `json:"description,omitempty"`
-	Labels       map[string]string      `json:"labels,omitempty"`
-	CreatedAt    time.Time              `json:"created_at"`
-	UpdatedAt    time.Time              `json:"updated_at"`
-	CreatedBy    string                 `json:"created_by"`
+	ID          string                 `json:"id"`
+	ServiceID   string                 `json:"service_id"`
+	Name        string                 `json:"name"`
+	Type        ConfigurationType      `json:"type"`
+	Status      ConfigurationStatus    `json:"status"`
+	Data        map[string]interface{} `json:"data"`
+	Schema      *ConfigurationSchema   `json:"schema,omitempty"`
+	Version     int                    `json:"version"`
+	Description string                 `json:"description,omitempty"`
+	Labels      map[string]string      `json:"labels,omitempty"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	CreatedBy   string                 `json:"created_by"`
 }
 
 // ConfigurationSchema defines configuration validation schema
@@ -404,27 +404,27 @@ type ConfigurationSchema struct {
 
 // ConfigurationProperty defines a configuration property
 type ConfigurationProperty struct {
-	Type        string      `json:"type"`
-	Description string      `json:"description,omitempty"`
-	Default     interface{} `json:"default,omitempty"`
+	Type        string        `json:"type"`
+	Description string        `json:"description,omitempty"`
+	Default     interface{}   `json:"default,omitempty"`
 	Enum        []interface{} `json:"enum,omitempty"`
-	Pattern     string      `json:"pattern,omitempty"`
-	Minimum     *float64    `json:"minimum,omitempty"`
-	Maximum     *float64    `json:"maximum,omitempty"`
+	Pattern     string        `json:"pattern,omitempty"`
+	Minimum     *float64      `json:"minimum,omitempty"`
+	Maximum     *float64      `json:"maximum,omitempty"`
 }
 
 // ConfigurationTemplate represents a configuration template
 type ConfigurationTemplate struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Type        ConfigurationType      `json:"type"`
-	Description string                 `json:"description"`
-	Template    string                 `json:"template"`
-	Variables   []TemplateVariable     `json:"variables"`
-	Schema      *ConfigurationSchema   `json:"schema,omitempty"`
-	Labels      map[string]string      `json:"labels,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
+	ID          string               `json:"id"`
+	Name        string               `json:"name"`
+	Type        ConfigurationType    `json:"type"`
+	Description string               `json:"description"`
+	Template    string               `json:"template"`
+	Variables   []TemplateVariable   `json:"variables"`
+	Schema      *ConfigurationSchema `json:"schema,omitempty"`
+	Labels      map[string]string    `json:"labels,omitempty"`
+	CreatedAt   time.Time            `json:"created_at"`
+	UpdatedAt   time.Time            `json:"updated_at"`
 }
 
 // TemplateVariable defines a template variable
@@ -438,11 +438,11 @@ type TemplateVariable struct {
 
 // ConfigurationVersion represents a configuration version
 type ConfigurationVersion struct {
-	Version   int       `json:"version"`
+	Version   int                   `json:"version"`
 	Config    *ServiceConfiguration `json:"config"`
-	CreatedAt time.Time `json:"created_at"`
-	CreatedBy string    `json:"created_by"`
-	Message   string    `json:"message,omitempty"`
+	CreatedAt time.Time             `json:"created_at"`
+	CreatedBy string                `json:"created_by"`
+	Message   string                `json:"message,omitempty"`
 }
 
 // ConfigurationBackup represents a configuration backup
@@ -461,14 +461,14 @@ type ConfigurationBackup struct {
 
 // CertificateSpec defines certificate request specification
 type CertificateSpec struct {
-	CommonName       string   `json:"common_name"`
-	AlternativeNames []string `json:"alternative_names,omitempty"`
-	Organization     string   `json:"organization,omitempty"`
-	Country          string   `json:"country,omitempty"`
-	ValidityDays     int      `json:"validity_days"`
-	KeySize          int      `json:"key_size,omitempty"`
+	CommonName       string          `json:"common_name"`
+	AlternativeNames []string        `json:"alternative_names,omitempty"`
+	Organization     string          `json:"organization,omitempty"`
+	Country          string          `json:"country,omitempty"`
+	ValidityDays     int             `json:"validity_days"`
+	KeySize          int             `json:"key_size,omitempty"`
 	CertType         CertificateType `json:"cert_type"`
-	AutoRenew        bool     `json:"auto_renew"`
+	AutoRenew        bool            `json:"auto_renew"`
 }
 
 // Certificate represents a TLS certificate
@@ -494,22 +494,22 @@ type Certificate struct {
 
 // CertificateValidation represents certificate validation result
 type CertificateValidation struct {
-	CertificateID string                   `json:"certificate_id"`
-	Valid         bool                     `json:"valid"`
-	Errors        []string                 `json:"errors,omitempty"`
-	Warnings      []string                 `json:"warnings,omitempty"`
-	ExpiresIn     time.Duration            `json:"expires_in"`
-	Details       *CertificateDetails      `json:"details,omitempty"`
-	ValidatedAt   time.Time                `json:"validated_at"`
+	CertificateID string              `json:"certificate_id"`
+	Valid         bool                `json:"valid"`
+	Errors        []string            `json:"errors,omitempty"`
+	Warnings      []string            `json:"warnings,omitempty"`
+	ExpiresIn     time.Duration       `json:"expires_in"`
+	Details       *CertificateDetails `json:"details,omitempty"`
+	ValidatedAt   time.Time           `json:"validated_at"`
 }
 
 // CertificateDetails represents detailed certificate information
 type CertificateDetails struct {
-	Subject    *CertificateSubject `json:"subject"`
-	Issuer     *CertificateSubject `json:"issuer"`
+	Subject    *CertificateSubject    `json:"subject"`
+	Issuer     *CertificateSubject    `json:"issuer"`
 	Extensions []CertificateExtension `json:"extensions,omitempty"`
-	KeyUsage   []string            `json:"key_usage,omitempty"`
-	PublicKey  *PublicKeyInfo      `json:"public_key"`
+	KeyUsage   []string               `json:"key_usage,omitempty"`
+	PublicKey  *PublicKeyInfo         `json:"public_key"`
 }
 
 // CertificateSubject represents certificate subject information
@@ -537,11 +537,11 @@ type PublicKeyInfo struct {
 
 // CertificateEvent represents certificate-related events
 type CertificateEvent struct {
-	ID            string    `json:"id"`
-	CertificateID string    `json:"certificate_id"`
-	Type          EventType `json:"type"`
-	Timestamp     time.Time `json:"timestamp"`
-	Message       string    `json:"message"`
+	ID            string                 `json:"id"`
+	CertificateID string                 `json:"certificate_id"`
+	Type          EventType              `json:"type"`
+	Timestamp     time.Time              `json:"timestamp"`
+	Message       string                 `json:"message"`
 	Data          map[string]interface{} `json:"data,omitempty"`
 }
 
@@ -549,13 +549,13 @@ type CertificateEvent struct {
 
 // NetworkSpec defines network creation specification
 type NetworkSpec struct {
-	Name      string            `json:"name"`
-	Driver    string            `json:"driver"`
-	IPAM      *NetworkIPAM      `json:"ipam,omitempty"`
-	Options   map[string]string `json:"options,omitempty"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	Internal  bool              `json:"internal,omitempty"`
-	Attachable bool             `json:"attachable,omitempty"`
+	Name       string            `json:"name"`
+	Driver     string            `json:"driver"`
+	IPAM       *NetworkIPAM      `json:"ipam,omitempty"`
+	Options    map[string]string `json:"options,omitempty"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	Internal   bool              `json:"internal,omitempty"`
+	Attachable bool              `json:"attachable,omitempty"`
 }
 
 // Network represents a container network
@@ -580,43 +580,43 @@ type NetworkIPAM struct {
 
 // NetworkIPAMConfig represents IPAM configuration
 type NetworkIPAMConfig struct {
-	Subnet     string `json:"subnet"`
-	IPRange    string `json:"ip_range,omitempty"`
-	Gateway    string `json:"gateway,omitempty"`
+	Subnet     string            `json:"subnet"`
+	IPRange    string            `json:"ip_range,omitempty"`
+	Gateway    string            `json:"gateway,omitempty"`
 	AuxAddress map[string]string `json:"aux_addresses,omitempty"`
 }
 
 // NetworkPolicy defines network security policies
 type NetworkPolicy struct {
-	ID          string                `json:"id"`
-	Name        string                `json:"name"`
-	NetworkID   string                `json:"network_id"`
-	Rules       []NetworkPolicyRule   `json:"rules"`
-	Labels      map[string]string     `json:"labels,omitempty"`
-	CreatedAt   time.Time             `json:"created_at"`
-	UpdatedAt   time.Time             `json:"updated_at"`
+	ID        string              `json:"id"`
+	Name      string              `json:"name"`
+	NetworkID string              `json:"network_id"`
+	Rules     []NetworkPolicyRule `json:"rules"`
+	Labels    map[string]string   `json:"labels,omitempty"`
+	CreatedAt time.Time           `json:"created_at"`
+	UpdatedAt time.Time           `json:"updated_at"`
 }
 
 // NetworkPolicyRule defines network policy rules
 type NetworkPolicyRule struct {
-	ID        string            `json:"id"`
-	Action    PolicyAction      `json:"action"` // allow, deny
-	Direction TrafficDirection  `json:"direction"` // ingress, egress
-	Protocol  string            `json:"protocol,omitempty"` // tcp, udp, icmp
-	Ports     []string          `json:"ports,omitempty"`
-	Sources   []string          `json:"sources,omitempty"`
-	Targets   []string          `json:"targets,omitempty"`
-	Priority  int               `json:"priority"`
+	ID        string           `json:"id"`
+	Action    PolicyAction     `json:"action"`             // allow, deny
+	Direction TrafficDirection `json:"direction"`          // ingress, egress
+	Protocol  string           `json:"protocol,omitempty"` // tcp, udp, icmp
+	Ports     []string         `json:"ports,omitempty"`
+	Sources   []string         `json:"sources,omitempty"`
+	Targets   []string         `json:"targets,omitempty"`
+	Priority  int              `json:"priority"`
 }
 
 // LoadBalancerSpec defines load balancer specification
 type LoadBalancerSpec struct {
-	Name      string                  `json:"name"`
-	Type      LoadBalancerType        `json:"type"`
-	Algorithm LoadBalancePolicy       `json:"algorithm"`
-	Backends  []LoadBalancerBackend   `json:"backends"`
-	Config    map[string]interface{}  `json:"config,omitempty"`
-	Labels    map[string]string       `json:"labels,omitempty"`
+	Name      string                 `json:"name"`
+	Type      LoadBalancerType       `json:"type"`
+	Algorithm LoadBalancePolicy      `json:"algorithm"`
+	Backends  []LoadBalancerBackend  `json:"backends"`
+	Config    map[string]interface{} `json:"config,omitempty"`
+	Labels    map[string]string      `json:"labels,omitempty"`
 }
 
 // LoadBalancer represents a load balancer instance
@@ -635,35 +635,35 @@ type LoadBalancer struct {
 
 // LoadBalancerBackend represents a load balancer backend
 type LoadBalancerBackend struct {
-	ID       string           `json:"id"`
-	Address  string           `json:"address"`
-	Port     int              `json:"port"`
-	Weight   int              `json:"weight"`
-	Health   HealthStatusType `json:"health"`
-	Enabled  bool             `json:"enabled"`
+	ID      string           `json:"id"`
+	Address string           `json:"address"`
+	Port    int              `json:"port"`
+	Weight  int              `json:"weight"`
+	Health  HealthStatusType `json:"health"`
+	Enabled bool             `json:"enabled"`
 }
 
 // TrafficRule defines traffic management rules
 type TrafficRule struct {
-	ID          string           `json:"id"`
-	Name        string           `json:"name"`
-	Priority    int              `json:"priority"`
-	Match       *TrafficMatch    `json:"match"`
-	Action      *TrafficAction   `json:"action"`
-	Enabled     bool             `json:"enabled"`
-	CreatedAt   time.Time        `json:"created_at"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Priority  int            `json:"priority"`
+	Match     *TrafficMatch  `json:"match"`
+	Action    *TrafficAction `json:"action"`
+	Enabled   bool           `json:"enabled"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 // TrafficMatch defines traffic matching criteria
 type TrafficMatch struct {
-	Protocol    string            `json:"protocol,omitempty"`
-	SourceIP    string            `json:"source_ip,omitempty"`
-	DestIP      string            `json:"dest_ip,omitempty"`
-	SourcePort  string            `json:"source_port,omitempty"`
-	DestPort    string            `json:"dest_port,omitempty"`
-	Headers     map[string]string `json:"headers,omitempty"`
-	Path        string            `json:"path,omitempty"`
-	Method      string            `json:"method,omitempty"`
+	Protocol   string            `json:"protocol,omitempty"`
+	SourceIP   string            `json:"source_ip,omitempty"`
+	DestIP     string            `json:"dest_ip,omitempty"`
+	SourcePort string            `json:"source_port,omitempty"`
+	DestPort   string            `json:"dest_port,omitempty"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	Path       string            `json:"path,omitempty"`
+	Method     string            `json:"method,omitempty"`
 }
 
 // TrafficAction defines traffic management actions
@@ -678,27 +678,27 @@ type TrafficAction struct {
 
 // LoadBalancingConfig defines load balancing configuration
 type LoadBalancingConfig struct {
-	Algorithm      LoadBalancePolicy `json:"algorithm"`
-	SessionAffinity bool             `json:"session_affinity,omitempty"`
-	AffinityType   string           `json:"affinity_type,omitempty"`
-	AffinityTTL    time.Duration    `json:"affinity_ttl,omitempty"`
+	Algorithm       LoadBalancePolicy `json:"algorithm"`
+	SessionAffinity bool              `json:"session_affinity,omitempty"`
+	AffinityType    string            `json:"affinity_type,omitempty"`
+	AffinityTTL     time.Duration     `json:"affinity_ttl,omitempty"`
 }
 
 // SSLConfiguration defines SSL/TLS configuration
 type SSLConfiguration struct {
-	Enabled      bool     `json:"enabled"`
-	CertificateID string  `json:"certificate_id"`
-	Protocols    []string `json:"protocols,omitempty"`
-	Ciphers      []string `json:"ciphers,omitempty"`
-	HSTS         bool     `json:"hsts,omitempty"`
-	Redirect     bool     `json:"redirect_http,omitempty"`
+	Enabled       bool     `json:"enabled"`
+	CertificateID string   `json:"certificate_id"`
+	Protocols     []string `json:"protocols,omitempty"`
+	Ciphers       []string `json:"ciphers,omitempty"`
+	HSTS          bool     `json:"hsts,omitempty"`
+	Redirect      bool     `json:"redirect_http,omitempty"`
 }
 
 // AuthenticationConfig defines authentication configuration
 type AuthenticationConfig struct {
-	Type     AuthenticationType `json:"type"`
+	Type     AuthenticationType     `json:"type"`
 	Config   map[string]interface{} `json:"config"`
-	Required bool               `json:"required"`
+	Required bool                   `json:"required"`
 }
 
 // RateLimitingConfig defines rate limiting configuration
@@ -713,9 +713,9 @@ type RateLimitingConfig struct {
 
 // CachingConfig defines caching configuration
 type CachingConfig struct {
-	Enabled  bool          `json:"enabled"`
-	TTL      time.Duration `json:"ttl"`
-	MaxSize  int64         `json:"max_size,omitempty"`
+	Enabled  bool           `json:"enabled"`
+	TTL      time.Duration  `json:"ttl"`
+	MaxSize  int64          `json:"max_size,omitempty"`
 	KeyRules []CacheKeyRule `json:"key_rules,omitempty"`
 }
 
@@ -735,21 +735,21 @@ type HeaderManipulationConfig struct {
 
 // HealthCheckConfig defines health check configuration
 type HealthCheckConfig struct {
-	ID       string        `json:"id"`
-	Type     HealthCheckType `json:"type"` // http, tcp, grpc
-	Path     string        `json:"path,omitempty"`
-	Port     int           `json:"port,omitempty"`
-	Interval time.Duration `json:"interval"`
-	Timeout  time.Duration `json:"timeout"`
-	Retries  int           `json:"retries"`
-	Headers  map[string]string `json:"headers,omitempty"`
+	ID       string               `json:"id"`
+	Type     HealthCheckType      `json:"type"` // http, tcp, grpc
+	Path     string               `json:"path,omitempty"`
+	Port     int                  `json:"port,omitempty"`
+	Interval time.Duration        `json:"interval"`
+	Timeout  time.Duration        `json:"timeout"`
+	Retries  int                  `json:"retries"`
+	Headers  map[string]string    `json:"headers,omitempty"`
 	Expected *HealthCheckExpected `json:"expected,omitempty"`
 }
 
 // HealthCheckExpected defines expected health check results
 type HealthCheckExpected struct {
-	StatusCode int    `json:"status_code,omitempty"`
-	Body       string `json:"body,omitempty"`
+	StatusCode int               `json:"status_code,omitempty"`
+	Body       string            `json:"body,omitempty"`
 	Headers    map[string]string `json:"headers,omitempty"`
 }
 
@@ -771,19 +771,19 @@ type RewriteRule struct {
 
 // HealthCheck represents health check configuration
 type HealthCheck struct {
-	Type     HealthCheckType `json:"type"`
-	Config   *HealthCheckConfig `json:"config"`
-	Status   HealthStatusType `json:"status"`
-	LastCheck *time.Time      `json:"last_check,omitempty"`
-	Message  string          `json:"message,omitempty"`
+	Type      HealthCheckType    `json:"type"`
+	Config    *HealthCheckConfig `json:"config"`
+	Status    HealthStatusType   `json:"status"`
+	LastCheck *time.Time         `json:"last_check,omitempty"`
+	Message   string             `json:"message,omitempty"`
 }
 
 // CircuitBreakerConfig defines circuit breaker configuration
 type CircuitBreakerConfig struct {
-	Enabled           bool          `json:"enabled"`
-	FailureThreshold  int           `json:"failure_threshold"`
-	RecoveryTimeout   time.Duration `json:"recovery_timeout"`
-	TestRequestCount  int           `json:"test_request_count"`
+	Enabled          bool          `json:"enabled"`
+	FailureThreshold int           `json:"failure_threshold"`
+	RecoveryTimeout  time.Duration `json:"recovery_timeout"`
+	TestRequestCount int           `json:"test_request_count"`
 }
 
 // RetryPolicy defines retry policy configuration
@@ -797,19 +797,19 @@ type RetryPolicy struct {
 
 // ResourceConstraints defines resource constraints
 type ResourceConstraints struct {
-	CPULimit     string `json:"cpu_limit,omitempty"`
-	CPURequest   string `json:"cpu_request,omitempty"`
-	MemoryLimit  string `json:"memory_limit,omitempty"`
+	CPULimit      string `json:"cpu_limit,omitempty"`
+	CPURequest    string `json:"cpu_request,omitempty"`
+	MemoryLimit   string `json:"memory_limit,omitempty"`
 	MemoryRequest string `json:"memory_request,omitempty"`
 }
 
 // SecurityConfig defines security configuration
 type SecurityConfig struct {
-	RunAsUser     *int64  `json:"run_as_user,omitempty"`
-	RunAsGroup    *int64  `json:"run_as_group,omitempty"`
-	ReadOnlyRoot  bool    `json:"read_only_root,omitempty"`
-	Privileged    bool    `json:"privileged,omitempty"`
-	Capabilities  *SecurityCapabilities `json:"capabilities,omitempty"`
+	RunAsUser    *int64                `json:"run_as_user,omitempty"`
+	RunAsGroup   *int64                `json:"run_as_group,omitempty"`
+	ReadOnlyRoot bool                  `json:"read_only_root,omitempty"`
+	Privileged   bool                  `json:"privileged,omitempty"`
+	Capabilities *SecurityCapabilities `json:"capabilities,omitempty"`
 }
 
 // SecurityCapabilities defines Linux capabilities
@@ -832,18 +832,18 @@ type Event struct {
 
 // Subscription represents an event subscription
 type Subscription struct {
-	ID       string    `json:"id"`
-	Pattern  string    `json:"pattern"`
-	Handler  string    `json:"handler"`
-	Active   bool      `json:"active"`
-	Created  time.Time `json:"created"`
+	ID      string    `json:"id"`
+	Pattern string    `json:"pattern"`
+	Handler string    `json:"handler"`
+	Active  bool      `json:"active"`
+	Created time.Time `json:"created"`
 }
 
 // HealthStatus represents health status information
 type HealthStatus struct {
-	Status    HealthStatusType `json:"status"`
-	Message   string           `json:"message,omitempty"`
-	Timestamp time.Time        `json:"timestamp"`
+	Status    HealthStatusType       `json:"status"`
+	Message   string                 `json:"message,omitempty"`
+	Timestamp time.Time              `json:"timestamp"`
 	Details   map[string]interface{} `json:"details,omitempty"`
 }
 
@@ -901,8 +901,8 @@ type RequestMetrics struct {
 
 // MetricPoint represents a single metric data point
 type MetricPoint struct {
-	Timestamp time.Time   `json:"timestamp"`
-	Value     float64     `json:"value"`
+	Timestamp time.Time         `json:"timestamp"`
+	Value     float64           `json:"value"`
 	Labels    map[string]string `json:"labels,omitempty"`
 }
 
@@ -979,16 +979,16 @@ type BackupSpec struct {
 
 // Backup represents a backup instance
 type Backup struct {
-	ID          string     `json:"id"`
-	ServiceID   string     `json:"service_id"`
-	Type        BackupType `json:"type"`
-	Status      BackupStatus `json:"status"`
-	Path        string     `json:"path"`
-	Size        int64      `json:"size"`
-	Checksum    string     `json:"checksum"`
-	StartedAt   time.Time  `json:"started_at"`
-	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	Error       string     `json:"error,omitempty"`
+	ID          string            `json:"id"`
+	ServiceID   string            `json:"service_id"`
+	Type        BackupType        `json:"type"`
+	Status      BackupStatus      `json:"status"`
+	Path        string            `json:"path"`
+	Size        int64             `json:"size"`
+	Checksum    string            `json:"checksum"`
+	StartedAt   time.Time         `json:"started_at"`
+	CompletedAt *time.Time        `json:"completed_at,omitempty"`
+	Error       string            `json:"error,omitempty"`
 	Labels      map[string]string `json:"labels,omitempty"`
 }
 
@@ -1003,15 +1003,15 @@ type BackupValidation struct {
 
 // BackupSchedule represents a backup schedule
 type BackupSchedule struct {
-	ID        string        `json:"id"`
-	ServiceID string        `json:"service_id"`
-	Spec      *BackupSpec   `json:"spec"`
-	Schedule  string        `json:"schedule"` // cron expression
-	Enabled   bool          `json:"enabled"`
-	NextRun   *time.Time    `json:"next_run,omitempty"`
-	LastRun   *time.Time    `json:"last_run,omitempty"`
-	CreatedAt time.Time     `json:"created_at"`
-	UpdatedAt time.Time     `json:"updated_at"`
+	ID        string      `json:"id"`
+	ServiceID string      `json:"service_id"`
+	Spec      *BackupSpec `json:"spec"`
+	Schedule  string      `json:"schedule"` // cron expression
+	Enabled   bool        `json:"enabled"`
+	NextRun   *time.Time  `json:"next_run,omitempty"`
+	LastRun   *time.Time  `json:"last_run,omitempty"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
 }
 
 // Additional specification types
@@ -1037,11 +1037,11 @@ type VolumeSpec struct {
 
 // Volume represents a storage volume
 type Volume struct {
-	Name      string            `json:"name"`
-	Driver    string            `json:"driver"`
-	Mountpoint string           `json:"mountpoint"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	CreatedAt time.Time         `json:"created_at"`
+	Name       string            `json:"name"`
+	Driver     string            `json:"driver"`
+	Mountpoint string            `json:"mountpoint"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	CreatedAt  time.Time         `json:"created_at"`
 }
 
 // Container represents a container instance
@@ -1059,21 +1059,21 @@ type Container struct {
 
 // ContainerVolume represents a container volume mount
 type ContainerVolume struct {
-	Type        string `json:"type"`   // bind, volume, tmpfs
-	Source      string `json:"source"` // host path or volume name
-	Destination string `json:"destination"` // container path
+	Type        string `json:"type"`           // bind, volume, tmpfs
+	Source      string `json:"source"`         // host path or volume name
+	Destination string `json:"destination"`    // container path
 	Mode        string `json:"mode,omitempty"` // rw, ro
 }
 
 // ContainerStats represents container resource statistics
 type ContainerStats struct {
-	ContainerID   string                 `json:"container_id"`
-	Timestamp     time.Time              `json:"timestamp"`
-	CPU           *CPUMetrics            `json:"cpu"`
-	Memory        *MemoryMetrics         `json:"memory"`
-	Network       map[string]*NetworkMetrics `json:"network"`
-	BlockIO       *BlockIOMetrics        `json:"block_io,omitempty"`
-	PIDs          *PIDMetrics            `json:"pids,omitempty"`
+	ContainerID string                     `json:"container_id"`
+	Timestamp   time.Time                  `json:"timestamp"`
+	CPU         *CPUMetrics                `json:"cpu"`
+	Memory      *MemoryMetrics             `json:"memory"`
+	Network     map[string]*NetworkMetrics `json:"network"`
+	BlockIO     *BlockIOMetrics            `json:"block_io,omitempty"`
+	PIDs        *PIDMetrics                `json:"pids,omitempty"`
 }
 
 // BlockIOMetrics represents block I/O metrics
@@ -1101,11 +1101,11 @@ type ExecutionResult struct {
 
 // RuntimeInfo represents container runtime information
 type RuntimeInfo struct {
-	Name         string `json:"name"`
-	Version      string `json:"version"`
-	APIVersion   string `json:"api_version"`
-	Architecture string `json:"architecture"`
-	OS           string `json:"os"`
+	Name          string `json:"name"`
+	Version       string `json:"version"`
+	APIVersion    string `json:"api_version"`
+	Architecture  string `json:"architecture"`
+	OS            string `json:"os"`
 	KernelVersion string `json:"kernel_version"`
 }
 
@@ -1138,11 +1138,11 @@ type PruneResult struct {
 
 // ContainerEvent represents a container-related event
 type ContainerEvent struct {
-	ID          string    `json:"id"`
-	ContainerID string    `json:"container_id"`
-	Action      string    `json:"action"`
-	Actor       string    `json:"actor"`
-	Timestamp   time.Time `json:"timestamp"`
+	ID          string            `json:"id"`
+	ContainerID string            `json:"container_id"`
+	Action      string            `json:"action"`
+	Actor       string            `json:"actor"`
+	Timestamp   time.Time         `json:"timestamp"`
 	Attributes  map[string]string `json:"attributes,omitempty"`
 }
 
@@ -1157,15 +1157,15 @@ type SearchResult struct {
 
 // ExecConfig represents command execution configuration
 type ExecConfig struct {
-	Command     []string `json:"command"`
-	WorkingDir  string   `json:"working_dir,omitempty"`
-	Environment []string `json:"environment,omitempty"`
-	User        string   `json:"user,omitempty"`
-	Privileged  bool     `json:"privileged,omitempty"`
-	TTY         bool     `json:"tty,omitempty"`
-	AttachStdout bool    `json:"attach_stdout"`
-	AttachStderr bool    `json:"attach_stderr"`
-	PolicyRules []string `json:"policy_rules,omitempty"`
+	Command      []string `json:"command"`
+	WorkingDir   string   `json:"working_dir,omitempty"`
+	Environment  []string `json:"environment,omitempty"`
+	User         string   `json:"user,omitempty"`
+	Privileged   bool     `json:"privileged,omitempty"`
+	TTY          bool     `json:"tty,omitempty"`
+	AttachStdout bool     `json:"attach_stdout"`
+	AttachStderr bool     `json:"attach_stderr"`
+	PolicyRules  []string `json:"policy_rules,omitempty"`
 }
 
 // ExecResult represents command execution result in container
@@ -1188,22 +1188,22 @@ type ComposeConfig struct {
 
 // ComposeService represents a service in Docker Compose
 type ComposeService struct {
-	Image        string                 `json:"image,omitempty"`
-	Build        *ComposeBuild          `json:"build,omitempty"`
-	Ports        []string               `json:"ports,omitempty"`
-	Environment  map[string]string      `json:"environment,omitempty"`
-	Volumes      []string               `json:"volumes,omitempty"`
-	Networks     []string               `json:"networks,omitempty"`
-	DependsOn    []string               `json:"depends_on,omitempty"`
-	Command      []string               `json:"command,omitempty"`
-	Entrypoint   []string               `json:"entrypoint,omitempty"`
-	WorkingDir   string                 `json:"working_dir,omitempty"`
-	User         string                 `json:"user,omitempty"`
-	Restart      string                 `json:"restart,omitempty"`
-	HealthCheck  *ComposeHealthCheck    `json:"healthcheck,omitempty"`
-	Labels       map[string]string      `json:"labels,omitempty"`
-	Logging      *ComposeLogging        `json:"logging,omitempty"`
-	Deploy       *ComposeDeploy         `json:"deploy,omitempty"`
+	Image       string              `json:"image,omitempty"`
+	Build       *ComposeBuild       `json:"build,omitempty"`
+	Ports       []string            `json:"ports,omitempty"`
+	Environment map[string]string   `json:"environment,omitempty"`
+	Volumes     []string            `json:"volumes,omitempty"`
+	Networks    []string            `json:"networks,omitempty"`
+	DependsOn   []string            `json:"depends_on,omitempty"`
+	Command     []string            `json:"command,omitempty"`
+	Entrypoint  []string            `json:"entrypoint,omitempty"`
+	WorkingDir  string              `json:"working_dir,omitempty"`
+	User        string              `json:"user,omitempty"`
+	Restart     string              `json:"restart,omitempty"`
+	HealthCheck *ComposeHealthCheck `json:"healthcheck,omitempty"`
+	Labels      map[string]string   `json:"labels,omitempty"`
+	Logging     *ComposeLogging     `json:"logging,omitempty"`
+	Deploy      *ComposeDeploy      `json:"deploy,omitempty"`
 }
 
 // ComposeBuild represents build configuration
@@ -1231,10 +1231,10 @@ type ComposeLogging struct {
 
 // ComposeDeploy represents deployment configuration
 type ComposeDeploy struct {
-	Replicas  int                      `json:"replicas,omitempty"`
-	Resources *ComposeResources        `json:"resources,omitempty"`
-	Placement *ComposePlacement        `json:"placement,omitempty"`
-	Labels    map[string]string        `json:"labels,omitempty"`
+	Replicas  int               `json:"replicas,omitempty"`
+	Resources *ComposeResources `json:"resources,omitempty"`
+	Placement *ComposePlacement `json:"placement,omitempty"`
+	Labels    map[string]string `json:"labels,omitempty"`
 }
 
 // ComposeResources represents resource constraints
@@ -1293,12 +1293,12 @@ type Service struct {
 
 // Image represents a container image
 type Image struct {
-	ID          string            `json:"id"`
-	Repository  string            `json:"repository"`
-	Tag         string            `json:"tag"`
-	Size        int64             `json:"size"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Created     time.Time         `json:"created"`
+	ID         string            `json:"id"`
+	Repository string            `json:"repository"`
+	Tag        string            `json:"tag"`
+	Size       int64             `json:"size"`
+	Labels     map[string]string `json:"labels,omitempty"`
+	Created    time.Time         `json:"created"`
 }
 
 // Audit entities
@@ -1335,39 +1335,39 @@ type AuditEvent struct {
 
 // SecurityPolicy represents security policy
 type SecurityPolicy struct {
-	ID              string         `json:"id"`
-	Name            string         `json:"name"`
-	Description     string         `json:"description"`
-	AllowPrivileged bool           `json:"allow_privileged"`
-	ReadOnlyRootfs  bool           `json:"read_only_rootfs"`
-	Rules           []PolicyRule   `json:"rules"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	Description     string            `json:"description"`
+	AllowPrivileged bool              `json:"allow_privileged"`
+	ReadOnlyRootfs  bool              `json:"read_only_rootfs"`
+	Rules           []PolicyRule      `json:"rules"`
 	Labels          map[string]string `json:"labels,omitempty"`
-	CreatedAt       time.Time      `json:"created_at"`
-	UpdatedAt       time.Time      `json:"updated_at"`
+	CreatedAt       time.Time         `json:"created_at"`
+	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 // PolicyRule represents a security policy rule
 type PolicyRule struct {
-	Name      string           `json:"name"`
-	Condition string           `json:"condition"`
-	Action    PolicyAction     `json:"action"`
-	Severity  PolicySeverity   `json:"severity"`
-	Message   string           `json:"message,omitempty"`
+	Name      string         `json:"name"`
+	Condition string         `json:"condition"`
+	Action    PolicyAction   `json:"action"`
+	Severity  PolicySeverity `json:"severity"`
+	Message   string         `json:"message,omitempty"`
 }
 
 // AccessRule represents access control rule
 type AccessRule struct {
-	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Resource    string            `json:"resource"`
-	Action      string            `json:"action"`
-	Subject     string            `json:"subject"`
-	Conditions  map[string]string `json:"conditions,omitempty"`
-	Effect      AccessEffect      `json:"effect"` // allow, deny
-	Priority    int               `json:"priority"`
-	Enabled     bool              `json:"enabled"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
+	ID         string            `json:"id"`
+	Name       string            `json:"name"`
+	Resource   string            `json:"resource"`
+	Action     string            `json:"action"`
+	Subject    string            `json:"subject"`
+	Conditions map[string]string `json:"conditions,omitempty"`
+	Effect     AccessEffect      `json:"effect"` // allow, deny
+	Priority   int               `json:"priority"`
+	Enabled    bool              `json:"enabled"`
+	CreatedAt  time.Time         `json:"created_at"`
+	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
 // AccessRequest represents access control request
@@ -1381,10 +1381,10 @@ type AccessRequest struct {
 
 // AccessDecision represents access control decision
 type AccessDecision struct {
-	Decision  AccessEffect      `json:"decision"`
-	Reason    string            `json:"reason"`
-	Rules     []string          `json:"applied_rules,omitempty"`
-	Timestamp time.Time         `json:"timestamp"`
+	Decision  AccessEffect `json:"decision"`
+	Reason    string       `json:"reason"`
+	Rules     []string     `json:"applied_rules,omitempty"`
+	Timestamp time.Time    `json:"timestamp"`
 }
 
 // AccessLog represents access log entry
@@ -1402,41 +1402,41 @@ type AccessLog struct {
 
 // AccessLogFilter represents access log filtering criteria
 type AccessLogFilter struct {
-	Users     []string     `json:"users,omitempty"`
-	Resources []string     `json:"resources,omitempty"`
-	Actions   []string     `json:"actions,omitempty"`
+	Users     []string       `json:"users,omitempty"`
+	Resources []string       `json:"resources,omitempty"`
+	Actions   []string       `json:"actions,omitempty"`
 	Decisions []AccessEffect `json:"decisions,omitempty"`
-	After     *time.Time   `json:"after,omitempty"`
-	Before    *time.Time   `json:"before,omitempty"`
-	Limit     int          `json:"limit,omitempty"`
+	After     *time.Time     `json:"after,omitempty"`
+	Before    *time.Time     `json:"before,omitempty"`
+	Limit     int            `json:"limit,omitempty"`
 }
 
 // SecurityScanResult represents security scan result
 type SecurityScanResult struct {
-	ScanID        string               `json:"scan_id"`
-	ResourceID    string               `json:"resource_id"`
-	ResourceType  string               `json:"resource_type"`
-	Status        ScanStatus           `json:"status"`
-	Vulnerabilities []Vulnerability    `json:"vulnerabilities,omitempty"`
+	ScanID           string            `json:"scan_id"`
+	ResourceID       string            `json:"resource_id"`
+	ResourceType     string            `json:"resource_type"`
+	Status           ScanStatus        `json:"status"`
+	Vulnerabilities  []Vulnerability   `json:"vulnerabilities,omitempty"`
 	PolicyViolations []PolicyViolation `json:"policy_violations,omitempty"`
-	Score         float64              `json:"score"`
-	StartedAt     time.Time            `json:"started_at"`
-	CompletedAt   *time.Time           `json:"completed_at,omitempty"`
-	Error         string               `json:"error,omitempty"`
+	Score            float64           `json:"score"`
+	StartedAt        time.Time         `json:"started_at"`
+	CompletedAt      *time.Time        `json:"completed_at,omitempty"`
+	Error            string            `json:"error,omitempty"`
 }
 
 // Vulnerability represents a security vulnerability
 type Vulnerability struct {
-	ID          string             `json:"id"`
-	CVE         string             `json:"cve,omitempty"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
+	ID          string                `json:"id"`
+	CVE         string                `json:"cve,omitempty"`
+	Title       string                `json:"title"`
+	Description string                `json:"description"`
 	Severity    VulnerabilitySeverity `json:"severity"`
-	Score       float64            `json:"score,omitempty"`
-	Package     string             `json:"package,omitempty"`
-	Version     string             `json:"version,omitempty"`
-	FixedIn     string             `json:"fixed_in,omitempty"`
-	References  []string           `json:"references,omitempty"`
+	Score       float64               `json:"score,omitempty"`
+	Package     string                `json:"package,omitempty"`
+	Version     string                `json:"version,omitempty"`
+	FixedIn     string                `json:"fixed_in,omitempty"`
+	References  []string              `json:"references,omitempty"`
 }
 
 // PolicyViolation represents a policy violation
@@ -1474,18 +1474,18 @@ type NetworkConfiguration struct {
 
 // ContainerConfiguration represents container configuration
 type ContainerConfiguration struct {
-	DefaultRuntime        string                `json:"default_runtime"`
-	DefaultSecurityConfig *SecurityConfig       `json:"default_security_config,omitempty"`
-	ResourceLimits        *ResourceConstraints  `json:"resource_limits,omitempty"`
-	RegistryConfig        *RegistryConfig       `json:"registry_config,omitempty"`
-	LoggingConfig         *LoggingConfig        `json:"logging_config,omitempty"`
+	DefaultRuntime        string               `json:"default_runtime"`
+	DefaultSecurityConfig *SecurityConfig      `json:"default_security_config,omitempty"`
+	ResourceLimits        *ResourceConstraints `json:"resource_limits,omitempty"`
+	RegistryConfig        *RegistryConfig      `json:"registry_config,omitempty"`
+	LoggingConfig         *LoggingConfig       `json:"logging_config,omitempty"`
 }
 
 // RegistryConfig represents registry configuration
 type RegistryConfig struct {
-	DefaultRegistry string                       `json:"default_registry"`
-	Registries      map[string]*RegistrySettings `json:"registries,omitempty"`
-	InsecureRegistries []string                  `json:"insecure_registries,omitempty"`
+	DefaultRegistry    string                       `json:"default_registry"`
+	Registries         map[string]*RegistrySettings `json:"registries,omitempty"`
+	InsecureRegistries []string                     `json:"insecure_registries,omitempty"`
 }
 
 // RegistrySettings represents registry settings
@@ -1506,11 +1506,11 @@ type LoggingConfig struct {
 
 // ServiceTopology represents service topology information
 type ServiceTopology struct {
-	ServiceName string                    `json:"service_name"`
-	Backends    []Backend                 `json:"backends"`
-	Dependencies []ServiceDependency      `json:"dependencies,omitempty"`
-	Dependents  []ServiceDependency       `json:"dependents,omitempty"`
-	Networks    []NetworkTopology         `json:"networks,omitempty"`
+	ServiceName  string              `json:"service_name"`
+	Backends     []Backend           `json:"backends"`
+	Dependencies []ServiceDependency `json:"dependencies,omitempty"`
+	Dependents   []ServiceDependency `json:"dependents,omitempty"`
+	Networks     []NetworkTopology   `json:"networks,omitempty"`
 }
 
 // ServiceDependency represents service dependency
@@ -1531,12 +1531,12 @@ type NetworkTopology struct {
 
 // EventFilter represents event filtering criteria
 type EventFilter struct {
-	Types     []EventType   `json:"types,omitempty"`
-	Sources   []string      `json:"sources,omitempty"`
-	After     *time.Time    `json:"after,omitempty"`
-	Before    *time.Time    `json:"before,omitempty"`
-	Severity  []EventSeverity `json:"severity,omitempty"`
-	Limit     int           `json:"limit,omitempty"`
+	Types    []EventType     `json:"types,omitempty"`
+	Sources  []string        `json:"sources,omitempty"`
+	After    *time.Time      `json:"after,omitempty"`
+	Before   *time.Time      `json:"before,omitempty"`
+	Severity []EventSeverity `json:"severity,omitempty"`
+	Limit    int             `json:"limit,omitempty"`
 }
 
 // RateLimit represents rate limit configuration
@@ -1555,15 +1555,17 @@ type RedirectAction struct {
 // Additional enumeration types
 
 type ProxyType string
+
 const (
-	ProxyTypeHTTP       ProxyType = "http"
-	ProxyTypeHTTPS      ProxyType = "https"
-	ProxyTypeTCP        ProxyType = "tcp"
-	ProxyTypeUDP        ProxyType = "udp"
-	ProxyTypeGRPC       ProxyType = "grpc"
+	ProxyTypeHTTP  ProxyType = "http"
+	ProxyTypeHTTPS ProxyType = "https"
+	ProxyTypeTCP   ProxyType = "tcp"
+	ProxyTypeUDP   ProxyType = "udp"
+	ProxyTypeGRPC  ProxyType = "grpc"
 )
 
 type PathMatchType string
+
 const (
 	PathMatchExact  PathMatchType = "exact"
 	PathMatchPrefix PathMatchType = "prefix"
@@ -1571,16 +1573,18 @@ const (
 )
 
 type BackendType string
+
 const (
-	BackendTypeHTTP       BackendType = "http"
-	BackendTypeHTTPS      BackendType = "https"
-	BackendTypeTCP        BackendType = "tcp"
-	BackendTypeUDP        BackendType = "udp"
-	BackendTypeGRPC       BackendType = "grpc"
+	BackendTypeHTTP         BackendType = "http"
+	BackendTypeHTTPS        BackendType = "https"
+	BackendTypeTCP          BackendType = "tcp"
+	BackendTypeUDP          BackendType = "udp"
+	BackendTypeGRPC         BackendType = "grpc"
 	BackendTypeLoadBalancer BackendType = "load_balancer"
 )
 
 type HealthCheckType string
+
 const (
 	HealthCheckTypeHTTP HealthCheckType = "http"
 	HealthCheckTypeTCP  HealthCheckType = "tcp"
@@ -1589,12 +1593,14 @@ const (
 )
 
 type LoadBalancerType string
+
 const (
 	LoadBalancerTypeLayer4 LoadBalancerType = "layer4"
 	LoadBalancerTypeLayer7 LoadBalancerType = "layer7"
 )
 
 type CertificateType string
+
 const (
 	CertificateTypeTLS        CertificateType = "tls"
 	CertificateTypeMutualTLS  CertificateType = "mutual_tls"
@@ -1603,6 +1609,7 @@ const (
 )
 
 type AuthenticationType string
+
 const (
 	AuthenticationTypeBasic  AuthenticationType = "basic"
 	AuthenticationTypeOAuth2 AuthenticationType = "oauth2"
@@ -1612,12 +1619,14 @@ const (
 )
 
 type TrafficDirection string
+
 const (
 	TrafficDirectionIngress TrafficDirection = "ingress"
 	TrafficDirectionEgress  TrafficDirection = "egress"
 )
 
 type TrafficActionType string
+
 const (
 	TrafficActionAllow     TrafficActionType = "allow"
 	TrafficActionDeny      TrafficActionType = "deny"
@@ -1626,6 +1635,7 @@ const (
 )
 
 type PolicyAction string
+
 const (
 	PolicyActionAllow PolicyAction = "allow"
 	PolicyActionDeny  PolicyAction = "deny"
@@ -1634,6 +1644,7 @@ const (
 )
 
 type PolicySeverity string
+
 const (
 	PolicySeverityLow      PolicySeverity = "low"
 	PolicySeverityMedium   PolicySeverity = "medium"
@@ -1642,12 +1653,14 @@ const (
 )
 
 type AccessEffect string
+
 const (
 	AccessEffectAllow AccessEffect = "allow"
 	AccessEffectDeny  AccessEffect = "deny"
 )
 
 type EventSeverity string
+
 const (
 	EventSeverityInfo     EventSeverity = "info"
 	EventSeverityWarning  EventSeverity = "warning"
@@ -1656,6 +1669,7 @@ const (
 )
 
 type AlertSeverity string
+
 const (
 	AlertSeverityInfo     AlertSeverity = "info"
 	AlertSeverityWarning  AlertSeverity = "warning"
@@ -1664,15 +1678,17 @@ const (
 )
 
 type BackupStatus string
+
 const (
-	BackupStatusPending    BackupStatus = "pending"
-	BackupStatusRunning    BackupStatus = "running"
-	BackupStatusCompleted  BackupStatus = "completed"
-	BackupStatusFailed     BackupStatus = "failed"
-	BackupStatusCancelled  BackupStatus = "cancelled"
+	BackupStatusPending   BackupStatus = "pending"
+	BackupStatusRunning   BackupStatus = "running"
+	BackupStatusCompleted BackupStatus = "completed"
+	BackupStatusFailed    BackupStatus = "failed"
+	BackupStatusCancelled BackupStatus = "cancelled"
 )
 
 type ScanStatus string
+
 const (
 	ScanStatusPending   ScanStatus = "pending"
 	ScanStatusRunning   ScanStatus = "running"
@@ -1681,6 +1697,7 @@ const (
 )
 
 type VulnerabilitySeverity string
+
 const (
 	VulnerabilitySeverityInfo     VulnerabilitySeverity = "info"
 	VulnerabilitySeverityLow      VulnerabilitySeverity = "low"
@@ -1690,15 +1707,17 @@ const (
 )
 
 type RecommendationType string
+
 const (
-	RecommendationTypeSecurity      RecommendationType = "security"
-	RecommendationTypePerformance   RecommendationType = "performance"
-	RecommendationTypeReliability   RecommendationType = "reliability"
-	RecommendationTypeCost          RecommendationType = "cost"
-	RecommendationTypeCompliance    RecommendationType = "compliance"
+	RecommendationTypeSecurity    RecommendationType = "security"
+	RecommendationTypePerformance RecommendationType = "performance"
+	RecommendationTypeReliability RecommendationType = "reliability"
+	RecommendationTypeCost        RecommendationType = "cost"
+	RecommendationTypeCompliance  RecommendationType = "compliance"
 )
 
 type ContainerStatus string
+
 const (
 	ContainerStatusCreated    ContainerStatus = "created"
 	ContainerStatusRunning    ContainerStatus = "running"
@@ -1722,6 +1741,7 @@ type ServiceEvent struct {
 }
 
 type ServiceEventType string
+
 const (
 	ServiceEventRegistered   ServiceEventType = "registered"
 	ServiceEventUnregistered ServiceEventType = "unregistered"
@@ -1742,18 +1762,18 @@ type AuditFilter struct {
 
 // ContainerSpec defines container creation specification
 type ContainerSpec struct {
-	Name         string               `json:"name"`
-	Image        string               `json:"image"`
-	Tag          string               `json:"tag,omitempty"`
-	Command      []string             `json:"command,omitempty"`
-	Args         []string             `json:"args,omitempty"`
-	Environment  map[string]string    `json:"environment,omitempty"`
-	Ports        []ContainerPort      `json:"ports,omitempty"`
-	Volumes      []ContainerVolume `json:"volumes,omitempty"`
-	Resources    *ResourceRequirements `json:"resources,omitempty"`
-	Labels       map[string]string    `json:"labels,omitempty"`
-	NetworkMode  string               `json:"network_mode,omitempty"`
-	RestartPolicy string              `json:"restart_policy,omitempty"`
+	Name          string                `json:"name"`
+	Image         string                `json:"image"`
+	Tag           string                `json:"tag,omitempty"`
+	Command       []string              `json:"command,omitempty"`
+	Args          []string              `json:"args,omitempty"`
+	Environment   map[string]string     `json:"environment,omitempty"`
+	Ports         []ContainerPort       `json:"ports,omitempty"`
+	Volumes       []ContainerVolume     `json:"volumes,omitempty"`
+	Resources     *ResourceRequirements `json:"resources,omitempty"`
+	Labels        map[string]string     `json:"labels,omitempty"`
+	NetworkMode   string                `json:"network_mode,omitempty"`
+	RestartPolicy string                `json:"restart_policy,omitempty"`
 }
 
 // ContainerPort defines container port mapping
@@ -1784,12 +1804,12 @@ type ResourceRequests struct {
 
 // ServiceInstanceStatus represents the status of a service instance (distinct from ServiceStatus struct)
 type ServiceInstanceStatus struct {
-	InstanceID    string       `json:"instance_id"`
-	ServiceName   string       `json:"service_name"`
-	State         ServiceState `json:"state"`
-	Health        HealthStatusType `json:"health"`
-	StartedAt     *time.Time   `json:"started_at,omitempty"`
-	UpdatedAt     time.Time    `json:"updated_at"`
-	Message       string       `json:"message,omitempty"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	InstanceID  string                 `json:"instance_id"`
+	ServiceName string                 `json:"service_name"`
+	State       ServiceState           `json:"state"`
+	Health      HealthStatusType       `json:"health"`
+	StartedAt   *time.Time             `json:"started_at,omitempty"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	Message     string                 `json:"message,omitempty"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }

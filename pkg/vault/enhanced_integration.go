@@ -194,35 +194,51 @@ func (vc *EnhancedVaultContainer) createCompositeSecretStore(ctx context.Context
 func (vc *EnhancedVaultContainer) createVaultAuthenticator(ctx context.Context, container *architecture.EnhancedContainer) (interface{}, error) {
 	client, err := architecture.GetTyped[*api.Client](container, "vaultClient")
 	if err != nil || client == nil {
+		vc.rc.Log.Debug("No vault client available, skipping authenticator")
 		return (vault.VaultAuthenticator)(nil), nil
 	}
 	
-	// TODO: Implement VaultAuthenticator when interface is defined
-	vc.rc.Log.Debug("Vault authenticator not yet implemented")
-	return (vault.VaultAuthenticator)(nil), nil
+	logger := vc.rc.Log.Named("vault.auth")
+	authenticator := infra.NewVaultAuthProvider(client, logger)
+	
+	vc.rc.Log.Info("Vault authenticator created successfully")
+	return authenticator, nil
 }
 
 func (vc *EnhancedVaultContainer) createVaultManager(ctx context.Context, container *architecture.EnhancedContainer) (interface{}, error) {
 	client, err := architecture.GetTyped[*api.Client](container, "vaultClient")
 	if err != nil || client == nil {
+		vc.rc.Log.Debug("No vault client available, skipping manager")
 		return (vault.VaultManager)(nil), nil
 	}
 	
-	// TODO: Implement VaultManager when interface is defined
-	vc.rc.Log.Debug("Vault manager not yet implemented")
-	return (vault.VaultManager)(nil), nil
+	logger := vc.rc.Log.Named("vault.manager")
+	manager := infra.NewVaultManager(client, logger)
+	
+	vc.rc.Log.Info("Vault manager created successfully")
+	return manager, nil
 }
 
 func (vc *EnhancedVaultContainer) createConfigRepository(ctx context.Context, container *architecture.EnhancedContainer) (interface{}, error) {
-	// TODO: Implement ConfigRepository - could use file-based or vault-based storage
-	vc.rc.Log.Debug("Config repository not yet implemented")
-	return (vault.ConfigRepository)(nil), nil
+	// Use file-based config repository by default
+	logger := vc.rc.Log.Named("vault.config")
+	configDir := "/etc/eos"
+	
+	configRepo := infra.NewFileConfigRepository(configDir, logger)
+	
+	vc.rc.Log.Info("File-based config repository created", zap.String("dir", configDir))
+	return configRepo, nil
 }
 
 func (vc *EnhancedVaultContainer) createAuditRepository(ctx context.Context, container *architecture.EnhancedContainer) (interface{}, error) {
-	// TODO: Implement AuditRepository - could use file-based logging to /var/log/eos
-	vc.rc.Log.Debug("Audit repository not yet implemented")
-	return (vault.AuditRepository)(nil), nil
+	// Use file-based audit repository
+	logger := vc.rc.Log.Named("vault.audit")
+	logDir := "/var/log/eos"
+	
+	auditRepo := infra.NewFileAuditRepository(logDir, logger)
+	
+	vc.rc.Log.Info("File-based audit repository created", zap.String("dir", logDir))
+	return auditRepo, nil
 }
 
 func (vc *EnhancedVaultContainer) createVaultService(ctx context.Context, container *architecture.EnhancedContainer) (interface{}, error) {
