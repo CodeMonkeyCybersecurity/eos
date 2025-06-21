@@ -1,12 +1,15 @@
 # This workflow will triage pull requests and apply a label based on the
 # paths that are modified in the pull request.
 #
-# To use this workflow, you will need to set up a .github/labeler.yml
-# file with configuration.  For more information, see:
-# https://github.com/actions/labeler
+# This workflow is currently disabled in favor of label-simple.yml
+# which doesn't require label creation permissions.
 
-name: Labeler
-on: [pull_request_target]
+name: Labeler (Disabled)
+on: 
+  workflow_dispatch:
+  # Disabled - use label-simple.yml instead
+  # pull_request:
+  #   types: [opened, edited, synchronize]
 
 jobs:
   label:
@@ -15,6 +18,12 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/labeler@v4
-        with:
-          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Workflow disabled
+        run: |
+          echo "🏷️ This labeler workflow is disabled"
+          echo "Using label-simple.yml instead which doesn't require label creation permissions"
+          echo ""
+          echo "To re-enable this workflow:"
+          echo "1. Create repository labels: ./scripts/setup-github-labels.sh"
+          echo "2. Uncomment the pull_request trigger above"
+          echo "3. Disable label-simple.yml workflow"

@@ -1,0 +1,100 @@
+# Simple labeler workflow that doesn't require label creation permissions
+name: Simple Labeler
+
+on: 
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Apply labels based on changed files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          
+          echo "🏷️ Analyzing changed files in PR #${{ github.event.number }}"
+          
+          # Get list of changed files
+          git diff --name-only origin/${{ github.base_ref }}...HEAD > changed_files.txt
+          
+          echo "📁 Changed files:"
+          cat changed_files.txt
+          echo ""
+          
+          # Function to add label if it doesn't exist
+          add_label() {
+            local label="$1"
+            echo "🏷️ Attempting to add label: $label"
+            
+            # Try to add the label, but don't fail if it doesn't exist
+            gh pr edit ${{ github.event.number }} --add-label "$label" 2>/dev/null && \
+              echo "✅ Added label: $label" || \
+              echo "⚠️ Could not add label '$label' (may not exist in repository)"
+          }
+          
+          # Check for documentation changes
+          if grep -E '\.(md|txt)$|README|SECURITY|LICENSE' changed_files.txt; then
+            add_label "documentation"
+          fi
+          
+          # Check for CLI changes
+          if grep -E '^(main\.go|cmd/|policies/|sql/)' changed_files.txt; then
+            add_label "cli"
+          fi
+          
+          # Check for Ansible changes
+          if grep -E '^ansible/' changed_files.txt; then
+            add_label "ansible"
+          fi
+          
+          # Check for script changes
+          if grep -E '^scripts/|install\.|setupGo\.sh|uninstall\.sh' changed_files.txt; then
+            add_label "scripts"
+          fi
+          
+          # Check for container package changes
+          if grep -E '^pkg/(container|docker)/' changed_files.txt; then
+            add_label "pkg-container"
+          fi
+          
+          # Check for vault package changes
+          if grep -E '^pkg/vault/' changed_files.txt; then
+            add_label "pkg-vault"
+          fi
+          
+          # Check for crypto package changes
+          if grep -E '^pkg/crypto/' changed_files.txt; then
+            add_label "pkg-crypto"
+          fi
+          
+          # Check for CI changes
+          if grep -E '^\.github/' changed_files.txt; then
+            add_label "ci"
+          fi
+          
+          # Check for dependency changes
+          if grep -E '^(go\.(mod|sum)|Dockerfile|docker-compose\.yml)$' changed_files.txt; then
+            add_label "dependencies"
+          fi
+          
+          # Check for any package changes (fallback)
+          if grep -E '^pkg/' changed_files.txt; then
+            add_label "pkg-other"
+          fi
+          
+          echo ""
+          echo "✅ Labeling complete!"
+          
+          # Clean up
+          rm -f changed_files.txt
