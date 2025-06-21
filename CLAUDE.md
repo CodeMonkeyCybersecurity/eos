@@ -151,6 +151,106 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 
+### Enhanced Developer Logging Requirements
+**CRITICAL**: Eos is a developer tool requiring comprehensive visibility into all operations. Every function MUST provide detailed logging:
+
+#### Mandatory Logging Elements
+1. **User Context**: Who is running the command, where, and how
+2. **Command Execution**: What commands are run, with arguments and timing
+3. **File Operations**: Paths, permissions, sizes, and validation status
+4. **Progress Indicators**: Detailed metrics, counts, and durations
+5. **Resource Discovery**: What was found, skipped, or failed
+6. **Error Context**: Actionable troubleshooting information
+
+#### Required Logging Patterns
+Every function MUST log at appropriate levels with structured fields:
+
+```go
+// Function entry with context
+logger.Info("🔍 Starting [operation]", 
+    zap.String("user", os.Getenv("USER")),
+    zap.String("pwd", pwd),
+    zap.String("command_line", strings.Join(os.Args, " ")),
+    zap.String("function", "functionName"))
+
+// File operations (ALWAYS log file paths immediately when determined)
+logger.Info("📁 Output file determined",
+    zap.String("file_path", outputPath),
+    zap.String("format", format),
+    zap.String("directory", outputDir),
+    zap.Bool("exists", fileExists),
+    zap.Bool("writable", isWritable))
+
+// Command execution (MUST be INFO level, not DEBUG)
+logger.Info("🔧 Executing command",
+    zap.String("command", cmdName),
+    zap.Strings("args", args),
+    zap.Duration("timeout", timeout))
+
+// Command completion with metrics
+logger.Info("✅ Command completed",
+    zap.String("command", cmdName),
+    zap.Duration("duration", elapsed),
+    zap.Int("output_lines", lineCount),
+    zap.Int64("output_bytes", byteCount),
+    zap.Int("exit_code", exitCode))
+
+// Discovery results with detailed metrics
+logger.Info("✅ [Resource] discovery completed",
+    zap.Int("containers", containerCount),
+    zap.Int("running", runningCount),
+    zap.Int("networks", networkCount),
+    zap.Int("volumes", volumeCount),
+    zap.Duration("duration", elapsed))
+
+// File creation with full details
+logger.Info("📝 Writing [format] file",
+    zap.String("file_path", outputPath),
+    zap.Int("resources", resourceCount),
+    zap.Int("providers", providerCount))
+
+// File completion with validation
+logger.Info("✅ File written successfully",
+    zap.String("file_path", outputPath),
+    zap.String("size", humanReadableSize),
+    zap.String("permissions", permissions),
+    zap.String("validation", "passed"))
+
+// Operation completion with summary
+logger.Info("✨ [Operation] complete",
+    zap.Duration("total_duration", totalElapsed),
+    zap.String("output_file", outputPath),
+    zap.Int("resources_found", totalResources),
+    zap.Int("phases_completed", phaseCount))
+```
+
+#### Error Logging Requirements
+All errors MUST include actionable context:
+
+```go
+logger.Error("❌ [Operation] failed",
+    zap.Error(err),
+    zap.String("command", failedCommand),
+    zap.Strings("args", args),
+    zap.String("working_dir", pwd),
+    zap.String("user", user),
+    zap.String("troubleshooting", "Check permissions and ensure Docker is running"),
+    zap.String("phase", currentPhase))
+```
+
+#### Debug vs Info Level Guidelines
+- **INFO**: All user-facing operations, file paths, command execution, progress, results
+- **DEBUG**: Internal state, variable values, detailed parsing
+- **WARN**: Non-fatal issues, fallbacks, missing optional components
+- **ERROR**: Failures requiring user attention
+
+#### Timing Requirements
+Every operation MUST include timing information:
+- Command execution duration
+- Phase completion time
+- Total operation time
+- File I/O timing
+
 #### Structured Logging Examples
 ```go
 // ✅ CORRECT - Use structured logging for all output

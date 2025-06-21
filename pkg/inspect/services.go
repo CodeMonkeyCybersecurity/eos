@@ -15,7 +15,7 @@ import (
 // DiscoverServices gathers service configuration information
 func (i *Inspector) DiscoverServices() (*ServicesInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Debug("⚙️ Starting services discovery")
+	logger.Info("⚙️ Starting services discovery")
 
 	info := &ServicesInfo{}
 
@@ -24,58 +24,58 @@ func (i *Inspector) DiscoverServices() (*ServicesInfo, error) {
 		logger.Warn("⚠️ Failed to discover systemd services", zap.Error(err))
 	} else {
 		info.SystemdServices = services
-		logger.Debug("🔧 Discovered systemd services", zap.Int("count", len(services)))
+		logger.Info("🔧 Discovered systemd services", zap.Int("count", len(services)))
 	}
 
 	// Discover Nginx
 	if nginx, err := i.discoverNginx(); err == nil && nginx != nil {
 		info.Nginx = nginx
-		logger.Debug("🌐 Discovered Nginx configuration")
+		logger.Info("🌐 Discovered Nginx configuration")
 	}
 
 	// Discover Apache
 	if apache, err := i.discoverApache(); err == nil && apache != nil {
 		info.Apache = apache
-		logger.Debug("🌐 Discovered Apache configuration")
+		logger.Info("🌐 Discovered Apache configuration")
 	}
 
 	// Discover Caddy
 	if caddy, err := i.discoverCaddy(); err == nil && caddy != nil {
 		info.Caddy = caddy
-		logger.Debug("🌐 Discovered Caddy configuration")
+		logger.Info("🌐 Discovered Caddy configuration")
 	}
 
 	// Discover PostgreSQL
 	if postgres, err := i.discoverPostgreSQL(); err == nil && postgres != nil {
 		info.PostgreSQL = postgres
-		logger.Debug("🗄️ Discovered PostgreSQL configuration")
+		logger.Info("🗄️ Discovered PostgreSQL configuration")
 	}
 
 	// Discover MySQL
 	if mysql, err := i.discoverMySQL(); err == nil && mysql != nil {
 		info.MySQL = mysql
-		logger.Debug("🗄️ Discovered MySQL configuration")
+		logger.Info("🗄️ Discovered MySQL configuration")
 	}
 
 	// Discover Redis
 	if redis, err := i.discoverRedis(); err == nil && redis != nil {
 		info.Redis = redis
-		logger.Debug("💾 Discovered Redis configuration")
+		logger.Info("💾 Discovered Redis configuration")
 	}
 
 	// Discover HashiCorp tools
 	if hashicorp, err := i.discoverHashiCorp(); err == nil && hashicorp != nil {
 		info.HashiCorp = hashicorp
-		logger.Debug("🔧 Discovered HashiCorp tools")
+		logger.Info("🔧 Discovered HashiCorp tools")
 	}
 
 	// Discover Tailscale
 	if tailscale, err := i.discoverTailscale(); err == nil && tailscale != nil {
 		info.Tailscale = tailscale
-		logger.Debug("🔐 Discovered Tailscale configuration")
+		logger.Info("🔐 Discovered Tailscale configuration")
 	}
 
-	logger.Debug("✅ Services discovery completed")
+	logger.Info("✅ Services discovery completed")
 	return info, nil
 }
 

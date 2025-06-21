@@ -12,7 +12,7 @@ import (
 // DiscoverHetzner gathers Hetzner Cloud infrastructure information
 func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Debug("☁️ Starting Hetzner Cloud discovery")
+	logger.Info("☁️ Starting Hetzner Cloud discovery")
 
 	// Check if hcloud CLI is installed
 	if !i.commandExists("hcloud") {
@@ -31,7 +31,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("⚠️ Failed to discover Hetzner servers", zap.Error(err))
 	} else {
 		info.Servers = servers
-		logger.Debug("🖥️ Discovered Hetzner servers", zap.Int("count", len(servers)))
+		logger.Info("🖥️ Discovered Hetzner servers", zap.Int("count", len(servers)))
 	}
 
 	// Discover networks
@@ -39,7 +39,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("⚠️ Failed to discover Hetzner networks", zap.Error(err))
 	} else {
 		info.Networks = networks
-		logger.Debug("🌐 Discovered Hetzner networks", zap.Int("count", len(networks)))
+		logger.Info("🌐 Discovered Hetzner networks", zap.Int("count", len(networks)))
 	}
 
 	// Discover firewalls
@@ -47,7 +47,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("⚠️ Failed to discover Hetzner firewalls", zap.Error(err))
 	} else {
 		info.Firewalls = firewalls
-		logger.Debug("🔒 Discovered Hetzner firewalls", zap.Int("count", len(firewalls)))
+		logger.Info("🔒 Discovered Hetzner firewalls", zap.Int("count", len(firewalls)))
 	}
 
 	// Discover load balancers
@@ -55,7 +55,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("⚠️ Failed to discover Hetzner load balancers", zap.Error(err))
 	} else {
 		info.LoadBalancers = lbs
-		logger.Debug("⚖️ Discovered Hetzner load balancers", zap.Int("count", len(lbs)))
+		logger.Info("⚖️ Discovered Hetzner load balancers", zap.Int("count", len(lbs)))
 	}
 
 	// Discover volumes
@@ -63,7 +63,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("⚠️ Failed to discover Hetzner volumes", zap.Error(err))
 	} else {
 		info.Volumes = volumes
-		logger.Debug("💾 Discovered Hetzner volumes", zap.Int("count", len(volumes)))
+		logger.Info("💾 Discovered Hetzner volumes", zap.Int("count", len(volumes)))
 	}
 
 	// Discover floating IPs
@@ -71,10 +71,10 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("⚠️ Failed to discover Hetzner floating IPs", zap.Error(err))
 	} else {
 		info.FloatingIPs = fips
-		logger.Debug("🌐 Discovered Hetzner floating IPs", zap.Int("count", len(fips)))
+		logger.Info("🌐 Discovered Hetzner floating IPs", zap.Int("count", len(fips)))
 	}
 
-	logger.Debug("✅ Hetzner discovery completed")
+	logger.Info("✅ Hetzner discovery completed")
 	return info, nil
 }
 

@@ -30,9 +30,12 @@ func New(rc *eos_io.RuntimeContext) *Inspector {
 // runCommand executes a command and returns output
 func (i *Inspector) runCommand(name string, args ...string) (string, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Debug("🔧 Running command",
+	start := time.Now()
+	
+	logger.Info("🔧 Running command",
 		zap.String("command", name),
-		zap.Strings("args", args))
+		zap.Strings("args", args),
+		zap.Duration("timeout", 30*time.Second))
 
 	ctx, cancel := context.WithTimeout(i.rc.Ctx, 30*time.Second)
 	defer cancel()
@@ -43,13 +46,21 @@ func (i *Inspector) runCommand(name string, args ...string) (string, error) {
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
+	duration := time.Since(start)
+	
 	if err != nil {
-		logger.Debug("⚠️ Command failed",
+		logger.Error("⚠️ Command failed",
 			zap.String("command", name),
 			zap.Error(err),
-			zap.String("stderr", stderr.String()))
+			zap.String("stderr", stderr.String()),
+			zap.Duration("duration", duration))
 		return "", fmt.Errorf("command %s failed: %w (stderr: %s)", name, err, stderr.String())
 	}
+
+	logger.Info("✅ Command completed",
+		zap.String("command", name),
+		zap.Duration("duration", duration),
+		zap.Int("output_length", len(strings.TrimSpace(stdout.String()))))
 
 	return strings.TrimSpace(stdout.String()), nil
 }
@@ -63,7 +74,7 @@ func (i *Inspector) commandExists(name string) bool {
 // DiscoverSystem gathers system information
 func (i *Inspector) DiscoverSystem() (*SystemInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Debug("📊 Starting system discovery")
+	logger.Info("📊 Starting system discovery")
 	
 	info := &SystemInfo{}
 
@@ -116,7 +127,7 @@ func (i *Inspector) DiscoverSystem() (*SystemInfo, error) {
 		info.Routes = i.parseRouteInfo(output)
 	}
 
-	logger.Debug("✅ System discovery completed",
+	logger.Info("✅ System discovery completed",
 		zap.String("hostname", info.Hostname),
 		zap.String("os", info.OS))
 
@@ -126,9 +137,8 @@ func (i *Inspector) DiscoverSystem() (*SystemInfo, error) {
 // parseCPUInfo parses lscpu output
 func (i *Inspector) parseCPUInfo(output string) CPUInfo {
 	info := CPUInfo{}
-	lines := strings.Split(output, "\n")
 	
-	for _, line := range lines {
+	for line := range strings.SplitSeq(output, "\n") {
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
 			continue
@@ -161,9 +171,8 @@ func (i *Inspector) parseCPUInfo(output string) CPUInfo {
 // parseMemoryInfo parses free -h output
 func (i *Inspector) parseMemoryInfo(output string) MemoryInfo {
 	info := MemoryInfo{}
-	lines := strings.Split(output, "\n")
 	
-	for _, line := range lines {
+	for line := range strings.SplitSeq(output, "\n") {
 		fields := strings.Fields(line)
 		if len(fields) < 7 {
 			continue

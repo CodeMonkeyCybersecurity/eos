@@ -14,7 +14,7 @@ import (
 // DiscoverKVM gathers KVM/Libvirt infrastructure information
 func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Debug("🖥️ Starting KVM/Libvirt discovery")
+	logger.Info("🖥️ Starting KVM/Libvirt discovery")
 
 	// Check if virsh is installed
 	if !i.commandExists("virsh") {
@@ -36,7 +36,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 				parts := strings.Fields(line)
 				if len(parts) >= 2 {
 					info.LibvirtVersion = parts[len(parts)-1]
-					logger.Debug("📊 Libvirt version detected", zap.String("version", info.LibvirtVersion))
+					logger.Info("📊 Libvirt version detected", zap.String("version", info.LibvirtVersion))
 					break
 				}
 			}
@@ -48,7 +48,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 		logger.Warn("⚠️ Failed to discover VMs", zap.Error(err))
 	} else {
 		info.VMs = vms
-		logger.Debug("🖥️ Discovered VMs", zap.Int("count", len(vms)))
+		logger.Info("🖥️ Discovered VMs", zap.Int("count", len(vms)))
 	}
 
 	// Discover networks
@@ -56,7 +56,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 		logger.Warn("⚠️ Failed to discover KVM networks", zap.Error(err))
 	} else {
 		info.Networks = networks
-		logger.Debug("🌐 Discovered KVM networks", zap.Int("count", len(networks)))
+		logger.Info("🌐 Discovered KVM networks", zap.Int("count", len(networks)))
 	}
 
 	// Discover storage pools
@@ -64,10 +64,10 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 		logger.Warn("⚠️ Failed to discover storage pools", zap.Error(err))
 	} else {
 		info.StoragePools = pools
-		logger.Debug("💾 Discovered storage pools", zap.Int("count", len(pools)))
+		logger.Info("💾 Discovered storage pools", zap.Int("count", len(pools)))
 	}
 
-	logger.Debug("✅ KVM discovery completed")
+	logger.Info("✅ KVM discovery completed")
 	return info, nil
 }
 

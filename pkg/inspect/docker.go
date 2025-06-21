@@ -15,7 +15,7 @@ import (
 // DiscoverDocker gathers Docker infrastructure information
 func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Debug("🐳 Starting Docker discovery")
+	logger.Info("🐳 Starting Docker discovery")
 
 	// Check if Docker is installed
 	if !i.commandExists("docker") {
@@ -27,7 +27,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 	// Get Docker version
 	if output, err := i.runCommand("docker", "version", "--format", "{{.Server.Version}}"); err == nil {
 		info.Version = output
-		logger.Debug("📊 Docker version detected", zap.String("version", info.Version))
+		logger.Info("📊 Docker version detected", zap.String("version", info.Version))
 	}
 
 	// Discover containers
@@ -35,7 +35,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Warn("⚠️ Failed to discover containers", zap.Error(err))
 	} else {
 		info.Containers = containers
-		logger.Debug("📦 Discovered containers", zap.Int("count", len(containers)))
+		logger.Info("📦 Discovered containers", zap.Int("count", len(containers)))
 	}
 
 	// Discover images
@@ -43,7 +43,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Warn("⚠️ Failed to discover images", zap.Error(err))
 	} else {
 		info.Images = images
-		logger.Debug("🖼️ Discovered images", zap.Int("count", len(images)))
+		logger.Info("🖼️ Discovered images", zap.Int("count", len(images)))
 	}
 
 	// Discover networks
@@ -51,7 +51,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Warn("⚠️ Failed to discover networks", zap.Error(err))
 	} else {
 		info.Networks = networks
-		logger.Debug("🌐 Discovered networks", zap.Int("count", len(networks)))
+		logger.Info("🌐 Discovered networks", zap.Int("count", len(networks)))
 	}
 
 	// Discover volumes
@@ -59,7 +59,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Warn("⚠️ Failed to discover volumes", zap.Error(err))
 	} else {
 		info.Volumes = volumes
-		logger.Debug("💾 Discovered volumes", zap.Int("count", len(volumes)))
+		logger.Info("💾 Discovered volumes", zap.Int("count", len(volumes)))
 	}
 
 	// Discover compose files
@@ -67,10 +67,10 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 		logger.Warn("⚠️ Failed to discover compose files", zap.Error(err))
 	} else {
 		info.ComposeFiles = composeFiles
-		logger.Debug("📄 Discovered compose files", zap.Int("count", len(composeFiles)))
+		logger.Info("📄 Discovered compose files", zap.Int("count", len(composeFiles)))
 	}
 
-	logger.Debug("✅ Docker discovery completed")
+	logger.Info("✅ Docker discovery completed")
 	return info, nil
 }
 
