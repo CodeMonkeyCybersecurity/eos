@@ -37,6 +37,14 @@ go tool cover -html=coverage.out -o coverage.html
 # Run security-focused tests
 go test -v -run "Security|Validation|Auth" ./pkg/...
 
+# Run fuzz tests for security validation
+./scripts/run-fuzz-tests.sh          # Run all fuzz tests (10s each)
+./scripts/run-fuzz-tests.sh 30s      # Run with custom duration
+
+# Run specific fuzz tests manually
+go test -run=^FuzzValidateStrongPassword$ -fuzz=^FuzzValidateStrongPassword$ -fuzztime=10s ./pkg/crypto
+go test -run=^FuzzNormalizeYesNoInput$ -fuzz=^FuzzNormalizeYesNoInput$ -fuzztime=10s ./pkg/interaction
+
 # Run specific test files:
 # - pkg/crypto/fuzz_test.go - Cryptographic fuzzing tests
 # - pkg/parse/fuzz_test.go - Input parsing fuzzing tests

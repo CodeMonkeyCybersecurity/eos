@@ -17,4 +17,28 @@ jobs:
 
       - name: Run Go fuzz tests
         run: |
-          go test -fuzz=Fuzz -fuzztime=30s ./...
+          echo "🔍 Running fuzz tests for each package individually..."
+          
+          echo "🧮 Fuzzing crypto package..."
+          go test -run=^FuzzValidateStrongPassword$ -fuzz=^FuzzValidateStrongPassword$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzHashString$ -fuzz=^FuzzHashString$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzHashStrings$ -fuzz=^FuzzHashStrings$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzAllUnique$ -fuzz=^FuzzAllUnique$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzAllHashesPresent$ -fuzz=^FuzzAllHashesPresent$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzRedact$ -fuzz=^FuzzRedact$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzInjectSecretsFromPlaceholders$ -fuzz=^FuzzInjectSecretsFromPlaceholders$ -fuzztime=5s ./pkg/crypto
+          go test -run=^FuzzSecureZero$ -fuzz=^FuzzSecureZero$ -fuzztime=5s ./pkg/crypto
+          
+          echo "🎯 Fuzzing interaction package..."
+          go test -run=^FuzzNormalizeYesNoInput$ -fuzz=^FuzzNormalizeYesNoInput$ -fuzztime=5s ./pkg/interaction
+          go test -run=^FuzzValidateNonEmpty$ -fuzz=^FuzzValidateNonEmpty$ -fuzztime=5s ./pkg/interaction
+          go test -run=^FuzzValidateUsername$ -fuzz=^FuzzValidateUsername$ -fuzztime=5s ./pkg/interaction
+          go test -run=^FuzzValidateEmail$ -fuzz=^FuzzValidateEmail$ -fuzztime=5s ./pkg/interaction
+          go test -run=^FuzzValidateURL$ -fuzz=^FuzzValidateURL$ -fuzztime=5s ./pkg/interaction
+          go test -run=^FuzzValidateIP$ -fuzz=^FuzzValidateIP$ -fuzztime=5s ./pkg/interaction
+          go test -run=^FuzzValidateNoShellMeta$ -fuzz=^FuzzValidateNoShellMeta$ -fuzztime=5s ./pkg/interaction
+          
+          echo "📊 Fuzzing parse package..."
+          go test -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime=5s ./pkg/parse
+          
+          echo "✅ All fuzz tests completed successfully!"
