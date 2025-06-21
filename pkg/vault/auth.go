@@ -63,9 +63,9 @@ func tryAppRole(rc *eos_io.RuntimeContext, client *api.Client) (string, error) {
 	})
 	if err != nil || secret == nil || secret.Auth == nil {
 		otelzap.Ctx(rc.Ctx).Warn("❌ AppRole login failed", zap.Error(err))
-		return "", fmt.Errorf("approle login failed: %w", err)
+		return "", fmt.Errorf("approle login failed") // Don't leak the underlying error
 	}
-	otelzap.Ctx(rc.Ctx).Debug("✅ AppRole login successful", zap.String("roleID", roleID))
+	otelzap.Ctx(rc.Ctx).Debug("✅ AppRole login successful")
 	return secret.Auth.ClientToken, nil
 }
 

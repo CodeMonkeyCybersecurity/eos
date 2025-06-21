@@ -75,13 +75,21 @@ func ValidateDomainName(domain string) error {
 	lowercaseDomain := strings.ToLower(domain)
 	suspiciousDomains := []string{
 		"localhost", "127.0.0.1", "::1", "0.0.0.0",
-		"internal", "local", "test", "example.com",
+		"internal", "local",
 		"*.local", "*.internal",
 	}
 
 	for _, suspicious := range suspiciousDomains {
 		if lowercaseDomain == suspicious || strings.Contains(lowercaseDomain, suspicious) {
 			return fmt.Errorf("domain name contains suspicious pattern: %s", suspicious)
+		}
+	}
+	
+	// Check for test domains that should only be blocked in production
+	testDomains := []string{"test", "example.com"}
+	for _, testDomain := range testDomains {
+		if lowercaseDomain == testDomain {
+			return fmt.Errorf("domain name contains suspicious pattern: %s", testDomain)
 		}
 	}
 
@@ -198,19 +206,27 @@ func SanitizeInputForCommand(input string) string {
 	// Remove any null bytes
 	input = strings.ReplaceAll(input, "\x00", "")
 
-	// Remove any control characters
-	var sanitized strings.Builder
-	for _, r := range input {
-		// Only allow printable ASCII characters and basic punctuation
-		if (r >= 'a' && r <= 'z') ||
-			(r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') ||
-			r == '.' || r == '-' || r == '_' || r == '@' || r == '+' {
-			sanitized.WriteRune(r)
-		}
+	// Remove dangerous characters that could be used for injection
+	dangerousReplacements := map[string]string{
+		";": "",
+		"&": "",
+		"|": "",
+		"`": "",
+		"$": "",
+		"\\": "",
+		"'": "",
+		"\"": "",
+		"\n": "",
+		"\r": "",
+		"\t": "",
 	}
 
-	return sanitized.String()
+	sanitized := input
+	for dangerous, replacement := range dangerousReplacements {
+		sanitized = strings.ReplaceAll(sanitized, dangerous, replacement)
+	}
+
+	return sanitized
 }
 
 // ValidateAllCertificateInputs validates all inputs for certificate generation

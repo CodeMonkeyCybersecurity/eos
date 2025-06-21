@@ -120,22 +120,7 @@ func isValidVaultTokenFormat(token string) bool {
 		return false
 	}
 
-	// New Vault service tokens start with hvs.
-	if len(token) > 4 && token[:4] == "hvs." {
-		return true
-	}
-
-	// Legacy service tokens start with s.
-	if len(token) > 2 && token[:2] == "s." {
-		return true
-	}
-
-	// UUID format (legacy) - 36 characters with hyphens
-	if len(token) == 36 && token[8] == '-' && token[13] == '-' && token[18] == '-' && token[23] == '-' {
-		return true
-	}
-
-	// Allow any token that's alphanumeric with dots and hyphens (be permissive for testing)
+	// Check for valid characters first (alphanumeric plus allowed punctuation)
 	for _, char := range token {
 		if (char < 'a' || char > 'z') &&
 			(char < 'A' || char > 'Z') &&
@@ -143,6 +128,21 @@ func isValidVaultTokenFormat(token string) bool {
 			char != '.' && char != '-' && char != '_' {
 			return false
 		}
+	}
+
+	// New Vault service tokens start with hvs.
+	if len(token) > 4 && token[:4] == "hvs." {
+		return len(token) >= 8
+	}
+
+	// Legacy service tokens start with s.
+	if len(token) > 2 && token[:2] == "s." {
+		return len(token) >= 8
+	}
+
+	// UUID format (legacy) - 36 characters with hyphens
+	if len(token) == 36 && token[8] == '-' && token[13] == '-' && token[18] == '-' && token[23] == '-' {
+		return true
 	}
 
 	return len(token) >= 8

@@ -101,10 +101,17 @@ func InjectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, erro
 	content := string(data)
 	replacements := make(map[string]string)
 
-	for i := 0; i < 10; i++ {
+	// Process longer placeholders first to avoid substring replacement issues
+	// Process changeme9 down to changeme1, then changeme
+	for i := 9; i >= 0; i-- {
 		placeholder := "changeme"
 		if i > 0 {
 			placeholder = fmt.Sprintf("changeme%d", i)
+		}
+
+		// Only generate password if placeholder exists in content
+		if !strings.Contains(content, placeholder) {
+			continue
 		}
 
 		pw, err := GeneratePassword(20)

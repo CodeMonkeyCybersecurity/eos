@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -89,15 +90,25 @@ func validateFilePath(path string) error {
 		return fmt.Errorf("absolute paths not allowed: %s", path)
 	}
 
-	// Clean the path and check it hasn't changed (indicates traversal attempts)
-	cleanPath := filepath.Clean(path)
-	if cleanPath != path {
+	// Check for .. elements which indicate path traversal
+	if strings.Contains(path, "..") {
 		return fmt.Errorf("path contains traversal elements: %s", path)
 	}
 
-	// Check for any .. elements
-	if filepath.Dir(cleanPath) != filepath.Dir(path) {
-		return fmt.Errorf("path validation failed: %s", path)
+	// Clean the path and check if it's trying to escape
+	cleanPath := filepath.Clean(path)
+	
+	// If the clean path starts with .. or contains .., it's trying to escape
+	if strings.HasPrefix(cleanPath, "..") || strings.Contains(cleanPath, "/..") {
+		return fmt.Errorf("path contains traversal elements: %s", path)
+	}
+
+	// Additional check for dangerous paths
+	dangerousPaths := []string{"/etc/", "/var/", "/usr/", "/home/", "/root/", "/tmp/"}
+	for _, dangerous := range dangerousPaths {
+		if strings.Contains(strings.ToLower(cleanPath), dangerous) {
+			return fmt.Errorf("path accesses restricted directory: %s", path)
+		}
 	}
 
 	return nil

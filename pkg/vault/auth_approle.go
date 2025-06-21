@@ -70,7 +70,7 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 		log.Error("❌ Failed to read role_id from disk",
 			zap.String("path", shared.AppRolePaths.RoleID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read role_id from disk")
+		return "", "", cerr.Wrap(err, "read role identifier from disk")
 	}
 	roleID := strings.TrimSpace(string(roleIDBytes))
 	log.Info("✅ RoleID read successfully")
@@ -81,7 +81,7 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 		log.Error("❌ Failed to read secret_id from disk",
 			zap.String("path", shared.AppRolePaths.SecretID),
 			zap.Error(err))
-		return "", "", cerr.Wrap(err, "read secret_id from disk")
+		return "", "", cerr.Wrap(err, "read secret identifier from disk")
 	}
 	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
 

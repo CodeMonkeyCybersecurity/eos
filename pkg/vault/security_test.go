@@ -313,6 +313,7 @@ func TestAppRoleAuthenticationSecurity(t *testing.T) {
 
 		// Error should not contain role_id or secret_id
 		errMsg := err.Error()
+		t.Logf("AppRole error message: %s", errMsg) // Debug print
 		if strings.Contains(errMsg, "role_id") || strings.Contains(errMsg, "secret_id") {
 			t.Error("AppRole error contains sensitive credential information")
 		}

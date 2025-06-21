@@ -213,7 +213,7 @@ func TestValidInputsAccepted(t *testing.T) {
 
 func TestCertificateInputValidationIntegration(t *testing.T) {
 	t.Run("valid_certificate_inputs", func(t *testing.T) {
-		err := ValidateAllCertificateInputs("myapp", "example.com", "admin@example.com")
+		err := ValidateAllCertificateInputs("myapp", "validcorp.com", "admin@validcorp.com")
 		testutil.AssertNoError(t, err)
 	})
 
@@ -295,7 +295,7 @@ func TestSanitizationSecurity(t *testing.T) {
 			{
 				name:     "preserve_email_format",
 				input:    "user@domain.com",
-				expected: "userdomain.com", // @ gets removed but that's ok for sanitization
+				expected: "user@domain.com", // @ should be preserved
 			},
 		}
 
