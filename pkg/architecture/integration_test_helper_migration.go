@@ -66,7 +66,7 @@ func TestHelperMigrationIntegration(t *testing.T) {
 			t.Errorf("Copy operation not successful")
 		}
 
-		t.Logf("File operations test passed - copied %d bytes in %v", 
+		t.Logf("File operations test passed - copied %d bytes in %v",
 			result.BytesWritten, result.Duration)
 	})
 
@@ -126,11 +126,11 @@ func TestHelperMigrationIntegration(t *testing.T) {
 		}
 
 		if string(decResult.Plaintext) != string(plaintext) {
-			t.Errorf("Decryption failed: got %s, want %s", 
+			t.Errorf("Decryption failed: got %s, want %s",
 				string(decResult.Plaintext), string(plaintext))
 		}
 
-		t.Logf("Encryption/decryption test passed - %d bytes encrypted/decrypted", 
+		t.Logf("Encryption/decryption test passed - %d bytes encrypted/decrypted",
 			len(plaintext))
 	})
 
@@ -204,7 +204,7 @@ debug: ${DEBUG}
 		// Test directory copy
 		opts := fileops.DefaultCopyOptions()
 		filter := fileops.DefaultFileFilter()
-		
+
 		batchResult, err := fileService.CopyDirectory(ctx, srcDir, dstDir, opts, filter)
 		if err != nil {
 			t.Errorf("CopyDirectory failed: %v", err)
@@ -214,7 +214,7 @@ debug: ${DEBUG}
 			t.Errorf("No files were copied successfully")
 		}
 
-		t.Logf("Directory copy test passed - %d files copied in %v", 
+		t.Logf("Directory copy test passed - %d files copied in %v",
 			batchResult.SuccessfulFiles, batchResult.Duration)
 
 		// Test directory info
@@ -227,7 +227,7 @@ debug: ${DEBUG}
 			t.Errorf("Expected 3 files, got %d", dirInfo.FileCount)
 		}
 
-		t.Logf("Directory info test passed - found %d files, %d directories", 
+		t.Logf("Directory info test passed - found %d files, %d directories",
 			dirInfo.FileCount, dirInfo.DirCount)
 	})
 }
@@ -265,4 +265,3 @@ func BenchmarkHelperMigration(b *testing.B) {
 	//     }
 	// })
 }
-

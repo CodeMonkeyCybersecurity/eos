@@ -15,9 +15,9 @@ import (
 
 // APISecretStore implements domain.SecretStore using HashiCorp Vault API
 type APISecretStore struct {
-	client     *api.Client
-	mountPath  string
-	logger     *zap.Logger
+	client    *api.Client
+	mountPath string
+	logger    *zap.Logger
 }
 
 // NewAPISecretStore creates a new vault API secret store
@@ -36,14 +36,14 @@ func NewAPISecretStore(client *api.Client, mountPath string, logger *zap.Logger)
 func (a *APISecretStore) Get(ctx context.Context, key string) (*domain.Secret, error) {
 	path := a.sanitizePath(key)
 
-	a.logger.Debug("Getting secret from vault", 
-		zap.String("key", key), 
+	a.logger.Debug("Getting secret from vault",
+		zap.String("key", key),
 		zap.String("path", path))
 
 	secret, err := a.client.KVv2(a.mountPath).Get(ctx, path)
 	if err != nil {
-		a.logger.Error("Failed to get secret from vault", 
-			zap.String("path", path), 
+		a.logger.Error("Failed to get secret from vault",
+			zap.String("path", path),
 			zap.Error(err))
 		return nil, fmt.Errorf("vault get failed for key %s: %w", key, err)
 	}
@@ -56,8 +56,8 @@ func (a *APISecretStore) Get(ctx context.Context, key string) (*domain.Secret, e
 	// Convert vault secret to domain secret
 	domainSecret, err := a.convertVaultSecretToDomain(key, secret)
 	if err != nil {
-		a.logger.Error("Failed to convert vault secret", 
-			zap.String("key", key), 
+		a.logger.Error("Failed to convert vault secret",
+			zap.String("key", key),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to convert secret %s: %w", key, err)
 	}
@@ -70,23 +70,23 @@ func (a *APISecretStore) Get(ctx context.Context, key string) (*domain.Secret, e
 func (a *APISecretStore) Set(ctx context.Context, key string, secret *domain.Secret) error {
 	path := a.sanitizePath(key)
 
-	a.logger.Debug("Setting secret in vault", 
-		zap.String("key", key), 
+	a.logger.Debug("Setting secret in vault",
+		zap.String("key", key),
 		zap.String("path", path))
 
 	// Convert domain secret to vault data format
 	data, err := a.convertDomainSecretToVault(secret)
 	if err != nil {
-		a.logger.Error("Failed to convert domain secret", 
-			zap.String("key", key), 
+		a.logger.Error("Failed to convert domain secret",
+			zap.String("key", key),
 			zap.Error(err))
 		return fmt.Errorf("failed to convert secret %s: %w", key, err)
 	}
 
 	_, err = a.client.KVv2(a.mountPath).Put(ctx, path, data)
 	if err != nil {
-		a.logger.Error("Failed to set secret in vault", 
-			zap.String("path", path), 
+		a.logger.Error("Failed to set secret in vault",
+			zap.String("path", path),
 			zap.Error(err))
 		return fmt.Errorf("vault set failed for key %s: %w", key, err)
 	}
@@ -99,14 +99,14 @@ func (a *APISecretStore) Set(ctx context.Context, key string, secret *domain.Sec
 func (a *APISecretStore) Delete(ctx context.Context, key string) error {
 	path := a.sanitizePath(key)
 
-	a.logger.Debug("Deleting secret from vault", 
-		zap.String("key", key), 
+	a.logger.Debug("Deleting secret from vault",
+		zap.String("key", key),
 		zap.String("path", path))
 
 	err := a.client.KVv2(a.mountPath).DeleteMetadata(ctx, path)
 	if err != nil {
-		a.logger.Error("Failed to delete secret from vault", 
-			zap.String("path", path), 
+		a.logger.Error("Failed to delete secret from vault",
+			zap.String("path", path),
 			zap.Error(err))
 		return fmt.Errorf("vault delete failed for key %s: %w", key, err)
 	}
@@ -119,16 +119,16 @@ func (a *APISecretStore) Delete(ctx context.Context, key string) error {
 func (a *APISecretStore) List(ctx context.Context, prefix string) ([]*domain.Secret, error) {
 	path := a.sanitizePath(prefix)
 
-	a.logger.Debug("Listing secrets from vault", 
-		zap.String("prefix", prefix), 
+	a.logger.Debug("Listing secrets from vault",
+		zap.String("prefix", prefix),
 		zap.String("path", path))
 
 	// Use the Logical client to list metadata
 	metaPath := fmt.Sprintf("%s/metadata/%s", a.mountPath, path)
 	secretList, err := a.client.Logical().List(metaPath)
 	if err != nil {
-		a.logger.Error("Failed to list secrets from vault", 
-			zap.String("path", path), 
+		a.logger.Error("Failed to list secrets from vault",
+			zap.String("path", path),
 			zap.Error(err))
 		return nil, fmt.Errorf("vault list failed for prefix %s: %w", prefix, err)
 	}
@@ -139,12 +139,12 @@ func (a *APISecretStore) List(ctx context.Context, prefix string) ([]*domain.Sec
 			for _, keyInterface := range keys {
 				if keyStr, ok := keyInterface.(string); ok {
 					fullKey := a.buildFullKey(prefix, keyStr)
-					
+
 					// Get full secret data
 					secret, err := a.Get(ctx, fullKey)
 					if err != nil {
-						a.logger.Warn("Failed to get secret during list", 
-							zap.String("key", fullKey), 
+						a.logger.Warn("Failed to get secret during list",
+							zap.String("key", fullKey),
 							zap.Error(err))
 						continue // Skip this secret but continue listing
 					}
@@ -154,8 +154,8 @@ func (a *APISecretStore) List(ctx context.Context, prefix string) ([]*domain.Sec
 		}
 	}
 
-	a.logger.Debug("Secrets listed successfully from vault", 
-		zap.String("prefix", prefix), 
+	a.logger.Debug("Secrets listed successfully from vault",
+		zap.String("prefix", prefix),
 		zap.Int("count", len(secrets)))
 
 	return secrets, nil
@@ -165,23 +165,23 @@ func (a *APISecretStore) List(ctx context.Context, prefix string) ([]*domain.Sec
 func (a *APISecretStore) Exists(ctx context.Context, key string) (bool, error) {
 	path := a.sanitizePath(key)
 
-	a.logger.Debug("Checking if secret exists in vault", 
-		zap.String("key", key), 
+	a.logger.Debug("Checking if secret exists in vault",
+		zap.String("key", key),
 		zap.String("path", path))
 
 	// Try to get metadata only (more efficient than full secret)
 	metaPath := fmt.Sprintf("%s/metadata/%s", a.mountPath, path)
 	secret, err := a.client.Logical().Read(metaPath)
 	if err != nil {
-		a.logger.Debug("Error checking secret existence", 
-			zap.String("key", key), 
+		a.logger.Debug("Error checking secret existence",
+			zap.String("key", key),
 			zap.Error(err))
 		return false, nil // Treat errors as "not found" for existence check
 	}
 
 	exists := secret != nil
-	a.logger.Debug("Secret existence check completed", 
-		zap.String("key", key), 
+	a.logger.Debug("Secret existence check completed",
+		zap.String("key", key),
 		zap.Bool("exists", exists))
 
 	return exists, nil
@@ -270,10 +270,10 @@ func (a *APISecretStore) sanitizePath(key string) string {
 	path := strings.ReplaceAll(key, "..", "")
 	path = strings.ReplaceAll(path, "//", "/")
 	path = strings.Trim(path, "/")
-	
+
 	// Ensure path doesn't start with slash (vault KV paths are relative)
 	path = strings.TrimPrefix(path, "/")
-	
+
 	return path
 }
 

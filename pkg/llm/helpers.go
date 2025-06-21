@@ -22,14 +22,14 @@ import (
 // ───────────────────────── Config (env driven) ────────────────────────────
 
 var (
-	apiKey        = env("AZURE_API_KEY", "")
-	endpoint      = env("AZURE_ENDPOINT", "https://languageatcodemonkey.openai.azure.com")
-	deployment    = env("AZURE_DEPLOYMENT", "gpt-4.1")
-	apiVersion    = env("AZURE_API_VERSION", "2025-01-01-preview")
-	promptFile    = env("PROMPT_FILE", "/opt/system-prompt.txt")
-	debugLogFile  = env("DEBUG_LOG", "/var/log/stackstorm/llm-debug.log")
-	_ = env("PROMPT_DEBUG", "/var/log/stackstorm/prompt-debug.log") // promptDbgFile unused but kept for future debug logging
-	maxLogBytes   = int64(10 * 1024 * 1024)
+	apiKey       = env("AZURE_API_KEY", "")
+	endpoint     = env("AZURE_ENDPOINT", "https://languageatcodemonkey.openai.azure.com")
+	deployment   = env("AZURE_DEPLOYMENT", "gpt-4.1")
+	apiVersion   = env("AZURE_API_VERSION", "2025-01-01-preview")
+	promptFile   = env("PROMPT_FILE", "/opt/system-prompt.txt")
+	debugLogFile = env("DEBUG_LOG", "/var/log/stackstorm/llm-debug.log")
+	_            = env("PROMPT_DEBUG", "/var/log/stackstorm/prompt-debug.log") // promptDbgFile unused but kept for future debug logging
+	maxLogBytes  = int64(10 * 1024 * 1024)
 )
 
 func env(key, def string) string {

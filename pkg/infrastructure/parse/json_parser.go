@@ -25,24 +25,24 @@ func NewJSONParser(logger *zap.Logger) *JSONParserImpl {
 // Parse parses JSON string into a map
 func (j *JSONParserImpl) Parse(ctx context.Context, input string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	
+
 	if err := json.Unmarshal([]byte(input), &result); err != nil {
 		j.logger.Error("Failed to parse JSON", zap.Error(err), zap.String("input_preview", j.previewString(input)))
 		return nil, fmt.Errorf("JSON parse error: %w", err)
 	}
-	
+
 	return result, nil
 }
 
 // ParseArray parses JSON string into an array
 func (j *JSONParserImpl) ParseArray(ctx context.Context, input string) ([]interface{}, error) {
 	var result []interface{}
-	
+
 	if err := json.Unmarshal([]byte(input), &result); err != nil {
 		j.logger.Error("Failed to parse JSON array", zap.Error(err), zap.String("input_preview", j.previewString(input)))
 		return nil, fmt.Errorf("JSON array parse error: %w", err)
 	}
-	
+
 	return result, nil
 }
 
@@ -52,7 +52,7 @@ func (j *JSONParserImpl) ParseToStruct(ctx context.Context, input string, target
 		j.logger.Error("Failed to parse JSON to struct", zap.Error(err), zap.String("input_preview", j.previewString(input)))
 		return fmt.Errorf("JSON struct parse error: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -60,18 +60,18 @@ func (j *JSONParserImpl) ParseToStruct(ctx context.Context, input string, target
 func (j *JSONParserImpl) Format(ctx context.Context, data interface{}, pretty bool) (string, error) {
 	var result []byte
 	var err error
-	
+
 	if pretty {
 		result, err = json.MarshalIndent(data, "", "  ")
 	} else {
 		result, err = json.Marshal(data)
 	}
-	
+
 	if err != nil {
 		j.logger.Error("Failed to format JSON", zap.Error(err), zap.Bool("pretty", pretty))
 		return "", fmt.Errorf("JSON format error: %w", err)
 	}
-	
+
 	return string(result), nil
 }
 
@@ -82,7 +82,7 @@ func (j *JSONParserImpl) Validate(ctx context.Context, input string, schema inte
 	if err := json.Unmarshal([]byte(input), &temp); err != nil {
 		return fmt.Errorf("invalid JSON: %w", err)
 	}
-	
+
 	// TODO: Implement proper JSON schema validation using github.com/xeipuuv/gojsonschema
 	j.logger.Info("JSON validation completed (basic validation only)")
 	return nil
@@ -94,22 +94,22 @@ func (j *JSONParserImpl) ExtractPath(ctx context.Context, input string, jsonPath
 	if err := json.Unmarshal([]byte(input), &data); err != nil {
 		return nil, fmt.Errorf("failed to parse JSON for path extraction: %w", err)
 	}
-	
+
 	// Simple path extraction - supports basic dot notation like "user.name"
 	// For more complex JSONPath, would need to integrate a JSONPath library
 	if jsonPath == "" || jsonPath == "." {
 		return data, nil
 	}
-	
+
 	// Remove leading dot if present
 	path := jsonPath
 	if path[0] == '.' {
 		path = path[1:]
 	}
-	
+
 	// Split path by dots
 	keys := regexp.MustCompile(`\.`).Split(path, -1)
-	
+
 	current := interface{}(data)
 	for _, key := range keys {
 		if currentMap, ok := current.(map[string]interface{}); ok {
@@ -122,7 +122,7 @@ func (j *JSONParserImpl) ExtractPath(ctx context.Context, input string, jsonPath
 			return nil, fmt.Errorf("cannot traverse path at key '%s': not a map", key)
 		}
 	}
-	
+
 	return current, nil
 }
 

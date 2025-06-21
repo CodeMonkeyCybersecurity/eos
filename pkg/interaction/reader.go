@@ -18,7 +18,7 @@ import (
 func ReadLine(ctx context.Context, reader *bufio.Reader, label string) (string, error) {
 	logger := otelzap.Ctx(ctx)
 	logger.Debug("📝 Prompting user for input", zap.String("label", label))
-	
+
 	// Use os.Stderr for user-facing prompts to preserve stdout for automation
 	_, _ = fmt.Fprint(os.Stderr, label+": ")
 

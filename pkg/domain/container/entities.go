@@ -27,23 +27,23 @@ type Container struct {
 
 // ContainerSpec defines parameters for creating a container
 type ContainerSpec struct {
-	Name         string            `json:"name"`
-	Image        string            `json:"image"`
-	Command      []string          `json:"command,omitempty"`
-	Args         []string          `json:"args,omitempty"`
-	Environment  []string          `json:"environment,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty"`
-	Ports        []PortMapping     `json:"ports,omitempty"`
-	Volumes      []VolumeMount     `json:"volumes,omitempty"`
-	NetworkMode  string            `json:"network_mode,omitempty"`
-	RestartPolicy *RestartPolicy   `json:"restart_policy,omitempty"`
-	Resources    *ResourceLimits   `json:"resources,omitempty"`
-	Security     *SecurityConfig   `json:"security,omitempty"`
-	HealthCheck  *HealthCheck      `json:"health_check,omitempty"`
-	WorkingDir   string            `json:"working_dir,omitempty"`
-	User         string            `json:"user,omitempty"`
-	Privileged   bool              `json:"privileged,omitempty"`
-	ReadOnly     bool              `json:"read_only,omitempty"`
+	Name          string            `json:"name"`
+	Image         string            `json:"image"`
+	Command       []string          `json:"command,omitempty"`
+	Args          []string          `json:"args,omitempty"`
+	Environment   []string          `json:"environment,omitempty"`
+	Labels        map[string]string `json:"labels,omitempty"`
+	Ports         []PortMapping     `json:"ports,omitempty"`
+	Volumes       []VolumeMount     `json:"volumes,omitempty"`
+	NetworkMode   string            `json:"network_mode,omitempty"`
+	RestartPolicy *RestartPolicy    `json:"restart_policy,omitempty"`
+	Resources     *ResourceLimits   `json:"resources,omitempty"`
+	Security      *SecurityConfig   `json:"security,omitempty"`
+	HealthCheck   *HealthCheck      `json:"health_check,omitempty"`
+	WorkingDir    string            `json:"working_dir,omitempty"`
+	User          string            `json:"user,omitempty"`
+	Privileged    bool              `json:"privileged,omitempty"`
+	ReadOnly      bool              `json:"read_only,omitempty"`
 }
 
 // ContainerState represents the current state of a container
@@ -62,21 +62,21 @@ type ContainerState struct {
 
 // ContainerConfig represents container configuration
 type ContainerConfig struct {
-	Hostname        string            `json:"hostname,omitempty"`
-	Domainname      string            `json:"domainname,omitempty"`
-	User            string            `json:"user,omitempty"`
-	AttachStdin     bool              `json:"attach_stdin"`
-	AttachStdout    bool              `json:"attach_stdout"`
-	AttachStderr    bool              `json:"attach_stderr"`
-	Tty             bool              `json:"tty"`
-	OpenStdin       bool              `json:"open_stdin"`
-	StdinOnce       bool              `json:"stdin_once"`
-	Environment     []string          `json:"environment,omitempty"`
-	Command         []string          `json:"command,omitempty"`
-	Image           string            `json:"image"`
-	WorkingDir      string            `json:"working_dir,omitempty"`
-	Entrypoint      []string          `json:"entrypoint,omitempty"`
-	Labels          map[string]string `json:"labels,omitempty"`
+	Hostname     string            `json:"hostname,omitempty"`
+	Domainname   string            `json:"domainname,omitempty"`
+	User         string            `json:"user,omitempty"`
+	AttachStdin  bool              `json:"attach_stdin"`
+	AttachStdout bool              `json:"attach_stdout"`
+	AttachStderr bool              `json:"attach_stderr"`
+	Tty          bool              `json:"tty"`
+	OpenStdin    bool              `json:"open_stdin"`
+	StdinOnce    bool              `json:"stdin_once"`
+	Environment  []string          `json:"environment,omitempty"`
+	Command      []string          `json:"command,omitempty"`
+	Image        string            `json:"image"`
+	WorkingDir   string            `json:"working_dir,omitempty"`
+	Entrypoint   []string          `json:"entrypoint,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
 }
 
 // PortMapping defines port mapping between host and container
@@ -89,9 +89,9 @@ type PortMapping struct {
 
 // VolumeMount defines volume mounting configuration
 type VolumeMount struct {
-	Type        string `json:"type"`         // bind, volume, tmpfs
-	Source      string `json:"source"`       // host path or volume name
-	Destination string `json:"destination"`  // container path
+	Type        string `json:"type"`        // bind, volume, tmpfs
+	Source      string `json:"source"`      // host path or volume name
+	Destination string `json:"destination"` // container path
 	ReadOnly    bool   `json:"read_only"`
 	Propagation string `json:"propagation,omitempty"` // shared, slave, private, rshared, rslave, rprivate
 }
@@ -104,12 +104,12 @@ type RestartPolicy struct {
 
 // ResourceLimits defines container resource constraints
 type ResourceLimits struct {
-	Memory     int64   `json:"memory,omitempty"`      // bytes
-	MemorySwap int64   `json:"memory_swap,omitempty"` // bytes
-	CPUShares  int64   `json:"cpu_shares,omitempty"`  // relative weight
-	CPUQuota   int64   `json:"cpu_quota,omitempty"`   // microseconds
-	CPUPeriod  int64   `json:"cpu_period,omitempty"`  // microseconds
-	CPUSetCPUs string  `json:"cpuset_cpus,omitempty"` // 0-3, 0,1
+	Memory     int64    `json:"memory,omitempty"`      // bytes
+	MemorySwap int64    `json:"memory_swap,omitempty"` // bytes
+	CPUShares  int64    `json:"cpu_shares,omitempty"`  // relative weight
+	CPUQuota   int64    `json:"cpu_quota,omitempty"`   // microseconds
+	CPUPeriod  int64    `json:"cpu_period,omitempty"`  // microseconds
+	CPUSetCPUs string   `json:"cpuset_cpus,omitempty"` // 0-3, 0,1
 	Ulimits    []Ulimit `json:"ulimits,omitempty"`
 }
 
@@ -122,26 +122,26 @@ type Ulimit struct {
 
 // SecurityConfig defines container security settings
 type SecurityConfig struct {
-	Privileged       bool     `json:"privileged"`
-	ReadOnlyRootfs   bool     `json:"read_only_rootfs"`
-	SecurityOpt      []string `json:"security_opt,omitempty"`
-	CapAdd           []string `json:"cap_add,omitempty"`
-	CapDrop          []string `json:"cap_drop,omitempty"`
-	UsernsMode       string   `json:"userns_mode,omitempty"`
-	PidMode          string   `json:"pid_mode,omitempty"`
-	IpcMode          string   `json:"ipc_mode,omitempty"`
-	UTSMode          string   `json:"uts_mode,omitempty"`
-	AppArmorProfile  string   `json:"apparmor_profile,omitempty"`
-	SELinuxLabel     string   `json:"selinux_label,omitempty"`
+	Privileged      bool     `json:"privileged"`
+	ReadOnlyRootfs  bool     `json:"read_only_rootfs"`
+	SecurityOpt     []string `json:"security_opt,omitempty"`
+	CapAdd          []string `json:"cap_add,omitempty"`
+	CapDrop         []string `json:"cap_drop,omitempty"`
+	UsernsMode      string   `json:"userns_mode,omitempty"`
+	PidMode         string   `json:"pid_mode,omitempty"`
+	IpcMode         string   `json:"ipc_mode,omitempty"`
+	UTSMode         string   `json:"uts_mode,omitempty"`
+	AppArmorProfile string   `json:"apparmor_profile,omitempty"`
+	SELinuxLabel    string   `json:"selinux_label,omitempty"`
 }
 
 // HealthCheck defines container health check configuration
 type HealthCheck struct {
-	Test        []string      `json:"test,omitempty"`        // CMD, CMD-SHELL, or NONE
-	Interval    time.Duration `json:"interval,omitempty"`    // time between checks
-	Timeout     time.Duration `json:"timeout,omitempty"`     // maximum time for check
+	Test        []string      `json:"test,omitempty"`         // CMD, CMD-SHELL, or NONE
+	Interval    time.Duration `json:"interval,omitempty"`     // time between checks
+	Timeout     time.Duration `json:"timeout,omitempty"`      // maximum time for check
 	StartPeriod time.Duration `json:"start_period,omitempty"` // grace period
-	Retries     int           `json:"retries,omitempty"`     // consecutive failures needed
+	Retries     int           `json:"retries,omitempty"`      // consecutive failures needed
 }
 
 // Image represents a container image
@@ -178,15 +178,15 @@ type VolumeSpec struct {
 
 // Network represents a container network
 type Network struct {
-	ID         string                 `json:"id"`
-	Name       string                 `json:"name"`
-	Driver     string                 `json:"driver"`
-	Scope      string                 `json:"scope"`
-	IPAM       *NetworkIPAM           `json:"ipam,omitempty"`
+	ID         string                      `json:"id"`
+	Name       string                      `json:"name"`
+	Driver     string                      `json:"driver"`
+	Scope      string                      `json:"scope"`
+	IPAM       *NetworkIPAM                `json:"ipam,omitempty"`
 	Containers map[string]*NetworkEndpoint `json:"containers,omitempty"`
-	Options    map[string]string      `json:"options,omitempty"`
-	Labels     map[string]string      `json:"labels,omitempty"`
-	Created    time.Time              `json:"created"`
+	Options    map[string]string           `json:"options,omitempty"`
+	Labels     map[string]string           `json:"labels,omitempty"`
+	Created    time.Time                   `json:"created"`
 }
 
 // NetworkSpec defines parameters for creating a network
@@ -204,9 +204,9 @@ type NetworkSpec struct {
 
 // NetworkIPAM defines IP Address Management for networks
 type NetworkIPAM struct {
-	Driver  string             `json:"driver,omitempty"`
+	Driver  string              `json:"driver,omitempty"`
 	Config  []NetworkIPAMConfig `json:"config,omitempty"`
-	Options map[string]string  `json:"options,omitempty"`
+	Options map[string]string   `json:"options,omitempty"`
 }
 
 // NetworkIPAMConfig defines IPAM configuration
@@ -252,12 +252,12 @@ type BuildConfig struct {
 
 // DeployConfig defines deployment configuration for a service
 type DeployConfig struct {
-	Mode        string                 `json:"mode,omitempty"`
-	Replicas    *int                   `json:"replicas,omitempty"`
-	Resources   *DeployResourceConfig  `json:"resources,omitempty"`
-	Placement   *PlacementConfig       `json:"placement,omitempty"`
+	Mode         string                `json:"mode,omitempty"`
+	Replicas     *int                  `json:"replicas,omitempty"`
+	Resources    *DeployResourceConfig `json:"resources,omitempty"`
+	Placement    *PlacementConfig      `json:"placement,omitempty"`
 	UpdateConfig *UpdateConfig         `json:"update_config,omitempty"`
-	Labels      map[string]string      `json:"labels,omitempty"`
+	Labels       map[string]string     `json:"labels,omitempty"`
 }
 
 // DeployResourceConfig defines resource configuration for deployment
@@ -336,18 +336,18 @@ type ConfigFile struct {
 
 // ExecConfig defines command execution configuration
 type ExecConfig struct {
-	Command      []string          `json:"command"`
-	Environment  []string          `json:"environment,omitempty"`
-	WorkingDir   string            `json:"working_dir,omitempty"`
-	User         string            `json:"user,omitempty"`
-	Privileged   bool              `json:"privileged,omitempty"`
-	Tty          bool              `json:"tty,omitempty"`
-	AttachStdin  bool              `json:"attach_stdin,omitempty"`
-	AttachStdout bool              `json:"attach_stdout,omitempty"`
-	AttachStderr bool              `json:"attach_stderr,omitempty"`
-	Detach       bool              `json:"detach,omitempty"`
-	DetachKeys   string            `json:"detach_keys,omitempty"`
-	PolicyRules  []string          `json:"policy_rules,omitempty"`
+	Command      []string `json:"command"`
+	Environment  []string `json:"environment,omitempty"`
+	WorkingDir   string   `json:"working_dir,omitempty"`
+	User         string   `json:"user,omitempty"`
+	Privileged   bool     `json:"privileged,omitempty"`
+	Tty          bool     `json:"tty,omitempty"`
+	AttachStdin  bool     `json:"attach_stdin,omitempty"`
+	AttachStdout bool     `json:"attach_stdout,omitempty"`
+	AttachStderr bool     `json:"attach_stderr,omitempty"`
+	Detach       bool     `json:"detach,omitempty"`
+	DetachKeys   string   `json:"detach_keys,omitempty"`
+	PolicyRules  []string `json:"policy_rules,omitempty"`
 }
 
 // ExecResult represents the result of command execution
@@ -363,23 +363,23 @@ type ExecResult struct {
 
 // ContainerStats represents container resource usage statistics
 type ContainerStats struct {
-	ContainerID   string                 `json:"container_id"`
-	Name          string                 `json:"name"`
-	CPUUsage      *CPUUsage              `json:"cpu_usage,omitempty"`
-	MemoryUsage   *MemoryUsage           `json:"memory_usage,omitempty"`
-	NetworkUsage  map[string]*NetworkUsage `json:"network_usage,omitempty"`
-	BlockIOUsage  *BlockIOUsage          `json:"block_io_usage,omitempty"`
-	PidsUsage     *PidsUsage             `json:"pids_usage,omitempty"`
-	Timestamp     time.Time              `json:"timestamp"`
+	ContainerID  string                   `json:"container_id"`
+	Name         string                   `json:"name"`
+	CPUUsage     *CPUUsage                `json:"cpu_usage,omitempty"`
+	MemoryUsage  *MemoryUsage             `json:"memory_usage,omitempty"`
+	NetworkUsage map[string]*NetworkUsage `json:"network_usage,omitempty"`
+	BlockIOUsage *BlockIOUsage            `json:"block_io_usage,omitempty"`
+	PidsUsage    *PidsUsage               `json:"pids_usage,omitempty"`
+	Timestamp    time.Time                `json:"timestamp"`
 }
 
 // CPUUsage represents CPU usage statistics
 type CPUUsage struct {
-	TotalUsage        uint64   `json:"total_usage"`
-	UsageInKernelmode uint64   `json:"usage_in_kernelmode"`
-	UsageInUsermode   uint64   `json:"usage_in_usermode"`
-	SystemCPUUsage    uint64   `json:"system_cpu_usage"`
-	OnlineCPUs        uint32   `json:"online_cpus"`
+	TotalUsage        uint64          `json:"total_usage"`
+	UsageInKernelmode uint64          `json:"usage_in_kernelmode"`
+	UsageInUsermode   uint64          `json:"usage_in_usermode"`
+	SystemCPUUsage    uint64          `json:"system_cpu_usage"`
+	OnlineCPUs        uint32          `json:"online_cpus"`
 	ThrottlingData    *ThrottlingData `json:"throttling_data,omitempty"`
 }
 
@@ -444,12 +444,12 @@ type HealthStatus struct {
 
 // ContainerEvent represents a container event
 type ContainerEvent struct {
-	Type       string            `json:"type"`       // container, image, volume, network
-	Action     string            `json:"action"`     // create, start, stop, destroy, etc.
-	Actor      *EventActor       `json:"actor,omitempty"`
-	Time       time.Time         `json:"time"`
-	TimeNano   int64             `json:"time_nano"`
-	Scope      string            `json:"scope,omitempty"`
+	Type     string      `json:"type"`   // container, image, volume, network
+	Action   string      `json:"action"` // create, start, stop, destroy, etc.
+	Actor    *EventActor `json:"actor,omitempty"`
+	Time     time.Time   `json:"time"`
+	TimeNano int64       `json:"time_nano"`
+	Scope    string      `json:"scope,omitempty"`
 }
 
 // EventActor represents the actor of an event
@@ -462,59 +462,59 @@ type EventActor struct {
 
 // RuntimeInfo represents container runtime information
 type RuntimeInfo struct {
-	ID                string                 `json:"id"`
-	Name              string                 `json:"name"`
-	Version           string                 `json:"version"`
-	APIVersion        string                 `json:"api_version"`
-	Architecture      string                 `json:"architecture"`
-	OSType            string                 `json:"os_type"`
-	OSVersion         string                 `json:"os_version"`
-	KernelVersion     string                 `json:"kernel_version"`
-	TotalMemory       int64                  `json:"total_memory"`
-	CPUs              int                    `json:"cpus"`
-	ServerVersion     string                 `json:"server_version"`
-	IndexServerAddress string                `json:"index_server_address"`
-	RegistryConfig    *RegistryConfig        `json:"registry_config,omitempty"`
-	Plugins           map[string][]string    `json:"plugins,omitempty"`
-	Swarm             *SwarmInfo             `json:"swarm,omitempty"`
+	ID                 string              `json:"id"`
+	Name               string              `json:"name"`
+	Version            string              `json:"version"`
+	APIVersion         string              `json:"api_version"`
+	Architecture       string              `json:"architecture"`
+	OSType             string              `json:"os_type"`
+	OSVersion          string              `json:"os_version"`
+	KernelVersion      string              `json:"kernel_version"`
+	TotalMemory        int64               `json:"total_memory"`
+	CPUs               int                 `json:"cpus"`
+	ServerVersion      string              `json:"server_version"`
+	IndexServerAddress string              `json:"index_server_address"`
+	RegistryConfig     *RegistryConfig     `json:"registry_config,omitempty"`
+	Plugins            map[string][]string `json:"plugins,omitempty"`
+	Swarm              *SwarmInfo          `json:"swarm,omitempty"`
 }
 
 // RegistryConfig represents registry configuration
 type RegistryConfig struct {
-	IndexConfigs  map[string]*IndexConfig `json:"index_configs,omitempty"`
-	InsecureRegistryCIDRs []string         `json:"insecure_registry_cidrs,omitempty"`
-	Mirrors       []string                 `json:"mirrors,omitempty"`
+	IndexConfigs          map[string]*IndexConfig `json:"index_configs,omitempty"`
+	InsecureRegistryCIDRs []string                `json:"insecure_registry_cidrs,omitempty"`
+	Mirrors               []string                `json:"mirrors,omitempty"`
 }
 
 // IndexConfig represents index configuration
 type IndexConfig struct {
-	Name     string `json:"name"`
+	Name     string   `json:"name"`
 	Mirrors  []string `json:"mirrors,omitempty"`
-	Secure   bool   `json:"secure"`
-	Official bool   `json:"official"`
+	Secure   bool     `json:"secure"`
+	Official bool     `json:"official"`
 }
 
 // SwarmInfo represents Docker Swarm information
 type SwarmInfo struct {
-	NodeID   string `json:"node_id,omitempty"`
-	NodeAddr string `json:"node_addr,omitempty"`
+	NodeID   string       `json:"node_id,omitempty"`
+	NodeAddr string       `json:"node_addr,omitempty"`
 	Cluster  *ClusterInfo `json:"cluster,omitempty"`
 }
 
 // ClusterInfo represents cluster information
 type ClusterInfo struct {
-	ID   string         `json:"id,omitempty"`
-	Spec *ClusterSpec   `json:"spec,omitempty"`
+	ID   string       `json:"id,omitempty"`
+	Spec *ClusterSpec `json:"spec,omitempty"`
 }
 
 // ClusterSpec represents cluster specification
 type ClusterSpec struct {
-	Name         string            `json:"name,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty"`
+	Name          string               `json:"name,omitempty"`
+	Labels        map[string]string    `json:"labels,omitempty"`
 	Orchestration *OrchestrationConfig `json:"orchestration,omitempty"`
-	Raft         *RaftConfig       `json:"raft,omitempty"`
-	Dispatcher   *DispatcherConfig `json:"dispatcher,omitempty"`
-	CAConfig     *CAConfig         `json:"ca_config,omitempty"`
+	Raft          *RaftConfig          `json:"raft,omitempty"`
+	Dispatcher    *DispatcherConfig    `json:"dispatcher,omitempty"`
+	CAConfig      *CAConfig            `json:"ca_config,omitempty"`
 }
 
 // OrchestrationConfig represents orchestration configuration
@@ -543,24 +543,24 @@ type CAConfig struct {
 
 // SystemUsage represents system resource usage
 type SystemUsage struct {
-	Containers         int                    `json:"containers"`
-	ContainersRunning  int                    `json:"containers_running"`
-	ContainersPaused   int                    `json:"containers_paused"`
-	ContainersStopped  int                    `json:"containers_stopped"`
-	Images             int                    `json:"images"`
-	Driver             string                 `json:"driver"`
-	DriverStatus       [][]string             `json:"driver_status,omitempty"`
-	SystemTime         time.Time              `json:"system_time"`
-	LoggingDriver      string                 `json:"logging_driver"`
-	CgroupDriver       string                 `json:"cgroup_driver"`
-	NEventsListener    int                    `json:"n_events_listener"`
-	KernelVersion      string                 `json:"kernel_version"`
-	OperatingSystem    string                 `json:"operating_system"`
-	OSType             string                 `json:"os_type"`
-	Architecture       string                 `json:"architecture"`
-	IndexServerAddress string                 `json:"index_server_address"`
-	MemTotal           int64                  `json:"mem_total"`
-	NCPU               int                    `json:"ncpu"`
+	Containers         int        `json:"containers"`
+	ContainersRunning  int        `json:"containers_running"`
+	ContainersPaused   int        `json:"containers_paused"`
+	ContainersStopped  int        `json:"containers_stopped"`
+	Images             int        `json:"images"`
+	Driver             string     `json:"driver"`
+	DriverStatus       [][]string `json:"driver_status,omitempty"`
+	SystemTime         time.Time  `json:"system_time"`
+	LoggingDriver      string     `json:"logging_driver"`
+	CgroupDriver       string     `json:"cgroup_driver"`
+	NEventsListener    int        `json:"n_events_listener"`
+	KernelVersion      string     `json:"kernel_version"`
+	OperatingSystem    string     `json:"operating_system"`
+	OSType             string     `json:"os_type"`
+	Architecture       string     `json:"architecture"`
+	IndexServerAddress string     `json:"index_server_address"`
+	MemTotal           int64      `json:"mem_total"`
+	NCPU               int        `json:"ncpu"`
 }
 
 // Search and registry types
@@ -578,70 +578,70 @@ type SearchResult struct {
 
 // PruneResult represents the result of a system prune operation
 type PruneResult struct {
-	ContainersDeleted int     `json:"containers_deleted"`
-	ImagesDeleted     int     `json:"images_deleted"`
-	NetworksDeleted   int     `json:"networks_deleted"`
-	VolumesDeleted    int     `json:"volumes_deleted"`
-	SpaceReclaimed    int64   `json:"space_reclaimed"`
+	ContainersDeleted int   `json:"containers_deleted"`
+	ImagesDeleted     int   `json:"images_deleted"`
+	NetworksDeleted   int   `json:"networks_deleted"`
+	VolumesDeleted    int   `json:"volumes_deleted"`
+	SpaceReclaimed    int64 `json:"space_reclaimed"`
 }
 
 // Configuration and policy types
 
 // ContainerConfiguration represents global container configuration
 type ContainerConfiguration struct {
-	DefaultRegistry      string            `json:"default_registry,omitempty"`
-	DefaultNamespace     string            `json:"default_namespace,omitempty"`
-	DefaultResourceLimits *ResourceLimits  `json:"default_resource_limits,omitempty"`
-	DefaultSecurityConfig *SecurityConfig  `json:"default_security_config,omitempty"`
-	RegistryMirrors      []string         `json:"registry_mirrors,omitempty"`
-	InsecureRegistries   []string         `json:"insecure_registries,omitempty"`
-	LogDriver            string           `json:"log_driver,omitempty"`
-	LogOptions           map[string]string `json:"log_options,omitempty"`
+	DefaultRegistry       string            `json:"default_registry,omitempty"`
+	DefaultNamespace      string            `json:"default_namespace,omitempty"`
+	DefaultResourceLimits *ResourceLimits   `json:"default_resource_limits,omitempty"`
+	DefaultSecurityConfig *SecurityConfig   `json:"default_security_config,omitempty"`
+	RegistryMirrors       []string          `json:"registry_mirrors,omitempty"`
+	InsecureRegistries    []string          `json:"insecure_registries,omitempty"`
+	LogDriver             string            `json:"log_driver,omitempty"`
+	LogOptions            map[string]string `json:"log_options,omitempty"`
 }
 
 // NetworkConfiguration represents global network configuration
 type NetworkConfiguration struct {
-	DefaultNetwork    string            `json:"default_network,omitempty"`
-	DefaultIPv4Subnet string            `json:"default_ipv4_subnet,omitempty"`
-	DefaultIPv6Subnet string            `json:"default_ipv6_subnet,omitempty"`
-	EnableIPv6        bool              `json:"enable_ipv6,omitempty"`
-	DNSServers        []string          `json:"dns_servers,omitempty"`
-	DNSSearch         []string          `json:"dns_search,omitempty"`
-	MTU               int               `json:"mtu,omitempty"`
+	DefaultNetwork    string   `json:"default_network,omitempty"`
+	DefaultIPv4Subnet string   `json:"default_ipv4_subnet,omitempty"`
+	DefaultIPv6Subnet string   `json:"default_ipv6_subnet,omitempty"`
+	EnableIPv6        bool     `json:"enable_ipv6,omitempty"`
+	DNSServers        []string `json:"dns_servers,omitempty"`
+	DNSSearch         []string `json:"dns_search,omitempty"`
+	MTU               int      `json:"mtu,omitempty"`
 }
 
 // SecurityPolicy represents container security policy
 type SecurityPolicy struct {
-	Name                string            `json:"name"`
-	Description         string            `json:"description,omitempty"`
-	AllowPrivileged     bool              `json:"allow_privileged"`
-	AllowRootUser       bool              `json:"allow_root_user"`
-	AllowedCapabilities []string          `json:"allowed_capabilities,omitempty"`
-	ForbiddenCapabilities []string        `json:"forbidden_capabilities,omitempty"`
-	AllowedSysctls      []string          `json:"allowed_sysctls,omitempty"`
-	ForbiddenSysctls    []string          `json:"forbidden_sysctls,omitempty"`
-	RequiredLabels      map[string]string `json:"required_labels,omitempty"`
-	ForbiddenLabels     map[string]string `json:"forbidden_labels,omitempty"`
-	AllowedRegistries   []string          `json:"allowed_registries,omitempty"`
-	ForbiddenImages     []string          `json:"forbidden_images,omitempty"`
-	MaxMemory           int64             `json:"max_memory,omitempty"`
-	MaxCPU              float64           `json:"max_cpu,omitempty"`
-	ReadOnlyRootfs      bool              `json:"read_only_rootfs"`
-	Rules               []PolicyRule      `json:"rules,omitempty"`
-	Version             string            `json:"version"`
-	Created             time.Time         `json:"created"`
-	Updated             time.Time         `json:"updated"`
+	Name                  string            `json:"name"`
+	Description           string            `json:"description,omitempty"`
+	AllowPrivileged       bool              `json:"allow_privileged"`
+	AllowRootUser         bool              `json:"allow_root_user"`
+	AllowedCapabilities   []string          `json:"allowed_capabilities,omitempty"`
+	ForbiddenCapabilities []string          `json:"forbidden_capabilities,omitempty"`
+	AllowedSysctls        []string          `json:"allowed_sysctls,omitempty"`
+	ForbiddenSysctls      []string          `json:"forbidden_sysctls,omitempty"`
+	RequiredLabels        map[string]string `json:"required_labels,omitempty"`
+	ForbiddenLabels       map[string]string `json:"forbidden_labels,omitempty"`
+	AllowedRegistries     []string          `json:"allowed_registries,omitempty"`
+	ForbiddenImages       []string          `json:"forbidden_images,omitempty"`
+	MaxMemory             int64             `json:"max_memory,omitempty"`
+	MaxCPU                float64           `json:"max_cpu,omitempty"`
+	ReadOnlyRootfs        bool              `json:"read_only_rootfs"`
+	Rules                 []PolicyRule      `json:"rules,omitempty"`
+	Version               string            `json:"version"`
+	Created               time.Time         `json:"created"`
+	Updated               time.Time         `json:"updated"`
 }
 
 // PolicyRule represents a specific policy rule
 type PolicyRule struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description,omitempty"`
-	Condition   string            `json:"condition"`   // OPA/Rego expression
-	Action      PolicyAction      `json:"action"`     // allow, deny, warn
-	Severity    PolicySeverity    `json:"severity"`   // low, medium, high, critical
-	Message     string            `json:"message,omitempty"`
-	Tags        []string          `json:"tags,omitempty"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Condition   string         `json:"condition"` // OPA/Rego expression
+	Action      PolicyAction   `json:"action"`    // allow, deny, warn
+	Severity    PolicySeverity `json:"severity"`  // low, medium, high, critical
+	Message     string         `json:"message,omitempty"`
+	Tags        []string       `json:"tags,omitempty"`
 }
 
 // PolicyAction represents policy rule actions
@@ -667,27 +667,27 @@ const (
 
 // SecurityScanResult represents container security scan results
 type SecurityScanResult struct {
-	ContainerID     string               `json:"container_id"`
-	Image           string               `json:"image"`
-	ScanTime        time.Time            `json:"scan_time"`
-	Scanner         string               `json:"scanner"`
-	Vulnerabilities []Vulnerability      `json:"vulnerabilities,omitempty"`
+	ContainerID       string             `json:"container_id"`
+	Image             string             `json:"image"`
+	ScanTime          time.Time          `json:"scan_time"`
+	Scanner           string             `json:"scanner"`
+	Vulnerabilities   []Vulnerability    `json:"vulnerabilities,omitempty"`
 	Misconfigurations []Misconfiguration `json:"misconfigurations,omitempty"`
-	Secrets         []Secret             `json:"secrets,omitempty"`
-	Score           *SecurityScore       `json:"score,omitempty"`
+	Secrets           []Secret           `json:"secrets,omitempty"`
+	Score             *SecurityScore     `json:"score,omitempty"`
 }
 
 // Vulnerability represents a security vulnerability
 type Vulnerability struct {
-	ID          string             `json:"id"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	Severity    VulnerabilitySeverity `json:"severity"`
-	Package     string             `json:"package,omitempty"`
-	Version     string             `json:"version,omitempty"`
-	FixedVersion string            `json:"fixed_version,omitempty"`
-	References  []string           `json:"references,omitempty"`
-	CVSS        *CVSSScore         `json:"cvss,omitempty"`
+	ID           string                `json:"id"`
+	Title        string                `json:"title"`
+	Description  string                `json:"description"`
+	Severity     VulnerabilitySeverity `json:"severity"`
+	Package      string                `json:"package,omitempty"`
+	Version      string                `json:"version,omitempty"`
+	FixedVersion string                `json:"fixed_version,omitempty"`
+	References   []string              `json:"references,omitempty"`
+	CVSS         *CVSSScore            `json:"cvss,omitempty"`
 }
 
 // VulnerabilitySeverity represents vulnerability severity levels
@@ -710,48 +710,48 @@ type CVSSScore struct {
 
 // Misconfiguration represents a security misconfiguration
 type Misconfiguration struct {
-	ID          string `json:"id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
+	ID          string         `json:"id"`
+	Title       string         `json:"title"`
+	Description string         `json:"description"`
 	Severity    PolicySeverity `json:"severity"`
-	Resolution  string `json:"resolution,omitempty"`
-	References  []string `json:"references,omitempty"`
+	Resolution  string         `json:"resolution,omitempty"`
+	References  []string       `json:"references,omitempty"`
 }
 
 // Secret represents a detected secret
 type Secret struct {
-	Type        string `json:"type"`
-	Title       string `json:"title"`
-	Severity    PolicySeverity `json:"severity"`
-	StartLine   int    `json:"start_line,omitempty"`
-	EndLine     int    `json:"end_line,omitempty"`
-	Code        string `json:"code,omitempty"`
-	Match       string `json:"match,omitempty"`
+	Type      string         `json:"type"`
+	Title     string         `json:"title"`
+	Severity  PolicySeverity `json:"severity"`
+	StartLine int            `json:"start_line,omitempty"`
+	EndLine   int            `json:"end_line,omitempty"`
+	Code      string         `json:"code,omitempty"`
+	Match     string         `json:"match,omitempty"`
 }
 
 // SecurityScore represents overall security score
 type SecurityScore struct {
-	Overall         float64 `json:"overall"`
-	Vulnerabilities float64 `json:"vulnerabilities"`
+	Overall           float64 `json:"overall"`
+	Vulnerabilities   float64 `json:"vulnerabilities"`
 	Misconfigurations float64 `json:"misconfigurations"`
-	Secrets         float64 `json:"secrets"`
-	MaxScore        float64 `json:"max_score"`
+	Secrets           float64 `json:"secrets"`
+	MaxScore          float64 `json:"max_score"`
 }
 
 // Audit and logging types
 
 // ContainerAuditEvent represents an audit event for container operations
 type ContainerAuditEvent struct {
-	ID          string            `json:"id"`
-	Timestamp   time.Time         `json:"timestamp"`
-	User        string            `json:"user"`
-	Action      string            `json:"action"`
-	Resource    string            `json:"resource"`
-	ResourceID  string            `json:"resource_id,omitempty"`
-	Details     map[string]string `json:"details,omitempty"`
-	Result      string            `json:"result"` // success, failure, partial
-	Error       string            `json:"error,omitempty"`
-	Duration    time.Duration     `json:"duration,omitempty"`
-	SourceIP    string            `json:"source_ip,omitempty"`
-	UserAgent   string            `json:"user_agent,omitempty"`
+	ID         string            `json:"id"`
+	Timestamp  time.Time         `json:"timestamp"`
+	User       string            `json:"user"`
+	Action     string            `json:"action"`
+	Resource   string            `json:"resource"`
+	ResourceID string            `json:"resource_id,omitempty"`
+	Details    map[string]string `json:"details,omitempty"`
+	Result     string            `json:"result"` // success, failure, partial
+	Error      string            `json:"error,omitempty"`
+	Duration   time.Duration     `json:"duration,omitempty"`
+	SourceIP   string            `json:"source_ip,omitempty"`
+	UserAgent  string            `json:"user_agent,omitempty"`
 }

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // DiscoverHetzner gathers Hetzner Cloud infrastructure information
@@ -88,10 +88,10 @@ func (i *Inspector) discoverHetznerServers() ([]HetznerServer, error) {
 	}
 
 	var hcloudServers []struct {
-		ID         int               `json:"id"`
-		Name       string            `json:"name"`
-		Status     string            `json:"status"`
-		Created    string            `json:"created"`
+		ID         int    `json:"id"`
+		Name       string `json:"name"`
+		Status     string `json:"status"`
+		Created    string `json:"created"`
 		ServerType struct {
 			Name string `json:"name"`
 		} `json:"server_type"`
@@ -209,9 +209,9 @@ func (i *Inspector) discoverHetznerFirewalls() ([]HetznerFirewall, error) {
 	}
 
 	var hcloudFirewalls []struct {
-		ID     int    `json:"id"`
-		Name   string `json:"name"`
-		Rules  []struct {
+		ID    int    `json:"id"`
+		Name  string `json:"name"`
+		Rules []struct {
 			Direction      string   `json:"direction"`
 			Protocol       string   `json:"protocol"`
 			Port           *string  `json:"port"`
@@ -261,9 +261,9 @@ func (i *Inspector) discoverHetznerLoadBalancers() ([]HetznerLoadBalancer, error
 	}
 
 	var hcloudLBs []struct {
-		ID               int    `json:"id"`
-		Name             string `json:"name"`
-		PublicNet        struct {
+		ID        int    `json:"id"`
+		Name      string `json:"name"`
+		PublicNet struct {
 			IPv4 struct {
 				IP string `json:"ip"`
 			} `json:"ipv4"`
@@ -306,10 +306,10 @@ func (i *Inspector) discoverHetznerVolumes() ([]HetznerVolume, error) {
 	}
 
 	var hcloudVolumes []struct {
-		ID       int     `json:"id"`
-		Name     string  `json:"name"`
-		Size     int     `json:"size"`
-		Server   *int    `json:"server"`
+		ID       int    `json:"id"`
+		Name     string `json:"name"`
+		Size     int    `json:"size"`
+		Server   *int   `json:"server"`
 		Location struct {
 			Name string `json:"name"`
 		} `json:"location"`
@@ -345,11 +345,11 @@ func (i *Inspector) discoverHetznerFloatingIPs() ([]HetznerFloatingIP, error) {
 	}
 
 	var hcloudFIPs []struct {
-		ID       int     `json:"id"`
-		Name     string  `json:"name"`
-		IP       string  `json:"ip"`
-		Type     string  `json:"type"`
-		Server   *int    `json:"server"`
+		ID           int    `json:"id"`
+		Name         string `json:"name"`
+		IP           string `json:"ip"`
+		Type         string `json:"type"`
+		Server       *int   `json:"server"`
 		HomeLocation struct {
 			Name string `json:"name"`
 		} `json:"home_location"`

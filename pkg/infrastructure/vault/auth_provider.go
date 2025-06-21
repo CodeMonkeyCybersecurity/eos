@@ -28,7 +28,7 @@ func NewVaultAuthProvider(client *api.Client, logger *zap.Logger) *VaultAuthProv
 
 // Authenticate performs user authentication using various methods
 func (v *VaultAuthProvider) Authenticate(ctx context.Context, method string, credentials map[string]string) (*vault.AuthResult, error) {
-	v.logger.Info("Performing vault authentication", 
+	v.logger.Info("Performing vault authentication",
 		zap.String("method", method),
 		zap.String("user", credentials["username"]))
 
@@ -55,7 +55,7 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 	if !ok {
 		return nil, fmt.Errorf("username is required for userpass authentication")
 	}
-	
+
 	password, ok := credentials["password"]
 	if !ok {
 		return nil, fmt.Errorf("password is required for userpass authentication")
@@ -70,8 +70,8 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 	path := fmt.Sprintf("auth/userpass/login/%s", username)
 	secret, err := v.client.Logical().WriteWithContext(ctx, path, authData)
 	if err != nil {
-		v.logger.Error("Userpass authentication failed", 
-			zap.String("username", username), 
+		v.logger.Error("Userpass authentication failed",
+			zap.String("username", username),
 			zap.Error(err))
 		return &vault.AuthResult{
 			Success:      false,
@@ -94,7 +94,7 @@ func (v *VaultAuthProvider) authenticateUserpass(ctx context.Context, credential
 	// Set the token for future requests
 	v.client.SetToken(secret.Auth.ClientToken)
 
-	v.logger.Info("Userpass authentication successful", 
+	v.logger.Info("Userpass authentication successful",
 		zap.String("username", username),
 		zap.Duration("token_ttl", time.Duration(secret.Auth.LeaseDuration)*time.Second))
 
@@ -116,7 +116,7 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 	if !ok {
 		return nil, fmt.Errorf("role_id is required for approle authentication")
 	}
-	
+
 	secretID, ok := credentials["secret_id"]
 	if !ok {
 		return nil, fmt.Errorf("secret_id is required for approle authentication")
@@ -131,8 +131,8 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 	// Perform authentication
 	secret, err := v.client.Logical().WriteWithContext(ctx, "auth/approle/login", authData)
 	if err != nil {
-		v.logger.Error("AppRole authentication failed", 
-			zap.String("role_id", roleID), 
+		v.logger.Error("AppRole authentication failed",
+			zap.String("role_id", roleID),
 			zap.Error(err))
 		return &vault.AuthResult{
 			Success:      false,
@@ -155,7 +155,7 @@ func (v *VaultAuthProvider) authenticateAppRole(ctx context.Context, credentials
 	// Set the token for future requests
 	v.client.SetToken(secret.Auth.ClientToken)
 
-	v.logger.Info("AppRole authentication successful", 
+	v.logger.Info("AppRole authentication successful",
 		zap.String("role_id", roleID),
 		zap.Duration("token_ttl", time.Duration(secret.Auth.LeaseDuration)*time.Second))
 

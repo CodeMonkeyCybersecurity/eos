@@ -20,26 +20,26 @@ func EnsureCertificates(appName, baseDomain, email string) error {
 	if err := ValidateAllCertificateInputs(appName, baseDomain, email); err != nil {
 		return fmt.Errorf("certificate input validation failed: %w", err)
 	}
-	
+
 	// Additional sanitization as defense-in-depth
 	appName = SanitizeInputForCommand(appName)
 	baseDomain = SanitizeInputForCommand(baseDomain)
 	email = SanitizeInputForCommand(email)
-	
+
 	// Re-validate after sanitization to ensure nothing malicious got through
 	if err := ValidateAllCertificateInputs(appName, baseDomain, email); err != nil {
 		return fmt.Errorf("post-sanitization validation failed: %w", err)
 	}
-	
+
 	certDir := "certs"
-	
+
 	// Construct the fully qualified domain name using validated inputs
 	fqdn := fmt.Sprintf("%s.%s", appName, baseDomain)
-	
+
 	// Use secure file path construction
 	privKey := filepath.Join(certDir, fmt.Sprintf("%s.privkey.pem", fqdn))
 	fullChain := filepath.Join(certDir, fmt.Sprintf("%s.fullchain.pem", fqdn))
-	
+
 	// Validate that the constructed file paths are safe
 	if err := validateFilePath(privKey); err != nil {
 		return fmt.Errorf("invalid private key path: %w", err)
@@ -53,26 +53,26 @@ func EnsureCertificates(appName, baseDomain, email string) error {
 		// Use secure command execution with timeout and validation
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
-		
+
 		// Execute certbot with validated parameters using our secure execute package
 		args := []string{
 			"certonly",
-			"--standalone", 
+			"--standalone",
 			"--preferred-challenges", "http",
 			"-d", fqdn,
 			"-m", email,
 			"--agree-tos",
 			"--non-interactive",
 		}
-		
+
 		// Log the command being executed (but not the email for privacy)
 		if err := execute.RunSimple(ctx, "certbot", args...); err != nil {
 			return fmt.Errorf("failed to generate certificate for domain %s: %w", fqdn, err)
 		}
-		
+
 		// In production, you would move or copy the generated certificates to certDir
 		// For now, we assume certbot places them in the correct location
-		
+
 	} else if _, err := os.Stat(fullChain); os.IsNotExist(err) {
 		// If the private key exists but the fullchain is missing, return an error
 		return fmt.Errorf("fullchain certificate missing for domain %s", fqdn)
@@ -88,17 +88,17 @@ func validateFilePath(path string) error {
 	if filepath.IsAbs(path) {
 		return fmt.Errorf("absolute paths not allowed: %s", path)
 	}
-	
+
 	// Clean the path and check it hasn't changed (indicates traversal attempts)
 	cleanPath := filepath.Clean(path)
 	if cleanPath != path {
 		return fmt.Errorf("path contains traversal elements: %s", path)
 	}
-	
+
 	// Check for any .. elements
 	if filepath.Dir(cleanPath) != filepath.Dir(path) {
 		return fmt.Errorf("path validation failed: %s", path)
 	}
-	
+
 	return nil
 }

@@ -14,7 +14,7 @@ func ExampleUsage() {
 	// Create context and logger
 	ctx := context.Background()
 	logger, _ := zap.NewDevelopment()
-	
+
 	// Build container with enhanced patterns
 	container := NewContainerBuilder(ctx, logger).
 		WithSingleton("secretStore", createSecretStore).
@@ -124,10 +124,10 @@ func createInfraService(ctx context.Context, container *EnhancedContainer) (inte
 // BeforeMigration shows the old container usage pattern
 func BeforeMigration() {
 	logger, _ := zap.NewDevelopment()
-	
+
 	// Old pattern - manual dependency management
 	container := NewDIContainer(logger)
-	
+
 	// Manual registration
 	container.RegisterSecretStore(&MockSecretStore{})
 	container.RegisterAuditRepository(&MockAuditRepository{})
@@ -154,7 +154,7 @@ func BeforeMigration() {
 func AfterMigration() {
 	ctx := context.Background()
 	logger, _ := zap.NewDevelopment()
-	
+
 	// New pattern - enhanced container with lifecycle
 	container := NewContainerBuilder(ctx, logger).
 		WithSingleton("secretStore", createSecretStore).
@@ -323,7 +323,7 @@ type MockContainerManager struct{}
 func (m *MockContainerManager) ListContainers(ctx context.Context) ([]*Container, error) {
 	return []*Container{{
 		ID:      "1",
-		Name:    "test-container", 
+		Name:    "test-container",
 		Image:   "nginx",
 		Status:  "running",
 		Created: time.Now(),
@@ -334,7 +334,7 @@ func (m *MockContainerManager) GetContainer(ctx context.Context, id string) (*Co
 	return &Container{
 		ID:      id,
 		Name:    "test-container",
-		Image:   "nginx", 
+		Image:   "nginx",
 		Status:  "running",
 		Created: time.Now(),
 	}, nil
@@ -345,7 +345,7 @@ func (m *MockContainerManager) CreateContainer(ctx context.Context, spec *Contai
 		ID:      "new-1",
 		Name:    spec.Name,
 		Image:   spec.Image,
-		Status:  "running", 
+		Status:  "running",
 		Created: time.Now(),
 	}, nil
 }

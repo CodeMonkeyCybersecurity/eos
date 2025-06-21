@@ -43,7 +43,7 @@ type EnhancedContainer struct {
 // NewEnhancedContainer creates a new enhanced dependency injection container
 func NewEnhancedContainer(ctx context.Context, logger *zap.Logger) *EnhancedContainer {
 	containerCtx, cancel := context.WithCancel(ctx)
-	
+
 	return &EnhancedContainer{
 		ctx:           containerCtx,
 		cancel:        cancel,
@@ -64,7 +64,7 @@ func (c *EnhancedContainer) RegisterSingleton(name string, factory func(ctx cont
 		Singleton: true,
 		Factory:   factory,
 	}
-	
+
 	c.logger.Debug("Singleton service registered", zap.String("name", name))
 }
 
@@ -78,7 +78,7 @@ func (c *EnhancedContainer) RegisterTransient(name string, factory func(ctx cont
 		Singleton: false,
 		Factory:   factory,
 	}
-	
+
 	c.logger.Debug("Transient service registered", zap.String("name", name))
 }
 
@@ -104,14 +104,14 @@ func (c *EnhancedContainer) RegisterInstance(name string, instance interface{}) 
 		Lifecycle: lifecycle,
 		Singleton: true,
 	}
-	
+
 	c.instances[name] = instance
-	
-	c.logger.Debug("Instance registered", 
+
+	c.logger.Debug("Instance registered",
 		zap.String("name", name),
 		zap.String("type", reflect.TypeOf(instance).String()),
 	)
-	
+
 	return nil
 }
 
@@ -142,17 +142,17 @@ func (c *EnhancedContainer) Get(name string) (interface{}, error) {
 // GetTyped retrieves a service with type safety
 func GetTyped[T any](c *EnhancedContainer, name string) (T, error) {
 	var zero T
-	
+
 	instance, err := c.Get(name)
 	if err != nil {
 		return zero, err
 	}
-	
+
 	typed, ok := instance.(T)
 	if !ok {
 		return zero, fmt.Errorf("service '%s' is not of expected type %T", name, zero)
 	}
-	
+
 	return typed, nil
 }
 
@@ -175,14 +175,14 @@ func (c *EnhancedContainer) Start(ctx context.Context) error {
 	}
 
 	c.startTime = time.Now()
-	
+
 	c.logger.Info("Starting container", zap.Int("services", len(c.registrations)))
 
 	// Start all services with lifecycle support
 	for name, registration := range c.registrations {
 		if registration.Lifecycle != nil {
 			if err := registration.Lifecycle.Start(ctx); err != nil {
-				c.logger.Error("Failed to start service", 
+				c.logger.Error("Failed to start service",
 					zap.String("service", name),
 					zap.Error(err),
 				)
@@ -193,11 +193,11 @@ func (c *EnhancedContainer) Start(ctx context.Context) error {
 	}
 
 	c.started = true
-	
-	c.logger.Info("Container started successfully", 
+
+	c.logger.Info("Container started successfully",
 		zap.Duration("startup_time", time.Since(c.startTime)),
 	)
-	
+
 	return nil
 }
 
@@ -211,13 +211,13 @@ func (c *EnhancedContainer) Stop(ctx context.Context) error {
 	}
 
 	c.logger.Info("Stopping container")
-	
+
 	// Stop services in reverse order
 	var services []string
 	for name := range c.registrations {
 		services = append(services, name)
 	}
-	
+
 	// Reverse slice
 	for i := len(services)/2 - 1; i >= 0; i-- {
 		opp := len(services) - 1 - i
@@ -228,7 +228,7 @@ func (c *EnhancedContainer) Stop(ctx context.Context) error {
 		registration := c.registrations[name]
 		if registration.Lifecycle != nil {
 			if err := registration.Lifecycle.Stop(ctx); err != nil {
-				c.logger.Error("Failed to stop service", 
+				c.logger.Error("Failed to stop service",
 					zap.String("service", name),
 					zap.Error(err),
 				)
@@ -241,7 +241,7 @@ func (c *EnhancedContainer) Stop(ctx context.Context) error {
 
 	c.cancel()
 	c.started = false
-	
+
 	c.logger.Info("Container stopped successfully")
 	return nil
 }
@@ -256,12 +256,12 @@ func (c *EnhancedContainer) Health(ctx context.Context) error {
 	}
 
 	var unhealthyServices []string
-	
+
 	for name, registration := range c.registrations {
 		if registration.Lifecycle != nil {
 			if err := registration.Lifecycle.Health(ctx); err != nil {
 				unhealthyServices = append(unhealthyServices, name)
-				c.logger.Warn("Service health check failed", 
+				c.logger.Warn("Service health check failed",
 					zap.String("service", name),
 					zap.Error(err),
 				)
@@ -299,8 +299,8 @@ func (c *EnhancedContainer) GetServiceInfo(name string) (*ServiceInfo, error) {
 	}
 
 	info := &ServiceInfo{
-		Name:      registration.Name,
-		Singleton: registration.Singleton,
+		Name:         registration.Name,
+		Singleton:    registration.Singleton,
 		HasLifecycle: registration.Lifecycle != nil,
 	}
 
@@ -333,7 +333,7 @@ func (c *EnhancedContainer) Validate() error {
 		}
 	}
 
-	c.logger.Info("Container validation successful", 
+	c.logger.Info("Container validation successful",
 		zap.Int("services", serviceCount),
 	)
 
@@ -350,10 +350,10 @@ func (c *EnhancedContainer) createInstance(name string, registration *ServiceReg
 	// Use factory
 	if registration.Factory != nil {
 		start := time.Now()
-		
+
 		instance, err := registration.Factory(c.ctx, c)
 		if err != nil {
-			c.logger.Error("Factory failed to create service", 
+			c.logger.Error("Factory failed to create service",
 				zap.String("service", name),
 				zap.Error(err),
 			)
@@ -367,7 +367,7 @@ func (c *EnhancedContainer) createInstance(name string, registration *ServiceReg
 			c.mu.Unlock()
 		}
 
-		c.logger.Debug("Service instance created", 
+		c.logger.Debug("Service instance created",
 			zap.String("service", name),
 			zap.Duration("creation_time", time.Since(start)),
 		)

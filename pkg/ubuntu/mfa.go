@@ -264,6 +264,7 @@ func createMFABackupScript(rc *eos_io.RuntimeContext) error {
 
 // _checkMFAStatus verifies if MFA is properly configured
 // Prefixed with underscore to indicate it's intentionally unused (future functionality)
+//
 //nolint:unused
 func _checkMFAStatus(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -292,6 +293,7 @@ func _checkMFAStatus(rc *eos_io.RuntimeContext) error {
 
 // _contains checks if a string contains a substring
 // Prefixed with underscore to indicate it's intentionally unused (helper for future functionality)
+//
 //nolint:unused
 func _contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr ||
@@ -301,6 +303,7 @@ func _contains(s, substr string) bool {
 
 // _findSubstring finds a substring within a string
 // Prefixed with underscore to indicate it's intentionally unused (helper for future functionality)
+//
 //nolint:unused
 func _findSubstring(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {

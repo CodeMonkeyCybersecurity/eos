@@ -25,8 +25,8 @@ import (
 // DEPRECATED: This function should be moved to a more appropriate package with proper context handling
 func DeployApp(ctx context.Context, app string, force bool) error {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("🚀 Starting application deployment", 
-		zap.String("app", app), 
+	logger.Info("🚀 Starting application deployment",
+		zap.String("app", app),
 		zap.Bool("force", force))
 
 	if err := ValidateConfigPaths(app); err != nil {

@@ -105,7 +105,7 @@ func (s *Service) GetOSInfo(ctx context.Context) (*OSInfo, error) {
 	osInfo := &OSInfo{
 		Type:         osType,
 		Name:         string(osType),
-		Version:      "unknown",      // This would be detected by infrastructure
+		Version:      "unknown", // This would be detected by infrastructure
 		Distribution: distroInfo,
 	}
 
@@ -129,10 +129,10 @@ func (s *Service) GetArchitecture(ctx context.Context) (*ArchitectureInfo, error
 
 	// This would be implemented by infrastructure layer
 	archInfo := &ArchitectureInfo{
-		CPU:      "x86_64", // Default, would be detected
-		Platform: "x86_64",
-		Bits:     64,
-		Endianness: "little",
+		CPU:          "x86_64", // Default, would be detected
+		Platform:     "x86_64",
+		Bits:         64,
+		Endianness:   "little",
 		Capabilities: []string{}, // Would be detected from /proc/cpuinfo or similar
 	}
 
@@ -205,7 +205,7 @@ func (s *Service) GetMemoryInfo(ctx context.Context) (*MemoryInfo, error) {
 	}
 
 	used := total - available
-	
+
 	memInfo := &MemoryInfo{
 		Total:     total,
 		Available: available,
@@ -321,7 +321,7 @@ func (s *Service) GetNetworkInfo(ctx context.Context) (*NetworkInfo, error) {
 	netInfo := &NetworkInfo{
 		Hostname:   "localhost", // Would be detected by infrastructure
 		Interfaces: interfaces,
-		DNSServers: []string{},  // Would be detected by infrastructure
+		DNSServers: []string{}, // Would be detected by infrastructure
 	}
 
 	s.logger.Debug("Network information retrieved",

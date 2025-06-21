@@ -14,7 +14,7 @@ type StringUtilsService interface {
 	Split(ctx context.Context, input string, config *SplitConfig) ([]string, error)
 	Join(ctx context.Context, parts []string, separator string) (string, error)
 	Replace(ctx context.Context, input string, config *ReplaceConfig) (string, error)
-	
+
 	// Case operations
 	ToUpper(ctx context.Context, input string) (string, error)
 	ToLower(ctx context.Context, input string) (string, error)
@@ -22,7 +22,7 @@ type StringUtilsService interface {
 	ToCamelCase(ctx context.Context, input string) (string, error)
 	ToSnakeCase(ctx context.Context, input string) (string, error)
 	ToKebabCase(ctx context.Context, input string) (string, error)
-	
+
 	// Validation operations
 	ValidateString(ctx context.Context, input string, rules *ValidationRules) (*ValidationResult, error)
 	ValidateEmail(ctx context.Context, email string) (*ValidationResult, error)
@@ -30,31 +30,31 @@ type StringUtilsService interface {
 	ValidateIP(ctx context.Context, ip string) (*ValidationResult, error)
 	ValidateDomain(ctx context.Context, domain string) (*ValidationResult, error)
 	ValidateUsername(ctx context.Context, username string) (*ValidationResult, error)
-	
+
 	// Sanitization operations
 	Sanitize(ctx context.Context, input string, options *SanitizeOptions) (string, error)
 	Redact(ctx context.Context, input string, patterns []string) (string, error)
 	RemoveShellMetacharacters(ctx context.Context, input string) (string, error)
 	EscapeShell(ctx context.Context, input string) (string, error)
-	
+
 	// Path operations
 	ExpandPath(ctx context.Context, path string) (string, error)
 	SplitPath(ctx context.Context, pathList string) ([]string, error)
 	ValidatePath(ctx context.Context, path string, options *PathValidationOptions) (*ValidationResult, error)
 	NormalizePath(ctx context.Context, path string) (string, error)
-	
+
 	// Formatting operations
 	Quote(ctx context.Context, input string, quoteType QuoteType) (string, error)
 	Unquote(ctx context.Context, input string) (string, error)
 	PadLeft(ctx context.Context, input string, length int, padChar rune) (string, error)
 	PadRight(ctx context.Context, input string, length int, padChar rune) (string, error)
 	Truncate(ctx context.Context, input string, maxLength int, ellipsis string) (string, error)
-	
+
 	// Pattern matching operations
 	Match(ctx context.Context, pattern string, input string) (bool, error)
 	FindAll(ctx context.Context, pattern string, input string) ([]string, error)
 	ReplacePattern(ctx context.Context, pattern string, input string, replacement string) (string, error)
-	
+
 	// Encoding operations
 	Base64Encode(ctx context.Context, input string) (string, error)
 	Base64Decode(ctx context.Context, encoded string) (string, error)
@@ -62,17 +62,17 @@ type StringUtilsService interface {
 	URLDecode(ctx context.Context, encoded string) (string, error)
 	HTMLEscape(ctx context.Context, input string) (string, error)
 	HTMLUnescape(ctx context.Context, escaped string) (string, error)
-	
+
 	// Conversion operations
 	ToBytes(ctx context.Context, input string, encoding StringEncoding) ([]byte, error)
 	FromBytes(ctx context.Context, data []byte, encoding StringEncoding) (string, error)
 	ConvertEncoding(ctx context.Context, input string, from, to StringEncoding) (string, error)
-	
+
 	// Analysis operations
 	Analyze(ctx context.Context, input string) (*StringAnalysis, error)
 	Compare(ctx context.Context, str1, str2 string, options *CompareOptions) (*CompareResult, error)
 	CalculateDistance(ctx context.Context, str1, str2 string, algorithm DistanceAlgorithm) (int, error)
-	
+
 	// Generation operations
 	GenerateRandom(ctx context.Context, config *RandomStringConfig) (string, error)
 	GenerateSlug(ctx context.Context, input string, options *SlugOptions) (string, error)

@@ -34,11 +34,11 @@ Features:
 
 func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if err := terraform.CheckTerraformInstalled(); err != nil {
 		return fmt.Errorf("terraform is required but not installed. Run 'eos create terraform' first: %w", err)
 	}
-	
+
 	// Get flags
 	outputDir, _ := cmd.Flags().GetString("output-dir")
 	cloudDeploy, _ := cmd.Flags().GetBool("cloud")
@@ -47,7 +47,7 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 	serverType, _ := cmd.Flags().GetString("server-type")
 	location, _ := cmd.Flags().GetString("location")
 	enableMail, _ := cmd.Flags().GetBool("enable-mail")
-	
+
 	// Interactive prompts for missing values
 	if domain == "" {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -59,7 +59,7 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 		}
 		logger.Info("✅ Domain configured", zap.String("domain", domain))
 	}
-	
+
 	if clusterName == "" {
 		logger := otelzap.Ctx(rc.Ctx)
 		clusterName = "k3s-cluster"
@@ -78,64 +78,64 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 		}
 		logger.Info("✅ Cluster name configured", zap.String("cluster_name", clusterName))
 	}
-	
+
 	// Configure mail ports
 	mailPorts := []int{}
 	if enableMail {
 		mailPorts = []int{25, 587, 465, 110, 995, 143, 993, 4190}
 	}
-	
+
 	config := terraform.K3sCaddyNginxConfig{
-		CloudDeploy:          cloudDeploy,
-		ClusterName:          clusterName,
-		ServerType:           serverType,
-		Location:             location,
-		Domain:               domain,
-		CaddyVersion:         "2.7-alpine",
-		NginxVersion:         "1.24-alpine",
-		CaddyReplicas:        2,
-		NginxReplicas:        1,
-		CaddyAdminEnabled:    true,
-		CaddyStorageSize:     "1Gi",
-		CaddyMemoryRequest:   "128Mi",
-		CaddyCPURequest:      "100m",
-		CaddyMemoryLimit:     "256Mi",
-		CaddyCPULimit:        "200m",
-		NginxMemoryRequest:   "64Mi",
-		NginxCPURequest:      "50m",
-		NginxMemoryLimit:     "128Mi",
-		NginxCPULimit:        "100m",
-		MailPorts:            mailPorts,
-		MailBackend:          "stalwart-mail.default.svc.cluster.local",
+		CloudDeploy:        cloudDeploy,
+		ClusterName:        clusterName,
+		ServerType:         serverType,
+		Location:           location,
+		Domain:             domain,
+		CaddyVersion:       "2.7-alpine",
+		NginxVersion:       "1.24-alpine",
+		CaddyReplicas:      2,
+		NginxReplicas:      1,
+		CaddyAdminEnabled:  true,
+		CaddyStorageSize:   "1Gi",
+		CaddyMemoryRequest: "128Mi",
+		CaddyCPURequest:    "100m",
+		CaddyMemoryLimit:   "256Mi",
+		CaddyCPULimit:      "200m",
+		NginxMemoryRequest: "64Mi",
+		NginxCPURequest:    "50m",
+		NginxMemoryLimit:   "128Mi",
+		NginxCPULimit:      "100m",
+		MailPorts:          mailPorts,
+		MailBackend:        "stalwart-mail.default.svc.cluster.local",
 	}
-	
-	logger.Info("Generating K3s + Caddy + Nginx configuration", 
+
+	logger.Info("Generating K3s + Caddy + Nginx configuration",
 		zap.String("domain", domain),
 		zap.String("cluster", clusterName),
 		zap.Bool("cloud", cloudDeploy),
 		zap.Bool("enable_mail", enableMail),
 		zap.String("output_dir", outputDir))
-	
+
 	tfManager := terraform.NewManager(rc, outputDir)
-	
+
 	// Generate main.tf
 	if err := tfManager.GenerateFromString(terraform.K3sCaddyNginxTemplate, "main.tf", config); err != nil {
 		return fmt.Errorf("failed to generate main.tf: %w", err)
 	}
-	
+
 	// Generate cloud-init if using cloud
 	if cloudDeploy {
 		if err := tfManager.GenerateFromString(terraform.K3sCaddyNginxCloudInit, "k3s-cloud-init.yaml", config); err != nil {
 			return fmt.Errorf("failed to generate cloud-init.yaml: %w", err)
 		}
 	}
-	
+
 	// Create config directory and files
 	configDir := filepath.Join(outputDir, "config")
 	if err := os.MkdirAll(configDir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
-	
+
 	// Generate Caddyfile template
 	caddyfileContent := fmt.Sprintf(`# Caddyfile Template for %s
 %s {
@@ -181,11 +181,11 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
     }
 }
 `, clusterName, domain)
-	
+
 	if err := os.WriteFile(filepath.Join(configDir, "Caddyfile.tpl"), []byte(caddyfileContent), 0644); err != nil {
 		return fmt.Errorf("failed to generate Caddyfile template: %w", err)
 	}
-	
+
 	// Generate nginx mail config if mail is enabled
 	if enableMail {
 		nginxMailContent := fmt.Sprintf(`# Nginx Mail Proxy Configuration
@@ -296,18 +296,18 @@ http {
     }
 }
 `, domain, config.MailBackend, config.MailBackend)
-		
+
 		if err := os.WriteFile(filepath.Join(configDir, "nginx-mail.conf.tpl"), []byte(nginxMailContent), 0644); err != nil {
 			return fmt.Errorf("failed to generate nginx mail config: %w", err)
 		}
 	}
-	
+
 	// Generate terraform.tfvars
 	tfvarsContent := fmt.Sprintf(`# Terraform variables for K3s + Caddy + Nginx deployment
 domain = "%s"
 caddy_admin_enabled = true
 `, domain)
-	
+
 	if cloudDeploy {
 		tfvarsContent += fmt.Sprintf(`
 # Cloud deployment settings
@@ -317,11 +317,11 @@ server_type = "%s"
 location = "%s"
 `, serverType, location)
 	}
-	
+
 	if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), 0644); err != nil {
 		return fmt.Errorf("failed to generate terraform.tfvars: %w", err)
 	}
-	
+
 	// Generate deployment script
 	deployScript := fmt.Sprintf(`#!/bin/bash
 # Deployment script for %s
@@ -360,37 +360,37 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
 else
     echo "Deployment cancelled"
 fi
-`, clusterName, domain, 
-	func() string {
-		if enableMail {
-			return "4. Configure mail routing and SSL certificates"
-		}
-		return ""
-	}(),
-	func() string {
-		if enableMail {
-			return "  kubectl logs -n ingress-system deployment/nginx-mail-proxy"
-		}
-		return ""
-	}())
-	
+`, clusterName, domain,
+		func() string {
+			if enableMail {
+				return "4. Configure mail routing and SSL certificates"
+			}
+			return ""
+		}(),
+		func() string {
+			if enableMail {
+				return "  kubectl logs -n ingress-system deployment/nginx-mail-proxy"
+			}
+			return ""
+		}())
+
 	if err := os.WriteFile(filepath.Join(outputDir, "deploy.sh"), []byte(deployScript), 0755); err != nil {
 		return fmt.Errorf("failed to generate deploy script: %w", err)
 	}
-	
+
 	// Initialize and validate
 	if err := tfManager.Init(rc); err != nil {
 		return fmt.Errorf("failed to initialize terraform: %w", err)
 	}
-	
+
 	if err := tfManager.Validate(rc); err != nil {
 		return fmt.Errorf("terraform configuration validation failed: %w", err)
 	}
-	
+
 	if err := tfManager.Format(rc); err != nil {
 		logger.Warn("Failed to format terraform files", zap.Error(err))
 	}
-	
+
 	fmt.Printf("\n✅ K3s + Caddy + Nginx configuration generated in: %s\n", outputDir)
 	fmt.Println("\n🎯 What you get:")
 	fmt.Println("  • K3s cluster without Traefik")
@@ -398,11 +398,11 @@ fi
 	fmt.Println("  • Nginx for mail protocols (SMTP/IMAP/POP3)")
 	fmt.Println("  • MetalLB for LoadBalancer services")
 	fmt.Println("  • Automatic SSL with Let's Encrypt")
-	
+
 	if enableMail {
 		fmt.Println("  • Mail proxy configuration")
 	}
-	
+
 	fmt.Println("\n📂 Generated files:")
 	fmt.Printf("  %s/main.tf - Main Terraform configuration\n", outputDir)
 	fmt.Printf("  %s/config/Caddyfile.tpl - Caddy configuration template\n", outputDir)
@@ -410,7 +410,7 @@ fi
 		fmt.Printf("  %s/config/nginx-mail.conf.tpl - Nginx mail proxy config\n", outputDir)
 	}
 	fmt.Printf("  %s/deploy.sh - Deployment script\n", outputDir)
-	
+
 	fmt.Println("\n⚡ Quick start:")
 	fmt.Printf("  cd %s\n", outputDir)
 	if cloudDeploy {
@@ -418,13 +418,13 @@ fi
 		fmt.Println("  # Update terraform.tfvars with your SSH key")
 	}
 	fmt.Println("  ./deploy.sh")
-	
+
 	return nil
 }
 
 func init() {
 	CreateCmd.AddCommand(k3sCaddyNginxCmd)
-	
+
 	k3sCaddyNginxCmd.Flags().String("output-dir", "./k3s-caddy-nginx", "Output directory for Terraform files")
 	k3sCaddyNginxCmd.Flags().Bool("cloud", false, "Deploy to cloud infrastructure (Hetzner)")
 	k3sCaddyNginxCmd.Flags().String("domain", "", "Primary domain for the cluster")

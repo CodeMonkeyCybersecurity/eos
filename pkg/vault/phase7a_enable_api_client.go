@@ -35,7 +35,7 @@ func GetRootClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		log.Error("❌ Failed to create Vault API client", zap.Error(err))
 		return nil, fmt.Errorf("create Vault client: %w", err)
 	}
-	log.Info("✅ Vault API client created", 
+	log.Info("✅ Vault API client created",
 		zap.String("addr", client.Address()),
 		zap.String("existing_token", func() string {
 			if token := client.Token(); token != "" {
@@ -51,7 +51,7 @@ func GetRootClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		log.Error("❌ Failed to load root token", zap.Error(err))
 		return nil, fmt.Errorf("load root token: %w", err)
 	}
-	
+
 	log.Info("🔄 Setting privileged token on client")
 	SetVaultToken(rc, client, rootToken)
 

@@ -34,12 +34,12 @@ func (f *FileSystemOperations) ReadFile(ctx context.Context, path string) ([]byt
 		)
 		return nil, fmt.Errorf("failed to read file %s: %w", path, err)
 	}
-	
+
 	f.logger.Debug("File read successfully",
 		zap.String("path", path),
 		zap.Int("size", len(data)),
 	)
-	
+
 	return data, nil
 }
 
@@ -52,13 +52,13 @@ func (f *FileSystemOperations) WriteFile(ctx context.Context, path string, data 
 		)
 		return fmt.Errorf("failed to write file %s: %w", path, err)
 	}
-	
+
 	f.logger.Debug("File written successfully",
 		zap.String("path", path),
 		zap.Int("size", len(data)),
 		zap.String("permissions", perm.String()),
 	)
-	
+
 	return nil
 }
 
@@ -139,12 +139,12 @@ func (f *FileSystemOperations) MoveFile(ctx context.Context, src, dst string) er
 			)
 		}
 	}
-	
+
 	f.logger.Info("File moved successfully",
 		zap.String("src", src),
 		zap.String("dst", dst),
 	)
-	
+
 	return nil
 }
 
@@ -157,11 +157,11 @@ func (f *FileSystemOperations) DeleteFile(ctx context.Context, path string) erro
 		)
 		return fmt.Errorf("failed to delete file %s: %w", path, err)
 	}
-	
+
 	f.logger.Debug("File deleted successfully",
 		zap.String("path", path),
 	)
-	
+
 	return nil
 }
 
@@ -186,12 +186,12 @@ func (f *FileSystemOperations) CreateDirectory(ctx context.Context, path string,
 		)
 		return fmt.Errorf("failed to create directory %s: %w", path, err)
 	}
-	
+
 	f.logger.Debug("Directory created successfully",
 		zap.String("path", path),
 		zap.String("permissions", perm.String()),
 	)
-	
+
 	return nil
 }
 
@@ -205,12 +205,12 @@ func (f *FileSystemOperations) ListDirectory(ctx context.Context, path string) (
 		)
 		return nil, fmt.Errorf("failed to list directory %s: %w", path, err)
 	}
-	
+
 	f.logger.Debug("Directory listed successfully",
 		zap.String("path", path),
 		zap.Int("entries", len(entries)),
 	)
-	
+
 	return entries, nil
 }
 
@@ -224,7 +224,7 @@ func (f *FileSystemOperations) GetFileInfo(ctx context.Context, path string) (os
 		)
 		return nil, fmt.Errorf("failed to get file info for %s: %w", path, err)
 	}
-	
+
 	return info, nil
 }
 
@@ -239,12 +239,12 @@ func (f *FileSystemOperations) OpenFile(ctx context.Context, path string, flag i
 		)
 		return nil, fmt.Errorf("failed to open file %s: %w", path, err)
 	}
-	
+
 	f.logger.Debug("File opened successfully",
 		zap.String("path", path),
 		zap.Int("flags", flag),
 	)
-	
+
 	return file, nil
 }
 
@@ -295,7 +295,7 @@ func (p *PathOperationsImpl) ExpandPath(path string) string {
 			path = filepath.Join(home, path[1:])
 		}
 	}
-	
+
 	// Expand environment variables
 	return os.ExpandEnv(path)
 }
@@ -317,7 +317,7 @@ func (s *SafeFileOperations) SafeClose(ctx context.Context, closer io.Closer) er
 	if closer == nil {
 		return nil
 	}
-	
+
 	if err := closer.Close(); err != nil {
 		s.logger.Warn("Failed to close resource",
 			zap.String("type", fmt.Sprintf("%T", closer)),
@@ -325,7 +325,7 @@ func (s *SafeFileOperations) SafeClose(ctx context.Context, closer io.Closer) er
 		)
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -338,7 +338,7 @@ func (s *SafeFileOperations) SafeRemove(ctx context.Context, path string) error 
 		)
 		return err
 	}
-	
+
 	return nil
 }
 
@@ -353,7 +353,7 @@ func (s *SafeFileOperations) SafeFlush(ctx context.Context, writer io.Writer) er
 			return err
 		}
 	}
-	
+
 	return nil
 }
 

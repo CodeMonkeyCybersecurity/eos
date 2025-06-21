@@ -14,12 +14,12 @@ import (
 
 // AuthenticationAttempt represents a single authentication attempt
 type AuthenticationAttempt struct {
-	Method     string
-	StartTime  time.Time
-	EndTime    time.Time
-	Success    bool
-	ErrorType  string // sanitized error type
-	Sensitive  bool    // whether this method uses sensitive files
+	Method    string
+	StartTime time.Time
+	EndTime   time.Time
+	Success   bool
+	ErrorType string // sanitized error type
+	Sensitive bool   // whether this method uses sensitive files
 }
 
 // AuthenticationSession tracks a complete authentication session
@@ -81,7 +81,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 			Sensitive: method.sensitive,
 		}
 
-		log.Info("🔑 Attempting authentication method", 
+		log.Info("🔑 Attempting authentication method",
 			zap.String("method", method.name),
 			zap.Int("priority", method.priority),
 		)
@@ -225,7 +225,7 @@ func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) erro
 
 	token, err := tryRootToken(rc, client)
 	attempt.EndTime = time.Now()
-	
+
 	// Log the attempt for security monitoring
 	defer func() {
 		log.Info("🚨 Emergency root token attempt completed",

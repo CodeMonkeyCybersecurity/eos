@@ -28,7 +28,7 @@ func NewVaultManager(client *api.Client, logger *zap.Logger) *VaultManagerImpl {
 
 // Initialize initializes a new vault instance
 func (v *VaultManagerImpl) Initialize(ctx context.Context, config *vault.InitConfig) (*vault.InitResult, error) {
-	v.logger.Info("Initializing vault", 
+	v.logger.Info("Initializing vault",
 		zap.Int("secret_shares", config.SecretShares),
 		zap.Int("secret_threshold", config.SecretThreshold))
 
@@ -99,13 +99,13 @@ func (v *VaultManagerImpl) Unseal(ctx context.Context, keys []string) error {
 	for i, key := range keys {
 		unsealResp, err := v.client.Sys().UnsealWithContext(ctx, key)
 		if err != nil {
-			v.logger.Error("Unseal attempt failed", 
+			v.logger.Error("Unseal attempt failed",
 				zap.Int("key_index", i),
 				zap.Error(err))
 			return fmt.Errorf("unseal failed with key %d: %w", i, err)
 		}
 
-		v.logger.Debug("Unseal progress", 
+		v.logger.Debug("Unseal progress",
 			zap.Int("progress", unsealResp.Progress),
 			zap.Int("threshold", unsealResp.T))
 
@@ -202,25 +202,25 @@ func (v *VaultManagerImpl) EnableAuth(ctx context.Context, method string, config
 
 	// Apply configuration if provided
 	for key, value := range config {
-			switch key {
-			case "default_lease_ttl":
-				if ttl, ok := value.(string); ok {
-					authOptions.Config.DefaultLeaseTTL = ttl
-				}
-			case "max_lease_ttl":
-				if ttl, ok := value.(string); ok {
-					authOptions.Config.MaxLeaseTTL = ttl
-				}
-			case "description":
-				if desc, ok := value.(string); ok {
-					authOptions.Description = desc
-				}
+		switch key {
+		case "default_lease_ttl":
+			if ttl, ok := value.(string); ok {
+				authOptions.Config.DefaultLeaseTTL = ttl
+			}
+		case "max_lease_ttl":
+			if ttl, ok := value.(string); ok {
+				authOptions.Config.MaxLeaseTTL = ttl
+			}
+		case "description":
+			if desc, ok := value.(string); ok {
+				authOptions.Description = desc
 			}
 		}
+	}
 
 	err = v.client.Sys().EnableAuthWithOptionsWithContext(ctx, authPath, authOptions)
 	if err != nil {
-		v.logger.Error("Failed to enable auth method", 
+		v.logger.Error("Failed to enable auth method",
 			zap.String("method", method),
 			zap.Error(err))
 		return fmt.Errorf("failed to enable auth method %s: %w", method, err)
@@ -250,10 +250,10 @@ func (v *VaultManagerImpl) EnableAudit(ctx context.Context, auditType string, co
 	// Prepare audit options
 	options := make(map[string]string)
 	for key, value := range config {
-			if str, ok := value.(string); ok {
-				options[key] = str
-			}
+		if str, ok := value.(string); ok {
+			options[key] = str
 		}
+	}
 
 	// Set default file path for file audit device
 	if auditType == "file" && options["file_path"] == "" {
@@ -268,13 +268,13 @@ func (v *VaultManagerImpl) EnableAudit(ctx context.Context, auditType string, co
 
 	err = v.client.Sys().EnableAuditWithOptionsWithContext(ctx, auditPath, auditOptions)
 	if err != nil {
-		v.logger.Error("Failed to enable audit device", 
+		v.logger.Error("Failed to enable audit device",
 			zap.String("type", auditType),
 			zap.Error(err))
 		return fmt.Errorf("failed to enable audit device %s: %w", auditType, err)
 	}
 
-	v.logger.Info("Audit device enabled successfully", 
+	v.logger.Info("Audit device enabled successfully",
 		zap.String("type", auditType),
 		zap.Any("options", options))
 	return nil

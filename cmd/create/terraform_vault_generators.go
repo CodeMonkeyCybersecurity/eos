@@ -27,7 +27,7 @@ This creates Terraform configuration that:
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		outputDir := "./terraform-vault-k3s"
 		if len(args) > 0 {
 			outputDir = args[0]
@@ -100,7 +100,7 @@ This creates Terraform configuration that:
 
 		logger.Info("Vault-integrated K3s configuration generated successfully",
 			zap.String("directory", outputDir))
-		
+
 		fmt.Printf("✅ K3s configuration with Vault integration generated in: %s\n", outputDir)
 		fmt.Printf("📋 Next steps:\n")
 		fmt.Printf("   1. Review and customize the generated configuration\n")
@@ -117,7 +117,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		outputDir := "./terraform-vault-hetzner"
 		if len(args) > 0 {
 			outputDir = args[0]
@@ -183,7 +183,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 
 		logger.Info("Vault-integrated Hetzner configuration generated successfully",
 			zap.String("directory", outputDir))
-		
+
 		fmt.Printf("✅ Hetzner configuration with Vault integration generated in: %s\n", outputDir)
 
 		return nil

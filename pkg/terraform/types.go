@@ -62,13 +62,13 @@ type DockerVolumeDefinition struct {
 }
 
 type DockerComposeConfig struct {
-	ProjectName  string
-	ComposeFile  string
-	Services     []DockerService
-	Networks     []DockerNetwork
-	Volumes      []DockerVolumeDefinition
-	UseHetzner   bool
-	RemoteHost   string
+	ProjectName string
+	ComposeFile string
+	Services    []DockerService
+	Networks    []DockerNetwork
+	Volumes     []DockerVolumeDefinition
+	UseHetzner  bool
+	RemoteHost  string
 }
 
 type HetznerServer struct {
@@ -130,12 +130,12 @@ type HetznerFirewallRule struct {
 }
 
 type HetznerInfraConfig struct {
-	ProjectName     string
-	SSHKeyName      string
-	Servers         []HetznerServer
-	Networks        []HetznerNetwork
-	LoadBalancers   []HetznerLoadBalancer
-	Firewalls       []HetznerFirewall
+	ProjectName   string
+	SSHKeyName    string
+	Servers       []HetznerServer
+	Networks      []HetznerNetwork
+	LoadBalancers []HetznerLoadBalancer
+	Firewalls     []HetznerFirewall
 }
 
 type WorkflowStep struct {
@@ -147,21 +147,21 @@ type WorkflowStep struct {
 }
 
 type TerraformWorkflow struct {
-	Name            string
-	Description     string
-	WorkingDir      string
-	PreSteps        []WorkflowStep
-	PostSteps       []WorkflowStep
-	Variables       map[string]interface{}
-	AutoApprove     bool
-	BackupState     bool
+	Name        string
+	Description string
+	WorkingDir  string
+	PreSteps    []WorkflowStep
+	PostSteps   []WorkflowStep
+	Variables   map[string]interface{}
+	AutoApprove bool
+	BackupState bool
 }
 
 type ProviderConfig struct {
-	Name     string
-	Source   string
-	Version  string
-	Config   map[string]interface{}
+	Name    string
+	Source  string
+	Version string
+	Config  map[string]interface{}
 }
 
 type BackendConfig struct {

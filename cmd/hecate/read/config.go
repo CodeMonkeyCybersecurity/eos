@@ -36,16 +36,16 @@ You can choose from:
 // runInspectConfig presents an interactive menu for inspection
 func runInspectConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("🔍 Inspect Configurations Menu")
 	logger.Info("Select the resource you want to inspect:")
 	logger.Info("1) Inspect Certificates")
 	logger.Info("2) Inspect docker-compose file")
-	logger.Info("3) Inspect Eos backend web apps configuration")  
+	logger.Info("3) Inspect Eos backend web apps configuration")
 	logger.Info("4) Inspect Nginx defaults")
 	logger.Info("5) Inspect all configurations")
 	logger.Info("Enter choice (1-5): ")
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	choice, _ := reader.ReadString('\n')
 	choice = strings.ToLower(strings.TrimSpace(choice))
@@ -68,6 +68,6 @@ func runInspectConfig(rc *eos_io.RuntimeContext) error {
 		logger.Error("❌ Invalid choice provided", zap.String("choice", choice))
 		return fmt.Errorf("invalid choice: %s", choice)
 	}
-	
+
 	return nil
 }

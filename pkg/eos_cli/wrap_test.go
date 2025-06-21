@@ -38,7 +38,7 @@ func TestWrap(t *testing.T) {
 
 		// Create test command
 		cmd := &cobra.Command{
-			Use: "test-command",
+			Use:  "test-command",
 			RunE: Wrap(successFunc),
 		}
 
@@ -51,13 +51,13 @@ func TestWrap(t *testing.T) {
 
 	t.Run("command_execution_with_error", func(t *testing.T) {
 		expectedErr := errors.New("test error")
-		
+
 		errorFunc := func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			return expectedErr
 		}
 
 		cmd := &cobra.Command{
-			Use: "test-error-command",
+			Use:  "test-error-command",
 			RunE: Wrap(errorFunc),
 		}
 
@@ -65,7 +65,7 @@ func TestWrap(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		
+
 		// The error should be wrapped with stack trace unless it's a user error
 		if err == expectedErr {
 			t.Error("expected error to be wrapped with stack trace")
@@ -74,13 +74,13 @@ func TestWrap(t *testing.T) {
 
 	t.Run("expected_user_error_not_wrapped", func(t *testing.T) {
 		userErr := eos_err.NewExpectedError(context.Background(), errors.New("user did something wrong"))
-		
+
 		userErrorFunc := func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			return userErr
 		}
 
 		cmd := &cobra.Command{
-			Use: "test-user-error-command",
+			Use:  "test-user-error-command",
 			RunE: Wrap(userErrorFunc),
 		}
 
@@ -88,7 +88,7 @@ func TestWrap(t *testing.T) {
 		if err == nil {
 			t.Fatal("expected error, got nil")
 		}
-		
+
 		// User errors should not be wrapped with stack trace
 		if !eos_err.IsExpectedUserError(err) {
 			t.Error("expected user error to remain as user error")
@@ -101,7 +101,7 @@ func TestWrap(t *testing.T) {
 		}
 
 		cmd := &cobra.Command{
-			Use: "test-panic-command",
+			Use:  "test-panic-command",
 			RunE: Wrap(panicFunc),
 		}
 
@@ -130,7 +130,7 @@ func TestWrap(t *testing.T) {
 				}
 			}
 		}()
-		
+
 		if err := os.Setenv("VAULT_ADDR", "http://test:8200"); err != nil {
 			t.Fatalf("Failed to set VAULT_ADDR: %v", err)
 		}
@@ -145,7 +145,7 @@ func TestWrap(t *testing.T) {
 		}
 
 		cmd := &cobra.Command{
-			Use: "test-vault-command",
+			Use:  "test-vault-command",
 			RunE: Wrap(vaultFunc),
 		}
 
@@ -155,7 +155,7 @@ func TestWrap(t *testing.T) {
 		}
 	})
 
-	// Note: Validation test skipped as it depends on external CUE/OPA validation 
+	// Note: Validation test skipped as it depends on external CUE/OPA validation
 	// which may not be configured in test environment
 	t.Run("validation_skipped", func(t *testing.T) {
 		t.Skip("Validation test requires CUE/OPA configuration")
@@ -166,7 +166,7 @@ func TestWrap(t *testing.T) {
 			// Test that we can set and retrieve attributes
 			rc.Attributes["test_key"] = "test_value"
 			rc.Attributes["command_name"] = cmd.Name()
-			
+
 			if rc.Attributes["test_key"] != "test_value" {
 				t.Errorf("expected 'test_value', got %s", rc.Attributes["test_key"])
 			}
@@ -177,7 +177,7 @@ func TestWrap(t *testing.T) {
 		}
 
 		cmd := &cobra.Command{
-			Use: "test-attributes-command",
+			Use:  "test-attributes-command",
 			RunE: Wrap(attributeFunc),
 		}
 
@@ -189,7 +189,7 @@ func TestWrap(t *testing.T) {
 
 	t.Run("context_timing", func(t *testing.T) {
 		start := time.Now()
-		
+
 		timingFunc := func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			// Verify that the context timestamp is recent
 			if rc.Timestamp.Before(start) {
@@ -198,14 +198,14 @@ func TestWrap(t *testing.T) {
 			if rc.Timestamp.After(time.Now()) {
 				t.Error("context timestamp should not be in the future")
 			}
-			
+
 			// Add some duration to test timing
 			time.Sleep(10 * time.Millisecond)
 			return nil
 		}
 
 		cmd := &cobra.Command{
-			Use: "test-timing-command",
+			Use:  "test-timing-command",
 			RunE: Wrap(timingFunc),
 		}
 
@@ -221,7 +221,7 @@ func TestWrapValidation(t *testing.T) {
 		validation := &WrapValidation{
 			Cfg:         "test config",
 			SchemaPath:  "/path/to/schema.cue",
-			YAMLPath:    "/path/to/data.yaml", 
+			YAMLPath:    "/path/to/data.yaml",
 			PolicyPath:  "/path/to/policy.rego",
 			PolicyInput: func() any { return map[string]string{"key": "value"} },
 		}
@@ -231,7 +231,7 @@ func TestWrapValidation(t *testing.T) {
 		_ = validation.SchemaPath
 		_ = validation.YAMLPath
 		_ = validation.PolicyPath
-		
+
 		if validation.PolicyInput == nil {
 			t.Error("expected non-nil PolicyInput function")
 		}
@@ -245,10 +245,10 @@ func TestWrapValidation(t *testing.T) {
 
 	t.Run("validation_with_nil_policy_input", func(t *testing.T) {
 		validation := &WrapValidation{
-			Cfg:        "test",
-			SchemaPath: "/test",
-			YAMLPath:   "/test",
-			PolicyPath: "/test",
+			Cfg:         "test",
+			SchemaPath:  "/test",
+			YAMLPath:    "/test",
+			PolicyPath:  "/test",
 			PolicyInput: nil, // This should be allowed
 		}
 
@@ -257,7 +257,7 @@ func TestWrapValidation(t *testing.T) {
 		_ = validation.SchemaPath
 		_ = validation.YAMLPath
 		_ = validation.PolicyPath
-		
+
 		if validation.PolicyInput != nil {
 			t.Error("expected nil PolicyInput")
 		}
@@ -266,10 +266,10 @@ func TestWrapValidation(t *testing.T) {
 
 // Helper function to check if string contains substring (reused from context_test.go)
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || 
-		(len(s) > len(substr) && (s[:len(substr)] == substr || 
-		s[len(s)-len(substr):] == substr || 
-		containsInner(s, substr))))
+	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||
+		(len(s) > len(substr) && (s[:len(substr)] == substr ||
+			s[len(s)-len(substr):] == substr ||
+			containsInner(s, substr))))
 }
 
 func containsInner(s, substr string) bool {

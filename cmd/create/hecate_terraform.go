@@ -404,17 +404,17 @@ type HecateConfig struct {
 
 func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if err := terraform.CheckTerraformInstalled(); err != nil {
 		return fmt.Errorf("terraform is required but not installed. Run 'eos create terraform' first: %w", err)
 	}
-	
+
 	outputDir, _ := cmd.Flags().GetString("output-dir")
 	useCloud, _ := cmd.Flags().GetBool("cloud")
 	serverType, _ := cmd.Flags().GetString("server-type")
 	location, _ := cmd.Flags().GetString("location")
 	domain, _ := cmd.Flags().GetString("domain")
-	
+
 	// Interactive prompts for missing values
 	if domain == "" {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -426,7 +426,7 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 		}
 		logger.Info("✅ Domain configured", zap.String("domain", domain))
 	}
-	
+
 	serverName := "hecate-mail"
 	if useCloud {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -445,7 +445,7 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 		}
 		logger.Info("✅ Server name configured", zap.String("server_name", serverName))
 	}
-	
+
 	config := HecateConfig{
 		UseHetzner: useCloud,
 		ServerName: serverName,
@@ -453,30 +453,30 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 		Location:   location,
 		Domain:     domain,
 	}
-	
-	logger.Info("Generating Hecate Terraform configuration", 
+
+	logger.Info("Generating Hecate Terraform configuration",
 		zap.String("domain", domain),
 		zap.Bool("cloud", useCloud),
 		zap.String("output_dir", outputDir))
-	
+
 	tfManager := terraform.NewManager(rc, outputDir)
-	
+
 	// Generate main.tf
 	if err := tfManager.GenerateFromString(HecateTerraformTemplate, "main.tf", config); err != nil {
 		return fmt.Errorf("failed to generate main.tf: %w", err)
 	}
-	
+
 	// Generate cloud-init if using cloud
 	if useCloud {
 		if err := tfManager.GenerateFromString(HecateCloudInitTemplate, "hecate-cloud-init.yaml", config); err != nil {
 			return fmt.Errorf("failed to generate cloud-init.yaml: %w", err)
 		}
 	}
-	
+
 	// Generate terraform.tfvars
 	tfvarsContent := fmt.Sprintf(`# Terraform variables for Hecate deployment
 domain = "%s"`, domain)
-	
+
 	if useCloud {
 		tfvarsContent += fmt.Sprintf(`
 # hcloud_token = "your-hetzner-cloud-token"
@@ -484,11 +484,11 @@ ssh_key_name = "your-ssh-key"
 server_type = "%s"
 location = "%s"`, serverType, location)
 	}
-	
+
 	if err := os.WriteFile(filepath.Join(outputDir, "terraform.tfvars"), []byte(tfvarsContent), 0644); err != nil {
 		return fmt.Errorf("failed to generate terraform.tfvars: %w", err)
 	}
-	
+
 	// Copy existing files if they exist
 	configFiles := []string{"nginx.conf", "Caddyfile"}
 	for _, file := range configFiles {
@@ -504,20 +504,20 @@ location = "%s"`, serverType, location)
 			}
 		}
 	}
-	
+
 	// Initialize and validate
 	if err := tfManager.Init(rc); err != nil {
 		return fmt.Errorf("failed to initialize terraform: %w", err)
 	}
-	
+
 	if err := tfManager.Validate(rc); err != nil {
 		return fmt.Errorf("terraform configuration validation failed: %w", err)
 	}
-	
+
 	if err := tfManager.Format(rc); err != nil {
 		logger.Warn("Failed to format terraform files", zap.Error(err))
 	}
-	
+
 	fmt.Printf("\n✅ Hecate Terraform configuration generated in: %s\n", outputDir)
 	fmt.Println("\nNext steps:")
 	if useCloud {
@@ -527,13 +527,13 @@ location = "%s"`, serverType, location)
 	fmt.Printf("3. Review the configuration: cd %s\n", outputDir)
 	fmt.Println("4. Plan the deployment: terraform plan")
 	fmt.Println("5. Apply the configuration: terraform apply")
-	
+
 	return nil
 }
 
 func init() {
 	CreateCmd.AddCommand(hecateTerraformCmd)
-	
+
 	hecateTerraformCmd.Flags().String("output-dir", "./terraform-hecate", "Output directory for Terraform files")
 	hecateTerraformCmd.Flags().Bool("cloud", false, "Deploy to cloud infrastructure")
 	hecateTerraformCmd.Flags().String("server-type", "cx21", "Server type for cloud instance")

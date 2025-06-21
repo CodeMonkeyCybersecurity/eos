@@ -119,10 +119,10 @@ func CollateAndWriteFile[T any](
 
 // HecateConfiguration holds the user-provided configuration for Hecate setup
 type HecateConfiguration struct {
-	DomainName     string
-	KeycloakDomain string
-	BackendIP      string
-	Proxies        []CaddyAppProxy
+	DomainName      string
+	KeycloakDomain  string
+	BackendIP       string
+	Proxies         []CaddyAppProxy
 	EnabledServices map[string]bool
 }
 
@@ -130,16 +130,16 @@ type HecateConfiguration struct {
 func collectHecateConfiguration(rc *eos_io.RuntimeContext) (*HecateConfiguration, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	config := &HecateConfiguration{
 		EnabledServices: make(map[string]bool),
-		Proxies:        []CaddyAppProxy{},
+		Proxies:         []CaddyAppProxy{},
 	}
-	
+
 	logger.Info("🚀 Welcome to Hecate Setup Wizard")
 	logger.Info("This wizard will help you set up a reverse proxy for your applications")
 	logger.Info("")
-	
+
 	// Collect domain name
 	logger.Info("📋 Enter your primary domain name (e.g., example.com):")
 	domain, err := reader.ReadString('\n')
@@ -147,12 +147,12 @@ func collectHecateConfiguration(rc *eos_io.RuntimeContext) (*HecateConfiguration
 		return nil, fmt.Errorf("failed to read domain: %w", err)
 	}
 	config.DomainName = strings.TrimSpace(domain)
-	
+
 	if config.DomainName == "" {
 		config.DomainName = "localhost"
 		logger.Info("🔧 Using default domain: localhost")
 	}
-	
+
 	// Collect backend IP
 	logger.Info("📋 Enter your backend server IP (default: 127.0.0.1):")
 	backendIP, err := reader.ReadString('\n')
@@ -160,20 +160,20 @@ func collectHecateConfiguration(rc *eos_io.RuntimeContext) (*HecateConfiguration
 		return nil, fmt.Errorf("failed to read backend IP: %w", err)
 	}
 	config.BackendIP = strings.TrimSpace(backendIP)
-	
+
 	if config.BackendIP == "" {
 		config.BackendIP = "127.0.0.1"
 		logger.Info("🔧 Using default backend IP: 127.0.0.1")
 	}
-	
+
 	// For now, we'll set up a basic vanilla reverse proxy
 	// Future versions can add more service selection
-	config.KeycloakDomain = ""  // No Keycloak for vanilla setup
-	
-	logger.Info("✅ Configuration collected successfully", 
+	config.KeycloakDomain = "" // No Keycloak for vanilla setup
+
+	logger.Info("✅ Configuration collected successfully",
 		zap.String("domain", config.DomainName),
 		zap.String("backend_ip", config.BackendIP),
 	)
-	
+
 	return config, nil
 }

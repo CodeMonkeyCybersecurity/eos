@@ -727,14 +727,14 @@ type ConsulTemplateData struct {
 
 // ConsulServiceTemplate represents a service configuration for templates
 type ConsulServiceTemplate struct {
-	Name        string
-	Port        int
-	Address     string
-	Tags        []string
-	Check       *ConsulHealthCheck
-	Connect     *ConsulConnect
-	Intentions  []ConsulIntention
-	Resolver    *ConsulResolver
+	Name       string
+	Port       int
+	Address    string
+	Tags       []string
+	Check      *ConsulHealthCheck
+	Connect    *ConsulConnect
+	Intentions []ConsulIntention
+	Resolver   *ConsulResolver
 }
 
 // ConsulIntention represents a service intention
@@ -746,10 +746,10 @@ type ConsulIntention struct {
 
 // ConsulResolver represents a service resolver configuration
 type ConsulResolver struct {
-	DefaultSubset     string
-	Subsets           map[string]ConsulSubset
-	ConnectTimeout    string
-	RequestTimeout    string
+	DefaultSubset  string
+	Subsets        map[string]ConsulSubset
+	ConnectTimeout string
+	RequestTimeout string
 }
 
 // ConsulSubset represents a service subset

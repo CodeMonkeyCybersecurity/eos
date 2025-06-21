@@ -231,28 +231,28 @@ func newConfiguredClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info("🔑 Loading privileged token for Vault authentication")
-	
+
 	// For enable command, we should ALWAYS use the root token from vault_init.json
 	// The Vault Agent token won't have permissions to create mounts and manage auth methods
 	log.Info("📌 Loading root token from vault_init.json for provisioning operations")
-	
+
 	// Skip agent token check - go directly to root token for enable operations
 	log.Info("🔐 Reading root token from vault_init.json")
 	token, err := readTokenFromInitFile(rc)
 	if err != nil {
 		log.Error("❌ Failed to read root token from init file", zap.Error(err))
-		
+
 		// Only try agent token as last resort
 		log.Warn("🔄 Attempting to read Vault Agent token as fallback")
 		if agentToken, agentErr := readTokenFromSink(rc, shared.AgentToken); agentErr == nil {
 			log.Warn("⚠️ Using Vault Agent token - this may not have sufficient privileges")
 			return agentToken, nil
 		}
-		
+
 		return "", fmt.Errorf("failed to load any privileged token: %w", err)
 	}
-	
-	log.Info("✅ Successfully loaded root token from init file", 
+
+	log.Info("✅ Successfully loaded root token from init file",
 		zap.String("source", "/var/lib/eos/secrets/vault_init.json"))
 	return token, nil
 }
@@ -260,73 +260,73 @@ func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
 func readTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	path := filepath.Join(shared.SecretsDir, "vault_init.json")
-	
+
 	log.Info("📄 Reading root token from init file", zap.String("path", path))
-	
+
 	// Check if secrets directory exists
 	if dirStat, err := os.Stat(shared.SecretsDir); err != nil {
 		if os.IsNotExist(err) {
-			log.Error("❌ Secrets directory does not exist", 
+			log.Error("❌ Secrets directory does not exist",
 				zap.String("dir", shared.SecretsDir),
 				zap.Error(err))
 			return "", fmt.Errorf("secrets directory does not exist: %s", shared.SecretsDir)
 		}
-		log.Error("❌ Cannot access secrets directory", 
+		log.Error("❌ Cannot access secrets directory",
 			zap.String("dir", shared.SecretsDir),
 			zap.Error(err))
 		return "", fmt.Errorf("cannot access secrets directory %s: %w", shared.SecretsDir, err)
 	} else {
-		log.Info("✅ Secrets directory accessible", 
+		log.Info("✅ Secrets directory accessible",
 			zap.String("dir", shared.SecretsDir),
 			zap.String("mode", dirStat.Mode().String()))
 	}
-	
+
 	// Check if init file exists and get its permissions
 	if stat, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			log.Error("❌ vault_init.json does not exist", 
+			log.Error("❌ vault_init.json does not exist",
 				zap.String("path", path),
 				zap.Error(err))
 			return "", fmt.Errorf("vault_init.json does not exist at %s", path)
 		}
-		log.Error("❌ Cannot access vault_init.json", 
+		log.Error("❌ Cannot access vault_init.json",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("cannot access vault_init.json at %s: %w", path, err)
 	} else {
-		log.Info("✅ vault_init.json file found", 
+		log.Info("✅ vault_init.json file found",
 			zap.String("path", path),
 			zap.String("mode", stat.Mode().String()),
 			zap.Int64("size", stat.Size()),
 			zap.Time("mod_time", stat.ModTime()))
 	}
-	
+
 	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Error("❌ Failed to read vault_init.json file", 
+		log.Error("❌ Failed to read vault_init.json file",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("read vault_init.json: %w", err)
 	}
-	log.Info("✅ vault_init.json file read successfully", 
+	log.Info("✅ vault_init.json file read successfully",
 		zap.String("path", path),
 		zap.Int("data_length", len(data)))
 
 	var init shared.VaultInitResponse
 	if err := json.Unmarshal(data, &init); err != nil {
-		log.Error("❌ Failed to unmarshal vault_init.json", 
+		log.Error("❌ Failed to unmarshal vault_init.json",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("unmarshal vault_init.json: %w", err)
 	}
 
 	if init.RootToken == "" {
-		log.Error("❌ vault_init.json contains no root token", 
+		log.Error("❌ vault_init.json contains no root token",
 			zap.String("path", path))
 		return "", fmt.Errorf("vault_init.json contains no root token")
 	}
-	
-	log.Info("✅ Root token extracted from vault_init.json", 
+
+	log.Info("✅ Root token extracted from vault_init.json",
 		zap.String("path", path))
 	return init.RootToken, nil
 }

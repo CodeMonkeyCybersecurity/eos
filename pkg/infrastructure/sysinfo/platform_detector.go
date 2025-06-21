@@ -52,7 +52,7 @@ func (p *PlatformDetectorImpl) DetectDistribution(ctx context.Context) (*sysinfo
 	}
 
 	distro := platform.DetectLinuxDistro(p.rc)
-	
+
 	// Create distribution info based on detected distro
 	distroInfo := &sysinfo.DistributionInfo{
 		ID:             distro,
@@ -190,7 +190,7 @@ func (p *PlatformDetectorImpl) parseOSRelease() *sysinfo.DistributionInfo {
 func (p *PlatformDetectorImpl) GetPlatformString(ctx context.Context) string {
 	osType, _ := p.DetectOS(ctx)
 	arch := runtime.GOARCH
-	
+
 	return string(osType) + "/" + arch
 }
 
@@ -217,7 +217,7 @@ func (p *PlatformDetectorImpl) GetSystemArchitecture() *sysinfo.ArchitectureInfo
 	return &sysinfo.ArchitectureInfo{
 		CPU:        runtime.GOARCH,
 		Platform:   runtime.GOOS,
-		Bits:       64, // Most systems are 64-bit today
+		Bits:       64,       // Most systems are 64-bit today
 		Endianness: "little", // Most common
 	}
 }

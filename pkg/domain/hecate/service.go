@@ -12,35 +12,35 @@ import (
 // HecateService orchestrates reverse proxy and service management operations
 type HecateService struct {
 	// Core service managers
-	reverseProxyService  ReverseProxyService
-	serviceOrchestrator  ServiceOrchestrator
-	configManager        ConfigurationManager
-	certificateManager   CertificateManager
-	serviceDiscovery     ServiceDiscovery
-	networkManager       NetworkManager
-	securityManager      SecurityManager
-	monitoringManager    MonitoringManager
-	backupManager        BackupManager
-	
+	reverseProxyService ReverseProxyService
+	serviceOrchestrator ServiceOrchestrator
+	configManager       ConfigurationManager
+	certificateManager  CertificateManager
+	serviceDiscovery    ServiceDiscovery
+	networkManager      NetworkManager
+	securityManager     SecurityManager
+	monitoringManager   MonitoringManager
+	backupManager       BackupManager
+
 	// Infrastructure components
-	containerRuntime     ContainerRuntime
-	proxyAdapter         ProxyAdapter
-	templateEngine       TemplateEngine
-	lifecycleManager     LifecycleManager
-	eventBus             EventBus
-	
+	containerRuntime ContainerRuntime
+	proxyAdapter     ProxyAdapter
+	templateEngine   TemplateEngine
+	lifecycleManager LifecycleManager
+	eventBus         EventBus
+
 	// Repository layer
-	deploymentRepo       DeploymentRepository
-	serviceRepo          ServiceRepository
-	configRepo           ConfigurationRepository
-	certificateRepo      CertificateRepository
-	auditRepo            AuditRepository
-	
+	deploymentRepo  DeploymentRepository
+	serviceRepo     ServiceRepository
+	configRepo      ConfigurationRepository
+	certificateRepo CertificateRepository
+	auditRepo       AuditRepository
+
 	// Validation layer
-	serviceValidator     ServiceValidator
-	securityValidator    SecurityValidator
-	
-	logger               *zap.Logger
+	serviceValidator  ServiceValidator
+	securityValidator SecurityValidator
+
+	logger *zap.Logger
 }
 
 // NewHecateService creates a new Hecate domain service
@@ -99,7 +99,7 @@ func NewHecateService(
 // DeployReverseProxyWithLifecycle deploys a reverse proxy with full lifecycle management
 func (s *HecateService) DeployReverseProxyWithLifecycle(ctx context.Context, userID string, spec *ReverseProxySpec) (*Deployment, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Deploying reverse proxy with lifecycle management",
 		zap.String("user", userID),
 		zap.String("name", spec.Name),
@@ -131,7 +131,7 @@ func (s *HecateService) DeployReverseProxyWithLifecycle(ctx context.Context, use
 			Name:  spec.Name,
 			Image: "nginx:latest", // Default proxy image
 		}
-		
+
 		if err := s.lifecycleManager.PreDeploy(ctx, serviceSpec); err != nil {
 			s.logger.Error("Pre-deployment lifecycle hook failed", zap.Error(err))
 			return nil, fmt.Errorf("pre-deployment failed: %w", err)
@@ -158,7 +158,7 @@ func (s *HecateService) DeployReverseProxyWithLifecycle(ctx context.Context, use
 			zap.String("name", spec.Name),
 			zap.Error(err),
 		)
-		
+
 		// Audit failed deployment
 		s.auditDeploymentOperation(ctx, userID, "proxy.deploy", spec.Name, start, err)
 		return nil, fmt.Errorf("deployment failed: %w", err)
@@ -186,10 +186,10 @@ func (s *HecateService) DeployReverseProxyWithLifecycle(ctx context.Context, use
 				ReadyReplicas: 1,
 				UpdatedAt:     time.Now(),
 			},
-			Address:   spec.Domain,
-			Port:      80, // Default HTTP port
+			Address: spec.Domain,
+			Port:    80, // Default HTTP port
 		}
-		
+
 		if err := s.lifecycleManager.PostDeploy(ctx, instance); err != nil {
 			s.logger.Warn("Post-deployment lifecycle hook failed", zap.Error(err))
 			// Don't fail the deployment for post-deploy hook failures
@@ -205,13 +205,13 @@ func (s *HecateService) DeployReverseProxyWithLifecycle(ctx context.Context, use
 			Timestamp: time.Now(),
 			Data: map[string]interface{}{
 				"deployment_id": deployment.ID,
-				"name":         deployment.Name,
-				"domain":       spec.Domain,
-				"user":         userID,
+				"name":          deployment.Name,
+				"domain":        spec.Domain,
+				"user":          userID,
 			},
 			Severity: EventSeverityInfo,
 		}
-		
+
 		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
 			s.logger.Warn("Failed to publish deployment event", zap.Error(err))
 		}
@@ -232,7 +232,7 @@ func (s *HecateService) DeployReverseProxyWithLifecycle(ctx context.Context, use
 // UpdateReverseProxyWithValidation updates a reverse proxy with comprehensive validation
 func (s *HecateService) UpdateReverseProxyWithValidation(ctx context.Context, userID, deploymentID string, spec *ReverseProxySpec) error {
 	start := time.Now()
-	
+
 	s.logger.Info("Updating reverse proxy with validation",
 		zap.String("user", userID),
 		zap.String("deployment_id", deploymentID),
@@ -259,12 +259,12 @@ func (s *HecateService) UpdateReverseProxyWithValidation(ctx context.Context, us
 			Name:      existing.Name,
 			Type:      ServiceTypeReverseProxy,
 		}
-		
+
 		newConfig := &ServiceConfiguration{
 			ServiceID: existing.Name,
 			Data:      map[string]interface{}{"spec": spec},
 		}
-		
+
 		if err := s.lifecycleManager.PreUpdate(ctx, instance, newConfig); err != nil {
 			s.logger.Error("Pre-update lifecycle hook failed", zap.Error(err))
 			return fmt.Errorf("pre-update failed: %w", err)
@@ -303,7 +303,7 @@ func (s *HecateService) UpdateReverseProxyWithValidation(ctx context.Context, us
 			Name:      existing.Name,
 			Type:      ServiceTypeReverseProxy,
 		}
-		
+
 		if err := s.lifecycleManager.PostUpdate(ctx, instance); err != nil {
 			s.logger.Warn("Post-update lifecycle hook failed", zap.Error(err))
 		}
@@ -318,14 +318,14 @@ func (s *HecateService) UpdateReverseProxyWithValidation(ctx context.Context, us
 			Timestamp: time.Now(),
 			Data: map[string]interface{}{
 				"deployment_id": deploymentID,
-				"name":         spec.Name,
-				"user":         userID,
+				"name":          spec.Name,
+				"user":          userID,
 			},
 			Severity: EventSeverityInfo,
 		}
-		
+
 		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
-			s.logger.Warn("Failed to publish proxy update event", 
+			s.logger.Warn("Failed to publish proxy update event",
 				zap.Error(err),
 				zap.String("deployment_id", deploymentID))
 		}
@@ -346,7 +346,7 @@ func (s *HecateService) UpdateReverseProxyWithValidation(ctx context.Context, us
 // DeployStackWithOrchestration deploys a multi-service stack with orchestration
 func (s *HecateService) DeployStackWithOrchestration(ctx context.Context, userID string, spec *StackSpec) (*StackDeployment, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Deploying stack with orchestration",
 		zap.String("user", userID),
 		zap.String("stack_name", spec.Name),
@@ -415,18 +415,18 @@ func (s *HecateService) DeployStackWithOrchestration(ctx context.Context, userID
 	// Register services with service discovery
 	for _, service := range deployment.Services {
 		registration := &ServiceRegistration{
-			ID:        service.ID,
-			ServiceID: service.ServiceID,
-			Name:      service.Name,
-			Type:      service.Type,
-			Address:   service.Address,
-			Port:      service.Port,
-			Health:    service.Health,
+			ID:           service.ID,
+			ServiceID:    service.ServiceID,
+			Name:         service.Name,
+			Type:         service.Type,
+			Address:      service.Address,
+			Port:         service.Port,
+			Health:       service.Health,
 			RegisteredAt: time.Now(),
-			LastSeen:  time.Now(),
-			TTL:       15 * time.Minute,
+			LastSeen:     time.Now(),
+			TTL:          15 * time.Minute,
 		}
-		
+
 		if err := s.serviceDiscovery.RegisterService(ctx, registration); err != nil {
 			s.logger.Warn("Service registration failed",
 				zap.String("service", service.Name),
@@ -462,9 +462,9 @@ func (s *HecateService) DeployStackWithOrchestration(ctx context.Context, userID
 			},
 			Severity: EventSeverityInfo,
 		}
-		
+
 		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
-			s.logger.Warn("Failed to publish stack deploy event", 
+			s.logger.Warn("Failed to publish stack deploy event",
 				zap.Error(err),
 				zap.String("stack_id", deployment.ID))
 		}
@@ -487,7 +487,7 @@ func (s *HecateService) DeployStackWithOrchestration(ctx context.Context, userID
 // RequestCertificateWithValidation requests a certificate with comprehensive validation
 func (s *HecateService) RequestCertificateWithValidation(ctx context.Context, userID string, spec *CertificateSpec) (*Certificate, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Requesting certificate with validation",
 		zap.String("user", userID),
 		zap.String("common_name", spec.CommonName),
@@ -498,9 +498,9 @@ func (s *HecateService) RequestCertificateWithValidation(ctx context.Context, us
 	cert := &Certificate{
 		CommonName:       spec.CommonName,
 		AlternativeNames: spec.AlternativeNames,
-		Status:          CertificateStatusPending,
+		Status:           CertificateStatusPending,
 	}
-	
+
 	if err := s.securityValidator.ValidateCertificate(cert); err != nil {
 		s.logger.Error("Certificate validation failed", zap.Error(err))
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -533,14 +533,14 @@ func (s *HecateService) RequestCertificateWithValidation(ctx context.Context, us
 			Timestamp: time.Now(),
 			Data: map[string]interface{}{
 				"certificate_id": certificate.ID,
-				"common_name":   certificate.CommonName,
-				"user":         userID,
+				"common_name":    certificate.CommonName,
+				"user":           userID,
 			},
 			Severity: EventSeverityInfo,
 		}
-		
+
 		if err := s.eventBus.PublishAsync(ctx, event); err != nil {
-			s.logger.Warn("Failed to publish certificate request event", 
+			s.logger.Warn("Failed to publish certificate request event",
 				zap.Error(err),
 				zap.String("certificate_id", certificate.ID))
 		}
@@ -562,7 +562,7 @@ func (s *HecateService) RequestCertificateWithValidation(ctx context.Context, us
 // GetComprehensiveStatus retrieves comprehensive system status
 func (s *HecateService) GetComprehensiveStatus(ctx context.Context, userID string) (*SystemStatusReport, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Getting comprehensive system status",
 		zap.String("user", userID),
 	)
@@ -606,7 +606,7 @@ func (s *HecateService) GetComprehensiveStatus(ctx context.Context, userID strin
 				)
 				continue
 			}
-			
+
 			if report.ProxyMetrics == nil {
 				report.ProxyMetrics = make(map[string]*ProxyMetrics)
 			}
@@ -632,7 +632,7 @@ func (s *HecateService) GetComprehensiveStatus(ctx context.Context, userID strin
 // ProcessConfigurationTemplate processes a configuration template with variables
 func (s *HecateService) ProcessConfigurationTemplate(ctx context.Context, userID string, templateID string, variables map[string]interface{}) (*ServiceConfiguration, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Processing configuration template",
 		zap.String("user", userID),
 		zap.String("template_id", templateID),
@@ -669,11 +669,11 @@ func (s *HecateService) ProcessConfigurationTemplate(ctx context.Context, userID
 
 	// Save processed configuration
 	if err := s.configRepo.SaveConfiguration(ctx, &ProxyConfiguration{
-		ID:           config.ID,
-		Type:         config.Type,
-		Status:       ConfigurationStatusActive,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		ID:        config.ID,
+		Type:      config.Type,
+		Status:    ConfigurationStatusActive,
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
 	}); err != nil {
 		s.logger.Error("Failed to save configuration", zap.Error(err))
 	}
@@ -697,19 +697,19 @@ func (s *HecateService) ensureCertificateAvailable(ctx context.Context, domain s
 		Domains: []string{domain},
 		Status:  []CertificateStatus{CertificateStatusIssued},
 	}
-	
+
 	existing, err := s.certificateRepo.ListCertificates(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check existing certificates: %w", err)
 	}
-	
+
 	// If valid certificate exists, return it
 	for _, cert := range existing {
 		if cert.NotAfter.After(time.Now().Add(30 * 24 * time.Hour)) { // At least 30 days validity
 			return cert, nil
 		}
 	}
-	
+
 	// Request new certificate
 	spec := &CertificateSpec{
 		CommonName:       domain,
@@ -718,7 +718,7 @@ func (s *HecateService) ensureCertificateAvailable(ctx context.Context, domain s
 		CertType:         CertificateTypeTLS,
 		AutoRenew:        true,
 	}
-	
+
 	return s.certificateManager.RequestCertificate(ctx, spec)
 }
 
@@ -747,7 +747,7 @@ func (s *HecateService) setupServiceMonitoring(ctx context.Context, service *Ser
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
-	
+
 	return s.monitoringManager.CreateAlert(ctx, alert)
 }
 
@@ -755,13 +755,13 @@ func (s *HecateService) summarizeDeployments(deployments []*Deployment) *Deploym
 	summary := &DeploymentSummary{
 		Total: len(deployments),
 	}
-	
+
 	statusCounts := make(map[DeploymentStatus]int)
 	for _, deployment := range deployments {
 		statusCounts[deployment.Status]++
 	}
 	summary.ByStatus = statusCounts
-	
+
 	return summary
 }
 
@@ -769,7 +769,7 @@ func (s *HecateService) summarizeServices(services []*ServiceConfiguration) *Ser
 	summary := &ServiceSummary{
 		Total: len(services),
 	}
-	
+
 	typeCounts := make(map[ServiceType]int)
 	statusCounts := make(map[ConfigurationStatus]int)
 	for _, service := range services {
@@ -778,7 +778,7 @@ func (s *HecateService) summarizeServices(services []*ServiceConfiguration) *Ser
 	}
 	summary.ByType = typeCounts
 	summary.ByStatus = statusCounts
-	
+
 	return summary
 }
 
@@ -786,7 +786,7 @@ func (s *HecateService) summarizeCertificates(certificates []*Certificate) *Cert
 	summary := &CertificateSummary{
 		Total: len(certificates),
 	}
-	
+
 	statusCounts := make(map[CertificateStatus]int)
 	var expiringSoon int
 	for _, cert := range certificates {
@@ -797,7 +797,7 @@ func (s *HecateService) summarizeCertificates(certificates []*Certificate) *Cert
 	}
 	summary.ByStatus = statusCounts
 	summary.ExpiringSoon = expiringSoon
-	
+
 	return summary
 }
 
@@ -808,7 +808,7 @@ func (s *HecateService) calculateOverallHealth(deployments []*Deployment, servic
 			return HealthStatusUnhealthy
 		}
 	}
-	
+
 	// Check for expiring certificates
 	for _, cert := range certificates {
 		if cert.Status == CertificateStatusExpired {
@@ -818,7 +818,7 @@ func (s *HecateService) calculateOverallHealth(deployments []*Deployment, servic
 			return HealthStatusDegraded
 		}
 	}
-	
+
 	// Check inactive services
 	inactiveServices := 0
 	for _, service := range services {
@@ -826,11 +826,11 @@ func (s *HecateService) calculateOverallHealth(deployments []*Deployment, servic
 			inactiveServices++
 		}
 	}
-	
+
 	if inactiveServices > len(services)/2 {
 		return HealthStatusDegraded
 	}
-	
+
 	return HealthStatusHealthy
 }
 
@@ -887,27 +887,27 @@ func (s *HecateService) auditSystemOperation(ctx context.Context, userID, action
 // Summary types for status reporting
 
 type SystemStatusReport struct {
-	Timestamp     time.Time                     `json:"timestamp"`
-	OverallHealth HealthStatusType              `json:"overall_health"`
-	Deployments   *DeploymentSummary            `json:"deployments,omitempty"`
-	Services      *ServiceSummary               `json:"services,omitempty"`
-	Certificates  *CertificateSummary           `json:"certificates,omitempty"`
-	ProxyMetrics  map[string]*ProxyMetrics      `json:"proxy_metrics,omitempty"`
+	Timestamp     time.Time                `json:"timestamp"`
+	OverallHealth HealthStatusType         `json:"overall_health"`
+	Deployments   *DeploymentSummary       `json:"deployments,omitempty"`
+	Services      *ServiceSummary          `json:"services,omitempty"`
+	Certificates  *CertificateSummary      `json:"certificates,omitempty"`
+	ProxyMetrics  map[string]*ProxyMetrics `json:"proxy_metrics,omitempty"`
 }
 
 type DeploymentSummary struct {
-	Total    int                              `json:"total"`
-	ByStatus map[DeploymentStatus]int         `json:"by_status"`
+	Total    int                      `json:"total"`
+	ByStatus map[DeploymentStatus]int `json:"by_status"`
 }
 
 type ServiceSummary struct {
-	Total    int                              `json:"total"`
-	ByType   map[ServiceType]int              `json:"by_type"`
-	ByStatus map[ConfigurationStatus]int      `json:"by_status"`
+	Total    int                         `json:"total"`
+	ByType   map[ServiceType]int         `json:"by_type"`
+	ByStatus map[ConfigurationStatus]int `json:"by_status"`
 }
 
 type CertificateSummary struct {
-	Total        int                           `json:"total"`
-	ByStatus     map[CertificateStatus]int     `json:"by_status"`
-	ExpiringSoon int                           `json:"expiring_soon"`
+	Total        int                       `json:"total"`
+	ByStatus     map[CertificateStatus]int `json:"by_status"`
+	ExpiringSoon int                       `json:"expiring_soon"`
 }

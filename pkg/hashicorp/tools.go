@@ -27,13 +27,13 @@ var SupportedHCLTools = []string{
 // InstallTool installs a specific HashiCorp tool with comprehensive error handling
 func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔧 Starting HashiCorp tool installation", 
+	logger.Info("🔧 Starting HashiCorp tool installation",
 		zap.String("tool", tool),
 		zap.Strings("supported_tools", SupportedHCLTools))
-	
+
 	if !IsToolSupported(tool) {
 		err := fmt.Errorf("unsupported HashiCorp tool: %s", tool)
-		logger.Error("❌ Tool not supported", 
+		logger.Error("❌ Tool not supported",
 			zap.String("tool", tool),
 			zap.Strings("supported_tools", SupportedHCLTools),
 			zap.Error(err))
@@ -69,7 +69,7 @@ func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	// Install specific tool
 	logger.Info("⬇️ Installing specific tool", zap.String("tool", tool))
 	if err := installSpecificTool(rc, tool); err != nil {
-		logger.Error("❌ Failed to install tool", 
+		logger.Error("❌ Failed to install tool",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "install %s", tool)
@@ -79,7 +79,7 @@ func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	// Verify installation
 	logger.Info("🔍 Verifying installation", zap.String("tool", tool))
 	if err := VerifyInstallation(rc, tool); err != nil {
-		logger.Error("❌ Installation verification failed", 
+		logger.Error("❌ Installation verification failed",
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrapf(err, "verify %s installation", tool)
@@ -121,12 +121,12 @@ func InstallAllTools(rc *eos_io.RuntimeContext) error {
 	failedTools := map[string]error{}
 
 	for _, tool := range SupportedHCLTools {
-		logger.Info("⬇️ Installing tool", 
+		logger.Info("⬇️ Installing tool",
 			zap.String("tool", tool),
 			zap.Int("remaining", len(SupportedHCLTools)-len(successfulTools)-len(failedTools)))
 
 		if err := installSpecificTool(rc, tool); err != nil {
-			logger.Error("❌ Failed to install tool", 
+			logger.Error("❌ Failed to install tool",
 				zap.String("tool", tool),
 				zap.Error(err))
 			failedTools[tool] = err
@@ -134,7 +134,7 @@ func InstallAllTools(rc *eos_io.RuntimeContext) error {
 		}
 
 		if err := VerifyInstallation(rc, tool); err != nil {
-			logger.Error("❌ Tool verification failed", 
+			logger.Error("❌ Tool verification failed",
 				zap.String("tool", tool),
 				zap.Error(err))
 			failedTools[tool] = err
@@ -158,7 +158,7 @@ func InstallAllTools(rc *eos_io.RuntimeContext) error {
 		}
 		logger.Error("❌ Some tools failed to install",
 			zap.Strings("failed_tools", failedNames))
-		
+
 		// Return error with details about first failure
 		for tool, err := range failedTools {
 			return cerr.Wrapf(err, "install all tools - %s failed", tool)
@@ -186,7 +186,7 @@ func installPrerequisites(rc *eos_io.RuntimeContext) error {
 	logger.Info("📦 Installing system prerequisites")
 
 	prerequisites := []string{"wget", "gpg", "lsb-release"}
-	
+
 	distro := platform.DetectLinuxDistro(rc)
 	logger.Info("🔍 Detected Linux distribution", zap.String("distro", distro))
 
@@ -194,7 +194,7 @@ func installPrerequisites(rc *eos_io.RuntimeContext) error {
 	case "debian":
 		args := append([]string{"install", "-y"}, prerequisites...)
 		if err := execute.RunSimple(rc.Ctx, "apt-get", args...); err != nil {
-			logger.Error("❌ Failed to install prerequisites via apt-get", 
+			logger.Error("❌ Failed to install prerequisites via apt-get",
 				zap.Strings("packages", prerequisites),
 				zap.Error(err))
 			return cerr.Wrap(err, "install debian prerequisites")
@@ -202,20 +202,20 @@ func installPrerequisites(rc *eos_io.RuntimeContext) error {
 	case "rhel":
 		args := append([]string{"install", "-y"}, prerequisites...)
 		if err := execute.RunSimple(rc.Ctx, "dnf", args...); err != nil {
-			logger.Error("❌ Failed to install prerequisites via dnf", 
+			logger.Error("❌ Failed to install prerequisites via dnf",
 				zap.Strings("packages", prerequisites),
 				zap.Error(err))
 			return cerr.Wrap(err, "install rhel prerequisites")
 		}
 	default:
 		err := fmt.Errorf("unsupported distribution: %s", distro)
-		logger.Error("❌ Unsupported Linux distribution", 
+		logger.Error("❌ Unsupported Linux distribution",
 			zap.String("distro", distro),
 			zap.Error(err))
 		return cerr.Wrap(err, "check distribution support")
 	}
 
-	logger.Info("✅ Prerequisites installed successfully", 
+	logger.Info("✅ Prerequisites installed successfully",
 		zap.Strings("packages", prerequisites),
 		zap.String("distro", distro))
 	return nil
@@ -227,37 +227,37 @@ func installSpecificTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger.Info("⬇️ Installing specific HashiCorp tool", zap.String("tool", tool))
 
 	distro := platform.DetectLinuxDistro(rc)
-	
+
 	switch distro {
 	case "debian":
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "update"); err != nil {
 			logger.Error("❌ Failed to update package lists", zap.Error(err))
 			return cerr.Wrap(err, "update package lists")
 		}
-		
+
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "install", "-y", tool); err != nil {
-			logger.Error("❌ Failed to install tool via apt-get", 
+			logger.Error("❌ Failed to install tool via apt-get",
 				zap.String("tool", tool),
 				zap.Error(err))
 			return cerr.Wrapf(err, "install %s via apt-get", tool)
 		}
 	case "rhel":
 		if err := execute.RunSimple(rc.Ctx, "dnf", "install", "-y", tool); err != nil {
-			logger.Error("❌ Failed to install tool via dnf", 
+			logger.Error("❌ Failed to install tool via dnf",
 				zap.String("tool", tool),
 				zap.Error(err))
 			return cerr.Wrapf(err, "install %s via dnf", tool)
 		}
 	default:
 		err := fmt.Errorf("unsupported distribution: %s", distro)
-		logger.Error("❌ Cannot install on unsupported distribution", 
+		logger.Error("❌ Cannot install on unsupported distribution",
 			zap.String("distro", distro),
 			zap.String("tool", tool),
 			zap.Error(err))
 		return cerr.Wrap(err, "check distribution support")
 	}
 
-	logger.Info("✅ Tool package installation completed", 
+	logger.Info("✅ Tool package installation completed",
 		zap.String("tool", tool),
 		zap.String("distro", distro))
 	return nil

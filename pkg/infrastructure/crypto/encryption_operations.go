@@ -129,7 +129,7 @@ func (e *EncryptionOperationsImpl) DecryptStream(ctx context.Context, reader io.
 func (e *EncryptionOperationsImpl) GenerateKey(ctx context.Context, bits int) ([]byte, error) {
 	bytes := bits / 8
 	key := make([]byte, bytes)
-	
+
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("failed to generate key: %w", err)
 	}

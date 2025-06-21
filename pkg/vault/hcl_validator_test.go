@@ -16,11 +16,11 @@ func TestValidateAndFixCommonIssues(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		input          string
-		expectFixed    bool
-		expectValid    bool
-		description    string
+		name        string
+		input       string
+		expectFixed bool
+		expectValid bool
+		description string
 	}{
 		{
 			name: "policy_with_invalid_max_ttl",
@@ -63,7 +63,7 @@ path "secret/data/test/*" {
 		t.Run(test.name, func(t *testing.T) {
 			// Test the validation and fixing
 			fixed, err := ValidateAndFixCommonIssues(rc, test.name, test.input)
-			
+
 			if test.expectValid && err != nil {
 				t.Errorf("Expected valid policy but got error: %v", err)
 				return
@@ -73,7 +73,7 @@ path "secret/data/test/*" {
 				if fixed == test.input {
 					t.Errorf("Expected policy to be fixed but it was unchanged")
 				}
-				
+
 				// The fixed policy should not contain invalid attributes
 				if containsInvalidAttributes(fixed) {
 					t.Errorf("Fixed policy still contains invalid attributes: %s", fixed)
@@ -148,7 +148,7 @@ func containsInvalidAttributes(policy string) bool {
 }
 
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) && 
+	return len(s) >= len(substr) && (s == substr || (len(s) > len(substr) &&
 		(stringContains(s, substr))))
 }
 

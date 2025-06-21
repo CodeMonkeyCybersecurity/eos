@@ -4,7 +4,6 @@ package ldap
 
 import "github.com/CodeMonkeyCybersecurity/eos/pkg/schema"
 
-
 const VaultLDAPPath = "eos/ldap/config"
 
 type LDAPConfig struct {

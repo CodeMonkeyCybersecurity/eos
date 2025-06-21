@@ -11,9 +11,9 @@ func SanitizeErrorMessage(err error) string {
 	if err == nil {
 		return ""
 	}
-	
+
 	message := err.Error()
-	
+
 	// Use shared sanitization function
 	return shared.SanitizeForLogging(message)
 }
@@ -23,12 +23,12 @@ func SafeErrorSummary(err error) string {
 	if err == nil {
 		return "success"
 	}
-	
+
 	sanitized := SanitizeErrorMessage(err)
-	
+
 	// Categorize errors without exposing internals
 	lowered := strings.ToLower(sanitized)
-	
+
 	switch {
 	case strings.Contains(lowered, "permission") || strings.Contains(lowered, "unauthorized"):
 		return "authentication_required"

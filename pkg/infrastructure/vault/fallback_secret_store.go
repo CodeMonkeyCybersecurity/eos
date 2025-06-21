@@ -38,15 +38,15 @@ func (f *FallbackSecretStore) Get(ctx context.Context, key string) (*domain.Secr
 	// First try environment variable
 	envVar := f.keyToEnvVar(key)
 	if value := os.Getenv(envVar); value != "" {
-		f.logger.Debug("Secret found in environment", 
-			zap.String("key", key), 
+		f.logger.Debug("Secret found in environment",
+			zap.String("key", key),
 			zap.String("env_var", envVar))
-		
+
 		return &domain.Secret{
 			Key:   key,
 			Value: value,
 			Metadata: map[string]string{
-				"source": "environment",
+				"source":  "environment",
 				"env_var": envVar,
 			},
 			CreatedAt: time.Now(), // We don't know actual creation time
@@ -57,8 +57,8 @@ func (f *FallbackSecretStore) Get(ctx context.Context, key string) (*domain.Secr
 	// Try file-based fallback
 	filePath := f.keyToFilePath(key)
 	if data, err := os.ReadFile(filePath); err == nil {
-		f.logger.Debug("Secret found in file", 
-			zap.String("key", key), 
+		f.logger.Debug("Secret found in file",
+			zap.String("key", key),
 			zap.String("file_path", filePath))
 
 		// Try to parse as JSON first
@@ -80,7 +80,7 @@ func (f *FallbackSecretStore) Get(ctx context.Context, key string) (*domain.Secr
 		}, nil
 	}
 
-	f.logger.Debug("Secret not found in fallback store", 
+	f.logger.Debug("Secret not found in fallback store",
 		zap.String("key", key),
 		zap.String("env_var", envVar),
 		zap.String("file_path", filePath))
@@ -94,8 +94,8 @@ func (f *FallbackSecretStore) Set(ctx context.Context, key string, secret *domai
 
 	// Ensure fallback directory exists
 	if err := os.MkdirAll(f.fallbackDir, 0750); err != nil {
-		f.logger.Error("Failed to create fallback directory", 
-			zap.String("dir", f.fallbackDir), 
+		f.logger.Error("Failed to create fallback directory",
+			zap.String("dir", f.fallbackDir),
 			zap.Error(err))
 		return fmt.Errorf("failed to create fallback directory: %w", err)
 	}
@@ -126,8 +126,8 @@ func (f *FallbackSecretStore) Set(ctx context.Context, key string, secret *domai
 	filePath := f.keyToFilePath(key)
 	data, err := json.MarshalIndent(secretData, "", "  ")
 	if err != nil {
-		f.logger.Error("Failed to marshal secret data", 
-			zap.String("key", key), 
+		f.logger.Error("Failed to marshal secret data",
+			zap.String("key", key),
 			zap.Error(err))
 		return fmt.Errorf("failed to marshal secret data: %w", err)
 	}
@@ -135,21 +135,21 @@ func (f *FallbackSecretStore) Set(ctx context.Context, key string, secret *domai
 	// Ensure parent directory exists
 	parentDir := filepath.Dir(filePath)
 	if err := os.MkdirAll(parentDir, 0750); err != nil {
-		f.logger.Error("Failed to create parent directory", 
-			zap.String("dir", parentDir), 
+		f.logger.Error("Failed to create parent directory",
+			zap.String("dir", parentDir),
 			zap.Error(err))
 		return fmt.Errorf("failed to create parent directory: %w", err)
 	}
 
 	// Write with secure permissions
 	if err := os.WriteFile(filePath, data, 0640); err != nil {
-		f.logger.Error("Failed to write secret file", 
-			zap.String("file_path", filePath), 
+		f.logger.Error("Failed to write secret file",
+			zap.String("file_path", filePath),
 			zap.Error(err))
 		return fmt.Errorf("failed to write secret file: %w", err)
 	}
 
-	f.logger.Debug("Secret stored successfully in fallback store", 
+	f.logger.Debug("Secret stored successfully in fallback store",
 		zap.String("key", key),
 		zap.String("file_path", filePath))
 
@@ -163,18 +163,18 @@ func (f *FallbackSecretStore) Delete(ctx context.Context, key string) error {
 	filePath := f.keyToFilePath(key)
 	if err := os.Remove(filePath); err != nil {
 		if os.IsNotExist(err) {
-			f.logger.Debug("Secret file not found for deletion", 
+			f.logger.Debug("Secret file not found for deletion",
 				zap.String("key", key),
 				zap.String("file_path", filePath))
 			return nil // Not an error if file doesn't exist
 		}
-		f.logger.Error("Failed to delete secret file", 
-			zap.String("file_path", filePath), 
+		f.logger.Error("Failed to delete secret file",
+			zap.String("file_path", filePath),
 			zap.Error(err))
 		return fmt.Errorf("failed to delete secret file: %w", err)
 	}
 
-	f.logger.Debug("Secret deleted successfully from fallback store", 
+	f.logger.Debug("Secret deleted successfully from fallback store",
 		zap.String("key", key),
 		zap.String("file_path", filePath))
 
@@ -201,8 +201,8 @@ func (f *FallbackSecretStore) List(ctx context.Context, prefix string) ([]*domai
 		// Convert file path back to key
 		relPath, err := filepath.Rel(f.fallbackDir, path)
 		if err != nil {
-			f.logger.Warn("Failed to get relative path", 
-				zap.String("path", path), 
+			f.logger.Warn("Failed to get relative path",
+				zap.String("path", path),
 				zap.Error(err))
 			return nil
 		}
@@ -210,8 +210,8 @@ func (f *FallbackSecretStore) List(ctx context.Context, prefix string) ([]*domai
 		key := f.filePathToKey(relPath)
 		secret, err := f.Get(ctx, key)
 		if err != nil {
-			f.logger.Warn("Failed to get secret during list", 
-				zap.String("key", key), 
+			f.logger.Warn("Failed to get secret during list",
+				zap.String("key", key),
 				zap.Error(err))
 			return nil // Continue walking
 		}
@@ -221,14 +221,14 @@ func (f *FallbackSecretStore) List(ctx context.Context, prefix string) ([]*domai
 	})
 
 	if err != nil {
-		f.logger.Error("Failed to walk fallback directory", 
-			zap.String("prefix_dir", prefixDir), 
+		f.logger.Error("Failed to walk fallback directory",
+			zap.String("prefix_dir", prefixDir),
 			zap.Error(err))
 		return nil, fmt.Errorf("failed to list secrets: %w", err)
 	}
 
-	f.logger.Debug("Secrets listed successfully from fallback store", 
-		zap.String("prefix", prefix), 
+	f.logger.Debug("Secrets listed successfully from fallback store",
+		zap.String("prefix", prefix),
 		zap.Int("count", len(secrets)))
 
 	return secrets, nil
@@ -241,8 +241,8 @@ func (f *FallbackSecretStore) Exists(ctx context.Context, key string) (bool, err
 	// Check environment variable
 	envVar := f.keyToEnvVar(key)
 	if os.Getenv(envVar) != "" {
-		f.logger.Debug("Secret exists in environment", 
-			zap.String("key", key), 
+		f.logger.Debug("Secret exists in environment",
+			zap.String("key", key),
 			zap.String("env_var", envVar))
 		return true, nil
 	}
@@ -250,8 +250,8 @@ func (f *FallbackSecretStore) Exists(ctx context.Context, key string) (bool, err
 	// Check file
 	filePath := f.keyToFilePath(key)
 	if _, err := os.Stat(filePath); err == nil {
-		f.logger.Debug("Secret exists in file", 
-			zap.String("key", key), 
+		f.logger.Debug("Secret exists in file",
+			zap.String("key", key),
 			zap.String("file_path", filePath))
 		return true, nil
 	}
@@ -291,7 +291,7 @@ func (f *FallbackSecretStore) sanitizePath(path string) string {
 	clean := strings.ReplaceAll(path, "..", "")
 	clean = strings.ReplaceAll(clean, "//", "/")
 	clean = strings.Trim(clean, "/")
-	
+
 	// Convert to OS-specific path
 	return filepath.FromSlash(clean)
 }

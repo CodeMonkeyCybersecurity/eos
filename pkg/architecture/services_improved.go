@@ -14,19 +14,19 @@ import (
 
 // EnhancedInfrastructureService provides infrastructure management with lifecycle support
 type EnhancedInfrastructureService struct {
-	provider        InfrastructureProvider
-	containerMgr    ContainerManager
-	serviceMgr      ServiceManager
-	auditRepo       AuditRepository
-	logger          *zap.Logger
-	
+	provider     InfrastructureProvider
+	containerMgr ContainerManager
+	serviceMgr   ServiceManager
+	auditRepo    AuditRepository
+	logger       *zap.Logger
+
 	// Lifecycle management
-	ctx             context.Context
-	cancel          context.CancelFunc
-	started         bool
-	mu              sync.RWMutex
-	healthCheck     *time.Ticker
-	metrics         *ServiceMetrics
+	ctx         context.Context
+	cancel      context.CancelFunc
+	started     bool
+	mu          sync.RWMutex
+	healthCheck *time.Ticker
+	metrics     *ServiceMetrics
 }
 
 // ServiceMetrics tracks service performance and health
@@ -69,14 +69,14 @@ func (s *EnhancedInfrastructureService) Start(ctx context.Context) error {
 	}
 
 	s.ctx, s.cancel = context.WithCancel(ctx)
-	
+
 	// Start health check routine
 	s.healthCheck = time.NewTicker(30 * time.Second)
 	go s.healthCheckRoutine()
 
 	s.started = true
 	s.logger.Info("Infrastructure service started")
-	
+
 	return nil
 }
 
@@ -99,7 +99,7 @@ func (s *EnhancedInfrastructureService) Stop(ctx context.Context) error {
 
 	s.started = false
 	s.logger.Info("Infrastructure service stopped")
-	
+
 	return nil
 }
 
@@ -247,7 +247,7 @@ func (s *EnhancedInfrastructureService) GetInfrastructureStatus(ctx context.Cont
 // CreateServerWithTimeout creates a server with enhanced timeout and retry logic
 func (s *EnhancedInfrastructureService) CreateServerWithTimeout(ctx context.Context, userID string, spec *ServerSpec, timeout time.Duration) (*Server, error) {
 	start := time.Now()
-	
+
 	if !s.isStarted() {
 		return nil, fmt.Errorf("service not started")
 	}
@@ -265,19 +265,19 @@ func (s *EnhancedInfrastructureService) CreateServerWithTimeout(ctx context.Cont
 	// Attempt creation with retry logic
 	var server *Server
 	var err error
-	
+
 	for attempt := 1; attempt <= 3; attempt++ {
 		server, err = s.provider.CreateServer(createCtx, spec)
 		if err == nil {
 			break
 		}
-		
+
 		if attempt < 3 {
 			s.logger.Warn("Server creation attempt failed, retrying",
 				zap.Int("attempt", attempt),
 				zap.Error(err),
 			)
-			
+
 			select {
 			case <-createCtx.Done():
 				s.updateMetrics(start, createCtx.Err())
@@ -337,12 +337,12 @@ func (s *EnhancedInfrastructureService) isStarted() bool {
 func (s *EnhancedInfrastructureService) updateMetrics(start time.Time, err error) {
 	s.metrics.mu.Lock()
 	defer s.metrics.mu.Unlock()
-	
+
 	s.metrics.RequestCount++
 	if err != nil {
 		s.metrics.ErrorCount++
 	}
-	
+
 	// Update average latency (simple moving average)
 	latency := time.Since(start)
 	if s.metrics.RequestCount == 1 {
@@ -355,7 +355,7 @@ func (s *EnhancedInfrastructureService) updateMetrics(start time.Time, err error
 func (s *EnhancedInfrastructureService) getMetricsSnapshot() *ServiceMetrics {
 	s.metrics.mu.RLock()
 	defer s.metrics.mu.RUnlock()
-	
+
 	return &ServiceMetrics{
 		RequestCount:    s.metrics.RequestCount,
 		ErrorCount:      s.metrics.ErrorCount,
@@ -453,14 +453,14 @@ func (s *EnhancedInfrastructureService) auditServerCreation(ctx context.Context,
 
 // EnhancedInfrastructureStatus extends the basic status with additional monitoring data
 type EnhancedInfrastructureStatus struct {
-	RequestID     string           `json:"request_id"`
-	Timestamp     time.Time        `json:"timestamp"`
-	Servers       []*Server        `json:"servers,omitempty"`
-	Containers    []*Container     `json:"containers,omitempty"`
-	Services      []*Service       `json:"services,omitempty"`
-	Network       *NetworkInfo     `json:"network,omitempty"`
-	Metrics       *ServiceMetrics  `json:"metrics,omitempty"`
-	PartialErrors []error          `json:"-"` // Errors that occurred during collection
+	RequestID     string          `json:"request_id"`
+	Timestamp     time.Time       `json:"timestamp"`
+	Servers       []*Server       `json:"servers,omitempty"`
+	Containers    []*Container    `json:"containers,omitempty"`
+	Services      []*Service      `json:"services,omitempty"`
+	Network       *NetworkInfo    `json:"network,omitempty"`
+	Metrics       *ServiceMetrics `json:"metrics,omitempty"`
+	PartialErrors []error         `json:"-"` // Errors that occurred during collection
 }
 
 // generateRequestID creates a unique request ID

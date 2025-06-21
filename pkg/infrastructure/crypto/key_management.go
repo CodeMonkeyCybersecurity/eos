@@ -13,10 +13,10 @@ import (
 
 // FileBasedKeyManagement implements crypto.KeyManagement using file system
 type FileBasedKeyManagement struct {
-	keyDir   string
-	fileOps  fileops.FileOperations
-	pathOps  fileops.PathOperations
-	logger   *zap.Logger
+	keyDir  string
+	fileOps fileops.FileOperations
+	pathOps fileops.PathOperations
+	logger  *zap.Logger
 }
 
 // NewFileBasedKeyManagement creates a new file-based key management implementation
@@ -123,7 +123,7 @@ func (f *FileBasedKeyManagement) RotateKey(ctx context.Context, keyID string) ([
 	// Generate new key (simplified - would use proper key generation in real implementation)
 	newKey := make([]byte, 32) // 256-bit key
 	// In real implementation, would use crypto/rand
-	
+
 	// Backup old key if it exists
 	oldKeyPath := f.pathOps.JoinPath(f.keyDir, keyID+".key")
 	exists, err := f.fileOps.Exists(ctx, oldKeyPath)

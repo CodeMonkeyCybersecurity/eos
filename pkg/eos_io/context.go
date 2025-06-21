@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cue"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_opa"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cue"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/verify"
@@ -56,24 +56,24 @@ func NewContext(ctx context.Context, cmdName string) *RuntimeContext {
 func NewExtendedContext(ctx context.Context, cmdName string, timeout time.Duration) *RuntimeContext {
 	// Create context with extended timeout
 	extendedCtx, cancel := context.WithTimeout(ctx, timeout)
-	
+
 	// Store cancel function in the context so it can be cleaned up
 	// We'll use a custom key to avoid conflicts
 	type cancelKey struct{}
 	extendedCtx = context.WithValue(extendedCtx, cancelKey{}, cancel)
-	
+
 	comp, action := resolveCallContext(3)
 	baseLogger := zap.L()
 	if baseLogger == nil {
 		baseLogger, _ = zap.NewDevelopment()
 	}
 	log := baseLogger.With(
-		zap.String("component", comp), 
+		zap.String("component", comp),
 		zap.String("action", action),
 		zap.Duration("extended_timeout", timeout)).Named(cmdName)
-	
+
 	log.Info("🕐 Created extended runtime context", zap.Duration("timeout", timeout))
-	
+
 	return &RuntimeContext{
 		Ctx:        extendedCtx,
 		Log:        log,

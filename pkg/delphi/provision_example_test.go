@@ -10,16 +10,16 @@ import (
 func TestResolveWazuhUserID_WithFramework(t *testing.T) {
 	// Create test context using the framework
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Setup mock HTTP client that restores automatically
 	cleanup := testutil.WithMockHTTPClient(t, testutil.WazuhMockTransport())
 	defer cleanup()
-	
+
 	// Test existing user
 	id, err := ResolveWazuhUserID(rc, "alice")
 	testutil.AssertNoError(t, err)
 	testutil.AssertEqual(t, "user-123", id)
-	
+
 	// Test non-existing user
 	_, err = ResolveWazuhUserID(rc, "nonexistent")
 	testutil.AssertErrorContains(t, err, "user not found")
@@ -30,7 +30,7 @@ func TestResolveWazuhUserID_TableDriven_WithFramework(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 	cleanup := testutil.WithMockHTTPClient(t, testutil.WazuhMockTransport())
 	defer cleanup()
-	
+
 	tests := []testutil.TableTest[string]{
 		{
 			Name:     "existing user alice",
@@ -38,7 +38,7 @@ func TestResolveWazuhUserID_TableDriven_WithFramework(t *testing.T) {
 			Expected: "user-123",
 		},
 		{
-			Name:     "existing user bob", 
+			Name:     "existing user bob",
 			Input:    "bob",
 			Expected: "user-456",
 		},
@@ -53,7 +53,7 @@ func TestResolveWazuhUserID_TableDriven_WithFramework(t *testing.T) {
 			Error: "user not found",
 		},
 	}
-	
+
 	testutil.RunTableTests(t, tests, func(t *testing.T, username string) (any, error) {
 		return ResolveWazuhUserID(rc, username)
 	})
@@ -64,13 +64,13 @@ func TestEnsureWazuhGroup_WithFramework(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 	cleanup := testutil.WithMockHTTPClient(t, testutil.WazuhMockTransport())
 	defer cleanup()
-	
+
 	spec := TenantSpec{
 		Name:    "test-tenant",
 		User:    "alice",
 		GroupID: "group_test",
 	}
-	
+
 	err := EnsureWazuhGroup(rc, spec)
 	testutil.AssertNoError(t, err)
 }
@@ -78,7 +78,7 @@ func TestEnsureWazuhGroup_WithFramework(t *testing.T) {
 // Example test with custom mock responses
 func TestResolveWazuhUserID_CustomMockResponse(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Create custom mock transport for this specific test
 	mockTransport := &testutil.MockHTTPTransport{
 		ResponseMap: map[string]testutil.MockResponse{
@@ -96,10 +96,10 @@ func TestResolveWazuhUserID_CustomMockResponse(t *testing.T) {
 			Body:       map[string]any{"error": "not found"},
 		},
 	}
-	
+
 	cleanup := testutil.WithMockHTTPClient(t, mockTransport)
 	defer cleanup()
-	
+
 	// Test with custom response
 	id, err := ResolveWazuhUserID(rc, "test-user")
 	testutil.AssertNoError(t, err)
@@ -144,20 +144,20 @@ func TestResolveWazuhUserID_ErrorScenarios(t *testing.T) {
 			expectedErr: "user not found",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rc := testutil.TestRuntimeContext(t)
-			
+
 			mockTransport := &testutil.MockHTTPTransport{
 				ResponseMap: map[string]testutil.MockResponse{
 					"/security/users": tt.mockResponse,
 				},
 			}
-			
+
 			cleanup := testutil.WithMockHTTPClient(t, mockTransport)
 			defer cleanup()
-			
+
 			_, err := ResolveWazuhUserID(rc, tt.username)
 			testutil.AssertErrorContains(t, err, tt.expectedErr)
 		})

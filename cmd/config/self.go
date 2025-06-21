@@ -50,8 +50,8 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 		// Change to /opt/eos directory
 		if err := os.Chdir("/opt/eos"); err != nil {
-			logger.Error("❌ Failed to change directory", 
-				zap.String("directory", "/opt/eos"), 
+			logger.Error("❌ Failed to change directory",
+				zap.String("directory", "/opt/eos"),
 				zap.Error(err))
 			return fmt.Errorf("failed to change to /opt/eos directory: %w", err)
 		}

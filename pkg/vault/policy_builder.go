@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/hashicorp/hcl/v2/hclwrite"
-	"github.com/hashicorp/hcl/v2/hclsyntax"
-	"github.com/zclconf/go-cty/cty"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/hashicorp/hcl/v2/hclsyntax"
+	"github.com/hashicorp/hcl/v2/hclwrite"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"github.com/zclconf/go-cty/cty"
 	"go.uber.org/zap"
 )
 
@@ -23,15 +23,15 @@ type PolicyBuilder struct {
 
 // PolicyPath represents a single path block in a Vault policy
 type PolicyPath struct {
-	Pattern           string
-	Capabilities      []string
-	DeniedParameters  map[string][]string
-	AllowedParameters map[string][]string
+	Pattern            string
+	Capabilities       []string
+	DeniedParameters   map[string][]string
+	AllowedParameters  map[string][]string
 	RequiredParameters []string
-	MFAMethods        []string
-	MinWrappingTTL    string
-	MaxWrappingTTL    string
-	ControlGroup      *ControlGroup
+	MFAMethods         []string
+	MinWrappingTTL     string
+	MaxWrappingTTL     string
+	ControlGroup       *ControlGroup
 }
 
 // ControlGroup represents control group configuration
@@ -42,15 +42,15 @@ type ControlGroup struct {
 
 // ControlGroupFactor represents a factor in control group authorization
 type ControlGroupFactor struct {
-	Name        string
-	GroupNames  []string
-	Approvals   int
+	Name       string
+	GroupNames []string
+	Approvals  int
 }
 
 // NewPolicyBuilder creates a new Vault policy builder
 func NewPolicyBuilder() *PolicyBuilder {
 	file := hclwrite.NewEmptyFile()
-	
+
 	return &PolicyBuilder{
 		file:  file,
 		body:  file.Body(),
@@ -125,8 +125,8 @@ func (pb *PolicyBuilder) Build(rc *eos_io.RuntimeContext) (string, error) {
 
 	// Generate the HCL content
 	content := string(pb.file.Bytes())
-	
-	log.Info("✅ Policy built successfully", 
+
+	log.Info("✅ Policy built successfully",
 		zap.Int("paths", len(pb.paths)),
 		zap.Int("size", len(content)))
 
@@ -268,10 +268,10 @@ func (pb *PolicyBuilder) AddSharedSecretsReadOnly() *PolicyBuilder {
 func (pb *PolicyBuilder) AddSelfServiceUserpass() *PolicyBuilder {
 	pb.AddSection("Self-Service User Management")
 	deniedParams := map[string][]string{
-		"policies":      {},
+		"policies":       {},
 		"token_policies": {},
-		"token_ttl":     {},
-		"token_max_ttl": {},
+		"token_ttl":      {},
+		"token_max_ttl":  {},
 	}
 	pb.AddPathWithDeniedParams(
 		"auth/userpass/users/{{identity.entity.name}}",
@@ -304,7 +304,7 @@ func (pb *PolicyBuilder) AddSecurityDenials() *PolicyBuilder {
 		"sys/mounts/*",
 		"sys/policy/*",
 	}
-	
+
 	for _, path := range dangerousPaths {
 		pb.AddPath(path, "deny")
 	}

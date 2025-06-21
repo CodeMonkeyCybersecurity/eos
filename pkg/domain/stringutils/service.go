@@ -65,9 +65,9 @@ func NewService(
 // Trim trims whitespace or specified characters from a string
 func (s *Service) Trim(ctx context.Context, input string, options *TrimOptions) (string, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string trim operation", zap.Int("input_length", len(input)))
-	
+
 	if options == nil {
 		options = &TrimOptions{
 			TrimType: TrimBoth,
@@ -114,16 +114,16 @@ func (s *Service) Trim(ctx context.Context, input string, options *TrimOptions) 
 
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String trim completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // Split splits a string based on configuration
 func (s *Service) Split(ctx context.Context, input string, config *SplitConfig) ([]string, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string split operation", zap.Int("input_length", len(input)))
-	
+
 	if config == nil {
 		config = &SplitConfig{
 			Separator:   " ",
@@ -134,7 +134,7 @@ func (s *Service) Split(ctx context.Context, input string, config *SplitConfig) 
 	}
 
 	var parts []string
-	
+
 	switch config.SplitType {
 	case SplitString:
 		if config.MaxSplit > 0 {
@@ -172,36 +172,36 @@ func (s *Service) Split(ctx context.Context, input string, config *SplitConfig) 
 
 	s.recordOperation(ctx, OperationTransform, len(input), len(parts), true, nil, time.Since(start))
 	s.logger.Info("String split completed", zap.Duration("duration", time.Since(start)), zap.Int("parts", len(parts)))
-	
+
 	return parts, nil
 }
 
 // Join joins string parts with a separator
 func (s *Service) Join(ctx context.Context, parts []string, separator string) (string, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string join operation", zap.Int("parts_count", len(parts)))
-	
+
 	result := strings.Join(parts, separator)
-	
+
 	s.recordOperation(ctx, OperationTransform, len(parts), len(result), true, nil, time.Since(start))
 	s.logger.Info("String join completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // Replace replaces text in a string based on configuration
 func (s *Service) Replace(ctx context.Context, input string, config *ReplaceConfig) (string, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string replace operation", zap.Int("input_length", len(input)))
-	
+
 	if config == nil {
 		return input, fmt.Errorf("replace config is required")
 	}
 
 	var result string
-	
+
 	if config.UseRegex {
 		// Would need pattern matcher for regex replacement
 		return "", fmt.Errorf("regex replacement requires pattern matcher implementation")
@@ -209,13 +209,13 @@ func (s *Service) Replace(ctx context.Context, input string, config *ReplaceConf
 
 	searchText := config.SearchText
 	replaceText := config.ReplaceText
-	
+
 	if !config.CaseSensitive {
 		// For case-insensitive replacement, we'd need a more sophisticated approach
 		// This is a simplified version
 		lowerInput := strings.ToLower(input)
 		lowerSearch := strings.ToLower(searchText)
-		
+
 		if strings.Contains(lowerInput, lowerSearch) {
 			// Find actual positions in original string and replace
 			result = input // Placeholder - would need proper case-insensitive replacement
@@ -232,7 +232,7 @@ func (s *Service) Replace(ctx context.Context, input string, config *ReplaceConf
 
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String replace completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -241,81 +241,81 @@ func (s *Service) Replace(ctx context.Context, input string, config *ReplaceConf
 // ToUpper converts string to uppercase
 func (s *Service) ToUpper(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	result := strings.ToUpper(input)
-	
+
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to upper completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // ToLower converts string to lowercase
 func (s *Service) ToLower(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	result := strings.ToLower(input)
-	
+
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to lower completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // ToTitle converts string to title case
 func (s *Service) ToTitle(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	result := strings.ToTitle(input)
-	
+
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to title completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // ToCamelCase converts string to camelCase
 func (s *Service) ToCamelCase(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	// Split on common delimiters
 	words := strings.FieldsFunc(input, func(r rune) bool {
 		return r == ' ' || r == '-' || r == '_' || r == '.'
 	})
-	
+
 	if len(words) == 0 {
 		return "", nil
 	}
-	
+
 	result := strings.ToLower(words[0])
 	for i := 1; i < len(words); i++ {
 		if len(words[i]) > 0 {
 			result += strings.ToUpper(string(words[i][0])) + strings.ToLower(words[i][1:])
 		}
 	}
-	
+
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to camelCase completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // ToSnakeCase converts string to snake_case
 func (s *Service) ToSnakeCase(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	// Split on common delimiters and spaces
 	words := strings.FieldsFunc(input, func(r rune) bool {
 		return r == ' ' || r == '-' || r == '.'
 	})
-	
+
 	// Also handle camelCase by inserting underscores before uppercase letters
 	var allWords []string
 	for _, word := range words {
 		subWords := s.splitCamelCase(word)
 		allWords = append(allWords, subWords...)
 	}
-	
+
 	// Convert all to lowercase and join with underscores
 	var lowerWords []string
 	for _, word := range allWords {
@@ -323,30 +323,30 @@ func (s *Service) ToSnakeCase(ctx context.Context, input string) (string, error)
 			lowerWords = append(lowerWords, strings.ToLower(word))
 		}
 	}
-	
+
 	result := strings.Join(lowerWords, "_")
-	
+
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to snake_case completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // ToKebabCase converts string to kebab-case
 func (s *Service) ToKebabCase(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	// Similar to snake case but with hyphens
 	snakeCase, err := s.ToSnakeCase(ctx, input)
 	if err != nil {
 		return "", err
 	}
-	
+
 	result := strings.ReplaceAll(snakeCase, "_", "-")
-	
+
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String to kebab-case completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -355,9 +355,9 @@ func (s *Service) ToKebabCase(ctx context.Context, input string) (string, error)
 // ValidateString validates a string against rules
 func (s *Service) ValidateString(ctx context.Context, input string, rules *ValidationRules) (*ValidationResult, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string validation", zap.Int("input_length", len(input)))
-	
+
 	if s.validator == nil {
 		return nil, fmt.Errorf("validator not available")
 	}
@@ -374,7 +374,7 @@ func (s *Service) ValidateString(ctx context.Context, input string, rules *Valid
 			s.recordOperation(ctx, OperationValidate, len(input), 0, false, fmt.Errorf("validation failed"), time.Since(start))
 			return result, nil
 		}
-		
+
 		if rules.MaxLength > 0 && len(input) > rules.MaxLength {
 			result := &ValidationResult{
 				Valid:       false,
@@ -390,7 +390,7 @@ func (s *Service) ValidateString(ctx context.Context, input string, rules *Valid
 	// Use the validator for more complex validation
 	var result *ValidationResult
 	var err error
-	
+
 	if rules.Format != "" {
 		result, err = s.validator.ValidateFormat(ctx, input, rules.Format)
 	} else if rules.Pattern != "" {
@@ -416,7 +416,7 @@ func (s *Service) ValidateString(ctx context.Context, input string, rules *Valid
 
 	s.recordOperation(ctx, OperationValidate, len(input), 0, result.Valid, nil, time.Since(start))
 	s.logger.Info("String validation completed", zap.Duration("duration", time.Since(start)), zap.Bool("valid", result.Valid))
-	
+
 	return result, nil
 }
 
@@ -451,9 +451,9 @@ func (s *Service) ValidateDomain(ctx context.Context, domain string) (*Validatio
 // ValidateUsername validates a username
 func (s *Service) ValidateUsername(ctx context.Context, username string) (*ValidationResult, error) {
 	return s.ValidateString(ctx, username, &ValidationRules{
-		MinLength:     3,
-		MaxLength:     32,
-		AllowedChars:  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-",
+		MinLength:    3,
+		MaxLength:    32,
+		AllowedChars: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-",
 	})
 }
 
@@ -462,46 +462,46 @@ func (s *Service) ValidateUsername(ctx context.Context, username string) (*Valid
 // Sanitize sanitizes a string based on options
 func (s *Service) Sanitize(ctx context.Context, input string, options *SanitizeOptions) (string, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string sanitization", zap.Int("input_length", len(input)))
-	
+
 	if s.sanitizer == nil {
 		return input, fmt.Errorf("sanitizer not available")
 	}
 
 	result := input
-	
+
 	if options != nil {
 		var err error
-		
+
 		if options.RemoveControlChars {
 			result, err = s.sanitizer.RemoveControlChars(ctx, result)
 			if err != nil {
 				return "", err
 			}
 		}
-		
+
 		if options.RemoveNonPrintable {
 			result, err = s.sanitizer.RemoveNonPrintable(ctx, result)
 			if err != nil {
 				return "", err
 			}
 		}
-		
+
 		if options.RemoveHTML {
 			result, err = s.sanitizer.RemoveHTML(ctx, result)
 			if err != nil {
 				return "", err
 			}
 		}
-		
+
 		if options.RemoveSQL {
 			result, err = s.sanitizer.RemoveSQL(ctx, result)
 			if err != nil {
 				return "", err
 			}
 		}
-		
+
 		if options.NormalizeWhitespace {
 			result, err = s.sanitizer.NormalizeWhitespace(ctx, result)
 			if err != nil {
@@ -512,18 +512,18 @@ func (s *Service) Sanitize(ctx context.Context, input string, options *SanitizeO
 
 	s.recordOperation(ctx, OperationSanitize, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String sanitization completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // Redact redacts sensitive information from a string
 func (s *Service) Redact(ctx context.Context, input string, patterns []string) (string, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting string redaction", zap.Int("input_length", len(input)), zap.Int("patterns_count", len(patterns)))
-	
+
 	result := input
-	
+
 	// Simple redaction - replace with asterisks
 	for _, pattern := range patterns {
 		if strings.Contains(result, pattern) {
@@ -534,17 +534,17 @@ func (s *Service) Redact(ctx context.Context, input string, patterns []string) (
 
 	s.recordOperation(ctx, OperationSanitize, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("String redaction completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // RemoveShellMetacharacters removes shell metacharacters
 func (s *Service) RemoveShellMetacharacters(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	// Common shell metacharacters
 	metaChars := []string{";", "&", "|", "<", ">", "(", ")", "{", "}", "[", "]", "$", "`", "\\", "'", "\"", "*", "?"}
-	
+
 	result := input
 	for _, char := range metaChars {
 		result = strings.ReplaceAll(result, char, "")
@@ -552,20 +552,20 @@ func (s *Service) RemoveShellMetacharacters(ctx context.Context, input string) (
 
 	s.recordOperation(ctx, OperationSanitize, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("Shell metacharacters removed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // EscapeShell escapes shell metacharacters
 func (s *Service) EscapeShell(ctx context.Context, input string) (string, error) {
 	start := time.Now()
-	
+
 	// Simple shell escaping by wrapping in single quotes
 	result := "'" + strings.ReplaceAll(input, "'", "'\"'\"'") + "'"
 
 	s.recordOperation(ctx, OperationTransform, len(input), len(result), true, nil, time.Since(start))
 	s.logger.Info("Shell escaping completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -585,7 +585,7 @@ func (s *Service) normalizeWhitespace(input string) string {
 func (s *Service) splitCamelCase(input string) []string {
 	var words []string
 	var current strings.Builder
-	
+
 	for i, r := range input {
 		if i > 0 && r >= 'A' && r <= 'Z' {
 			if current.Len() > 0 {
@@ -595,11 +595,11 @@ func (s *Service) splitCamelCase(input string) []string {
 		}
 		current.WriteRune(r)
 	}
-	
+
 	if current.Len() > 0 {
 		words = append(words, current.String())
 	}
-	
+
 	return words
 }
 
@@ -648,7 +648,7 @@ func (s *Service) SplitPath(ctx context.Context, pathList string) ([]string, err
 	// Use the appropriate path separator for the platform
 	separator := ":"
 	// On Windows: separator = ";"
-	
+
 	return strings.Split(pathList, separator), nil
 }
 
@@ -689,13 +689,13 @@ func (s *Service) Unquote(ctx context.Context, input string) (string, error) {
 	if len(input) < 2 {
 		return input, nil
 	}
-	
+
 	if (strings.HasPrefix(input, `"`) && strings.HasSuffix(input, `"`)) ||
 		(strings.HasPrefix(input, "'") && strings.HasSuffix(input, "'")) ||
 		(strings.HasPrefix(input, "`") && strings.HasSuffix(input, "`")) {
 		return input[1 : len(input)-1], nil
 	}
-	
+
 	return input, nil
 }
 
@@ -704,7 +704,7 @@ func (s *Service) PadLeft(ctx context.Context, input string, length int, padChar
 	if len(input) >= length {
 		return input, nil
 	}
-	
+
 	padding := strings.Repeat(string(padChar), length-len(input))
 	return padding + input, nil
 }
@@ -714,7 +714,7 @@ func (s *Service) PadRight(ctx context.Context, input string, length int, padCha
 	if len(input) >= length {
 		return input, nil
 	}
-	
+
 	padding := strings.Repeat(string(padChar), length-len(input))
 	return input + padding, nil
 }
@@ -724,17 +724,17 @@ func (s *Service) Truncate(ctx context.Context, input string, maxLength int, ell
 	if len(input) <= maxLength {
 		return input, nil
 	}
-	
+
 	if len(ellipsis) >= maxLength {
 		return ellipsis[:maxLength], nil
 	}
-	
+
 	return input[:maxLength-len(ellipsis)] + ellipsis, nil
 }
 
 // The remaining methods would delegate to their respective specialized interfaces:
 // - Pattern matching operations -> PatternMatcher
-// - Encoding operations -> StringEncoder  
+// - Encoding operations -> StringEncoder
 // - Conversion operations -> StringEncoder
 // - Analysis operations -> StringAnalyzer
 // - Generation operations -> StringGenerator

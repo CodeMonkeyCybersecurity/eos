@@ -21,7 +21,7 @@ var (
 	lowerChars  = "abcdefghijklmnopqrstuvwxyz"
 	upperChars  = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	digitChars  = "0123456789"
-	symbolChars = "!@#%^&*()-_=+[]{}|;:,.<>?/"  // Removed $ to prevent shell injection
+	symbolChars = "!@#%^&*()-_=+[]{}|;:,.<>?/" // Removed $ to prevent shell injection
 	allChars    = lowerChars + upperChars + digitChars + symbolChars
 )
 

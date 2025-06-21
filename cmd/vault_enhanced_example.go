@@ -17,6 +17,7 @@ import (
 
 // _vaultEnhancedCmd demonstrates the enhanced vault container usage
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//
 //nolint:unused
 var _vaultEnhancedCmd = &cobra.Command{
 	Use:   "vault-enhanced",
@@ -33,6 +34,7 @@ var _vaultEnhancedCmd = &cobra.Command{
 
 // _vaultEnhancedExample shows enhanced vault container usage patterns
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//
 //nolint:unused
 func _vaultEnhancedExample(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := rc.Log.Named("vault.enhanced.example")
@@ -107,6 +109,7 @@ func _vaultEnhancedExample(rc *eos_io.RuntimeContext, cmd *cobra.Command, args [
 
 // _demonstrateSecretOperations shows secret store operations with proper error handling
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//
 //nolint:unused
 func _demonstrateSecretOperations(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
 	logger.Info("🔐 Demonstrating secret operations")
@@ -171,6 +174,7 @@ func _demonstrateSecretOperations(rc *eos_io.RuntimeContext, secretStore vault.S
 
 // _demonstrateServiceOperations shows domain service level operations
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//
 //nolint:unused
 func _demonstrateServiceOperations(_ *eos_io.RuntimeContext, vaultService *vault.Service, logger *zap.Logger) error {
 	logger.Info("🏗️ Demonstrating service-level operations")
@@ -192,6 +196,7 @@ func _demonstrateServiceOperations(_ *eos_io.RuntimeContext, vaultService *vault
 
 // _demonstrateErrorHandling shows proper error handling patterns
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
+//
 //nolint:unused
 func _demonstrateErrorHandling(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
 	logger.Info("🚨 Demonstrating error handling and fallback behavior")

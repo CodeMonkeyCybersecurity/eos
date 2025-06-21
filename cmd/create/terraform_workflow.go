@@ -24,11 +24,11 @@ var terraformPlanCmd = &cobra.Command{
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		return tfManager.Plan(rc)
 	}),
@@ -43,13 +43,13 @@ var terraformApplyCmd = &cobra.Command{
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		autoApprove, _ := cmd.Flags().GetBool("auto-approve")
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		return tfManager.Apply(rc, autoApprove)
 	}),
@@ -64,13 +64,13 @@ var terraformDestroyCmd = &cobra.Command{
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		autoApprove, _ := cmd.Flags().GetBool("auto-approve")
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		return tfManager.Destroy(rc, autoApprove)
 	}),
@@ -85,11 +85,11 @@ var terraformInitCmd = &cobra.Command{
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		return tfManager.Init(rc)
 	}),
@@ -102,24 +102,24 @@ var terraformOutputCmd = &cobra.Command{
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		workingDir := "."
 		outputName := ""
-		
+
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
 		if len(args) > 1 {
 			outputName = args[1]
 		}
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		output, err := tfManager.Output(rc, outputName)
 		if err != nil {
 			return err
 		}
-		
+
 		fmt.Println(output)
 		return nil
 	}),
@@ -139,11 +139,11 @@ var terraformValidateCmd = &cobra.Command{
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		return tfManager.Validate(rc)
 	}),
@@ -158,11 +158,11 @@ var terraformFormatCmd = &cobra.Command{
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
 		return tfManager.Format(rc)
 	}),
@@ -174,51 +174,51 @@ var terraformFullWorkflowCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		workingDir := "."
 		if len(args) > 0 {
 			workingDir = args[0]
 		}
-		
+
 		autoApprove, _ := cmd.Flags().GetBool("auto-approve")
-		
+
 		if err := terraform.CheckTerraformInstalled(); err != nil {
 			return fmt.Errorf("terraform is required: %w", err)
 		}
-		
+
 		// Check if directory exists
 		if _, err := os.Stat(workingDir); os.IsNotExist(err) {
 			return fmt.Errorf("directory %s does not exist", workingDir)
 		}
-		
+
 		// Check if it looks like a terraform directory
 		mainTf := filepath.Join(workingDir, "main.tf")
 		if _, err := os.Stat(mainTf); os.IsNotExist(err) {
 			return fmt.Errorf("no main.tf found in %s", workingDir)
 		}
-		
+
 		tfManager := terraform.NewManager(rc, workingDir)
-		
+
 		logger.Info("Starting Terraform deployment workflow", zap.String("directory", workingDir))
-		
+
 		// Step 1: Initialize
 		logger.Info("Step 1: Initializing Terraform")
 		if err := tfManager.Init(rc); err != nil {
 			return fmt.Errorf("terraform init failed: %w", err)
 		}
-		
+
 		// Step 2: Validate
 		logger.Info("Step 2: Validating configuration")
 		if err := tfManager.Validate(rc); err != nil {
 			return fmt.Errorf("terraform validation failed: %w", err)
 		}
-		
+
 		// Step 3: Plan
 		logger.Info("Step 3: Planning deployment")
 		if err := tfManager.Plan(rc); err != nil {
 			return fmt.Errorf("terraform plan failed: %w", err)
 		}
-		
+
 		// Step 4: Apply (if auto-approve or user confirms)
 		if !autoApprove {
 			fmt.Print("\nDo you want to apply these changes? [y/N]: ")
@@ -232,15 +232,15 @@ var terraformFullWorkflowCmd = &cobra.Command{
 				return nil
 			}
 		}
-		
+
 		logger.Info("Step 4: Applying configuration")
 		if err := tfManager.Apply(rc, true); err != nil {
 			return fmt.Errorf("terraform apply failed: %w", err)
 		}
-		
+
 		logger.Info("Terraform deployment completed successfully")
 		fmt.Println("\n✅ Deployment completed successfully!")
-		
+
 		return nil
 	}),
 }
@@ -255,7 +255,7 @@ func init() {
 	CreateCmd.AddCommand(terraformValidateCmd)
 	CreateCmd.AddCommand(terraformFormatCmd)
 	CreateCmd.AddCommand(terraformFullWorkflowCmd)
-	
+
 	// Add flags
 	terraformApplyCmd.Flags().Bool("auto-approve", false, "Auto approve the apply")
 	terraformDestroyCmd.Flags().Bool("auto-approve", false, "Auto approve the destroy")

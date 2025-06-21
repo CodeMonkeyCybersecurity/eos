@@ -6,28 +6,28 @@ import (
 
 // Infrastructure represents the complete infrastructure audit
 type Infrastructure struct {
-	Timestamp time.Time        `yaml:"timestamp" json:"timestamp"`
-	Hostname  string           `yaml:"hostname" json:"hostname"`
-	System    *SystemInfo      `yaml:"system" json:"system"`
-	Docker    *DockerInfo      `yaml:"docker,omitempty" json:"docker,omitempty"`
-	KVM       *KVMInfo         `yaml:"kvm,omitempty" json:"kvm,omitempty"`
-	Hetzner   *HetznerInfo     `yaml:"hetzner,omitempty" json:"hetzner,omitempty"`
-	Services  *ServicesInfo    `yaml:"services,omitempty" json:"services,omitempty"`
+	Timestamp time.Time     `yaml:"timestamp" json:"timestamp"`
+	Hostname  string        `yaml:"hostname" json:"hostname"`
+	System    *SystemInfo   `yaml:"system" json:"system"`
+	Docker    *DockerInfo   `yaml:"docker,omitempty" json:"docker,omitempty"`
+	KVM       *KVMInfo      `yaml:"kvm,omitempty" json:"kvm,omitempty"`
+	Hetzner   *HetznerInfo  `yaml:"hetzner,omitempty" json:"hetzner,omitempty"`
+	Services  *ServicesInfo `yaml:"services,omitempty" json:"services,omitempty"`
 }
 
 // SystemInfo contains basic system information
 type SystemInfo struct {
-	Hostname     string            `yaml:"hostname" json:"hostname"`
-	OS           string            `yaml:"os" json:"os"`
-	OSVersion    string            `yaml:"os_version" json:"os_version"`
-	Kernel       string            `yaml:"kernel" json:"kernel"`
-	Architecture string            `yaml:"architecture" json:"architecture"`
-	Uptime       string            `yaml:"uptime" json:"uptime"`
-	CPU          CPUInfo           `yaml:"cpu" json:"cpu"`
-	Memory       MemoryInfo        `yaml:"memory" json:"memory"`
-	Disks        []DiskInfo        `yaml:"disks" json:"disks"`
-	Networks     []NetworkInfo     `yaml:"networks" json:"networks"`
-	Routes       []RouteInfo       `yaml:"routes" json:"routes"`
+	Hostname     string        `yaml:"hostname" json:"hostname"`
+	OS           string        `yaml:"os" json:"os"`
+	OSVersion    string        `yaml:"os_version" json:"os_version"`
+	Kernel       string        `yaml:"kernel" json:"kernel"`
+	Architecture string        `yaml:"architecture" json:"architecture"`
+	Uptime       string        `yaml:"uptime" json:"uptime"`
+	CPU          CPUInfo       `yaml:"cpu" json:"cpu"`
+	Memory       MemoryInfo    `yaml:"memory" json:"memory"`
+	Disks        []DiskInfo    `yaml:"disks" json:"disks"`
+	Networks     []NetworkInfo `yaml:"networks" json:"networks"`
+	Routes       []RouteInfo   `yaml:"routes" json:"routes"`
 }
 
 // CPUInfo contains CPU information
@@ -78,12 +78,12 @@ type RouteInfo struct {
 
 // DockerInfo contains Docker infrastructure information
 type DockerInfo struct {
-	Version       string              `yaml:"version" json:"version"`
-	Containers    []DockerContainer   `yaml:"containers" json:"containers"`
-	Images        []DockerImage       `yaml:"images" json:"images"`
-	Networks      []DockerNetwork     `yaml:"networks" json:"networks"`
-	Volumes       []DockerVolume      `yaml:"volumes" json:"volumes"`
-	ComposeFiles  []ComposeFile       `yaml:"compose_files,omitempty" json:"compose_files,omitempty"`
+	Version      string            `yaml:"version" json:"version"`
+	Containers   []DockerContainer `yaml:"containers" json:"containers"`
+	Images       []DockerImage     `yaml:"images" json:"images"`
+	Networks     []DockerNetwork   `yaml:"networks" json:"networks"`
+	Volumes      []DockerVolume    `yaml:"volumes" json:"volumes"`
+	ComposeFiles []ComposeFile     `yaml:"compose_files,omitempty" json:"compose_files,omitempty"`
 }
 
 // DockerContainer represents a Docker container
@@ -136,39 +136,39 @@ type ComposeFile struct {
 
 // KVMInfo contains KVM/Libvirt infrastructure information
 type KVMInfo struct {
-	LibvirtVersion string         `yaml:"libvirt_version" json:"libvirt_version"`
-	VMs            []KVMDomain    `yaml:"vms" json:"vms"`
-	Networks       []KVMNetwork   `yaml:"networks" json:"networks"`
-	StoragePools   []KVMPool      `yaml:"storage_pools" json:"storage_pools"`
+	LibvirtVersion string       `yaml:"libvirt_version" json:"libvirt_version"`
+	VMs            []KVMDomain  `yaml:"vms" json:"vms"`
+	Networks       []KVMNetwork `yaml:"networks" json:"networks"`
+	StoragePools   []KVMPool    `yaml:"storage_pools" json:"storage_pools"`
 }
 
 // KVMDomain represents a KVM virtual machine
 type KVMDomain struct {
-	Name       string        `yaml:"name" json:"name"`
-	UUID       string        `yaml:"uuid" json:"uuid"`
-	State      string        `yaml:"state" json:"state"`
-	CPUs       int           `yaml:"cpus" json:"cpus"`
-	Memory     string        `yaml:"memory" json:"memory"`
-	OSType     string        `yaml:"os_type" json:"os_type"`
-	Disks      []KVMDisk     `yaml:"disks" json:"disks"`
+	Name       string         `yaml:"name" json:"name"`
+	UUID       string         `yaml:"uuid" json:"uuid"`
+	State      string         `yaml:"state" json:"state"`
+	CPUs       int            `yaml:"cpus" json:"cpus"`
+	Memory     string         `yaml:"memory" json:"memory"`
+	OSType     string         `yaml:"os_type" json:"os_type"`
+	Disks      []KVMDisk      `yaml:"disks" json:"disks"`
 	Interfaces []KVMInterface `yaml:"interfaces" json:"interfaces"`
 }
 
 // KVMDisk represents a VM disk
 type KVMDisk struct {
-	Device   string `yaml:"device" json:"device"`
-	Path     string `yaml:"path" json:"path"`
-	Format   string `yaml:"format" json:"format"`
-	Size     string `yaml:"size" json:"size"`
-	Bus      string `yaml:"bus" json:"bus"`
+	Device string `yaml:"device" json:"device"`
+	Path   string `yaml:"path" json:"path"`
+	Format string `yaml:"format" json:"format"`
+	Size   string `yaml:"size" json:"size"`
+	Bus    string `yaml:"bus" json:"bus"`
 }
 
 // KVMInterface represents a VM network interface
 type KVMInterface struct {
-	Type    string `yaml:"type" json:"type"`
-	MAC     string `yaml:"mac" json:"mac"`
-	Source  string `yaml:"source" json:"source"`
-	Model   string `yaml:"model" json:"model"`
+	Type   string `yaml:"type" json:"type"`
+	MAC    string `yaml:"mac" json:"mac"`
+	Source string `yaml:"source" json:"source"`
+	Model  string `yaml:"model" json:"model"`
 }
 
 // KVMNetwork represents a libvirt network
@@ -203,17 +203,17 @@ type HetznerInfo struct {
 
 // HetznerServer represents a Hetzner cloud server
 type HetznerServer struct {
-	ID           int               `yaml:"id" json:"id"`
-	Name         string            `yaml:"name" json:"name"`
-	Status       string            `yaml:"status" json:"status"`
-	ServerType   string            `yaml:"server_type" json:"server_type"`
-	Image        string            `yaml:"image" json:"image"`
-	Datacenter   string            `yaml:"datacenter" json:"datacenter"`
-	Location     string            `yaml:"location" json:"location"`
-	PublicIP     string            `yaml:"public_ip" json:"public_ip"`
-	PrivateIPs   []string          `yaml:"private_ips,omitempty" json:"private_ips,omitempty"`
-	Labels       map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Created      time.Time         `yaml:"created" json:"created"`
+	ID         int               `yaml:"id" json:"id"`
+	Name       string            `yaml:"name" json:"name"`
+	Status     string            `yaml:"status" json:"status"`
+	ServerType string            `yaml:"server_type" json:"server_type"`
+	Image      string            `yaml:"image" json:"image"`
+	Datacenter string            `yaml:"datacenter" json:"datacenter"`
+	Location   string            `yaml:"location" json:"location"`
+	PublicIP   string            `yaml:"public_ip" json:"public_ip"`
+	PrivateIPs []string          `yaml:"private_ips,omitempty" json:"private_ips,omitempty"`
+	Labels     map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
+	Created    time.Time         `yaml:"created" json:"created"`
 }
 
 // HetznerNetwork represents a Hetzner network
@@ -234,29 +234,29 @@ type HetznerSubnet struct {
 
 // HetznerFirewall represents a Hetzner firewall
 type HetznerFirewall struct {
-	ID     int                    `yaml:"id" json:"id"`
-	Name   string                 `yaml:"name" json:"name"`
-	Rules  []HetznerFirewallRule  `yaml:"rules" json:"rules"`
-	Labels map[string]string      `yaml:"labels,omitempty" json:"labels,omitempty"`
+	ID     int                   `yaml:"id" json:"id"`
+	Name   string                `yaml:"name" json:"name"`
+	Rules  []HetznerFirewallRule `yaml:"rules" json:"rules"`
+	Labels map[string]string     `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 // HetznerFirewallRule represents a firewall rule
 type HetznerFirewallRule struct {
-	Direction   string   `yaml:"direction" json:"direction"`
-	Protocol    string   `yaml:"protocol" json:"protocol"`
-	Port        string   `yaml:"port,omitempty" json:"port,omitempty"`
-	SourceIPs   []string `yaml:"source_ips,omitempty" json:"source_ips,omitempty"`
+	Direction      string   `yaml:"direction" json:"direction"`
+	Protocol       string   `yaml:"protocol" json:"protocol"`
+	Port           string   `yaml:"port,omitempty" json:"port,omitempty"`
+	SourceIPs      []string `yaml:"source_ips,omitempty" json:"source_ips,omitempty"`
 	DestinationIPs []string `yaml:"destination_ips,omitempty" json:"destination_ips,omitempty"`
 }
 
 // HetznerLoadBalancer represents a load balancer
 type HetznerLoadBalancer struct {
-	ID           int               `yaml:"id" json:"id"`
-	Name         string            `yaml:"name" json:"name"`
-	PublicIP     string            `yaml:"public_ip" json:"public_ip"`
-	Location     string            `yaml:"location" json:"location"`
-	Type         string            `yaml:"type" json:"type"`
-	Labels       map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
+	ID       int               `yaml:"id" json:"id"`
+	Name     string            `yaml:"name" json:"name"`
+	PublicIP string            `yaml:"public_ip" json:"public_ip"`
+	Location string            `yaml:"location" json:"location"`
+	Type     string            `yaml:"type" json:"type"`
+	Labels   map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 // HetznerVolume represents a Hetzner volume
@@ -271,26 +271,26 @@ type HetznerVolume struct {
 
 // HetznerFloatingIP represents a floating IP
 type HetznerFloatingIP struct {
-	ID          int               `yaml:"id" json:"id"`
-	Name        string            `yaml:"name" json:"name"`
-	IP          string            `yaml:"ip" json:"ip"`
-	Type        string            `yaml:"type" json:"type"`
-	Server      *int              `yaml:"server,omitempty" json:"server,omitempty"`
-	Location    string            `yaml:"location" json:"location"`
-	Labels      map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
+	ID       int               `yaml:"id" json:"id"`
+	Name     string            `yaml:"name" json:"name"`
+	IP       string            `yaml:"ip" json:"ip"`
+	Type     string            `yaml:"type" json:"type"`
+	Server   *int              `yaml:"server,omitempty" json:"server,omitempty"`
+	Location string            `yaml:"location" json:"location"`
+	Labels   map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 // ServicesInfo contains service configuration information
 type ServicesInfo struct {
-	SystemdServices []SystemdService       `yaml:"systemd_services" json:"systemd_services"`
-	Nginx           *NginxInfo            `yaml:"nginx,omitempty" json:"nginx,omitempty"`
-	Apache          *ApacheInfo           `yaml:"apache,omitempty" json:"apache,omitempty"`
-	Caddy           *CaddyInfo            `yaml:"caddy,omitempty" json:"caddy,omitempty"`
-	PostgreSQL      *PostgreSQLInfo       `yaml:"postgresql,omitempty" json:"postgresql,omitempty"`
-	MySQL           *MySQLInfo            `yaml:"mysql,omitempty" json:"mysql,omitempty"`
-	Redis           *RedisInfo            `yaml:"redis,omitempty" json:"redis,omitempty"`
-	HashiCorp       *HashiCorpInfo        `yaml:"hashicorp,omitempty" json:"hashicorp,omitempty"`
-	Tailscale       *TailscaleInfo        `yaml:"tailscale,omitempty" json:"tailscale,omitempty"`
+	SystemdServices []SystemdService `yaml:"systemd_services" json:"systemd_services"`
+	Nginx           *NginxInfo       `yaml:"nginx,omitempty" json:"nginx,omitempty"`
+	Apache          *ApacheInfo      `yaml:"apache,omitempty" json:"apache,omitempty"`
+	Caddy           *CaddyInfo       `yaml:"caddy,omitempty" json:"caddy,omitempty"`
+	PostgreSQL      *PostgreSQLInfo  `yaml:"postgresql,omitempty" json:"postgresql,omitempty"`
+	MySQL           *MySQLInfo       `yaml:"mysql,omitempty" json:"mysql,omitempty"`
+	Redis           *RedisInfo       `yaml:"redis,omitempty" json:"redis,omitempty"`
+	HashiCorp       *HashiCorpInfo   `yaml:"hashicorp,omitempty" json:"hashicorp,omitempty"`
+	Tailscale       *TailscaleInfo   `yaml:"tailscale,omitempty" json:"tailscale,omitempty"`
 }
 
 // SystemdService represents a systemd service
@@ -305,10 +305,10 @@ type SystemdService struct {
 
 // NginxInfo contains Nginx configuration
 type NginxInfo struct {
-	Version      string   `yaml:"version" json:"version"`
-	ConfigPath   string   `yaml:"config_path" json:"config_path"`
-	Sites        []string `yaml:"sites" json:"sites"`
-	Upstreams    []string `yaml:"upstreams,omitempty" json:"upstreams,omitempty"`
+	Version    string   `yaml:"version" json:"version"`
+	ConfigPath string   `yaml:"config_path" json:"config_path"`
+	Sites      []string `yaml:"sites" json:"sites"`
+	Upstreams  []string `yaml:"upstreams,omitempty" json:"upstreams,omitempty"`
 }
 
 // ApacheInfo contains Apache configuration
@@ -321,9 +321,9 @@ type ApacheInfo struct {
 
 // CaddyInfo contains Caddy configuration
 type CaddyInfo struct {
-	Version      string   `yaml:"version" json:"version"`
-	ConfigPath   string   `yaml:"config_path" json:"config_path"`
-	Sites        []string `yaml:"sites" json:"sites"`
+	Version    string   `yaml:"version" json:"version"`
+	ConfigPath string   `yaml:"config_path" json:"config_path"`
+	Sites      []string `yaml:"sites" json:"sites"`
 }
 
 // PostgreSQLInfo contains PostgreSQL information
@@ -366,12 +366,12 @@ type HashiCorpTool struct {
 
 // TailscaleInfo contains Tailscale information
 type TailscaleInfo struct {
-	Version  string            `yaml:"version" json:"version"`
-	Status   string            `yaml:"status" json:"status"`
-	Tailnet  string            `yaml:"tailnet,omitempty" json:"tailnet,omitempty"`
-	IP       string            `yaml:"ip,omitempty" json:"ip,omitempty"`
-	Hostname string            `yaml:"hostname,omitempty" json:"hostname,omitempty"`
-	Peers    []TailscalePeer   `yaml:"peers,omitempty" json:"peers,omitempty"`
+	Version  string          `yaml:"version" json:"version"`
+	Status   string          `yaml:"status" json:"status"`
+	Tailnet  string          `yaml:"tailnet,omitempty" json:"tailnet,omitempty"`
+	IP       string          `yaml:"ip,omitempty" json:"ip,omitempty"`
+	Hostname string          `yaml:"hostname,omitempty" json:"hostname,omitempty"`
+	Peers    []TailscalePeer `yaml:"peers,omitempty" json:"peers,omitempty"`
 }
 
 // TailscalePeer represents a Tailscale peer

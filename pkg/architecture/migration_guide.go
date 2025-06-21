@@ -21,27 +21,27 @@ func OldVaultOperations(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Mixed business logic with infrastructure concerns
 	if os.Getenv("VAULT_TOKEN") == "" {
 		fmt.Println("No vault token found") // ❌ Direct output
 		return errors.New("authentication required")
 	}
-	
+
 	// Direct file system access
 	data, err := ioutil.ReadFile("/etc/vault/secrets")
 	if err != nil {
 		fmt.Printf("Error reading secrets: %v\n", err) // ❌ Mixed concerns
 		return err
 	}
-	
+
 	// Direct command execution
 	cmd := exec.Command("vault", "auth", "-method=userpass")
 	output, err := cmd.Output()
 	if err != nil {
 		return err
 	}
-	
+
 	fmt.Printf("Vault output: %s\n", output) // ❌ Presentation in business logic
 	return nil
 }
@@ -57,7 +57,7 @@ func NewVaultOperations(container *DIContainer) *VaultOperations {
 	return &VaultOperations{
 		secretService: secretService,
 		commandExec:   commandExec,
-		logger:       zap.L(),
+		logger:        zap.L(),
 	}
 }
 
@@ -75,12 +75,12 @@ func (v *VaultOperations) AuthenticateUser(ctx context.Context, userID string) e
 		v.logger.Error("Authentication failed", zap.String("user", userID), zap.Error(err))
 		return fmt.Errorf("vault authentication failed: %w", err)
 	}
-	
+
 	if secret == nil || secret.Value == "" {
 		v.logger.Warn("No vault token found", zap.String("user", userID))
 		return fmt.Errorf("authentication required for user %s", userID)
 	}
-	
+
 	v.logger.Info("User authenticated successfully", zap.String("user", userID))
 	return nil
 }
@@ -91,7 +91,7 @@ func (v *VaultOperations) ExecuteVaultCommand(ctx context.Context, args []string
 		Name: "vault",
 		Args: args,
 	}
-	
+
 	return v.commandExec.Execute(ctx, cmd)
 }
 
@@ -103,7 +103,7 @@ func (v *VaultOperations) ExecuteVaultCommand(ctx context.Context, args []string
 // Example: Current vault package has many responsibilities
 // We can extract these interfaces:
 // - SecretStore (for secret operations)
-// - AuthenticationProvider (for auth operations) 
+// - AuthenticationProvider (for auth operations)
 // - ConfigurationManager (for vault config)
 
 // Step 2: Create domain services that use these interfaces
@@ -140,22 +140,22 @@ func MigrateVaultPackage() {
 	// Step 1: Identify current responsibilities
 	responsibilities := []string{
 		"Secret storage and retrieval",
-		"User authentication", 
+		"User authentication",
 		"Configuration management",
 		"Audit logging",
 		"Command execution",
 		"File system operations",
 	}
-	
+
 	// Step 2: Create domain interfaces for each responsibility
 	// (Already done in interfaces.go)
-	
+
 	// Step 3: Create domain service that coordinates these interfaces
 	// (Already done in services.go)
-	
+
 	// Step 4: Implement interfaces using existing vault code
 	// This would wrap the existing vault client
-	
+
 	fmt.Printf("Vault package migration plan:\n")
 	for i, resp := range responsibilities {
 		fmt.Printf("%d. Extract %s into domain interface\n", i+1, resp)
@@ -181,13 +181,13 @@ func TestNewVaultOperations(t *testing.T) {
 	mockSecretService := &MockSecretService{}
 	mockCommandExec := &MockCommandExecutor{}
 	logger := zap.NewNop()
-	
+
 	vaultOps := &VaultOperations{
 		secretService: mockSecretService,
 		commandExec:   mockCommandExec,
 		logger:        logger,
 	}
-	
+
 	// Test business logic in isolation
 	err := vaultOps.AuthenticateUser(context.Background(), "test-user")
 	assert.NoError(t, err)
@@ -243,7 +243,7 @@ func (c *CompatibilityWrapper) GetVaultSecret(key string) (string, error) {
 // GRADUAL MIGRATION CHECKLIST
 
 // ✅ Define domain interfaces
-// ✅ Create domain services  
+// ✅ Create domain services
 // ✅ Implement dependency injection container
 // ✅ Create example implementations
 // ⏳ Migrate one package (pkg/vault recommended)

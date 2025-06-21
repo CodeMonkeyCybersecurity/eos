@@ -12,18 +12,18 @@ import (
 
 // Service implements the ParseService interface and coordinates parsing operations
 type Service struct {
-	jsonParser       JSONParser
-	yamlParser       YAMLParser
-	xmlParser        XMLParser
-	csvParser        CSVParser
-	tomlParser       TOMLParser
-	iniParser        INIParser
-	formatDetector   FormatDetector
-	dataValidator    DataValidator
-	dataConverter    DataConverter
-	repository       ParseRepository
-	auditRepository  ParseAuditRepository
-	logger           *zap.Logger
+	jsonParser      JSONParser
+	yamlParser      YAMLParser
+	xmlParser       XMLParser
+	csvParser       CSVParser
+	tomlParser      TOMLParser
+	iniParser       INIParser
+	formatDetector  FormatDetector
+	dataValidator   DataValidator
+	dataConverter   DataConverter
+	repository      ParseRepository
+	auditRepository ParseAuditRepository
+	logger          *zap.Logger
 }
 
 // NewService creates a new parse domain service
@@ -62,9 +62,9 @@ func NewService(
 // ParseJSON parses JSON string into structured data
 func (s *Service) ParseJSON(ctx context.Context, input string) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting JSON parsing", zap.Int("input_size", len(input)))
-	
+
 	parsedValue, err := s.jsonParser.Parse(ctx, input)
 	if err != nil {
 		s.recordOperation(ctx, OperationParse, FormatJSON, int64(len(input)), false, err, time.Since(start))
@@ -93,7 +93,7 @@ func (s *Service) ParseJSON(ctx context.Context, input string) (*ParsedData, err
 
 	s.recordOperation(ctx, OperationParse, FormatJSON, int64(len(input)), true, nil, time.Since(start))
 	s.logger.Info("JSON parsing completed successfully", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -104,14 +104,14 @@ func (s *Service) ParseJSONFromReader(ctx context.Context, reader io.Reader) (*P
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from reader: %w", err)
 	}
-	
+
 	return s.ParseJSON(ctx, string(data))
 }
 
 // FormatJSON formats data as JSON string
 func (s *Service) FormatJSON(ctx context.Context, data interface{}, pretty bool) (string, error) {
 	start := time.Now()
-	
+
 	result, err := s.jsonParser.Format(ctx, data, pretty)
 	if err != nil {
 		return "", fmt.Errorf("failed to format JSON: %w", err)
@@ -126,9 +126,9 @@ func (s *Service) FormatJSON(ctx context.Context, data interface{}, pretty bool)
 // ParseYAML parses YAML string into structured data
 func (s *Service) ParseYAML(ctx context.Context, input string) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting YAML parsing", zap.Int("input_size", len(input)))
-	
+
 	parsedValue, err := s.yamlParser.Parse(ctx, input)
 	if err != nil {
 		s.recordOperation(ctx, OperationParse, FormatYAML, int64(len(input)), false, err, time.Since(start))
@@ -157,7 +157,7 @@ func (s *Service) ParseYAML(ctx context.Context, input string) (*ParsedData, err
 
 	s.recordOperation(ctx, OperationParse, FormatYAML, int64(len(input)), true, nil, time.Since(start))
 	s.logger.Info("YAML parsing completed successfully", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -167,14 +167,14 @@ func (s *Service) ParseYAMLFromReader(ctx context.Context, reader io.Reader) (*P
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from reader: %w", err)
 	}
-	
+
 	return s.ParseYAML(ctx, string(data))
 }
 
 // FormatYAML formats data as YAML string
 func (s *Service) FormatYAML(ctx context.Context, data interface{}) (string, error) {
 	start := time.Now()
-	
+
 	result, err := s.yamlParser.Format(ctx, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to format YAML: %w", err)
@@ -189,9 +189,9 @@ func (s *Service) FormatYAML(ctx context.Context, data interface{}) (string, err
 // ParseXML parses XML string into structured data
 func (s *Service) ParseXML(ctx context.Context, input string) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting XML parsing", zap.Int("input_size", len(input)))
-	
+
 	parsedValue, err := s.xmlParser.Parse(ctx, input)
 	if err != nil {
 		s.recordOperation(ctx, OperationParse, FormatXML, int64(len(input)), false, err, time.Since(start))
@@ -220,7 +220,7 @@ func (s *Service) ParseXML(ctx context.Context, input string) (*ParsedData, erro
 
 	s.recordOperation(ctx, OperationParse, FormatXML, int64(len(input)), true, nil, time.Since(start))
 	s.logger.Info("XML parsing completed successfully", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -230,14 +230,14 @@ func (s *Service) ParseXMLFromReader(ctx context.Context, reader io.Reader) (*Pa
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from reader: %w", err)
 	}
-	
+
 	return s.ParseXML(ctx, string(data))
 }
 
 // FormatXML formats data as XML string
 func (s *Service) FormatXML(ctx context.Context, data interface{}, pretty bool) (string, error) {
 	start := time.Now()
-	
+
 	result, err := s.xmlParser.Format(ctx, data, pretty)
 	if err != nil {
 		return "", fmt.Errorf("failed to format XML: %w", err)
@@ -252,9 +252,9 @@ func (s *Service) FormatXML(ctx context.Context, data interface{}, pretty bool) 
 // ParseCSV parses CSV string into structured data
 func (s *Service) ParseCSV(ctx context.Context, input string, config *CSVConfig) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting CSV parsing", zap.Int("input_size", len(input)))
-	
+
 	if config == nil {
 		config = &CSVConfig{
 			Delimiter: ',',
@@ -293,7 +293,7 @@ func (s *Service) ParseCSV(ctx context.Context, input string, config *CSVConfig)
 
 	s.recordOperation(ctx, OperationParse, FormatCSV, int64(len(input)), true, nil, time.Since(start))
 	s.logger.Info("CSV parsing completed successfully", zap.Duration("duration", time.Since(start)), zap.Int("records", len(parsedValue)))
-	
+
 	return result, nil
 }
 
@@ -303,14 +303,14 @@ func (s *Service) ParseCSVFromReader(ctx context.Context, reader io.Reader, conf
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from reader: %w", err)
 	}
-	
+
 	return s.ParseCSV(ctx, string(data), config)
 }
 
 // FormatCSV formats data as CSV string
 func (s *Service) FormatCSV(ctx context.Context, data []map[string]interface{}, config *CSVConfig) (string, error) {
 	start := time.Now()
-	
+
 	if config == nil {
 		config = &CSVConfig{
 			Delimiter: ',',
@@ -333,9 +333,9 @@ func (s *Service) FormatCSV(ctx context.Context, data []map[string]interface{}, 
 // ParseTOML parses TOML string into structured data
 func (s *Service) ParseTOML(ctx context.Context, input string) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting TOML parsing", zap.Int("input_size", len(input)))
-	
+
 	parsedValue, err := s.tomlParser.Parse(ctx, input)
 	if err != nil {
 		s.recordOperation(ctx, OperationParse, FormatTOML, int64(len(input)), false, err, time.Since(start))
@@ -364,14 +364,14 @@ func (s *Service) ParseTOML(ctx context.Context, input string) (*ParsedData, err
 
 	s.recordOperation(ctx, OperationParse, FormatTOML, int64(len(input)), true, nil, time.Since(start))
 	s.logger.Info("TOML parsing completed successfully", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // FormatTOML formats data as TOML string
 func (s *Service) FormatTOML(ctx context.Context, data interface{}) (string, error) {
 	start := time.Now()
-	
+
 	result, err := s.tomlParser.Format(ctx, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to format TOML: %w", err)
@@ -386,9 +386,9 @@ func (s *Service) FormatTOML(ctx context.Context, data interface{}) (string, err
 // ParseINI parses INI string into structured data
 func (s *Service) ParseINI(ctx context.Context, input string) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting INI parsing", zap.Int("input_size", len(input)))
-	
+
 	parsedValue, err := s.iniParser.Parse(ctx, input)
 	if err != nil {
 		s.recordOperation(ctx, OperationParse, FormatINI, int64(len(input)), false, err, time.Since(start))
@@ -417,14 +417,14 @@ func (s *Service) ParseINI(ctx context.Context, input string) (*ParsedData, erro
 
 	s.recordOperation(ctx, OperationParse, FormatINI, int64(len(input)), true, nil, time.Since(start))
 	s.logger.Info("INI parsing completed successfully", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
 // FormatINI formats data as INI string
 func (s *Service) FormatINI(ctx context.Context, data map[string]map[string]string) (string, error) {
 	start := time.Now()
-	
+
 	result, err := s.iniParser.Format(ctx, data)
 	if err != nil {
 		return "", fmt.Errorf("failed to format INI: %w", err)
@@ -444,9 +444,9 @@ func (s *Service) DetectFormat(ctx context.Context, input string) (DataFormat, f
 // Convert converts data between formats
 func (s *Service) Convert(ctx context.Context, input string, fromFormat, toFormat DataFormat, options *ConvertOptions) (string, error) {
 	start := time.Now()
-	
-	s.logger.Info("Starting format conversion", 
-		zap.String("from", string(fromFormat)), 
+
+	s.logger.Info("Starting format conversion",
+		zap.String("from", string(fromFormat)),
 		zap.String("to", string(toFormat)),
 		zap.Int("input_size", len(input)))
 
@@ -457,17 +457,17 @@ func (s *Service) Convert(ctx context.Context, input string, fromFormat, toForma
 	}
 
 	s.recordOperation(ctx, OperationConvert, fromFormat, int64(len(input)), true, nil, time.Since(start))
-	s.logger.Info("Format conversion completed successfully", 
+	s.logger.Info("Format conversion completed successfully",
 		zap.Duration("duration", time.Since(start)),
 		zap.Int("output_size", len(result)))
-	
+
 	return result, nil
 }
 
 // Validate validates parsed data against a schema
 func (s *Service) Validate(ctx context.Context, input string, format DataFormat, schema interface{}) (*ValidationResult, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting data validation", zap.String("format", string(format)))
 
 	var result *ValidationResult
@@ -503,10 +503,10 @@ func (s *Service) Validate(ctx context.Context, input string, format DataFormat,
 	}
 
 	s.recordOperation(ctx, OperationValidate, format, int64(len(input)), true, nil, time.Since(start))
-	s.logger.Info("Data validation completed", 
+	s.logger.Info("Data validation completed",
 		zap.Duration("duration", time.Since(start)),
 		zap.Bool("valid", result.Valid))
-	
+
 	return result, nil
 }
 
@@ -515,7 +515,7 @@ func (s *Service) Validate(ctx context.Context, input string, format DataFormat,
 // Transform applies a transformation to parsed data
 func (s *Service) Transform(ctx context.Context, data *ParsedData, transformer DataTransformer) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting data transformation", zap.String("transformer", transformer.GetName()))
 
 	result, err := transformer.Transform(ctx, data)
@@ -528,17 +528,17 @@ func (s *Service) Transform(ctx context.Context, data *ParsedData, transformer D
 		result.Metadata.ParseDuration += time.Since(start)
 	}
 
-	s.logger.Info("Data transformation completed", 
+	s.logger.Info("Data transformation completed",
 		zap.Duration("duration", time.Since(start)),
 		zap.String("transformer", transformer.GetName()))
-	
+
 	return result, nil
 }
 
 // ExtractFields extracts specific fields from parsed data
 func (s *Service) ExtractFields(ctx context.Context, data *ParsedData, fields []string) (*ParsedData, error) {
 	s.logger.Info("Extracting fields from data", zap.Strings("fields", fields))
-	
+
 	// Implementation would depend on the specific data format and structure
 	// This is a simplified version that works with map[string]interface{}
 	if dataMap, ok := data.ParsedValue.(map[string]interface{}); ok {
@@ -548,11 +548,11 @@ func (s *Service) ExtractFields(ctx context.Context, data *ParsedData, fields []
 				extracted[field] = value
 			}
 		}
-		
+
 		result := *data // Copy the structure
 		result.ParsedValue = extracted
 		result.UpdatedAt = time.Now()
-		
+
 		return &result, nil
 	}
 
@@ -562,7 +562,7 @@ func (s *Service) ExtractFields(ctx context.Context, data *ParsedData, fields []
 // FilterData filters parsed data based on criteria
 func (s *Service) FilterData(ctx context.Context, data *ParsedData, filter DataFilter) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Filtering data", zap.String("criteria", filter.GetCriteria()))
 
 	result, err := filter.Filter(ctx, data)
@@ -576,7 +576,7 @@ func (s *Service) FilterData(ctx context.Context, data *ParsedData, filter DataF
 	}
 
 	s.logger.Info("Data filtering completed", zap.Duration("duration", time.Since(start)))
-	
+
 	return result, nil
 }
 
@@ -585,12 +585,12 @@ func (s *Service) FilterData(ctx context.Context, data *ParsedData, filter DataF
 // ParseMultiple parses multiple inputs of the same format
 func (s *Service) ParseMultiple(ctx context.Context, inputs []string, format DataFormat) ([]*ParsedData, error) {
 	s.logger.Info("Starting batch parsing", zap.Int("count", len(inputs)), zap.String("format", string(format)))
-	
+
 	results := make([]*ParsedData, len(inputs))
 	for i, input := range inputs {
 		var result *ParsedData
 		var err error
-		
+
 		switch format {
 		case FormatJSON:
 			result, err = s.ParseJSON(ctx, input)
@@ -607,14 +607,14 @@ func (s *Service) ParseMultiple(ctx context.Context, inputs []string, format Dat
 		default:
 			return nil, fmt.Errorf("batch parsing not supported for format: %s", format)
 		}
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse input %d: %w", i, err)
 		}
-		
+
 		results[i] = result
 	}
-	
+
 	s.logger.Info("Batch parsing completed", zap.Int("count", len(results)))
 	return results, nil
 }
@@ -622,7 +622,7 @@ func (s *Service) ParseMultiple(ctx context.Context, inputs []string, format Dat
 // MergeData merges multiple datasets using the specified strategy
 func (s *Service) MergeData(ctx context.Context, datasets []*ParsedData, strategy MergeStrategy) (*ParsedData, error) {
 	start := time.Now()
-	
+
 	s.logger.Info("Starting data merge", zap.Int("datasets", len(datasets)), zap.String("strategy", string(strategy)))
 
 	if len(datasets) == 0 {
@@ -688,14 +688,14 @@ func (s *Service) recordOperation(ctx context.Context, operation OperationType, 
 	}
 
 	op := &ParseOperation{
-		ID:        fmt.Sprintf("op_%d", time.Now().UnixNano()),
-		Operation: operation,
-		Format:    format,
+		ID:         fmt.Sprintf("op_%d", time.Now().UnixNano()),
+		Operation:  operation,
+		Format:     format,
 		SourceSize: size,
-		Success:   success,
-		Error:     auditErr,
-		Duration:  duration,
-		Timestamp: time.Now(),
+		Success:    success,
+		Error:      auditErr,
+		Duration:   duration,
+		Timestamp:  time.Now(),
 	}
 
 	if auditRecordErr := s.auditRepository.RecordParseOperation(ctx, op); auditRecordErr != nil {

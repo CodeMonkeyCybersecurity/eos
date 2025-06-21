@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
@@ -97,7 +97,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 		inspectOutput, err := i.runCommand("docker", "inspect", id)
 		if err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to inspect container", 
+			logger.Warn("⚠️ Failed to inspect container",
 				zap.String("id", id),
 				zap.Error(err))
 			continue
@@ -138,7 +138,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 
 		if err := json.Unmarshal([]byte(inspectOutput), &inspectData); err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to parse container inspect data", 
+			logger.Warn("⚠️ Failed to parse container inspect data",
 				zap.String("id", id),
 				zap.Error(err))
 			continue
@@ -379,14 +379,14 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 
 	for _, basePath := range searchPaths {
 		// Use find command to locate compose files
-		output, err := i.runCommand("find", basePath, 
+		output, err := i.runCommand("find", basePath,
 			"-name", "docker-compose.yml",
 			"-o", "-name", "docker-compose.yaml",
 			"-o", "-name", "compose.yml",
 			"-o", "-name", "compose.yaml",
 			"-type", "f",
 			"2>/dev/null")
-		
+
 		if err != nil {
 			continue
 		}

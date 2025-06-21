@@ -755,25 +755,25 @@ http {
 `
 
 type K3sCaddyNginxConfig struct {
-	CloudDeploy          bool
-	ClusterName          string
-	ServerType           string
-	Location             string
-	Domain               string
-	CaddyVersion         string
-	NginxVersion         string
-	CaddyReplicas        int
-	NginxReplicas        int
-	CaddyAdminEnabled    bool
-	CaddyStorageSize     string
-	CaddyMemoryRequest   string
-	CaddyCPURequest      string
-	CaddyMemoryLimit     string
-	CaddyCPULimit        string
-	NginxMemoryRequest   string
-	NginxCPURequest      string
-	NginxMemoryLimit     string
-	NginxCPULimit        string
-	MailPorts            []int
-	MailBackend          string
+	CloudDeploy        bool
+	ClusterName        string
+	ServerType         string
+	Location           string
+	Domain             string
+	CaddyVersion       string
+	NginxVersion       string
+	CaddyReplicas      int
+	NginxReplicas      int
+	CaddyAdminEnabled  bool
+	CaddyStorageSize   string
+	CaddyMemoryRequest string
+	CaddyCPURequest    string
+	CaddyMemoryLimit   string
+	CaddyCPULimit      string
+	NginxMemoryRequest string
+	NginxCPURequest    string
+	NginxMemoryLimit   string
+	NginxCPULimit      string
+	MailPorts          []int
+	MailBackend        string
 }

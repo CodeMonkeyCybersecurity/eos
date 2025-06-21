@@ -30,11 +30,11 @@ Use the specific tool commands for simpler syntax:
 	Args: cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		tool := args[0]
-		
+
 		if tool == "all" {
 			return hashicorp.InstallAllTools(rc)
 		}
-		
+
 		return hashicorp.InstallTool(rc, tool)
 	}),
 }
@@ -92,7 +92,7 @@ func init() {
 // testability, and reusability across the codebase. The functions include:
 //
 // - hashicorp.InstallTool() - Install a single HashiCorp tool
-// - hashicorp.InstallAllTools() - Install all supported HashiCorp tools  
+// - hashicorp.InstallAllTools() - Install all supported HashiCorp tools
 // - hashicorp.InstallGPGKey() - Install and verify HashiCorp GPG key
 // - hashicorp.AddRepository() - Add HashiCorp package repository
 // - hashicorp.VerifyInstallation() - Verify tool installation

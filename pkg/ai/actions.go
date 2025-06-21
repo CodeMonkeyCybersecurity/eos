@@ -25,30 +25,30 @@ type ActionExecutor struct {
 
 // Action represents an action that can be executed
 type Action struct {
-	Type        ActionType            `json:"type"`
-	Description string               `json:"description"`
-	Target      string               `json:"target"`
-	Content     string               `json:"content"`
-	Command     string               `json:"command"`
-	Arguments   []string             `json:"arguments"`
-	Environment map[string]string    `json:"environment"`
-	Metadata    map[string]any       `json:"metadata"`
-	Validation  *ActionValidation    `json:"validation,omitempty"`
+	Type        ActionType        `json:"type"`
+	Description string            `json:"description"`
+	Target      string            `json:"target"`
+	Content     string            `json:"content"`
+	Command     string            `json:"command"`
+	Arguments   []string          `json:"arguments"`
+	Environment map[string]string `json:"environment"`
+	Metadata    map[string]any    `json:"metadata"`
+	Validation  *ActionValidation `json:"validation,omitempty"`
 }
 
 // ActionType represents the type of action
 type ActionType string
 
 const (
-	ActionTypeFileCreate   ActionType = "file_create"
-	ActionTypeFileModify   ActionType = "file_modify"
-	ActionTypeFileDelete   ActionType = "file_delete"
-	ActionTypeCommand      ActionType = "command"
-	ActionTypeService      ActionType = "service"
-	ActionTypeContainer    ActionType = "container"
-	ActionTypeTerraform    ActionType = "terraform"
-	ActionTypeVault        ActionType = "vault"
-	ActionTypeConsul       ActionType = "consul"
+	ActionTypeFileCreate ActionType = "file_create"
+	ActionTypeFileModify ActionType = "file_modify"
+	ActionTypeFileDelete ActionType = "file_delete"
+	ActionTypeCommand    ActionType = "command"
+	ActionTypeService    ActionType = "service"
+	ActionTypeContainer  ActionType = "container"
+	ActionTypeTerraform  ActionType = "terraform"
+	ActionTypeVault      ActionType = "vault"
+	ActionTypeConsul     ActionType = "consul"
 )
 
 // ActionValidation represents validation rules for actions
@@ -61,13 +61,13 @@ type ActionValidation struct {
 
 // ActionResult represents the result of an action execution
 type ActionResult struct {
-	Success     bool      `json:"success"`
-	Message     string    `json:"message"`
-	Output      string    `json:"output"`
-	Error       string    `json:"error,omitempty"`
-	Duration    time.Duration `json:"duration"`
-	BackupPath  string    `json:"backup_path,omitempty"`
-	ChangedFiles []string `json:"changed_files,omitempty"`
+	Success      bool          `json:"success"`
+	Message      string        `json:"message"`
+	Output       string        `json:"output"`
+	Error        string        `json:"error,omitempty"`
+	Duration     time.Duration `json:"duration"`
+	BackupPath   string        `json:"backup_path,omitempty"`
+	ChangedFiles []string      `json:"changed_files,omitempty"`
 }
 
 // NewActionExecutor creates a new action executor
@@ -77,7 +77,7 @@ func NewActionExecutor(workingDir string, dryRun bool) *ActionExecutor {
 	}
 
 	backupDir := filepath.Join(workingDir, ".eos-ai-backups", time.Now().Format("20060102-150405"))
-	
+
 	return &ActionExecutor{
 		workingDir: workingDir,
 		backupDir:  backupDir,
@@ -173,7 +173,7 @@ func (ae *ActionExecutor) validateAction(action *Action) error {
 	}
 
 	// Check file size limits
-	if (action.Type == ActionTypeFileCreate || action.Type == ActionTypeFileModify) && 
+	if (action.Type == ActionTypeFileCreate || action.Type == ActionTypeFileModify) &&
 		action.Validation.MaxFileSize > 0 {
 		if int64(len(action.Content)) > action.Validation.MaxFileSize {
 			return fmt.Errorf("content exceeds maximum file size: %d bytes", action.Validation.MaxFileSize)
@@ -186,7 +186,7 @@ func (ae *ActionExecutor) validateAction(action *Action) error {
 // executeFileAction executes file creation or modification
 func (ae *ActionExecutor) executeFileAction(rc *eos_io.RuntimeContext, action *Action, result *ActionResult) error {
 	targetPath := filepath.Join(ae.workingDir, action.Target)
-	
+
 	// Create backup if file exists
 	if _, err := os.Stat(targetPath); err == nil {
 		if err := ae.createBackup(targetPath); err != nil {
@@ -218,7 +218,7 @@ func (ae *ActionExecutor) executeFileAction(rc *eos_io.RuntimeContext, action *A
 // executeFileDelete executes file deletion
 func (ae *ActionExecutor) executeFileDelete(rc *eos_io.RuntimeContext, action *Action, result *ActionResult) error {
 	targetPath := filepath.Join(ae.workingDir, action.Target)
-	
+
 	// Create backup before deletion
 	if err := ae.createBackup(targetPath); err != nil {
 		return fmt.Errorf("failed to create backup: %w", err)
@@ -443,7 +443,7 @@ func ParseActionsFromResponse(response string) ([]*Action, error) {
 	for _, match := range matches {
 		if len(match) >= 3 {
 			actionText := strings.TrimSpace(match[2])
-			
+
 			// Try to parse as JSON action
 			action, err := parseJSONAction(actionText)
 			if err == nil {

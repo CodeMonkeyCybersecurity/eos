@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// tracer is unused but kept for potential future tracing instrumentation  
+// tracer is unused but kept for potential future tracing instrumentation
 var _ = otel.Tracer("eos/pkg/packer")
 
 // EnsureInstalled installs Packer cross-platform with full logging, tracing, and error wrapping

@@ -18,7 +18,7 @@ import (
 type AIConfig struct {
 	// Provider selection
 	Provider string `yaml:"provider,omitempty"` // "anthropic" or "azure-openai"
-	
+
 	// Common configuration
 	APIKey      string `yaml:"api_key,omitempty"`
 	APIKeyVault string `yaml:"api_key_vault,omitempty"` // Vault path for API key
@@ -26,11 +26,11 @@ type AIConfig struct {
 	Model       string `yaml:"model,omitempty"`
 	MaxTokens   int    `yaml:"max_tokens,omitempty"`
 	Timeout     int    `yaml:"timeout,omitempty"`
-	
+
 	// Azure OpenAI specific configuration
-	AzureEndpoint    string `yaml:"azure_endpoint,omitempty"`
-	AzureAPIVersion  string `yaml:"azure_api_version,omitempty"`
-	AzureDeployment  string `yaml:"azure_deployment,omitempty"`
+	AzureEndpoint   string `yaml:"azure_endpoint,omitempty"`
+	AzureAPIVersion string `yaml:"azure_api_version,omitempty"`
+	AzureDeployment string `yaml:"azure_deployment,omitempty"`
 }
 
 // ConfigManager manages AI configuration
@@ -46,9 +46,9 @@ func NewConfigManager() *ConfigManager {
 	if err != nil {
 		configDir = os.Getenv("HOME")
 	}
-	
+
 	configPath := filepath.Join(configDir, "eos", "ai-config.yaml")
-	
+
 	return &ConfigManager{
 		configPath: configPath,
 		config:     &AIConfig{},
@@ -120,13 +120,13 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 	// 1. Environment variable (takes precedence)
 	// 2. Vault (if configured)
 	// 3. Config file
-	
+
 	// Check provider-specific environment variables first
 	provider := cm.config.Provider
 	if provider == "" {
 		provider = "anthropic" // Default to Anthropic
 	}
-	
+
 	// Provider-specific environment variables
 	if provider == "azure-openai" {
 		if apiKey := os.Getenv("AZURE_OPENAI_API_KEY"); apiKey != "" {
@@ -148,7 +148,7 @@ func (cm *ConfigManager) GetAPIKey(rc *eos_io.RuntimeContext) (string, error) {
 			return apiKey, nil
 		}
 	}
-	
+
 	// Generic AI API key (works for both)
 	if apiKey := os.Getenv("AI_API_KEY"); apiKey != "" {
 		logger.Debug("Using API key from AI_API_KEY environment variable")
@@ -238,7 +238,7 @@ func (cm *ConfigManager) UpdateConfig(updates map[string]any) error {
 			}
 		}
 	}
-	
+
 	return cm.SaveConfig()
 }
 
@@ -250,21 +250,21 @@ func (cm *ConfigManager) GetConfigPath() string {
 // ValidateAPIKey performs a simple validation of the API key format
 func ValidateAPIKey(apiKey string) error {
 	apiKey = strings.TrimSpace(apiKey)
-	
+
 	if apiKey == "" {
 		return fmt.Errorf("API key cannot be empty")
 	}
-	
+
 	if len(apiKey) < 20 {
 		return fmt.Errorf("API key appears to be too short")
 	}
-	
+
 	// Check for common patterns
 	if strings.HasPrefix(apiKey, "sk-") || strings.HasPrefix(apiKey, "claude-") {
 		// OpenAI/Anthropic style key
 		return nil
 	}
-	
+
 	// Warn but don't fail for unknown patterns (could be Azure OpenAI)
 	return nil
 }
@@ -274,8 +274,8 @@ func GetProviderDefaults(provider string) *AIConfig {
 	switch provider {
 	case "azure-openai":
 		return &AIConfig{
-			Provider:         "azure-openai",
-			AzureAPIVersion:  "2024-02-15-preview",
+			Provider:        "azure-openai",
+			AzureAPIVersion: "2024-02-15-preview",
 			Model:           "gpt-4",
 			MaxTokens:       4096,
 			Timeout:         60,

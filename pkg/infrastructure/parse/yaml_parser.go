@@ -26,25 +26,25 @@ func NewYAMLParser(logger *zap.Logger) *YAMLParserImpl {
 // Parse parses YAML string into a map
 func (y *YAMLParserImpl) Parse(ctx context.Context, input string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	
+
 	if err := yaml.Unmarshal([]byte(input), &result); err != nil {
 		y.logger.Error("Failed to parse YAML", zap.Error(err), zap.String("input_preview", y.previewString(input)))
 		return nil, fmt.Errorf("YAML parse error: %w", err)
 	}
-	
+
 	return result, nil
 }
 
 // ParseMultiDocument parses YAML string with multiple documents
 func (y *YAMLParserImpl) ParseMultiDocument(ctx context.Context, input string) ([]map[string]interface{}, error) {
 	decoder := yaml.NewDecoder(strings.NewReader(input))
-	
+
 	var documents []map[string]interface{}
-	
+
 	for {
 		var doc map[string]interface{}
 		err := decoder.Decode(&doc)
-		
+
 		if err != nil {
 			if err.Error() == "EOF" {
 				break
@@ -52,12 +52,12 @@ func (y *YAMLParserImpl) ParseMultiDocument(ctx context.Context, input string) (
 			y.logger.Error("Failed to parse YAML document", zap.Error(err))
 			return nil, fmt.Errorf("YAML multi-document parse error: %w", err)
 		}
-		
+
 		if doc != nil {
 			documents = append(documents, doc)
 		}
 	}
-	
+
 	return documents, nil
 }
 
@@ -67,7 +67,7 @@ func (y *YAMLParserImpl) ParseToStruct(ctx context.Context, input string, target
 		y.logger.Error("Failed to parse YAML to struct", zap.Error(err), zap.String("input_preview", y.previewString(input)))
 		return fmt.Errorf("YAML struct parse error: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -78,7 +78,7 @@ func (y *YAMLParserImpl) Format(ctx context.Context, data interface{}) (string, 
 		y.logger.Error("Failed to format YAML", zap.Error(err))
 		return "", fmt.Errorf("YAML format error: %w", err)
 	}
-	
+
 	return string(result), nil
 }
 
@@ -89,7 +89,7 @@ func (y *YAMLParserImpl) Validate(ctx context.Context, input string, schema inte
 	if err := yaml.Unmarshal([]byte(input), &temp); err != nil {
 		return fmt.Errorf("invalid YAML: %w", err)
 	}
-	
+
 	// TODO: Implement proper YAML schema validation
 	y.logger.Info("YAML validation completed (basic validation only)")
 	return nil
@@ -102,13 +102,13 @@ func (y *YAMLParserImpl) ConvertToJSON(ctx context.Context, input string) (strin
 	if err := yaml.Unmarshal([]byte(input), &yamlData); err != nil {
 		return "", fmt.Errorf("failed to parse YAML for JSON conversion: %w", err)
 	}
-	
+
 	// Convert to JSON
 	jsonData, err := json.Marshal(yamlData)
 	if err != nil {
 		return "", fmt.Errorf("failed to convert YAML to JSON: %w", err)
 	}
-	
+
 	return string(jsonData), nil
 }
 

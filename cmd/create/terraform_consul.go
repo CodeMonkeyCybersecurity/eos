@@ -30,7 +30,7 @@ Example:
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		workingDir := "."
 		if len(args) > 0 {
 			workingDir = args[0]
@@ -162,7 +162,7 @@ Example:
 		fmt.Println("\n✅ Infrastructure deployed successfully with Consul-Vault integration!")
 		fmt.Printf("🔍 Consul UI: %s\n", consulAddr+"/ui")
 		fmt.Printf("🔒 Vault UI: %s\n", vaultAddr+"/ui")
-		
+
 		return nil
 	}),
 }
@@ -179,7 +179,7 @@ This creates Terraform configuration that:
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		outputDir := "./terraform-consul-cluster"
 		if len(args) > 0 {
 			outputDir = args[0]
@@ -257,7 +257,7 @@ This creates Terraform configuration that:
 
 		logger.Info("Consul cluster configuration generated successfully",
 			zap.String("directory", outputDir))
-		
+
 		fmt.Printf("✅ Consul cluster configuration generated in: %s\n", outputDir)
 		fmt.Printf("📋 Next steps:\n")
 		fmt.Printf("   1. Review and customize the generated configuration\n")
@@ -274,7 +274,7 @@ var consulServiceMeshCmd = &cobra.Command{
 	Args:  cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		outputDir := "./terraform-service-mesh"
 		if len(args) > 0 {
 			outputDir = args[0]
@@ -382,7 +382,7 @@ var consulServiceMeshCmd = &cobra.Command{
 
 		logger.Info("Service mesh configuration generated successfully",
 			zap.String("directory", outputDir))
-		
+
 		fmt.Printf("✅ Service mesh configuration generated in: %s\n", outputDir)
 
 		return nil

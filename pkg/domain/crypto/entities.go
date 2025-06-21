@@ -9,24 +9,24 @@ import (
 type HashAlgorithm string
 
 const (
-	SHA256    HashAlgorithm = "sha256"
-	SHA384    HashAlgorithm = "sha384"
-	SHA512    HashAlgorithm = "sha512"
-	MD5       HashAlgorithm = "md5"    // For legacy compatibility only
-	BLAKE2b   HashAlgorithm = "blake2b"
-	BLAKE2s   HashAlgorithm = "blake2s"
-	SHA3_256  HashAlgorithm = "sha3-256"
-	SHA3_384  HashAlgorithm = "sha3-384"
-	SHA3_512  HashAlgorithm = "sha3-512"
+	SHA256   HashAlgorithm = "sha256"
+	SHA384   HashAlgorithm = "sha384"
+	SHA512   HashAlgorithm = "sha512"
+	MD5      HashAlgorithm = "md5" // For legacy compatibility only
+	BLAKE2b  HashAlgorithm = "blake2b"
+	BLAKE2s  HashAlgorithm = "blake2s"
+	SHA3_256 HashAlgorithm = "sha3-256"
+	SHA3_384 HashAlgorithm = "sha3-384"
+	SHA3_512 HashAlgorithm = "sha3-512"
 )
 
 // EncryptionAlgorithm represents supported encryption algorithms
 type EncryptionAlgorithm string
 
 const (
-	AES256GCM    EncryptionAlgorithm = "aes-256-gcm"
-	AES128GCM    EncryptionAlgorithm = "aes-128-gcm"
-	ChaCha20Poly EncryptionAlgorithm = "chacha20-poly1305"
+	AES256GCM     EncryptionAlgorithm = "aes-256-gcm"
+	AES128GCM     EncryptionAlgorithm = "aes-128-gcm"
+	ChaCha20Poly  EncryptionAlgorithm = "chacha20-poly1305"
 	XChaCha20Poly EncryptionAlgorithm = "xchacha20-poly1305"
 )
 
@@ -34,12 +34,12 @@ const (
 type KeyAlgorithm string
 
 const (
-	RSA2048   KeyAlgorithm = "rsa-2048"
-	RSA4096   KeyAlgorithm = "rsa-4096"
-	ECDSA256  KeyAlgorithm = "ecdsa-p256"
-	ECDSA384  KeyAlgorithm = "ecdsa-p384"
-	ECDSA521  KeyAlgorithm = "ecdsa-p521"
-	Ed25519   KeyAlgorithm = "ed25519"
+	RSA2048  KeyAlgorithm = "rsa-2048"
+	RSA4096  KeyAlgorithm = "rsa-4096"
+	ECDSA256 KeyAlgorithm = "ecdsa-p256"
+	ECDSA384 KeyAlgorithm = "ecdsa-p384"
+	ECDSA521 KeyAlgorithm = "ecdsa-p521"
+	Ed25519  KeyAlgorithm = "ed25519"
 )
 
 // PasswordAlgorithm represents password hashing algorithms
@@ -62,11 +62,11 @@ type HashResult struct {
 
 // EncryptionResult represents the result of an encryption operation
 type EncryptionResult struct {
-	Algorithm    EncryptionAlgorithm `json:"algorithm"`
-	Ciphertext   []byte              `json:"ciphertext"`
-	Nonce        []byte              `json:"nonce"`
-	Tag          []byte              `json:"tag,omitempty"`
-	EncryptTime  time.Duration       `json:"encrypt_time"`
+	Algorithm   EncryptionAlgorithm `json:"algorithm"`
+	Ciphertext  []byte              `json:"ciphertext"`
+	Nonce       []byte              `json:"nonce"`
+	Tag         []byte              `json:"tag,omitempty"`
+	EncryptTime time.Duration       `json:"encrypt_time"`
 }
 
 // DecryptionResult represents the result of a decryption operation
@@ -78,12 +78,12 @@ type DecryptionResult struct {
 
 // KeyPair represents a cryptographic key pair
 type KeyPair struct {
-	Algorithm   KeyAlgorithm `json:"algorithm"`
-	PrivateKey  []byte       `json:"-"` // Never serialize private key
-	PublicKey   []byte       `json:"public_key"`
-	KeyID       string       `json:"key_id"`
-	CreatedAt   time.Time    `json:"created_at"`
-	ExpiresAt   *time.Time   `json:"expires_at,omitempty"`
+	Algorithm  KeyAlgorithm `json:"algorithm"`
+	PrivateKey []byte       `json:"-"` // Never serialize private key
+	PublicKey  []byte       `json:"public_key"`
+	KeyID      string       `json:"key_id"`
+	CreatedAt  time.Time    `json:"created_at"`
+	ExpiresAt  *time.Time   `json:"expires_at,omitempty"`
 }
 
 // PasswordHash represents a hashed password with metadata
@@ -99,9 +99,9 @@ type PasswordHash struct {
 
 // RandomData represents generated random data
 type RandomData struct {
-	Data      []byte `json:"data"`
-	Length    int    `json:"length"`
-	Entropy   int    `json:"entropy_bits"`
+	Data      []byte    `json:"data"`
+	Length    int       `json:"length"`
+	Entropy   int       `json:"entropy_bits"`
 	Generated time.Time `json:"generated"`
 }
 
@@ -115,8 +115,8 @@ type SecureString struct {
 // NewSecureString creates a new secure string
 func NewSecureString(value string) *SecureString {
 	return &SecureString{
-		value:    value,
-		redacted: false,
+		value:     value,
+		redacted:  false,
 		destroyed: false,
 	}
 }
@@ -158,21 +158,21 @@ func (s *SecureString) String() string {
 
 // ValidationResult represents the result of cryptographic validation
 type ValidationResult struct {
-	Valid       bool      `json:"valid"`
-	Algorithm   string    `json:"algorithm"`
-	CheckedAt   time.Time `json:"checked_at"`
-	Message     string    `json:"message,omitempty"`
-	Details     map[string]interface{} `json:"details,omitempty"`
+	Valid     bool                   `json:"valid"`
+	Algorithm string                 `json:"algorithm"`
+	CheckedAt time.Time              `json:"checked_at"`
+	Message   string                 `json:"message,omitempty"`
+	Details   map[string]interface{} `json:"details,omitempty"`
 }
 
 // CryptoPolicy defines cryptographic policy constraints
 type CryptoPolicy struct {
-	MinKeySize           int                   `json:"min_key_size"`
-	AllowedAlgorithms    []string              `json:"allowed_algorithms"`
-	RequireAuthentication bool                  `json:"require_authentication"`
-	MaxKeyAge            time.Duration         `json:"max_key_age"`
-	PasswordMinLength    int                   `json:"password_min_length"`
-	PasswordRequirements PasswordRequirements  `json:"password_requirements"`
+	MinKeySize            int                  `json:"min_key_size"`
+	AllowedAlgorithms     []string             `json:"allowed_algorithms"`
+	RequireAuthentication bool                 `json:"require_authentication"`
+	MaxKeyAge             time.Duration        `json:"max_key_age"`
+	PasswordMinLength     int                  `json:"password_min_length"`
+	PasswordRequirements  PasswordRequirements `json:"password_requirements"`
 }
 
 // PasswordRequirements defines password complexity requirements
@@ -195,8 +195,8 @@ func DefaultCryptoPolicy() CryptoPolicy {
 			string(RSA2048), string(RSA4096), string(ECDSA256),
 		},
 		RequireAuthentication: true,
-		MaxKeyAge:            365 * 24 * time.Hour, // 1 year
-		PasswordMinLength:    12,
+		MaxKeyAge:             365 * 24 * time.Hour, // 1 year
+		PasswordMinLength:     12,
 		PasswordRequirements: PasswordRequirements{
 			MinLength:      12,
 			RequireUpper:   true,

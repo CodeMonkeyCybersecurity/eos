@@ -148,15 +148,15 @@ func VerifyInitResult(rc *eos_io.RuntimeContext, r *api.InitResponse) error {
 
 func VerifyRootToken(rc *eos_io.RuntimeContext, client *api.Client, token string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Verifying token with Vault", 
+	log.Info("🔍 Verifying token with Vault",
 		zap.String("vault_addr", client.Address()))
-		
+
 	client.SetToken(token)
-	
+
 	log.Info("📞 Making token lookup-self API call to Vault")
 	secret, err := client.Auth().Token().LookupSelf()
 	if err != nil {
-		log.Error("❌ Token lookup-self API call failed", 
+		log.Error("❌ Token lookup-self API call failed",
 			zap.Error(err),
 			zap.String("vault_addr", client.Address()))
 		return fmt.Errorf("token validation failed: %w", err)
@@ -165,14 +165,14 @@ func VerifyRootToken(rc *eos_io.RuntimeContext, client *api.Client, token string
 		log.Error("❌ Token lookup returned nil secret")
 		return fmt.Errorf("token validation failed: nil secret returned")
 	}
-	
+
 	// Extract token metadata safely
 	tokenType := "unknown"
 	if typeVal, ok := secret.Data["type"]; ok && typeVal != nil {
 		tokenType = typeVal.(string)
 	}
-	
-	log.Info("✅ Token validated successfully", 
+
+	log.Info("✅ Token validated successfully",
 		zap.String("token_type", tokenType),
 		zap.Any("policies", secret.Data["policies"]),
 		zap.Any("path", secret.Data["path"]),

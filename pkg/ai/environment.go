@@ -19,8 +19,8 @@ import (
 
 // EnvironmentAnalyzer analyzes the current environment
 type EnvironmentAnalyzer struct {
-	workingDir string
-	maxFiles   int
+	workingDir  string
+	maxFiles    int
 	maxLogLines int
 }
 
@@ -87,7 +87,7 @@ func (ea *EnvironmentAnalyzer) AnalyzeEnvironment(rc *eos_io.RuntimeContext) (*E
 // analyzeFileSystem analyzes the file system for relevant files
 func (ea *EnvironmentAnalyzer) analyzeFileSystem(rc *eos_io.RuntimeContext) (*FileSystemContext, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	fsCtx := &FileSystemContext{
 		DirectoryTree: make(map[string][]string),
 	}
@@ -101,8 +101,8 @@ func (ea *EnvironmentAnalyzer) analyzeFileSystem(rc *eos_io.RuntimeContext) (*Fi
 		// Skip hidden directories and common ignore patterns
 		if d.IsDir() {
 			name := d.Name()
-			if strings.HasPrefix(name, ".") && name != "." || 
-			   name == "node_modules" || name == "vendor" || name == ".terraform" {
+			if strings.HasPrefix(name, ".") && name != "." ||
+				name == "node_modules" || name == "vendor" || name == ".terraform" {
 				return filepath.SkipDir
 			}
 		}
@@ -123,8 +123,8 @@ func (ea *EnvironmentAnalyzer) analyzeFileSystem(rc *eos_io.RuntimeContext) (*Fi
 				fsCtx.ComposeFiles = append(fsCtx.ComposeFiles, *fileInfo)
 			case ext == ".tf" || ext == ".tfvars":
 				fsCtx.TerraformFiles = append(fsCtx.TerraformFiles, *fileInfo)
-			case ext == ".yml" || ext == ".yaml" || ext == ".json" || ext == ".toml" || 
-				 base == "dockerfile" || strings.Contains(base, "config"):
+			case ext == ".yml" || ext == ".yaml" || ext == ".json" || ext == ".toml" ||
+				base == "dockerfile" || strings.Contains(base, "config"):
 				fsCtx.ConfigFiles = append(fsCtx.ConfigFiles, *fileInfo)
 			}
 
@@ -212,7 +212,7 @@ func (ea *EnvironmentAnalyzer) getDockerContainers(rc *eos_io.RuntimeContext) ([
 
 	var containers []ContainerInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	// Skip header line
 	for i, line := range lines {
 		if i == 0 || strings.TrimSpace(line) == "" {
@@ -247,7 +247,7 @@ func (ea *EnvironmentAnalyzer) getSystemdServices(rc *eos_io.RuntimeContext) ([]
 
 	var services []ServiceInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -278,7 +278,7 @@ func (ea *EnvironmentAnalyzer) getProcesses(rc *eos_io.RuntimeContext) ([]Proces
 
 	var processes []ProcessInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	// Skip header line
 	for i, line := range lines {
 		if i == 0 || strings.TrimSpace(line) == "" {
@@ -290,18 +290,18 @@ func (ea *EnvironmentAnalyzer) getProcesses(rc *eos_io.RuntimeContext) ([]Proces
 			pid, _ := strconv.Atoi(fields[1])
 			cpu, _ := strconv.ParseFloat(fields[2], 64)
 			memory, _ := strconv.ParseFloat(fields[3], 64)
-			
+
 			process := ProcessInfo{
 				PID:     pid,
 				CPU:     cpu,
 				Memory:  memory,
 				Command: strings.Join(fields[10:], " "),
 			}
-			
+
 			if len(fields) >= 11 {
 				process.Name = fields[10]
 			}
-			
+
 			processes = append(processes, process)
 		}
 	}
@@ -317,7 +317,7 @@ func (ea *EnvironmentAnalyzer) getNetworkPorts(rc *eos_io.RuntimeContext) ([]Por
 	} else {
 		cmd = exec.CommandContext(rc.Ctx, "ss", "-tuln")
 	}
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -325,7 +325,7 @@ func (ea *EnvironmentAnalyzer) getNetworkPorts(rc *eos_io.RuntimeContext) ([]Por
 
 	var ports []PortInfo
 	lines := strings.Split(string(output), "\n")
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "LISTEN") || strings.Contains(line, "LISTENING") {
 			fields := strings.Fields(line)
@@ -378,7 +378,7 @@ func (ea *EnvironmentAnalyzer) analyzeInfrastructure(rc *eos_io.RuntimeContext) 
 func (ea *EnvironmentAnalyzer) getVaultStatus(rc *eos_io.RuntimeContext) (*VaultStatusInfo, error) {
 	cmd := exec.CommandContext(rc.Ctx, "vault", "status", "-format=json")
 	cmd.Env = append(os.Environ(), "VAULT_ADDR="+os.Getenv("VAULT_ADDR"))
-	
+
 	output, err := cmd.Output()
 	if err != nil {
 		// Vault might not be available or configured
@@ -458,9 +458,9 @@ func (ea *EnvironmentAnalyzer) analyzeLogs(rc *eos_io.RuntimeContext) (*LogConte
 		logs.SystemLogs = sysLogs
 		// Filter for errors
 		for _, log := range sysLogs {
-			if strings.Contains(strings.ToLower(log.Level), "error") || 
-			   strings.Contains(strings.ToLower(log.Message), "error") ||
-			   strings.Contains(strings.ToLower(log.Message), "failed") {
+			if strings.Contains(strings.ToLower(log.Level), "error") ||
+				strings.Contains(strings.ToLower(log.Message), "error") ||
+				strings.Contains(strings.ToLower(log.Message), "failed") {
 				logs.ErrorLogs = append(logs.ErrorLogs, log)
 			}
 		}
@@ -490,7 +490,7 @@ func (ea *EnvironmentAnalyzer) getSystemLogs(rc *eos_io.RuntimeContext) ([]LogEn
 
 	var logs []LogEntry
 	lines := strings.Split(string(output), "\n")
-	
+
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
 			continue
@@ -507,8 +507,8 @@ func (ea *EnvironmentAnalyzer) getSystemLogs(rc *eos_io.RuntimeContext) ([]LogEn
 
 		// Try to detect error level
 		if strings.Contains(strings.ToLower(line), "error") ||
-		   strings.Contains(strings.ToLower(line), "failed") ||
-		   strings.Contains(strings.ToLower(line), "warning") {
+			strings.Contains(strings.ToLower(line), "failed") ||
+			strings.Contains(strings.ToLower(line), "warning") {
 			log.Level = "ERROR"
 		}
 
@@ -532,7 +532,7 @@ func (ea *EnvironmentAnalyzer) getDockerLogs(rc *eos_io.RuntimeContext) ([]LogEn
 
 	var logs []LogEntry
 	containers := strings.Split(strings.TrimSpace(string(output)), "\n")
-	
+
 	for _, container := range containers {
 		if container == "" {
 			continue
@@ -560,7 +560,7 @@ func (ea *EnvironmentAnalyzer) getDockerLogs(rc *eos_io.RuntimeContext) ([]LogEn
 			}
 
 			if strings.Contains(strings.ToLower(line), "error") ||
-			   strings.Contains(strings.ToLower(line), "failed") {
+				strings.Contains(strings.ToLower(line), "failed") {
 				log.Level = "ERROR"
 			}
 

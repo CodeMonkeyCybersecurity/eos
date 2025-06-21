@@ -31,7 +31,7 @@ Example:
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		workingDir := "."
 		if len(args) > 0 {
 			workingDir = args[0]
@@ -55,7 +55,7 @@ Example:
 			return fmt.Errorf("directory %s does not exist", workingDir)
 		}
 
-		logger.Info("Starting Terraform-Vault integrated deployment", 
+		logger.Info("Starting Terraform-Vault integrated deployment",
 			zap.String("directory", workingDir),
 			zap.Bool("vault_state", useVaultState),
 			zap.Bool("vault_secrets", useVaultSecrets))
@@ -161,7 +161,7 @@ Example:
 
 		logger.Info("Terraform-Vault deployment completed successfully")
 		fmt.Println("\n✅ Infrastructure deployed successfully with Vault integration!")
-		
+
 		return nil
 	}),
 }
@@ -172,7 +172,7 @@ var vaultSecretsEngineCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		secretsPath := args[0]
-		
+
 		tfManager := terraform.NewManager(rc, ".")
 		return tfManager.CreateVaultSecretsEngine(rc, secretsPath)
 	}),
@@ -194,7 +194,7 @@ var vaultBackendCmd = &cobra.Command{
 		}
 
 		tfManager := terraform.NewManager(rc, workingDir)
-		
+
 		vaultConfig := terraform.VaultBackendConfig{
 			Address: os.Getenv("VAULT_ADDR"),
 			Path:    statePath,
@@ -218,7 +218,7 @@ var syncOutputsCmd = &cobra.Command{
 		vaultPath := args[1]
 
 		tfManager := terraform.NewManager(rc, workingDir)
-		
+
 		outputs, err := getOutputNames(rc, tfManager)
 		if err != nil {
 			return fmt.Errorf("failed to get output names: %w", err)

@@ -15,12 +15,12 @@ type ContainerManager interface {
 	StopContainer(ctx context.Context, id string) error
 	RestartContainer(ctx context.Context, id string) error
 	RemoveContainer(ctx context.Context, id string) error
-	
+
 	// Query operations
 	ListContainers(ctx context.Context, filter *ContainerFilter) ([]*Container, error)
 	GetContainer(ctx context.Context, id string) (*Container, error)
 	GetContainerLogs(ctx context.Context, id string, options *LogOptions) (io.ReadCloser, error)
-	
+
 	// Batch operations
 	StopMultipleContainers(ctx context.Context, ids []string) error
 	RemoveMultipleContainers(ctx context.Context, ids []string) error
@@ -40,7 +40,7 @@ type ComposeManager interface {
 	Stop(ctx context.Context, projectName string) error
 	Remove(ctx context.Context, projectName string) error
 	Scale(ctx context.Context, projectName string, services map[string]int) error
-	
+
 	GetServices(ctx context.Context, projectName string) ([]*Service, error)
 	GetServiceLogs(ctx context.Context, projectName, serviceName string, options *LogOptions) (io.ReadCloser, error)
 }
@@ -51,7 +51,7 @@ type ImageManager interface {
 	RemoveImage(ctx context.Context, image string) error
 	ListImages(ctx context.Context, filter *ImageFilter) ([]*Image, error)
 	BuildImage(ctx context.Context, buildPath string, options *BuildOptions) error
-	
+
 	// Registry operations
 	PushImage(ctx context.Context, image string, options *PushOptions) error
 	TagImage(ctx context.Context, sourceImage, targetImage string) error
@@ -63,11 +63,11 @@ type VolumeManager interface {
 	RemoveVolume(ctx context.Context, name string) error
 	ListVolumes(ctx context.Context, filter *VolumeFilter) ([]*Volume, error)
 	GetVolume(ctx context.Context, name string) (*Volume, error)
-	
+
 	// Backup and restore operations
 	BackupVolume(ctx context.Context, name, backupPath string) error
 	RestoreVolume(ctx context.Context, name, backupPath string) error
-	
+
 	// Batch operations
 	RemoveUnusedVolumes(ctx context.Context) error
 }
@@ -78,7 +78,7 @@ type NetworkManager interface {
 	RemoveNetwork(ctx context.Context, name string) error
 	ListNetworks(ctx context.Context, filter *NetworkFilter) ([]*Network, error)
 	GetNetwork(ctx context.Context, name string) (*Network, error)
-	
+
 	// Network operations
 	ConnectContainer(ctx context.Context, networkName, containerID string) error
 	DisconnectContainer(ctx context.Context, networkName, containerID string) error
@@ -183,9 +183,9 @@ type PolicyManager interface {
 
 // ContainerFilter defines container listing filters
 type ContainerFilter struct {
-	Names     []string
-	Status    []ContainerStatus
-	Labels    map[string]string
+	Names         []string
+	Status        []ContainerStatus
+	Labels        map[string]string
 	CreatedBefore *time.Time
 	CreatedAfter  *time.Time
 }
@@ -200,8 +200,8 @@ type ImageFilter struct {
 
 // VolumeFilter defines volume listing filters
 type VolumeFilter struct {
-	Names   []string
-	Labels  map[string]string
+	Names    []string
+	Labels   map[string]string
 	Dangling *bool
 }
 
@@ -271,12 +271,12 @@ type EventFilter struct {
 
 // AuditFilter defines audit log filtering
 type AuditFilter struct {
-	User       string
-	Action     string
-	Resource   string
-	After      *time.Time
-	Before     *time.Time
-	Limit      int
+	User     string
+	Action   string
+	Resource string
+	After    *time.Time
+	Before   *time.Time
+	Limit    int
 }
 
 // Registry credentials

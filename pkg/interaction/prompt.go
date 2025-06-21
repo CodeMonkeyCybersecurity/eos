@@ -61,7 +61,7 @@ func PromptSecret(ctx context.Context, prompt string) (string, error) {
 
 	logger := otelzap.Ctx(ctx)
 	logger.Info("🔐 Prompting for secret input", zap.String("prompt", prompt))
-	
+
 	// Use os.Stderr for user-facing prompts to preserve stdout for automation
 	_, _ = fmt.Fprint(os.Stderr, prompt+": ")
 	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
@@ -103,7 +103,7 @@ func PromptSelect(ctx context.Context, prompt string, options []string) string {
 
 	logger := otelzap.Ctx(ctx)
 	logger.Info("📋 Displaying selection menu", zap.String("prompt", prompt), zap.Strings("options", options))
-	
+
 	// Use os.Stderr for user-facing prompts to preserve stdout for automation
 	_, _ = fmt.Fprintln(os.Stderr, prompt)
 	for i, option := range options {

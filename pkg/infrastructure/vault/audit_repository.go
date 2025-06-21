@@ -39,8 +39,8 @@ func NewFileAuditRepository(logDir string, logger *zap.Logger) *FileAuditReposit
 
 	// Ensure log directory exists
 	if err := os.MkdirAll(logDir, 0750); err != nil {
-		logger.Error("Failed to create audit log directory", 
-			zap.String("dir", logDir), 
+		logger.Error("Failed to create audit log directory",
+			zap.String("dir", logDir),
 			zap.Error(err))
 	}
 
@@ -115,7 +115,7 @@ func (r *FileAuditRepository) Record(ctx context.Context, event *vault.AuditEven
 		r.logger.Warn("Failed to sync audit log to disk", zap.Error(err))
 	}
 
-	r.logger.Debug("Audit event recorded", 
+	r.logger.Debug("Audit event recorded",
 		zap.String("id", event.ID),
 		zap.String("type", event.Type))
 
@@ -146,7 +146,7 @@ func (r *FileAuditRepository) Query(ctx context.Context, filter *vault.AuditFilt
 		}
 	}
 
-	r.logger.Debug("Audit events queried", 
+	r.logger.Debug("Audit events queried",
 		zap.Int("total", len(events)),
 		zap.Int("filtered", len(filteredEvents)))
 
@@ -197,7 +197,7 @@ func (r *FileAuditRepository) GetStats(ctx context.Context) (*vault.AuditStats, 
 		}
 	}
 
-	r.logger.Debug("Audit statistics calculated", 
+	r.logger.Debug("Audit statistics calculated",
 		zap.Int64("total_events", stats.TotalEvents))
 
 	return stats, nil
@@ -229,7 +229,7 @@ func (r *FileAuditRepository) readLogFile() ([]*vault.AuditEvent, error) {
 
 		var event vault.AuditEvent
 		if err := json.Unmarshal([]byte(line), &event); err != nil {
-			r.logger.Warn("Failed to parse audit log line", 
+			r.logger.Warn("Failed to parse audit log line",
 				zap.String("line", line),
 				zap.Error(err))
 			continue

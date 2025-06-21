@@ -20,25 +20,25 @@ import (
 // HardeningConfig represents comprehensive hardening configuration
 type HardeningConfig struct {
 	// System hardening
-	DisableSwap         bool
-	DisableCoreDumps    bool
-	SetUlimits          bool
-	ConfigureFirewall   bool
-	HardenSSH           bool
-	
+	DisableSwap       bool
+	DisableCoreDumps  bool
+	SetUlimits        bool
+	ConfigureFirewall bool
+	HardenSSH         bool
+
 	// Vault-specific hardening
-	EnableAuditLogging  bool
-	ConfigureTLS        bool
-	SetupLogRotation    bool
-	EnableRateLimiting  bool
-	ConfigureBackup     bool
-	
+	EnableAuditLogging bool
+	ConfigureTLS       bool
+	SetupLogRotation   bool
+	EnableRateLimiting bool
+	ConfigureBackup    bool
+
 	// Security policies
-	RevokeRootToken     bool
+	RevokeRootToken      bool
 	EnableSecretRotation bool
-	ConfigureLease      bool
-	EnableMFA           bool
-	
+	ConfigureLease       bool
+	EnableMFA            bool
+
 	// Network security
 	RestrictNetworkAccess bool
 	EnableIPWhitelist     bool
@@ -267,7 +267,7 @@ func disableSwap(rc *eos_io.RuntimeContext) error {
 	if err == nil {
 		lines := strings.Split(string(content), "\n")
 		var newLines []string
-		
+
 		for _, line := range lines {
 			if strings.Contains(line, "swap") && !strings.HasPrefix(strings.TrimSpace(line), "#") {
 				newLines = append(newLines, "# "+line+" # Disabled by Eos hardening")
@@ -275,7 +275,7 @@ func disableSwap(rc *eos_io.RuntimeContext) error {
 				newLines = append(newLines, line)
 			}
 		}
-		
+
 		newContent := strings.Join(newLines, "\n")
 		if err := os.WriteFile(fstabPath+".eos-backup", content, 0644); err == nil {
 			if err := os.WriteFile(fstabPath, []byte(newContent), 0644); err != nil {
@@ -343,7 +343,7 @@ vault hard memlock unlimited
 vault soft nproc 4096
 vault hard nproc 4096
 `
-	
+
 	if err := os.WriteFile("/etc/security/limits.d/vault-ulimits.conf", []byte(ulimitsContent), 0644); err != nil {
 		return fmt.Errorf("failed to write ulimits configuration: %w", err)
 	}
@@ -398,7 +398,7 @@ func hardenSSH(rc *eos_io.RuntimeContext) error {
 	log.Info("🔐 Hardening SSH configuration")
 
 	sshConfigPath := "/etc/ssh/sshd_config"
-	
+
 	// Backup original config
 	if err := execute.RunSimple(rc.Ctx, "cp", sshConfigPath, sshConfigPath+".eos-backup"); err != nil {
 		log.Warn("⚠️ Failed to backup SSH config", zap.Error(err))
@@ -412,33 +412,33 @@ func hardenSSH(rc *eos_io.RuntimeContext) error {
 
 	// Apply hardening settings
 	hardeningSettings := map[string]string{
-		"PermitRootLogin":           "no",
-		"PasswordAuthentication":    "no",
-		"PubkeyAuthentication":      "yes",
-		"Protocol":                  "2",
-		"X11Forwarding":            "no",
-		"AllowAgentForwarding":     "no",
-		"AllowTcpForwarding":       "no",
-		"UsePAM":                   "yes",
-		"MaxAuthTries":             "3",
-		"ClientAliveInterval":      "300",
-		"ClientAliveCountMax":      "2",
-		"LoginGraceTime":           "60",
-		"MaxStartups":              "10:30:60",
+		"PermitRootLogin":        "no",
+		"PasswordAuthentication": "no",
+		"PubkeyAuthentication":   "yes",
+		"Protocol":               "2",
+		"X11Forwarding":          "no",
+		"AllowAgentForwarding":   "no",
+		"AllowTcpForwarding":     "no",
+		"UsePAM":                 "yes",
+		"MaxAuthTries":           "3",
+		"ClientAliveInterval":    "300",
+		"ClientAliveCountMax":    "2",
+		"LoginGraceTime":         "60",
+		"MaxStartups":            "10:30:60",
 	}
 
 	lines := strings.Split(string(content), "\n")
 	var newLines []string
-	
+
 	settingsApplied := make(map[string]bool)
-	
+
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			newLines = append(newLines, line)
 			continue
 		}
-		
+
 		parts := strings.Fields(trimmed)
 		if len(parts) >= 2 {
 			key := parts[0]
@@ -448,10 +448,10 @@ func hardenSSH(rc *eos_io.RuntimeContext) error {
 				continue
 			}
 		}
-		
+
 		newLines = append(newLines, line)
 	}
-	
+
 	// Add any missing settings
 	newLines = append(newLines, "", "# Eos SSH hardening settings")
 	for key, value := range hardeningSettings {
@@ -546,10 +546,10 @@ func hardenTLSConfiguration(rc *eos_io.RuntimeContext) error {
 	// This would involve updating the Vault configuration file
 	// to use stronger TLS settings, cipher suites, etc.
 	// For now, we'll log that this should be done manually
-	
+
 	log.Info("ℹ️ TLS hardening requires manual Vault configuration update")
 	log.Info("ℹ️ Recommended: Use TLS 1.2+, strong cipher suites, and HSTS")
-	
+
 	return nil
 }
 
@@ -593,19 +593,19 @@ func enableRateLimiting(rc *eos_io.RuntimeContext, client *api.Client) error {
 		{
 			name: "global-rate-limit",
 			config: map[string]interface{}{
-				"type":     "rate-limit",
-				"rate":     1000.0, // 1000 requests per second
-				"interval": "1s",
+				"type":           "rate-limit",
+				"rate":           1000.0, // 1000 requests per second
+				"interval":       "1s",
 				"block_interval": "60s",
 			},
 		},
 		{
 			name: "auth-rate-limit",
 			config: map[string]interface{}{
-				"type":     "rate-limit",
-				"rate":     10.0, // 10 auth attempts per second
-				"interval": "1s",
-				"path":     "auth/",
+				"type":           "rate-limit",
+				"rate":           10.0, // 10 auth attempts per second
+				"interval":       "1s",
+				"path":           "auth/",
 				"block_interval": "300s", // 5 minute block
 			},
 		},
@@ -752,7 +752,7 @@ func revokeRootTokenSafely(rc *eos_io.RuntimeContext, client *api.Client) error 
 
 	log.Info("✅ Root token revoked successfully")
 	log.Info("🔔 Use alternative authentication methods for future access")
-	
+
 	return nil
 }
 

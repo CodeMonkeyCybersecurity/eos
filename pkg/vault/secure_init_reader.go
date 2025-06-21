@@ -25,23 +25,23 @@ import (
 
 // VaultInitInfo represents comprehensive Vault initialization information
 type VaultInitInfo struct {
-	InitResponse    *api.InitResponse       `json:"init_response"`
-	FileInfo        *VaultInitFileInfo      `json:"file_info"`
-	VaultStatus     *VaultStatusInfo        `json:"vault_status"`
-	SecurityStatus  *SecurityStatusInfo     `json:"security_status"`
-	EosCredentials  *shared.UserpassCreds   `json:"eos_credentials,omitempty"`
-	AccessAudit     *AccessAuditInfo        `json:"access_audit"`
+	InitResponse   *api.InitResponse     `json:"init_response"`
+	FileInfo       *VaultInitFileInfo    `json:"file_info"`
+	VaultStatus    *VaultStatusInfo      `json:"vault_status"`
+	SecurityStatus *SecurityStatusInfo   `json:"security_status"`
+	EosCredentials *shared.UserpassCreds `json:"eos_credentials,omitempty"`
+	AccessAudit    *AccessAuditInfo      `json:"access_audit"`
 }
 
 type VaultInitFileInfo struct {
-	Path         string    `json:"path"`
-	Size         int64     `json:"size"`
-	ModTime      time.Time `json:"modification_time"`
-	Checksum     string    `json:"checksum"`
-	Permissions  string    `json:"permissions"`
-	Owner        string    `json:"owner"`
-	Exists       bool      `json:"exists"`
-	Readable     bool      `json:"readable"`
+	Path        string    `json:"path"`
+	Size        int64     `json:"size"`
+	ModTime     time.Time `json:"modification_time"`
+	Checksum    string    `json:"checksum"`
+	Permissions string    `json:"permissions"`
+	Owner       string    `json:"owner"`
+	Exists      bool      `json:"exists"`
+	Readable    bool      `json:"readable"`
 }
 
 type VaultStatusInfo struct {
@@ -55,13 +55,13 @@ type VaultStatusInfo struct {
 }
 
 type SecurityStatusInfo struct {
-	MFAEnabled           bool     `json:"mfa_enabled"`
-	AuditEnabled         bool     `json:"audit_enabled"`
-	AuthMethods          []string `json:"auth_methods"`
-	HardeningApplied     bool     `json:"hardening_applied"`
-	RootTokenRevoked     bool     `json:"root_token_revoked"`
-	BackupConfigured     bool     `json:"backup_configured"`
-	FirewallConfigured   bool     `json:"firewall_configured"`
+	MFAEnabled         bool     `json:"mfa_enabled"`
+	AuditEnabled       bool     `json:"audit_enabled"`
+	AuthMethods        []string `json:"auth_methods"`
+	HardeningApplied   bool     `json:"hardening_applied"`
+	RootTokenRevoked   bool     `json:"root_token_revoked"`
+	BackupConfigured   bool     `json:"backup_configured"`
+	FirewallConfigured bool     `json:"firewall_configured"`
 }
 
 type AccessAuditInfo struct {
@@ -73,14 +73,14 @@ type AccessAuditInfo struct {
 
 // ReadInitOptions controls how vault init data is read and displayed
 type ReadInitOptions struct {
-	RedactSensitive   bool   `json:"redact_sensitive"`
-	VerifyIntegrity   bool   `json:"verify_integrity"`
-	IncludeStatus     bool   `json:"include_status"`
-	AuditAccess       bool   `json:"audit_access"`
-	ExportFormat      string `json:"export_format"` // "console", "json", "secure"
-	OutputPath        string `json:"output_path,omitempty"`
-	RequireConfirm    bool   `json:"require_confirmation"`
-	AccessReason      string `json:"access_reason,omitempty"`
+	RedactSensitive bool   `json:"redact_sensitive"`
+	VerifyIntegrity bool   `json:"verify_integrity"`
+	IncludeStatus   bool   `json:"include_status"`
+	AuditAccess     bool   `json:"audit_access"`
+	ExportFormat    string `json:"export_format"` // "console", "json", "secure"
+	OutputPath      string `json:"output_path,omitempty"`
+	RequireConfirm  bool   `json:"require_confirmation"`
+	AccessReason    string `json:"access_reason,omitempty"`
 }
 
 // DefaultReadInitOptions returns secure defaults for reading vault init data
@@ -202,7 +202,7 @@ func performSecurityVerification(rc *eos_io.RuntimeContext, options *ReadInitOpt
 		}
 	}
 
-	log.Info("✅ Security verification passed", 
+	log.Info("✅ Security verification passed",
 		zap.String("user", currentUser.Username),
 		zap.String("access_reason", options.AccessReason))
 	return nil
@@ -211,7 +211,7 @@ func performSecurityVerification(rc *eos_io.RuntimeContext, options *ReadInitOpt
 // readAndVerifyInitFile reads the vault init file with integrity verification
 func readAndVerifyInitFile(rc *eos_io.RuntimeContext, options *ReadInitOptions) (*api.InitResponse, *VaultInitFileInfo, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get file info
 	fileInfo, err := getInitFileInfo(shared.VaultInitPath)
 	if err != nil {
@@ -272,7 +272,7 @@ func getInitFileInfo(path string) (*VaultInitFileInfo, error) {
 	// Check if readable
 	if _, err := os.ReadFile(path); err == nil {
 		info.Readable = true
-		
+
 		// Calculate checksum
 		data, _ := os.ReadFile(path)
 		hash := sha256.Sum256(data)
@@ -298,9 +298,9 @@ func verifyInitDataIntegrity(initResponse *api.InitResponse) error {
 	}
 
 	// Verify token format (basic validation)
-	if !strings.HasPrefix(initResponse.RootToken, "hvs.") && 
-	   !strings.HasPrefix(initResponse.RootToken, "s.") &&
-	   len(initResponse.RootToken) < 20 {
+	if !strings.HasPrefix(initResponse.RootToken, "hvs.") &&
+		!strings.HasPrefix(initResponse.RootToken, "s.") &&
+		len(initResponse.RootToken) < 20 {
 		return fmt.Errorf("root token format appears invalid")
 	}
 
@@ -317,7 +317,7 @@ func verifyInitDataIntegrity(initResponse *api.InitResponse) error {
 // getVaultStatus retrieves current Vault operational status
 func getVaultStatus(rc *eos_io.RuntimeContext) (*VaultStatusInfo, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	status := &VaultStatusInfo{
 		Address: shared.GetVaultAddr(),
 	}
@@ -418,7 +418,7 @@ func checkFirewallStatus() bool {
 // auditVaultInitAccess logs the access to vault init data for security audit
 func auditVaultInitAccess(rc *eos_io.RuntimeContext, audit *AccessAuditInfo) {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// Log to structured logs
 	log.Warn("🔐 AUDIT: Vault initialization data accessed",
 		zap.String("accessed_by", audit.AccessedBy),
@@ -429,14 +429,14 @@ func auditVaultInitAccess(rc *eos_io.RuntimeContext, audit *AccessAuditInfo) {
 	// Write to audit file
 	auditDir := "/var/log/eos"
 	auditFile := filepath.Join(auditDir, "vault-access.log")
-	
+
 	if err := os.MkdirAll(auditDir, 0750); err == nil {
 		auditEntry := fmt.Sprintf("[%s] User '%s' accessed vault init data. Reason: '%s', Redaction: %s\n",
 			audit.AccessTime.Format(time.RFC3339),
 			audit.AccessedBy,
 			audit.AccessReason,
 			audit.RedactionMode)
-		
+
 		f, err := os.OpenFile(auditFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0640)
 		if err == nil {
 			if _, err := f.WriteString(auditEntry); err != nil {
@@ -502,7 +502,7 @@ func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
 	// Display initialization data
 	if info.InitResponse != nil {
 		fmt.Printf("\n🔑 Vault Initialization Data\n")
-		
+
 		if options.RedactSensitive {
 			fmt.Printf("   Root Token: %s\n", crypto.Redact(info.InitResponse.RootToken))
 			for i, key := range info.InitResponse.KeysB64 {

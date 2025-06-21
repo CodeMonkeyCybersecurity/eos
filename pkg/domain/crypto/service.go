@@ -14,15 +14,15 @@ import (
 
 // Service implements cryptographic domain logic
 type Service struct {
-	hashOps       HashOperations
-	encryptOps    EncryptionOperations
-	signatureOps  SignatureOperations
-	certOps       CertificateOperations
-	randomOps     RandomOperations
-	secureOps     SecureOperations
-	keyMgmt       KeyManagement
-	policy        CryptoPolicy
-	logger        *zap.Logger
+	hashOps      HashOperations
+	encryptOps   EncryptionOperations
+	signatureOps SignatureOperations
+	certOps      CertificateOperations
+	randomOps    RandomOperations
+	secureOps    SecureOperations
+	keyMgmt      KeyManagement
+	policy       CryptoPolicy
+	logger       *zap.Logger
 }
 
 // NewService creates a new cryptographic service
@@ -107,9 +107,9 @@ func (s *Service) EncryptData(ctx context.Context, plaintext []byte, keyID strin
 	}
 
 	result := &EncryptionResult{
-		Algorithm:    AES256GCM, // Default algorithm
-		Ciphertext:   ciphertext,
-		EncryptTime:  time.Since(start),
+		Algorithm:   AES256GCM, // Default algorithm
+		Ciphertext:  ciphertext,
+		EncryptTime: time.Since(start),
 	}
 
 	s.logger.Info("Data encrypted successfully",
@@ -368,11 +368,11 @@ func (s *Service) RedactSensitiveData(ctx context.Context, input string, pattern
 	// Add common sensitive patterns if none provided
 	if len(patterns) == 0 {
 		patterns = []string{
-			`\b\d{3}-\d{2}-\d{4}\b`,              // SSN
-			`\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b`, // Credit card
+			`\b\d{3}-\d{2}-\d{4}\b`,                               // SSN
+			`\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b`,          // Credit card
 			`\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b`, // Email
-			`Bearer\s+[A-Za-z0-9\-_]+`,           // Bearer tokens
-			`password["\s:=]+[^"\s]+`,            // Passwords in configs
+			`Bearer\s+[A-Za-z0-9\-_]+`,                            // Bearer tokens
+			`password["\s:=]+[^"\s]+`,                             // Passwords in configs
 		}
 	}
 

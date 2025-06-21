@@ -9,7 +9,7 @@ import (
 // BuildEosDefaultPolicy creates the default EOS user policy using the builder
 func BuildEosDefaultPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
-	
+
 	policy := builder.
 		AddComment("EOS Default Policy - Standard user access with security restrictions").
 		AddTokenCapabilities().
@@ -38,7 +38,7 @@ func BuildEosDefaultPolicy(rc *eos_io.RuntimeContext) (string, error) {
 // BuildEosAdminPolicy creates the admin policy for infrastructure management
 func BuildEosAdminPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
-	
+
 	policy := builder.
 		AddComment("EOS Admin Policy - Infrastructure management with elevated privileges").
 		AddSection("Full Token Management").
@@ -87,7 +87,7 @@ func BuildEosAdminPolicy(rc *eos_io.RuntimeContext) (string, error) {
 // BuildEosEmergencyPolicy creates the emergency access policy
 func BuildEosEmergencyPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
-	
+
 	policy := builder.
 		AddComment("EOS Emergency Policy - Broad access for emergency response").
 		AddSection("Emergency Read Access").
@@ -116,7 +116,7 @@ func BuildEosEmergencyPolicy(rc *eos_io.RuntimeContext) (string, error) {
 // BuildEosReadOnlyPolicy creates the read-only policy for monitoring
 func BuildEosReadOnlyPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
-	
+
 	policy := builder.
 		AddComment("EOS Read-Only Policy - Monitoring and auditing access").
 		AddSection("Read-Only Secrets Access").

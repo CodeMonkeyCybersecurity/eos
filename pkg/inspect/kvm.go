@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // DiscoverKVM gathers KVM/Libvirt infrastructure information
@@ -171,8 +171,8 @@ type vmXML struct {
 			} `xml:"target"`
 		} `xml:"disk"`
 		Interfaces []struct {
-			Type   string `xml:"type,attr"`
-			MAC    struct {
+			Type string `xml:"type,attr"`
+			MAC  struct {
 				Address string `xml:"address,attr"`
 			} `xml:"mac"`
 			Source struct {

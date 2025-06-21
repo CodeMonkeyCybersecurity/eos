@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
-	"github.com/zclconf/go-cty/cty"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"github.com/zclconf/go-cty/cty"
 	"go.uber.org/zap"
 )
 
@@ -21,11 +21,11 @@ type VaultPolicyValidator struct {
 
 // PolicyValidationResult contains validation results and suggestions
 type PolicyValidationResult struct {
-	Valid       bool              `json:"valid"`
-	Errors      []string          `json:"errors,omitempty"`
-	Warnings    []string          `json:"warnings,omitempty"`
-	Suggestions []string          `json:"suggestions,omitempty"`
-	ParsedBody  hcl.Body          `json:"-"`
+	Valid       bool     `json:"valid"`
+	Errors      []string `json:"errors,omitempty"`
+	Warnings    []string `json:"warnings,omitempty"`
+	Suggestions []string `json:"suggestions,omitempty"`
+	ParsedBody  hcl.Body `json:"-"`
 }
 
 // NewVaultPolicyValidator creates a new HCL validator for Vault policies
@@ -68,7 +68,7 @@ func (v *VaultPolicyValidator) ValidatePolicy(rc *eos_io.RuntimeContext, policyN
 		result.Valid = false
 	}
 
-	log.Info("✅ Policy validation completed", 
+	log.Info("✅ Policy validation completed",
 		zap.String("policy", policyName),
 		zap.Bool("valid", result.Valid),
 		zap.Int("errors", len(result.Errors)),
@@ -113,7 +113,7 @@ func (v *VaultPolicyValidator) validateVaultPolicySemantics(rc *eos_io.RuntimeCo
 // validatePathBlock validates a path block in a Vault policy
 func (v *VaultPolicyValidator) validatePathBlock(rc *eos_io.RuntimeContext, result *PolicyValidationResult, block *hcl.Block) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	if len(block.Labels) == 0 {
 		result.Errors = append(result.Errors, "path block missing path pattern")
 		return nil
@@ -145,7 +145,7 @@ func (v *VaultPolicyValidator) validatePathBlock(rc *eos_io.RuntimeContext, resu
 	// Common syntax mistakes
 	parameterValidation := map[string]string{
 		"denied_parameters":   "must be an object/map, not a list",
-		"allowed_parameters":  "must be an object/map, not a list", 
+		"allowed_parameters":  "must be an object/map, not a list",
 		"required_parameters": "can be either a list or object/map",
 	}
 
@@ -180,10 +180,10 @@ func (v *VaultPolicyValidator) validatePathBlock(rc *eos_io.RuntimeContext, resu
 	// Check for invalid attributes
 	for name, attr := range content.Attributes {
 		if suggestion, isInvalid := invalidAttributes[name]; isInvalid {
-			result.Errors = append(result.Errors, 
+			result.Errors = append(result.Errors,
 				fmt.Sprintf("path %s: invalid attribute '%s' - %s", pathPattern, name, suggestion))
 		} else if !validAttributes[name] {
-			result.Warnings = append(result.Warnings, 
+			result.Warnings = append(result.Warnings,
 				fmt.Sprintf("path %s: unknown attribute '%s'", pathPattern, name))
 		}
 
@@ -260,7 +260,7 @@ func (v *VaultPolicyValidator) validateCapabilities(result *PolicyValidationResu
 			if capVal.Type() == cty.String {
 				capability := capVal.AsString()
 				if !validCapabilities[capability] {
-					result.Errors = append(result.Errors, 
+					result.Errors = append(result.Errors,
 						fmt.Sprintf("path %s: invalid capability '%s'", pathPattern, capability))
 				}
 			}
@@ -276,26 +276,26 @@ func (v *VaultPolicyValidator) validatePathPattern(result *PolicyValidationResul
 	if strings.Contains(pathPattern, "{{") && strings.Contains(pathPattern, "}}") {
 		// Check for proper identity templating
 		if strings.Contains(pathPattern, "{{identity.entity.name}}") {
-			result.Suggestions = append(result.Suggestions, 
+			result.Suggestions = append(result.Suggestions,
 				fmt.Sprintf("path %s: using identity templating - ensure entities are properly configured", pathPattern))
 		}
-		
+
 		// Check for malformed templating
 		if strings.Count(pathPattern, "{{") != strings.Count(pathPattern, "}}") {
-			result.Errors = append(result.Errors, 
+			result.Errors = append(result.Errors,
 				fmt.Sprintf("path %s: malformed template syntax - mismatched braces", pathPattern))
 		}
 	}
 
 	// Check for overly broad permissions
 	if pathPattern == "*" {
-		result.Warnings = append(result.Warnings, 
+		result.Warnings = append(result.Warnings,
 			"path '*': extremely broad permissions - consider more specific paths")
 	}
 
 	// Check for secret engine specific patterns
 	if strings.HasPrefix(pathPattern, "secret/data/") {
-		result.Suggestions = append(result.Suggestions, 
+		result.Suggestions = append(result.Suggestions,
 			fmt.Sprintf("path %s: using KV v2 engine - ensure corresponding metadata path is also configured", pathPattern))
 	}
 }
@@ -334,7 +334,7 @@ func ValidateAndFixCommonIssues(rc *eos_io.RuntimeContext, policyName, policyCon
 
 	// Remove max_ttl from path blocks (not valid in ACL policies)
 	fixedContent = removeInvalidPathAttributes(fixedContent, []string{"max_ttl", "ttl", "default_ttl", "period"})
-	
+
 	// Fix denied_parameters syntax (convert from list to object)
 	fixedContent = fixParameterSyntax(fixedContent)
 
@@ -344,7 +344,7 @@ func ValidateAndFixCommonIssues(rc *eos_io.RuntimeContext, policyName, policyCon
 	}
 
 	if fixedContent != policyContent {
-		log.Info("🔧 Policy automatically fixed", 
+		log.Info("🔧 Policy automatically fixed",
 			zap.String("policy", policyName),
 			zap.Int("original_length", len(policyContent)),
 			zap.Int("fixed_length", len(fixedContent)))
@@ -384,7 +384,7 @@ func fixParameterSyntax(content string) string {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		
+
 		// Look for denied_parameters or allowed_parameters as lists
 		if strings.Contains(trimmed, "denied_parameters =") && strings.Contains(trimmed, "[") {
 			// Convert list to object format
@@ -393,15 +393,15 @@ func fixParameterSyntax(content string) string {
 				if len(parts) == 2 {
 					prefix := strings.TrimSpace(parts[0])
 					listPart := strings.TrimSpace(parts[1])
-					
+
 					// Extract list items
 					listPart = strings.Trim(listPart, "[]")
 					items := strings.Split(listPart, ",")
-					
+
 					// Convert to object format
 					indent := strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " ")))
 					result = append(result, fmt.Sprintf("%s%s = {", indent, prefix))
-					
+
 					for _, item := range items {
 						item = strings.TrimSpace(item)
 						item = strings.Trim(item, "\"")
@@ -414,7 +414,7 @@ func fixParameterSyntax(content string) string {
 				}
 			}
 		}
-		
+
 		result = append(result, line)
 	}
 

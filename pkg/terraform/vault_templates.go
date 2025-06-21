@@ -483,18 +483,18 @@ runcmd:
 
 // VaultTemplateData contains data for generating Vault-integrated templates
 type VaultTemplateData struct {
-	VaultAddr     string
-	SecretsMount  string
-	ProjectName   string
-	ServerName    string
-	ServerType    string
-	Location      string
-	SSHKeyName    string
-	ClusterName   string
-	NodeCount     int
-	K3sToken      string
-	K3sServerURL  string
-	Providers     []ProviderConfig
+	VaultAddr    string
+	SecretsMount string
+	ProjectName  string
+	ServerName   string
+	ServerType   string
+	Location     string
+	SSHKeyName   string
+	ClusterName  string
+	NodeCount    int
+	K3sToken     string
+	K3sServerURL string
+	Providers    []ProviderConfig
 }
 
 // VaultSecretRef represents a reference to a Vault secret in templates

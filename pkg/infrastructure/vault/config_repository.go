@@ -32,8 +32,8 @@ func NewFileConfigRepository(configDir string, logger *zap.Logger) *FileConfigRe
 
 	// Ensure config directory exists
 	if err := os.MkdirAll(configDir, 0750); err != nil {
-		logger.Error("Failed to create config directory", 
-			zap.String("dir", configDir), 
+		logger.Error("Failed to create config directory",
+			zap.String("dir", configDir),
 			zap.Error(err))
 	}
 
@@ -65,9 +65,9 @@ func (r *FileConfigRepository) SetConfig(ctx context.Context, key, value string)
 	defer r.mutex.Unlock()
 
 	r.configMap[key] = value
-	
+
 	if err := r.saveToFile(); err != nil {
-		r.logger.Error("Failed to save configuration", 
+		r.logger.Error("Failed to save configuration",
 			zap.String("key", key),
 			zap.Error(err))
 		return fmt.Errorf("failed to save configuration: %w", err)
@@ -102,9 +102,9 @@ func (r *FileConfigRepository) DeleteConfig(ctx context.Context, key string) err
 	}
 
 	delete(r.configMap, key)
-	
+
 	if err := r.saveToFile(); err != nil {
-		r.logger.Error("Failed to save configuration after deletion", 
+		r.logger.Error("Failed to save configuration after deletion",
 			zap.String("key", key),
 			zap.Error(err))
 		return fmt.Errorf("failed to save configuration: %w", err)
@@ -117,7 +117,7 @@ func (r *FileConfigRepository) DeleteConfig(ctx context.Context, key string) err
 // loadFromFile loads configuration from the file system
 func (r *FileConfigRepository) loadFromFile() error {
 	configFile := filepath.Join(r.configDir, "vault-config.json")
-	
+
 	// Check if file exists
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		r.logger.Debug("No existing configuration file found")
@@ -137,7 +137,7 @@ func (r *FileConfigRepository) loadFromFile() error {
 	}
 
 	r.configMap = config
-	r.logger.Info("Configuration loaded from file", 
+	r.logger.Info("Configuration loaded from file",
 		zap.String("file", configFile),
 		zap.Int("count", len(config)))
 
@@ -147,7 +147,7 @@ func (r *FileConfigRepository) loadFromFile() error {
 // saveToFile saves configuration to the file system
 func (r *FileConfigRepository) saveToFile() error {
 	configFile := filepath.Join(r.configDir, "vault-config.json")
-	
+
 	// Marshal to JSON
 	data, err := json.MarshalIndent(r.configMap, "", "  ")
 	if err != nil {
@@ -171,7 +171,7 @@ func (r *FileConfigRepository) saveToFile() error {
 		return fmt.Errorf("failed to rename config file: %w", err)
 	}
 
-	r.logger.Debug("Configuration saved to file", 
+	r.logger.Debug("Configuration saved to file",
 		zap.String("file", configFile),
 		zap.Int("count", len(r.configMap)))
 
@@ -197,10 +197,10 @@ func NewVaultConfigRepository(secretStore vault.SecretStore, keyPrefix string, l
 // GetConfig retrieves configuration by key from vault
 func (r *VaultConfigRepository) GetConfig(ctx context.Context, key string) (string, error) {
 	fullKey := r.keyPrefix + "/" + key
-	
+
 	secret, err := r.secretStore.Get(ctx, fullKey)
 	if err != nil {
-		r.logger.Error("Failed to get config from vault", 
+		r.logger.Error("Failed to get config from vault",
 			zap.String("key", key),
 			zap.Error(err))
 		return "", fmt.Errorf("failed to get config from vault: %w", err)
@@ -217,18 +217,18 @@ func (r *VaultConfigRepository) GetConfig(ctx context.Context, key string) (stri
 // SetConfig stores configuration in vault
 func (r *VaultConfigRepository) SetConfig(ctx context.Context, key, value string) error {
 	fullKey := r.keyPrefix + "/" + key
-	
+
 	secret := &vault.Secret{
 		Key:   fullKey,
 		Value: value,
 		Metadata: map[string]string{
-			"type":        "config",
-			"config_key":  key,
+			"type":       "config",
+			"config_key": key,
 		},
 	}
 
 	if err := r.secretStore.Set(ctx, fullKey, secret); err != nil {
-		r.logger.Error("Failed to store config in vault", 
+		r.logger.Error("Failed to store config in vault",
 			zap.String("key", key),
 			zap.Error(err))
 		return fmt.Errorf("failed to store config in vault: %w", err)
@@ -262,9 +262,9 @@ func (r *VaultConfigRepository) GetAllConfig(ctx context.Context) (map[string]st
 // DeleteConfig removes configuration from vault
 func (r *VaultConfigRepository) DeleteConfig(ctx context.Context, key string) error {
 	fullKey := r.keyPrefix + "/" + key
-	
+
 	if err := r.secretStore.Delete(ctx, fullKey); err != nil {
-		r.logger.Error("Failed to delete config from vault", 
+		r.logger.Error("Failed to delete config from vault",
 			zap.String("key", key),
 			zap.Error(err))
 		return fmt.Errorf("failed to delete config from vault: %w", err)

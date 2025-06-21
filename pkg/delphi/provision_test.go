@@ -43,9 +43,9 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		Body:       nil,
 	}
 	response.Header.Set("Content-Type", "application/json")
-	
+
 	var responseData map[string]any
-	
+
 	switch req.URL.Path {
 	case "/security/users":
 		responseData = map[string]any{
@@ -72,18 +72,18 @@ func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) 
 		response.StatusCode = 404
 		return response, nil
 	}
-	
+
 	// Convert response data to JSON
 	jsonData, err := json.Marshal(responseData)
 	if err != nil {
 		response.StatusCode = 500
 		return response, nil
 	}
-	
+
 	response.Body = http.NoBody
 	response.ContentLength = int64(len(jsonData))
 	response.Body = &mockResponseBody{data: jsonData}
-	
+
 	return response, nil
 }
 
@@ -97,7 +97,7 @@ func (m *mockResponseBody) Read(p []byte) (n int, err error) {
 	if m.pos >= len(m.data) {
 		return 0, io.EOF
 	}
-	
+
 	n = copy(p, m.data[m.pos:])
 	m.pos += n
 	if m.pos >= len(m.data) {
@@ -115,10 +115,10 @@ func TestResolveWazuhUserID(t *testing.T) {
 	originalClient := httpclient.DefaultClient()
 	httpclient.SetDefaultClient(createMockHTTPClient())
 	defer httpclient.SetDefaultClient(originalClient)
-	
+
 	// Create test context
 	rc := newTestRuntimeContext()
-	
+
 	// Test existing user
 	id, err := ResolveWazuhUserID(rc, "alice")
 	if err != nil {
@@ -127,7 +127,7 @@ func TestResolveWazuhUserID(t *testing.T) {
 	if id != "user-123" {
 		t.Fatalf("expected 'user-123', got: %s", id)
 	}
-	
+
 	// Test non-existing user
 	_, err = ResolveWazuhUserID(rc, "nonexistent")
 	if err == nil {
@@ -144,10 +144,10 @@ func TestResolveWazuhRoleID(t *testing.T) {
 	originalClient := httpclient.DefaultClient()
 	httpclient.SetDefaultClient(createMockHTTPClient())
 	defer httpclient.SetDefaultClient(originalClient)
-	
+
 	// Create test context
 	rc := newTestRuntimeContext()
-	
+
 	// Test existing role
 	id, err := ResolveWazuhRoleID(rc, "role_alice")
 	if err != nil {
@@ -156,7 +156,7 @@ func TestResolveWazuhRoleID(t *testing.T) {
 	if id != "role-123" {
 		t.Fatalf("expected 'role-123', got: %s", id)
 	}
-	
+
 	// Test non-existing role
 	_, err = ResolveWazuhRoleID(rc, "nonexistent")
 	if err == nil {
@@ -173,10 +173,10 @@ func TestResolveWazuhPolicyID(t *testing.T) {
 	originalClient := httpclient.DefaultClient()
 	httpclient.SetDefaultClient(createMockHTTPClient())
 	defer httpclient.SetDefaultClient(originalClient)
-	
+
 	// Create test context
 	rc := newTestRuntimeContext()
-	
+
 	// Test existing policy
 	id, err := ResolveWazuhPolicyID(rc, "policy_alice")
 	if err != nil {
@@ -185,7 +185,7 @@ func TestResolveWazuhPolicyID(t *testing.T) {
 	if id != "policy-123" {
 		t.Fatalf("expected 'policy-123', got: %s", id)
 	}
-	
+
 	// Test non-existing policy
 	_, err = ResolveWazuhPolicyID(rc, "nonexistent")
 	if err == nil {
@@ -221,18 +221,18 @@ func TestResolveWazuhUserID_TableDriven(t *testing.T) {
 			expectedError: "user not found: charlie",
 		},
 	}
-	
+
 	// Store original client and restore after test
 	originalClient := httpclient.DefaultClient()
 	httpclient.SetDefaultClient(createMockHTTPClient())
 	defer httpclient.SetDefaultClient(originalClient)
-	
+
 	rc := newTestRuntimeContext()
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			id, err := ResolveWazuhUserID(rc, tt.username)
-			
+
 			if tt.expectedError != "" {
 				if err == nil {
 					t.Fatalf("expected error '%s', got nil", tt.expectedError)

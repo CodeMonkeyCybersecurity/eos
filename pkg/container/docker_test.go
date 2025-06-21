@@ -21,14 +21,14 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "Failed to initialize telemetry: %v\n", err)
 		os.Exit(1)
 	}
-	
+
 	// Run tests
 	code := m.Run()
 	os.Exit(code)
 }
 
 func TestRunDockerAction(t *testing.T) {
-	
+
 	tests := []struct {
 		name        string
 		action      string

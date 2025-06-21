@@ -11,8 +11,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/inspect"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var (
@@ -46,14 +46,14 @@ func init() {
 func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	start := time.Now()
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Get current working directory and user context for debugging
 	pwd, _ := os.Getwd()
 	user := os.Getenv("USER")
 	if user == "" {
 		user = os.Getenv("USERNAME") // Windows fallback
 	}
-	
+
 	logger.Info("🔍 Starting infrastructure inspection",
 		zap.String("user", user),
 		zap.String("pwd", pwd),
@@ -69,11 +69,11 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger.Info("📊 Discovering system information",
 		zap.String("phase", "system"),
 		zap.Duration("timeout", 30*time.Second))
-	
+
 	systemStart := time.Now()
 	systemInfo, err := inspector.DiscoverSystem()
 	if err != nil {
-		logger.Error("❌ Failed to discover system information", 
+		logger.Error("❌ Failed to discover system information",
 			zap.Error(err),
 			zap.String("phase", "system"),
 			zap.Duration("duration", time.Since(systemStart)),
@@ -94,7 +94,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger.Info("🐳 Discovering Docker containers and configurations",
 		zap.String("phase", "docker"),
 		zap.Duration("timeout", 30*time.Second))
-	
+
 	dockerStart := time.Now()
 	dockerInfo, err := inspector.DiscoverDocker()
 	if err != nil {
@@ -122,7 +122,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger.Info("🖥️ Discovering KVM/Libvirt virtual machines",
 		zap.String("phase", "kvm"),
 		zap.Duration("timeout", 30*time.Second))
-	
+
 	kvmStart := time.Now()
 	kvmInfo, err := inspector.DiscoverKVM()
 	if err != nil {
@@ -149,7 +149,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger.Info("☁️ Discovering Hetzner Cloud resources",
 		zap.String("phase", "hetzner"),
 		zap.Duration("timeout", 30*time.Second))
-	
+
 	hetznerStart := time.Now()
 	hetznerInfo, err := inspector.DiscoverHetzner()
 	if err != nil {
@@ -170,7 +170,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	logger.Info("⚙️ Discovering service configurations",
 		zap.String("phase", "services"),
 		zap.Duration("timeout", 30*time.Second))
-	
+
 	servicesStart := time.Now()
 	servicesInfo, err := inspector.DiscoverServices()
 	if err != nil {
@@ -190,13 +190,13 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	// Compile all information
 	infrastructure := &inspect.Infrastructure{
-		Timestamp:   time.Now(),
-		Hostname:    systemInfo.Hostname,
-		System:      systemInfo,
-		Docker:      dockerInfo,
-		KVM:         kvmInfo,
-		Hetzner:     hetznerInfo,
-		Services:    servicesInfo,
+		Timestamp: time.Now(),
+		Hostname:  systemInfo.Hostname,
+		System:    systemInfo,
+		Docker:    dockerInfo,
+		KVM:       kvmInfo,
+		Hetzner:   hetznerInfo,
+		Services:  servicesInfo,
 	}
 
 	// Determine output path with detailed logging
@@ -231,18 +231,18 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		// For YAML, get the parent directory of the file
 		outputDir = filepath.Dir(infraOutputPath)
 	}
-	
+
 	logger.Info("📁 Creating output directory",
 		zap.String("directory", outputDir),
 		zap.String("permissions", "0755"))
-	
+
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
 		logger.Error("❌ Failed to create output directory",
 			zap.Error(err),
 			zap.String("directory", outputDir))
 		return err
 	}
-	
+
 	logger.Info("✅ Output directory ready",
 		zap.String("directory", outputDir))
 

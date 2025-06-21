@@ -19,11 +19,11 @@ import (
 
 // VaultIntegration holds configuration for Vault-Terraform integration
 type VaultIntegration struct {
-	VaultAddr    string
-	VaultToken   string
-	SecretsPath  string
-	BackendPath  string
-	EnableState  bool
+	VaultAddr     string
+	VaultToken    string
+	SecretsPath   string
+	BackendPath   string
+	EnableState   bool
 	EnableSecrets bool
 }
 
@@ -38,17 +38,17 @@ type VaultSecretReference struct {
 
 // VaultBackendConfig represents Vault backend configuration for Terraform state
 type VaultBackendConfig struct {
-	Address     string
-	Path        string
-	Token       string
-	Namespace   string
+	Address       string
+	Path          string
+	Token         string
+	Namespace     string
 	SkipTLSVerify bool
 }
 
 // ConfigureVaultIntegration sets up Vault integration for the Terraform manager
 func (m *Manager) ConfigureVaultIntegration(rc *eos_io.RuntimeContext, config VaultIntegration) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Configuring Vault integration for Terraform", 
+	logger.Info("Configuring Vault integration for Terraform",
 		zap.String("vault_addr", config.VaultAddr),
 		zap.Bool("enable_state", config.EnableState),
 		zap.Bool("enable_secrets", config.EnableSecrets))
@@ -89,7 +89,7 @@ func (m *Manager) LoadSecretsFromVault(rc *eos_io.RuntimeContext, secretRefs []V
 	for _, ref := range secretRefs {
 		secret, err := m.retrieveVaultSecret(rc, client, ref)
 		if err != nil {
-			logger.Error("Failed to retrieve secret", 
+			logger.Error("Failed to retrieve secret",
 				zap.String("path", ref.Path),
 				zap.String("key", ref.Key),
 				zap.Error(err))
@@ -98,7 +98,7 @@ func (m *Manager) LoadSecretsFromVault(rc *eos_io.RuntimeContext, secretRefs []V
 
 		// Add as Terraform variable
 		m.SetVariable(ref.VarName, secret)
-		logger.Debug("Secret loaded as Terraform variable", 
+		logger.Debug("Secret loaded as Terraform variable",
 			zap.String("var_name", ref.VarName),
 			zap.String("vault_path", ref.Path))
 	}
@@ -127,10 +127,10 @@ terraform {
     retry_wait_max = 10
   }
 }
-`, config.Address, config.Path, 
-   config.Address, config.Path,
-   config.Address, config.Path,
-   config.Token)
+`, config.Address, config.Path,
+		config.Address, config.Path,
+		config.Address, config.Path,
+		config.Token)
 
 	backendFile := filepath.Join(m.Config.WorkingDir, "backend.tf")
 	if err := os.WriteFile(backendFile, []byte(backendHCL), 0644); err != nil {
@@ -144,7 +144,7 @@ terraform {
 // GenerateVaultProviderConfig creates Vault provider configuration for Terraform
 func (m *Manager) GenerateVaultProviderConfig(rc *eos_io.RuntimeContext, vaultAddr, vaultToken string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	providerHCL := fmt.Sprintf(`
 terraform {
   required_providers {
@@ -173,7 +173,7 @@ provider "vault" {
 // SyncTerraformOutputsToVault stores Terraform outputs in Vault
 func (m *Manager) SyncTerraformOutputsToVault(rc *eos_io.RuntimeContext, vaultPath string, outputNames []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Syncing Terraform outputs to Vault", 
+	logger.Info("Syncing Terraform outputs to Vault",
 		zap.String("vault_path", vaultPath),
 		zap.Strings("outputs", outputNames))
 
@@ -188,7 +188,7 @@ func (m *Manager) SyncTerraformOutputsToVault(rc *eos_io.RuntimeContext, vaultPa
 	for _, outputName := range outputNames {
 		output, err := m.Output(rc, outputName)
 		if err != nil {
-			logger.Warn("Failed to retrieve output", 
+			logger.Warn("Failed to retrieve output",
 				zap.String("output", outputName),
 				zap.Error(err))
 			continue
@@ -344,7 +344,7 @@ locals {
   %s = data.vault_kv_secret_v2.%s.data["%s"]
 }
 `, ref.VarName, strings.Split(ref.Path, "/")[0], strings.Join(strings.Split(ref.Path, "/")[1:], "/"),
-   ref.VarName, ref.VarName, ref.Key))
+			ref.VarName, ref.VarName, ref.Key))
 	}
 
 	dataSourcesFile := filepath.Join(m.Config.WorkingDir, "vault_data_sources.tf")

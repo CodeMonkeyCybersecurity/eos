@@ -81,7 +81,7 @@ func (s *Service) GetSecret(ctx context.Context, userID, key string) (*Secret, e
 
 	if err != nil {
 		auditEvent.Error = err.Error()
-		s.logger.Error("Failed to get secret", 
+		s.logger.Error("Failed to get secret",
 			zap.String("user", userID),
 			zap.String("key", key),
 			zap.Error(err))
@@ -152,9 +152,9 @@ func (s *Service) SetSecret(ctx context.Context, userID string, secret *Secret) 
 	// Update audit event
 	auditEvent.Auth.Metadata["duration"] = time.Since(start).String()
 	auditEvent.Request.Data = map[string]interface{}{
-		"key_length": len(secret.Key),
+		"key_length":   len(secret.Key),
 		"has_metadata": len(secret.Metadata) > 0,
-		"has_expiry": secret.ExpiresAt != nil,
+		"has_expiry":   secret.ExpiresAt != nil,
 	}
 
 	if err != nil {
@@ -211,7 +211,7 @@ func (s *Service) DeleteSecret(ctx context.Context, userID, key string) error {
 
 	// Delete secret
 	err := s.secretStore.Delete(ctx, key)
-	
+
 	// Update audit event with final duration
 	auditEvent.Auth.Metadata["duration"] = time.Since(start).String()
 
@@ -443,7 +443,7 @@ func (s *Service) validateSecret(secret *Secret) error {
 		return fmt.Errorf("secret value is required")
 	}
 	if strings.Contains(secret.Key, "..") {
-		return fmt.Errorf("secret key cannot contain '..'") 
+		return fmt.Errorf("secret key cannot contain '..'")
 	}
 	if len(secret.Key) > 1024 {
 		return fmt.Errorf("secret key too long (max 1024 characters)")

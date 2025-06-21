@@ -14,12 +14,12 @@ import (
 
 // Service implements file operations domain logic
 type Service struct {
-	fileOps      FileOperations
-	pathOps      PathOperations
-	templateOps  TemplateOperations
-	archiveOps   ArchiveOperations
-	safeOps      SafeOperations
-	logger       *zap.Logger
+	fileOps     FileOperations
+	pathOps     PathOperations
+	templateOps TemplateOperations
+	archiveOps  ArchiveOperations
+	safeOps     SafeOperations
+	logger      *zap.Logger
 }
 
 // NewService creates a new file operations service
@@ -394,7 +394,7 @@ func (s *Service) matchesFilter(path string, info os.FileInfo, filter FileFilter
 
 	// Check patterns
 	baseName := s.pathOps.BaseName(path)
-	
+
 	// Check exclude patterns first
 	for _, pattern := range filter.ExcludePatterns {
 		if matched, _ := filepath.Match(pattern, baseName); matched {
@@ -406,7 +406,7 @@ func (s *Service) matchesFilter(path string, info os.FileInfo, filter FileFilter
 	if len(filter.IncludePatterns) == 0 {
 		return true
 	}
-	
+
 	for _, pattern := range filter.IncludePatterns {
 		if matched, _ := filepath.Match(pattern, baseName); matched {
 			return true

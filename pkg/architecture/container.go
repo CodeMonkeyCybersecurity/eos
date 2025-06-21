@@ -11,18 +11,18 @@ import (
 // DIContainer manages dependencies and provides dependency injection
 type DIContainer struct {
 	// Infrastructure dependencies
-	infraProvider    InfrastructureProvider
-	containerMgr     ContainerManager
-	serviceMgr       ServiceManager
-	commandExecutor  CommandExecutor
+	infraProvider   InfrastructureProvider
+	containerMgr    ContainerManager
+	serviceMgr      ServiceManager
+	commandExecutor CommandExecutor
 
 	// Storage dependencies
-	secretStore   SecretStore
-	configRepo    ConfigRepository
-	auditRepo     AuditRepository
+	secretStore SecretStore
+	configRepo  ConfigRepository
+	auditRepo   AuditRepository
 
 	// Services (business logic)
-	infraService *InfrastructureService
+	infraService  *InfrastructureService
 	secretService *SecretService
 
 	// Cross-cutting concerns

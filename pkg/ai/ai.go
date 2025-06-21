@@ -19,13 +19,13 @@ import (
 
 // AIAssistant represents the AI assistant for infrastructure management
 type AIAssistant struct {
-	provider     string
-	apiKey       string
-	baseURL      string
-	model        string
-	client       *http.Client
-	maxTokens    int
-	
+	provider  string
+	apiKey    string
+	baseURL   string
+	model     string
+	client    *http.Client
+	maxTokens int
+
 	// Azure OpenAI specific fields
 	azureEndpoint   string
 	azureAPIVersion string
@@ -72,12 +72,12 @@ type AIUsage struct {
 
 // ConversationContext holds context for AI conversations
 type ConversationContext struct {
-	SystemPrompt    string
-	Environment     *EnvironmentContext
-	ConversationID  string
-	Messages        []AIMessage
-	LastResponse    *AIResponse
-	ActiveSession   bool
+	SystemPrompt   string
+	Environment    *EnvironmentContext
+	ConversationID string
+	Messages       []AIMessage
+	LastResponse   *AIResponse
+	ActiveSession  bool
 }
 
 // EnvironmentContext holds information about the current environment
@@ -92,11 +92,11 @@ type EnvironmentContext struct {
 
 // FileSystemContext holds file system information
 type FileSystemContext struct {
-	RecentFiles     []FileInfo
-	ConfigFiles     []FileInfo
-	ComposeFiles    []FileInfo
-	TerraformFiles  []FileInfo
-	DirectoryTree   map[string][]string
+	RecentFiles    []FileInfo
+	ConfigFiles    []FileInfo
+	ComposeFiles   []FileInfo
+	TerraformFiles []FileInfo
+	DirectoryTree  map[string][]string
 }
 
 // ServicesContext holds information about running services
@@ -117,10 +117,10 @@ type InfrastructureContext struct {
 
 // LogContext holds recent log information
 type LogContext struct {
-	SystemLogs    []LogEntry
-	ServiceLogs   []LogEntry
-	ErrorLogs     []LogEntry
-	RecentErrors  []LogEntry
+	SystemLogs   []LogEntry
+	ServiceLogs  []LogEntry
+	ErrorLogs    []LogEntry
+	RecentErrors []LogEntry
 }
 
 // SystemInfo holds system information
@@ -136,12 +136,12 @@ type SystemInfo struct {
 
 // FileInfo represents file information
 type FileInfo struct {
-	Path         string
-	Size         int64
-	ModTime      time.Time
-	IsDirectory  bool
-	ContentType  string
-	Excerpt      string
+	Path        string
+	Size        int64
+	ModTime     time.Time
+	IsDirectory bool
+	ContentType string
+	Excerpt     string
 }
 
 // ContainerInfo represents Docker container information
@@ -223,13 +223,13 @@ type LogEntry struct {
 // NewAIAssistant creates a new AI assistant instance
 func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Load configuration
 	configManager := NewConfigManager()
 	if err := configManager.LoadConfig(); err != nil {
 		logger.Warn("Failed to load AI config", zap.Error(err))
 	}
-	
+
 	// Get API key
 	apiKey, err := configManager.GetAPIKey(rc)
 	if err != nil {
@@ -237,18 +237,18 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		logger.Debug("API key not available", zap.Error(err))
 		apiKey = ""
 	}
-	
+
 	config := configManager.GetConfig()
-	
+
 	// Determine provider
 	provider := config.Provider
 	if provider == "" {
 		provider = "anthropic" // Default to Anthropic
 	}
-	
+
 	var baseURL, model string
 	var azureEndpoint, azureAPIVersion, azureDeployment string
-	
+
 	// Configure based on provider
 	if provider == "azure-openai" {
 		// Azure OpenAI configuration
@@ -256,7 +256,7 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		if envEndpoint := os.Getenv("AZURE_OPENAI_ENDPOINT"); envEndpoint != "" {
 			azureEndpoint = envEndpoint
 		}
-		
+
 		azureAPIVersion = config.AzureAPIVersion
 		if azureAPIVersion == "" {
 			azureAPIVersion = "2024-02-15-preview"
@@ -264,12 +264,12 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		if envVersion := os.Getenv("AZURE_OPENAI_API_VERSION"); envVersion != "" {
 			azureAPIVersion = envVersion
 		}
-		
+
 		azureDeployment = config.AzureDeployment
 		if envDeployment := os.Getenv("AZURE_OPENAI_DEPLOYMENT"); envDeployment != "" {
 			azureDeployment = envDeployment
 		}
-		
+
 		model = config.Model
 		if model == "" {
 			model = "gpt-4"
@@ -277,7 +277,7 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		if envModel := os.Getenv("AZURE_OPENAI_MODEL"); envModel != "" {
 			model = envModel
 		}
-		
+
 		// Construct Azure OpenAI URL
 		if azureEndpoint != "" && azureDeployment != "" {
 			baseURL = fmt.Sprintf("%s/openai/deployments/%s", azureEndpoint, azureDeployment)
@@ -291,7 +291,7 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		if envURL := os.Getenv("ANTHROPIC_BASE_URL"); envURL != "" {
 			baseURL = envURL
 		}
-		
+
 		model = config.Model
 		if model == "" {
 			model = "claude-3-sonnet-20240229"
@@ -300,12 +300,12 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 			model = envModel
 		}
 	}
-	
+
 	maxTokens := config.MaxTokens
 	if maxTokens == 0 {
 		maxTokens = 4096
 	}
-	
+
 	timeout := time.Duration(config.Timeout) * time.Second
 	if timeout == 0 {
 		timeout = 60 * time.Second
@@ -393,7 +393,7 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 	var requestBody []byte
 	var err error
 	var url string
-	
+
 	if ai.provider == "azure-openai" {
 		// Azure OpenAI uses a different request format
 		azureRequest := map[string]any{
@@ -406,7 +406,7 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal Azure request: %w", err)
 		}
-		
+
 		// Azure OpenAI URL format
 		url = fmt.Sprintf("%s/chat/completions?api-version=%s", ai.baseURL, ai.azureAPIVersion)
 	} else {
@@ -415,7 +415,7 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 		if err != nil {
 			return nil, fmt.Errorf("failed to marshal request: %w", err)
 		}
-		
+
 		url = ai.baseURL + "/messages"
 	}
 
@@ -477,10 +477,10 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 // NewConversationContext creates a new conversation context
 func NewConversationContext(systemPrompt string) *ConversationContext {
 	return &ConversationContext{
-		SystemPrompt:    systemPrompt,
-		ConversationID:  generateConversationID(),
-		Messages:        []AIMessage{},
-		ActiveSession:   true,
+		SystemPrompt:   systemPrompt,
+		ConversationID: generateConversationID(),
+		Messages:       []AIMessage{},
+		ActiveSession:  true,
 	}
 }
 
@@ -571,7 +571,7 @@ func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
 			if len(services.DockerContainers) > 0 {
 				prompt.WriteString("Docker Containers:\n")
 				for _, container := range services.DockerContainers {
-					prompt.WriteString(fmt.Sprintf("- %s: %s (image: %s, status: %s)\n", 
+					prompt.WriteString(fmt.Sprintf("- %s: %s (image: %s, status: %s)\n",
 						container.Name, container.ID, container.Image, container.Status))
 				}
 				prompt.WriteString("\n")
@@ -584,7 +584,7 @@ func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
 			if len(logs.RecentErrors) > 0 {
 				prompt.WriteString("Recent Errors:\n")
 				for _, log := range logs.RecentErrors {
-					prompt.WriteString(fmt.Sprintf("- [%s] %s: %s\n", 
+					prompt.WriteString(fmt.Sprintf("- [%s] %s: %s\n",
 						log.Timestamp.Format("15:04:05"), log.Service, log.Message))
 				}
 				prompt.WriteString("\n")
@@ -595,11 +595,11 @@ func BuildEnvironmentPrompt(ctx *ConversationContext, userQuery string) string {
 		if ctx.Environment.Infrastructure != nil {
 			infra := ctx.Environment.Infrastructure
 			if infra.VaultStatus != nil {
-				prompt.WriteString(fmt.Sprintf("Vault Status: Sealed=%t, Initialized=%t, Version=%s\n", 
+				prompt.WriteString(fmt.Sprintf("Vault Status: Sealed=%t, Initialized=%t, Version=%s\n",
 					infra.VaultStatus.Sealed, infra.VaultStatus.Initialized, infra.VaultStatus.Version))
 			}
 			if infra.ConsulStatus != nil {
-				prompt.WriteString(fmt.Sprintf("Consul Status: Leader=%s, Datacenter=%s\n", 
+				prompt.WriteString(fmt.Sprintf("Consul Status: Leader=%s, Datacenter=%s\n",
 					infra.ConsulStatus.Leader, infra.ConsulStatus.Datacenter))
 			}
 		}

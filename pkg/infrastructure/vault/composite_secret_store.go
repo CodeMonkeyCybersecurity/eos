@@ -41,8 +41,8 @@ func (c *CompositeSecretStore) Get(ctx context.Context, key string) (*domain.Sec
 	}
 
 	// Log primary failure and try fallback
-	c.logger.Debug("Primary store failed, trying fallback", 
-		zap.String("key", key), 
+	c.logger.Debug("Primary store failed, trying fallback",
+		zap.String("key", key),
 		zap.Error(err))
 
 	secret, fallbackErr := c.fallback.Get(ctx, key)
@@ -57,7 +57,7 @@ func (c *CompositeSecretStore) Get(ctx context.Context, key string) (*domain.Sec
 	}
 
 	// Both stores failed
-	c.logger.Warn("Secret not found in any store", 
+	c.logger.Warn("Secret not found in any store",
 		zap.String("key", key),
 		zap.NamedError("primary_error", err),
 		zap.NamedError("fallback_error", fallbackErr))
@@ -74,22 +74,22 @@ func (c *CompositeSecretStore) Set(ctx context.Context, key string, secret *doma
 	err := c.primary.Set(ctx, key, secret)
 	if err == nil {
 		c.logger.Debug("Secret stored in primary store", zap.String("key", key))
-		
+
 		// Optionally sync to fallback for backup (best effort)
 		if fallbackErr := c.fallback.Set(ctx, key, secret); fallbackErr != nil {
-			c.logger.Warn("Failed to sync secret to fallback store", 
-				zap.String("key", key), 
+			c.logger.Warn("Failed to sync secret to fallback store",
+				zap.String("key", key),
 				zap.Error(fallbackErr))
 		} else {
 			c.logger.Debug("Secret synced to fallback store", zap.String("key", key))
 		}
-		
+
 		return nil
 	}
 
 	// Primary failed, try fallback as last resort
-	c.logger.Warn("Primary store failed for set, trying fallback", 
-		zap.String("key", key), 
+	c.logger.Warn("Primary store failed for set, trying fallback",
+		zap.String("key", key),
 		zap.Error(err))
 
 	fallbackErr := c.fallback.Set(ctx, key, secret)
@@ -99,7 +99,7 @@ func (c *CompositeSecretStore) Set(ctx context.Context, key string, secret *doma
 	}
 
 	// Both stores failed
-	c.logger.Error("Failed to store secret in any store", 
+	c.logger.Error("Failed to store secret in any store",
 		zap.String("key", key),
 		zap.NamedError("primary_error", err),
 		zap.NamedError("fallback_error", fallbackErr))
@@ -117,16 +117,16 @@ func (c *CompositeSecretStore) Delete(ctx context.Context, key string) error {
 
 	// Log results
 	if primaryErr != nil {
-		c.logger.Debug("Failed to delete from primary store", 
-			zap.String("key", key), 
+		c.logger.Debug("Failed to delete from primary store",
+			zap.String("key", key),
 			zap.Error(primaryErr))
 	} else {
 		c.logger.Debug("Secret deleted from primary store", zap.String("key", key))
 	}
 
 	if fallbackErr != nil {
-		c.logger.Debug("Failed to delete from fallback store", 
-			zap.String("key", key), 
+		c.logger.Debug("Failed to delete from fallback store",
+			zap.String("key", key),
 			zap.Error(fallbackErr))
 	} else {
 		c.logger.Debug("Secret deleted from fallback store", zap.String("key", key))
@@ -139,7 +139,7 @@ func (c *CompositeSecretStore) Delete(ctx context.Context, key string) error {
 	}
 
 	// Both deletions failed
-	c.logger.Warn("Failed to delete secret from any store", 
+	c.logger.Warn("Failed to delete secret from any store",
 		zap.String("key", key),
 		zap.NamedError("primary_error", primaryErr),
 		zap.NamedError("fallback_error", fallbackErr))
@@ -154,23 +154,23 @@ func (c *CompositeSecretStore) List(ctx context.Context, prefix string) ([]*doma
 	// Try primary store first
 	secrets, err := c.primary.List(ctx, prefix)
 	if err == nil {
-		c.logger.Debug("Secrets listed from primary store", 
-			zap.String("prefix", prefix), 
+		c.logger.Debug("Secrets listed from primary store",
+			zap.String("prefix", prefix),
 			zap.Int("count", len(secrets)))
 		return secrets, nil
 	}
 
 	// Primary failed, try fallback
-	c.logger.Debug("Primary store failed for list, trying fallback", 
-		zap.String("prefix", prefix), 
+	c.logger.Debug("Primary store failed for list, trying fallback",
+		zap.String("prefix", prefix),
 		zap.Error(err))
 
 	secrets, fallbackErr := c.fallback.List(ctx, prefix)
 	if fallbackErr == nil {
-		c.logger.Info("Secrets listed from fallback store", 
-			zap.String("prefix", prefix), 
+		c.logger.Info("Secrets listed from fallback store",
+			zap.String("prefix", prefix),
 			zap.Int("count", len(secrets)))
-		
+
 		// Mark secrets as coming from fallback
 		for _, secret := range secrets {
 			if secret.Metadata == nil {
@@ -178,12 +178,12 @@ func (c *CompositeSecretStore) List(ctx context.Context, prefix string) ([]*doma
 			}
 			secret.Metadata["listed_from"] = "fallback"
 		}
-		
+
 		return secrets, nil
 	}
 
 	// Both stores failed
-	c.logger.Warn("Failed to list secrets from any store", 
+	c.logger.Warn("Failed to list secrets from any store",
 		zap.String("prefix", prefix),
 		zap.NamedError("primary_error", err),
 		zap.NamedError("fallback_error", fallbackErr))
@@ -211,7 +211,7 @@ func (c *CompositeSecretStore) Exists(ctx context.Context, key string) (bool, er
 
 	// Neither store has the secret or both had errors
 	if err != nil && fallbackErr != nil {
-		c.logger.Debug("Error checking existence in both stores", 
+		c.logger.Debug("Error checking existence in both stores",
 			zap.String("key", key),
 			zap.NamedError("primary_error", err),
 			zap.NamedError("fallback_error", fallbackErr))
@@ -244,7 +244,7 @@ func (c *CompositeSecretStore) HealthCheck(ctx context.Context) map[string]error
 	_, fallbackErr := c.fallback.Exists(ctx, "__health_check__")
 	health["fallback"] = fallbackErr
 
-	c.logger.Debug("Composite store health check completed", 
+	c.logger.Debug("Composite store health check completed",
 		zap.Bool("primary_healthy", primaryErr == nil),
 		zap.Bool("fallback_healthy", fallbackErr == nil))
 

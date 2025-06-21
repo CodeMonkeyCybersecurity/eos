@@ -8,16 +8,16 @@ import (
 
 // FileMetadata represents metadata about a file
 type FileMetadata struct {
-	Path         string      `json:"path"`
-	Name         string      `json:"name"`
-	Size         int64       `json:"size"`
-	Mode         os.FileMode `json:"mode"`
-	ModTime      time.Time   `json:"mod_time"`
-	IsDir        bool        `json:"is_dir"`
-	Owner        string      `json:"owner,omitempty"`
-	Group        string      `json:"group,omitempty"`
-	Permissions  string      `json:"permissions"`
-	Checksum     string      `json:"checksum,omitempty"`
+	Path        string      `json:"path"`
+	Name        string      `json:"name"`
+	Size        int64       `json:"size"`
+	Mode        os.FileMode `json:"mode"`
+	ModTime     time.Time   `json:"mod_time"`
+	IsDir       bool        `json:"is_dir"`
+	Owner       string      `json:"owner,omitempty"`
+	Group       string      `json:"group,omitempty"`
+	Permissions string      `json:"permissions"`
+	Checksum    string      `json:"checksum,omitempty"`
 }
 
 // DirectoryInfo represents information about a directory
@@ -32,13 +32,13 @@ type DirectoryInfo struct {
 
 // CopyOptions represents options for file copy operations
 type CopyOptions struct {
-	Overwrite        bool        `json:"overwrite"`
-	PreserveMode     bool        `json:"preserve_mode"`
-	PreserveOwner    bool        `json:"preserve_owner"`
-	PreserveTimes    bool        `json:"preserve_times"`
-	CreateDirs       bool        `json:"create_dirs"`
-	FollowSymlinks   bool        `json:"follow_symlinks"`
-	DefaultMode      os.FileMode `json:"default_mode"`
+	Overwrite      bool        `json:"overwrite"`
+	PreserveMode   bool        `json:"preserve_mode"`
+	PreserveOwner  bool        `json:"preserve_owner"`
+	PreserveTimes  bool        `json:"preserve_times"`
+	CreateDirs     bool        `json:"create_dirs"`
+	FollowSymlinks bool        `json:"follow_symlinks"`
+	DefaultMode    os.FileMode `json:"default_mode"`
 }
 
 // WatchEvent represents a file system watch event
@@ -80,23 +80,23 @@ type FileOperationResult struct {
 
 // BatchOperationResult represents the result of batch file operations
 type BatchOperationResult struct {
-	TotalFiles      int                    `json:"total_files"`
-	SuccessfulFiles int                    `json:"successful_files"`
-	FailedFiles     int                    `json:"failed_files"`
-	Results         []FileOperationResult  `json:"results"`
-	Duration        time.Duration          `json:"duration"`
+	TotalFiles      int                   `json:"total_files"`
+	SuccessfulFiles int                   `json:"successful_files"`
+	FailedFiles     int                   `json:"failed_files"`
+	Results         []FileOperationResult `json:"results"`
+	Duration        time.Duration         `json:"duration"`
 }
 
 // FileFilter represents criteria for filtering files
 type FileFilter struct {
-	IncludePatterns []string      `json:"include_patterns"`
-	ExcludePatterns []string      `json:"exclude_patterns"`
-	MinSize         int64         `json:"min_size"`
-	MaxSize         int64         `json:"max_size"`
-	ModifiedAfter   *time.Time    `json:"modified_after,omitempty"`
-	ModifiedBefore  *time.Time    `json:"modified_before,omitempty"`
-	FileTypes       []string      `json:"file_types"` // extensions
-	IncludeHidden   bool          `json:"include_hidden"`
+	IncludePatterns []string   `json:"include_patterns"`
+	ExcludePatterns []string   `json:"exclude_patterns"`
+	MinSize         int64      `json:"min_size"`
+	MaxSize         int64      `json:"max_size"`
+	ModifiedAfter   *time.Time `json:"modified_after,omitempty"`
+	ModifiedBefore  *time.Time `json:"modified_before,omitempty"`
+	FileTypes       []string   `json:"file_types"` // extensions
+	IncludeHidden   bool       `json:"include_hidden"`
 }
 
 // DefaultCopyOptions returns default copy options

@@ -11,7 +11,7 @@ import (
 func TestTokenFilePermissionValidation(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 	tempDir := t.TempDir()
-	
+
 	tests := []struct {
 		name        string
 		permissions os.FileMode
@@ -49,19 +49,19 @@ func TestTokenFilePermissionValidation(t *testing.T) {
 			description: "Executable permissions - insecure for token file",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create test token file with specific permissions
 			tokenFile := filepath.Join(tempDir, tt.name+"_token")
 			testToken := "hvs.test_token_123"
-			
+
 			err := os.WriteFile(tokenFile, []byte(testToken), tt.permissions)
 			testutil.AssertNoError(t, err)
-			
+
 			// Test permission validation
 			err = ValidateTokenFilePermissions(rc, tokenFile)
-			
+
 			if tt.expectError {
 				testutil.AssertError(t, err)
 				t.Logf("✅ Correctly rejected insecure permissions: %s", tt.description)
@@ -76,53 +76,53 @@ func TestTokenFilePermissionValidation(t *testing.T) {
 func TestSecureTokenFileOperations(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 	tempDir := t.TempDir()
-	
+
 	t.Run("secure_write_and_read", func(t *testing.T) {
 		tokenFile := filepath.Join(tempDir, "secure_token")
 		testToken := "hvs.AAAAAQKLwI_VgPyvmn_dV7wR8xOz"
-		
+
 		// Write token securely
 		err := SecureWriteTokenFile(rc, tokenFile, testToken)
 		testutil.AssertNoError(t, err)
-		
+
 		// Verify file has correct permissions
 		info, err := os.Stat(tokenFile)
 		testutil.AssertNoError(t, err)
 		testutil.AssertEqual(t, SecureFilePermissions, info.Mode().Perm())
-		
+
 		// Read token securely
 		readToken, err := SecureReadTokenFile(rc, tokenFile)
 		testutil.AssertNoError(t, err)
 		testutil.AssertEqual(t, testToken, readToken)
 	})
-	
+
 	t.Run("refuse_to_read_insecure_file", func(t *testing.T) {
 		tokenFile := filepath.Join(tempDir, "insecure_token")
 		testToken := "hvs.InsecureToken123"
-		
+
 		// Write file with insecure permissions
 		err := os.WriteFile(tokenFile, []byte(testToken), 0644) // World readable
 		testutil.AssertNoError(t, err)
-		
+
 		// Should refuse to read
 		_, err = SecureReadTokenFile(rc, tokenFile)
 		testutil.AssertError(t, err)
 		testutil.AssertErrorContains(t, err, "insecure permissions")
 	})
-	
+
 	t.Run("create_secure_directory", func(t *testing.T) {
 		deepPath := filepath.Join(tempDir, "deep", "nested", "path", "token")
 		testToken := "hvs.DeepPathToken"
-		
+
 		// Should create directory structure with secure permissions
 		err := SecureWriteTokenFile(rc, deepPath, testToken)
 		testutil.AssertNoError(t, err)
-		
+
 		// Verify file exists and is readable
 		readToken, err := SecureReadTokenFile(rc, deepPath)
 		testutil.AssertNoError(t, err)
 		testutil.AssertEqual(t, testToken, readToken)
-		
+
 		// Verify directory has secure permissions (700)
 		dirInfo, err := os.Stat(filepath.Dir(deepPath))
 		testutil.AssertNoError(t, err)
@@ -177,7 +177,7 @@ func TestVaultTokenFormatValidation(t *testing.T) {
 			expectValid: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			isValid := isValidVaultTokenFormat(tt.token)
@@ -189,18 +189,18 @@ func TestVaultTokenFormatValidation(t *testing.T) {
 func TestSecureTokenFileIntegration(t *testing.T) {
 	rc := testutil.TestRuntimeContext(t)
 	tempDir := t.TempDir()
-	
+
 	t.Run("integration_with_readTokenFile", func(t *testing.T) {
 		tokenFile := filepath.Join(tempDir, "integration_token")
 		testToken := "hvs.IntegrationTestToken123"
-		
+
 		// Write token using secure function
 		err := SecureWriteTokenFile(rc, tokenFile, testToken)
 		testutil.AssertNoError(t, err)
-		
+
 		// Read using the auth.go readTokenFile function
 		readFn := readTokenFile(rc, tokenFile)
-		
+
 		// Client parameter is not used in readTokenFile
 		token, err := readFn(nil)
 		testutil.AssertNoError(t, err)

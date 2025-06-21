@@ -8,8 +8,8 @@ import (
 	"sync"
 
 	domain "github.com/CodeMonkeyCybersecurity/eos/pkg/domain/vault"
-	infra "github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	infra "github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/vault"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -18,12 +18,12 @@ import (
 
 // ServiceFacade provides a backward-compatible interface to the new vault architecture
 type ServiceFacade struct {
-	vaultService  *domain.Service
-	secretStore   domain.SecretStore
-	client        *api.Client
-	logger        *zap.Logger
-	initialized   bool
-	mu            sync.RWMutex
+	vaultService *domain.Service
+	secretStore  domain.SecretStore
+	client       *api.Client
+	logger       *zap.Logger
+	initialized  bool
+	mu           sync.RWMutex
 }
 
 var (
@@ -73,7 +73,7 @@ func InitializeServiceFacade(rc *eos_io.RuntimeContext) error {
 	vaultService := domain.NewService(
 		secretStore,
 		nil, // authenticator - implement as needed
-		nil, // manager - implement as needed  
+		nil, // manager - implement as needed
 		nil, // configRepo - implement as needed
 		nil, // auditRepo - implement as needed
 		zapLogger,
@@ -87,7 +87,7 @@ func InitializeServiceFacade(rc *eos_io.RuntimeContext) error {
 		initialized:  true,
 	}
 
-	logger.Info("Vault service facade initialized", 
+	logger.Info("Vault service facade initialized",
 		zap.Bool("has_vault_client", client != nil))
 
 	return nil
@@ -146,8 +146,8 @@ func ReadCompat(rc *eos_io.RuntimeContext, client *api.Client, name string, out 
 			}
 		}
 		// If new architecture fails, fall back to old method
-		facade.logger.Debug("New architecture failed, falling back to old Read method", 
-			zap.String("name", name), 
+		facade.logger.Debug("New architecture failed, falling back to old Read method",
+			zap.String("name", name),
 			zap.Error(err))
 	}
 
@@ -194,7 +194,7 @@ func (f *ServiceFacade) HealthCheck(ctx context.Context) error {
 
 	// Try to check if a test secret exists
 	exists, err := f.secretStore.Exists(ctx, "__health_check__")
-	f.logger.Debug("Vault health check completed", 
+	f.logger.Debug("Vault health check completed",
 		zap.Bool("exists_check_passed", err == nil),
 		zap.Bool("test_secret_exists", exists),
 		zap.Error(err))
@@ -249,8 +249,8 @@ func GetSecretWithFallback(rc *eos_io.RuntimeContext, key string) (string, error
 			facade.logger.Debug("Secret retrieved using new architecture", zap.String("key", key))
 			return secret.Value, nil
 		}
-		facade.logger.Debug("New architecture failed, falling back to old method", 
-			zap.String("key", key), 
+		facade.logger.Debug("New architecture failed, falling back to old method",
+			zap.String("key", key),
 			zap.Error(err))
 	}
 
@@ -272,8 +272,8 @@ func SetSecretWithMigration(rc *eos_io.RuntimeContext, key, value string) error 
 
 	err := facade.secretStore.Set(rc.Ctx, key, secret)
 	if err != nil {
-		facade.logger.Error("Failed to set secret using new architecture", 
-			zap.String("key", key), 
+		facade.logger.Error("Failed to set secret using new architecture",
+			zap.String("key", key),
 			zap.Error(err))
 		return err
 	}

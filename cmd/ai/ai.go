@@ -53,7 +53,7 @@ Examples:
   eos ai ask "How can I improve my Terraform configuration?"
   eos ai ask "What's wrong with my vault setup?"
   eos ai ask "My containers keep restarting, what should I check?"`,
-	
+
 	Args: cobra.MinimumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -68,7 +68,7 @@ Examples:
 			workingDir, _ = os.Getwd()
 		}
 
-		logger.Info("Processing AI question", 
+		logger.Info("Processing AI question",
 			zap.String("question", question),
 			zap.String("directory", workingDir),
 			zap.Bool("analyze", analyze))
@@ -85,7 +85,7 @@ Examples:
 		// Analyze environment if requested or if it's a technical question
 		if analyze || containsTechnicalTerms(question) {
 			fmt.Println("🔍 Analyzing current environment...")
-			
+
 			analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 			env, err := analyzer.AnalyzeEnvironment(rc)
 			if err != nil {
@@ -103,7 +103,7 @@ Examples:
 
 		// Build comprehensive prompt with environment context
 		fullPrompt := ai.BuildEnvironmentPrompt(ctx, question)
-		
+
 		fmt.Println("🤖 Thinking...")
 
 		// Get AI response
@@ -128,7 +128,7 @@ Examples:
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
 			fmt.Printf("💡 I found %d suggested action(s). Run 'eos ai implement' to execute them.\n", len(actions))
-			
+
 			// Store actions for later implementation (simplified - would use proper storage)
 			if verbose {
 				fmt.Println("\nSuggested actions:")
@@ -196,7 +196,7 @@ Examples:
 		// Get AI analysis if requested
 		if askAI {
 			fmt.Println("\n🤖 Getting AI analysis...")
-			
+
 			assistant, err := ai.NewAIAssistant(rc)
 			if err != nil {
 				logger.Warn("AI assistant initialization failed", zap.Error(err))
@@ -240,7 +240,7 @@ Examples:
 	Args: cobra.MinimumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		issue := strings.Join(args, " ")
-		
+
 		// Get flags
 		workingDir, _ := cmd.Flags().GetString("directory")
 		autoFix, _ := cmd.Flags().GetBool("auto-fix")
@@ -304,7 +304,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
 			fmt.Printf("💡 Found %d suggested fix action(s).\n", len(actions))
-			
+
 			if autoFix {
 				fmt.Println("🚀 Auto-fix enabled, implementing suggestions...")
 				return implementActions(rc, actions, workingDir, false)
@@ -472,18 +472,18 @@ Examples:
 			fmt.Println("🔧 Current AI Configuration")
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Printf("Config file: %s\n", configManager.GetConfigPath())
-			
+
 			provider := config.Provider
 			if provider == "" {
 				provider = "anthropic"
 			}
 			fmt.Printf("Provider: %s\n", provider)
-			
+
 			fmt.Printf("API Key: %s\n", maskAPIKey(config.APIKey))
 			if config.APIKeyVault != "" {
 				fmt.Printf("API Key Vault Path: %s\n", config.APIKeyVault)
 			}
-			
+
 			if provider == "azure-openai" {
 				if config.AzureEndpoint != "" {
 					fmt.Printf("Azure Endpoint: %s\n", config.AzureEndpoint)
@@ -499,7 +499,7 @@ Examples:
 					fmt.Printf("Base URL: %s\n", config.BaseURL)
 				}
 			}
-			
+
 			fmt.Printf("Model: %s\n", config.Model)
 			fmt.Printf("Max Tokens: %d\n", config.MaxTokens)
 			fmt.Printf("Timeout: %d seconds\n", config.Timeout)
@@ -520,15 +520,15 @@ Examples:
 			fmt.Println("   a) Anthropic Claude (default)")
 			fmt.Println("   b) Azure OpenAI")
 			fmt.Print("\nYour choice [a/b]: ")
-			
+
 			providerChoice, _ := reader.ReadString('\n')
 			providerChoice = strings.TrimSpace(strings.ToLower(providerChoice))
-			
+
 			selectedProvider := "anthropic"
 			if providerChoice == "b" {
 				selectedProvider = "azure-openai"
 			}
-			
+
 			// Apply provider defaults
 			updates := map[string]any{"provider": selectedProvider}
 			if err := configManager.UpdateConfig(updates); err != nil {
@@ -542,7 +542,7 @@ Examples:
 			fmt.Println("   b) Use Vault path (recommended for production)")
 			fmt.Println("   c) Skip (use environment variable)")
 			fmt.Print("\nYour choice [a/b/c]: ")
-			
+
 			choice, _ := reader.ReadString('\n')
 			choice = strings.TrimSpace(strings.ToLower(choice))
 
@@ -555,7 +555,7 @@ Examples:
 				}
 				apiKeyInput, _ := reader.ReadString('\n')
 				apiKeyInput = strings.TrimSpace(apiKeyInput)
-				
+
 				if apiKeyInput != "" {
 					if err := ai.ValidateAPIKey(apiKeyInput); err != nil {
 						fmt.Printf("⚠️  Warning: %v\n", err)
@@ -570,7 +570,7 @@ Examples:
 				fmt.Print("\nEnter Vault path for API key (e.g., secret/ai/api-key): ")
 				vaultInput, _ := reader.ReadString('\n')
 				vaultInput = strings.TrimSpace(vaultInput)
-				
+
 				if vaultInput != "" {
 					if err := configManager.SetAPIKeyVault(vaultInput); err != nil {
 						return fmt.Errorf("failed to save Vault path: %w", err)
@@ -595,11 +595,11 @@ Examples:
 			// Azure OpenAI specific configuration
 			if selectedProvider == "azure-openai" {
 				fmt.Println("\n3. Azure OpenAI Configuration")
-				
+
 				fmt.Print("Enter your Azure OpenAI endpoint (e.g., https://myresource.openai.azure.com): ")
 				endpointInput, _ := reader.ReadString('\n')
 				endpointInput = strings.TrimSpace(endpointInput)
-				
+
 				if endpointInput != "" {
 					updates := map[string]any{"azure_endpoint": endpointInput}
 					if err := configManager.UpdateConfig(updates); err != nil {
@@ -607,11 +607,11 @@ Examples:
 					}
 					fmt.Println("✅ Azure endpoint saved")
 				}
-				
+
 				fmt.Print("Enter your deployment name (e.g., gpt-4): ")
 				deploymentInput, _ := reader.ReadString('\n')
 				deploymentInput = strings.TrimSpace(deploymentInput)
-				
+
 				if deploymentInput != "" {
 					updates := map[string]any{"azure_deployment": deploymentInput}
 					if err := configManager.UpdateConfig(updates); err != nil {
@@ -619,11 +619,11 @@ Examples:
 					}
 					fmt.Println("✅ Azure deployment saved")
 				}
-				
+
 				fmt.Print("Enter API version (press Enter for default 2024-02-15-preview): ")
 				versionInput, _ := reader.ReadString('\n')
 				versionInput = strings.TrimSpace(versionInput)
-				
+
 				if versionInput != "" {
 					updates := map[string]any{"azure_api_version": versionInput}
 					if err := configManager.UpdateConfig(updates); err != nil {
@@ -637,7 +637,7 @@ Examples:
 			fmt.Print("\nSelect AI model (press Enter for default): ")
 			modelInput, _ := reader.ReadString('\n')
 			modelInput = strings.TrimSpace(modelInput)
-			
+
 			if modelInput != "" {
 				updates := map[string]any{"model": modelInput}
 				if err := configManager.UpdateConfig(updates); err != nil {
@@ -653,12 +653,12 @@ Examples:
 
 		// Non-interactive mode - apply flags
 		updates := make(map[string]any)
-		
+
 		if provider != "" {
 			updates["provider"] = provider
 			fmt.Printf("✅ Provider set to: %s\n", provider)
 		}
-		
+
 		if apiKey != "" {
 			if err := ai.ValidateAPIKey(apiKey); err != nil {
 				fmt.Printf("⚠️  Warning: %v\n", err)
@@ -683,15 +683,15 @@ Examples:
 		if baseURL != "" {
 			updates["base_url"] = baseURL
 		}
-		
+
 		if azureEndpoint != "" {
 			updates["azure_endpoint"] = azureEndpoint
 		}
-		
+
 		if azureAPIVersion != "" {
 			updates["azure_api_version"] = azureAPIVersion
 		}
-		
+
 		if azureDeployment != "" {
 			updates["azure_deployment"] = azureDeployment
 		}
@@ -884,7 +884,7 @@ func implementActions(rc *eos_io.RuntimeContext, actions []*ai.Action, workingDi
 
 	for i, action := range actions {
 		fmt.Printf("Action %d/%d: %s\n", i+1, len(actions), action.Description)
-		
+
 		result, err := executor.ExecuteAction(rc, action)
 		if err != nil {
 			fmt.Printf("❌ Failed: %v\n", err)
@@ -917,17 +917,17 @@ func maskAPIKey(apiKey string) string {
 	if apiKey == "" {
 		return "[not configured]"
 	}
-	
+
 	// Show first few characters and last few characters
 	if len(apiKey) > 10 {
 		return apiKey[:6] + "..." + apiKey[len(apiKey)-4:]
 	}
-	
+
 	// For shorter keys, just show partial
 	if len(apiKey) > 4 {
 		return apiKey[:3] + "..."
 	}
-	
+
 	return "***"
 }
 

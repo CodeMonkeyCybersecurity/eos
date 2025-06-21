@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	EosDefaultPolicyName    = "eos-default-policy"
-	EosAdminPolicyName      = "eos-admin-policy"
-	EosEmergencyPolicyName  = "eos-emergency-policy"
-	EosReadOnlyPolicyName   = "eos-readonly-policy"
+	EosDefaultPolicyName   = "eos-default-policy"
+	EosAdminPolicyName     = "eos-admin-policy"
+	EosEmergencyPolicyName = "eos-emergency-policy"
+	EosReadOnlyPolicyName  = "eos-readonly-policy"
 )
 
 const EosDefaultPolicyTemplate = `

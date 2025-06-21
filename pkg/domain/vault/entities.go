@@ -42,24 +42,24 @@ type AuthStatus struct {
 
 // InitConfig represents vault initialization configuration
 type InitConfig struct {
-	SecretShares    int `json:"secret_shares"`
-	SecretThreshold int `json:"secret_threshold"`
-	RecoveryShares  int `json:"recovery_shares,omitempty"`
-	RecoveryThreshold int `json:"recovery_threshold,omitempty"`
-	StoredShares    int `json:"stored_shares,omitempty"`
-	PGPKeys         []string `json:"pgp_keys,omitempty"`
-	RootTokenPGPKey string `json:"root_token_pgp_key,omitempty"`
+	SecretShares      int      `json:"secret_shares"`
+	SecretThreshold   int      `json:"secret_threshold"`
+	RecoveryShares    int      `json:"recovery_shares,omitempty"`
+	RecoveryThreshold int      `json:"recovery_threshold,omitempty"`
+	StoredShares      int      `json:"stored_shares,omitempty"`
+	PGPKeys           []string `json:"pgp_keys,omitempty"`
+	RootTokenPGPKey   string   `json:"root_token_pgp_key,omitempty"`
 }
 
 // InitResult represents the result of vault initialization
 type InitResult struct {
-	Keys         []string `json:"-"` // Never serialize
-	KeysBase64   []string `json:"-"` // Never serialize  
-	RootToken    string   `json:"-"` // Never serialize
-	Initialized  bool     `json:"initialized"`
+	Keys         []string  `json:"-"` // Never serialize
+	KeysBase64   []string  `json:"-"` // Never serialize
+	RootToken    string    `json:"-"` // Never serialize
+	Initialized  bool      `json:"initialized"`
 	Timestamp    time.Time `json:"timestamp"`
-	KeyThreshold int      `json:"key_threshold"`
-	KeyShares    int      `json:"key_shares"`
+	KeyThreshold int       `json:"key_threshold"`
+	KeyShares    int       `json:"key_shares"`
 }
 
 // VaultStatus represents vault health and status
@@ -79,13 +79,13 @@ type VaultStatus struct {
 
 // AuditEvent represents an audit log entry
 type AuditEvent struct {
-	ID        string            `json:"id"`
-	Timestamp time.Time         `json:"timestamp"`
-	Type      string            `json:"type"`
-	Auth      *AuditAuth        `json:"auth,omitempty"`
-	Request   *AuditRequest     `json:"request,omitempty"`
-	Response  *AuditResponse    `json:"response,omitempty"`
-	Error     string            `json:"error,omitempty"`
+	ID        string         `json:"id"`
+	Timestamp time.Time      `json:"timestamp"`
+	Type      string         `json:"type"`
+	Auth      *AuditAuth     `json:"auth,omitempty"`
+	Request   *AuditRequest  `json:"request,omitempty"`
+	Response  *AuditResponse `json:"response,omitempty"`
+	Error     string         `json:"error,omitempty"`
 }
 
 // AuditAuth represents authentication information in audit logs
@@ -101,24 +101,24 @@ type AuditAuth struct {
 
 // AuditRequest represents request information in audit logs
 type AuditRequest struct {
-	ID                    string                 `json:"id"`
-	Operation             string                 `json:"operation"`
-	Path                  string                 `json:"path"`
-	Data                  map[string]interface{} `json:"data,omitempty"`
-	RemoteAddress         string                 `json:"remote_address,omitempty"`
-	WrapTTL               int64                  `json:"wrap_ttl,omitempty"`
-	Headers               map[string][]string    `json:"headers,omitempty"`
-	ClientCertificateSerial string                `json:"client_certificate_serial,omitempty"`
+	ID                      string                 `json:"id"`
+	Operation               string                 `json:"operation"`
+	Path                    string                 `json:"path"`
+	Data                    map[string]interface{} `json:"data,omitempty"`
+	RemoteAddress           string                 `json:"remote_address,omitempty"`
+	WrapTTL                 int64                  `json:"wrap_ttl,omitempty"`
+	Headers                 map[string][]string    `json:"headers,omitempty"`
+	ClientCertificateSerial string                 `json:"client_certificate_serial,omitempty"`
 }
 
 // AuditResponse represents response information in audit logs
 type AuditResponse struct {
-	MountType   string                 `json:"mount_type,omitempty"`
-	MountPoint  string                 `json:"mount_point,omitempty"`
-	Auth        *AuditAuth             `json:"auth,omitempty"`
-	Data        map[string]interface{} `json:"data,omitempty"`
-	WrapInfo    *AuditWrapInfo         `json:"wrap_info,omitempty"`
-	Warnings    []string               `json:"warnings,omitempty"`
+	MountType  string                 `json:"mount_type,omitempty"`
+	MountPoint string                 `json:"mount_point,omitempty"`
+	Auth       *AuditAuth             `json:"auth,omitempty"`
+	Data       map[string]interface{} `json:"data,omitempty"`
+	WrapInfo   *AuditWrapInfo         `json:"wrap_info,omitempty"`
+	Warnings   []string               `json:"warnings,omitempty"`
 }
 
 // AuditWrapInfo represents wrap information in audit logs
@@ -133,23 +133,23 @@ type AuditWrapInfo struct {
 
 // AuditFilter represents audit query parameters
 type AuditFilter struct {
-	StartTime   *time.Time `json:"start_time,omitempty"`
-	EndTime     *time.Time `json:"end_time,omitempty"`
-	Operation   string     `json:"operation,omitempty"`
-	Path        string     `json:"path,omitempty"`
-	UserID      string     `json:"user_id,omitempty"`
-	RemoteAddr  string     `json:"remote_addr,omitempty"`
-	Limit       int        `json:"limit,omitempty"`
-	Offset      int        `json:"offset,omitempty"`
+	StartTime  *time.Time `json:"start_time,omitempty"`
+	EndTime    *time.Time `json:"end_time,omitempty"`
+	Operation  string     `json:"operation,omitempty"`
+	Path       string     `json:"path,omitempty"`
+	UserID     string     `json:"user_id,omitempty"`
+	RemoteAddr string     `json:"remote_addr,omitempty"`
+	Limit      int        `json:"limit,omitempty"`
+	Offset     int        `json:"offset,omitempty"`
 }
 
 // AuditStats represents audit statistics
 type AuditStats struct {
-	TotalEvents    int64              `json:"total_events"`
-	EventsByType   map[string]int64   `json:"events_by_type"`
-	EventsByPath   map[string]int64   `json:"events_by_path"`
-	LastEvent      *time.Time         `json:"last_event,omitempty"`
-	TimeRange      *AuditTimeRange    `json:"time_range,omitempty"`
+	TotalEvents  int64            `json:"total_events"`
+	EventsByType map[string]int64 `json:"events_by_type"`
+	EventsByPath map[string]int64 `json:"events_by_path"`
+	LastEvent    *time.Time       `json:"last_event,omitempty"`
+	TimeRange    *AuditTimeRange  `json:"time_range,omitempty"`
 }
 
 // AuditTimeRange represents time range for audit stats
@@ -173,13 +173,13 @@ type AppRoleCredentials struct {
 // EnableOptions controls which parts of the Vault enable sequence to run
 // This maintains compatibility with existing vault package
 type EnableOptions struct {
-	EnableAgent    bool                   `json:"enable_agent"`
-	EnableAPI      bool                   `json:"enable_api"`
-	EnableAppRole  bool                   `json:"enable_approle"`
-	EnableUserpass bool                   `json:"enable_userpass"`
-	Password       string                 `json:"-"` // Never serialize
-	NonInteractive bool                   `json:"non_interactive"`
-	AppRoleOptions AppRoleOptions         `json:"approle_options,omitempty"`
+	EnableAgent    bool           `json:"enable_agent"`
+	EnableAPI      bool           `json:"enable_api"`
+	EnableAppRole  bool           `json:"enable_approle"`
+	EnableUserpass bool           `json:"enable_userpass"`
+	Password       string         `json:"-"` // Never serialize
+	NonInteractive bool           `json:"non_interactive"`
+	AppRoleOptions AppRoleOptions `json:"approle_options,omitempty"`
 }
 
 // AppRoleOptions represents AppRole configuration options

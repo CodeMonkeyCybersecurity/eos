@@ -11,22 +11,22 @@ import (
 
 // ContainerService orchestrates container operations with business logic and auditing
 type ContainerService struct {
-	containerMgr    ContainerManager
-	imageMgr        ImageManager
-	volumeMgr       VolumeManager
-	networkMgr      NetworkManager
-	composeMgr      ComposeManager
-	executor        ContainerExecutor
-	runtimeMgr      RuntimeManager
-	securityMgr     SecurityManager
-	monitoringMgr   MonitoringManager
-	backupMgr       BackupManager
-	templateMgr     TemplateManager
-	policyMgr       PolicyManager
-	validator       ContainerValidator
-	auditRepo       AuditRepository
-	configRepo      ConfigRepository
-	logger          *zap.Logger
+	containerMgr  ContainerManager
+	imageMgr      ImageManager
+	volumeMgr     VolumeManager
+	networkMgr    NetworkManager
+	composeMgr    ComposeManager
+	executor      ContainerExecutor
+	runtimeMgr    RuntimeManager
+	securityMgr   SecurityManager
+	monitoringMgr MonitoringManager
+	backupMgr     BackupManager
+	templateMgr   TemplateManager
+	policyMgr     PolicyManager
+	validator     ContainerValidator
+	auditRepo     AuditRepository
+	configRepo    ConfigRepository
+	logger        *zap.Logger
 }
 
 // NewContainerService creates a new container domain service
@@ -73,7 +73,7 @@ func NewContainerService(
 // CreateContainerWithValidation creates a container with comprehensive validation
 func (s *ContainerService) CreateContainerWithValidation(ctx context.Context, userID string, spec *ContainerSpec) (*Container, error) {
 	start := time.Now()
-	
+
 	// Audit the attempt
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "container.create", spec.Name, start, nil)
@@ -102,12 +102,12 @@ func (s *ContainerService) CreateContainerWithValidation(ctx context.Context, us
 				AllowPrivileged: !config.DefaultSecurityConfig.Privileged,
 				ReadOnlyRootfs:  config.DefaultSecurityConfig.ReadOnlyRootfs,
 			}
-			
+
 			result, err := s.policyMgr.EvaluateContainerPolicy(ctx, spec, policy)
 			if err != nil {
 				return nil, fmt.Errorf("policy evaluation failed: %w", err)
 			}
-			
+
 			if !result.Allowed {
 				s.logger.Warn("Container creation denied by policy",
 					zap.String("name", spec.Name),
@@ -115,7 +115,7 @@ func (s *ContainerService) CreateContainerWithValidation(ctx context.Context, us
 				)
 				return nil, fmt.Errorf("policy violations: %v", result.Violations)
 			}
-			
+
 			if len(result.Warnings) > 0 {
 				s.logger.Warn("Container creation has policy warnings",
 					zap.String("name", spec.Name),
@@ -166,7 +166,7 @@ func (s *ContainerService) CreateContainerWithValidation(ctx context.Context, us
 // DeployComposeWithValidation deploys a Docker Compose stack with validation
 func (s *ContainerService) DeployComposeWithValidation(ctx context.Context, userID string, config *ComposeConfig) error {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "compose.deploy", getComposeProjectName(config), start, nil)
 	}()
@@ -215,7 +215,7 @@ func (s *ContainerService) DeployComposeWithValidation(ctx context.Context, user
 // ExecuteCommandWithPolicy executes a command in a container with policy enforcement
 func (s *ContainerService) ExecuteCommandWithPolicy(ctx context.Context, userID, containerID string, config *ExecConfig) (*ExecResult, error) {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "container.exec", containerID, start, nil)
 	}()
@@ -237,9 +237,9 @@ func (s *ContainerService) ExecuteCommandWithPolicy(ctx context.Context, userID,
 		// Create a basic policy from the rules
 		policy := &SecurityPolicy{
 			AllowPrivileged: !config.Privileged,
-			Rules: make([]PolicyRule, len(config.PolicyRules)),
+			Rules:           make([]PolicyRule, len(config.PolicyRules)),
 		}
-		
+
 		for i, rule := range config.PolicyRules {
 			policy.Rules[i] = PolicyRule{
 				Name:      fmt.Sprintf("exec_rule_%d", i),
@@ -248,12 +248,12 @@ func (s *ContainerService) ExecuteCommandWithPolicy(ctx context.Context, userID,
 				Severity:  PolicySeverityMedium,
 			}
 		}
-		
+
 		result, err := s.policyMgr.EvaluateExecPolicy(ctx, config, policy)
 		if err != nil {
 			return nil, fmt.Errorf("policy evaluation failed: %w", err)
 		}
-		
+
 		if !result.Allowed {
 			s.logger.Warn("Command execution denied by policy",
 				zap.String("container", containerID),
@@ -287,7 +287,7 @@ func (s *ContainerService) ExecuteCommandWithPolicy(ctx context.Context, userID,
 // GetContainerHealthStatus retrieves comprehensive container health information
 func (s *ContainerService) GetContainerHealthStatus(ctx context.Context, userID, containerID string) (*ContainerHealthReport, error) {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "container.health", containerID, start, nil)
 	}()
@@ -350,7 +350,7 @@ func (s *ContainerService) GetContainerHealthStatus(ctx context.Context, userID,
 // BackupContainerWithVolumes creates a comprehensive backup of a container and its volumes
 func (s *ContainerService) BackupContainerWithVolumes(ctx context.Context, userID, containerID, backupPath string) error {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "container.backup", containerID, start, nil)
 	}()
@@ -385,7 +385,7 @@ func (s *ContainerService) BackupContainerWithVolumes(ctx context.Context, userI
 				volumeNames = append(volumeNames, vol.Source)
 			}
 		}
-		
+
 		if len(volumeNames) > 0 {
 			if err := s.backupMgr.BackupVolumes(ctx, volumeNames, backupPath); err != nil {
 				s.logger.Error("Volume backup failed", zap.Error(err))
@@ -407,7 +407,7 @@ func (s *ContainerService) BackupContainerWithVolumes(ctx context.Context, userI
 // CreateNetworkWithValidation creates a network with validation and configuration
 func (s *ContainerService) CreateNetworkWithValidation(ctx context.Context, userID string, spec *NetworkSpec) (*Network, error) {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "network.create", spec.Name, start, nil)
 	}()
@@ -426,7 +426,7 @@ func (s *ContainerService) CreateNetworkWithValidation(ctx context.Context, user
 		if spec.Driver == "" {
 			spec.Driver = "bridge" // Default driver
 		}
-		
+
 		// Apply default IPAM configuration if not specified
 		if spec.IPAM == nil && config.DefaultIPv4Subnet != "" {
 			spec.IPAM = &NetworkIPAM{
@@ -464,7 +464,7 @@ func (s *ContainerService) CreateNetworkWithValidation(ctx context.Context, user
 // DeployFromTemplate deploys containers from a template with variable substitution
 func (s *ContainerService) DeployFromTemplate(ctx context.Context, userID, templatePath string, variables map[string]interface{}) error {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "template.deploy", templatePath, start, nil)
 	}()
@@ -510,7 +510,7 @@ func (s *ContainerService) DeployFromTemplate(ctx context.Context, userID, templ
 // GetSystemStatus retrieves comprehensive system status
 func (s *ContainerService) GetSystemStatus(ctx context.Context, userID string) (*SystemStatusReport, error) {
 	start := time.Now()
-	
+
 	defer func() {
 		s.auditContainerOperation(ctx, userID, "system.status", "system", start, nil)
 	}()
@@ -601,12 +601,12 @@ func (s *ContainerService) auditContainerOperation(ctx context.Context, userID, 
 	}
 
 	event := &ContainerAuditEvent{
-		ID:         fmt.Sprintf("%d", time.Now().UnixNano()),
-		Timestamp:  time.Now(),
-		User:       userID,
-		Action:     action,
-		Resource:   resource,
-		Details:    map[string]string{
+		ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
+		Timestamp: time.Now(),
+		User:      userID,
+		Action:    action,
+		Resource:  resource,
+		Details: map[string]string{
 			"duration": time.Since(start).String(),
 		},
 		Result:   result,
@@ -627,7 +627,7 @@ func getComposeProjectName(config *ComposeConfig) string {
 
 func (s *ContainerService) summarizeContainers(containers []*Container) *ContainerSummary {
 	summary := &ContainerSummary{}
-	
+
 	for _, container := range containers {
 		summary.Total++
 		switch container.Status {
@@ -639,7 +639,7 @@ func (s *ContainerService) summarizeContainers(containers []*Container) *Contain
 			summary.Paused++
 		}
 	}
-	
+
 	return summary
 }
 
@@ -647,13 +647,13 @@ func (s *ContainerService) summarizeImages(images []*Image) *ImageSummary {
 	summary := &ImageSummary{
 		Total: len(images),
 	}
-	
+
 	var totalSize int64
 	for _, image := range images {
 		totalSize += image.Size
 	}
 	summary.TotalSize = totalSize
-	
+
 	return summary
 }
 
@@ -667,13 +667,13 @@ func (s *ContainerService) summarizeNetworks(networks []*Network) *NetworkSummar
 	summary := &NetworkSummary{
 		Total: len(networks),
 	}
-	
+
 	drivers := make(map[string]int)
 	for _, network := range networks {
 		drivers[network.Driver]++
 	}
 	summary.ByDriver = drivers
-	
+
 	return summary
 }
 
@@ -681,12 +681,12 @@ func (s *ContainerService) summarizeNetworks(networks []*Network) *NetworkSummar
 
 // ContainerHealthReport provides comprehensive container health information
 type ContainerHealthReport struct {
-	ContainerID  string                 `json:"container_id"`
-	Timestamp    time.Time              `json:"timestamp"`
-	Container    *Container             `json:"container"`
-	Health       *HealthStatus          `json:"health,omitempty"`
-	Stats        *ContainerStats        `json:"stats,omitempty"`
-	SecurityScan *SecurityScanResult    `json:"security_scan,omitempty"`
+	ContainerID  string              `json:"container_id"`
+	Timestamp    time.Time           `json:"timestamp"`
+	Container    *Container          `json:"container"`
+	Health       *HealthStatus       `json:"health,omitempty"`
+	Stats        *ContainerStats     `json:"stats,omitempty"`
+	SecurityScan *SecurityScanResult `json:"security_scan,omitempty"`
 }
 
 // SystemStatusReport provides comprehensive system status information

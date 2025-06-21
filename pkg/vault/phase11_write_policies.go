@@ -33,7 +33,7 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 
 	for _, policy := range policies {
 		otelzap.Ctx(rc.Ctx).Info("📝 Writing Vault policy", zap.String("policy", policy.name))
-		
+
 		pol, err := policy.builder(rc)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("❌ Failed to build policy", zap.String("policy", policy.name), zap.Error(err))
@@ -43,12 +43,12 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 		// Validate and fix common HCL issues
 		fixedPolicy, err := ValidateAndFixCommonIssues(rc, policy.name, pol)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Error("❌ Policy validation failed", 
-				zap.String("policy", policy.name), 
+			otelzap.Ctx(rc.Ctx).Error("❌ Policy validation failed",
+				zap.String("policy", policy.name),
 				zap.Error(err))
 			return fmt.Errorf("policy validation failed for %s: %w", policy.name, err)
 		} else if fixedPolicy != pol {
-			otelzap.Ctx(rc.Ctx).Info("🔧 Policy automatically fixed", 
+			otelzap.Ctx(rc.Ctx).Info("🔧 Policy automatically fixed",
 				zap.String("policy", policy.name))
 			pol = fixedPolicy
 		}

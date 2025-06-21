@@ -224,12 +224,12 @@ func (s *SystemServiceManager) parseSystemctlOutput(output string) []*Service {
 				Name:   strings.TrimSuffix(fields[0], ".service"),
 				Status: fields[2], // ACTIVE state
 			}
-			
+
 			// Description is everything after the 4th field
 			if len(fields) > 4 {
 				service.Description = strings.Join(fields[4:], " ")
 			}
-			
+
 			services = append(services, service)
 		}
 	}

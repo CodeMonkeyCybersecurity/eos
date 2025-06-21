@@ -45,7 +45,7 @@ func PhaseEnableAppRole(
 		log.Error("❌ Failed to get privileged Vault client for AppRole setup", zap.Error(err))
 		return cerr.Wrap(err, "get privileged client")
 	}
-	
+
 	// Log that we have a privileged client ready
 	if privToken := privilegedClient.Token(); privToken != "" {
 		log.Info("✅ Using privileged client for AppRole operations")

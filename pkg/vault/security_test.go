@@ -9,14 +9,13 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
-
 // TestTokenFileSecurityPermissions validates that token files have secure permissions
 func TestTokenFileSecurityPermissions(t *testing.T) {
 	tests := []struct {
-		name         string
-		path         string
-		shouldExist  bool
-		maxPerms     os.FileMode
+		name        string
+		path        string
+		shouldExist bool
+		maxPerms    os.FileMode
 	}{
 		{
 			name:        "agent token file",
@@ -25,7 +24,7 @@ func TestTokenFileSecurityPermissions(t *testing.T) {
 			maxPerms:    0600,  // Owner read/write only
 		},
 		{
-			name:        "disk token file", 
+			name:        "disk token file",
 			path:        "/var/lib/eos/secrets/token",
 			shouldExist: false,
 			maxPerms:    0600,
@@ -38,10 +37,10 @@ func TestTokenFileSecurityPermissions(t *testing.T) {
 				// File exists - check permissions
 				perms := info.Mode().Perm()
 				if perms > tt.maxPerms {
-					t.Errorf("Token file %s has insecure permissions %o, should be <= %o", 
+					t.Errorf("Token file %s has insecure permissions %o, should be <= %o",
 						tt.path, perms, tt.maxPerms)
 				}
-				
+
 				// Check file is owned by root or current user
 				if info.Mode()&os.ModeSetuid != 0 || info.Mode()&os.ModeSetgid != 0 {
 					t.Errorf("Token file %s has setuid/setgid bits set - security risk", tt.path)
@@ -55,10 +54,10 @@ func TestTokenFileSecurityPermissions(t *testing.T) {
 func TestAuthenticationFallbackSecurity(t *testing.T) {
 	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Create temp directory for test token files
 	tempDir := t.TempDir()
-	
+
 	// Test 1: Ensure no sensitive data in error messages
 	t.Run("no_token_file_info_disclosure", func(t *testing.T) {
 		// Mock vault client that fails all auth methods
@@ -74,17 +73,17 @@ func TestAuthenticationFallbackSecurity(t *testing.T) {
 				Body:       map[string]any{"errors": []string{"unauthorized"}},
 			},
 		}
-		
+
 		cleanup := testutil.WithMockHTTPClient(t, mockTransport)
 		defer cleanup()
-		
+
 		client, err := NewClient(rc)
 		testutil.AssertNoError(t, err)
-		
+
 		// Authentication should fail without disclosing file paths
 		err = OrchestrateVaultAuth(rc, client)
 		testutil.AssertError(t, err)
-		
+
 		// Error should not contain sensitive file paths
 		errMsg := err.Error()
 		sensitiveTerms := []string{
@@ -93,32 +92,32 @@ func TestAuthenticationFallbackSecurity(t *testing.T) {
 			"vault_init.json",
 			"root token",
 		}
-		
+
 		for _, term := range sensitiveTerms {
 			if strings.Contains(errMsg, term) {
 				t.Errorf("Error message contains sensitive information: %s", term)
 			}
 		}
 	})
-	
+
 	// Test 2: Token file reading security
 	t.Run("token_file_reading_security", func(t *testing.T) {
 		// Create a test token file with sensitive content
 		tokenFile := filepath.Join(tempDir, "test_token")
 		sensitiveToken := "hvs.ABCDEF123456789"
-		
+
 		err := os.WriteFile(tokenFile, []byte(sensitiveToken+"\n"), 0600)
 		testutil.AssertNoError(t, err)
-		
+
 		// Test the readTokenFile function
 		readFn := readTokenFile(rc, tokenFile)
 		client, err := NewClient(rc)
 		testutil.AssertNoError(t, err)
-		
+
 		token, err := readFn(client)
 		testutil.AssertNoError(t, err)
 		testutil.AssertEqual(t, sensitiveToken, token)
-		
+
 		// Verify file still has secure permissions
 		info, err := os.Stat(tokenFile)
 		testutil.AssertNoError(t, err)
@@ -130,32 +129,32 @@ func TestAuthenticationFallbackSecurity(t *testing.T) {
 func TestVaultClientCacheSecurity(t *testing.T) {
 	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	// Test concurrent access to vault client cache
 	t.Run("concurrent_client_access", func(t *testing.T) {
 		cleanup := testutil.WithMockHTTPClient(t, testutil.VaultMockTransport())
 		defer cleanup()
-		
+
 		// Create multiple goroutines accessing vault client simultaneously
 		done := make(chan bool, 10)
-		
+
 		for i := 0; i < 10; i++ {
 			go func() {
 				defer func() { done <- true }()
-				
+
 				client, err := NewClient(rc)
 				if err != nil {
 					t.Errorf("Failed to create vault client: %v", err)
 					return
 				}
-				
+
 				// Verify client is properly configured
 				if client.Address() == "" {
 					t.Error("Vault client address is empty")
 				}
 			}()
 		}
-		
+
 		// Wait for all goroutines to complete
 		for i := 0; i < 10; i++ {
 			<-done
@@ -167,7 +166,7 @@ func TestVaultClientCacheSecurity(t *testing.T) {
 func TestTLSConfigurationSecurity(t *testing.T) {
 	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	tests := []struct {
 		name        string
 		caCertPath  string
@@ -175,7 +174,7 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 	}{
 		{
 			name:        "default_ca_cert_path",
-			caCertPath:  "",  // Will use default /opt/vault/tls/tls.crt
+			caCertPath:  "",    // Will use default /opt/vault/tls/tls.crt
 			expectError: false, // Should work with mock
 		},
 		{
@@ -184,7 +183,7 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 			expectError: false, // Should still create client, just with different config
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.caCertPath != "" {
@@ -197,7 +196,7 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 					}
 				}()
 			}
-			
+
 			client, err := NewClient(rc)
 			if tt.expectError {
 				testutil.AssertError(t, err)
@@ -213,7 +212,7 @@ func TestTLSConfigurationSecurity(t *testing.T) {
 func TestTokenValidationSecurity(t *testing.T) {
 	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	tests := []struct {
 		name          string
 		token         string
@@ -244,7 +243,7 @@ func TestTokenValidationSecurity(t *testing.T) {
 			shouldBeValid: false,
 		},
 		{
-			name:  "malformed_token", 
+			name:  "malformed_token",
 			token: "not_a_vault_token",
 			mockResponse: testutil.MockResponse{
 				StatusCode: 400,
@@ -262,7 +261,7 @@ func TestTokenValidationSecurity(t *testing.T) {
 			shouldBeValid: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockTransport := &testutil.MockHTTPTransport{
@@ -274,13 +273,13 @@ func TestTokenValidationSecurity(t *testing.T) {
 					Body:       map[string]any{"errors": []string{"not found"}},
 				},
 			}
-			
+
 			cleanup := testutil.WithMockHTTPClient(t, mockTransport)
 			defer cleanup()
-			
+
 			client, err := NewClient(rc)
 			testutil.AssertNoError(t, err)
-			
+
 			isValid := VerifyToken(rc, client, tt.token)
 			testutil.AssertEqual(t, tt.shouldBeValid, isValid)
 		})
@@ -291,7 +290,7 @@ func TestTokenValidationSecurity(t *testing.T) {
 func TestAppRoleAuthenticationSecurity(t *testing.T) {
 	setupVaultTestEnvironment(t)
 	rc := testutil.TestRuntimeContext(t)
-	
+
 	t.Run("invalid_credentials_no_leak", func(t *testing.T) {
 		mockTransport := &testutil.MockHTTPTransport{
 			ResponseMap: map[string]testutil.MockResponse{
@@ -301,17 +300,17 @@ func TestAppRoleAuthenticationSecurity(t *testing.T) {
 				},
 			},
 		}
-		
+
 		cleanup := testutil.WithMockHTTPClient(t, mockTransport)
 		defer cleanup()
-		
+
 		client, err := NewClient(rc)
 		testutil.AssertNoError(t, err)
-		
+
 		// This should fail but not leak sensitive information
 		_, err = tryAppRole(rc, client)
 		testutil.AssertError(t, err)
-		
+
 		// Error should not contain role_id or secret_id
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "role_id") || strings.Contains(errMsg, "secret_id") {

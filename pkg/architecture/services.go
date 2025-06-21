@@ -13,11 +13,11 @@ import (
 
 // InfrastructureService orchestrates infrastructure operations
 type InfrastructureService struct {
-	provider        InfrastructureProvider
-	containerMgr    ContainerManager
-	serviceMgr      ServiceManager
-	auditRepo       AuditRepository
-	logger          *zap.Logger
+	provider     InfrastructureProvider
+	containerMgr ContainerManager
+	serviceMgr   ServiceManager
+	auditRepo    AuditRepository
+	logger       *zap.Logger
 }
 
 // NewInfrastructureService creates a new infrastructure service

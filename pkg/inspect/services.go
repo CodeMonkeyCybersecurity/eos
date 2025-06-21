@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 // DiscoverServices gathers service configuration information
@@ -357,7 +357,7 @@ func (i *Inspector) discoverPostgreSQL() (*PostgreSQLInfo, error) {
 	} else {
 		dbOutput, err = i.runCommand("sudo", "-u", "postgres", "psql", "-lqt")
 	}
-	
+
 	if err == nil {
 		lines := strings.Split(dbOutput, "\n")
 		for _, line := range lines {
@@ -431,9 +431,9 @@ func (i *Inspector) discoverMySQL() (*MySQLInfo, error) {
 		lines := strings.Split(output, "\n")
 		for _, line := range lines {
 			dbName := strings.TrimSpace(line)
-			if dbName != "" && dbName != "Database" && 
-				dbName != "information_schema" && 
-				dbName != "mysql" && 
+			if dbName != "" && dbName != "Database" &&
+				dbName != "information_schema" &&
+				dbName != "mysql" &&
 				dbName != "performance_schema" &&
 				dbName != "sys" {
 				info.Databases = append(info.Databases, dbName)
@@ -490,7 +490,7 @@ func (i *Inspector) discoverHashiCorp() (*HashiCorpInfo, error) {
 		if output, err := i.runCommand("vault", "version"); err == nil {
 			tool.Version = extractVersion(output)
 		}
-		
+
 		// Find config
 		configPaths := []string{
 			"/etc/vault.d/vault.hcl",
@@ -665,10 +665,10 @@ func (i *Inspector) discoverTailscale() (*TailscaleInfo, error) {
 func extractVersion(output string) string {
 	// Common version patterns
 	patterns := []string{
-		`(\d+\.\d+\.\d+(?:\.\d+)?)`,      // x.y.z or x.y.z.w
-		`v(\d+\.\d+\.\d+(?:\.\d+)?)`,     // vx.y.z
-		`version\s+(\d+\.\d+\.\d+)`,       // version x.y.z
-		`Version:\s*(\d+\.\d+\.\d+)`,      // Version: x.y.z
+		`(\d+\.\d+\.\d+(?:\.\d+)?)`,  // x.y.z or x.y.z.w
+		`v(\d+\.\d+\.\d+(?:\.\d+)?)`, // vx.y.z
+		`version\s+(\d+\.\d+\.\d+)`,  // version x.y.z
+		`Version:\s*(\d+\.\d+\.\d+)`, // Version: x.y.z
 	}
 
 	for _, pattern := range patterns {

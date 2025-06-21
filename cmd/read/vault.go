@@ -25,7 +25,7 @@ func init() {
 	InspectVaultCmd.AddCommand(InspectVaultLDAPCmd)
 	ReadCmd.AddCommand(InspectVaultCmd)
 	ReadCmd.AddCommand(InspectVaultInitCmd)
-	
+
 	// Add flags for enhanced vault-init command
 	InspectVaultInitCmd.Flags().Bool("no-redact", false, "Show sensitive data in plaintext (requires confirmation)")
 	InspectVaultInitCmd.Flags().String("export", "console", "Export format: console, json, secure")
@@ -33,7 +33,7 @@ func init() {
 	InspectVaultInitCmd.Flags().String("output", "", "Output file path for export formats")
 	InspectVaultInitCmd.Flags().String("reason", "", "Access reason for audit logging")
 	InspectVaultInitCmd.Flags().Bool("no-confirm", false, "Skip confirmation prompts (use with caution)")
-	
+
 	// Add flags for vault agent command
 	InspectVaultAgentCmd.Flags().Bool("json", false, "Output status in JSON format for automation")
 }
@@ -316,12 +316,12 @@ func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) err
 	if options.OutputPath != "" {
 		return os.WriteFile(options.OutputPath, data, 0600)
 	}
-	
+
 	fmt.Print(string(data))
 	return nil
 }
 
-// TODO: Convert to structured logging when RuntimeContext is available  
+// TODO: Convert to structured logging when RuntimeContext is available
 func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
 	if options.OutputPath == "" {
 		return fmt.Errorf("output path required for secure export")

@@ -17,12 +17,12 @@ import (
 
 // MFAConfig represents MFA configuration for Vault
 type MFAConfig struct {
-	TOTPEnabled     bool
-	DuoEnabled      bool
-	EnforceForAll   bool
-	SkipRoot        bool
-	PingIDEnabled   bool
-	OktaEnabled     bool
+	TOTPEnabled   bool
+	DuoEnabled    bool
+	EnforceForAll bool
+	SkipRoot      bool
+	PingIDEnabled bool
+	OktaEnabled   bool
 }
 
 // DefaultMFAConfig returns secure defaults for MFA
@@ -53,7 +53,7 @@ func EnableMFAMethods(rc *eos_io.RuntimeContext, client *api.Client, config *MFA
 		log.Error("❌ Failed to get privileged Vault client for MFA setup", zap.Error(err))
 		return cerr.Wrap(err, "get privileged client for MFA")
 	}
-	
+
 	// Log what token the privileged client is using
 	if privToken := privilegedClient.Token(); privToken != "" {
 		log.Info("✅ Using privileged client for MFA operations")
@@ -115,12 +115,12 @@ func enableTOTPMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 	// Configure TOTP MFA method using the correct Identity API
 	totpConfig := map[string]interface{}{
-		"generate":   true,
-		"issuer":     "Vault - Eos Infrastructure", 
-		"period":     30,
-		"algorithm":  "SHA256",
-		"digits":     6,
-		"key_size":   30,
+		"generate":  true,
+		"issuer":    "Vault - Eos Infrastructure",
+		"period":    30,
+		"algorithm": "SHA256",
+		"digits":    6,
+		"key_size":  30,
 	}
 
 	// Create the TOTP MFA method using the Identity API
@@ -134,8 +134,8 @@ func enableTOTPMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 	if resp == nil || resp.Data == nil || resp.Data["method_id"] == nil {
 		log.Error("❌ TOTP MFA method creation did not return method_id",
-		zap.Any("response", resp))
-	return cerr.New("TOTP MFA method creation did not return method_id")
+			zap.Any("response", resp))
+		return cerr.New("TOTP MFA method creation did not return method_id")
 	}
 
 	methodID := resp.Data["method_id"].(string)
@@ -152,35 +152,35 @@ func enableTOTPMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 // storeMFAMethodID stores MFA method ID for later enforcement configuration
 func storeMFAMethodID(rc *eos_io.RuntimeContext, methodType, methodID string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// Store in a simple key-value structure in Vault
 	secretPath := fmt.Sprintf("secret/data/eos/mfa-methods/%s", methodType)
-	log.Info("💾 Storing MFA method ID in Vault", 
+	log.Info("💾 Storing MFA method ID in Vault",
 		zap.String("path", secretPath),
 		zap.String("method_type", methodType))
 	data := map[string]interface{}{
 		"data": map[string]interface{}{
-			"method_id":    methodID,
-			"method_type":  methodType,
-			"created_at":   time.Now().UTC().Format(time.RFC3339),
-			"created_by":   "eos",
+			"method_id":   methodID,
+			"method_type": methodType,
+			"created_at":  time.Now().UTC().Format(time.RFC3339),
+			"created_by":  "eos",
 		},
 	}
-	
+
 	client, err := GetRootClient(rc)
 	if err != nil {
 		return cerr.Wrap(err, "failed to get root client")
 	}
-	
+
 	_, err = client.Logical().Write(secretPath, data)
 	if err != nil {
 		return cerr.Wrap(err, "failed to store MFA method ID")
 	}
-	
-	log.Info("📝 MFA method ID stored", 
-		zap.String("method_type", methodType), 
+
+	log.Info("📝 MFA method ID stored",
+		zap.String("method_type", methodType),
 		zap.String("method_id", methodID))
-	
+
 	return nil
 }
 
@@ -204,7 +204,7 @@ func enableDuoMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Enable Duo auth method
 	authPath := "mfa/duo"
 	err = client.Sys().EnableAuthWithOptions(authPath, &api.EnableAuthOptions{
-		Type: "duo",
+		Type:        "duo",
 		Description: "Duo Security Multi-Factor Authentication",
 	})
 	if err != nil && !strings.Contains(err.Error(), "path is already in use") {
@@ -247,7 +247,7 @@ func enablePingIDMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Enable PingID auth method
 	authPath := "mfa/pingid"
 	err = client.Sys().EnableAuthWithOptions(authPath, &api.EnableAuthOptions{
-		Type: "pingid",
+		Type:        "pingid",
 		Description: "PingID Multi-Factor Authentication",
 	})
 	if err != nil && !strings.Contains(err.Error(), "path is already in use") {
@@ -290,7 +290,7 @@ func enableOktaMFA(rc *eos_io.RuntimeContext, client *api.Client) error {
 	// Enable Okta auth method
 	authPath := "mfa/okta"
 	err = client.Sys().EnableAuthWithOptions(authPath, &api.EnableAuthOptions{
-		Type: "okta",
+		Type:        "okta",
 		Description: "Okta Multi-Factor Authentication",
 	})
 	if err != nil && !strings.Contains(err.Error(), "path is already in use") {
@@ -335,16 +335,17 @@ func enforceMFAForAllUsers(rc *eos_io.RuntimeContext, client *api.Client, config
 // enforceIdentityMFAForUserpass creates a basic MFA enforcement for userpass auth
 func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
-	
+
 	// This is a simplified enforcement - in production, you'd want more sophisticated policies
 	log.Info("📝 MFA enforcement setup complete - method created and ready for use")
 	log.Info("💡 Users can now configure TOTP MFA using: vault write identity/mfa/method/totp generate=true")
-	
+
 	return nil
 }
 
 // _shouldEnforceMFAForAuth determines if MFA should be enforced for a specific auth method
 // Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//
 //nolint:unused
 func _shouldEnforceMFAForAuth(authType string, config *MFAConfig) bool {
 	switch authType {
@@ -362,6 +363,7 @@ func _shouldEnforceMFAForAuth(authType string, config *MFAConfig) bool {
 
 // _configureMFAForAuthMethod configures MFA requirements for a specific auth method
 // Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//
 //nolint:unused
 func _configureMFAForAuthMethod(rc *eos_io.RuntimeContext, client *api.Client, authPath, authType string) error {
 	log := otelzap.Ctx(rc.Ctx)
@@ -383,6 +385,7 @@ func _configureMFAForAuthMethod(rc *eos_io.RuntimeContext, client *api.Client, a
 
 // _configureMFAForUserpass configures MFA for userpass authentication
 // Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//
 //nolint:unused
 func _configureMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
@@ -409,6 +412,7 @@ func _configureMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client, aut
 
 // _configureMFAForLDAP configures MFA for LDAP authentication
 // Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//
 //nolint:unused
 func _configureMFAForLDAP(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
@@ -435,6 +439,7 @@ func _configureMFAForLDAP(rc *eos_io.RuntimeContext, client *api.Client, authPat
 
 // _configureMFAForOIDC configures MFA for OIDC/JWT authentication
 // Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//
 //nolint:unused
 func _configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPath string) error {
 	log := otelzap.Ctx(rc.Ctx)
@@ -461,6 +466,7 @@ func _configureMFAForOIDC(rc *eos_io.RuntimeContext, client *api.Client, authPat
 
 // _createMFAEnforcementPolicy creates a Vault policy that enforces MFA
 // Prefixed with underscore to indicate it's intentionally unused (future MFA enforcement)
+//
 //nolint:unused
 func _createMFAEnforcementPolicy(config *MFAConfig) string {
 	_ = config // TODO: Use config to customize policy based on MFA settings
@@ -549,10 +555,10 @@ func promptPingIDConfig(rc *eos_io.RuntimeContext) (map[string]interface{}, erro
 	}
 
 	return map[string]interface{}{
-		"admin_url":        adminUrl[0],
+		"admin_url":         adminUrl[0],
 		"authenticator_url": authenticatorUrl[0],
-		"org_alias":        orgAlias[0],
-		"use_signature":    true,
+		"org_alias":         orgAlias[0],
+		"use_signature":     true,
 	}, nil
 }
 
@@ -590,22 +596,22 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 
 	// Generate TOTP key for user
 	keyData := map[string]interface{}{
-		"generate": true,
-		"issuer":   "Vault - Eos Infrastructure",
+		"generate":     true,
+		"issuer":       "Vault - Eos Infrastructure",
 		"account_name": username,
 	}
 
 	secret, err := client.Logical().Write(fmt.Sprintf("auth/totp/keys/%s", username), keyData)
 	if err != nil {
 		log.Error("❌ Failed to generate TOTP key",
-		zap.Error(err),
-		zap.String("username", username))
-	return cerr.Wrap(err, "failed to generate TOTP key")
+			zap.Error(err),
+			zap.String("username", username))
+		return cerr.Wrap(err, "failed to generate TOTP key")
 	}
 
 	if secret == nil || secret.Data == nil {
 		log.Error("❌ No TOTP key data returned from Vault", zap.String("username", username))
-	return cerr.New("no TOTP key data returned")
+		return cerr.New("no TOTP key data returned")
 	}
 
 	// Display QR code and backup key
@@ -636,7 +642,7 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		testCodes, err := interaction.PromptSecrets(rc.Ctx, "Enter TOTP code from your authenticator app", 1)
 		if err != nil {
 			log.Error("❌ Failed to get test code from user", zap.Error(err))
-		return cerr.Wrap(err, "failed to get test code")
+			return cerr.Wrap(err, "failed to get test code")
 		}
 
 		// Verify the test code

@@ -28,7 +28,7 @@ Examples:
 	Args: cobra.MaximumNArgs(1),
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		if len(args) == 0 {
 			logger.Info("🗑️ Please use a subcommand like 'delete resources' or specify an app name")
 			return nil
@@ -63,7 +63,7 @@ func init() {
 // runDeleteConfig presents an interactive menu for delete actions.
 func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("🗑️ Delete Resources Menu")
 	logger.Info("Select the resource you want to delete:")
 	logger.Info("1) Delete Certificates")
@@ -72,7 +72,7 @@ func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 	logger.Info("4) Delete (or revert) Nginx defaults")
 	logger.Info("5) Delete all specified resources")
 	logger.Info("Enter choice (1-5): ")
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	choice, _ := reader.ReadString('\n')
 	choice = strings.ToLower(strings.TrimSpace(choice))
@@ -101,9 +101,9 @@ func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 func deleteCertificates(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	certsDir := "/opt/hecate/certs"
-	
+
 	logger.Info("🗑️ Deleting Certificates", zap.String("directory", certsDir))
-	
+
 	err := os.RemoveAll(certsDir)
 	if err != nil {
 		logger.Error("❌ Error deleting certificates directory", zap.String("directory", certsDir), zap.Error(err))
@@ -114,15 +114,15 @@ func deleteCertificates(rc *eos_io.RuntimeContext) {
 
 func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("🗑️ Deleting docker-compose modifications/backups")
-	
+
 	matches, err := filepath.Glob("/opt/hecate/*_docker-compose.yml.bak")
 	if err != nil {
 		logger.Error("❌ Error searching for backups", zap.Error(err))
 		return
 	}
-	
+
 	for _, file := range matches {
 		if err := os.Remove(file); err != nil {
 			logger.Error("❌ Error removing backup file", zap.String("file", file), zap.Error(err))
@@ -130,7 +130,7 @@ func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 			logger.Info("✅ Removed backup file", zap.String("file", file))
 		}
 	}
-	
+
 	// Also remove the main docker-compose.yml file
 	mainCompose := "/opt/hecate/docker-compose.yml"
 	if err := os.Remove(mainCompose); err != nil {
@@ -143,9 +143,9 @@ func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 func deleteEosConfig(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	confDir := "/opt/hecate/assets/conf.d"
-	
+
 	logger.Info("🗑️ Deleting Eos backend configuration files", zap.String("directory", confDir))
-	
+
 	err := os.RemoveAll(confDir)
 	if err != nil {
 		logger.Error("❌ Error deleting configuration directory", zap.String("directory", confDir), zap.Error(err))
@@ -158,9 +158,9 @@ func deleteNginxDefaults(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	configFile := "/opt/hecate/nginx.conf"
 	backupFile := "/opt/hecate/nginx.conf.bak"
-	
+
 	logger.Info("🗑️ Deleting/reverting Nginx defaults", zap.String("file", configFile))
-	
+
 	if _, err := os.Stat(backupFile); err == nil {
 		if err := os.Remove(configFile); err != nil {
 			logger.Error("❌ Error removing current config", zap.String("file", configFile), zap.Error(err))

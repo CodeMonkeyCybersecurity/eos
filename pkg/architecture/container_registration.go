@@ -48,7 +48,7 @@ func RegisterFileOperationsServices(builder *ContainerBuilder) *ContainerBuilder
 		pathOps, _ := GetTyped[fileops.PathOperations](c, "fileops:path_operations")
 		templateOps, _ := GetTyped[fileops.TemplateOperations](c, "fileops:template_operations")
 		safeOps, _ := GetTyped[fileops.SafeOperations](c, "fileops:safe_operations")
-		
+
 		// Archive ops is optional for now
 		var archiveOps fileops.ArchiveOperations
 		if ops, err := GetTyped[fileops.ArchiveOperations](c, "fileops:archive_operations"); err == nil {
@@ -88,7 +88,7 @@ func RegisterCryptoServices(builder *ContainerBuilder) *ContainerBuilder {
 		logger, _ := GetTyped[*zap.Logger](c, "logger")
 		fileOps, _ := GetTyped[fileops.FileOperations](c, "fileops:file_operations")
 		pathOps, _ := GetTyped[fileops.PathOperations](c, "fileops:path_operations")
-		
+
 		// Use secure key storage directory
 		keyDir := "/var/lib/eos/keys"
 		return cryptoInfra.NewFileBasedKeyManagement(keyDir, fileOps, pathOps, logger), nil
@@ -117,11 +117,11 @@ func RegisterCryptoServices(builder *ContainerBuilder) *ContainerBuilder {
 		secureOps, _ := GetTyped[crypto.SecureOperations](c, "crypto:secure_operations")
 		keyMgmt, _ := GetTyped[crypto.KeyManagement](c, "crypto:key_management")
 		policy, _ := GetTyped[crypto.CryptoPolicy](c, "crypto:policy")
-		
+
 		// Optional services
 		var signatureOps crypto.SignatureOperations
 		var certOps crypto.CertificateOperations
-		
+
 		if ops, err := GetTyped[crypto.SignatureOperations](c, "crypto:signature_operations"); err == nil {
 			signatureOps = ops
 		}
@@ -148,7 +148,7 @@ func CreateApplicationContainer(ctx context.Context, logger *zap.Logger) (*Enhan
 	// Register domain services
 	RegisterFileOperationsServices(builder)
 	RegisterCryptoServices(builder)
-	
+
 	// TODO: Register additional domain services
 	// RegisterSystemInfoServices(builder)
 	// RegisterParseServices(builder)

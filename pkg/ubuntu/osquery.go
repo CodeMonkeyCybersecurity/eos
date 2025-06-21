@@ -49,7 +49,7 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 
 	// Add osquery official repository GPG key
 	logger.Info("📝 Adding osquery repository GPG key")
-	
+
 	// Download GPG key to temporary file first
 	keyPath := "/tmp/osquery-key.gpg"
 	if err := execute.RunSimple(rc.Ctx, "curl", "-fsSL", "https://pkg.osquery.io/deb/pubkey.gpg", "-o", keyPath); err != nil {
@@ -60,7 +60,7 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 			logger.Warn("Failed to remove temporary GPG key file", zap.String("path", keyPath), zap.Error(err))
 		}
 	}()
-	
+
 	// Convert and install GPG key
 	keyringPath := "/usr/share/keyrings/osquery-keyring.gpg"
 	if err := execute.RunSimple(rc.Ctx, "gpg", "--dearmor", "--output", keyringPath, keyPath); err != nil {
