@@ -203,17 +203,19 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	if infraOutputPath == "" {
 		hostname, _ := os.Hostname()
 		timestamp := time.Now().Format("20060102-150405")
-		ext := ".yml"
 		if infraTerraformFlag {
-			ext = ".tf"
+			// For modular Terraform, create a directory
+			infraOutputPath = filepath.Join("/etc/eos", fmt.Sprintf("%s_%s_terraform", timestamp, hostname))
+		} else {
+			// For YAML, create a file
+			infraOutputPath = filepath.Join("/etc/eos", fmt.Sprintf("%s_%s_infra_status.yml", timestamp, hostname))
 		}
-		infraOutputPath = filepath.Join("/etc/eos", fmt.Sprintf("%s_%s_infra_status%s", timestamp, hostname, ext))
 		logger.Info("📂 Generated output path",
 			zap.String("path", infraOutputPath),
 			zap.String("hostname", hostname),
 			zap.String("timestamp", timestamp),
-			zap.String("extension", ext),
-			zap.Bool("terraform_format", infraTerraformFlag))
+			zap.Bool("terraform_format", infraTerraformFlag),
+			zap.String("output_type", map[bool]string{true: "directory", false: "file"}[infraTerraformFlag]))
 	} else {
 		logger.Info("📂 Using custom output path",
 			zap.String("path", infraOutputPath),
@@ -221,7 +223,15 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	}
 
 	// Ensure output directory exists with logging
-	outputDir := filepath.Dir(infraOutputPath)
+	var outputDir string
+	if infraTerraformFlag {
+		// For Terraform, the infraOutputPath is the directory itself
+		outputDir = infraOutputPath
+	} else {
+		// For YAML, get the parent directory of the file
+		outputDir = filepath.Dir(infraOutputPath)
+	}
+	
 	logger.Info("📁 Creating output directory",
 		zap.String("directory", outputDir),
 		zap.String("permissions", "0755"))
@@ -258,8 +268,9 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	}
 
 	logger.Info("✨ Infrastructure inspection complete",
-		zap.String("output_file", infraOutputPath),
+		zap.String("output_path", infraOutputPath),
 		zap.String("format", map[bool]string{true: "terraform", false: "yaml"}[infraTerraformFlag]),
+		zap.String("type", map[bool]string{true: "modular_directory", false: "single_file"}[infraTerraformFlag]),
 		zap.Duration("total_duration", time.Since(start)))
 
 	return nil

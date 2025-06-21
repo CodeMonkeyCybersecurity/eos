@@ -116,8 +116,19 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 	return nil
 }
 
-// WriteTerraform writes infrastructure data as Terraform configuration
+// WriteTerraform writes infrastructure data as modular Terraform configuration
 func WriteTerraform(ctx context.Context, infrastructure *Infrastructure, outputPath string) error {
+	// For backward compatibility, if outputPath is a file, create the old monolithic format
+	if strings.HasSuffix(outputPath, ".tf") {
+		return WriteTerraformMonolithic(ctx, infrastructure, outputPath)
+	}
+	
+	// Otherwise, create modular structure
+	return WriteTerraformModular(ctx, infrastructure, outputPath)
+}
+
+// WriteTerraformMonolithic writes infrastructure data as single Terraform file (legacy)
+func WriteTerraformMonolithic(ctx context.Context, infrastructure *Infrastructure, outputPath string) error {
 	start := time.Now()
 	logger := otelzap.Ctx(ctx)
 	
@@ -327,6 +338,110 @@ locals {
 			zap.String("file_path", outputPath))
 	}
 
+	return nil
+}
+
+// WriteTerraformModular creates a modular Terraform configuration structure
+func WriteTerraformModular(ctx context.Context, infrastructure *Infrastructure, baseDir string) error {
+	start := time.Now()
+	logger := otelzap.Ctx(ctx)
+	
+	logger.Info("🏗️ Starting modular Terraform configuration generation",
+		zap.String("base_directory", baseDir),
+		zap.String("hostname", infrastructure.Hostname),
+		zap.Time("timestamp", infrastructure.Timestamp))
+	
+	// Create directory structure
+	if err := createTerraformDirectories(baseDir); err != nil {
+		return fmt.Errorf("failed to create directories: %w", err)
+	}
+	
+	// Generate configuration files  
+	config := &TerraformConfig{
+		Infrastructure: infrastructure,
+		BaseDir:        baseDir,
+		Logger:         logger.Logger(), // Get the underlying zap.Logger
+	}
+	
+	// Generate core files
+	if err := config.generateMainTf(); err != nil {
+		return fmt.Errorf("failed to generate main.tf: %w", err)
+	}
+	
+	if err := config.generateVariablesTf(); err != nil {
+		return fmt.Errorf("failed to generate variables.tf: %w", err)
+	}
+	
+	if err := config.generateOutputsTf(); err != nil {
+		return fmt.Errorf("failed to generate outputs.tf: %w", err)
+	}
+	
+	// Generate resource files
+	if infrastructure.Docker != nil {
+		if err := config.generateDockerResources(); err != nil {
+			return fmt.Errorf("failed to generate docker resources: %w", err)
+		}
+	}
+	
+	if infrastructure.Hetzner != nil {
+		if err := config.generateHetznerResources(); err != nil {
+			return fmt.Errorf("failed to generate hetzner resources: %w", err)
+		}
+	}
+	
+	if infrastructure.KVM != nil {
+		if err := config.generateKVMResources(); err != nil {
+			return fmt.Errorf("failed to generate kvm resources: %w", err)
+		}
+	}
+	
+	// Generate modules
+	if err := config.generateWazuhModule(); err != nil {
+		return fmt.Errorf("failed to generate wazuh module: %w", err)
+	}
+	
+	// Generate environment files
+	if err := config.generateEnvironmentFiles(); err != nil {
+		return fmt.Errorf("failed to generate environment files: %w", err)
+	}
+	
+	// Generate documentation
+	if err := config.generateDocumentation(); err != nil {
+		return fmt.Errorf("failed to generate documentation: %w", err)
+	}
+	
+	logger.Info("✅ Modular Terraform configuration created successfully",
+		zap.String("base_directory", baseDir),
+		zap.Duration("total_duration", time.Since(start)))
+	
+	return nil
+}
+
+// TerraformConfig holds configuration for generating modular Terraform
+type TerraformConfig struct {
+	Infrastructure *Infrastructure
+	BaseDir        string
+	Logger         *otelzap.Logger
+}
+
+// createTerraformDirectories creates the directory structure for modular Terraform
+func createTerraformDirectories(baseDir string) error {
+	dirs := []string{
+		baseDir,
+		baseDir + "/docker",
+		baseDir + "/hetzner", 
+		baseDir + "/kvm",
+		baseDir + "/modules",
+		baseDir + "/modules/wazuh-volumes",
+		baseDir + "/envs",
+	}
+	
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
+		}
+	}
+	
 	return nil
 }
 
