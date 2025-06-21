@@ -1,6 +1,6 @@
-// cmd/delphi/inspect/config.go
+// cmd/delphi/read/config.go
 
-package inspect
+package read
 
 import (
 	"encoding/json"
@@ -16,9 +16,9 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 )
 
-var InspectConfigCmd = &cobra.Command{
+var ReadConfigCmd = &cobra.Command{
 	Use:     "config",
-	Short:   "Inspect the currently loaded Delphi configuration",
+	Short:   "Read the currently loaded Delphi configuration",
 	Long:    "Displays the contents of the delphi.json config file, with sensitive fields masked for safety.",
 	Aliases: []string{"cfg", "settings"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -54,6 +54,6 @@ var InspectConfigCmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(InspectConfigCmd)
-	InspectConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
+	ReadCmd.AddCommand(ReadConfigCmd)
+	ReadConfigCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }

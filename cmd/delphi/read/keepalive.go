@@ -1,6 +1,6 @@
-// cmd/delphi/inspect/keepalive.go
+// cmd/delphi/read/keepalive.go
 
-package inspect
+package read
 
 import (
 	"encoding/json"
@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var KeepAliveCmd = &cobra.Command{
+var ReadKeepAliveCmd = &cobra.Command{
 	Use:   "keepalive",
 	Short: "Check disconnected agents from Wazuh API",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -58,5 +58,5 @@ var KeepAliveCmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(KeepAliveCmd)
+	ReadCmd.AddCommand(ReadKeepAliveCmd)
 }

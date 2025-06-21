@@ -6,7 +6,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect" // This is delphi's 'read' subcommand
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read" // This is delphi's 'read' subcommand
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
 
@@ -33,7 +33,7 @@ var DelphiCmd = &cobra.Command{
 func init() {
 	// Register subcommands to DelphiCmd
 	DelphiCmd.AddCommand(create.CreateCmd)
-	DelphiCmd.AddCommand(inspect.InspectCmd) // This 'read' is specific to 'delphi'
+	DelphiCmd.AddCommand(read.ReadCmd) // This 'read' is specific to 'delphi'
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(sync.SyncCmd)

@@ -1,5 +1,5 @@
-// cmd/delphi/inspect/api.go
-package inspect
+// cmd/delphi/read/api.go
+package read
 
 import (
 	"fmt"
@@ -19,9 +19,9 @@ var (
 	showVersion     bool
 )
 
-var InspectAPICmd = &cobra.Command{
+var ReadAPICmd = &cobra.Command{
 	Use:   "api",
-	Short: "Inspect API details from Delphi (Wazuh)",
+	Short: "Read API details from Delphi (Wazuh)",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		// ✅ Step 2: Toggle ShowSecrets and confirm config
@@ -49,7 +49,7 @@ var InspectAPICmd = &cobra.Command{
 			return err
 		}
 
-		// ✅ Step 5: Execute inspection
+		// ✅ Step 5: Execute read operation
 		if showPermissions {
 			body, code := delphi.GetUserDetails(rc, cfg)
 			delphi.HandleAPIResponse("API User Permissions", []byte(body), code)
@@ -64,8 +64,8 @@ var InspectAPICmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(InspectAPICmd)
-	InspectAPICmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
-	InspectAPICmd.Flags().BoolVar(&showPermissions, "permissions", false, "Display user permissions")
-	InspectAPICmd.Flags().BoolVar(&showVersion, "version", false, "Display Wazuh manager version")
+	ReadCmd.AddCommand(ReadAPICmd)
+	ReadAPICmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
+	ReadAPICmd.Flags().BoolVar(&showPermissions, "permissions", false, "Display user permissions")
+	ReadAPICmd.Flags().BoolVar(&showVersion, "version", false, "Display Wazuh manager version")
 }

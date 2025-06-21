@@ -1,5 +1,5 @@
-// cmd/delphi/inspect/credentials.go
-package inspect
+// cmd/delphi/read/credentials.go
+package read
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var InspectCredentialsCmd = &cobra.Command{
+var ReadCredentialsCmd = &cobra.Command{
 	Use:   "credentials",
 	Short: "List all Delphi (Wazuh) user credentials",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
@@ -82,6 +82,6 @@ var InspectCredentialsCmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(InspectCredentialsCmd)
-	InspectCredentialsCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
+	ReadCmd.AddCommand(ReadCredentialsCmd)
+	ReadCredentialsCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }

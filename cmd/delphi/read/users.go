@@ -1,5 +1,5 @@
-// cmd/delphi/inspect/users.go
-package inspect
+// cmd/delphi/read/users.go
+package read
 
 import (
 	"fmt"
@@ -13,7 +13,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 )
 
-var UsersCmd = &cobra.Command{
+var ReadUsersCmd = &cobra.Command{
 	Use:   "users",
 	Short: "List Wazuh users and their IDs",
 	Long:  "Fetches and displays all Wazuh users along with their associated user IDs from the Delphi (Wazuh) API.",
@@ -38,5 +38,5 @@ var UsersCmd = &cobra.Command{
 }
 
 func init() {
-	InspectCmd.AddCommand(UsersCmd)
+	ReadCmd.AddCommand(ReadUsersCmd)
 }
