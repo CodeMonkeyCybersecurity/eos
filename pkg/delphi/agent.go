@@ -21,7 +21,7 @@ import (
 	"golang.org/x/term"
 )
 
-func DeleteAgent(rc *eos_io.RuntimeContext, agentID string, token string, config *Config) (map[string]interface{}, error) {
+func DeleteAgent(rc *eos_io.RuntimeContext, agentID string, token string, config *Config) (map[string]any, error) {
 	url := fmt.Sprintf("%s://%s:%s/agents/%s?pretty=true", config.Protocol, config.FQDN, config.Port, agentID)
 
 	req, _ := http.NewRequest("DELETE", url, nil)
@@ -38,13 +38,13 @@ func DeleteAgent(rc *eos_io.RuntimeContext, agentID string, token string, config
 	}
 	defer shared.SafeClose(rc.Ctx, resp.Body)
 
-	var result map[string]interface{}
+	var result map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&result)
 	return result, nil
 }
 
 // UpgradeAgents calls the Wazuh API to upgrade a list of agent IDs.
-func UpgradeAgents(rc *eos_io.RuntimeContext, cfg *Config, token string, agentIDs []string, payload map[string]interface{}) error {
+func UpgradeAgents(rc *eos_io.RuntimeContext, cfg *Config, token string, agentIDs []string, payload map[string]any) error {
 	url := fmt.Sprintf("%s://%s:%s/agents/upgrade?agents_list=%s&pretty=true",
 		cfg.Protocol, cfg.FQDN, cfg.Port, strings.Join(agentIDs, ","))
 
@@ -173,12 +173,12 @@ func queryUpgradeResult(rc *eos_io.RuntimeContext, apiURL, token string, agentID
 		zap.Strings("agentIDs", agentIDs)) // Add agent IDs for context
 
 	// Build payload for upgrade_result request.
-	payloadMap := map[string]interface{}{
+	payloadMap := map[string]any{
 		"origin": map[string]string{
 			"module": "api",
 		},
 		"command": "upgrade_result",
-		"parameters": map[string]interface{}{
+		"parameters": map[string]any{
 			"agents": agentIDs,
 		},
 	}
@@ -312,7 +312,7 @@ type Rule struct {
 	ID              int                    `json:"id"`
 	Level           int                    `json:"level"`
 	Status          string                 `json:"status"`
-	Details         map[string]interface{} `json:"details"` // Can be more specific if schema is known
+	Details         map[string]any `json:"details"` // Can be more specific if schema is known
 	PCIDSS          []string               `json:"pci_dss"`
 	GPG13           []string               `json:"gpg13"`
 	GDPR            []string               `json:"gdpr"`
@@ -401,7 +401,7 @@ type ManagerStatus struct {
 
 // ManagerConfiguration represents a section of the Wazuh manager's configuration.
 type ManagerConfiguration struct {
-	Global map[string]interface{} `json:"global"` // Example for 'global' section. Can be more specific.
+	Global map[string]any `json:"global"` // Example for 'global' section. Can be more specific.
 }
 
 // AgentInfo represents information about a Wazuh agent.
@@ -429,7 +429,7 @@ type NewEvents struct {
 }
 
 // makeRequest is a generic helper to make Wazuh API calls.
-func makeRequest(rc *eos_io.RuntimeContext, cfg *Config, token, method, endpoint string, queryParams map[string]string, body interface{}) ([]byte, error) {
+func makeRequest(rc *eos_io.RuntimeContext, cfg *Config, token, method, endpoint string, queryParams map[string]string, body any) ([]byte, error) {
 	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.FQDN, cfg.Port)
 	fullURL := fmt.Sprintf("%s%s", baseURL, endpoint)
 

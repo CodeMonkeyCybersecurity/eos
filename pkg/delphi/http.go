@@ -14,7 +14,7 @@ import (
 )
 
 // GetJSON performs an unauthenticated GET request and returns parsed JSON.
-func GetJSON(rc *eos_io.RuntimeContext, url string, headers map[string]string) (map[string]interface{}, error) {
+func GetJSON(rc *eos_io.RuntimeContext, url string, headers map[string]string) (map[string]any, error) {
 	client := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: getHTTPTLSConfig(),
@@ -40,7 +40,7 @@ func GetJSON(rc *eos_io.RuntimeContext, url string, headers map[string]string) (
 		return nil, fmt.Errorf("delphi API returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode JSON: %w", err)
 	}
@@ -89,7 +89,7 @@ func AuthenticatedPost(cfg *Config, path string, body io.Reader) (*http.Response
 }
 
 // AuthenticatedPut sends a PUT request with a JSON payload using a Bearer token.
-func AuthenticatedPut(cfg *Config, path string, payload interface{}) (*http.Response, error) {
+func AuthenticatedPut(cfg *Config, path string, payload any) (*http.Response, error) {
 	url := fmt.Sprintf("%s/%s", BaseURL(cfg), strings.TrimPrefix(path, "/"))
 
 	data, err := json.Marshal(payload)
