@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.24
+          go-version: 1.22
 
       - name: Download Go module dependencies
         run: go mod download
@@ -36,7 +36,7 @@ jobs:
 
       - name: Run static security analysis with gosec
         run: |
-          go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
           gosec -fmt json -out gosec-report.json ./... || echo '{"issues": [], "errors": []}' > gosec-report.json
 
       - name: Upload security artifacts
