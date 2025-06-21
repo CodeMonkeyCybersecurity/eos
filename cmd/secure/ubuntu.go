@@ -3,6 +3,7 @@ package secure
 import (
 	"fmt"
 	"os"
+	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -24,9 +25,11 @@ var ubuntuCmd = &cobra.Command{
 - Automatic security updates
 - Kernel hardening and sysctl settings
 - Multi-Factor Authentication (MFA) for sudo/root access`,
-	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.WrapExtended(7*time.Minute, func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("Starting Ubuntu security hardening")
+		logger.Info("🛡️ Starting Ubuntu security hardening with extended timeout",
+			zap.Duration("timeout", 7*time.Minute),
+			zap.String("reason", "AIDE installation and security tools require extended time"))
 
 		// Check if running as root
 		if os.Geteuid() != 0 {
