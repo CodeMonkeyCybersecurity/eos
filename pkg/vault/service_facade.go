@@ -49,18 +49,21 @@ func InitializeServiceFacade(rc *eos_io.RuntimeContext) error {
 		logger.Warn("Failed to create vault client, using fallback only", zap.Error(err))
 	}
 
+	// Extract zap logger from otelzap wrapper
+	zapLogger := logger.ZapLogger()
+
 	// Create secret stores
 	var primaryStore domain.SecretStore
 	if client != nil {
-		primaryStore = infra.NewAPISecretStore(client, shared.VaultMountKV, logger)
+		primaryStore = infra.NewAPISecretStore(client, shared.VaultMountKV, zapLogger)
 	}
 
-	fallbackStore := infra.NewFallbackSecretStore(shared.SecretsDir, logger)
+	fallbackStore := infra.NewFallbackSecretStore(shared.SecretsDir, zapLogger)
 
 	// Create composite store
 	var secretStore domain.SecretStore
 	if primaryStore != nil {
-		secretStore = infra.NewCompositeSecretStore(primaryStore, fallbackStore, logger)
+		secretStore = infra.NewCompositeSecretStore(primaryStore, fallbackStore, zapLogger)
 	} else {
 		secretStore = fallbackStore
 	}
@@ -73,14 +76,14 @@ func InitializeServiceFacade(rc *eos_io.RuntimeContext) error {
 		nil, // manager - implement as needed  
 		nil, // configRepo - implement as needed
 		nil, // auditRepo - implement as needed
-		logger,
+		zapLogger,
 	)
 
 	globalFacade = &ServiceFacade{
 		vaultService: vaultService,
 		secretStore:  secretStore,
 		client:       client,
-		logger:       logger,
+		logger:       zapLogger,
 		initialized:  true,
 	}
 

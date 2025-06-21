@@ -31,7 +31,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read" // NOTE: This `read` is a TOP-LEVEL command, not delphi/read
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	// Internal packages
@@ -80,7 +79,6 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		config.ConfigCmd,
 		refresh.RefreshCmd,
 		secure.SecureCmd,
-		self.SelfCmd,
 		disable.DisableCmd,
 		backup.BackupCmd,
 		enable.EnableCmd,
@@ -120,16 +118,16 @@ func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
 		select {
 		case <-timer.C:
 			fmt.Fprintf(os.Stderr, "⚠️ Eos watchdog: global timeout (%s) exceeded. Initiating graceful shutdown.\n", max)
-			otelzap.Ctx(rc.Ctx).Error("Global timeout exceeded, initiating graceful shutdown", 
+			otelzap.Ctx(rc.Ctx).Error("Global timeout exceeded, initiating graceful shutdown",
 				zap.Duration("timeout", max))
-			
+
 			// Log the timeout and attempt graceful shutdown
 			otelzap.Ctx(rc.Ctx).Warn("Attempting graceful shutdown due to watchdog timeout")
-			
+
 			// Give cleanup 5 seconds, then exit normally
 			gracefulTimer := time.NewTimer(5 * time.Second)
 			<-gracefulTimer.C
-			
+
 			fmt.Fprintf(os.Stderr, "💣 Cleanup timeout exceeded. Forcing exit.\n")
 			os.Exit(1) // Use normal exit instead of SIGKILL
 		case <-rc.Ctx.Done():

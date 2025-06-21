@@ -135,7 +135,7 @@ func (s *SystemServiceManager) GetService(ctx context.Context, name string) (*Se
 		Args: []string{"status", name},
 	}
 
-	result, err := s.executor.Execute(ctx, cmd)
+	result, _ := s.executor.Execute(ctx, cmd)
 	// systemctl status returns non-zero for inactive services, which is expected
 
 	service := &Service{

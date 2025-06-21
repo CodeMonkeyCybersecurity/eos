@@ -51,11 +51,13 @@ func OldVaultOperations(rc *eos_io.RuntimeContext) error {
 // This shows how the same functionality would be implemented
 
 // ✅ IMPROVED: Clean separation of concerns
-func NewVaultOperations(container *Container) *VaultOperations {
+func NewVaultOperations(container *DIContainer) *VaultOperations {
+	secretService, _ := container.GetSecretService()
+	commandExec := container.GetCommandExecutor()
 	return &VaultOperations{
-		secretService: container.GetSecretService(),
-		commandExec:   container.GetCommandExecutor(),
-		logger:       container.logger,
+		secretService: secretService,
+		commandExec:   commandExec,
+		logger:       zap.L(),
 	}
 }
 

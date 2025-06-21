@@ -8,8 +8,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// Container manages dependencies and provides dependency injection
-type Container struct {
+// DIContainer manages dependencies and provides dependency injection
+type DIContainer struct {
 	// Infrastructure dependencies
 	infraProvider    InfrastructureProvider
 	containerMgr     ContainerManager
@@ -29,50 +29,50 @@ type Container struct {
 	logger *zap.Logger
 }
 
-// NewContainer creates a new dependency injection container
-func NewContainer(logger *zap.Logger) *Container {
-	return &Container{
+// NewDIContainer creates a new dependency injection container
+func NewDIContainer(logger *zap.Logger) *DIContainer {
+	return &DIContainer{
 		logger: logger,
 	}
 }
 
 // RegisterInfrastructureProvider registers an infrastructure provider
-func (c *Container) RegisterInfrastructureProvider(provider InfrastructureProvider) {
+func (c *DIContainer) RegisterInfrastructureProvider(provider InfrastructureProvider) {
 	c.infraProvider = provider
 }
 
 // RegisterContainerManager registers a container manager
-func (c *Container) RegisterContainerManager(mgr ContainerManager) {
+func (c *DIContainer) RegisterContainerManager(mgr ContainerManager) {
 	c.containerMgr = mgr
 }
 
 // RegisterServiceManager registers a service manager
-func (c *Container) RegisterServiceManager(mgr ServiceManager) {
+func (c *DIContainer) RegisterServiceManager(mgr ServiceManager) {
 	c.serviceMgr = mgr
 }
 
 // RegisterCommandExecutor registers a command executor
-func (c *Container) RegisterCommandExecutor(executor CommandExecutor) {
+func (c *DIContainer) RegisterCommandExecutor(executor CommandExecutor) {
 	c.commandExecutor = executor
 }
 
 // RegisterSecretStore registers a secret store
-func (c *Container) RegisterSecretStore(store SecretStore) {
+func (c *DIContainer) RegisterSecretStore(store SecretStore) {
 	c.secretStore = store
 }
 
 // RegisterConfigRepository registers a config repository
-func (c *Container) RegisterConfigRepository(repo ConfigRepository) {
+func (c *DIContainer) RegisterConfigRepository(repo ConfigRepository) {
 	c.configRepo = repo
 }
 
 // RegisterAuditRepository registers an audit repository
-func (c *Container) RegisterAuditRepository(repo AuditRepository) {
+func (c *DIContainer) RegisterAuditRepository(repo AuditRepository) {
 	c.auditRepo = repo
 }
 
 // GetInfrastructureService returns the infrastructure service, creating it if necessary
-func (c *Container) GetInfrastructureService() (*InfrastructureService, error) {
+func (c *DIContainer) GetInfrastructureService() (*InfrastructureService, error) {
 	if c.infraService == nil {
 		if err := c.validateInfrastructureDependencies(); err != nil {
 			return nil, fmt.Errorf("missing infrastructure dependencies: %w", err)
@@ -90,7 +90,7 @@ func (c *Container) GetInfrastructureService() (*InfrastructureService, error) {
 }
 
 // GetSecretService returns the secret service, creating it if necessary
-func (c *Container) GetSecretService() (*SecretService, error) {
+func (c *DIContainer) GetSecretService() (*SecretService, error) {
 	if c.secretService == nil {
 		if err := c.validateSecretDependencies(); err != nil {
 			return nil, fmt.Errorf("missing secret dependencies: %w", err)
@@ -106,27 +106,27 @@ func (c *Container) GetSecretService() (*SecretService, error) {
 }
 
 // GetSecretStore returns the registered secret store
-func (c *Container) GetSecretStore() SecretStore {
+func (c *DIContainer) GetSecretStore() SecretStore {
 	return c.secretStore
 }
 
 // GetConfigRepository returns the registered config repository
-func (c *Container) GetConfigRepository() ConfigRepository {
+func (c *DIContainer) GetConfigRepository() ConfigRepository {
 	return c.configRepo
 }
 
 // GetAuditRepository returns the registered audit repository
-func (c *Container) GetAuditRepository() AuditRepository {
+func (c *DIContainer) GetAuditRepository() AuditRepository {
 	return c.auditRepo
 }
 
 // GetCommandExecutor returns the registered command executor
-func (c *Container) GetCommandExecutor() CommandExecutor {
+func (c *DIContainer) GetCommandExecutor() CommandExecutor {
 	return c.commandExecutor
 }
 
 // ValidateAll validates that all required dependencies are registered
-func (c *Container) ValidateAll() error {
+func (c *DIContainer) ValidateAll() error {
 	if err := c.validateInfrastructureDependencies(); err != nil {
 		return err
 	}
@@ -137,7 +137,7 @@ func (c *Container) ValidateAll() error {
 }
 
 // validateInfrastructureDependencies checks infrastructure service dependencies
-func (c *Container) validateInfrastructureDependencies() error {
+func (c *DIContainer) validateInfrastructureDependencies() error {
 	if c.infraProvider == nil {
 		return fmt.Errorf("infrastructure provider not registered")
 	}
@@ -154,7 +154,7 @@ func (c *Container) validateInfrastructureDependencies() error {
 }
 
 // validateSecretDependencies checks secret service dependencies
-func (c *Container) validateSecretDependencies() error {
+func (c *DIContainer) validateSecretDependencies() error {
 	if c.secretStore == nil {
 		return fmt.Errorf("secret store not registered")
 	}
@@ -166,7 +166,7 @@ func (c *Container) validateSecretDependencies() error {
 
 // ApplicationContext provides application-wide dependencies
 type ApplicationContext struct {
-	Container *Container
+	Container *DIContainer
 	Logger    *zap.Logger
 	Context   context.Context
 }
@@ -174,7 +174,7 @@ type ApplicationContext struct {
 // NewApplicationContext creates a new application context
 func NewApplicationContext(ctx context.Context, logger *zap.Logger) *ApplicationContext {
 	return &ApplicationContext{
-		Container: NewContainer(logger),
+		Container: NewDIContainer(logger),
 		Logger:    logger,
 		Context:   ctx,
 	}
@@ -182,14 +182,14 @@ func NewApplicationContext(ctx context.Context, logger *zap.Logger) *Application
 
 // ConfigurationBuilder helps build container configuration
 type ConfigurationBuilder struct {
-	container *Container
+	container *DIContainer
 	logger    *zap.Logger
 }
 
 // NewConfigurationBuilder creates a new configuration builder
 func NewConfigurationBuilder(logger *zap.Logger) *ConfigurationBuilder {
 	return &ConfigurationBuilder{
-		container: NewContainer(logger),
+		container: NewDIContainer(logger),
 		logger:    logger,
 	}
 }
@@ -237,7 +237,7 @@ func (b *ConfigurationBuilder) WithCommandExecutor(executor CommandExecutor) *Co
 }
 
 // Build creates the final container with validation
-func (b *ConfigurationBuilder) Build() (*Container, error) {
+func (b *ConfigurationBuilder) Build() (*DIContainer, error) {
 	if err := b.container.ValidateAll(); err != nil {
 		return nil, fmt.Errorf("container validation failed: %w", err)
 	}
@@ -245,7 +245,7 @@ func (b *ConfigurationBuilder) Build() (*Container, error) {
 }
 
 // MustBuild creates the container or panics if validation fails
-func (b *ConfigurationBuilder) MustBuild() *Container {
+func (b *ConfigurationBuilder) MustBuild() *DIContainer {
 	container, err := b.Build()
 	if err != nil {
 		panic(fmt.Sprintf("container build failed: %v", err))

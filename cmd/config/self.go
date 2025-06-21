@@ -1,6 +1,6 @@
-// cmd/self/self.go
+// cmd/config/update.go
 
-package self
+package config
 
 import (
 	"errors"

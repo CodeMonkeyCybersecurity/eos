@@ -113,6 +113,27 @@ Use `eos_err.IsExpectedUserError()` to distinguish between user errors and syste
 ### Command Wrapping
 All command implementations should use `eos.Wrap()` to properly handle the runtime context and error patterns.
 
+### Code Quality Requirements
+**CRITICAL**: Before any task can be considered completed by Claude, the following requirements MUST be met:
+
+1. **Zero Compilation Errors**: The code must compile successfully without any errors throughout the entire codebase
+2. **Linting Standards**: Run `golangci-lint run` and the code MUST pass all linting checks without warnings or errors
+3. **Test Compliance**: The code MUST pass all existing test modules relevant to the changes made
+4. **Fix Code, Not Tests**: When tests fail, the production code must be corrected unless the test is clearly invalid or unreliable
+5. **Verification Commands**: Before marking a task complete, run:
+   ```bash
+   # Verify compilation
+   go build -o /tmp/eos-build ./cmd/
+   
+   # Verify linting
+   golangci-lint run
+   
+   # Verify tests
+   go test -v ./pkg/...
+   ```
+
+**No task should be marked as complete until ALL of these verification steps pass successfully.**
+
 ### External References
 - Knowledge base: [Athena](https://wiki.cybermonkey.net.au)
 - Company website: [cybermonkey.net.au](https://cybermonkey.net.au/)
