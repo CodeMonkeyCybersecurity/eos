@@ -41,6 +41,7 @@ Usage:
 
 		// Define the directory and token placeholder
 		assetsDir := "assets"
+		// #nosec G101 - This is a template placeholder, not a hardcoded credential
 		token := "{{BACKEND_IP}}" // Make sure this token matches what you use in your asset files
 
 		fmt.Printf("Updating backend IP to %s in assets directory...\n", backendIP)

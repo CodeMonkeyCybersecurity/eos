@@ -244,13 +244,27 @@ func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
 	} else {
 		currentUID := stat.Uid
 		currentGID := stat.Gid
-		if currentUID != uint32(eosUID) || currentGID != uint32(eosGID) {
+		
+		// Safely convert int to uint32 with bounds checking
+		if eosUID < 0 || eosGID < 0 {
+			otelzap.Ctx(rc.Ctx).Error("❌ Invalid eos user UID/GID", 
+				zap.Int("uid", eosUID), 
+				zap.Int("gid", eosGID))
+			return fmt.Errorf("invalid eos user UID/GID: %d/%d", eosUID, eosGID)
+		}
+		
+		// #nosec G115 - Safe conversion after bounds checking above
+		expectedUID := uint32(eosUID)
+		// #nosec G115 - Safe conversion after bounds checking above  
+		expectedGID := uint32(eosGID)
+		
+		if currentUID != expectedUID || currentGID != expectedGID {
 			otelzap.Ctx(rc.Ctx).Warn("⚠️ Runtime directory not owned by eos user",
 				zap.String("path", shared.EosRunDir),
 				zap.Uint32("current_uid", currentUID),
 				zap.Uint32("current_gid", currentGID),
-				zap.Int("expected_uid", eosUID),
-				zap.Int("expected_gid", eosGID),
+				zap.Uint32("expected_uid", expectedUID),
+				zap.Uint32("expected_gid", expectedGID),
 			)
 		}
 	}

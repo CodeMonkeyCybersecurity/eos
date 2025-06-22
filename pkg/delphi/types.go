@@ -33,9 +33,12 @@ type APICreds struct {
 }
 
 const (
+	// #nosec G101 - This is a Vault path for credentials, not a hardcoded credential
 	VaultDelphiCreds     = "eos/delphi/api_creds"
 	VaultDelphiConfig    = "eos/delphi/config"
+	// #nosec G101 - This is a URL for a password tool, not a hardcoded credential
 	DelphiPasswdToolURL  = "https://packages.wazuh.com/4.11/wazuh-passwords-tool.sh"
+	// #nosec G101 - This is a file path for a password tool, not a hardcoded credential
 	DelphiPasswdToolPath = "/usr/local/bin/wazuh-passwords-tool.sh"
 )
 

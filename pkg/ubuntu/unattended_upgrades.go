@@ -107,6 +107,7 @@ restic forget --prune \
 	}
 
 	// Create example restic password file
+	// #nosec G101 - This is a file path, not a hardcoded credential
 	passwordPath := "/root/.restic-password"
 	if err := os.WriteFile(passwordPath, []byte("CHANGE_THIS_PASSWORD\n"), 0600); err != nil {
 		return fmt.Errorf("write restic password file: %w", err)

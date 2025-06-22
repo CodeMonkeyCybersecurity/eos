@@ -19,6 +19,7 @@ const (
 	PromptEnterPassword   = "Enter password: "
 	PromptConfirmPassword = "Confirm password: "
 	PromptUsernameInput   = "Enter username (default: eos): "
+	// #nosec G101 - This is a filename, not a hardcoded credential
 	SecretsFilename       = "eos-passwd.json"
 )
 

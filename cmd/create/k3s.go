@@ -210,6 +210,7 @@ func saveScript(rc *eos_io.RuntimeContext, cmdStr string) string {
 
 // outputJoinToken waits for the K3s join token to be available and prints it.
 func outputJoinToken() {
+	// #nosec G101 - This is a file path to a token file, not a hardcoded credential
 	tokenPath := "/var/lib/rancher/k3s/server/node-token"
 	fmt.Println("Retrieving K3s join token...")
 	maxAttempts := 30

@@ -154,6 +154,7 @@ func EnsureWazuhGroup(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	}
 
 	// TODO: retrieve Wazuh API token from Vault
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // Replace with secure lookup
 
 	req, err := http.NewRequest("POST", "https://127.0.0.1:55000/groups?pretty=true", bytes.NewBuffer(body))
@@ -206,6 +207,7 @@ func EnsureWazuhEnrollmentKey(rc *eos_io.RuntimeContext, spec TenantSpec) error 
 	}
 
 	// TODO: replace with Vault-protected Wazuh API token
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>"
 
 	req, err := http.NewRequest("POST", "https://127.0.0.1:55000/agents?pretty=true", bytes.NewBuffer(body))
@@ -261,6 +263,7 @@ func EnsureWazuhPolicy(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	}
 
 	// TODO: Replace with Vault-managed token
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>"
 
 	req, err := http.NewRequest("POST", "https://127.0.0.1:55000/security/policies?pretty=true", bytes.NewBuffer(body))
@@ -419,6 +422,7 @@ func EnsureGlobalReadonlyRole(rc *eos_io.RuntimeContext) error {
 func ResolveWazuhRoleID(rc *eos_io.RuntimeContext, name string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: secure lookup
 	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/roles?pretty=true", nil)
 	if err != nil {
@@ -462,6 +466,7 @@ func ResolveWazuhRoleID(rc *eos_io.RuntimeContext, name string) (string, error) 
 func ResolveWazuhUserID(rc *eos_io.RuntimeContext, name string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Retrieve from Vault
 	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/users?pretty=true", nil)
 	if err != nil {
@@ -505,6 +510,7 @@ func ResolveWazuhUserID(rc *eos_io.RuntimeContext, name string) (string, error) 
 func ResolveWazuhPolicyID(rc *eos_io.RuntimeContext, name string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Retrieve from Vault
 	req, err := http.NewRequest("GET", "https://127.0.0.1:55000/security/policies?pretty=true", nil)
 	if err != nil {
@@ -565,6 +571,7 @@ func AttachPolicyToRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	}
 
 	url := fmt.Sprintf("https://127.0.0.1:55000/security/roles/%s/policies?policy_ids=%s&pretty=true", roleID, policyID)
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Vault integration
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -619,6 +626,7 @@ func AssignRoleToUser(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	}
 
 	url := fmt.Sprintf("https://127.0.0.1:55000/security/users/%s/roles?role_ids=%s&pretty=true", userID, roleID)
+	// #nosec G101 - This is a placeholder template, not a hardcoded credential
 	token := "<vaulted-wazuh-token>" // TODO: Vault integration
 
 	req, err := http.NewRequest("POST", url, nil)

@@ -41,10 +41,12 @@ const (
 	// Auth specific Vault paths
 	// ----------------------
 
+	// #nosec G101 - This is a Vault path prefix, not a hardcoded credential
 	UserpassPathPrefix  = "auth/userpass/users/"
 	EosUserpassPath     = UserpassPathPrefix + EosID
 	VaultSecretMount    = "secret"
 	UserpassKVPath      = VaultSecretMount + "/eos/userpass-password"
+	// #nosec G101 - This is a configuration key name, not a hardcoded credential
 	FallbackPasswordKey = "eos-userpass-password"
 
 	AuditID   = "file/"

@@ -57,6 +57,7 @@ terraform {
 }
 `
 
+// #nosec G101 - This is a Terraform template containing secret references, not hardcoded credentials
 const VaultSecretDataSourceTemplate = `
 # Vault secret data sources
 {{range .SecretReferences}}
