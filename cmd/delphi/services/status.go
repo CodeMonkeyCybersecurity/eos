@@ -64,6 +64,15 @@ Examples:
 				logger.Info("Checking service status",
 					zap.String("service", service))
 				
+				// Check if service exists first
+				if !eos_unix.ServiceExists(service) {
+					logger.Info("Service status",
+						zap.String("service", service),
+						zap.String("status", "⚫ not installed"),
+						zap.Bool("active", false))
+					continue
+				}
+				
 				err := eos_unix.CheckServiceStatus(rc.Ctx, service)
 				
 				status := "🔴 inactive"

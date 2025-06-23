@@ -64,6 +64,14 @@ Examples:
 				logger.Info("Stopping service",
 					zap.String("service", service))
 				
+				// Check if service exists before trying to stop it
+				if !eos_unix.ServiceExists(service) {
+					logger.Warn("⚠️ Service unit file not found",
+						zap.String("service", service))
+					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
+					continue
+				}
+				
 				if err := eos_unix.StopSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
 					logger.Error("Failed to stop service",
 						zap.String("service", service),

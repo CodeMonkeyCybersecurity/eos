@@ -64,6 +64,14 @@ Examples:
 				logger.Info("Restarting service",
 					zap.String("service", service))
 				
+				// Check if service exists before trying to restart it
+				if !eos_unix.ServiceExists(service) {
+					logger.Warn("⚠️ Service unit file not found",
+						zap.String("service", service))
+					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
+					continue
+				}
+				
 				if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
 					logger.Error("Failed to restart service",
 						zap.String("service", service),

@@ -109,17 +109,19 @@ func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, de
 	return fmt.Errorf("systemctl %s for unit %q failed: %w", action, unit, lastErr)
 }
 
-// CanSudoSystemctl checks if the current user can run sudo systemctl <action> <unit> without a password.
-// Example: CanSudoSystemctl("status", "vault")
+// CanSudoSystemctl checks if the current user can run sudo systemctl without a password.
+// Uses a safe command that won't fail due to non-existent services.
 func CanSudoSystemctl(action, unit string) bool {
-	cmd := exec.Command("systemctl", action, unit)
+	// Test with a safe systemctl command that always exists
+	cmd := exec.Command("sudo", "-n", "systemctl", "--version")
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("❌ sudo -n systemctl %s %s failed: %v\n", action, unit, err)
+		fmt.Printf("❌ sudo -n systemctl --version failed: %v\n", err)
 		return false
 	}
 	return true
 }
+
 
 func PromptAndRunInteractiveSystemctl(action, unit string) error {
 	fmt.Printf("⚠️ Privilege escalation required to run 'systemctl %s %s'\n", action, unit)
@@ -131,6 +133,13 @@ func PromptAndRunInteractiveSystemctl(action, unit string) error {
 	cmd.Stderr = os.Stderr
 
 	return cmd.Run()
+}
+
+// ServiceExists checks if a systemd service unit file exists
+func ServiceExists(unit string) bool {
+	cmd := exec.Command("systemctl", "cat", unit)
+	err := cmd.Run()
+	return err == nil
 }
 
 // CheckServiceStatus checks if a systemd service is active
