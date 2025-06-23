@@ -1,6 +1,6 @@
-// cmd/config/telemetry.go
+// cmd/self/telemetry.go
 
-package config
+package self
 
 import (
 	"fmt"
@@ -51,5 +51,5 @@ var TelemetryCmd = &cobra.Command{
 }
 
 func init() {
-	ConfigCmd.AddCommand(TelemetryCmd)
+	SelfCmd.AddCommand(TelemetryCmd)
 }

@@ -1,6 +1,6 @@
-// cmd/config/self.go
+// cmd/self/self.go
 
-package config
+package self
 
 import (
 	"errors"
@@ -19,7 +19,8 @@ import (
 var SelfCmd = &cobra.Command{
 	Use:   "self",
 	Short: "Self-management commands for Eos",
-	Long:  `The self command provides utilities for managing the Eos installation itself.`,
+	Long:  `The self command provides utilities for managing the Eos installation itself.
+	Including telemetry, authentication, environment defaults, and other Eos behaviors.`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
@@ -93,5 +94,4 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 func init() {
 	SelfCmd.AddCommand(updateCmd)
 	// Add SelfCmd to ConfigCmd so 'eos config self' works
-	ConfigCmd.AddCommand(SelfCmd)
 }

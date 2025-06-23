@@ -18,7 +18,7 @@ import (
 	// Subcommands
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ai"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/config"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
@@ -76,7 +76,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		list.ListCmd,
 		update.UpdateCmd,
 		delete.DeleteCmd,
-		config.ConfigCmd,
+		self.SelfCmd,
 		refresh.RefreshCmd,
 		secure.SecureCmd,
 		disable.DisableCmd,
