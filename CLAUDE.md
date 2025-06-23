@@ -159,6 +159,14 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 
+### Logging Configuration Requirements
+**CRITICAL**: Eos must implement dual-output logging for maximum visibility:
+- **Console Output**: All structured logs (INFO level and above) MUST be displayed on the console for immediate user feedback
+- **File Output**: All structured logs MUST also be written to the log file for persistence and debugging
+- **Format**: Console output should use a human-readable format with colors, while file output should use JSON format
+- **Implementation**: The logging system MUST be configured to use multiple outputs (console + file) simultaneously
+- **User Experience**: Users should see real-time feedback via console logs while maintaining a complete audit trail in log files
+
 ### Enhanced Developer Logging Requirements
 **CRITICAL**: Eos is a developer tool requiring comprehensive visibility into all operations. Every function MUST provide detailed logging:
 

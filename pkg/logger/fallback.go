@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -24,6 +25,7 @@ func InitFallback() {
 
 		fallbackLogger := zap.New(fallbackCore, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 		zap.ReplaceGlobals(fallbackLogger)
+		otelzap.ReplaceGlobals(otelzap.New(fallbackLogger))
 		fallbackLogger.Info("Logger fallback initialized")
 		return
 	}
@@ -46,6 +48,10 @@ func InitFallback() {
 
 	combinedLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(combinedLogger)
+	
+	// Also replace the otelzap global logger
+	otelzap.ReplaceGlobals(otelzap.New(combinedLogger))
+	
 	combinedLogger.Info("Logger fallback initialized",
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
@@ -54,12 +60,18 @@ func InitFallback() {
 
 func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 	cfg := zap.NewProductionEncoderConfig()
-	cfg.TimeKey = "T"
-	cfg.LevelKey = "L"
-	cfg.NameKey = "N"
-	cfg.CallerKey = "C"
-	cfg.MessageKey = "M"
-	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.TimeKey = ""  // Disable time in console output for clarity
+	cfg.LevelKey = "level"
+	cfg.NameKey = "logger"
+	cfg.CallerKey = ""  // Disable caller in console output for clarity
+	cfg.FunctionKey = ""  // Disable function in console output
+	cfg.MessageKey = "msg"
+	cfg.StacktraceKey = ""  // Disable stacktrace in console output
+	cfg.LineEnding = zapcore.DefaultLineEnding
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	cfg.EncodeTime = zapcore.ISO8601TimeEncoder
+	cfg.EncodeDuration = zapcore.StringDurationEncoder
+	cfg.EncodeCaller = zapcore.ShortCallerEncoder
+	cfg.ConsoleSeparator = " "
 	return cfg
 }
