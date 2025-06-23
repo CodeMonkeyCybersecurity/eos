@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 # /var/ossec/integrations/custom-delphi-webhook.py
 # root:wazuh 0750
+# ─── Standard library ────────────────────────────────────────────────────────
 import sys
 import json
 import os
 
-
+# ─── Third-party import (guarded) ────────────────────────────────────────────
+# The `# type: ignore` tells Pylance to ignore the fact that it may not be
+# installed in the current editor environment.
 try:
-    import requests
-except ImportError:
-    print("No module 'requests' found. Install: pip install requests")
+    import requests  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    print(
+        "ERROR: Missing dependency 'requests'.\n"
+        "Install it with:\n\n    pip install requests\n"
+    )
     sys.exit(1)  # ERR_NO_REQUEST_MODULE
 
 
@@ -105,10 +111,6 @@ def main(args):
 
 
 if __name__ == "__main__":
-    main(sys.argv)
-
-
-if __name__ == "__main__":
     if "--test" in sys.argv:
         # Example test: send known alert to a test URL
         import tempfile
@@ -126,7 +128,7 @@ if __name__ == "__main__":
             json.dump(test_payload, tf)
             tf.flush()
             # Call main() with fake args
-            sys.argv = [sys.argv[0], tf.name, "FAKE_AUTH_TOKEN", "http://localhost:9000/wazuh_alert", "debug"]
-            main(sys.argv)
+            test_args = [sys.argv[0], tf.name, "FAKE_AUTH_TOKEN", "http://localhost:9000/wazuh_alert", "debug"]
+            main(test_args)
     else:
         main(sys.argv)

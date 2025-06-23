@@ -19,7 +19,7 @@ import (
 var SelfCmd = &cobra.Command{
 	Use:   "self",
 	Short: "Self-management commands for Eos",
-	Long:  `The self command provides utilities for managing the Eos installation itself.
+	Long: `The self command provides utilities for managing the Eos installation itself.
 	Including telemetry, authentication, environment defaults, and other Eos behaviors.`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {

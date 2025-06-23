@@ -16,7 +16,7 @@ import (
 // NewDisableCmd creates the disable command
 func NewDisableCmd() *cobra.Command {
 	var all bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "disable [service-name]",
 		Short: "Disable Delphi pipeline services from starting at boot",
@@ -63,7 +63,7 @@ Examples:
 			for _, service := range services {
 				logger.Info("Disabling service",
 					zap.String("service", service))
-				
+
 				// Check if service exists before trying to disable it
 				if !eos_unix.ServiceExists(service) {
 					logger.Warn("⚠️ Service unit file not found",
@@ -71,14 +71,14 @@ Examples:
 					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
 					continue
 				}
-				
+
 				if err := eos_unix.RunSystemctlWithRetry(rc.Ctx, "disable", service, 3, 2); err != nil {
 					logger.Error("Failed to disable service",
 						zap.String("service", service),
 						zap.Error(err))
 					return fmt.Errorf("failed to disable %s: %w", service, err)
 				}
-				
+
 				logger.Info("✅ Service disabled successfully",
 					zap.String("service", service))
 			}

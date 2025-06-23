@@ -18,7 +18,17 @@ import subprocess
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-from dotenv import load_dotenv
+# ─── Third-party import with graceful fallback ───────────────────────────────
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    # Stub so the script still runs (env vars may already be in the real env)
+    def load_dotenv(*_a: object, **_kw: object) -> None:  # type: ignore
+        pass
+    logging.warning(
+        "Optional dependency 'python-dotenv' not found – "
+        "continuing without loading .env files."
+    )
 
 LOG_PATH = "/var/log/stackstorm/wazuh-listener.log"
 RAW_LOG_PATH = "/var/log/stackstorm/wazuh-alerts.log"
@@ -103,7 +113,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK\n")
 
     # Silence the default noisy access log
-    def log_message(self, fmt, *args):
+    # NOTE: keep param name 'format' to satisfy BaseHTTPRequestHandler signature
+    def log_message(self, format: str, *args) -> None:  # noqa: A002
         return
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):

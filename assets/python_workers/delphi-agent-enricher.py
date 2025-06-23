@@ -2,14 +2,48 @@
 # /usr/local/bin/delphi-agent-enricher.py
 # stanley:stanley 0750
 
-import requests, select, json, os, psycopg2, sys, time, logging
-
-from psycopg2 import extras
+# ─── Standard library ────────────────────────────────────────────────────────
+import select
+import json
+import os
+import sys
+import time
+import logging
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
-from dotenv import load_dotenv
 from base64 import b64encode
-from typing import Union
+from typing import Union, Optional, cast, Any
+
+# ─── Third-party libraries (import-guarded for IDE happiness) ───────────────
+try:
+    import requests  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    sys.stderr.write(
+        "ERROR: Missing dependency 'requests'.\n"
+        "Install it with:\n\n    pip install requests\n\n"
+    )
+    sys.exit(1)
+
+try:
+    import psycopg2  # type: ignore
+    import psycopg2.extras as extras  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    sys.stderr.write(
+        "ERROR: Missing dependency 'psycopg2-binary'.\n"
+        "Install it with:\n\n    pip install psycopg2-binary\n\n"
+    )
+    sys.exit(1)
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    # Provide a harmless stub so type-checkers stop complaining
+    def load_dotenv(*_args: object, **_kwargs: object) -> None:  # type: ignore
+        pass
+    logging.warning(
+        "Optional dependency 'python-dotenv' not found – "
+        "continuing without loading .env files."
+    )
 
 # --- Configuration & Environment Variable Validation ---
 
@@ -83,6 +117,7 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> Union[str,
         'Authorization': f'Basic {b64encode(basic_auth_string).decode("utf-8")}'
     }
 
+    response = None  # ensures 'response' is always defined for except blocks
     log.info("Attempting Wazuh API login...")
     try:
         response = requests.post(login_url, headers=login_headers, timeout=10)
@@ -97,13 +132,21 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> Union[str,
             log.error(f"Wazuh API login failed: No token in response. Response: {token_data}")
             return None
     except requests.exceptions.HTTPError as http_err:
-        log.error(f"Wazuh API login HTTP error: {http_err} - {response.text}")
+        log.error(
+            "Wazuh API login HTTP error: %s - %s",
+            http_err,
+            response.text if response is not None else "",
+        )
         return None
     except requests.exceptions.RequestException as req_err:
         log.error(f"Wazuh API login request error: {req_err}")
         return None
     except json.JSONDecodeError as json_err:
-        log.error(f"Failed to decode JSON from Wazuh API login: {json_err}. Response: {response.text}")
+        log.error(
+            "Failed to decode JSON from Wazuh API login: %s. Response text: %s",
+            json_err,
+            response.text if response is not None else "",
+        )
         return None
     except Exception as e:
         log.error(f"An unexpected error occurred during Wazuh API login: {e}")
@@ -138,9 +181,10 @@ def get_wazuh_agent_info(agent_id: str) -> Union[dict, None]:
         "Content-Type": "application/json"
     }
 
+    response = None  # avoids 'possibly unbound' IDE warning
     log.debug(f"Attempting to fetch all agents from Wazuh API: {api_endpoint}")
     try:
-        response = requests.get(api_endpoint, headers=headers, timeout=30) # Increased timeout for potentially larger response
+        response = requests.get(api_endpoint, headers=headers, timeout=30)
         response.raise_for_status()
 
         all_agents_data = response.json()
@@ -163,8 +207,12 @@ def get_wazuh_agent_info(agent_id: str) -> Union[dict, None]:
             return None
 
     except requests.exceptions.HTTPError as http_err:
-        log.error(f"HTTP error during Wazuh API call for all agents: {http_err} - {response.text}")
-        if response.status_code in [401, 403]:
+        log.error(
+            "HTTP error during Wazuh API call for all agents: %s - %s",
+            http_err,
+            response.text if response is not None else "",
+        )
+        if response is not None and response.status_code in [401, 403]:
             log.warning("JWT token might be expired or invalid. Clearing token for re-authentication attempt.")
             WAZUH_JWT_TOKEN = None # Clear token to force re-authentication on next call
         return None
@@ -178,7 +226,11 @@ def get_wazuh_agent_info(agent_id: str) -> Union[dict, None]:
         log.error(f"An unexpected request error occurred during Wazuh API call for all agents: {req_err}", exc_info=True)
         return None
     except json.JSONDecodeError as json_err:
-        log.error(f"Failed to decode JSON response from Wazuh API for all agents: {json_err}. Response text: {response.text}")
+        log.error(
+            "Failed to decode JSON response from Wazuh API for all agents: %s. Response text: %s",
+            json_err,
+            response.text if response is not None else "",
+        )
         return None
     except Exception as e:
         log.error(f"An unexpected error occurred in get_wazuh_agent_info: {e}", exc_info=True)
@@ -189,7 +241,8 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
     """
     Updates or inserts agent information into the 'agents' table.
     """
-    conn = None
+    conn: Optional["psycopg2.extensions.connection"] = None
+    cur: Optional["psycopg2.extensions.cursor"] = None
     try:
         conn = psycopg2.connect(AGENTS_PG_DSN)
         cur = conn.cursor()
@@ -316,8 +369,9 @@ def update_agent_info_in_db(agent_id: str, agent_data: dict, api_fetch_timestamp
         log.error(f"An unexpected error occurred during DB update for agent '{agent_id}': {e}", exc_info=True)
         return False
     finally:
-        if conn:
+        if cur:
             cur.close()
+        if conn:
             conn.close()
 
 # --- Main Alert Processing Logic ---
@@ -327,18 +381,21 @@ def process_new_alert(alert_id: int) -> Union[dict, None]:
     and returns an enriched alert.
     It also updates the alerts table state and sends a notification.
     """
-    conn = None
+    conn: Optional["psycopg2.extensions.connection"] = None
+    cur: Optional["psycopg2.extensions.cursor"] = None
     try:
         conn = psycopg2.connect(AGENTS_PG_DSN)
-        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur = conn.cursor(cursor_factory=extras.DictCursor)
 
         log.debug(f"Attempting to fetch alert ID {alert_id} for processing.")
         cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
-        alert_record = cur.fetchone()
-
-        if not alert_record:
+        raw_record = cur.fetchone()
+        
+        if not raw_record:
             log.error(f"Alert with ID {alert_id} not found in alerts table after notification. Skipping.")
             return None
+
+        alert_record: dict[str, Any] = dict(raw_record)  # cast for Pylance
 
         current_state = alert_record.get('state')
         log.debug(f"Alert ID {alert_id} fetched. Current state: '{current_state}'.")
@@ -413,8 +470,9 @@ def process_new_alert(alert_id: int) -> Union[dict, None]:
         log.critical(f"An unexpected error occurred in process_new_alert for alert ID {alert_id}: {e}", exc_info=True)
         return None
     finally:
-        if conn:
+        if cur:
             cur.close()
+        if conn:
             conn.close()
 
 # --- Listener for new_alert notifications ---
@@ -424,7 +482,8 @@ def listen_for_new_alerts():
     When a notification is received, it triggers process_new_alert.
     """
     log.info(f"Starting PostgreSQL listener for channel '{LISTEN_CHANNEL}'...")
-    conn = None
+    conn: Optional["psycopg2.extensions.connection"] = None
+    cur: Optional["psycopg2.extensions.cursor"] = None
     try:
         conn = psycopg2.connect(AGENTS_PG_DSN)
         conn.autocommit = True # Important for LISTEN to work without explicit commits
@@ -477,7 +536,11 @@ def main():
     # Initial authentication attempt for Wazuh API
     global WAZUH_JWT_TOKEN
     if not WAZUH_JWT_TOKEN:
-        WAZUH_JWT_TOKEN = authenticate_wazuh_api(WAZUH_API_URL, WAZUH_API_USER, WAZUH_API_PASSWD)
+        WAZUH_JWT_TOKEN = authenticate_wazuh_api(
+            WAZUH_API_URL,
+            cast(str, WAZUH_API_USER),
+            cast(str, WAZUH_API_PASSWD),
+        )
         if not WAZUH_JWT_TOKEN:
             log.critical("Initial Wazuh API authentication failed. Exiting.")
             sys.exit(1)

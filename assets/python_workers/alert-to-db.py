@@ -2,18 +2,48 @@
 # /usr/local/bin/alert-to-db.py
 # st2ctl reload --register-all
 
+# stdlib
 import sys
 import json
 import os
-import psycopg2
 import hashlib
 import logging
-from dotenv import load_dotenv
-from datetime import datetime, timedelta, timezone # Import timezone
+from datetime import datetime, timedelta, timezone
+
+# ───── Third-party imports with graceful fallbacks ─────
+try:
+    import psycopg2  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    sys.stderr.write(
+        "ERROR: Missing dependency 'psycopg2-binary'. "
+        "Install it with:\n\n    pip install psycopg2-binary\n\n"
+    )
+    sys.exit(1)
+
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    # Provide a stub so Pylance/mypy are happy and runtime doesn’t break
+    def load_dotenv(*_args, **_kwargs):  # type: ignore
+        pass
+    logging.warning(
+        "Optional dependency 'python-dotenv' not found; "
+        "continuing without loading a .env file."
+    )
 
 # ───── Load Environment Variables ─────
+# (If python-dotenv is installed this loads overrides from the file;
+# otherwise we rely solely on real env vars, as logged above.)
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 PG_DSN = os.getenv("PG_DSN")
+
+# Abort early if the DSN is still missing
+if not PG_DSN:
+    sys.stderr.write(
+        "ERROR: Environment variable PG_DSN is not set "
+        "and no .env file supplied it.\n"
+    )
+    sys.exit(1)
 
 # ───── Set Up Logging ─────
 LOG_FILE = "/var/log/stackstorm/alert-to-db.log"

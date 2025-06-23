@@ -16,7 +16,7 @@ import (
 // NewStatusCmd creates the status command
 func NewStatusCmd() *cobra.Command {
 	var all bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "status [service-name]",
 		Short: "Check status of Delphi pipeline services",
@@ -63,7 +63,7 @@ Examples:
 			for _, service := range services {
 				logger.Info("Checking service status",
 					zap.String("service", service))
-				
+
 				// Check if service exists first
 				if !eos_unix.ServiceExists(service) {
 					logger.Info("Service status",
@@ -72,21 +72,21 @@ Examples:
 						zap.Bool("active", false))
 					continue
 				}
-				
+
 				err := eos_unix.CheckServiceStatus(rc.Ctx, service)
-				
+
 				status := "🔴 inactive"
 				isActive := false
 				if err == nil {
 					status = "🟢 active"
 					isActive = true
 				}
-				
+
 				logger.Info("Service status",
 					zap.String("service", service),
 					zap.String("status", status),
 					zap.Bool("active", isActive))
-				
+
 				if err != nil {
 					logger.Debug("Service status details",
 						zap.String("service", service),
