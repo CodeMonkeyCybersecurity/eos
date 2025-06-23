@@ -9,13 +9,13 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 try:
-    import requests # For interacting with Azure OpenAI API
+    import requests # type: ignore # For interacting with Azure OpenAI API
 except ImportError:
     requests = None
 
 try:
-    import psycopg2
-    from psycopg2.extras import DictCursor
+    import psycopg2 # type: ignore
+    from psycopg2.extras import DictCursor # type: ignore
 except ImportError:
     psycopg2 = None
     DictCursor = None
@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 
 # Handle dotenv import gracefully
 try:
-    from dotenv import load_dotenv
+    from dotenv import load_dotenv # type: ignore
 except ImportError:
     load_dotenv = None
 
