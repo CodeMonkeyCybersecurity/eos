@@ -5,11 +5,12 @@
 """
 Minimal HTTP listener that replaces the old StackStorm webhook rule.
 
-* Listens on 0.0.0.0:9000  (adjust in the systemd unit if you like)
+* Listens on 0.0.0.0:9101  (adjust in the systemd unit if you like)
 * Accepts POST /wazuh_alert with a JSON body produced by Wazuh.
+* Authenticates requests using X-Auth-Token header
 * Discards messages where body["rule"]["level"] <= 2.
 * Pipes accepted JSON to /usr/local/bin/alert-to-db.py via STDIN.
-* Appends accepted JSON (one-liner) to /var/log/stackstorm/wazuh-alerts.log.
+* Appends accepted JSON (one-liner) to /var/log/stackstorm/wazuh_alerts.log.
 """
 
 import json
@@ -18,33 +19,20 @@ import subprocess
 import os
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-# ─── Third-party import with graceful fallback ───────────────────────────────
-try:
-    from dotenv import load_dotenv  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
-    # Stub so the script still runs (env vars may already be in the real env)
-    def load_dotenv(*_a: object, **_kw: object) -> None:  # type: ignore
-        pass
-    logging.warning(
-        "Optional dependency 'python-dotenv' not found – "
-        "continuing without loading .env files."
-    )
+from pathlib import Path
+from dotenv import load_dotenv
 
-LOG_PATH = "/var/log/stackstorm/wazuh-listener.log"
-RAW_LOG_PATH = "/var/log/stackstorm/wazuh-alerts.log"
+# Load environment variables
+ENV_PATH = Path("/opt/stackstorm/packs/delphi/.env")
+load_dotenv(ENV_PATH)
+
+LOG_PATH = "/var/log/stackstorm/delphi-listener.log"
+RAW_LOG_PATH = "/var/log/stackstorm/delphi-alerts.log"
 ALERT_LOADER = "/usr/local/bin/alert-to-db.py"
 PORT = 9101           # change here or in the systemd ExecStart line
 
-# Load environment variables
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
-
-# Get authentication token from environment
-WEBHOOK_AUTH_TOKEN = os.getenv('WEBHOOK_AUTH_TOKEN')
-if not WEBHOOK_AUTH_TOKEN:
-    logging.error("WEBHOOK_AUTH_TOKEN not set in environment. Authentication will be disabled!")
-    print("WARNING: WEBHOOK_AUTH_TOKEN not set. Running without authentication!")
-else:
-    logging.info("Webhook authentication enabled")
+# Get the auth token from environment
+WEBHOOK_AUTH_TOKEN = os.getenv("WEBHOOK_AUTH_TOKEN")
 
 logging.basicConfig(
     filename=LOG_PATH,
@@ -52,22 +40,26 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s: %(message)s",
 )
 
+# Log startup info
+logging.info("Loaded WEBHOOK_AUTH_TOKEN: %s", "Yes" if WEBHOOK_AUTH_TOKEN else "No")
+
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/wazuh_alert":
             self.send_error(404, "Not Found")
             return
 
-        # Check authentication if token is configured
-        if WEBHOOK_AUTH_TOKEN:
-            auth_header = self.headers.get('X-Auth-Token')
-            if auth_header != WEBHOOK_AUTH_TOKEN:
-                logging.warning("Unauthorized webhook attempt from %s", self.client_address[0])
-                self.send_response(401)
-                self.send_header('Content-Type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps({'error': 'Unauthorized'}).encode())
-                return
+        # Check authentication
+        provided_token = self.headers.get("X-Auth-Token")
+        if not provided_token:
+            logging.warning("Missing X-Auth-Token header from %s", self.client_address[0])
+            self.send_error(401, "Missing authentication token")
+            return
+        
+        if provided_token != WEBHOOK_AUTH_TOKEN:
+            logging.warning("Invalid X-Auth-Token from %s", self.client_address[0])
+            self.send_error(401, "Invalid authentication token")
+            return
 
         length = int(self.headers.get("Content-Length", 0))
         body_bytes = self.rfile.read(length)
@@ -113,14 +105,16 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b"OK\n")
 
     # Silence the default noisy access log
-    # NOTE: keep param name 'format' to satisfy BaseHTTPRequestHandler signature
-    def log_message(self, format: str, *args) -> None:  # noqa: A002
+    def log_message(self, fmt, *args):
         return
 
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
 if __name__ == "__main__":
+    if not WEBHOOK_AUTH_TOKEN:
+        logging.error("WEBHOOK_AUTH_TOKEN not set in environment - authentication disabled!")
+    
     logging.info("Starting Wazuh webhook listener on port %d", PORT)
     try:
         ThreadedHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()

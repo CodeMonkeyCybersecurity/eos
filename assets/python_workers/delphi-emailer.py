@@ -296,7 +296,7 @@ def format_subject(row: Dict) -> str:
 def split_sections(text: str) -> Dict[str,str]:
     """
     Parses the LLM’s single-string response into a dict:
-      { "What happened": "...", "Further investigation": "...", "What to do": "...", "How to check": "..." }
+      { "Summary": "...", "What happened": "...", "Further investigation": "...", "What to do": "...", "How to check": "...", "How to prevent this in future": "...", "What to ask next": "..." }
     """
     # split on those exact headings (including the colon)
     parts = re.split(r'(Summary:|What happened:|Further investigation:|What to do:|How to check:|How to prevent this in future:|What to ask next:)', text)

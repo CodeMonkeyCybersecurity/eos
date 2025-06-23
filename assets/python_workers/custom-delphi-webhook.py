@@ -2,21 +2,17 @@
 # /var/ossec/integrations/custom-delphi-webhook.py
 # root:wazuh 0750
 # ─── Standard library ────────────────────────────────────────────────────────
-import sys
-import json
-import os
+import sys, json, os
+from datetime import datetime 
+from pathlib import Path
 
-# ─── Third-party import (guarded) ────────────────────────────────────────────
-# The `# type: ignore` tells Pylance to ignore the fact that it may not be
-# installed in the current editor environment.
+# third-party imports -------------------------------------------------------
 try:
-    import requests  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
-    print(
-        "ERROR: Missing dependency 'requests'.\n"
-        "Install it with:\n\n    pip install requests\n"
-    )
-    sys.exit(1)  # ERR_NO_REQUEST_MODULE
+    import requests
+    from dotenv import load_dotenv                 # lightweight helper
+except ModuleNotFoundError as e:                   # pragma: no cover
+    print(f"Missing dependency '{e.name}'. Run: pip install {e.name}")
+    sys.exit(1)
 
 
 # Error codes (Wazuh convention)
@@ -26,16 +22,34 @@ ERR_FILE_NOT_FOUND = 6
 ERR_INVALID_JSON = 7
 
 
-pwd = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-LOG_FILE = f'{pwd}/logs/integrations.log'
+BASE_DIR = Path(__file__).resolve().parent            # /var/ossec/integrations
+load_dotenv(BASE_DIR / ".env")                        # loads HOOK_URL + WEBHOOK_TOKEN
+
+HOOK_URL      = os.getenv("HOOK_URL")
+WEBHOOK_TOKEN = os.getenv("WEBHOOK_TOKEN")
+
+# FIXED: Use the correct Wazuh logs directory
+LOG_FILE = '/var/ossec/logs/integrations.log'
 debug_enabled = False
 
 
 def debug(msg):
-    with open(LOG_FILE, 'a') as f:
-        f.write(msg + '\n')
+    """
+    Append a line with an ISO-8601 timestamp (UTC) to integrations.log
+    and echo to stdout when debug mode is on.
+    """
+    ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    line = f"{ts}  {msg}"
+
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError as e:
+        # fall back to stderr if the file can't be written
+        print(f"[debug-fail] {e}: {line}", file=sys.stderr)
+
     if debug_enabled:
-        print(msg)
+        print(line)
 
 
 def get_json_file(file_path, is_options=False):
@@ -56,16 +70,30 @@ def main(args):
     global debug_enabled
     debug_enabled = False
 
+    # Add debugging to see what's happening
+    debug(f"Script started with args: {args}")
+    debug(f"Python executable: {sys.executable}")
+    debug(f"Current working directory: {os.getcwd()}")
+    debug(f"Script location: {__file__}")
+    debug(f"BASE_DIR: {BASE_DIR}")
+    debug(f"HOOK_URL from env: {HOOK_URL}")
+    debug(f"WEBHOOK_TOKEN loaded: {'Yes' if WEBHOOK_TOKEN else 'No'}")
 
-    if len(args) < 4:
+    if len(args) < 2:
         debug(f"# ERROR: Wrong arguments: {args}")
         sys.exit(ERR_BAD_ARGUMENTS)
 
-
     alert_file = args[1]
-    auth_token = args[2]  # X-Auth-Token for delphi-listener authentication
-    hook_url = args[3]    # Should be http://your-delphi-host:9000/wazuh_alert
+    hook_url   = HOOK_URL or os.getenv("OVERRIDE_HOOK_URL")  # env override
+    api_key    = WEBHOOK_TOKEN or os.getenv("OVERRIDE_TOKEN")
+
     options_file = None
+
+    if not hook_url or not api_key:
+        debug("# ERROR: HOOK_URL or WEBHOOK_TOKEN not set – check .env")
+        debug(f"# DEBUG: Looking for .env at: {BASE_DIR / '.env'}")
+        debug(f"# DEBUG: .env exists: {(BASE_DIR / '.env').exists()}")
+        sys.exit(ERR_BAD_ARGUMENTS)
 
 
     # Check for options file and debug
@@ -86,20 +114,19 @@ def main(args):
         body.update(options_json)
 
 
-    # LOG OUTGOING PAYLOAD
-    PAYLOAD_DUMP_FILE = f'{pwd}/logs/sent_payload.log'
+    # LOG OUTGOING PAYLOAD - FIXED path
+    PAYLOAD_DUMP_FILE = '/var/ossec/logs/sent_payload.log'
     try:
         with open(PAYLOAD_DUMP_FILE, 'a') as pf:
-            pf.write(json.dumps(body, indent=2) + '\n')
+            ts = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+            pf.write(f"{ts}  " + json.dumps(body, indent=2) + '\n')
     except Exception as log_e:
         debug(f"Failed to log sent payload: {log_e}")
 
-
     headers = {
         "Content-Type": "application/json",
-        "X-Auth-Token": auth_token
+        "X-Auth-Token" : api_key
     }
-
 
     try:
         resp = requests.post(hook_url, headers=headers, data=json.dumps(body), timeout=10)
@@ -128,7 +155,7 @@ if __name__ == "__main__":
             json.dump(test_payload, tf)
             tf.flush()
             # Call main() with fake args
-            test_args = [sys.argv[0], tf.name, "FAKE_AUTH_TOKEN", "http://localhost:9000/wazuh_alert", "debug"]
-            main(test_args)
+            sys.argv = [sys.argv[0], tf.name, "FAKE_API_KEY", "https://httpbin.org/post", "debug"]
+            main(sys.argv)
     else:
         main(sys.argv)
