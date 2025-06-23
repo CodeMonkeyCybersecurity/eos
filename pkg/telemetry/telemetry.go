@@ -30,9 +30,31 @@ func Init(service string) error {
 		return nil
 	}
 
-	exp, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
+	// Create telemetry log directory
+	telemetryDir := "/var/log/eos"
+	if err := os.MkdirAll(telemetryDir, 0755); err != nil {
+		// Fallback to user home if system directory fails
+		telemetryDir = filepath.Join(os.Getenv("HOME"), ".eos", "telemetry")
+		if err := os.MkdirAll(telemetryDir, 0755); err != nil {
+			return cerr.Wrap(err, "failed to create telemetry directory")
+		}
+	}
+
+	// Open telemetry file for appending (JSONL format)
+	telemetryFile := filepath.Join(telemetryDir, "telemetry.jsonl")
+	file, err := os.OpenFile(telemetryFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return cerr.Wrap(err, "failed to create stdout exporter")
+		return cerr.Wrap(err, "failed to open telemetry file")
+	}
+
+	// Use stdout exporter but write to file instead of stdout
+	exp, err := stdouttrace.New(
+		stdouttrace.WithWriter(file),
+		stdouttrace.WithoutTimestamps(), // Spans already have timestamps
+	)
+	if err != nil {
+		file.Close()
+		return cerr.Wrap(err, "failed to create file exporter")
 	}
 
 	tp := sdktrace.NewTracerProvider(
