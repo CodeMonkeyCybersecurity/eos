@@ -1,0 +1,37 @@
+# /etc/systemd/system/delphi-listener.service
+[Unit]
+Description=Wazuh → Delphi webhook listener
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/bin/delphi-listener.py
+Restart=always
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=300
+Type=simple
+User=stanley
+StandardOutput=journal
+StandardError=journal
+EnvironmentFile=/opt/stackstorm/packs/delphi/.env
+WorkingDirectory=/usr/local/bin
+Environment="PYTHONUNBUFFERED=1"
+
+# Resource limits
+MemoryMax=1G
+CPUQuota=80%
+TasksMax=100
+
+# Timeouts
+TimeoutStartSec=90
+TimeoutStopSec=30
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log
+
+[Install]
+WantedBy=multi-user.target

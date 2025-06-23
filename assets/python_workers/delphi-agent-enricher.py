@@ -2,7 +2,7 @@
 # /usr/local/bin/delphi-agent-enricher.py
 # stanley:stanley 0750
 
-import requests, select, json, os, psycopg2, sys, time, logging, urllib3
+import requests, select, json, os, psycopg2, sys, time, logging
 
 from psycopg2 import extras
 from datetime import datetime, timezone
@@ -73,7 +73,7 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> Union[str,
         log.warning("Wazuh API username or password not provided. Cannot authenticate using user/pass.")
         return None
 
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning) # Disable insecure https warnings for self-signed certs
+    # SSL verification enabled for security - ensure Wazuh API has valid certificates
 
     login_endpoint = 'security/user/authenticate'
     login_url = f"{api_url}/{login_endpoint}"
@@ -85,7 +85,7 @@ def authenticate_wazuh_api(api_url: str, user: str, password: str) -> Union[str,
 
     log.info("Attempting Wazuh API login...")
     try:
-        response = requests.post(login_url, headers=login_headers, verify=False, timeout=10)
+        response = requests.post(login_url, headers=login_headers, timeout=10)
         response.raise_for_status()
 
         token_data = response.json()
@@ -140,7 +140,7 @@ def get_wazuh_agent_info(agent_id: str) -> Union[dict, None]:
 
     log.debug(f"Attempting to fetch all agents from Wazuh API: {api_endpoint}")
     try:
-        response = requests.get(api_endpoint, headers=headers, verify=False, timeout=30) # Increased timeout for potentially larger response
+        response = requests.get(api_endpoint, headers=headers, timeout=30) # Increased timeout for potentially larger response
         response.raise_for_status()
 
         all_agents_data = response.json()
