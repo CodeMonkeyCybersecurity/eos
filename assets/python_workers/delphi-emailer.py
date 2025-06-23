@@ -4,15 +4,71 @@
 """
 Delphi Emailer – event-driven via Postgres LISTEN/NOTIFY
 """
-import os, sys, re, time, select, signal, logging, pytz, psycopg2, smtplib
+import os, sys, re, time, select, signal, logging, smtplib
 import json # ADDED: Import json for handling agent_data_json
 import html as html_lib
-from datetime import datetime, timezone # ADDED: Explicitly import datetime and timezone
+from datetime import datetime, timezone, tzinfo # ADDED: Explicitly import datetime, timezone, and tzinfo
 from logging.handlers import RotatingFileHandler
 from string import Template
 from typing import Tuple, Dict, List, Union # ADDED: Union for type hints
-from dotenv import load_dotenv
-from psycopg2.extras import RealDictCursor
+
+# ─── Third-party imports with graceful fallbacks ───────────────────────────────
+try:
+    from dotenv import load_dotenv  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    # Provide a stub so the script still runs (env vars may already be in the real env)
+    def load_dotenv(*_a: object, **_kw: object) -> None:  # type: ignore
+        pass
+    logging.warning(
+        "Optional dependency 'python-dotenv' not found – "
+        "continuing without loading .env files."
+    )
+
+try:
+    import pytz  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    # Provide a stub timezone class that inherits from tzinfo
+    class _StubTimezone(tzinfo):
+        def __init__(self, name: str):
+            self.zone = name
+        def localize(self, dt):
+            return dt.replace(tzinfo=timezone.utc)
+        def normalize(self, dt):
+            return dt
+        def utcoffset(self, dt):
+            return timezone.utc.utcoffset(dt)
+        def tzname(self, dt):
+            return self.zone
+        def dst(self, dt):
+            return None
+    
+    class _StubPytz:
+        @staticmethod
+        def timezone(name: str):
+            return _StubTimezone(name)
+    
+    pytz = _StubPytz()  # type: ignore
+    logging.warning(
+        "Optional dependency 'pytz' not found – "
+        "using basic timezone fallback."
+    )
+
+try:
+    import psycopg2  # type: ignore
+    import psycopg2.extensions  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    logging.error(
+        "Required dependency 'psycopg2' not found. "
+        "Please install with: pip install psycopg2-binary"
+    )
+    sys.exit(1)
+
+try:
+    from psycopg2.extras import RealDictCursor  # type: ignore
+except (ModuleNotFoundError, ImportError):  # pragma: no cover
+    # This should not happen if psycopg2 import succeeded above
+    logging.error("Failed to import psycopg2.extras.RealDictCursor")
+    sys.exit(1)
 from email.header import Header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -33,9 +89,9 @@ if _missing:
     print(f"FATAL: Missing environment variables: {', '.join(_missing)}", file=sys.stderr)
     sys.exit(1)
 
-PG_DSN        = os.getenv("PG_DSN").strip()
+PG_DSN        = (os.getenv("PG_DSN") or "").strip()
 SMTP_HOST     = os.getenv("MAILCOW_SMTP_HOST")
-SMTP_PORT     = int(os.getenv("MAILCOW_SMTP_PORT"))
+SMTP_PORT     = int(os.getenv("MAILCOW_SMTP_PORT") or "587")
 SMTP_USER     = os.getenv("MAILCOW_SMTP_USER")
 SMTP_PASS     = os.getenv("MAILCOW_SMTP_PASS")
 FROM_ADDR     = os.getenv("MAILCOW_FROM")
@@ -73,13 +129,54 @@ def setup_logging() -> logging.Logger:
 log = setup_logging()
 
 # ───── 3. TEMPLATE LOADING ──────────────────────────────────
-TEMPLATE_PATH = "/opt/stackstorm/packs/delphi/email.html"
-try:
-    with open(TEMPLATE_PATH, encoding="utf-8") as f:
-        email_tpl = Template(f.read())
-except Exception as e:
-    log.error("Failed to load template %r: %s", TEMPLATE_PATH, e)
-    sys.exit(1)
+# Try multiple possible template locations
+TEMPLATE_PATHS = [
+    "/opt/stackstorm/packs/delphi/email.html",
+    "/usr/local/share/eos/email.html",
+    "/var/lib/eos/email.html",
+    os.path.join(os.path.dirname(__file__), "../email.html"),  # Relative to script location
+]
+
+email_tpl = None
+template_loaded = False
+
+for template_path in TEMPLATE_PATHS:
+    try:
+        with open(template_path, encoding="utf-8") as f:
+            email_tpl = Template(f.read())
+            log.info("Successfully loaded email template from %r", template_path)
+            template_loaded = True
+            break
+    except FileNotFoundError:
+        log.debug("Template not found at %r", template_path)
+        continue
+    except PermissionError:
+        log.warning("Permission denied reading template at %r", template_path)
+        continue
+    except Exception as e:
+        log.warning("Failed to load template %r: %s", template_path, e)
+        continue
+
+if not template_loaded:
+    log.error("Could not load email template from any of the following locations:")
+    for path in TEMPLATE_PATHS:
+        log.error("  - %s", path)
+    log.error("Creating fallback template...")
+    
+    # Fallback basic HTML template
+    fallback_template = """<!DOCTYPE html>
+<html>
+<head><title>Security Alert</title></head>
+<body>
+<h2>Security Alert Notification</h2>
+<p><strong>Timestamp:</strong> $timestamp</p>
+<div>$content</div>
+<hr>
+<p><em>Generated by Delphi Security Monitoring</em></p>
+</body>
+</html>"""
+    email_tpl = Template(fallback_template)
+    log.info("Using fallback email template")
 
 # ───── 4. DATABASE HELPERS ─────────────────────────────────
 def connect_db() -> psycopg2.extensions.connection:
@@ -89,7 +186,7 @@ def connect_db() -> psycopg2.extensions.connection:
         conn.autocommit = True
         log.info("Connected to Postgres")
         return conn
-    except Exception as e:
+    except Exception:
         log.exception("Could not connect to Postgres")
         sys.exit(1)
 
@@ -202,7 +299,7 @@ def split_sections(text: str) -> Dict[str,str]:
       { "What happened": "...", "Further investigation": "...", "What to do": "...", "How to check": "..." }
     """
     # split on those exact headings (including the colon)
-    parts = re.split(r'(What happened:|Further investigation:|What to do:|How to check:)', text)
+    parts = re.split(r'(Summary:|What happened:|Further investigation:|What to do:|How to check:|How to prevent this in future:|What to ask next:)', text)
     # parts will be: ["", "What happened:", " ...", "Further investigation:", "...", "How to check:", "...", ...]
     out = {}
     for i in range(1, len(parts), 2):
@@ -283,7 +380,7 @@ def build_body_html(response: str, agent_details: Dict) -> str: # MODIFIED: Adde
     html_blocks = []
 
     # Add LLM analysis sections
-    for heading in ("What happened", "Further investigation", "What to do", "How to check"):
+    for heading in ("Summary", "What happened", "Further investigation", "What to do", "How to check", "How to prevent this in future", "What to ask next"):
         content = secs.get(heading, "")
         # make each paragraph
         paras = "".join(f"<p>{html_lib.escape(p)}</p>"
@@ -315,12 +412,12 @@ def build_email(row: Dict) -> Tuple[str, str, str]:
     alert_id_short = row["alert_hash"][:8] # Shortened ID for email readability
 
     # The HTML template expects 'body', 'subject', 'sent_at', 'alert_id', 'support_email'
-    html_body = email_tpl.safe_substitute(
+    html_body = (email_tpl or Template("")).safe_substitute(
         subject=html_lib.escape(subject), # Escape subject for HTML email
         sent_at=html_lib.escape(sent_at),
         alert_id=html_lib.escape(alert_id_short),
         body=body_html_content, # This is already HTML formatted
-        support_email=html_lib.escape(SUPPORT_EMAIL)
+        support_email=html_lib.escape(SUPPORT_EMAIL or "")
     )
 
     # Building plain text version (simplified for brevity, but could be expanded)
@@ -362,17 +459,17 @@ def build_email(row: Dict) -> Tuple[str, str, str]:
 def send_email(subject: str, plain: str, html_body: str) -> bool:
     """Attempt to send an email, retrying on failure."""
     msg = MIMEMultipart("alternative")
-    msg["Subject"] = Header(subject, "utf-8")
-    msg["From"]    = FROM_ADDR
-    msg["To"]      = TO_ADDR
+    msg["Subject"] = str(Header(subject, "utf-8"))
+    msg["From"]    = FROM_ADDR or ""
+    msg["To"]      = TO_ADDR or ""
     msg.attach(MIMEText(plain, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html",  "utf-8"))
 
     for attempt in range(1, SMTP_RETRIES + 1):
         try:
-            with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
+            with smtplib.SMTP(SMTP_HOST or "localhost", SMTP_PORT, timeout=30) as s:
                 s.starttls()
-                s.login(SMTP_USER, SMTP_PASS)
+                s.login(SMTP_USER or "", SMTP_PASS or "")
                 s.send_message(msg)
             log.info("Email sent: %r", subject)
             return True
@@ -389,7 +486,7 @@ def send_email(subject: str, plain: str, html_body: str) -> bool:
 # ───── 7. MAIN LOOP & SIGNALS ─────────────────────────────
 shutdown = False
 
-def on_signal(signum, frame):
+def on_signal(signum, _frame):
     """Handle clean shutdown on SIGINT/SIGTERM."""
     global shutdown
     shutdown = True

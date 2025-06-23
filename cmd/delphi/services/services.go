@@ -25,6 +25,7 @@ This includes:
 Available operations:
 - check: Verify Python dependencies are installed
 - install: Install required Python dependencies
+- deploy-template: Deploy email template with correct permissions
 - start/stop/restart: Control service lifecycle
 - enable/disable: Configure service autostart
 - status: View service status and health
