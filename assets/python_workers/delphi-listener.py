@@ -33,7 +33,7 @@ except ModuleNotFoundError:  # pragma: no cover
 LOG_PATH = "/var/log/stackstorm/wazuh-listener.log"
 RAW_LOG_PATH = "/var/log/stackstorm/wazuh-alerts.log"
 ALERT_LOADER = "/usr/local/bin/alert-to-db.py"
-PORT = 9000           # change here or in the systemd ExecStart line
+PORT = 9101           # change here or in the systemd ExecStart line
 
 # Load environment variables
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
