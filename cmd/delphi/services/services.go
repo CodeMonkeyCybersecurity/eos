@@ -22,7 +22,13 @@ This includes:
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
 
-You can start, stop, restart, enable, disable, and check the status of these services.`,
+Available operations:
+- check: Verify Python dependencies are installed
+- install: Install required Python dependencies
+- start/stop/restart: Control service lifecycle
+- enable/disable: Configure service autostart
+- status: View service status and health
+- logs: View service logs and troubleshooting info`,
 	Aliases: []string{"svc"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
