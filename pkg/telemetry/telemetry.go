@@ -53,7 +53,7 @@ func Init(service string) error {
 		stdouttrace.WithoutTimestamps(), // Spans already have timestamps
 	)
 	if err != nil {
-		file.Close()
+		_ = file.Close() // Best effort cleanup
 		return cerr.Wrap(err, "failed to create file exporter")
 	}
 
