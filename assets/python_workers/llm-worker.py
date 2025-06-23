@@ -8,18 +8,33 @@ import json
 import time
 import logging
 from logging.handlers import RotatingFileHandler
-import requests # For interacting with Azure OpenAI API
-import psycopg2
-from psycopg2 import extras # For DictCursor
+try:
+    import requests # For interacting with Azure OpenAI API
+except ImportError:
+    requests = None
+
+try:
+    import psycopg2
+    from psycopg2.extras import DictCursor
+except ImportError:
+    psycopg2 = None
+    DictCursor = None
 from datetime import datetime, timezone
-from dotenv import load_dotenv
+
+# Handle dotenv import gracefully
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
 from typing import Union
 
 # --- Configuration & Environment Variable Validation ---
 
 # Load environment variables from a single .env file.
 # This file should contain ALL necessary variables.
-load_dotenv("/opt/stackstorm/packs/delphi/.env")
+if load_dotenv is not None:
+    load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
 # PostgreSQL Database Connection String (DSN)
 PG_DSN = os.getenv("PG_DSN")
@@ -105,6 +120,12 @@ def get_llm_response(raw_alert_json: dict, agent_details_json: dict) -> Union[di
         dict: A dictionary containing the raw text response from the LLM,
               and token usage, or None on failure.
     """
+    if requests is None:
+        log.error("requests module not available")
+        return None
+        
+    response = None
+    response_data = None
     try:
         # Construct the user message combining raw alert and agent details
         user_message_content = {
@@ -160,7 +181,8 @@ def get_llm_response(raw_alert_json: dict, agent_details_json: dict) -> Union[di
         }
 
     except requests.exceptions.HTTPError as http_err:
-        log.error(f"HTTP error during LLM API call: {http_err} - {response.text}", exc_info=True)
+        response_text = response.text if response is not None else 'No response available'
+        log.error(f"HTTP error during LLM API call: {http_err} - {response_text}", exc_info=True)
         return None
     except requests.exceptions.ConnectionError as conn_err:
         log.error(f"Connection error during LLM API call: {conn_err}", exc_info=True)
@@ -172,7 +194,8 @@ def get_llm_response(raw_alert_json: dict, agent_details_json: dict) -> Union[di
         log.error(f"An unexpected request error occurred during LLM API call: {req_err}", exc_info=True)
         return None
     except KeyError as ke:
-        log.error(f"KeyError in LLM response structure: {ke}. Full response: {response_data}", exc_info=True)
+        response_data_str = str(response_data) if response_data is not None else 'No response data available'
+        log.error(f"KeyError in LLM response structure: {ke}. Full response: {response_data_str}", exc_info=True)
         return None
     except Exception as e:
         log.error(f"An unexpected error occurred in get_llm_response: {e}", exc_info=True)
@@ -184,11 +207,16 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
     Fetches an alert and its enriched agent details, sends to LLM,
     and updates the alerts table with the LLM response.
     """
+    if psycopg2 is None:
+        log.error("psycopg2 module not available")
+        return None
+        
     conn = None
+    cur = None
     alert_record = None
     try:
         conn = psycopg2.connect(PG_DSN)
-        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+        cur = conn.cursor(cursor_factory=DictCursor)
 
         # 1. Fetch the alert record from the alerts table
         cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
@@ -203,13 +231,26 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
         # This will prevent re-processing by this worker if another LLM worker instance
         # somehow processed it in the interim, or if the notification was delayed.
         cur.execute("SELECT state FROM alerts WHERE id = %s;", (alert_id,))
-        current_state = cur.fetchone()['state']
+        state_row = cur.fetchone()
+        if not state_row:
+            log.warning(f"No state found for alert ID {alert_id}; skipping.")
+            return dict(alert_record)
+        current_state = state_row[0] if isinstance(state_row, tuple) else state_row['state']
 
         if current_state != 'agent_enriched':
             log.info(f"Alert ID {alert_id} is in state '{current_state}', not 'agent_enriched'. Skipping LLM processing.")
             return dict(alert_record) # Return alert as dict for consistency
 
-        agent_id = alert_record.get('agent_id')
+        if isinstance(alert_record, tuple):
+            # For tuple records, we need to get the column index
+            agent_id = None
+            try:
+                # Assuming standard column order, adjust as needed
+                agent_id = alert_record[5] if len(alert_record) > 5 else None
+            except IndexError:
+                agent_id = None
+        else:
+            agent_id = alert_record.get('agent_id')
         if not agent_id:
             log.error(f"Alert ID {alert_id} is missing agent_id. Cannot fetch agent details for LLM.")
             return dict(alert_record)
@@ -219,15 +260,22 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
         agent_data_from_db = cur.fetchone()
 
         agent_details_for_llm = {}
-        if agent_data_from_db and agent_data_from_db.get('api_response'):
-            agent_details_for_llm = agent_data_from_db['api_response'] # This is already JSONB, so it's a dict
+        if agent_data_from_db:
+            if isinstance(agent_data_from_db, tuple):
+                agent_details_for_llm = agent_data_from_db[0] if agent_data_from_db[0] else {}
+            elif hasattr(agent_data_from_db, 'get') and agent_data_from_db.get('api_response'):
+                agent_details_for_llm = agent_data_from_db['api_response']
             log.info(f"Successfully retrieved agent details for agent {agent_id} from DB for alert {alert_id}.")
         else:
             log.warning(f"No detailed agent data found in 'agents' table for agent ID {agent_id}. LLM prompt will lack agent context.")
             # If no agent data, send an empty dict to LLM to prevent errors
 
         # 3. Send to LLM
-        raw_alert = alert_record['raw'] # Assuming 'raw' is the JSONB column with original alert
+        if isinstance(alert_record, tuple):
+            # For tuple records, get raw data by index (adjust index as needed)
+            raw_alert = alert_record[3] if len(alert_record) > 3 else {}
+        else:
+            raw_alert = alert_record['raw']
         llm_response_data = get_llm_response(raw_alert, agent_details_for_llm)
 
         if not llm_response_data:
@@ -258,14 +306,14 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
         ], indent=2)
 
         cur.execute(update_query, (
-            datetime.now(timezone.utc), # prompt_sent_at (approximate)
+            datetime.now(timezone.utc),
             full_prompt_text,
-            datetime.now(timezone.utc), # response_received_at (approximate)
-            llm_response_data['parsed_response'], # Store raw string directly
-            llm_response_data['prompt_tokens'],
-            llm_response_data['completion_tokens'],
-            llm_response_data['total_tokens'],
-            'summarized', # New state after LLM processing
+            datetime.now(timezone.utc),
+            llm_response_data.get('parsed_response'),
+            llm_response_data.get('prompt_tokens'),
+            llm_response_data.get('completion_tokens'),
+            llm_response_data.get('total_tokens'),
+            'summarized',
             alert_id
         ))
         conn.commit()
@@ -278,7 +326,8 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
 
         # Return the updated alert record with LLM details
         cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
-        return dict(cur.fetchone())
+        updated_record = cur.fetchone()
+        return dict(updated_record) if updated_record else None
 
     except psycopg2.Error as db_err:
         log.critical(f"Database error in process_alert_for_llm for alert ID {alert_id}: {db_err}", exc_info=True)
@@ -290,7 +339,8 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
         return None
     finally:
         if conn:
-            cur.close()
+            if cur is not None:
+                cur.close()
             conn.close()
 
 # --- Listener for agent_enriched notifications ---
@@ -299,8 +349,13 @@ def listen_for_enriched_alerts():
     Connects to PostgreSQL and listens for 'agent_enriched' notifications.
     When a notification is received, it triggers process_alert_for_llm.
     """
+    if psycopg2 is None:
+        log.error("psycopg2 module not available")
+        return
+        
     log.info(f"Starting PostgreSQL listener for channel '{LISTEN_CHANNEL}'...")
     conn = None
+    cur = None
     try:
         conn = psycopg2.connect(PG_DSN)
         conn.autocommit = True # Important for LISTEN to work without explicit commits
@@ -336,6 +391,8 @@ def listen_for_enriched_alerts():
         sys.exit(1)
     finally:
         if conn:
+            if cur is not None:
+                cur.close()
             conn.close()
 
 # --- Main function to run the script ---
@@ -343,6 +400,10 @@ def main():
     log.info("--- Starting LLM Worker Script ---")
 
     # Test database connection immediately
+    if psycopg2 is None:
+        log.critical("psycopg2 module not available. Cannot connect to database.")
+        sys.exit(1)
+        
     try:
         conn_test = psycopg2.connect(PG_DSN, connect_timeout=5)
         conn_test.close()
