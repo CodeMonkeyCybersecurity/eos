@@ -57,8 +57,8 @@ def main(args):
 
 
     alert_file = args[1]
-    api_key = args[2]
-    hook_url = args[3]
+    auth_token = args[2]  # X-Auth-Token for delphi-listener authentication
+    hook_url = args[3]    # Should be http://your-delphi-host:9000/wazuh_alert
     options_file = None
 
 
@@ -91,7 +91,7 @@ def main(args):
 
     headers = {
         "Content-Type": "application/json",
-        "St2-Api-Key": api_key
+        "X-Auth-Token": auth_token
     }
 
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             json.dump(test_payload, tf)
             tf.flush()
             # Call main() with fake args
-            sys.argv = [sys.argv[0], tf.name, "FAKE_API_KEY", "https://httpbin.org/post", "debug"]
+            sys.argv = [sys.argv[0], tf.name, "FAKE_AUTH_TOKEN", "http://localhost:9000/wazuh_alert", "debug"]
             main(sys.argv)
     else:
         main(sys.argv)
