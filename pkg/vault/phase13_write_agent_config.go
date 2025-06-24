@@ -70,17 +70,38 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 // prepareTokenSink ensures the runtime directory exists, ownership is correct,
 // and the sink file is a fresh, zero‐length file owned by `user`.
 func prepareTokenSink(rc *eos_io.RuntimeContext, tokenPath, user string) error {
+	log := otelzap.Ctx(rc.Ctx)
 	runDir := filepath.Dir(tokenPath)
-	if err := os.MkdirAll(runDir, 0o700); err != nil {
+	
+	log.Info("📁 Preparing runtime directory", zap.String("dir", runDir))
+	
+	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		log.Error("❌ Failed to create runtime directory", 
+			zap.String("dir", runDir), 
+			zap.Error(err))
 		return err
 	}
+	
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, user)
 	if err != nil {
+		log.Error("❌ Failed to lookup user for runtime directory ownership", 
+			zap.String("user", user), 
+			zap.Error(err))
 		return err
 	}
+	
 	if err := os.Chown(runDir, uid, gid); err != nil {
+		log.Error("❌ Failed to set ownership on runtime directory", 
+			zap.String("dir", runDir), 
+			zap.String("user", user),
+			zap.Error(err))
 		return err
 	}
+
+	log.Info("✅ Runtime directory prepared successfully", 
+		zap.String("dir", runDir),
+		zap.String("owner", user),
+		zap.String("mode", "0755"))
 
 	// remove stray directory if present
 	if fi, err := os.Lstat(tokenPath); err == nil && fi.IsDir() {
@@ -171,13 +192,27 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write tmpfiles config %s: %w", tmpfilesPath, err)
 	}
 
-	// Apply tmpfiles configuration immediately
-	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", tmpfilesPath)
-	if err := cmd.Run(); err != nil {
-		log.Warn("⚠️ Failed to apply tmpfiles config immediately", zap.Error(err))
-		// Don't fail the entire process as the config will be applied on next boot
+	// Apply tmpfiles configuration immediately to create /run/eos
+	log.Info("🔧 Applying tmpfiles configuration immediately")
+	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", "--prefix=/run/eos")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Error("❌ Failed to apply tmpfiles config immediately", 
+			zap.Error(err),
+			zap.String("output", string(out)))
+		// This is critical for Vault Agent to work, so return the error
+		return fmt.Errorf("failed to apply tmpfiles config: %w", err)
 	}
 
-	log.Info("✅ Systemd tmpfiles configuration created", zap.String("path", tmpfilesPath))
+	// Verify the directory was created
+	if stat, err := os.Stat("/run/eos"); err != nil {
+		log.Error("❌ /run/eos directory still doesn't exist after tmpfiles creation", zap.Error(err))
+		return fmt.Errorf("runtime directory not created by tmpfiles: %w", err)
+	} else {
+		log.Info("✅ Runtime directory created by tmpfiles", 
+			zap.String("path", "/run/eos"),
+			zap.String("mode", stat.Mode().String()))
+	}
+
+	log.Info("✅ Systemd tmpfiles configuration created and applied", zap.String("path", tmpfilesPath))
 	return nil
 }

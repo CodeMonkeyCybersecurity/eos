@@ -222,26 +222,59 @@ func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 
 // ensureRuntimeDirectory creates /run/eos directory with proper permissions before starting Vault Agent
 func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
 	runDir := "/run/eos"
 
+	log.Info("🔍 Ensuring runtime directory exists", zap.String("path", runDir))
+
+	// Check if directory already exists
+	if stat, err := os.Stat(runDir); err == nil {
+		log.Info("📁 Runtime directory already exists", 
+			zap.String("path", runDir),
+			zap.String("mode", stat.Mode().String()))
+		
+		// Verify ownership
+		uid, gid, userErr := eos_unix.LookupUser(rc.Ctx, shared.EosID)
+		if userErr == nil {
+			if chownErr := os.Chown(runDir, uid, gid); chownErr != nil {
+				log.Warn("⚠️ Could not update ownership of existing runtime directory", 
+					zap.String("dir", runDir), 
+					zap.Error(chownErr))
+			} else {
+				log.Info("✅ Runtime directory ownership verified")
+			}
+		}
+		return nil
+	}
+
 	// Create directory if it doesn't exist
+	log.Info("📁 Creating runtime directory", zap.String("path", runDir))
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
+		log.Error("❌ Failed to create runtime directory", 
+			zap.String("path", runDir), 
+			zap.Error(err))
 		return fmt.Errorf("create runtime directory %s: %w", runDir, err)
 	}
 
 	// Set proper ownership (eos user)
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Could not lookup eos user, using root ownership", zap.Error(err))
+		log.Warn("⚠️ Could not lookup eos user, using root ownership", zap.Error(err))
 		return nil // Continue with root ownership rather than failing
 	}
 
 	if err := os.Chown(runDir, uid, gid); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Could not change ownership of runtime directory", zap.String("dir", runDir), zap.Error(err))
+		log.Warn("⚠️ Could not change ownership of runtime directory", 
+			zap.String("dir", runDir), 
+			zap.String("user", shared.EosID),
+			zap.Error(err))
 		return nil // Continue rather than failing
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Runtime directory prepared", zap.String("path", runDir))
+	log.Info("✅ Runtime directory created and configured", 
+		zap.String("path", runDir),
+		zap.String("owner", shared.EosID),
+		zap.String("mode", "0755"))
 	return nil
 }
 

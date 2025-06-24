@@ -64,17 +64,23 @@ type AgentConfigData struct {
 const AgentSystemDUnit = `[Unit]
 Description={{ .Description }}
 After=network.target
+After=systemd-tmpfiles-setup.service
 
 [Service]
 User={{ .User }}
 Group={{ .Group }}
 RuntimeDirectory={{ .RuntimeDir }}
 RuntimeDirectoryMode={{ .RuntimeMode }}
+RuntimeDirectoryPreserve=yes
 Environment=VAULT_SKIP_HCP=true
 Environment=VAULT_SKIP_TLS_VERIFY=false
+ExecStartPre=/bin/mkdir -p /run/eos
+ExecStartPre=/bin/chown {{ .User }}:{{ .Group }} /run/eos
 ExecStart={{ .ExecStart }}
 Restart=on-failure
 RestartSec=5
+StartLimitBurst=3
+StartLimitIntervalSec=30
 
 [Install]
 WantedBy=multi-user.target
