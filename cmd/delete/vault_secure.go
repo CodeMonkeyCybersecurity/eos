@@ -195,6 +195,7 @@ func purgeVaultFiles(rc *eos_io.RuntimeContext) error {
 		"/etc/profile.d/eos_vault.sh",
 		"/home/eos/.vault-token",
 		"/home/eos/.config/vault/",
+		"/home/eos/.config/hcp/",     // Vault binary creates this despite VAULT_SKIP_HCP=true
 		"/tmp/vault*",
 	}
 	allPaths = append(allPaths, additionalPaths...)

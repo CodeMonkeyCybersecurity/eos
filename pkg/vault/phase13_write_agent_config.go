@@ -41,6 +41,12 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 		return fmt.Errorf("prepare token sink: %w", err)
 	}
 
+	// 1.5) clean up any stale HCP directory that may cause JSON parsing issues
+	if err := cleanupStaleHCPDirectory(rc); err != nil {
+		log.Warn("⚠️ Failed to clean stale HCP directory", zap.Error(err))
+		// Don't fail the entire process as this is not critical
+	}
+
 	// 2) render + write HCL
 	roleID, secretID, err := readAppRoleCredsFromDisk(rc, client)
 	if err != nil {
@@ -214,5 +220,31 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 	}
 
 	log.Info("✅ Systemd tmpfiles configuration created and applied", zap.String("path", tmpfilesPath))
+	return nil
+}
+
+// cleanupStaleHCPDirectory removes the HCP directory that vault binary creates despite VAULT_SKIP_HCP=true
+func cleanupStaleHCPDirectory(rc *eos_io.RuntimeContext) error {
+	log := otelzap.Ctx(rc.Ctx)
+	hcpDir := "/home/eos/.config/hcp"
+
+	// Check if directory exists
+	if _, err := os.Stat(hcpDir); os.IsNotExist(err) {
+		log.Info("📁 HCP directory does not exist - no cleanup needed")
+		return nil
+	}
+
+	log.Info("🧹 Cleaning up stale HCP directory to prevent JSON parsing issues", 
+		zap.String("path", hcpDir))
+
+	// Remove the entire HCP directory
+	if err := os.RemoveAll(hcpDir); err != nil {
+		log.Error("❌ Failed to remove HCP directory", 
+			zap.String("path", hcpDir), 
+			zap.Error(err))
+		return fmt.Errorf("remove HCP directory %s: %w", hcpDir, err)
+	}
+
+	log.Info("✅ HCP directory cleaned up successfully", zap.String("path", hcpDir))
 	return nil
 }
