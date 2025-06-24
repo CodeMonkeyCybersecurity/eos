@@ -68,7 +68,7 @@ Examples:
 				return fmt.Errorf("source A/B config file not found: %s", sourceConfig)
 			}
 
-			logger.Info("📂 Source configuration found",
+			logger.Info(" Source configuration found",
 				zap.String("source", sourceConfig))
 
 			// Validate JSON syntax if requested

@@ -28,7 +28,7 @@ func UnsealVaultIfNeeded(rc *eos_io.RuntimeContext, client *api.Client) (bool, e
 		return false, fmt.Errorf("could not get seal status: %w", err)
 	}
 	if !status.Sealed {
-		otelzap.Ctx(rc.Ctx).Info("🔓 Vault is already unsealed")
+		otelzap.Ctx(rc.Ctx).Info(" Vault is already unsealed")
 		return false, nil
 	}
 

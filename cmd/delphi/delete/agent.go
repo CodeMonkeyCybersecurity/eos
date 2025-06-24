@@ -53,7 +53,7 @@ Supported OS uninstallers:
 			os.Exit(1)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("🗑️  Deleting Wazuh agent via API", zap.String("agentID", agentID))
+		otelzap.Ctx(rc.Ctx).Info("  Deleting Wazuh agent via API", zap.String("agentID", agentID))
 		resp, err := delphi.DeleteAgent(rc, agentID, token, config)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to delete agent via API", zap.Error(err))

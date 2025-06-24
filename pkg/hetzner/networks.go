@@ -124,6 +124,6 @@ func DeleteANetwork(rc *eos_io.RuntimeContext, id int64) error {
 		return cerr.Wrap(err, "failed to delete network")
 	}
 
-	log.Info("🗑️ Network deleted", zap.Int64("id", id))
+	log.Info(" Network deleted", zap.Int64("id", id))
 	return nil
 }

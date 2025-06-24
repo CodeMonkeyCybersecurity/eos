@@ -176,7 +176,7 @@ func (c *DNSClient) DeleteRecord(rc *eos_io.RuntimeContext, id string) error {
 		return errors.Errorf("delete failed (%d): %s", resp.StatusCode, raw)
 	}
 
-	c.Log.Info("🗑️ Deleted record", zap.String("id", id))
+	c.Log.Info(" Deleted record", zap.String("id", id))
 	return nil
 }
 

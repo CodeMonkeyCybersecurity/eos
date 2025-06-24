@@ -175,7 +175,7 @@ func (c *DNSClient) DeleteZone(rc *eos_io.RuntimeContext, zoneID string) error {
 		return errors.Errorf("delete failed (%d): %s", resp.StatusCode, raw)
 	}
 
-	c.Log.Info("🗑️ Deleted zone", zap.String("id", zoneID))
+	c.Log.Info(" Deleted zone", zap.String("id", zoneID))
 	return nil
 }
 
@@ -206,7 +206,7 @@ func (c *DNSClient) ImportZoneFilePlain(rc *eos_io.RuntimeContext, zoneID string
 		return errors.Errorf("import failed (%d): %s", resp.StatusCode, raw)
 	}
 
-	c.Log.Info("📥 Imported zone file", zap.String("zone_id", zoneID))
+	c.Log.Info(" Imported zone file", zap.String("zone_id", zoneID))
 	return nil
 }
 

@@ -155,7 +155,7 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	// Verify eos user exists
-	log.Info("👤 Verifying eos system user exists")
+	log.Info(" Verifying eos system user exists")
 	if _, _, err := eos_unix.LookupUser(rc.Ctx, shared.EosID); err != nil {
 		log.Error(" eos system user not found",
 			zap.String("user", shared.EosID),
@@ -192,7 +192,7 @@ func ensureAppRoleCredentials(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	// Try to retrieve from Vault
-	log.Info("📥 Retrieving AppRole credentials from Vault")
+	log.Info(" Retrieving AppRole credentials from Vault")
 	roleID, secretID, err := getAppRoleCredentialsFromVault(rc, privilegedClient)
 	if err != nil {
 		log.Error(" Failed to get AppRole credentials from Vault", zap.Error(err))

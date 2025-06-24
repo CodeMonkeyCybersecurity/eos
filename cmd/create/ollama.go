@@ -80,7 +80,7 @@ var CreateOllamaCmd = &cobra.Command{
 				return fmt.Errorf("failed to write GPU config: %w", err)
 			}
 			log.Info(" GPU support enabled in shell config")
-			log.Info("🔁 Run `source " + rcPath + "` to apply changes")
+			log.Info(" Run `source " + rcPath + "` to apply changes")
 		}
 
 		return nil

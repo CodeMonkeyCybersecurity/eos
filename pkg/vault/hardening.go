@@ -738,7 +738,7 @@ func revokeRootTokenSafely(rc *eos_io.RuntimeContext, client *api.Client) error 
 	}
 
 	// Final confirmation
-	log.Warn("🚨 IMPORTANT: Revoking root token will require alternative authentication")
+	log.Warn(" IMPORTANT: Revoking root token will require alternative authentication")
 	if !interaction.PromptYesNo(rc.Ctx, "Are you sure you want to revoke the root token?", false) {
 		log.Info("⏭️ Root token revocation cancelled by user")
 		return nil

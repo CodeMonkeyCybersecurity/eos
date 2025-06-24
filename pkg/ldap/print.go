@@ -27,6 +27,6 @@ func printUser(rc *eos_io.RuntimeContext, uid string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
-	fmt.Printf("👤  %s (%s)\n", user.UID, user.DN)
+	fmt.Printf("  %s (%s)\n", user.UID, user.DN)
 	return nil
 }

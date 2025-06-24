@@ -32,7 +32,7 @@ func SyncFileBetweenVMs(rc *eos_io.RuntimeContext, sourceVM, guestPath, destVM, 
 		fmt.Sprintf("%s_from-%s_to-%s_%s", timestamp, sourceVM, destVM, baseName),
 	)
 
-	log.Info("🔁 Starting full VM-to-VM file sync",
+	log.Info(" Starting full VM-to-VM file sync",
 		zap.String("sourceVM", sourceVM),
 		zap.String("guestPath", guestPath),
 		zap.String("intermediate", hostPath),
@@ -92,7 +92,7 @@ func CopyOutFromVM(rc *eos_io.RuntimeContext, vmName, guestPath, hostFile string
 	// Rename to the expected full path if needed
 	actual := filepath.Join(hostDir, tempName)
 	if actual != hostFile {
-		log.Info("🔁 Renaming extracted file", zap.String("from", actual), zap.String("to", hostFile))
+		log.Info(" Renaming extracted file", zap.String("from", actual), zap.String("to", hostFile))
 		if err := os.Rename(actual, hostFile); err != nil {
 			log.Error(" Failed to rename extracted file", zap.Error(err))
 			return fmt.Errorf("failed to rename extracted file: %w", err)
@@ -107,7 +107,7 @@ func CopyOutFromVM(rc *eos_io.RuntimeContext, vmName, guestPath, hostFile string
 func CopyInToVM(rc *eos_io.RuntimeContext, vmName, hostPath, guestDir string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Info("📥 Preparing to copy file into VM",
+	log.Info(" Preparing to copy file into VM",
 		zap.String("vm", vmName),
 		zap.String("hostPath", hostPath),
 		zap.String("guestDir", guestDir),

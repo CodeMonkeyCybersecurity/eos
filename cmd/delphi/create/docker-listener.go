@@ -31,7 +31,7 @@ var DockerListenerCmd = &cobra.Command{
 				_, err := execute.RunShell(rc.Ctx, "apt install -y python3-venv python3-pip")
 				return err
 			}},
-			{"📂 create venv dir", func() error {
+			{" create venv dir", func() error {
 				return execute.RunSimple(rc.Ctx, "mkdir", "-p", shared.VenvPath)
 			}},
 			{"🐍 create venv", func() error {

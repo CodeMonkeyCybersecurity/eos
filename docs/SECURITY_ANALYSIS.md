@@ -62,7 +62,7 @@ During comprehensive analysis of the Eos codebase, several critical security vul
 - Maintained functional logging without exposing sensitive data
 - Comprehensive audit and cleanup of all vault logging
 
-## 🚨 HIGH SEVERITY ISSUES
+##  HIGH SEVERITY ISSUES
 
 ### 6. Inadequate Input Validation
 **Location**: `pkg/shared/input_validation.go`

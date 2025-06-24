@@ -28,7 +28,7 @@ func RunDockerAction(rc *eos_io.RuntimeContext, action string, args ...string) e
 // UninstallConflictingPackages removes any preinstalled Docker versions or conflicts
 func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🗑️ Removing conflicting Docker packages")
+	logger.Info(" Removing conflicting Docker packages")
 
 	packages := []string{
 		"docker.io", "docker-doc", "docker-compose", "docker-compose-v2",
@@ -36,7 +36,7 @@ func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
 	}
 
 	for _, pkg := range packages {
-		logger.Debug("🗑️ Attempting to remove package", zap.String("package", pkg))
+		logger.Debug(" Attempting to remove package", zap.String("package", pkg))
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "remove", "-y", pkg); err != nil {
 			logger.Debug("Package removal failed (likely not installed)",
 				zap.String("package", pkg),
@@ -52,7 +52,7 @@ func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
 // UninstallSnapDocker removes the Snap version of Docker
 func UninstallSnapDocker(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🗑️ Removing Docker snap package")
+	logger.Info(" Removing Docker snap package")
 
 	if err := execute.RunSimple(rc.Ctx, "snap", "remove", "docker"); err != nil {
 		logger.Debug("Docker snap removal failed (likely not installed)", zap.Error(err))
@@ -190,7 +190,7 @@ func VerifyDockerInstallation(rc *eos_io.RuntimeContext) error {
 // SetupDockerNonRoot configures Docker for non-root user access
 func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("👥 Setting up Docker for non-root user access")
+	logger.Info(" Setting up Docker for non-root user access")
 
 	// Create docker group (may already exist)
 	logger.Debug(" Creating docker group")
@@ -220,7 +220,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Add user to docker group
-	logger.Info("👤 Adding user to docker group", zap.String("user", user))
+	logger.Info(" Adding user to docker group", zap.String("user", user))
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "usermod",
 		Args:    []string{"-aG", "docker", user},
@@ -244,11 +244,11 @@ func InstallDocker(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Starting complete Docker installation process")
 
 	// Step 1: Uninstall conflicting packages
-	logger.Info("🗑️ Removing conflicting Docker packages")
+	logger.Info(" Removing conflicting Docker packages")
 	UninstallConflictingPackages(rc)
 
 	// Step 2: Remove Docker snap
-	logger.Info("🗑️ Removing Docker snap package")
+	logger.Info(" Removing Docker snap package")
 	UninstallSnapDocker(rc)
 
 	// Step 3: Install prerequisites and GPG keys

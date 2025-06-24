@@ -59,7 +59,7 @@ func DeleteFloatingIP(rc *eos_io.RuntimeContext, client *hcloud.Client, ip *hclo
 		otelzap.Ctx(rc.Ctx).Error("Failed to delete floating IP", zap.String("ip", ip.IP.String()), zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(rc.Ctx).Info("🗑️ Floating IP deleted", zap.String("ip", ip.IP.String()))
+	otelzap.Ctx(rc.Ctx).Info(" Floating IP deleted", zap.String("ip", ip.IP.String()))
 	return nil
 }
 
@@ -70,6 +70,6 @@ func ChangeFloatingIPRDNS(rc *eos_io.RuntimeContext, client *hcloud.Client, ip *
 		otelzap.Ctx(rc.Ctx).Error("Failed to change reverse DNS", zap.String("ip", ipStr), zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(rc.Ctx).Info("🔁 Reverse DNS updated", zap.String("ip", ipStr), zap.String("rdns", dnsPtr))
+	otelzap.Ctx(rc.Ctx).Info(" Reverse DNS updated", zap.String("ip", ipStr), zap.String("rdns", dnsPtr))
 	return nil
 }

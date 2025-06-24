@@ -32,7 +32,7 @@ func OrchestrateMattermostInstall(rc *eos_io.RuntimeContext) error {
 	_ = os.RemoveAll(CloneDir)
 
 	// Step 1: Clone into a temp dir
-	log.Info("📥 Cloning Mattermost repo to temp dir", zap.String("dir", CloneDir))
+	log.Info(" Cloning Mattermost repo to temp dir", zap.String("dir", CloneDir))
 	if err := git.Clone(repoURL, CloneDir); err != nil {
 		return cerr.Wrap(err, "git clone to temp dir")
 	}

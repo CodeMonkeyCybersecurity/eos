@@ -24,7 +24,7 @@ func InspectCertificates(ctx context.Context) {
 	}
 
 	if len(files) == 0 {
-		logger.Info("📂 No certificates found", zap.String("directory", certsDir))
+		logger.Info(" No certificates found", zap.String("directory", certsDir))
 		return
 	}
 
@@ -69,7 +69,7 @@ func InspectEosConfig(ctx context.Context) {
 	}
 
 	if len(configFiles) == 0 {
-		logger.Info("📂 No Eos configuration files found", zap.String("directory", confDir))
+		logger.Info(" No Eos configuration files found", zap.String("directory", confDir))
 		return
 	}
 

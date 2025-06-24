@@ -47,7 +47,7 @@ func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	scriptURL := "https://packages.wazuh.com/4.11/wazuh-install.sh"
 	scriptPath := filepath.Join(tmpDir, "wazuh-install.sh")
 
-	log.Info("⬇️ Downloading Wazuh installer", zap.String("url", scriptURL))
+	log.Info(" Downloading Wazuh installer", zap.String("url", scriptURL))
 	if err := utils.DownloadFile(scriptPath, scriptURL); err != nil {
 		return fmt.Errorf("failed to download installer: %w", err)
 	}

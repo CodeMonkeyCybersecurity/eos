@@ -100,7 +100,7 @@ install_go() {
 
   if [ "$need_go_install" = true ]; then
     if $IS_MAC; then
-      log INFO "🍺 Installing Go via Homebrew..."
+      log INFO " Installing Go via Homebrew..."
       if ! command -v brew >/dev/null 2>&1; then
         log ERR " Homebrew not found. Please install it first: https://brew.sh/"
         exit 1
@@ -113,7 +113,7 @@ install_go() {
       local go_tarball="go${GO_VERSION}.${os}-${arch}.tar.gz"
       local download_url="https://go.dev/dl/${go_tarball}"
       
-      log INFO "⬇️ Downloading Go ${GO_VERSION} from ${download_url}..."
+      log INFO " Downloading Go ${GO_VERSION} from ${download_url}..."
       cd /tmp
       curl -LO "$download_url"
       
@@ -332,7 +332,7 @@ create_directories() {
 setup_linux_user() {
   if $IS_LINUX; then
     if ! id "$Eos_USER" &>/dev/null; then
-      log INFO "👤 Creating system user: $Eos_USER (for service operations)"
+      log INFO " Creating system user: $Eos_USER (for service operations)"
       useradd --system --no-create-home --shell /usr/sbin/nologin "$Eos_USER" || log ERR "Failed to create user $Eos_USER."
     fi
 

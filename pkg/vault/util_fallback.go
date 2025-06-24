@@ -94,7 +94,7 @@ func MaybeWriteVaultInitFallback(rc *eos_io.RuntimeContext, init *api.InitRespon
 // TryLoadUnsealKeysFromFallback attempts to load the vault-init.json file and parse the keys.
 func TryLoadUnsealKeysFromFallback(rc *eos_io.RuntimeContext) (*api.InitResponse, error) {
 	path := DiskPath(rc, "vault_init")
-	otelzap.Ctx(rc.Ctx).Info("📂 Attempting fallback unseal using init file", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Attempting fallback unseal using init file", zap.String("path", path))
 	initRes := new(api.InitResponse)
 
 	if err := ReadFallbackJSON(path, initRes); err != nil {

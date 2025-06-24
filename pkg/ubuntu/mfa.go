@@ -215,7 +215,7 @@ const mfaBackupScript = `#!/bin/bash
 
 set -euo pipefail
 
-echo "🚨 EMERGENCY MFA DISABLE SCRIPT"
+echo " EMERGENCY MFA DISABLE SCRIPT"
 echo "=================================="
 echo "This script will DISABLE Multi-Factor Authentication for sudo/su commands."
 echo " WARNING: This reduces security! Only proceed if absolutely necessary."
@@ -245,7 +245,7 @@ else
 fi
 
 echo
-echo "🔓 MFA has been disabled for sudo/su commands."
+echo " MFA has been disabled for sudo/su commands."
 echo " To re-enable MFA, run: eos secure ubuntu --enable-mfa"
 echo
 `
@@ -317,7 +317,7 @@ func _findSubstring(s, substr string) bool {
 // disableMFAFunction removes MFA configuration and restores original PAM settings
 func disableMFAFunction(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔓 Disabling Multi-Factor Authentication for sudo/root access")
+	logger.Info(" Disabling Multi-Factor Authentication for sudo/root access")
 
 	// Restore original sudo PAM configuration
 	sudoBackupPath := "/etc/pam.d/sudo.backup-before-mfa"

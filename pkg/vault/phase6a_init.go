@@ -44,7 +44,7 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 		return nil, fmt.Errorf("check vault init status: %w", err)
 	}
 	if status {
-		otelzap.Ctx(rc.Ctx).Info("🔓 Vault already initialized — skipping Phase 6a")
+		otelzap.Ctx(rc.Ctx).Info(" Vault already initialized — skipping Phase 6a")
 		return client, nil
 	}
 

@@ -72,7 +72,7 @@ func installWindowsMSI(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Download MSI
-	logger.Info("📥 Downloading osquery MSI installer",
+	logger.Info(" Downloading osquery MSI installer",
 		zap.String("url", msiURL))
 
 	tempDir := os.TempDir()

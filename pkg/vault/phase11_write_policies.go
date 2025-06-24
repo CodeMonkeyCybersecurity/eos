@@ -68,7 +68,7 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("failed to verify written policy %s: %w", policy.name, err)
 		}
 		if strings.TrimSpace(storedPol) != strings.TrimSpace(pol) {
-			otelzap.Ctx(rc.Ctx).Error("🚨 Policy mismatch after write",
+			otelzap.Ctx(rc.Ctx).Error(" Policy mismatch after write",
 				zap.String("policy", policy.name),
 				zap.String("expected_preview", truncatePolicy(pol)),
 				zap.String("stored_preview", truncatePolicy(storedPol)))

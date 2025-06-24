@@ -29,7 +29,7 @@ func ReadLine(ctx context.Context, reader *bufio.Reader, label string) (string, 
 	}
 
 	value := strings.TrimSpace(text)
-	otelzap.Ctx(ctx).Debug("📥 User input received", zap.String("value", value))
+	otelzap.Ctx(ctx).Debug(" User input received", zap.String("value", value))
 	return value, nil
 }
 

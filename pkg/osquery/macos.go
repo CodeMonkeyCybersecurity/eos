@@ -38,7 +38,7 @@ func installMacOS(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("homebrew not found - required for macOS osquery installation")
 	}
 
-	logger.Info("🍺 Using Homebrew to install osquery")
+	logger.Info(" Using Homebrew to install osquery")
 	return installMacOSBrew(rc)
 }
 

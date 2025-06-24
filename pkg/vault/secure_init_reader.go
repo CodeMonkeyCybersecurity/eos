@@ -179,8 +179,8 @@ func performSecurityVerification(rc *eos_io.RuntimeContext, options *ReadInitOpt
 
 	// Require confirmation for sensitive data access
 	if options.RequireConfirm && !options.RedactSensitive {
-		log.Warn("🚨 SECURITY WARNING: Requesting access to sensitive Vault initialization data")
-		fmt.Println("🚨 SECURITY WARNING")
+		log.Warn(" SECURITY WARNING: Requesting access to sensitive Vault initialization data")
+		fmt.Println(" SECURITY WARNING")
 		fmt.Println("You are requesting access to highly sensitive Vault initialization data including:")
 		fmt.Println("   • Root token (full Vault administrative access)")
 		fmt.Println("   • Unseal keys (ability to unseal Vault)")
@@ -519,7 +519,7 @@ func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
 
 	// Display Eos credentials
 	if info.EosCredentials != nil {
-		fmt.Printf("\n👤 Eos User Credentials\n")
+		fmt.Printf("\n Eos User Credentials\n")
 		fmt.Printf("   Username: %s\n", info.EosCredentials.Username)
 		if options.RedactSensitive {
 			fmt.Printf("   Password: %s\n", crypto.Redact(info.EosCredentials.Password))

@@ -50,7 +50,7 @@ func PhaseEnsureVaultHealthy(rc *eos_io.RuntimeContext) error {
 
 func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) error {
 	for attempt := 1; attempt <= shared.VaultRetryCount; attempt++ {
-		otelzap.Ctx(rc.Ctx).Info("🔁 Vault health probe attempt", zap.Int("attempt", attempt))
+		otelzap.Ctx(rc.Ctx).Info(" Vault health probe attempt", zap.Int("attempt", attempt))
 
 		status, err := client.Sys().Health()
 		if err != nil {

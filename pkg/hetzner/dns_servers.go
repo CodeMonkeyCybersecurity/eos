@@ -185,6 +185,6 @@ func (c *DNSClient) DeletePrimaryServer(rc *eos_io.RuntimeContext, id string) er
 		return errors.Errorf("delete failed: status %d, body: %s", resp.StatusCode, string(raw))
 	}
 
-	c.Log.Info("🗑️ Deleted primary server", zap.String("id", id))
+	c.Log.Info(" Deleted primary server", zap.String("id", id))
 	return nil
 }

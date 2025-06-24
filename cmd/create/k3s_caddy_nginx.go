@@ -403,7 +403,7 @@ fi
 		fmt.Println("  • Mail proxy configuration")
 	}
 
-	fmt.Println("\n📂 Generated files:")
+	fmt.Println("\n Generated files:")
 	fmt.Printf("  %s/main.tf - Main Terraform configuration\n", outputDir)
 	fmt.Printf("  %s/config/Caddyfile.tpl - Caddy configuration template\n", outputDir)
 	if enableMail {

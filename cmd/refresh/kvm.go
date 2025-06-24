@@ -70,7 +70,7 @@ Example:
 		}
 
 		// Launch virt-rescue
-		log.Info("🚨 Launching virt-rescue shell (requires sudo)", zap.String("vm", vmName))
+		log.Info(" Launching virt-rescue shell (requires sudo)", zap.String("vm", vmName))
 		cmdRescue := exec.Command("sudo", "virt-rescue", "-d", vmName)
 		cmdRescue.Stdout = os.Stdout
 		cmdRescue.Stderr = os.Stderr

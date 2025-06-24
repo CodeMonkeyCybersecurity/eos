@@ -277,7 +277,7 @@ func cleanupSystemHardening(rc *eos_io.RuntimeContext) error {
 
 func cleanupEosUser(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("👤 Cleaning up eos user and related files")
+	logger.Info(" Cleaning up eos user and related files")
 
 	// Remove eos user home directory
 	if err := removePathSecurely(rc, "/home/eos"); err != nil {

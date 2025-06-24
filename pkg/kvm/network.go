@@ -31,7 +31,7 @@ func ConfigureKVMBridge() error {
 	// Check if a bridge already exists
 	existing, err := exec.Command("ip", "link", "show", "br0").CombinedOutput()
 	if err == nil && strings.Contains(string(existing), "br0") {
-		fmt.Println("🔁 br0 already exists; skipping bridge creation.")
+		fmt.Println(" br0 already exists; skipping bridge creation.")
 		return nil
 	}
 

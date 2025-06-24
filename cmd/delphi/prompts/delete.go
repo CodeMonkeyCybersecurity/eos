@@ -54,7 +54,7 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			promptName := args[0]
 
-			logger.Info("🗑️ Deleting system prompt",
+			logger.Info(" Deleting system prompt",
 				zap.String("prompt_name", promptName))
 
 			promptsDir, err := GetSystemPromptsDir()
@@ -146,7 +146,7 @@ Examples:
 			}
 
 			// Delete the file
-			logger.Info("🗑️ Deleting prompt file",
+			logger.Info(" Deleting prompt file",
 				zap.String("file_path", promptPath))
 
 			if err := os.Remove(promptPath); err != nil {

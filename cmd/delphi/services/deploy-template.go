@@ -56,7 +56,7 @@ The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 		logger.Info(" Source template found", zap.String("path", sourcePath))
 
 		// Create target directory with proper permissions
-		logger.Info("📂 Creating target directory", zap.String("directory", targetDir))
+		logger.Info(" Creating target directory", zap.String("directory", targetDir))
 
 		mkdirCmd := exec.Command("sudo", "mkdir", "-p", targetDir)
 		mkdirCmd.Stdout = os.Stdout

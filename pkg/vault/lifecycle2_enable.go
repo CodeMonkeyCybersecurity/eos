@@ -34,7 +34,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		log.Info(" No existing VAULT_TOKEN found - proceeding with fresh setup")
 	}
 
-	log.Info("🔓 Starting Vault initialization and unseal process")
+	log.Info(" Starting Vault initialization and unseal process")
 	unsealedClient, err := UnsealVault(rc)
 	if err != nil {
 		return logger.LogErrAndWrap(rc, "initialize and unseal vault", err)

@@ -18,5 +18,5 @@ func captureVaultLogsOnFailure(rc *eos_io.RuntimeContext) {
 		otelzap.Ctx(rc.Ctx).Warn("Failed to capture Vault journal logs", zap.Error(err))
 		return
 	}
-	otelzap.Ctx(rc.Ctx).Error("🚨 Vault systemd logs", zap.String("logs", string(out)))
+	otelzap.Ctx(rc.Ctx).Error(" Vault systemd logs", zap.String("logs", string(out)))
 }

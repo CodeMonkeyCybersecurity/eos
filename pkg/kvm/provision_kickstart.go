@@ -45,7 +45,7 @@ func ProvisionKickstartTenantVM(rc *eos_io.RuntimeContext, vmName, pubKeyPath st
 		if mac := getMACFromDomiflist(vmName); mac != "" {
 			if fallbackIP, _ := getIPFromDHCPLeases(mac); fallbackIP != "" {
 				ipAddr = fallbackIP
-				log.Info("🔁 Found fallback DHCP IP", zap.String("ip", ipAddr))
+				log.Info(" Found fallback DHCP IP", zap.String("ip", ipAddr))
 			}
 		}
 	}
@@ -68,7 +68,7 @@ func ensureDomainRunning(vmName string, log *zap.Logger) error {
 	log.Info(" VM current state", zap.String("state", state))
 
 	if state == "shut off" {
-		log.Info("🔁 VM shut off — restarting manually")
+		log.Info(" VM shut off — restarting manually")
 		if err := exec.Command("virsh", "start", vmName).Run(); err != nil {
 			return fmt.Errorf("failed to restart domain: %w", err)
 		}

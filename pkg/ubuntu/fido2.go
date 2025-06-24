@@ -131,7 +131,7 @@ func PhaseConfigureFIDO2(rc *eos_io.RuntimeContext, config *FIDO2Config) error {
 	}
 
 	// Step 4: Set up FIDO2 user enrollment
-	log.Info("👤 Setting up FIDO2 user enrollment system")
+	log.Info(" Setting up FIDO2 user enrollment system")
 	if err := setupFIDO2Enrollment(rc, config); err != nil {
 		log.Error(" FIDO2 enrollment setup failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 enrollment setup failed")

@@ -210,14 +210,14 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 			// For YAML, create a file
 			infraOutputPath = filepath.Join("/etc/eos", fmt.Sprintf("%s_%s_infra_status.yml", timestamp, hostname))
 		}
-		logger.Info("📂 Generated output path",
+		logger.Info(" Generated output path",
 			zap.String("path", infraOutputPath),
 			zap.String("hostname", hostname),
 			zap.String("timestamp", timestamp),
 			zap.Bool("terraform_format", infraTerraformFlag),
 			zap.String("output_type", map[bool]string{true: "directory", false: "file"}[infraTerraformFlag]))
 	} else {
-		logger.Info("📂 Using custom output path",
+		logger.Info(" Using custom output path",
 			zap.String("path", infraOutputPath),
 			zap.Bool("terraform_format", infraTerraformFlag))
 	}

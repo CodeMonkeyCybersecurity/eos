@@ -176,7 +176,7 @@ eos create k3s
 eos create k3s-terraform --provider hetzner
 ```
 
-## 📂 Generated File Structure
+##  Generated File Structure
 
 ### K3s + Caddy + Nginx
 ```

@@ -33,7 +33,7 @@ var DeleteTestDataCmd = &cobra.Command{
 		vault.SetVaultClient(rc, client)
 		vault.ValidateAndCache(rc, client)
 
-		log.Info("🗑️ Attempting to delete test-data from Vault...")
+		log.Info(" Attempting to delete test-data from Vault...")
 		err = vault.Delete(rc, client, shared.TestDataVaultPath)
 		if err != nil {
 			log.Warn("Vault delete failed, falling back to disk", zap.Error(err))
@@ -41,9 +41,9 @@ var DeleteTestDataCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println("🗑️  Test Data Deletion Summary")
+		fmt.Println("  Test Data Deletion Summary")
 		fmt.Println("   Vault: SUCCESS")
-		fmt.Printf("    📂 Path: secret/data/%s\n\n", shared.TestDataVaultPath)
+		fmt.Printf("     Path: secret/data/%s\n\n", shared.TestDataVaultPath)
 		log.Info(" Test-data deleted successfully (Vault)")
 		return nil
 	}),

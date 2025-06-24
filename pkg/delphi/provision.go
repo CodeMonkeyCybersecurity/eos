@@ -553,7 +553,7 @@ func AttachPolicyToRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	roleID := spec.RoleID
 	policyID := spec.PolicyID
 
-	// 🔁 Fallback to lookup if missing
+	//  Fallback to lookup if missing
 	if roleID == "" {
 		resolved, err := ResolveWazuhRoleID(rc, fmt.Sprintf("role_%s", spec.Name))
 		if err != nil {
@@ -608,7 +608,7 @@ func AssignRoleToUser(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 	roleID := spec.RoleID
 	userID := ""
 
-	// 🔁 Fallback to lookup if missing
+	//  Fallback to lookup if missing
 	if roleID == "" {
 		resolved, err := ResolveWazuhRoleID(rc, fmt.Sprintf("role_%s", spec.Name))
 		if err != nil {

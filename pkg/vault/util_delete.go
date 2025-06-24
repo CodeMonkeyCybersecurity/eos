@@ -38,9 +38,9 @@ func DeleteTestDataFromDisk(rc *eos_io.RuntimeContext) error {
 	}
 
 	fmt.Println()
-	fmt.Println("🗑️  Test Data Deletion Summary")
+	fmt.Println("  Test Data Deletion Summary")
 	fmt.Println("   Disk: SUCCESS")
-	fmt.Printf("    📂 Path: %s\n\n", path)
+	fmt.Printf("     Path: %s\n\n", path)
 	otelzap.Ctx(rc.Ctx).Info(" Test-data deleted successfully (fallback)", zap.String("path", path))
 	return nil
 }

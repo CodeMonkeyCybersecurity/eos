@@ -33,7 +33,7 @@ func UnsealVault(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	otelzap.Ctx(rc.Ctx).Info(" InitStatus retrieved", zap.Bool("initialized", initStatus))
 
 	if initStatus {
-		otelzap.Ctx(rc.Ctx).Info("🔓 Vault already initialized")
+		otelzap.Ctx(rc.Ctx).Info(" Vault already initialized")
 
 		sealStatus, err := client.Sys().SealStatus()
 		if err != nil {

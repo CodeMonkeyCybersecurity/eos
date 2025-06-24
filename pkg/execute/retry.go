@@ -18,7 +18,7 @@ import (
 func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) error {
 	var lastErr error
 	for i := 1; i <= maxAttempts; i++ {
-		fmt.Printf("🔁 Attempt %d: %s %s\n", i, name, joinArgs(args))
+		fmt.Printf(" Attempt %d: %s %s\n", i, name, joinArgs(args))
 
 		cmd := exec.CommandContext(rc.Ctx, name, args...)
 
@@ -50,7 +50,7 @@ func RetryCaptureOutput(rc *eos_io.RuntimeContext, retries int, delay time.Durat
 
 	for i := 1; i <= retries; i++ {
 		cmd := exec.CommandContext(rc.Ctx, name, args...)
-		fmt.Printf("🔁 Capturing attempt %d: %s %s\n", i, name, joinArgs(args))
+		fmt.Printf(" Capturing attempt %d: %s %s\n", i, name, joinArgs(args))
 		out, err = cmd.CombinedOutput()
 
 		if err == nil {

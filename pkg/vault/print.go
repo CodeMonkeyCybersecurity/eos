@@ -56,12 +56,12 @@ func PrintStorageSummary(ctx context.Context, primary string, primaryPath string
 	_, _ = fmt.Fprintln(os.Stderr, " Test Data Storage Summary")
 	_, _ = fmt.Fprintf(os.Stderr, "  %s: %s\n", primary, primaryResult)
 	if primaryResult == "SUCCESS" {
-		_, _ = fmt.Fprintf(os.Stderr, "    📂 Path: %s\n", primaryPath)
+		_, _ = fmt.Fprintf(os.Stderr, "     Path: %s\n", primaryPath)
 	}
 	if fallback != "N/A" {
 		_, _ = fmt.Fprintf(os.Stderr, "  %s: %s\n", fallback, fallbackResult)
 		if fallbackResult == "SUCCESS" {
-			_, _ = fmt.Fprintf(os.Stderr, "    📂 Path: %s\n", diskFallbackPath())
+			_, _ = fmt.Fprintf(os.Stderr, "     Path: %s\n", diskFallbackPath())
 		}
 	}
 	_, _ = fmt.Fprintln(os.Stderr, "")
@@ -99,7 +99,7 @@ func PrintInspectSummary(ctx context.Context, source, path string) {
 	default:
 		_, _ = fmt.Fprintf(os.Stderr, "  ❓ Source: %s\n", source)
 	}
-	_, _ = fmt.Fprintf(os.Stderr, "  📂 Path: %s\n", path)
+	_, _ = fmt.Fprintf(os.Stderr, "   Path: %s\n", path)
 	_, _ = fmt.Fprintln(os.Stderr, "")
 }
 

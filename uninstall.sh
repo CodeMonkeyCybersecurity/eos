@@ -38,7 +38,7 @@ sudo rm -f "${VAULT_SYSTEMD}"
 sudo rm -f "${VAULT_AGENT_SYSTEMD}"
 sudo systemctl daemon-reload
 
-echo "👥 Removing eos user, group, and sudoers..."
+echo " Removing eos user, group, and sudoers..."
 if id "${Eos_USER}" &>/dev/null; then
     sudo userdel "${Eos_USER}"
 fi

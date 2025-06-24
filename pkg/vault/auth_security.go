@@ -192,14 +192,14 @@ func logAuthenticationSession(rc *eos_io.RuntimeContext, session *Authentication
 
 	// Alert on suspicious patterns
 	if len(session.Attempts) > 3 {
-		log.Warn("🚨 Multiple authentication failures detected",
+		log.Warn(" Multiple authentication failures detected",
 			zap.Int("failure_count", len(session.Attempts)),
 			zap.Duration("duration", session.TotalDuration),
 		)
 	}
 
 	if session.TotalDuration > 30*time.Second {
-		log.Warn("🚨 Authentication session took unusually long",
+		log.Warn(" Authentication session took unusually long",
 			zap.Duration("duration", session.TotalDuration),
 		)
 	}
@@ -209,7 +209,7 @@ func logAuthenticationSession(rc *eos_io.RuntimeContext, session *Authentication
 func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Warn("🚨 ROOT TOKEN FALLBACK REQUESTED")
+	log.Warn(" ROOT TOKEN FALLBACK REQUESTED")
 	log.Warn("This is an emergency authentication method")
 	log.Warn("Root tokens provide unlimited access to Vault")
 	log.Warn("Only use in emergency situations")
@@ -228,7 +228,7 @@ func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) erro
 
 	// Log the attempt for security monitoring
 	defer func() {
-		log.Info("🚨 Emergency root token attempt completed",
+		log.Info(" Emergency root token attempt completed",
 			zap.String("method", attempt.Method),
 			zap.Bool("success", attempt.Success),
 			zap.String("error_type", attempt.ErrorType),
@@ -269,7 +269,7 @@ func EnhancedTokenVerification(rc *eos_io.RuntimeContext, client *api.Client, to
 
 	// Basic format validation
 	if !isValidVaultTokenFormat(token) {
-		otelzap.Ctx(rc.Ctx).Warn("🚨 Invalid token format detected")
+		otelzap.Ctx(rc.Ctx).Warn(" Invalid token format detected")
 		return false
 	}
 

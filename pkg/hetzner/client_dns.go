@@ -86,7 +86,7 @@ func (c *DNSClient) DeleteServer(rc *eos_io.RuntimeContext, id string) error {
 		return errors.Errorf("failed to delete server %s, status %d", id, resp.StatusCode)
 	}
 
-	c.Log.Info("🗑️ Deleted Hetzner server", zap.String("server_id", id))
+	c.Log.Info(" Deleted Hetzner server", zap.String("server_id", id))
 	return nil
 }
 

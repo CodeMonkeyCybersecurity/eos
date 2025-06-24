@@ -162,7 +162,7 @@ func _demonstrateSecretOperations(rc *eos_io.RuntimeContext, secretStore vault.S
 	}
 
 	// Clean up test secret
-	logger.Info("🗑️ Cleaning up test secret", zap.String("key", testKey))
+	logger.Info(" Cleaning up test secret", zap.String("key", testKey))
 	if err := secretStore.Delete(ctx, testKey); err != nil {
 		logger.Warn("Failed to delete test secret", zap.Error(err))
 	} else {
@@ -199,7 +199,7 @@ func _demonstrateServiceOperations(_ *eos_io.RuntimeContext, vaultService *vault
 //
 //nolint:unused
 func _demonstrateErrorHandling(rc *eos_io.RuntimeContext, secretStore vault.SecretStore, logger *zap.Logger) error {
-	logger.Info("🚨 Demonstrating error handling and fallback behavior")
+	logger.Info(" Demonstrating error handling and fallback behavior")
 
 	// Create context with very short timeout to trigger timeout errors
 	ctx, cancel := context.WithTimeout(rc.Ctx, 1*time.Millisecond)

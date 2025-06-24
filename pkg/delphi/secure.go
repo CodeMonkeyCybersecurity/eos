@@ -25,7 +25,7 @@ func RotateWithTool(rc *eos_io.RuntimeContext) error {
 	_, span := telemetry.Start(rc.Ctx, "delphi.rotate_tool")
 	defer span.End()
 
-	rc.Log.Info("📥 Downloading Wazuh password tool",
+	rc.Log.Info(" Downloading Wazuh password tool",
 		zap.String("url", DelphiPasswdToolURL),
 		zap.String("path", DelphiPasswdToolPath),
 	)
@@ -62,7 +62,7 @@ func RunPrimary(rc *eos_io.RuntimeContext, apiPass string) (*bytes.Buffer, error
 // RunFallback extracts the UI password, rotates via API, then retries.
 func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 
-	rc.Log.Info("🔁 Fallback: extracting WUI password")
+	rc.Log.Info(" Fallback: extracting WUI password")
 	content, err := os.ReadFile("/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml")
 	if err != nil {
 		return "", cerr.Wrapf(err, "read wazuh.yml")
@@ -98,7 +98,7 @@ func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 	}
 
 	// Retry tool to sync everything
-	rc.Log.Info("🔁 Retrying with new password")
+	rc.Log.Info(" Retrying with new password")
 	retry := exec.CommandContext(rc.Ctx, filepath.Base(DelphiPasswdToolPath),
 		"-a", "-A", "-au", "wazuh", "-ap", newPass,
 	)

@@ -84,7 +84,7 @@ func DeleteServer(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Log
 		log.Error("Failed to delete server", zap.String("name", server.Name), zap.Error(err))
 		return nil, err
 	}
-	log.Info("🗑️ Server deletion triggered", zap.Int64("id", server.ID))
+	log.Info(" Server deletion triggered", zap.Int64("id", server.ID))
 	return result, nil
 }
 

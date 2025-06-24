@@ -85,7 +85,7 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 
 	// Validate permissions before reading
 	if err := ValidateTokenFilePermissions(rc, filePath); err != nil {
-		log.Warn("🚨 Refusing to read token file with insecure permissions",
+		log.Warn(" Refusing to read token file with insecure permissions",
 			zap.String("file", filePath),
 			zap.Error(err),
 		)
@@ -102,7 +102,7 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 
 	// Basic token format validation (Vault tokens start with hvs. or s.)
 	if token != "" && !isValidVaultTokenFormat(token) {
-		log.Warn("🚨 Token file contains invalid format", zap.String("file", filePath))
+		log.Warn(" Token file contains invalid format", zap.String("file", filePath))
 		return "", fmt.Errorf("token file %s contains invalid token format", filePath)
 	}
 

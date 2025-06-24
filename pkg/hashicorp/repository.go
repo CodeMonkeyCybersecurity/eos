@@ -47,7 +47,7 @@ func InstallGPGKey(rc *eos_io.RuntimeContext) error {
 
 // installDebianGPGKey installs GPG key for Debian/Ubuntu systems
 func installDebianGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
-	logger.Info("📥 Downloading HashiCorp GPG key for Debian/Ubuntu")
+	logger.Info(" Downloading HashiCorp GPG key for Debian/Ubuntu")
 
 	// Check if key already exists
 	if _, err := os.Stat(hashicorpKeyPath); err == nil {
@@ -79,7 +79,7 @@ func installDebianGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 
 // installRHELGPGKey installs GPG key for RHEL/CentOS systems
 func installRHELGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
-	logger.Info("📥 Installing HashiCorp GPG key for RHEL/CentOS")
+	logger.Info(" Installing HashiCorp GPG key for RHEL/CentOS")
 
 	// For RHEL systems, the GPG key is typically handled by the repository configuration
 	// But we can still import it explicitly
@@ -213,7 +213,7 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg
 // RemoveRepository removes HashiCorp's package repository from the system
 func RemoveRepository(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🗑️ Removing HashiCorp package repository")
+	logger.Info(" Removing HashiCorp package repository")
 
 	distro := platform.DetectLinuxDistro(rc)
 	logger.Info(" Removing repository for distribution", zap.String("distro", distro))

@@ -67,7 +67,7 @@ func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger.Info(" Repository added successfully")
 
 	// Install specific tool
-	logger.Info("⬇️ Installing specific tool", zap.String("tool", tool))
+	logger.Info(" Installing specific tool", zap.String("tool", tool))
 	if err := installSpecificTool(rc, tool); err != nil {
 		logger.Error(" Failed to install tool",
 			zap.String("tool", tool),
@@ -121,7 +121,7 @@ func InstallAllTools(rc *eos_io.RuntimeContext) error {
 	failedTools := map[string]error{}
 
 	for _, tool := range SupportedHCLTools {
-		logger.Info("⬇️ Installing tool",
+		logger.Info(" Installing tool",
 			zap.String("tool", tool),
 			zap.Int("remaining", len(SupportedHCLTools)-len(successfulTools)-len(failedTools)))
 
@@ -224,7 +224,7 @@ func installPrerequisites(rc *eos_io.RuntimeContext) error {
 // installSpecificTool installs a single HashiCorp tool
 func installSpecificTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("⬇️ Installing specific HashiCorp tool", zap.String("tool", tool))
+	logger.Info(" Installing specific HashiCorp tool", zap.String("tool", tool))
 
 	distro := platform.DetectLinuxDistro(rc)
 

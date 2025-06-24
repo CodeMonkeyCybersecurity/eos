@@ -42,7 +42,7 @@ var UpdateTestDataCmd = &cobra.Command{
 				fmt.Println()
 				fmt.Println("✏️ Test Data Update Summary")
 				fmt.Println("   Vault: SUCCESS")
-				fmt.Printf("    📂 Path: secret/data/%s\n\n", shared.TestDataVaultPath)
+				fmt.Printf("     Path: secret/data/%s\n\n", shared.TestDataVaultPath)
 				log.Info(" Test-data updated successfully (Vault)")
 				return nil
 			}
@@ -65,7 +65,7 @@ var UpdateTestDataCmd = &cobra.Command{
 		fmt.Println()
 		fmt.Println("✏️ Test Data Update Summary")
 		fmt.Println("   Disk: SUCCESS")
-		fmt.Printf("    📂 Path: %s\n\n", path)
+		fmt.Printf("     Path: %s\n\n", path)
 		log.Info(" Test-data updated successfully (fallback)", zap.String("path", path))
 		return nil
 	}),

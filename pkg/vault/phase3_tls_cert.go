@@ -99,7 +99,7 @@ func TrustVaultCA_RHEL(rc *eos_io.RuntimeContext) error {
 	src := shared.TLSCrt
 	dest := shared.VaultSystemCATrustPath
 
-	otelzap.Ctx(rc.Ctx).Info("📥 Installing Vault CA into system trust store",
+	otelzap.Ctx(rc.Ctx).Info(" Installing Vault CA into system trust store",
 		zap.String("src", src),
 		zap.String("dest", dest),
 	)
@@ -131,7 +131,7 @@ func TrustVaultCA_Debian(rc *eos_io.RuntimeContext) error {
 	src := shared.TLSCrt
 	dest := "/usr/local/share/ca-certificates/vault-local-ca.crt"
 
-	otelzap.Ctx(rc.Ctx).Info("📥 Installing Vault CA into Debian trust store",
+	otelzap.Ctx(rc.Ctx).Info(" Installing Vault CA into Debian trust store",
 		zap.String("src", src), zap.String("dest", dest))
 
 	if err := eos_unix.CopyFile(rc.Ctx, src, dest, shared.FilePermStandard); err != nil {

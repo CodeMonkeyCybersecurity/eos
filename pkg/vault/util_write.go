@@ -163,7 +163,7 @@ func Delete(rc *eos_io.RuntimeContext, client *api.Client, path string) error {
 		return fmt.Errorf("vault client is nil")
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🗑️ Deleting secret from Vault", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Deleting secret from Vault", zap.String("path", path))
 
 	kv := client.KVv2("secret") // Assuming your KV mount is "secret/"
 

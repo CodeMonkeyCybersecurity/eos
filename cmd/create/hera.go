@@ -61,7 +61,7 @@ var CreateHeraCmd = &cobra.Command{
 			// Use local docker-compose file(s)
 			for _, file := range composeFiles {
 				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
-				otelzap.Ctx(rc.Ctx).Info("📂 Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
+				otelzap.Ctx(rc.Ctx).Info(" Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
 				if err := eos_unix.CopyFile(rc.Ctx, file, destFile, 0); err != nil {
 					otelzap.Ctx(rc.Ctx).Fatal("Failed to copy docker-compose file", zap.Error(err))
 				}

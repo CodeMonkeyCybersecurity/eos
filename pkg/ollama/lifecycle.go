@@ -75,7 +75,7 @@ func RunWebUI(rc *eos_io.RuntimeContext, cfg WebUIConfig) error {
 	}
 
 	if err == nil && strings.TrimSpace(output) == "true" {
-		zap.L().Info("🔁 Web UI container already running")
+		zap.L().Info(" Web UI container already running")
 		return nil
 	}
 
@@ -95,7 +95,7 @@ func RunWebUI(rc *eos_io.RuntimeContext, cfg WebUIConfig) error {
 		zap.String("volume", "open-webui"),
 	)
 
-	zap.L().Info("📥 Inspecting local image cache", zap.String("image", image))
+	zap.L().Info(" Inspecting local image cache", zap.String("image", image))
 	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"inspect", "--type=image", image},
@@ -151,7 +151,7 @@ func waitForBackend(rc *eos_io.RuntimeContext, url string, timeout time.Duration
 		}
 
 		if !triedServe {
-			zap.L().Warn("🔁 Backend not reachable — attempting to start `ollama serve`")
+			zap.L().Warn(" Backend not reachable — attempting to start `ollama serve`")
 			home, err := os.UserHomeDir()
 			if err == nil {
 				logPath := filepath.Join(home, ".ollama", "serve.log")

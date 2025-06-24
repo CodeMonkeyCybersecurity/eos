@@ -46,7 +46,7 @@ func EnsureEosUser(ctx context.Context, auto bool, loginShell bool) error {
 		return nil
 	}
 
-	otelzap.Ctx(ctx).Warn("👤 eos user not found — creating...")
+	otelzap.Ctx(ctx).Warn(" eos user not found — creating...")
 
 	// Interactive username override (optional)
 	if !auto {

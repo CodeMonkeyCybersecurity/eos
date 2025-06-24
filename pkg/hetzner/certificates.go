@@ -100,7 +100,7 @@ func DeleteCert(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return cerr.Wrap(err, "failed to delete certificate")
 	}
-	fmt.Println("🗑️ Certificate deleted")
+	fmt.Println(" Certificate deleted")
 	return nil
 }
 
@@ -143,6 +143,6 @@ func RetryRenewal(rc *eos_io.RuntimeContext) error {
 		return cerr.Wrap(err, "retry wait failed")
 	}
 
-	fmt.Println("🔁 Certificate retry successful")
+	fmt.Println(" Certificate retry successful")
 	return nil
 }

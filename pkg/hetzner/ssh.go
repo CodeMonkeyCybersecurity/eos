@@ -94,6 +94,6 @@ func DeleteAnSshKey(rc *eos_io.RuntimeContext, id int64) error {
 		return cerr.Wrap(err, "failed to delete ssh key")
 	}
 
-	log.Info("🗑️ SSH key deleted", zap.Int64("id", id))
+	log.Info(" SSH key deleted", zap.Int64("id", id))
 	return nil
 }

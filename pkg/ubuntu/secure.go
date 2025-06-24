@@ -102,7 +102,7 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 
 	// Handle MFA disable request
 	if disableMFA {
-		logger.Info("🔓 Disabling Multi-Factor Authentication")
+		logger.Info(" Disabling Multi-Factor Authentication")
 		if err := disableMFAFunction(rc); err != nil {
 			return fmt.Errorf("disable MFA: %w", err)
 		}
