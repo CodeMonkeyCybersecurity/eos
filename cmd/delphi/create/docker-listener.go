@@ -41,7 +41,7 @@ var DockerListenerCmd = &cobra.Command{
 				return execute.RunSimple(rc.Ctx, shared.VenvPath+"/bin/pip", "install",
 					"docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2")
 			}},
-			{"✏️ patch DockerListener", func() error {
+			{" patch DockerListener", func() error {
 				return patchDockerListener(rc)
 			}},
 			{" restart wazuh-agent", func() error {

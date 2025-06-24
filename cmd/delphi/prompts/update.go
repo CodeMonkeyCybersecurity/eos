@@ -129,7 +129,7 @@ Examples:
 					zap.String("size", formatFileSize(int64(len(newContent)))))
 			} else if interactive {
 				// Interactive mode
-				logger.Info("✏️ Entering interactive mode")
+				logger.Info(" Entering interactive mode")
 
 				if appendMode {
 					// Read existing content first

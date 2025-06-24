@@ -147,7 +147,7 @@ func (c *DNSClient) UpdateRecord(rc *eos_io.RuntimeContext, id string, updated D
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("✏️ Updated record", zap.String("id", result.Record.ID))
+	c.Log.Info(" Updated record", zap.String("id", result.Record.ID))
 	return &result.Record, nil
 }
 

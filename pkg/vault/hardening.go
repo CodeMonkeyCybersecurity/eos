@@ -789,7 +789,7 @@ func enableSecretRotation(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 func configureLeaseManagement(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("⏰ Configuring lease management")
+	log.Info(" Configuring lease management")
 
 	// Configure default lease settings
 	tuneConfig := map[string]interface{}{

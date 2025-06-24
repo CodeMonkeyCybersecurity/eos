@@ -55,10 +55,10 @@ func runCrontabUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		log.Info(" Crontab backup saved", zap.String("path", backupPath))
 	}
 
-	log.Info("✏️ Patching crontab with MAILTO directive", zap.String("mailto", email))
+	log.Info(" Patching crontab with MAILTO directive", zap.String("mailto", email))
 	updated := eos_unix.PatchMailto(current, email)
 
-	log.Info("📤 Applying updated crontab...")
+	log.Info(" Applying updated crontab...")
 	if err := eos_unix.SetCrontab(updated); err != nil {
 		log.Error(" Failed to apply updated crontab", zap.Error(err))
 		return err

@@ -49,7 +49,7 @@ The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 			logger.Error(" Source template not found",
 				zap.String("path", sourcePath),
 				zap.Error(err))
-			logger.Info("💡 The email template should be deployed during 'eos create delphi'")
+			logger.Info(" The email template should be deployed during 'eos create delphi'")
 			return err
 		}
 
@@ -112,7 +112,7 @@ The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 		}
 
 		logger.Info(" Email template deployment complete")
-		logger.Info("💡 Next steps:")
+		logger.Info(" Next steps:")
 		logger.Info("   1. Ensure .env file is configured at /opt/stackstorm/packs/delphi/.env")
 		logger.Info("   2. Restart emailer service: eos delphi services restart delphi-emailer")
 		logger.Info("   3. Check service status: eos delphi services status delphi-emailer")

@@ -183,7 +183,7 @@ VARIANT PERFORMANCE:
    Avg Response Time: 1.87s
    Avg Tokens/Request: 654.2
 
-💰 COST ANALYSIS:
+ COST ANALYSIS:
 ---------------
 Total Cost: $1.2847
 Avg Cost per Request: $0.0015

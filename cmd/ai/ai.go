@@ -127,7 +127,7 @@ Examples:
 		// Check for suggested actions
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
-			fmt.Printf("💡 I found %d suggested action(s). Run 'eos ai implement' to execute them.\n", len(actions))
+			fmt.Printf(" I found %d suggested action(s). Run 'eos ai implement' to execute them.\n", len(actions))
 
 			// Store actions for later implementation (simplified - would use proper storage)
 			if verbose {
@@ -303,7 +303,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 		// Parse and offer to implement actions
 		actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content)
 		if err == nil && len(actions) > 0 {
-			fmt.Printf("💡 Found %d suggested fix action(s).\n", len(actions))
+			fmt.Printf(" Found %d suggested fix action(s).\n", len(actions))
 
 			if autoFix {
 				fmt.Println(" Auto-fix enabled, implementing suggestions...")
@@ -416,7 +416,7 @@ Examples:
 			fmt.Println(" Action file loading not yet implemented")
 			return nil
 		} else {
-			fmt.Println("💡 No previous AI suggestions found.")
+			fmt.Println(" No previous AI suggestions found.")
 			fmt.Println("Run 'eos ai ask' or 'eos ai fix' first to get suggestions.")
 			return nil
 		}
@@ -865,7 +865,7 @@ func startInteractiveChat(rc *eos_io.RuntimeContext, assistant *ai.AIAssistant, 
 
 		// Check for actions
 		if actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content); err == nil && len(actions) > 0 {
-			fmt.Printf("💡 I have %d suggestion(s). Type 'implement' to execute them.\n\n", len(actions))
+			fmt.Printf(" I have %d suggestion(s). Type 'implement' to execute them.\n\n", len(actions))
 		}
 	}
 

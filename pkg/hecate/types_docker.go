@@ -28,7 +28,7 @@ type ServiceSpec struct {
 	Environment     map[string]string // Optional: extra env vars
 	DependsOn       []string
 	Volumes         []string
-	Networks        []string // 💡 [optional] good to have for merges
+	Networks        []string //  [optional] good to have for merges
 }
 
 // ComposeSpec holds the full Docker Compose spec across all services.

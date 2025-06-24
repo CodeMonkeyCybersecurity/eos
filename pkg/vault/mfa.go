@@ -338,7 +338,7 @@ func enforceIdentityMFAForUserpass(rc *eos_io.RuntimeContext, client *api.Client
 
 	// This is a simplified enforcement - in production, you'd want more sophisticated policies
 	log.Info(" MFA enforcement setup complete - method created and ready for use")
-	log.Info("💡 Users can now configure TOTP MFA using: vault write identity/mfa/method/totp generate=true")
+	log.Info(" Users can now configure TOTP MFA using: vault write identity/mfa/method/totp generate=true")
 
 	return nil
 }

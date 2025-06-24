@@ -37,10 +37,10 @@ var UpdateTestDataCmd = &cobra.Command{
 		newData := shared.GenerateUpdatedTestData()
 
 		if client != nil {
-			log.Info("✏️ Attempting to update test-data in Vault...")
+			log.Info(" Attempting to update test-data in Vault...")
 			if err := vault.Write(rc, client, shared.TestDataVaultPath, newData); err == nil {
 				fmt.Println()
-				fmt.Println("✏️ Test Data Update Summary")
+				fmt.Println(" Test Data Update Summary")
 				fmt.Println("   Vault: SUCCESS")
 				fmt.Printf("     Path: secret/data/%s\n\n", shared.TestDataVaultPath)
 				log.Info(" Test-data updated successfully (Vault)")
@@ -63,7 +63,7 @@ var UpdateTestDataCmd = &cobra.Command{
 		}
 
 		fmt.Println()
-		fmt.Println("✏️ Test Data Update Summary")
+		fmt.Println(" Test Data Update Summary")
 		fmt.Println("   Disk: SUCCESS")
 		fmt.Printf("     Path: %s\n\n", path)
 		log.Info(" Test-data updated successfully (fallback)", zap.String("path", path))

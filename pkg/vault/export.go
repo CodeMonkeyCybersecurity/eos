@@ -38,7 +38,7 @@ func ExportTLSCert(rc *eos_io.RuntimeContext, input TLSExportInput) error {
 	}
 
 	dest := fmt.Sprintf("%s@%s:%s", input.User, input.Host, input.Path)
-	log.Info("📤 Exporting Vault TLS cert via SCP", zap.String("source", shared.TLSCrt), zap.String("destination", dest))
+	log.Info(" Exporting Vault TLS cert via SCP", zap.String("source", shared.TLSCrt), zap.String("destination", dest))
 
 	cmd := exec.CommandContext(rc.Ctx, "scp", shared.TLSCrt, dest)
 	output, err := cmd.CombinedOutput()

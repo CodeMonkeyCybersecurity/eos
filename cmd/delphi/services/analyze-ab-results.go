@@ -120,7 +120,7 @@ Examples:
 				logger.Info(" Results exported",
 					zap.String("file", outputFile),
 					zap.String("format", export))
-				logger.Info("💡 Next steps:")
+				logger.Info(" Next steps:")
 				logger.Info("   - Review exported results for insights")
 				logger.Info("   - Consider adjusting prompt weights in /opt/delphi/ab-test-config.json")
 				logger.Info("   - Monitor ongoing experiments with: eos delphi services logs prompt-ab-tester")

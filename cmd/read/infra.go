@@ -119,7 +119,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 			zap.Duration("discovery_duration", time.Since(dockerStart)))
 	}
 
-	logger.Info("🖥️ Discovering KVM/Libvirt virtual machines",
+	logger.Info(" Discovering KVM/Libvirt virtual machines",
 		zap.String("phase", "kvm"),
 		zap.Duration("timeout", 30*time.Second))
 

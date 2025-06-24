@@ -11,7 +11,7 @@ import (
 
 // GetLogFileWriter tries to create a file writer at the specified path.
 func GetLogFileWriter(path string) (zapcore.WriteSyncer, error) {
-	// 💡 Ensure secure directory + file exists with correct perms
+	//  Ensure secure directory + file exists with correct perms
 	if err := EnsureLogPermissions(path); err != nil {
 		return zapcore.AddSync(os.Stdout), fmt.Errorf("log permission error: %w", err)
 	}
@@ -48,6 +48,6 @@ func GetFallbackLogWriter() zapcore.WriteSyncer {
 		fmt.Fprintf(os.Stderr, "Logging fallback: no valid log paths found\n")
 	}
 
-	fmt.Fprintln(os.Stderr, "📤 Logging to stdout")
+	fmt.Fprintln(os.Stderr, " Logging to stdout")
 	return zapcore.AddSync(os.Stdout)
 }

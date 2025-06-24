@@ -137,7 +137,7 @@ func GenerateAndDisplayMLKEMKeypair(rc *eos_io.RuntimeContext) (*MLKEMKeypair, e
 		zap.Int("size_bytes", len(keypair.PrivateKey)),
 	)
 
-	logger.Info("💡 Usage Instructions",
+	logger.Info(" Usage Instructions",
 		zap.String("next_step", "Use the public key with 'eos crypto mlkem encapsulate <public_key>'"),
 		zap.String("note", "For full demo without key storage, use 'eos crypto demo'"),
 	)
@@ -186,7 +186,7 @@ func PerformMLKEMEncapsulation(rc *eos_io.RuntimeContext, publicKeyHex string) (
 		zap.Int("size_bytes", len(result.SharedSecret)),
 	)
 
-	logger.Info("💡 Note",
+	logger.Info(" Note",
 		zap.String("limitation", "Decapsulation requires in-memory keys due to API constraints"),
 		zap.String("recommendation", "Use 'eos crypto demo' for full workflow demonstration"),
 	)

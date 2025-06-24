@@ -22,7 +22,7 @@ func GetAllImages(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, img := range images {
-		log.Info("📸 Image", zap.String("name", img.Name), zap.Int64("id", img.ID), zap.String("type", string(img.Type)))
+		log.Info(" Image", zap.String("name", img.Name), zap.Int64("id", img.ID), zap.String("type", string(img.Type)))
 	}
 	return nil
 }
@@ -42,7 +42,7 @@ func GetAnImage(rc *eos_io.RuntimeContext, id int64) error {
 		return nil
 	}
 
-	log.Info("📷 Retrieved image", zap.String("name", image.Name), zap.Int64("id", image.ID), zap.String("status", string(image.Status)))
+	log.Info(" Retrieved image", zap.String("name", image.Name), zap.Int64("id", image.ID), zap.String("status", string(image.Status)))
 	return nil
 }
 

@@ -98,7 +98,7 @@ Examples:
 					zap.String("size", formatFileSize(int64(len(content)))))
 			} else if interactive {
 				// Interactive mode
-				logger.Info("✏️ Entering interactive mode")
+				logger.Info(" Entering interactive mode")
 				logger.Info(" Enter prompt content (press Ctrl+D when finished):")
 
 				var lines []string

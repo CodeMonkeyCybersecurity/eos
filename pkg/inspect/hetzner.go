@@ -31,7 +31,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 		logger.Warn("Failed to discover Hetzner servers", zap.Error(err))
 	} else {
 		info.Servers = servers
-		logger.Info("🖥️ Discovered Hetzner servers", zap.Int("count", len(servers)))
+		logger.Info(" Discovered Hetzner servers", zap.Int("count", len(servers)))
 	}
 
 	// Discover networks

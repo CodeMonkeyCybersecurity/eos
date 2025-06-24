@@ -454,7 +454,7 @@ class ABTestAnalyzer:
             print(f"   Avg Response Time: {stats['avg_response_time']:.2f}s")
             print(f"   Avg Tokens/Request: {stats['avg_tokens_per_request']:.1f}")
         
-        print(f"\n💰 COST ANALYSIS:")
+        print(f"\n COST ANALYSIS:")
         print("-" * 15)
         print(f"Total Cost: ${cost_analysis['summary']['total_cost_usd']:.4f}")
         print(f"Avg Cost per Request: ${cost_analysis['summary']['avg_cost_per_request']:.4f}")

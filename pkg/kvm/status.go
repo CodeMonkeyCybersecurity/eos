@@ -37,7 +37,7 @@ func StartInstallStatusTicker(ctx context.Context, log *zap.Logger, vmName, disk
 			// VM power state
 			if out, err := exec.Command("virsh", "dominfo", vmName).Output(); err == nil {
 				state := parseDominfoState(out)
-				log.Info("🖥️ VM state", zap.String("vm", vmName), zap.String("state", state))
+				log.Info(" VM state", zap.String("vm", vmName), zap.String("state", state))
 			} else {
 				log.Warn("Failed to get dominfo", zap.String("vm", vmName), zap.Error(err))
 			}

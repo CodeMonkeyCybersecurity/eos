@@ -87,7 +87,7 @@ func showTelemetryInfo(log otelzap.LoggerWithCtx) {
 		zap.String("format", "JSONL (JSON Lines)"),
 		zap.String("privacy", "Local storage only - no external transmission"))
 
-	log.Info("💡 Analysis commands",
+	log.Info(" Analysis commands",
 		zap.String("command_frequency", "jq -r '.name' "+telemetryPath+" | sort | uniq -c | sort -nr"),
 		zap.String("success_rate", "jq -r 'select(.attributes.success == true) | .name' "+telemetryPath+" | wc -l"),
 		zap.String("avg_duration", "jq -r 'select(.attributes.duration_ms) | \"\\(.name) \\(.attributes.duration_ms)\"' "+telemetryPath))

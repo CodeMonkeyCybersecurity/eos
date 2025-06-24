@@ -13,7 +13,7 @@ import (
 )
 
 func WriteAgentPassword(rc *eos_io.RuntimeContext, password string) error {
-	otelzap.Ctx(rc.Ctx).Debug("🔏 Writing Vault Agent password to file", zap.String("path", shared.VaultAgentPassPath))
+	otelzap.Ctx(rc.Ctx).Debug(" Writing Vault Agent password to file", zap.String("path", shared.VaultAgentPassPath))
 
 	data := []byte(password + "\n")
 	if err := os.WriteFile(shared.VaultAgentPassPath, data, 0600); err != nil {

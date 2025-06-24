@@ -134,7 +134,7 @@ func fetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 }
 
 func printAgentInfo(agent Agent) {
-	fmt.Printf("\n🖥️ Agent %s:\n", agent.ID)
+	fmt.Printf("\n Agent %s:\n", agent.ID)
 	fmt.Printf("  OS: %s %s (%s)\n", agent.OS.Name, agent.OS.Version, agent.OS.Architecture)
 }
 

@@ -215,7 +215,7 @@ func ContextualLogger(rc *RuntimeContext, skipFrames int, base *zap.Logger) *zap
 
 	component, action, err := getCallContext(skipFrames)
 	if err != nil {
-		logger.Warn("🧭 Context resolution failed", zap.Error(err))
+		logger.Warn(" Context resolution failed", zap.Error(err))
 		component, action = "unknown", "unknown"
 	}
 

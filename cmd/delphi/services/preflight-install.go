@@ -257,7 +257,7 @@ func verifyAllPackages(logger otelzap.LoggerWithCtx) error {
 
 	// Show next steps
 	logger.Info(" Delphi Python dependencies installation complete")
-	logger.Info("💡 Next steps:")
+	logger.Info(" Next steps:")
 	logger.Info("   1. Ensure PostgreSQL is installed and running")
 	logger.Info("   2. Configure .env file at /opt/stackstorm/packs/delphi/.env")
 	logger.Info("   3. Deploy Delphi services: eos create delphi")

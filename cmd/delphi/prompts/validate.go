@@ -414,7 +414,7 @@ func displayValidationDetails(logger otelzap.LoggerWithCtx, result ValidationRes
 
 	// Display suggestions
 	for _, suggestion := range result.Suggestions {
-		logger.Info("💡 Suggestion: " + suggestion)
+		logger.Info(" Suggestion: " + suggestion)
 	}
 }
 

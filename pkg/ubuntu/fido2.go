@@ -390,7 +390,7 @@ if pamu2fcfg -u "$USER" >> "$FIDO2_DIR/u2f_keys"; then
     echo "  • sudo authentication"
     echo "  • SSH authentication"
     echo ""
-    echo "💡 Backup your recovery codes:"
+    echo " Backup your recovery codes:"
     echo "   • TOTP: Use Google Authenticator app"
     echo "   • Backup codes: Save in secure location"
     

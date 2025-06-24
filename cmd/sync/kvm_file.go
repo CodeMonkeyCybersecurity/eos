@@ -33,7 +33,7 @@ Both VMs must be shut off for virt-copy to work.`,
 		}
 
 		intermediate := filepath.Join(tempDir, fmt.Sprintf("%s_from-%s_to-%s_%s", timestamp, kvm.SourceVM, kvm.DestVM, filename))
-		rc.Log.Info("📤 Starting KVM file sync",
+		rc.Log.Info(" Starting KVM file sync",
 			zap.String("sourceVM", kvm.SourceVM),
 			zap.String("sourcePath", kvm.SourcePath),
 			zap.String("destVM", kvm.DestVM),

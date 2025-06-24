@@ -386,7 +386,7 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 		fmt.Printf("   Auth Methods: %d\n", len(info.SecurityStatus.AuthMethods))
 	}
 
-	fmt.Println("\n💡 Use --no-redact flag to view sensitive initialization data")
+	fmt.Println("\n Use --no-redact flag to view sensitive initialization data")
 	return nil
 }
 
@@ -440,7 +440,7 @@ func displayAgentStatus(status *vault.AgentStatus) {
 
 	// Recommendations
 	if status.HealthStatus != "healthy" {
-		fmt.Println("\n💡 Recommendations:")
+		fmt.Println("\n Recommendations:")
 		if !status.ServiceRunning {
 			fmt.Println("   • Start the service: sudo systemctl start vault-agent-eos")
 		}

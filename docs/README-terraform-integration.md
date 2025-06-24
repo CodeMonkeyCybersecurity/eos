@@ -292,7 +292,7 @@ eos create terraform-apply .
 eos create terraform-deploy .
 ```
 
-## 💡 Why This Approach?
+##  Why This Approach?
 
 ### Advantages over Default Traefik Ingress
 

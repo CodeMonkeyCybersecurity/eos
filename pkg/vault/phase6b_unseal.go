@@ -152,7 +152,7 @@ func finalizeVaultSetup(rc *eos_io.RuntimeContext, client *api.Client, initRes *
 	otelzap.Ctx(rc.Ctx).Info(" Root token set on client")
 
 	if err := Write(rc, client, "vault_init", initRes); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("💡 Failed to persist init result, re-unsealing may be needed next time", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn(" Failed to persist init result, re-unsealing may be needed next time", zap.Error(err))
 	}
 
 	return nil

@@ -78,7 +78,7 @@ Examples:
 				if !eos_unix.ServiceExists(service) {
 					logger.Warn("Service unit file not found",
 						zap.String("service", service))
-					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
+					logger.Info(" To install service files, check your Delphi installation or run deployment commands")
 					continue
 				}
 

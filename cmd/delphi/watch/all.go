@@ -172,7 +172,7 @@ func displayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 	displayRecentAlerts(ctx, logger, db, alertLimit)
 
 	// Display agents section
-	fmt.Printf("\n🖥️  Active Agents (Top %d)\n", agentLimit)
+	fmt.Printf("\n  Active Agents (Top %d)\n", agentLimit)
 	fmt.Println(strings.Repeat("-", 80))
 
 	displayRecentAgents(ctx, logger, db, agentLimit)

@@ -27,7 +27,7 @@ func GetAllServers(rc *eos_io.RuntimeContext) error {
 
 	log.Info(" Total servers found", zap.Int("count", len(servers)))
 	for _, s := range servers {
-		log.Info("🖥️ Server", zap.String("name", s.Name), zap.Int64("id", s.ID))
+		log.Info(" Server", zap.String("name", s.Name), zap.Int64("id", s.ID))
 	}
 	return nil
 }
@@ -74,7 +74,7 @@ func UpdateServer(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap.Log
 		log.Error("Failed to update server", zap.String("name", server.Name), zap.Error(err))
 		return nil, err
 	}
-	log.Info("✏️ Server updated", zap.String("new_name", name))
+	log.Info(" Server updated", zap.String("new_name", name))
 	return updated, nil
 }
 

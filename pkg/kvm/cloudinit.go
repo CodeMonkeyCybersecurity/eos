@@ -78,7 +78,7 @@ users:
 
 	// Generate seed.img
 	cmdSeed := exec.Command("cloud-localds", seedImg, userDataPath, metaDataPath)
-	log.Info("💿 Running cloud-localds", zap.String("cmd", cmdSeed.String()))
+	log.Info(" Running cloud-localds", zap.String("cmd", cmdSeed.String()))
 	if out, err := cmdSeed.CombinedOutput(); err != nil {
 		log.Error("cloud-localds failed", zap.ByteString("output", out), zap.Error(err))
 		return fmt.Errorf("cloud-localds error: %w", err)

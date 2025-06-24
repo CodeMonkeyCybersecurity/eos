@@ -173,7 +173,7 @@ func runCloudInitProvisioning(rc *eos_io.RuntimeContext, vmName string) error {
 		return err
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("💡 TODO: virt-install the VM using cloud image + seed.img")
+	otelzap.Ctx(rc.Ctx).Info(" TODO: virt-install the VM using cloud image + seed.img")
 	return fmt.Errorf("virt-install not yet implemented")
 }
 

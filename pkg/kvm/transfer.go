@@ -66,7 +66,7 @@ func CopyOutFromVM(rc *eos_io.RuntimeContext, vmName, guestPath, hostFile string
 	hostDir := filepath.Dir(hostFile)
 	tempName := filepath.Base(guestPath)
 
-	log.Info("📤 Preparing to copy file out of VM",
+	log.Info(" Preparing to copy file out of VM",
 		zap.String("vm", vmName),
 		zap.String("guestPath", guestPath),
 		zap.String("hostDir", hostDir),

@@ -146,7 +146,7 @@ func (c *DNSClient) UpdateZone(rc *eos_io.RuntimeContext, zoneID string, updated
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("✏️ Updated zone", zap.String("id", result.Zone.ID))
+	c.Log.Info(" Updated zone", zap.String("id", result.Zone.ID))
 	return &result.Zone, nil
 }
 
@@ -239,7 +239,7 @@ func (c *DNSClient) ExportZoneFile(rc *eos_io.RuntimeContext, zoneID string) (st
 		return "", errors.Wrap(err, "reading export data")
 	}
 
-	c.Log.Info("📤 Exported zone file", zap.String("zone_id", zoneID))
+	c.Log.Info(" Exported zone file", zap.String("zone_id", zoneID))
 	return string(data), nil
 }
 

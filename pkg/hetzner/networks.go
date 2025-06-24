@@ -110,7 +110,7 @@ func UpdateANetwork(rc *eos_io.RuntimeContext, id int64, newName string) error {
 		return cerr.Wrap(err, "failed to update network")
 	}
 
-	log.Info("✏️ Network updated", zap.String("name", updated.Name), zap.Int64("id", updated.ID))
+	log.Info(" Network updated", zap.String("name", updated.Name), zap.Int64("id", updated.ID))
 	return nil
 }
 

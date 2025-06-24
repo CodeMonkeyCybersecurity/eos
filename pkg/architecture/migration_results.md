@@ -211,7 +211,7 @@ health := compositeStore.HealthCheck(ctx)
 -  **Performance Improved**: Faster compilation, better resource usage
 -  **Maintainability**: Clear separation of concerns, easy to extend
 
-### 💡 **Key Learnings**
+###  **Key Learnings**
 
 1. **Interface-First Design**: Define what you need before how you implement it
 2. **Layered Architecture**: Clear boundaries make code easier to understand and test

@@ -89,7 +89,7 @@ func IsMountEnabled(rc *eos_io.RuntimeContext, client *api.Client, mount string)
 
 // VaultUpdate reads existing secret and applies a patch map
 func UpdateVault(rc *eos_io.RuntimeContext, path string, update map[string]interface{}) error {
-	otelzap.Ctx(rc.Ctx).Info("✏️ Updating Vault secret", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Updating Vault secret", zap.String("path", path))
 
 	client, err := GetRootClient(rc)
 	if err != nil {
@@ -109,7 +109,7 @@ func UpdateVault(rc *eos_io.RuntimeContext, path string, update map[string]inter
 	for k, v := range update {
 		existing[k] = v
 	}
-	otelzap.Ctx(rc.Ctx).Debug("🔃 Merged updated data", zap.Any("data", existing))
+	otelzap.Ctx(rc.Ctx).Debug(" Merged updated data", zap.Any("data", existing))
 
 	if _, err = kv.Put(context.Background(), path, existing); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to write updated secret", zap.String("path", path), zap.Error(err))
@@ -180,7 +180,7 @@ func BootstrapKV(rc *eos_io.RuntimeContext, client *api.Client, kvPath string) e
 	kvClient := client.KVv2(shared.VaultMountKV)
 
 	payload := map[string]interface{}{"value": "ok"}
-	otelzap.Ctx(rc.Ctx).Debug("🔃 KV v2 put payload prepared", zap.String("path", kvPath), zap.Any("data", payload))
+	otelzap.Ctx(rc.Ctx).Debug(" KV v2 put payload prepared", zap.String("path", kvPath), zap.Any("data", payload))
 
 	if _, err := kvClient.Put(context.Background(), kvPath, payload); err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to write bootstrap secret", zap.String("path", kvPath), zap.Error(err))

@@ -278,7 +278,7 @@ locals {
 
 	// Write KVM resources with logging
 	if infrastructure.KVM != nil {
-		logger.Info("🖥️ Generating KVM/Libvirt Terraform resources",
+		logger.Info(" Generating KVM/Libvirt Terraform resources",
 			zap.Int("vms", len(infrastructure.KVM.VMs)),
 			zap.Int("networks", len(infrastructure.KVM.Networks)),
 			zap.Int("storage_pools", len(infrastructure.KVM.StoragePools)))

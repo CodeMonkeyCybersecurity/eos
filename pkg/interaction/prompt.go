@@ -167,7 +167,7 @@ func PromptConfirmOrValue(ctx context.Context, prompt, defaultValue string) stri
 		otelzap.Ctx(ctx).Error("Failed to read custom value", zap.Error(err))
 		return defaultValue
 	}
-	otelzap.Ctx(ctx).Info("✏️ Custom value entered", zap.String("value", input))
+	otelzap.Ctx(ctx).Info(" Custom value entered", zap.String("value", input))
 	return input
 }
 

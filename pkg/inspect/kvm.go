@@ -14,7 +14,7 @@ import (
 // DiscoverKVM gathers KVM/Libvirt infrastructure information
 func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Info("🖥️ Starting KVM/Libvirt discovery")
+	logger.Info(" Starting KVM/Libvirt discovery")
 
 	// Check if virsh is installed
 	if !i.commandExists("virsh") {
@@ -48,7 +48,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 		logger.Warn("Failed to discover VMs", zap.Error(err))
 	} else {
 		info.VMs = vms
-		logger.Info("🖥️ Discovered VMs", zap.Int("count", len(vms)))
+		logger.Info(" Discovered VMs", zap.Int("count", len(vms)))
 	}
 
 	// Discover networks

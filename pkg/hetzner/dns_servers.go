@@ -158,7 +158,7 @@ func (c *DNSClient) UpdatePrimaryServer(rc *eos_io.RuntimeContext, id, zoneID, a
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("✏️ Updated primary server", zap.String("id", result.PrimaryServer.ID))
+	c.Log.Info(" Updated primary server", zap.String("id", result.PrimaryServer.ID))
 	return &result.PrimaryServer, nil
 }
 

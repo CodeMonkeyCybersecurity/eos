@@ -309,7 +309,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				logger.Warn("Service is not active after restart",
 					zap.String("service", service),
 					zap.Error(err))
-				logger.Info("💡 Check service logs with: eos delphi services logs",
+				logger.Info(" Check service logs with: eos delphi services logs",
 					zap.String("service", service))
 			} else {
 				logger.Info(" Service is running",

@@ -94,15 +94,15 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 		if len(missingPackages) > 0 {
 			logger.Warn("Missing packages",
 				zap.Strings("packages", missingPackages))
-			logger.Info("💡 To install missing packages, run:")
+			logger.Info(" To install missing packages, run:")
 			logger.Info("   eos delphi services install")
 
 			// Also show manual installation command
-			logger.Info("💡 Or install manually with:")
+			logger.Info(" Or install manually with:")
 			logger.Info("   sudo pip3 install " + strings.Join(missingPackages, " "))
 		} else {
 			logger.Info(" All Python dependencies are installed!")
-			logger.Info("💡 Next steps:")
+			logger.Info(" Next steps:")
 			logger.Info("   1. Ensure PostgreSQL is running")
 			logger.Info("   2. Configure environment variables")
 			logger.Info("   3. Check service status: eos delphi services status --all")

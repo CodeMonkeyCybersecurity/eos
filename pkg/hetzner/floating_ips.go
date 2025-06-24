@@ -49,7 +49,7 @@ func UnassignFloatingIP(rc *eos_io.RuntimeContext, client *hcloud.Client, ip *hc
 		otelzap.Ctx(rc.Ctx).Error("Failed to unassign floating IP", zap.String("ip", ip.IP.String()), zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(rc.Ctx).Info("🔌 Floating IP unassigned", zap.String("ip", ip.IP.String()))
+	otelzap.Ctx(rc.Ctx).Info(" Floating IP unassigned", zap.String("ip", ip.IP.String()))
 	return nil
 }
 

@@ -27,7 +27,7 @@ func ConnectWithConfig(rc *eos_io.RuntimeContext) (*ldap.Conn, *LDAPConfig, erro
 		return nil, nil, fmt.Errorf("could not load LDAP config: %w", err)
 	}
 
-	fmt.Printf("🔌 Connecting to LDAP via %s config (%s:%d)...\n", source, cfg.FQDN, cfg.Port)
+	fmt.Printf(" Connecting to LDAP via %s config (%s:%d)...\n", source, cfg.FQDN, cfg.Port)
 
 	addr := fmt.Sprintf("ldap://%s:%d", cfg.FQDN, cfg.Port)
 	var conn *ldap.Conn

@@ -88,7 +88,7 @@ func UpdateCert(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return cerr.Wrap(err, "failed to update certificate")
 	}
-	fmt.Printf("✏️ Updated certificate: %s (ID: %d)\n", updated.Name, updated.ID)
+	fmt.Printf(" Updated certificate: %s (ID: %d)\n", updated.Name, updated.ID)
 	return nil
 }
 

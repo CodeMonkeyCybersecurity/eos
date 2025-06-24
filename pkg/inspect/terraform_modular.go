@@ -410,7 +410,7 @@ func (c *TerraformConfig) generateHetznerResources() error {
 
 // generateKVMResources creates KVM-specific configuration
 func (c *TerraformConfig) generateKVMResources() error {
-	c.Logger.Info("🖥️ Generating KVM resources")
+	c.Logger.Info(" Generating KVM resources")
 
 	var tf strings.Builder
 	tf.WriteString(`# KVM/Libvirt Resources

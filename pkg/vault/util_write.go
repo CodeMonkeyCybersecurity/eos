@@ -110,7 +110,7 @@ func WriteFallbackJSON(rc *eos_io.RuntimeContext, path string, data any) error {
 	}
 
 	otelzap.Ctx(rc.Ctx).Info(" Fallback data saved", zap.String("path", path))
-	otelzap.Ctx(rc.Ctx).Info("💡 Run `eos vault sync` later to upload to Vault")
+	otelzap.Ctx(rc.Ctx).Info(" Run `eos vault sync` later to upload to Vault")
 	return nil
 }
 
@@ -124,7 +124,7 @@ func WriteToDisk(rc *eos_io.RuntimeContext, name string, data any) error {
 // WriteKVv2 writes a payload to a Vault KV v2 mount at the given logical path.
 // It handles the /data/ prefix required by KVv2 automatically.
 func WriteKVv2(rc *eos_io.RuntimeContext, client *api.Client, mount string, path string, data map[string]interface{}) error {
-	otelzap.Ctx(rc.Ctx).Info("🔃 Writing KVv2 secret",
+	otelzap.Ctx(rc.Ctx).Info(" Writing KVv2 secret",
 		zap.String("mount", mount),
 		zap.String("path", path),
 		zap.Any("data_keys", keysOf(data)),
