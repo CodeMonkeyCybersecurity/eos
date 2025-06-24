@@ -111,6 +111,33 @@ var createOsQueryCmd = &cobra.Command{
 			zap.String("distro", distro),
 			zap.String("arch", arch))
 
+		// Provide installation guidance based on platform and user context
+		currentUser := os.Getenv("USER")
+		isRoot := os.Getuid() == 0
+		
+		var installGuidance string
+		switch platformOS {
+		case "macos":
+			if isRoot {
+				installGuidance = "Running as root - will use PKG installer (recommended for system-wide installation)"
+			} else {
+				installGuidance = "Running as regular user - will attempt Homebrew first, fallback to PKG if needed"
+			}
+		case "linux":
+			if !isRoot {
+				installGuidance = "Installation requires sudo privileges for package management"
+			} else {
+				installGuidance = "Running as root - will install using system package manager"
+			}
+		case "windows":
+			installGuidance = "Installation requires administrator privileges"
+		}
+		
+		logger.Info("📋 Installation guidance",
+			zap.String("user", currentUser),
+			zap.Bool("is_root", isRoot),
+			zap.String("guidance", installGuidance))
+
 		// Run the installer with timing
 		installStart := time.Now()
 		if err := osquery.InstallOsquery(rc); err != nil {
@@ -118,8 +145,10 @@ var createOsQueryCmd = &cobra.Command{
 				zap.Error(err),
 				zap.String("distro", distro),
 				zap.String("arch", arch),
+				zap.String("user", currentUser),
+				zap.Bool("is_root", isRoot),
 				zap.Duration("duration", time.Since(installStart)),
-				zap.String("troubleshooting", "Check network connectivity, package manager locks, and verify you have sudo/admin privileges"))
+				zap.String("troubleshooting", "Check network connectivity, package manager locks, and verify you have appropriate privileges"))
 			return err
 		}
 

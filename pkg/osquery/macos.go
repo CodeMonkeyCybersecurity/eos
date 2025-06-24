@@ -19,10 +19,22 @@ func installMacOS(rc *eos_io.RuntimeContext) error {
 
 	logger.Info("🍎 Installing osquery on macOS")
 
-	// Check if Homebrew is available
+	// Check if running as root - Homebrew doesn't support root execution
+	if os.Getuid() == 0 {
+		logger.Info("🔒 Running as root - using PKG installer (Homebrew doesn't support root)")
+		return installMacOSPKG(rc)
+	}
+
+	// Check if Homebrew is available for non-root users
 	if platform.IsCommandAvailable("brew") {
 		logger.Info("🍺 Using Homebrew to install osquery")
-		return installMacOSBrew(rc)
+		err := installMacOSBrew(rc)
+		if err != nil {
+			logger.Warn("⚠️ Homebrew installation failed, falling back to PKG installer",
+				zap.Error(err))
+			return installMacOSPKG(rc)
+		}
+		return nil
 	}
 
 	// Fall back to PKG installer

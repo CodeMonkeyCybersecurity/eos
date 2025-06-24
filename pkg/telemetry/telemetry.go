@@ -78,12 +78,25 @@ func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) (conte
 	if ctx == nil {
 		ctx = context.Background() // 🔧 Safe fallback
 	}
+	
+	// Safety check: if tracer is nil, initialize a no-op tracer
+	if tracer == nil {
+		tp := noop.NewTracerProvider()
+		tracer = tp.Tracer("eos-fallback")
+	}
+	
 	return tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
 
 func TrackCommand(ctx context.Context, name string, success bool, durationMs int64, tags map[string]string) {
 	if !IsEnabled() {
 		return
+	}
+
+	// Safety check: if tracer is nil, initialize a no-op tracer
+	if tracer == nil {
+		tp := noop.NewTracerProvider()
+		tracer = tp.Tracer("eos-fallback")
 	}
 
 	_, span := tracer.Start(ctx, name)
