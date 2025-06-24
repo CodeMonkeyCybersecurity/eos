@@ -48,9 +48,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 
 		if !found {
 			log.Warn("No log files found; attempting journalctl fallback")
-			fmt.Println("\n")
-			fmt.Println("No log files found. Trying journalctl fallback...")
-			fmt.Println("\n")
+			log.Info("No log files found. Trying journalctl fallback...")
 			out, err := logger.TryJournalctl(rc)
 			if err != nil {
 				return fmt.Errorf("journalctl fallback failed: %w", err)
