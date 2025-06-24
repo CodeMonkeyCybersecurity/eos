@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -200,8 +201,18 @@ func verifyWindowsInstallation(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("osqueryi verification failed: %w", err)
 	}
 
+	// Clean up the version output and extract version number
+	version := strings.TrimSpace(output)
+	if version != "" {
+		// Extract version from "osqueryi version X.X.X" format
+		parts := strings.Fields(version)
+		if len(parts) >= 3 && parts[1] == "version" {
+			version = parts[2]
+		}
+	}
+	
 	logger.Info("✅ osquery verified successfully",
-		zap.String("version", output))
+		zap.String("version", version))
 
 	// Check service status
 	output, err = execute.Run(rc.Ctx, execute.Options{

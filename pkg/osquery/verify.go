@@ -30,8 +30,18 @@ func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("osqueryi verification failed: %w", err)
 	}
 
+	// Clean up the version output and extract version number
+	version := strings.TrimSpace(output)
+	if version != "" {
+		// Extract version from "osqueryi version X.X.X" format
+		parts := strings.Fields(version)
+		if len(parts) >= 3 && parts[1] == "version" {
+			version = parts[2]
+		}
+	}
+	
 	logger.Info("✅ osquery verified",
-		zap.String("version", strings.TrimSpace(output)))
+		zap.String("version", version))
 
 	// Check if config file exists
 	paths := GetOsqueryPaths()

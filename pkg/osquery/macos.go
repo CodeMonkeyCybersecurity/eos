@@ -46,14 +46,29 @@ func installMacOS(rc *eos_io.RuntimeContext) error {
 func installMacOSBrew(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Check if osquery is already installed via Homebrew
+	// Check if osquery is already installed via Homebrew (check both formula and cask)
 	logger.Info("🔍 Checking if osquery is already installed")
-	output, err := execute.Run(rc.Ctx, execute.Options{
+	
+	// First check if it's installed as a cask (most common for osquery)
+	caskOutput, caskErr := execute.Run(rc.Ctx, execute.Options{
+		Command: "brew",
+		Args:    []string{"list", "--cask", "osquery"},
+	})
+	
+	// Then check if it's installed as a formula (alternative)
+	formulaOutput, formulaErr := execute.Run(rc.Ctx, execute.Options{
 		Command: "brew",
 		Args:    []string{"list", "--formula", "osquery"},
 	})
 	
-	isAlreadyInstalled := (err == nil && strings.Contains(output, "osquery"))
+	isAlreadyInstalled := (caskErr == nil && strings.Contains(caskOutput, "osquery")) ||
+						 (formulaErr == nil && strings.Contains(formulaOutput, "osquery"))
+	
+	if caskErr == nil && strings.Contains(caskOutput, "osquery") {
+		logger.Info("ℹ️ osquery is already installed via Homebrew (cask)")
+	} else if formulaErr == nil && strings.Contains(formulaOutput, "osquery") {
+		logger.Info("ℹ️ osquery is already installed via Homebrew (formula)")
+	}
 	
 	if isAlreadyInstalled {
 		logger.Info("ℹ️ osquery is already installed via Homebrew",
@@ -174,28 +189,44 @@ func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("osqueryi verification failed: %w", err)
 	}
 
-	// Clean up the version output and ensure it's not empty
+	// Clean up the version output and extract version number
 	version := strings.TrimSpace(output)
 	if version == "" {
 		version = "unknown"
+	} else {
+		// Extract version from "osqueryi version X.X.X" format
+		parts := strings.Fields(version)
+		if len(parts) >= 3 && parts[1] == "version" {
+			version = parts[2]
+		}
 	}
 
 	logger.Info("✅ osquery verified successfully",
 		zap.String("version", version))
 
-	// Verify Homebrew installation
+	// Verify Homebrew installation (check both cask and formula)
 	logger.Info("🔍 Verifying Homebrew installation")
-	brewOutput, brewErr := execute.Run(rc.Ctx, execute.Options{
+	
+	// Check cask installation first (most common)
+	caskOutput, caskErr := execute.Run(rc.Ctx, execute.Options{
+		Command: "brew",
+		Args:    []string{"list", "--cask", "osquery"},
+	})
+	
+	// Check formula installation as fallback
+	formulaOutput, formulaErr := execute.Run(rc.Ctx, execute.Options{
 		Command: "brew",
 		Args:    []string{"list", "--formula", "osquery"},
 	})
 	
-	if brewErr != nil || !strings.Contains(brewOutput, "osquery") {
-		logger.Warn("⚠️ osquery may not be properly installed via Homebrew",
-			zap.Error(brewErr),
-			zap.String("note", "Binary is available but Homebrew doesn't show it as installed"))
+	if caskErr == nil && strings.Contains(caskOutput, "osquery") {
+		logger.Info("✅ osquery is properly installed via Homebrew (cask)")
+	} else if formulaErr == nil && strings.Contains(formulaOutput, "osquery") {
+		logger.Info("✅ osquery is properly installed via Homebrew (formula)")
 	} else {
-		logger.Info("✅ osquery is properly installed via Homebrew")
+		logger.Warn("⚠️ osquery may not be installed via Homebrew",
+			zap.String("note", "Binary is available but not detected in Homebrew cask or formula listings"),
+			zap.String("troubleshooting", "This is normal if osquery was installed through other means"))
 	}
 
 	// Check configuration file

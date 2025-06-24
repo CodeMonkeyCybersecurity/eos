@@ -94,15 +94,25 @@ func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 			return true
 		}
 	case "macos":
-		// For macOS, also check Homebrew installation
+		// For macOS, also check Homebrew installation (both cask and formula)
 		if platform.IsCommandAvailable("brew") {
-			// Check if osquery is installed via Homebrew
-			output, err := execute.Run(rc.Ctx, execute.Options{
+			// Check if osquery is installed via Homebrew cask (most common)
+			caskOutput, caskErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "brew",
+				Args:    []string{"list", "--cask", "osquery"},
+			})
+			if caskErr == nil && strings.Contains(caskOutput, "osquery") {
+				logger.Info("✅ osquery is installed via Homebrew (cask)")
+				return true
+			}
+			
+			// Check if osquery is installed via Homebrew formula (alternative)
+			formulaOutput, formulaErr := execute.Run(rc.Ctx, execute.Options{
 				Command: "brew",
 				Args:    []string{"list", "--formula", "osquery"},
 			})
-			if err == nil && strings.Contains(output, "osquery") {
-				logger.Info("✅ osquery is installed via Homebrew")
+			if formulaErr == nil && strings.Contains(formulaOutput, "osquery") {
+				logger.Info("✅ osquery is installed via Homebrew (formula)")
 				return true
 			}
 		}
