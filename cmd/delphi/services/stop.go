@@ -27,6 +27,7 @@ Available services:
 - delphi-agent-enricher: Agent enrichment service  
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
+- prompt-ab-tester: A/B testing worker for prompt optimization
 
 Examples:
   eos delphi services stop delphi-listener

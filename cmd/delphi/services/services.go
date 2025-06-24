@@ -21,11 +21,14 @@ This includes:
 - delphi-agent-enricher: Agent enrichment service
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
+- prompt-ab-tester: A/B testing worker for prompt optimization
 
 Available operations:
 - check: Verify Python dependencies are installed
 - install: Install required Python dependencies
 - deploy-template: Deploy email template with correct permissions
+- deploy-ab-config: Deploy A/B testing configuration for prompt optimization
+- analyze-ab-results: Analyze A/B testing results and provide optimization insights
 - start/stop/restart: Control service lifecycle
 - enable/disable: Configure service autostart
 - status: View service status and health
@@ -52,4 +55,6 @@ func init() {
 	ServicesCmd.AddCommand(NewDisableCmd())
 	ServicesCmd.AddCommand(NewLogsCmd())
 	ServicesCmd.AddCommand(NewUpdateCmd())
+	ServicesCmd.AddCommand(NewDeployABConfigCmd())
+	ServicesCmd.AddCommand(NewAnalyzeABResultsCmd())
 }

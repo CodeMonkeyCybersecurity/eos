@@ -55,6 +55,18 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/llm-worker.py.%s.bak", timestamp),
 		},
 		{
+			ServiceName: "prompt-ab-tester",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "prompt-ab-tester.py"),
+			TargetPath:  "/usr/local/bin/prompt-ab-tester.py",
+			BackupPath:  fmt.Sprintf("/usr/local/bin/prompt-ab-tester.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "ab-test-analyzer",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "ab-test-analyzer.py"),
+			TargetPath:  "/usr/local/bin/ab-test-analyzer.py",
+			BackupPath:  fmt.Sprintf("/usr/local/bin/ab-test-analyzer.py.%s.bak", timestamp),
+		},
+		{
 			ServiceName: "alert-to-db",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "alert-to-db.py"),
 			TargetPath:  "/opt/stackstorm/packs/delphi/alert-to-db.py",
@@ -88,6 +100,7 @@ Available services:
 - delphi-agent-enricher: Agent enrichment service  
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
+- prompt-ab-tester: A/B testing worker for prompt optimization
 - alert-to-db: Database operations for alerts
 
 Examples:
