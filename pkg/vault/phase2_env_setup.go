@@ -213,7 +213,7 @@ func PrepareVaultAgentEnvironment(rc *eos_io.RuntimeContext) error {
 }
 
 func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
-	otelzap.Ctx(rc.Ctx).Info("🔍 Validating Vault Agent runtime environment")
+	otelzap.Ctx(rc.Ctx).Info(" Validating Vault Agent runtime environment")
 
 	// Resolve eos user UID and GID safely
 	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)

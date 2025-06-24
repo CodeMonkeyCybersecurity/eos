@@ -77,7 +77,7 @@ func InstallTool(rc *eos_io.RuntimeContext, tool string) error {
 	logger.Info(" Tool installation completed", zap.String("tool", tool))
 
 	// Verify installation
-	logger.Info("🔍 Verifying installation", zap.String("tool", tool))
+	logger.Info(" Verifying installation", zap.String("tool", tool))
 	if err := VerifyInstallation(rc, tool); err != nil {
 		logger.Error(" Installation verification failed",
 			zap.String("tool", tool),
@@ -188,7 +188,7 @@ func installPrerequisites(rc *eos_io.RuntimeContext) error {
 	prerequisites := []string{"wget", "gpg", "lsb-release"}
 
 	distro := platform.DetectLinuxDistro(rc)
-	logger.Info("🔍 Detected Linux distribution", zap.String("distro", distro))
+	logger.Info(" Detected Linux distribution", zap.String("distro", distro))
 
 	switch distro {
 	case "debian":

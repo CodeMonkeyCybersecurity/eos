@@ -37,7 +37,7 @@ func hasBinary(name string) bool {
 
 // CheckFirewallStatus tries UFW, then iptables, and prints the firewall status.
 func CheckFirewallStatus(rc *eos_io.RuntimeContext) {
-	fmt.Println("🔍 Checking firewall status...")
+	fmt.Println(" Checking firewall status...")
 
 	if hasBinary("ufw") {
 		otelzap.Ctx(rc.Ctx).Info("UFW detected")

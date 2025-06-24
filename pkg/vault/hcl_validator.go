@@ -38,7 +38,7 @@ func NewVaultPolicyValidator() *VaultPolicyValidator {
 // ValidatePolicy validates a Vault policy HCL string
 func (v *VaultPolicyValidator) ValidatePolicy(rc *eos_io.RuntimeContext, policyName, policyContent string) (*PolicyValidationResult, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Validating Vault policy HCL", zap.String("policy", policyName))
+	log.Info(" Validating Vault policy HCL", zap.String("policy", policyName))
 
 	result := &PolicyValidationResult{
 		Valid:       true,

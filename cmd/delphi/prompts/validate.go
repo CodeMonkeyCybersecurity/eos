@@ -81,12 +81,12 @@ Examples:
 
 			if len(args) == 0 {
 				// Validate all prompts
-				logger.Info("🔍 Validating all system prompts")
+				logger.Info(" Validating all system prompts")
 				return validateAllPrompts(rc, verbose, fix)
 			} else {
 				// Validate specific prompt
 				promptName := args[0]
-				logger.Info("🔍 Validating system prompt",
+				logger.Info(" Validating system prompt",
 					zap.String("prompt_name", promptName))
 				return validateSinglePrompt(rc, promptName, verbose, fix)
 			}

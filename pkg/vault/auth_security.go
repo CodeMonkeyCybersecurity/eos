@@ -104,7 +104,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 		}
 
 		// Verify the token
-		log.Debug("🔍 Verifying authentication token", zap.String("method", method.name))
+		log.Debug(" Verifying authentication token", zap.String("method", method.name))
 		if !VerifyToken(rc, client, token) {
 			attempt.Success = false
 			attempt.ErrorType = "token_verification_failed"

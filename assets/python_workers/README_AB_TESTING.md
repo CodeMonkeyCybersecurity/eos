@@ -188,7 +188,7 @@ VARIANT PERFORMANCE:
 Total Cost: $1.2847
 Avg Cost per Request: $0.0015
 
-🎯 RECOMMENDATIONS:
+ RECOMMENDATIONS:
 ------------------
 1. Best performing variant: 'cybersobar' (success rate: 97.8%)
 2. Fastest variant: 'delphi_notify_long' (avg response time: 1.87s)

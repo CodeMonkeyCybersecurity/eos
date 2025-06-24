@@ -160,7 +160,7 @@ Example:
 
 		logger.Info("Consul-Vault-Terraform deployment completed successfully")
 		fmt.Println("\n Infrastructure deployed successfully with Consul-Vault integration!")
-		fmt.Printf("🔍 Consul UI: %s\n", consulAddr+"/ui")
+		fmt.Printf(" Consul UI: %s\n", consulAddr+"/ui")
 		fmt.Printf(" Vault UI: %s\n", vaultAddr+"/ui")
 
 		return nil

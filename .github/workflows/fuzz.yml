@@ -17,9 +17,9 @@ jobs:
 
       - name: Run Go fuzz tests
         run: |
-          echo "🔍 Running fuzz tests for each package individually..."
+          echo " Running fuzz tests for each package individually..."
           
-          echo "🧮 Fuzzing crypto package..."
+          echo " Fuzzing crypto package..."
           go test -run=^FuzzValidateStrongPassword$ -fuzz=^FuzzValidateStrongPassword$ -fuzztime=5s ./pkg/crypto
           go test -run=^FuzzHashString$ -fuzz=^FuzzHashString$ -fuzztime=5s ./pkg/crypto
           go test -run=^FuzzHashStrings$ -fuzz=^FuzzHashStrings$ -fuzztime=5s ./pkg/crypto
@@ -29,7 +29,7 @@ jobs:
           go test -run=^FuzzInjectSecretsFromPlaceholders$ -fuzz=^FuzzInjectSecretsFromPlaceholders$ -fuzztime=5s ./pkg/crypto
           go test -run=^FuzzSecureZero$ -fuzz=^FuzzSecureZero$ -fuzztime=5s ./pkg/crypto
           
-          echo "🎯 Fuzzing interaction package..."
+          echo " Fuzzing interaction package..."
           go test -run=^FuzzNormalizeYesNoInput$ -fuzz=^FuzzNormalizeYesNoInput$ -fuzztime=5s ./pkg/interaction
           go test -run=^FuzzValidateNonEmpty$ -fuzz=^FuzzValidateNonEmpty$ -fuzztime=5s ./pkg/interaction
           go test -run=^FuzzValidateUsername$ -fuzz=^FuzzValidateUsername$ -fuzztime=5s ./pkg/interaction

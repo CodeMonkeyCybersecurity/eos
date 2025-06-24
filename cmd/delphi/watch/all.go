@@ -45,7 +45,7 @@ Example:
   eos delphi watch all --alert-limit 5 --agent-limit 10 --refresh 3`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔍 Starting combined alerts & agents watch",
+			logger.Info(" Starting combined alerts & agents watch",
 				zap.Int("alert_limit", alertLimit),
 				zap.Int("agent_limit", agentLimit),
 				zap.Int("refresh_seconds", refresh))
@@ -162,7 +162,7 @@ func displayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 	fmt.Print("\033[2J\033[H")
 
 	currentTime := time.Now().Format("15:04:05")
-	fmt.Printf("🔍 Delphi Real-Time Monitor (Updated: %s)\n", currentTime)
+	fmt.Printf(" Delphi Real-Time Monitor (Updated: %s)\n", currentTime)
 	fmt.Println(strings.Repeat("=", 120))
 
 	// Display recent alerts section

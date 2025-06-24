@@ -54,7 +54,7 @@ func StartServeProcess(rc *eos_io.RuntimeContext, serveLog string) error {
 	if err != nil {
 		zap.L().Warn("Ollama serve may not have started", zap.Error(err))
 	}
-	zap.L().Info("🔍 Ollama logs: " + serveLog)
+	zap.L().Info(" Ollama logs: " + serveLog)
 	return nil
 }
 

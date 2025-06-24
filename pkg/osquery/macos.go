@@ -47,7 +47,7 @@ func installMacOSBrew(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if osquery is already installed via Homebrew (check both formula and cask)
-	logger.Info("🔍 Checking if osquery is already installed")
+	logger.Info(" Checking if osquery is already installed")
 
 	// First check if it's installed as a cask (most common for osquery)
 	caskOutput, caskErr := execute.Run(rc.Ctx, execute.Options{
@@ -174,7 +174,7 @@ func configureMacOSHomebrew(rc *eos_io.RuntimeContext) error {
 // verifyMacOSInstallation verifies osquery installation on macOS (Homebrew)
 func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying osquery installation on macOS")
+	logger.Info(" Verifying osquery installation on macOS")
 
 	// Check if osqueryi is available
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -204,7 +204,7 @@ func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 		zap.String("version", version))
 
 	// Verify Homebrew installation (check both cask and formula)
-	logger.Info("🔍 Verifying Homebrew installation")
+	logger.Info(" Verifying Homebrew installation")
 
 	// Check cask installation first (most common)
 	caskOutput, caskErr := execute.Run(rc.Ctx, execute.Options{

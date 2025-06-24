@@ -183,7 +183,7 @@ Every function MUST log at appropriate levels with structured fields:
 
 ```go
 // Function entry with context
-logger.Info("🔍 Starting [operation]", 
+logger.Info(" Starting [operation]", 
     zap.String("user", os.Getenv("USER")),
     zap.String("pwd", pwd),
     zap.String("command_line", strings.Join(os.Args, " ")),

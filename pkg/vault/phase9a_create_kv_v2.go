@@ -35,7 +35,7 @@ func PhaseEnableKVv2(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 	// Log if current client has token
 	if currentToken := client.Token(); currentToken != "" {
-		log.Info("🔍 Current client has token set")
+		log.Info(" Current client has token set")
 	} else {
 		log.Warn("Current client has no token set")
 	}
@@ -75,7 +75,7 @@ func PhaseEnableKVv2(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 // IsMountEnabled checks whether a Vault mount exists at the given path.
 func IsMountEnabled(rc *eos_io.RuntimeContext, client *api.Client, mount string) (bool, error) {
-	otelzap.Ctx(rc.Ctx).Debug("🔍 Checking if mount is enabled", zap.String("mount", mount))
+	otelzap.Ctx(rc.Ctx).Debug(" Checking if mount is enabled", zap.String("mount", mount))
 
 	mounts, err := client.Sys().ListMounts()
 	if err != nil {
@@ -127,7 +127,7 @@ func EnsureKVv2Enabled(rc *eos_io.RuntimeContext, client *api.Client, mountPath 
 
 	// Log client details before making API call
 	if token := client.Token(); token != "" {
-		log.Info("🔍 Making API call with token",
+		log.Info(" Making API call with token",
 			zap.String("vault_addr", client.Address()),
 			zap.String("api_endpoint", "GET /v1/sys/mounts"))
 	} else {

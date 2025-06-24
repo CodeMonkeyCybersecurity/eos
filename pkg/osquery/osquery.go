@@ -23,7 +23,7 @@ func InstallOsquery(rc *eos_io.RuntimeContext) error {
 	// Log platform detection
 	osPlat := platform.GetOSPlatform()
 	arch := platform.GetArch()
-	logger.Info("🔍 Detecting platform for osquery installation",
+	logger.Info(" Detecting platform for osquery installation",
 		zap.String("os", osPlat),
 		zap.String("arch", arch),
 		zap.String("goos", runtime.GOOS),
@@ -136,7 +136,7 @@ func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 // VerifyOsqueryInstallation performs post-installation verification
 func VerifyOsqueryInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying osquery installation")
+	logger.Info(" Verifying osquery installation")
 
 	// Check if osqueryi (interactive shell) is available
 	if !platform.IsCommandAvailable("osqueryi") {

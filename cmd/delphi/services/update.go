@@ -200,7 +200,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 	}
 
 	if dryRun {
-		logger.Info("🔍 DRY RUN - would perform the following actions:")
+		logger.Info(" DRY RUN - would perform the following actions:")
 		for _, worker := range workers {
 			logger.Info(" Service worker update plan",
 				zap.String("service", worker.ServiceName),
@@ -302,7 +302,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 	// Step 4: Verify services are running
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info("🔍 Verifying service status")
+		logger.Info(" Verifying service status")
 
 		for _, service := range servicesToRestart {
 			if err := eos_unix.CheckServiceStatus(rc.Ctx, service); err != nil {

@@ -27,7 +27,7 @@ This command verifies the following dependencies:
 If any dependencies are missing, use 'eos delphi services install' to install them.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔍 Checking Python dependencies for Delphi services")
+		logger.Info(" Checking Python dependencies for Delphi services")
 
 		// Check Python and pip availability
 		pythonCmd := exec.Command("python3", "--version")
@@ -58,7 +58,7 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 			"pyyaml":          "yaml",
 		}
 
-		logger.Info("🔍 Checking package availability",
+		logger.Info(" Checking package availability",
 			zap.Int("total_packages", len(packages)))
 
 		var missingPackages []string
@@ -109,7 +109,7 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 		}
 
 		// Additional system checks
-		logger.Info("🔍 Additional system checks")
+		logger.Info(" Additional system checks")
 
 		// Check PostgreSQL client
 		psqlCmd := exec.Command("psql", "--version")

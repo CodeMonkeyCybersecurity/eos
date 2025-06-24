@@ -100,7 +100,7 @@ func AddDockerRepository(rc *eos_io.RuntimeContext) error {
 	arch := eos_unix.GetArchitecture()
 	codename := eos_unix.GetUbuntuCodename(rc)
 
-	logger.Debug("🔍 Detected system information",
+	logger.Debug(" Detected system information",
 		zap.String("architecture", arch),
 		zap.String("codename", codename))
 
@@ -208,7 +208,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 		user = os.Getenv("USER")
 	}
 
-	logger.Debug("🔍 Detected user information",
+	logger.Debug(" Detected user information",
 		zap.String("sudo_user", os.Getenv("SUDO_USER")),
 		zap.String("user", os.Getenv("USER")),
 		zap.String("selected_user", user))

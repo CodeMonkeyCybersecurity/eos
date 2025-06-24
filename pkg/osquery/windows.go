@@ -179,7 +179,7 @@ func configureWindowsService(rc *eos_io.RuntimeContext) error {
 // verifyWindowsInstallation verifies osquery installation on Windows
 func verifyWindowsInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying osquery installation on Windows")
+	logger.Info(" Verifying osquery installation on Windows")
 
 	// Check if osqueryi.exe is available
 	osqueryiPath := `C:\Program Files\osquery\osqueryi.exe`

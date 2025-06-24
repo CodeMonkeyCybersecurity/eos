@@ -77,7 +77,7 @@ func InteractiveLDAPQuery(rc *eos_io.RuntimeContext) error {
 	args := []string{"-x", "-H", uri, "-D", bindDN, "-w", password, "-b", baseDN, "-z", maxResultsStr, filter}
 	args = append(args, attrs...)
 
-	fmt.Println("\n➡️  Running:", "ldapsearch", strings.Join(args, " "))
+	fmt.Println("\n  Running:", "ldapsearch", strings.Join(args, " "))
 	cmd := exec.Command("ldapsearch", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

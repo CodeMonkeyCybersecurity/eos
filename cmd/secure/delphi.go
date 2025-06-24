@@ -27,7 +27,7 @@ var SecureDelphiCmd = &cobra.Command{
 		}
 
 		// 2) Fetch current Wazuh API password
-		rc.Log.Info("🔍 Extracting current Wazuh API password")
+		rc.Log.Info(" Extracting current Wazuh API password")
 		var apiPass string
 		if apiPass, err = delphi.ExtractWazuhUserPassword(rc); err != nil {
 			err = cerr.Wrapf(err, "extract Wazuh API password")

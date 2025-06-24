@@ -171,7 +171,7 @@ func ValidateMLKEMPrivateKey(rc *eos_io.RuntimeContext, privateKey []byte) error
 	// Note: With the current API, we can only validate the size
 	// Full validation would require reconstructing the DecapsulationKey
 	// which isn't easily possible from raw bytes with this API
-	logger.Info("🔍 ML-KEM private key size validation only (API limitation)")
+	logger.Info(" ML-KEM private key size validation only (API limitation)")
 
 	logger.Info(" ML-KEM private key validation passed")
 	return nil

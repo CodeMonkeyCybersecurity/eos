@@ -40,7 +40,7 @@ func runCrontabUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		return fmt.Errorf("email address is required")
 	}
 
-	log.Info("🔍 Fetching current crontab...")
+	log.Info(" Fetching current crontab...")
 	current, err := eos_unix.GetCrontab()
 	if err != nil {
 		log.Error(" Failed to retrieve crontab", zap.Error(err))

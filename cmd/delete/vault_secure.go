@@ -338,7 +338,7 @@ func cleanupPackageRepos(rc *eos_io.RuntimeContext, distro string) error {
 
 func verifyCleanup(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying cleanup completion")
+	logger.Info(" Verifying cleanup completion")
 
 	// Check for remaining processes
 	output, err := execute.Run(rc.Ctx, execute.Options{

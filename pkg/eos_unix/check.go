@@ -35,7 +35,7 @@ func Exists(path string) bool {
 func LookupUser(ctx context.Context, name string) (int, int, error) {
 	otelzap.Ctx(ctx)
 
-	otelzap.Ctx(ctx).Debug("🔍 Looking up user", zap.String("username", name))
+	otelzap.Ctx(ctx).Debug(" Looking up user", zap.String("username", name))
 
 	u, err := user.Lookup(name)
 	if err != nil {

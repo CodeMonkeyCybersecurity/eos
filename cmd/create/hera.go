@@ -140,7 +140,7 @@ var CreateHeraCmd = &cobra.Command{
 
 		time.Sleep(5 * time.Second)
 
-		otelzap.Ctx(rc.Ctx).Info("🔍 Verifying container status")
+		otelzap.Ctx(rc.Ctx).Info(" Verifying container status")
 		if err := container.CheckDockerContainers(rc); err != nil {
 			otelzap.Ctx(rc.Ctx).Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}

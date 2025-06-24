@@ -147,7 +147,7 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 			return strings.TrimSpace(string(data)), nil
 		} else {
 			if attempt%10 == 1 || attempt <= 5 { // Log first 5 attempts and every 10th after
-				log.Warn("🔍 Failed to read token",
+				log.Warn(" Failed to read token",
 					zap.Int("attempt", attempt),
 					zap.String("path", path),
 					zap.Error(err))
@@ -225,7 +225,7 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	runDir := "/run/eos"
 
-	log.Info("🔍 Ensuring runtime directory exists", zap.String("path", runDir))
+	log.Info(" Ensuring runtime directory exists", zap.String("path", runDir))
 
 	// Check if directory already exists
 	if stat, err := os.Stat(runDir); err == nil {
@@ -286,11 +286,11 @@ func logSystemdServiceStatus(rc *eos_io.RuntimeContext, serviceName string) erro
 	statusCmd := exec.CommandContext(rc.Ctx, "systemctl", "status", serviceName, "--no-pager")
 	statusOutput, statusErr := statusCmd.CombinedOutput()
 	if statusErr != nil {
-		log.Info("🔍 Service status (may be failing)",
+		log.Info(" Service status (may be failing)",
 			zap.String("service", serviceName),
 			zap.String("output", string(statusOutput)))
 	} else {
-		log.Info("🔍 Service status",
+		log.Info(" Service status",
 			zap.String("service", serviceName),
 			zap.String("output", string(statusOutput)))
 	}

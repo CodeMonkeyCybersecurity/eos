@@ -35,7 +35,7 @@ func HandleFallbackOrStore(rc *eos_io.RuntimeContext, name string, secrets map[s
 		return WriteToVault(rc, name, secrets)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🔍 Vault unavailable or unhealthy", zap.String("name", name))
+	otelzap.Ctx(rc.Ctx).Info(" Vault unavailable or unhealthy", zap.String("name", name))
 	return handleVaultUnavailable(rc, name, secrets)
 }
 

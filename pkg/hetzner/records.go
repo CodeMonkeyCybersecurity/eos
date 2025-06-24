@@ -111,7 +111,7 @@ func (c *DNSClient) GetRecord(rc *eos_io.RuntimeContext, id string) (*DNSRecord,
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("🔍 Fetched record", zap.String("id", result.Record.ID))
+	c.Log.Info(" Fetched record", zap.String("id", result.Record.ID))
 	return &result.Record, nil
 }
 

@@ -52,14 +52,14 @@ function Show-Hash($Label, $Path) {
     }
 }
 
-Show-Hash "🔍 Existing binary SHA256:" $InstallPath
+Show-Hash " Existing binary SHA256:" $InstallPath
 
 # --- Install Binary ---
-Log INFO "🚚 Installing to $InstallPath"
+Log INFO " Installing to $InstallPath"
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 Copy-Item -Force $EosBuildPath $InstallPath
 
-Show-Hash "🔍 New binary SHA256:" $InstallPath
+Show-Hash " New binary SHA256:" $InstallPath
 
 # --- Create Directories ---
 Log INFO " Ensuring application directories"

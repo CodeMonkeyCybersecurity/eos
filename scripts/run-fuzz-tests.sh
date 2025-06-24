@@ -6,11 +6,11 @@ set -e
 
 FUZZTIME="${1:-10s}"
 
-echo "🔍 Running fuzz tests with ${FUZZTIME} duration..."
+echo " Running fuzz tests with ${FUZZTIME} duration..."
 echo " Working directory: $(pwd)"
 echo ""
 
-echo "🧮 Fuzzing crypto package..."
+echo " Fuzzing crypto package..."
 go test -run=^FuzzValidateStrongPassword$ -fuzz=^FuzzValidateStrongPassword$ -fuzztime="${FUZZTIME}" ./pkg/crypto
 go test -run=^FuzzHashString$ -fuzz=^FuzzHashString$ -fuzztime="${FUZZTIME}" ./pkg/crypto
 go test -run=^FuzzHashStrings$ -fuzz=^FuzzHashStrings$ -fuzztime="${FUZZTIME}" ./pkg/crypto
@@ -21,7 +21,7 @@ go test -run=^FuzzInjectSecretsFromPlaceholders$ -fuzz=^FuzzInjectSecretsFromPla
 go test -run=^FuzzSecureZero$ -fuzz=^FuzzSecureZero$ -fuzztime="${FUZZTIME}" ./pkg/crypto
 
 echo ""
-echo "🎯 Fuzzing interaction package..."
+echo " Fuzzing interaction package..."
 go test -run=^FuzzNormalizeYesNoInput$ -fuzz=^FuzzNormalizeYesNoInput$ -fuzztime="${FUZZTIME}" ./pkg/interaction
 go test -run=^FuzzValidateNonEmpty$ -fuzz=^FuzzValidateNonEmpty$ -fuzztime="${FUZZTIME}" ./pkg/interaction
 go test -run=^FuzzValidateUsername$ -fuzz=^FuzzValidateUsername$ -fuzztime="${FUZZTIME}" ./pkg/interaction

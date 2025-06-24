@@ -37,7 +37,7 @@ You can choose from:
 func runInspectConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🔍 Inspect Configurations Menu")
+	logger.Info(" Inspect Configurations Menu")
 	logger.Info("Select the resource you want to inspect:")
 	logger.Info("1) Inspect Certificates")
 	logger.Info("2) Inspect docker-compose file")

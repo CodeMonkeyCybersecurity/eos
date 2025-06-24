@@ -65,7 +65,7 @@ func ensureDomainRunning(vmName string, log *zap.Logger) error {
 		return fmt.Errorf("could not determine domain state: %w", err)
 	}
 	state := strings.TrimSpace(string(out))
-	log.Info("🔍 VM current state", zap.String("state", state))
+	log.Info(" VM current state", zap.String("state", state))
 
 	if state == "shut off" {
 		log.Info("🔁 VM shut off — restarting manually")

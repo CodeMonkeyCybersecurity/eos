@@ -99,7 +99,7 @@ result, err := vaultService.AuthenticateUser(ctx, "admin", "userpass")
 -  Create example implementations
 
 ### Phase 2: High-Impact Migration (Week 2-3)
-- 🎯 **Target**: `pkg/vault` (50+ dependencies)
+-  **Target**: `pkg/vault` (50+ dependencies)
 - Extract `SecretStore` interface
 - Create `VaultDomainService`
 - Implement concrete vault API store
@@ -156,7 +156,7 @@ func TestVaultService(t *testing.T) {
 }
 ```
 
-## 🔍 Real-World Example: Vault Package Transformation
+##  Real-World Example: Vault Package Transformation
 
 See `vault_refactor_example.go` for a complete transformation showing:
 
@@ -166,7 +166,7 @@ See `vault_refactor_example.go` for a complete transformation showing:
 4. **Error Handling**: Proper error boundaries and logging
 5. **Testing**: Mock-friendly interfaces
 
-## 🎯 Benefits Realized
+##  Benefits Realized
 
 ### 1. Maintainability
 - **Clear Boundaries**: Each layer has specific responsibilities

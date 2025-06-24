@@ -73,7 +73,7 @@ Examples:
 
 			// Validate JSON syntax if requested
 			if validate {
-				logger.Info("🔍 Validating configuration syntax")
+				logger.Info(" Validating configuration syntax")
 				if err := validateABConfigJSON(sourceConfig); err != nil {
 					return fmt.Errorf("configuration validation failed: %w", err)
 				}
@@ -144,7 +144,7 @@ Examples:
 				zap.String("reports_dir", reportsDir))
 
 			// Display next steps
-			logger.Info("🎯 Next steps:")
+			logger.Info(" Next steps:")
 			logger.Info("   1. Review configuration: cat /opt/delphi/ab-test-config.json")
 			logger.Info("   2. Deploy prompt-ab-tester service: eos delphi services update prompt-ab-tester")
 			logger.Info("   3. Start A/B testing: systemctl start prompt-ab-tester")

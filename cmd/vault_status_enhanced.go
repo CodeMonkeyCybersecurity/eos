@@ -83,7 +83,7 @@ func _vaultStatusEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []
 //
 //nolint:unused
 func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
-	logger.Info("🔍 Performing comprehensive status checks")
+	logger.Info(" Performing comprehensive status checks")
 
 	// Check container health
 	if err := container.Health(); err != nil {

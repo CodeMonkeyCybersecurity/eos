@@ -108,7 +108,7 @@ The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 				zap.String("path", targetPath),
 				zap.Error(err))
 		} else {
-			logger.Info("🔍 Template deployment verified", zap.String("path", targetPath))
+			logger.Info(" Template deployment verified", zap.String("path", targetPath))
 		}
 
 		logger.Info(" Email template deployment complete")

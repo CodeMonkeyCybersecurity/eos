@@ -76,7 +76,7 @@ var SshKeyCmd = &cobra.Command{
 		}
 
 		chosen := fmt.Sprintf("%s/%s", vaultDir, name)
-		otelzap.Ctx(rc.Ctx).Info("🔍 Chosen Vault path for new SSH key", zap.String("path", chosen))
+		otelzap.Ctx(rc.Ctx).Info(" Chosen Vault path for new SSH key", zap.String("path", chosen))
 
 		// Generate key
 		pub, priv, err := ed25519.GenerateKey(rand.Reader)

@@ -148,7 +148,7 @@ func VerifyInitResult(rc *eos_io.RuntimeContext, r *api.InitResponse) error {
 
 func VerifyRootToken(rc *eos_io.RuntimeContext, client *api.Client, token string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Verifying token with Vault",
+	log.Info(" Verifying token with Vault",
 		zap.String("vault_addr", client.Address()))
 
 	client.SetToken(token)

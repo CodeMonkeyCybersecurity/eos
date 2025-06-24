@@ -55,7 +55,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		}},
 	}
 	for _, step := range steps {
-		otelzap.Ctx(rc.Ctx).Info(fmt.Sprintf("🔍 %s...", step.name))
+		otelzap.Ctx(rc.Ctx).Info(fmt.Sprintf(" %s...", step.name))
 		if err := step.fn(); err != nil {
 			return logger.LogErrAndWrap(rc, step.name, err)
 		}

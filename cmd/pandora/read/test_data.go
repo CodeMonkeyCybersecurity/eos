@@ -34,7 +34,7 @@ var InspectTestDataCmd = &cobra.Command{
 		}
 
 		if client != nil {
-			log.Info("🔍 Attempting to read test-data from Vault...")
+			log.Info(" Attempting to read test-data from Vault...")
 			if err := vault.Read(rc, client, shared.TestDataVaultPath, &out); err != nil {
 				vaultReadErr = err
 				if vault.IsSecretNotFound(err) {
@@ -54,7 +54,7 @@ var InspectTestDataCmd = &cobra.Command{
 		}
 
 		// Otherwise fallback to disk
-		log.Info("🔍 Attempting fallback to disk...")
+		log.Info(" Attempting fallback to disk...")
 
 		if fallbackErr := vault.InspectFromDisk(rc); fallbackErr != nil {
 			log.Error(" Both Vault and disk fallback failed",

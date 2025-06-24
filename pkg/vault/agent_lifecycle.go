@@ -95,7 +95,7 @@ func PhaseEnableVaultAgent(rc *eos_io.RuntimeContext, client *api.Client, config
 // verifyAgentPrerequisites checks that all required components are ready
 func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔍 Verifying Vault Agent prerequisites")
+	log.Info(" Verifying Vault Agent prerequisites")
 
 	// Check Vault is accessible
 	if IsVaultSealed(client) {
@@ -133,7 +133,7 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	// Check AppRole auth method is enabled
-	log.Info("🔍 Checking for AppRole auth method")
+	log.Info(" Checking for AppRole auth method")
 	authMethods, err := privilegedClient.Sys().ListAuth()
 	if err != nil {
 		log.Error(" Failed to list auth methods", zap.Error(err))
@@ -378,7 +378,7 @@ func verifyAgentFunctionality(rc *eos_io.RuntimeContext, client *api.Client) err
 	log.Info(" Agent token is valid")
 
 	// Check agent service status
-	log.Info("🔍 Checking agent service status")
+	log.Info(" Checking agent service status")
 	if err := checkAgentServiceStatus(rc); err != nil {
 		log.Error(" Agent service check failed", zap.Error(err))
 		return cerr.Wrap(err, "agent service check failed")
@@ -393,7 +393,7 @@ func checkAgentServiceStatus(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Check if service is active
-	log.Info("🔍 Checking systemd service status", zap.String("service", shared.VaultAgentService))
+	log.Info(" Checking systemd service status", zap.String("service", shared.VaultAgentService))
 	if err := eos_unix.CheckServiceStatus(rc.Ctx, shared.VaultAgentService); err != nil {
 		log.Error(" Agent service not running",
 			zap.String("service", shared.VaultAgentService),

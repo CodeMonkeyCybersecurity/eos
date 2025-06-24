@@ -61,7 +61,7 @@ func GetAnSshKey(rc *eos_io.RuntimeContext, id int64) error {
 		return nil
 	}
 
-	log.Info("🔍 SSH key found", zap.String("name", key.Name), zap.Int64("id", key.ID))
+	log.Info(" SSH key found", zap.String("name", key.Name), zap.Int64("id", key.ID))
 	return nil
 }
 

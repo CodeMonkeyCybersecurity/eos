@@ -376,7 +376,7 @@ func _configureMFAForAuthMethod(rc *eos_io.RuntimeContext, client *api.Client, a
 	case "oidc", "jwt":
 		return _configureMFAForOIDC(rc, client, authPath)
 	default:
-		log.Debug("🔍 MFA configuration not implemented for auth type",
+		log.Debug(" MFA configuration not implemented for auth type",
 			zap.String("auth_type", authType),
 			zap.String("path", authPath))
 		return nil

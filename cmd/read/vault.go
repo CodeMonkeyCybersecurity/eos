@@ -83,7 +83,7 @@ Examples:
 			options.RequireConfirm = false
 		}
 
-		log.Info("🔍 Starting secure vault init inspection",
+		log.Info(" Starting secure vault init inspection",
 			zap.Bool("redacted", options.RedactSensitive),
 			zap.String("format", options.ExportFormat),
 			zap.Bool("status_only", statusOnly))
@@ -124,7 +124,7 @@ This command demonstrates:
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := rc.Log.Named("vault.inspect")
 
-		logger.Info("🔍 Starting vault secrets inspection with enhanced architecture")
+		logger.Info(" Starting vault secrets inspection with enhanced architecture")
 
 		// Create enhanced vault container
 		vaultContainer, err := vault.NewEnhancedVaultContainer(rc)
@@ -351,7 +351,7 @@ func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOption
 func displayStatusOnly(info *vault.VaultInitInfo) error {
 	// Note: This function doesn't have access to RuntimeContext, so we'll use a fallback logger
 	// In a proper implementation, this function should accept RuntimeContext as parameter
-	fmt.Println("\n🔍 Vault Status Overview")
+	fmt.Println("\n Vault Status Overview")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Display file information

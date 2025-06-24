@@ -11,7 +11,7 @@ import (
 )
 
 func loadFromEnv(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
-	otelzap.Ctx(rc.Ctx).Debug("🔍 Attempting to load LDAP config from environment variables")
+	otelzap.Ctx(rc.Ctx).Debug(" Attempting to load LDAP config from environment variables")
 
 	fqdn := os.Getenv("LDAP_FQDN")
 	if fqdn == "" {
@@ -36,7 +36,7 @@ func loadFromEnv(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 }
 
 func tryDetectFromHost(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
-	otelzap.Ctx(rc.Ctx).Debug("🔍 Attempting to detect LDAP config from host environment")
+	otelzap.Ctx(rc.Ctx).Debug(" Attempting to detect LDAP config from host environment")
 
 	cfg := TryDetectFromHost()
 	if cfg == nil {
@@ -49,7 +49,7 @@ func tryDetectFromHost(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 }
 
 func tryDetectFromContainer(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
-	otelzap.Ctx(rc.Ctx).Debug("🔍 Attempting to detect LDAP config from container environment")
+	otelzap.Ctx(rc.Ctx).Debug(" Attempting to detect LDAP config from container environment")
 
 	cfg := TryDetectFromContainer()
 	if cfg == nil {

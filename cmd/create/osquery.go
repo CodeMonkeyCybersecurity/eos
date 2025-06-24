@@ -27,7 +27,7 @@ var createOsQueryCmd = &cobra.Command{
 
 		// Log user context and command details
 		pwd, _ := os.Getwd()
-		logger.Info("🔍 Starting osquery installation",
+		logger.Info(" Starting osquery installation",
 			zap.String("user", os.Getenv("USER")),
 			zap.String("pwd", pwd),
 			zap.String("command_line", strings.Join(os.Args, " ")),
@@ -153,7 +153,7 @@ var createOsQueryCmd = &cobra.Command{
 		}
 
 		// Verify installation
-		logger.Info("🔍 Verifying osquery installation")
+		logger.Info(" Verifying osquery installation")
 		if err := osquery.VerifyOsqueryInstallation(rc); err != nil {
 			logger.Warn("Installation verification had warnings",
 				zap.Error(err),

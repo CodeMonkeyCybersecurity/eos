@@ -146,7 +146,7 @@ var MyCmd = &cobra.Command{
 logger := otelzap.Ctx(rc.Ctx)
 
 // Function entry with context
-logger.Info("🔍 Starting operation", 
+logger.Info(" Starting operation", 
     zap.String("user", os.Getenv("USER")),
     zap.String("function", "functionName"))
 

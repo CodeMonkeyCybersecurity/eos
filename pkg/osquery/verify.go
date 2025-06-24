@@ -17,7 +17,7 @@ import (
 // verifyLinuxInstallation verifies osquery installation on Linux
 func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying osquery installation on Linux")
+	logger.Info(" Verifying osquery installation on Linux")
 
 	// Check osqueryi version
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -86,7 +86,7 @@ func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 // RunOsqueryQuery executes a query using osqueryi
 func RunOsqueryQuery(rc *eos_io.RuntimeContext, query string) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Running osquery query",
+	logger.Info(" Running osquery query",
 		zap.String("query", query))
 
 	output, err := execute.Run(rc.Ctx, execute.Options{

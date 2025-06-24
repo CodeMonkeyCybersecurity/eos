@@ -69,7 +69,7 @@ func GetCert(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return cerr.Wrap(err, "failed to get certificate")
 	}
-	fmt.Printf("🔍 Got certificate: %s (ID: %d)\n", cert.Name, cert.ID)
+	fmt.Printf(" Got certificate: %s (ID: %d)\n", cert.Name, cert.ID)
 	return nil
 }
 
@@ -126,7 +126,7 @@ func GetAnAction(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return cerr.Wrap(err, "failed to get certificate action")
 	}
-	fmt.Printf("🎯 Cert Action ID %d: %s (%s)\n", action.ID, action.Command, action.Status)
+	fmt.Printf(" Cert Action ID %d: %s (%s)\n", action.ID, action.Command, action.Status)
 	return nil
 }
 

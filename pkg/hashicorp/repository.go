@@ -29,7 +29,7 @@ func InstallGPGKey(rc *eos_io.RuntimeContext) error {
 		zap.String("key_path", hashicorpKeyPath))
 
 	distro := platform.DetectLinuxDistro(rc)
-	logger.Info("🔍 Configuring GPG key for distribution", zap.String("distro", distro))
+	logger.Info(" Configuring GPG key for distribution", zap.String("distro", distro))
 
 	switch distro {
 	case "debian":
@@ -100,7 +100,7 @@ func AddRepository(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Adding HashiCorp package repository")
 
 	distro := platform.DetectLinuxDistro(rc)
-	logger.Info("🔍 Configuring repository for distribution", zap.String("distro", distro))
+	logger.Info(" Configuring repository for distribution", zap.String("distro", distro))
 
 	switch distro {
 	case "debian":
@@ -139,7 +139,7 @@ func addDebianRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 	}
 
 	codename := output
-	logger.Info("🔍 Detected distribution codename", zap.String("codename", codename))
+	logger.Info(" Detected distribution codename", zap.String("codename", codename))
 
 	// Create repository configuration
 	repoConfig := fmt.Sprintf("deb [signed-by=%s] https://apt.releases.hashicorp.com %s main",
@@ -216,7 +216,7 @@ func RemoveRepository(rc *eos_io.RuntimeContext) error {
 	logger.Info("🗑️ Removing HashiCorp package repository")
 
 	distro := platform.DetectLinuxDistro(rc)
-	logger.Info("🔍 Removing repository for distribution", zap.String("distro", distro))
+	logger.Info(" Removing repository for distribution", zap.String("distro", distro))
 
 	var repoPath string
 	switch distro {

@@ -127,7 +127,7 @@ func CheckVaultHealth(rc *eos_io.RuntimeContext) (bool, error) {
 }
 
 func isVaultProcessRunning(rc *eos_io.RuntimeContext) bool {
-	otelzap.Ctx(rc.Ctx).Debug("🔍 Checking Vault process using lsof")
+	otelzap.Ctx(rc.Ctx).Debug(" Checking Vault process using lsof")
 	out, err := exec.Command("lsof", "-i", shared.VaultDefaultPort).Output()
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("lsof command failed (process check skipped)", zap.Error(err))

@@ -54,7 +54,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		user = os.Getenv("USERNAME") // Windows fallback
 	}
 
-	logger.Info("🔍 Starting infrastructure inspection",
+	logger.Info(" Starting infrastructure inspection",
 		zap.String("user", user),
 		zap.String("pwd", pwd),
 		zap.String("command_line", strings.Join(os.Args, " ")),

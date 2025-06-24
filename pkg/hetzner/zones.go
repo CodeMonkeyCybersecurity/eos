@@ -110,7 +110,7 @@ func (c *DNSClient) GetZone(rc *eos_io.RuntimeContext, zoneID string) (*DNSZone,
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("🔍 Retrieved zone", zap.String("id", result.Zone.ID))
+	c.Log.Info(" Retrieved zone", zap.String("id", result.Zone.ID))
 	return &result.Zone, nil
 }
 

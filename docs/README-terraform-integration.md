@@ -130,7 +130,7 @@ eos create terraform-deploy --auto-approve [directory]
 - **MetalLB**: LoadBalancer services for K3s
 - **Stalwart**: Modern mail server (optional)
 
-## 🎯 Use Cases
+##  Use Cases
 
 ### 1. Mail Server Deployment
 Perfect for deploying production mail servers with familiar reverse proxy tools:
@@ -311,7 +311,7 @@ eos create terraform-deploy .
 4. **Rollback Capable**: Revert to previous working configurations
 5. **Documentation**: Infrastructure configuration is self-documenting
 
-## 🔍 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 

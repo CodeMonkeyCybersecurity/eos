@@ -15,7 +15,7 @@ import (
 // DEPRECATED: Use pkg/eos_unix for process management operations
 func GrepProcess(ctx context.Context, keyword string) (string, error) {
 	logger := otelzap.Ctx(ctx)
-	logger.Debug("🔍 Searching for processes", zap.String("keyword", keyword))
+	logger.Debug(" Searching for processes", zap.String("keyword", keyword))
 
 	// Use shell mode for piping - but this is inherently less secure
 	// Better approach would be to use eos_unix package which has proper process handling

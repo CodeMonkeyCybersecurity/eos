@@ -459,7 +459,7 @@ class ABTestAnalyzer:
         print(f"Total Cost: ${cost_analysis['summary']['total_cost_usd']:.4f}")
         print(f"Avg Cost per Request: ${cost_analysis['summary']['avg_cost_per_request']:.4f}")
         
-        print(f"\n🎯 RECOMMENDATIONS:")
+        print(f"\n RECOMMENDATIONS:")
         print("-" * 18)
         for i, rec in enumerate(recommendations, 1):
             print(f"{i}. {rec}")

@@ -141,7 +141,7 @@ func EnsureSudoersEntryForEos(ctx context.Context, auto bool) error {
 	const path = shared.EosSudoersPath
 	const entry = shared.SudoersEosEntry
 
-	otelzap.Ctx(ctx).Info("🔍 Checking for existing sudoers entry", zap.String("path", path))
+	otelzap.Ctx(ctx).Info(" Checking for existing sudoers entry", zap.String("path", path))
 	if _, err := os.Stat(path); err == nil {
 		otelzap.Ctx(ctx).Info(" Sudoers file for eos already exists", zap.String("path", path))
 		return nil

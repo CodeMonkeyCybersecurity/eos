@@ -109,7 +109,7 @@ The entities file provides comprehensive domain models including:
 - **20+ Enum Types**: Type-safe status and configuration values
 - **40+ Filter Types**: Flexible query and search capabilities
 
-### 🎯 **Next Steps**
+###  **Next Steps**
 
 1. **Service Implementation**: Create infrastructure implementations for the interfaces
 2. **Repository Implementation**: Implement persistence layer with database adapters

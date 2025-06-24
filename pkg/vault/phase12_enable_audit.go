@@ -25,7 +25,7 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 I
 	}
 
 	// Check if the audit device is already enabled
-	log.Info("🔍 Listing current audit devices")
+	log.Info(" Listing current audit devices")
 	audits, err := client.Sys().ListAudit()
 	if err != nil {
 		log.Error(" Failed to list audit devices", zap.Error(err))

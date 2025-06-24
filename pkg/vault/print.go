@@ -29,7 +29,7 @@ func PrintNextSteps(ctx context.Context) {
 	_, _ = fmt.Fprintln(os.Stderr, "    sudo eos read vault-init")
 	_, _ = fmt.Fprintln(os.Stderr, "\nMake sure no one is looking over your shoulder when you do this!")
 
-	_, _ = fmt.Fprintln(os.Stderr, "\n➡️ NEXT STEPS:")
+	_, _ = fmt.Fprintln(os.Stderr, "\n NEXT STEPS:")
 	_, _ = fmt.Fprintln(os.Stderr, "View and securely record the keys now. You will need them in the next step.")
 	_, _ = fmt.Fprintln(os.Stderr, "Run:")
 	_, _ = fmt.Fprintln(os.Stderr, "    sudo eos enable vault")

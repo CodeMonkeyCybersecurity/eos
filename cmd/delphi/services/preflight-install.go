@@ -45,7 +45,7 @@ Requires sudo privileges for system-wide installation.`,
 
 		// Detect OS and use appropriate installation method
 		os := runtime.GOOS
-		logger.Info("🔍 Detected operating system", zap.String("os", os))
+		logger.Info(" Detected operating system", zap.String("os", os))
 
 		// Check Python version
 		pythonCmd := exec.Command("python3", "--version")
@@ -167,7 +167,7 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 		logger.Error(" pip3 not found", zap.Error(err))
 		return err
 	}
-	logger.Info("🔍 Found pip3", zap.String("path", pip3Path))
+	logger.Info(" Found pip3", zap.String("path", pip3Path))
 
 	// Build install command
 	var installArgs []string
@@ -214,7 +214,7 @@ func isDebianBased() bool {
 
 // verifyAllPackages verifies that all required packages can be imported
 func verifyAllPackages(logger otelzap.LoggerWithCtx) error {
-	logger.Info("🔍 Verifying package installation")
+	logger.Info(" Verifying package installation")
 
 	packages := map[string]string{
 		"psycopg2-binary": "psycopg2",

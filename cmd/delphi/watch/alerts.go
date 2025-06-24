@@ -59,7 +59,7 @@ Example:
   eos delphi watch alerts --limit 20 --refresh 2`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔍 Starting alerts watch",
+			logger.Info(" Starting alerts watch",
 				zap.Int("limit", limit),
 				zap.Int("refresh_seconds", refresh))
 
@@ -182,7 +182,7 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
 
-	fmt.Printf("🔍 Delphi Alerts Monitor - Last %d alerts (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
+	fmt.Printf(" Delphi Alerts Monitor - Last %d alerts (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
 	fmt.Println(strings.Repeat("=", 120))
 
 	// Query recent alerts

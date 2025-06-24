@@ -57,7 +57,7 @@ func PhaseInstallVault(rc *eos_io.RuntimeContext) error {
 // InstallVaultViaApt ensures the Vault binary is installed on Debian-based systems via APT.
 // It adds the official HashiCorp repository if needed, installs Vault, and verifies the binary path.
 func InstallVaultViaApt(rc *eos_io.RuntimeContext) error {
-	otelzap.Ctx(rc.Ctx).Info("🔍 Checking if Vault is already installed via apt")
+	otelzap.Ctx(rc.Ctx).Info(" Checking if Vault is already installed via apt")
 	if _, err := exec.LookPath("vault"); err == nil {
 		otelzap.Ctx(rc.Ctx).Info(" Vault is already installed")
 		return nil
@@ -139,7 +139,7 @@ func InstallVaultViaApt(rc *eos_io.RuntimeContext) error {
 }
 
 func InstallVaultViaDnf(rc *eos_io.RuntimeContext) error {
-	otelzap.Ctx(rc.Ctx).Info("🔍 Checking if Vault is already installed via dnf")
+	otelzap.Ctx(rc.Ctx).Info(" Checking if Vault is already installed via dnf")
 	if _, err := exec.LookPath("vault"); err == nil {
 		otelzap.Ctx(rc.Ctx).Info(" Vault is already installed")
 		return nil

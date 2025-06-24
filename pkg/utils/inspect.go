@@ -15,7 +15,7 @@ func InspectCertificates(ctx context.Context) {
 	logger := otelzap.Ctx(ctx)
 	certsDir := "/opt/hecate/certs"
 
-	logger.Info("🔍 Inspecting Certificates", zap.String("directory", certsDir))
+	logger.Info(" Inspecting Certificates", zap.String("directory", certsDir))
 
 	files, err := os.ReadDir(certsDir)
 	if err != nil {
@@ -38,7 +38,7 @@ func InspectDockerCompose(ctx context.Context) {
 	logger := otelzap.Ctx(ctx)
 	configFile := "/opt/hecate/docker-compose.yml"
 
-	logger.Info("🔍 Inspecting docker-compose file", zap.String("file", configFile))
+	logger.Info(" Inspecting docker-compose file", zap.String("file", configFile))
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {
@@ -53,7 +53,7 @@ func InspectEosConfig(ctx context.Context) {
 	logger := otelzap.Ctx(ctx)
 	confDir := "/opt/hecate/assets/conf.d"
 
-	logger.Info("🔍 Inspecting Eos backend configuration", zap.String("directory", confDir))
+	logger.Info(" Inspecting Eos backend configuration", zap.String("directory", confDir))
 
 	files, err := os.ReadDir(confDir)
 	if err != nil {
@@ -80,7 +80,7 @@ func InspectNginxDefaults(ctx context.Context) {
 	logger := otelzap.Ctx(ctx)
 	configFile := "/opt/hecate/nginx.conf"
 
-	logger.Info("🔍 Inspecting Nginx configuration", zap.String("file", configFile))
+	logger.Info(" Inspecting Nginx configuration", zap.String("file", configFile))
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {

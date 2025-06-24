@@ -245,7 +245,7 @@ func EnableAppRoleAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 	// Log client details before making API call
 	if token := client.Token(); token != "" {
-		log.Info("🔍 Making API call to enable AppRole auth",
+		log.Info(" Making API call to enable AppRole auth",
 			zap.String("vault_addr", client.Address()),
 			zap.String("api_endpoint", "POST /v1/sys/auth/approle"))
 	} else {

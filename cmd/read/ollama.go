@@ -24,7 +24,7 @@ var InspectOllamaCmd = &cobra.Command{
 			return fmt.Errorf(" Ollama inspection is only supported on macOS")
 		}
 
-		log.Info("🔍 Inspecting Docker container for Ollama Web UI...")
+		log.Info(" Inspecting Docker container for Ollama Web UI...")
 		out, err := execute.RunShell(rc.Ctx, "docker ps --filter name=ollama-webui")
 		if err != nil {
 			return fmt.Errorf("failed to inspect container: %w", err)

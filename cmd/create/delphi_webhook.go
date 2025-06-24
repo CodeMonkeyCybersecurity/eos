@@ -110,7 +110,7 @@ func deployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 	}
 
 	if dryRun {
-		logger.Info("🔍 DRY RUN - would perform the following actions:")
+		logger.Info(" DRY RUN - would perform the following actions:")
 		logger.Info(" Copy files:",
 			zap.String("python", fmt.Sprintf("%s → %s", pythonScript, pythonDest)),
 			zap.String("bash", fmt.Sprintf("%s → %s", bashScript, bashDest)))

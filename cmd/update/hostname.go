@@ -26,7 +26,7 @@ var UpdateHostnameCmd = &cobra.Command{
 // UpdateHostname updates the system hostname
 func UpdateHostname(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Starting hostname update",
+	logger.Info(" Starting hostname update",
 		zap.String("user", os.Getenv("USER")),
 		zap.String("function", "UpdateHostname"))
 

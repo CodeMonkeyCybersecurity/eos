@@ -84,7 +84,7 @@ Examples:
 
 		// Analyze environment if requested or if it's a technical question
 		if analyze || containsTechnicalTerms(question) {
-			fmt.Println("🔍 Analyzing current environment...")
+			fmt.Println(" Analyzing current environment...")
 
 			analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 			env, err := analyzer.AnalyzeEnvironment(rc)
@@ -180,7 +180,7 @@ Examples:
 
 		logger.Info("Starting infrastructure analysis", zap.String("directory", workingDir))
 
-		fmt.Println("🔍 Analyzing infrastructure environment...")
+		fmt.Println(" Analyzing infrastructure environment...")
 		fmt.Printf(" Working directory: %s\n\n", workingDir)
 
 		// Analyze environment
@@ -259,7 +259,7 @@ Examples:
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Always analyze environment for fix requests
-		fmt.Println("🔍 Gathering environment context...")
+		fmt.Println(" Gathering environment context...")
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 		env, err := analyzer.AnalyzeEnvironment(rc)
 		if err != nil {
@@ -355,7 +355,7 @@ Example:
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Initial environment analysis
-		fmt.Println("🔍 Analyzing environment...")
+		fmt.Println(" Analyzing environment...")
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 		env, err := analyzer.AnalyzeEnvironment(rc)
 		if err != nil {
@@ -398,7 +398,7 @@ Examples:
 		fmt.Println(" AI Action Implementation")
 		fmt.Printf("Working directory: %s\n", workingDir)
 		if dryRun {
-			fmt.Println("🔍 DRY RUN MODE - No actual changes will be made")
+			fmt.Println(" DRY RUN MODE - No actual changes will be made")
 		}
 		fmt.Println()
 
@@ -792,7 +792,7 @@ func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
 			fmt.Printf("    Vault: %s\n", status)
 		}
 		if infra.ConsulStatus != nil && infra.ConsulStatus.Leader != "" {
-			fmt.Printf("   🔍 Consul:  Ready (leader: %s)\n", infra.ConsulStatus.Leader)
+			fmt.Printf("    Consul:  Ready (leader: %s)\n", infra.ConsulStatus.Leader)
 		}
 		fmt.Println()
 	}
@@ -836,7 +836,7 @@ func startInteractiveChat(rc *eos_io.RuntimeContext, assistant *ai.AIAssistant, 
 
 		// Special commands
 		if strings.ToLower(input) == "analyze" {
-			fmt.Println("🔍 Re-analyzing environment...")
+			fmt.Println(" Re-analyzing environment...")
 			analyzer := ai.NewEnvironmentAnalyzer(ctx.Environment.WorkingDirectory)
 			if env, err := analyzer.AnalyzeEnvironment(rc); err == nil {
 				ctx.Environment = env

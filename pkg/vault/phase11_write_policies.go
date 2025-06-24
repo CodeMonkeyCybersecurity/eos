@@ -61,7 +61,7 @@ func EnsurePolicy(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("failed to write policy %s to Vault: %w", policy.name, err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("🔍 Verifying policy write", zap.String("policy", policy.name))
+		otelzap.Ctx(rc.Ctx).Info(" Verifying policy write", zap.String("policy", policy.name))
 		storedPol, err := client.Sys().GetPolicy(policy.name)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error(" Failed to retrieve policy for verification", zap.String("policy", policy.name), zap.Error(err))

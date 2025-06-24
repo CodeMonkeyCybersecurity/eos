@@ -59,7 +59,7 @@ Example:
   eos delphi watch agents --limit 25 --refresh 3`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔍 Starting agents watch",
+			logger.Info(" Starting agents watch",
 				zap.Int("limit", limit),
 				zap.Int("refresh_seconds", refresh))
 

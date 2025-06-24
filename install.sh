@@ -83,17 +83,17 @@ install_go() {
 
   # Check if Go needs to be installed or updated
   if ! command -v go >/dev/null 2>&1; then
-    log INFO "➡️ Go is not installed"
+    log INFO " Go is not installed"
     need_go_install=true
   else
     current_version=$(go version | awk '{print $3}' | sed 's/go//')
-    log INFO "➡️ Detected Go version: $current_version"
+    log INFO " Detected Go version: $current_version"
     
     # Simple version comparison - check if current version is at least the required version
     if printf '%s\n%s\n' "$GO_VERSION" "$current_version" | sort -V | head -n1 | grep -q "^$GO_VERSION$"; then
       log INFO " Go is already up-to-date (version $current_version >= $GO_VERSION)"
     else
-      log INFO "➡️ Go version is older (wanted: $GO_VERSION, found: $current_version)"
+      log INFO " Go version is older (wanted: $GO_VERSION, found: $current_version)"
       need_go_install=true
     fi
   fi
@@ -170,7 +170,7 @@ install_github_cli() {
     return
   fi
   
-  log INFO "➡️ Installing GitHub CLI..."
+  log INFO " Installing GitHub CLI..."
   
   if $IS_MAC; then
     if ! command -v brew >/dev/null 2>&1; then
@@ -272,7 +272,7 @@ build_eos_binary() {
 
 show_existing_checksum() {
   if [ -f "$INSTALL_PATH" ]; then
-    log INFO "🔍 Existing installed binary SHA256:"
+    log INFO " Existing installed binary SHA256:"
     # Use command -v for robustness, or ensure shasum is on Mac
     command -v sha256sum >/dev/null && sha256sum "$INSTALL_PATH" || shasum -a 256 "$INSTALL_PATH"
   else
@@ -281,7 +281,7 @@ show_existing_checksum() {
 }
 
 install_binary() {
-  log INFO "🚚 Installing to $INSTALL_PATH"
+  log INFO " Installing to $INSTALL_PATH"
   if $IS_MAC; then
     # On macOS, sudo is typically implied for /usr/local/bin
     sudo rm -rf "$INSTALL_PATH" || log ERR "Failed to remove existing binary at $INSTALL_PATH. Permissions issue?"
@@ -302,7 +302,7 @@ install_binary() {
 }
 
 show_new_checksum() {
-  log INFO "🔍 New installed binary SHA256:"
+  log INFO " New installed binary SHA256:"
   command -v sha256sum >/dev/null && sha256sum "$INSTALL_PATH" || shasum -a 256 "$INSTALL_PATH"
 }
 

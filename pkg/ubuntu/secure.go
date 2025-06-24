@@ -33,25 +33,25 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 	}
 
 	// 1. Configure auditd
-	logger.Info("🔍 Installing and configuring auditd")
+	logger.Info(" Installing and configuring auditd")
 	if err := configureAuditd(rc); err != nil {
 		return fmt.Errorf("configure auditd: %w", err)
 	}
 
 	// 2. Install osquery
-	logger.Info("🔍 Installing osquery")
+	logger.Info(" Installing osquery")
 	if err := installOsquery(rc); err != nil {
 		return fmt.Errorf("install osquery: %w", err)
 	}
 
 	// 3. Install and configure AIDE
-	logger.Info("🔍 Installing AIDE for file integrity monitoring")
+	logger.Info(" Installing AIDE for file integrity monitoring")
 	if err := configureAIDE(rc); err != nil {
 		return fmt.Errorf("configure AIDE: %w", err)
 	}
 
 	// 4. Install Lynis
-	logger.Info("🔍 Installing Lynis security auditing tool")
+	logger.Info(" Installing Lynis security auditing tool")
 	if err := installLynis(rc); err != nil {
 		return fmt.Errorf("install Lynis: %w", err)
 	}

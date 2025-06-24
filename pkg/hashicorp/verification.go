@@ -25,7 +25,7 @@ type VerificationResult struct {
 // VerifyInstallation verifies that a HashiCorp tool was installed correctly
 func VerifyInstallation(rc *eos_io.RuntimeContext, tool string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying HashiCorp tool installation", zap.String("tool", tool))
+	logger.Info(" Verifying HashiCorp tool installation", zap.String("tool", tool))
 
 	result := &VerificationResult{
 		Tool: tool,
@@ -67,7 +67,7 @@ func VerifyInstallation(rc *eos_io.RuntimeContext, tool string) error {
 // VerifyAllInstallations verifies all installed HashiCorp tools
 func VerifyAllInstallations(rc *eos_io.RuntimeContext) ([]VerificationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying all HashiCorp tool installations",
+	logger.Info(" Verifying all HashiCorp tool installations",
 		zap.Strings("tools", SupportedHCLTools))
 
 	results := make([]VerificationResult, 0, len(SupportedHCLTools))
@@ -77,7 +77,7 @@ func VerifyAllInstallations(rc *eos_io.RuntimeContext) ([]VerificationResult, er
 			Tool: tool,
 		}
 
-		logger.Info("🔍 Verifying tool", zap.String("tool", tool))
+		logger.Info(" Verifying tool", zap.String("tool", tool))
 
 		// Check if binary exists
 		if err := verifyBinaryExists(rc, tool, &result); err != nil {
@@ -125,7 +125,7 @@ func VerifyAllInstallations(rc *eos_io.RuntimeContext) ([]VerificationResult, er
 // verifyBinaryExists checks if the tool binary is available and executable
 func verifyBinaryExists(rc *eos_io.RuntimeContext, tool string, result *VerificationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("🔍 Checking binary existence", zap.String("tool", tool))
+	logger.Debug(" Checking binary existence", zap.String("tool", tool))
 
 	// Check if command exists using which
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -152,7 +152,7 @@ func verifyBinaryExists(rc *eos_io.RuntimeContext, tool string, result *Verifica
 // verifyVersion gets and validates the version information
 func verifyVersion(rc *eos_io.RuntimeContext, tool string, result *VerificationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("🔍 Getting version information", zap.String("tool", tool))
+	logger.Debug(" Getting version information", zap.String("tool", tool))
 
 	// Most HashiCorp tools support --version or version subcommand
 	versionArgs := []string{"--version"}
@@ -188,7 +188,7 @@ func verifyVersion(rc *eos_io.RuntimeContext, tool string, result *VerificationR
 // verifyToolSpecific performs tool-specific verification checks
 func verifyToolSpecific(rc *eos_io.RuntimeContext, tool string, result *VerificationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Debug("🔍 Performing tool-specific verification", zap.String("tool", tool))
+	logger.Debug(" Performing tool-specific verification", zap.String("tool", tool))
 
 	switch tool {
 	case "terraform":
@@ -211,7 +211,7 @@ func verifyToolSpecific(rc *eos_io.RuntimeContext, tool string, result *Verifica
 
 // verifyTerraform performs Terraform-specific verification
 func verifyTerraform(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
-	logger.Debug("🔍 Verifying Terraform configuration")
+	logger.Debug(" Verifying Terraform configuration")
 
 	// Check providers
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -233,7 +233,7 @@ func verifyTerraform(rc *eos_io.RuntimeContext, result *VerificationResult, logg
 
 // verifyVault performs Vault-specific verification
 func verifyVault(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
-	logger.Debug("🔍 Verifying Vault configuration")
+	logger.Debug(" Verifying Vault configuration")
 
 	// Check if Vault can show help (basic functionality test)
 	_, err := execute.Run(rc.Ctx, execute.Options{
@@ -251,7 +251,7 @@ func verifyVault(rc *eos_io.RuntimeContext, result *VerificationResult, logger o
 
 // verifyConsul performs Consul-specific verification
 func verifyConsul(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
-	logger.Debug("🔍 Verifying Consul configuration")
+	logger.Debug(" Verifying Consul configuration")
 
 	// Check Consul members command (basic functionality)
 	_, err := execute.Run(rc.Ctx, execute.Options{
@@ -269,7 +269,7 @@ func verifyConsul(rc *eos_io.RuntimeContext, result *VerificationResult, logger 
 
 // verifyNomad performs Nomad-specific verification
 func verifyNomad(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
-	logger.Debug("🔍 Verifying Nomad configuration")
+	logger.Debug(" Verifying Nomad configuration")
 
 	// Check Nomad help
 	_, err := execute.Run(rc.Ctx, execute.Options{
@@ -287,7 +287,7 @@ func verifyNomad(rc *eos_io.RuntimeContext, result *VerificationResult, logger o
 
 // verifyPacker performs Packer-specific verification
 func verifyPacker(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
-	logger.Debug("🔍 Verifying Packer configuration")
+	logger.Debug(" Verifying Packer configuration")
 
 	// Check Packer plugins
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -310,7 +310,7 @@ func verifyPacker(rc *eos_io.RuntimeContext, result *VerificationResult, logger 
 
 // verifyBoundary performs Boundary-specific verification
 func verifyBoundary(rc *eos_io.RuntimeContext, result *VerificationResult, logger otelzap.LoggerWithCtx) error {
-	logger.Debug("🔍 Verifying Boundary configuration")
+	logger.Debug(" Verifying Boundary configuration")
 
 	// Check Boundary help
 	_, err := execute.Run(rc.Ctx, execute.Options{

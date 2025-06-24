@@ -392,7 +392,7 @@ fi
 	}
 
 	fmt.Printf("\n K3s + Caddy + Nginx configuration generated in: %s\n", outputDir)
-	fmt.Println("\n🎯 What you get:")
+	fmt.Println("\n What you get:")
 	fmt.Println("  • K3s cluster without Traefik")
 	fmt.Println("  • Caddy for HTTP/HTTPS ingress (familiar reverse proxy)")
 	fmt.Println("  • Nginx for mail protocols (SMTP/IMAP/POP3)")

@@ -2,7 +2,7 @@
 
 This guide provides a comprehensive strategy for implementing and prioritizing tests in the Eos project.
 
-## 🎯 Testing Prioritization Framework
+##  Testing Prioritization Framework
 
 ### Priority 1: Critical Security & Infrastructure (Target: 95%+ coverage)
 
