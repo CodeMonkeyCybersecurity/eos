@@ -5,6 +5,7 @@ package osquery
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -168,19 +169,69 @@ func configureMacOSService(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Load and start the LaunchDaemon
-	logger.Info("🚀 Loading osquery LaunchDaemon")
+	logger.Info("🚀 Configuring osquery LaunchDaemon")
 	plistPath := "/Library/LaunchDaemons/com.facebook.osqueryd.plist"
 	
-	// Unload if already loaded
-	if err := execute.RunSimple(rc.Ctx, "sudo", "launchctl", "unload", plistPath); err != nil {
-		logger.Debug("🔄 Service was not previously loaded", zap.Error(err))
+	// Check if plist exists first
+	if _, err := os.Stat(plistPath); err != nil {
+		logger.Error("❌ LaunchDaemon plist not found",
+			zap.String("path", plistPath),
+			zap.Error(err),
+			zap.String("troubleshooting", "osquery installation may be incomplete"))
+		return fmt.Errorf("launchd plist not found: %w", err)
+	}
+	
+	// Check current user context for proper launchctl operations
+	currentUser := os.Getenv("USER")
+	isRoot := os.Getuid() == 0
+	
+	logger.Info("🔍 Service configuration context",
+		zap.String("user", currentUser),
+		zap.Bool("is_root", isRoot),
+		zap.String("plist_path", plistPath))
+	
+	// Try to unload if already loaded (ignore errors as it may not be loaded)
+	logger.Info("🔄 Attempting to unload existing service")
+	if isRoot {
+		if err := execute.RunSimple(rc.Ctx, "launchctl", "bootout", "system", plistPath); err != nil {
+			logger.Debug("🔄 Service was not previously loaded or bootout failed", zap.Error(err))
+		}
+	} else {
+		if err := execute.RunSimple(rc.Ctx, "sudo", "launchctl", "bootout", "system", plistPath); err != nil {
+			logger.Debug("🔄 Service was not previously loaded or bootout failed", zap.Error(err))
+		}
 	}
 	
 	// Load the daemon
-	if err := execute.RunSimple(rc.Ctx, "sudo", "launchctl", "load", "-w", plistPath); err != nil {
-		logger.Warn("⚠️ Failed to load osquery LaunchDaemon",
-			zap.Error(err),
-			zap.String("note", "Service may need manual configuration"))
+	logger.Info("🚀 Loading osquery LaunchDaemon")
+	var loadErr error
+	if isRoot {
+		loadErr = execute.RunSimple(rc.Ctx, "launchctl", "bootstrap", "system", plistPath)
+	} else {
+		loadErr = execute.RunSimple(rc.Ctx, "sudo", "launchctl", "bootstrap", "system", plistPath)
+	}
+	
+	if loadErr != nil {
+		logger.Warn("⚠️ Failed to load osquery LaunchDaemon using bootstrap, trying legacy load",
+			zap.Error(loadErr))
+		
+		// Fallback to legacy load command
+		if isRoot {
+			loadErr = execute.RunSimple(rc.Ctx, "launchctl", "load", "-w", plistPath)
+		} else {
+			loadErr = execute.RunSimple(rc.Ctx, "sudo", "launchctl", "load", "-w", plistPath)
+		}
+		
+		if loadErr != nil {
+			logger.Warn("⚠️ Failed to load osquery LaunchDaemon",
+				zap.Error(loadErr),
+				zap.String("note", "Service configuration completed but may need manual start"),
+				zap.String("manual_start", "sudo launchctl bootstrap system "+plistPath))
+		} else {
+			logger.Info("✅ osquery LaunchDaemon loaded successfully using legacy method")
+		}
+	} else {
+		logger.Info("✅ osquery LaunchDaemon loaded successfully")
 	}
 
 	return nil
@@ -202,16 +253,61 @@ func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("osqueryi verification failed: %w", err)
 	}
 
-	logger.Info("✅ osquery verified successfully",
-		zap.String("version", output))
+	// Clean up the version output and ensure it's not empty
+	version := strings.TrimSpace(output)
+	if version == "" {
+		version = "unknown"
+	}
 
-	// Check if service is running
-	if err := execute.RunSimple(rc.Ctx, "sudo", "launchctl", "list", "com.facebook.osqueryd"); err != nil {
-		logger.Warn("⚠️ osquery service not running",
-			zap.Error(err),
-			zap.String("note", "Service may need manual start"))
+	logger.Info("✅ osquery verified successfully",
+		zap.String("version", version))
+
+	// Check if service is configured and potentially running
+	currentUser := os.Getenv("USER")
+	isRoot := os.Getuid() == 0
+	
+	logger.Info("🔍 Checking service status",
+		zap.String("user", currentUser),
+		zap.Bool("is_root", isRoot))
+
+	// Try different methods to check service status
+	var serviceCheckErr error
+	
+	// Method 1: Check if service is loaded
+	if isRoot {
+		serviceCheckErr = execute.RunSimple(rc.Ctx, "launchctl", "list", "com.facebook.osqueryd")
 	} else {
-		logger.Info("✅ osquery service is running")
+		serviceCheckErr = execute.RunSimple(rc.Ctx, "sudo", "launchctl", "list", "com.facebook.osqueryd")
+	}
+	
+	if serviceCheckErr != nil {
+		// Method 2: Check if plist exists (service configured but not running)
+		plistPath := "/Library/LaunchDaemons/com.facebook.osqueryd.plist"
+		if _, err := os.Stat(plistPath); err == nil {
+			logger.Warn("⚠️ osquery service configured but not loaded",
+				zap.String("plist_path", plistPath),
+				zap.String("note", "Service can be started manually"),
+				zap.String("manual_start", "sudo launchctl bootstrap system "+plistPath))
+		} else {
+			logger.Warn("⚠️ osquery service not configured",
+				zap.Error(serviceCheckErr),
+				zap.String("note", "Installation completed but service configuration may have failed"))
+		}
+	} else {
+		logger.Info("✅ osquery service is loaded and available")
+		
+		// Additional check: verify service is actually running
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "pgrep",
+			Args:    []string{"-f", "osqueryd"},
+		})
+		if err != nil || strings.TrimSpace(output) == "" {
+			logger.Warn("⚠️ osquery service loaded but may not be actively running",
+				zap.String("note", "Check system logs for startup issues"))
+		} else {
+			logger.Info("✅ osquery daemon process is running",
+				zap.String("pid", strings.TrimSpace(output)))
+		}
 	}
 
 	return nil
