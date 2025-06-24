@@ -2,6 +2,7 @@
 [Unit]
 Description=Delphi Emailer Service
 After=network.target
+StartLimitIntervalSec=300
 
 [Service]
 Type=simple
@@ -11,7 +12,6 @@ WorkingDirectory=/home/ubuntu
 Restart=always
 RestartSec=5
 StartLimitBurst=5
-StartLimitIntervalSec=300
 MemoryMax=1G
 CPUQuota=80%
 TasksMax=100

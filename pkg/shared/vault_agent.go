@@ -49,7 +49,12 @@ auto_auth {
       remove_secret_id_file_after_reading = false
     }
   }
-  sink "{{ .SinkType }}" { config = { path = "{{ .SinkPath }}" } }
+  sink "{{ .SinkType }}" { 
+  	config = { 
+	  path = "{{ .SinkPath }}" 
+	  mode = 0600
+	} 
+  }
 }
 `
 
@@ -65,6 +70,7 @@ const AgentSystemDUnit = `[Unit]
 Description={{ .Description }}
 After=network.target
 After=systemd-tmpfiles-setup.service
+StartLimitIntervalSec=30
 
 [Service]
 User={{ .User }}
@@ -80,7 +86,6 @@ ExecStart={{ .ExecStart }}
 Restart=on-failure
 RestartSec=5
 StartLimitBurst=3
-StartLimitIntervalSec=30
 
 [Install]
 WantedBy=multi-user.target

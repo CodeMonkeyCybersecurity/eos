@@ -2,13 +2,13 @@
 [Unit]
 Description=Wazuh → Delphi webhook listener
 After=network.target
+StartLimitIntervalSec=300
 
 [Service]
 ExecStart=/usr/bin/python3 /usr/local/bin/delphi-listener.py
 Restart=always
 RestartSec=5
 StartLimitBurst=5
-StartLimitIntervalSec=300
 Type=simple
 User=stanley
 StandardOutput=journal
