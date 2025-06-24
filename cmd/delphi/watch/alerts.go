@@ -76,7 +76,11 @@ Example:
 			if err != nil {
 				return fmt.Errorf("failed to connect to database: %w", err)
 			}
-			defer db.Close()
+			defer func() {
+				if err := db.Close(); err != nil {
+					logger.Error("❌ Failed to close database connection", zap.Error(err))
+				}
+			}()
 
 			// Test connection
 			if err := db.Ping(); err != nil {
@@ -114,7 +118,11 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 			logger.Error("PostgreSQL listener error", zap.Error(err))
 		}
 	})
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			logger.Error("❌ Failed to close PostgreSQL listener", zap.Error(err))
+		}
+	}()
 
 	// Listen for new alert notifications
 	err := listener.Listen("new_alert")
@@ -192,7 +200,11 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		logger.Error("Failed to query alerts", zap.Error(err))
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Error("❌ Failed to close rows", zap.Error(err))
+		}
+	}()
 
 	// Print header
 	fmt.Printf("%-6s %-12s %-8s %-6s %-10s %-20s %-12s %-10s %-10s %-10s\n",

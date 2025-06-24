@@ -63,7 +63,11 @@ Example:
 			if err != nil {
 				return fmt.Errorf("failed to connect to database: %w", err)
 			}
-			defer db.Close()
+			defer func() {
+				if err := db.Close(); err != nil {
+					logger.Error("❌ Failed to close database connection", zap.Error(err))
+				}
+			}()
 
 			// Test connection
 			if err := db.Ping(); err != nil {
@@ -102,7 +106,11 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 			logger.Error("PostgreSQL listener error", zap.Error(err))
 		}
 	})
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			logger.Error("❌ Failed to close PostgreSQL listener", zap.Error(err))
+		}
+	}()
 
 	// Listen for alert-related notifications
 	channels := []string{"new_alert", "new_response", "alert_sent"}
@@ -189,7 +197,11 @@ func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		logger.Error("Failed to query recent alerts", zap.Error(err))
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Error("❌ Failed to close rows", zap.Error(err))
+		}
+	}()
 
 	fmt.Printf("%-6s %-12s %-5s %-10s %-8s %s\n",
 		"ID", "Agent", "Level", "State", "Time", "Description")
@@ -245,7 +257,11 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		logger.Error("Failed to query recent agents", zap.Error(err))
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Error("❌ Failed to close rows", zap.Error(err))
+		}
+	}()
 
 	fmt.Printf("%-8s %-15s %-15s %-12s %s\n",
 		"ID", "Name", "IP", "Status", "Last Seen")
@@ -298,6 +314,8 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 }
 
 func displaySummaryStats(ctx context.Context, db *sql.DB) {
+	logger := otelzap.Ctx(ctx)
+	
 	// Get alert stats
 	var alertStats struct {
 		total    int
@@ -308,15 +326,30 @@ func displaySummaryStats(ctx context.Context, db *sql.DB) {
 	}
 
 	// Total alerts
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts").Scan(&alertStats.total)
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts").Scan(&alertStats.total); err != nil {
+		logger.Error("❌ Failed to get total alerts count", zap.Error(err))
+		alertStats.total = 0
+	}
 	
 	// Alerts by state
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'new'").Scan(&alertStats.new)
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'sent'").Scan(&alertStats.sent)
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'failed'").Scan(&alertStats.failed)
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'new'").Scan(&alertStats.new); err != nil {
+		logger.Error("❌ Failed to get new alerts count", zap.Error(err))
+		alertStats.new = 0
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'sent'").Scan(&alertStats.sent); err != nil {
+		logger.Error("❌ Failed to get sent alerts count", zap.Error(err))
+		alertStats.sent = 0
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'failed'").Scan(&alertStats.failed); err != nil {
+		logger.Error("❌ Failed to get failed alerts count", zap.Error(err))
+		alertStats.failed = 0
+	}
 	
 	// Alerts in last 24h
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE ingest_timestamp > NOW() - INTERVAL '24 hours'").Scan(&alertStats.last24h)
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE ingest_timestamp > NOW() - INTERVAL '24 hours'").Scan(&alertStats.last24h); err != nil {
+		logger.Error("❌ Failed to get 24h alerts count", zap.Error(err))
+		alertStats.last24h = 0
+	}
 
 	// Get agent stats
 	var agentStats struct {
@@ -326,10 +359,22 @@ func displaySummaryStats(ctx context.Context, db *sql.DB) {
 		lastHour     int
 	}
 
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents").Scan(&agentStats.total)
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'active'").Scan(&agentStats.active)
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'disconnected'").Scan(&agentStats.disconnected)
-	db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE last_seen > NOW() - INTERVAL '1 hour'").Scan(&agentStats.lastHour)
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents").Scan(&agentStats.total); err != nil {
+		logger.Error("❌ Failed to get total agents count", zap.Error(err))
+		agentStats.total = 0
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'active'").Scan(&agentStats.active); err != nil {
+		logger.Error("❌ Failed to get active agents count", zap.Error(err))
+		agentStats.active = 0
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'disconnected'").Scan(&agentStats.disconnected); err != nil {
+		logger.Error("❌ Failed to get disconnected agents count", zap.Error(err))
+		agentStats.disconnected = 0
+	}
+	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE last_seen > NOW() - INTERVAL '1 hour'").Scan(&agentStats.lastHour); err != nil {
+		logger.Error("❌ Failed to get recent agents count", zap.Error(err))
+		agentStats.lastHour = 0
+	}
 
 	fmt.Printf("📈 Alerts: %d total | %d new | %d sent | %d failed | %d (24h) | "+
 		"Agents: %d total | %d active | %d disconnected | %d (1h)",

@@ -30,13 +30,25 @@ func Init(service string) error {
 		return nil
 	}
 
-	// Create telemetry log directory
-	telemetryDir := "/var/log/eos"
+	// Create telemetry log directory with fallback chain
+	var telemetryDir string
+	var dirErr error
+	
+	// Try system directory first
+	telemetryDir = "/var/log/eos"
 	if err := os.MkdirAll(telemetryDir, 0755); err != nil {
-		// Fallback to user home if system directory fails
+		// Fallback to user home
 		telemetryDir = filepath.Join(os.Getenv("HOME"), ".eos", "telemetry")
 		if err := os.MkdirAll(telemetryDir, 0755); err != nil {
-			return cerr.Wrap(err, "failed to create telemetry directory")
+			// Final fallback to temp directory for tests
+			telemetryDir = filepath.Join(os.TempDir(), "eos-telemetry")
+			if dirErr = os.MkdirAll(telemetryDir, 0755); dirErr != nil {
+				// If all fallbacks fail, use no-op tracer
+				tp := noop.NewTracerProvider()
+				otel.SetTracerProvider(tp)
+				tracer = tp.Tracer(service)
+				return nil
+			}
 		}
 	}
 
@@ -44,7 +56,11 @@ func Init(service string) error {
 	telemetryFile := filepath.Join(telemetryDir, "telemetry.jsonl")
 	file, err := os.OpenFile(telemetryFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		return cerr.Wrap(err, "failed to open telemetry file")
+		// If file opening fails, use no-op tracer
+		tp := noop.NewTracerProvider()
+		otel.SetTracerProvider(tp)
+		tracer = tp.Tracer(service)
+		return nil
 	}
 
 	// Use stdout exporter but write to file instead of stdout

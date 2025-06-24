@@ -4,6 +4,7 @@ package self
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -171,7 +172,8 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			// Log error but don't fail the operation
+			logger := otelzap.Ctx(context.Background())
+			logger.Warn("⚠️ Failed to close telemetry file", zap.Error(err))
 		}
 	}()
 	

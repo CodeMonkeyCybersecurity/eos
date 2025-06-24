@@ -76,7 +76,11 @@ Example:
 			if err != nil {
 				return fmt.Errorf("failed to connect to database: %w", err)
 			}
-			defer db.Close()
+			defer func() {
+				if err := db.Close(); err != nil {
+					logger.Error("❌ Failed to close database connection", zap.Error(err))
+				}
+			}()
 
 			// Test connection
 			if err := db.Ping(); err != nil {
@@ -154,7 +158,11 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		logger.Error("Failed to query agents", zap.Error(err))
 		return
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			logger.Error("❌ Failed to close rows", zap.Error(err))
+		}
+	}()
 
 	// Print header
 	fmt.Printf("%-8s %-15s %-15s %-20s %-12s %-12s %-15s %-12s %-15s %-12s\n",
