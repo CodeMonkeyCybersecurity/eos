@@ -94,21 +94,21 @@ func runMapping(rc *eos_io.RuntimeContext) {
 
 		mappings := getMappings(agent.OS.Name)
 		if mappings == nil {
-			fmt.Printf("  ❌ No mapping for distribution: %s\n", agent.OS.Name)
+			fmt.Printf("   No mapping for distribution: %s\n", agent.OS.Name)
 			continue
 		}
 
 		major, err := getMajorVersion(agent.OS.Version)
 		if err != nil {
-			fmt.Printf("  ⚠️  Could not parse version: %v\n", err)
+			fmt.Printf("   Could not parse version: %v\n", err)
 			continue
 		}
 
 		pkg := matchPackage(mappings, strings.ToLower(agent.OS.Architecture), major)
 		if pkg == "" {
-			fmt.Printf("  ❌ No suitable package for version %s (%s)\n", agent.OS.Version, agent.OS.Architecture)
+			fmt.Printf("   No suitable package for version %s (%s)\n", agent.OS.Version, agent.OS.Architecture)
 		} else {
-			fmt.Printf("  ✅ Recommended package: %s\n", pkg)
+			fmt.Printf("   Recommended package: %s\n", pkg)
 		}
 	}
 }
@@ -163,7 +163,7 @@ func getAgentFetchTLSConfig() *tls.Config {
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
-	
+
 	// Secure TLS configuration for production agent fetching
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,

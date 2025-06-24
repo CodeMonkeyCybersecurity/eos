@@ -16,7 +16,7 @@ func PromptValidated(label string, validator func(string) error) string {
 	for {
 		input := PromptRequired(label)
 		if err := validator(input); err != nil {
-			fmt.Println("❌", err)
+			fmt.Println("", err)
 			continue
 		}
 		return input

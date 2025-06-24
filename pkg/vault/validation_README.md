@@ -94,7 +94,7 @@ if err != nil {
 ```hcl
 path "secret/data/eos/{{identity.entity.name}}/*" { 
   capabilities = ["create", "read", "update", "delete", "list"]
-  max_ttl = "24h"  # ❌ Invalid in ACL policies
+  max_ttl = "24h"  #  Invalid in ACL policies
   required_parameters = ["version"]
 }
 ```

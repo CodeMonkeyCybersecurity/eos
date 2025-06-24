@@ -98,7 +98,7 @@ func DefaultReadInitOptions() *ReadInitOptions {
 // SecureReadVaultInit provides secure, comprehensive reading of Vault initialization data
 func SecureReadVaultInit(rc *eos_io.RuntimeContext, options *ReadInitOptions) (*VaultInitInfo, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔐 Starting secure Vault init data access")
+	log.Info(" Starting secure Vault init data access")
 
 	if options == nil {
 		options = DefaultReadInitOptions()
@@ -135,7 +135,7 @@ func SecureReadVaultInit(rc *eos_io.RuntimeContext, options *ReadInitOptions) (*
 	if options.IncludeStatus {
 		vaultStatus, err := getVaultStatus(rc)
 		if err != nil {
-			log.Warn("⚠️ Failed to get Vault status", zap.Error(err))
+			log.Warn("Failed to get Vault status", zap.Error(err))
 			vaultStatus = &VaultStatusInfo{Running: false, Reachable: false}
 		}
 		info.VaultStatus = vaultStatus
@@ -143,7 +143,7 @@ func SecureReadVaultInit(rc *eos_io.RuntimeContext, options *ReadInitOptions) (*
 		// Get security status
 		securityStatus, err := getSecurityStatus(rc)
 		if err != nil {
-			log.Warn("⚠️ Failed to get security status", zap.Error(err))
+			log.Warn("Failed to get security status", zap.Error(err))
 		}
 		info.SecurityStatus = securityStatus
 	}
@@ -158,7 +158,7 @@ func SecureReadVaultInit(rc *eos_io.RuntimeContext, options *ReadInitOptions) (*
 		auditVaultInitAccess(rc, info.AccessAudit)
 	}
 
-	log.Info("✅ Secure Vault init data access completed")
+	log.Info(" Secure Vault init data access completed")
 	return info, nil
 }
 
@@ -202,7 +202,7 @@ func performSecurityVerification(rc *eos_io.RuntimeContext, options *ReadInitOpt
 		}
 	}
 
-	log.Info("✅ Security verification passed",
+	log.Info(" Security verification passed",
 		zap.String("user", currentUser.Username),
 		zap.String("access_reason", options.AccessReason))
 	return nil
@@ -240,9 +240,9 @@ func readAndVerifyInitFile(rc *eos_io.RuntimeContext, options *ReadInitOptions) 
 	// Verify integrity if requested
 	if options.VerifyIntegrity {
 		if err := verifyInitDataIntegrity(&initResponse); err != nil {
-			log.Warn("⚠️ Vault init data integrity check failed", zap.Error(err))
+			log.Warn("Vault init data integrity check failed", zap.Error(err))
 		} else {
-			log.Info("✅ Vault init data integrity verified")
+			log.Info(" Vault init data integrity verified")
 		}
 	}
 
@@ -420,7 +420,7 @@ func auditVaultInitAccess(rc *eos_io.RuntimeContext, audit *AccessAuditInfo) {
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Log to structured logs
-	log.Warn("🔐 AUDIT: Vault initialization data accessed",
+	log.Warn(" AUDIT: Vault initialization data accessed",
 		zap.String("accessed_by", audit.AccessedBy),
 		zap.Time("access_time", audit.AccessTime),
 		zap.String("access_reason", audit.AccessReason),
@@ -461,12 +461,12 @@ func getRedactionMode(redacted bool) string {
 
 // DisplayVaultInitInfo presents the vault init information in a user-friendly format
 func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
-	fmt.Println("\n🔐 Vault Initialization Information")
+	fmt.Println("\n Vault Initialization Information")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Display file information
 	if info.FileInfo != nil {
-		fmt.Printf("\n📄 Init File Information\n")
+		fmt.Printf("\n Init File Information\n")
 		fmt.Printf("   Path: %s\n", info.FileInfo.Path)
 		fmt.Printf("   Size: %d bytes\n", info.FileInfo.Size)
 		fmt.Printf("   Modified: %s\n", info.FileInfo.ModTime.Format(time.RFC3339))
@@ -489,7 +489,7 @@ func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
 
 	// Display security status
 	if info.SecurityStatus != nil {
-		fmt.Printf("\n🛡️ Security Status\n")
+		fmt.Printf("\n Security Status\n")
 		fmt.Printf("   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled)
 		fmt.Printf("   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled)
 		fmt.Printf("   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied)
@@ -501,14 +501,14 @@ func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
 
 	// Display initialization data
 	if info.InitResponse != nil {
-		fmt.Printf("\n🔑 Vault Initialization Data\n")
+		fmt.Printf("\n Vault Initialization Data\n")
 
 		if options.RedactSensitive {
 			fmt.Printf("   Root Token: %s\n", crypto.Redact(info.InitResponse.RootToken))
 			for i, key := range info.InitResponse.KeysB64 {
 				fmt.Printf("   Unseal Key %d: %s\n", i+1, crypto.Redact(key))
 			}
-			fmt.Println("\n   ℹ️ Sensitive data is redacted. Use --no-redact flag to show plaintext.")
+			fmt.Println("\n    Sensitive data is redacted. Use --no-redact flag to show plaintext.")
 		} else {
 			fmt.Printf("   Root Token: %s\n", info.InitResponse.RootToken)
 			for i, key := range info.InitResponse.KeysB64 {
@@ -532,7 +532,7 @@ func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
 	displayNextSteps(info)
 
 	// Display security reminders
-	fmt.Println("\n⚠️ Security Reminders")
+	fmt.Println("\nSecurity Reminders")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println("   • Store this information securely (password manager, encrypted storage)")
 	fmt.Println("   • Never share root tokens or unseal keys via insecure channels")
@@ -544,7 +544,7 @@ func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
 
 // displayNextSteps provides contextual guidance based on Vault status
 func displayNextSteps(info *VaultInitInfo) {
-	fmt.Println("\n👉 Recommended Next Steps")
+	fmt.Println("\n Recommended Next Steps")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	if info.VaultStatus == nil {

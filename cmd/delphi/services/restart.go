@@ -16,7 +16,7 @@ import (
 // NewRestartCmd creates the restart command
 func NewRestartCmd() *cobra.Command {
 	var all bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "restart [service-name]",
 		Short: "Restart Delphi pipeline services",
@@ -37,7 +37,7 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔄 Restarting Delphi services")
+			logger.Info(" Restarting Delphi services")
 
 			var services []string
 			if all {
@@ -64,23 +64,23 @@ Examples:
 			for _, service := range services {
 				logger.Info("Restarting service",
 					zap.String("service", service))
-				
+
 				// Check if service exists before trying to restart it
 				if !eos_unix.ServiceExists(service) {
-					logger.Warn("⚠️ Service unit file not found",
+					logger.Warn("Service unit file not found",
 						zap.String("service", service))
 					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
 					continue
 				}
-				
+
 				if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
 					logger.Error("Failed to restart service",
 						zap.String("service", service),
 						zap.Error(err))
 					return fmt.Errorf("failed to restart %s: %w", service, err)
 				}
-				
-				logger.Info("✅ Service restarted successfully",
+
+				logger.Info(" Service restarted successfully",
 					zap.String("service", service))
 			}
 

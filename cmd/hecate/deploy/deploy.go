@@ -51,18 +51,18 @@ Examples:
 func runDeploy(rc *eos_io.RuntimeContext, _ *cobra.Command, args []string) {
 	app := strings.ToLower(args[0])
 	if !utils.IsValidApp(app, apps.GetSupportedAppNames()) {
-		fmt.Printf("❌ Invalid application: %s. Supported: %v\n", app, apps.GetSupportedAppNames())
+		fmt.Printf(" Invalid application: %s. Supported: %v\n", app, apps.GetSupportedAppNames())
 		return
 	}
 
 	otelzap.Ctx(rc.Ctx).Info("Deploying application", zap.String("app", app))
 	if err := deployApplication(rc, app); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Deployment failed", zap.String("app", app), zap.Error(err))
-		fmt.Printf("❌ Deployment failed for '%s': %v\n", app, err)
+		fmt.Printf(" Deployment failed for '%s': %v\n", app, err)
 		return
 	}
 	otelzap.Ctx(rc.Ctx).Info("Deployment completed successfully", zap.String("app", app))
-	fmt.Printf("✅ Deployment completed successfully for %s\n", app)
+	fmt.Printf(" Deployment completed successfully for %s\n", app)
 }
 
 // deployApplication calls the deployment function from the utils package.

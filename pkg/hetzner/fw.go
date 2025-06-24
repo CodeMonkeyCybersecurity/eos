@@ -17,11 +17,11 @@ func GetAllFws(rc *eos_io.RuntimeContext) {
 
 	firewalls, err := client.Firewall.All(rc.Ctx)
 	if err != nil {
-		fmt.Println("❌ Error retrieving firewalls:", err)
+		fmt.Println(" Error retrieving firewalls:", err)
 		return
 	}
 	for _, fw := range firewalls {
-		fmt.Printf("✅ Firewall: %s (ID: %d)\n", fw.Name, fw.ID)
+		fmt.Printf(" Firewall: %s (ID: %d)\n", fw.Name, fw.ID)
 	}
 }
 
@@ -57,17 +57,17 @@ func CreateAFw(rc *eos_io.RuntimeContext) {
 		},
 	})
 	if err != nil {
-		fmt.Println("❌ Error creating firewall:", err)
+		fmt.Println(" Error creating firewall:", err)
 		return
 	}
 
 	err = client.Action.WaitFor(rc.Ctx, result.Actions...)
 	if err != nil {
-		fmt.Println("❌ Error waiting for actions:", err)
+		fmt.Println(" Error waiting for actions:", err)
 		return
 	}
 
-	fmt.Printf("✅ Created firewall: %s (ID: %d)\n", result.Firewall.Name, result.Firewall.ID)
+	fmt.Printf(" Created firewall: %s (ID: %d)\n", result.Firewall.Name, result.Firewall.ID)
 }
 
 func GetAFw(rc *eos_io.RuntimeContext) {
@@ -76,10 +76,10 @@ func GetAFw(rc *eos_io.RuntimeContext) {
 
 	fw, _, err := client.Firewall.GetByID(rc.Ctx, 123)
 	if err != nil {
-		fmt.Println("❌ Error retrieving firewall:", err)
+		fmt.Println(" Error retrieving firewall:", err)
 		return
 	}
-	fmt.Printf("✅ Got firewall: %s (ID: %d)\n", fw.Name, fw.ID)
+	fmt.Printf(" Got firewall: %s (ID: %d)\n", fw.Name, fw.ID)
 }
 
 func UpdateAFw(rc *eos_io.RuntimeContext) {
@@ -95,7 +95,7 @@ func UpdateAFw(rc *eos_io.RuntimeContext) {
 		Name: "new-name",
 	})
 	if err != nil {
-		fmt.Println("❌ Error updating firewall:", err)
+		fmt.Println(" Error updating firewall:", err)
 	}
 }
 
@@ -105,7 +105,7 @@ func DeleteAFw(rc *eos_io.RuntimeContext) {
 
 	_, err := client.Firewall.Delete(rc.Ctx, &hcloud.Firewall{ID: 123})
 	if err != nil {
-		fmt.Println("❌ Error deleting firewall:", err)
+		fmt.Println(" Error deleting firewall:", err)
 	}
 }
 
@@ -122,7 +122,7 @@ func ApplyToResources(rc *eos_io.RuntimeContext) {
 		},
 	})
 	if err != nil {
-		fmt.Println("❌ Error applying firewall to resources:", err)
+		fmt.Println(" Error applying firewall to resources:", err)
 		return
 	}
 	_ = client.Action.WaitFor(rc.Ctx, actions...)
@@ -141,7 +141,7 @@ func RemoveFromResources(rc *eos_io.RuntimeContext) {
 		},
 	})
 	if err != nil {
-		fmt.Println("❌ Error removing firewall from resources:", err)
+		fmt.Println(" Error removing firewall from resources:", err)
 		return
 	}
 	_ = client.Action.WaitFor(rc.Ctx, actions...)
@@ -167,7 +167,7 @@ func SetRules(rc *eos_io.RuntimeContext) {
 		},
 	})
 	if err != nil {
-		fmt.Println("❌ Error setting firewall rules:", err)
+		fmt.Println(" Error setting firewall rules:", err)
 		return
 	}
 	_ = client.Action.WaitFor(rc.Ctx, actions...)

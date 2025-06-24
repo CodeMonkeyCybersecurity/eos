@@ -8,7 +8,7 @@ See our knowledge base, [Athena](https://wiki.cybermonkey.net.au), for more on h
 
 ---
 
-## 🚀 Quick Deployment
+##  Quick Deployment
 
 ### Get admin access
 

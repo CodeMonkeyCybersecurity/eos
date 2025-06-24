@@ -79,6 +79,6 @@ func configureAuditd(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("enable auditd: %w", err)
 	}
 
-	logger.Info("✅ Auditd configured and started")
+	logger.Info(" Auditd configured and started")
 	return nil
 }

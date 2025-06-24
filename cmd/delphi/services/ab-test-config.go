@@ -45,7 +45,7 @@ Examples:
   eos delphi services deploy-ab-config --validate`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🧪 Deploying A/B testing configuration")
+			logger.Info(" Deploying A/B testing configuration")
 
 			// Get EOS root directory
 			eosRoot := os.Getenv("EOS_ROOT")
@@ -77,7 +77,7 @@ Examples:
 				if err := validateABConfigJSON(sourceConfig); err != nil {
 					return fmt.Errorf("configuration validation failed: %w", err)
 				}
-				logger.Info("✅ Configuration syntax is valid")
+				logger.Info(" Configuration syntax is valid")
 			}
 
 			// Check if target already exists
@@ -86,18 +86,18 @@ Examples:
 			}
 
 			// Create target directories
-			logger.Info("📁 Creating target directories")
-			
+			logger.Info(" Creating target directories")
+
 			for _, dir := range []string{targetDir, reportsDir} {
 				if err := os.MkdirAll(dir, 0755); err != nil {
 					return fmt.Errorf("failed to create directory %s: %w", dir, err)
 				}
-				logger.Info("✅ Directory created",
+				logger.Info(" Directory created",
 					zap.String("directory", dir))
 			}
 
 			// Deploy configuration file
-			logger.Info("📝 Deploying configuration file",
+			logger.Info(" Deploying configuration file",
 				zap.String("source", sourceConfig),
 				zap.String("target", targetConfig))
 
@@ -106,8 +106,8 @@ Examples:
 			}
 
 			// Set permissions
-			logger.Info("🔐 Setting file permissions")
-			
+			logger.Info(" Setting file permissions")
+
 			// Set file permissions
 			if err := os.Chmod(targetConfig, 0644); err != nil {
 				logger.Warn("Failed to set file permissions",
@@ -139,7 +139,7 @@ Examples:
 				}
 			}
 
-			logger.Info("✅ A/B testing configuration deployed successfully",
+			logger.Info(" A/B testing configuration deployed successfully",
 				zap.String("config_file", targetConfig),
 				zap.String("reports_dir", reportsDir))
 

@@ -68,7 +68,7 @@ func (v *VaultPolicyValidator) ValidatePolicy(rc *eos_io.RuntimeContext, policyN
 		result.Valid = false
 	}
 
-	log.Info("✅ Policy validation completed",
+	log.Info(" Policy validation completed",
 		zap.String("policy", policyName),
 		zap.Bool("valid", result.Valid),
 		zap.Int("errors", len(result.Errors)),
@@ -327,7 +327,7 @@ func ValidatePolicyString(rc *eos_io.RuntimeContext, policyName, policyContent s
 // ValidateAndFixCommonIssues attempts to automatically fix common policy issues
 func ValidateAndFixCommonIssues(rc *eos_io.RuntimeContext, policyName, policyContent string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Attempting to fix common policy issues", zap.String("policy", policyName))
+	log.Info(" Attempting to fix common policy issues", zap.String("policy", policyName))
 
 	// Fix common invalid attributes by removing them
 	fixedContent := policyContent
@@ -344,7 +344,7 @@ func ValidateAndFixCommonIssues(rc *eos_io.RuntimeContext, policyName, policyCon
 	}
 
 	if fixedContent != policyContent {
-		log.Info("🔧 Policy automatically fixed",
+		log.Info(" Policy automatically fixed",
 			zap.String("policy", policyName),
 			zap.Int("original_length", len(policyContent)),
 			zap.Int("fixed_length", len(fixedContent)))

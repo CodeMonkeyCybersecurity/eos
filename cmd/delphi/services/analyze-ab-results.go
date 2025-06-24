@@ -49,7 +49,7 @@ Examples:
   eos delphi services analyze-ab-results --export json --output /tmp/ab-results.json`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("📊 Starting A/B testing results analysis",
+			logger.Info(" Starting A/B testing results analysis",
 				zap.Int("hours_back", hours),
 				zap.String("export_format", export),
 				zap.Bool("quiet", quiet))
@@ -84,7 +84,7 @@ Examples:
 				cmdArgs = append(cmdArgs, "--quiet")
 			}
 
-			logger.Info("🔄 Running A/B testing analysis",
+			logger.Info(" Running A/B testing analysis",
 				zap.String("analyzer", analyzerScript),
 				zap.Strings("arguments", cmdArgs[1:]))
 
@@ -95,7 +95,7 @@ Examples:
 			})
 
 			if err != nil {
-				logger.Error("❌ Analysis failed",
+				logger.Error(" Analysis failed",
 					zap.Error(err),
 					zap.String("output", output))
 				return fmt.Errorf("A/B testing analysis failed: %w", err)
@@ -113,11 +113,11 @@ Examples:
 				}
 			}
 
-			logger.Info("✅ A/B testing analysis completed")
+			logger.Info(" A/B testing analysis completed")
 
 			// Show next steps if export was used
 			if export != "" && outputFile != "" {
-				logger.Info("📄 Results exported",
+				logger.Info(" Results exported",
 					zap.String("file", outputFile),
 					zap.String("format", export))
 				logger.Info("💡 Next steps:")

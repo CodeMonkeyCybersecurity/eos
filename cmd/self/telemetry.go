@@ -48,7 +48,7 @@ Commands:
 				log.Error("Failed to write telemetry toggle file", zap.Error(err))
 				return fmt.Errorf("enable telemetry: %w", err)
 			}
-			log.Info("✅ Telemetry enabled")
+			log.Info(" Telemetry enabled")
 			showTelemetryInfo(log)
 		case "off":
 			if err := os.Remove(stateFile); err != nil && !os.IsNotExist(err) {
@@ -74,7 +74,7 @@ func getTelemetryFilePath() string {
 	if _, err := os.Stat(filepath.Dir(systemPath)); err == nil {
 		return systemPath
 	}
-	
+
 	// Fallback to user directory (development/macOS)
 	return filepath.Join(os.Getenv("HOME"), ".eos", "telemetry", "telemetry.jsonl")
 }
@@ -82,46 +82,46 @@ func getTelemetryFilePath() string {
 // showTelemetryInfo displays telemetry configuration details
 func showTelemetryInfo(log otelzap.LoggerWithCtx) {
 	telemetryPath := getTelemetryFilePath()
-	log.Info("📊 Telemetry configuration", 
+	log.Info(" Telemetry configuration",
 		zap.String("file_path", telemetryPath),
 		zap.String("format", "JSONL (JSON Lines)"),
 		zap.String("privacy", "Local storage only - no external transmission"))
-	
+
 	log.Info("💡 Analysis commands",
 		zap.String("command_frequency", "jq -r '.name' "+telemetryPath+" | sort | uniq -c | sort -nr"),
 		zap.String("success_rate", "jq -r 'select(.attributes.success == true) | .name' "+telemetryPath+" | wc -l"),
 		zap.String("avg_duration", "jq -r 'select(.attributes.duration_ms) | \"\\(.name) \\(.attributes.duration_ms)\"' "+telemetryPath))
 }
 
-// showTelemetryStatus displays current telemetry status and statistics  
+// showTelemetryStatus displays current telemetry status and statistics
 func showTelemetryStatus(log otelzap.LoggerWithCtx, stateFile string) error {
 	// Check if telemetry is enabled
 	enabled := false
 	if _, err := os.Stat(stateFile); err == nil {
 		enabled = true
 	}
-	
+
 	telemetryPath := getTelemetryFilePath()
-	
-	log.Info("📊 Telemetry Status",
+
+	log.Info(" Telemetry Status",
 		zap.Bool("enabled", enabled),
 		zap.String("config_file", stateFile),
 		zap.String("data_file", telemetryPath))
-	
+
 	if !enabled {
-		log.Info("ℹ️ Telemetry is disabled", 
+		log.Info(" Telemetry is disabled",
 			zap.String("enable_command", "eos self telemetry on"))
 		return nil
 	}
-	
+
 	// Get file statistics
 	stats, err := getTelemetryStats(telemetryPath)
 	if err != nil {
-		log.Warn("⚠️ Could not read telemetry statistics", zap.Error(err))
+		log.Warn("Could not read telemetry statistics", zap.Error(err))
 		return nil
 	}
-	
-	log.Info("📈 Telemetry Statistics", 
+
+	log.Info("📈 Telemetry Statistics",
 		zap.Int("total_commands", stats.TotalCommands),
 		zap.Int("successful_commands", stats.SuccessfulCommands),
 		zap.Int("failed_commands", stats.FailedCommands),
@@ -129,20 +129,20 @@ func showTelemetryStatus(log otelzap.LoggerWithCtx, stateFile string) error {
 		zap.String("file_size", stats.FileSize),
 		zap.String("oldest_entry", stats.OldestEntry),
 		zap.String("newest_entry", stats.NewestEntry))
-	
+
 	if len(stats.TopCommands) > 0 {
 		log.Info("🔝 Most Used Commands")
 		for i, cmd := range stats.TopCommands {
 			if i >= 5 { // Show top 5
 				break
 			}
-			log.Info("", 
+			log.Info("",
 				zap.Int("rank", i+1),
 				zap.String("command", cmd.Name),
 				zap.Int("count", cmd.Count))
 		}
 	}
-	
+
 	showTelemetryInfo(log)
 	return nil
 }
@@ -173,45 +173,45 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 	defer func() {
 		if err := file.Close(); err != nil {
 			logger := otelzap.Ctx(context.Background())
-			logger.Warn("⚠️ Failed to close telemetry file", zap.Error(err))
+			logger.Warn("Failed to close telemetry file", zap.Error(err))
 		}
 	}()
-	
+
 	// Get file info
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := &TelemetryStats{
 		FileSize: formatFileSize(fileInfo.Size()),
 	}
-	
+
 	commandCounts := make(map[string]int)
 	scanner := bufio.NewScanner(file)
 	lineCount := 0
-	
+
 	var oldestTime, newestTime time.Time
-	
+
 	for scanner.Scan() {
 		lineCount++
 		line := scanner.Text()
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		
+
 		// Parse JSON line
 		var span map[string]any
 		if err := json.Unmarshal([]byte(line), &span); err != nil {
 			continue // Skip malformed lines
 		}
-		
+
 		// Extract command name
 		if name, ok := span["name"].(string); ok {
 			commandCounts[name]++
 			stats.TotalCommands++
 		}
-		
+
 		// Extract success status
 		if attrs, ok := span["attributes"].(map[string]any); ok {
 			if success, ok := attrs["success"].(bool); ok && success {
@@ -220,7 +220,7 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 				stats.FailedCommands++
 			}
 		}
-		
+
 		// Extract timestamp
 		if startTime, ok := span["startTime"].(string); ok {
 			if t, err := time.Parse(time.RFC3339Nano, startTime); err == nil {
@@ -233,12 +233,12 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 			}
 		}
 	}
-	
+
 	// Calculate success rate
 	if stats.TotalCommands > 0 {
 		stats.SuccessRate = float64(stats.SuccessfulCommands) / float64(stats.TotalCommands) * 100
 	}
-	
+
 	// Format timestamps
 	if !oldestTime.IsZero() {
 		stats.OldestEntry = oldestTime.Format("2006-01-02 15:04:05")
@@ -246,12 +246,12 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 	if !newestTime.IsZero() {
 		stats.NewestEntry = newestTime.Format("2006-01-02 15:04:05")
 	}
-	
+
 	// Sort top commands
 	for cmd, count := range commandCounts {
 		stats.TopCommands = append(stats.TopCommands, CommandCount{Name: cmd, Count: count})
 	}
-	
+
 	// Simple bubble sort for top commands (small data set)
 	for i := 0; i < len(stats.TopCommands)-1; i++ {
 		for j := 0; j < len(stats.TopCommands)-i-1; j++ {
@@ -260,7 +260,7 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 			}
 		}
 	}
-	
+
 	return stats, scanner.Err()
 }
 

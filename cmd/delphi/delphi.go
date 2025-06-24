@@ -27,9 +27,9 @@ var DelphiCmd = &cobra.Command{
 	// RunE here is good. If 'eos delphi' is called without subcommands,
 	// it will print the specific help for 'delphi' thanks to shared.SafeHelp(cmd).
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		fmt.Println("❌ Missing subcommand for 'eos delphi'.") // More specific message
-		shared.SafeHelp(cmd)                                  // This should now correctly print help for DelphiCmd
-		return nil                                            // Return nil so Cobra doesn't print its own generic error/usage
+		fmt.Println(" Missing subcommand for 'eos delphi'.") // More specific message
+		shared.SafeHelp(cmd)                                 // This should now correctly print help for DelphiCmd
+		return nil                                           // Return nil so Cobra doesn't print its own generic error/usage
 	}),
 }
 

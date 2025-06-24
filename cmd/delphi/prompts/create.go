@@ -45,7 +45,7 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			promptName := args[0]
 
-			logger.Info("🔨 Creating new system prompt",
+			logger.Info(" Creating new system prompt",
 				zap.String("prompt_name", promptName))
 
 			// Validate prompt name
@@ -76,7 +76,7 @@ Examples:
 				return fmt.Errorf("system prompt already exists: %s", promptName)
 			}
 
-			logger.Info("📁 Output file determined",
+			logger.Info(" Output file determined",
 				zap.String("file_path", promptPath),
 				zap.String("directory", promptsDir),
 				zap.Bool("exists", false))
@@ -85,45 +85,45 @@ Examples:
 
 			if fromFile != "" {
 				// Read content from file
-				logger.Info("📖 Reading content from file",
+				logger.Info(" Reading content from file",
 					zap.String("source_file", fromFile))
-				
+
 				contentBytes, err := os.ReadFile(fromFile)
 				if err != nil {
 					return fmt.Errorf("failed to read source file: %w", err)
 				}
 				content = string(contentBytes)
-				
-				logger.Info("✅ Content loaded from file",
+
+				logger.Info(" Content loaded from file",
 					zap.String("size", formatFileSize(int64(len(content)))))
 			} else if interactive {
 				// Interactive mode
 				logger.Info("✏️ Entering interactive mode")
-				logger.Info("📝 Enter prompt content (press Ctrl+D when finished):")
-				
+				logger.Info(" Enter prompt content (press Ctrl+D when finished):")
+
 				var lines []string
 				scanner := bufio.NewScanner(os.Stdin)
 				for scanner.Scan() {
 					lines = append(lines, scanner.Text())
 				}
-				
+
 				if err := scanner.Err(); err != nil {
 					return fmt.Errorf("error reading input: %w", err)
 				}
-				
+
 				content = strings.Join(lines, "\n")
-				logger.Info("✅ Content entered interactively",
+				logger.Info(" Content entered interactively",
 					zap.Int("lines", len(lines)),
 					zap.String("size", formatFileSize(int64(len(content)))))
 			} else {
 				// Create empty template
 				content = createPromptTemplate(promptName, description)
-				logger.Info("📋 Created template content",
+				logger.Info(" Created template content",
 					zap.String("template_type", "default"))
 			}
 
 			// Write the prompt file
-			logger.Info("📝 Writing prompt file",
+			logger.Info(" Writing prompt file",
 				zap.String("file_path", promptPath),
 				zap.String("size", formatFileSize(int64(len(content)))))
 
@@ -133,7 +133,7 @@ Examples:
 
 			// Verify file was created successfully
 			if stat, err := os.Stat(promptPath); err == nil {
-				logger.Info("✅ Prompt created successfully",
+				logger.Info(" Prompt created successfully",
 					zap.String("name", promptName),
 					zap.String("path", promptPath),
 					zap.String("size", formatFileSize(stat.Size())),
@@ -214,13 +214,13 @@ func titleCase(s string) string {
 	if s == "" {
 		return s
 	}
-	
+
 	words := strings.Fields(s)
 	for i, word := range words {
 		if word == "" {
 			continue
 		}
-		
+
 		runes := []rune(word)
 		runes[0] = unicode.ToUpper(runes[0])
 		for j := 1; j < len(runes); j++ {
@@ -228,6 +228,6 @@ func titleCase(s string) string {
 		}
 		words[i] = string(runes)
 	}
-	
+
 	return strings.Join(words, " ")
 }

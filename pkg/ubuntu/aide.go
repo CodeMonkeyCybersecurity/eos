@@ -40,7 +40,7 @@ func configureAIDE(rc *eos_io.RuntimeContext) error {
 	}
 	logger.Info("AIDE daily check configured", zap.String("path", cronPath))
 
-	logger.Info("✅ AIDE configured for file integrity monitoring")
+	logger.Info(" AIDE configured for file integrity monitoring")
 	return nil
 }
 
@@ -74,7 +74,7 @@ func installLynis(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("install Lynis: %w", err)
 	}
 
-	logger.Info("✅ Lynis security auditing tool installed")
+	logger.Info(" Lynis security auditing tool installed")
 	return nil
 }
 
@@ -101,6 +101,6 @@ $nrconf{restart} = 'a';
 		return fmt.Errorf("write needrestart config: %w", err)
 	}
 
-	logger.Info("✅ Needrestart configured for automatic service restarts")
+	logger.Info(" Needrestart configured for automatic service restarts")
 	return nil
 }

@@ -56,12 +56,12 @@ var CreateFail2banCmd = &cobra.Command{
 		for _, step := range steps {
 			otelzap.Ctx(rc.Ctx).Info("▶ "+step.desc, zap.String("step", step.desc))
 			if err := step.fn(); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("❌ Failed: "+step.desc, zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Error(" Failed: "+step.desc, zap.Error(err))
 				return err
 			}
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Fail2Ban deployed successfully!")
+		otelzap.Ctx(rc.Ctx).Info(" Fail2Ban deployed successfully!")
 		return nil
 	}),
 }

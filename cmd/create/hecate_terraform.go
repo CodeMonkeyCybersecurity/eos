@@ -421,10 +421,10 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 		logger.Info("🔤 Domain name required for mail server configuration")
 		fmt.Print("Enter domain name for mail server: ")
 		if _, err := fmt.Scanln(&domain); err != nil {
-			logger.Error("❌ Failed to read domain input", zap.Error(err))
+			logger.Error(" Failed to read domain input", zap.Error(err))
 			return fmt.Errorf("failed to read domain: %w", err)
 		}
-		logger.Info("✅ Domain configured", zap.String("domain", domain))
+		logger.Info(" Domain configured", zap.String("domain", domain))
 	}
 
 	serverName := "hecate-mail"
@@ -436,14 +436,14 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 		if _, err := fmt.Scanln(&input); err != nil {
 			// Empty input is acceptable (use default), but actual read errors should be handled
 			if err.Error() != "unexpected newline" {
-				logger.Error("❌ Failed to read server name input", zap.Error(err))
+				logger.Error(" Failed to read server name input", zap.Error(err))
 				return fmt.Errorf("failed to read server name: %w", err)
 			}
 		}
 		if input != "" {
 			serverName = input
 		}
-		logger.Info("✅ Server name configured", zap.String("server_name", serverName))
+		logger.Info(" Server name configured", zap.String("server_name", serverName))
 	}
 
 	config := HecateConfig{
@@ -518,7 +518,7 @@ location = "%s"`, serverType, location)
 		logger.Warn("Failed to format terraform files", zap.Error(err))
 	}
 
-	fmt.Printf("\n✅ Hecate Terraform configuration generated in: %s\n", outputDir)
+	fmt.Printf("\n Hecate Terraform configuration generated in: %s\n", outputDir)
 	fmt.Println("\nNext steps:")
 	if useCloud {
 		fmt.Println("1. Set your Hetzner Cloud token: export HCLOUD_TOKEN='your-token'")

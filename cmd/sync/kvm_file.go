@@ -46,7 +46,7 @@ Both VMs must be shut off for virt-copy to work.`,
 			log.Fatal("sync failed", zap.Error(err))
 		}
 
-		rc.Log.Info("✅ File transferred successfully", zap.String("from", kvm.SourceVM), zap.String("to", kvm.DestVM))
+		rc.Log.Info(" File transferred successfully", zap.String("from", kvm.SourceVM), zap.String("to", kvm.DestVM))
 		return nil
 	}),
 }

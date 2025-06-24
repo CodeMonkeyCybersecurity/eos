@@ -29,9 +29,9 @@ func StartInstallStatusTicker(ctx context.Context, log *zap.Logger, vmName, disk
 
 			// Disk size
 			if fi, err := os.Stat(diskPath); err == nil {
-				log.Info("📦 Disk image size", zap.String("path", diskPath), zap.Int64("bytes", fi.Size()))
+				log.Info(" Disk image size", zap.String("path", diskPath), zap.Int64("bytes", fi.Size()))
 			} else {
-				log.Warn("⚠️ Failed to stat disk image", zap.String("path", diskPath), zap.Error(err))
+				log.Warn("Failed to stat disk image", zap.String("path", diskPath), zap.Error(err))
 			}
 
 			// VM power state
@@ -39,7 +39,7 @@ func StartInstallStatusTicker(ctx context.Context, log *zap.Logger, vmName, disk
 				state := parseDominfoState(out)
 				log.Info("🖥️ VM state", zap.String("vm", vmName), zap.String("state", state))
 			} else {
-				log.Warn("⚠️ Failed to get dominfo", zap.String("vm", vmName), zap.Error(err))
+				log.Warn("Failed to get dominfo", zap.String("vm", vmName), zap.Error(err))
 			}
 
 			// DHCP leases

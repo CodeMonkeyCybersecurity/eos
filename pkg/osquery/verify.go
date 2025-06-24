@@ -25,7 +25,7 @@ func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"--version"},
 	})
 	if err != nil {
-		logger.Error("❌ osqueryi not found or not working",
+		logger.Error(" osqueryi not found or not working",
 			zap.Error(err))
 		return fmt.Errorf("osqueryi verification failed: %w", err)
 	}
@@ -39,18 +39,18 @@ func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 			version = parts[2]
 		}
 	}
-	
-	logger.Info("✅ osquery verified",
+
+	logger.Info(" osquery verified",
 		zap.String("version", version))
 
 	// Check if config file exists
 	paths := GetOsqueryPaths()
 	if _, err := os.Stat(paths.ConfigPath); err != nil {
-		logger.Warn("⚠️ Configuration file not found",
+		logger.Warn("Configuration file not found",
 			zap.String("path", paths.ConfigPath),
 			zap.Error(err))
 	} else {
-		logger.Info("✅ Configuration file exists",
+		logger.Info(" Configuration file exists",
 			zap.String("path", paths.ConfigPath))
 	}
 
@@ -60,11 +60,11 @@ func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"is-active", "osqueryd"},
 	})
 	if err != nil || strings.TrimSpace(output) != "active" {
-		logger.Warn("⚠️ osquery service is not active",
+		logger.Warn("osquery service is not active",
 			zap.String("status", strings.TrimSpace(output)),
 			zap.Error(err))
 	} else {
-		logger.Info("✅ osquery service is active")
+		logger.Info(" osquery service is active")
 	}
 
 	// Check if osquery is enabled
@@ -73,11 +73,11 @@ func verifyLinuxInstallation(rc *eos_io.RuntimeContext) error {
 		Args:    []string{"is-enabled", "osqueryd"},
 	})
 	if err != nil || strings.TrimSpace(output) != "enabled" {
-		logger.Warn("⚠️ osquery service is not enabled",
+		logger.Warn("osquery service is not enabled",
 			zap.String("status", strings.TrimSpace(output)),
 			zap.Error(err))
 	} else {
-		logger.Info("✅ osquery service is enabled")
+		logger.Info(" osquery service is enabled")
 	}
 
 	return nil
@@ -94,7 +94,7 @@ func RunOsqueryQuery(rc *eos_io.RuntimeContext, query string) (string, error) {
 		Args:    []string{"--json", query},
 	})
 	if err != nil {
-		logger.Error("❌ Failed to run osquery query",
+		logger.Error(" Failed to run osquery query",
 			zap.String("query", query),
 			zap.Error(err))
 		return "", fmt.Errorf("run osquery query: %w", err)
@@ -112,21 +112,21 @@ func GetOsqueryStatus(rc *eos_io.RuntimeContext) (string, error) {
 			Args:    []string{"status", "osqueryd"},
 		})
 		return output, err
-		
+
 	case "macos":
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "sudo",
 			Args:    []string{"launchctl", "list", "com.facebook.osqueryd"},
 		})
 		return output, err
-		
+
 	case "windows":
 		output, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "sc",
 			Args:    []string{"query", "osqueryd"},
 		})
 		return output, err
-		
+
 	default:
 		return "", fmt.Errorf("unsupported platform")
 	}

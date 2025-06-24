@@ -2,7 +2,7 @@
 
 Eos provides comprehensive Terraform integration for infrastructure automation and deployment. This allows you to use familiar tools (Caddy, Nginx) with modern orchestration (K3s) and infrastructure as code (Terraform).
 
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 # Install Terraform via eos
@@ -15,7 +15,7 @@ eos create k3s-caddy-nginx --domain mail.example.com --enable-mail
 eos create k3s-caddy-nginx --domain mail.example.com --cloud --enable-mail
 ```
 
-## 📦 Available Commands
+##  Available Commands
 
 ### HashiCorp Tools Installation
 ```bash
@@ -90,7 +90,7 @@ eos create terraform-apply --auto-approve [directory]
 eos create terraform-deploy --auto-approve [directory]
 ```
 
-## 🏗️ Architecture Overview
+##  Architecture Overview
 
 ### K3s + Caddy + Nginx Stack
 
@@ -199,7 +199,7 @@ terraform-k3s/
 └── README.md                # Setup instructions
 ```
 
-## 🔧 Configuration Examples
+##  Configuration Examples
 
 ### Caddyfile Template
 ```caddyfile
@@ -372,7 +372,7 @@ terraform output
 - CI/CD pipeline integration
 - Backup automation
 
-## 📚 Related Documentation
+##  Related Documentation
 
 - [K3s Documentation](https://docs.k3s.io/)
 - [Caddy Documentation](https://caddyserver.com/docs/)

@@ -19,7 +19,7 @@ func GetAllCerts(rc *eos_io.RuntimeContext) error {
 		return cerr.Wrap(err, "failed to retrieve certificates")
 	}
 	for _, c := range certs {
-		fmt.Printf("📜 Certificate: %s (ID: %d)\n", c.Name, c.ID)
+		fmt.Printf(" Certificate: %s (ID: %d)\n", c.Name, c.ID)
 	}
 	return nil
 }
@@ -40,7 +40,7 @@ func CreateManagedCert(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return cerr.Wrap(err, "failed to create managed certificate")
 	}
-	fmt.Printf("✅ Managed cert created: %s (ID: %d)\n", cert.Name, cert.ID)
+	fmt.Printf(" Managed cert created: %s (ID: %d)\n", cert.Name, cert.ID)
 	return nil
 }
 
@@ -57,7 +57,7 @@ func CreateUploadedCert(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return cerr.Wrap(err, "failed to create uploaded certificate")
 	}
-	fmt.Printf("✅ Uploaded cert created: %s (ID: %d)\n", cert.Name, cert.ID)
+	fmt.Printf(" Uploaded cert created: %s (ID: %d)\n", cert.Name, cert.ID)
 	return nil
 }
 
@@ -113,7 +113,7 @@ func GetAllActions(rc *eos_io.RuntimeContext) error {
 		return cerr.Wrap(err, "failed to get certificate actions")
 	}
 	for _, a := range actions {
-		fmt.Printf("📦 Cert Action: %s (ID: %d, Status: %s)\n", a.Command, a.ID, a.Status)
+		fmt.Printf(" Cert Action: %s (ID: %d, Status: %s)\n", a.Command, a.ID, a.Status)
 	}
 	return nil
 }

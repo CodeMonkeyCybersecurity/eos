@@ -106,7 +106,7 @@ var SshKeyCmd = &cobra.Command{
 				string(privPEM),
 				fingerprint,
 			); err == nil {
-				otelzap.Ctx(rc.Ctx).Info("🔐 SSH key written to Vault",
+				otelzap.Ctx(rc.Ctx).Info(" SSH key written to Vault",
 					zap.String("path", fullVaultPath),
 					zap.String("fingerprint", fingerprint),
 				)
@@ -141,7 +141,7 @@ var SshKeyCmd = &cobra.Command{
 			return fmt.Errorf("write private key failed: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("🔐 SSH key written to disk",
+		otelzap.Ctx(rc.Ctx).Info(" SSH key written to disk",
 			zap.String("private_key_path", privPath),
 			zap.String("public_key_path", pubPath),
 		)

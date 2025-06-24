@@ -61,9 +61,9 @@ func PromptLDAPDetails(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 		return nil, fmt.Errorf("missing required LDAP fields (FQDN, BindDN, Password, UserBase, or RoleBase)")
 	}
 
-	// 🔐 Save to Vault
+	//  Save to Vault
 	if err := vault.WriteToVault(rc, shared.LDAPVaultPath, cfg); err != nil {
-		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
+		fmt.Printf(" Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
 	return cfg, nil
@@ -90,7 +90,7 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 	}
 
 	if len(raw) < 10 {
-		fmt.Println("⚠️  Warning: config.yml appears to be mostly empty. Proceeding anyway.")
+		fmt.Println(" Warning: config.yml appears to be mostly empty. Proceeding anyway.")
 	}
 
 	var root map[string]interface{}
@@ -185,7 +185,7 @@ func PatchConfigYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to write config.yml: %w", err)
 	}
 
-	fmt.Println("✅ Patched config.yml with LDAP authc/authz blocks.")
+	fmt.Println(" Patched config.yml with LDAP authc/authz blocks.")
 	return nil
 }
 
@@ -199,7 +199,7 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 	}
 
 	if len(raw) < 10 {
-		fmt.Println("⚠️  Warning: roles_mapping.yml appears to be mostly empty. Proceeding anyway.")
+		fmt.Println(" Warning: roles_mapping.yml appears to be mostly empty. Proceeding anyway.")
 	}
 
 	var data map[string]interface{}
@@ -239,7 +239,7 @@ func PatchRolesMappingYML(cfg *LDAPConfig) error {
 		return fmt.Errorf("failed to write roles_mapping.yml: %w", err)
 	}
 
-	fmt.Println("✅ Patched roles_mapping.yml with admin + readonly mappings.")
+	fmt.Println(" Patched roles_mapping.yml with admin + readonly mappings.")
 	return nil
 }
 

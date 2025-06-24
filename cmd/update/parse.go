@@ -60,7 +60,7 @@ var ParseCmd = &cobra.Command{
 			}
 		}
 
-		fmt.Printf("✅ Parsed %d conversations into ./%s/\n", len(conversations), outDir)
+		fmt.Printf(" Parsed %d conversations into ./%s/\n", len(conversations), outDir)
 		return nil
 	}),
 }

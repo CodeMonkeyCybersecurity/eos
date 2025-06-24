@@ -25,27 +25,27 @@ func PromptIfMissing(ctx context.Context, cmd *cobra.Command, flagName, prompt s
 		return "", err
 	}
 	if val != "" {
-		otelzap.Ctx(ctx).Debug("✅ CLI flag provided", zap.String("flag", flagName), zap.String("value", val))
+		otelzap.Ctx(ctx).Debug(" CLI flag provided", zap.String("flag", flagName), zap.String("value", val))
 		return val, nil
 	}
 
-	otelzap.Ctx(ctx).Info("📝 Prompting for missing flag", zap.String("flag", flagName), zap.Bool("is_secret", isSecret))
+	otelzap.Ctx(ctx).Info(" Prompting for missing flag", zap.String("flag", flagName), zap.Bool("is_secret", isSecret))
 
 	if isSecret {
 		secret, err := PromptSecret(ctx, prompt) // <-- capture both values
 		if err != nil {
-			otelzap.Ctx(ctx).Error("❌ Failed to read secret input", zap.Error(err))
+			otelzap.Ctx(ctx).Error(" Failed to read secret input", zap.Error(err))
 			return "", err
 		}
 		if secret == "" {
-			otelzap.Ctx(ctx).Warn("⚠️ Empty input received for secret prompt")
+			otelzap.Ctx(ctx).Warn("Empty input received for secret prompt")
 		}
 		return secret, nil
 	}
 
 	input := PromptInput(ctx, prompt, "")
 	if input == "" {
-		otelzap.Ctx(ctx).Warn("⚠️ Empty input received for prompt", zap.String("prompt", prompt))
+		otelzap.Ctx(ctx).Warn("Empty input received for prompt", zap.String("prompt", prompt))
 	}
 	return input, nil
 }
@@ -55,24 +55,24 @@ func PromptIfMissing(ctx context.Context, cmd *cobra.Command, flagName, prompt s
 // Returns trimmed input or warns if no input is provided.
 func PromptSecret(ctx context.Context, prompt string) (string, error) {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		otelzap.Ctx(ctx).Error("❌ Cannot prompt for secret input: not a TTY")
+		otelzap.Ctx(ctx).Error(" Cannot prompt for secret input: not a TTY")
 		return "", fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
 	logger := otelzap.Ctx(ctx)
-	logger.Info("🔐 Prompting for secret input", zap.String("prompt", prompt))
+	logger.Info(" Prompting for secret input", zap.String("prompt", prompt))
 
 	// Use os.Stderr for user-facing prompts to preserve stdout for automation
 	_, _ = fmt.Fprint(os.Stderr, prompt+": ")
 	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
 	_, _ = fmt.Fprintln(os.Stderr)
 	if err != nil {
-		otelzap.Ctx(ctx).Error("❌ Failed to read secret input", zap.Error(err))
+		otelzap.Ctx(ctx).Error(" Failed to read secret input", zap.Error(err))
 		return "", err
 	}
 	secret := strings.TrimSpace(string(bytePassword))
 	if secret == "" {
-		otelzap.Ctx(ctx).Warn("⚠️ No input received for secret", zap.String("prompt", prompt))
+		otelzap.Ctx(ctx).Warn("No input received for secret", zap.String("prompt", prompt))
 	}
 	return secret, nil
 }
@@ -81,7 +81,7 @@ func PromptSecret(ctx context.Context, prompt string) (string, error) {
 func PromptSecrets(ctx context.Context, promptBase string, count int) ([]string, error) {
 
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
-		otelzap.Ctx(ctx).Error("❌ Cannot prompt for secret input: not a TTY")
+		otelzap.Ctx(ctx).Error(" Cannot prompt for secret input: not a TTY")
 		return nil, fmt.Errorf("secret prompt failed: no terminal available")
 	}
 
@@ -99,10 +99,10 @@ func PromptSecrets(ctx context.Context, promptBase string, count int) ([]string,
 
 // PromptSelect displays numbered options and returns the selected value by index.
 func PromptSelect(ctx context.Context, prompt string, options []string) string {
-	otelzap.Ctx(ctx).Info("📋 Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
+	otelzap.Ctx(ctx).Info(" Prompting selection", zap.String("prompt", prompt), zap.Int("num_options", len(options)))
 
 	logger := otelzap.Ctx(ctx)
-	logger.Info("📋 Displaying selection menu", zap.String("prompt", prompt), zap.Strings("options", options))
+	logger.Info(" Displaying selection menu", zap.String("prompt", prompt), zap.Strings("options", options))
 
 	// Use os.Stderr for user-facing prompts to preserve stdout for automation
 	_, _ = fmt.Fprintln(os.Stderr, prompt)
@@ -120,12 +120,12 @@ func PromptSelect(ctx context.Context, prompt string, options []string) string {
 
 		idx, err := strconv.Atoi(choice)
 		if err == nil && idx >= 1 && idx <= len(options) {
-			otelzap.Ctx(ctx).Info("✅ User selected option", zap.Int("index", idx), zap.String("value", options[idx-1]))
+			otelzap.Ctx(ctx).Info(" User selected option", zap.Int("index", idx), zap.String("value", options[idx-1]))
 			return options[idx-1]
 		}
 
 		logger := otelzap.Ctx(ctx)
-		logger.Warn("❌ Invalid selection", zap.String("input", choice))
+		logger.Warn(" Invalid selection", zap.String("input", choice))
 		_, _ = fmt.Fprintln(os.Stderr, "Invalid selection. Please try again.")
 	}
 }
@@ -146,18 +146,18 @@ func PromptYesNo(ctx context.Context, prompt string, defaultYes bool) bool {
 	}
 
 	if answer, ok := NormalizeYesNoInput(input); ok {
-		otelzap.Ctx(ctx).Info("✅ User input parsed", zap.Bool("answer", answer))
+		otelzap.Ctx(ctx).Info(" User input parsed", zap.Bool("answer", answer))
 		return answer
 	}
 
-	otelzap.Ctx(ctx).Info("ℹ️ Default applied", zap.String("prompt", prompt), zap.Bool("default_yes", defaultYes))
+	otelzap.Ctx(ctx).Info(" Default applied", zap.String("prompt", prompt), zap.Bool("default_yes", defaultYes))
 	return defaultYes
 }
 
 // PromptConfirmOrValue asks the user to accept a default or enter a custom value.
 func PromptConfirmOrValue(ctx context.Context, prompt, defaultValue string) string {
 	if PromptYesNo(ctx, fmt.Sprintf("%s (default: %s)?", prompt, defaultValue), true) {
-		otelzap.Ctx(ctx).Info("✅ Default value confirmed", zap.String("value", defaultValue))
+		otelzap.Ctx(ctx).Info(" Default value confirmed", zap.String("value", defaultValue))
 		return defaultValue
 	}
 
@@ -181,7 +181,7 @@ func PromptInput(ctx context.Context, prompt, defaultVal string) string {
 		return defaultVal
 	}
 	if input == "" {
-		otelzap.Ctx(ctx).Debug("ℹ️ Using default value", zap.String("default", defaultVal))
+		otelzap.Ctx(ctx).Debug(" Using default value", zap.String("default", defaultVal))
 		return defaultVal
 	}
 	return input
@@ -207,7 +207,7 @@ func PromptInputWithReader(ctx context.Context, prompt, defaultVal string, reade
 		return defaultVal
 	}
 	if input == "" {
-		otelzap.Ctx(ctx).Debug("ℹ️ Using default value", zap.String("default", defaultVal))
+		otelzap.Ctx(ctx).Debug(" Using default value", zap.String("default", defaultVal))
 		return defaultVal
 	}
 	return input

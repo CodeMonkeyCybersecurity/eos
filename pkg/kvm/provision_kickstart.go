@@ -36,12 +36,12 @@ func ProvisionKickstartTenantVM(rc *eos_io.RuntimeContext, vmName, pubKeyPath st
 	log.Info("🟡 virt-install finished; checking post-install VM status")
 
 	if err := ensureDomainRunning(vmName, zap.L()); err != nil {
-		log.Warn("⚠️ VM not running post-install", zap.Error(err))
+		log.Warn("VM not running post-install", zap.Error(err))
 	}
 
 	ipAddr := waitForIP(vmName, 60*time.Second, zap.L())
 	if ipAddr == "" || ipAddr == "unknown" {
-		log.Warn("⚠️ IP not found via qemu-agent; falling back to DHCP lease")
+		log.Warn("IP not found via qemu-agent; falling back to DHCP lease")
 		if mac := getMACFromDomiflist(vmName); mac != "" {
 			if fallbackIP, _ := getIPFromDHCPLeases(mac); fallbackIP != "" {
 				ipAddr = fallbackIP
@@ -51,9 +51,9 @@ func ProvisionKickstartTenantVM(rc *eos_io.RuntimeContext, vmName, pubKeyPath st
 	}
 
 	if ipAddr == "unknown" {
-		log.Warn("⚠️ Provisioning finished but no IP could be determined")
+		log.Warn("Provisioning finished but no IP could be determined")
 	} else {
-		log.Info("✅ Provisioning complete", zap.String("ip", ipAddr))
+		log.Info(" Provisioning complete", zap.String("ip", ipAddr))
 	}
 
 	return nil
@@ -72,7 +72,7 @@ func ensureDomainRunning(vmName string, log *zap.Logger) error {
 		if err := exec.Command("virsh", "start", vmName).Run(); err != nil {
 			return fmt.Errorf("failed to restart domain: %w", err)
 		}
-		log.Info("✅ VM restarted")
+		log.Info(" VM restarted")
 	}
 	return nil
 }
@@ -82,13 +82,13 @@ func waitForIP(vmName string, maxWait time.Duration, log *zap.Logger) string {
 	for time.Since(start) < maxWait {
 		ip, err := getTenantVMIP(vmName)
 		if err == nil && ip != "" {
-			log.Info("✅ VM IP address found", zap.String("vm", vmName), zap.String("ip", ip))
+			log.Info(" VM IP address found", zap.String("vm", vmName), zap.String("ip", ip))
 			return ip
 		}
 		log.Debug("⌛ Still waiting for IP...", zap.String("vm", vmName), zap.Error(err))
 		time.Sleep(5 * time.Second)
 	}
-	log.Warn("⚠️ Timed out waiting for VM IP", zap.String("vm", vmName))
+	log.Warn("Timed out waiting for VM IP", zap.String("vm", vmName))
 	return "unknown"
 }
 

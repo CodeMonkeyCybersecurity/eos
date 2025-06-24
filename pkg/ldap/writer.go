@@ -18,7 +18,7 @@ func createUser(config *LDAPConfig, user LDAPUser, password string) error {
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("⚠️ Warning: failed to close LDAP connection: %v\n", cerr)
+			fmt.Printf("Warning: failed to close LDAP connection: %v\n", cerr)
 		}
 	}()
 

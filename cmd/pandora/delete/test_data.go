@@ -24,7 +24,7 @@ var DeleteTestDataCmd = &cobra.Command{
 
 		client, err := vault.GetVaultClient(rc)
 		if err != nil {
-			log.Warn("⚠️ Vault client unavailable", zap.Error(err))
+			log.Warn("Vault client unavailable", zap.Error(err))
 			client = nil // Will trigger fallback to disk
 		} else {
 			vault.ValidateAndCache(rc, client)
@@ -36,15 +36,15 @@ var DeleteTestDataCmd = &cobra.Command{
 		log.Info("🗑️ Attempting to delete test-data from Vault...")
 		err = vault.Delete(rc, client, shared.TestDataVaultPath)
 		if err != nil {
-			log.Warn("⚠️ Vault delete failed, falling back to disk", zap.Error(err))
+			log.Warn("Vault delete failed, falling back to disk", zap.Error(err))
 			return vault.DeleteTestDataFromDisk(rc)
 		}
 
 		fmt.Println()
 		fmt.Println("🗑️  Test Data Deletion Summary")
-		fmt.Println("  🔐 Vault: SUCCESS")
+		fmt.Println("   Vault: SUCCESS")
 		fmt.Printf("    📂 Path: secret/data/%s\n\n", shared.TestDataVaultPath)
-		log.Info("✅ Test-data deleted successfully (Vault)")
+		log.Info(" Test-data deleted successfully (Vault)")
 		return nil
 	}),
 }

@@ -24,7 +24,7 @@ attempts to upload it into Vault, and falls back to saving locally if Vault is u
 
 		client, err := vault.Authn(rc)
 		if err != nil {
-			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
+			log.Warn("Vault auth failed, falling back to disk", zap.Error(err))
 			client = nil // triggers fallback to disk
 		}
 

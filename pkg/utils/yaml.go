@@ -22,7 +22,7 @@ import (
 // DEPRECATED: Use structured logging or pkg/eos_io for YAML operations
 func ProcessMap(ctx context.Context, data map[string]interface{}, indent string) string {
 	logger := otelzap.Ctx(ctx)
-	logger.Debug("🔄 Processing YAML map structure",
+	logger.Debug(" Processing YAML map structure",
 		zap.Int("keys", len(data)),
 		zap.String("indent", indent))
 
@@ -53,10 +53,10 @@ func ProcessMap(ctx context.Context, data map[string]interface{}, indent string)
 // PrintProcessedMap displays the processed YAML structure to stderr
 func PrintProcessedMap(ctx context.Context, data map[string]interface{}, indent string) {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("📋 Displaying YAML structure")
+	logger.Info(" Displaying YAML structure")
 
 	output := ProcessMap(ctx, data, indent)
 	_, _ = fmt.Fprint(os.Stderr, output)
 
-	logger.Debug("✅ YAML structure displayed", zap.Int("output_length", len(output)))
+	logger.Debug(" YAML structure displayed", zap.Int("output_length", len(output)))
 }

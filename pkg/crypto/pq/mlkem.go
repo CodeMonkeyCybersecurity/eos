@@ -43,12 +43,12 @@ func GenerateMLKEMKeypair(rc *eos_io.RuntimeContext) (*MLKEMKeypair, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	start := time.Now()
 
-	logger.Info("🔐 Generating ML-KEM-768 keypair")
+	logger.Info(" Generating ML-KEM-768 keypair")
 
 	// Use filippo.io/mlkem768 for production-ready implementation
 	decapsulationKey, err := mlkem768.GenerateKey()
 	if err != nil {
-		logger.Error("❌ Failed to generate ML-KEM keypair", zap.Error(err))
+		logger.Error(" Failed to generate ML-KEM keypair", zap.Error(err))
 		return nil, fmt.Errorf("ML-KEM keypair generation failed: %w", err)
 	}
 
@@ -61,7 +61,7 @@ func GenerateMLKEMKeypair(rc *eos_io.RuntimeContext) (*MLKEMKeypair, error) {
 	}
 
 	duration := time.Since(start)
-	logger.Info("✅ ML-KEM keypair generated successfully",
+	logger.Info(" ML-KEM keypair generated successfully",
 		zap.Duration("generation_time", duration),
 		zap.Int("public_key_size", len(keypair.PublicKey)),
 		zap.Int("private_key_size", len(keypair.PrivateKey)),
@@ -76,18 +76,18 @@ func EncapsulateSecret(rc *eos_io.RuntimeContext, publicKey []byte) (*Encapsulat
 	logger := otelzap.Ctx(rc.Ctx)
 	start := time.Now()
 
-	logger.Info("🔐 Performing ML-KEM encapsulation")
+	logger.Info(" Performing ML-KEM encapsulation")
 
 	// Validate the public key size
 	if len(publicKey) != 1184 {
-		logger.Error("❌ Invalid ML-KEM public key size", zap.Int("expected", 1184), zap.Int("got", len(publicKey)))
+		logger.Error(" Invalid ML-KEM public key size", zap.Int("expected", 1184), zap.Int("got", len(publicKey)))
 		return nil, fmt.Errorf("invalid public key size: expected 1184, got %d", len(publicKey))
 	}
 
 	// Perform encapsulation using the public key bytes directly
 	ciphertext, sharedSecret, err := mlkem768.Encapsulate(publicKey)
 	if err != nil {
-		logger.Error("❌ ML-KEM encapsulation failed", zap.Error(err))
+		logger.Error(" ML-KEM encapsulation failed", zap.Error(err))
 		return nil, fmt.Errorf("encapsulation failed: %w", err)
 	}
 
@@ -97,7 +97,7 @@ func EncapsulateSecret(rc *eos_io.RuntimeContext, publicKey []byte) (*Encapsulat
 	}
 
 	duration := time.Since(start)
-	logger.Info("✅ ML-KEM encapsulation completed",
+	logger.Info(" ML-KEM encapsulation completed",
 		zap.Duration("encapsulation_time", duration),
 		zap.Int("ciphertext_size", len(result.Ciphertext)),
 		zap.Int("shared_secret_size", len(result.SharedSecret)),
@@ -111,11 +111,11 @@ func EncapsulateSecret(rc *eos_io.RuntimeContext, publicKey []byte) (*Encapsulat
 func DecapsulateSecret(rc *eos_io.RuntimeContext, privateKey, ciphertext []byte) ([]byte, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🔐 Performing ML-KEM decapsulation")
+	logger.Info(" Performing ML-KEM decapsulation")
 
 	// Validate private key size
 	if len(privateKey) != 2400 {
-		logger.Error("❌ Invalid ML-KEM private key size", zap.Int("expected", 2400), zap.Int("got", len(privateKey)))
+		logger.Error(" Invalid ML-KEM private key size", zap.Int("expected", 2400), zap.Int("got", len(privateKey)))
 		return nil, fmt.Errorf("invalid private key size: expected 2400, got %d", len(privateKey))
 	}
 
@@ -127,7 +127,7 @@ func DecapsulateSecret(rc *eos_io.RuntimeContext, privateKey, ciphertext []byte)
 	// This is a limitation of the current API demonstration
 	// In a real implementation, you would store the DecapsulationKey object
 	// or use the seed-based approach for key storage
-	logger.Error("❌ DecapsulationKey reconstruction from bytes not supported in current API")
+	logger.Error(" DecapsulationKey reconstruction from bytes not supported in current API")
 	return nil, fmt.Errorf("decapsulation from stored bytes not yet implemented - use in-memory keys only")
 }
 
@@ -137,7 +137,7 @@ func ValidateMLKEMPublicKey(rc *eos_io.RuntimeContext, publicKey []byte) error {
 
 	// ML-KEM-768 public key should be exactly 1184 bytes
 	if len(publicKey) != 1184 {
-		logger.Error("❌ Invalid ML-KEM public key size",
+		logger.Error(" Invalid ML-KEM public key size",
 			zap.Int("expected_size", 1184),
 			zap.Int("actual_size", len(publicKey)),
 		)
@@ -147,11 +147,11 @@ func ValidateMLKEMPublicKey(rc *eos_io.RuntimeContext, publicKey []byte) error {
 	// Try to use the key for encapsulation to ensure it's valid
 	_, _, err := mlkem768.Encapsulate(publicKey)
 	if err != nil {
-		logger.Error("❌ ML-KEM public key validation failed", zap.Error(err))
+		logger.Error(" ML-KEM public key validation failed", zap.Error(err))
 		return fmt.Errorf("invalid ML-KEM public key: %w", err)
 	}
 
-	logger.Info("✅ ML-KEM public key validation passed")
+	logger.Info(" ML-KEM public key validation passed")
 	return nil
 }
 
@@ -161,7 +161,7 @@ func ValidateMLKEMPrivateKey(rc *eos_io.RuntimeContext, privateKey []byte) error
 
 	// ML-KEM-768 private key should be exactly 2400 bytes
 	if len(privateKey) != 2400 {
-		logger.Error("❌ Invalid ML-KEM private key size",
+		logger.Error(" Invalid ML-KEM private key size",
 			zap.Int("expected_size", 2400),
 			zap.Int("actual_size", len(privateKey)),
 		)
@@ -173,7 +173,7 @@ func ValidateMLKEMPrivateKey(rc *eos_io.RuntimeContext, privateKey []byte) error
 	// which isn't easily possible from raw bytes with this API
 	logger.Info("🔍 ML-KEM private key size validation only (API limitation)")
 
-	logger.Info("✅ ML-KEM private key validation passed")
+	logger.Info(" ML-KEM private key validation passed")
 	return nil
 }
 
@@ -181,7 +181,7 @@ func ValidateMLKEMPrivateKey(rc *eos_io.RuntimeContext, privateKey []byte) error
 func GenerateHybridKeypair(rc *eos_io.RuntimeContext, usage string) (*HybridKeypair, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🔐 Generating hybrid keypair",
+	logger.Info(" Generating hybrid keypair",
 		zap.String("usage", usage),
 	)
 
@@ -201,7 +201,7 @@ func GenerateHybridKeypair(rc *eos_io.RuntimeContext, usage string) (*HybridKeyp
 		Usage:       usage,
 	}
 
-	logger.Info("✅ Hybrid keypair generated successfully",
+	logger.Info(" Hybrid keypair generated successfully",
 		zap.String("usage", usage),
 		zap.Time("created_at", hybrid.CreatedAt),
 	)

@@ -33,7 +33,7 @@ func runCrontabUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	// Trim and prompt if needed
 	email = strings.TrimSpace(email)
 	if email == "" {
-		email = interaction.PromptInput(rc.Ctx, "📧 Email address for cron failure alerts", "e.g., your@email.com")
+		email = interaction.PromptInput(rc.Ctx, " Email address for cron failure alerts", "e.g., your@email.com")
 	}
 	if email == "" {
 		log.Error("No email address provided. Aborting update.")
@@ -43,16 +43,16 @@ func runCrontabUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	log.Info("🔍 Fetching current crontab...")
 	current, err := eos_unix.GetCrontab()
 	if err != nil {
-		log.Error("❌ Failed to retrieve crontab", zap.Error(err))
+		log.Error(" Failed to retrieve crontab", zap.Error(err))
 		return err
 	}
 
 	log.Info("🛟 Creating backup of existing crontab...")
 	backupPath, err := eos_unix.BackupCrontab(current)
 	if err != nil {
-		log.Warn("⚠️ Could not create crontab backup", zap.Error(err))
+		log.Warn("Could not create crontab backup", zap.Error(err))
 	} else {
-		log.Info("✅ Crontab backup saved", zap.String("path", backupPath))
+		log.Info(" Crontab backup saved", zap.String("path", backupPath))
 	}
 
 	log.Info("✏️ Patching crontab with MAILTO directive", zap.String("mailto", email))
@@ -60,12 +60,12 @@ func runCrontabUpdate(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 	log.Info("📤 Applying updated crontab...")
 	if err := eos_unix.SetCrontab(updated); err != nil {
-		log.Error("❌ Failed to apply updated crontab", zap.Error(err))
+		log.Error(" Failed to apply updated crontab", zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Crontab updated successfully", zap.String("mailto", email))
-	fmt.Println("\n📜 New crontab:\n==============================")
+	log.Info(" Crontab updated successfully", zap.String("mailto", email))
+	fmt.Println("\n New crontab:\n==============================")
 	fmt.Println(updated)
 	fmt.Println("==============================")
 

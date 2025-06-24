@@ -108,7 +108,7 @@ var DeleteVaultSecureCmd = &cobra.Command{
 			}
 		}
 
-		logger.Info("✅ Secure Vault deletion completed successfully")
+		logger.Info(" Secure Vault deletion completed successfully")
 		return nil
 	}),
 }
@@ -162,7 +162,7 @@ func stopVaultServices(rc *eos_io.RuntimeContext) error {
 
 func removeVaultPackages(rc *eos_io.RuntimeContext, distro string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("📦 Removing Vault packages", zap.String("distro", distro))
+	logger.Info(" Removing Vault packages", zap.String("distro", distro))
 
 	switch distro {
 	case "debian":
@@ -195,7 +195,7 @@ func purgeVaultFiles(rc *eos_io.RuntimeContext) error {
 		"/etc/profile.d/eos_vault.sh",
 		"/home/eos/.vault-token",
 		"/home/eos/.config/vault/",
-		"/home/eos/.config/hcp/",     // Vault binary creates this despite VAULT_SKIP_HCP=true
+		"/home/eos/.config/hcp/", // Vault binary creates this despite VAULT_SKIP_HCP=true
 		"/tmp/vault*",
 	}
 	allPaths = append(allPaths, additionalPaths...)
@@ -249,7 +249,7 @@ func removePathSecurely(rc *eos_io.RuntimeContext, path string) error {
 
 func cleanupSystemHardening(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔒 Cleaning up system hardening configurations")
+	logger.Info(" Cleaning up system hardening configurations")
 
 	hardeningPaths := []string{
 		"/etc/systemd/system/vault.service.d/",
@@ -309,7 +309,7 @@ func cleanupEosUser(rc *eos_io.RuntimeContext) error {
 
 func cleanupPackageRepos(rc *eos_io.RuntimeContext, distro string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("📋 Cleaning up package repositories", zap.String("distro", distro))
+	logger.Info(" Cleaning up package repositories", zap.String("distro", distro))
 
 	switch distro {
 	case "debian":
@@ -384,6 +384,6 @@ func verifyCleanup(rc *eos_io.RuntimeContext) error {
 		logger.Warn("Failed to reload systemd daemon", zap.Error(err))
 	}
 
-	logger.Info("✅ Cleanup verification passed")
+	logger.Info(" Cleanup verification passed")
 	return nil
 }

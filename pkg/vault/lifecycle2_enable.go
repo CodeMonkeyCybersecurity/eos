@@ -21,7 +21,7 @@ func VaultAddress() string {
 
 // EnableVault now drives everything interactively.
 func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger) error {
-	log.Info("🚀 Starting Vault enablement flow")
+	log.Info(" Starting Vault enablement flow")
 
 	// Clear any existing VAULT_TOKEN to ensure fresh authentication setup
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
@@ -29,9 +29,9 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		if err := os.Unsetenv("VAULT_TOKEN"); err != nil {
 			log.Warn("Failed to unset VAULT_TOKEN", zap.Error(err))
 		}
-		log.Info("✅ VAULT_TOKEN cleared successfully")
+		log.Info(" VAULT_TOKEN cleared successfully")
 	} else {
-		log.Info("✅ No existing VAULT_TOKEN found - proceeding with fresh setup")
+		log.Info(" No existing VAULT_TOKEN found - proceeding with fresh setup")
 	}
 
 	log.Info("🔓 Starting Vault initialization and unseal process")
@@ -40,7 +40,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		return logger.LogErrAndWrap(rc, "initialize and unseal vault", err)
 	}
 	client = unsealedClient
-	log.Info("✅ Vault client initialized and unsealed successfully")
+	log.Info(" Vault client initialized and unsealed successfully")
 
 	steps := []struct {
 		name string
@@ -62,12 +62,12 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	}
 
 	// Step 9a: Enable KV v2
-	log.Info("🗂️ Enabling KV v2 secrets engine")
+	log.Info(" Enabling KV v2 secrets engine")
 	if err := PhaseEnableKVv2(rc, client); err != nil {
-		log.Error("❌ Failed to enable KV v2 secrets engine", zap.Error(err))
+		log.Error(" Failed to enable KV v2 secrets engine", zap.Error(err))
 		return logger.LogErrAndWrap(rc, "enable KV v2", err)
 	}
-	log.Info("✅ KV v2 secrets engine enabled successfully")
+	log.Info(" KV v2 secrets engine enabled successfully")
 
 	// Step 10a: interactively configure userpass auth
 	if interaction.PromptYesNo(rc.Ctx, "Enable Userpass authentication?", false) {
@@ -106,23 +106,23 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 		if err := EnableMFAMethods(rc, client, mfaConfig); err != nil {
 			return logger.LogErrAndWrap(rc, "enable MFA", err)
 		}
-		log.Info("✅ MFA configuration completed")
+		log.Info(" MFA configuration completed")
 	} else {
-		log.Warn("⚠️ MFA was not enabled - this reduces security")
+		log.Warn("MFA was not enabled - this reduces security")
 	}
 
 	// Step 14: Vault Agent comprehensive enablement
 	if interaction.PromptYesNo(rc.Ctx, "Enable Vault Agent service?", true) {
-		log.Info("🤖 Starting Vault Agent enablement")
+		log.Info(" Starting Vault Agent enablement")
 		config := DefaultVaultAgentConfig()
 		if err := PhaseEnableVaultAgent(rc, client, config); err != nil {
 			return logger.LogErrAndWrap(rc, "enable Vault Agent", err)
 		}
-		log.Info("✅ Vault Agent enabled successfully")
-		fmt.Println("✅ Vault Agent is now running and configured for automatic authentication")
+		log.Info(" Vault Agent enabled successfully")
+		fmt.Println(" Vault Agent is now running and configured for automatic authentication")
 	} else {
 		log.Info("⏭️ Vault Agent enablement skipped by user")
-		fmt.Println("ℹ️ Vault Agent not enabled. You can enable it later with manual configuration.")
+		fmt.Println(" Vault Agent not enabled. You can enable it later with manual configuration.")
 	}
 
 	// Step 15: Apply core secrets and verify readiness
@@ -133,24 +133,24 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	// Step 16: Optional root token revocation
 	if interaction.PromptYesNo(rc.Ctx, "Revoke root token for enhanced security? (Ensure alternative auth methods work first)", false) {
 		if err := revokeRootTokenSafely(rc, client); err != nil {
-			log.Warn("⚠️ Root token revocation failed", zap.Error(err))
-			fmt.Println("⚠️ Root token revocation failed. You can revoke it later using 'eos secure vault --comprehensive'")
+			log.Warn("Root token revocation failed", zap.Error(err))
+			fmt.Println("Root token revocation failed. You can revoke it later using 'eos secure vault --comprehensive'")
 		} else {
-			log.Info("✅ Root token revoked successfully")
-			fmt.Println("✅ Root token has been revoked. Use alternative authentication methods for future access.")
+			log.Info(" Root token revoked successfully")
+			fmt.Println(" Root token has been revoked. Use alternative authentication methods for future access.")
 		}
 	} else {
-		log.Info("📝 Root token kept active - remember to revoke it after setting up alternative auth")
+		log.Info(" Root token kept active - remember to revoke it after setting up alternative auth")
 	}
 
-	log.Info("🎉 Vault enablement process completed successfully")
+	log.Info(" Vault enablement process completed successfully")
 	PrintEnableNextSteps()
 	return nil
 }
 
 func PrintEnableNextSteps() {
 	fmt.Println("\n🔔 Vault setup is now complete!")
-	fmt.Println("👉 Next steps:")
+	fmt.Println(" Next steps:")
 	fmt.Println("   1. Run: eos secure vault   (to finalize hardening and cleanup)")
 	fmt.Println("   2. Test Vault Agent: eos read vault agent")
 	fmt.Println("   3. Optionally onboard new users, configure roles, or deploy additional services.")

@@ -33,17 +33,17 @@ func UpdateHostname(rc *eos_io.RuntimeContext) error {
 	// Get the current hostname
 	currentHostname, err := os.Hostname()
 	if err != nil {
-		logger.Error("❌ Failed to retrieve current hostname",
+		logger.Error(" Failed to retrieve current hostname",
 			zap.Error(err),
 			zap.String("troubleshooting", "Check system configuration"))
 		return err
 	}
-	logger.Info("📋 Current hostname retrieved",
+	logger.Info(" Current hostname retrieved",
 		zap.String("hostname", currentHostname))
 
 	// Ask for confirmation to proceed using default No
 	if !interaction.PromptYesNo(rc.Ctx, "Do you want to change the hostname?", false) {
-		logger.Info("ℹ️ Hostname change aborted by user")
+		logger.Info(" Hostname change aborted by user")
 		return nil
 	}
 
@@ -53,51 +53,51 @@ func UpdateHostname(rc *eos_io.RuntimeContext) error {
 
 	// Check if the input is not empty
 	if newHostname == "" {
-		logger.Error("❌ Empty hostname provided",
+		logger.Error(" Empty hostname provided",
 			zap.String("troubleshooting", "Hostname cannot be empty"))
 		return nil
 	}
 
-	logger.Info("🔧 Changing hostname",
+	logger.Info(" Changing hostname",
 		zap.String("old_hostname", currentHostname),
 		zap.String("new_hostname", newHostname))
 
 	// Change the hostname temporarily
-	logger.Info("🔧 Executing command",
+	logger.Info(" Executing command",
 		zap.String("command", "hostname"),
 		zap.Strings("args", []string{newHostname}))
 	err = exec.Command("hostname", newHostname).Run()
 	if err != nil {
-		logger.Error("❌ Failed to change hostname temporarily",
+		logger.Error(" Failed to change hostname temporarily",
 			zap.Error(err),
 			zap.String("command", "hostname"),
 			zap.String("new_hostname", newHostname),
 			zap.String("troubleshooting", "Check permissions and system state"))
 		return err
 	}
-	logger.Info("✅ Temporary hostname change completed")
+	logger.Info(" Temporary hostname change completed")
 
 	// Change the hostname permanently
-	logger.Info("🔧 Writing new hostname to /etc/hostname",
+	logger.Info(" Writing new hostname to /etc/hostname",
 		zap.String("file_path", "/etc/hostname"),
 		zap.String("new_hostname", newHostname))
 	err = os.WriteFile("/etc/hostname", []byte(newHostname+"\n"), 0644)
 	if err != nil {
-		logger.Error("❌ Failed to write /etc/hostname",
+		logger.Error(" Failed to write /etc/hostname",
 			zap.Error(err),
 			zap.String("file_path", "/etc/hostname"),
 			zap.String("troubleshooting", "Check permissions for /etc/hostname"))
 		return err
 	}
-	logger.Info("✅ Permanent hostname file updated")
+	logger.Info(" Permanent hostname file updated")
 
 	// Update the /etc/hosts file
-	logger.Info("🔧 Executing command",
+	logger.Info(" Executing command",
 		zap.String("command", "sed"),
 		zap.Strings("args", []string{"-i", "s/" + currentHostname + "/" + newHostname + "/g", "/etc/hosts"}))
 	err = exec.Command("sed", "-i", "s/"+currentHostname+"/"+newHostname+"/g", "/etc/hosts").Run()
 	if err != nil {
-		logger.Error("❌ Failed to update /etc/hosts",
+		logger.Error(" Failed to update /etc/hosts",
 			zap.Error(err),
 			zap.String("file_path", "/etc/hosts"),
 			zap.String("old_hostname", currentHostname),
@@ -105,7 +105,7 @@ func UpdateHostname(rc *eos_io.RuntimeContext) error {
 			zap.String("troubleshooting", "Check permissions for /etc/hosts"))
 		return err
 	}
-	logger.Info("✅ /etc/hosts file updated")
+	logger.Info(" /etc/hosts file updated")
 
 	logger.Info("✨ Hostname change complete",
 		zap.String("old_hostname", currentHostname),

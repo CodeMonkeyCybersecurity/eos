@@ -63,7 +63,7 @@ func configureUnattendedUpgrades(rc *eos_io.RuntimeContext) error {
 	}
 	logger.Info("Automatic updates enabled", zap.String("path", autoPath))
 
-	logger.Info("✅ Automatic security updates configured")
+	logger.Info(" Automatic security updates configured")
 	return nil
 }
 
@@ -113,7 +113,7 @@ restic forget --prune \
 		return fmt.Errorf("write restic password file: %w", err)
 	}
 
-	logger.Info("✅ Restic backup solution installed",
+	logger.Info(" Restic backup solution installed",
 		zap.String("script", scriptPath),
 		zap.String("note", "Remember to configure backup destination and password"))
 	return nil

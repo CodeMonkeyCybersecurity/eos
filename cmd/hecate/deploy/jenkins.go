@@ -89,7 +89,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 				return err
 			}
 
-			fmt.Println("🎉 Jenkins reverse proxy deployed successfully.")
+			fmt.Println(" Jenkins reverse proxy deployed successfully.")
 			return nil
 		}),
 	}

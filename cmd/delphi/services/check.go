@@ -33,7 +33,7 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 		pythonCmd := exec.Command("python3", "--version")
 		pythonOutput, err := pythonCmd.Output()
 		if err != nil {
-			logger.Error("❌ Python 3 not found", zap.Error(err))
+			logger.Error(" Python 3 not found", zap.Error(err))
 			return err
 		}
 
@@ -42,20 +42,20 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 
 		pip3Path, err := exec.LookPath("pip3")
 		if err != nil {
-			logger.Error("❌ pip3 not found", zap.Error(err))
+			logger.Error(" pip3 not found", zap.Error(err))
 			return err
 		}
 
-		logger.Info("📦 pip3 available", zap.String("path", pip3Path))
+		logger.Info(" pip3 available", zap.String("path", pip3Path))
 
 		// Define required packages and their import names
 		packages := map[string]string{
 			"psycopg2-binary": "psycopg2",
 			"python-dotenv":   "dotenv",
 			"requests":        "requests",
-			"pytz":           "pytz",
-			"ipwhois":        "ipwhois",
-			"pyyaml":         "yaml",
+			"pytz":            "pytz",
+			"ipwhois":         "ipwhois",
+			"pyyaml":          "yaml",
 		}
 
 		logger.Info("🔍 Checking package availability",
@@ -68,12 +68,12 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 			// Try to import the package
 			importCmd := exec.Command("python3", "-c", "import "+importName)
 			if err := importCmd.Run(); err != nil {
-				logger.Warn("❌ Package not available",
+				logger.Warn(" Package not available",
 					zap.String("package", pkg),
 					zap.String("import_name", importName))
 				missingPackages = append(missingPackages, pkg)
 			} else {
-				logger.Info("✅ Package available",
+				logger.Info(" Package available",
 					zap.String("package", pkg),
 					zap.String("import_name", importName))
 				installedPackages = append(installedPackages, pkg)
@@ -81,27 +81,27 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 		}
 
 		// Show summary
-		logger.Info("📊 Dependency check summary",
+		logger.Info(" Dependency check summary",
 			zap.Int("total", len(packages)),
 			zap.Int("installed", len(installedPackages)),
 			zap.Int("missing", len(missingPackages)))
 
 		if len(installedPackages) > 0 {
-			logger.Info("✅ Installed packages",
+			logger.Info(" Installed packages",
 				zap.Strings("packages", installedPackages))
 		}
 
 		if len(missingPackages) > 0 {
-			logger.Warn("⚠️ Missing packages",
+			logger.Warn("Missing packages",
 				zap.Strings("packages", missingPackages))
 			logger.Info("💡 To install missing packages, run:")
 			logger.Info("   eos delphi services install")
-			
+
 			// Also show manual installation command
 			logger.Info("💡 Or install manually with:")
 			logger.Info("   sudo pip3 install " + strings.Join(missingPackages, " "))
 		} else {
-			logger.Info("🎉 All Python dependencies are installed!")
+			logger.Info(" All Python dependencies are installed!")
 			logger.Info("💡 Next steps:")
 			logger.Info("   1. Ensure PostgreSQL is running")
 			logger.Info("   2. Configure environment variables")
@@ -114,21 +114,21 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 		// Check PostgreSQL client
 		psqlCmd := exec.Command("psql", "--version")
 		if psqlOutput, err := psqlCmd.Output(); err != nil {
-			logger.Warn("⚠️ PostgreSQL client (psql) not found",
+			logger.Warn("PostgreSQL client (psql) not found",
 				zap.Error(err))
 		} else {
-			logger.Info("✅ PostgreSQL client available",
+			logger.Info(" PostgreSQL client available",
 				zap.String("version", strings.TrimSpace(string(psqlOutput))))
 		}
 
 		// Check if systemctl is available (for service management)
 		systemctlCmd := exec.Command("systemctl", "--version")
 		if systemctlOutput, err := systemctlCmd.Output(); err != nil {
-			logger.Warn("⚠️ systemctl not found - service management may not work",
+			logger.Warn("systemctl not found - service management may not work",
 				zap.Error(err))
 		} else {
 			systemctlVersion := strings.Split(string(systemctlOutput), "\n")[0]
-			logger.Info("✅ systemctl available",
+			logger.Info(" systemctl available",
 				zap.String("version", strings.TrimSpace(systemctlVersion)))
 		}
 

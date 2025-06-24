@@ -66,21 +66,21 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	inspector := inspect.New(rc)
 
 	// Run discovery with progress updates
-	logger.Info("📊 Discovering system information",
+	logger.Info(" Discovering system information",
 		zap.String("phase", "system"),
 		zap.Duration("timeout", 30*time.Second))
 
 	systemStart := time.Now()
 	systemInfo, err := inspector.DiscoverSystem()
 	if err != nil {
-		logger.Error("❌ Failed to discover system information",
+		logger.Error(" Failed to discover system information",
 			zap.Error(err),
 			zap.String("phase", "system"),
 			zap.Duration("duration", time.Since(systemStart)),
 			zap.String("troubleshooting", "Check system commands availability (hostnamectl, free, df)"))
 		return err
 	}
-	logger.Info("✅ System information collected",
+	logger.Info(" System information collected",
 		zap.String("hostname", systemInfo.Hostname),
 		zap.String("os", systemInfo.OS),
 		zap.String("kernel", systemInfo.Kernel),
@@ -91,14 +91,14 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		zap.String("uptime", systemInfo.Uptime),
 		zap.Duration("discovery_duration", time.Since(systemStart)))
 
-	logger.Info("🐳 Discovering Docker containers and configurations",
+	logger.Info(" Discovering Docker containers and configurations",
 		zap.String("phase", "docker"),
 		zap.Duration("timeout", 30*time.Second))
 
 	dockerStart := time.Now()
 	dockerInfo, err := inspector.DiscoverDocker()
 	if err != nil {
-		logger.Warn("⚠️ Docker discovery failed (Docker might not be installed)",
+		logger.Warn("Docker discovery failed (Docker might not be installed)",
 			zap.Error(err),
 			zap.String("phase", "docker"),
 			zap.Duration("duration", time.Since(dockerStart)),
@@ -110,7 +110,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 				runningContainers++
 			}
 		}
-		logger.Info("✅ Docker information collected",
+		logger.Info(" Docker information collected",
 			zap.Int("containers", len(dockerInfo.Containers)),
 			zap.Int("running", runningContainers),
 			zap.Int("images", len(dockerInfo.Images)),
@@ -126,7 +126,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	kvmStart := time.Now()
 	kvmInfo, err := inspector.DiscoverKVM()
 	if err != nil {
-		logger.Warn("⚠️ KVM discovery failed (libvirt might not be installed)",
+		logger.Warn("KVM discovery failed (libvirt might not be installed)",
 			zap.Error(err),
 			zap.String("phase", "kvm"),
 			zap.Duration("duration", time.Since(kvmStart)),
@@ -138,7 +138,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 				runningVMs++
 			}
 		}
-		logger.Info("✅ KVM information collected",
+		logger.Info(" KVM information collected",
 			zap.Int("vms", len(kvmInfo.VMs)),
 			zap.Int("running", runningVMs),
 			zap.Int("networks", len(kvmInfo.Networks)),
@@ -153,13 +153,13 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	hetznerStart := time.Now()
 	hetznerInfo, err := inspector.DiscoverHetzner()
 	if err != nil {
-		logger.Warn("⚠️ Hetzner discovery failed (hcloud CLI might not be configured)",
+		logger.Warn("Hetzner discovery failed (hcloud CLI might not be configured)",
 			zap.Error(err),
 			zap.String("phase", "hetzner"),
 			zap.Duration("duration", time.Since(hetznerStart)),
 			zap.String("troubleshooting", "Install hcloud CLI and configure with 'hcloud auth' or set HCLOUD_TOKEN"))
 	} else if hetznerInfo != nil {
-		logger.Info("✅ Hetzner information collected",
+		logger.Info(" Hetzner information collected",
 			zap.Int("servers", len(hetznerInfo.Servers)),
 			zap.Int("networks", len(hetznerInfo.Networks)),
 			zap.Int("firewalls", len(hetznerInfo.Firewalls)),
@@ -167,20 +167,20 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 			zap.Duration("discovery_duration", time.Since(hetznerStart)))
 	}
 
-	logger.Info("⚙️ Discovering service configurations",
+	logger.Info(" Discovering service configurations",
 		zap.String("phase", "services"),
 		zap.Duration("timeout", 30*time.Second))
 
 	servicesStart := time.Now()
 	servicesInfo, err := inspector.DiscoverServices()
 	if err != nil {
-		logger.Warn("⚠️ Services discovery partially failed",
+		logger.Warn("Services discovery partially failed",
 			zap.Error(err),
 			zap.String("phase", "services"),
 			zap.Duration("duration", time.Since(servicesStart)),
 			zap.String("troubleshooting", "Check systemctl availability and service configurations"))
 	} else {
-		logger.Info("✅ Service information collected",
+		logger.Info(" Service information collected",
 			zap.Int("systemd_services", len(servicesInfo.SystemdServices)),
 			zap.Bool("nginx_found", servicesInfo.Nginx != nil),
 			zap.Bool("postgres_found", servicesInfo.PostgreSQL != nil),
@@ -232,35 +232,35 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		outputDir = filepath.Dir(infraOutputPath)
 	}
 
-	logger.Info("📁 Creating output directory",
+	logger.Info(" Creating output directory",
 		zap.String("directory", outputDir),
 		zap.String("permissions", "0755"))
 
 	if err := os.MkdirAll(outputDir, 0755); err != nil {
-		logger.Error("❌ Failed to create output directory",
+		logger.Error(" Failed to create output directory",
 			zap.Error(err),
 			zap.String("directory", outputDir))
 		return err
 	}
 
-	logger.Info("✅ Output directory ready",
+	logger.Info(" Output directory ready",
 		zap.String("directory", outputDir))
 
 	// Write output
 	if infraTerraformFlag {
-		logger.Info("📝 Generating Terraform configuration",
+		logger.Info(" Generating Terraform configuration",
 			zap.String("path", infraOutputPath))
 		if err := inspect.WriteTerraform(rc.Ctx, infrastructure, infraOutputPath); err != nil {
-			logger.Error("❌ Failed to write Terraform output",
+			logger.Error(" Failed to write Terraform output",
 				zap.Error(err),
 				zap.String("path", infraOutputPath))
 			return err
 		}
 	} else {
-		logger.Info("📝 Generating YAML report",
+		logger.Info(" Generating YAML report",
 			zap.String("path", infraOutputPath))
 		if err := inspect.WriteYAML(rc.Ctx, infrastructure, infraOutputPath); err != nil {
-			logger.Error("❌ Failed to write YAML output",
+			logger.Error(" Failed to write YAML output",
 				zap.Error(err),
 				zap.String("path", infraOutputPath))
 			return err

@@ -14,7 +14,7 @@ func printGroup(rc *eos_io.RuntimeContext, cn string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get group: %w", err)
 	}
-	fmt.Printf("🛡️  %s\nMembers:\n", group.CN)
+	fmt.Printf("  %s\nMembers:\n", group.CN)
 	for _, m := range group.Members {
 		fmt.Println("   -", m)
 	}

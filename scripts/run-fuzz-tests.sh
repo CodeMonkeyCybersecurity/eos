@@ -7,7 +7,7 @@ set -e
 FUZZTIME="${1:-10s}"
 
 echo "🔍 Running fuzz tests with ${FUZZTIME} duration..."
-echo "📁 Working directory: $(pwd)"
+echo " Working directory: $(pwd)"
 echo ""
 
 echo "🧮 Fuzzing crypto package..."
@@ -31,9 +31,9 @@ go test -run=^FuzzValidateIP$ -fuzz=^FuzzValidateIP$ -fuzztime="${FUZZTIME}" ./p
 go test -run=^FuzzValidateNoShellMeta$ -fuzz=^FuzzValidateNoShellMeta$ -fuzztime="${FUZZTIME}" ./pkg/interaction
 
 echo ""
-echo "📊 Fuzzing parse package..."
+echo " Fuzzing parse package..."
 go test -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime="${FUZZTIME}" ./pkg/parse
 
 echo ""
-echo "✅ All fuzz tests completed successfully!"
-echo "🎉 No issues found during fuzzing with ${FUZZTIME} duration."
+echo " All fuzz tests completed successfully!"
+echo " No issues found during fuzzing with ${FUZZTIME} duration."

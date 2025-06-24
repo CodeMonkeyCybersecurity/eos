@@ -21,15 +21,15 @@ var CreateHecateCmd = &cobra.Command{
 places it in /opt/hecate, and prepares it for use with Eos.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info("🚀 Starting full Hecate setup wizard...")
+		log.Info(" Starting full Hecate setup wizard...")
 
-		// ✅ Call the full prompt + orchestrator flow
+		//  Call the full prompt + orchestrator flow
 		if err := hecate.OrchestrateHecateWizard(rc); err != nil {
-			log.Error("❌ Hecate setup failed", zap.Error(err))
+			log.Error(" Hecate setup failed", zap.Error(err))
 			return err
 		}
 
-		log.Info("✅ Hecate setup completed successfully!")
+		log.Info(" Hecate setup completed successfully!")
 		return nil
 	}),
 }

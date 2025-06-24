@@ -171,12 +171,12 @@ func PathExistsKVv2(rc *eos_io.RuntimeContext, client *api.Client, mount, path s
 	md, err := client.KVv2(mount).GetMetadata(rc.Ctx, path)
 	switch {
 	case err == nil && md != nil:
-		otelzap.Ctx(rc.Ctx).Debug("✅ Metadata found", zap.String("mount", mount), zap.String("path", path))
+		otelzap.Ctx(rc.Ctx).Debug(" Metadata found", zap.String("mount", mount), zap.String("path", path))
 		return true, nil
 	case isNotFound(err):
 		return false, nil
 	default:
-		otelzap.Ctx(rc.Ctx).Error("❌ Metadata check failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Metadata check failed", zap.Error(err))
 		return false, err
 	}
 }

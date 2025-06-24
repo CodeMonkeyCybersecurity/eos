@@ -118,11 +118,11 @@ func TrustVaultCA_RHEL(rc *eos_io.RuntimeContext) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to update system CA trust", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault CA is now trusted system‑wide")
+	otelzap.Ctx(rc.Ctx).Info(" Vault CA is now trusted system‑wide")
 	return nil
 }
 
@@ -145,11 +145,11 @@ func TrustVaultCA_Debian(rc *eos_io.RuntimeContext) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to update system CA trust", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to update system CA trust", zap.Error(err))
 		return fmt.Errorf("failed to update system CA trust: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault CA trusted system-wide on Debian/Ubuntu")
+	otelzap.Ctx(rc.Ctx).Info(" Vault CA trusted system-wide on Debian/Ubuntu")
 	return nil
 }
 

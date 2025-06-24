@@ -59,7 +59,7 @@ func RenderBundleFragments(
 	// === Compose ===
 	if bundle.Compose != nil {
 		for name, svc := range bundle.Compose.Services {
-			log.Info("🔧 Rendering Compose service", zap.String("service", name))
+			log.Info(" Rendering Compose service", zap.String("service", name))
 
 			rendered, err := renderTemplateFromString(svc.FullServiceYAML, svc.Environment)
 			if err != nil {
@@ -72,7 +72,7 @@ func RenderBundleFragments(
 				log.Error("Failed to write Compose", zap.String("service", name), zap.Error(err))
 				return fmt.Errorf("failed to write Compose %s: %w", name, err)
 			}
-			log.Info("✅ Compose block written", zap.String("service", name))
+			log.Info(" Compose block written", zap.String("service", name))
 		}
 	}
 
@@ -95,7 +95,7 @@ func RenderBundleFragments(
 			log.Error("Failed to write Caddy", zap.Error(err))
 			return fmt.Errorf("failed to write Caddy: %w", err)
 		}
-		log.Info("✅ Caddy block written", zap.String("path", filePath))
+		log.Info(" Caddy block written", zap.String("path", filePath))
 	}
 
 	// === Nginx ===
@@ -117,7 +117,7 @@ func RenderBundleFragments(
 			log.Error("Failed to write Nginx block", zap.Error(err))
 			return fmt.Errorf("failed to write Nginx: %w", err)
 		}
-		log.Info("✅ Nginx block written", zap.String("path", filePath))
+		log.Info(" Nginx block written", zap.String("path", filePath))
 	}
 
 	return nil
@@ -137,7 +137,7 @@ func GenericWizard(
 	ports []string,
 ) ServiceBundle {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting setup information...")
+	log.Info(" Collecting setup information...")
 
 	env := make(map[string]string)
 	for _, field := range prompts {
@@ -167,7 +167,7 @@ func GenericWizard(
 		}
 	}
 
-	log.Info("✅ ServiceBundle prepared", zap.String("service", serviceName))
+	log.Info(" ServiceBundle prepared", zap.String("service", serviceName))
 
 	return ServiceBundle{
 		Compose: composeSpec,
@@ -200,6 +200,6 @@ func RenderAndWriteTemplate(
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
-	log.Info("✅ Template written successfully", zap.String("path", outputPath))
+	log.Info(" Template written successfully", zap.String("path", outputPath))
 	return nil
 }

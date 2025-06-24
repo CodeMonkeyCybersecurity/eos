@@ -103,55 +103,55 @@ func DefaultFIDO2Config() *FIDO2Config {
 // PhaseConfigureFIDO2 provides comprehensive FIDO2 setup and integration
 func PhaseConfigureFIDO2(rc *eos_io.RuntimeContext, config *FIDO2Config) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔐 Starting comprehensive FIDO2 configuration")
+	log.Info(" Starting comprehensive FIDO2 configuration")
 
 	if config == nil {
 		config = DefaultFIDO2Config()
 	}
 
 	// Step 1: Install FIDO2 packages
-	log.Info("📦 Installing FIDO2 packages")
+	log.Info(" Installing FIDO2 packages")
 	if err := installFIDO2Packages(rc); err != nil {
-		log.Error("❌ FIDO2 package installation failed", zap.Error(err))
+		log.Error(" FIDO2 package installation failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 package installation failed")
 	}
 
 	// Step 2: Configure udev rules for FIDO2 devices
-	log.Info("⚙️ Configuring udev rules for FIDO2 devices")
+	log.Info(" Configuring udev rules for FIDO2 devices")
 	if err := configureFIDO2UdevRules(rc); err != nil {
-		log.Error("❌ FIDO2 udev configuration failed", zap.Error(err))
+		log.Error(" FIDO2 udev configuration failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 udev configuration failed")
 	}
 
 	// Step 3: Configure PAM for FIDO2 authentication
-	log.Info("🔧 Configuring PAM for FIDO2 authentication")
+	log.Info(" Configuring PAM for FIDO2 authentication")
 	if err := configureFIDO2PAM(rc, config); err != nil {
-		log.Error("❌ FIDO2 PAM configuration failed", zap.Error(err))
+		log.Error(" FIDO2 PAM configuration failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 PAM configuration failed")
 	}
 
 	// Step 4: Set up FIDO2 user enrollment
 	log.Info("👤 Setting up FIDO2 user enrollment system")
 	if err := setupFIDO2Enrollment(rc, config); err != nil {
-		log.Error("❌ FIDO2 enrollment setup failed", zap.Error(err))
+		log.Error(" FIDO2 enrollment setup failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 enrollment setup failed")
 	}
 
 	// Step 5: Configure FIDO2 logging and monitoring
-	log.Info("📊 Configuring FIDO2 monitoring")
+	log.Info(" Configuring FIDO2 monitoring")
 	if err := configureFIDO2Monitoring(rc, config); err != nil {
-		log.Error("❌ FIDO2 monitoring setup failed", zap.Error(err))
+		log.Error(" FIDO2 monitoring setup failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 monitoring setup failed")
 	}
 
 	// Step 6: Validate FIDO2 configuration
-	log.Info("✅ Validating FIDO2 configuration")
+	log.Info(" Validating FIDO2 configuration")
 	if err := validateFIDO2Setup(rc, config); err != nil {
-		log.Error("❌ FIDO2 validation failed", zap.Error(err))
+		log.Error(" FIDO2 validation failed", zap.Error(err))
 		return cerr.Wrap(err, "FIDO2 validation failed")
 	}
 
-	log.Info("✅ FIDO2 configuration completed successfully")
+	log.Info(" FIDO2 configuration completed successfully")
 	return nil
 }
 
@@ -170,14 +170,14 @@ func installFIDO2Packages(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, pkg := range packages {
-		log.Info("📦 Installing FIDO2 package", zap.String("package", pkg))
+		log.Info(" Installing FIDO2 package", zap.String("package", pkg))
 		if err := execute.RunSimple(rc.Ctx, "apt-get", "install", "-y", pkg); err != nil {
-			log.Error("❌ Failed to install package", zap.String("package", pkg), zap.Error(err))
+			log.Error(" Failed to install package", zap.String("package", pkg), zap.Error(err))
 			return cerr.Wrapf(err, "failed to install package: %s", pkg)
 		}
 	}
 
-	log.Info("✅ All FIDO2 packages installed successfully")
+	log.Info(" All FIDO2 packages installed successfully")
 	return nil
 }
 
@@ -214,25 +214,25 @@ ACTION=="add", SUBSYSTEM=="hidraw", ATTRS{usage}=="00010006", RUN+="/usr/sbin/us
 `
 
 	udevPath := "/etc/udev/rules.d/70-fido2.rules"
-	log.Info("📝 Writing FIDO2 udev rules", zap.String("path", udevPath))
+	log.Info(" Writing FIDO2 udev rules", zap.String("path", udevPath))
 	if err := os.WriteFile(udevPath, []byte(udevRules), 0644); err != nil {
-		log.Error("❌ Failed to write udev rules", zap.Error(err))
+		log.Error(" Failed to write udev rules", zap.Error(err))
 		return cerr.Wrap(err, "failed to write udev rules")
 	}
 
 	// Reload udev rules
-	log.Info("🔄 Reloading udev rules")
+	log.Info(" Reloading udev rules")
 	if err := execute.RunSimple(rc.Ctx, "udevadm", "control", "--reload-rules"); err != nil {
-		log.Error("❌ Failed to reload udev rules", zap.Error(err))
+		log.Error(" Failed to reload udev rules", zap.Error(err))
 		return cerr.Wrap(err, "failed to reload udev rules")
 	}
 
 	if err := execute.RunSimple(rc.Ctx, "udevadm", "trigger"); err != nil {
-		log.Error("❌ Failed to trigger udev", zap.Error(err))
+		log.Error(" Failed to trigger udev", zap.Error(err))
 		return cerr.Wrap(err, "failed to trigger udev")
 	}
 
-	log.Info("✅ FIDO2 udev rules configured and loaded")
+	log.Info(" FIDO2 udev rules configured and loaded")
 	return nil
 }
 
@@ -242,23 +242,23 @@ func configureFIDO2PAM(rc *eos_io.RuntimeContext, config *FIDO2Config) error {
 
 	// Configure PAM for sudo if enabled
 	if config.EnforceForSudo {
-		log.Info("🔧 Configuring PAM for sudo FIDO2 authentication")
+		log.Info(" Configuring PAM for sudo FIDO2 authentication")
 		if err := configurePAMForSudo(rc, config); err != nil {
-			log.Error("❌ Failed to configure sudo PAM", zap.Error(err))
+			log.Error(" Failed to configure sudo PAM", zap.Error(err))
 			return cerr.Wrap(err, "failed to configure sudo PAM")
 		}
 	}
 
 	// Configure PAM for SSH if enabled
 	if config.EnforceForSSH {
-		log.Info("🔧 Configuring PAM for SSH FIDO2 authentication")
+		log.Info(" Configuring PAM for SSH FIDO2 authentication")
 		if err := configurePAMForSSH(rc, config); err != nil {
-			log.Error("❌ Failed to configure SSH PAM", zap.Error(err))
+			log.Error(" Failed to configure SSH PAM", zap.Error(err))
 			return cerr.Wrap(err, "failed to configure SSH PAM")
 		}
 	}
 
-	log.Info("✅ FIDO2 PAM configuration completed")
+	log.Info(" FIDO2 PAM configuration completed")
 	return nil
 }
 
@@ -269,7 +269,7 @@ func configurePAMForSudo(rc *eos_io.RuntimeContext, config *FIDO2Config) error {
 	// Backup original sudo PAM configuration
 	backupPath := "/etc/pam.d/sudo.backup-" + time.Now().Format("20060102-150405")
 	if err := execute.RunSimple(rc.Ctx, "cp", "/etc/pam.d/sudo", backupPath); err != nil {
-		log.Error("❌ Failed to backup sudo PAM config", zap.Error(err))
+		log.Error(" Failed to backup sudo PAM config", zap.Error(err))
 		return cerr.Wrap(err, "failed to backup sudo PAM config")
 	}
 
@@ -288,13 +288,13 @@ auth    required      pam_unix.so
 @include common-session-noninteractive
 `, time.Now().Format(time.RFC3339))
 
-	log.Info("📝 Writing sudo PAM configuration")
+	log.Info(" Writing sudo PAM configuration")
 	if err := os.WriteFile("/etc/pam.d/sudo", []byte(sudoPAMConfig), 0644); err != nil {
-		log.Error("❌ Failed to write sudo PAM config", zap.Error(err))
+		log.Error(" Failed to write sudo PAM config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write sudo PAM config")
 	}
 
-	log.Info("✅ Sudo PAM configured for FIDO2")
+	log.Info(" Sudo PAM configured for FIDO2")
 	return nil
 }
 
@@ -308,7 +308,7 @@ func configurePAMForSSH(rc *eos_io.RuntimeContext, config *FIDO2Config) error {
 	// Read current SSH config
 	sshConfigBytes, err := os.ReadFile(sshConfigPath)
 	if err != nil {
-		log.Error("❌ Failed to read SSH config", zap.Error(err))
+		log.Error(" Failed to read SSH config", zap.Error(err))
 		return cerr.Wrap(err, "failed to read SSH config")
 	}
 
@@ -330,24 +330,24 @@ UsePAM yes
 	// Backup original SSH config
 	backupPath := sshConfigPath + ".backup-" + time.Now().Format("20060102-150405")
 	if err := execute.RunSimple(rc.Ctx, "cp", sshConfigPath, backupPath); err != nil {
-		log.Error("❌ Failed to backup SSH config", zap.Error(err))
+		log.Error(" Failed to backup SSH config", zap.Error(err))
 		return cerr.Wrap(err, "failed to backup SSH config")
 	}
 
-	log.Info("📝 Writing SSH configuration")
+	log.Info(" Writing SSH configuration")
 	if err := os.WriteFile(sshConfigPath, []byte(sshConfig), 0644); err != nil {
-		log.Error("❌ Failed to write SSH config", zap.Error(err))
+		log.Error(" Failed to write SSH config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write SSH config")
 	}
 
 	// Restart SSH service
-	log.Info("🔄 Restarting SSH service")
+	log.Info(" Restarting SSH service")
 	if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, "ssh", 3, 2); err != nil {
-		log.Error("❌ Failed to restart SSH service", zap.Error(err))
+		log.Error(" Failed to restart SSH service", zap.Error(err))
 		return cerr.Wrap(err, "failed to restart SSH service")
 	}
 
-	log.Info("✅ SSH configured for FIDO2 authentication")
+	log.Info(" SSH configured for FIDO2 authentication")
 	return nil
 }
 
@@ -365,7 +365,7 @@ set -euo pipefail
 USER="${1:-$USER}"
 FIDO2_DIR="/home/$USER/.config/fido2"
 
-echo "🔐 FIDO2 Key Enrollment for user: $USER"
+echo " FIDO2 Key Enrollment for user: $USER"
 echo "=================================================="
 
 # Create FIDO2 directory
@@ -374,17 +374,17 @@ chmod 700 "$FIDO2_DIR"
 
 # Check for existing registrations
 if [[ -f "$FIDO2_DIR/u2f_keys" ]]; then
-    echo "ℹ️ Existing FIDO2 registrations found:"
+    echo " Existing FIDO2 registrations found:"
     cat "$FIDO2_DIR/u2f_keys"
     echo ""
 fi
 
-echo "📱 Please insert your FIDO2 security key and touch it when it blinks..."
+echo " Please insert your FIDO2 security key and touch it when it blinks..."
 echo ""
 
 # Generate new U2F registration
 if pamu2fcfg -u "$USER" >> "$FIDO2_DIR/u2f_keys"; then
-    echo "✅ FIDO2 key registered successfully!"
+    echo " FIDO2 key registered successfully!"
     echo ""
     echo "Your FIDO2 key is now configured for:"
     echo "  • sudo authentication"
@@ -399,15 +399,15 @@ if pamu2fcfg -u "$USER" >> "$FIDO2_DIR/u2f_keys"; then
     chown "$USER:$USER" "$FIDO2_DIR/u2f_keys"
     
 else
-    echo "❌ FIDO2 key registration failed!"
+    echo " FIDO2 key registration failed!"
     exit 1
 fi
 `
 
 	enrollmentPath := "/usr/local/bin/setup-fido2"
-	log.Info("📝 Creating FIDO2 enrollment script", zap.String("path", enrollmentPath))
+	log.Info(" Creating FIDO2 enrollment script", zap.String("path", enrollmentPath))
 	if err := os.WriteFile(enrollmentPath, []byte(enrollmentScript), 0755); err != nil {
-		log.Error("❌ Failed to write enrollment script", zap.Error(err))
+		log.Error(" Failed to write enrollment script", zap.Error(err))
 		return cerr.Wrap(err, "failed to write enrollment script")
 	}
 
@@ -424,7 +424,7 @@ ACTION="${2:-list}"
 
 case "$ACTION" in
     "list")
-        echo "🔐 FIDO2 Keys for user: $USER"
+        echo " FIDO2 Keys for user: $USER"
         if [[ -f "$FIDO2_DIR/u2f_keys" ]]; then
             echo "Registered keys:"
             cat "$FIDO2_DIR/u2f_keys"
@@ -435,17 +435,17 @@ case "$ACTION" in
     "remove")
         if [[ -f "$FIDO2_DIR/u2f_keys" ]]; then
             rm "$FIDO2_DIR/u2f_keys"
-            echo "✅ All FIDO2 keys removed for user: $USER"
+            echo " All FIDO2 keys removed for user: $USER"
         else
             echo "No FIDO2 keys to remove"
         fi
         ;;
     "test")
-        echo "🧪 Testing FIDO2 authentication..."
+        echo " Testing FIDO2 authentication..."
         if sudo -u "$USER" pam_test_fido2; then
-            echo "✅ FIDO2 authentication test successful"
+            echo " FIDO2 authentication test successful"
         else
-            echo "❌ FIDO2 authentication test failed"
+            echo " FIDO2 authentication test failed"
         fi
         ;;
     *)
@@ -456,13 +456,13 @@ esac
 `
 
 	managementPath := "/usr/local/bin/manage-fido2"
-	log.Info("📝 Creating FIDO2 management script", zap.String("path", managementPath))
+	log.Info(" Creating FIDO2 management script", zap.String("path", managementPath))
 	if err := os.WriteFile(managementPath, []byte(managementScript), 0755); err != nil {
-		log.Error("❌ Failed to write management script", zap.Error(err))
+		log.Error(" Failed to write management script", zap.Error(err))
 		return cerr.Wrap(err, "failed to write management script")
 	}
 
-	log.Info("✅ FIDO2 enrollment system configured")
+	log.Info(" FIDO2 enrollment system configured")
 	return nil
 }
 
@@ -478,7 +478,7 @@ func configureFIDO2Monitoring(rc *eos_io.RuntimeContext, config *FIDO2Config) er
 	// Create FIDO2 log directory
 	logDir := "/var/log/fido2"
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		log.Error("❌ Failed to create FIDO2 log directory", zap.Error(err))
+		log.Error(" Failed to create FIDO2 log directory", zap.Error(err))
 		return cerr.Wrap(err, "failed to create FIDO2 log directory")
 	}
 
@@ -490,20 +490,20 @@ func configureFIDO2Monitoring(rc *eos_io.RuntimeContext, config *FIDO2Config) er
 `
 
 	configPath := "/etc/rsyslog.d/60-fido2.conf"
-	log.Info("📝 Configuring FIDO2 logging", zap.String("path", configPath))
+	log.Info(" Configuring FIDO2 logging", zap.String("path", configPath))
 	if err := os.WriteFile(configPath, []byte(rsyslogConfig), 0644); err != nil {
-		log.Error("❌ Failed to write rsyslog config", zap.Error(err))
+		log.Error(" Failed to write rsyslog config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write rsyslog config")
 	}
 
 	// Restart rsyslog service
-	log.Info("🔄 Restarting rsyslog service")
+	log.Info(" Restarting rsyslog service")
 	if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, "rsyslog", 3, 2); err != nil {
-		log.Error("❌ Failed to restart rsyslog", zap.Error(err))
+		log.Error(" Failed to restart rsyslog", zap.Error(err))
 		return cerr.Wrap(err, "failed to restart rsyslog")
 	}
 
-	log.Info("✅ FIDO2 monitoring configured")
+	log.Info(" FIDO2 monitoring configured")
 	return nil
 }
 
@@ -514,16 +514,16 @@ func validateFIDO2Setup(rc *eos_io.RuntimeContext, config *FIDO2Config) error {
 	// Check FIDO2 status
 	status, err := GetFIDO2Status(rc)
 	if err != nil {
-		log.Error("❌ Failed to get FIDO2 status", zap.Error(err))
+		log.Error(" Failed to get FIDO2 status", zap.Error(err))
 		return cerr.Wrap(err, "failed to get FIDO2 status")
 	}
 
 	if !status.SystemConfigured {
-		log.Error("❌ FIDO2 system is not properly configured")
+		log.Error(" FIDO2 system is not properly configured")
 		return cerr.New("FIDO2 system is not properly configured")
 	}
 
-	log.Info("✅ FIDO2 validation completed",
+	log.Info(" FIDO2 validation completed",
 		zap.Bool("pam_configured", status.PAMConfigured),
 		zap.Bool("udev_configured", status.UdevRulesConfigured),
 		zap.Int("connected_devices", len(status.ConnectedDevices)),

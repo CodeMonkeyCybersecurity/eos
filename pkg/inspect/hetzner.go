@@ -28,7 +28,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 
 	// Discover servers
 	if servers, err := i.discoverHetznerServers(); err != nil {
-		logger.Warn("⚠️ Failed to discover Hetzner servers", zap.Error(err))
+		logger.Warn("Failed to discover Hetzner servers", zap.Error(err))
 	} else {
 		info.Servers = servers
 		logger.Info("🖥️ Discovered Hetzner servers", zap.Int("count", len(servers)))
@@ -36,7 +36,7 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 
 	// Discover networks
 	if networks, err := i.discoverHetznerNetworks(); err != nil {
-		logger.Warn("⚠️ Failed to discover Hetzner networks", zap.Error(err))
+		logger.Warn("Failed to discover Hetzner networks", zap.Error(err))
 	} else {
 		info.Networks = networks
 		logger.Info("🌐 Discovered Hetzner networks", zap.Int("count", len(networks)))
@@ -44,15 +44,15 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 
 	// Discover firewalls
 	if firewalls, err := i.discoverHetznerFirewalls(); err != nil {
-		logger.Warn("⚠️ Failed to discover Hetzner firewalls", zap.Error(err))
+		logger.Warn("Failed to discover Hetzner firewalls", zap.Error(err))
 	} else {
 		info.Firewalls = firewalls
-		logger.Info("🔒 Discovered Hetzner firewalls", zap.Int("count", len(firewalls)))
+		logger.Info(" Discovered Hetzner firewalls", zap.Int("count", len(firewalls)))
 	}
 
 	// Discover load balancers
 	if lbs, err := i.discoverHetznerLoadBalancers(); err != nil {
-		logger.Warn("⚠️ Failed to discover Hetzner load balancers", zap.Error(err))
+		logger.Warn("Failed to discover Hetzner load balancers", zap.Error(err))
 	} else {
 		info.LoadBalancers = lbs
 		logger.Info("⚖️ Discovered Hetzner load balancers", zap.Int("count", len(lbs)))
@@ -60,21 +60,21 @@ func (i *Inspector) DiscoverHetzner() (*HetznerInfo, error) {
 
 	// Discover volumes
 	if volumes, err := i.discoverHetznerVolumes(); err != nil {
-		logger.Warn("⚠️ Failed to discover Hetzner volumes", zap.Error(err))
+		logger.Warn("Failed to discover Hetzner volumes", zap.Error(err))
 	} else {
 		info.Volumes = volumes
-		logger.Info("💾 Discovered Hetzner volumes", zap.Int("count", len(volumes)))
+		logger.Info(" Discovered Hetzner volumes", zap.Int("count", len(volumes)))
 	}
 
 	// Discover floating IPs
 	if fips, err := i.discoverHetznerFloatingIPs(); err != nil {
-		logger.Warn("⚠️ Failed to discover Hetzner floating IPs", zap.Error(err))
+		logger.Warn("Failed to discover Hetzner floating IPs", zap.Error(err))
 	} else {
 		info.FloatingIPs = fips
 		logger.Info("🌐 Discovered Hetzner floating IPs", zap.Int("count", len(fips)))
 	}
 
-	logger.Info("✅ Hetzner discovery completed")
+	logger.Info(" Hetzner discovery completed")
 	return info, nil
 }
 

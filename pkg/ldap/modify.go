@@ -17,7 +17,7 @@ func updateUserAttributes(rc *eos_io.RuntimeContext, uid string, attrs map[strin
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("⚠️ Failed to close LDAP connection: %v\n", cerr)
+			fmt.Printf("Failed to close LDAP connection: %v\n", cerr)
 		}
 	}()
 
@@ -45,7 +45,7 @@ func addUserToGroup(rc *eos_io.RuntimeContext, uid, groupCN string) error {
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("⚠️ Failed to close LDAP connection: %v\n", cerr)
+			fmt.Printf("Failed to close LDAP connection: %v\n", cerr)
 		}
 	}()
 
@@ -75,7 +75,7 @@ func removeUserFromGroup(rc *eos_io.RuntimeContext, uid, groupCN string) error {
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("⚠️ Failed to close LDAP connection: %v\n", cerr)
+			fmt.Printf("Failed to close LDAP connection: %v\n", cerr)
 		}
 	}()
 

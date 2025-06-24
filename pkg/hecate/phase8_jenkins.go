@@ -19,7 +19,7 @@ import (
 // SetupJenkinsWizard prompts the user for Jenkins setup info and returns a ServiceBundle.
 func SetupJenkinsWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting Jenkins setup information...")
+	log.Info(" Collecting Jenkins setup information...")
 
 	jenkinsDomain := interaction.PromptInputWithReader(rc.Ctx, "Enter Jenkins domain (e.g., ci.domain.com)", "ci.domain.com", reader)
 	backendIP := interaction.PromptInputWithReader(rc.Ctx, "Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
@@ -71,7 +71,7 @@ func SetupJenkinsWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) Service
 		PortsTCP: []string{"50000"},
 	}
 
-	log.Info("✅ Jenkins ServiceBundle prepared")
+	log.Info(" Jenkins ServiceBundle prepared")
 	return ServiceBundle{
 		Compose: composeSpec,
 		Caddy:   caddySpec,
@@ -82,7 +82,7 @@ func SetupJenkinsWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) Service
 // SetupJenkinsCompose builds and returns the DockerComposeFragment for Jenkins.
 func SetupJenkinsCompose(rc *eos_io.RuntimeContext, config DockerConfig) (DockerComposeFragment, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Building Docker Compose fragment for Jenkins (port injection)...")
+	log.Info(" Building Docker Compose fragment for Jenkins (port injection)...")
 
 	// This is only adding port 50000 to the nginx service
 	rendered, err := renderTemplateFromString(`
@@ -94,7 +94,7 @@ func SetupJenkinsCompose(rc *eos_io.RuntimeContext, config DockerConfig) (Docker
 		return DockerComposeFragment{}, fmt.Errorf("failed to render Jenkins Docker Compose: %w", err)
 	}
 
-	log.Info("✅ Docker Compose fragment for Jenkins rendered successfully")
+	log.Info(" Docker Compose fragment for Jenkins rendered successfully")
 	return DockerComposeFragment{
 		ServiceYAML: rendered,
 	}, nil
@@ -103,9 +103,9 @@ func SetupJenkinsCompose(rc *eos_io.RuntimeContext, config DockerConfig) (Docker
 // RenderJenkinsCompose renders and writes the Jenkins Docker Compose block.
 func RenderJenkinsCompose(rc *eos_io.RuntimeContext, bundle ServiceBundle) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Rendering Jenkins Docker Compose block...")
+	log.Info(" Rendering Jenkins Docker Compose block...")
 	for svcName, svc := range bundle.Compose.Services {
-		log.Info("🔧 Rendering service", zap.String("service", svcName))
+		log.Info(" Rendering service", zap.String("service", svcName))
 		rendered, err := renderTemplateFromString(svc.FullServiceYAML, svc.Environment)
 		if err != nil {
 			log.Error("Failed to render service", zap.Error(err),
@@ -125,14 +125,14 @@ func RenderJenkinsCompose(rc *eos_io.RuntimeContext, bundle ServiceBundle) error
 		}
 	}
 
-	log.Info("✅ Jenkins Docker Compose block(s) written successfully")
+	log.Info(" Jenkins Docker Compose block(s) written successfully")
 	return nil
 }
 
 // SetupJenkinsCaddy prompts for domain backend info and returns a CaddySpec fragment.
 func SetupJenkinsCaddy(rc *eos_io.RuntimeContext, reader *bufio.Reader) CaddySpec {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting Jenkins Caddy reverse proxy setup information...")
+	log.Info(" Collecting Jenkins Caddy reverse proxy setup information...")
 
 	jenkinsDomain := interaction.PromptInputWithReader(rc.Ctx, "Enter Jenkins domain (e.g., jenkins.domain.com)", "jenkins.domain.com", reader)
 	backendIP := interaction.PromptInputWithReader(rc.Ctx, "Enter backend IP address for Jenkins (e.g., 192.168.0.10)", "", reader)
@@ -148,7 +148,7 @@ func SetupJenkinsCaddy(rc *eos_io.RuntimeContext, reader *bufio.Reader) CaddySpe
 		},
 	}
 
-	log.Info("✅ Jenkins Caddy config fragment prepared",
+	log.Info(" Jenkins Caddy config fragment prepared",
 		zap.String("domain", jenkinsDomain),
 		zap.String("backend_ip", backendIP),
 	)
@@ -159,7 +159,7 @@ func SetupJenkinsCaddy(rc *eos_io.RuntimeContext, reader *bufio.Reader) CaddySpe
 // RenderJenkinsCaddy renders and writes the Caddyfile block for Jenkins.
 func RenderJenkinsCaddy(rc *eos_io.RuntimeContext, caddyCfg CaddySpec) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Rendering Jenkins Caddyfile fragment...")
+	log.Info(" Rendering Jenkins Caddyfile fragment...")
 
 	content, err := RenderCaddyfileContent(caddyCfg)
 	if err != nil {
@@ -176,7 +176,7 @@ func RenderJenkinsCaddy(rc *eos_io.RuntimeContext, caddyCfg CaddySpec) error {
 		return fmt.Errorf("failed to write Jenkins Caddy block: %w", err)
 	}
 
-	log.Info("📝 Jenkins Caddy block appended successfully",
+	log.Info(" Jenkins Caddy block appended successfully",
 		zap.String("path", caddyfilePath),
 	)
 	return nil
@@ -185,7 +185,7 @@ func RenderJenkinsCaddy(rc *eos_io.RuntimeContext, caddyCfg CaddySpec) error {
 // SetupJenkinsNginx prompts for backend IP and returns an NginxSpec for Jenkins agent port.
 func SetupJenkinsNginx(rc *eos_io.RuntimeContext, reader *bufio.Reader) *NginxSpec {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting Jenkins NGINX stream proxy setup information...")
+	log.Info(" Collecting Jenkins NGINX stream proxy setup information...")
 
 	backendIP := interaction.PromptInputWithReader(rc.Ctx, "Enter backend IP address for Jenkins agent (e.g., 192.168.0.10)", "", reader)
 
@@ -201,7 +201,7 @@ func SetupJenkinsNginx(rc *eos_io.RuntimeContext, reader *bufio.Reader) *NginxSp
 		PortsTCP: []string{"50000"},
 	}
 
-	log.Info("✅ Jenkins NGINX config prepared",
+	log.Info(" Jenkins NGINX config prepared",
 		zap.String("backend_ip", backendIP),
 	)
 
@@ -211,7 +211,7 @@ func SetupJenkinsNginx(rc *eos_io.RuntimeContext, reader *bufio.Reader) *NginxSp
 // RenderJenkinsNginx renders and writes the NGINX stream block for Jenkins agent port.
 func RenderJenkinsNginx(rc *eos_io.RuntimeContext, bundle ServiceBundle) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Rendering Jenkins NGINX stream block...")
+	log.Info(" Rendering Jenkins NGINX stream block...")
 
 	// Render the stream configuration
 	streamContent, err := RenderStreamBlocks(
@@ -239,6 +239,6 @@ func RenderJenkinsNginx(rc *eos_io.RuntimeContext, bundle ServiceBundle) error {
 		return fmt.Errorf("failed to write Jenkins NGINX stream block: %w", err)
 	}
 
-	log.Info("📝 Jenkins NGINX stream block written successfully", zap.String("path", filePath))
+	log.Info(" Jenkins NGINX stream block written successfully", zap.String("path", filePath))
 	return nil
 }

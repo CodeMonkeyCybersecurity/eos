@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Workflow disabled
         run: |
-          echo "🏷️ This labeler workflow is disabled"
+          echo " This labeler workflow is disabled"
           echo "Using label-simple.yml instead which doesn't require label creation permissions"
           echo ""
           echo "To re-enable this workflow:"

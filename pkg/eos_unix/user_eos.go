@@ -26,7 +26,7 @@ func EnsureEosUser(ctx context.Context, auto bool, loginShell bool) error {
 
 	// Check if user already exists
 	if UserExists(username) {
-		otelzap.Ctx(ctx).Info("✅ eos user exists", zap.String("user", username))
+		otelzap.Ctx(ctx).Info(" eos user exists", zap.String("user", username))
 
 		_, err := user.Lookup(username)
 		if err != nil {
@@ -37,12 +37,12 @@ func EnsureEosUser(ctx context.Context, auto bool, loginShell bool) error {
 			return err
 		}
 		if !strings.Contains(shell, "nologin") {
-			otelzap.Ctx(ctx).Warn("❌ eos user has shell access, which is unexpected", zap.String("shell", shell))
+			otelzap.Ctx(ctx).Warn(" eos user has shell access, which is unexpected", zap.String("shell", shell))
 			return fmt.Errorf("user '%s' has shell access: %s (expected /usr/sbin/nologin)", username, shell)
 		}
 
-		otelzap.Ctx(ctx).Info("✅ eos user has no shell access")
-		otelzap.Ctx(ctx).Info("✅ eos user validation complete")
+		otelzap.Ctx(ctx).Info(" eos user has no shell access")
+		otelzap.Ctx(ctx).Info(" eos user validation complete")
 		return nil
 	}
 
@@ -77,7 +77,7 @@ func EnsureEosUser(ctx context.Context, auto bool, loginShell bool) error {
 	}
 
 	if err := SavePasswordToSecrets(ctx, username, password); err != nil {
-		otelzap.Ctx(ctx).Warn("⚠️ Could not save password to disk", zap.Error(err))
+		otelzap.Ctx(ctx).Warn("Could not save password to disk", zap.Error(err))
 	}
 
 	userExists := UserExists(shared.EosID)
@@ -97,14 +97,14 @@ func EnsureEosUser(ctx context.Context, auto bool, loginShell bool) error {
 			return fmt.Errorf("failed to save replacement password: %w", err)
 		}
 
-		otelzap.Ctx(ctx).Info("✅ Replacement eos credentials generated and saved")
+		otelzap.Ctx(ctx).Info(" Replacement eos credentials generated and saved")
 	}
 
 	// Memory hygiene (zero password string)
 	passwordBytes := []byte(password)
 	crypto.SecureZero(passwordBytes)
 
-	otelzap.Ctx(ctx).Info("✅ eos user created and configured", zap.String("username", username))
+	otelzap.Ctx(ctx).Info(" eos user created and configured", zap.String("username", username))
 	return nil
 }
 
@@ -121,7 +121,7 @@ func RepairEosSecrets(ctx context.Context) error {
 		return fmt.Errorf("save password: %w", err)
 	}
 
-	otelzap.Ctx(ctx).Info("✅ Regenerated eos credentials successfully", zap.String("user", shared.EosID))
+	otelzap.Ctx(ctx).Info(" Regenerated eos credentials successfully", zap.String("user", shared.EosID))
 	return nil
 }
 
@@ -129,10 +129,10 @@ func ValidateEosSudoAccess(ctx context.Context) error {
 	cmd := exec.Command("cat", shared.AgentToken)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		otelzap.Ctx(ctx).Warn("❌ sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
+		otelzap.Ctx(ctx).Warn(" sudo -u eos failed", zap.Error(err), zap.String("output", string(out)))
 		return fmt.Errorf("sudo check failed")
 	}
-	otelzap.Ctx(ctx).Info("✅ sudo test succeeded")
+	otelzap.Ctx(ctx).Info(" sudo test succeeded")
 	return nil
 }
 
@@ -143,7 +143,7 @@ func EnsureSudoersEntryForEos(ctx context.Context, auto bool) error {
 
 	otelzap.Ctx(ctx).Info("🔍 Checking for existing sudoers entry", zap.String("path", path))
 	if _, err := os.Stat(path); err == nil {
-		otelzap.Ctx(ctx).Info("✅ Sudoers file for eos already exists", zap.String("path", path))
+		otelzap.Ctx(ctx).Info(" Sudoers file for eos already exists", zap.String("path", path))
 		return nil
 	}
 
@@ -151,11 +151,11 @@ func EnsureSudoersEntryForEos(ctx context.Context, auto bool) error {
 		reader := bufio.NewReader(os.Stdin)
 		resp, err := interaction.ReadLine(ctx, reader, "Create sudoers entry for eos? (y/N)")
 		if err != nil {
-			otelzap.Ctx(ctx).Warn("❌ Failed to read sudoers prompt", zap.Error(err))
+			otelzap.Ctx(ctx).Warn(" Failed to read sudoers prompt", zap.Error(err))
 			return err
 		}
 		if strings.ToLower(resp) != "y" {
-			otelzap.Ctx(ctx).Warn("⚠️ User declined to write sudoers file")
+			otelzap.Ctx(ctx).Warn("User declined to write sudoers file")
 			return nil
 		}
 	}
@@ -165,15 +165,15 @@ func EnsureSudoersEntryForEos(ctx context.Context, auto bool) error {
 		return fmt.Errorf("write sudoers entry: %w", err)
 	}
 
-	otelzap.Ctx(ctx).Info("✅ Sudoers entry written successfully", zap.String("path", path))
+	otelzap.Ctx(ctx).Info(" Sudoers entry written successfully", zap.String("path", path))
 
-	otelzap.Ctx(ctx).Info("🧪 Validating sudoers file with visudo -c")
+	otelzap.Ctx(ctx).Info(" Validating sudoers file with visudo -c")
 	if err := exec.Command("visudo", "-c").Run(); err != nil {
-		otelzap.Ctx(ctx).Warn("❌ Sudoers file validation failed", zap.Error(err))
+		otelzap.Ctx(ctx).Warn(" Sudoers file validation failed", zap.Error(err))
 		return fmt.Errorf("sudoers validation failed")
 	}
 
-	otelzap.Ctx(ctx).Info("✅ Sudoers file is valid")
+	otelzap.Ctx(ctx).Info(" Sudoers file is valid")
 	return nil
 }
 
@@ -182,7 +182,7 @@ func SetupEosSudoers(ctx context.Context) error {
 		otelzap.Ctx(ctx).Warn("Failed to write sudoers file", zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(ctx).Info("✅ Added eos to sudoers")
+	otelzap.Ctx(ctx).Info(" Added eos to sudoers")
 	return nil
 }
 
@@ -193,7 +193,7 @@ func CreateEosDirectories(ctx context.Context) error {
 			otelzap.Ctx(ctx).Warn("Failed to create directory", zap.String("path", dir), zap.Error(err))
 			return err
 		}
-		otelzap.Ctx(ctx).Info("✅ Directory ready", zap.String("path", dir))
+		otelzap.Ctx(ctx).Info(" Directory ready", zap.String("path", dir))
 	}
 	return nil
 }
@@ -226,7 +226,7 @@ func FixEosSudoersFile(ctx context.Context) error {
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to set sudoers permissions: %w", err)
 	}
-	otelzap.Ctx(ctx).Info("✅ Fixed /etc/sudoers.d/eos file and permissions")
+	otelzap.Ctx(ctx).Info(" Fixed /etc/sudoers.d/eos file and permissions")
 	return nil
 }
 

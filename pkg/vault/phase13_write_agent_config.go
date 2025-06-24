@@ -43,7 +43,7 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 
 	// 1.5) clean up any stale HCP directory that may cause JSON parsing issues
 	if err := cleanupStaleHCPDirectory(rc); err != nil {
-		log.Warn("⚠️ Failed to clean stale HCP directory", zap.Error(err))
+		log.Warn("Failed to clean stale HCP directory", zap.Error(err))
 		// Don't fail the entire process as this is not critical
 	}
 
@@ -69,7 +69,7 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 		return fmt.Errorf("reload/enable service: %w", err)
 	}
 
-	log.Info("✅ Vault Agent config + service installed")
+	log.Info(" Vault Agent config + service installed")
 	return nil
 }
 
@@ -78,33 +78,33 @@ func PhaseRenderVaultAgentConfig(rc *eos_io.RuntimeContext, client *api.Client) 
 func prepareTokenSink(rc *eos_io.RuntimeContext, tokenPath, user string) error {
 	log := otelzap.Ctx(rc.Ctx)
 	runDir := filepath.Dir(tokenPath)
-	
-	log.Info("📁 Preparing runtime directory", zap.String("dir", runDir))
-	
+
+	log.Info(" Preparing runtime directory", zap.String("dir", runDir))
+
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		log.Error("❌ Failed to create runtime directory", 
-			zap.String("dir", runDir), 
+		log.Error(" Failed to create runtime directory",
+			zap.String("dir", runDir),
 			zap.Error(err))
 		return err
 	}
-	
+
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, user)
 	if err != nil {
-		log.Error("❌ Failed to lookup user for runtime directory ownership", 
-			zap.String("user", user), 
-			zap.Error(err))
-		return err
-	}
-	
-	if err := os.Chown(runDir, uid, gid); err != nil {
-		log.Error("❌ Failed to set ownership on runtime directory", 
-			zap.String("dir", runDir), 
+		log.Error(" Failed to lookup user for runtime directory ownership",
 			zap.String("user", user),
 			zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Runtime directory prepared successfully", 
+	if err := os.Chown(runDir, uid, gid); err != nil {
+		log.Error(" Failed to set ownership on runtime directory",
+			zap.String("dir", runDir),
+			zap.String("user", user),
+			zap.Error(err))
+		return err
+	}
+
+	log.Info(" Runtime directory prepared successfully",
 		zap.String("dir", runDir),
 		zap.String("owner", user),
 		zap.String("mode", "0755"))
@@ -192,17 +192,17 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 	tmpfilesPath := "/etc/tmpfiles.d/eos.conf"
 	tmpfilesContent := "d /run/eos 0755 eos eos -\n"
 
-	log.Info("📁 Creating systemd tmpfiles configuration", zap.String("path", tmpfilesPath))
+	log.Info(" Creating systemd tmpfiles configuration", zap.String("path", tmpfilesPath))
 
 	if err := os.WriteFile(tmpfilesPath, []byte(tmpfilesContent), 0o644); err != nil {
 		return fmt.Errorf("write tmpfiles config %s: %w", tmpfilesPath, err)
 	}
 
 	// Apply tmpfiles configuration immediately to create /run/eos
-	log.Info("🔧 Applying tmpfiles configuration immediately")
+	log.Info(" Applying tmpfiles configuration immediately")
 	cmd := exec.CommandContext(rc.Ctx, "systemd-tmpfiles", "--create", "--prefix=/run/eos")
 	if out, err := cmd.CombinedOutput(); err != nil {
-		log.Error("❌ Failed to apply tmpfiles config immediately", 
+		log.Error(" Failed to apply tmpfiles config immediately",
 			zap.Error(err),
 			zap.String("output", string(out)))
 		// This is critical for Vault Agent to work, so return the error
@@ -211,15 +211,15 @@ func createTmpfilesConfig(rc *eos_io.RuntimeContext) error {
 
 	// Verify the directory was created
 	if stat, err := os.Stat("/run/eos"); err != nil {
-		log.Error("❌ /run/eos directory still doesn't exist after tmpfiles creation", zap.Error(err))
+		log.Error(" /run/eos directory still doesn't exist after tmpfiles creation", zap.Error(err))
 		return fmt.Errorf("runtime directory not created by tmpfiles: %w", err)
 	} else {
-		log.Info("✅ Runtime directory created by tmpfiles", 
+		log.Info(" Runtime directory created by tmpfiles",
 			zap.String("path", "/run/eos"),
 			zap.String("mode", stat.Mode().String()))
 	}
 
-	log.Info("✅ Systemd tmpfiles configuration created and applied", zap.String("path", tmpfilesPath))
+	log.Info(" Systemd tmpfiles configuration created and applied", zap.String("path", tmpfilesPath))
 	return nil
 }
 
@@ -230,21 +230,21 @@ func cleanupStaleHCPDirectory(rc *eos_io.RuntimeContext) error {
 
 	// Check if directory exists
 	if _, err := os.Stat(hcpDir); os.IsNotExist(err) {
-		log.Info("📁 HCP directory does not exist - no cleanup needed")
+		log.Info(" HCP directory does not exist - no cleanup needed")
 		return nil
 	}
 
-	log.Info("🧹 Cleaning up stale HCP directory to prevent JSON parsing issues", 
+	log.Info("🧹 Cleaning up stale HCP directory to prevent JSON parsing issues",
 		zap.String("path", hcpDir))
 
 	// Remove the entire HCP directory
 	if err := os.RemoveAll(hcpDir); err != nil {
-		log.Error("❌ Failed to remove HCP directory", 
-			zap.String("path", hcpDir), 
+		log.Error(" Failed to remove HCP directory",
+			zap.String("path", hcpDir),
 			zap.Error(err))
 		return fmt.Errorf("remove HCP directory %s: %w", hcpDir, err)
 	}
 
-	log.Info("✅ HCP directory cleaned up successfully", zap.String("path", hcpDir))
+	log.Info(" HCP directory cleaned up successfully", zap.String("path", hcpDir))
 	return nil
 }

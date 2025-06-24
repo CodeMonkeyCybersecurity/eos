@@ -42,7 +42,7 @@ func (c *DNSClient) GetZones(rc *eos_io.RuntimeContext) ([]DNSZone, error) {
 		return nil, errors.Wrap(err, "decoding zone list")
 	}
 
-	c.Log.Info("✅ Retrieved zones", zap.Int("count", len(result.Zones)))
+	c.Log.Info(" Retrieved zones", zap.Int("count", len(result.Zones)))
 	return result.Zones, nil
 }
 
@@ -77,7 +77,7 @@ func (c *DNSClient) CreateZone(rc *eos_io.RuntimeContext, zone DNSZone) (*DNSZon
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("📦 Created zone", zap.String("id", result.Zone.ID))
+	c.Log.Info(" Created zone", zap.String("id", result.Zone.ID))
 	return &result.Zone, nil
 }
 
@@ -270,6 +270,6 @@ func (c *DNSClient) ValidateZoneFile(rc *eos_io.RuntimeContext, zoneFile string)
 		return errors.Errorf("validate failed (%d): %s", resp.StatusCode, raw)
 	}
 
-	c.Log.Info("✅ Validated zone file")
+	c.Log.Info(" Validated zone file")
 	return nil
 }

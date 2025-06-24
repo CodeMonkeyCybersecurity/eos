@@ -34,7 +34,7 @@ var CreateHeraCmd = &cobra.Command{
 - Running docker compose up -d and displaying service status & access URL`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		otelzap.Ctx(rc.Ctx).Info("🚀 Starting Hera (Authentik) deployment")
+		otelzap.Ctx(rc.Ctx).Info(" Starting Hera (Authentik) deployment")
 
 		// Ensure target directory exists
 		if _, err := os.Stat(shared.HeraDir); os.IsNotExist(err) {
@@ -68,14 +68,14 @@ var CreateHeraCmd = &cobra.Command{
 			}
 		} else {
 			// Download the latest docker-compose.yml from the remote URL
-			otelzap.Ctx(rc.Ctx).Info("📦 Downloading latest docker-compose.yml")
+			otelzap.Ctx(rc.Ctx).Info(" Downloading latest docker-compose.yml")
 			if err := execute.RunSimple(rc.Ctx, shared.HeraDir, "wget", "-O", "docker-compose.yml", "https://goauthentik.io/docker-compose.yml"); err != nil {
 				otelzap.Ctx(rc.Ctx).Fatal("Failed to download docker-compose.yml", zap.Error(err))
 			}
 		}
 
 		// Generate secrets
-		otelzap.Ctx(rc.Ctx).Info("🔐 Generating secrets for .env file")
+		otelzap.Ctx(rc.Ctx).Info(" Generating secrets for .env file")
 		pgPassCmd := exec.Command("openssl", "rand", "-base64", "36")
 		secretKeyCmd := exec.Command("openssl", "rand", "-base64", "60")
 
@@ -111,10 +111,10 @@ var CreateHeraCmd = &cobra.Command{
 		if err := os.WriteFile(envPath, []byte(strings.Join(envContents, "\n")+"\n"), 0644); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to write .env file", zap.Error(err))
 		}
-		otelzap.Ctx(rc.Ctx).Info("✅ .env file created", zap.String("path", envPath))
+		otelzap.Ctx(rc.Ctx).Info(" .env file created", zap.String("path", envPath))
 
 		// Fix directory ownership so the container can write as needed.
-		otelzap.Ctx(rc.Ctx).Info("🔧 Fixing ownership of directory", zap.String("path", shared.HeraDir))
+		otelzap.Ctx(rc.Ctx).Info(" Fixing ownership of directory", zap.String("path", shared.HeraDir))
 		chownCmd := exec.Command("chown", "-R", "472:472", shared.HeraDir)
 		chownCmd.Stdout = os.Stdout
 		chownCmd.Stderr = os.Stderr
@@ -128,12 +128,12 @@ var CreateHeraCmd = &cobra.Command{
 		}
 
 		// Pull images and deploy
-		otelzap.Ctx(rc.Ctx).Info("🐳 Pulling docker images")
+		otelzap.Ctx(rc.Ctx).Info(" Pulling docker images")
 		if err := execute.RunSimple(rc.Ctx, shared.HeraDir, "docker", "compose", "pull"); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to pull docker images", zap.Error(err))
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("🚀 Launching Hera via docker compose")
+		otelzap.Ctx(rc.Ctx).Info(" Launching Hera via docker compose")
 		if err := execute.RunSimple(rc.Ctx, shared.HeraDir, "docker", "compose", "up", "-d"); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to run docker compose", zap.Error(err))
 		}
@@ -145,7 +145,7 @@ var CreateHeraCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Warn("Docker containers may not have started cleanly", zap.Error(err))
 		}
 
-		fmt.Println("\n🎉 Hera (Authentik) is deploying.")
+		fmt.Println("\n Hera (Authentik) is deploying.")
 		fmt.Println("Visit: http://<your-server>:9000/if/flow/initial-setup/")
 		fmt.Println("Be sure to include the trailing slash or you may see a 404.")
 		return nil

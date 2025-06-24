@@ -35,9 +35,9 @@ func Wrap(fn func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		// Vault environment, telemetry attribute
 		vaultAddr, vaultErr := vault.EnsureVaultEnv(ctx)
 		if vaultErr != nil {
-			ctx.Log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
+			ctx.Log.Warn("Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
 		} else {
-			ctx.Log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
+			ctx.Log.Info(" VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
 			ctx.Attributes["vault_addr"] = vaultAddr
 		}
 
@@ -76,9 +76,9 @@ func WrapExtended(timeout time.Duration, fn func(rc *eos_io.RuntimeContext, cmd 
 		// Vault environment, telemetry attribute
 		vaultAddr, vaultErr := vault.EnsureVaultEnv(ctx)
 		if vaultErr != nil {
-			ctx.Log.Warn("⚠️ Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
+			ctx.Log.Warn("Failed to resolve VAULT_ADDR", zap.Error(vaultErr))
 		} else {
-			ctx.Log.Info("🔐 VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
+			ctx.Log.Info(" VAULT_ADDR resolved", zap.String("VAULT_ADDR", vaultAddr))
 			ctx.Attributes["vault_addr"] = vaultAddr
 		}
 

@@ -20,7 +20,7 @@ import (
 
 // DeployAndStoreSecrets automates Vault setup and stores secrets after confirmation.
 func DeployAndStoreSecrets(rc *eos_io.RuntimeContext, client *api.Client, path string, secrets map[string]string) error {
-	otelzap.Ctx(rc.Ctx).Info("🚀 Starting Vault deployment")
+	otelzap.Ctx(rc.Ctx).Info(" Starting Vault deployment")
 
 	if err := execute.RunSimple(rc.Ctx, shared.EosID, "deploy", "vault"); err != nil && !strings.Contains(err.Error(), "already installed") {
 		otelzap.Ctx(rc.Ctx).Error("Vault deploy failed", zap.Error(err))
@@ -43,7 +43,7 @@ func DeployAndStoreSecrets(rc *eos_io.RuntimeContext, client *api.Client, path s
 		return fmt.Errorf("vault does not appear to be running after setup. Try 'eos logs vault'")
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault is ready. Proceeding to store secrets...", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Vault is ready. Proceeding to store secrets...", zap.String("path", path))
 
 	// Convert string map to interface{}
 	data := make(map[string]interface{}, len(secrets))
@@ -56,6 +56,6 @@ func DeployAndStoreSecrets(rc *eos_io.RuntimeContext, client *api.Client, path s
 		return err
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Secrets written to Vault successfully", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Secrets written to Vault successfully", zap.String("path", path))
 	return nil
 }

@@ -23,24 +23,24 @@ jobs:
         run: |
           set -e
           
-          echo "🏷️ Analyzing changed files in PR #${{ github.event.number }}"
+          echo " Analyzing changed files in PR #${{ github.event.number }}"
           
           # Get list of changed files
           git diff --name-only origin/${{ github.base_ref }}...HEAD > changed_files.txt
           
-          echo "📁 Changed files:"
+          echo " Changed files:"
           cat changed_files.txt
           echo ""
           
           # Function to add label if it doesn't exist
           add_label() {
             local label="$1"
-            echo "🏷️ Attempting to add label: $label"
+            echo " Attempting to add label: $label"
             
             # Try to add the label, but don't fail if it doesn't exist
             gh pr edit ${{ github.event.number }} --add-label "$label" 2>/dev/null && \
-              echo "✅ Added label: $label" || \
-              echo "⚠️ Could not add label '$label' (may not exist in repository)"
+              echo " Added label: $label" || \
+              echo "Could not add label '$label' (may not exist in repository)"
           }
           
           # Check for documentation changes
@@ -94,7 +94,7 @@ jobs:
           fi
           
           echo ""
-          echo "✅ Labeling complete!"
+          echo " Labeling complete!"
           
           # Clean up
           rm -f changed_files.txt

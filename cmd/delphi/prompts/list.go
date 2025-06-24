@@ -40,9 +40,9 @@ func GetSystemPromptsDir() (string, error) {
 // GetPromptDescription returns a description for known prompts
 func GetPromptDescription(name string) string {
 	descriptions := map[string]string{
-		"cybersobar":           "ISOBAR framework for structured security communications",
-		"delphi-notify-long":   "Detailed user-friendly explanations for non-technical users",
-		"delphi-notify-short":  "Concise alert explanations with risk indicators",
+		"cybersobar":          "ISOBAR framework for structured security communications",
+		"delphi-notify-long":  "Detailed user-friendly explanations for non-technical users",
+		"delphi-notify-short": "Concise alert explanations with risk indicators",
 	}
 	if desc, exists := descriptions[name]; exists {
 		return desc
@@ -110,7 +110,7 @@ Examples:
   eos delphi prompts list --detailed`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("📋 Listing system prompts")
+			logger.Info(" Listing system prompts")
 
 			prompts, err := ListSystemPrompts()
 			if err != nil {
@@ -118,23 +118,23 @@ Examples:
 			}
 
 			if len(prompts) == 0 {
-				logger.Info("ℹ️ No system prompts found")
+				logger.Info(" No system prompts found")
 				return nil
 			}
 
-			logger.Info("📝 Available system prompts",
+			logger.Info(" Available system prompts",
 				zap.Int("count", len(prompts)))
 
 			for _, prompt := range prompts {
 				if detailed {
-					logger.Info("📄 System prompt details",
+					logger.Info(" System prompt details",
 						zap.String("name", prompt.Name),
 						zap.String("description", prompt.Description),
 						zap.String("path", prompt.Path),
 						zap.Int64("size_bytes", prompt.Size),
 						zap.String("modified", prompt.Modified.Format("2006-01-02 15:04:05")))
 				} else {
-					logger.Info("📄 "+prompt.Name,
+					logger.Info(" "+prompt.Name,
 						zap.String("description", prompt.Description),
 						zap.String("size", formatFileSize(prompt.Size)),
 						zap.String("modified", formatRelativeTime(prompt.Modified)))

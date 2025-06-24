@@ -14,7 +14,7 @@ import (
 // SetupNextcloudWizard prompts the user for Nextcloud + Coturn setup and returns a ServiceBundle.
 func SetupNextcloudWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting Nextcloud + Coturn setup information...")
+	log.Info(" Collecting Nextcloud + Coturn setup information...")
 
 	// Define the prompts
 	fields := []PromptField{
@@ -67,7 +67,7 @@ func SetupNextcloudWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) Servi
 func SetupNextcloud(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Info("🚀 Starting Nextcloud + Coturn setup rendering...")
+	log.Info(" Starting Nextcloud + Coturn setup rendering...")
 
 	err := RenderBundleFragments(
 		rc,
@@ -78,10 +78,10 @@ func SetupNextcloud(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir s
 		"nextcloud",
 	)
 	if err != nil {
-		log.Error("❌ Failed to render Nextcloud service", zap.Error(err))
+		log.Error(" Failed to render Nextcloud service", zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Nextcloud setup rendered successfully!")
+	log.Info(" Nextcloud setup rendered successfully!")
 	return nil
 }

@@ -20,14 +20,14 @@ var DockerListenerCmd = &cobra.Command{
 	Short: "Installs and configures the Delphi DockerListener for Wazuh",
 	Long:  "Sets up a Python virtual environment and configures Wazuh's DockerListener integration.",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		otelzap.Ctx(rc.Ctx).Info("🚀 Setting up Delphi DockerListener...")
+		otelzap.Ctx(rc.Ctx).Info(" Setting up Delphi DockerListener...")
 
 		steps := []struct {
 			desc string
 			fn   func() error
 		}{
-			{"🔧 apt update", func() error { _, err := execute.RunShell(rc.Ctx, "apt update"); return err }},
-			{"🔧 install python3-venv + pip", func() error {
+			{" apt update", func() error { _, err := execute.RunShell(rc.Ctx, "apt update"); return err }},
+			{" install python3-venv + pip", func() error {
 				_, err := execute.RunShell(rc.Ctx, "apt install -y python3-venv python3-pip")
 				return err
 			}},
@@ -37,14 +37,14 @@ var DockerListenerCmd = &cobra.Command{
 			{"🐍 create venv", func() error {
 				return execute.RunSimple(rc.Ctx, "python3", "-m", "venv", shared.VenvPath)
 			}},
-			{"📦 pip install requirements", func() error {
+			{" pip install requirements", func() error {
 				return execute.RunSimple(rc.Ctx, shared.VenvPath+"/bin/pip", "install",
 					"docker==7.1.0", "urllib3==1.26.20", "requests==2.32.2")
 			}},
 			{"✏️ patch DockerListener", func() error {
 				return patchDockerListener(rc)
 			}},
-			{"🔄 restart wazuh-agent", func() error {
+			{" restart wazuh-agent", func() error {
 				return execute.RunSimple(rc.Ctx, "systemctl", "restart", "wazuh-agent")
 			}},
 		}
@@ -52,12 +52,12 @@ var DockerListenerCmd = &cobra.Command{
 		for _, step := range steps {
 			otelzap.Ctx(rc.Ctx).Info(step.desc)
 			if err := step.fn(); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("❌ Failed: "+step.desc, zap.Error(err))
+				otelzap.Ctx(rc.Ctx).Error(" Failed: "+step.desc, zap.Error(err))
 				return err
 			}
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ DockerListener setup complete.")
+		otelzap.Ctx(rc.Ctx).Info(" DockerListener setup complete.")
 		return nil
 	}),
 }
@@ -65,13 +65,13 @@ var DockerListenerCmd = &cobra.Command{
 func patchDockerListener(rc *eos_io.RuntimeContext) error {
 	path := shared.DockerListener
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ DockerListener script not found", zap.String("path", path))
+		otelzap.Ctx(rc.Ctx).Warn("DockerListener script not found", zap.String("path", path))
 		return nil
 	}
 
 	backup := path + ".bak"
 	if err := execute.RunSimple(rc.Ctx, "cp", path, backup); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to backup DockerListener", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to backup DockerListener", zap.Error(err))
 	}
 
 	content, err := os.ReadFile(path)
@@ -91,6 +91,6 @@ func patchDockerListener(rc *eos_io.RuntimeContext) error {
 		return err
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ DockerListener script patched", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" DockerListener script patched", zap.String("path", path))
 	return nil
 }

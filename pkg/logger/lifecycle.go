@@ -75,14 +75,14 @@ func ResolveLogPath(rc *eos_io.RuntimeContext) string {
 			if cerr := file.Close(); cerr != nil {
 				otelzap.Ctx(rc.Ctx).Warn("Failed to close test log file", zap.String("path", path), zap.Error(cerr))
 			}
-			otelzap.Ctx(rc.Ctx).Info("📝 Using resolved log path", zap.String("log_path", path))
+			otelzap.Ctx(rc.Ctx).Info(" Using resolved log path", zap.String("log_path", path))
 			return path
 		} else {
 			otelzap.Ctx(rc.Ctx).Debug("Skipped unwritable log path", zap.String("path", path), zap.Error(err))
 		}
 	}
 
-	otelzap.Ctx(rc.Ctx).Warn("⚠️ No writable log path could be resolved")
+	otelzap.Ctx(rc.Ctx).Warn("No writable log path could be resolved")
 	return ""
 }
 

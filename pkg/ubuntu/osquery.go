@@ -48,7 +48,7 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Add osquery official repository GPG key
-	logger.Info("📝 Adding osquery repository GPG key")
+	logger.Info(" Adding osquery repository GPG key")
 
 	// Download GPG key to temporary file first
 	keyPath := "/tmp/osquery-key.gpg"
@@ -85,13 +85,13 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Update package lists
-	logger.Info("🔄 Updating package lists")
+	logger.Info(" Updating package lists")
 	if err := execute.RunSimple(rc.Ctx, "apt-get", "update"); err != nil {
 		return fmt.Errorf("update package lists: %w", err)
 	}
 
 	// Install osquery via apt
-	logger.Info("📦 Installing osquery from repository")
+	logger.Info(" Installing osquery from repository")
 	if err := execute.RunSimple(rc.Ctx, "apt-get", "install", "-y", "osquery"); err != nil {
 		return fmt.Errorf("install osquery: %w", err)
 	}
@@ -118,6 +118,6 @@ func installOsquery(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("enable osqueryd: %w", err)
 	}
 
-	logger.Info("✅ Osquery installed and configured")
+	logger.Info(" Osquery installed and configured")
 	return nil
 }

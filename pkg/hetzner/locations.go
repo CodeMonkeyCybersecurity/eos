@@ -20,7 +20,7 @@ func GetAllLocations(rc *eos_io.RuntimeContext) error {
 
 	locations, err := client.Location.All(rc.Ctx)
 	if err != nil {
-		log.Error("❌ Failed to retrieve locations", zap.Error(err))
+		log.Error(" Failed to retrieve locations", zap.Error(err))
 		return cerr.Wrap(err, "failed to retrieve locations")
 	}
 
@@ -37,7 +37,7 @@ func GetALocation(rc *eos_io.RuntimeContext, id int64) error {
 
 	loc, _, err := client.Location.GetByID(rc.Ctx, id)
 	if err != nil {
-		log.Error("❌ Failed to get location", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to get location", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get location")
 	}
 
@@ -52,7 +52,7 @@ func GetAllDatacentres(rc *eos_io.RuntimeContext) error {
 
 	dcs, err := client.Datacenter.All(rc.Ctx)
 	if err != nil {
-		log.Error("❌ Failed to retrieve datacenters", zap.Error(err))
+		log.Error(" Failed to retrieve datacenters", zap.Error(err))
 		return cerr.Wrap(err, "failed to retrieve datacenters")
 	}
 
@@ -69,7 +69,7 @@ func GetADatacentre(rc *eos_io.RuntimeContext, id int64) error {
 
 	dc, _, err := client.Datacenter.GetByID(rc.Ctx, id)
 	if err != nil {
-		log.Error("❌ Failed to get datacenter", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to get datacenter", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get datacenter")
 	}
 

@@ -23,9 +23,9 @@ func InteractiveLDAPQuery(rc *eos_io.RuntimeContext) error {
 
 	// Try to load existing config from Vault to prefill
 	if err := vault.ReadFromVaultAt(rc, "secret", shared.LDAPVaultPath, cfg); err == nil {
-		fmt.Println("✅ LDAP config prefilled from Vault")
+		fmt.Println(" LDAP config prefilled from Vault")
 	} else {
-		fmt.Printf("⚠️  Vault fallback: could not load LDAP config: %v\n", err)
+		fmt.Printf(" Vault fallback: could not load LDAP config: %v\n", err)
 	}
 
 	// Prompts
@@ -33,13 +33,13 @@ func InteractiveLDAPQuery(rc *eos_io.RuntimeContext) error {
 	host := interaction.PromptInput(rc.Ctx, "LDAP host or IP", cfg.FQDN)
 	bindDN := interaction.PromptInput(rc.Ctx, "Bind DN (e.g. cn=admin,dc=domain,dc=com)", cfg.BindDN)
 	if bindDN == "" {
-		fmt.Println("⚠️  No BindDN provided — defaulting to cn=anonymous instead.")
+		fmt.Println(" No BindDN provided — defaulting to cn=anonymous instead.")
 		bindDN = "cn=anonymous"
 	}
 
 	password, err := crypto.PromptPasswordOrDefault(rc, "LDAP password [press Enter to keep existing]", cfg.Password)
 	if err != nil {
-		fmt.Println("⚠️  No Password provided.")
+		fmt.Println(" No Password provided.")
 		return err
 	}
 
@@ -48,10 +48,10 @@ func InteractiveLDAPQuery(rc *eos_io.RuntimeContext) error {
 	if baseDN == "" || baseDN == `""` {
 		inferred := inferBaseDN(rc, bindDN)
 		if inferred != "" {
-			fmt.Printf("⚠️  No base DN provided — using inferred root (%s)\n", inferred)
+			fmt.Printf(" No base DN provided — using inferred root (%s)\n", inferred)
 			baseDN = inferred
 		} else {
-			fmt.Println("⚠️  No base DN could be inferred — aborting for safety.")
+			fmt.Println(" No base DN could be inferred — aborting for safety.")
 			return fmt.Errorf("invalid base DN")
 		}
 	}
@@ -68,7 +68,7 @@ func InteractiveLDAPQuery(rc *eos_io.RuntimeContext) error {
 
 	// Save config to Vault
 	if err := vault.WriteToVault(rc, shared.LDAPVaultPath, cfg); err != nil {
-		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
+		fmt.Printf(" Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
 	// Build URI and args
@@ -101,7 +101,7 @@ func inferBaseDN(rc *eos_io.RuntimeContext, bindDN string) string {
 	if inferred == "" {
 		otelzap.Ctx(rc.Ctx).Warn("Could not infer base DN from BindDN", zap.String("bindDN", bindDN))
 	} else {
-		otelzap.Ctx(rc.Ctx).Info("✅ Inferred base DN", zap.String("baseDN", inferred))
+		otelzap.Ctx(rc.Ctx).Info(" Inferred base DN", zap.String("baseDN", inferred))
 	}
 
 	return inferred
@@ -175,7 +175,7 @@ func PromptLDAPDetails(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 	}
 
 	if err := vault.WriteToVault(rc, shared.LDAPVaultPath, cfg); err != nil {
-		fmt.Printf("⚠️  Warning: failed to save LDAP config to Vault: %v\n", err)
+		fmt.Printf(" Warning: failed to save LDAP config to Vault: %v\n", err)
 	}
 
 	return cfg, nil

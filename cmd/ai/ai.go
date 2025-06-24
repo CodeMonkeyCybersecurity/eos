@@ -93,7 +93,7 @@ Examples:
 			} else {
 				ctx.Environment = env
 				if verbose {
-					fmt.Printf("📊 Environment analysis completed: %d files, %d containers, %d services\n",
+					fmt.Printf(" Environment analysis completed: %d files, %d containers, %d services\n",
 						len(env.FileSystem.ComposeFiles)+len(env.FileSystem.TerraformFiles)+len(env.FileSystem.ConfigFiles),
 						len(env.Services.DockerContainers),
 						len(env.Services.SystemdServices))
@@ -104,7 +104,7 @@ Examples:
 		// Build comprehensive prompt with environment context
 		fullPrompt := ai.BuildEnvironmentPrompt(ctx, question)
 
-		fmt.Println("🤖 Thinking...")
+		fmt.Println(" Thinking...")
 
 		// Get AI response
 		response, err := assistant.Chat(rc, ctx, fullPrompt)
@@ -118,7 +118,7 @@ Examples:
 
 		// Display response
 		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Println("🤖 AI Assistant Response")
+		fmt.Println(" AI Assistant Response")
 		fmt.Println(strings.Repeat("=", 80))
 		fmt.Println()
 		fmt.Println(response.Choices[0].Message.Content)
@@ -139,7 +139,7 @@ Examples:
 		}
 
 		// Ask if user wants to continue conversation
-		fmt.Print("\n💬 Do you have any follow-up questions? [y/N]: ")
+		fmt.Print("\n Do you have any follow-up questions? [y/N]: ")
 		reader := bufio.NewReader(os.Stdin)
 		if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
 			return startInteractiveChat(rc, assistant, ctx)
@@ -181,7 +181,7 @@ Examples:
 		logger.Info("Starting infrastructure analysis", zap.String("directory", workingDir))
 
 		fmt.Println("🔍 Analyzing infrastructure environment...")
-		fmt.Printf("📁 Working directory: %s\n\n", workingDir)
+		fmt.Printf(" Working directory: %s\n\n", workingDir)
 
 		// Analyze environment
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
@@ -195,7 +195,7 @@ Examples:
 
 		// Get AI analysis if requested
 		if askAI {
-			fmt.Println("\n🤖 Getting AI analysis...")
+			fmt.Println("\n Getting AI analysis...")
 
 			assistant, err := ai.NewAIAssistant(rc)
 			if err != nil {
@@ -212,7 +212,7 @@ Examples:
 				logger.Warn("AI analysis failed", zap.Error(err))
 			} else if len(response.Choices) > 0 {
 				fmt.Println("\n" + strings.Repeat("=", 80))
-				fmt.Println("🤖 AI Analysis & Recommendations")
+				fmt.Println(" AI Analysis & Recommendations")
 				fmt.Println(strings.Repeat("=", 80))
 				fmt.Println()
 				fmt.Println(response.Choices[0].Message.Content)
@@ -249,7 +249,7 @@ Examples:
 			workingDir, _ = os.Getwd()
 		}
 
-		fmt.Printf("🔧 Analyzing issue: %s\n\n", issue)
+		fmt.Printf(" Analyzing issue: %s\n\n", issue)
 
 		// Initialize AI assistant
 		assistant, err := ai.NewAIAssistant(rc)
@@ -280,7 +280,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 
 		fullPrompt := ai.BuildEnvironmentPrompt(ctx, diagnosticPrompt)
 
-		fmt.Println("🤖 Diagnosing issue...")
+		fmt.Println(" Diagnosing issue...")
 
 		// Get AI response
 		response, err := assistant.Chat(rc, ctx, fullPrompt)
@@ -294,7 +294,7 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 
 		// Display response
 		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Println("🔧 Diagnostic Results & Fix Recommendations")
+		fmt.Println(" Diagnostic Results & Fix Recommendations")
 		fmt.Println(strings.Repeat("=", 80))
 		fmt.Println()
 		fmt.Println(response.Choices[0].Message.Content)
@@ -306,10 +306,10 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 			fmt.Printf("💡 Found %d suggested fix action(s).\n", len(actions))
 
 			if autoFix {
-				fmt.Println("🚀 Auto-fix enabled, implementing suggestions...")
+				fmt.Println(" Auto-fix enabled, implementing suggestions...")
 				return implementActions(rc, actions, workingDir, false)
 			} else {
-				fmt.Print("🔧 Would you like me to implement these fixes? [y/N]: ")
+				fmt.Print(" Would you like me to implement these fixes? [y/N]: ")
 				reader := bufio.NewReader(os.Stdin)
 				if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
 					return implementActions(rc, actions, workingDir, false)
@@ -342,7 +342,7 @@ Example:
 			workingDir, _ = os.Getwd()
 		}
 
-		fmt.Println("🤖 AI Assistant Chat Mode")
+		fmt.Println(" AI Assistant Chat Mode")
 		fmt.Println("Type 'exit', 'quit', or 'bye' to end the conversation.")
 		fmt.Printf("Working directory: %s\n", workingDir)
 		fmt.Println(strings.Repeat("-", 60))
@@ -359,10 +359,10 @@ Example:
 		analyzer := ai.NewEnvironmentAnalyzer(workingDir)
 		env, err := analyzer.AnalyzeEnvironment(rc)
 		if err != nil {
-			fmt.Printf("⚠️  Environment analysis failed: %v\n", err)
+			fmt.Printf(" Environment analysis failed: %v\n", err)
 		} else {
 			ctx.Environment = env
-			fmt.Println("✅ Environment analysis complete.")
+			fmt.Println(" Environment analysis complete.")
 		}
 		fmt.Println()
 
@@ -395,7 +395,7 @@ Examples:
 		}
 
 		// For now, implement a placeholder that shows how it would work
-		fmt.Println("🚀 AI Action Implementation")
+		fmt.Println(" AI Action Implementation")
 		fmt.Printf("Working directory: %s\n", workingDir)
 		if dryRun {
 			fmt.Println("🔍 DRY RUN MODE - No actual changes will be made")
@@ -411,9 +411,9 @@ Examples:
 		// var actions []*ai.Action // Reserved for future implementation
 
 		if actionFile != "" {
-			fmt.Printf("📁 Loading actions from: %s\n", actionFile)
+			fmt.Printf(" Loading actions from: %s\n", actionFile)
 			// Would load actions from JSON file
-			fmt.Println("⚠️  Action file loading not yet implemented")
+			fmt.Println(" Action file loading not yet implemented")
 			return nil
 		} else {
 			fmt.Println("💡 No previous AI suggestions found.")
@@ -469,7 +469,7 @@ Examples:
 		// Show current configuration if requested
 		if showConfig {
 			config := configManager.GetConfig()
-			fmt.Println("🔧 Current AI Configuration")
+			fmt.Println(" Current AI Configuration")
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Printf("Config file: %s\n", configManager.GetConfigPath())
 
@@ -508,7 +508,7 @@ Examples:
 
 		// Interactive mode if no flags provided
 		if provider == "" && apiKey == "" && vaultPath == "" && model == "" && baseURL == "" && azureEndpoint == "" {
-			fmt.Println("🔧 AI Assistant Configuration")
+			fmt.Println(" AI Assistant Configuration")
 			fmt.Println(strings.Repeat("-", 40))
 			fmt.Printf("Config file: %s\n\n", configManager.GetConfigPath())
 
@@ -558,12 +558,12 @@ Examples:
 
 				if apiKeyInput != "" {
 					if err := ai.ValidateAPIKey(apiKeyInput); err != nil {
-						fmt.Printf("⚠️  Warning: %v\n", err)
+						fmt.Printf(" Warning: %v\n", err)
 					}
 					if err := configManager.SetAPIKey(apiKeyInput); err != nil {
 						return fmt.Errorf("failed to save API key: %w", err)
 					}
-					fmt.Println("✅ API key saved to config file")
+					fmt.Println(" API key saved to config file")
 				}
 
 			case "b":
@@ -575,12 +575,12 @@ Examples:
 					if err := configManager.SetAPIKeyVault(vaultInput); err != nil {
 						return fmt.Errorf("failed to save Vault path: %w", err)
 					}
-					fmt.Println("✅ Vault path saved to config file")
-					fmt.Println("📝 Note: Make sure to store your API key at this Vault path")
+					fmt.Println(" Vault path saved to config file")
+					fmt.Println(" Note: Make sure to store your API key at this Vault path")
 				}
 
 			case "c":
-				fmt.Println("📝 Skipping API key configuration")
+				fmt.Println(" Skipping API key configuration")
 				fmt.Println("   Set one of these environment variables:")
 				if selectedProvider == "azure-openai" {
 					fmt.Println("   - AZURE_OPENAI_API_KEY")
@@ -605,7 +605,7 @@ Examples:
 					if err := configManager.UpdateConfig(updates); err != nil {
 						return fmt.Errorf("failed to save Azure endpoint: %w", err)
 					}
-					fmt.Println("✅ Azure endpoint saved")
+					fmt.Println(" Azure endpoint saved")
 				}
 
 				fmt.Print("Enter your deployment name (e.g., gpt-4): ")
@@ -617,7 +617,7 @@ Examples:
 					if err := configManager.UpdateConfig(updates); err != nil {
 						return fmt.Errorf("failed to save Azure deployment: %w", err)
 					}
-					fmt.Println("✅ Azure deployment saved")
+					fmt.Println(" Azure deployment saved")
 				}
 
 				fmt.Print("Enter API version (press Enter for default 2024-02-15-preview): ")
@@ -629,7 +629,7 @@ Examples:
 					if err := configManager.UpdateConfig(updates); err != nil {
 						return fmt.Errorf("failed to save Azure API version: %w", err)
 					}
-					fmt.Printf("✅ Azure API version set to: %s\n", versionInput)
+					fmt.Printf(" Azure API version set to: %s\n", versionInput)
 				}
 			}
 
@@ -643,10 +643,10 @@ Examples:
 				if err := configManager.UpdateConfig(updates); err != nil {
 					return fmt.Errorf("failed to update model: %w", err)
 				}
-				fmt.Printf("✅ Model set to: %s\n", modelInput)
+				fmt.Printf(" Model set to: %s\n", modelInput)
 			}
 
-			fmt.Println("\n✅ Configuration complete!")
+			fmt.Println("\n Configuration complete!")
 			fmt.Println("You can now use 'eos ai ask' and other AI commands.")
 			return nil
 		}
@@ -656,24 +656,24 @@ Examples:
 
 		if provider != "" {
 			updates["provider"] = provider
-			fmt.Printf("✅ Provider set to: %s\n", provider)
+			fmt.Printf(" Provider set to: %s\n", provider)
 		}
 
 		if apiKey != "" {
 			if err := ai.ValidateAPIKey(apiKey); err != nil {
-				fmt.Printf("⚠️  Warning: %v\n", err)
+				fmt.Printf(" Warning: %v\n", err)
 			}
 			if err := configManager.SetAPIKey(apiKey); err != nil {
 				return fmt.Errorf("failed to save API key: %w", err)
 			}
-			fmt.Println("✅ API key saved")
+			fmt.Println(" API key saved")
 		}
 
 		if vaultPath != "" {
 			if err := configManager.SetAPIKeyVault(vaultPath); err != nil {
 				return fmt.Errorf("failed to save Vault path: %w", err)
 			}
-			fmt.Println("✅ Vault path saved")
+			fmt.Println(" Vault path saved")
 		}
 
 		if model != "" {
@@ -700,7 +700,7 @@ Examples:
 			if err := configManager.UpdateConfig(updates); err != nil {
 				return fmt.Errorf("failed to update configuration: %w", err)
 			}
-			fmt.Println("✅ Configuration updated")
+			fmt.Println(" Configuration updated")
 		}
 
 		return nil
@@ -726,15 +726,15 @@ func containsTechnicalTerms(text string) bool {
 }
 
 func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
-	fmt.Println("📊 Environment Analysis Results")
+	fmt.Println(" Environment Analysis Results")
 	fmt.Println(strings.Repeat("-", 40))
 
 	// File System Analysis
 	if env.FileSystem != nil {
 		fs := env.FileSystem
-		fmt.Printf("📁 Files Found:\n")
+		fmt.Printf(" Files Found:\n")
 		if len(fs.ComposeFiles) > 0 {
-			fmt.Printf("   🐳 Docker Compose: %d files\n", len(fs.ComposeFiles))
+			fmt.Printf("    Docker Compose: %d files\n", len(fs.ComposeFiles))
 			if detailed {
 				for _, file := range fs.ComposeFiles {
 					fmt.Printf("      - %s (modified: %s)\n", file.Path, file.ModTime.Format("2006-01-02 15:04"))
@@ -742,7 +742,7 @@ func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
 			}
 		}
 		if len(fs.TerraformFiles) > 0 {
-			fmt.Printf("   🏗️  Terraform: %d files\n", len(fs.TerraformFiles))
+			fmt.Printf("     Terraform: %d files\n", len(fs.TerraformFiles))
 			if detailed {
 				for _, file := range fs.TerraformFiles {
 					fmt.Printf("      - %s\n", file.Path)
@@ -750,7 +750,7 @@ func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
 			}
 		}
 		if len(fs.ConfigFiles) > 0 {
-			fmt.Printf("   ⚙️  Configuration: %d files\n", len(fs.ConfigFiles))
+			fmt.Printf("     Configuration: %d files\n", len(fs.ConfigFiles))
 		}
 		fmt.Println()
 	}
@@ -758,9 +758,9 @@ func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
 	// Services Analysis
 	if env.Services != nil {
 		services := env.Services
-		fmt.Printf("🔧 Services:\n")
+		fmt.Printf(" Services:\n")
 		if len(services.DockerContainers) > 0 {
-			fmt.Printf("   🐳 Docker Containers: %d\n", len(services.DockerContainers))
+			fmt.Printf("    Docker Containers: %d\n", len(services.DockerContainers))
 			if detailed {
 				for _, container := range services.DockerContainers {
 					fmt.Printf("      - %s: %s (%s)\n", container.Name, container.Status, container.Image)
@@ -768,7 +768,7 @@ func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
 			}
 		}
 		if len(services.SystemdServices) > 0 {
-			fmt.Printf("   ⚙️  Systemd Services: %d\n", len(services.SystemdServices))
+			fmt.Printf("     Systemd Services: %d\n", len(services.SystemdServices))
 		}
 		if len(services.NetworkPorts) > 0 {
 			fmt.Printf("   🌐 Listening Ports: %d\n", len(services.NetworkPorts))
@@ -779,27 +779,27 @@ func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
 	// Infrastructure Status
 	if env.Infrastructure != nil {
 		infra := env.Infrastructure
-		fmt.Printf("🏗️  Infrastructure:\n")
+		fmt.Printf("  Infrastructure:\n")
 		if infra.VaultStatus != nil {
-			status := "❌ Unavailable"
+			status := " Unavailable"
 			if infra.VaultStatus.Initialized {
 				if infra.VaultStatus.Sealed {
-					status = "🔒 Sealed"
+					status = " Sealed"
 				} else {
-					status = "✅ Ready"
+					status = " Ready"
 				}
 			}
-			fmt.Printf("   🔐 Vault: %s\n", status)
+			fmt.Printf("    Vault: %s\n", status)
 		}
 		if infra.ConsulStatus != nil && infra.ConsulStatus.Leader != "" {
-			fmt.Printf("   🔍 Consul: ✅ Ready (leader: %s)\n", infra.ConsulStatus.Leader)
+			fmt.Printf("   🔍 Consul:  Ready (leader: %s)\n", infra.ConsulStatus.Leader)
 		}
 		fmt.Println()
 	}
 
 	// Recent Issues
 	if env.Logs != nil && len(env.Logs.ErrorLogs) > 0 {
-		fmt.Printf("⚠️  Recent Issues: %d errors found\n", len(env.Logs.ErrorLogs))
+		fmt.Printf(" Recent Issues: %d errors found\n", len(env.Logs.ErrorLogs))
 		if detailed {
 			for i, log := range env.Logs.ErrorLogs {
 				if i >= 5 {
@@ -830,7 +830,7 @@ func startInteractiveChat(rc *eos_io.RuntimeContext, assistant *ai.AIAssistant, 
 
 		// Check for exit commands
 		if strings.ToLower(input) == "exit" || strings.ToLower(input) == "quit" || strings.ToLower(input) == "bye" {
-			fmt.Println("🤖 Goodbye! Feel free to ask for help anytime.")
+			fmt.Println(" Goodbye! Feel free to ask for help anytime.")
 			break
 		}
 
@@ -840,26 +840,26 @@ func startInteractiveChat(rc *eos_io.RuntimeContext, assistant *ai.AIAssistant, 
 			analyzer := ai.NewEnvironmentAnalyzer(ctx.Environment.WorkingDirectory)
 			if env, err := analyzer.AnalyzeEnvironment(rc); err == nil {
 				ctx.Environment = env
-				fmt.Println("✅ Environment analysis updated.")
+				fmt.Println(" Environment analysis updated.")
 				continue
 			}
 		}
 
-		fmt.Println("🤖 Thinking...")
+		fmt.Println(" Thinking...")
 
 		// Get AI response
 		response, err := assistant.Chat(rc, ctx, input)
 		if err != nil {
-			fmt.Printf("❌ Error: %v\n", err)
+			fmt.Printf(" Error: %v\n", err)
 			continue
 		}
 
 		if len(response.Choices) == 0 {
-			fmt.Println("❌ No response from AI")
+			fmt.Println(" No response from AI")
 			continue
 		}
 
-		fmt.Println("\n🤖 AI:")
+		fmt.Println("\n AI:")
 		fmt.Println(response.Choices[0].Message.Content)
 		fmt.Println()
 
@@ -880,24 +880,24 @@ func implementActions(rc *eos_io.RuntimeContext, actions []*ai.Action, workingDi
 
 	executor := ai.NewActionExecutor(workingDir, dryRun)
 
-	fmt.Printf("🚀 Implementing %d action(s)...\n\n", len(actions))
+	fmt.Printf(" Implementing %d action(s)...\n\n", len(actions))
 
 	for i, action := range actions {
 		fmt.Printf("Action %d/%d: %s\n", i+1, len(actions), action.Description)
 
 		result, err := executor.ExecuteAction(rc, action)
 		if err != nil {
-			fmt.Printf("❌ Failed: %v\n", err)
+			fmt.Printf(" Failed: %v\n", err)
 			continue
 		}
 
 		if result.Success {
-			fmt.Printf("✅ Success: %s\n", result.Message)
+			fmt.Printf(" Success: %s\n", result.Message)
 			if result.Output != "" {
 				fmt.Printf("   Output: %s\n", result.Output)
 			}
 		} else {
-			fmt.Printf("❌ Failed: %s\n", result.Message)
+			fmt.Printf(" Failed: %s\n", result.Message)
 		}
 		fmt.Println()
 	}

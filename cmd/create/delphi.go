@@ -57,15 +57,15 @@ func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 	args = []string{"-a"}
 	if ignoreHardwareCheck {
-		log.Info("⚙️ Ignoring hardware checks (passing -i)")
+		log.Info(" Ignoring hardware checks (passing -i)")
 		args = append(args, "-i")
 	}
 	if overwriteInstall {
-		log.Info("⚙️ Overwriting existing installation (passing -o)")
+		log.Info(" Overwriting existing installation (passing -o)")
 		args = append(args, "-o")
 	}
 
-	log.Info("📦 Running Wazuh installer script")
+	log.Info(" Running Wazuh installer script")
 	cmdArgs := append([]string{scriptPath}, args...)
 	installCmd := exec.Command("bash", cmdArgs...)
 	installCmd.Stdout = os.Stdout
@@ -73,11 +73,11 @@ func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	if err := installCmd.Run(); err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
-	log.Info("✅ Wazuh installation completed")
+	log.Info(" Wazuh installation completed")
 
-	log.Info("🔐 Attempting to extract Wazuh admin credentials")
+	log.Info(" Attempting to extract Wazuh admin credentials")
 	if err := extractWazuhPasswords(rc); err != nil {
-		log.Warn("⚠️ Could not extract Wazuh credentials", zap.Error(err))
+		log.Warn("Could not extract Wazuh credentials", zap.Error(err))
 	}
 
 	log.Info("🚫 Disabling Wazuh repo updates")
@@ -90,7 +90,7 @@ func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		if err := cmd.Run(); err != nil {
 			log.Warn("Failed to comment out Wazuh APT repo", zap.Error(err))
 		} else {
-			log.Info("✅ Wazuh APT repo commented out")
+			log.Info(" Wazuh APT repo commented out")
 			_ = exec.Command("apt", "update").Run()
 		}
 	default:
@@ -100,18 +100,18 @@ func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		if err := cmd.Run(); err != nil {
 			log.Warn("Failed to disable Wazuh yum repo", zap.Error(err))
 		} else {
-			log.Info("✅ Wazuh yum repo disabled")
+			log.Info(" Wazuh yum repo disabled")
 		}
 	}
 
-	log.Info("🎉 Delphi (Wazuh) setup complete")
+	log.Info(" Delphi (Wazuh) setup complete")
 	log.Info("To access the Wazuh Dashboard:")
-	log.Info("👉 Run this on your **local machine** (not over SSH):")
+	log.Info(" Run this on your **local machine** (not over SSH):")
 	log.Info("    firefox https://$(hostname -I | awk '{print $1}')")
 	log.Info("Or forward port with:")
 	log.Info("    ssh -L 8443:localhost:443 user@your-server")
 	log.Info("Then browse: https://localhost:8443")
-	log.Info("🔐 To harden this install, run: `eos harden delphi`")
+	log.Info(" To harden this install, run: `eos harden delphi`")
 
 	return nil
 }
@@ -121,7 +121,7 @@ func extractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 	for _, dir := range searchPaths {
 		tarPath := filepath.Join(dir, "wazuh-install-files.tar")
 		if eos_unix.Exists(tarPath) {
-			otelzap.Ctx(rc.Ctx).Info("📦 Found Wazuh tar file", zap.String("path", tarPath))
+			otelzap.Ctx(rc.Ctx).Info(" Found Wazuh tar file", zap.String("path", tarPath))
 			cmd := exec.Command("tar", "-O", "-xvf", tarPath, "wazuh-install-files/wazuh-passwords.txt")
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr

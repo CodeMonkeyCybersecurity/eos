@@ -25,7 +25,7 @@ func GetAllServers(rc *eos_io.RuntimeContext) error {
 		return cerr.Wrap(err, "failed to get all servers")
 	}
 
-	log.Info("📋 Total servers found", zap.Int("count", len(servers)))
+	log.Info(" Total servers found", zap.Int("count", len(servers)))
 	for _, s := range servers {
 		log.Info("🖥️ Server", zap.String("name", s.Name), zap.Int64("id", s.ID))
 	}
@@ -38,7 +38,7 @@ func ListServersFiltered(rc *eos_io.RuntimeContext, client *hcloud.Client, log *
 		log.Error("Failed to list filtered servers", zap.Error(err))
 		return nil, err
 	}
-	log.Info("📋 Retrieved servers", zap.Int("count", len(servers)))
+	log.Info(" Retrieved servers", zap.Int("count", len(servers)))
 	return servers, nil
 }
 

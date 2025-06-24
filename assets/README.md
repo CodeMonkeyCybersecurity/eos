@@ -132,7 +132,7 @@ EMAIL_TO="admin@example.com"
 WEBHOOK_AUTH_TOKEN="your-secure-token"
 ```
 
-### 🔧 Service Files (`services/`)
+###  Service Files (`services/`)
 
 Systemd service files for managing the Delphi pipeline services.
 
@@ -157,7 +157,7 @@ sudo eos delphi services status --all
 sudo eos delphi services logs delphi-listener
 ```
 
-### 📧 Email Template (`email.html`)
+###  Email Template (`email.html`)
 
 Professional HTML email template for security alert notifications.
 
@@ -174,7 +174,7 @@ Professional HTML email template for security alert notifications.
 - `$content` - Alert details and analysis
 - Additional variables populated by delphi-emailer.py
 
-### 📋 StackStorm Integration (`stackstorm_rules/`)
+###  StackStorm Integration (`stackstorm_rules/`)
 
 StackStorm pack configuration for workflow automation.
 

@@ -64,7 +64,7 @@ func ConfigureKVMBridge() error {
 		return fmt.Errorf("failed to apply netplan: %w\nOutput: %s", err, string(out))
 	}
 
-	fmt.Println("✅ br0 bridge configured and applied.")
+	fmt.Println(" br0 bridge configured and applied.")
 	return nil
 }
 

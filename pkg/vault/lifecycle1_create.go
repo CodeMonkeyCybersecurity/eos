@@ -10,7 +10,7 @@ import (
 )
 
 func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
-	otelzap.Ctx(rc.Ctx).Info("🚀 Starting full Vault create lifecycle")
+	otelzap.Ctx(rc.Ctx).Info(" Starting full Vault create lifecycle")
 
 	if err := PhaseInstallVault(rc); err != nil {
 		return fmt.Errorf("install vault binary: %w", err)
@@ -31,6 +31,6 @@ func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("initialize vault: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🎉 Vault create lifecycle completed successfully")
+	otelzap.Ctx(rc.Ctx).Info(" Vault create lifecycle completed successfully")
 	return nil
 }

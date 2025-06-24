@@ -37,9 +37,9 @@ provides comprehensive error handling with detailed troubleshooting guidance.`,
 			return logger.LogErrAndWrap(rc, "enable vault", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Vault setup completed successfully")
-		otelzap.Ctx(rc.Ctx).Info("📋 Configured: AppRole authentication, Vault Agent with systemd integration, and TLS security")
-		otelzap.Ctx(rc.Ctx).Info("ℹ️  Next step: run `eos secure vault` to finalize hardening")
+		otelzap.Ctx(rc.Ctx).Info(" Vault setup completed successfully")
+		otelzap.Ctx(rc.Ctx).Info(" Configured: AppRole authentication, Vault Agent with systemd integration, and TLS security")
+		otelzap.Ctx(rc.Ctx).Info("  Next step: run `eos secure vault` to finalize hardening")
 		return nil
 	}),
 }

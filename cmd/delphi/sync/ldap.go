@@ -57,8 +57,8 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 			return fmt.Errorf("failed to restart wazuh-dashboard: %w", err)
 		}
 
-		fmt.Println("✅ LDAP configuration synced to Delphi successfully!")
-		fmt.Println("🔐 Please test logging in to the Wazuh dashboard using your LDAP credentials.")
+		fmt.Println(" LDAP configuration synced to Delphi successfully!")
+		fmt.Println(" Please test logging in to the Wazuh dashboard using your LDAP credentials.")
 		return nil
 	}),
 }

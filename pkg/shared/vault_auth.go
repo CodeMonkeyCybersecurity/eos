@@ -56,10 +56,10 @@ var DefaultAppRoleData = map[string]interface{}{
 // WriteAppRoleFile writes a single secret to a file.
 func WriteAppRoleFile(path, value string, perm os.FileMode) error {
 	if err := os.WriteFile(path, []byte(value), perm); err != nil {
-		zap.L().Error("❌ Failed to write secret file", zap.String("path", path), zap.Error(err))
+		zap.L().Error(" Failed to write secret file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("write %s: %w", path, err)
 	}
-	zap.L().Info("✅ Secret file written", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
+	zap.L().Info(" Secret file written", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
 	return nil
 }
 

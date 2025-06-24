@@ -54,7 +54,7 @@ var CreatePostfixCmd = &cobra.Command{
 			return fmt.Errorf("test mail failed: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Postfix SMTP relay setup complete.")
+		otelzap.Ctx(rc.Ctx).Info(" Postfix SMTP relay setup complete.")
 		return nil
 	}),
 }

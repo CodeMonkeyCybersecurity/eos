@@ -48,8 +48,8 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 			promptName := args[0]
-			
-			logger.Info("📖 Reading system prompt",
+
+			logger.Info(" Reading system prompt",
 				zap.String("prompt_name", promptName))
 
 			promptsDir, err := GetSystemPromptsDir()
@@ -74,14 +74,14 @@ Examples:
 			}
 
 			if showPath {
-				logger.Info("📁 Prompt file location",
+				logger.Info(" Prompt file location",
 					zap.String("path", promptPath))
 			}
 
 			// Log prompt metadata
 			stat, err := os.Stat(promptPath)
 			if err == nil {
-				logger.Info("📄 Prompt information",
+				logger.Info(" Prompt information",
 					zap.String("name", promptName),
 					zap.String("description", GetPromptDescription(promptName)),
 					zap.String("size", formatFileSize(stat.Size())),
@@ -89,17 +89,17 @@ Examples:
 			}
 
 			// Display content with proper formatting
-			logger.Info("📝 Prompt content:")
+			logger.Info(" Prompt content:")
 			logger.Info("---")
-			
+
 			// Split content into lines for better logging
 			lines := strings.Split(string(content), "\n")
 			for _, line := range lines {
 				logger.Info(line)
 			}
-			
+
 			logger.Info("---")
-			logger.Info("✅ Prompt displayed successfully",
+			logger.Info(" Prompt displayed successfully",
 				zap.Int("lines", len(lines)),
 				zap.Int("characters", len(content)))
 

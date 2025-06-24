@@ -48,7 +48,7 @@ func GetDelphiAPICredsOrPrompt(rc *eos_io.RuntimeContext) (string, string, error
 		return promptDelphiAPICreds(rc)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Retrieved Delphi API credentials from Vault")
+	otelzap.Ctx(rc.Ctx).Info(" Retrieved Delphi API credentials from Vault")
 	return user, pass, nil
 }
 
@@ -61,7 +61,7 @@ func promptDelphiAPICreds(rc *eos_io.RuntimeContext) (string, string, error) {
 		return "", "", err
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🔐 Saving entered API credentials to Vault")
+	otelzap.Ctx(rc.Ctx).Info(" Saving entered API credentials to Vault")
 	creds := &APICreds{
 		Username: user,
 		Password: pass,
@@ -81,21 +81,21 @@ func ReadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	// Try Vault first
 	err := vault.Read(rc, nil, VaultDelphiConfig, &cfg)
 	if err == nil && cfg.FQDN != "" && cfg.APIUser != "" && cfg.APIPassword != "" {
-		otelzap.Ctx(rc.Ctx).Info("✅ Loaded Delphi config from Vault")
+		otelzap.Ctx(rc.Ctx).Info(" Loaded Delphi config from Vault")
 		return &cfg, nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Warn("⚠️  Delphi config not found or incomplete in Vault. Trying disk fallback...")
+	otelzap.Ctx(rc.Ctx).Warn(" Delphi config not found or incomplete in Vault. Trying disk fallback...")
 
 	// Try disk fallback
 	diskPath := xdg.XDGConfigPath(shared.EosID, "delphi.json")
 	data, err := os.ReadFile(diskPath)
 	if err == nil {
 		if err := json.Unmarshal(data, &cfg); err == nil && cfg.FQDN != "" {
-			otelzap.Ctx(rc.Ctx).Info("✅ Loaded Delphi config from disk", zap.String("path", diskPath))
+			otelzap.Ctx(rc.Ctx).Info(" Loaded Delphi config from disk", zap.String("path", diskPath))
 			return &cfg, nil
 		}
-		otelzap.Ctx(rc.Ctx).Warn("❌ Failed to parse disk config or it was incomplete", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn(" Failed to parse disk config or it was incomplete", zap.Error(err))
 	}
 
 	pw, err := crypto.PromptPassword(rc, "Enter the API password")
@@ -106,14 +106,14 @@ func ReadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 
 	// Optionally save to disk
 	if err := WriteConfig(rc, &cfg); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️  Failed to write disk config fallback", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn(" Failed to write disk config fallback", zap.Error(err))
 	}
 
 	// Attempt to write back to Vault
 	if err := vault.Write(rc, nil, VaultDelphiConfig, &cfg); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️  Failed to save config to Vault", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn(" Failed to save config to Vault", zap.Error(err))
 	} else {
-		otelzap.Ctx(rc.Ctx).Info("✅ Delphi config saved to Vault")
+		otelzap.Ctx(rc.Ctx).Info(" Delphi config saved to Vault")
 	}
 
 	return &cfg, nil

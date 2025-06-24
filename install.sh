@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-trap 'echo "❌ Installation failed on line $LINENO"; exit 1' ERR
+trap 'echo " Installation failed on line $LINENO"; exit 1' ERR
 
 log() { echo "[$1] $2"; }
 
@@ -19,16 +19,16 @@ detect_platform() {
       # Detect Linux distribution
       if [ -f /etc/redhat-release ] || [ -f /etc/centos-release ] || [ -f /etc/fedora-release ]; then
         IS_RHEL=true
-        log INFO "📦 Detected RHEL-based system"
+        log INFO " Detected RHEL-based system"
       elif [ -f /etc/debian_version ] || command -v apt-get >/dev/null 2>&1; then
         IS_DEBIAN=true
-        log INFO "📦 Detected Debian-based system"
+        log INFO " Detected Debian-based system"
       fi
       ;;
     Darwin) PLATFORM="mac"; IS_MAC=true ;;
-    *) log ERR "❌ Unsupported OS: $(uname -s)"; exit 1 ;;
+    *) log ERR " Unsupported OS: $(uname -s)"; exit 1 ;;
   esac
-  log INFO "📦 Detected platform: $PLATFORM"
+  log INFO " Detected platform: $PLATFORM"
 }
 
 # --- Globals ---
@@ -59,21 +59,21 @@ fi
 
 update_system_packages() {
   if $IS_RHEL; then
-    log INFO "📦 Updating RHEL-based system packages..."
+    log INFO " Updating RHEL-based system packages..."
     if command -v dnf >/dev/null 2>&1; then
       dnf update -y
     elif command -v yum >/dev/null 2>&1; then
       yum update -y
     else
-      log ERR "❌ Neither dnf nor yum found on RHEL-based system"
+      log ERR " Neither dnf nor yum found on RHEL-based system"
       exit 1
     fi
   elif $IS_DEBIAN; then
-    log INFO "📦 Updating Debian-based system packages..."
+    log INFO " Updating Debian-based system packages..."
     apt-get update -y
     apt-get upgrade -y
   elif $IS_MAC; then
-    log INFO "ℹ️ Skipping system update on macOS (use brew upgrade manually if needed)"
+    log INFO " Skipping system update on macOS (use brew upgrade manually if needed)"
   fi
 }
 
@@ -91,7 +91,7 @@ install_go() {
     
     # Simple version comparison - check if current version is at least the required version
     if printf '%s\n%s\n' "$GO_VERSION" "$current_version" | sort -V | head -n1 | grep -q "^$GO_VERSION$"; then
-      log INFO "✅ Go is already up-to-date (version $current_version >= $GO_VERSION)"
+      log INFO " Go is already up-to-date (version $current_version >= $GO_VERSION)"
     else
       log INFO "➡️ Go version is older (wanted: $GO_VERSION, found: $current_version)"
       need_go_install=true
@@ -102,7 +102,7 @@ install_go() {
     if $IS_MAC; then
       log INFO "🍺 Installing Go via Homebrew..."
       if ! command -v brew >/dev/null 2>&1; then
-        log ERR "❌ Homebrew not found. Please install it first: https://brew.sh/"
+        log ERR " Homebrew not found. Please install it first: https://brew.sh/"
         exit 1
       fi
       brew install go
@@ -118,23 +118,23 @@ install_go() {
       curl -LO "$download_url"
       
       if [ ! -f "$go_tarball" ]; then
-        log ERR "❌ Failed to download Go archive"
+        log ERR " Failed to download Go archive"
         exit 1
       fi
       
       # Verify download
       if ! file "$go_tarball" | grep -q "gzip compressed data"; then
-        log ERR "❌ Download failed or was not a valid tarball"
+        log ERR " Download failed or was not a valid tarball"
         exit 1
       fi
       
-      log INFO "📦 Extracting Go archive to ${GO_INSTALL_DIR}..."
+      log INFO " Extracting Go archive to ${GO_INSTALL_DIR}..."
       rm -rf "${GO_INSTALL_DIR}/go"
       tar -C "${GO_INSTALL_DIR}" -xzf "$go_tarball"
       
       # Set up environment variables system-wide
       local profile_file="/etc/profile.d/go.sh"
-      log INFO "⚙️ Setting up Go environment in ${profile_file}..."
+      log INFO " Setting up Go environment in ${profile_file}..."
       tee "${profile_file}" >/dev/null <<EOF
 export PATH=\$PATH:/usr/local/go/bin
 EOF
@@ -151,7 +151,7 @@ EOF
       # Update PATH for current script execution
       export PATH="${GO_INSTALL_DIR}/go/bin:$PATH"
       
-      log INFO "✅ Go installed successfully"
+      log INFO " Go installed successfully"
     fi
   fi
   
@@ -159,14 +159,14 @@ EOF
   if command -v go >/dev/null 2>&1; then
     log INFO "Go version: $(go version)"
   else
-    log ERR "❌ Go installation verification failed"
+    log ERR " Go installation verification failed"
     exit 1
   fi
 }
 
 install_github_cli() {
   if command -v gh >/dev/null 2>&1; then
-    log INFO "✅ GitHub CLI is already installed: $(gh --version | head -n1)"
+    log INFO " GitHub CLI is already installed: $(gh --version | head -n1)"
     return
   fi
   
@@ -174,7 +174,7 @@ install_github_cli() {
   
   if $IS_MAC; then
     if ! command -v brew >/dev/null 2>&1; then
-      log ERR "❌ Homebrew not found. Please install it first: https://brew.sh/"
+      log ERR " Homebrew not found. Please install it first: https://brew.sh/"
       exit 1
     fi
     brew install gh
@@ -185,7 +185,7 @@ install_github_cli() {
       
       # Remove any stale local repo
       if [ -f "/etc/yum.repos.d/opt_eos.repo" ]; then
-        log INFO "⚠️ Removing stale local repo: /etc/yum.repos.d/opt_eos.repo"
+        log INFO "Removing stale local repo: /etc/yum.repos.d/opt_eos.repo"
         rm -f /etc/yum.repos.d/opt_eos.repo
       fi
       
@@ -209,15 +209,15 @@ install_github_cli() {
     apt-get update
     apt-get install -y gh
   else
-    log ERR "❌ Unsupported Linux distribution for GitHub CLI installation"
+    log ERR " Unsupported Linux distribution for GitHub CLI installation"
     exit 1
   fi
   
   # Verify installation
   if command -v gh >/dev/null 2>&1; then
-    log INFO "✅ GitHub CLI installed: $(gh --version | head -n1)"
+    log INFO " GitHub CLI installed: $(gh --version | head -n1)"
   else
-    log ERR "❌ GitHub CLI installation verification failed"
+    log ERR " GitHub CLI installation verification failed"
     exit 1
   fi
 }
@@ -227,22 +227,22 @@ check_prerequisites() {
 
   # 1. Check if 'go' is in the current PATH
   if command -v go >/dev/null; then
-    log INFO "✅ Go found in current PATH: $(command -v go)"
+    log INFO " Go found in current PATH: $(command -v go)"
     go_found=true
   # 2. Check the standard /usr/local/go/bin/go location directly
   elif [[ -x "/usr/local/go/bin/go" ]]; then
     export PATH="/usr/local/go/bin:$PATH" # Temporarily add to PATH for this script's execution
-    log INFO "✅ Go found at standard installation path: /usr/local/go/bin/go"
+    log INFO " Go found at standard installation path: /usr/local/go/bin/go"
     go_found=true
   # 3. Check the user's HOME/go/bin/go location directly (as a fallback)
   elif [[ -x "$HOME/go/bin/go" ]]; then
     export PATH="$HOME/go/bin:$PATH" # Temporarily add to PATH for this script's execution
-    log INFO "✅ Go found at user home path: $HOME/go/bin/go"
+    log INFO " Go found at user home path: $HOME/go/bin/go"
     go_found=true
   fi
 
   if ! $go_found; then
-    log INFO "❌ Go executable not found. Will install Go automatically."
+    log INFO " Go executable not found. Will install Go automatically."
     install_go
   else
     # Check Go version and potentially upgrade
@@ -263,7 +263,7 @@ check_prerequisites() {
 }
 
 build_eos_binary() {
-  log INFO "⚙️ Building Eos..."
+  log INFO " Building Eos..."
   cd "$Eos_SRC_DIR"
   rm -rf "$Eos_BINARY_NAME"
   # Use the 'go' command which should now be in PATH due to check_prerequisites
@@ -276,7 +276,7 @@ show_existing_checksum() {
     # Use command -v for robustness, or ensure shasum is on Mac
     command -v sha256sum >/dev/null && sha256sum "$INSTALL_PATH" || shasum -a 256 "$INSTALL_PATH"
   else
-    log INFO "ℹ️ No existing installed binary to replace"
+    log INFO " No existing installed binary to replace"
   fi
 }
 
@@ -290,7 +290,7 @@ install_binary() {
   else
     # Linux handling: re-run with sudo if not already root
     if [[ "$EUID" -ne 0 ]]; then
-      log INFO "🔐 Re-running with sudo to ensure proper permissions..."
+      log INFO " Re-running with sudo to ensure proper permissions..."
       # Use `bash -c` to ensure the environment is inherited correctly when `sudo` re-runs
       exec sudo bash -c "export PATH=\"$PATH\"; \"$0\" \"$@\""
     fi
@@ -307,13 +307,13 @@ show_new_checksum() {
 }
 
 create_directories() {
-  log INFO "📁 Creating system-wide secrets, config, and log directories: $SECRETS_DIR, $CONFIG_DIR, $LOG_DIR"
+  log INFO " Creating system-wide secrets, config, and log directories: $SECRETS_DIR, $CONFIG_DIR, $LOG_DIR"
   # Ensure directories are created as root if running with sudo
   mkdir -p "$SECRETS_DIR" "$CONFIG_DIR" "$LOG_DIR" || log ERR "Failed to create directories."
   chmod 700 "$SECRETS_DIR" || log ERR "Failed to set permissions on $SECRETS_DIR."
   chmod 755 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
 
-  # ⚠️ This is where the core logic for user-runnable commands comes in.
+  # This is where the core logic for user-runnable commands comes in.
   # If Eos can run certain commands as a regular user, it needs to access
   # config/log/secret files *owned by that user*.
   # The recommended approach is for the Go application itself to determine
@@ -338,7 +338,7 @@ setup_linux_user() {
 
     # Check if syslog group exists and user is not already in it
     if getent group syslog >/dev/null && ! id -nG "$Eos_USER" | grep -qw syslog; then
-      log INFO "➕ Adding $Eos_USER to syslog group (for log access)"
+      log INFO " Adding $Eos_USER to syslog group (for log access)"
       usermod -aG syslog "$Eos_USER" || log ERR "Failed to add user $Eos_USER to syslog group."
     fi
 
@@ -353,11 +353,11 @@ setup_linux_user() {
 
 add_sudoers_entry() {
   if $IS_LINUX && [ ! -f /etc/sudoers.d/eos ]; then
-    log INFO "⚙️ Adding sudoers entry for $Eos_USER (to allow passwordless sudo for the 'eos' system user)"
+    log INFO " Adding sudoers entry for $Eos_USER (to allow passwordless sudo for the 'eos' system user)"
     echo "$Eos_USER ALL=(ALL) NOPASSWD: $INSTALL_PATH" | tee /etc/sudoers.d/eos > /dev/null \
       || { log ERR "Failed to write sudoers entry."; exit 1; }
     chmod 440 /etc/sudoers.d/eos || { log ERR "Failed to set permissions on sudoers file."; exit 1; }
-    visudo -c || { log ERR "❌ Sudoers validation failed. Please check /etc/sudoers.d/eos manually."; exit 1; }
+    visudo -c || { log ERR " Sudoers validation failed. Please check /etc/sudoers.d/eos manually."; exit 1; }
     log INFO "Sudoers entry validated."
   else
     log INFO "Sudoers entry already exists or not applicable for this OS."
@@ -372,7 +372,7 @@ main() {
     if [[ "$EUID" -eq 0 ]]; then
       update_system_packages
     else
-      log INFO "ℹ️ Skipping system package update (not running as root)"
+      log INFO " Skipping system package update (not running as root)"
     fi
   fi
   
@@ -385,7 +385,7 @@ main() {
   setup_linux_user
   add_sudoers_entry
   echo
-  log INFO "🎉 Eos installation complete!"
+  log INFO " Eos installation complete!"
   log INFO "The 'eos' binary has been installed to '$INSTALL_PATH'."
   log INFO "This path is typically included in your user's PATH."
   log INFO "You should now be able to run 'eos --help' directly."

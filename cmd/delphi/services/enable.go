@@ -16,7 +16,7 @@ import (
 // NewEnableCmd creates the enable command
 func NewEnableCmd() *cobra.Command {
 	var all bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "enable [service-name]",
 		Short: "Enable Delphi pipeline services to start at boot",
@@ -37,7 +37,7 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔧 Enabling Delphi services")
+			logger.Info(" Enabling Delphi services")
 
 			var services []string
 			if all {
@@ -64,23 +64,23 @@ Examples:
 			for _, service := range services {
 				logger.Info("Enabling service",
 					zap.String("service", service))
-				
+
 				// Check if service exists before trying to enable it
 				if !eos_unix.ServiceExists(service) {
-					logger.Warn("⚠️ Service unit file not found",
+					logger.Warn("Service unit file not found",
 						zap.String("service", service))
 					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
 					continue
 				}
-				
+
 				if err := eos_unix.RunSystemctlWithRetry(rc.Ctx, "enable", service, 3, 2); err != nil {
 					logger.Error("Failed to enable service",
 						zap.String("service", service),
 						zap.Error(err))
 					return fmt.Errorf("failed to enable %s: %w", service, err)
 				}
-				
-				logger.Info("✅ Service enabled successfully",
+
+				logger.Info(" Service enabled successfully",
 					zap.String("service", service))
 			}
 

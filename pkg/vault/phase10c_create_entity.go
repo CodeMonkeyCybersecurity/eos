@@ -19,7 +19,7 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 
 	client, err := GetRootClient(rc)
 	if err != nil {
-		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		log.Error(" Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)
 	}
 
@@ -34,7 +34,7 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 
 	if entityResp != nil && entityResp.Data != nil {
 		entityID = entityResp.Data["id"].(string)
-		log.Info("✅ Entity already exists", zap.String("entity_id", entityID))
+		log.Info(" Entity already exists", zap.String("entity_id", entityID))
 	} else {
 		entityData := map[string]interface{}{
 			"name":     entityName,
@@ -46,7 +46,7 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("failed to create entity: %w", err)
 		}
 		entityID = resp.Data["id"].(string)
-		log.Info("✅ Created new entity", zap.String("entity_id", entityID))
+		log.Info(" Created new entity", zap.String("entity_id", entityID))
 	}
 
 	// Add aliases if auth backends exist
@@ -68,7 +68,7 @@ func PhaseCreateEosEntity(rc *eos_io.RuntimeContext) error {
 			if err != nil {
 				log.Warn(fmt.Sprintf("⚠ Failed to create %s alias", label), zap.Error(err))
 			} else {
-				log.Info(fmt.Sprintf("✅ Linked %s to entity", label))
+				log.Info(fmt.Sprintf(" Linked %s to entity", label))
 			}
 		} else {
 			log.Info(fmt.Sprintf("ℹ %s auth not enabled yet, skipping alias", label))

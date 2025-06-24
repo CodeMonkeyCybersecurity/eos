@@ -15,7 +15,7 @@ func loadFromEnv(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 
 	fqdn := os.Getenv("LDAP_FQDN")
 	if fqdn == "" {
-		otelzap.Ctx(rc.Ctx).Warn("❌ LDAP_FQDN environment variable not set")
+		otelzap.Ctx(rc.Ctx).Warn(" LDAP_FQDN environment variable not set")
 		return nil, errors.New("LDAP_FQDN not set")
 	}
 
@@ -31,7 +31,7 @@ func loadFromEnv(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 		ReadonlyRole: os.Getenv("LDAP_READONLY_ROLE"),
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ LDAP config loaded from environment", zap.String("fqdn", cfg.FQDN))
+	otelzap.Ctx(rc.Ctx).Info(" LDAP config loaded from environment", zap.String("fqdn", cfg.FQDN))
 	return cfg, nil
 }
 
@@ -40,11 +40,11 @@ func tryDetectFromHost(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 
 	cfg := TryDetectFromHost()
 	if cfg == nil {
-		otelzap.Ctx(rc.Ctx).Warn("❌ Host-based LDAP detection failed")
+		otelzap.Ctx(rc.Ctx).Warn(" Host-based LDAP detection failed")
 		return nil, errors.New("host detection failed")
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Host-based LDAP config detected", zap.String("fqdn", cfg.FQDN))
+	otelzap.Ctx(rc.Ctx).Info(" Host-based LDAP config detected", zap.String("fqdn", cfg.FQDN))
 	return cfg, nil
 }
 
@@ -53,10 +53,10 @@ func tryDetectFromContainer(rc *eos_io.RuntimeContext) (*LDAPConfig, error) {
 
 	cfg := TryDetectFromContainer()
 	if cfg == nil {
-		otelzap.Ctx(rc.Ctx).Warn("❌ Container-based LDAP detection failed")
+		otelzap.Ctx(rc.Ctx).Warn(" Container-based LDAP detection failed")
 		return nil, errors.New("container detection failed")
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Container-based LDAP config detected", zap.String("fqdn", cfg.FQDN))
+	otelzap.Ctx(rc.Ctx).Info(" Container-based LDAP config detected", zap.String("fqdn", cfg.FQDN))
 	return cfg, nil
 }

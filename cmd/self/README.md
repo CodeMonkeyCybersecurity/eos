@@ -30,7 +30,7 @@ eos self telemetry status
 
 ```bash
 $ eos self telemetry status
-INFO    📊 Telemetry Status     {"enabled": true, "config_file": "/home/user/.eos/telemetry_on", "data_file": "/var/log/eos/telemetry.jsonl"}
+INFO     Telemetry Status     {"enabled": true, "config_file": "/home/user/.eos/telemetry_on", "data_file": "/var/log/eos/telemetry.jsonl"}
 INFO    📈 Telemetry Statistics {"total_commands": 156, "successful_commands": 142, "failed_commands": 14, "success_rate_percent": 91.0, "file_size": "45.2 KB", "oldest_entry": "2024-06-20 10:30:15", "newest_entry": "2024-06-23 16:45:22"}
 INFO    🔝 Most Used Commands
 INFO                            {"rank": 1, "command": "vault", "count": 45}

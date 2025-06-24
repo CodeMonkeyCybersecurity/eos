@@ -32,12 +32,12 @@ func InitFallback()
 **Log Format Examples:**
 ```bash
 # Console output (human-readable)
-INFO 📊 Checking Delphi services status
-WARN ⚠️ Service unit file not found {"service": "delphi-listener"}
+INFO  Checking Delphi services status
+WARN Service unit file not found {"service": "delphi-listener"}
 
 # File output (JSON structured)
-{"level":"INFO","ts":"2024-06-23T10:30:00.000Z","msg":"📊 Checking Delphi services status"}
-{"level":"WARN","ts":"2024-06-23T10:30:01.000Z","msg":"⚠️ Service unit file not found","service":"delphi-listener"}
+{"level":"INFO","ts":"2024-06-23T10:30:00.000Z","msg":" Checking Delphi services status"}
+{"level":"WARN","ts":"2024-06-23T10:30:01.000Z","msg":"Service unit file not found","service":"delphi-listener"}
 ```
 
 #### Configuration Management (`config.go`)
@@ -151,17 +151,17 @@ logger.Info("🔍 Starting operation",
     zap.String("function", "functionName"))
 
 // File operations
-logger.Info("📁 Output file determined",
+logger.Info(" Output file determined",
     zap.String("file_path", outputPath),
     zap.Bool("exists", fileExists))
 
 // Command execution
-logger.Info("🔧 Executing command",
+logger.Info(" Executing command",
     zap.String("command", cmdName),
     zap.Strings("args", args))
 
 // Error handling
-logger.Error("❌ Operation failed",
+logger.Error(" Operation failed",
     zap.Error(err),
     zap.String("phase", currentPhase))
 ```

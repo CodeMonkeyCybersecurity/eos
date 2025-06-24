@@ -28,7 +28,7 @@ var disableSuspensionCmd = &cobra.Command{
 
 		if runtime.GOOS != "linux" {
 			otelzap.Ctx(rc.Ctx).Warn("System suspension disabling is only supported on Linux.")
-			fmt.Println("❌ This command is not supported on your operating eos_unix.")
+			fmt.Println(" This command is not supported on your operating eos_unix.")
 			return nil
 		}
 
@@ -47,8 +47,8 @@ var disableSuspensionCmd = &cobra.Command{
 			return fmt.Errorf("failed to modify logind.conf: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ System suspension and hibernation disabled successfully.")
-		fmt.Println("✅ Suspension/hibernation is now disabled and persistent.")
+		otelzap.Ctx(rc.Ctx).Info(" System suspension and hibernation disabled successfully.")
+		fmt.Println(" Suspension/hibernation is now disabled and persistent.")
 		return nil
 	}),
 }
@@ -59,7 +59,7 @@ func init() {
 
 // disableSystemdTargets disables suspend and hibernate targets
 func disableSystemdTargets() error {
-	fmt.Println("🔧 Disabling suspend.target and hibernate.target...")
+	fmt.Println(" Disabling suspend.target and hibernate.target...")
 	cmd := exec.Command("systemctl", "disable", "suspend.target", "hibernate.target")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -68,7 +68,7 @@ func disableSystemdTargets() error {
 
 // maskSleepTargets masks system sleep targets
 func maskSleepTargets() error {
-	fmt.Println("🔧 Masking sleep.target, suspend.target, hibernate.target...")
+	fmt.Println(" Masking sleep.target, suspend.target, hibernate.target...")
 	cmd := exec.Command("systemctl", "mask", "sleep.target", "suspend.target", "hibernate.target")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -77,7 +77,7 @@ func maskSleepTargets() error {
 
 func disableLogindSleep(rc *eos_io.RuntimeContext) error {
 	const configPath = "/etc/systemd/logind.conf"
-	fmt.Println("🔧 Patching", configPath, "to disable sleep options...")
+	fmt.Println(" Patching", configPath, "to disable sleep options...")
 
 	input, err := os.ReadFile(configPath)
 	if err != nil {
@@ -119,7 +119,7 @@ func disableLogindSleep(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to write updated config: %w", err)
 	}
 
-	fmt.Println("🔄 Reloading systemd daemon and restarting systemd-logind...")
+	fmt.Println(" Reloading systemd daemon and restarting systemd-logind...")
 
 	// Reload systemd to apply changes
 	if err := exec.Command("systemctl", "daemon-reexec").Run(); err != nil {
@@ -131,7 +131,7 @@ func disableLogindSleep(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("failed to restart systemd-logind: %w", err)
 	}
 
-	// ✅ Logging fix
+	//  Logging fix
 	otelzap.Ctx(rc.Ctx).Info("Suspension hardening complete", zap.Strings("modified_units", []string{
 		"suspend.target", "hibernate.target", "sleep.target", "systemd-logind",
 	}))

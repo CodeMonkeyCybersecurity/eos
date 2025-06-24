@@ -81,7 +81,7 @@ Examples:
 				return fmt.Errorf("failed to get file info: %w", err)
 			}
 
-			logger.Info("📄 Prompt to delete",
+			logger.Info(" Prompt to delete",
 				zap.String("name", promptName),
 				zap.String("path", promptPath),
 				zap.String("size", formatFileSize(stat.Size())),
@@ -98,7 +98,7 @@ Examples:
 			}
 
 			if isCore {
-				logger.Warn("⚠️ Warning: This is a core system prompt",
+				logger.Warn("Warning: This is a core system prompt",
 					zap.String("prompt_name", promptName),
 					zap.String("warning", "Deleting core prompts may affect Delphi functionality"))
 			}
@@ -110,10 +110,10 @@ Examples:
 					zap.Bool("is_core", isCore))
 
 				if isCore {
-					logger.Info("⚠️ This is a core system prompt. Deletion may affect Delphi functionality.")
+					logger.Info("This is a core system prompt. Deletion may affect Delphi functionality.")
 				}
 
-				logger.Info("📝 Type 'yes' to confirm deletion:")
+				logger.Info(" Type 'yes' to confirm deletion:")
 
 				var response string
 				if _, err := fmt.Scanln(&response); err != nil {
@@ -121,7 +121,7 @@ Examples:
 				}
 
 				if strings.ToLower(strings.TrimSpace(response)) != "yes" {
-					logger.Info("❌ Deletion cancelled")
+					logger.Info(" Deletion cancelled")
 					return nil
 				}
 			}
@@ -129,7 +129,7 @@ Examples:
 			// Create backup if requested
 			if backup {
 				backupPath := promptPath + ".deleted." + time.Now().Format("20060102-150405")
-				logger.Info("💾 Creating backup before deletion",
+				logger.Info(" Creating backup before deletion",
 					zap.String("backup_path", backupPath))
 
 				content, err := os.ReadFile(promptPath)
@@ -141,7 +141,7 @@ Examples:
 					return fmt.Errorf("failed to create backup: %w", err)
 				}
 
-				logger.Info("✅ Backup created successfully",
+				logger.Info(" Backup created successfully",
 					zap.String("backup_path", backupPath))
 			}
 
@@ -158,14 +158,14 @@ Examples:
 				return fmt.Errorf("failed to delete prompt file: file still exists")
 			}
 
-			logger.Info("✅ Prompt deleted successfully",
+			logger.Info(" Prompt deleted successfully",
 				zap.String("name", promptName),
 				zap.String("path", promptPath),
 				zap.String("size_deleted", formatFileSize(stat.Size())),
 				zap.Bool("backup_created", backup))
 
 			if isCore {
-				logger.Warn("⚠️ Core system prompt deleted",
+				logger.Warn("Core system prompt deleted",
 					zap.String("prompt_name", promptName),
 					zap.String("recommendation", "Consider recreating this prompt to maintain Delphi functionality"))
 			}

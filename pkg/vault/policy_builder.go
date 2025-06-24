@@ -114,7 +114,7 @@ func (pb *PolicyBuilder) AddSection(title string) *PolicyBuilder {
 // Build generates the final HCL policy string
 func (pb *PolicyBuilder) Build(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔨 Building Vault policy programmatically", zap.Int("paths", len(pb.paths)))
+	log.Info(" Building Vault policy programmatically", zap.Int("paths", len(pb.paths)))
 
 	// Add all paths to the HCL body
 	for _, path := range pb.paths {
@@ -126,7 +126,7 @@ func (pb *PolicyBuilder) Build(rc *eos_io.RuntimeContext) (string, error) {
 	// Generate the HCL content
 	content := string(pb.file.Bytes())
 
-	log.Info("✅ Policy built successfully",
+	log.Info(" Policy built successfully",
 		zap.Int("paths", len(pb.paths)),
 		zap.Int("size", len(content)))
 

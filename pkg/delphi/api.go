@@ -46,16 +46,16 @@ func SetFieldValue(cfg *Config, field, value string) {
 // HandleAPIResponse prettifies and prints the API response or exits on error
 func HandleAPIResponse(label string, body []byte, code int) {
 	if code != http.StatusOK {
-		fmt.Printf("❌ Failed to retrieve %s (%d): %s\n", label, code, string(body))
+		fmt.Printf(" Failed to retrieve %s (%d): %s\n", label, code, string(body))
 		os.Exit(1)
 	}
 
 	var prettyJSON map[string]interface{}
 	if err := json.Unmarshal(body, &prettyJSON); err != nil {
-		fmt.Printf("❌ Failed to parse JSON: %v\n", err)
+		fmt.Printf(" Failed to parse JSON: %v\n", err)
 		os.Exit(1)
 	}
 
 	output, _ := json.MarshalIndent(prettyJSON, "", "  ")
-	fmt.Printf("✅ %s:\n%s\n", label, string(output))
+	fmt.Printf(" %s:\n%s\n", label, string(output))
 }

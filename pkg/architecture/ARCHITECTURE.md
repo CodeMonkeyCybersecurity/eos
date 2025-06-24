@@ -1,6 +1,6 @@
 # Eos Clean Architecture Proposal
 
-## 🏗️ Layered Architecture Design
+##  Layered Architecture Design
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -141,8 +141,8 @@ Maintain backward compatibility during migration:
 
 ## Files Created
 
-- ✅ `pkg/architecture/interfaces.go` - 155 lines of domain interfaces
-- ✅ `pkg/architecture/services.go` - 284 lines of business logic
-- ✅ `pkg/architecture/container.go` - 216 lines of dependency injection
-- ✅ `pkg/architecture/example_implementation.go` - 312 lines of concrete examples
-- ✅ `pkg/architecture/migration_guide.go` - 245 lines of migration strategy
+-  `pkg/architecture/interfaces.go` - 155 lines of domain interfaces
+-  `pkg/architecture/services.go` - 284 lines of business logic
+-  `pkg/architecture/container.go` - 216 lines of dependency injection
+-  `pkg/architecture/example_implementation.go` - 312 lines of concrete examples
+-  `pkg/architecture/migration_guide.go` - 245 lines of migration strategy

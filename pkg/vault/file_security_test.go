@@ -64,10 +64,10 @@ func TestTokenFilePermissionValidation(t *testing.T) {
 
 			if tt.expectError {
 				testutil.AssertError(t, err)
-				t.Logf("✅ Correctly rejected insecure permissions: %s", tt.description)
+				t.Logf(" Correctly rejected insecure permissions: %s", tt.description)
 			} else {
 				testutil.AssertNoError(t, err)
-				t.Logf("✅ Correctly accepted secure permissions: %s", tt.description)
+				t.Logf(" Correctly accepted secure permissions: %s", tt.description)
 			}
 		})
 	}

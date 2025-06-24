@@ -14,7 +14,7 @@ import (
 // SecureUbuntu performs comprehensive security hardening for Ubuntu systems
 func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🛡️ Starting Ubuntu security hardening process")
+	logger.Info(" Starting Ubuntu security hardening process")
 
 	// Check Ubuntu version
 	if err := checkUbuntuVersion(rc); err != nil {
@@ -57,7 +57,7 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 	}
 
 	// 5. Install needrestart
-	logger.Info("🔄 Installing needrestart")
+	logger.Info(" Installing needrestart")
 	if err := installNeedrestart(rc); err != nil {
 		return fmt.Errorf("install needrestart: %w", err)
 	}
@@ -69,32 +69,32 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 	}
 
 	// 7. Configure unattended upgrades
-	logger.Info("🔄 Configuring automatic security updates")
+	logger.Info(" Configuring automatic security updates")
 	if err := configureUnattendedUpgrades(rc); err != nil {
 		return fmt.Errorf("configure unattended-upgrades: %w", err)
 	}
 
 	// 8. Install restic for backups
-	logger.Info("💾 Installing restic backup solution")
+	logger.Info(" Installing restic backup solution")
 	if err := installRestic(rc); err != nil {
 		return fmt.Errorf("install restic: %w", err)
 	}
 
 	// 9. Apply system hardening
-	logger.Info("🔒 Applying system hardening configurations")
+	logger.Info(" Applying system hardening configurations")
 	if err := applySystemHardening(rc); err != nil {
 		return fmt.Errorf("apply system hardening: %w", err)
 	}
 
 	// 10. Create security report script
-	logger.Info("📊 Creating security report script")
+	logger.Info(" Creating security report script")
 	if err := createSecurityReportScript(rc); err != nil {
 		return fmt.Errorf("create security report script: %w", err)
 	}
 
 	// 11. Configure MFA if requested
 	if enableMFA {
-		logger.Info("🔐 Configuring Multi-Factor Authentication")
+		logger.Info(" Configuring Multi-Factor Authentication")
 		if err := configureMFA(rc); err != nil {
 			return fmt.Errorf("configure MFA: %w", err)
 		}
@@ -108,7 +108,7 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 		}
 	}
 
-	logger.Info("✅ Ubuntu security hardening completed successfully",
+	logger.Info(" Ubuntu security hardening completed successfully",
 		zap.String("next_steps", "Run 'security-report' for a security overview"))
 
 	return nil

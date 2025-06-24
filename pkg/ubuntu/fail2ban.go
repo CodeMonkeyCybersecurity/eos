@@ -64,6 +64,6 @@ func configureFail2ban(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("enable fail2ban: %w", err)
 	}
 
-	logger.Info("✅ Fail2ban configured for brute force protection")
+	logger.Info(" Fail2ban configured for brute force protection")
 	return nil
 }

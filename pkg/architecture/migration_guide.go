@@ -14,7 +14,7 @@ import (
 // This is how current Eos code typically looks
 
 /*
-// ❌ PROBLEMATIC: Direct dependencies, no interfaces, mixed concerns
+//  PROBLEMATIC: Direct dependencies, no interfaces, mixed concerns
 func OldVaultOperations(rc *eos_io.RuntimeContext) error {
 	// Direct vault client creation
 	client, err := api.NewClient(api.DefaultConfig())
@@ -24,14 +24,14 @@ func OldVaultOperations(rc *eos_io.RuntimeContext) error {
 
 	// Mixed business logic with infrastructure concerns
 	if os.Getenv("VAULT_TOKEN") == "" {
-		fmt.Println("No vault token found") // ❌ Direct output
+		fmt.Println("No vault token found") //  Direct output
 		return errors.New("authentication required")
 	}
 
 	// Direct file system access
 	data, err := ioutil.ReadFile("/etc/vault/secrets")
 	if err != nil {
-		fmt.Printf("Error reading secrets: %v\n", err) // ❌ Mixed concerns
+		fmt.Printf("Error reading secrets: %v\n", err) //  Mixed concerns
 		return err
 	}
 
@@ -42,7 +42,7 @@ func OldVaultOperations(rc *eos_io.RuntimeContext) error {
 		return err
 	}
 
-	fmt.Printf("Vault output: %s\n", output) // ❌ Presentation in business logic
+	fmt.Printf("Vault output: %s\n", output) //  Presentation in business logic
 	return nil
 }
 */
@@ -50,7 +50,7 @@ func OldVaultOperations(rc *eos_io.RuntimeContext) error {
 // AFTER: Clean architecture with dependency injection
 // This shows how the same functionality would be implemented
 
-// ✅ IMPROVED: Clean separation of concerns
+// IMPROVED: Clean separation of concerns
 func NewVaultOperations(container *DIContainer) *VaultOperations {
 	secretService, _ := container.GetSecretService()
 	commandExec := container.GetCommandExecutor()
@@ -167,17 +167,17 @@ func MigrateVaultPackage() {
 // Before: Hard to test due to direct dependencies
 /*
 func TestOldVaultOperations(t *testing.T) {
-	// ❌ Cannot test without actual Vault server
-	// ❌ Cannot test without file system
-	// ❌ Cannot test without network access
-	// ❌ Tests are slow and brittle
+	//  Cannot test without actual Vault server
+	//  Cannot test without file system
+	//  Cannot test without network access
+	//  Tests are slow and brittle
 }
 */
 
 // After: Easy to test with mocks
 /*
 func TestNewVaultOperations(t *testing.T) {
-	// ✅ Fast unit tests with mocks
+	//  Fast unit tests with mocks
 	mockSecretService := &MockSecretService{}
 	mockCommandExec := &MockCommandExecutor{}
 	logger := zap.NewNop()
@@ -242,13 +242,13 @@ func (c *CompatibilityWrapper) GetVaultSecret(key string) (string, error) {
 
 // GRADUAL MIGRATION CHECKLIST
 
-// ✅ Define domain interfaces
-// ✅ Create domain services
-// ✅ Implement dependency injection container
-// ✅ Create example implementations
-// ⏳ Migrate one package (pkg/vault recommended)
-// ⏳ Update command handlers
-// ⏳ Add comprehensive tests
-// ⏳ Document migration patterns
-// ⏳ Migrate remaining packages
-// ⏳ Remove deprecated patterns
+//  Define domain interfaces
+//  Create domain services
+//  Implement dependency injection container
+//  Create example implementations
+//  Migrate one package (pkg/vault recommended)
+//  Update command handlers
+//  Add comprehensive tests
+//  Document migration patterns
+//  Migrate remaining packages
+//  Remove deprecated patterns

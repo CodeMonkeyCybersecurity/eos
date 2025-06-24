@@ -15,33 +15,33 @@ import (
 
 // PhasePromptAndVerRootToken runs a fallback auth cascade and sets the token.
 func PhasePromptAndVerRootToken(rc *eos_io.RuntimeContext, client *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info("🔑 [Phase 7] Starting Vault authentication fallback cascade")
+	otelzap.Ctx(rc.Ctx).Info(" [Phase 7] Starting Vault authentication fallback cascade")
 
 	// 1. Try agent token
 	if token, err := readTokenFile(rc, shared.AgentToken)(client); err == nil && VerifyToken(rc, client, token) {
 		SetVaultToken(rc, client, token)
-		otelzap.Ctx(rc.Ctx).Info("✅ Authenticated via agent token")
+		otelzap.Ctx(rc.Ctx).Info(" Authenticated via agent token")
 		return nil
 	} else {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Agent token failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Agent token failed", zap.Error(err))
 	}
 
 	// 2. Try AppRole
 	if token, err := tryAppRole(rc, client); err == nil && VerifyToken(rc, client, token) {
 		SetVaultToken(rc, client, token)
-		otelzap.Ctx(rc.Ctx).Info("✅ Authenticated via AppRole")
+		otelzap.Ctx(rc.Ctx).Info(" Authenticated via AppRole")
 		return nil
 	} else {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ AppRole auth failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("AppRole auth failed", zap.Error(err))
 	}
 
 	// 3. Try reading root token from init file
 	if token, err := tryRootToken(rc, client); err == nil && VerifyToken(rc, client, token) {
 		SetVaultToken(rc, client, token)
-		otelzap.Ctx(rc.Ctx).Info("✅ Authenticated via init file root token")
+		otelzap.Ctx(rc.Ctx).Info(" Authenticated via init file root token")
 		return nil
 	} else {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Init file root token auth failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Init file root token auth failed", zap.Error(err))
 	}
 
 	// 4. Prompt user for root token
@@ -53,7 +53,7 @@ func PhasePromptAndVerRootToken(rc *eos_io.RuntimeContext, client *api.Client) e
 		return fmt.Errorf("validate root token: %w", err)
 	}
 	SetVaultToken(rc, client, token)
-	otelzap.Ctx(rc.Ctx).Info("✅ Root token validated and applied")
+	otelzap.Ctx(rc.Ctx).Info(" Root token validated and applied")
 
 	return nil
 }
@@ -71,7 +71,7 @@ func recoverVaultHealth(rc *eos_io.RuntimeContext, client *api.Client) error {
 		_, err := UnsealVault(rc)
 		return err
 	case status.Sealed:
-		otelzap.Ctx(rc.Ctx).Info("🔒 Vault sealed — attempting fallback unseal")
+		otelzap.Ctx(rc.Ctx).Info(" Vault sealed — attempting fallback unseal")
 		return MustUnseal(rc, client)
 	default:
 		return fmt.Errorf("unexpected vault state: initialized=%v sealed=%v", status.Initialized, status.Sealed)

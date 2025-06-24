@@ -30,10 +30,10 @@ var VaultUpdateCmd = &cobra.Command{
 
 		switch distro {
 		case "rhel":
-			fmt.Println("🔄 Updating Vault via dnf...")
+			fmt.Println(" Updating Vault via dnf...")
 			updateCmd = exec.Command("dnf", "upgrade", "-y", "vault")
 		case "debian":
-			fmt.Println("🔄 Updating Vault via apt...")
+			fmt.Println(" Updating Vault via apt...")
 			updateCmd = exec.Command("apt", "update")
 			if err := updateCmd.Run(); err != nil {
 				otelzap.Ctx(rc.Ctx).Fatal("Failed to run apt update", zap.Error(err))
@@ -49,7 +49,7 @@ var VaultUpdateCmd = &cobra.Command{
 		if err := updateCmd.Run(); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to update Vault", zap.Error(err))
 		}
-		fmt.Println("✅ Vault updated successfully.")
+		fmt.Println(" Vault updated successfully.")
 		return nil
 	}),
 }

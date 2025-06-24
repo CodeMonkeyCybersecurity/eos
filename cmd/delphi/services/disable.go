@@ -37,7 +37,7 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔧 Disabling Delphi services")
+			logger.Info(" Disabling Delphi services")
 
 			var services []string
 			if all {
@@ -67,7 +67,7 @@ Examples:
 
 				// Check if service exists before trying to disable it
 				if !eos_unix.ServiceExists(service) {
-					logger.Warn("⚠️ Service unit file not found",
+					logger.Warn("Service unit file not found",
 						zap.String("service", service))
 					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
 					continue
@@ -80,7 +80,7 @@ Examples:
 					return fmt.Errorf("failed to disable %s: %w", service, err)
 				}
 
-				logger.Info("✅ Service disabled successfully",
+				logger.Info(" Service disabled successfully",
 					zap.String("service", service))
 			}
 

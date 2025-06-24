@@ -60,7 +60,7 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			promptName := args[0]
 
-			logger.Info("🔄 Updating system prompt",
+			logger.Info(" Updating system prompt",
 				zap.String("prompt_name", promptName))
 
 			promptsDir, err := GetSystemPromptsDir()
@@ -87,7 +87,7 @@ Examples:
 				return fmt.Errorf("failed to get file info: %w", err)
 			}
 
-			logger.Info("📄 Current prompt information",
+			logger.Info(" Current prompt information",
 				zap.String("name", promptName),
 				zap.String("path", promptPath),
 				zap.String("size", formatFileSize(originalStat.Size())),
@@ -96,7 +96,7 @@ Examples:
 			// Create backup if requested
 			if backup {
 				backupPath := promptPath + ".backup." + time.Now().Format("20060102-150405")
-				logger.Info("💾 Creating backup",
+				logger.Info(" Creating backup",
 					zap.String("backup_path", backupPath))
 
 				originalContent, err := os.ReadFile(promptPath)
@@ -108,7 +108,7 @@ Examples:
 					return fmt.Errorf("failed to create backup: %w", err)
 				}
 
-				logger.Info("✅ Backup created successfully",
+				logger.Info(" Backup created successfully",
 					zap.String("backup_path", backupPath))
 			}
 
@@ -116,7 +116,7 @@ Examples:
 
 			if fromFile != "" {
 				// Read content from file
-				logger.Info("📖 Reading content from file",
+				logger.Info(" Reading content from file",
 					zap.String("source_file", fromFile))
 
 				contentBytes, err := os.ReadFile(fromFile)
@@ -125,7 +125,7 @@ Examples:
 				}
 				newContent = string(contentBytes)
 
-				logger.Info("✅ Content loaded from file",
+				logger.Info(" Content loaded from file",
 					zap.String("size", formatFileSize(int64(len(newContent)))))
 			} else if interactive {
 				// Interactive mode
@@ -138,14 +138,14 @@ Examples:
 						return fmt.Errorf("failed to read existing content: %w", err)
 					}
 
-					logger.Info("📝 Current content:")
+					logger.Info(" Current content:")
 					logger.Info("---")
 					existingLines := strings.Split(string(existingContent), "\n")
 					for i, line := range existingLines {
 						logger.Info(fmt.Sprintf("%3d: %s", i+1, line))
 					}
 					logger.Info("---")
-					logger.Info("📝 Enter additional content to append (press Ctrl+D when finished):")
+					logger.Info(" Enter additional content to append (press Ctrl+D when finished):")
 
 					var lines []string
 					scanner := bufio.NewScanner(os.Stdin)
@@ -164,7 +164,7 @@ Examples:
 					}
 					newContent += additionalContent
 
-					logger.Info("✅ Content appended interactively",
+					logger.Info(" Content appended interactively",
 						zap.Int("new_lines", len(lines)),
 						zap.Int("total_lines", len(strings.Split(newContent, "\n"))))
 				} else {
@@ -174,14 +174,14 @@ Examples:
 						return fmt.Errorf("failed to read existing content: %w", err)
 					}
 
-					logger.Info("📝 Current content:")
+					logger.Info(" Current content:")
 					logger.Info("---")
 					existingLines := strings.Split(string(existingContent), "\n")
 					for i, line := range existingLines {
 						logger.Info(fmt.Sprintf("%3d: %s", i+1, line))
 					}
 					logger.Info("---")
-					logger.Info("📝 Enter new content (press Ctrl+D when finished):")
+					logger.Info(" Enter new content (press Ctrl+D when finished):")
 
 					var lines []string
 					scanner := bufio.NewScanner(os.Stdin)
@@ -194,7 +194,7 @@ Examples:
 					}
 
 					newContent = strings.Join(lines, "\n")
-					logger.Info("✅ Content entered interactively",
+					logger.Info(" Content entered interactively",
 						zap.Int("lines", len(lines)),
 						zap.String("size", formatFileSize(int64(len(newContent)))))
 				}
@@ -216,13 +216,13 @@ Examples:
 				combinedContent += newContent
 				newContent = combinedContent
 
-				logger.Info("✅ Content appended from file",
+				logger.Info(" Content appended from file",
 					zap.String("mode", "append"),
 					zap.String("total_size", formatFileSize(int64(len(newContent)))))
 			}
 
 			// Write the updated prompt file
-			logger.Info("📝 Writing updated prompt file",
+			logger.Info(" Writing updated prompt file",
 				zap.String("file_path", promptPath),
 				zap.String("new_size", formatFileSize(int64(len(newContent)))))
 
@@ -232,7 +232,7 @@ Examples:
 
 			// Verify file was updated successfully
 			if stat, err := os.Stat(promptPath); err == nil {
-				logger.Info("✅ Prompt updated successfully",
+				logger.Info(" Prompt updated successfully",
 					zap.String("name", promptName),
 					zap.String("path", promptPath),
 					zap.String("old_size", formatFileSize(originalStat.Size())),

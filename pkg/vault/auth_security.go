@@ -81,7 +81,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 			Sensitive: method.sensitive,
 		}
 
-		log.Info("🔑 Attempting authentication method",
+		log.Info(" Attempting authentication method",
 			zap.String("method", method.name),
 			zap.Int("priority", method.priority),
 		)
@@ -95,7 +95,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 			session.Attempts = append(session.Attempts, attempt)
 
 			// Log failure without sensitive information
-			log.Warn("⚠️ Authentication method failed",
+			log.Warn("Authentication method failed",
 				zap.String("method", method.name),
 				zap.String("error_category", attempt.ErrorType),
 				zap.Duration("duration", attempt.EndTime.Sub(attempt.StartTime)),
@@ -110,7 +110,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 			attempt.ErrorType = "token_verification_failed"
 			session.Attempts = append(session.Attempts, attempt)
 
-			log.Warn("⚠️ Token verification failed",
+			log.Warn("Token verification failed",
 				zap.String("method", method.name),
 			)
 			continue
@@ -122,7 +122,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 		session.SuccessMethod = method.name
 
 		SetVaultToken(rc, client, token)
-		log.Info("✅ Authentication successful",
+		log.Info(" Authentication successful",
 			zap.String("method", method.name),
 			zap.Duration("duration", attempt.EndTime.Sub(attempt.StartTime)),
 		)
@@ -130,7 +130,7 @@ func SecureAuthenticationOrchestrator(rc *eos_io.RuntimeContext, client *api.Cli
 	}
 
 	// All methods failed - provide generic error without sensitive details
-	log.Error("❌ All authentication methods exhausted",
+	log.Error(" All authentication methods exhausted",
 		zap.Int("methods_tried", len(session.Attempts)),
 		zap.Duration("total_duration", time.Since(session.StartTime)),
 	)
@@ -182,7 +182,7 @@ func logAuthenticationSession(rc *eos_io.RuntimeContext, session *Authentication
 		}
 	}
 
-	log.Info("🔐 Authentication session summary",
+	log.Info(" Authentication session summary",
 		zap.Strings("methods_attempted", methodsAttempted),
 		zap.String("successful_method", successfulMethod),
 		zap.Strings("error_summary", errorTypes),
@@ -210,9 +210,9 @@ func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) erro
 	log := otelzap.Ctx(rc.Ctx)
 
 	log.Warn("🚨 ROOT TOKEN FALLBACK REQUESTED")
-	log.Warn("⚠️ This is an emergency authentication method")
-	log.Warn("⚠️ Root tokens provide unlimited access to Vault")
-	log.Warn("⚠️ Only use in emergency situations")
+	log.Warn("This is an emergency authentication method")
+	log.Warn("Root tokens provide unlimited access to Vault")
+	log.Warn("Only use in emergency situations")
 
 	// In a real implementation, you might want additional confirmation
 	// For now, we'll just log the attempt and proceed with caution
@@ -239,7 +239,7 @@ func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) erro
 	if err != nil {
 		attempt.Success = false
 		attempt.ErrorType = categorizeAuthError(err)
-		log.Error("❌ Emergency root token authentication failed",
+		log.Error(" Emergency root token authentication failed",
 			zap.String("error_category", attempt.ErrorType),
 		)
 		return fmt.Errorf("emergency root token authentication failed: %s", attempt.ErrorType)
@@ -248,15 +248,15 @@ func SecureRootTokenFallback(rc *eos_io.RuntimeContext, client *api.Client) erro
 	if !VerifyToken(rc, client, token) {
 		attempt.Success = false
 		attempt.ErrorType = "token_verification_failed"
-		log.Error("❌ Emergency root token verification failed")
+		log.Error(" Emergency root token verification failed")
 		return errors.New("emergency root token verification failed")
 	}
 
 	attempt.Success = true
 	SetVaultToken(rc, client, token)
 
-	log.Warn("✅ Emergency root token authentication successful")
-	log.Warn("🔧 IMMEDIATE ACTION REQUIRED: Rotate root token and fix normal authentication")
+	log.Warn(" Emergency root token authentication successful")
+	log.Warn(" IMMEDIATE ACTION REQUIRED: Rotate root token and fix normal authentication")
 
 	return nil
 }

@@ -17,7 +17,7 @@ func GetAllImages(rc *eos_io.RuntimeContext) error {
 
 	images, err := client.Image.All(rc.Ctx)
 	if err != nil {
-		log.Error("❌ Failed to retrieve images", zap.Error(err))
+		log.Error(" Failed to retrieve images", zap.Error(err))
 		return cerr.Wrap(err, "failed to retrieve images")
 	}
 
@@ -33,12 +33,12 @@ func GetAnImage(rc *eos_io.RuntimeContext, id int64) error {
 
 	image, _, err := client.Image.GetByID(rc.Ctx, id)
 	if err != nil {
-		log.Error("❌ Failed to get image", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to get image", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get image")
 	}
 
 	if image == nil {
-		log.Warn("⚠️ Image not found", zap.Int64("id", id))
+		log.Warn("Image not found", zap.Int64("id", id))
 		return nil
 	}
 
@@ -60,11 +60,11 @@ func UpdateAnImage(rc *eos_io.RuntimeContext, id int64, newDesc string) error {
 		Type: hcloud.ImageTypeSnapshot,
 	})
 	if err != nil {
-		log.Error("❌ Failed to update image", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to update image", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to update image")
 	}
 
-	log.Info("📝 Image updated", zap.String("name", updated.Name), zap.Int64("id", updated.ID))
+	log.Info(" Image updated", zap.String("name", updated.Name), zap.Int64("id", updated.ID))
 	return nil
 }
 
@@ -74,7 +74,7 @@ func DeleteAnImage(rc *eos_io.RuntimeContext, id int64) error {
 
 	_, err := client.Image.Delete(rc.Ctx, &hcloud.Image{ID: id})
 	if err != nil {
-		log.Error("❌ Failed to delete image", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to delete image", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to delete image")
 	}
 

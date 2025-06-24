@@ -2,7 +2,7 @@
 
 This document outlines the consolidation and refactoring of helper packages in Eos to eliminate duplicated functionality and ensure compliance with structured logging requirements.
 
-## ✅ Completed Refactoring
+##  Completed Refactoring
 
 ### 1. **Structured Logging Compliance**
 
@@ -62,14 +62,14 @@ data, err := eos_io.ParseYAMLString(ctx, yamlString)
 - `pkg/utils/file.go` - Basic file operations (backup, cat) marked deprecated
 - Multiple file utilities scattered across packages
 
-## 📋 Migration Guidelines
+##  Migration Guidelines
 
 ### For Developers
 
 1. **Use Structured Logging:**
    ```go
    logger := otelzap.Ctx(ctx)
-   logger.Info("🔧 Operation starting", zap.String("key", value))
+   logger.Info(" Operation starting", zap.String("key", value))
    ```
 
 2. **User-Facing Output:**
@@ -97,7 +97,7 @@ All refactored packages include compatibility functions marked as DEPRECATED:
 - `BackupFileCompat()` - Use `BackupFile()` with context
 - Functions with `Compat` suffix provide bridging until full migration
 
-## 🏗️ Architecture Improvements
+##  Architecture Improvements
 
 ### Package Responsibilities
 
@@ -127,40 +127,40 @@ All refactored packages include compatibility functions marked as DEPRECATED:
 5. **Enhanced observability** - All operations now have structured logging and telemetry
 6. **Better maintainability** - Clear package boundaries and responsibilities
 
-## ✅ **REFACTORING COMPLETE**
+##  **REFACTORING COMPLETE**
 
 All major helper package refactoring has been completed successfully:
 
-### Compilation Status: ✅ PASSING
+### Compilation Status:  PASSING
 - All structured logging violations fixed
 - All command execution consolidated
 - All YAML operations unified
 - All function signature updates applied
 - All calling code updated for compatibility
 
-### Test Results: ✅ VERIFIED
+### Test Results:  VERIFIED
 - Build succeeds without errors
 - Basic functionality tested and working
 - New `eos inspect infra` command operational
 - Backward compatibility maintained where needed
 
-## 📚 Next Steps
+##  Next Steps
 
-1. **Gradual migration** - ✅ COMPLETED - All calling code updated
+1. **Gradual migration** -  COMPLETED - All calling code updated
 2. **Remove deprecated functions** - After migration period, remove backward compatibility functions
 3. **Documentation updates** - Update code examples to use preferred packages  
-4. **Testing** - ✅ VERIFIED - Core functionality maintains behavior
+4. **Testing** -  VERIFIED - Core functionality maintains behavior
 
 This refactoring establishes a solid foundation for continued development while maintaining backward compatibility during the transition period.
 
 ## 🎯 **FINAL STATUS: SUCCESS**
 
 The helper package refactoring successfully:
-- ✅ Eliminated all structured logging violations (67 files fixed)
-- ✅ Consolidated command execution into secure, unified approach
-- ✅ Unified YAML operations with context support
-- ✅ Maintained backward compatibility during transition
-- ✅ Enhanced observability with proper telemetry integration
-- ✅ Improved security with better input validation and error handling
+-  Eliminated all structured logging violations (67 files fixed)
+-  Consolidated command execution into secure, unified approach
+-  Unified YAML operations with context support
+-  Maintained backward compatibility during transition
+-  Enhanced observability with proper telemetry integration
+-  Improved security with better input validation and error handling
 
 The Eos codebase now adheres to the architectural standards specified in CLAUDE.md and provides a much cleaner, more maintainable foundation for future development.

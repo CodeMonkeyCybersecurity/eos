@@ -111,10 +111,10 @@ func EnsureSecretsDir() error {
 // SetFilePermission safely updates the file permissions.
 func SetFilePermission(path string, perm os.FileMode) error {
 	if err := os.Chmod(path, perm); err != nil {
-		zap.L().Warn("⚠️ Failed to set file permissions", zap.String("path", path), zap.Error(err))
+		zap.L().Warn("Failed to set file permissions", zap.String("path", path), zap.Error(err))
 		return err
 	}
-	zap.L().Info("✅ File permissions set", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
+	zap.L().Info(" File permissions set", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
 	return nil
 }
 
@@ -122,17 +122,17 @@ func SetFilePermission(path string, perm os.FileMode) error {
 func WriteAgentConfig(path string, tpl *template.Template, data any) error {
 	f, err := os.Create(path)
 	if err != nil {
-		zap.L().Error("❌ Failed to create agent config file", zap.String("path", path), zap.Error(err))
+		zap.L().Error(" Failed to create agent config file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("create %s: %w", path, err)
 	}
 	defer func() {
 		if cerr := f.Close(); cerr != nil {
-			zap.L().Warn("⚠️ Failed to close agent config file", zap.String("path", path), zap.Error(cerr))
+			zap.L().Warn("Failed to close agent config file", zap.String("path", path), zap.Error(cerr))
 		}
 	}()
 
 	if err := tpl.Execute(f, data); err != nil {
-		zap.L().Error("❌ Failed to render agent config template", zap.Error(err))
+		zap.L().Error(" Failed to render agent config template", zap.Error(err))
 		return fmt.Errorf("execute template: %w", err)
 	}
 
@@ -142,14 +142,14 @@ func WriteAgentConfig(path string, tpl *template.Template, data any) error {
 // EnsureFileExists writes value if file is missing.
 func EnsureFileExists(ctx context.Context, path, value string, perm os.FileMode) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		zap.L().Warn("🔧 File missing — creating", zap.String("path", path))
+		zap.L().Warn(" File missing — creating", zap.String("path", path))
 		if err := os.WriteFile(path, []byte(value), perm); err != nil {
-			zap.L().Error("❌ Failed to write file", zap.String("path", path), zap.Error(err))
+			zap.L().Error(" Failed to write file", zap.String("path", path), zap.Error(err))
 			return err
 		}
-		zap.L().Info("✅ File written", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
+		zap.L().Info(" File written", zap.String("path", path), zap.String("perm", fmt.Sprintf("%#o", perm)))
 	} else {
-		zap.L().Info("📄 File already exists", zap.String("path", path))
+		zap.L().Info(" File already exists", zap.String("path", path))
 	}
 	return nil
 }
@@ -170,9 +170,9 @@ func BuildAgentTemplateData(addr string) AgentConfigData {
 // WriteRawConfig writes raw string content to a file.
 func WriteRawConfig(ctx context.Context, path, content string, perm os.FileMode) error {
 	if err := os.WriteFile(path, []byte(content), perm); err != nil {
-		zap.L().Error("❌ Failed to write config file", zap.String("path", path), zap.Error(err))
+		zap.L().Error(" Failed to write config file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("write %s: %w", path, err)
 	}
-	zap.L().Info("✅ Config file written", zap.String("path", path))
+	zap.L().Info(" Config file written", zap.String("path", path))
 	return nil
 }

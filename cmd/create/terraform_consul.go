@@ -159,9 +159,9 @@ Example:
 		}
 
 		logger.Info("Consul-Vault-Terraform deployment completed successfully")
-		fmt.Println("\n✅ Infrastructure deployed successfully with Consul-Vault integration!")
+		fmt.Println("\n Infrastructure deployed successfully with Consul-Vault integration!")
 		fmt.Printf("🔍 Consul UI: %s\n", consulAddr+"/ui")
-		fmt.Printf("🔒 Vault UI: %s\n", vaultAddr+"/ui")
+		fmt.Printf(" Vault UI: %s\n", vaultAddr+"/ui")
 
 		return nil
 	}),
@@ -258,8 +258,8 @@ This creates Terraform configuration that:
 		logger.Info("Consul cluster configuration generated successfully",
 			zap.String("directory", outputDir))
 
-		fmt.Printf("✅ Consul cluster configuration generated in: %s\n", outputDir)
-		fmt.Printf("📋 Next steps:\n")
+		fmt.Printf(" Consul cluster configuration generated in: %s\n", outputDir)
+		fmt.Printf(" Next steps:\n")
 		fmt.Printf("   1. Review and customize the generated configuration\n")
 		fmt.Printf("   2. Run: ./setup-consul-vault-secrets.sh to configure secrets\n")
 		fmt.Printf("   3. Deploy with: eos create consul-vault %s --services --consul-kv\n", outputDir)
@@ -383,7 +383,7 @@ var consulServiceMeshCmd = &cobra.Command{
 		logger.Info("Service mesh configuration generated successfully",
 			zap.String("directory", outputDir))
 
-		fmt.Printf("✅ Service mesh configuration generated in: %s\n", outputDir)
+		fmt.Printf(" Service mesh configuration generated in: %s\n", outputDir)
 
 		return nil
 	}),
@@ -518,7 +518,7 @@ vault kv put "$SECRETS_MOUNT/consul" \
     encrypt_key="$CONSUL_ENCRYPT_KEY" \
     datacenter="%s"
 
-echo "✅ Vault and Consul secrets setup completed!"
+echo " Vault and Consul secrets setup completed!"
 echo "Generated Consul encrypt key: $CONSUL_ENCRYPT_KEY"
 echo "You can now run: eos create consul-vault . --services --consul-kv"
 `, data.VaultAddr, data.SecretsMount, data.ConsulDatacenter)

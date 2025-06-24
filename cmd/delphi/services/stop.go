@@ -16,7 +16,7 @@ import (
 // NewStopCmd creates the stop command
 func NewStopCmd() *cobra.Command {
 	var all bool
-	
+
 	cmd := &cobra.Command{
 		Use:   "stop [service-name]",
 		Short: "Stop Delphi pipeline services",
@@ -64,23 +64,23 @@ Examples:
 			for _, service := range services {
 				logger.Info("Stopping service",
 					zap.String("service", service))
-				
+
 				// Check if service exists before trying to stop it
 				if !eos_unix.ServiceExists(service) {
-					logger.Warn("⚠️ Service unit file not found",
+					logger.Warn("Service unit file not found",
 						zap.String("service", service))
 					logger.Info("💡 To install service files, check your Delphi installation or run deployment commands")
 					continue
 				}
-				
+
 				if err := eos_unix.StopSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
 					logger.Error("Failed to stop service",
 						zap.String("service", service),
 						zap.Error(err))
 					return fmt.Errorf("failed to stop %s: %w", service, err)
 				}
-				
-				logger.Info("✅ Service stopped successfully",
+
+				logger.Info(" Service stopped successfully",
 					zap.String("service", service))
 			}
 

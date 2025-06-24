@@ -14,7 +14,7 @@ import (
 )
 
 // ----------------------------
-// 🔐 Hashing
+//  Hashing
 // ----------------------------
 
 func ConfirmHashedInputs(rc *eos_io.RuntimeContext, reader *bufio.Reader, keyLabel string, count int, tokenLabel string, expectedHashes []string, expectedTokenHash string) error {
@@ -23,27 +23,27 @@ func ConfirmHashedInputs(rc *eos_io.RuntimeContext, reader *bufio.Reader, keyLab
 
 		keys, err := interaction.ReadLines(rc, reader, keyLabel, count)
 		if err != nil {
-			fmt.Println("❌ Error reading keys:", err)
+			fmt.Println(" Error reading keys:", err)
 			continue
 		}
 
 		token, err := interaction.ReadLine(rc.Ctx, reader, tokenLabel)
 		if err != nil {
-			fmt.Println("❌ Error reading token:", err)
+			fmt.Println(" Error reading token:", err)
 			continue
 		}
 
 		if !AllUnique(keys) {
-			fmt.Println("⚠️ Keys must be unique. Try again.")
+			fmt.Println("Keys must be unique. Try again.")
 			continue
 		}
 
 		if !AllHashesPresent(HashStrings(keys), expectedHashes) || HashString(token) != expectedTokenHash {
-			fmt.Println("❌ One or more values are incorrect. Try again.")
+			fmt.Println(" One or more values are incorrect. Try again.")
 			continue
 		}
 
-		fmt.Println("✅ Confirmation successful.")
+		fmt.Println(" Confirmation successful.")
 		return nil
 	}
 }
@@ -93,7 +93,7 @@ func AllHashesPresent(hashes, known []string) bool {
 }
 
 // ----------------------------
-// 🔐 Injecting secrets
+//  Injecting secrets
 // ----------------------------
 
 // InjectSecretsFromPlaceholders replaces "changeme" and "changeme[1-9]" with passwords.
@@ -121,7 +121,7 @@ func InjectSecretsFromPlaceholders(data []byte) ([]byte, map[string]string, erro
 
 		content = strings.ReplaceAll(content, placeholder, pw)
 		replacements[placeholder] = pw
-		fmt.Printf("🔐 Secret injected: %s = %s\n", placeholder, pw)
+		fmt.Printf(" Secret injected: %s = %s\n", placeholder, pw)
 	}
 
 	return []byte(content), replacements, nil

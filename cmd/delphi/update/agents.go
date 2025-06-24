@@ -61,7 +61,7 @@ var UpdateAgentsCmd = &cobra.Command{
 			return fmt.Errorf("upgrade failed: %w", err)
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Agent upgrade request sent successfully.")
+		otelzap.Ctx(rc.Ctx).Info(" Agent upgrade request sent successfully.")
 		return nil
 	}),
 }

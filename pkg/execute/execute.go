@@ -44,7 +44,7 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		attribute.String("args", strings.Join(opts.Args, " ")),
 	)
 
-	// ✅ Validation
+	//  Validation
 	if opts.Struct != nil {
 		if err := verify.Struct(opts.Struct); err != nil {
 			span.RecordError(err)
@@ -55,12 +55,12 @@ func Run(ctx context.Context, opts Options) (string, error) {
 	if opts.SchemaPath != "" && opts.YAMLPath != "" {
 		if err := eos_cue.ValidateYAMLWithCUE(opts.SchemaPath, opts.YAMLPath); err != nil {
 			span.RecordError(err)
-			logError(logger, "📄 CUE validation failed", err)
+			logError(logger, " CUE validation failed", err)
 			return "", cerr.WithHint(err, "Schema/YAML mismatch")
 		}
 	}
 
-	// 🧪 Dry-run
+	//  Dry-run
 	if opts.DryRun || DefaultDryRun {
 		logInfo(logger, "Dry-run: skipping execution", zap.String("command", cmdStr))
 		return "", nil
@@ -76,7 +76,7 @@ func Run(ctx context.Context, opts Options) (string, error) {
 		if opts.Shell {
 			// SECURITY: Shell mode is dangerous and should be avoided
 			// If absolutely necessary, validate and sanitize the command string
-			logger.Warn("⚠️ Shell execution mode is deprecated due to security risks",
+			logger.Warn("Shell execution mode is deprecated due to security risks",
 				zap.String("command", opts.Command))
 			return "", fmt.Errorf("shell execution mode disabled for security - use Args instead")
 		} else {
@@ -142,7 +142,7 @@ func logInfo(logger *zap.Logger, msg string, fields ...zap.Field) {
 	} else if DefaultLogger != nil {
 		DefaultLogger.Info(msg, fields...)
 	} else {
-		fmt.Println("ℹ️", msg)
+		fmt.Println("", msg)
 	}
 }
 
@@ -152,7 +152,7 @@ func logError(logger *zap.Logger, msg string, err error, fields ...zap.Field) {
 	} else if DefaultLogger != nil {
 		DefaultLogger.Error(msg, append(fields, zap.Error(err))...)
 	} else {
-		fmt.Printf("❌ %s: %v\n", msg, err)
+		fmt.Printf(" %s: %v\n", msg, err)
 	}
 }
 

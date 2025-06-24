@@ -36,7 +36,7 @@ var createOsQueryCmd = &cobra.Command{
 		// Platform validation with detailed logging
 		platformOS := platform.GetOSPlatform()
 		supportedPlatforms := []string{"linux", "macos", "windows"}
-		logger.Info("📊 Checking platform requirements",
+		logger.Info(" Checking platform requirements",
 			zap.String("os_platform", platformOS),
 			zap.Strings("supported_platforms", supportedPlatforms))
 
@@ -50,7 +50,7 @@ var createOsQueryCmd = &cobra.Command{
 		}
 
 		if !isSupported {
-			logger.Error("❌ Platform requirement not met",
+			logger.Error(" Platform requirement not met",
 				zap.String("platform", platformOS),
 				zap.Strings("supported", supportedPlatforms),
 				zap.String("troubleshooting", "osquery supports Linux, macOS, and Windows platforms"))
@@ -77,13 +77,13 @@ var createOsQueryCmd = &cobra.Command{
 			}
 		}
 
-		logger.Info("🏗️ System architecture detected",
+		logger.Info(" System architecture detected",
 			zap.String("arch", arch),
 			zap.Strings("supported_archs", supportedArchs),
 			zap.Bool("is_supported", isArchSupported))
 
 		if !isArchSupported {
-			logger.Error("❌ Unsupported architecture",
+			logger.Error(" Unsupported architecture",
 				zap.String("arch", arch),
 				zap.Strings("supported", supportedArchs),
 				zap.String("troubleshooting", "osquery only supports 64-bit systems (amd64 and arm64)"))
@@ -92,10 +92,10 @@ var createOsQueryCmd = &cobra.Command{
 
 		// Check if osquery is already installed
 		if osquery.IsOsqueryInstalled(rc) {
-			logger.Info("ℹ️ osquery is already installed")
+			logger.Info(" osquery is already installed")
 			// Verify the existing installation
 			if err := osquery.VerifyOsqueryInstallation(rc); err != nil {
-				logger.Warn("⚠️ Existing installation verification failed",
+				logger.Warn("Existing installation verification failed",
 					zap.Error(err),
 					zap.String("action", "Proceeding with reinstallation"))
 			} else {
@@ -106,7 +106,7 @@ var createOsQueryCmd = &cobra.Command{
 		}
 
 		// Log installation phase start
-		logger.Info("🚀 Starting osquery installation process",
+		logger.Info(" Starting osquery installation process",
 			zap.String("platform", platformOS),
 			zap.String("distro", distro),
 			zap.String("arch", arch))
@@ -114,7 +114,7 @@ var createOsQueryCmd = &cobra.Command{
 		// Provide installation guidance based on platform and user context
 		currentUser := os.Getenv("USER")
 		isRoot := os.Getuid() == 0
-		
+
 		var installGuidance string
 		switch platformOS {
 		case "macos":
@@ -132,8 +132,8 @@ var createOsQueryCmd = &cobra.Command{
 		case "windows":
 			installGuidance = "Installation requires administrator privileges"
 		}
-		
-		logger.Info("📋 Installation guidance",
+
+		logger.Info(" Installation guidance",
 			zap.String("user", currentUser),
 			zap.Bool("is_root", isRoot),
 			zap.String("guidance", installGuidance))
@@ -141,7 +141,7 @@ var createOsQueryCmd = &cobra.Command{
 		// Run the installer with timing
 		installStart := time.Now()
 		if err := osquery.InstallOsquery(rc); err != nil {
-			logger.Error("❌ osquery installation failed",
+			logger.Error(" osquery installation failed",
 				zap.Error(err),
 				zap.String("distro", distro),
 				zap.String("arch", arch),
@@ -155,7 +155,7 @@ var createOsQueryCmd = &cobra.Command{
 		// Verify installation
 		logger.Info("🔍 Verifying osquery installation")
 		if err := osquery.VerifyOsqueryInstallation(rc); err != nil {
-			logger.Warn("⚠️ Installation verification had warnings",
+			logger.Warn("Installation verification had warnings",
 				zap.Error(err),
 				zap.String("note", "osquery is installed but may require manual configuration"))
 		}

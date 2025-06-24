@@ -86,7 +86,7 @@ users:
 
 	// Create VM disk
 	cmdDisk := exec.Command("qemu-img", "create", "-f", "qcow2", vmDisk, fmt.Sprintf("%dG", cfg.DiskSizeGB))
-	log.Info("📦 Creating VM disk", zap.String("path", vmDisk))
+	log.Info(" Creating VM disk", zap.String("path", vmDisk))
 	if out, err := cmdDisk.CombinedOutput(); err != nil {
 		log.Error("Disk creation failed", zap.ByteString("output", out), zap.Error(err))
 		return fmt.Errorf("disk creation error: %w", err)
@@ -113,13 +113,13 @@ users:
 	}
 
 	cmdVirt := exec.Command("virt-install", args...)
-	log.Info("🚀 Running virt-install", zap.Strings("args", args))
+	log.Info(" Running virt-install", zap.Strings("args", args))
 	cmdVirt.Stdout = os.Stdout
 	cmdVirt.Stderr = os.Stderr
 	if err := cmdVirt.Run(); err != nil {
 		return fmt.Errorf("virt-install failed: %w", err)
 	}
 
-	log.Info("✅ cloud-init VM provisioned", zap.String("vm", vm))
+	log.Info(" cloud-init VM provisioned", zap.String("vm", vm))
 	return nil
 }

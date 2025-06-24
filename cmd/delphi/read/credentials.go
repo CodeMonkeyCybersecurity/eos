@@ -34,7 +34,7 @@ var ReadCredentialsCmd = &cobra.Command{
 		if cfg.Token == "" {
 			token, err := delphi.Authenticate(rc, cfg)
 			if err != nil {
-				fmt.Printf("❌ Authentication failed: %v\n", err)
+				fmt.Printf(" Authentication failed: %v\n", err)
 				os.Exit(1)
 			}
 			cfg.Token = token
@@ -45,13 +45,13 @@ var ReadCredentialsCmd = &cobra.Command{
 
 		resp, err := delphi.AuthenticatedGet(cfg, "/security/users")
 		if err != nil {
-			fmt.Printf("❌ Failed to fetch users: %v\n", err)
+			fmt.Printf(" Failed to fetch users: %v\n", err)
 			os.Exit(1)
 		}
 		defer shared.SafeClose(rc.Ctx, resp.Body)
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("❌ Failed with status code: %d\n", resp.StatusCode)
+			fmt.Printf(" Failed with status code: %d\n", resp.StatusCode)
 			os.Exit(1)
 		}
 
@@ -65,11 +65,11 @@ var ReadCredentialsCmd = &cobra.Command{
 			} `json:"data"`
 		}
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			fmt.Printf("❌ Failed to parse response: %v\n", err)
+			fmt.Printf(" Failed to parse response: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Println("🔐 Delphi API Users:")
+		fmt.Println(" Delphi API Users:")
 		for _, user := range result.Data.Users {
 			status := "disabled"
 			if user.Active {

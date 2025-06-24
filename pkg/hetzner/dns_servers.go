@@ -45,7 +45,7 @@ func (c *DNSClient) GetAllPrimaryServers(rc *eos_io.RuntimeContext, zoneID strin
 		return nil, errors.Wrap(err, "decoding primary server list")
 	}
 
-	c.Log.Info("✅ Retrieved primary servers", zap.Int("count", len(result.PrimaryServers)))
+	c.Log.Info(" Retrieved primary servers", zap.Int("count", len(result.PrimaryServers)))
 	return result.PrimaryServers, nil
 }
 
@@ -85,7 +85,7 @@ func (c *DNSClient) CreatePrimaryServer(rc *eos_io.RuntimeContext, zoneID, addre
 		return nil, errors.Wrap(err, "decoding create response")
 	}
 
-	c.Log.Info("✅ Created primary server", zap.String("id", result.PrimaryServer.ID))
+	c.Log.Info(" Created primary server", zap.String("id", result.PrimaryServer.ID))
 	return &result.PrimaryServer, nil
 }
 
@@ -118,7 +118,7 @@ func (c *DNSClient) GetPrimaryServer(rc *eos_io.RuntimeContext, id string) (*Pri
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("📄 Retrieved primary server", zap.String("id", result.PrimaryServer.ID))
+	c.Log.Info(" Retrieved primary server", zap.String("id", result.PrimaryServer.ID))
 	return &result.PrimaryServer, nil
 }
 

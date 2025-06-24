@@ -42,11 +42,11 @@ func UninstallConflictingPackages(rc *eos_io.RuntimeContext) {
 				zap.String("package", pkg),
 				zap.Error(err))
 		} else {
-			logger.Debug("✅ Package removed successfully", zap.String("package", pkg))
+			logger.Debug(" Package removed successfully", zap.String("package", pkg))
 		}
 	}
 
-	logger.Info("✅ Conflicting package removal completed")
+	logger.Info(" Conflicting package removal completed")
 }
 
 // UninstallSnapDocker removes the Snap version of Docker
@@ -57,14 +57,14 @@ func UninstallSnapDocker(rc *eos_io.RuntimeContext) {
 	if err := execute.RunSimple(rc.Ctx, "snap", "remove", "docker"); err != nil {
 		logger.Debug("Docker snap removal failed (likely not installed)", zap.Error(err))
 	} else {
-		logger.Info("✅ Docker snap package removed successfully")
+		logger.Info(" Docker snap package removed successfully")
 	}
 }
 
 // InstallPrerequisitesAndGpg sets up apt and Docker GPG keys
 func InstallPrerequisitesAndGpg(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔧 Installing Docker prerequisites and GPG keys")
+	logger.Info(" Installing Docker prerequisites and GPG keys")
 
 	steps := []execute.Options{
 		{Command: "apt-get", Args: []string{"install", "-y", "ca-certificates", "curl"}},
@@ -74,13 +74,13 @@ func InstallPrerequisitesAndGpg(rc *eos_io.RuntimeContext) error {
 	}
 
 	for i, step := range steps {
-		logger.Debug("🔧 Executing prerequisite step",
+		logger.Debug(" Executing prerequisite step",
 			zap.Int("step", i+1),
 			zap.String("command", step.Command),
 			zap.Strings("args", step.Args))
 
 		if _, err := execute.Run(rc.Ctx, step); err != nil {
-			logger.Error("❌ Prerequisite step failed",
+			logger.Error(" Prerequisite step failed",
 				zap.Int("step", i+1),
 				zap.String("command", step.Command),
 				zap.Error(err))
@@ -88,14 +88,14 @@ func InstallPrerequisitesAndGpg(rc *eos_io.RuntimeContext) error {
 		}
 	}
 
-	logger.Info("✅ Docker prerequisites and GPG keys installed successfully")
+	logger.Info(" Docker prerequisites and GPG keys installed successfully")
 	return nil
 }
 
 // AddDockerRepository adds the official Docker repository to APT sources
 func AddDockerRepository(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("📦 Adding Docker repository to APT sources")
+	logger.Info(" Adding Docker repository to APT sources")
 
 	arch := eos_unix.GetArchitecture()
 	codename := eos_unix.GetUbuntuCodename(rc)
@@ -109,32 +109,32 @@ func AddDockerRepository(rc *eos_io.RuntimeContext) error {
 		arch, codename,
 	)
 
-	logger.Debug("📝 Writing Docker repository configuration",
+	logger.Debug(" Writing Docker repository configuration",
 		zap.String("repo_line", strings.TrimSpace(repoLine)),
 		zap.String("file_path", "/etc/apt/sources.list.d/docker.list"))
 
 	if err := os.WriteFile("/etc/apt/sources.list.d/docker.list", []byte(repoLine), 0644); err != nil {
-		logger.Error("❌ Failed to write Docker repository file", zap.Error(err))
+		logger.Error(" Failed to write Docker repository file", zap.Error(err))
 		return cerr.Wrap(err, "write Docker repository file")
 	}
 
-	logger.Info("🔄 Updating APT repositories")
+	logger.Info(" Updating APT repositories")
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",
 		Args:    []string{"update"},
 	}); err != nil {
-		logger.Error("❌ Failed to update APT repositories", zap.Error(err))
+		logger.Error(" Failed to update APT repositories", zap.Error(err))
 		return cerr.Wrap(err, "update APT repositories")
 	}
 
-	logger.Info("✅ Docker repository added and APT updated successfully")
+	logger.Info(" Docker repository added and APT updated successfully")
 	return nil
 }
 
 // InstallDockerEngine installs Docker CE and related components
 func InstallDockerEngine(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🐳 Installing Docker engine and components")
+	logger.Info(" Installing Docker engine and components")
 
 	packages := []string{
 		"docker-ce",
@@ -144,7 +144,7 @@ func InstallDockerEngine(rc *eos_io.RuntimeContext) error {
 		"docker-compose-plugin",
 	}
 
-	logger.Debug("📦 Installing Docker packages",
+	logger.Debug(" Installing Docker packages",
 		zap.Strings("packages", packages))
 
 	args := append([]string{"install", "-y"}, packages...)
@@ -153,37 +153,37 @@ func InstallDockerEngine(rc *eos_io.RuntimeContext) error {
 		Command: "apt",
 		Args:    args,
 	}); err != nil {
-		logger.Error("❌ Docker installation failed", zap.Error(err))
+		logger.Error(" Docker installation failed", zap.Error(err))
 		return cerr.Wrap(err, "install Docker packages")
 	}
 
-	logger.Info("✅ Docker engine and components installed successfully")
+	logger.Info(" Docker engine and components installed successfully")
 	return nil
 }
 
 // VerifyDockerInstallation verifies Docker installation by running hello-world
 func VerifyDockerInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🧪 Verifying Docker installation with hello-world container")
+	logger.Info(" Verifying Docker installation with hello-world container")
 
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"run", "--rm", "hello-world"},
 	})
 	if err != nil {
-		logger.Error("❌ Docker hello-world verification failed", zap.Error(err))
+		logger.Error(" Docker hello-world verification failed", zap.Error(err))
 		return cerr.Wrap(err, "run Docker hello-world")
 	}
 
-	logger.Debug("📄 Docker hello-world output",
+	logger.Debug(" Docker hello-world output",
 		zap.String("output", strings.TrimSpace(output)))
 
 	if !strings.Contains(output, "Hello from Docker!") {
-		logger.Error("❌ Docker hello-world output doesn't contain expected message")
+		logger.Error(" Docker hello-world output doesn't contain expected message")
 		return cerr.New("Docker hello-world verification failed - unexpected output")
 	}
 
-	logger.Info("✅ Docker installation verified successfully")
+	logger.Info(" Docker installation verified successfully")
 	return nil
 }
 
@@ -193,12 +193,12 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 	logger.Info("👥 Setting up Docker for non-root user access")
 
 	// Create docker group (may already exist)
-	logger.Debug("🔧 Creating docker group")
+	logger.Debug(" Creating docker group")
 	if _, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "groupadd",
 		Args:    []string{"docker"},
 	}); err != nil {
-		logger.Debug("⚠️ Docker group creation failed (likely already exists)", zap.Error(err))
+		logger.Debug("Docker group creation failed (likely already exists)", zap.Error(err))
 		// This is not a critical error as the group might already exist
 	}
 
@@ -214,7 +214,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 		zap.String("selected_user", user))
 
 	if user == "" || user == "root" {
-		logger.Warn("⚠️ No non-root user detected; skipping usermod step",
+		logger.Warn("No non-root user detected; skipping usermod step",
 			zap.String("user", user))
 		return nil
 	}
@@ -225,15 +225,15 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 		Command: "usermod",
 		Args:    []string{"-aG", "docker", user},
 	}); err != nil {
-		logger.Error("❌ Failed to add user to docker group",
+		logger.Error(" Failed to add user to docker group",
 			zap.String("user", user),
 			zap.Error(err))
 		return cerr.Wrapf(err, "add user %s to docker group", user)
 	}
 
-	logger.Info("✅ User added to docker group successfully",
+	logger.Info(" User added to docker group successfully",
 		zap.String("user", user))
-	logger.Info("📋 Note: Log out and log back in or run 'newgrp docker' to apply group membership")
+	logger.Info(" Note: Log out and log back in or run 'newgrp docker' to apply group membership")
 
 	return nil
 }
@@ -241,7 +241,7 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 // InstallDocker performs a complete Docker installation with all steps
 func InstallDocker(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🐳 Starting complete Docker installation process")
+	logger.Info(" Starting complete Docker installation process")
 
 	// Step 1: Uninstall conflicting packages
 	logger.Info("🗑️ Removing conflicting Docker packages")
@@ -267,7 +267,7 @@ func InstallDocker(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Step 6: Verify installation as root
-	logger.Info("🧪 Verifying Docker installation as root")
+	logger.Info(" Verifying Docker installation as root")
 	if err := VerifyDockerInstallation(rc); err != nil {
 		return cerr.Wrap(err, "verify Docker installation as root")
 	}
@@ -278,15 +278,15 @@ func InstallDocker(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Step 8: Verify installation as non-root (if possible)
-	logger.Info("🧪 Attempting to verify Docker installation for non-root user")
+	logger.Info(" Attempting to verify Docker installation for non-root user")
 	if err := VerifyDockerInstallation(rc); err != nil {
-		logger.Warn("⚠️ Non-root Docker verification failed (user may need to log out/in)",
+		logger.Warn("Non-root Docker verification failed (user may need to log out/in)",
 			zap.Error(err))
 		// Don't return error here as this is expected until user logs out/in
 	}
 
-	logger.Info("✅ Docker installation completed successfully")
-	logger.Info("📋 Remember: Users need to log out and back in to use Docker without sudo")
+	logger.Info(" Docker installation completed successfully")
+	logger.Info(" Remember: Users need to log out and back in to use Docker without sudo")
 
 	return nil
 }

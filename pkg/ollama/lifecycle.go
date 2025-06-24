@@ -20,12 +20,12 @@ import (
 
 func EnsureInstalled(rc *eos_io.RuntimeContext) error {
 	if !platform.IsCommandAvailable("ollama") {
-		zap.L().Info("📦 Installing Ollama via Homebrew")
+		zap.L().Info(" Installing Ollama via Homebrew")
 		_, err := execute.RunShell(rc.Ctx, "brew install ollama")
 		if err != nil {
 			return fmt.Errorf("failed to install Ollama: %w", err)
 		}
-		zap.L().Info("✅ Ollama installed")
+		zap.L().Info(" Ollama installed")
 	}
 
 	home, err := os.UserHomeDir()
@@ -41,7 +41,7 @@ func EnsureInstalled(rc *eos_io.RuntimeContext) error {
 
 	// Always ensure `ollama serve` is running
 	if !platform.IsProcessRunning("ollama serve") {
-		zap.L().Info("🚀 Starting Ollama serve process")
+		zap.L().Info(" Starting Ollama serve process")
 		_ = StartServeProcess(rc, serveLogPath)
 	}
 
@@ -52,7 +52,7 @@ func StartServeProcess(rc *eos_io.RuntimeContext, serveLog string) error {
 	cmd := fmt.Sprintf("nohup ollama serve > %s 2>&1 &", serveLog)
 	_, err := execute.RunShell(rc.Ctx, cmd)
 	if err != nil {
-		zap.L().Warn("⚠️ Ollama serve may not have started", zap.Error(err))
+		zap.L().Warn("Ollama serve may not have started", zap.Error(err))
 	}
 	zap.L().Info("🔍 Ollama logs: " + serveLog)
 	return nil
@@ -69,7 +69,7 @@ func RunWebUI(rc *eos_io.RuntimeContext, cfg WebUIConfig) error {
 	})
 
 	if isWebUIContainerRunningOnPort3000(rc) {
-		zap.L().Info("✅ OpenWebUI is already active — skipping container start")
+		zap.L().Info(" OpenWebUI is already active — skipping container start")
 		_ = platform.OpenBrowser("http://localhost:3000")
 		return nil
 	}
@@ -101,29 +101,29 @@ func RunWebUI(rc *eos_io.RuntimeContext, cfg WebUIConfig) error {
 		Args:    []string{"inspect", "--type=image", image},
 	})
 	if err != nil {
-		zap.L().Warn("📦 Image not found locally, pulling", zap.String("image", image))
+		zap.L().Warn(" Image not found locally, pulling", zap.String("image", image))
 		_, pullErr := execute.Run(rc.Ctx, execute.Options{
 
 			Command: "docker",
 			Args:    []string{"pull", "--disable-content-trust=1", image},
 		})
 		if pullErr != nil {
-			zap.L().Error("❌ Failed to pull Web UI image", zap.Error(pullErr))
+			zap.L().Error(" Failed to pull Web UI image", zap.Error(pullErr))
 			if cerr.HasType(pullErr, &exec.ExitError{}) && pullErr.Error() == "exit status 127" {
 				return cerr.WithHint(pullErr, "Check if `docker-credential-desktop` is missing from your $PATH")
 			}
 			return cerr.WithHint(pullErr, "Unable to pull Web UI image")
 		}
-		zap.L().Info("✅ Image pulled successfully")
+		zap.L().Info(" Image pulled successfully")
 	}
 
-	zap.L().Info("🚀 Launching Web UI container")
+	zap.L().Info(" Launching Web UI container")
 	_, runErr := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    runArgs,
 	})
 	if runErr != nil {
-		zap.L().Error("❌ Web UI launch failed", zap.Error(runErr))
+		zap.L().Error(" Web UI launch failed", zap.Error(runErr))
 		return cerr.WithHint(runErr, "Docker container failed to start")
 	}
 
@@ -131,7 +131,7 @@ func RunWebUI(rc *eos_io.RuntimeContext, cfg WebUIConfig) error {
 		return cerr.New("Ollama backend is not reachable — the Web UI may fail to connect")
 	}
 
-	zap.L().Info("✅ Web UI container started")
+	zap.L().Info(" Web UI container started")
 	_ = platform.OpenBrowser("http://localhost:3000")
 
 	return nil
@@ -146,7 +146,7 @@ func waitForBackend(rc *eos_io.RuntimeContext, url string, timeout time.Duration
 		resp, err := http.DefaultClient.Do(req)
 		if err == nil && resp.StatusCode == 200 {
 			_ = resp.Body.Close()
-			zap.L().Info("✅ Ollama backend reachable", zap.String("url", url))
+			zap.L().Info(" Ollama backend reachable", zap.String("url", url))
 			return true
 		}
 
@@ -158,13 +158,13 @@ func waitForBackend(rc *eos_io.RuntimeContext, url string, timeout time.Duration
 				_ = StartServeProcess(rc, logPath)
 				triedServe = true
 			} else {
-				zap.L().Warn("❌ Could not resolve user home directory to start serve", zap.Error(err))
+				zap.L().Warn(" Could not resolve user home directory to start serve", zap.Error(err))
 			}
 		}
 
 		time.Sleep(2 * time.Second)
 	}
 
-	zap.L().Warn("⚠️ Ollama backend did not become available in time", zap.String("url", url))
+	zap.L().Warn("Ollama backend did not become available in time", zap.String("url", url))
 	return false
 }

@@ -15,7 +15,7 @@ func ListFloatingIPs(rc *eos_io.RuntimeContext, client *hcloud.Client) ([]*hclou
 		otelzap.Ctx(rc.Ctx).Error("Failed to list floating IPs", zap.Error(err))
 		return nil, err
 	}
-	otelzap.Ctx(rc.Ctx).Info("📡 Floating IPs retrieved", zap.Int("count", len(ips)))
+	otelzap.Ctx(rc.Ctx).Info(" Floating IPs retrieved", zap.Int("count", len(ips)))
 	return ips, nil
 }
 
@@ -29,7 +29,7 @@ func CreateFloatingIP(rc *eos_io.RuntimeContext, client *hcloud.Client, ipType h
 		otelzap.Ctx(rc.Ctx).Error("Failed to create floating IP", zap.Error(err))
 		return nil, err
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Floating IP created", zap.String("ip", result.FloatingIP.IP.String()))
+	otelzap.Ctx(rc.Ctx).Info(" Floating IP created", zap.String("ip", result.FloatingIP.IP.String()))
 	return result.FloatingIP, nil
 }
 

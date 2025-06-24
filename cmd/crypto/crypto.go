@@ -27,7 +27,7 @@ Examples:
   eos crypto info`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔐 Crypto command executed - use subcommands for specific operations")
+		logger.Info(" Crypto command executed - use subcommands for specific operations")
 		_ = cmd.Help()
 		return nil
 	}),
@@ -47,7 +47,7 @@ var mlkemCmd = &cobra.Command{
 Implements NIST FIPS 203 for quantum-resistant key exchange.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔐 ML-KEM command - use subcommands for specific operations")
+		logger.Info(" ML-KEM command - use subcommands for specific operations")
 		_ = cmd.Help()
 		return nil
 	}),
@@ -104,29 +104,29 @@ the original shared secret that was established during encapsulation.`,
 
 		privateKey, err := hex.DecodeString(privateKeyHex)
 		if err != nil {
-			logger.Error("❌ Invalid private key format", zap.Error(err))
+			logger.Error(" Invalid private key format", zap.Error(err))
 			return fmt.Errorf("invalid hex private key: %w", err)
 		}
 
 		ciphertext, err := hex.DecodeString(ciphertextHex)
 		if err != nil {
-			logger.Error("❌ Invalid ciphertext format", zap.Error(err))
+			logger.Error(" Invalid ciphertext format", zap.Error(err))
 			return fmt.Errorf("invalid hex ciphertext: %w", err)
 		}
 
-		logger.Info("🔐 Performing ML-KEM decapsulation",
+		logger.Info(" Performing ML-KEM decapsulation",
 			zap.Int("private_key_size", len(privateKey)),
 			zap.Int("ciphertext_size", len(ciphertext)),
 		)
 
 		sharedSecret, err := pq.DecapsulateSecret(rc, privateKey, ciphertext)
 		if err != nil {
-			logger.Error("❌ Decapsulation failed", zap.Error(err))
+			logger.Error(" Decapsulation failed", zap.Error(err))
 			return fmt.Errorf("decapsulation failed: %w", err)
 		}
 
-		logger.Info("✅ ML-KEM Decapsulation Completed")
-		logger.Info("🔑 Recovered Shared Secret (hex)",
+		logger.Info(" ML-KEM Decapsulation Completed")
+		logger.Info(" Recovered Shared Secret (hex)",
 			zap.String("shared_secret", hex.EncodeToString(sharedSecret)),
 			zap.Int("size_bytes", len(sharedSecret)),
 		)
@@ -150,7 +150,7 @@ Key types: 'public' or 'private'`,
 
 		keyBytes, err := hex.DecodeString(keyHex)
 		if err != nil {
-			logger.Error("❌ Invalid key format", zap.Error(err))
+			logger.Error(" Invalid key format", zap.Error(err))
 			return fmt.Errorf("invalid hex key: %w", err)
 		}
 
@@ -160,16 +160,16 @@ Key types: 'public' or 'private'`,
 		case "private":
 			err = pq.ValidateMLKEMPrivateKey(rc, keyBytes)
 		default:
-			logger.Error("❌ Invalid key type", zap.String("key_type", keyType))
+			logger.Error(" Invalid key type", zap.String("key_type", keyType))
 			return fmt.Errorf("invalid key type: must be 'public' or 'private'")
 		}
 
 		if err != nil {
-			logger.Error("❌ Key validation failed", zap.Error(err))
+			logger.Error(" Key validation failed", zap.Error(err))
 			return fmt.Errorf("key validation failed: %w", err)
 		}
 
-		logger.Info("✅ Key validation successful",
+		logger.Info(" Key validation successful",
 			zap.String("key_type", keyType),
 			zap.Int("key_size", len(keyBytes)),
 		)
@@ -187,21 +187,21 @@ and implementations available in Eos, including post-quantum algorithms.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
-		logger.Info("🔐 Eos Cryptographic Information")
+		logger.Info(" Eos Cryptographic Information")
 
 		// ML-KEM Information
 		mlkemInfo := pq.GetMLKEMInfo()
-		logger.Info("📋 ML-KEM-768 Information",
+		logger.Info(" ML-KEM-768 Information",
 			zap.Any("details", mlkemInfo),
 		)
 
-		logger.Info("🛡️ Quantum Resistance Status",
+		logger.Info(" Quantum Resistance Status",
 			zap.Bool("ml_kem_available", true),
 			zap.String("ml_kem_library", "filippo.io/mlkem768"),
 			zap.Bool("quantum_resistant", true),
 		)
 
-		logger.Info("📊 Performance Characteristics",
+		logger.Info(" Performance Characteristics",
 			zap.String("keygen_time", "~0.1ms"),
 			zap.String("encaps_time", "~0.2ms"),
 			zap.String("decaps_time", "~0.2ms"),

@@ -15,7 +15,7 @@ import (
 // SetupWazuhWizard prompts the user for Wazuh setup info and returns a ServiceBundle.
 func SetupWazuhWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting Wazuh setup information...")
+	log.Info(" Collecting Wazuh setup information...")
 
 	// Define the fields to prompt for.
 	fields := []PromptField{
@@ -67,7 +67,7 @@ func SetupWazuhWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBu
 func SetupWazuh(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Info("🚀 Starting Wazuh setup rendering...")
+	log.Info(" Starting Wazuh setup rendering...")
 
 	err := RenderBundleFragments(
 		rc,
@@ -78,10 +78,10 @@ func SetupWazuh(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir strin
 		"wazuh",
 	)
 	if err != nil {
-		log.Error("❌ Failed to render Wazuh service", zap.Error(err))
+		log.Error(" Failed to render Wazuh service", zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Wazuh setup rendered successfully!")
+	log.Info(" Wazuh setup rendered successfully!")
 	return nil
 }

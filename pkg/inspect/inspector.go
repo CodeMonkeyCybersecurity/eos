@@ -32,7 +32,7 @@ func (i *Inspector) runCommand(name string, args ...string) (string, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
 	start := time.Now()
 
-	logger.Info("🔧 Running command",
+	logger.Info(" Running command",
 		zap.String("command", name),
 		zap.Strings("args", args),
 		zap.Duration("timeout", 30*time.Second))
@@ -49,7 +49,7 @@ func (i *Inspector) runCommand(name string, args ...string) (string, error) {
 	duration := time.Since(start)
 
 	if err != nil {
-		logger.Error("⚠️ Command failed",
+		logger.Error("Command failed",
 			zap.String("command", name),
 			zap.Error(err),
 			zap.String("stderr", stderr.String()),
@@ -57,7 +57,7 @@ func (i *Inspector) runCommand(name string, args ...string) (string, error) {
 		return "", fmt.Errorf("command %s failed: %w (stderr: %s)", name, err, stderr.String())
 	}
 
-	logger.Info("✅ Command completed",
+	logger.Info(" Command completed",
 		zap.String("command", name),
 		zap.Duration("duration", duration),
 		zap.Int("output_length", len(strings.TrimSpace(stdout.String()))))
@@ -74,7 +74,7 @@ func (i *Inspector) commandExists(name string) bool {
 // DiscoverSystem gathers system information
 func (i *Inspector) DiscoverSystem() (*SystemInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Info("📊 Starting system discovery")
+	logger.Info(" Starting system discovery")
 
 	info := &SystemInfo{}
 
@@ -127,7 +127,7 @@ func (i *Inspector) DiscoverSystem() (*SystemInfo, error) {
 		info.Routes = i.parseRouteInfo(output)
 	}
 
-	logger.Info("✅ System discovery completed",
+	logger.Info(" System discovery completed",
 		zap.String("hostname", info.Hostname),
 		zap.String("os", info.OS))
 
@@ -245,7 +245,7 @@ func (i *Inspector) parseNetworkInfo(output string) []NetworkInfo {
 
 	if err := json.Unmarshal([]byte(output), &interfaces); err != nil {
 		logger := otelzap.Ctx(i.rc.Ctx)
-		logger.Warn("⚠️ Failed to parse network JSON", zap.Error(err))
+		logger.Warn("Failed to parse network JSON", zap.Error(err))
 		return networks
 	}
 
@@ -286,7 +286,7 @@ func (i *Inspector) parseRouteInfo(output string) []RouteInfo {
 
 	if err := json.Unmarshal([]byte(output), &jsonRoutes); err != nil {
 		logger := otelzap.Ctx(i.rc.Ctx)
-		logger.Warn("⚠️ Failed to parse route JSON", zap.Error(err))
+		logger.Warn("Failed to parse route JSON", zap.Error(err))
 		return routes
 	}
 

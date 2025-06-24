@@ -28,9 +28,9 @@ Subcommands are required to specify which type of information to read.`,
 		// then its RunE should indicate missing subcommand and display its own help.
 		otelzap.Ctx(rc.Ctx).Info("'eos delphi read' was called without a subcommand")
 
-		fmt.Println("❌ Missing subcommand for 'eos delphi read'.")                                 // More specific message
-		fmt.Println("ℹ️  Run `eos delphi read --help` to see available options for reading data.") // More specific advice
-		_ = cmd.Help()                                                                             // Print built-in help for 'read' command
+		fmt.Println(" Missing subcommand for 'eos delphi read'.")                                // More specific message
+		fmt.Println("  Run `eos delphi read --help` to see available options for reading data.") // More specific advice
+		_ = cmd.Help()                                                                           // Print built-in help for 'read' command
 		return nil
 	}),
 }

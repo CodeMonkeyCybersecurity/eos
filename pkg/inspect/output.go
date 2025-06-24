@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"context"
+
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
@@ -17,7 +18,7 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 	start := time.Now()
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("📝 Starting YAML file generation",
+	logger.Info(" Starting YAML file generation",
 		zap.String("output_path", outputPath),
 		zap.String("hostname", infrastructure.Hostname),
 		zap.Time("timestamp", infrastructure.Timestamp))
@@ -55,7 +56,7 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 	}
 
 	// Marshal to YAML with logging
-	logger.Info("🔄 Marshaling infrastructure data to YAML",
+	logger.Info(" Marshaling infrastructure data to YAML",
 		zap.Int("sections", len(yamlData)),
 		zap.Bool("has_docker", infrastructure.Docker != nil),
 		zap.Bool("has_kvm", infrastructure.KVM != nil),
@@ -64,11 +65,11 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 
 	yamlContent, err := yaml.Marshal(yamlData)
 	if err != nil {
-		logger.Error("❌ Failed to marshal YAML data", zap.Error(err))
+		logger.Error(" Failed to marshal YAML data", zap.Error(err))
 		return fmt.Errorf("failed to marshal YAML: %w", err)
 	}
 
-	logger.Info("✅ YAML marshaling completed", zap.Int("yaml_size_bytes", len(yamlContent)))
+	logger.Info(" YAML marshaling completed", zap.Int("yaml_size_bytes", len(yamlContent)))
 
 	// Add header comment
 	header := fmt.Sprintf(`# Infrastructure Audit Report
@@ -88,13 +89,13 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 	finalContent := header + string(yamlContent)
 
 	// Write to file with comprehensive logging
-	logger.Info("💾 Writing YAML file to disk",
+	logger.Info(" Writing YAML file to disk",
 		zap.String("file_path", outputPath),
 		zap.Int("total_size_bytes", len(finalContent)),
 		zap.String("permissions", "0644"))
 
 	if err := os.WriteFile(outputPath, []byte(finalContent), 0644); err != nil {
-		logger.Error("❌ Failed to write YAML file",
+		logger.Error(" Failed to write YAML file",
 			zap.Error(err),
 			zap.String("file_path", outputPath))
 		return fmt.Errorf("failed to write YAML file: %w", err)
@@ -102,13 +103,13 @@ func WriteYAML(ctx context.Context, infrastructure *Infrastructure, outputPath s
 
 	// Verify file was created successfully
 	if fileInfo, err := os.Stat(outputPath); err == nil {
-		logger.Info("✅ YAML file created successfully",
+		logger.Info(" YAML file created successfully",
 			zap.String("file_path", outputPath),
 			zap.Int64("file_size_bytes", fileInfo.Size()),
 			zap.String("file_mode", fileInfo.Mode().String()),
 			zap.Duration("total_duration", time.Since(start)))
 	} else {
-		logger.Warn("⚠️ Could not verify YAML file creation",
+		logger.Warn("Could not verify YAML file creation",
 			zap.Error(err),
 			zap.String("file_path", outputPath))
 	}
@@ -132,7 +133,7 @@ func WriteTerraformMonolithic(ctx context.Context, infrastructure *Infrastructur
 	start := time.Now()
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🏗️ Starting Terraform configuration generation",
+	logger.Info(" Starting Terraform configuration generation",
 		zap.String("output_path", outputPath),
 		zap.String("hostname", infrastructure.Hostname),
 		zap.Time("timestamp", infrastructure.Timestamp))
@@ -244,19 +245,19 @@ locals {
 
 	// Write Docker resources with modular approach and logging
 	if infrastructure.Docker != nil {
-		logger.Info("🐳 Generating Docker Terraform resources",
+		logger.Info(" Generating Docker Terraform resources",
 			zap.Int("containers", len(infrastructure.Docker.Containers)),
 			zap.Int("networks", len(infrastructure.Docker.Networks)),
 			zap.Int("volumes", len(infrastructure.Docker.Volumes)))
 
 		dockerStart := time.Now()
 		tf.WriteString(generateDockerTerraform(infrastructure.Docker))
-		logger.Info("✅ Docker resources generated",
+		logger.Info(" Docker resources generated",
 			zap.Duration("duration", time.Since(dockerStart)))
 
 		// Generate separate module for Wazuh volumes if detected
 		if hasWazuhVolumes(infrastructure.Docker) {
-			logger.Info("🛡️ Generating Wazuh module configuration")
+			logger.Info(" Generating Wazuh module configuration")
 			tf.WriteString(generateWazuhModule(infrastructure.Docker))
 		}
 	}
@@ -271,7 +272,7 @@ locals {
 
 		hetznerStart := time.Now()
 		tf.WriteString(generateHetznerTerraform(infrastructure.Hetzner))
-		logger.Info("✅ Hetzner resources generated",
+		logger.Info(" Hetzner resources generated",
 			zap.Duration("duration", time.Since(hetznerStart)))
 	}
 
@@ -284,32 +285,32 @@ locals {
 
 		kvmStart := time.Now()
 		tf.WriteString(generateKVMTerraform(infrastructure.KVM))
-		logger.Info("✅ KVM resources generated",
+		logger.Info(" KVM resources generated",
 			zap.Duration("duration", time.Since(kvmStart)))
 	}
 
 	// Write locals block with system information
-	logger.Info("📊 Generating system information locals")
+	logger.Info(" Generating system information locals")
 	tf.WriteString(generateSystemLocals(infrastructure.System))
 
 	// Add migration and usage guidance with import command counting
-	logger.Info("📚 Generating migration guide and import commands")
+	logger.Info(" Generating migration guide and import commands")
 	migrationGuide := generateMigrationGuide(infrastructure)
 	tf.WriteString(migrationGuide)
 
 	// Count import commands for user feedback
 	importCount := strings.Count(migrationGuide, "terraform import")
-	logger.Info("📋 Migration guide generated", zap.Int("import_commands", importCount))
+	logger.Info(" Migration guide generated", zap.Int("import_commands", importCount))
 
 	// Write to file with comprehensive logging
 	finalContent := tf.String()
-	logger.Info("💾 Writing Terraform file to disk",
+	logger.Info(" Writing Terraform file to disk",
 		zap.String("file_path", outputPath),
 		zap.Int("total_size_bytes", len(finalContent)),
 		zap.String("permissions", "0644"))
 
 	if err := os.WriteFile(outputPath, []byte(finalContent), 0644); err != nil {
-		logger.Error("❌ Failed to write Terraform file",
+		logger.Error(" Failed to write Terraform file",
 			zap.Error(err),
 			zap.String("file_path", outputPath))
 		return fmt.Errorf("failed to write Terraform file: %w", err)
@@ -323,7 +324,7 @@ locals {
 		variableCount := strings.Count(finalContent, "variable ")
 		outputCount := strings.Count(finalContent, "output ")
 
-		logger.Info("✅ Terraform file created successfully",
+		logger.Info(" Terraform file created successfully",
 			zap.String("file_path", outputPath),
 			zap.Int64("file_size_bytes", fileInfo.Size()),
 			zap.String("file_mode", fileInfo.Mode().String()),
@@ -333,7 +334,7 @@ locals {
 			zap.Int("outputs", outputCount),
 			zap.Duration("total_duration", time.Since(start)))
 	} else {
-		logger.Warn("⚠️ Could not verify Terraform file creation",
+		logger.Warn("Could not verify Terraform file creation",
 			zap.Error(err),
 			zap.String("file_path", outputPath))
 	}
@@ -346,7 +347,7 @@ func WriteTerraformModular(ctx context.Context, infrastructure *Infrastructure, 
 	start := time.Now()
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🏗️ Starting modular Terraform configuration generation",
+	logger.Info(" Starting modular Terraform configuration generation",
 		zap.String("base_directory", baseDir),
 		zap.String("hostname", infrastructure.Hostname),
 		zap.Time("timestamp", infrastructure.Timestamp))
@@ -410,7 +411,7 @@ func WriteTerraformModular(ctx context.Context, infrastructure *Infrastructure, 
 		return fmt.Errorf("failed to generate documentation: %w", err)
 	}
 
-	logger.Info("✅ Modular Terraform configuration created successfully",
+	logger.Info(" Modular Terraform configuration created successfully",
 		zap.String("base_directory", baseDir),
 		zap.Duration("total_duration", time.Since(start)))
 

@@ -18,24 +18,24 @@ import (
 
 // ValidationResult contains the results of prompt validation
 type ValidationResult struct {
-	PromptName   string
-	IsValid      bool
-	Errors       []string
-	Warnings     []string
-	Suggestions  []string
-	Statistics   PromptStatistics
+	PromptName  string
+	IsValid     bool
+	Errors      []string
+	Warnings    []string
+	Suggestions []string
+	Statistics  PromptStatistics
 }
 
 // PromptStatistics contains statistical information about a prompt
 type PromptStatistics struct {
-	CharacterCount   int
-	WordCount        int
-	LineCount        int
-	ParagraphCount   int
-	HasTitle         bool
-	HasInstructions  bool
-	HasExamples      bool
-	ComplexityScore  int
+	CharacterCount  int
+	WordCount       int
+	LineCount       int
+	ParagraphCount  int
+	HasTitle        bool
+	HasInstructions bool
+	HasExamples     bool
+	ComplexityScore int
 }
 
 // NewValidateCmd creates the validate command
@@ -109,11 +109,11 @@ func validateAllPrompts(rc *eos_io.RuntimeContext, verbose, fix bool) error {
 	}
 
 	if len(prompts) == 0 {
-		logger.Info("ℹ️ No system prompts found to validate")
+		logger.Info(" No system prompts found to validate")
 		return nil
 	}
 
-	logger.Info("📊 Starting validation of all prompts",
+	logger.Info(" Starting validation of all prompts",
 		zap.Int("total_prompts", len(prompts)))
 
 	var results []ValidationResult
@@ -123,7 +123,7 @@ func validateAllPrompts(rc *eos_io.RuntimeContext, verbose, fix bool) error {
 	for _, prompt := range prompts {
 		result, err := validatePrompt(prompt.Name, verbose)
 		if err != nil {
-			logger.Error("❌ Failed to validate prompt",
+			logger.Error(" Failed to validate prompt",
 				zap.String("prompt_name", prompt.Name),
 				zap.Error(err))
 			continue
@@ -138,10 +138,10 @@ func validateAllPrompts(rc *eos_io.RuntimeContext, verbose, fix bool) error {
 
 		// Display individual results
 		if result.IsValid {
-			logger.Info("✅ Prompt validation passed",
+			logger.Info(" Prompt validation passed",
 				zap.String("prompt_name", result.PromptName))
 		} else {
-			logger.Warn("⚠️ Prompt validation issues found",
+			logger.Warn("Prompt validation issues found",
 				zap.String("prompt_name", result.PromptName),
 				zap.Int("errors", len(result.Errors)),
 				zap.Int("warnings", len(result.Warnings)))
@@ -154,18 +154,18 @@ func validateAllPrompts(rc *eos_io.RuntimeContext, verbose, fix bool) error {
 		// Apply fixes if requested
 		if fix && !result.IsValid {
 			if err := applyFixes(rc, result); err != nil {
-				logger.Error("❌ Failed to apply fixes",
+				logger.Error(" Failed to apply fixes",
 					zap.String("prompt_name", result.PromptName),
 					zap.Error(err))
 			} else {
-				logger.Info("🔧 Applied automatic fixes",
+				logger.Info(" Applied automatic fixes",
 					zap.String("prompt_name", result.PromptName))
 			}
 		}
 	}
 
 	// Display summary
-	logger.Info("📋 Validation summary",
+	logger.Info(" Validation summary",
 		zap.Int("total_prompts", len(results)),
 		zap.Int("valid_prompts", validCount),
 		zap.Int("prompts_with_issues", issueCount),
@@ -185,10 +185,10 @@ func validateSinglePrompt(rc *eos_io.RuntimeContext, promptName string, verbose,
 
 	// Display results
 	if result.IsValid {
-		logger.Info("✅ Prompt validation passed",
+		logger.Info(" Prompt validation passed",
 			zap.String("prompt_name", result.PromptName))
 	} else {
-		logger.Warn("⚠️ Prompt validation issues found",
+		logger.Warn("Prompt validation issues found",
 			zap.String("prompt_name", result.PromptName),
 			zap.Int("errors", len(result.Errors)),
 			zap.Int("warnings", len(result.Warnings)))
@@ -201,7 +201,7 @@ func validateSinglePrompt(rc *eos_io.RuntimeContext, promptName string, verbose,
 		if err := applyFixes(rc, result); err != nil {
 			return fmt.Errorf("failed to apply fixes: %w", err)
 		}
-		logger.Info("🔧 Applied automatic fixes",
+		logger.Info(" Applied automatic fixes",
 			zap.String("prompt_name", result.PromptName))
 	}
 
@@ -263,7 +263,7 @@ func calculateStatistics(content string) PromptStatistics {
 
 	stats.CharacterCount = utf8.RuneCountInString(content)
 	stats.LineCount = len(strings.Split(content, "\n"))
-	
+
 	// Count words (simple whitespace split)
 	words := strings.Fields(content)
 	stats.WordCount = len(words)
@@ -274,7 +274,7 @@ func calculateStatistics(content string) PromptStatistics {
 
 	// Check for structural elements
 	contentLower := strings.ToLower(content)
-	stats.HasTitle = strings.Contains(contentLower, "#") || 
+	stats.HasTitle = strings.Contains(contentLower, "#") ||
 		regexp.MustCompile(`^[A-Z][^.!?]*$`).MatchString(strings.Split(content, "\n")[0])
 	stats.HasInstructions = strings.Contains(contentLower, "instructions") ||
 		strings.Contains(contentLower, "you are") ||
@@ -294,18 +294,38 @@ func calculateComplexityScore(content string) int {
 	contentLower := strings.ToLower(content)
 
 	// Points for various elements
-	if strings.Contains(contentLower, "analyze") { score += 2 }
-	if strings.Contains(contentLower, "identify") { score += 2 }
-	if strings.Contains(contentLower, "evaluate") { score += 2 }
-	if strings.Contains(contentLower, "recommend") { score += 2 }
-	if strings.Contains(contentLower, "security") { score += 1 }
-	if strings.Contains(contentLower, "alert") { score += 1 }
-	if strings.Contains(contentLower, "incident") { score += 1 }
-	if strings.Contains(contentLower, "threat") { score += 1 }
+	if strings.Contains(contentLower, "analyze") {
+		score += 2
+	}
+	if strings.Contains(contentLower, "identify") {
+		score += 2
+	}
+	if strings.Contains(contentLower, "evaluate") {
+		score += 2
+	}
+	if strings.Contains(contentLower, "recommend") {
+		score += 2
+	}
+	if strings.Contains(contentLower, "security") {
+		score += 1
+	}
+	if strings.Contains(contentLower, "alert") {
+		score += 1
+	}
+	if strings.Contains(contentLower, "incident") {
+		score += 1
+	}
+	if strings.Contains(contentLower, "threat") {
+		score += 1
+	}
 
 	// Points for structure
-	if strings.Contains(content, "#") { score += 1 }
-	if strings.Contains(content, "1.") || strings.Contains(content, "- ") { score += 1 }
+	if strings.Contains(content, "#") {
+		score += 1
+	}
+	if strings.Contains(content, "1.") || strings.Contains(content, "- ") {
+		score += 1
+	}
 
 	return score
 }
@@ -368,10 +388,10 @@ func performValidationChecks(result *ValidationResult, content string) {
 	}
 }
 
-// displayValidationDetails displays detailed validation information  
+// displayValidationDetails displays detailed validation information
 func displayValidationDetails(logger otelzap.LoggerWithCtx, result ValidationResult) {
 	// Display statistics
-	logger.Info("📊 Prompt statistics",
+	logger.Info(" Prompt statistics",
 		zap.String("prompt_name", result.PromptName),
 		zap.Int("characters", result.Statistics.CharacterCount),
 		zap.Int("words", result.Statistics.WordCount),
@@ -384,12 +404,12 @@ func displayValidationDetails(logger otelzap.LoggerWithCtx, result ValidationRes
 
 	// Display errors
 	for _, err := range result.Errors {
-		logger.Error("❌ Error: " + err)
+		logger.Error(" Error: " + err)
 	}
 
 	// Display warnings
 	for _, warn := range result.Warnings {
-		logger.Warn("⚠️ Warning: " + warn)
+		logger.Warn("Warning: " + warn)
 	}
 
 	// Display suggestions
@@ -426,14 +446,14 @@ func applyFixes(rc *eos_io.RuntimeContext, result ValidationResult) error {
 	if strings.Contains(contentStr, "  ") {
 		contentStr = regexp.MustCompile(`\s{2,}`).ReplaceAllString(contentStr, " ")
 		modified = true
-		logger.Info("🔧 Fixed double spaces")
+		logger.Info(" Fixed double spaces")
 	}
 
 	// Normalize line endings
 	if strings.Contains(contentStr, "\r\n") {
 		contentStr = strings.ReplaceAll(contentStr, "\r\n", "\n")
 		modified = true
-		logger.Info("🔧 Normalized line endings")
+		logger.Info(" Normalized line endings")
 	}
 
 	// Trim trailing whitespace
@@ -446,7 +466,7 @@ func applyFixes(rc *eos_io.RuntimeContext, result ValidationResult) error {
 	if trimmedContent != contentStr {
 		contentStr = trimmedContent
 		modified = true
-		logger.Info("🔧 Trimmed trailing whitespace")
+		logger.Info(" Trimmed trailing whitespace")
 	}
 
 	// Write back if modified

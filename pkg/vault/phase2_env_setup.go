@@ -72,16 +72,16 @@ func EnsureVaultEnv(rc *eos_io.RuntimeContext) (string, error) {
 	// 3. Probe TLS before setting
 	if canConnectTLS(rc, addr, testTimeout) {
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
-		otelzap.Ctx(rc.Ctx).Info("🔐 VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
+		otelzap.Ctx(rc.Ctx).Info(" VAULT_ADDR validated and set", zap.String(shared.VaultAddrEnv, addr))
 	} else {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ VAULT_ADDR unreachable over TLS — setting anyway", zap.String("addr", addr))
+		otelzap.Ctx(rc.Ctx).Warn("VAULT_ADDR unreachable over TLS — setting anyway", zap.String("addr", addr))
 		_ = os.Setenv(shared.VaultAddrEnv, addr)
 	}
 
 	// 4. Set CA cert path if missing
 	if os.Getenv(shared.VaultCA) == "" {
 		_ = os.Setenv(shared.VaultCA, shared.VaultAgentCACopyPath)
-		otelzap.Ctx(rc.Ctx).Debug("🔧 Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
+		otelzap.Ctx(rc.Ctx).Debug(" Auto-set VAULT_CACERT", zap.String("path", shared.VaultAgentCACopyPath))
 	}
 
 	return addr, nil
@@ -94,18 +94,18 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 		return false
 	}
 	dialer := &net.Dialer{Timeout: d}
-	
+
 	// Use secure TLS configuration for production, allow insecure only for testing
 	tlsConfig := &tls.Config{
 		MinVersion: tls.VersionTLS12,
 	}
-	
+
 	// Only skip verification in development/testing environments
 	if os.Getenv("EOS_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		tlsConfig.InsecureSkipVerify = true
 		otelzap.Ctx(rc.Ctx).Debug("Using insecure TLS for development/testing", zap.String("host", u.Host))
 	}
-	
+
 	conn, err := tls.DialWithDialer(dialer, "tcp", u.Host, tlsConfig)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Debug("TLS probe failed", zap.String("host", u.Host), zap.Error(err))
@@ -120,7 +120,7 @@ func EnsureVaultDirs(rc *eos_io.RuntimeContext) error {
 	if err := createBaseDirs(rc); err != nil {
 		return err
 	}
-	// ⚠️ now pass ctx
+	// now pass ctx
 	if err := secureVaultDirOwnership(rc); err != nil {
 		return err
 	}
@@ -130,7 +130,7 @@ func EnsureVaultDirs(rc *eos_io.RuntimeContext) error {
 func createBaseDirs(rc *eos_io.RuntimeContext) error {
 	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Critical error: eos system user not found. Vault environment cannot be safely prepared.", zap.Error(err))
 		return fmt.Errorf("critical: eos system user not found: %w", err)
 	}
 
@@ -148,12 +148,12 @@ func createBaseDirs(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, d := range dirs {
-		otelzap.Ctx(rc.Ctx).Debug("🔧 Creating directory", zap.String("path", d.path))
+		otelzap.Ctx(rc.Ctx).Debug(" Creating directory", zap.String("path", d.path))
 		if err := os.MkdirAll(d.path, d.perm); err != nil {
 			return fmt.Errorf("mkdir %s: %w", d.path, err)
 		}
 		if err := os.Chown(d.path, eosUID, eosGID); err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to chown directory", zap.String("path", d.path), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn("Failed to chown directory", zap.String("path", d.path), zap.Error(err))
 		}
 	}
 	return nil
@@ -218,48 +218,48 @@ func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
 	// Resolve eos user UID and GID safely
 	eosUID, eosGID, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to lookup eos user", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to lookup eos user", zap.Error(err))
 		return fmt.Errorf("failed to lookup eos user: %w", err)
 	}
 
 	// Check if /run/eos exists and is a directory
 	info, err := os.Stat(shared.EosRunDir)
 	if os.IsNotExist(err) {
-		otelzap.Ctx(rc.Ctx).Error("❌ Missing runtime directory", zap.String("path", shared.EosRunDir))
+		otelzap.Ctx(rc.Ctx).Error(" Missing runtime directory", zap.String("path", shared.EosRunDir))
 		return fmt.Errorf("missing runtime directory: %s", shared.EosRunDir)
 	}
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to stat runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to stat runtime directory", zap.String("path", shared.EosRunDir), zap.Error(err))
 		return fmt.Errorf("failed to stat runtime directory: %w", err)
 	}
 	if !info.IsDir() {
-		otelzap.Ctx(rc.Ctx).Error("❌ Runtime path is not a directory", zap.String("path", shared.EosRunDir))
+		otelzap.Ctx(rc.Ctx).Error(" Runtime path is not a directory", zap.String("path", shared.EosRunDir))
 		return fmt.Errorf("runtime path is not a directory: %s", shared.EosRunDir)
 	}
 
 	// Check ownership of the runtime directory
 	stat, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Unable to get ownership info of runtime directory")
+		otelzap.Ctx(rc.Ctx).Warn("Unable to get ownership info of runtime directory")
 	} else {
 		currentUID := stat.Uid
 		currentGID := stat.Gid
-		
+
 		// Safely convert int to uint32 with bounds checking
 		if eosUID < 0 || eosGID < 0 {
-			otelzap.Ctx(rc.Ctx).Error("❌ Invalid eos user UID/GID", 
-				zap.Int("uid", eosUID), 
+			otelzap.Ctx(rc.Ctx).Error(" Invalid eos user UID/GID",
+				zap.Int("uid", eosUID),
 				zap.Int("gid", eosGID))
 			return fmt.Errorf("invalid eos user UID/GID: %d/%d", eosUID, eosGID)
 		}
-		
+
 		// #nosec G115 - Safe conversion after bounds checking above
 		expectedUID := uint32(eosUID)
-		// #nosec G115 - Safe conversion after bounds checking above  
+		// #nosec G115 - Safe conversion after bounds checking above
 		expectedGID := uint32(eosGID)
-		
+
 		if currentUID != expectedUID || currentGID != expectedGID {
-			otelzap.Ctx(rc.Ctx).Warn("⚠️ Runtime directory not owned by eos user",
+			otelzap.Ctx(rc.Ctx).Warn("Runtime directory not owned by eos user",
 				zap.String("path", shared.EosRunDir),
 				zap.Uint32("current_uid", currentUID),
 				zap.Uint32("current_gid", currentGID),
@@ -272,10 +272,10 @@ func ValidateVaultAgentRuntimeEnvironment(rc *eos_io.RuntimeContext) error {
 	// Check if Vault binary exists in PATH
 	vaultPath, err := exec.LookPath("vault")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Vault binary not found in PATH", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Vault binary not found in PATH", zap.Error(err))
 		return fmt.Errorf("vault binary not found in PATH: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault binary found", zap.String("vault_path", vaultPath))
+	otelzap.Ctx(rc.Ctx).Info(" Vault binary found", zap.String("vault_path", vaultPath))
 
 	return nil
 }

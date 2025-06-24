@@ -39,14 +39,14 @@ func InstallOsquery(rc *eos_io.RuntimeContext) error {
 	case "windows":
 		err = installWindows(rc)
 	default:
-		logger.Error("❌ Unsupported platform",
+		logger.Error(" Unsupported platform",
 			zap.String("platform", osPlat),
 			zap.String("troubleshooting", "osquery supports Linux, macOS, and Windows"))
 		return fmt.Errorf("unsupported platform: %s", osPlat)
 	}
 
 	if err != nil {
-		logger.Error("❌ osquery installation failed",
+		logger.Error(" osquery installation failed",
 			zap.Error(err),
 			zap.String("platform", osPlat),
 			zap.Duration("duration", time.Since(start)),
@@ -70,17 +70,17 @@ func GetOsqueryConfig() string {
 // IsOsqueryInstalled checks if osquery is already installed on the system
 func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Primary check: osqueryi interactive shell (available on all platforms)
 	if platform.IsCommandAvailable("osqueryi") {
-		logger.Info("✅ osquery is already installed",
+		logger.Info(" osquery is already installed",
 			zap.String("binary", "osqueryi"))
 		return true
 	}
-	
+
 	// Secondary check: osqueryd daemon binary
 	if platform.IsCommandAvailable("osqueryd") {
-		logger.Info("✅ osquery is already installed",
+		logger.Info(" osquery is already installed",
 			zap.String("binary", "osqueryd"))
 		return true
 	}
@@ -90,7 +90,7 @@ func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 	case "windows":
 		// Check Windows service
 		if platform.IsProcessRunning("osqueryd") {
-			logger.Info("✅ osquery service is running on Windows")
+			logger.Info(" osquery service is running on Windows")
 			return true
 		}
 	case "macos":
@@ -102,34 +102,34 @@ func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 				Args:    []string{"list", "--cask", "osquery"},
 			})
 			if caskErr == nil && strings.Contains(caskOutput, "osquery") {
-				logger.Info("✅ osquery is installed via Homebrew (cask)")
+				logger.Info(" osquery is installed via Homebrew (cask)")
 				return true
 			}
-			
+
 			// Check if osquery is installed via Homebrew formula (alternative)
 			formulaOutput, formulaErr := execute.Run(rc.Ctx, execute.Options{
 				Command: "brew",
 				Args:    []string{"list", "--formula", "osquery"},
 			})
 			if formulaErr == nil && strings.Contains(formulaOutput, "osquery") {
-				logger.Info("✅ osquery is installed via Homebrew (formula)")
+				logger.Info(" osquery is installed via Homebrew (formula)")
 				return true
 			}
 		}
 		// Check macOS launchd (for non-Homebrew installations)
 		if platform.IsProcessRunning("com.facebook.osqueryd") {
-			logger.Info("✅ osquery is managed by launchd on macOS")
+			logger.Info(" osquery is managed by launchd on macOS")
 			return true
 		}
 	case "linux":
 		// Check systemd service
 		if platform.IsProcessRunning("osqueryd") {
-			logger.Info("✅ osquery service is running on Linux")
+			logger.Info(" osquery service is running on Linux")
 			return true
 		}
 	}
 
-	logger.Info("📊 osquery is not installed")
+	logger.Info(" osquery is not installed")
 	return false
 }
 
@@ -140,7 +140,7 @@ func VerifyOsqueryInstallation(rc *eos_io.RuntimeContext) error {
 
 	// Check if osqueryi (interactive shell) is available
 	if !platform.IsCommandAvailable("osqueryi") {
-		logger.Error("❌ osqueryi binary not found",
+		logger.Error(" osqueryi binary not found",
 			zap.String("troubleshooting", "Ensure osquery installation completed successfully"))
 		return fmt.Errorf("osqueryi binary not found in PATH")
 	}
@@ -163,24 +163,24 @@ func GetOsqueryPaths() OsqueryPaths {
 	switch platform.GetOSPlatform() {
 	case "windows":
 		return OsqueryPaths{
-			ConfigPath:  `C:\Program Files\osquery\osquery.conf`,
-			LogPath:     `C:\Program Files\osquery\log`,
+			ConfigPath:   `C:\Program Files\osquery\osquery.conf`,
+			LogPath:      `C:\Program Files\osquery\log`,
 			DatabasePath: `C:\Program Files\osquery\osquery.db`,
-			ServiceName: "osqueryd",
+			ServiceName:  "osqueryd",
 		}
 	case "macos":
 		return OsqueryPaths{
-			ConfigPath:  "/var/osquery/osquery.conf",
-			LogPath:     "/var/log/osquery",
+			ConfigPath:   "/var/osquery/osquery.conf",
+			LogPath:      "/var/log/osquery",
 			DatabasePath: "/var/osquery/osquery.db",
-			ServiceName: "com.facebook.osqueryd",
+			ServiceName:  "com.facebook.osqueryd",
 		}
 	default: // Linux
 		return OsqueryPaths{
-			ConfigPath:  "/etc/osquery/osquery.conf",
-			LogPath:     "/var/log/osquery",
+			ConfigPath:   "/etc/osquery/osquery.conf",
+			LogPath:      "/var/log/osquery",
 			DatabasePath: "/var/osquery/osquery.db",
-			ServiceName: "osqueryd",
+			ServiceName:  "osqueryd",
 		}
 	}
 }

@@ -65,7 +65,7 @@ func runInspectConfig(rc *eos_io.RuntimeContext) error {
 		utils.InspectEosConfig(rc.Ctx)
 		utils.InspectNginxDefaults(rc.Ctx)
 	default:
-		logger.Error("❌ Invalid choice provided", zap.String("choice", choice))
+		logger.Error(" Invalid choice provided", zap.String("choice", choice))
 		return fmt.Errorf("invalid choice: %s", choice)
 	}
 

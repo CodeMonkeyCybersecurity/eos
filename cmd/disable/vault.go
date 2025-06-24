@@ -36,12 +36,12 @@ func runStopVault(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error
 	if err := systemctl("disable", "--now", shared.VaultAgentService); err != nil {
 		log.Warn("Failed to disable service", zap.String("unit", shared.VaultAgentService), zap.Error(err))
 	} else {
-		log.Info("✅ Service stopped & disabled", zap.String("unit", shared.VaultAgentService))
+		log.Info(" Service stopped & disabled", zap.String("unit", shared.VaultAgentService))
 	}
 
 	// ② kill anything still bound to VaultDefaultPort
 	if killed := killByPort(rc, shared.VaultDefaultPort); killed == 0 {
-		log.Info("ℹ️  No process bound to "+shared.VaultDefaultPort, zap.String("port", shared.VaultDefaultPort))
+		log.Info("  No process bound to "+shared.VaultDefaultPort, zap.String("port", shared.VaultDefaultPort))
 	}
 
 	// ③ purge runtime/config files via existing helper
@@ -55,7 +55,7 @@ func runStopVault(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error
 	_ = systemctl("daemon-reexec")
 	_ = systemctl("daemon-reload")
 
-	log.Info("✅ Vault Agent stopped and cleaned")
+	log.Info(" Vault Agent stopped and cleaned")
 	return nil
 }
 

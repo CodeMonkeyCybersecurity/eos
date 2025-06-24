@@ -86,55 +86,55 @@ func DefaultAppArmorConfig() *AppArmorConfig {
 // PhaseConfigureAppArmor provides comprehensive AppArmor setup and hardening
 func PhaseConfigureAppArmor(rc *eos_io.RuntimeContext, config *AppArmorConfig) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🛡️ Starting comprehensive AppArmor configuration")
+	log.Info(" Starting comprehensive AppArmor configuration")
 
 	if config == nil {
 		config = DefaultAppArmorConfig()
 	}
 
 	// Step 1: Install and verify AppArmor
-	log.Info("📦 Installing AppArmor packages")
+	log.Info(" Installing AppArmor packages")
 	if err := installAppArmorPackages(rc); err != nil {
-		log.Error("❌ AppArmor package installation failed", zap.Error(err))
+		log.Error(" AppArmor package installation failed", zap.Error(err))
 		return cerr.Wrap(err, "AppArmor package installation failed")
 	}
 
 	// Step 2: Enable AppArmor service
-	log.Info("🚀 Enabling AppArmor service")
+	log.Info(" Enabling AppArmor service")
 	if err := enableAppArmorService(rc); err != nil {
-		log.Error("❌ AppArmor service enablement failed", zap.Error(err))
+		log.Error(" AppArmor service enablement failed", zap.Error(err))
 		return cerr.Wrap(err, "AppArmor service enablement failed")
 	}
 
 	// Step 3: Generate EOS custom profiles
-	log.Info("📝 Generating EOS custom AppArmor profiles")
+	log.Info(" Generating EOS custom AppArmor profiles")
 	if err := generateEOSProfiles(rc, config); err != nil {
-		log.Error("❌ EOS profile generation failed", zap.Error(err))
+		log.Error(" EOS profile generation failed", zap.Error(err))
 		return cerr.Wrap(err, "EOS profile generation failed")
 	}
 
 	// Step 4: Load and enforce standard profiles
-	log.Info("⚙️ Loading standard AppArmor profiles")
+	log.Info(" Loading standard AppArmor profiles")
 	if err := loadStandardProfiles(rc, config); err != nil {
-		log.Error("❌ Standard profile loading failed", zap.Error(err))
+		log.Error(" Standard profile loading failed", zap.Error(err))
 		return cerr.Wrap(err, "standard profile loading failed")
 	}
 
 	// Step 5: Configure AppArmor logging and monitoring
-	log.Info("📊 Configuring AppArmor monitoring")
+	log.Info(" Configuring AppArmor monitoring")
 	if err := configureAppArmorMonitoring(rc, config); err != nil {
-		log.Error("❌ AppArmor monitoring setup failed", zap.Error(err))
+		log.Error(" AppArmor monitoring setup failed", zap.Error(err))
 		return cerr.Wrap(err, "AppArmor monitoring setup failed")
 	}
 
 	// Step 6: Validate configuration
-	log.Info("✅ Validating AppArmor configuration")
+	log.Info(" Validating AppArmor configuration")
 	if err := validateAppArmorSetup(rc, config); err != nil {
-		log.Error("❌ AppArmor validation failed", zap.Error(err))
+		log.Error(" AppArmor validation failed", zap.Error(err))
 		return cerr.Wrap(err, "AppArmor validation failed")
 	}
 
-	log.Info("✅ AppArmor configuration completed successfully")
+	log.Info(" AppArmor configuration completed successfully")
 	return nil
 }
 
@@ -152,17 +152,17 @@ func installAppArmorPackages(rc *eos_io.RuntimeContext) error {
 	}
 
 	for _, pkg := range packages {
-		log.Info("📦 Installing AppArmor package", zap.String("package", pkg))
+		log.Info(" Installing AppArmor package", zap.String("package", pkg))
 		if _, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "apt-get",
 			Args:    []string{"install", "-y", pkg},
 		}); err != nil {
-			log.Error("❌ Failed to install package", zap.String("package", pkg), zap.Error(err))
+			log.Error(" Failed to install package", zap.String("package", pkg), zap.Error(err))
 			return cerr.Wrapf(err, "failed to install package: %s", pkg)
 		}
 	}
 
-	log.Info("✅ All AppArmor packages installed successfully")
+	log.Info(" All AppArmor packages installed successfully")
 	return nil
 }
 
@@ -171,26 +171,26 @@ func enableAppArmorService(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
 	// Enable and start AppArmor service
-	log.Info("🔄 Enabling and starting AppArmor service")
+	log.Info(" Enabling and starting AppArmor service")
 	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, "apparmor"); err != nil {
-		log.Error("❌ Failed to enable AppArmor service", zap.Error(err))
+		log.Error(" Failed to enable AppArmor service", zap.Error(err))
 		return cerr.Wrap(err, "failed to enable AppArmor service")
 	}
 
 	// Start AppArmor service with retry
 	log.Info("▶️ Starting AppArmor service")
 	if err := eos_unix.StartSystemdUnitWithRetry(rc.Ctx, "apparmor", 3, 2); err != nil {
-		log.Error("❌ Failed to start AppArmor service", zap.Error(err))
+		log.Error(" Failed to start AppArmor service", zap.Error(err))
 		return cerr.Wrap(err, "failed to start AppArmor service")
 	}
 
 	// Verify service is running
 	if err := eos_unix.CheckServiceStatus(rc.Ctx, "apparmor"); err != nil {
-		log.Error("❌ AppArmor service not running", zap.Error(err))
+		log.Error(" AppArmor service not running", zap.Error(err))
 		return cerr.Wrap(err, "AppArmor service not running")
 	}
 
-	log.Info("✅ AppArmor service enabled and running")
+	log.Info(" AppArmor service enabled and running")
 	return nil
 }
 
@@ -275,25 +275,25 @@ func generateEOSProfiles(rc *eos_io.RuntimeContext, config *AppArmorConfig) erro
 	}
 
 	for profileName, profile := range eosProfiles {
-		log.Info("📝 Generating AppArmor profile", zap.String("profile", profileName))
+		log.Info(" Generating AppArmor profile", zap.String("profile", profileName))
 		if err := writeAppArmorProfile(rc, config, profile); err != nil {
-			log.Error("❌ Failed to write profile", zap.String("profile", profileName), zap.Error(err))
+			log.Error(" Failed to write profile", zap.String("profile", profileName), zap.Error(err))
 			return cerr.Wrapf(err, "failed to write profile: %s", profileName)
 		}
 
 		// Load the profile
 		profilePath := filepath.Join(config.ProfileDirectory, profileName)
-		log.Info("🔄 Loading AppArmor profile", zap.String("path", profilePath))
+		log.Info(" Loading AppArmor profile", zap.String("path", profilePath))
 		if _, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "apparmor_parser",
 			Args:    []string{"-r", "-T", profilePath},
 		}); err != nil {
-			log.Error("❌ Failed to load profile", zap.String("profile", profileName), zap.Error(err))
+			log.Error(" Failed to load profile", zap.String("profile", profileName), zap.Error(err))
 			return cerr.Wrapf(err, "failed to load profile: %s", profileName)
 		}
 	}
 
-	log.Info("✅ EOS AppArmor profiles generated and loaded")
+	log.Info(" EOS AppArmor profiles generated and loaded")
 	return nil
 }
 
@@ -304,18 +304,18 @@ func writeAppArmorProfile(rc *eos_io.RuntimeContext, config *AppArmorConfig, pro
 	profileContent := generateProfileContent(profile)
 	profilePath := filepath.Join(config.ProfileDirectory, profile.Name)
 
-	log.Info("💾 Writing AppArmor profile",
+	log.Info(" Writing AppArmor profile",
 		zap.String("profile", profile.Name),
 		zap.String("path", profilePath))
 
 	if err := os.WriteFile(profilePath, []byte(profileContent), 0644); err != nil {
-		log.Error("❌ Failed to write profile file",
+		log.Error(" Failed to write profile file",
 			zap.String("path", profilePath),
 			zap.Error(err))
 		return cerr.Wrapf(err, "failed to write profile file: %s", profilePath)
 	}
 
-	log.Info("✅ AppArmor profile written successfully", zap.String("profile", profile.Name))
+	log.Info(" AppArmor profile written successfully", zap.String("profile", profile.Name))
 	return nil
 }
 
@@ -402,20 +402,20 @@ func loadStandardProfiles(rc *eos_io.RuntimeContext, config *AppArmorConfig) err
 	for _, profile := range standardProfiles {
 		profilePath := filepath.Join("/etc/apparmor.d", profile)
 		if _, err := os.Stat(profilePath); err == nil {
-			log.Info("🔄 Loading standard profile", zap.String("profile", profile))
+			log.Info(" Loading standard profile", zap.String("profile", profile))
 			if _, err := execute.Run(rc.Ctx, execute.Options{
 				Command: "aa-enforce",
 				Args:    []string{profilePath},
 			}); err != nil {
-				log.Warn("⚠️ Failed to enforce profile", zap.String("profile", profile), zap.Error(err))
+				log.Warn("Failed to enforce profile", zap.String("profile", profile), zap.Error(err))
 				// Continue with other profiles
 			}
 		} else {
-			log.Info("ℹ️ Standard profile not found, skipping", zap.String("profile", profile))
+			log.Info(" Standard profile not found, skipping", zap.String("profile", profile))
 		}
 	}
 
-	log.Info("✅ Standard AppArmor profiles processed")
+	log.Info(" Standard AppArmor profiles processed")
 	return nil
 }
 
@@ -431,16 +431,16 @@ func configureAppArmorMonitoring(rc *eos_io.RuntimeContext, config *AppArmorConf
 `
 
 	configPath := "/etc/rsyslog.d/50-apparmor.conf"
-	log.Info("📝 Configuring AppArmor logging", zap.String("path", configPath))
+	log.Info(" Configuring AppArmor logging", zap.String("path", configPath))
 	if err := os.WriteFile(configPath, []byte(rsyslogConfig), 0644); err != nil {
-		log.Error("❌ Failed to write rsyslog config", zap.Error(err))
+		log.Error(" Failed to write rsyslog config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write rsyslog config")
 	}
 
 	// Restart rsyslog service
-	log.Info("🔄 Restarting rsyslog service")
+	log.Info(" Restarting rsyslog service")
 	if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, "rsyslog", 3, 2); err != nil {
-		log.Error("❌ Failed to restart rsyslog", zap.Error(err))
+		log.Error(" Failed to restart rsyslog", zap.Error(err))
 		return cerr.Wrap(err, "failed to restart rsyslog")
 	}
 
@@ -460,13 +460,13 @@ func configureAppArmorMonitoring(rc *eos_io.RuntimeContext, config *AppArmorConf
 `
 
 	logrotataPath := "/etc/logrotate.d/apparmor"
-	log.Info("📝 Configuring log rotation", zap.String("path", logrotataPath))
+	log.Info(" Configuring log rotation", zap.String("path", logrotataPath))
 	if err := os.WriteFile(logrotataPath, []byte(logrotateConfig), 0644); err != nil {
-		log.Error("❌ Failed to write logrotate config", zap.Error(err))
+		log.Error(" Failed to write logrotate config", zap.Error(err))
 		return cerr.Wrap(err, "failed to write logrotate config")
 	}
 
-	log.Info("✅ AppArmor monitoring configured")
+	log.Info(" AppArmor monitoring configured")
 	return nil
 }
 
@@ -477,16 +477,16 @@ func validateAppArmorSetup(rc *eos_io.RuntimeContext, config *AppArmorConfig) er
 	// Check AppArmor status
 	status, err := GetAppArmorStatus(rc)
 	if err != nil {
-		log.Error("❌ Failed to get AppArmor status", zap.Error(err))
+		log.Error(" Failed to get AppArmor status", zap.Error(err))
 		return cerr.Wrap(err, "failed to get AppArmor status")
 	}
 
 	if !status.Enabled {
-		log.Error("❌ AppArmor is not enabled")
+		log.Error(" AppArmor is not enabled")
 		return cerr.New("AppArmor is not enabled")
 	}
 
-	log.Info("✅ AppArmor validation completed",
+	log.Info(" AppArmor validation completed",
 		zap.Int("loaded_profiles", len(status.LoadedProfiles)),
 		zap.Int("enforced_profiles", len(status.EnforcedProfiles)))
 

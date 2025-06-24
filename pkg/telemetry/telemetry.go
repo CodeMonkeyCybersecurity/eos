@@ -33,7 +33,7 @@ func Init(service string) error {
 	// Create telemetry log directory with fallback chain
 	var telemetryDir string
 	var dirErr error
-	
+
 	// Try system directory first
 	telemetryDir = "/var/log/eos"
 	if err := os.MkdirAll(telemetryDir, 0755); err != nil {
@@ -92,15 +92,15 @@ func Init(service string) error {
 // Start a telemetry span with optional attributes.
 func Start(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 	if ctx == nil {
-		ctx = context.Background() // 🔧 Safe fallback
+		ctx = context.Background() //  Safe fallback
 	}
-	
+
 	// Safety check: if tracer is nil, initialize a no-op tracer
 	if tracer == nil {
 		tp := noop.NewTracerProvider()
 		tracer = tp.Tracer("eos-fallback")
 	}
-	
+
 	return tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
 

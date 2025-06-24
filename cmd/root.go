@@ -18,7 +18,6 @@ import (
 	// Subcommands
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ai"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
@@ -31,6 +30,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read" // NOTE: This `read` is a TOP-LEVEL command, not delphi/read
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	// Internal packages
@@ -48,7 +48,7 @@ and reverse proxy configurations via Hecate.
 
 Use "eos [command] --help" for more information about a command.`, // Added standard Cobra advice
 
-	// ⚠️ IMPORTANT CHANGE: Remove the custom SetHelpFunc on RootCmd.
+	// IMPORTANT CHANGE: Remove the custom SetHelpFunc on RootCmd.
 	// Cobra's default help function is smart enough to show context-specific help.
 	// If you need global logging for help, do it in PersistentPreRun or similar.
 
@@ -64,7 +64,7 @@ Use "eos [command] --help" for more information about a command.`, // Added stan
 // RegisterCommands adds all subcommands to the root command.
 // No change needed here, this is good.
 func RegisterCommands(rc *eos_io.RuntimeContext) {
-	// ⚠️ REMOVED: RootCmd.SetHelpFunc. This was the primary cause of generic help.
+	// REMOVED: RootCmd.SetHelpFunc. This was the primary cause of generic help.
 	// Cobra's default help generation is hierarchical and contextual.
 
 	// Group subcommands for cleanliness
@@ -117,7 +117,7 @@ func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
 		timer := time.NewTimer(max)
 		select {
 		case <-timer.C:
-			fmt.Fprintf(os.Stderr, "⚠️ Eos watchdog: global timeout (%s) exceeded. Initiating graceful shutdown.\n", max)
+			fmt.Fprintf(os.Stderr, "Eos watchdog: global timeout (%s) exceeded. Initiating graceful shutdown.\n", max)
 			otelzap.Ctx(rc.Ctx).Error("Global timeout exceeded, initiating graceful shutdown",
 				zap.Duration("timeout", max))
 

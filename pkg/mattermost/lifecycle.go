@@ -48,25 +48,25 @@ func OrchestrateMattermostInstall(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Step 3: Continue setup as usual
-	log.Info("✅ Cloned and copied Mattermost repo", zap.String("target", MattermostDir))
+	log.Info(" Cloned and copied Mattermost repo", zap.String("target", MattermostDir))
 
 	// Step 4: Patch and provision
-	log.Info("⚙️ Patching .env")
+	log.Info(" Patching .env")
 	if err := PatchMattermostEnv(MattermostDir); err != nil {
 		return cerr.Wrap(err, "patch .env")
 	}
 
-	log.Info("🗂️ Creating dirs and setting permissions")
+	log.Info(" Creating dirs and setting permissions")
 	if err := SetupMattermostDirs(MattermostDir); err != nil {
 		return cerr.Wrap(err, "setup dirs")
 	}
 
-	log.Info("🐳 Starting containers")
+	log.Info(" Starting containers")
 	if err := container.ComposeUpInDir(rc, MattermostDir); err != nil {
 		return cerr.Wrap(err, "docker compose up")
 	}
 
-	log.Info("✅ Done")
+	log.Info(" Done")
 	return nil
 }
 

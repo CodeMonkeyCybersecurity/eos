@@ -25,19 +25,19 @@ if (-not $GoCmd) {
         $env:PATH = "$($Fallback | Split-Path);$env:PATH"
         Log INFO "🧩 Using fallback Go: $Fallback"
     } else {
-        Log ERR "❌ Go not found in PATH. Install from https://go.dev/dl/"
+        Log ERR " Go not found in PATH. Install from https://go.dev/dl/"
         exit 1
     }
 }
 
 # --- Build ---
-Log INFO "📦 Building Eos..."
+Log INFO " Building Eos..."
 try {
     Push-Location $ScriptDir
     if (Test-Path $EosBinaryName) { Remove-Item $EosBinaryName -Force }
     & go build -o $EosBinaryName main.go
     if ($LASTEXITCODE -ne 0) {
-        Log ERR "❌ Build failed. Check your Go setup."
+        Log ERR " Build failed. Check your Go setup."
         exit 1
     }
 } finally {
@@ -62,7 +62,7 @@ Copy-Item -Force $EosBuildPath $InstallPath
 Show-Hash "🔍 New binary SHA256:" $InstallPath
 
 # --- Create Directories ---
-Log INFO "📁 Ensuring application directories"
+Log INFO " Ensuring application directories"
 foreach ($dir in @($SecretsDir, $ConfigDir, $LogDir)) {
     if (-not (Test-Path $dir)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
@@ -75,10 +75,10 @@ if ($PathUser -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$PathUser;$InstallDir", "User")
     Log INFO "📎 Added eos directory to user PATH"
 } else {
-    Log INFO "✅ eos directory already in user PATH"
+    Log INFO " eos directory already in user PATH"
 }
 
 # --- Complete ---
 Log INFO ""
-Log INFO "🎉 eos installation complete on Windows"
-Log INFO "👉 Run: eos.exe --help"
+Log INFO " eos installation complete on Windows"
+Log INFO " Run: eos.exe --help"

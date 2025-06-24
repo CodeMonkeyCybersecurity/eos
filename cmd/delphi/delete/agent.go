@@ -36,11 +36,11 @@ Supported OS uninstallers:
 
 		if agentID == "" {
 			otelzap.Ctx(rc.Ctx).Error("Agent ID is required")
-			fmt.Println("❌ Please provide an agent ID using --agent-id")
+			fmt.Println(" Please provide an agent ID using --agent-id")
 			return nil
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("🔐 Authenticating and loading Delphi config...")
+		otelzap.Ctx(rc.Ctx).Info(" Authenticating and loading Delphi config...")
 		config, err := delphi.ResolveConfig(rc)
 		if err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to load config", zap.Error(err))
@@ -61,7 +61,7 @@ Supported OS uninstallers:
 		}
 
 		prettyJSON, _ := json.MarshalIndent(resp, "", "  ")
-		fmt.Println("\n✅ Agent deleted successfully from Wazuh:\n" + string(prettyJSON))
+		fmt.Println("\n Agent deleted successfully from Wazuh:\n" + string(prettyJSON))
 
 		otelzap.Ctx(rc.Ctx).Info("🧹 Attempting local Wazuh agent uninstall...")
 		switch runtime.GOOS {

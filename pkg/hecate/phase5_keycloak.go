@@ -14,7 +14,7 @@ import (
 // SetupKeycloakWizard prompts the user for Keycloak setup info and returns a ServiceBundle.
 func SetupKeycloakWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) ServiceBundle {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Collecting Keycloak setup information...")
+	log.Info(" Collecting Keycloak setup information...")
 
 	// Define the fields to prompt for.
 	fields := []PromptField{
@@ -83,7 +83,7 @@ func SetupKeycloakWizard(rc *eos_io.RuntimeContext, reader *bufio.Reader) Servic
 func SetupKeycloak(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir string) error {
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Info("🚀 Starting Keycloak setup rendering...")
+	log.Info(" Starting Keycloak setup rendering...")
 
 	err := RenderBundleFragments(
 		rc,
@@ -94,10 +94,10 @@ func SetupKeycloak(rc *eos_io.RuntimeContext, bundle ServiceBundle, targetDir st
 		"keycloak",
 	)
 	if err != nil {
-		log.Error("❌ Failed to render Keycloak service", zap.Error(err))
+		log.Error(" Failed to render Keycloak service", zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Keycloak setup rendered successfully!")
+	log.Info(" Keycloak setup rendered successfully!")
 	return nil
 }

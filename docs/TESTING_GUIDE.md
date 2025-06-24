@@ -76,7 +76,7 @@ func TestVaultAgentConfiguration(t *testing.T) {
 - Core lifecycle: `create`, `read`, `update`, `delete`
 - Critical operations: `vault`, `secure`, `backup`
 
-## 🏗️ Testing Architecture
+##  Testing Architecture
 
 ### Test Types & When to Use Them
 
@@ -162,7 +162,7 @@ func TestVaultOperations(t *testing.T) {
 }
 ```
 
-## 🔧 Using the Testing Framework
+##  Using the Testing Framework
 
 ### Quick Start
 
@@ -236,7 +236,7 @@ func TestErrorHandling(t *testing.T) {
 }
 ```
 
-## 📋 Testing Checklist
+##  Testing Checklist
 
 ### Before Writing Tests
 - [ ] Is this function testable? (no hidden dependencies)
@@ -259,7 +259,7 @@ func TestErrorHandling(t *testing.T) {
 - **CLI commands:** 60%+ line coverage
 - **Utilities:** 50%+ line coverage
 
-## 🚀 Implementation Roadmap
+##  Implementation Roadmap
 
 ### Week 1: Foundation
 1. Test `pkg/eos_io/` runtime context creation and logging

@@ -26,7 +26,7 @@ var CreateOllamaCmd = &cobra.Command{
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 		if !platform.IsMacOS() {
-			return errors.New("❌ this command is only supported on macOS")
+			return errors.New(" this command is only supported on macOS")
 		}
 
 		if err := container.CheckRunning(rc); err != nil {
@@ -46,7 +46,7 @@ var CreateOllamaCmd = &cobra.Command{
 
 		serveLog := fmt.Sprintf("%s/serve.log", ollamaDir)
 		if err := ollama.StartServeProcess(rc, serveLog); err != nil {
-			log.Warn("⚠️ Ollama serve may not be running", zap.Error(err))
+			log.Warn("Ollama serve may not be running", zap.Error(err))
 		}
 
 		containerName, _ := cmd.Flags().GetString("container-name")
@@ -57,7 +57,7 @@ var CreateOllamaCmd = &cobra.Command{
 		// Remove stale container
 		out, err := execute.RunShell(rc.Ctx, "docker rm -f "+containerName)
 		if err != nil {
-			log.Warn("⚠️ Failed to remove container", zap.Error(err), zap.String("output", out))
+			log.Warn("Failed to remove container", zap.Error(err), zap.String("output", out))
 		}
 
 		cfg := ollama.WebUIConfig{
@@ -79,7 +79,7 @@ var CreateOllamaCmd = &cobra.Command{
 			if err := parse.AppendIfMissing(rcPath, "export OLLAMA_USE_GPU=true"); err != nil {
 				return fmt.Errorf("failed to write GPU config: %w", err)
 			}
-			log.Info("✅ GPU support enabled in shell config")
+			log.Info(" GPU support enabled in shell config")
 			log.Info("🔁 Run `source " + rcPath + "` to apply changes")
 		}
 

@@ -39,7 +39,7 @@ Requires sudo privileges for system-wide installation.`,
 
 		// Check if we have sudo privileges
 		if !eos_unix.CanInteractiveSudo() {
-			logger.Error("❌ Sudo privileges required for Python package installation")
+			logger.Error(" Sudo privileges required for Python package installation")
 			return nil
 		}
 
@@ -51,7 +51,7 @@ Requires sudo privileges for system-wide installation.`,
 		pythonCmd := exec.Command("python3", "--version")
 		pythonOutput, err := pythonCmd.Output()
 		if err != nil {
-			logger.Error("❌ Python 3 not found", zap.Error(err))
+			logger.Error(" Python 3 not found", zap.Error(err))
 			return err
 		}
 		logger.Info("🐍 Python version", zap.String("version", strings.TrimSpace(string(pythonOutput))))
@@ -63,7 +63,7 @@ Requires sudo privileges for system-wide installation.`,
 		case "darwin":
 			return installMacOSPackages(logger)
 		default:
-			logger.Warn("⚠️ Unsupported OS, attempting pip3 installation", zap.String("os", os))
+			logger.Warn("Unsupported OS, attempting pip3 installation", zap.String("os", os))
 			return installWithPip3(logger, false)
 		}
 
@@ -94,22 +94,22 @@ func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 		// Note: ipwhois is not available as a Debian package, will install via pip3
 	}
 
-	logger.Info("📦 Installing Debian packages",
+	logger.Info(" Installing Debian packages",
 		zap.Strings("packages", debianPackages),
 		zap.Int("count", len(debianPackages)))
 
 	// Update apt cache first
-	logger.Info("🔄 Updating apt package cache")
+	logger.Info(" Updating apt package cache")
 	updateCmd := exec.Command("sudo", "apt", "update")
 	updateCmd.Stdout = os.Stdout
 	updateCmd.Stderr = os.Stderr
 	if err := updateCmd.Run(); err != nil {
-		logger.Warn("⚠️ apt update failed, continuing anyway", zap.Error(err))
+		logger.Warn("apt update failed, continuing anyway", zap.Error(err))
 	}
 
 	// Install packages
 	installArgs := append([]string{"apt", "install", "-y"}, debianPackages...)
-	logger.Info("🔧 Installing packages with apt",
+	logger.Info(" Installing packages with apt",
 		zap.String("command", "sudo"),
 		zap.Strings("args", installArgs))
 
@@ -119,21 +119,21 @@ func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 	installCmd.Stdin = os.Stdin
 
 	if err := installCmd.Run(); err != nil {
-		logger.Error("❌ apt package installation failed", zap.Error(err))
+		logger.Error(" apt package installation failed", zap.Error(err))
 		return err
 	}
 
-	logger.Info("✅ Debian packages installed successfully")
+	logger.Info(" Debian packages installed successfully")
 
 	// Install ipwhois separately with pip3 (not available as Debian package)
-	logger.Info("📦 Installing ipwhois separately with pip3")
+	logger.Info(" Installing ipwhois separately with pip3")
 	pipCmd := exec.Command("sudo", "pip3", "install", "--break-system-packages", "ipwhois")
 	pipCmd.Stdout = os.Stdout
 	pipCmd.Stderr = os.Stderr
 	if err := pipCmd.Run(); err != nil {
-		logger.Warn("⚠️ Failed to install ipwhois with pip3", zap.Error(err))
+		logger.Warn("Failed to install ipwhois with pip3", zap.Error(err))
 	} else {
-		logger.Info("✅ ipwhois installed successfully")
+		logger.Info(" ipwhois installed successfully")
 	}
 
 	return verifyAllPackages(logger)
@@ -156,7 +156,7 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 		"pyyaml",
 	}
 
-	logger.Info("📦 Installing Python packages with pip3",
+	logger.Info(" Installing Python packages with pip3",
 		zap.Strings("packages", packages),
 		zap.Int("count", len(packages)),
 		zap.Bool("break_system_packages", useBreakSystemPackages))
@@ -164,7 +164,7 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 	// Check if pip3 is available
 	pip3Path, err := exec.LookPath("pip3")
 	if err != nil {
-		logger.Error("❌ pip3 not found", zap.Error(err))
+		logger.Error(" pip3 not found", zap.Error(err))
 		return err
 	}
 	logger.Info("🔍 Found pip3", zap.String("path", pip3Path))
@@ -177,7 +177,7 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 		installArgs = append([]string{"pip3", "install", "--upgrade"}, packages...)
 	}
 
-	logger.Info("🔧 Executing pip install command",
+	logger.Info(" Executing pip install command",
 		zap.String("command", "sudo"),
 		zap.Strings("args", installArgs))
 
@@ -187,13 +187,13 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 	installCmd.Stdin = os.Stdin
 
 	if err := installCmd.Run(); err != nil {
-		logger.Error("❌ pip3 installation failed",
+		logger.Error(" pip3 installation failed",
 			zap.Error(err),
 			zap.Strings("packages", packages))
 		return err
 	}
 
-	logger.Info("✅ pip3 packages installed successfully")
+	logger.Info(" pip3 packages installed successfully")
 	return verifyAllPackages(logger)
 }
 
@@ -231,13 +231,13 @@ func verifyAllPackages(logger otelzap.LoggerWithCtx) error {
 	for pkg, importName := range packages {
 		verifyCmd := exec.Command("python3", "-c", "import "+importName)
 		if err := verifyCmd.Run(); err != nil {
-			logger.Warn("⚠️ Package verification failed",
+			logger.Warn("Package verification failed",
 				zap.String("package", pkg),
 				zap.String("import_name", importName),
 				zap.Error(err))
 			failedPackages = append(failedPackages, pkg)
 		} else {
-			logger.Info("✅ Package verified",
+			logger.Info(" Package verified",
 				zap.String("package", pkg),
 				zap.String("import_name", importName))
 			successPackages = append(successPackages, pkg)
@@ -245,18 +245,18 @@ func verifyAllPackages(logger otelzap.LoggerWithCtx) error {
 	}
 
 	// Log summary
-	logger.Info("📊 Package verification summary",
+	logger.Info(" Package verification summary",
 		zap.Int("total", len(packages)),
 		zap.Int("successful", len(successPackages)),
 		zap.Int("failed", len(failedPackages)))
 
 	if len(failedPackages) > 0 {
-		logger.Warn("⚠️ Some packages failed verification",
+		logger.Warn("Some packages failed verification",
 			zap.Strings("failed_packages", failedPackages))
 	}
 
 	// Show next steps
-	logger.Info("🎉 Delphi Python dependencies installation complete")
+	logger.Info(" Delphi Python dependencies installation complete")
 	logger.Info("💡 Next steps:")
 	logger.Info("   1. Ensure PostgreSQL is installed and running")
 	logger.Info("   2. Configure .env file at /opt/stackstorm/packs/delphi/.env")

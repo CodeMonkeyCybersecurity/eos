@@ -42,7 +42,7 @@ func RotateWithTool(rc *eos_io.RuntimeContext) error {
 // RunPrimary performs API-based rotation via the tool.
 func RunPrimary(rc *eos_io.RuntimeContext, apiPass string) (*bytes.Buffer, error) {
 
-	rc.Log.Info("🔐 Running primary password rotation")
+	rc.Log.Info(" Running primary password rotation")
 
 	buf := &bytes.Buffer{}
 	cmd := exec.CommandContext(rc.Ctx,
@@ -55,7 +55,7 @@ func RunPrimary(rc *eos_io.RuntimeContext, apiPass string) (*bytes.Buffer, error
 	if err := cmd.Run(); err != nil {
 		return nil, cerr.Wrap(err, "primary rotation failed")
 	}
-	rc.Log.Info("✅ Primary rotation succeeded")
+	rc.Log.Info(" Primary rotation succeeded")
 	return buf, nil
 }
 
@@ -108,7 +108,7 @@ func RunFallback(rc *eos_io.RuntimeContext) (string, error) {
 		return "", cerr.Wrap(err, "fallback tool retry failed")
 	}
 
-	rc.Log.Info("✅ Fallback rotation succeeded")
+	rc.Log.Info(" Fallback rotation succeeded")
 	return newPass, nil
 }
 
@@ -125,7 +125,7 @@ func ParseSecrets(rc *eos_io.RuntimeContext, out *bytes.Buffer) map[string]strin
 		if m := re.FindStringSubmatch(scanner.Text()); m != nil {
 			user, pass := m[1], m[2]
 			secrets[user] = pass
-			rc.Log.Info("🔐 Parsed secret", zap.String("user", user))
+			rc.Log.Info(" Parsed secret", zap.String("user", user))
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -138,7 +138,7 @@ func ParseSecrets(rc *eos_io.RuntimeContext, out *bytes.Buffer) map[string]strin
 func RestartServices(rc *eos_io.RuntimeContext, services []string) error {
 
 	for _, svc := range services {
-		rc.Log.Info("🔄 Restarting service", zap.String("service", svc))
+		rc.Log.Info(" Restarting service", zap.String("service", svc))
 
 		var cmd *exec.Cmd
 		switch runtime.GOOS {
@@ -158,7 +158,7 @@ func RestartServices(rc *eos_io.RuntimeContext, services []string) error {
 				zap.ByteString("output", out),
 			)
 		} else {
-			rc.Log.Info("✅ Restarted", zap.String("service", svc))
+			rc.Log.Info(" Restarted", zap.String("service", svc))
 		}
 	}
 	return nil

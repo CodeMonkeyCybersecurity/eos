@@ -54,10 +54,10 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 		logger.Info("🔤 Primary domain required for cluster configuration")
 		fmt.Print("Enter primary domain for the cluster: ")
 		if _, err := fmt.Scanln(&domain); err != nil {
-			logger.Error("❌ Failed to read domain input", zap.Error(err))
+			logger.Error(" Failed to read domain input", zap.Error(err))
 			return fmt.Errorf("failed to read domain: %w", err)
 		}
-		logger.Info("✅ Domain configured", zap.String("domain", domain))
+		logger.Info(" Domain configured", zap.String("domain", domain))
 	}
 
 	if clusterName == "" {
@@ -69,14 +69,14 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 		if _, err := fmt.Scanln(&input); err != nil {
 			// Empty input is acceptable (use default), but actual read errors should be handled
 			if err.Error() != "unexpected newline" {
-				logger.Error("❌ Failed to read cluster name input", zap.Error(err))
+				logger.Error(" Failed to read cluster name input", zap.Error(err))
 				return fmt.Errorf("failed to read cluster name: %w", err)
 			}
 		}
 		if input != "" {
 			clusterName = input
 		}
-		logger.Info("✅ Cluster name configured", zap.String("cluster_name", clusterName))
+		logger.Info(" Cluster name configured", zap.String("cluster_name", clusterName))
 	}
 
 	// Configure mail ports
@@ -328,7 +328,7 @@ location = "%s"
 
 set -e
 
-echo "🚀 Deploying K3s cluster with Caddy + Nginx..."
+echo " Deploying K3s cluster with Caddy + Nginx..."
 
 # Initialize Terraform
 terraform init
@@ -345,15 +345,15 @@ read -r response
 if [[ "$response" =~ ^[Yy]$ ]]; then
     terraform apply
     
-    echo "✅ Deployment complete!"
+    echo " Deployment complete!"
     echo ""
-    echo "📋 Next steps:"
+    echo " Next steps:"
     echo "1. Update your DNS to point %s to the LoadBalancer IP"
     echo "2. Deploy your applications to the cluster"
     echo "3. Configure Caddy routing in config/Caddyfile.tpl"
     %s
     echo ""
-    echo "📊 Useful commands:"
+    echo " Useful commands:"
     echo "  kubectl get pods -n ingress-system"
     echo "  kubectl logs -n ingress-system deployment/caddy-ingress"
     %s
@@ -391,7 +391,7 @@ fi
 		logger.Warn("Failed to format terraform files", zap.Error(err))
 	}
 
-	fmt.Printf("\n✅ K3s + Caddy + Nginx configuration generated in: %s\n", outputDir)
+	fmt.Printf("\n K3s + Caddy + Nginx configuration generated in: %s\n", outputDir)
 	fmt.Println("\n🎯 What you get:")
 	fmt.Println("  • K3s cluster without Traefik")
 	fmt.Println("  • Caddy for HTTP/HTTPS ingress (familiar reverse proxy)")

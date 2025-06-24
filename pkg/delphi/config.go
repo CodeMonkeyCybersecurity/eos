@@ -30,7 +30,7 @@ func (c *Config) IsValid() bool {
 func PromptDelphiConfig(rc *eos_io.RuntimeContext) *Config {
 	password, err := crypto.PromptPassword(rc, "Enter the API password")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to read password: %v\n")
+		otelzap.Ctx(rc.Ctx).Error(" Failed to read password: %v\n")
 		os.Exit(1)
 	}
 

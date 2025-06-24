@@ -228,9 +228,9 @@ func ContextualLogger(rc *RuntimeContext, skipFrames int, base *zap.Logger) *zap
 func LogRuntimeExecutionContext(rc *RuntimeContext) {
 	currentUser, err := user.Current()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to get current user", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to get current user", zap.Error(err))
 	} else {
-		otelzap.Ctx(rc.Ctx).Info("🔎 User + UID/GID context",
+		otelzap.Ctx(rc.Ctx).Info(" User + UID/GID context",
 			zap.String("username", currentUser.Username),
 			zap.String("uid_str", currentUser.Uid),
 			zap.String("gid_str", currentUser.Gid),
@@ -243,9 +243,9 @@ func LogRuntimeExecutionContext(rc *RuntimeContext) {
 	}
 
 	if execPath, err := os.Executable(); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to resolve executable path", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to resolve executable path", zap.Error(err))
 	} else {
-		otelzap.Ctx(rc.Ctx).Info("🗂️ Executing binary", zap.String("path", execPath))
+		otelzap.Ctx(rc.Ctx).Info(" Executing binary", zap.String("path", execPath))
 	}
 }
 

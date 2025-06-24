@@ -27,20 +27,20 @@ func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	if err := EnableAppRoleAuth(rc, client); err != nil {
 		return cerr.Wrap(err, "enable approle auth")
 	}
-	rc.Log.Info("✅ Auth methods enabled")
+	rc.Log.Info(" Auth methods enabled")
 
 	// 3) Ensure the Eos policy exists
 	if err := EnsurePolicy(rc); err != nil {
 		return cerr.Wrap(err, "ensure Eos policy")
 	}
-	rc.Log.Info("✅ Eos policy ensured")
+	rc.Log.Info(" Eos policy ensured")
 
 	// 4) Prompt for the Eos user’s password
 	pass, err := crypto.PromptPassword(rc, "Enter password for Vault 'eos' user: ")
 	if err != nil {
 		return cerr.Wrap(err, "prompt Eos password")
 	}
-	rc.Log.Info("✅ Password captured")
+	rc.Log.Info(" Password captured")
 
 	// 5) Create the 'eos' user under userpass
 	writePath := "auth/userpass/users/eos"
@@ -51,7 +51,7 @@ func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	if _, err := client.Logical().Write(writePath, data); err != nil {
 		return cerr.Wrapf(err, "create Eos Vault user at %s", writePath)
 	}
-	rc.Log.Info("✅ Eos user created", zap.String("path", writePath))
+	rc.Log.Info(" Eos user created", zap.String("path", writePath))
 
 	// 6) Validate by logging in as that user
 	upAuth, err := userpass.NewUserpassAuth(
@@ -76,7 +76,7 @@ func EnableVaultUserpass(rc *eos_io.RuntimeContext) error {
 	if len(tok) > 8 {
 		tok = tok[:8] + "…"
 	}
-	rc.Log.Info("🔐 Authenticated with Eos Vault user", zap.String("token", tok))
+	rc.Log.Info(" Authenticated with Eos Vault user", zap.String("token", tok))
 
 	return nil
 }

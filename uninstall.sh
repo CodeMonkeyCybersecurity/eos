@@ -47,4 +47,4 @@ if getent group "${Eos_GROUP}" &>/dev/null; then
 fi
 sudo rm -f "${SUDOERS_FILE}"
 
-echo "✅ Eos has been purged from the system."
+echo " Eos has been purged from the system."

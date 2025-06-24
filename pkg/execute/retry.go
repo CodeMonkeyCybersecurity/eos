@@ -28,19 +28,19 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 
 		err := cmd.Run()
 		if err == nil {
-			fmt.Printf("✅ Attempt %d succeeded\n", i)
+			fmt.Printf(" Attempt %d succeeded\n", i)
 			return nil
 		}
 
 		output := buf.String()
 		summary := eos_err.ExtractSummary(rc.Ctx, output, 2)
-		lastErr = fmt.Errorf("❌ attempt %d failed: %w\noutput:\n%s", i, err, summary)
+		lastErr = fmt.Errorf(" attempt %d failed: %w\noutput:\n%s", i, err, summary)
 
 		if i < maxAttempts {
 			time.Sleep(delay)
 		}
 	}
-	return fmt.Errorf("❌ all %d attempts failed: %w", maxAttempts, lastErr)
+	return fmt.Errorf(" all %d attempts failed: %w", maxAttempts, lastErr)
 }
 
 // RetryCaptureOutput runs a command with retries and returns captured output.
@@ -57,7 +57,7 @@ func RetryCaptureOutput(rc *eos_io.RuntimeContext, retries int, delay time.Durat
 			return out, nil
 		}
 
-		fmt.Printf("❌ attempt %d failed: %s\n", i, err)
+		fmt.Printf(" attempt %d failed: %s\n", i, err)
 		if i < retries {
 			time.Sleep(delay)
 		}

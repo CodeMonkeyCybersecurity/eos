@@ -50,7 +50,7 @@ var runK3sCmd = &cobra.Command{
 This is the preferred method for managing Hecate containers.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔄 Starting k3s deployment update")
+		logger.Info(" Starting k3s deployment update")
 
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate"); os.IsNotExist(err) {
@@ -65,7 +65,7 @@ This is the preferred method for managing Hecate containers.`,
 			return fmt.Errorf("k3s cluster not running - ensure k3s is installed and running")
 		}
 
-		logger.Info("🔄 Applying updated k3s manifests")
+		logger.Info(" Applying updated k3s manifests")
 
 		// Apply manifests from /opt/hecate/k3s/ directory
 		applyCmd := exec.Command("kubectl", "apply", "-f", "/opt/hecate/k3s/")
@@ -74,7 +74,7 @@ This is the preferred method for managing Hecate containers.`,
 			return fmt.Errorf("failed to apply k3s manifests: %w", err)
 		}
 
-		logger.Info("🔄 Rolling restart of hecate deployments")
+		logger.Info(" Rolling restart of hecate deployments")
 
 		// Restart hecate namespace deployments
 		restartCmd := exec.Command("kubectl", "rollout", "restart", "deployment", "-n", "hecate")
@@ -82,7 +82,7 @@ This is the preferred method for managing Hecate containers.`,
 			logger.Warn("Failed to restart deployments (may not exist yet)", zap.Error(err))
 		}
 
-		logger.Info("✅ k3s deployment update completed successfully")
+		logger.Info(" k3s deployment update completed successfully")
 		return nil
 	}),
 }
@@ -93,7 +93,7 @@ var runCertsCmd = &cobra.Command{
 	Short: "Renew SSL certificates",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔄 Starting certificate renewal process")
+		logger.Info(" Starting certificate renewal process")
 
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate"); os.IsNotExist(err) {
@@ -103,7 +103,7 @@ var runCertsCmd = &cobra.Command{
 
 		// Try k3s first (preferred method)
 		if checkCmd := exec.Command("kubectl", "get", "nodes"); checkCmd.Run() == nil {
-			logger.Info("🔄 Restarting Caddy pod in k3s to trigger certificate renewal")
+			logger.Info(" Restarting Caddy pod in k3s to trigger certificate renewal")
 
 			restartCmd := exec.Command("kubectl", "rollout", "restart", "deployment/caddy", "-n", "hecate")
 			if err := restartCmd.Run(); err != nil {
@@ -112,7 +112,7 @@ var runCertsCmd = &cobra.Command{
 			}
 		} else {
 			// Fallback to docker compose if k3s isn't available
-			logger.Info("🔄 k3s not available, falling back to docker compose")
+			logger.Info(" k3s not available, falling back to docker compose")
 
 			if _, err := os.Stat("/opt/hecate/docker-compose.yml"); os.IsNotExist(err) {
 				return fmt.Errorf("neither k3s nor docker-compose.yml found - please set up Hecate properly")
@@ -125,8 +125,8 @@ var runCertsCmd = &cobra.Command{
 			}
 		}
 
-		logger.Info("✅ Certificate renewal triggered successfully")
-		logger.Info("📋 Caddy will automatically renew certificates that are near expiry")
+		logger.Info(" Certificate renewal triggered successfully")
+		logger.Info(" Caddy will automatically renew certificates that are near expiry")
 		return nil
 	}),
 }
@@ -137,7 +137,7 @@ var runEosCmd = &cobra.Command{
 	Short: "Update Eos system",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔄 Starting Eos system update")
+		logger.Info(" Starting Eos system update")
 
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate/docker-compose.yml"); os.IsNotExist(err) {
@@ -145,7 +145,7 @@ var runEosCmd = &cobra.Command{
 			return fmt.Errorf("hecate not installed - run 'eos create hecate' first")
 		}
 
-		logger.Info("🔄 Pulling latest container images")
+		logger.Info(" Pulling latest container images")
 
 		// Pull latest images
 		pullCmd := exec.Command("docker", "compose", "-f", "/opt/hecate/docker-compose.yml", "pull")
@@ -154,7 +154,7 @@ var runEosCmd = &cobra.Command{
 			return fmt.Errorf("failed to pull images: %w", err)
 		}
 
-		logger.Info("🔄 Restarting services with updated images")
+		logger.Info(" Restarting services with updated images")
 
 		// Restart services with new images
 		restartCmd := exec.Command("docker", "compose", "-f", "/opt/hecate/docker-compose.yml", "up", "-d", "--force-recreate")
@@ -163,7 +163,7 @@ var runEosCmd = &cobra.Command{
 			return fmt.Errorf("failed to restart services: %w", err)
 		}
 
-		logger.Info("✅ Eos system update completed successfully")
+		logger.Info(" Eos system update completed successfully")
 		return nil
 	}),
 }
@@ -174,7 +174,7 @@ var runHttpCmd = &cobra.Command{
 	Short: "Update HTTP configurations",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔄 Starting HTTP configuration update")
+		logger.Info(" Starting HTTP configuration update")
 
 		// Check if Hecate is properly set up
 		if _, err := os.Stat("/opt/hecate/docker-compose.yml"); os.IsNotExist(err) {
@@ -182,7 +182,7 @@ var runHttpCmd = &cobra.Command{
 			return fmt.Errorf("hecate not installed - run 'eos create hecate' first")
 		}
 
-		logger.Info("🔄 Reloading Caddy configuration")
+		logger.Info(" Reloading Caddy configuration")
 
 		// Reload Caddy configuration
 		reloadCmd := exec.Command("docker", "compose", "-f", "/opt/hecate/docker-compose.yml", "exec", "caddy", "caddy", "reload", "--config", "/etc/caddy/Caddyfile")
@@ -196,7 +196,7 @@ var runHttpCmd = &cobra.Command{
 			}
 		}
 
-		logger.Info("🔄 Reloading Nginx configuration")
+		logger.Info(" Reloading Nginx configuration")
 
 		// Reload Nginx configuration
 		nginxReloadCmd := exec.Command("docker", "compose", "-f", "/opt/hecate/docker-compose.yml", "exec", "nginx", "nginx", "-s", "reload")
@@ -210,7 +210,7 @@ var runHttpCmd = &cobra.Command{
 			}
 		}
 
-		logger.Info("✅ HTTP configuration update completed successfully")
+		logger.Info(" HTTP configuration update completed successfully")
 		return nil
 	}),
 }

@@ -15,7 +15,7 @@ import (
 // DiscoverDocker gathers Docker infrastructure information
 func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Info("🐳 Starting Docker discovery")
+	logger.Info(" Starting Docker discovery")
 
 	// Check if Docker is installed
 	if !i.commandExists("docker") {
@@ -27,20 +27,20 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 	// Get Docker version
 	if output, err := i.runCommand("docker", "version", "--format", "{{.Server.Version}}"); err == nil {
 		info.Version = output
-		logger.Info("📊 Docker version detected", zap.String("version", info.Version))
+		logger.Info(" Docker version detected", zap.String("version", info.Version))
 	}
 
 	// Discover containers
 	if containers, err := i.discoverContainers(); err != nil {
-		logger.Warn("⚠️ Failed to discover containers", zap.Error(err))
+		logger.Warn("Failed to discover containers", zap.Error(err))
 	} else {
 		info.Containers = containers
-		logger.Info("📦 Discovered containers", zap.Int("count", len(containers)))
+		logger.Info(" Discovered containers", zap.Int("count", len(containers)))
 	}
 
 	// Discover images
 	if images, err := i.discoverImages(); err != nil {
-		logger.Warn("⚠️ Failed to discover images", zap.Error(err))
+		logger.Warn("Failed to discover images", zap.Error(err))
 	} else {
 		info.Images = images
 		logger.Info("🖼️ Discovered images", zap.Int("count", len(images)))
@@ -48,7 +48,7 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 
 	// Discover networks
 	if networks, err := i.discoverNetworks(); err != nil {
-		logger.Warn("⚠️ Failed to discover networks", zap.Error(err))
+		logger.Warn("Failed to discover networks", zap.Error(err))
 	} else {
 		info.Networks = networks
 		logger.Info("🌐 Discovered networks", zap.Int("count", len(networks)))
@@ -56,21 +56,21 @@ func (i *Inspector) DiscoverDocker() (*DockerInfo, error) {
 
 	// Discover volumes
 	if volumes, err := i.discoverVolumes(); err != nil {
-		logger.Warn("⚠️ Failed to discover volumes", zap.Error(err))
+		logger.Warn("Failed to discover volumes", zap.Error(err))
 	} else {
 		info.Volumes = volumes
-		logger.Info("💾 Discovered volumes", zap.Int("count", len(volumes)))
+		logger.Info(" Discovered volumes", zap.Int("count", len(volumes)))
 	}
 
 	// Discover compose files
 	if composeFiles, err := i.discoverComposeFiles(); err != nil {
-		logger.Warn("⚠️ Failed to discover compose files", zap.Error(err))
+		logger.Warn("Failed to discover compose files", zap.Error(err))
 	} else {
 		info.ComposeFiles = composeFiles
-		logger.Info("📄 Discovered compose files", zap.Int("count", len(composeFiles)))
+		logger.Info(" Discovered compose files", zap.Int("count", len(composeFiles)))
 	}
 
-	logger.Info("✅ Docker discovery completed")
+	logger.Info(" Docker discovery completed")
 	return info, nil
 }
 
@@ -97,7 +97,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 		inspectOutput, err := i.runCommand("docker", "inspect", id)
 		if err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to inspect container",
+			logger.Warn("Failed to inspect container",
 				zap.String("id", id),
 				zap.Error(err))
 			continue
@@ -138,7 +138,7 @@ func (i *Inspector) discoverContainers() ([]DockerContainer, error) {
 
 		if err := json.Unmarshal([]byte(inspectOutput), &inspectData); err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to parse container inspect data",
+			logger.Warn("Failed to parse container inspect data",
 				zap.String("id", id),
 				zap.Error(err))
 			continue
@@ -232,7 +232,7 @@ func (i *Inspector) discoverImages() ([]DockerImage, error) {
 
 		if err := json.Unmarshal([]byte(line), &imageData); err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to parse image data", zap.Error(err))
+			logger.Warn("Failed to parse image data", zap.Error(err))
 			continue
 		}
 
@@ -288,7 +288,7 @@ func (i *Inspector) discoverNetworks() ([]DockerNetwork, error) {
 
 		if err := json.Unmarshal([]byte(line), &netData); err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to parse network data", zap.Error(err))
+			logger.Warn("Failed to parse network data", zap.Error(err))
 			continue
 		}
 
@@ -336,7 +336,7 @@ func (i *Inspector) discoverVolumes() ([]DockerVolume, error) {
 
 		if err := json.Unmarshal([]byte(line), &volData); err != nil {
 			logger := otelzap.Ctx(i.rc.Ctx)
-			logger.Warn("⚠️ Failed to parse volume data", zap.Error(err))
+			logger.Warn("Failed to parse volume data", zap.Error(err))
 			continue
 		}
 
@@ -404,7 +404,7 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 			content, err := os.ReadFile(path)
 			if err != nil {
 				logger := otelzap.Ctx(i.rc.Ctx)
-				logger.Warn("⚠️ Failed to read compose file",
+				logger.Warn("Failed to read compose file",
 					zap.String("path", path),
 					zap.Error(err))
 				continue
@@ -413,7 +413,7 @@ func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 			var composeData map[string]any
 			if err := yaml.Unmarshal(content, &composeData); err != nil {
 				logger := otelzap.Ctx(i.rc.Ctx)
-				logger.Warn("⚠️ Failed to parse compose file",
+				logger.Warn("Failed to parse compose file",
 					zap.String("path", path),
 					zap.Error(err))
 				continue

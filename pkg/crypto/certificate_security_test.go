@@ -69,7 +69,7 @@ func TestInputValidationSecurity(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateDomainName(tt.domain)
 				testutil.AssertError(t, err)
-				t.Logf("✅ Successfully blocked %s attack: %s", tt.attack, tt.domain)
+				t.Logf(" Successfully blocked %s attack: %s", tt.attack, tt.domain)
 			})
 		}
 	})
@@ -111,7 +111,7 @@ func TestInputValidationSecurity(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateEmailAddress(tt.email)
 				testutil.AssertError(t, err)
-				t.Logf("✅ Successfully blocked %s attack: %s", tt.attack, tt.email)
+				t.Logf(" Successfully blocked %s attack: %s", tt.attack, tt.email)
 			})
 		}
 	})
@@ -153,7 +153,7 @@ func TestInputValidationSecurity(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateAppName(tt.appName)
 				testutil.AssertError(t, err)
-				t.Logf("✅ Successfully blocked %s attack: %s", tt.attack, tt.appName)
+				t.Logf(" Successfully blocked %s attack: %s", tt.attack, tt.appName)
 			})
 		}
 	})
@@ -162,7 +162,7 @@ func TestInputValidationSecurity(t *testing.T) {
 func TestValidInputsAccepted(t *testing.T) {
 	// Set testing environment variable to allow test-reserved names
 	t.Setenv("TESTING", "true")
-	
+
 	t.Run("valid_domains", func(t *testing.T) {
 		validDomains := []string{
 			"example.com",
@@ -262,7 +262,7 @@ func TestCertificateInputValidationIntegration(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				err := ValidateAllCertificateInputs(tt.appName, tt.domain, tt.email)
 				testutil.AssertError(t, err)
-				t.Logf("✅ Successfully blocked %s", tt.attack)
+				t.Logf(" Successfully blocked %s", tt.attack)
 			})
 		}
 	})
@@ -325,7 +325,7 @@ func TestFilePathValidationSecurity(t *testing.T) {
 			t.Run("dangerous_path_"+path, func(t *testing.T) {
 				err := validateFilePath(path)
 				testutil.AssertError(t, err)
-				t.Logf("✅ Successfully blocked dangerous path: %s", path)
+				t.Logf(" Successfully blocked dangerous path: %s", path)
 			})
 		}
 	})

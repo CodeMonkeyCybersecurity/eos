@@ -36,14 +36,14 @@ set -euo pipefail
 GOOGLE_AUTH_FILE="$HOME/.google_authenticator"
 BACKUP_CODES_FILE="$HOME/.google_authenticator_backup_codes"
 
-echo "🔐 Setting up Multi-Factor Authentication (MFA) for sudo/root access"
+echo " Setting up Multi-Factor Authentication (MFA) for sudo/root access"
 echo "============================================================================"
 echo
 
 # Check if already configured
 if [[ -f "$GOOGLE_AUTH_FILE" ]]; then
-    echo "⚠️  MFA is already configured for this user."
-    echo "📱 If you need to reconfigure, remove $GOOGLE_AUTH_FILE and run this script again."
+    echo " MFA is already configured for this user."
+    echo " If you need to reconfigure, remove $GOOGLE_AUTH_FILE and run this script again."
     echo
     read -p "Do you want to reconfigure MFA? (y/N): " confirm
     if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
@@ -53,7 +53,7 @@ if [[ -f "$GOOGLE_AUTH_FILE" ]]; then
     rm -f "$GOOGLE_AUTH_FILE" "$BACKUP_CODES_FILE"
 fi
 
-echo "📱 Installing Google Authenticator for this user..."
+echo " Installing Google Authenticator for this user..."
 echo "⚡ Please scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)"
 echo
 
@@ -67,20 +67,20 @@ google-authenticator \
     --window-size=3
 
 echo
-echo "✅ MFA setup completed!"
+echo " MFA setup completed!"
 echo
-echo "📋 Important Information:"
+echo " Important Information:"
 echo "========================"
 echo "• Your MFA secret has been saved to: $GOOGLE_AUTH_FILE"
 echo "• Emergency backup codes are saved to: $BACKUP_CODES_FILE"
 echo "• Keep backup codes in a secure location - they can be used if you lose your phone"
 echo "• Each backup code can only be used once"
 echo
-echo "🔒 Next time you use sudo, you'll be prompted for:"
+echo " Next time you use sudo, you'll be prompted for:"
 echo "   1. Your password"
 echo "   2. Your 6-digit TOTP code from your authenticator app"
 echo
-echo "⚠️  IMPORTANT: Test sudo access in a new terminal before closing this session!"
+echo " IMPORTANT: Test sudo access in a new terminal before closing this session!"
 echo "   If there are issues, you can still fix them from this root session."
 echo
 `
@@ -98,7 +98,7 @@ func DisableMFA(rc *eos_io.RuntimeContext) error {
 // configureMFA sets up Multi-Factor Authentication for sudo and root access
 func configureMFA(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔐 Configuring Multi-Factor Authentication for sudo/root access")
+	logger.Info(" Configuring Multi-Factor Authentication for sudo/root access")
 
 	// Install required packages
 	if err := installMFAPackages(rc); err != nil {
@@ -125,7 +125,7 @@ func configureMFA(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("create MFA backup script: %w", err)
 	}
 
-	logger.Info("✅ MFA configuration completed",
+	logger.Info(" MFA configuration completed",
 		zap.String("setup_script", "/usr/local/bin/setup-mfa"),
 		zap.String("emergency_script", "/usr/local/bin/disable-mfa-emergency"))
 
@@ -169,7 +169,7 @@ func configurePAMSudo(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write sudo PAM config: %w", err)
 	}
 
-	logger.Info("✅ Configured PAM for sudo with MFA", zap.String("path", originalPath))
+	logger.Info(" Configured PAM for sudo with MFA", zap.String("path", originalPath))
 	return nil
 }
 
@@ -192,7 +192,7 @@ func configurePAMSu(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write su PAM config: %w", err)
 	}
 
-	logger.Info("✅ Configured PAM for su with MFA", zap.String("path", originalPath))
+	logger.Info(" Configured PAM for su with MFA", zap.String("path", originalPath))
 	return nil
 }
 
@@ -204,7 +204,7 @@ func createMFASetupScript(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write MFA setup script: %w", err)
 	}
 
-	logger.Info("✅ Created MFA setup script", zap.String("path", scriptPath))
+	logger.Info(" Created MFA setup script", zap.String("path", scriptPath))
 	return nil
 }
 
@@ -218,7 +218,7 @@ set -euo pipefail
 echo "🚨 EMERGENCY MFA DISABLE SCRIPT"
 echo "=================================="
 echo "This script will DISABLE Multi-Factor Authentication for sudo/su commands."
-echo "⚠️  WARNING: This reduces security! Only proceed if absolutely necessary."
+echo " WARNING: This reduces security! Only proceed if absolutely necessary."
 echo
 
 read -p "Are you sure you want to disable MFA? Type 'DISABLE' to confirm: " confirm
@@ -232,21 +232,21 @@ echo "Disabling MFA..."
 # Restore original PAM configurations
 if [[ -f "/etc/pam.d/sudo.backup-before-mfa" ]]; then
     cp "/etc/pam.d/sudo.backup-before-mfa" "/etc/pam.d/sudo"
-    echo "✅ Restored original sudo PAM configuration"
+    echo " Restored original sudo PAM configuration"
 else
-    echo "⚠️  No backup found for sudo PAM configuration"
+    echo " No backup found for sudo PAM configuration"
 fi
 
 if [[ -f "/etc/pam.d/su.backup-before-mfa" ]]; then
     cp "/etc/pam.d/su.backup-before-mfa" "/etc/pam.d/su"
-    echo "✅ Restored original su PAM configuration"
+    echo " Restored original su PAM configuration"
 else
-    echo "⚠️  No backup found for su PAM configuration"
+    echo " No backup found for su PAM configuration"
 fi
 
 echo
 echo "🔓 MFA has been disabled for sudo/su commands."
-echo "🔒 To re-enable MFA, run: eos secure ubuntu --enable-mfa"
+echo " To re-enable MFA, run: eos secure ubuntu --enable-mfa"
 echo
 `
 
@@ -258,7 +258,7 @@ func createMFABackupScript(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write MFA backup script: %w", err)
 	}
 
-	logger.Info("✅ Created emergency MFA disable script", zap.String("path", scriptPath))
+	logger.Info(" Created emergency MFA disable script", zap.String("path", scriptPath))
 	return nil
 }
 
@@ -287,7 +287,7 @@ func _checkMFAStatus(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("sudo MFA not configured")
 	}
 
-	logger.Info("✅ MFA status check passed")
+	logger.Info(" MFA status check passed")
 	return nil
 }
 
@@ -327,9 +327,9 @@ func disableMFAFunction(rc *eos_io.RuntimeContext) error {
 		if err := execute.RunSimple(rc.Ctx, "cp", sudoBackupPath, sudoPath); err != nil {
 			return fmt.Errorf("restore sudo PAM config: %w", err)
 		}
-		logger.Info("✅ Restored original sudo PAM configuration")
+		logger.Info(" Restored original sudo PAM configuration")
 	} else {
-		logger.Warn("⚠️  No backup found for sudo PAM configuration")
+		logger.Warn(" No backup found for sudo PAM configuration")
 	}
 
 	// Restore original su PAM configuration
@@ -340,12 +340,12 @@ func disableMFAFunction(rc *eos_io.RuntimeContext) error {
 		if err := execute.RunSimple(rc.Ctx, "cp", suBackupPath, suPath); err != nil {
 			return fmt.Errorf("restore su PAM config: %w", err)
 		}
-		logger.Info("✅ Restored original su PAM configuration")
+		logger.Info(" Restored original su PAM configuration")
 	} else {
-		logger.Warn("⚠️  No backup found for su PAM configuration")
+		logger.Warn(" No backup found for su PAM configuration")
 	}
 
-	logger.Info("✅ MFA has been disabled for sudo/su commands",
+	logger.Info(" MFA has been disabled for sudo/su commands",
 		zap.String("note", "To re-enable MFA, run: eos secure ubuntu --enable-mfa"))
 
 	return nil

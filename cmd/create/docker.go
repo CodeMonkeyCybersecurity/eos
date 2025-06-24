@@ -20,13 +20,13 @@ var CreateDockerCmd = &cobra.Command{
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🐳 Starting Docker installation process")
+		logger.Info(" Starting Docker installation process")
 
 		// Require root privileges for installation
 		eos_unix.RequireRoot(rc.Ctx)
 
 		// Update package repositories first
-		logger.Info("🔄 Updating package repositories")
+		logger.Info(" Updating package repositories")
 		if err := platform.PackageUpdate(rc, false); err != nil {
 			logger.Warn("Package update failed", zap.Error(err))
 			// Continue anyway as this might not be critical
@@ -34,11 +34,11 @@ var CreateDockerCmd = &cobra.Command{
 
 		// Use the comprehensive Docker installation from container package
 		if err := container.InstallDocker(rc); err != nil {
-			logger.Error("❌ Docker installation failed", zap.Error(err))
+			logger.Error(" Docker installation failed", zap.Error(err))
 			return cerr.Wrap(err, "install Docker")
 		}
 
-		logger.Info("✅ Docker installation and configuration completed successfully")
+		logger.Info(" Docker installation and configuration completed successfully")
 		return nil
 	}),
 }

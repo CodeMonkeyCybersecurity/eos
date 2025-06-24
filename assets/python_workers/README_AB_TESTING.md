@@ -171,13 +171,13 @@ Data Points Analyzed: 1,247
 VARIANT PERFORMANCE:
 ------------------------------
 
-📊 CYBERSOBAR:
+ CYBERSOBAR:
    Requests: 498
    Success Rate: 97.8%
    Avg Response Time: 2.34s
    Avg Tokens/Request: 892.1
 
-📊 DELPHI_NOTIFY_LONG:
+ DELPHI_NOTIFY_LONG:
    Requests: 374
    Success Rate: 96.5%
    Avg Response Time: 1.87s

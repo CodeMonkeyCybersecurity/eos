@@ -39,23 +39,23 @@ func LookupUser(ctx context.Context, name string) (int, int, error) {
 
 	u, err := user.Lookup(name)
 	if err != nil {
-		otelzap.Ctx(ctx).Error("❌ User lookup failed", zap.String("username", name), zap.Error(err))
+		otelzap.Ctx(ctx).Error(" User lookup failed", zap.String("username", name), zap.Error(err))
 		return 0, 0, fmt.Errorf("user lookup failed: %w", err)
 	}
 
 	uid, err := strconv.Atoi(u.Uid)
 	if err != nil {
-		otelzap.Ctx(ctx).Error("❌ Invalid UID format", zap.String("uid", u.Uid), zap.Error(err))
+		otelzap.Ctx(ctx).Error(" Invalid UID format", zap.String("uid", u.Uid), zap.Error(err))
 		return 0, 0, fmt.Errorf("invalid UID: %w", err)
 	}
 
 	gid, err := strconv.Atoi(u.Gid)
 	if err != nil {
-		otelzap.Ctx(ctx).Error("❌ Invalid GID format", zap.String("gid", u.Gid), zap.Error(err))
+		otelzap.Ctx(ctx).Error(" Invalid GID format", zap.String("gid", u.Gid), zap.Error(err))
 		return 0, 0, fmt.Errorf("invalid GID: %w", err)
 	}
 
-	otelzap.Ctx(ctx).Info("✅ User lookup succeeded",
+	otelzap.Ctx(ctx).Info(" User lookup succeeded",
 		zap.String("username", name),
 		zap.Int("uid", uid),
 		zap.Int("gid", gid),

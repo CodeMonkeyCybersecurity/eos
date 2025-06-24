@@ -18,7 +18,7 @@ import (
 // This is the thin wrapper that can be called by the lifecycle orchestrator.
 func PhaseNginx(backendIP string, rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🚀 Starting Phase 3: Build and setup Nginx...")
+	log.Info(" Starting Phase 3: Build and setup Nginx...")
 
 	// Always ensure directory structure first.
 	if err := EnsureNginxDirs(rc); err != nil {
@@ -39,14 +39,14 @@ func PhaseNginx(backendIP string, rc *eos_io.RuntimeContext) error {
 // This matches the "build phase" pattern.
 func BuildNginxEnvironment(rc *eos_io.RuntimeContext, backendIP string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🚀 Building Nginx configs for Hecate...")
+	log.Info(" Building Nginx configs for Hecate...")
 
 	// Step 1: Render and save StreamIncludeTemplate
 	if err := os.WriteFile(HecateStreamIncludePath, []byte(StreamIncludeTemplate), 0644); err != nil {
 		log.Error("Failed to write stream include config", zap.Error(err))
 		return err
 	}
-	log.Info("✅ Wrote stream include config", zap.String("path", HecateStreamIncludePath))
+	log.Info(" Wrote stream include config", zap.String("path", HecateStreamIncludePath))
 
 	// Step 2: Define services
 	services := []struct {
@@ -84,10 +84,10 @@ func BuildNginxEnvironment(rc *eos_io.RuntimeContext, backendIP string) error {
 			log.Error("Failed to write Nginx config", zap.String("path", svc.OutputFile), zap.Error(err))
 			return err
 		}
-		log.Info("✅ Rendered and wrote Nginx config", zap.String("file", svc.OutputFile))
+		log.Info(" Rendered and wrote Nginx config", zap.String("file", svc.OutputFile))
 	}
 
-	log.Info("✅ Full Nginx build completed successfully!")
+	log.Info(" Full Nginx build completed successfully!")
 	return nil
 }
 
@@ -102,7 +102,7 @@ func EnsureNginxDirs(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("ensure nginx dirs: %w", err)
 	}
 
-	log.Info("✅ Nginx directory structure ready")
+	log.Info(" Nginx directory structure ready")
 	return nil
 }
 

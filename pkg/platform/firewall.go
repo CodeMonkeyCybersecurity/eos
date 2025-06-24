@@ -25,7 +25,7 @@ func AllowPorts(rc *eos_io.RuntimeContext, ports []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Detected macOS PF firewall — not yet supported")
 		return fmt.Errorf("macOS firewall (pfctl) support not yet implemented")
 	default:
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ No supported firewall backend found")
+		otelzap.Ctx(rc.Ctx).Warn("No supported firewall backend found")
 		return fmt.Errorf("no supported firewall backend (ufw, firewalld, pfctl)")
 	}
 }

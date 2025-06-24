@@ -41,14 +41,14 @@ func UnsealVaultIfNeeded(rc *eos_io.RuntimeContext, client *api.Client) (bool, e
 	client.SetToken(initRes.RootToken)
 
 	for i, key := range initRes.KeysB64 {
-		otelzap.Ctx(rc.Ctx).Debug("🔐 Submitting unseal key", zap.Int("index", i))
+		otelzap.Ctx(rc.Ctx).Debug(" Submitting unseal key", zap.Int("index", i))
 		statusResp, err := client.Sys().Unseal(key)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("❌ Unseal key submission failed", zap.Int("index", i), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn(" Unseal key submission failed", zap.Int("index", i), zap.Error(err))
 			continue
 		}
 		if !statusResp.Sealed {
-			otelzap.Ctx(rc.Ctx).Info("✅ Vault successfully unsealed", zap.Int("used_keys", i+1))
+			otelzap.Ctx(rc.Ctx).Info(" Vault successfully unsealed", zap.Int("used_keys", i+1))
 			return true, nil
 		}
 	}

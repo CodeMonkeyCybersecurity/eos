@@ -29,7 +29,7 @@ var InspectTestDataCmd = &cobra.Command{
 
 		client, err := vault.Authn(rc)
 		if err != nil {
-			log.Warn("⚠️ Vault auth failed, falling back to disk", zap.Error(err))
+			log.Warn("Vault auth failed, falling back to disk", zap.Error(err))
 			client = nil // triggers fallback to disk
 		}
 
@@ -38,9 +38,9 @@ var InspectTestDataCmd = &cobra.Command{
 			if err := vault.Read(rc, client, shared.TestDataVaultPath, &out); err != nil {
 				vaultReadErr = err
 				if vault.IsSecretNotFound(err) {
-					log.Warn("⚠️ Test-data not found in Vault, attempting disk fallback...", zap.Error(err))
+					log.Warn("Test-data not found in Vault, attempting disk fallback...", zap.Error(err))
 				} else {
-					log.Error("❌ Vault read error", zap.String("vault_path", shared.TestDataVaultPath), zap.Error(err))
+					log.Error(" Vault read error", zap.String("vault_path", shared.TestDataVaultPath), zap.Error(err))
 					return fmt.Errorf("vault read failed at '%s': %w", shared.TestDataVaultPath, err)
 				}
 			}
@@ -49,7 +49,7 @@ var InspectTestDataCmd = &cobra.Command{
 		// If Vault read succeeded
 		if vaultReadErr == nil && client != nil {
 			vault.PrintData(rc.Ctx, out, "Vault", "secret/data/"+shared.TestDataVaultPath)
-			log.Info("✅ Test-data read successfully from Vault")
+			log.Info(" Test-data read successfully from Vault")
 			return nil
 		}
 
@@ -57,7 +57,7 @@ var InspectTestDataCmd = &cobra.Command{
 		log.Info("🔍 Attempting fallback to disk...")
 
 		if fallbackErr := vault.InspectFromDisk(rc); fallbackErr != nil {
-			log.Error("❌ Both Vault and disk fallback failed",
+			log.Error(" Both Vault and disk fallback failed",
 				zap.String("vault_path", shared.TestDataVaultPath),
 				zap.Error(vaultReadErr),
 				zap.Error(fallbackErr),
@@ -68,7 +68,7 @@ var InspectTestDataCmd = &cobra.Command{
 			)
 		}
 
-		log.Info("✅ Test-data read successfully from fallback")
+		log.Info(" Test-data read successfully from fallback")
 		return nil
 	}),
 }

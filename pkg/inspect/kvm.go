@@ -36,7 +36,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 				parts := strings.Fields(line)
 				if len(parts) >= 2 {
 					info.LibvirtVersion = parts[len(parts)-1]
-					logger.Info("📊 Libvirt version detected", zap.String("version", info.LibvirtVersion))
+					logger.Info(" Libvirt version detected", zap.String("version", info.LibvirtVersion))
 					break
 				}
 			}
@@ -45,7 +45,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 
 	// Discover VMs
 	if vms, err := i.discoverVMs(); err != nil {
-		logger.Warn("⚠️ Failed to discover VMs", zap.Error(err))
+		logger.Warn("Failed to discover VMs", zap.Error(err))
 	} else {
 		info.VMs = vms
 		logger.Info("🖥️ Discovered VMs", zap.Int("count", len(vms)))
@@ -53,7 +53,7 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 
 	// Discover networks
 	if networks, err := i.discoverKVMNetworks(); err != nil {
-		logger.Warn("⚠️ Failed to discover KVM networks", zap.Error(err))
+		logger.Warn("Failed to discover KVM networks", zap.Error(err))
 	} else {
 		info.Networks = networks
 		logger.Info("🌐 Discovered KVM networks", zap.Int("count", len(networks)))
@@ -61,13 +61,13 @@ func (i *Inspector) DiscoverKVM() (*KVMInfo, error) {
 
 	// Discover storage pools
 	if pools, err := i.discoverStoragePools(); err != nil {
-		logger.Warn("⚠️ Failed to discover storage pools", zap.Error(err))
+		logger.Warn("Failed to discover storage pools", zap.Error(err))
 	} else {
 		info.StoragePools = pools
-		logger.Info("💾 Discovered storage pools", zap.Int("count", len(pools)))
+		logger.Info(" Discovered storage pools", zap.Int("count", len(pools)))
 	}
 
-	logger.Info("✅ KVM discovery completed")
+	logger.Info(" KVM discovery completed")
 	return info, nil
 }
 

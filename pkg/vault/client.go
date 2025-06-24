@@ -64,14 +64,14 @@ func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 	// Check for VAULT_TOKEN but log it for debugging
 	if token := os.Getenv("VAULT_TOKEN"); token != "" {
-		log.Warn("⚠️ VAULT_TOKEN found in environment during client creation")
+		log.Warn("VAULT_TOKEN found in environment during client creation")
 		client.SetToken(token)
-		log.Info("🔑 Vault token loaded from VAULT_TOKEN environment variable")
+		log.Info(" Vault token loaded from VAULT_TOKEN environment variable")
 	} else {
-		log.Info("✅ No VAULT_TOKEN in environment - client created without token")
+		log.Info(" No VAULT_TOKEN in environment - client created without token")
 	}
 
-	log.Info("✅ Vault client created", zap.String("addr", cfg.Address))
+	log.Info(" Vault client created", zap.String("addr", cfg.Address))
 	return client, nil
 }
 
@@ -85,17 +85,17 @@ func GetVaultClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	defer vaultClientLock.Unlock()
 
 	if shared.VaultClient != nil {
-		otelzap.Ctx(rc.Ctx).Debug("📦 Returning cached Vault client")
+		otelzap.Ctx(rc.Ctx).Debug(" Returning cached Vault client")
 		return shared.VaultClient, nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault client not initialized — bootstrapping...")
+	otelzap.Ctx(rc.Ctx).Warn("Vault client not initialized — bootstrapping...")
 	client, err := initializeClient(rc)
 	if err != nil {
 		return nil, err
 	}
 	shared.VaultClient = client
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault client cached and ready")
+	otelzap.Ctx(rc.Ctx).Info(" Vault client cached and ready")
 	return client, nil
 }
 
@@ -104,7 +104,7 @@ func SetVaultClient(rc *eos_io.RuntimeContext, client *api.Client) {
 	vaultClientLock.Lock()
 	defer vaultClientLock.Unlock()
 	shared.VaultClient = client
-	otelzap.Ctx(rc.Ctx).Debug("📦 Global Vault client set")
+	otelzap.Ctx(rc.Ctx).Debug(" Global Vault client set")
 }
 
 // ==========================
@@ -124,16 +124,16 @@ func initializeClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	validated, report := validateClient(rc, client)
 	if validated == nil {
 		err := cerr.New("vault client failed health check")
-		log.Error("❌ Client validation failed")
+		log.Error(" Client validation failed")
 
 		return nil, err
 	}
 
 	for _, note := range report.Notes {
-		log.Warn("📋 Vault validation note", zap.String("note", note))
+		log.Warn(" Vault validation note", zap.String("note", note))
 	}
 
-	log.Info("✅ Vault client validated and ready")
+	log.Info(" Vault client validated and ready")
 	return validated, nil
 }
 
@@ -147,11 +147,11 @@ func tryEnvOrFallback(rc *eos_io.RuntimeContext) (*api.Client, error) {
 		span.SetStatus(codes.Ok, "client loaded from env")
 		return c, nil
 	} else {
-		log.Warn("⚠️ Failed to load Vault client from environment", zap.Error(err))
+		log.Warn("Failed to load Vault client from environment", zap.Error(err))
 		span.RecordError(err)
 	}
 
-	log.Info("🔐 Falling back to privileged client")
+	log.Info(" Falling back to privileged client")
 	client, err := buildPrivilegedClient(rc)
 	if err != nil {
 		span.RecordError(err)
@@ -172,7 +172,7 @@ func buildClientFromEnv(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("env client error: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault client constructed from environment")
+	otelzap.Ctx(rc.Ctx).Info(" Vault client constructed from environment")
 	return client, nil
 }
 
@@ -188,7 +188,7 @@ func buildPrivilegedClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	}
 	client.SetToken(token)
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault privileged client constructed")
+	otelzap.Ctx(rc.Ctx).Info(" Vault privileged client constructed")
 	return client, nil
 }
 
@@ -203,7 +203,7 @@ func newConfiguredClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	cfg.Timeout = 5 * time.Second
 
 	if err := cfg.ReadEnvironment(); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Could not load Vault env config", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Could not load Vault env config", zap.Error(err))
 	}
 
 	if os.Getenv("VAULT_CACERT") == "" {
@@ -230,29 +230,29 @@ func newConfiguredClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 
 func loadPrivilegedToken(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔑 Loading privileged token for Vault authentication")
+	log.Info(" Loading privileged token for Vault authentication")
 
 	// For enable command, we should ALWAYS use the root token from vault_init.json
 	// The Vault Agent token won't have permissions to create mounts and manage auth methods
-	log.Info("📌 Loading root token from vault_init.json for provisioning operations")
+	log.Info(" Loading root token from vault_init.json for provisioning operations")
 
 	// Skip agent token check - go directly to root token for enable operations
-	log.Info("🔐 Reading root token from vault_init.json")
+	log.Info(" Reading root token from vault_init.json")
 	token, err := readTokenFromInitFile(rc)
 	if err != nil {
-		log.Error("❌ Failed to read root token from init file", zap.Error(err))
+		log.Error(" Failed to read root token from init file", zap.Error(err))
 
 		// Only try agent token as last resort
-		log.Warn("🔄 Attempting to read Vault Agent token as fallback")
+		log.Warn(" Attempting to read Vault Agent token as fallback")
 		if agentToken, agentErr := readTokenFromSink(rc, shared.AgentToken); agentErr == nil {
-			log.Warn("⚠️ Using Vault Agent token - this may not have sufficient privileges")
+			log.Warn("Using Vault Agent token - this may not have sufficient privileges")
 			return agentToken, nil
 		}
 
 		return "", fmt.Errorf("failed to load any privileged token: %w", err)
 	}
 
-	log.Info("✅ Successfully loaded root token from init file",
+	log.Info(" Successfully loaded root token from init file",
 		zap.String("source", "/var/lib/eos/secrets/vault_init.json"))
 	return token, nil
 }
@@ -261,22 +261,22 @@ func readTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
 	path := filepath.Join(shared.SecretsDir, "vault_init.json")
 
-	log.Info("📄 Reading root token from init file", zap.String("path", path))
+	log.Info(" Reading root token from init file", zap.String("path", path))
 
 	// Check if secrets directory exists
 	if dirStat, err := os.Stat(shared.SecretsDir); err != nil {
 		if os.IsNotExist(err) {
-			log.Error("❌ Secrets directory does not exist",
+			log.Error(" Secrets directory does not exist",
 				zap.String("dir", shared.SecretsDir),
 				zap.Error(err))
 			return "", fmt.Errorf("secrets directory does not exist: %s", shared.SecretsDir)
 		}
-		log.Error("❌ Cannot access secrets directory",
+		log.Error(" Cannot access secrets directory",
 			zap.String("dir", shared.SecretsDir),
 			zap.Error(err))
 		return "", fmt.Errorf("cannot access secrets directory %s: %w", shared.SecretsDir, err)
 	} else {
-		log.Info("✅ Secrets directory accessible",
+		log.Info(" Secrets directory accessible",
 			zap.String("dir", shared.SecretsDir),
 			zap.String("mode", dirStat.Mode().String()))
 	}
@@ -284,17 +284,17 @@ func readTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
 	// Check if init file exists and get its permissions
 	if stat, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			log.Error("❌ vault_init.json does not exist",
+			log.Error(" vault_init.json does not exist",
 				zap.String("path", path),
 				zap.Error(err))
 			return "", fmt.Errorf("vault_init.json does not exist at %s", path)
 		}
-		log.Error("❌ Cannot access vault_init.json",
+		log.Error(" Cannot access vault_init.json",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("cannot access vault_init.json at %s: %w", path, err)
 	} else {
-		log.Info("✅ vault_init.json file found",
+		log.Info(" vault_init.json file found",
 			zap.String("path", path),
 			zap.String("mode", stat.Mode().String()),
 			zap.Int64("size", stat.Size()),
@@ -303,30 +303,30 @@ func readTokenFromInitFile(rc *eos_io.RuntimeContext) (string, error) {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		log.Error("❌ Failed to read vault_init.json file",
+		log.Error(" Failed to read vault_init.json file",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("read vault_init.json: %w", err)
 	}
-	log.Info("✅ vault_init.json file read successfully",
+	log.Info(" vault_init.json file read successfully",
 		zap.String("path", path),
 		zap.Int("data_length", len(data)))
 
 	var init shared.VaultInitResponse
 	if err := json.Unmarshal(data, &init); err != nil {
-		log.Error("❌ Failed to unmarshal vault_init.json",
+		log.Error(" Failed to unmarshal vault_init.json",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("unmarshal vault_init.json: %w", err)
 	}
 
 	if init.RootToken == "" {
-		log.Error("❌ vault_init.json contains no root token",
+		log.Error(" vault_init.json contains no root token",
 			zap.String("path", path))
 		return "", fmt.Errorf("vault_init.json contains no root token")
 	}
 
-	log.Info("✅ Root token extracted from vault_init.json",
+	log.Info(" Root token extracted from vault_init.json",
 		zap.String("path", path))
 	return init.RootToken, nil
 }
@@ -345,7 +345,7 @@ func validateClient(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 	}
 	if report == nil {
 		err := cerr.New("vault client failed health check")
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault Check returned nil report", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Vault Check returned nil report", zap.Error(err))
 		span.SetStatus(codes.Error, "nil report from vault.Check")
 		span.RecordError(err)
 		return nil, nil

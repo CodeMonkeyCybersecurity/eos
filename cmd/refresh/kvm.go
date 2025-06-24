@@ -29,7 +29,7 @@ Example:
 		// Grab the flag
 		vmName, _ := cmd.Flags().GetString("name")
 		if vmName == "" {
-			return fmt.Errorf("❌ You must provide a --name (the libvirt/KVM domain name)")
+			return fmt.Errorf(" You must provide a --name (the libvirt/KVM domain name)")
 		}
 
 		log := otelzap.Ctx(rc.Ctx)
@@ -42,7 +42,7 @@ Example:
 		}
 
 		if !isVMRunning(string(out), vmName) {
-			log.Info("✅ VM is already shut off", zap.String("vm", vmName))
+			log.Info(" VM is already shut off", zap.String("vm", vmName))
 		} else {
 			// Shut it down
 			log.Info("🔻 Shutting down VM...", zap.String("vm", vmName))
@@ -54,7 +54,7 @@ Example:
 			}
 
 			// Wait for shutdown
-			log.Info("⏳ Waiting for VM to shut off...")
+			log.Info(" Waiting for VM to shut off...")
 			for {
 				time.Sleep(3 * time.Second)
 				out, err := exec.Command("virsh", "list", "--all").Output()
@@ -62,7 +62,7 @@ Example:
 					return fmt.Errorf("failed to list VMs during shutdown wait: %w", err)
 				}
 				if !isVMRunning(string(out), vmName) {
-					log.Info("✅ VM is now shut off", zap.String("vm", vmName))
+					log.Info(" VM is now shut off", zap.String("vm", vmName))
 					break
 				}
 				log.Debug("...still waiting for VM to shut off")
@@ -79,7 +79,7 @@ Example:
 			return fmt.Errorf("virt-rescue failed: %w", err)
 		}
 
-		log.Info("✅ Rescue session completed")
+		log.Info(" Rescue session completed")
 		return nil
 	}),
 }

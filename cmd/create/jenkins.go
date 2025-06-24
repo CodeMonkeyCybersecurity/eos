@@ -89,10 +89,10 @@ var CreateJenkinsCmd = &cobra.Command{
 			Tty:           false, // or true if you need a TTY
 		})
 		if err != nil {
-			fmt.Println("⚠️  Could not get admin password. Run manually:")
+			fmt.Println(" Could not get admin password. Run manually:")
 			fmt.Println("   docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword")
 		} else {
-			fmt.Printf("🔐 Admin password:\n\n%s\n\n", strings.TrimSpace(out))
+			fmt.Printf(" Admin password:\n\n%s\n\n", strings.TrimSpace(out))
 		}
 
 		// Step 7: Launch Jenkins
@@ -112,11 +112,11 @@ var CreateJenkinsCmd = &cobra.Command{
 		rawOut, err := cmdOut.CombinedOutput()
 		if pwErr != nil {
 			otelzap.Ctx(rc.Ctx).Warn("Could not retrieve initial admin password", zap.Error(err))
-			fmt.Println("⚠️  Could not retrieve admin password automatically. Check with:")
+			fmt.Println(" Could not retrieve admin password automatically. Check with:")
 			fmt.Println("   docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword")
 		} else {
 			password := strings.TrimSpace(string(rawOut))
-			fmt.Printf("\n🔐 Jenkins is ready!\nVisit: http://localhost:8059\nUnlock with password:\n\n%s\n\n", password)
+			fmt.Printf("\n Jenkins is ready!\nVisit: http://localhost:8059\nUnlock with password:\n\n%s\n\n", password)
 		}
 		vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
 		if err != nil {

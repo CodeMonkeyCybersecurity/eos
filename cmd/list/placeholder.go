@@ -19,7 +19,7 @@ var placeholderListExample = &cobra.Command{
 	Long:  "This is a placeholder subcommand under 'eos list' for demonstration purposes.",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info("📋 Executing placeholder list subcommand", zap.String("subcommand", "example"))
+		log.Info(" Executing placeholder list subcommand", zap.String("subcommand", "example"))
 
 		// Placeholder output
 		fmt.Println("This is a placeholder output for `eos list example`.")

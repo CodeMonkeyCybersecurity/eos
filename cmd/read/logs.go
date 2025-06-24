@@ -35,7 +35,7 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 		for _, candidate := range logger.PlatformLogPaths() {
 			path := os.ExpandEnv(candidate)
 			if content, err := logger.TryReadLogFile(rc, path); err == nil {
-				prefix := "📄"
+				prefix := ""
 				if path == active {
 					prefix = "⭐"
 				}
@@ -48,9 +48,9 @@ Tries known log file locations first. If none found, falls back to journalctl.`,
 
 		if !found {
 			log.Warn("No log files found; attempting journalctl fallback")
-			fmt.Println("\n⚠️")
+			fmt.Println("\n")
 			fmt.Println("No log files found. Trying journalctl fallback...")
-			fmt.Println("\n⚠️")
+			fmt.Println("\n")
 			out, err := logger.TryJournalctl(rc)
 			if err != nil {
 				return fmt.Errorf("journalctl fallback failed: %w", err)

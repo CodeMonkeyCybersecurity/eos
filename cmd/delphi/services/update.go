@@ -28,7 +28,7 @@ type ServiceWorkerInfo struct {
 // GetServiceWorkers returns information about all delphi service workers
 func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 	timestamp := time.Now().Format("20060102_150405")
-	
+
 	return []ServiceWorkerInfo{
 		{
 			ServiceName: "delphi-listener",
@@ -83,7 +83,7 @@ func NewUpdateCmd() *cobra.Command {
 		skipBackup  bool
 		skipRestart bool
 	)
-	
+
 	cmd := &cobra.Command{
 		Use:   "update [service-name]",
 		Short: "Update Delphi service workers to latest version",
@@ -118,7 +118,7 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🔄 Starting Delphi services update",
+			logger.Info(" Starting Delphi services update",
 				zap.Bool("all", all),
 				zap.Bool("dry_run", dryRun),
 				zap.Bool("skip_backup", skipBackup),
@@ -136,7 +136,7 @@ Examples:
 
 			// Get all service workers
 			allWorkers := GetServiceWorkers(eosRoot)
-			
+
 			// Determine which workers to update
 			var workersToUpdate []ServiceWorkerInfo
 			if all {
@@ -171,12 +171,12 @@ Examples:
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Show what would be done without making changes")
 	cmd.Flags().BoolVar(&skipBackup, "skip-backup", false, "Skip backing up existing workers")
 	cmd.Flags().BoolVar(&skipRestart, "skip-restart", false, "Skip restarting services after update")
-	
+
 	return cmd
 }
 
 func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
-	logger.Info("📋 Planning to update workers",
+	logger.Info(" Planning to update workers",
 		zap.Int("worker_count", len(workers)),
 		zap.Bool("dry_run", dryRun))
 
@@ -186,14 +186,14 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		if !fileExists(worker.SourcePath) {
 			return fmt.Errorf("source file not found: %s", worker.SourcePath)
 		}
-		
+
 		// Check target directory exists
 		targetDir := filepath.Dir(worker.TargetPath)
 		if !fileExists(targetDir) {
 			return fmt.Errorf("target directory does not exist: %s", targetDir)
 		}
-		
-		logger.Info("✅ Pre-flight check passed",
+
+		logger.Info(" Pre-flight check passed",
 			zap.String("service", worker.ServiceName),
 			zap.String("source", worker.SourcePath),
 			zap.String("target", worker.TargetPath))
@@ -202,7 +202,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 	if dryRun {
 		logger.Info("🔍 DRY RUN - would perform the following actions:")
 		for _, worker := range workers {
-			logger.Info("📝 Service worker update plan",
+			logger.Info(" Service worker update plan",
 				zap.String("service", worker.ServiceName),
 				zap.String("source", worker.SourcePath),
 				zap.String("target", worker.TargetPath),
@@ -218,32 +218,32 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 	// Update each worker
 	for _, worker := range workers {
-		logger.Info("🔄 Updating service worker",
+		logger.Info(" Updating service worker",
 			zap.String("service", worker.ServiceName))
 
 		// Step 1: Backup existing file if it exists and backup is not skipped
 		if !skipBackup && fileExists(worker.TargetPath) {
-			logger.Info("💾 Creating backup",
+			logger.Info(" Creating backup",
 				zap.String("source", worker.TargetPath),
 				zap.String("backup", worker.BackupPath))
-			
+
 			if err := copyFile(worker.TargetPath, worker.BackupPath); err != nil {
 				return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
 			}
-			
-			logger.Info("✅ Backup created",
+
+			logger.Info(" Backup created",
 				zap.String("backup_path", worker.BackupPath))
 		}
 
 		// Step 2: Deploy new version
-		logger.Info("📦 Deploying updated worker",
+		logger.Info(" Deploying updated worker",
 			zap.String("source", worker.SourcePath),
 			zap.String("target", worker.TargetPath))
-		
+
 		if err := copyFile(worker.SourcePath, worker.TargetPath); err != nil {
 			return fmt.Errorf("failed to deploy updated %s: %w", worker.ServiceName, err)
 		}
-		
+
 		// Set appropriate permissions
 		_, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "chmod",
@@ -254,7 +254,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				zap.String("file", worker.TargetPath),
 				zap.Error(err))
 		}
-		
+
 		// Set ownership to stanley (if running as root)
 		_, err = execute.Run(rc.Ctx, execute.Options{
 			Command: "chown",
@@ -266,36 +266,36 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				zap.Error(err))
 		}
 
-		logger.Info("✅ Service worker updated successfully",
+		logger.Info(" Service worker updated successfully",
 			zap.String("service", worker.ServiceName),
 			zap.String("target", worker.TargetPath))
-		
+
 		// Add to restart list if service exists
 		if eos_unix.ServiceExists(worker.ServiceName) {
 			servicesToRestart = append(servicesToRestart, worker.ServiceName)
 		} else {
-			logger.Warn("⚠️ Service unit file not found, skipping restart",
+			logger.Warn("Service unit file not found, skipping restart",
 				zap.String("service", worker.ServiceName))
 		}
 	}
 
 	// Step 3: Restart services if not skipped
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info("🔄 Restarting updated services",
+		logger.Info(" Restarting updated services",
 			zap.Strings("services", servicesToRestart))
-		
+
 		for _, service := range servicesToRestart {
-			logger.Info("🔄 Restarting service",
+			logger.Info(" Restarting service",
 				zap.String("service", service))
-			
+
 			if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
-				logger.Error("❌ Failed to restart service",
+				logger.Error(" Failed to restart service",
 					zap.String("service", service),
 					zap.Error(err))
 				return fmt.Errorf("failed to restart %s: %w", service, err)
 			}
-			
-			logger.Info("✅ Service restarted successfully",
+
+			logger.Info(" Service restarted successfully",
 				zap.String("service", service))
 		}
 	}
@@ -303,22 +303,22 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 	// Step 4: Verify services are running
 	if !skipRestart && len(servicesToRestart) > 0 {
 		logger.Info("🔍 Verifying service status")
-		
+
 		for _, service := range servicesToRestart {
 			if err := eos_unix.CheckServiceStatus(rc.Ctx, service); err != nil {
-				logger.Warn("⚠️ Service is not active after restart",
+				logger.Warn("Service is not active after restart",
 					zap.String("service", service),
 					zap.Error(err))
-				logger.Info("💡 Check service logs with: eos delphi services logs", 
+				logger.Info("💡 Check service logs with: eos delphi services logs",
 					zap.String("service", service))
 			} else {
-				logger.Info("✅ Service is running",
+				logger.Info(" Service is running",
 					zap.String("service", service))
 			}
 		}
 	}
 
-	logger.Info("🎉 Service worker update completed successfully",
+	logger.Info(" Service worker update completed successfully",
 		zap.Int("workers_updated", len(workers)),
 		zap.Int("services_restarted", len(servicesToRestart)))
 

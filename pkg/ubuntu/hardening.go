@@ -115,7 +115,7 @@ func applySystemHardening(rc *eos_io.RuntimeContext) error {
 		}
 	}
 
-	logger.Info("✅ System hardening applied")
+	logger.Info(" System hardening applied")
 	return nil
 }
 
@@ -168,6 +168,6 @@ func createSecurityReportScript(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write security report script: %w", err)
 	}
 
-	logger.Info("✅ Security report script created", zap.String("path", scriptPath))
+	logger.Info(" Security report script created", zap.String("path", scriptPath))
 	return nil
 }

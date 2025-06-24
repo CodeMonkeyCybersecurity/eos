@@ -53,7 +53,7 @@ func ConnectWithConfig(rc *eos_io.RuntimeContext) (*ldap.Conn, *LDAPConfig, erro
 		return nil, nil, fmt.Errorf("failed to bind to LDAP as %s: %w", cfg.BindDN, err)
 	}
 
-	fmt.Println("✅ Connected and bound to LDAP successfully.")
+	fmt.Println(" Connected and bound to LDAP successfully.")
 	return conn, cfg, nil
 }
 
@@ -66,7 +66,7 @@ func getSecureTLSConfig() *tls.Config {
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
-	
+
 	// Secure TLS configuration for production LDAP connections
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,

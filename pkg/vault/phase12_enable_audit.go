@@ -15,12 +15,12 @@ import (
 // EnableFileAudit enables file-based Vault auditing at /opt/vault/logs/vault_audit.log.
 func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 Ignore the passed client!
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔐 Starting file audit enablement process")
+	log.Info(" Starting file audit enablement process")
 
 	// Always get privileged root client
 	client, err := GetRootClient(rc)
 	if err != nil {
-		log.Error("❌ Failed to get privileged Vault client", zap.Error(err))
+		log.Error(" Failed to get privileged Vault client", zap.Error(err))
 		return fmt.Errorf("get privileged vault client: %w", err)
 	}
 
@@ -28,16 +28,16 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 I
 	log.Info("🔍 Listing current audit devices")
 	audits, err := client.Sys().ListAudit()
 	if err != nil {
-		log.Error("❌ Failed to list audit devices", zap.Error(err))
+		log.Error(" Failed to list audit devices", zap.Error(err))
 		return fmt.Errorf("failed to list audit devices: %w", err)
 	}
 
 	if _, exists := audits[shared.AuditID]; exists {
-		log.Info("✅ Audit device already enabled at sys/audit/file. Skipping.")
+		log.Info(" Audit device already enabled at sys/audit/file. Skipping.")
 		return nil
 	}
 
-	log.Info("➕ Enabling file-based audit device",
+	log.Info(" Enabling file-based audit device",
 		zap.String("audit_id", shared.AuditID),
 		zap.String("file_path", "/opt/vault/logs/vault_audit.log"))
 
@@ -48,13 +48,13 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 I
 				"file_path": "/opt/vault/logs/vault_audit.log",
 			},
 		},
-		"✅ File audit enabled.",
+		" File audit enabled.",
 	)
 	if err != nil {
-		log.Error("❌ Failed to enable file audit", zap.Error(err))
+		log.Error(" Failed to enable file audit", zap.Error(err))
 		return fmt.Errorf("failed to enable file audit: %w", err)
 	}
 
-	log.Info("🎉 File audit successfully enabled")
+	log.Info(" File audit successfully enabled")
 	return nil
 }

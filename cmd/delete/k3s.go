@@ -23,10 +23,10 @@ var DeleteK3sCmd = &cobra.Command{
 and removes it by running the appropriate uninstall scripts in the correct order.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if err := uninstallK3s(rc); err != nil {
-			otelzap.Ctx(rc.Ctx).Error("❌ Failed to uninstall K3s", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error(" Failed to uninstall K3s", zap.Error(err))
 			return err
 		}
-		otelzap.Ctx(rc.Ctx).Info("✅ K3s uninstallation completed.")
+		otelzap.Ctx(rc.Ctx).Info(" K3s uninstallation completed.")
 		return nil
 	}),
 }
@@ -47,13 +47,13 @@ func uninstallK3s(rc *eos_io.RuntimeContext) error {
 			)
 			err := execute.RunSimple(rc.Ctx, path)
 			if err != nil {
-				otelzap.Ctx(rc.Ctx).Error("❌ Script execution failed",
+				otelzap.Ctx(rc.Ctx).Error(" Script execution failed",
 					zap.String("role", role),
 					zap.Error(err),
 				)
 				return fmt.Errorf("failed to run %s script: %w", role, err)
 			}
-			otelzap.Ctx(rc.Ctx).Info("✅ Successfully ran uninstall script",
+			otelzap.Ctx(rc.Ctx).Info(" Successfully ran uninstall script",
 				zap.String("role", role),
 			)
 			ranAny = true
@@ -61,7 +61,7 @@ func uninstallK3s(rc *eos_io.RuntimeContext) error {
 	}
 
 	if !ranAny {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ No uninstall scripts were found at expected paths. Assuming K3s is not installed.")
+		otelzap.Ctx(rc.Ctx).Warn("No uninstall scripts were found at expected paths. Assuming K3s is not installed.")
 		return nil
 	}
 

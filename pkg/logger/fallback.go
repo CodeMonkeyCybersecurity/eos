@@ -14,7 +14,7 @@ import (
 func InitFallback() {
 	path, err := FindWritableLogPath()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "⚠️  No writable log path found. Logging to console only.")
+		fmt.Fprintln(os.Stderr, " No writable log path found. Logging to console only.")
 
 		cfg := DefaultConsoleEncoderConfig()
 		fallbackCore := zapcore.NewCore(
@@ -37,7 +37,7 @@ func InitFallback() {
 
 	writer, err := GetLogFileWriter(path)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "⚠️  Could not write to log file, falling back to stdout:", err)
+		fmt.Fprintln(os.Stderr, " Could not write to log file, falling back to stdout:", err)
 		writer = zapcore.AddSync(os.Stdout)
 	}
 
@@ -48,10 +48,10 @@ func InitFallback() {
 
 	combinedLogger := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	zap.ReplaceGlobals(combinedLogger)
-	
+
 	// Also replace the otelzap global logger
 	otelzap.ReplaceGlobals(otelzap.New(combinedLogger))
-	
+
 	combinedLogger.Info("Logger fallback initialized",
 		zap.String("log_level", os.Getenv("LOG_LEVEL")),
 		zap.String("log_path", path),
@@ -60,13 +60,13 @@ func InitFallback() {
 
 func DefaultConsoleEncoderConfig() zapcore.EncoderConfig {
 	cfg := zap.NewProductionEncoderConfig()
-	cfg.TimeKey = ""  // Disable time in console output for clarity
+	cfg.TimeKey = "" // Disable time in console output for clarity
 	cfg.LevelKey = "level"
 	cfg.NameKey = "logger"
-	cfg.CallerKey = ""  // Disable caller in console output for clarity
-	cfg.FunctionKey = ""  // Disable function in console output
+	cfg.CallerKey = ""   // Disable caller in console output for clarity
+	cfg.FunctionKey = "" // Disable function in console output
 	cfg.MessageKey = "msg"
-	cfg.StacktraceKey = ""  // Disable stacktrace in console output
+	cfg.StacktraceKey = "" // Disable stacktrace in console output
 	cfg.LineEnding = zapcore.DefaultLineEnding
 	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	cfg.EncodeTime = zapcore.ISO8601TimeEncoder

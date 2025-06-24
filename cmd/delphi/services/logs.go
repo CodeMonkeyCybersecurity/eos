@@ -20,7 +20,7 @@ func NewLogsCmd() *cobra.Command {
 		lines  int
 		all    bool
 	)
-	
+
 	cmd := &cobra.Command{
 		Use:   "logs [service-name]",
 		Short: "View logs for Delphi pipeline services",
@@ -44,17 +44,17 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			// Handle --all flag
 			if all {
-				logger.Info("📜 Viewing logs for all Delphi services",
+				logger.Info(" Viewing logs for all Delphi services",
 					zap.Bool("follow", follow),
 					zap.Int("lines", lines),
 					zap.Strings("services", DelphiServices))
 
 				return viewAllServiceLogs(rc, &logger, lines, follow)
 			}
-			
+
 			if len(args) == 0 {
 				return fmt.Errorf("specify a service name or use --all flag")
 			}
@@ -72,7 +72,7 @@ Examples:
 				return fmt.Errorf("invalid service: %s. Valid services: %s", service, strings.Join(DelphiServices, ", "))
 			}
 
-			logger.Info("📜 Viewing logs for service",
+			logger.Info(" Viewing logs for service",
 				zap.String("service", service),
 				zap.Bool("follow", follow),
 				zap.Int("lines", lines))
@@ -133,11 +133,11 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 	for i, service := range DelphiServices {
 		// Service header with decorative separator
 		fmt.Printf("%s%s┌─────────────────────────────────────────────────────────────────────────────────────────┐%s\n", colorBold, colorGreen, colorReset)
-		fmt.Printf("%s%s│  📋 Service: %-70s  │%s\n", colorBold, colorGreen, service, colorReset)
-		fmt.Printf("%s%s│  📊 Showing last %-60d lines  │%s\n", colorBold, colorGreen, lines, colorReset)
+		fmt.Printf("%s%s│   Service: %-70s  │%s\n", colorBold, colorGreen, service, colorReset)
+		fmt.Printf("%s%s│   Showing last %-60d lines  │%s\n", colorBold, colorGreen, lines, colorReset)
 		fmt.Printf("%s%s└─────────────────────────────────────────────────────────────────────────────────────────┘%s\n", colorBold, colorGreen, colorReset)
 
-		logger.Info("📜 Fetching logs for service",
+		logger.Info(" Fetching logs for service",
 			zap.String("service", service),
 			zap.Int("lines", lines),
 			zap.Int("service_index", i+1),
@@ -155,9 +155,9 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 			Args:    args,
 			Capture: true,
 		})
-		
+
 		if err != nil {
-			fmt.Printf("%s%s⚠️  Failed to fetch logs for %s: %v%s\n\n", colorBold, colorRed, service, err, colorReset)
+			fmt.Printf("%s%s Failed to fetch logs for %s: %v%s\n\n", colorBold, colorRed, service, err, colorReset)
 			logger.Warn("Failed to fetch logs for service",
 				zap.String("service", service),
 				zap.Error(err))
@@ -165,7 +165,7 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 		}
 
 		if strings.TrimSpace(output) == "" {
-			fmt.Printf("%s%s📝 No recent logs found for %s%s\n\n", colorBold, colorYellow, service, colorReset)
+			fmt.Printf("%s%s No recent logs found for %s%s\n\n", colorBold, colorYellow, service, colorReset)
 		} else {
 			// Display the logs with subtle formatting
 			fmt.Printf("%s", output)
@@ -182,10 +182,10 @@ func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx
 
 	// Footer
 	fmt.Printf("\n%s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n", colorBold, colorCyan, colorReset)
-	fmt.Printf("%s%s  ✅ Completed viewing logs for %d Delphi services%s\n", colorBold, colorGreen, len(DelphiServices), colorReset)
+	fmt.Printf("%s%s   Completed viewing logs for %d Delphi services%s\n", colorBold, colorGreen, len(DelphiServices), colorReset)
 	fmt.Printf("%s%s═══════════════════════════════════════════════════════════════════════════════════════%s\n", colorBold, colorCyan, colorReset)
 
-	logger.Info("✅ Successfully displayed logs for all Delphi services",
+	logger.Info(" Successfully displayed logs for all Delphi services",
 		zap.Int("services_count", len(DelphiServices)),
 		zap.Int("lines_per_service", lines))
 

@@ -139,7 +139,7 @@ output "wazuh_volume_names" {
 
 // generateDockerResources creates Docker-specific Terraform files
 func (c *TerraformConfig) generateDockerResources() error {
-	c.Logger.Info("🐳 Generating modular Docker resources")
+	c.Logger.Info(" Generating modular Docker resources")
 
 	// Generate container configuration
 	if err := c.generateDockerContainers(); err != nil {
@@ -297,7 +297,7 @@ func (c *TerraformConfig) generateWazuhModule() error {
 		return nil
 	}
 
-	c.Logger.Info("🛡️ Generating Wazuh volumes module")
+	c.Logger.Info(" Generating Wazuh volumes module")
 
 	// Generate module main.tf
 	moduleMain := `resource "docker_volume" "this" {
@@ -448,7 +448,7 @@ provider "libvirt" {
 
 // generateEnvironmentFiles creates environment-specific tfvars files
 func (c *TerraformConfig) generateEnvironmentFiles() error {
-	c.Logger.Info("📁 Generating environment files")
+	c.Logger.Info(" Generating environment files")
 
 	// Generate dev.tfvars
 	devContent := `environment = "dev"
@@ -530,7 +530,7 @@ volumes = {
 
 // generateDocumentation creates README and usage documentation
 func (c *TerraformConfig) generateDocumentation() error {
-	c.Logger.Info("📚 Generating documentation")
+	c.Logger.Info(" Generating documentation")
 
 	readmeContent := fmt.Sprintf(`# Infrastructure as Code - %s
 

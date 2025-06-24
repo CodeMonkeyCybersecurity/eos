@@ -15,16 +15,16 @@ import (
 // DiscoverServices gathers service configuration information
 func (i *Inspector) DiscoverServices() (*ServicesInfo, error) {
 	logger := otelzap.Ctx(i.rc.Ctx)
-	logger.Info("⚙️ Starting services discovery")
+	logger.Info(" Starting services discovery")
 
 	info := &ServicesInfo{}
 
 	// Discover systemd services
 	if services, err := i.discoverSystemdServices(); err != nil {
-		logger.Warn("⚠️ Failed to discover systemd services", zap.Error(err))
+		logger.Warn("Failed to discover systemd services", zap.Error(err))
 	} else {
 		info.SystemdServices = services
-		logger.Info("🔧 Discovered systemd services", zap.Int("count", len(services)))
+		logger.Info(" Discovered systemd services", zap.Int("count", len(services)))
 	}
 
 	// Discover Nginx
@@ -48,34 +48,34 @@ func (i *Inspector) DiscoverServices() (*ServicesInfo, error) {
 	// Discover PostgreSQL
 	if postgres, err := i.discoverPostgreSQL(); err == nil && postgres != nil {
 		info.PostgreSQL = postgres
-		logger.Info("🗄️ Discovered PostgreSQL configuration")
+		logger.Info(" Discovered PostgreSQL configuration")
 	}
 
 	// Discover MySQL
 	if mysql, err := i.discoverMySQL(); err == nil && mysql != nil {
 		info.MySQL = mysql
-		logger.Info("🗄️ Discovered MySQL configuration")
+		logger.Info(" Discovered MySQL configuration")
 	}
 
 	// Discover Redis
 	if redis, err := i.discoverRedis(); err == nil && redis != nil {
 		info.Redis = redis
-		logger.Info("💾 Discovered Redis configuration")
+		logger.Info(" Discovered Redis configuration")
 	}
 
 	// Discover HashiCorp tools
 	if hashicorp, err := i.discoverHashiCorp(); err == nil && hashicorp != nil {
 		info.HashiCorp = hashicorp
-		logger.Info("🔧 Discovered HashiCorp tools")
+		logger.Info(" Discovered HashiCorp tools")
 	}
 
 	// Discover Tailscale
 	if tailscale, err := i.discoverTailscale(); err == nil && tailscale != nil {
 		info.Tailscale = tailscale
-		logger.Info("🔐 Discovered Tailscale configuration")
+		logger.Info(" Discovered Tailscale configuration")
 	}
 
-	logger.Info("✅ Services discovery completed")
+	logger.Info(" Services discovery completed")
 	return info, nil
 }
 

@@ -36,7 +36,7 @@ func ReloadDaemonAndEnable(ctx context.Context, unit string) error {
 		return fmt.Errorf("enable --now %s: %w", unit, err)
 	}
 
-	otelzap.Ctx(ctx).Info("✅ systemd unit enabled & started",
+	otelzap.Ctx(ctx).Info(" systemd unit enabled & started",
 		zap.String("unit", unit),
 	)
 	return nil
@@ -55,20 +55,20 @@ func RestartSystemdUnitWithRetry(ctx context.Context, unit string, retries int, 
 }
 
 func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, delaySeconds int) error {
-	otelzap.Ctx(ctx).Info("⚙️ systemctl action initiated",
+	otelzap.Ctx(ctx).Info(" systemctl action initiated",
 		zap.String("action", action),
 		zap.String("unit", unit),
 	)
 
 	if !CanSudoSystemctl("status", unit) {
 		if !CanInteractiveSudo() {
-			return fmt.Errorf("❌ eos user missing sudo permissions; please add:\n    eos ALL=(ALL) NOPASSWD: /bin/systemctl")
+			return fmt.Errorf(" eos user missing sudo permissions; please add:\n    eos ALL=(ALL) NOPASSWD: /bin/systemctl")
 		}
-		otelzap.Ctx(ctx).Warn("⚠️ NOPASSWD sudo missing. Attempting interactive sudo...")
+		otelzap.Ctx(ctx).Warn("NOPASSWD sudo missing. Attempting interactive sudo...")
 		if err := PromptAndRunInteractiveSystemctl(action, unit); err != nil {
 			return fmt.Errorf("interactive systemctl %s %s failed: %w", action, unit, err)
 		}
-		otelzap.Ctx(ctx).Info("✅ Interactive sudo succeeded; skipping retries")
+		otelzap.Ctx(ctx).Info(" Interactive sudo succeeded; skipping retries")
 		return nil
 	}
 
@@ -78,19 +78,19 @@ func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, de
 		out, err := cmd.CombinedOutput()
 
 		if bytes.Contains(out, []byte("Authentication is required")) {
-			otelzap.Ctx(ctx).Error("❌ Insufficient sudo privileges. Please add to sudoers...",
+			otelzap.Ctx(ctx).Error(" Insufficient sudo privileges. Please add to sudoers...",
 				zap.String("recommendation", "eos ALL=(ALL) NOPASSWD: /bin/systemctl"))
 			return fmt.Errorf("sudo privileges missing; systemctl %s %s requires password", action, unit)
 		}
 
 		if err == nil {
-			otelzap.Ctx(ctx).Info(fmt.Sprintf("✅ systemd unit %s succeeded", action),
+			otelzap.Ctx(ctx).Info(fmt.Sprintf(" systemd unit %s succeeded", action),
 				zap.String("unit", unit),
 			)
 			return nil
 		}
 
-		otelzap.Ctx(ctx).Warn(fmt.Sprintf("⚠️ systemctl %s failed", action),
+		otelzap.Ctx(ctx).Warn(fmt.Sprintf("systemctl %s failed", action),
 			zap.Int("attempt", i+1),
 			zap.String("unit", unit),
 			zap.Error(err),
@@ -100,7 +100,7 @@ func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, de
 		time.Sleep(time.Duration(delaySeconds) * time.Second)
 	}
 
-	otelzap.Ctx(ctx).Error(fmt.Sprintf("❌ systemd unit %s failed after retries", action),
+	otelzap.Ctx(ctx).Error(fmt.Sprintf(" systemd unit %s failed after retries", action),
 		zap.String("unit", unit),
 		zap.Error(lastErr),
 	)
@@ -116,15 +116,14 @@ func CanSudoSystemctl(action, unit string) bool {
 	cmd := exec.Command("sudo", "-n", "systemctl", "--version")
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("❌ sudo -n systemctl --version failed: %v\n", err)
+		fmt.Printf(" sudo -n systemctl --version failed: %v\n", err)
 		return false
 	}
 	return true
 }
 
-
 func PromptAndRunInteractiveSystemctl(action, unit string) error {
-	fmt.Printf("⚠️ Privilege escalation required to run 'systemctl %s %s'\n", action, unit)
+	fmt.Printf("Privilege escalation required to run 'systemctl %s %s'\n", action, unit)
 	fmt.Println("\nYou will be prompted for your password.")
 
 	cmd := exec.Command("systemctl", action, unit)

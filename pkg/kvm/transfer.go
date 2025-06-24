@@ -41,17 +41,17 @@ func SyncFileBetweenVMs(rc *eos_io.RuntimeContext, sourceVM, guestPath, destVM, 
 	)
 
 	if err := CopyOutFromVM(rc, sourceVM, guestPath, hostPath); err != nil {
-		log.Error("❌ Copy out from source VM failed", zap.Error(err))
+		log.Error(" Copy out from source VM failed", zap.Error(err))
 		return fmt.Errorf("extract from %s failed: %w", sourceVM, err)
 	}
 
 	destDir := filepath.Dir(destGuestPath)
 	if err := CopyInToVM(rc, destVM, hostPath, destDir); err != nil {
-		log.Error("❌ Copy into destination VM failed", zap.Error(err))
+		log.Error(" Copy into destination VM failed", zap.Error(err))
 		return fmt.Errorf("inject to %s failed: %w", destVM, err)
 	}
 
-	log.Info("✅ VM-to-VM file sync complete",
+	log.Info(" VM-to-VM file sync complete",
 		zap.String("source", sourceVM),
 		zap.String("dest", destVM),
 		zap.String("file", guestPath),
@@ -74,14 +74,14 @@ func CopyOutFromVM(rc *eos_io.RuntimeContext, vmName, guestPath, hostFile string
 	)
 
 	if err := os.MkdirAll(hostDir, 0o700); err != nil {
-		log.Error("❌ Failed to create host directory", zap.Error(err))
+		log.Error(" Failed to create host directory", zap.Error(err))
 		return fmt.Errorf("create host dir failed: %w", err)
 	}
 
 	cmd := exec.Command("virt-copy-out", "-d", vmName, guestPath, hostDir)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error("❌ virt-copy-out failed",
+		log.Error(" virt-copy-out failed",
 			zap.Error(err),
 			zap.ByteString("output", output),
 			zap.Strings("args", cmd.Args),
@@ -94,12 +94,12 @@ func CopyOutFromVM(rc *eos_io.RuntimeContext, vmName, guestPath, hostFile string
 	if actual != hostFile {
 		log.Info("🔁 Renaming extracted file", zap.String("from", actual), zap.String("to", hostFile))
 		if err := os.Rename(actual, hostFile); err != nil {
-			log.Error("❌ Failed to rename extracted file", zap.Error(err))
+			log.Error(" Failed to rename extracted file", zap.Error(err))
 			return fmt.Errorf("failed to rename extracted file: %w", err)
 		}
 	}
 
-	log.Info("✅ virt-copy-out completed and renamed successfully", zap.String("file", hostFile))
+	log.Info(" virt-copy-out completed and renamed successfully", zap.String("file", hostFile))
 	return nil
 }
 
@@ -116,14 +116,14 @@ func CopyInToVM(rc *eos_io.RuntimeContext, vmName, hostPath, guestDir string) er
 	// Check if the host file exists
 	info, err := os.Stat(hostPath)
 	if err != nil {
-		log.Error("❌ Host file not found",
+		log.Error(" Host file not found",
 			zap.String("path", hostPath),
 			zap.Error(err),
 		)
 		return fmt.Errorf("host file not found: %w", err)
 	}
 	if info.IsDir() {
-		log.Error("❌ Host path is a directory, not a file", zap.String("path", hostPath))
+		log.Error(" Host path is a directory, not a file", zap.String("path", hostPath))
 		return fmt.Errorf("host path is a directory, not a file: %s", hostPath)
 	}
 
@@ -131,7 +131,7 @@ func CopyInToVM(rc *eos_io.RuntimeContext, vmName, hostPath, guestDir string) er
 	cmd := exec.Command("virt-copy-in", "-d", vmName, hostPath, guestDir)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error("❌ virt-copy-in failed",
+		log.Error(" virt-copy-in failed",
 			zap.Error(err),
 			zap.ByteString("output", output),
 			zap.Strings("args", cmd.Args),
@@ -139,7 +139,7 @@ func CopyInToVM(rc *eos_io.RuntimeContext, vmName, hostPath, guestDir string) er
 		return fmt.Errorf("virt-copy-in failed: %w", err)
 	}
 
-	log.Info("✅ virt-copy-in completed successfully",
+	log.Info(" virt-copy-in completed successfully",
 		zap.String("vm", vmName),
 		zap.String("file", hostPath),
 		zap.String("dest", guestDir),

@@ -35,7 +35,7 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 		}
 
 		for _, c := range cmds {
-			fmt.Printf("🔧 Executing: %s\n", c)
+			fmt.Printf(" Executing: %s\n", c)
 			if !dryRun {
 				cmd := exec.Command("bash", "-c", c)
 				cmd.Stdout = cmd.Stderr
@@ -45,8 +45,8 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 			}
 		}
 
-		fmt.Println("✅ LDAP TLS certificate regenerated with IP SAN.")
-		fmt.Println("📁 Path: /etc/ldap/certs/ldap.crt and ldap.key")
+		fmt.Println(" LDAP TLS certificate regenerated with IP SAN.")
+		fmt.Println(" Path: /etc/ldap/certs/ldap.crt and ldap.key")
 		fmt.Println("🧠 Reminder: Restart your LDAP server to use the new certificate.")
 
 		return nil

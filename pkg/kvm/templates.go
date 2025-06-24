@@ -88,14 +88,14 @@ systemctl start sshd
 
 # Install and start Tailscale
 for i in {1..3}; do curl -fsSL https://tailscale.com/install.sh | sh && break || sleep 3; done
-tailscale up --authkey='{{ .TailscaleKey }}' --hostname="$(hostname)" --ssh || echo "⚠️ Tailscale failed to start"
+tailscale up --authkey='{{ .TailscaleKey }}' --hostname="$(hostname)" --ssh || echo "Tailscale failed to start"
 
 # Debug info
 ip a > /root/network-debug.txt
 tailscale status > /root/tailscale-status.txt || true
 hostname > /root/hostname.txt
 
-echo "✅ VM Provisioned Successfully"
+echo " VM Provisioned Successfully"
 %end
 
 reboot

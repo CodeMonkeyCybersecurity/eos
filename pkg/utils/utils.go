@@ -25,7 +25,7 @@ import (
 // DEPRECATED: This function should be moved to a more appropriate package with proper context handling
 func DeployApp(ctx context.Context, app string, force bool) error {
 	logger := otelzap.Ctx(ctx)
-	logger.Info("🚀 Starting application deployment",
+	logger.Info(" Starting application deployment",
 		zap.String("app", app),
 		zap.Bool("force", force))
 
@@ -34,7 +34,7 @@ func DeployApp(ctx context.Context, app string, force bool) error {
 	}
 
 	// Test Nginx configuration using execute package
-	logger.Info("🔧 Testing Nginx configuration")
+	logger.Info(" Testing Nginx configuration")
 	_, err := execute.Run(ctx, execute.Options{
 		Ctx:     ctx,
 		Command: "nginx",
@@ -42,12 +42,12 @@ func DeployApp(ctx context.Context, app string, force bool) error {
 		Capture: true,
 	})
 	if err != nil {
-		logger.Error("❌ Nginx config test failed", zap.Error(err))
+		logger.Error(" Nginx config test failed", zap.Error(err))
 		return fmt.Errorf("nginx config test failed: %w", err)
 	}
 
 	// Restart Nginx using execute package
-	logger.Info("🔄 Restarting Nginx service")
+	logger.Info(" Restarting Nginx service")
 	_, err = execute.Run(ctx, execute.Options{
 		Ctx:     ctx,
 		Command: "systemctl",
@@ -55,11 +55,11 @@ func DeployApp(ctx context.Context, app string, force bool) error {
 		Capture: false,
 	})
 	if err != nil {
-		logger.Error("❌ Failed to restart nginx", zap.Error(err))
+		logger.Error(" Failed to restart nginx", zap.Error(err))
 		return fmt.Errorf("failed to restart nginx: %w", err)
 	}
 
-	logger.Info("✅ Application deployment completed successfully", zap.String("app", app))
+	logger.Info(" Application deployment completed successfully", zap.String("app", app))
 	return nil
 }
 

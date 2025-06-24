@@ -47,7 +47,7 @@ Example:
   eos create delphi-webhook --target-dir /custom/path --dry-run`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🚀 Starting Delphi webhook deployment",
+			logger.Info(" Starting Delphi webhook deployment",
 				zap.String("target_dir", targetDir),
 				zap.Bool("dry_run", dryRun),
 				zap.Bool("force", forceInstall))
@@ -93,7 +93,7 @@ func deployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 		}
 	}
 
-	logger.Info("📁 Source files located",
+	logger.Info(" Source files located",
 		zap.String("python_script", pythonScript),
 		zap.String("bash_script", bashScript))
 
@@ -111,31 +111,31 @@ func deployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 
 	if dryRun {
 		logger.Info("🔍 DRY RUN - would perform the following actions:")
-		logger.Info("📋 Copy files:",
+		logger.Info(" Copy files:",
 			zap.String("python", fmt.Sprintf("%s → %s", pythonScript, pythonDest)),
 			zap.String("bash", fmt.Sprintf("%s → %s", bashScript, bashDest)))
-		logger.Info("🔧 Set ownership: root:wazuh")
-		logger.Info("🔒 Set permissions: 0750")
+		logger.Info(" Set ownership: root:wazuh")
+		logger.Info(" Set permissions: 0750")
 		return nil
 	}
 
 	// Deploy files
-	logger.Info("📋 Copying webhook scripts...")
+	logger.Info(" Copying webhook scripts...")
 
 	// Copy Python script
 	if err := copyFile(pythonScript, pythonDest); err != nil {
 		return fmt.Errorf("failed to copy Python script: %w", err)
 	}
-	logger.Info("✅ Python script deployed", zap.String("path", pythonDest))
+	logger.Info(" Python script deployed", zap.String("path", pythonDest))
 
 	// Copy bash script
 	if err := copyFile(bashScript, bashDest); err != nil {
 		return fmt.Errorf("failed to copy bash script: %w", err)
 	}
-	logger.Info("✅ Bash script deployed", zap.String("path", bashDest))
+	logger.Info(" Bash script deployed", zap.String("path", bashDest))
 
 	// Set ownership and permissions
-	logger.Info("🔧 Setting ownership and permissions...")
+	logger.Info(" Setting ownership and permissions...")
 
 	files := []string{pythonDest, bashDest}
 	for _, file := range files {
@@ -145,8 +145,8 @@ func deployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 			Args:    []string{"root:wazuh", file},
 		})
 		if err != nil {
-			logger.Warn("Failed to set ownership (continuing)", 
-				zap.String("file", file), 
+			logger.Warn("Failed to set ownership (continuing)",
+				zap.String("file", file),
 				zap.Error(err))
 		}
 
@@ -156,14 +156,14 @@ func deployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 			Args:    []string{"0750", file},
 		})
 		if err != nil {
-			logger.Warn("Failed to set permissions (continuing)", 
-				zap.String("file", file), 
+			logger.Warn("Failed to set permissions (continuing)",
+				zap.String("file", file),
 				zap.Error(err))
 		}
 	}
 
-	logger.Info("✅ Delphi webhook scripts deployed successfully")
-	
+	logger.Info(" Delphi webhook scripts deployed successfully")
+
 	// Print post-deployment instructions
 	printPostDeploymentInstructions(logger)
 
@@ -190,7 +190,7 @@ func fileExists(path string) bool {
 }
 
 func printPostDeploymentInstructions(logger otelzap.LoggerWithCtx) {
-	logger.Info("📋 Post-deployment configuration required:")
+	logger.Info(" Post-deployment configuration required:")
 	logger.Info("")
 	logger.Info("1. Configure Wazuh integration in /var/ossec/etc/ossec.conf:")
 	logger.Info("")

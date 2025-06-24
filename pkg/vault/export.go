@@ -33,7 +33,7 @@ func ExportTLSCert(rc *eos_io.RuntimeContext, input TLSExportInput) error {
 
 	// Validate input using go-playground/validator
 	if err := verify.Struct(input); err != nil {
-		log.Error("❌ Invalid TLS cert export input", zap.Error(err))
+		log.Error(" Invalid TLS cert export input", zap.Error(err))
 		return cerr.WithHint(err, "Missing or invalid SCP target input")
 	}
 
@@ -43,10 +43,10 @@ func ExportTLSCert(rc *eos_io.RuntimeContext, input TLSExportInput) error {
 	cmd := exec.CommandContext(rc.Ctx, "scp", shared.TLSCrt, dest)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Error("❌ SCP command failed", zap.Error(err), zap.ByteString("output", output))
+		log.Error(" SCP command failed", zap.Error(err), zap.ByteString("output", output))
 		return cerr.Wrap(err, "scp failed")
 	}
 
-	log.Info("✅ TLS cert exported successfully", zap.ByteString("output", output))
+	log.Info(" TLS cert exported successfully", zap.ByteString("output", output))
 	return nil
 }

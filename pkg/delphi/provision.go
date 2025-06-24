@@ -87,7 +87,7 @@ func EnsureOpensearchRoleMapping(rc *eos_io.RuntimeContext, spec TenantSpec) err
 		return fmt.Errorf("unexpected status from OpenSearch: %s", resp.Status)
 	}
 
-	log.Info("✅ OpenSearch role mapping applied", zap.String("role", fmt.Sprintf("delphi-%s-role", spec.Name)))
+	log.Info(" OpenSearch role mapping applied", zap.String("role", fmt.Sprintf("delphi-%s-role", spec.Name)))
 	return nil
 }
 
@@ -130,7 +130,7 @@ func EnsureOpensearchTenant(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("unexpected status creating tenant: %s", resp.Status)
 	}
 
-	log.Info("✅ OpenSearch tenant created", zap.String("tenant", spec.Name))
+	log.Info(" OpenSearch tenant created", zap.String("tenant", spec.Name))
 	return nil
 }
 
@@ -180,7 +180,7 @@ func EnsureWazuhGroup(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("unexpected status from Wazuh API: %s", resp.Status)
 	}
 
-	log.Info("✅ Wazuh group created", zap.String("group", groupID))
+	log.Info(" Wazuh group created", zap.String("group", groupID))
 	return nil
 }
 
@@ -233,7 +233,7 @@ func EnsureWazuhEnrollmentKey(rc *eos_io.RuntimeContext, spec TenantSpec) error 
 		return fmt.Errorf("unexpected status creating enrollment key: %s", resp.Status)
 	}
 
-	log.Info("✅ Enrollment key created", zap.String("group", groupID))
+	log.Info(" Enrollment key created", zap.String("group", groupID))
 	return nil
 }
 
@@ -289,7 +289,7 @@ func EnsureWazuhPolicy(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("unexpected status from Wazuh policy API: %s", resp.Status)
 	}
 
-	log.Info("✅ Wazuh policy created", zap.String("policy", policyName))
+	log.Info(" Wazuh policy created", zap.String("policy", policyName))
 	return nil
 }
 
@@ -363,7 +363,7 @@ func EnsureOpensearchRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("unexpected response: %s", resp.Status)
 	}
 
-	log.Info("✅ OpenSearch role created", zap.String("tenant", spec.Name))
+	log.Info(" OpenSearch role created", zap.String("tenant", spec.Name))
 	return nil
 }
 
@@ -415,7 +415,7 @@ func EnsureGlobalReadonlyRole(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("unexpected response from OpenSearch: %s", resp.Status)
 	}
 
-	log.Info("✅ Global readonly role ensured")
+	log.Info(" Global readonly role ensured")
 	return nil
 }
 
@@ -453,7 +453,7 @@ func ResolveWazuhRoleID(rc *eos_io.RuntimeContext, name string) (string, error) 
 
 	for _, r := range result.Data {
 		if r.Name == name {
-			log.Info("🔎 Resolved role ID",
+			log.Info(" Resolved role ID",
 				zap.String("name", name),
 				zap.String("id", r.ID),
 			)
@@ -497,7 +497,7 @@ func ResolveWazuhUserID(rc *eos_io.RuntimeContext, name string) (string, error) 
 
 	for _, user := range result.Data {
 		if user.Name == name {
-			log.Info("🔎 Resolved role ID",
+			log.Info(" Resolved role ID",
 				zap.String("name", name),
 				zap.String("id", user.ID),
 			)
@@ -541,7 +541,7 @@ func ResolveWazuhPolicyID(rc *eos_io.RuntimeContext, name string) (string, error
 
 	for _, p := range result.Data {
 		if p.Name == name {
-			log.Info("🔎 Resolved policy ID", zap.String("name", name), zap.String("id", p.ID))
+			log.Info(" Resolved policy ID", zap.String("name", name), zap.String("id", p.ID))
 			return p.ID, nil
 		}
 	}
@@ -595,7 +595,7 @@ func AttachPolicyToRole(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("unexpected status attaching policy: %s", resp.Status)
 	}
 
-	log.Info("✅ Policy attached to role",
+	log.Info(" Policy attached to role",
 		zap.String("role_id", roleID),
 		zap.String("policy_id", policyID),
 	)
@@ -650,6 +650,6 @@ func AssignRoleToUser(rc *eos_io.RuntimeContext, spec TenantSpec) error {
 		return fmt.Errorf("unexpected status assigning role to user: %s", resp.Status)
 	}
 
-	log.Info("✅ Role assigned to user", zap.String("user_id", userID), zap.String("role_id", roleID))
+	log.Info(" Role assigned to user", zap.String("user_id", userID), zap.String("role_id", roleID))
 	return nil
 }

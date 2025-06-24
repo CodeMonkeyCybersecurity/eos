@@ -31,7 +31,7 @@ func HandleFallbackOrStore(rc *eos_io.RuntimeContext, name string, secrets map[s
 	}
 
 	if report.Initialized && !report.Sealed && report.KVWorking {
-		otelzap.Ctx(rc.Ctx).Info("🔐 Vault is available and healthy — storing secrets securely", zap.String("name", name))
+		otelzap.Ctx(rc.Ctx).Info(" Vault is available and healthy — storing secrets securely", zap.String("name", name))
 		return WriteToVault(rc, name, secrets)
 	}
 
@@ -61,14 +61,14 @@ func handleVaultUnavailable(rc *eos_io.RuntimeContext, name string, secrets map[
 		},
 		string(shared.FallbackDisk): func() error {
 			otelzap.Ctx(rc.Ctx).Warn("Saving secrets to disk fallback", zap.String("fallback", "disk"), zap.String("name", name))
-			return WriteFallbackSecrets(rc, name, secrets) // ✅ fixed missing logger arg
+			return WriteFallbackSecrets(rc, name, secrets) //  fixed missing logger arg
 		},
 		string(shared.FallbackAbort): func() error {
 			otelzap.Ctx(rc.Ctx).Warn("User aborted — Vault unavailable and disk fallback declined", zap.String("name", name))
 			otelzap.Ctx(rc.Ctx).Info("Secrets were not saved due to user abort", zap.String("name", name))
 			return fmt.Errorf("vault unavailable, user aborted")
 		},
-	}) // ✅ fixed missing logger arg
+	}) //  fixed missing logger arg
 }
 
 // mustNewClient attempts to create a Vault client and logs any error.
@@ -81,11 +81,11 @@ func mustNewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 }
 
 func MaybeWriteVaultInitFallback(rc *eos_io.RuntimeContext, init *api.InitResponse) error {
-	fmt.Print("💾 Save Vault init material to fallback file? (y/N): ")
+	fmt.Print(" Save Vault init material to fallback file? (y/N): ")
 	var resp string
 	shared.SafeScanln(&resp)
 	if strings.ToLower(resp) != "y" {
-		otelzap.Ctx(rc.Ctx).Warn("❌ Skipping fallback write at user request")
+		otelzap.Ctx(rc.Ctx).Warn(" Skipping fallback write at user request")
 		return nil
 	}
 	return SaveInitResult(rc, init)
@@ -98,12 +98,12 @@ func TryLoadUnsealKeysFromFallback(rc *eos_io.RuntimeContext) (*api.InitResponse
 	initRes := new(api.InitResponse)
 
 	if err := ReadFallbackJSON(path, initRes); err != nil {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to read fallback file", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Failed to read fallback file", zap.Error(err))
 		return nil, fmt.Errorf("failed to read vault init fallback file: %w", err)
 	}
 	if len(initRes.KeysB64) < 3 || initRes.RootToken == "" {
 		return nil, fmt.Errorf("invalid or incomplete vault-init.json file")
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Fallback file validated", zap.Int("keys_found", len(initRes.KeysB64)))
+	otelzap.Ctx(rc.Ctx).Info(" Fallback file validated", zap.Int("keys_found", len(initRes.KeysB64)))
 	return initRes, nil
 }

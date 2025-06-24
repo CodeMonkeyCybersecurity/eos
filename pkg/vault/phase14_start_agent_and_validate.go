@@ -28,7 +28,7 @@ import (
 //            └── SetVaultToken()
 
 func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info("🚀 Starting Vault Agent and validating token")
+	otelzap.Ctx(rc.Ctx).Info(" Starting Vault Agent and validating token")
 
 	// Ensure runtime directory exists before starting service
 	if err := ensureRuntimeDirectory(rc); err != nil {
@@ -38,13 +38,13 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 	if err := startVaultAgentService(rc); err != nil {
 		// Enhanced error handling - get systemd logs to help with troubleshooting
 		if logErr := logSystemdServiceStatus(rc, shared.VaultAgentService); logErr != nil {
-			otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to retrieve service logs", zap.Error(logErr))
+			otelzap.Ctx(rc.Ctx).Warn("Failed to retrieve service logs", zap.Error(logErr))
 		}
 		return fmt.Errorf("start agent service: %w", err)
 	}
 
 	// Wait a moment for the service to fully start and begin authentication
-	otelzap.Ctx(rc.Ctx).Info("⏳ Allowing time for Vault Agent service to start and authenticate")
+	otelzap.Ctx(rc.Ctx).Info(" Allowing time for Vault Agent service to start and authenticate")
 	time.Sleep(3 * time.Second)
 
 	tokenPath := shared.AgentToken
@@ -52,13 +52,13 @@ func PhaseStartVaultAgentAndValidate(rc *eos_io.RuntimeContext, client *api.Clie
 	if err != nil {
 		// Enhanced error handling - get systemd logs when token acquisition fails
 		if logErr := logSystemdServiceStatus(rc, shared.VaultAgentService); logErr != nil {
-			otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to retrieve service logs for token wait failure", zap.Error(logErr))
+			otelzap.Ctx(rc.Ctx).Warn("Failed to retrieve service logs for token wait failure", zap.Error(logErr))
 		}
 		return fmt.Errorf("wait for agent token: %w", err)
 	}
 	SetVaultToken(rc, client, token)
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault Agent token acquired", zap.String("path", tokenPath))
+	otelzap.Ctx(rc.Ctx).Info(" Vault Agent token acquired", zap.String("path", tokenPath))
 	return nil
 }
 
@@ -67,23 +67,23 @@ func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 	unit := shared.VaultAgentService
 	log := otelzap.Ctx(rc.Ctx)
 
-	log.Info("🔄 Reloading systemd daemon and enabling Vault Agent service", zap.String("unit", unit))
+	log.Info(" Reloading systemd daemon and enabling Vault Agent service", zap.String("unit", unit))
 
 	// Check current service status before restart
 	if statusCmd := exec.Command("systemctl", "is-active", unit); statusCmd.Run() == nil {
-		log.Info("🔄 Service is currently active - it will be restarted", zap.String("unit", unit))
+		log.Info(" Service is currently active - it will be restarted", zap.String("unit", unit))
 	} else {
-		log.Info("🔄 Service is not currently active - it will be started", zap.String("unit", unit))
+		log.Info(" Service is not currently active - it will be started", zap.String("unit", unit))
 	}
 
 	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, unit); err != nil {
-		log.Error("❌ Failed to reload daemon and enable service",
+		log.Error(" Failed to reload daemon and enable service",
 			zap.String("unit", unit),
 			zap.Error(err))
 		return err
 	}
 
-	log.Info("✅ Service reload and enable completed", zap.String("unit", unit))
+	log.Info(" Service reload and enable completed", zap.String("unit", unit))
 	return nil
 }
 
@@ -91,7 +91,7 @@ func startVaultAgentService(rc *eos_io.RuntimeContext) error {
 // Runs as the eos user to avoid permission issues with /run/eos directory.
 func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Duration) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("⏳ Waiting for Vault Agent token",
+	log.Info(" Waiting for Vault Agent token",
 		zap.String("path", path),
 		zap.Duration("timeout", timeout))
 
@@ -105,13 +105,13 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 		parentDir := "/run/eos"
 		if dirStat, err := os.Stat(parentDir); err != nil {
 			if os.IsNotExist(err) {
-				log.Warn("📁 Parent directory does not exist",
+				log.Warn(" Parent directory does not exist",
 					zap.Int("attempt", attempt),
 					zap.String("dir", parentDir),
 					zap.Error(err))
 			}
 		} else {
-			log.Debug("📁 Parent directory status",
+			log.Debug(" Parent directory status",
 				zap.Int("attempt", attempt),
 				zap.String("dir", parentDir),
 				zap.String("mode", dirStat.Mode().String()))
@@ -119,18 +119,18 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 
 		if stat, err := os.Stat(path); err != nil {
 			if os.IsNotExist(err) {
-				log.Debug("📄 Token file does not exist yet",
+				log.Debug(" Token file does not exist yet",
 					zap.Int("attempt", attempt),
 					zap.String("path", path),
 					zap.Error(err))
 			} else {
-				log.Warn("📄 Cannot stat token file",
+				log.Warn(" Cannot stat token file",
 					zap.Int("attempt", attempt),
 					zap.String("path", path),
 					zap.Error(err))
 			}
 		} else {
-			log.Info("📄 Token file found",
+			log.Info(" Token file found",
 				zap.Int("attempt", attempt),
 				zap.String("path", path),
 				zap.String("mode", stat.Mode().String()),
@@ -140,7 +140,7 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 		// Use sudo -u eos to read the token file since /run/eos is owned by eos user
 		cmd := exec.Command("sudo", "-u", shared.EosID, "cat", path)
 		if data, err := cmd.Output(); err == nil && len(data) > 0 {
-			log.Info("✅ Token acquired successfully",
+			log.Info(" Token acquired successfully",
 				zap.Int("attempt", attempt),
 				zap.String("path", path),
 				zap.Int("token_length", len(data)))
@@ -157,7 +157,7 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 		time.Sleep(shared.Interval)
 	}
 
-	log.Error("❌ Timeout waiting for token",
+	log.Error(" Timeout waiting for token",
 		zap.String("path", path),
 		zap.Duration("timeout", timeout),
 		zap.Int("total_attempts", attempt))
@@ -167,7 +167,7 @@ func WaitForAgentToken(rc *eos_io.RuntimeContext, path string, timeout time.Dura
 // readTokenFromSink reads the Vault Agent token (run as 'eos' system user)
 func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("📄 Reading Vault Agent token from sink", zap.String("path", path))
+	log.Info(" Reading Vault Agent token from sink", zap.String("path", path))
 
 	if path == "" {
 		path = shared.AgentToken
@@ -176,17 +176,17 @@ func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 	// Check file existence and permissions before attempting to read
 	if stat, err := os.Stat(path); err != nil {
 		if os.IsNotExist(err) {
-			log.Error("❌ Token file does not exist",
+			log.Error(" Token file does not exist",
 				zap.String("path", path),
 				zap.Error(err))
 		} else {
-			log.Error("❌ Cannot stat token file",
+			log.Error(" Cannot stat token file",
 				zap.String("path", path),
 				zap.Error(err))
 		}
 		return "", fmt.Errorf("token file not accessible at %s: %w", path, err)
 	} else {
-		log.Info("✅ Token file exists",
+		log.Info(" Token file exists",
 			zap.String("path", path),
 			zap.String("mode", stat.Mode().String()),
 			zap.Int64("size", stat.Size()),
@@ -196,24 +196,24 @@ func readTokenFromSink(rc *eos_io.RuntimeContext, path string) (string, error) {
 	// Check parent directory permissions
 	parentDir := "/run/eos"
 	if dirStat, err := os.Stat(parentDir); err != nil {
-		log.Error("❌ Cannot stat parent directory",
+		log.Error(" Cannot stat parent directory",
 			zap.String("dir", parentDir),
 			zap.Error(err))
 	} else {
-		log.Info("📁 Parent directory status",
+		log.Info(" Parent directory status",
 			zap.String("dir", parentDir),
 			zap.String("mode", dirStat.Mode().String()))
 	}
 
 	out, err := exec.Command("cat", path).Output()
 	if err != nil {
-		log.Error("❌ Failed to read token via shell",
+		log.Error(" Failed to read token via shell",
 			zap.String("path", path),
 			zap.Error(err))
 		return "", fmt.Errorf("failed to read token from Vault Agent sink at %s: %w", path, err)
 	}
 	token := strings.TrimSpace(string(out))
-	log.Info("✅ Token read successfully via shell",
+	log.Info(" Token read successfully via shell",
 		zap.String("path", path),
 		zap.Int("token_length", len(token)))
 
@@ -229,29 +229,29 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 
 	// Check if directory already exists
 	if stat, err := os.Stat(runDir); err == nil {
-		log.Info("📁 Runtime directory already exists", 
+		log.Info(" Runtime directory already exists",
 			zap.String("path", runDir),
 			zap.String("mode", stat.Mode().String()))
-		
+
 		// Verify ownership
 		uid, gid, userErr := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 		if userErr == nil {
 			if chownErr := os.Chown(runDir, uid, gid); chownErr != nil {
-				log.Warn("⚠️ Could not update ownership of existing runtime directory", 
-					zap.String("dir", runDir), 
+				log.Warn("Could not update ownership of existing runtime directory",
+					zap.String("dir", runDir),
 					zap.Error(chownErr))
 			} else {
-				log.Info("✅ Runtime directory ownership verified")
+				log.Info(" Runtime directory ownership verified")
 			}
 		}
 		return nil
 	}
 
 	// Create directory if it doesn't exist
-	log.Info("📁 Creating runtime directory", zap.String("path", runDir))
+	log.Info(" Creating runtime directory", zap.String("path", runDir))
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
-		log.Error("❌ Failed to create runtime directory", 
-			zap.String("path", runDir), 
+		log.Error(" Failed to create runtime directory",
+			zap.String("path", runDir),
 			zap.Error(err))
 		return fmt.Errorf("create runtime directory %s: %w", runDir, err)
 	}
@@ -259,19 +259,19 @@ func ensureRuntimeDirectory(rc *eos_io.RuntimeContext) error {
 	// Set proper ownership (eos user)
 	uid, gid, err := eos_unix.LookupUser(rc.Ctx, shared.EosID)
 	if err != nil {
-		log.Warn("⚠️ Could not lookup eos user, using root ownership", zap.Error(err))
+		log.Warn("Could not lookup eos user, using root ownership", zap.Error(err))
 		return nil // Continue with root ownership rather than failing
 	}
 
 	if err := os.Chown(runDir, uid, gid); err != nil {
-		log.Warn("⚠️ Could not change ownership of runtime directory", 
-			zap.String("dir", runDir), 
+		log.Warn("Could not change ownership of runtime directory",
+			zap.String("dir", runDir),
 			zap.String("user", shared.EosID),
 			zap.Error(err))
 		return nil // Continue rather than failing
 	}
 
-	log.Info("✅ Runtime directory created and configured", 
+	log.Info(" Runtime directory created and configured",
 		zap.String("path", runDir),
 		zap.String("owner", shared.EosID),
 		zap.String("mode", "0755"))
@@ -299,9 +299,9 @@ func logSystemdServiceStatus(rc *eos_io.RuntimeContext, serviceName string) erro
 	journalCmd := exec.CommandContext(rc.Ctx, "journalctl", "-u", serviceName, "--no-pager", "-n", "20")
 	journalOutput, journalErr := journalCmd.CombinedOutput()
 	if journalErr != nil {
-		log.Warn("⚠️ Failed to get journal logs", zap.String("service", serviceName), zap.Error(journalErr))
+		log.Warn("Failed to get journal logs", zap.String("service", serviceName), zap.Error(journalErr))
 	} else {
-		log.Info("📋 Recent journal entries",
+		log.Info(" Recent journal entries",
 			zap.String("service", serviceName),
 			zap.String("logs", string(journalOutput)))
 	}

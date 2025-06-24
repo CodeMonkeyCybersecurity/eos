@@ -123,12 +123,12 @@ type QuantumSafeKeypair struct {
 
 | Algorithm | Current Security | Post-Quantum Security | Transition Priority |
 |-----------|------------------|----------------------|-------------------|
-| RSA       | ✅ Secure        | ❌ Vulnerable         | 🔴 High           |
-| ECDSA     | ✅ Secure        | ❌ Vulnerable         | 🔴 High           |
-| Ed25519   | ✅ Secure        | ❌ Vulnerable         | 🟡 Medium         |
-| bcrypt    | ✅ Secure        | ✅ Secure             | 🟢 Low            |
-| SHA256    | ✅ Secure        | ⚠️ Weakened          | 🟡 Medium         |
-| ML-KEM    | ✅ Secure        | ✅ Secure             | ✅ Ready          |
+| RSA       |  Secure        |  Vulnerable         | 🔴 High           |
+| ECDSA     |  Secure        |  Vulnerable         | 🔴 High           |
+| Ed25519   |  Secure        |  Vulnerable         | 🟡 Medium         |
+| bcrypt    |  Secure        |  Secure             | 🟢 Low            |
+| SHA256    |  Secure        | Weakened          | 🟡 Medium         |
+| ML-KEM    |  Secure        |  Secure             |  Ready          |
 
 ### Key Management Best Practices
 
@@ -242,22 +242,22 @@ func TestKeyRotation(t *testing.T)
 ## Migration Guide
 
 ### Phase 1: Preparation (Current)
-- ✅ Implement hybrid cryptography
-- ✅ Add ML-KEM support alongside classical algorithms
-- ✅ Update key generation to support both types
-- ✅ Comprehensive testing of post-quantum implementations
+-  Implement hybrid cryptography
+-  Add ML-KEM support alongside classical algorithms
+-  Update key generation to support both types
+-  Comprehensive testing of post-quantum implementations
 
 ### Phase 2: Transition (2024-2025)
-- 🔄 Default to post-quantum for new installations
-- 🔄 Provide migration tools for existing deployments
-- 🔄 Maintain backward compatibility with classical systems
-- 🔄 Monitor quantum computing developments
+-  Default to post-quantum for new installations
+-  Provide migration tools for existing deployments
+-  Maintain backward compatibility with classical systems
+-  Monitor quantum computing developments
 
 ### Phase 3: Post-Quantum Default (2025+)
-- ⏳ Deprecate classical-only algorithms
-- ⏳ Require post-quantum for all new keys
-- ⏳ Provide legacy support for hybrid systems
-- ⏳ Regular security audits and updates
+-  Deprecate classical-only algorithms
+-  Require post-quantum for all new keys
+-  Provide legacy support for hybrid systems
+-  Regular security audits and updates
 
 ## Integration Points
 
@@ -279,9 +279,9 @@ func TestKeyRotation(t *testing.T)
 ## Compliance and Standards
 
 ### NIST Post-Quantum Standards
-- **FIPS 203** (ML-KEM): ✅ Implemented
-- **FIPS 204** (ML-DSA): 🔄 In Development
-- **FIPS 205** (SLH-DSA): ⏳ Future
+- **FIPS 203** (ML-KEM):  Implemented
+- **FIPS 204** (ML-DSA):  In Development
+- **FIPS 205** (SLH-DSA):  Future
 
 ### Industry Compliance
 - **CNSA 2.0**: Partial compliance (key exchange only)

@@ -27,7 +27,7 @@ var ubuntuCmd = &cobra.Command{
 - Multi-Factor Authentication (MFA) for sudo/root access`,
 	RunE: eos.WrapExtended(7*time.Minute, func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🛡️ Starting Ubuntu security hardening with extended timeout",
+		logger.Info(" Starting Ubuntu security hardening with extended timeout",
 			zap.Duration("timeout", 7*time.Minute),
 			zap.String("reason", "AIDE installation and security tools require extended time"))
 

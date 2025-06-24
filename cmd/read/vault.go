@@ -129,37 +129,37 @@ This command demonstrates:
 		// Create enhanced vault container
 		vaultContainer, err := vault.NewEnhancedVaultContainer(rc)
 		if err != nil {
-			logger.Error("❌ Failed to create enhanced vault container", zap.Error(err))
+			logger.Error(" Failed to create enhanced vault container", zap.Error(err))
 			return fmt.Errorf("failed to create vault container: %w", err)
 		}
 
 		// Start container
 		if err := vaultContainer.Start(); err != nil {
-			logger.Error("❌ Failed to start vault container", zap.Error(err))
+			logger.Error(" Failed to start vault container", zap.Error(err))
 			return fmt.Errorf("failed to start vault container: %w", err)
 		}
 
 		// Ensure proper cleanup
 		defer func() {
 			if err := vaultContainer.Stop(); err != nil {
-				logger.Error("❌ Failed to stop vault container", zap.Error(err))
+				logger.Error(" Failed to stop vault container", zap.Error(err))
 			}
 		}()
 
-		logger.Info("✅ Enhanced vault container started successfully")
+		logger.Info(" Enhanced vault container started successfully")
 
 		// Get secret store for operations
 		secretStore, err := vaultContainer.GetSecretStore()
 		if err != nil {
-			logger.Error("❌ Failed to get secret store", zap.Error(err))
+			logger.Error(" Failed to get secret store", zap.Error(err))
 			return fmt.Errorf("failed to get secret store: %w", err)
 		}
 
 		// List secrets under eos prefix
-		logger.Info("📋 Listing secrets under secret/eos")
+		logger.Info(" Listing secrets under secret/eos")
 		secrets, err := secretStore.List(rc.Ctx, shared.EosID+"/")
 		if err != nil {
-			logger.Error("❌ Failed to list vault secrets", zap.Error(err))
+			logger.Error(" Failed to list vault secrets", zap.Error(err))
 			return fmt.Errorf("could not list vault contents: %w", err)
 		}
 
@@ -167,10 +167,10 @@ This command demonstrates:
 		for _, secret := range secrets {
 			// Only show the key, not the value for security
 			secretPath := "secret/eos/" + strings.TrimPrefix(secret.Key, shared.EosID+"/")
-			logger.Info("📄 Found vault entry", zap.String("entry", secretPath))
+			logger.Info(" Found vault entry", zap.String("entry", secretPath))
 		}
 
-		logger.Info("✅ Vault entries inspection complete", zap.Int("count", len(secrets)))
+		logger.Info(" Vault entries inspection complete", zap.Int("count", len(secrets)))
 		return nil
 	}),
 }
@@ -214,12 +214,12 @@ Examples:
 		// Handle different health statuses appropriately
 		switch status.HealthStatus {
 		case "healthy":
-			log.Info("✅ Vault Agent is healthy and functioning correctly")
+			log.Info(" Vault Agent is healthy and functioning correctly")
 		case "degraded":
-			log.Warn("⚠️ Vault Agent is degraded but operational", zap.String("status", status.HealthStatus))
+			log.Warn("Vault Agent is degraded but operational", zap.String("status", status.HealthStatus))
 			// Degraded is informational - agent is running but has minor issues
 		case "unhealthy":
-			log.Error("❌ Vault Agent is unhealthy", zap.String("status", status.HealthStatus))
+			log.Error(" Vault Agent is unhealthy", zap.String("status", status.HealthStatus))
 			return fmt.Errorf("vault agent status: %s", status.HealthStatus)
 		default:
 			log.Warn("❓ Vault Agent has unknown status", zap.String("status", status.HealthStatus))
@@ -271,25 +271,25 @@ var InspectSecretsCmd = &cobra.Command{
 			return nil
 		}
 
-		log.Info("🔐 Eos Secrets Directory", zap.String("directory", shared.SecretsDir))
+		log.Info(" Eos Secrets Directory", zap.String("directory", shared.SecretsDir))
 
 		for _, file := range files {
 			path := filepath.Join(shared.SecretsDir, file.Name())
 
 			data, err := os.ReadFile(path)
 			if err != nil {
-				log.Warn("❌ Failed to read secret file", zap.String("path", path), zap.Error(err))
+				log.Warn(" Failed to read secret file", zap.String("path", path), zap.Error(err))
 				continue
 			}
 
 			var content map[string]any
 			if err := json.Unmarshal(data, &content); err != nil {
-				log.Warn("❌ Failed to parse JSON secret", zap.String("path", path), zap.Error(err))
+				log.Warn(" Failed to parse JSON secret", zap.String("path", path), zap.Error(err))
 				log.Warn("Unreadable JSON file", zap.String("file", file.Name()))
 				continue
 			}
 
-			log.Info("📄 Secret file", zap.String("file", file.Name()))
+			log.Info(" Secret file", zap.String("file", file.Name()))
 			for k, v := range content {
 				valStr := fmt.Sprintf("%v", v)
 				if strings.Contains(strings.ToLower(k), "password") || strings.Contains(strings.ToLower(k), "token") || strings.Contains(strings.ToLower(k), "key") {
@@ -299,7 +299,7 @@ var InspectSecretsCmd = &cobra.Command{
 			}
 		}
 
-		log.Info("✅ Secrets inspection complete")
+		log.Info(" Secrets inspection complete")
 		return nil
 	}),
 }
@@ -344,7 +344,7 @@ func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOption
 		return fmt.Errorf("failed to write secure file: %w", err)
 	}
 
-	fmt.Printf("✅ Vault init data exported securely to: %s\n", options.OutputPath)
+	fmt.Printf(" Vault init data exported securely to: %s\n", options.OutputPath)
 	return nil
 }
 
@@ -356,7 +356,7 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 
 	// Display file information
 	if info.FileInfo != nil {
-		fmt.Printf("\n📄 Init File: %s\n", info.FileInfo.Path)
+		fmt.Printf("\n Init File: %s\n", info.FileInfo.Path)
 		fmt.Printf("   Exists: %v\n", info.FileInfo.Exists)
 		fmt.Printf("   Readable: %v\n", info.FileInfo.Readable)
 		if info.FileInfo.Exists {
@@ -379,7 +379,7 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 
 	// Display security status
 	if info.SecurityStatus != nil {
-		fmt.Printf("\n🛡️ Security Status\n")
+		fmt.Printf("\n Security Status\n")
 		fmt.Printf("   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled)
 		fmt.Printf("   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled)
 		fmt.Printf("   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied)
@@ -393,47 +393,47 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 // displayAgentStatus provides human-readable display of Vault Agent status
 // TODO: Convert to structured logging when RuntimeContext is available
 func displayAgentStatus(status *vault.AgentStatus) {
-	fmt.Println("\n🤖 Vault Agent Status")
+	fmt.Println("\n Vault Agent Status")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Service status
 	if status.ServiceRunning {
-		fmt.Println("✅ Service: Running")
+		fmt.Println(" Service: Running")
 	} else {
-		fmt.Println("❌ Service: Not Running")
+		fmt.Println(" Service: Not Running")
 	}
 
 	// Token status
 	if status.TokenAvailable {
-		fmt.Println("✅ Token: Available")
+		fmt.Println(" Token: Available")
 		if !status.LastTokenTime.IsZero() {
 			fmt.Printf("   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
 		}
 		if status.TokenValid {
-			fmt.Println("✅ Token: Valid")
+			fmt.Println(" Token: Valid")
 		} else {
-			fmt.Println("⚠️ Token: Invalid or Empty")
+			fmt.Println("Token: Invalid or Empty")
 		}
 	} else {
-		fmt.Println("❌ Token: Not Available")
+		fmt.Println(" Token: Not Available")
 	}
 
 	// Configuration status
 	if status.ConfigValid {
-		fmt.Println("✅ Configuration: Valid")
+		fmt.Println(" Configuration: Valid")
 	} else {
-		fmt.Println("❌ Configuration: Missing or Invalid")
+		fmt.Println(" Configuration: Missing or Invalid")
 	}
 
 	// Overall health
 	fmt.Printf("\n🏥 Overall Health: ")
 	switch status.HealthStatus {
 	case "healthy":
-		fmt.Println("✅ Healthy")
+		fmt.Println(" Healthy")
 	case "degraded":
-		fmt.Println("⚠️ Degraded")
+		fmt.Println("Degraded")
 	case "unhealthy":
-		fmt.Println("❌ Unhealthy")
+		fmt.Println(" Unhealthy")
 	default:
 		fmt.Printf("❓ Unknown (%s)\n", status.HealthStatus)
 	}
@@ -442,10 +442,10 @@ func displayAgentStatus(status *vault.AgentStatus) {
 	if status.HealthStatus != "healthy" {
 		fmt.Println("\n💡 Recommendations:")
 		if !status.ServiceRunning {
-			fmt.Println("   • Start the service: sudo systemctl start vault-agent")
+			fmt.Println("   • Start the service: sudo systemctl start vault-agent-eos")
 		}
 		if !status.TokenAvailable || !status.TokenValid {
-			fmt.Println("   • Check agent authentication: journalctl -u vault-agent")
+			fmt.Println("   • Check agent authentication: journalctl -fu vault-agent-eos")
 		}
 		if !status.ConfigValid {
 			fmt.Println("   • Verify configuration: eos enable vault")

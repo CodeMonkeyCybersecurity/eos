@@ -18,7 +18,7 @@ func GetAllNetworks(rc *eos_io.RuntimeContext) error {
 
 	networks, err := client.Network.All(rc.Ctx)
 	if err != nil {
-		log.Error("❌ Failed to list networks", zap.Error(err))
+		log.Error(" Failed to list networks", zap.Error(err))
 		return cerr.Wrap(err, "failed to list networks")
 	}
 
@@ -66,11 +66,11 @@ func CreateANetwork(rc *eos_io.RuntimeContext) error {
 		},
 	})
 	if err != nil {
-		log.Error("❌ Failed to create network", zap.Error(err))
+		log.Error(" Failed to create network", zap.Error(err))
 		return cerr.Wrap(err, "failed to create network")
 	}
 
-	log.Info("✅ Network created", zap.String("name", result.Name), zap.Int64("id", result.ID))
+	log.Info(" Network created", zap.String("name", result.Name), zap.Int64("id", result.ID))
 	return nil
 }
 
@@ -80,15 +80,15 @@ func GetANetwork(rc *eos_io.RuntimeContext, id int64) error {
 
 	network, _, err := client.Network.GetByID(rc.Ctx, id)
 	if err != nil {
-		log.Error("❌ Failed to get network", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to get network", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to get network")
 	}
 	if network == nil {
-		log.Warn("⚠️ No network found", zap.Int64("id", id))
+		log.Warn("No network found", zap.Int64("id", id))
 		return nil
 	}
 
-	log.Info("📡 Network info", zap.String("name", network.Name), zap.Int64("id", network.ID))
+	log.Info(" Network info", zap.String("name", network.Name), zap.Int64("id", network.ID))
 	return nil
 }
 
@@ -106,7 +106,7 @@ func UpdateANetwork(rc *eos_io.RuntimeContext, id int64, newName string) error {
 		},
 	})
 	if err != nil {
-		log.Error("❌ Failed to update network", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to update network", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to update network")
 	}
 
@@ -120,7 +120,7 @@ func DeleteANetwork(rc *eos_io.RuntimeContext, id int64) error {
 
 	_, err := client.Network.Delete(rc.Ctx, &hcloud.Network{ID: id})
 	if err != nil {
-		log.Error("❌ Failed to delete network", zap.Int64("id", id), zap.Error(err))
+		log.Error(" Failed to delete network", zap.Int64("id", id), zap.Error(err))
 		return cerr.Wrap(err, "failed to delete network")
 	}
 

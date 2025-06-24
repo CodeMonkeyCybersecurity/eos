@@ -29,7 +29,7 @@ func CheckSudo() bool {
 func IsPrivilegedUser(ctx context.Context) bool {
 	current, err := user.Current()
 	if err != nil {
-		otelzap.Ctx(ctx).Warn("🧪 Could not determine current user", zap.Error(err))
+		otelzap.Ctx(ctx).Warn(" Could not determine current user", zap.Error(err))
 		return os.Geteuid() == 0
 	}
 	return current.Username == shared.EosID || os.Geteuid() == 0
@@ -48,7 +48,7 @@ func EnforceSecretsAccess(ctx context.Context, show bool) bool {
 func RequireRoot(ctx context.Context) {
 	if !IsPrivilegedUser(ctx) {
 		zap.L().Error("Root access required")
-		fmt.Fprintln(os.Stderr, "❌ This command must be run as root (try sudo).")
+		fmt.Fprintln(os.Stderr, " This command must be run as root (try sudo).")
 		os.Exit(1)
 	}
 }
@@ -62,7 +62,7 @@ func RequireRootInteractive() error {
 	if currentUser.Uid == "0" {
 		return nil // already root
 	}
-	fmt.Println("⚠️ Bootstrap requires root privileges. You may be prompted for your password.")
+	fmt.Println("Bootstrap requires root privileges. You may be prompted for your password.")
 	cmd := exec.Command("sudo", "-v")
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -75,12 +75,12 @@ func RequireRootInteractive() error {
 
 func FailIfPermissionDenied(ctx context.Context, action, path string, err error) {
 	if os.IsPermission(err) {
-		otelzap.Ctx(ctx).Error(fmt.Sprintf("❌ %s failed due to permissions", action),
+		otelzap.Ctx(ctx).Error(fmt.Sprintf(" %s failed due to permissions", action),
 			zap.String("path", path),
 			zap.Error(err),
 		)
-		fmt.Fprintf(os.Stderr, "\n🔒 %s requires elevated privileges.\n", action)
-		fmt.Fprintln(os.Stderr, "👉 Try rerunning the command with sudo:")
+		fmt.Fprintf(os.Stderr, "\n %s requires elevated privileges.\n", action)
+		fmt.Fprintln(os.Stderr, " Try rerunning the command with sudo:")
 		fmt.Fprintf(os.Stderr, "   sudo eos %s\n\n", os.Args[1:])
 		os.Exit(1)
 	}
@@ -96,7 +96,7 @@ func CanInteractiveSudo() bool {
 
 	err := cmd.Run()
 	if err != nil {
-		fmt.Printf("❌ interactive sudo check failed: %v\n", err)
+		fmt.Printf(" interactive sudo check failed: %v\n", err)
 		return false
 	}
 	return true
@@ -107,7 +107,7 @@ func CheckSudoersMembership(username string) bool {
 	cmd := exec.Command("sudo", "grep", "-r", username, "/etc/sudoers", "/etc/sudoers.d")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("❌ sudoers membership check failed: %v\n", err)
+		fmt.Printf(" sudoers membership check failed: %v\n", err)
 		return false
 	}
 	return strings.Contains(string(out), username)

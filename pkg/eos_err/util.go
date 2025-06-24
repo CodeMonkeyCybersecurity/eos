@@ -90,10 +90,10 @@ func PrintError(ctx context.Context, userMessage string, err error) {
 	if err != nil {
 		if IsExpectedUserError(err) {
 			otelzap.Ctx(ctx).Warn(userMessage, zap.Error(err))
-			fmt.Fprintf(os.Stderr, "⚠️  Notice: %s: %v\n", userMessage, err)
+			fmt.Fprintf(os.Stderr, " Notice: %s: %v\n", userMessage, err)
 		} else {
 			otelzap.Ctx(ctx).Error(userMessage, zap.Error(err))
-			fmt.Fprintf(os.Stderr, "❌ Error: %s: %v\n", userMessage, err)
+			fmt.Fprintf(os.Stderr, " Error: %s: %v\n", userMessage, err)
 		}
 	}
 }
@@ -101,6 +101,6 @@ func PrintError(ctx context.Context, userMessage string, err error) {
 // ExitWithError prints the error and exits with status 1.
 func ExitWithError(ctx context.Context, userMessage string, err error) {
 	PrintError(ctx, userMessage, err)
-	fmt.Fprintln(os.Stderr, "👉 Tip: rerun with --debug for more details.")
+	fmt.Fprintln(os.Stderr, " Tip: rerun with --debug for more details.")
 	os.Exit(1)
 }

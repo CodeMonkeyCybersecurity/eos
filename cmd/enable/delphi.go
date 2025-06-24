@@ -21,14 +21,14 @@ This includes 443, 1514, 1515, and 55000.`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
-		otelzap.Ctx(rc.Ctx).Info("🔐 Enabling Delphi firewall rules...")
+		otelzap.Ctx(rc.Ctx).Info(" Enabling Delphi firewall rules...")
 
 		if err := platform.AllowPorts(rc, delphi.DefaultPorts); err != nil {
-			otelzap.Ctx(rc.Ctx).Error("❌ Firewall configuration failed", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Error(" Firewall configuration failed", zap.Error(err))
 			return err
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Delphi firewall configuration complete.")
+		otelzap.Ctx(rc.Ctx).Info(" Delphi firewall configuration complete.")
 		return nil
 	}),
 }

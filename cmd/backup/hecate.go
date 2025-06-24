@@ -38,7 +38,7 @@ var BackupHecateCmd = &cobra.Command{
 				log.Error("Failed to create destination directory", zap.Error(err))
 				return fmt.Errorf("failed to create %s: %w", destDir, err)
 			}
-			log.Info("✅ Destination directory created", zap.String("path", destDir))
+			log.Info(" Destination directory created", zap.String("path", destDir))
 		}
 
 		// Prepare timestamped backup filename
@@ -66,7 +66,7 @@ var BackupHecateCmd = &cobra.Command{
 			return fmt.Errorf("failed to create backup archive: %w", err)
 		}
 
-		log.Info("✅ Backup completed successfully", zap.String("backup_file", backupFilePath))
+		log.Info(" Backup completed successfully", zap.String("backup_file", backupFilePath))
 		return nil
 	}),
 }

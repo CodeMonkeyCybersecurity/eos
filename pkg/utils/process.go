@@ -30,13 +30,13 @@ func GrepProcess(ctx context.Context, keyword string) (string, error) {
 	})
 
 	if err != nil {
-		logger.Error("❌ Failed to search processes",
+		logger.Error(" Failed to search processes",
 			zap.String("keyword", keyword),
 			zap.Error(err))
 		return "", fmt.Errorf("process search failed: %w", err)
 	}
 
-	logger.Debug("✅ Process search completed",
+	logger.Debug(" Process search completed",
 		zap.String("keyword", keyword),
 		zap.Int("output_length", len(output)))
 

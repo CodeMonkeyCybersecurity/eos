@@ -20,25 +20,25 @@ import (
 
 // Agent represents an agent record for display
 type Agent struct {
-	ID                 string     `json:"id"`
-	Name               *string    `json:"name"`
-	IP                 *string    `json:"ip"`
-	OS                 *string    `json:"os"`
-	Registered         *time.Time `json:"registered"`
-	LastSeen           *time.Time `json:"last_seen"`
-	AgentVersion       *string    `json:"agent_version"`
-	StatusText         *string    `json:"status_text"`
-	NodeName           *string    `json:"node_name"`
-	DisconnectionTime  *time.Time `json:"disconnection_time"`
-	APIFetchTimestamp  *time.Time `json:"api_fetch_timestamp"`
+	ID                string     `json:"id"`
+	Name              *string    `json:"name"`
+	IP                *string    `json:"ip"`
+	OS                *string    `json:"os"`
+	Registered        *time.Time `json:"registered"`
+	LastSeen          *time.Time `json:"last_seen"`
+	AgentVersion      *string    `json:"agent_version"`
+	StatusText        *string    `json:"status_text"`
+	NodeName          *string    `json:"node_name"`
+	DisconnectionTime *time.Time `json:"disconnection_time"`
+	APIFetchTimestamp *time.Time `json:"api_fetch_timestamp"`
 }
 
 // NewAgentsCmd creates the agents watch command
 func NewAgentsCmd() *cobra.Command {
 	var (
-		limit    int
-		refresh  int
-		dsn      string
+		limit   int
+		refresh int
+		dsn     string
 	)
 
 	cmd := &cobra.Command{
@@ -78,7 +78,7 @@ Example:
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					logger.Error("❌ Failed to close database connection", zap.Error(err))
+					logger.Error(" Failed to close database connection", zap.Error(err))
 				}
 			}()
 
@@ -87,7 +87,7 @@ Example:
 				return fmt.Errorf("failed to ping database: %w", err)
 			}
 
-			logger.Info("✅ Connected to PostgreSQL database")
+			logger.Info(" Connected to PostgreSQL database")
 
 			// Start watching
 			return watchAgents(rc.Ctx, logger, db, limit, refresh)
@@ -106,7 +106,7 @@ func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	logger.Info("📡 Starting agents monitoring...")
+	logger.Info(" Starting agents monitoring...")
 
 	// Initial display
 	displayAgents(ctx, logger, db, limit)
@@ -135,7 +135,7 @@ func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
-	
+
 	fmt.Printf("🖥️  Delphi Agents Monitor - Last %d agents (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
 	fmt.Println(strings.Repeat("=", 140))
 
@@ -160,7 +160,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logger.Error("❌ Failed to close rows", zap.Error(err))
+			logger.Error(" Failed to close rows", zap.Error(err))
 		}
 	}()
 
@@ -172,7 +172,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	agents := make([]Agent, 0, limit)
 	for rows.Next() {
 		var agent Agent
-		
+
 		err := rows.Scan(
 			&agent.ID, &agent.Name, &agent.IP, &agent.OS,
 			&agent.Registered, &agent.LastSeen, &agent.AgentVersion,
@@ -183,7 +183,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 			logger.Error("Failed to scan agent row", zap.Error(err))
 			continue
 		}
-		
+
 		agents = append(agents, agent)
 	}
 
@@ -196,7 +196,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		status := formatOptionalString(agent.StatusText, 12)
 		version := formatOptionalString(agent.AgentVersion, 15)
 		node := formatOptionalString(agent.NodeName, 15)
-		
+
 		// Format timestamps
 		lastSeenTime := formatOptionalTimeShort(agent.LastSeen)
 		registeredTime := formatOptionalTimeShort(agent.Registered)
@@ -204,9 +204,9 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 
 		// Color-code status
 		statusColor := getAgentStatusColor(agent.StatusText)
-		
+
 		fmt.Printf("%-8s %-15s %-15s %-20s %s%-12s\033[0m %-12s %-15s %-15s %-12s %-12s\n",
-			agent.ID, name, ip, os, statusColor, status, lastSeenTime, 
+			agent.ID, name, ip, os, statusColor, status, lastSeenTime,
 			version, node, registeredTime, apiFetchTime)
 	}
 
@@ -216,7 +216,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 
 	// Count active/inactive agents
 	activeCount, totalCount := countAgentsByStatus(ctx, db)
-	fmt.Printf("\n📊 Active: %d | Total: %d | Showing: %d | Press Ctrl+C to exit\n", 
+	fmt.Printf("\n Active: %d | Total: %d | Showing: %d | Press Ctrl+C to exit\n",
 		activeCount, totalCount, len(agents))
 }
 
@@ -235,10 +235,10 @@ func formatOptionalTimeShort(t *time.Time) string {
 	if t == nil {
 		return "-"
 	}
-	
+
 	now := time.Now()
 	diff := now.Sub(*t)
-	
+
 	if diff < time.Minute {
 		return "now"
 	} else if diff < time.Hour {
@@ -254,7 +254,7 @@ func getAgentStatusColor(status *string) string {
 	if status == nil {
 		return "\033[90m" // Gray
 	}
-	
+
 	switch strings.ToLower(*status) {
 	case "active":
 		return "\033[32m" // Green
@@ -275,12 +275,12 @@ func countAgentsByStatus(ctx context.Context, db *sql.DB) (active, total int) {
 	if err != nil {
 		active = 0
 	}
-	
+
 	// Count total agents
 	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents").Scan(&total)
 	if err != nil {
 		total = 0
 	}
-	
+
 	return active, total
 }

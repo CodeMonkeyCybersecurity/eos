@@ -27,11 +27,11 @@ This command:
 The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("📧 Deploying email template for Delphi emailer service")
+		logger.Info(" Deploying email template for Delphi emailer service")
 
 		// Check if we have sudo privileges
 		if !eos_unix.CanInteractiveSudo() {
-			logger.Error("❌ Sudo privileges required for template deployment")
+			logger.Error(" Sudo privileges required for template deployment")
 			return nil
 		}
 
@@ -40,44 +40,44 @@ The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 		targetDir := "/opt/stackstorm/packs/delphi"
 		targetPath := filepath.Join(targetDir, "email.html")
 
-		logger.Info("📁 Template deployment paths",
+		logger.Info(" Template deployment paths",
 			zap.String("source", sourcePath),
 			zap.String("target", targetPath))
 
 		// Check if source template exists
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-			logger.Error("❌ Source template not found",
+			logger.Error(" Source template not found",
 				zap.String("path", sourcePath),
 				zap.Error(err))
 			logger.Info("💡 The email template should be deployed during 'eos create delphi'")
 			return err
 		}
 
-		logger.Info("✅ Source template found", zap.String("path", sourcePath))
+		logger.Info(" Source template found", zap.String("path", sourcePath))
 
 		// Create target directory with proper permissions
 		logger.Info("📂 Creating target directory", zap.String("directory", targetDir))
-		
+
 		mkdirCmd := exec.Command("sudo", "mkdir", "-p", targetDir)
 		mkdirCmd.Stdout = os.Stdout
 		mkdirCmd.Stderr = os.Stderr
 		if err := mkdirCmd.Run(); err != nil {
-			logger.Error("❌ Failed to create target directory",
+			logger.Error(" Failed to create target directory",
 				zap.String("directory", targetDir),
 				zap.Error(err))
 			return err
 		}
 
-		logger.Info("✅ Target directory created", zap.String("directory", targetDir))
+		logger.Info(" Target directory created", zap.String("directory", targetDir))
 
 		// Copy template file
-		logger.Info("📄 Copying template file")
-		
+		logger.Info(" Copying template file")
+
 		copyCmd := exec.Command("sudo", "cp", sourcePath, targetPath)
 		copyCmd.Stdout = os.Stdout
 		copyCmd.Stderr = os.Stderr
 		if err := copyCmd.Run(); err != nil {
-			logger.Error("❌ Failed to copy template file",
+			logger.Error(" Failed to copy template file",
 				zap.String("source", sourcePath),
 				zap.String("target", targetPath),
 				zap.Error(err))
@@ -87,31 +87,31 @@ The template will be deployed to: /opt/stackstorm/packs/delphi/email.html`,
 		// Set ownership and permissions
 		chownCmd := exec.Command("sudo", "chown", "stanley:stanley", targetPath)
 		if err := chownCmd.Run(); err != nil {
-			logger.Warn("⚠️ Failed to set ownership (non-critical)",
+			logger.Warn("Failed to set ownership (non-critical)",
 				zap.String("file", targetPath),
 				zap.Error(err))
 		}
 
 		chmodCmd := exec.Command("sudo", "chmod", "0644", targetPath)
 		if err := chmodCmd.Run(); err != nil {
-			logger.Warn("⚠️ Failed to set permissions (non-critical)",
+			logger.Warn("Failed to set permissions (non-critical)",
 				zap.String("file", targetPath),
 				zap.Error(err))
 		}
 
-		logger.Info("✅ Template copied successfully",
+		logger.Info(" Template copied successfully",
 			zap.String("target", targetPath))
 
 		// Verify deployment
 		if _, err := os.Stat(targetPath); err != nil {
-			logger.Warn("⚠️ Template verification failed",
+			logger.Warn("Template verification failed",
 				zap.String("path", targetPath),
 				zap.Error(err))
 		} else {
 			logger.Info("🔍 Template deployment verified", zap.String("path", targetPath))
 		}
 
-		logger.Info("🎉 Email template deployment complete")
+		logger.Info(" Email template deployment complete")
 		logger.Info("💡 Next steps:")
 		logger.Info("   1. Ensure .env file is configured at /opt/stackstorm/packs/delphi/.env")
 		logger.Info("   2. Restart emailer service: eos delphi services restart delphi-emailer")

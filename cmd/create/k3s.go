@@ -343,7 +343,7 @@ k3s_token = "%s"`, serverURL, token)
 		logger.Warn("Failed to format terraform files", zap.Error(err))
 	}
 
-	fmt.Printf("\n✅ Terraform configuration generated successfully in: %s\n", outputDir)
+	fmt.Printf("\n Terraform configuration generated successfully in: %s\n", outputDir)
 	fmt.Println("\nNext steps:")
 	fmt.Printf("1. Set your Hetzner Cloud token: export HCLOUD_TOKEN='your-token'\n")
 	fmt.Printf("2. Review the configuration: cd %s\n", outputDir)

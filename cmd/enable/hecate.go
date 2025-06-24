@@ -25,7 +25,7 @@ var EnableHecateCmd = &cobra.Command{
 by running 'docker compose up -d' inside /opt/hecate.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info("🚀 Starting Hecate stack (docker compose up -d)...")
+		log.Info(" Starting Hecate stack (docker compose up -d)...")
 
 		composePath := hecate.BaseDir
 
@@ -34,11 +34,11 @@ by running 'docker compose up -d' inside /opt/hecate.`,
 
 		output, err := execCmd.CombinedOutput()
 		if err != nil {
-			log.Error("❌ Failed to start Hecate stack", zap.Error(err), zap.ByteString("output", output))
+			log.Error(" Failed to start Hecate stack", zap.Error(err), zap.ByteString("output", output))
 			return fmt.Errorf("failed to start Hecate stack: %w", err)
 		}
 
-		log.Info("✅ Hecate stack started successfully!", zap.ByteString("output", output))
+		log.Info(" Hecate stack started successfully!", zap.ByteString("output", output))
 		return nil
 	}),
 }

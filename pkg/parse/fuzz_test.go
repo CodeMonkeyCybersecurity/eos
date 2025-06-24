@@ -19,7 +19,7 @@ func FuzzSplitAndTrim(f *testing.F) {
 	f.Add("a")                  // single
 	f.Add("a,,b")               // double comma
 	f.Add(",,")                 // all empty
-	f.Add("🦄,   🚀,   🍕")        // unicode
+	f.Add("🦄,   ,   🍕")         // unicode
 	f.Fuzz(func(t *testing.T, s string) {
 		_ = SplitAndTrim(s)
 	})

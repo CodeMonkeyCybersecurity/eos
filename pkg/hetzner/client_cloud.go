@@ -15,6 +15,6 @@ func NewCloudClient(log *zap.Logger) *hcloud.Client {
 	if token == "" {
 		log.Fatal("🚫 HETZNER_TOKEN environment variable not set")
 	}
-	log.Info("🔐 Creating Hetzner client")
+	log.Info(" Creating Hetzner client")
 	return hcloud.NewClient(hcloud.WithToken(token))
 }

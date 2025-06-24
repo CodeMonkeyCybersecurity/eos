@@ -29,8 +29,8 @@ Subcommands are required to specify which type of resource to list.`,
 			zap.String("command", "eos delphi list"),
 		)
 
-		fmt.Println("❌ Missing subcommand for 'eos delphi list'.")
-		fmt.Println("ℹ️  Run `eos delphi list --help` to see available options for listing resources.")
+		fmt.Println(" Missing subcommand for 'eos delphi list'.")
+		fmt.Println("  Run `eos delphi list --help` to see available options for listing resources.")
 		_ = cmd.Help() // Print built-in help for 'list' command
 		return nil
 	}),

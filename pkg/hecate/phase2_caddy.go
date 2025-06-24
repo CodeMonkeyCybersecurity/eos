@@ -15,7 +15,7 @@ import (
 
 func PhaseCaddy(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🚀 Phase 2: Caddy setup",
+	log.Info(" Phase 2: Caddy setup",
 		zap.Int("proxy_count", len(spec.Proxies)),
 		zap.String("keycloak_domain", spec.KeycloakDomain),
 	)
@@ -28,11 +28,11 @@ func PhaseCaddy(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 			return fmt.Errorf("ensure caddy dir %s: %w", d, err)
 		}
 	}
-	log.Info("✅ Caddy directories ensured")
+	log.Info(" Caddy directories ensured")
 
 	// 2) Skip if nothing to do
 	if len(spec.Proxies) == 0 && spec.KeycloakDomain == "" {
-		log.Info("⚠️ No proxies or Keycloak; skipping Caddyfile")
+		log.Info("No proxies or Keycloak; skipping Caddyfile")
 		return nil
 	}
 
@@ -41,7 +41,7 @@ func PhaseCaddy(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 		log.Error("Caddyfile deploy failed", zap.Error(err))
 		return err
 	}
-	log.Info("✅ Caddyfile deployed")
+	log.Info(" Caddyfile deployed")
 	return nil
 }
 
@@ -67,7 +67,7 @@ func BuildAndPlaceCaddyfile(rc *eos_io.RuntimeContext, spec CaddySpec) error {
 // GenerateCaddySpecMulti creates the Caddyfile content from spec.
 func GenerateCaddySpecMulti(rc *eos_io.RuntimeContext, spec CaddySpec) string {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🔧 Starting Caddyfile generation", zap.Int("proxy_count", len(spec.Proxies)), zap.String("keycloak_domain", spec.KeycloakDomain))
+	log.Info(" Starting Caddyfile generation", zap.Int("proxy_count", len(spec.Proxies)), zap.String("keycloak_domain", spec.KeycloakDomain))
 
 	var builder strings.Builder
 
@@ -91,14 +91,14 @@ func GenerateCaddySpecMulti(rc *eos_io.RuntimeContext, spec CaddySpec) string {
 		builder.WriteString(fmt.Sprintf("%s {\n    reverse_proxy hecate-kc:8080\n    # Keycloak special settings can be added here if needed\n}\n\n", spec.KeycloakDomain))
 	}
 
-	log.Info("✅ Caddyfile generation complete")
+	log.Info(" Caddyfile generation complete")
 	return builder.String()
 }
 
 // CollateCaddyFragments handles collation + writing of the Caddyfile.
 func CollateCaddyFragments(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("📦 Collating and writing Caddy fragments", zap.Int("fragment_count", len(caddyFragments)))
+	log.Info(" Collating and writing Caddy fragments", zap.Int("fragment_count", len(caddyFragments)))
 
 	return CollateAndWriteFile(
 		rc,

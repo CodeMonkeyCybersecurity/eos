@@ -190,7 +190,7 @@ logger.Info("🔍 Starting [operation]",
     zap.String("function", "functionName"))
 
 // File operations (ALWAYS log file paths immediately when determined)
-logger.Info("📁 Output file determined",
+logger.Info(" Output file determined",
     zap.String("file_path", outputPath),
     zap.String("format", format),
     zap.String("directory", outputDir),
@@ -198,13 +198,13 @@ logger.Info("📁 Output file determined",
     zap.Bool("writable", isWritable))
 
 // Command execution (MUST be INFO level, not DEBUG)
-logger.Info("🔧 Executing command",
+logger.Info(" Executing command",
     zap.String("command", cmdName),
     zap.Strings("args", args),
     zap.Duration("timeout", timeout))
 
 // Command completion with metrics
-logger.Info("✅ Command completed",
+logger.Info(" Command completed",
     zap.String("command", cmdName),
     zap.Duration("duration", elapsed),
     zap.Int("output_lines", lineCount),
@@ -212,7 +212,7 @@ logger.Info("✅ Command completed",
     zap.Int("exit_code", exitCode))
 
 // Discovery results with detailed metrics
-logger.Info("✅ [Resource] discovery completed",
+logger.Info(" [Resource] discovery completed",
     zap.Int("containers", containerCount),
     zap.Int("running", runningCount),
     zap.Int("networks", networkCount),
@@ -220,13 +220,13 @@ logger.Info("✅ [Resource] discovery completed",
     zap.Duration("duration", elapsed))
 
 // File creation with full details
-logger.Info("📝 Writing [format] file",
+logger.Info(" Writing [format] file",
     zap.String("file_path", outputPath),
     zap.Int("resources", resourceCount),
     zap.Int("providers", providerCount))
 
 // File completion with validation
-logger.Info("✅ File written successfully",
+logger.Info(" File written successfully",
     zap.String("file_path", outputPath),
     zap.String("size", humanReadableSize),
     zap.String("permissions", permissions),
@@ -244,7 +244,7 @@ logger.Info("✨ [Operation] complete",
 All errors MUST include actionable context:
 
 ```go
-logger.Error("❌ [Operation] failed",
+logger.Error(" [Operation] failed",
     zap.Error(err),
     zap.String("command", failedCommand),
     zap.Strings("args", args),
@@ -269,14 +269,14 @@ Every operation MUST include timing information:
 
 #### Structured Logging Examples
 ```go
-// ✅ CORRECT - Use structured logging for all output
+//  CORRECT - Use structured logging for all output
 logger := otelzap.Ctx(rc.Ctx)
-logger.Info("🔄 Starting certificate renewal process")
-logger.Info("✅ Certificate renewal completed", zap.String("method", "k3s"), zap.Duration("duration", time.Since(start)))
-logger.Warn("⚠️ Configuration file not found", zap.String("path", configPath), zap.Error(err))
-logger.Error("❌ Operation failed", zap.String("operation", "deploy"), zap.Error(err))
+logger.Info(" Starting certificate renewal process")
+logger.Info(" Certificate renewal completed", zap.String("method", "k3s"), zap.Duration("duration", time.Since(start)))
+logger.Warn("Configuration file not found", zap.String("path", configPath), zap.Error(err))
+logger.Error(" Operation failed", zap.String("operation", "deploy"), zap.Error(err))
 
-// ❌ WRONG - Never use fmt package for output
+//  WRONG - Never use fmt package for output
 fmt.Println("Starting process...")
 fmt.Printf("Error: %v\n", err)
 fmt.Fprintf(os.Stderr, "Warning: %s\n", message)

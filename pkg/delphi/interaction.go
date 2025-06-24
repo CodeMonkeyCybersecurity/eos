@@ -54,7 +54,7 @@ func ConfirmConfig(rc *eos_io.RuntimeContext, cfg *Config) *Config {
 
 		pw, err := crypto.PromptPassword(rc, "API Password")
 		if err != nil {
-			fmt.Printf("❌ Failed to read password: %v\n", err)
+			fmt.Printf(" Failed to read password: %v\n", err)
 			os.Exit(1)
 		}
 		if pw != "" {
@@ -67,10 +67,10 @@ func ConfirmConfig(rc *eos_io.RuntimeContext, cfg *Config) *Config {
 		}
 
 		if err := WriteConfig(rc, cfg); err != nil {
-			fmt.Printf("❌ Error saving configuration: %v\n", err)
+			fmt.Printf(" Error saving configuration: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("✅ Configuration updated.")
+		fmt.Println(" Configuration updated.")
 	}
 	return cfg
 }

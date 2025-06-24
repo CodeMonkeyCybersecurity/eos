@@ -24,7 +24,7 @@ const (
 // InstallGPGKey installs and configures HashiCorp's GPG key for package verification
 func InstallGPGKey(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔑 Installing HashiCorp GPG key",
+	logger.Info(" Installing HashiCorp GPG key",
 		zap.String("url", hashicorpGPGKeyURL),
 		zap.String("key_path", hashicorpKeyPath))
 
@@ -38,7 +38,7 @@ func InstallGPGKey(rc *eos_io.RuntimeContext) error {
 		return installRHELGPGKey(rc, logger)
 	default:
 		err := fmt.Errorf("unsupported distribution for GPG key installation: %s", distro)
-		logger.Error("❌ GPG key installation not supported",
+		logger.Error(" GPG key installation not supported",
 			zap.String("distro", distro),
 			zap.Error(err))
 		return cerr.Wrap(err, "check distribution support")
@@ -51,14 +51,14 @@ func installDebianGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 
 	// Check if key already exists
 	if _, err := os.Stat(hashicorpKeyPath); err == nil {
-		logger.Info("ℹ️ HashiCorp GPG key already exists", zap.String("path", hashicorpKeyPath))
+		logger.Info(" HashiCorp GPG key already exists", zap.String("path", hashicorpKeyPath))
 		return nil
 	}
 
 	// Download and install the GPG key
 	cmd := fmt.Sprintf("wget -O- %s | gpg --dearmor -o %s", hashicorpGPGKeyURL, hashicorpKeyPath)
 	if err := execute.RunSimple(rc.Ctx, "sh", "-c", cmd); err != nil {
-		logger.Error("❌ Failed to download and install GPG key",
+		logger.Error(" Failed to download and install GPG key",
 			zap.String("command", cmd),
 			zap.Error(err))
 		return cerr.Wrap(err, "download and install GPG key")
@@ -66,13 +66,13 @@ func installDebianGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 
 	// Verify the key was installed
 	if _, err := os.Stat(hashicorpKeyPath); err != nil {
-		logger.Error("❌ GPG key file not found after installation",
+		logger.Error(" GPG key file not found after installation",
 			zap.String("path", hashicorpKeyPath),
 			zap.Error(err))
 		return cerr.Wrap(err, "verify GPG key installation")
 	}
 
-	logger.Info("✅ HashiCorp GPG key installed successfully",
+	logger.Info(" HashiCorp GPG key installed successfully",
 		zap.String("path", hashicorpKeyPath))
 	return nil
 }
@@ -84,20 +84,20 @@ func installRHELGPGKey(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) 
 	// For RHEL systems, the GPG key is typically handled by the repository configuration
 	// But we can still import it explicitly
 	if err := execute.RunSimple(rc.Ctx, "rpm", "--import", hashicorpGPGKeyURL); err != nil {
-		logger.Error("❌ Failed to import GPG key via rpm",
+		logger.Error(" Failed to import GPG key via rpm",
 			zap.String("url", hashicorpGPGKeyURL),
 			zap.Error(err))
 		return cerr.Wrap(err, "import GPG key via rpm")
 	}
 
-	logger.Info("✅ HashiCorp GPG key imported successfully for RHEL")
+	logger.Info(" HashiCorp GPG key imported successfully for RHEL")
 	return nil
 }
 
 // AddRepository adds HashiCorp's package repository to the system
 func AddRepository(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("📋 Adding HashiCorp package repository")
+	logger.Info(" Adding HashiCorp package repository")
 
 	distro := platform.DetectLinuxDistro(rc)
 	logger.Info("🔍 Configuring repository for distribution", zap.String("distro", distro))
@@ -109,7 +109,7 @@ func AddRepository(rc *eos_io.RuntimeContext) error {
 		return addRHELRepository(rc, logger)
 	default:
 		err := fmt.Errorf("unsupported distribution for repository configuration: %s", distro)
-		logger.Error("❌ Repository configuration not supported",
+		logger.Error(" Repository configuration not supported",
 			zap.String("distro", distro),
 			zap.Error(err))
 		return cerr.Wrap(err, "check distribution support")
@@ -118,12 +118,12 @@ func AddRepository(rc *eos_io.RuntimeContext) error {
 
 // addDebianRepository adds HashiCorp repository for Debian/Ubuntu systems
 func addDebianRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
-	logger.Info("📝 Configuring HashiCorp repository for Debian/Ubuntu",
+	logger.Info(" Configuring HashiCorp repository for Debian/Ubuntu",
 		zap.String("repo_file", debianRepoPath))
 
 	// Check if repository already exists
 	if _, err := os.Stat(debianRepoPath); err == nil {
-		logger.Info("ℹ️ HashiCorp repository already configured",
+		logger.Info(" HashiCorp repository already configured",
 			zap.String("path", debianRepoPath))
 		return nil
 	}
@@ -134,7 +134,7 @@ func addDebianRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 		Args:    []string{"-cs"},
 	})
 	if err != nil {
-		logger.Error("❌ Failed to get distribution codename", zap.Error(err))
+		logger.Error(" Failed to get distribution codename", zap.Error(err))
 		return cerr.Wrap(err, "get distribution codename")
 	}
 
@@ -146,36 +146,36 @@ func addDebianRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx
 		hashicorpKeyPath, codename)
 
 	if err := os.WriteFile(debianRepoPath, []byte(repoConfig+"\n"), 0644); err != nil {
-		logger.Error("❌ Failed to write repository configuration",
+		logger.Error(" Failed to write repository configuration",
 			zap.String("path", debianRepoPath),
 			zap.String("config", repoConfig),
 			zap.Error(err))
 		return cerr.Wrap(err, "write repository configuration")
 	}
 
-	logger.Info("✅ HashiCorp repository configured successfully",
+	logger.Info(" HashiCorp repository configured successfully",
 		zap.String("path", debianRepoPath),
 		zap.String("config", repoConfig))
 
 	// Update package lists
-	logger.Info("🔄 Updating package lists")
+	logger.Info(" Updating package lists")
 	if err := execute.RunSimple(rc.Ctx, "apt-get", "update"); err != nil {
-		logger.Error("❌ Failed to update package lists", zap.Error(err))
+		logger.Error(" Failed to update package lists", zap.Error(err))
 		return cerr.Wrap(err, "update package lists")
 	}
 
-	logger.Info("✅ Package lists updated successfully")
+	logger.Info(" Package lists updated successfully")
 	return nil
 }
 
 // addRHELRepository adds HashiCorp repository for RHEL/CentOS systems
 func addRHELRepository(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx) error {
-	logger.Info("📝 Configuring HashiCorp repository for RHEL/CentOS",
+	logger.Info(" Configuring HashiCorp repository for RHEL/CentOS",
 		zap.String("repo_file", rhelRepoPath))
 
 	// Check if repository already exists
 	if _, err := os.Stat(rhelRepoPath); err == nil {
-		logger.Info("ℹ️ HashiCorp repository already configured",
+		logger.Info(" HashiCorp repository already configured",
 			zap.String("path", rhelRepoPath))
 		return nil
 	}
@@ -190,23 +190,23 @@ gpgkey=https://rpm.releases.hashicorp.com/gpg
 `
 
 	if err := os.WriteFile(rhelRepoPath, []byte(repoConfig), 0644); err != nil {
-		logger.Error("❌ Failed to write repository configuration",
+		logger.Error(" Failed to write repository configuration",
 			zap.String("path", rhelRepoPath),
 			zap.Error(err))
 		return cerr.Wrap(err, "write repository configuration")
 	}
 
-	logger.Info("✅ HashiCorp repository configured successfully",
+	logger.Info(" HashiCorp repository configured successfully",
 		zap.String("path", rhelRepoPath))
 
 	// Update package cache
-	logger.Info("🔄 Updating package cache")
+	logger.Info(" Updating package cache")
 	if err := execute.RunSimple(rc.Ctx, "dnf", "makecache"); err != nil {
-		logger.Error("❌ Failed to update package cache", zap.Error(err))
+		logger.Error(" Failed to update package cache", zap.Error(err))
 		return cerr.Wrap(err, "update package cache")
 	}
 
-	logger.Info("✅ Package cache updated successfully")
+	logger.Info(" Package cache updated successfully")
 	return nil
 }
 
@@ -226,7 +226,7 @@ func RemoveRepository(rc *eos_io.RuntimeContext) error {
 		repoPath = rhelRepoPath
 	default:
 		err := fmt.Errorf("unsupported distribution for repository removal: %s", distro)
-		logger.Error("❌ Repository removal not supported",
+		logger.Error(" Repository removal not supported",
 			zap.String("distro", distro),
 			zap.Error(err))
 		return cerr.Wrap(err, "check distribution support")
@@ -234,7 +234,7 @@ func RemoveRepository(rc *eos_io.RuntimeContext) error {
 
 	// Remove repository file
 	if err := os.Remove(repoPath); err != nil && !os.IsNotExist(err) {
-		logger.Error("❌ Failed to remove repository file",
+		logger.Error(" Failed to remove repository file",
 			zap.String("path", repoPath),
 			zap.Error(err))
 		return cerr.Wrap(err, "remove repository file")
@@ -242,13 +242,13 @@ func RemoveRepository(rc *eos_io.RuntimeContext) error {
 
 	// Remove GPG key
 	if err := os.Remove(hashicorpKeyPath); err != nil && !os.IsNotExist(err) {
-		logger.Error("❌ Failed to remove GPG key",
+		logger.Error(" Failed to remove GPG key",
 			zap.String("path", hashicorpKeyPath),
 			zap.Error(err))
 		return cerr.Wrap(err, "remove GPG key")
 	}
 
-	logger.Info("✅ HashiCorp repository and GPG key removed successfully",
+	logger.Info(" HashiCorp repository and GPG key removed successfully",
 		zap.String("repo_path", repoPath),
 		zap.String("key_path", hashicorpKeyPath))
 	return nil

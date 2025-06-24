@@ -49,9 +49,9 @@ func DiskPath(rc *eos_io.RuntimeContext, name string) string {
 func ensureVaultDataDir(rc *eos_io.RuntimeContext) error {
 	dataPath := shared.VaultDataPath
 	if err := os.MkdirAll(dataPath, 0700); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to create Vault data dir", zap.String("path", dataPath), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to create Vault data dir", zap.String("path", dataPath), zap.Error(err))
 		return fmt.Errorf("failed to create Vault data dir: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault data directory ready", zap.String("path", dataPath))
+	otelzap.Ctx(rc.Ctx).Info(" Vault data directory ready", zap.String("path", dataPath))
 	return nil
 }

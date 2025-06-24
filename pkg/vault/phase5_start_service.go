@@ -46,18 +46,18 @@ import (
 
 // StartVaultService installs, enables, and starts the Vault SERVER (vault.service).
 func StartVaultService(rc *eos_io.RuntimeContext) error {
-	otelzap.Ctx(rc.Ctx).Info("🛠️ Writing Vault SERVER systemd unit file")
+	otelzap.Ctx(rc.Ctx).Info(" Writing Vault SERVER systemd unit file")
 	if err := WriteVaultServerSystemdUnit(rc); err != nil {
 		return fmt.Errorf("write server systemd unit: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🛠️ Validating Vault server config before starting")
+	otelzap.Ctx(rc.Ctx).Info(" Validating Vault server config before starting")
 	if err := ValidateVaultConfig(rc); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Vault config validation failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Vault config validation failed", zap.Error(err))
 		return fmt.Errorf("vault config validation failed: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🔄 Reloading systemd daemon and enabling vault.service")
+	otelzap.Ctx(rc.Ctx).Info(" Reloading systemd daemon and enabling vault.service")
 	if err := eos_unix.ReloadDaemonAndEnable(rc.Ctx, shared.VaultServiceName); err != nil {
 		return fmt.Errorf("reload/enable vault.service: %w", err)
 	}
@@ -66,19 +66,19 @@ func StartVaultService(rc *eos_io.RuntimeContext) error {
 		return err
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("🚀 Starting Vault systemd service")
+	otelzap.Ctx(rc.Ctx).Info(" Starting Vault systemd service")
 	if err := startVaultSystemdService(rc); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to start vault.service", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to start vault.service", zap.Error(err))
 		captureVaultLogsOnFailure(rc)
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault systemd service started, checking health...")
+	otelzap.Ctx(rc.Ctx).Info(" Vault systemd service started, checking health...")
 	if err := waitForVaultHealth(rc, shared.VaultMaxHealthWait); err != nil {
 		return err
 	}
 
-	// ✅ Print user instructions here
+	//  Print user instructions here
 	PrintNextSteps(rc.Ctx)
 
 	return nil
@@ -90,7 +90,7 @@ func WriteVaultServerSystemdUnit(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return fmt.Errorf("write vault server unit: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
+	otelzap.Ctx(rc.Ctx).Info(" Vault server systemd unit written", zap.String("path", shared.VaultServicePath))
 	return nil
 }
 
@@ -102,7 +102,7 @@ func startVaultSystemdService(rc *eos_io.RuntimeContext) error {
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to start vault.service", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to start vault.service", zap.Error(err))
 		return fmt.Errorf("failed to start vault.service: %w", err)
 	}
 	return nil
@@ -110,7 +110,7 @@ func startVaultSystemdService(rc *eos_io.RuntimeContext) error {
 
 // waitForVaultHealth probes Vault's TCP port until healthy or timeout.
 func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error {
-	otelzap.Ctx(rc.Ctx).Info("⏳ Waiting for Vault to start listening on port", zap.Int("port", shared.VaultDefaultPortInt))
+	otelzap.Ctx(rc.Ctx).Info(" Waiting for Vault to start listening on port", zap.Int("port", shared.VaultDefaultPortInt))
 	start := time.Now()
 	for {
 		if time.Since(start) > maxWait {
@@ -120,10 +120,10 @@ func waitForVaultHealth(rc *eos_io.RuntimeContext, maxWait time.Duration) error 
 		conn, err := net.DialTimeout("tcp", shared.ListenerAddr, shared.VaultRetryDelay)
 		if err == nil {
 			defer shared.SafeClose(rc.Ctx, conn)
-			otelzap.Ctx(rc.Ctx).Info("✅ Vault is now listening", zap.Duration("waited", time.Since(start)))
+			otelzap.Ctx(rc.Ctx).Info(" Vault is now listening", zap.Duration("waited", time.Since(start)))
 			return nil
 		}
-		otelzap.Ctx(rc.Ctx).Debug("⏳ Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
+		otelzap.Ctx(rc.Ctx).Debug(" Vault still not listening, retrying...", zap.Duration("waited", time.Since(start)))
 		time.Sleep(shared.VaultRetryDelay)
 	}
 }
@@ -160,7 +160,7 @@ func ValidateCriticalPaths(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("critical path %s is not writable (permissions %#o)", path, info.Mode().Perm())
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("✅ Critical path validated", zap.String("path", path))
+		otelzap.Ctx(rc.Ctx).Info(" Critical path validated", zap.String("path", path))
 	}
 
 	return nil

@@ -17,7 +17,7 @@ import (
 
 // ConfirmIrreversibleDeletion gets final consent before wiping unseal material.
 func ConfirmIrreversibleDeletion(rc *eos_io.RuntimeContext) error {
-	fmt.Println("⚠️ Confirm irreversible deletion of unseal materials. This action is final.")
+	fmt.Println("Confirm irreversible deletion of unseal materials. This action is final.")
 	fmt.Print("Type 'yes' to proceed: ")
 
 	reader := bufio.NewReader(os.Stdin)
@@ -33,14 +33,14 @@ func ConfirmIrreversibleDeletion(rc *eos_io.RuntimeContext) error {
 func DeleteTestDataFromDisk(rc *eos_io.RuntimeContext) error {
 	path := filepath.Join(shared.SecretsDir, shared.TestDataFilename)
 	if err := os.Remove(path); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to delete fallback test-data file", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to delete fallback test-data file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("delete fallback test-data file: %w", err)
 	}
 
 	fmt.Println()
 	fmt.Println("🗑️  Test Data Deletion Summary")
-	fmt.Println("  💾 Disk: SUCCESS")
+	fmt.Println("   Disk: SUCCESS")
 	fmt.Printf("    📂 Path: %s\n\n", path)
-	otelzap.Ctx(rc.Ctx).Info("✅ Test-data deleted successfully (fallback)", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Test-data deleted successfully (fallback)", zap.String("path", path))
 	return nil
 }

@@ -17,7 +17,7 @@ import (
 func GetUserDetails(rc *eos_io.RuntimeContext, cfg *Config) (string, int) {
 	resp, err := AuthenticatedGet(cfg, fmt.Sprintf("/security/users/%s", cfg.APIUser))
 	if err != nil {
-		fmt.Printf("❌ Request failed: %v\n", err)
+		fmt.Printf(" Request failed: %v\n", err)
 		os.Exit(1)
 	}
 	defer shared.SafeClose(rc.Ctx, resp.Body)

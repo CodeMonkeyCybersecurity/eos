@@ -60,7 +60,7 @@ var SecureDelphiCmd = &cobra.Command{
 			rc.Log.Warn("Failed to store secrets in Vault; continuing", zap.Error(storeErr))
 		}
 
-		rc.Log.Info("✅ Delphi hardening complete")
+		rc.Log.Info(" Delphi hardening complete")
 		return
 	}),
 }

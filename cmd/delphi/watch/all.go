@@ -65,7 +65,7 @@ Example:
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					logger.Error("❌ Failed to close database connection", zap.Error(err))
+					logger.Error(" Failed to close database connection", zap.Error(err))
 				}
 			}()
 
@@ -74,7 +74,7 @@ Example:
 				return fmt.Errorf("failed to ping database: %w", err)
 			}
 
-			logger.Info("✅ Connected to PostgreSQL database")
+			logger.Info(" Connected to PostgreSQL database")
 
 			// Start watching
 			return watchAll(rc.Ctx, logger, db, alertLimit, agentLimit, refresh)
@@ -108,7 +108,7 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 	})
 	defer func() {
 		if err := listener.Close(); err != nil {
-			logger.Error("❌ Failed to close PostgreSQL listener", zap.Error(err))
+			logger.Error(" Failed to close PostgreSQL listener", zap.Error(err))
 		}
 	}()
 
@@ -121,7 +121,7 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 		}
 	}
 
-	logger.Info("📡 Listening for database notifications...")
+	logger.Info(" Listening for database notifications...")
 
 	// Initial display
 	displayAll(ctx, logger, db, alertLimit, agentLimit)
@@ -145,7 +145,7 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 				logger.Debug("📬 Received database notification",
 					zap.String("channel", notification.Channel),
 					zap.String("payload", notification.Extra))
-				
+
 				// Refresh display on notification
 				displayAll(ctx, logger, db, alertLimit, agentLimit)
 			}
@@ -160,7 +160,7 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 func displayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, alertLimit, agentLimit int) {
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
-	
+
 	currentTime := time.Now().Format("15:04:05")
 	fmt.Printf("🔍 Delphi Real-Time Monitor (Updated: %s)\n", currentTime)
 	fmt.Println(strings.Repeat("=", 120))
@@ -168,19 +168,19 @@ func displayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 	// Display recent alerts section
 	fmt.Printf("\n🚨 Recent Alerts (Last %d)\n", alertLimit)
 	fmt.Println(strings.Repeat("-", 80))
-	
+
 	displayRecentAlerts(ctx, logger, db, alertLimit)
 
 	// Display agents section
 	fmt.Printf("\n🖥️  Active Agents (Top %d)\n", agentLimit)
 	fmt.Println(strings.Repeat("-", 80))
-	
+
 	displayRecentAgents(ctx, logger, db, agentLimit)
 
 	// Display summary statistics
 	fmt.Println(strings.Repeat("=", 120))
 	displaySummaryStats(ctx, db)
-	fmt.Println("\n📊 Press Ctrl+C to exit")
+	fmt.Println("\n Press Ctrl+C to exit")
 }
 
 func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
@@ -199,7 +199,7 @@ func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logger.Error("❌ Failed to close rows", zap.Error(err))
+			logger.Error(" Failed to close rows", zap.Error(err))
 		}
 	}()
 
@@ -212,7 +212,7 @@ func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		var agentID, ruleDesc, state string
 		var ruleLevel int
 		var ingestTime time.Time
-		
+
 		err := rows.Scan(&id, &agentID, &ruleLevel, &ruleDesc, &state, &ingestTime)
 		if err != nil {
 			logger.Error("Failed to scan alert row", zap.Error(err))
@@ -228,7 +228,7 @@ func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		// Format time as relative
 		timeStr := formatRelativeTime(ingestTime)
 		stateColor := getStateColor(state)
-		
+
 		fmt.Printf("%-6d %-12s %-5d %s%-10s\033[0m %-8s %s\n",
 			id, agentID, ruleLevel, stateColor, state, timeStr, desc)
 		count++
@@ -259,7 +259,7 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logger.Error("❌ Failed to close rows", zap.Error(err))
+			logger.Error(" Failed to close rows", zap.Error(err))
 		}
 	}()
 
@@ -271,7 +271,7 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		var id string
 		var name, ip, status sql.NullString
 		var lastSeen sql.NullTime
-		
+
 		err := rows.Scan(&id, &name, &ip, &status, &lastSeen)
 		if err != nil {
 			logger.Error("Failed to scan agent row", zap.Error(err))
@@ -302,7 +302,7 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		if lastSeen.Valid {
 			lastSeenStr = formatRelativeTime(lastSeen.Time)
 		}
-		
+
 		fmt.Printf("%-8s %-15s %-15s %s%-12s\033[0m %s\n",
 			id, nameStr, ipStr, statusColor, statusStr, lastSeenStr)
 		count++
@@ -315,39 +315,39 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 
 func displaySummaryStats(ctx context.Context, db *sql.DB) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	// Get alert stats
 	var alertStats struct {
-		total    int
-		new      int
-		sent     int
-		failed   int
-		last24h  int
+		total   int
+		new     int
+		sent    int
+		failed  int
+		last24h int
 	}
 
 	// Total alerts
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts").Scan(&alertStats.total); err != nil {
-		logger.Error("❌ Failed to get total alerts count", zap.Error(err))
+		logger.Error(" Failed to get total alerts count", zap.Error(err))
 		alertStats.total = 0
 	}
-	
+
 	// Alerts by state
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'new'").Scan(&alertStats.new); err != nil {
-		logger.Error("❌ Failed to get new alerts count", zap.Error(err))
+		logger.Error(" Failed to get new alerts count", zap.Error(err))
 		alertStats.new = 0
 	}
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'sent'").Scan(&alertStats.sent); err != nil {
-		logger.Error("❌ Failed to get sent alerts count", zap.Error(err))
+		logger.Error(" Failed to get sent alerts count", zap.Error(err))
 		alertStats.sent = 0
 	}
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE state = 'failed'").Scan(&alertStats.failed); err != nil {
-		logger.Error("❌ Failed to get failed alerts count", zap.Error(err))
+		logger.Error(" Failed to get failed alerts count", zap.Error(err))
 		alertStats.failed = 0
 	}
-	
+
 	// Alerts in last 24h
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM alerts WHERE ingest_timestamp > NOW() - INTERVAL '24 hours'").Scan(&alertStats.last24h); err != nil {
-		logger.Error("❌ Failed to get 24h alerts count", zap.Error(err))
+		logger.Error(" Failed to get 24h alerts count", zap.Error(err))
 		alertStats.last24h = 0
 	}
 
@@ -360,19 +360,19 @@ func displaySummaryStats(ctx context.Context, db *sql.DB) {
 	}
 
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents").Scan(&agentStats.total); err != nil {
-		logger.Error("❌ Failed to get total agents count", zap.Error(err))
+		logger.Error(" Failed to get total agents count", zap.Error(err))
 		agentStats.total = 0
 	}
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'active'").Scan(&agentStats.active); err != nil {
-		logger.Error("❌ Failed to get active agents count", zap.Error(err))
+		logger.Error(" Failed to get active agents count", zap.Error(err))
 		agentStats.active = 0
 	}
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'disconnected'").Scan(&agentStats.disconnected); err != nil {
-		logger.Error("❌ Failed to get disconnected agents count", zap.Error(err))
+		logger.Error(" Failed to get disconnected agents count", zap.Error(err))
 		agentStats.disconnected = 0
 	}
 	if err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE last_seen > NOW() - INTERVAL '1 hour'").Scan(&agentStats.lastHour); err != nil {
-		logger.Error("❌ Failed to get recent agents count", zap.Error(err))
+		logger.Error(" Failed to get recent agents count", zap.Error(err))
 		agentStats.lastHour = 0
 	}
 
@@ -384,7 +384,7 @@ func displaySummaryStats(ctx context.Context, db *sql.DB) {
 
 func formatRelativeTime(t time.Time) string {
 	diff := time.Since(t)
-	
+
 	if diff < time.Minute {
 		return "now"
 	} else if diff < time.Hour {

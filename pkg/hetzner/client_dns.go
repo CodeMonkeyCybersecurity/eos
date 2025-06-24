@@ -67,7 +67,7 @@ func (c *DNSClient) GetServers(rc *eos_io.RuntimeContext) ([]map[string]interfac
 		return nil, errors.Wrap(err, "decoding Hetzner server list")
 	}
 
-	c.Log.Info("✅ Retrieved Hetzner servers", zap.Int("count", len(result.Servers)))
+	c.Log.Info(" Retrieved Hetzner servers", zap.Int("count", len(result.Servers)))
 	return result.Servers, nil
 }
 
@@ -113,6 +113,6 @@ func (c *DNSClient) CreateServer(rc *eos_io.RuntimeContext, name string, image s
 		return nil, errors.Wrap(err, "decoding create server response")
 	}
 
-	c.Log.Info("🚀 Created Hetzner server", zap.String("name", name))
+	c.Log.Info(" Created Hetzner server", zap.String("name", name))
 	return result.Server, nil
 }

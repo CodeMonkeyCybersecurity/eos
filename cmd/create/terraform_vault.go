@@ -160,7 +160,7 @@ Example:
 		}
 
 		logger.Info("Terraform-Vault deployment completed successfully")
-		fmt.Println("\n✅ Infrastructure deployed successfully with Vault integration!")
+		fmt.Println("\n Infrastructure deployed successfully with Vault integration!")
 
 		return nil
 	}),

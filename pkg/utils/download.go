@@ -15,7 +15,7 @@ func DownloadFile(filepath string, url string) error {
 	}
 	defer func() {
 		if cerr := out.Close(); cerr != nil {
-			fmt.Fprintf(os.Stderr, "⚠️ Failed to close output file: %v\n", cerr)
+			fmt.Fprintf(os.Stderr, "Failed to close output file: %v\n", cerr)
 		}
 	}()
 
@@ -25,7 +25,7 @@ func DownloadFile(filepath string, url string) error {
 	}
 	defer func() {
 		if cerr := resp.Body.Close(); cerr != nil {
-			fmt.Fprintf(os.Stderr, "⚠️ Failed to close HTTP response body: %v\n", cerr)
+			fmt.Fprintf(os.Stderr, "Failed to close HTTP response body: %v\n", cerr)
 		}
 	}()
 

@@ -14,7 +14,7 @@ func FuzzValidateStrongPassword(f *testing.F) {
 	f.Add("pässwörd")
 	f.Add("!@#$%^&*()_+")
 	f.Add("' OR 1=1 --")
-	f.Add("👾🔑")
+	f.Add("👾")
 	f.Add("pass\u200Bword")
 	f.Add("../")
 	f.Add("\x00\xff\xfe")                       // odd byte values
@@ -31,7 +31,7 @@ func FuzzHashString(f *testing.F) {
 	f.Add("test")
 	f.Add("")
 	f.Add("123456")
-	f.Add("🐒🔑")
+	f.Add("🐒")
 	f.Add("\x00\xFF\xFE")
 	f.Fuzz(func(t *testing.T, s string) {
 		_ = HashString(s)
@@ -42,7 +42,7 @@ func FuzzHashStrings(f *testing.F) {
 	f.Add("a,b,c")
 	f.Add("")
 	f.Add("duplicate,duplicate")
-	f.Add("🐒,🔑")
+	f.Add("🐒,")
 	f.Fuzz(func(t *testing.T, s string) {
 		var items []string
 		if s != "" {

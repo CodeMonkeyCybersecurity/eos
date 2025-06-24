@@ -21,24 +21,24 @@ import (
 
 // Alert represents an alert record for display
 type Alert struct {
-	ID               int64     `json:"id"`
-	AgentID          string    `json:"agent_id"`
-	RuleID           int       `json:"rule_id"`
-	RuleLevel        int       `json:"rule_level"`
-	RuleDesc         string    `json:"rule_desc"`
-	IngestTimestamp  time.Time `json:"ingest_timestamp"`
-	State            string    `json:"state"`
-	PromptSentAt     *time.Time `json:"prompt_sent_at"`
+	ID                 int64      `json:"id"`
+	AgentID            string     `json:"agent_id"`
+	RuleID             int        `json:"rule_id"`
+	RuleLevel          int        `json:"rule_level"`
+	RuleDesc           string     `json:"rule_desc"`
+	IngestTimestamp    time.Time  `json:"ingest_timestamp"`
+	State              string     `json:"state"`
+	PromptSentAt       *time.Time `json:"prompt_sent_at"`
 	ResponseReceivedAt *time.Time `json:"response_received_at"`
-	AlertSentAt      *time.Time `json:"alert_sent_at"`
+	AlertSentAt        *time.Time `json:"alert_sent_at"`
 }
 
 // NewAlertsCmd creates the alerts watch command
 func NewAlertsCmd() *cobra.Command {
 	var (
-		limit    int
-		refresh  int
-		dsn      string
+		limit   int
+		refresh int
+		dsn     string
 	)
 
 	cmd := &cobra.Command{
@@ -78,7 +78,7 @@ Example:
 			}
 			defer func() {
 				if err := db.Close(); err != nil {
-					logger.Error("❌ Failed to close database connection", zap.Error(err))
+					logger.Error(" Failed to close database connection", zap.Error(err))
 				}
 			}()
 
@@ -87,7 +87,7 @@ Example:
 				return fmt.Errorf("failed to ping database: %w", err)
 			}
 
-			logger.Info("✅ Connected to PostgreSQL database")
+			logger.Info(" Connected to PostgreSQL database")
 
 			// Start watching
 			return watchAlerts(rc.Ctx, logger, db, limit, refresh)
@@ -120,7 +120,7 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 	})
 	defer func() {
 		if err := listener.Close(); err != nil {
-			logger.Error("❌ Failed to close PostgreSQL listener", zap.Error(err))
+			logger.Error(" Failed to close PostgreSQL listener", zap.Error(err))
 		}
 	}()
 
@@ -130,7 +130,7 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 		return fmt.Errorf("failed to listen for new_alert notifications: %w", err)
 	}
 
-	// Listen for alert response notifications  
+	// Listen for alert response notifications
 	err = listener.Listen("new_response")
 	if err != nil {
 		return fmt.Errorf("failed to listen for new_response notifications: %w", err)
@@ -142,7 +142,7 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 		return fmt.Errorf("failed to listen for alert_sent notifications: %w", err)
 	}
 
-	logger.Info("📡 Listening for database notifications...")
+	logger.Info(" Listening for database notifications...")
 
 	// Initial display
 	displayAlerts(ctx, logger, db, limit)
@@ -166,7 +166,7 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 				logger.Debug("📬 Received database notification",
 					zap.String("channel", notification.Channel),
 					zap.String("payload", notification.Extra))
-				
+
 				// Refresh display on notification
 				displayAlerts(ctx, logger, db, limit)
 			}
@@ -181,7 +181,7 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
-	
+
 	fmt.Printf("🔍 Delphi Alerts Monitor - Last %d alerts (Updated: %s)\n", limit, time.Now().Format("15:04:05"))
 	fmt.Println(strings.Repeat("=", 120))
 
@@ -202,7 +202,7 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
-			logger.Error("❌ Failed to close rows", zap.Error(err))
+			logger.Error(" Failed to close rows", zap.Error(err))
 		}
 	}()
 
@@ -215,7 +215,7 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 	for rows.Next() {
 		var alert Alert
 		var ruleDesc sql.NullString
-		
+
 		err := rows.Scan(
 			&alert.ID, &alert.AgentID, &alert.RuleID, &alert.RuleLevel, &ruleDesc,
 			&alert.IngestTimestamp, &alert.State,
@@ -229,7 +229,7 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		if ruleDesc.Valid {
 			alert.RuleDesc = ruleDesc.String
 		}
-		
+
 		alerts = append(alerts, alert)
 	}
 
@@ -249,7 +249,7 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 
 		// Color-code state
 		stateColor := getStateColor(alert.State)
-		
+
 		fmt.Printf("%-6d %-12s %-8d %-6d %s%-10s\033[0m %-20s %-10s %-10s %-10s %s\n",
 			alert.ID, alert.AgentID, alert.RuleID, alert.RuleLevel,
 			stateColor, alert.State, ingestedTime, promptedTime, responseTime, sentTime, desc)
@@ -259,7 +259,7 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		fmt.Println("No alerts found.")
 	}
 
-	fmt.Printf("\n📊 Total alerts shown: %d | Press Ctrl+C to exit\n", len(alerts))
+	fmt.Printf("\n Total alerts shown: %d | Press Ctrl+C to exit\n", len(alerts))
 }
 
 func formatOptionalTime(t *time.Time) string {

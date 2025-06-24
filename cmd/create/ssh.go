@@ -74,7 +74,7 @@ func runCreateSSH(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error
 
 	// Generate key if necessary.
 	if _, err := os.Stat(keyPath); err == nil && !force {
-		fmt.Println("🔑 Key already exists:", keyPath)
+		fmt.Println(" Key already exists:", keyPath)
 	} else {
 		otelzap.Ctx(rc.Ctx).Info("Generating FIPS-compliant RSA SSH key", zap.String("key", keyPath))
 		if err := eos_unix.GenerateFIPSKey(keyPath); err != nil {
@@ -83,13 +83,13 @@ func runCreateSSH(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error
 	}
 
 	// Copy key to remote host.
-	fmt.Printf("📡 Copying public key to %s...\n", targetLogin)
+	fmt.Printf(" Copying public key to %s...\n", targetLogin)
 	if err := eos_unix.CopyKeyToRemote(pubKeyPath, targetLogin); err != nil {
 		return fmt.Errorf("failed to copy key to remote host: %w", err)
 	}
 
 	// Append configuration to SSH config.
-	fmt.Println("🛠️ Updating SSH config...")
+	fmt.Println(" Updating SSH config...")
 	if alias == "" {
 		alias = host
 	}
@@ -97,6 +97,6 @@ func runCreateSSH(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error
 		return fmt.Errorf("failed to update SSH config: %w", err)
 	}
 
-	fmt.Println("✅ SSH key setup complete.")
+	fmt.Println(" SSH key setup complete.")
 	return nil
 }

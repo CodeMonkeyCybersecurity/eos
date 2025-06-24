@@ -21,7 +21,7 @@ var InspectOllamaCmd = &cobra.Command{
 		log := otelzap.Ctx(rc.Ctx)
 
 		if !platform.IsMacOS() {
-			return fmt.Errorf("❌ Ollama inspection is only supported on macOS")
+			return fmt.Errorf(" Ollama inspection is only supported on macOS")
 		}
 
 		log.Info("🔍 Inspecting Docker container for Ollama Web UI...")
@@ -34,13 +34,13 @@ var InspectOllamaCmd = &cobra.Command{
 		log.Info("🧠 Checking OLLAMA_USE_GPU environment variable...")
 		env := os.Getenv("OLLAMA_USE_GPU")
 		if env == "true" {
-			fmt.Println("✅ GPU is ENABLED (OLLAMA_USE_GPU=true)")
+			fmt.Println(" GPU is ENABLED (OLLAMA_USE_GPU=true)")
 		} else {
-			fmt.Println("⚠️ GPU is DISABLED or not configured (OLLAMA_USE_GPU=" + env + ")")
+			fmt.Println("GPU is DISABLED or not configured (OLLAMA_USE_GPU=" + env + ")")
 		}
 
 		logFile := "/tmp/ollama.log"
-		fmt.Println("\n📜 Last 20 lines of Ollama log:")
+		fmt.Println("\n Last 20 lines of Ollama log:")
 		if _, err := os.Stat(logFile); os.IsNotExist(err) {
 			fmt.Println("🚫 Ollama log not found at", logFile)
 		} else {

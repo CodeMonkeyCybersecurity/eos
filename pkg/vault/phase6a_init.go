@@ -36,11 +36,11 @@ func InitializeVault(rc *eos_io.RuntimeContext) error {
 
 // PhaseInitVaultOnly initializes Vault if not already initialized.
 func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client, error) {
-	otelzap.Ctx(rc.Ctx).Info("🚀 [Phase 6a]: Initialize Vault")
+	otelzap.Ctx(rc.Ctx).Info(" [Phase 6a]: Initialize Vault")
 
 	status, err := client.Sys().InitStatus()
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to check Vault initialization status", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to check Vault initialization status", zap.Error(err))
 		return nil, fmt.Errorf("check vault init status: %w", err)
 	}
 	if status {
@@ -48,7 +48,7 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 		return client, nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("⚙️ Vault not initialized — beginning initialization sequence")
+	otelzap.Ctx(rc.Ctx).Info(" Vault not initialized — beginning initialization sequence")
 	initRes, err := InitVault(rc, client)
 	if err != nil {
 		return nil, fmt.Errorf("initialize vault: %w", err)
@@ -56,14 +56,14 @@ func PhaseInitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.Client,
 
 	if err := SaveInitResult(rc, initRes); err != nil {
 		// If save fails, advise user to rescue init material manually
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Failed to persist Vault init result — printing keys to console")
+		otelzap.Ctx(rc.Ctx).Warn("Failed to persist Vault init result — printing keys to console")
 		fmt.Printf("\n\nUNSEAL KEYS:\n%v\n\nROOT TOKEN:\n%s\n\n", initRes.KeysB64, initRes.RootToken)
 		return nil, fmt.Errorf("save vault init result: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Warn("⚠️ Vault is initialized but NOT unsealed yet")
-	otelzap.Ctx(rc.Ctx).Info("📜 Please run 'eos inspect vault-init' to retrieve your keys and token")
-	otelzap.Ctx(rc.Ctx).Info("🚀 Then run 'eos enable vault' to unseal and secure Vault")
+	otelzap.Ctx(rc.Ctx).Warn("Vault is initialized but NOT unsealed yet")
+	otelzap.Ctx(rc.Ctx).Info(" Please run 'eos inspect vault-init' to retrieve your keys and token")
+	otelzap.Ctx(rc.Ctx).Info(" Then run 'eos enable vault' to unseal and secure Vault")
 
 	return client, nil
 }
@@ -76,10 +76,10 @@ func InitVault(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse
 	}
 	initRes, err := client.Sys().Init(initOptions)
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Vault initialization failed", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Vault initialization failed", zap.Error(err))
 		return nil, fmt.Errorf("vault init API call: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault initialized successfully",
+	otelzap.Ctx(rc.Ctx).Info(" Vault initialized successfully",
 		zap.Int("num_keys", len(initRes.KeysB64)),
 		zap.String("root_token_hash", crypto.HashString(initRes.RootToken)),
 	)
@@ -92,21 +92,21 @@ func SaveInitResult(rc *eos_io.RuntimeContext, initRes *api.InitResponse) error 
 	dir := filepath.Dir(path)
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to create init directory", zap.String("dir", dir), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to create init directory", zap.String("dir", dir), zap.Error(err))
 		return fmt.Errorf("create init dir: %w", err)
 	}
 
 	b, err := json.MarshalIndent(initRes, "", "  ")
 	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to marshal Vault init result", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to marshal Vault init result", zap.Error(err))
 		return fmt.Errorf("marshal init result: %w", err)
 	}
 
 	if err := os.WriteFile(path, b, 0600); err != nil {
-		otelzap.Ctx(rc.Ctx).Error("❌ Failed to write Vault init file", zap.String("path", path), zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Error(" Failed to write Vault init file", zap.String("path", path), zap.Error(err))
 		return fmt.Errorf("write init result: %w", err)
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("💾 Vault init result saved securely", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Vault init result saved securely", zap.String("path", path))
 	return nil
 }

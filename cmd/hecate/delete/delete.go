@@ -92,7 +92,7 @@ func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 		deleteEosConfig(rc)
 		deleteNginxDefaults(rc)
 	default:
-		logger.Error("❌ Invalid choice provided", zap.String("choice", choice))
+		logger.Error(" Invalid choice provided", zap.String("choice", choice))
 		return fmt.Errorf("invalid choice: %s", choice)
 	}
 	return nil
@@ -106,9 +106,9 @@ func deleteCertificates(rc *eos_io.RuntimeContext) {
 
 	err := os.RemoveAll(certsDir)
 	if err != nil {
-		logger.Error("❌ Error deleting certificates directory", zap.String("directory", certsDir), zap.Error(err))
+		logger.Error(" Error deleting certificates directory", zap.String("directory", certsDir), zap.Error(err))
 	} else {
-		logger.Info("✅ Certificates deleted", zap.String("directory", certsDir))
+		logger.Info(" Certificates deleted", zap.String("directory", certsDir))
 	}
 }
 
@@ -119,24 +119,24 @@ func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 
 	matches, err := filepath.Glob("/opt/hecate/*_docker-compose.yml.bak")
 	if err != nil {
-		logger.Error("❌ Error searching for backups", zap.Error(err))
+		logger.Error(" Error searching for backups", zap.Error(err))
 		return
 	}
 
 	for _, file := range matches {
 		if err := os.Remove(file); err != nil {
-			logger.Error("❌ Error removing backup file", zap.String("file", file), zap.Error(err))
+			logger.Error(" Error removing backup file", zap.String("file", file), zap.Error(err))
 		} else {
-			logger.Info("✅ Removed backup file", zap.String("file", file))
+			logger.Info(" Removed backup file", zap.String("file", file))
 		}
 	}
 
 	// Also remove the main docker-compose.yml file
 	mainCompose := "/opt/hecate/docker-compose.yml"
 	if err := os.Remove(mainCompose); err != nil {
-		logger.Error("❌ Error removing docker-compose file", zap.String("file", mainCompose), zap.Error(err))
+		logger.Error(" Error removing docker-compose file", zap.String("file", mainCompose), zap.Error(err))
 	} else {
-		logger.Info("✅ Removed main docker-compose file", zap.String("file", mainCompose))
+		logger.Info(" Removed main docker-compose file", zap.String("file", mainCompose))
 	}
 }
 
@@ -148,9 +148,9 @@ func deleteEosConfig(rc *eos_io.RuntimeContext) {
 
 	err := os.RemoveAll(confDir)
 	if err != nil {
-		logger.Error("❌ Error deleting configuration directory", zap.String("directory", confDir), zap.Error(err))
+		logger.Error(" Error deleting configuration directory", zap.String("directory", confDir), zap.Error(err))
 	} else {
-		logger.Info("✅ Eos backend configuration files deleted", zap.String("directory", confDir))
+		logger.Info(" Eos backend configuration files deleted", zap.String("directory", confDir))
 	}
 }
 
@@ -163,17 +163,17 @@ func deleteNginxDefaults(rc *eos_io.RuntimeContext) {
 
 	if _, err := os.Stat(backupFile); err == nil {
 		if err := os.Remove(configFile); err != nil {
-			logger.Error("❌ Error removing current config", zap.String("file", configFile), zap.Error(err))
+			logger.Error(" Error removing current config", zap.String("file", configFile), zap.Error(err))
 		} else if err := os.Rename(backupFile, configFile); err != nil {
-			logger.Error("❌ Error restoring backup", zap.String("backup", backupFile), zap.String("target", configFile), zap.Error(err))
+			logger.Error(" Error restoring backup", zap.String("backup", backupFile), zap.String("target", configFile), zap.Error(err))
 		} else {
-			logger.Info("✅ Nginx defaults reverted from backup", zap.String("file", configFile))
+			logger.Info(" Nginx defaults reverted from backup", zap.String("file", configFile))
 		}
 	} else {
 		if err := os.Remove(configFile); err != nil {
-			logger.Error("❌ Error removing config file", zap.String("file", configFile), zap.Error(err))
+			logger.Error(" Error removing config file", zap.String("file", configFile), zap.Error(err))
 		} else {
-			logger.Info("✅ Deleted config file", zap.String("file", configFile))
+			logger.Info(" Deleted config file", zap.String("file", configFile))
 		}
 	}
 }

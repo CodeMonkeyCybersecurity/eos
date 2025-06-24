@@ -35,7 +35,7 @@ func InstallKVM() error {
 
 // runInstall runs the given install command with stdout/stderr streaming.
 func runInstall(cmd string) error {
-	fmt.Println("📦 Installing KVM and dependencies...")
+	fmt.Println(" Installing KVM and dependencies...")
 	c := exec.Command("bash", "-c", cmd)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
@@ -44,14 +44,14 @@ func runInstall(cmd string) error {
 
 // EnsureLibvirtd ensures libvirtd is started and enabled.
 func EnsureLibvirtd() error {
-	fmt.Println("🔧 Ensuring libvirtd service is running...")
+	fmt.Println(" Ensuring libvirtd service is running...")
 	if err := exec.Command("systemctl", "start", "libvirtd").Run(); err != nil {
 		return fmt.Errorf("failed to start libvirtd: %w", err)
 	}
 	if err := exec.Command("systemctl", "enable", "libvirtd").Run(); err != nil {
 		return fmt.Errorf("failed to enable libvirtd: %w", err)
 	}
-	fmt.Println("✅ libvirtd is active and enabled.")
+	fmt.Println(" libvirtd is active and enabled.")
 	return nil
 }
 
@@ -187,20 +187,20 @@ func RunCreateKvmInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 	autostartFlag, _ := cmd.Flags().GetBool("autostart")
 	autostartExplicit := cmd.Flags().Changed("autostart")
 
-	otelzap.Ctx(rc.Ctx).Info("📦 Installing KVM and libvirt packages...")
+	otelzap.Ctx(rc.Ctx).Info(" Installing KVM and libvirt packages...")
 	if err := InstallKVM(); err != nil {
 		otelzap.Ctx(rc.Ctx).Error("Failed to install KVM", zap.Error(err))
 		return err
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ KVM installation complete")
+	otelzap.Ctx(rc.Ctx).Info(" KVM installation complete")
 
 	if enableBridge {
-		otelzap.Ctx(rc.Ctx).Info("🛠️  Configuring network bridge...")
+		otelzap.Ctx(rc.Ctx).Info("  Configuring network bridge...")
 		if err := ConfigureKVMBridge(); err != nil {
 			otelzap.Ctx(rc.Ctx).Error("Failed to configure network bridge", zap.Error(err))
 			return err
 		}
-		otelzap.Ctx(rc.Ctx).Info("✅ Network bridge configured")
+		otelzap.Ctx(rc.Ctx).Info(" Network bridge configured")
 	}
 
 	if err := EnsureLibvirtd(); err != nil {
@@ -210,20 +210,20 @@ func RunCreateKvmInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []s
 
 	isoDir := resolveIsoDir(rc, nonInteractive, isoOverride)
 	if info, err := os.Stat(isoDir); err == nil && info.IsDir() {
-		otelzap.Ctx(rc.Ctx).Info("🔐 Setting ACL for ISO directory", zap.String("path", isoDir))
+		otelzap.Ctx(rc.Ctx).Info(" Setting ACL for ISO directory", zap.String("path", isoDir))
 		SetLibvirtACL(isoDir)
 	} else {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ ISO directory not found or invalid", zap.String("path", isoDir))
+		otelzap.Ctx(rc.Ctx).Warn("ISO directory not found or invalid", zap.String("path", isoDir))
 	}
 
 	if resolveAutostart(rc, nonInteractive, autostartExplicit, autostartFlag) {
-		otelzap.Ctx(rc.Ctx).Info("⚙️  Enabling autostart for default libvirt network")
+		otelzap.Ctx(rc.Ctx).Info("  Enabling autostart for default libvirt network")
 		SetLibvirtDefaultNetworkAutostart()
 	} else {
 		otelzap.Ctx(rc.Ctx).Info("Skipping autostart — run 'virsh net-start default' manually if needed")
 	}
 
-	otelzap.Ctx(rc.Ctx).Info("✅ KVM setup completed successfully")
+	otelzap.Ctx(rc.Ctx).Info(" KVM setup completed successfully")
 	return nil
 }
 

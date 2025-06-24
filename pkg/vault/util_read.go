@@ -58,7 +58,7 @@ func SafeReadSecret(rc *eos_io.RuntimeContext, path string) (*api.Secret, bool) 
 	if err != nil || secret == nil {
 		return nil, false
 	}
-	otelzap.Ctx(rc.Ctx).Info("✅ Vault secret read", zap.String("path", path))
+	otelzap.Ctx(rc.Ctx).Info(" Vault secret read", zap.String("path", path))
 	return secret, true
 }
 
@@ -81,7 +81,7 @@ func ReadFallbackJSON[T any](path string, target *T) error {
 
 // ReadVaultSecureData loads vault_init and userpass fallback files.
 func ReadVaultSecureData(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse, shared.UserpassCreds, []string, string) {
-	otelzap.Ctx(rc.Ctx).Info("🔐 Starting secure Vault bootstrap sequence")
+	otelzap.Ctx(rc.Ctx).Info(" Starting secure Vault bootstrap sequence")
 	if err := eos_unix.EnsureEosUser(rc.Ctx, true, false); err != nil {
 		otelzap.Ctx(rc.Ctx).Fatal("Failed to ensure eos system user", zap.Error(err))
 	}
@@ -127,14 +127,14 @@ func InspectFromDisk(rc *eos_io.RuntimeContext) error {
 	var out map[string]interface{}
 	if err := readJSONFile(path, &out); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			otelzap.Ctx(rc.Ctx).Warn("⚠️ Fallback test-data file not found", zap.String("path", path))
+			otelzap.Ctx(rc.Ctx).Warn("Fallback test-data file not found", zap.String("path", path))
 			return fmt.Errorf("no test-data found in Vault or disk")
 		}
 		otelzap.Ctx(rc.Ctx).Error("Failed to read fallback test-data", zap.Error(err))
 		return fmt.Errorf("disk fallback read failed: %w", err)
 	}
 	PrintData(rc.Ctx, out, "Disk", path)
-	otelzap.Ctx(rc.Ctx).Info("✅ Test-data read successfully from fallback")
+	otelzap.Ctx(rc.Ctx).Info(" Test-data read successfully from fallback")
 	return nil
 }
 

@@ -54,20 +54,20 @@ func PhaseEnableUserpass(rc *eos_io.RuntimeContext, _ *api.Client, log *zap.Logg
 
 // EnableUserpassAuth enables the userpass auth method if it is not already mounted.
 func EnableUserpassAuth(rc *eos_io.RuntimeContext, client *api.Client) error {
-	otelzap.Ctx(rc.Ctx).Info("📡 Enabling userpass auth method if needed...")
+	otelzap.Ctx(rc.Ctx).Info(" Enabling userpass auth method if needed...")
 
 	err := client.Sys().EnableAuthWithOptions("userpass", &api.EnableAuthOptions{Type: "userpass"})
 	if err == nil {
-		otelzap.Ctx(rc.Ctx).Info("✅ Userpass auth method enabled")
+		otelzap.Ctx(rc.Ctx).Info(" Userpass auth method enabled")
 		return nil
 	}
 
 	if strings.Contains(err.Error(), "path is already in use") {
-		otelzap.Ctx(rc.Ctx).Warn("⚠️ Userpass auth method already enabled", zap.Error(err))
+		otelzap.Ctx(rc.Ctx).Warn("Userpass auth method already enabled", zap.Error(err))
 		return nil
 	}
 
-	otelzap.Ctx(rc.Ctx).Error("❌ Failed to enable userpass auth method", zap.Error(err))
+	otelzap.Ctx(rc.Ctx).Error(" Failed to enable userpass auth method", zap.Error(err))
 	return fmt.Errorf("enable userpass auth: %w", err)
 }
 

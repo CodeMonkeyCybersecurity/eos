@@ -361,19 +361,19 @@ class ABTestAnalyzer:
         for variant, stats in performance.items():
             if stats['success_rate'] < 0.8:
                 recommendations.append(
-                    f"⚠️  Variant '{variant}' has low success rate ({stats['success_rate']:.1%}) - consider review"
+                    f" Variant '{variant}' has low success rate ({stats['success_rate']:.1%}) - consider review"
                 )
             
             if stats['avg_response_time'] > 10:
                 recommendations.append(
-                    f"⚠️  Variant '{variant}' has slow response time ({stats['avg_response_time']:.2f}s) - consider optimization"
+                    f" Variant '{variant}' has slow response time ({stats['avg_response_time']:.2f}s) - consider optimization"
                 )
         
         # Sample size recommendations
         total_requests = sum(stats['total_requests'] for stats in performance.values())
         if total_requests < 100:
             recommendations.append(
-                "📊 Collect more data before making final decisions (current sample size: {total_requests})"
+                " Collect more data before making final decisions (current sample size: {total_requests})"
             )
         
         return recommendations
@@ -448,7 +448,7 @@ class ABTestAnalyzer:
         print("VARIANT PERFORMANCE:")
         print("-" * 30)
         for variant, stats in performance.items():
-            print(f"\n📊 {variant.upper()}:")
+            print(f"\n {variant.upper()}:")
             print(f"   Requests: {stats['total_requests']}")
             print(f"   Success Rate: {stats['success_rate']:.1%}")
             print(f"   Avg Response Time: {stats['avg_response_time']:.2f}s")

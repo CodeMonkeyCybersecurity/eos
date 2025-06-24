@@ -19,7 +19,7 @@ func InspectCertificates(ctx context.Context) {
 
 	files, err := os.ReadDir(certsDir)
 	if err != nil {
-		logger.Error("❌ Error reading certificates directory", zap.String("directory", certsDir), zap.Error(err))
+		logger.Error(" Error reading certificates directory", zap.String("directory", certsDir), zap.Error(err))
 		return
 	}
 
@@ -28,9 +28,9 @@ func InspectCertificates(ctx context.Context) {
 		return
 	}
 
-	logger.Info("📋 Found certificates", zap.Int("count", len(files)))
+	logger.Info(" Found certificates", zap.Int("count", len(files)))
 	for _, file := range files {
-		logger.Info("📄 Certificate file", zap.String("filename", file.Name()))
+		logger.Info(" Certificate file", zap.String("filename", file.Name()))
 	}
 }
 
@@ -42,11 +42,11 @@ func InspectDockerCompose(ctx context.Context) {
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		logger.Error("❌ Error reading docker-compose file", zap.String("file", configFile), zap.Error(err))
+		logger.Error(" Error reading docker-compose file", zap.String("file", configFile), zap.Error(err))
 		return
 	}
 
-	logger.Info("📄 Docker-compose file contents", zap.String("content", string(data)))
+	logger.Info(" Docker-compose file contents", zap.String("content", string(data)))
 }
 
 func InspectEosConfig(ctx context.Context) {
@@ -57,7 +57,7 @@ func InspectEosConfig(ctx context.Context) {
 
 	files, err := os.ReadDir(confDir)
 	if err != nil {
-		logger.Error("❌ Error reading configuration directory", zap.String("directory", confDir), zap.Error(err))
+		logger.Error(" Error reading configuration directory", zap.String("directory", confDir), zap.Error(err))
 		return
 	}
 
@@ -73,7 +73,7 @@ func InspectEosConfig(ctx context.Context) {
 		return
 	}
 
-	logger.Info("📋 Found Eos configuration files", zap.Strings("files", configFiles))
+	logger.Info(" Found Eos configuration files", zap.Strings("files", configFiles))
 }
 
 func InspectNginxDefaults(ctx context.Context) {
@@ -84,9 +84,9 @@ func InspectNginxDefaults(ctx context.Context) {
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		logger.Error("❌ Error reading Nginx configuration", zap.String("file", configFile), zap.Error(err))
+		logger.Error(" Error reading Nginx configuration", zap.String("file", configFile), zap.Error(err))
 		return
 	}
 
-	logger.Info("📄 Nginx configuration contents", zap.String("content", string(data)))
+	logger.Info(" Nginx configuration contents", zap.String("content", string(data)))
 }

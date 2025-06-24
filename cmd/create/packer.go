@@ -15,7 +15,7 @@ var CreatePackerCmd = &cobra.Command{
 	Short: "Install HashiCorp Packer on any supported platform",
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
-		log.Info("🚀 Installing Packer")
+		log.Info(" Installing Packer")
 		return packer.EnsureInstalled(rc, zap.L())
 	}),
 }

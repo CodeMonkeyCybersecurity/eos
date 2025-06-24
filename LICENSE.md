@@ -9,7 +9,7 @@ You may choose to use, distribute, and modify this software under the terms of *
 
 ---
 
-## 📜 License Philosophy
+##  License Philosophy
 
 As the author of this project, I encourage you to honor **the spirit of both licenses**, regardless of which one you formally adopt.
 
@@ -20,7 +20,7 @@ As the author of this project, I encourage you to honor **the spirit of both lic
 
 ---
 
-## 📄 Included License Files
+##  Included License Files
 
 Copies of both licenses are included in this repository:
 

@@ -25,7 +25,7 @@ var SecureVaultCmd = &cobra.Command{
 		swapOff, _ := cmd.Flags().GetBool("disable-swap")
 		coreDumpOff, _ := cmd.Flags().GetBool("disable-coredump")
 
-		log.Info("🔐 Connecting to Vault")
+		log.Info(" Connecting to Vault")
 		client, err := vault.EnsureVaultReady(rc)
 		if err != nil {
 			return logger.LogErrAndWrap(rc, "secure vault: connect failed", err)
@@ -40,7 +40,7 @@ var SecureVaultCmd = &cobra.Command{
 			log.Warn("⚠ Vault is not running over TLS; end-to-end encryption is strongly recommended")
 		}
 
-		// 4️⃣ Load init result + confirm secure storage
+		// Load init result + confirm secure storage
 		initRes, err := vault.LoadOrPromptInitResult(rc)
 		if err != nil {
 			return fmt.Errorf("failed to load init result: %w", err)
@@ -49,36 +49,36 @@ var SecureVaultCmd = &cobra.Command{
 			return fmt.Errorf("secure storage confirmation failed: %w", err)
 		}
 
-		// 5️⃣ Securely erase vault_init.json
+		// Securely erase vault_init.json
 		if err := crypto.SecureErase(rc.Ctx, shared.VaultInitPath); err != nil {
 			return fmt.Errorf("failed to erase vault init file: %w", err)
 		}
-		log.Info("✅ Securely erased vault init file")
+		log.Info(" Securely erased vault init file")
 
-		// 6️⃣ Disable swap (optional)
+		// Disable swap (optional)
 		if swapOff {
 			if err := execute.RunSimple(rc.Ctx, "swapoff", "-a"); err != nil {
 				log.Warn("⚠ Failed to disable swap; you may need root privileges", zap.Error(err))
 			} else {
-				log.Info("✅ Swap disabled")
+				log.Info(" Swap disabled")
 			}
 		}
 
-		// 7️⃣ Disable core dumps (optional)
+		// Disable core dumps (optional)
 		if coreDumpOff {
 			if err := execute.RunSimple(rc.Ctx, "ulimit", "-c", "0"); err != nil {
 				log.Warn("⚠ Failed to disable core dumps; update systemd unit with LimitCORE=0", zap.Error(err))
 			} else {
-				log.Info("✅ Core dumps disabled")
+				log.Info(" Core dumps disabled")
 			}
 		}
 
-		// 📋 Final reminders
-		log.Info("ℹ️ Reminder: Check audit device configuration and firewall rules")
-		log.Info("ℹ️ Reminder: Validate filesystem permissions on Vault binary and configs")
+		//  Final reminders
+		log.Info(" Reminder: Check audit device configuration and firewall rules")
+		log.Info(" Reminder: Validate filesystem permissions on Vault binary and configs")
 
-		// 📋 Final summary
-		log.Info("🔒 Vault hardening completed",
+		//  Final summary
+		log.Info(" Vault hardening completed",
 			zap.Bool("vault_hardened", true),
 		)
 		return nil

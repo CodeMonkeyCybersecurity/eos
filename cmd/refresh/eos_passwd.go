@@ -32,8 +32,8 @@ updates the system account password, and saves new credentials to disk.`,
 			return fmt.Errorf("refresh eos password: %w", err)
 		}
 
-		log.Info("✅ Eos password refreshed successfully")
-		fmt.Println("✅ Eos password refreshed and secrets updated.")
+		log.Info(" Eos password refreshed successfully")
+		fmt.Println(" Eos password refreshed and secrets updated.")
 		return nil
 	}),
 }

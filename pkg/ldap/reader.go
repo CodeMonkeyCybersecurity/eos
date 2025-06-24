@@ -69,7 +69,7 @@ func readAndMapUsers(rc *eos_io.RuntimeContext, baseDN, filter string) ([]LDAPUs
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("⚠️ Warning: failed to close LDAP connection: %v\n", cerr)
+			fmt.Printf("Warning: failed to close LDAP connection: %v\n", cerr)
 		}
 	}()
 
@@ -102,7 +102,7 @@ func readAndMapGroups(rc *eos_io.RuntimeContext, baseDN, filter string) ([]LDAPG
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			fmt.Printf("⚠️ Warning: failed to close LDAP connection: %v\n", cerr)
+			fmt.Printf("Warning: failed to close LDAP connection: %v\n", cerr)
 		}
 	}()
 
@@ -150,14 +150,14 @@ func ReadConfig(rc *eos_io.RuntimeContext) (*LDAPConfig, string, error) {
 
 	for _, source := range loaders {
 		if cfg, err := source.load(); err == nil && cfg.FQDN != "" {
-			fmt.Printf("✅ LDAP config loaded from %s: %s\n", source.name, cfg.FQDN)
+			fmt.Printf(" LDAP config loaded from %s: %s\n", source.name, cfg.FQDN)
 			return cfg, source.name, nil
 		}
 	}
 
 	// Fallback
 	cfg := DefaultLDAPConfig()
-	fmt.Printf("⚠️  Using fallback LDAP config: %s\n", cfg.FQDN)
+	fmt.Printf(" Using fallback LDAP config: %s\n", cfg.FQDN)
 	return cfg, "default", nil
 }
 

@@ -239,7 +239,7 @@ var terraformFullWorkflowCmd = &cobra.Command{
 		}
 
 		logger.Info("Terraform deployment completed successfully")
-		fmt.Println("\n✅ Deployment completed successfully!")
+		fmt.Println("\n Deployment completed successfully!")
 
 		return nil
 	}),

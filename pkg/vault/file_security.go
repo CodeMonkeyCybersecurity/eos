@@ -30,7 +30,7 @@ func ValidateTokenFilePermissions(rc *eos_io.RuntimeContext, filePath string) er
 	// Check permissions
 	perms := info.Mode().Perm()
 	if perms != SecureFilePermissions {
-		log.Warn("🔒 Token file has insecure permissions",
+		log.Warn(" Token file has insecure permissions",
 			zap.String("file", filePath),
 			zap.String("current_perms", fmt.Sprintf("%o", perms)),
 			zap.String("required_perms", fmt.Sprintf("%o", SecureFilePermissions)),
@@ -44,7 +44,7 @@ func ValidateTokenFilePermissions(rc *eos_io.RuntimeContext, filePath string) er
 		return fmt.Errorf("token file %s has setuid/setgid bits set - security risk", filePath)
 	}
 
-	log.Debug("✅ Token file permissions are secure", zap.String("file", filePath))
+	log.Debug(" Token file permissions are secure", zap.String("file", filePath))
 	return nil
 }
 
@@ -72,7 +72,7 @@ func SecureWriteTokenFile(rc *eos_io.RuntimeContext, filePath, token string) err
 		return fmt.Errorf("token file written with insecure permissions: %w", err)
 	}
 
-	log.Info("🔒 Token file written securely",
+	log.Info(" Token file written securely",
 		zap.String("file", filePath),
 		zap.String("permissions", fmt.Sprintf("%o", SecureFilePermissions)),
 	)
@@ -106,7 +106,7 @@ func SecureReadTokenFile(rc *eos_io.RuntimeContext, filePath string) (string, er
 		return "", fmt.Errorf("token file %s contains invalid token format", filePath)
 	}
 
-	log.Debug("🔑 Token file read successfully", zap.String("file", filePath))
+	log.Debug(" Token file read successfully", zap.String("file", filePath))
 	return token, nil
 }
 

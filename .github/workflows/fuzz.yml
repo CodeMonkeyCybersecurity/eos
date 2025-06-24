@@ -38,7 +38,7 @@ jobs:
           go test -run=^FuzzValidateIP$ -fuzz=^FuzzValidateIP$ -fuzztime=5s ./pkg/interaction
           go test -run=^FuzzValidateNoShellMeta$ -fuzz=^FuzzValidateNoShellMeta$ -fuzztime=5s ./pkg/interaction
           
-          echo "📊 Fuzzing parse package..."
+          echo " Fuzzing parse package..."
           go test -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime=5s ./pkg/parse
           
-          echo "✅ All fuzz tests completed successfully!"
+          echo " All fuzz tests completed successfully!"

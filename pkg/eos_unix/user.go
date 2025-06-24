@@ -72,7 +72,7 @@ func generateOrPromptPassword(ctx context.Context, auto bool) (string, error) {
 		}
 
 		if err := crypto.ValidateStrongPassword(ctx, pw1); err != nil {
-			otelzap.Ctx(ctx).Warn("❌ Password too weak", zap.Error(err))
+			otelzap.Ctx(ctx).Warn(" Password too weak", zap.Error(err))
 			continue
 		}
 
@@ -83,7 +83,7 @@ func generateOrPromptPassword(ctx context.Context, auto bool) (string, error) {
 		}
 
 		if pw1 != pw2 {
-			otelzap.Ctx(ctx).Warn("❌ Passwords do not match")
+			otelzap.Ctx(ctx).Warn(" Passwords do not match")
 			continue
 		}
 
@@ -109,22 +109,22 @@ func LoadPasswordFromSecrets(ctx context.Context) (*shared.UserpassCreds, error)
 
 	data, err := os.ReadFile(secretsPath)
 	if err != nil {
-		otelzap.Ctx(ctx).Warn("❌ Failed to read eos password file", zap.String("path", secretsPath), zap.Error(err))
+		otelzap.Ctx(ctx).Warn(" Failed to read eos password file", zap.String("path", secretsPath), zap.Error(err))
 		return nil, fmt.Errorf("read secrets file: %w", err)
 	}
 
 	var creds shared.UserpassCreds
 	if err := json.Unmarshal(data, &creds); err != nil {
-		otelzap.Ctx(ctx).Warn("❌ Failed to parse eos password JSON", zap.String("path", secretsPath), zap.Error(err))
+		otelzap.Ctx(ctx).Warn(" Failed to parse eos password JSON", zap.String("path", secretsPath), zap.Error(err))
 		return nil, fmt.Errorf("unmarshal secrets: %w", err)
 	}
 
 	if creds.Username == "" || creds.Password == "" {
-		otelzap.Ctx(ctx).Warn("❌ Loaded eos credentials are incomplete", zap.Any("creds", creds))
+		otelzap.Ctx(ctx).Warn(" Loaded eos credentials are incomplete", zap.Any("creds", creds))
 		return nil, fmt.Errorf("incomplete credentials loaded from %s", secretsPath)
 	}
 
-	otelzap.Ctx(ctx).Info("✅ Loaded eos credentials successfully", zap.String("username", creds.Username))
+	otelzap.Ctx(ctx).Info(" Loaded eos credentials successfully", zap.String("username", creds.Username))
 	return &creds, nil
 }
 
@@ -150,7 +150,7 @@ func SavePasswordToSecrets(ctx context.Context, username, password string) error
 		return fmt.Errorf("failed to write credentials to file: %w", err)
 	}
 
-	otelzap.Ctx(ctx).Info("🔐 eos credentials saved", zap.String("path", secretsPath))
+	otelzap.Ctx(ctx).Info(" eos credentials saved", zap.String("path", secretsPath))
 	return nil
 }
 
@@ -231,9 +231,9 @@ func RunCreateUser(ctx context.Context, opts CreateUserOptions) error {
 		return err
 	}
 
-	fmt.Println("✅ User created:", username)
-	fmt.Println("🔐 Password:", password)
-	fmt.Println("📁 SSH key:", "/home/"+username+"/.ssh/id_rsa")
+	fmt.Println(" User created:", username)
+	fmt.Println(" Password:", password)
+	fmt.Println(" SSH key:", "/home/"+username+"/.ssh/id_rsa")
 
 	return nil
 }
@@ -243,7 +243,7 @@ func SetupSignalHandler() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-sig
-		fmt.Println("\n❌ Operation canceled.")
+		fmt.Println("\n Operation canceled.")
 		os.Exit(1)
 	}()
 }

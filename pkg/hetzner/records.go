@@ -43,7 +43,7 @@ func (c *DNSClient) GetRecords(rc *eos_io.RuntimeContext, zoneID string) ([]DNSR
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("✅ Retrieved records", zap.Int("count", len(result.Records)))
+	c.Log.Info(" Retrieved records", zap.Int("count", len(result.Records)))
 	return result.Records, nil
 }
 
@@ -78,7 +78,7 @@ func (c *DNSClient) CreateRecord(rc *eos_io.RuntimeContext, record DNSRecord) (*
 		return nil, errors.Wrap(err, "decoding response")
 	}
 
-	c.Log.Info("📦 Created record", zap.String("id", result.Record.ID))
+	c.Log.Info(" Created record", zap.String("id", result.Record.ID))
 	return &result.Record, nil
 }
 
@@ -214,6 +214,6 @@ func (c *DNSClient) bulkSend(rc *eos_io.RuntimeContext, method string, records [
 		return errors.Errorf("bulk %s failed (%d): %s", method, resp.StatusCode, raw)
 	}
 
-	c.Log.Info("📦 Bulk records operation complete", zap.String("method", method), zap.Int("count", len(records)))
+	c.Log.Info(" Bulk records operation complete", zap.String("method", method), zap.Int("count", len(records)))
 	return nil
 }
