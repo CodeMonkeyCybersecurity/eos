@@ -119,9 +119,9 @@ var createOsQueryCmd = &cobra.Command{
 		switch platformOS {
 		case "macos":
 			if isRoot {
-				installGuidance = "Running as root - will use PKG installer (recommended for system-wide installation)"
+				installGuidance = "Running as root - macOS osquery requires Homebrew (run without sudo)"
 			} else {
-				installGuidance = "Running as regular user - will attempt Homebrew first, fallback to PKG if needed"
+				installGuidance = "Running as regular user - will use Homebrew for osquery installation"
 			}
 		case "linux":
 			if !isRoot {

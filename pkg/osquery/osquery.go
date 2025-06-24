@@ -5,9 +5,11 @@ package osquery
 import (
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -69,7 +71,14 @@ func GetOsqueryConfig() string {
 func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 	
-	// Check for osqueryd binary
+	// Primary check: osqueryi interactive shell (available on all platforms)
+	if platform.IsCommandAvailable("osqueryi") {
+		logger.Info("✅ osquery is already installed",
+			zap.String("binary", "osqueryi"))
+		return true
+	}
+	
+	// Secondary check: osqueryd daemon binary
 	if platform.IsCommandAvailable("osqueryd") {
 		logger.Info("✅ osquery is already installed",
 			zap.String("binary", "osqueryd"))
@@ -85,7 +94,19 @@ func IsOsqueryInstalled(rc *eos_io.RuntimeContext) bool {
 			return true
 		}
 	case "macos":
-		// Check macOS launchd
+		// For macOS, also check Homebrew installation
+		if platform.IsCommandAvailable("brew") {
+			// Check if osquery is installed via Homebrew
+			output, err := execute.Run(rc.Ctx, execute.Options{
+				Command: "brew",
+				Args:    []string{"list", "--formula", "osquery"},
+			})
+			if err == nil && strings.Contains(output, "osquery") {
+				logger.Info("✅ osquery is installed via Homebrew")
+				return true
+			}
+		}
+		// Check macOS launchd (for non-Homebrew installations)
 		if platform.IsProcessRunning("com.facebook.osqueryd") {
 			logger.Info("✅ osquery is managed by launchd on macOS")
 			return true

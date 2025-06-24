@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// installMacOS handles osquery installation on macOS
+// installMacOS handles osquery installation on macOS using Homebrew only
 func installMacOS(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -22,118 +22,89 @@ func installMacOS(rc *eos_io.RuntimeContext) error {
 
 	// Check if running as root - Homebrew doesn't support root execution
 	if os.Getuid() == 0 {
-		logger.Info("🔒 Running as root - using PKG installer (Homebrew doesn't support root)")
-		return installMacOSPKG(rc)
+		logger.Error("❌ Cannot install osquery as root user",
+			zap.String("reason", "Homebrew doesn't support root execution for security reasons"),
+			zap.String("solution", "Run without sudo: 'eos create osquery'"),
+			zap.String("note", "osquery installation will request sudo when needed for configuration"))
+		return fmt.Errorf("homebrew doesn't support root execution - run as regular user")
 	}
 
-	// Check if Homebrew is available for non-root users
-	if platform.IsCommandAvailable("brew") {
-		logger.Info("🍺 Using Homebrew to install osquery")
-		err := installMacOSBrew(rc)
-		if err != nil {
-			logger.Warn("⚠️ Homebrew installation failed, falling back to PKG installer",
-				zap.Error(err))
-			return installMacOSPKG(rc)
-		}
-		return nil
+	// Check if Homebrew is available
+	if !platform.IsCommandAvailable("brew") {
+		logger.Error("❌ Homebrew not found",
+			zap.String("requirement", "Homebrew is required for osquery installation on macOS"),
+			zap.String("install_homebrew", "Visit https://brew.sh for installation instructions"),
+			zap.String("troubleshooting", "Ensure Homebrew is installed and in your PATH"))
+		return fmt.Errorf("homebrew not found - required for macOS osquery installation")
 	}
 
-	// Fall back to PKG installer
-	logger.Info("📦 Using PKG installer for osquery")
-	return installMacOSPKG(rc)
+	logger.Info("🍺 Using Homebrew to install osquery")
+	return installMacOSBrew(rc)
 }
 
 // installMacOSBrew installs osquery using Homebrew
 func installMacOSBrew(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Update Homebrew
-	logger.Info("🔄 Updating Homebrew")
-	if err := execute.RunSimple(rc.Ctx, "brew", "update"); err != nil {
-		logger.Warn("⚠️ Failed to update Homebrew",
-			zap.Error(err),
-			zap.String("note", "Continuing with installation"))
-	}
-
-	// Install osquery
-	logger.Info("📦 Installing osquery via Homebrew")
-	if err := execute.RunSimple(rc.Ctx, "brew", "install", "osquery"); err != nil {
-		logger.Error("❌ Failed to install osquery via Homebrew",
-			zap.Error(err),
-			zap.String("troubleshooting", "Try 'brew doctor' to diagnose Homebrew issues"))
-		return fmt.Errorf("brew install osquery: %w", err)
-	}
-
-	// Configure osquery
-	if err := configureMacOSService(rc); err != nil {
-		return err
-	}
-
-	logger.Info("✅ osquery installed successfully via Homebrew")
-	return nil
-}
-
-// installMacOSPKG installs osquery using the official PKG installer
-func installMacOSPKG(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Determine package URL based on architecture
-	arch := platform.GetArch()
-	var pkgURL string
-	switch arch {
-	case "amd64":
-		pkgURL = "https://pkg.osquery.io/darwin/osquery-5.10.2.pkg"
-	case "arm64":
-		pkgURL = "https://pkg.osquery.io/darwin/osquery-5.10.2-arm64.pkg"
-	default:
-		logger.Error("❌ Unsupported macOS architecture",
-			zap.String("arch", arch))
-		return fmt.Errorf("unsupported architecture: %s", arch)
-	}
-
-	// Download package
-	logger.Info("📥 Downloading osquery package",
-		zap.String("url", pkgURL),
-		zap.String("arch", arch))
+	// Check if osquery is already installed via Homebrew
+	logger.Info("🔍 Checking if osquery is already installed")
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "brew",
+		Args:    []string{"list", "--formula", "osquery"},
+	})
 	
-	pkgPath := "/tmp/osquery.pkg"
-	if err := execute.RunSimple(rc.Ctx, "curl", "-fsSL", pkgURL, "-o", pkgPath); err != nil {
-		logger.Error("❌ Failed to download osquery package",
-			zap.Error(err),
-			zap.String("url", pkgURL),
-			zap.String("troubleshooting", "Check internet connectivity and URL validity"))
-		return fmt.Errorf("download osquery package: %w", err)
-	}
-	defer func() {
-		if err := os.Remove(pkgPath); err != nil {
-			logger.Warn("⚠️ Failed to remove temporary package file",
-				zap.String("path", pkgPath),
-				zap.Error(err))
+	isAlreadyInstalled := (err == nil && strings.Contains(output, "osquery"))
+	
+	if isAlreadyInstalled {
+		logger.Info("ℹ️ osquery is already installed via Homebrew",
+			zap.String("status", "skipping installation"))
+	} else {
+		// Update Homebrew
+		logger.Info("🔄 Updating Homebrew")
+		if err := execute.RunSimple(rc.Ctx, "brew", "update"); err != nil {
+			logger.Warn("⚠️ Failed to update Homebrew",
+				zap.Error(err),
+				zap.String("note", "Continuing with installation"))
 		}
-	}()
 
-	// Install package
-	logger.Info("🔧 Installing osquery package")
-	if err := execute.RunSimple(rc.Ctx, "sudo", "installer", "-pkg", pkgPath, "-target", "/"); err != nil {
-		logger.Error("❌ Failed to install osquery package",
-			zap.Error(err),
-			zap.String("troubleshooting", "Ensure you have administrator privileges"))
-		return fmt.Errorf("install osquery package: %w", err)
+		// Install osquery
+		logger.Info("📦 Installing osquery via Homebrew")
+		installOutput, installErr := execute.Run(rc.Ctx, execute.Options{
+			Command: "brew",
+			Args:    []string{"install", "osquery"},
+		})
+		
+		if installErr != nil {
+			// Check if it's already installed (Homebrew sometimes returns error for this)
+			if strings.Contains(installOutput, "already installed") || 
+			   strings.Contains(installOutput, "latest version is already installed") {
+				logger.Info("ℹ️ osquery was already installed",
+					zap.String("brew_output", strings.TrimSpace(installOutput)))
+			} else {
+				logger.Error("❌ Failed to install osquery via Homebrew",
+					zap.Error(installErr),
+					zap.String("brew_output", strings.TrimSpace(installOutput)),
+					zap.String("troubleshooting", "Try 'brew doctor' to diagnose Homebrew issues"))
+				return fmt.Errorf("brew install osquery: %w", installErr)
+			}
+		} else {
+			logger.Info("✅ osquery installed successfully via Homebrew")
+		}
 	}
 
-	// Configure osquery
-	if err := configureMacOSService(rc); err != nil {
+	// Configure osquery (this is needed whether it was just installed or already present)
+	logger.Info("⚙️ Configuring osquery")
+	if err := configureMacOSHomebrew(rc); err != nil {
 		return err
 	}
 
-	logger.Info("✅ osquery installed successfully via PKG installer")
+	logger.Info("✅ osquery setup completed successfully")
 	return nil
 }
 
-// configureMacOSService configures osquery on macOS
-func configureMacOSService(rc *eos_io.RuntimeContext) error {
+// configureMacOSHomebrew configures osquery installed via Homebrew
+func configureMacOSHomebrew(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	paths := GetOsqueryPaths()
 
 	// Create configuration directory
 	configDir := "/var/osquery"
@@ -147,8 +118,9 @@ func configureMacOSService(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Write configuration
+	configPath := "/var/osquery/osquery.conf"
 	logger.Info("📝 Writing osquery configuration",
-		zap.String("path", paths.ConfigPath))
+		zap.String("path", configPath))
 	configContent := defaultOsqueryConfig
 	if err := os.WriteFile("/tmp/osquery.conf", []byte(configContent), 0644); err != nil {
 		logger.Error("❌ Failed to write temporary config",
@@ -156,10 +128,10 @@ func configureMacOSService(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write temporary config: %w", err)
 	}
 	
-	if err := execute.RunSimple(rc.Ctx, "sudo", "cp", "/tmp/osquery.conf", paths.ConfigPath); err != nil {
+	if err := execute.RunSimple(rc.Ctx, "sudo", "cp", "/tmp/osquery.conf", configPath); err != nil {
 		logger.Error("❌ Failed to copy configuration",
 			zap.Error(err),
-			zap.String("path", paths.ConfigPath))
+			zap.String("path", configPath))
 		return fmt.Errorf("copy configuration: %w", err)
 	}
 	if err := os.Remove("/tmp/osquery.conf"); err != nil {
@@ -168,76 +140,24 @@ func configureMacOSService(rc *eos_io.RuntimeContext) error {
 			zap.Error(err))
 	}
 
-	// Load and start the LaunchDaemon
-	logger.Info("🚀 Configuring osquery LaunchDaemon")
-	plistPath := "/Library/LaunchDaemons/com.facebook.osqueryd.plist"
-	
-	// Check if plist exists first
-	if _, err := os.Stat(plistPath); err != nil {
-		logger.Error("❌ LaunchDaemon plist not found",
-			zap.String("path", plistPath),
-			zap.Error(err),
-			zap.String("troubleshooting", "osquery installation may be incomplete"))
-		return fmt.Errorf("launchd plist not found: %w", err)
-	}
-	
-	// Check current user context for proper launchctl operations
-	currentUser := os.Getenv("USER")
-	isRoot := os.Getuid() == 0
-	
-	logger.Info("🔍 Service configuration context",
-		zap.String("user", currentUser),
-		zap.Bool("is_root", isRoot),
-		zap.String("plist_path", plistPath))
-	
-	// Try to unload if already loaded (ignore errors as it may not be loaded)
-	logger.Info("🔄 Attempting to unload existing service")
-	if isRoot {
-		if err := execute.RunSimple(rc.Ctx, "launchctl", "bootout", "system", plistPath); err != nil {
-			logger.Debug("🔄 Service was not previously loaded or bootout failed", zap.Error(err))
-		}
-	} else {
-		if err := execute.RunSimple(rc.Ctx, "sudo", "launchctl", "bootout", "system", plistPath); err != nil {
-			logger.Debug("🔄 Service was not previously loaded or bootout failed", zap.Error(err))
-		}
-	}
-	
-	// Load the daemon
-	logger.Info("🚀 Loading osquery LaunchDaemon")
-	var loadErr error
-	if isRoot {
-		loadErr = execute.RunSimple(rc.Ctx, "launchctl", "bootstrap", "system", plistPath)
-	} else {
-		loadErr = execute.RunSimple(rc.Ctx, "sudo", "launchctl", "bootstrap", "system", plistPath)
-	}
-	
-	if loadErr != nil {
-		logger.Warn("⚠️ Failed to load osquery LaunchDaemon using bootstrap, trying legacy load",
-			zap.Error(loadErr))
-		
-		// Fallback to legacy load command
-		if isRoot {
-			loadErr = execute.RunSimple(rc.Ctx, "launchctl", "load", "-w", plistPath)
-		} else {
-			loadErr = execute.RunSimple(rc.Ctx, "sudo", "launchctl", "load", "-w", plistPath)
-		}
-		
-		if loadErr != nil {
-			logger.Warn("⚠️ Failed to load osquery LaunchDaemon",
-				zap.Error(loadErr),
-				zap.String("note", "Service configuration completed but may need manual start"),
-				zap.String("manual_start", "sudo launchctl bootstrap system "+plistPath))
-		} else {
-			logger.Info("✅ osquery LaunchDaemon loaded successfully using legacy method")
-		}
-	} else {
-		logger.Info("✅ osquery LaunchDaemon loaded successfully")
-	}
+	// Note about Homebrew's osquery service behavior
+	logger.Info("📋 Homebrew osquery configuration notes",
+		zap.String("note", "Homebrew's osquery doesn't automatically create a system LaunchDaemon"),
+		zap.String("config_location", configPath),
+		zap.String("manual_run", "Run 'osqueryi' for interactive queries"),
+		zap.String("daemon_setup", "LaunchDaemon setup requires manual configuration if needed"))
+
+	// Check if user wants to set up a custom LaunchDaemon
+	logger.Info("ℹ️ osquery is ready for interactive use",
+		zap.String("interactive_command", "osqueryi"),
+		zap.String("config_file", configPath),
+		zap.String("note", "For daemon mode, manual LaunchDaemon configuration may be required"))
 
 	return nil
 }
 
-// verifyMacOSInstallation verifies osquery installation on macOS
+
+// verifyMacOSInstallation verifies osquery installation on macOS (Homebrew)
 func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("🔍 Verifying osquery installation on macOS")
@@ -249,7 +169,8 @@ func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 	})
 	if err != nil {
 		logger.Error("❌ osqueryi not found or not working",
-			zap.Error(err))
+			zap.Error(err),
+			zap.String("troubleshooting", "Ensure osquery is properly installed via Homebrew"))
 		return fmt.Errorf("osqueryi verification failed: %w", err)
 	}
 
@@ -262,53 +183,38 @@ func verifyMacOSInstallation(rc *eos_io.RuntimeContext) error {
 	logger.Info("✅ osquery verified successfully",
 		zap.String("version", version))
 
-	// Check if service is configured and potentially running
-	currentUser := os.Getenv("USER")
-	isRoot := os.Getuid() == 0
+	// Verify Homebrew installation
+	logger.Info("🔍 Verifying Homebrew installation")
+	brewOutput, brewErr := execute.Run(rc.Ctx, execute.Options{
+		Command: "brew",
+		Args:    []string{"list", "--formula", "osquery"},
+	})
 	
-	logger.Info("🔍 Checking service status",
-		zap.String("user", currentUser),
-		zap.Bool("is_root", isRoot))
+	if brewErr != nil || !strings.Contains(brewOutput, "osquery") {
+		logger.Warn("⚠️ osquery may not be properly installed via Homebrew",
+			zap.Error(brewErr),
+			zap.String("note", "Binary is available but Homebrew doesn't show it as installed"))
+	} else {
+		logger.Info("✅ osquery is properly installed via Homebrew")
+	}
 
-	// Try different methods to check service status
-	var serviceCheckErr error
-	
-	// Method 1: Check if service is loaded
-	if isRoot {
-		serviceCheckErr = execute.RunSimple(rc.Ctx, "launchctl", "list", "com.facebook.osqueryd")
+	// Check configuration file
+	configPath := "/var/osquery/osquery.conf"
+	if _, err := os.Stat(configPath); err != nil {
+		logger.Warn("⚠️ osquery configuration file not found",
+			zap.String("path", configPath),
+			zap.String("note", "Configuration may need to be created"))
 	} else {
-		serviceCheckErr = execute.RunSimple(rc.Ctx, "sudo", "launchctl", "list", "com.facebook.osqueryd")
+		logger.Info("✅ osquery configuration file exists",
+			zap.String("path", configPath))
 	}
-	
-	if serviceCheckErr != nil {
-		// Method 2: Check if plist exists (service configured but not running)
-		plistPath := "/Library/LaunchDaemons/com.facebook.osqueryd.plist"
-		if _, err := os.Stat(plistPath); err == nil {
-			logger.Warn("⚠️ osquery service configured but not loaded",
-				zap.String("plist_path", plistPath),
-				zap.String("note", "Service can be started manually"),
-				zap.String("manual_start", "sudo launchctl bootstrap system "+plistPath))
-		} else {
-			logger.Warn("⚠️ osquery service not configured",
-				zap.Error(serviceCheckErr),
-				zap.String("note", "Installation completed but service configuration may have failed"))
-		}
-	} else {
-		logger.Info("✅ osquery service is loaded and available")
-		
-		// Additional check: verify service is actually running
-		output, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "pgrep",
-			Args:    []string{"-f", "osqueryd"},
-		})
-		if err != nil || strings.TrimSpace(output) == "" {
-			logger.Warn("⚠️ osquery service loaded but may not be actively running",
-				zap.String("note", "Check system logs for startup issues"))
-		} else {
-			logger.Info("✅ osquery daemon process is running",
-				zap.String("pid", strings.TrimSpace(output)))
-		}
-	}
+
+	// Note about daemon mode
+	logger.Info("📋 osquery installation summary",
+		zap.String("mode", "interactive"),
+		zap.String("command", "osqueryi"),
+		zap.String("config", configPath),
+		zap.String("note", "Homebrew osquery is configured for interactive use. Daemon mode requires additional setup."))
 
 	return nil
 }
