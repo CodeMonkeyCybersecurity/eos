@@ -29,7 +29,8 @@ Available operations:
 - start/stop/restart: Control service lifecycle
 - enable/disable: Configure service autostart
 - status: View service status and health
-- logs: View service logs and troubleshooting info`,
+- logs: View service logs and troubleshooting info
+- update: Update service workers to latest version with backup`,
 	Aliases: []string{"svc"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -50,4 +51,5 @@ func init() {
 	ServicesCmd.AddCommand(NewEnableCmd())
 	ServicesCmd.AddCommand(NewDisableCmd())
 	ServicesCmd.AddCommand(NewLogsCmd())
+	ServicesCmd.AddCommand(NewUpdateCmd())
 }
