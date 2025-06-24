@@ -8,11 +8,24 @@ log() { echo "[$1] $2"; }
 PLATFORM=""
 IS_LINUX=false
 IS_MAC=false
+IS_RHEL=false
+IS_DEBIAN=false
 
 detect_platform() {
   case "$(uname -s)" in
-    Linux)  PLATFORM="linux"; IS_LINUX=true ;;
-    Darwin) PLATFORM="mac";   IS_MAC=true ;;
+    Linux)  
+      PLATFORM="linux"
+      IS_LINUX=true
+      # Detect Linux distribution
+      if [ -f /etc/redhat-release ] || [ -f /etc/centos-release ] || [ -f /etc/fedora-release ]; then
+        IS_RHEL=true
+        log INFO "📦 Detected RHEL-based system"
+      elif [ -f /etc/debian_version ] || command -v apt-get >/dev/null 2>&1; then
+        IS_DEBIAN=true
+        log INFO "📦 Detected Debian-based system"
+      fi
+      ;;
+    Darwin) PLATFORM="mac"; IS_MAC=true ;;
     *) log ERR "❌ Unsupported OS: $(uname -s)"; exit 1 ;;
   esac
   log INFO "📦 Detected platform: $PLATFORM"
@@ -24,6 +37,10 @@ Eos_BINARY_NAME="eos"
 Eos_SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 Eos_BUILD_PATH="$Eos_SRC_DIR/$Eos_BINARY_NAME"
 INSTALL_PATH="/usr/local/bin/$Eos_BINARY_NAME"
+
+# Go installation settings
+GO_VERSION="1.24.0"
+GO_INSTALL_DIR="/usr/local"
 
 # --- Directories ---
 # These are the *default* system-wide paths.
@@ -39,6 +56,171 @@ else
   CONFIG_DIR="/etc/eos"
   LOG_DIR="/var/log/eos"
 fi
+
+update_system_packages() {
+  if $IS_RHEL; then
+    log INFO "📦 Updating RHEL-based system packages..."
+    if command -v dnf >/dev/null 2>&1; then
+      dnf update -y
+    elif command -v yum >/dev/null 2>&1; then
+      yum update -y
+    else
+      log ERR "❌ Neither dnf nor yum found on RHEL-based system"
+      exit 1
+    fi
+  elif $IS_DEBIAN; then
+    log INFO "📦 Updating Debian-based system packages..."
+    apt-get update -y
+    apt-get upgrade -y
+  elif $IS_MAC; then
+    log INFO "ℹ️ Skipping system update on macOS (use brew upgrade manually if needed)"
+  fi
+}
+
+install_go() {
+  local need_go_install=false
+  local current_version=""
+
+  # Check if Go needs to be installed or updated
+  if ! command -v go >/dev/null 2>&1; then
+    log INFO "➡️ Go is not installed"
+    need_go_install=true
+  else
+    current_version=$(go version | awk '{print $3}' | sed 's/go//')
+    log INFO "➡️ Detected Go version: $current_version"
+    
+    # Simple version comparison - check if current version is at least the required version
+    if printf '%s\n%s\n' "$GO_VERSION" "$current_version" | sort -V | head -n1 | grep -q "^$GO_VERSION$"; then
+      log INFO "✅ Go is already up-to-date (version $current_version >= $GO_VERSION)"
+    else
+      log INFO "➡️ Go version is older (wanted: $GO_VERSION, found: $current_version)"
+      need_go_install=true
+    fi
+  fi
+
+  if [ "$need_go_install" = true ]; then
+    if $IS_MAC; then
+      log INFO "🍺 Installing Go via Homebrew..."
+      if ! command -v brew >/dev/null 2>&1; then
+        log ERR "❌ Homebrew not found. Please install it first: https://brew.sh/"
+        exit 1
+      fi
+      brew install go
+    else
+      # Linux installation
+      local arch="amd64"
+      local os="linux"
+      local go_tarball="go${GO_VERSION}.${os}-${arch}.tar.gz"
+      local download_url="https://go.dev/dl/${go_tarball}"
+      
+      log INFO "⬇️ Downloading Go ${GO_VERSION} from ${download_url}..."
+      cd /tmp
+      curl -LO "$download_url"
+      
+      if [ ! -f "$go_tarball" ]; then
+        log ERR "❌ Failed to download Go archive"
+        exit 1
+      fi
+      
+      # Verify download
+      if ! file "$go_tarball" | grep -q "gzip compressed data"; then
+        log ERR "❌ Download failed or was not a valid tarball"
+        exit 1
+      fi
+      
+      log INFO "📦 Extracting Go archive to ${GO_INSTALL_DIR}..."
+      rm -rf "${GO_INSTALL_DIR}/go"
+      tar -C "${GO_INSTALL_DIR}" -xzf "$go_tarball"
+      
+      # Set up environment variables system-wide
+      local profile_file="/etc/profile.d/go.sh"
+      log INFO "⚙️ Setting up Go environment in ${profile_file}..."
+      tee "${profile_file}" >/dev/null <<EOF
+export PATH=\$PATH:/usr/local/go/bin
+EOF
+      
+      # Symlink for global access
+      if [ ! -f /usr/bin/go ]; then
+        log INFO "🔗 Creating symlink for global Go access..."
+        ln -sf /usr/local/go/bin/go /usr/bin/go
+      fi
+      
+      # Clean up
+      rm -f "$go_tarball"
+      
+      # Update PATH for current script execution
+      export PATH="${GO_INSTALL_DIR}/go/bin:$PATH"
+      
+      log INFO "✅ Go installed successfully"
+    fi
+  fi
+  
+  # Verify Go installation
+  if command -v go >/dev/null 2>&1; then
+    log INFO "Go version: $(go version)"
+  else
+    log ERR "❌ Go installation verification failed"
+    exit 1
+  fi
+}
+
+install_github_cli() {
+  if command -v gh >/dev/null 2>&1; then
+    log INFO "✅ GitHub CLI is already installed: $(gh --version | head -n1)"
+    return
+  fi
+  
+  log INFO "➡️ Installing GitHub CLI..."
+  
+  if $IS_MAC; then
+    if ! command -v brew >/dev/null 2>&1; then
+      log ERR "❌ Homebrew not found. Please install it first: https://brew.sh/"
+      exit 1
+    fi
+    brew install gh
+  elif $IS_RHEL; then
+    # Install dnf-plugins-core if not available
+    if command -v dnf >/dev/null 2>&1; then
+      dnf install -y dnf-plugins-core
+      
+      # Remove any stale local repo
+      if [ -f "/etc/yum.repos.d/opt_eos.repo" ]; then
+        log INFO "⚠️ Removing stale local repo: /etc/yum.repos.d/opt_eos.repo"
+        rm -f /etc/yum.repos.d/opt_eos.repo
+      fi
+      
+      # Add GitHub CLI repo if not already added
+      if ! dnf repolist | grep -q "github-cli"; then
+        dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      fi
+      
+      dnf install -y gh
+    elif command -v yum >/dev/null 2>&1; then
+      # Fallback to yum for older RHEL systems
+      yum install -y yum-utils
+      yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+      yum install -y gh
+    fi
+  elif $IS_DEBIAN; then
+    # Install GitHub CLI on Debian-based systems
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+    chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+    apt-get update
+    apt-get install -y gh
+  else
+    log ERR "❌ Unsupported Linux distribution for GitHub CLI installation"
+    exit 1
+  fi
+  
+  # Verify installation
+  if command -v gh >/dev/null 2>&1; then
+    log INFO "✅ GitHub CLI installed: $(gh --version | head -n1)"
+  else
+    log ERR "❌ GitHub CLI installation verification failed"
+    exit 1
+  fi
+}
 
 check_prerequisites() {
   local go_found=false
@@ -60,16 +242,17 @@ check_prerequisites() {
   fi
 
   if ! $go_found; then
-    log ERR "❌ Go executable not found anywhere (PATH, /usr/local/go/bin, $HOME/go/bin)."
-    if $IS_MAC; then
-      echo "👉 Install it with: brew install go"
-    else
-      echo "👉 Install it from https://go.dev/dl/ or run ./setupGo.sh"
-    fi
-    exit 1
+    log INFO "❌ Go executable not found. Will install Go automatically."
+    install_go
+  else
+    # Check Go version and potentially upgrade
+    install_go
   fi
 
-  # Confithe detected Go version
+  # Install GitHub CLI if not present
+  install_github_cli
+
+  # Verify Go is now available
   log INFO "Go detected and ready. Version details: $(go version)"
 
   if $IS_LINUX; then
@@ -183,6 +366,16 @@ add_sudoers_entry() {
 
 main() {
   detect_platform
+  
+  # Update system packages first (Linux only, requires root)
+  if $IS_LINUX; then
+    if [[ "$EUID" -eq 0 ]]; then
+      update_system_packages
+    else
+      log INFO "ℹ️ Skipping system package update (not running as root)"
+    fi
+  fi
+  
   check_prerequisites
   build_eos_binary
   show_existing_checksum
