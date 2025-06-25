@@ -37,6 +37,9 @@ go.work.sum
 *.venv
 *.json
 
+# python 
+__pycache__
+
 # MacOS
 .DS_Store
 desktop.ini
@@ -65,3 +68,4 @@ eos
 coverage.*
 *.out
 gosec-report.*
+

@@ -14,26 +14,31 @@ import (
 var ServicesCmd = &cobra.Command{
 	Use:   "services",
 	Short: "Manage Delphi pipeline systemd services",
-	Long: `The 'services' command provides functionality to manage the Delphi data pipeline systemd services.
+	Long: `The 'services' command provides CRUD operations and management for Delphi data pipeline systemd services.
 
-This includes:
+Available services:
 - delphi-listener: Webhook listener for Wazuh alerts
 - delphi-agent-enricher: Agent enrichment service
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
 
-Available operations:
-- check: Verify Python dependencies are installed
-- install: Install required Python dependencies
-- deploy-template: Deploy email template with correct permissions
-- deploy-ab-config: Deploy A/B testing configuration for prompt optimization
-- analyze-ab-results: Analyze A/B testing results and provide optimization insights
+CRUD Operations:
+- create <service>: Deploy/install a service with all required files
+- read <service>: Display detailed service information and configuration
+- update <service>: Update service workers and configuration to latest version
+- delete <service>: Remove service files (preserves configuration/data)
+- list: Show all services and their status
+
+Service Management:
 - start/stop/restart: Control service lifecycle
 - enable/disable: Configure service autostart
 - status: View service status and health
 - logs: View service logs and troubleshooting info
-- update: Update service workers to latest version with backup`,
+
+Special Operations:
+- deploy-ab-config: Deploy A/B testing configuration for prompt optimization
+- analyze-ab-results: Analyze A/B testing results and provide optimization insights`,
 	Aliases: []string{"svc"},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
@@ -46,7 +51,14 @@ Available operations:
 }
 
 func init() {
-	// Add subcommands for service management
+	// CRUD operations (primary interface)
+	ServicesCmd.AddCommand(NewCreateCmd())
+	ServicesCmd.AddCommand(NewReadCmd())
+	ServicesCmd.AddCommand(NewUpdateCmd())
+	ServicesCmd.AddCommand(NewDeleteCmd())
+	ServicesCmd.AddCommand(NewListCmd())
+	
+	// Service management operations
 	ServicesCmd.AddCommand(NewStartCmd())
 	ServicesCmd.AddCommand(NewStopCmd())
 	ServicesCmd.AddCommand(NewRestartCmd())
@@ -54,7 +66,9 @@ func init() {
 	ServicesCmd.AddCommand(NewEnableCmd())
 	ServicesCmd.AddCommand(NewDisableCmd())
 	ServicesCmd.AddCommand(NewLogsCmd())
-	ServicesCmd.AddCommand(NewUpdateCmd())
+	
+	// Special operations
+	// Note: checkCmd and installCmd add themselves via their own init() functions
 	ServicesCmd.AddCommand(NewDeployABConfigCmd())
 	ServicesCmd.AddCommand(NewAnalyzeABResultsCmd())
 }

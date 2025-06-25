@@ -159,6 +159,14 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 
+### CRUD Architecture Pattern
+- **CRITICAL**: Every module in Eos MUST implement CRUD-like operations as its foundation
+- **Required Operations**: create, read, update, delete, list
+- **Implementation Pattern**: Each module should expose these operations as subcommands
+- **Example**: `eos delphi services create <service-name>`, `eos delphi services read <service-name>`, etc.
+- **Additional Operations**: Modules may include domain-specific operations beyond CRUD (e.g., start/stop/restart for services)
+- **Consistency**: This pattern ensures predictable interfaces across all Eos modules
+
 ### Logging Configuration Requirements
 **CRITICAL**: Eos must implement dual-output logging for maximum visibility:
 - **Console Output**: All structured logs (INFO level and above) MUST be displayed on the console for immediate user feedback
