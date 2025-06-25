@@ -12,7 +12,7 @@ import signal
 import logging
 import json
 import html as html_lib
-import psycopg2
+import psycopg2 # Pylance: If this import cannot be resolved, ensure psycopg2-binary is installed
 import psycopg2.extensions
 from string import Template
 from datetime import datetime, timezone
@@ -20,6 +20,8 @@ from logging.handlers import RotatingFileHandler
 from typing import Dict, Any, Optional, Tuple
 from abc import ABC, abstractmethod
 
+# Pylance: If 'load_dotenv' is an unknown import symbol, ensure python-dotenv is installed.
+# The try-except handles runtime, but Pylance needs to see it defined statically.
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:
@@ -30,6 +32,13 @@ try:
 except ImportError:
     logging.error("Required dependency 'psycopg2' not found. Please install it using: pip install psycopg2-binary")
     sys.exit(1)
+
+# Pylance: If 'pytz' could not be resolved, ensure pytz is installed.
+try:
+    import pytz
+except ModuleNotFoundError:
+    logging.warning("Pytz module not found. Timezone conversions might be limited. Please install it using: pip install pytz")
+    pytz = None # Set pytz to None if not found, to handle gracefully
 
 # ───── CONFIGURATION ─────────────────────────────────────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
@@ -132,11 +141,14 @@ class FileBasedTemplate(EmailTemplate):
         timestamp = metadata.get('timestamp')
         if timestamp:
             try:
-                import pytz
-                tz = pytz.timezone(TIMEZONE)
-                if isinstance(timestamp, str):
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                sent_at = timestamp.astimezone(tz).strftime("%A, %d %B %Y %I:%M %p AWST")
+                # Use pytz only if it was successfully imported
+                if pytz:
+                    tz = pytz.timezone(TIMEZONE)
+                    if isinstance(timestamp, str):
+                        timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                    sent_at = timestamp.astimezone(tz).strftime("%A, %d %B %Y %I:%M %p AWST")
+                else:
+                    sent_at = str(timestamp) # Fallback if pytz not available
             except Exception: # Catch broader exceptions for timezone/datetime issues
                 sent_at = str(timestamp)
         else:
@@ -198,9 +210,10 @@ class FileBasedTemplate(EmailTemplate):
         for heading, content in sections.items():
             if content:
                 # Convert newlines to paragraphs
+                # FIX: Used raw string literal r'\n\n' to avoid Pylance warning about escape sequences in f-string
                 paragraphs = [
                     f"<p>{html_lib.escape(p)}</p>"
-                    for p in content.split("\n\n") if p.strip()
+                    for p in content.split(r'\n\n') if p.strip()
                 ]
                 if paragraphs:
                     html_parts.append(f"<h2>{html_lib.escape(heading)}:</h2>")
@@ -250,9 +263,12 @@ class FileBasedTemplate(EmailTemplate):
                 value = agent_info[field]
                 if isinstance(value, datetime):
                     try:
-                        import pytz
-                        tz = pytz.timezone(TIMEZONE)
-                        value = value.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+                        # Use pytz only if it was successfully imported
+                        if pytz:
+                            tz = pytz.timezone(TIMEZONE)
+                            value = value.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+                        else:
+                            value = str(value) # Fallback if pytz not available
                     except Exception: # Catch broader exceptions for timezone/datetime issues
                         value = str(value)
                 html_parts.append(f"<li><strong>{label}:</strong> {html_lib.escape(str(value))}</li>")
@@ -278,7 +294,7 @@ class ModernCardTemplate(EmailTemplate):
                 <div style="background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <h3 style="color: #2c3e50; margin-top: 0;">{html_lib.escape(heading)}</h3>
                     <div style="color: #555; line-height: 1.6;">
-                        {html_lib.escape(content).replace('\n\n', '<br><br>')}
+                        {html_lib.escape(content).replace(r'\n\n', '<br><br>')}
                     </div>
                 </div>
                 """
@@ -392,7 +408,8 @@ def fetch_alert_to_format(conn, alert_id: int) -> Optional[Dict]:
             structured_data,
             structured_at
         FROM alerts
-        WHERE id = %s AND state = 'structured'
+        WHERE state = 'STRUCTURED' -- FIX: Changed 'structured' to 'STRUCTURED' to match enum
+        AND id = %s
     """
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, (alert_id,))
@@ -416,7 +433,7 @@ def save_formatted_data(conn, alert_id: int, formatted_data: Dict[str, Any]):
             cur.execute("""
                 UPDATE alerts
                 SET formatted_data = %s,
-                    state = 'formatted',
+                    state = 'formatted', -- Assuming 'formatted' is a valid enum value
                     formatted_at = NOW()
                 WHERE id = %s
             """, (json.dumps(formatted_data), alert_id))
@@ -434,7 +451,7 @@ def catch_up(conn, formatter: EmailFormatter):
     """Process any backlog of unformatted alerts"""
     sql = """
         SELECT id FROM alerts
-        WHERE state = 'structured'
+        WHERE state = 'STRUCTURED' -- FIX: Changed 'structured' to 'STRUCTURED' to match enum
         ORDER BY structured_at
     """
     with conn.cursor() as cur:
