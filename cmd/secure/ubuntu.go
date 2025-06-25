@@ -49,13 +49,13 @@ Use --no-mfa to skip MFA configuration (not recommended for production).`,
 		// Handle MFA-only configuration
 		if mfaOnly {
 			if disableMFA {
-				logger.Info("🔓 Disabling MFA for sudo/root access")
+				logger.Info(" Disabling MFA for sudo/root access")
 				return ubuntu.DisableMFA(rc)
 			} else if enforceMFA {
-				logger.Info("🔐 Configuring ENFORCED MFA for sudo/root access")
+				logger.Info(" Configuring ENFORCED MFA for sudo/root access")
 				return ubuntu.ConfigureEnforcedMFA(rc)
 			} else {
-				logger.Info("🔐 Configuring standard MFA for sudo/root access")
+				logger.Info(" Configuring standard MFA for sudo/root access")
 				return ubuntu.ConfigureMFA(rc)
 			}
 		}
@@ -68,10 +68,10 @@ Use --no-mfa to skip MFA configuration (not recommended for production).`,
 		} else if enforceMFA || (!enableMFA && !disableMFA) {
 			// Default to enforced MFA
 			mfaMode = "enforced"
-			logger.Info("🔐 MFA will be configured and enforced (default security mode)")
+			logger.Info(" MFA will be configured and enforced (default security mode)")
 		} else if enableMFA {
 			mfaMode = "standard"
-			logger.Info("🔐 Standard MFA will be configured")
+			logger.Info(" Standard MFA will be configured")
 		} else {
 			mfaMode = "disabled"
 		}
@@ -89,14 +89,14 @@ Use --no-mfa to skip MFA configuration (not recommended for production).`,
 
 func init() {
 	SecureCmd.AddCommand(ubuntuCmd)
-	
+
 	// MFA Configuration Flags
 	ubuntuCmd.Flags().Bool("enforce-mfa", false, "Enable ENFORCED Multi-Factor Authentication (default if no MFA flags specified)")
 	ubuntuCmd.Flags().Bool("enable-mfa", false, "Enable standard Multi-Factor Authentication for sudo/root access")
 	ubuntuCmd.Flags().Bool("disable-mfa", false, "Disable Multi-Factor Authentication for sudo/root access")
 	ubuntuCmd.Flags().Bool("no-mfa", false, "Skip MFA configuration entirely (not recommended for production)")
 	ubuntuCmd.Flags().Bool("mfa-only", false, "Only configure MFA settings without running full hardening")
-	
+
 	// Mark mutually exclusive flags
 	ubuntuCmd.MarkFlagsMutuallyExclusive("enforce-mfa", "enable-mfa", "disable-mfa", "no-mfa")
 }

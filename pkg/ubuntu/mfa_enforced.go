@@ -15,21 +15,21 @@ import (
 
 // EnforcedMFAConfig represents the enforced MFA configuration
 type EnforcedMFAConfig struct {
-	RequireMFA           bool     `json:"require_mfa"`
-	AllowPasswordFallback bool    `json:"allow_password_fallback"`
-	EnforcementMode      string   `json:"enforcement_mode"` // strict, graceful
-	ExemptUsers          []string `json:"exempt_users"`
-	GracePeriodHours     int      `json:"grace_period_hours"`
+	RequireMFA            bool     `json:"require_mfa"`
+	AllowPasswordFallback bool     `json:"allow_password_fallback"`
+	EnforcementMode       string   `json:"enforcement_mode"` // strict, graceful
+	ExemptUsers           []string `json:"exempt_users"`
+	GracePeriodHours      int      `json:"grace_period_hours"`
 }
 
 // DefaultEnforcedMFAConfig returns secure defaults for MFA enforcement
 func DefaultEnforcedMFAConfig() EnforcedMFAConfig {
 	return EnforcedMFAConfig{
-		RequireMFA:           true,
+		RequireMFA:            true,
 		AllowPasswordFallback: false, // Strict by default
-		EnforcementMode:      "graceful",
-		ExemptUsers:          []string{}, // No exemptions by default
-		GracePeriodHours:     24,         // 24-hour grace period for setup
+		EnforcementMode:       "graceful",
+		ExemptUsers:           []string{}, // No exemptions by default
+		GracePeriodHours:      24,         // 24-hour grace period for setup
 	}
 }
 
@@ -83,7 +83,7 @@ log_message() {
 print_header() {
     echo -e "${BLUE}╔══════════════════════════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║                                                                              ║${NC}"
-    echo -e "${BLUE}║                    🔐 MANDATORY MFA SETUP REQUIRED 🔐                       ║${NC}"
+    echo -e "${BLUE}║                     MANDATORY MFA SETUP REQUIRED                        ║${NC}"
     echo -e "${BLUE}║                                                                              ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
     echo
@@ -94,10 +94,10 @@ print_header() {
 
 check_mfa_status() {
     if [[ -f "$GOOGLE_AUTH_FILE" ]]; then
-        echo -e "${GREEN}✅ MFA is already configured for user: $(whoami)${NC}"
+        echo -e "${GREEN} MFA is already configured for user: $(whoami)${NC}"
         return 0
     else
-        echo -e "${RED}❌ MFA is NOT configured for user: $(whoami)${NC}"
+        echo -e "${RED} MFA is NOT configured for user: $(whoami)${NC}"
         return 1
     fi
 }
@@ -129,7 +129,7 @@ setup_mfa_interactive() {
         cp "$GOOGLE_AUTH_FILE" "$GOOGLE_AUTH_FILE.backup.$(date +%s)"
     fi
     
-    echo -e "${BLUE}🔑 Generating MFA configuration...${NC}"
+    echo -e "${BLUE} Generating MFA configuration...${NC}"
     echo
     
     # Run google-authenticator with enhanced security settings
@@ -143,7 +143,7 @@ setup_mfa_interactive() {
         --emergency-codes=5
     
     echo
-    echo -e "${GREEN}✅ MFA configuration completed successfully!${NC}"
+    echo -e "${GREEN} MFA configuration completed successfully!${NC}"
     
     # Log the setup
     log_message "MFA configured for user: $(whoami) from IP: ${SSH_CLIENT%% *}"
@@ -169,11 +169,11 @@ test_mfa_configuration() {
     
     # Test the code using a temporary validation
     if echo "$code" | google-authenticator --verify="$GOOGLE_AUTH_FILE" 2>/dev/null; then
-        echo -e "${GREEN}✅ MFA test successful! Your configuration is working correctly.${NC}"
+        echo -e "${GREEN} MFA test successful! Your configuration is working correctly.${NC}"
         log_message "MFA test successful for user: $(whoami)"
         return 0
     else
-        echo -e "${RED}❌ MFA test failed. Please check your authenticator app and try again.${NC}"
+        echo -e "${RED} MFA test failed. Please check your authenticator app and try again.${NC}"
         echo
         echo "Common issues:"
         echo "  • Make sure your device time is synchronized"
@@ -199,7 +199,7 @@ enforce_mfa_strict() {
     echo -e "${YELLOW}⚠️  After this point, password-only authentication will be DISABLED.${NC}"
     echo "   You MUST use your authenticator app for all sudo operations."
     echo
-    echo -e "${GREEN}✅ Emergency access available via: sudo disable-mfa-emergency${NC}"
+    echo -e "${GREEN} Emergency access available via: sudo disable-mfa-emergency${NC}"
     echo
     
     read -p "Proceed with strict MFA enforcement? (y/N): " -r confirm
@@ -239,7 +239,7 @@ EOF
     echo "enforcement_date=$(date)" >> "$CONFIG_FILE"
     echo "enforced_by=$(whoami)" >> "$CONFIG_FILE"
     
-    echo -e "${GREEN}✅ Strict MFA enforcement is now active.${NC}"
+    echo -e "${GREEN} Strict MFA enforcement is now active.${NC}"
     log_message "Strict MFA enforcement activated by user: $(whoami)"
 }
 
@@ -291,7 +291,7 @@ main() {
     
     # Test the configuration
     if ! test_mfa_configuration; then
-        echo -e "${RED}❌ MFA setup failed. Please contact your system administrator.${NC}"
+        echo -e "${RED} MFA setup failed. Please contact your system administrator.${NC}"
         exit 1
     fi
     
@@ -318,7 +318,7 @@ main() {
     esac
     
     echo
-    echo -e "${GREEN}🔐 MFA enforcement setup completed successfully!${NC}"
+    echo -e "${GREEN} MFA enforcement setup completed successfully!${NC}"
 }
 
 # Only run main if script is executed directly
@@ -343,16 +343,16 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-echo -e "${BLUE}🔐 MFA Status Report for $(whoami)${NC}"
+echo -e "${BLUE} MFA Status Report for $(whoami)${NC}"
 echo "============================================================================"
 
 # Check user MFA configuration
 if [[ -f "$GOOGLE_AUTH_FILE" ]]; then
-    echo -e "${GREEN}✅ User MFA Configuration: CONFIGURED${NC}"
+    echo -e "${GREEN} User MFA Configuration: CONFIGURED${NC}"
     echo "   Secret file: $GOOGLE_AUTH_FILE"
     echo "   Last modified: $(stat -f %Sm "$GOOGLE_AUTH_FILE" 2>/dev/null || stat -c %y "$GOOGLE_AUTH_FILE" 2>/dev/null)"
 else
-    echo -e "${RED}❌ User MFA Configuration: NOT CONFIGURED${NC}"
+    echo -e "${RED} User MFA Configuration: NOT CONFIGURED${NC}"
     echo "   Run 'setup-mfa' to configure MFA for your account"
 fi
 
@@ -363,26 +363,26 @@ echo -e "${BLUE}🔧 PAM Configuration Status:${NC}"
 
 if grep -q "pam_google_authenticator.so" /etc/pam.d/sudo 2>/dev/null; then
     if grep -q "required.*pam_google_authenticator.so" /etc/pam.d/sudo; then
-        echo -e "${GREEN}✅ sudo MFA: ENFORCED (strict mode)${NC}"
+        echo -e "${GREEN} sudo MFA: ENFORCED (strict mode)${NC}"
     elif grep -q "nullok" /etc/pam.d/sudo; then
         echo -e "${YELLOW}⚠️  sudo MFA: GRACEFUL (fallback allowed)${NC}"
     else
-        echo -e "${GREEN}✅ sudo MFA: CONFIGURED${NC}"
+        echo -e "${GREEN} sudo MFA: CONFIGURED${NC}"
     fi
 else
-    echo -e "${RED}❌ sudo MFA: NOT CONFIGURED${NC}"
+    echo -e "${RED} sudo MFA: NOT CONFIGURED${NC}"
 fi
 
 if grep -q "pam_google_authenticator.so" /etc/pam.d/su 2>/dev/null; then
     if grep -q "required.*pam_google_authenticator.so" /etc/pam.d/su; then
-        echo -e "${GREEN}✅ su MFA: ENFORCED (strict mode)${NC}"
+        echo -e "${GREEN} su MFA: ENFORCED (strict mode)${NC}"
     elif grep -q "nullok" /etc/pam.d/su; then
         echo -e "${YELLOW}⚠️  su MFA: GRACEFUL (fallback allowed)${NC}"
     else
-        echo -e "${GREEN}✅ su MFA: CONFIGURED${NC}"
+        echo -e "${GREEN} su MFA: CONFIGURED${NC}"
     fi
 else
-    echo -e "${RED}❌ su MFA: NOT CONFIGURED${NC}"
+    echo -e "${RED} su MFA: NOT CONFIGURED${NC}"
 fi
 
 echo
@@ -392,7 +392,7 @@ echo -e "${BLUE}⚖️  Enforcement Policy:${NC}"
 if [[ -f "$CONFIG_FILE" ]]; then
     source "$CONFIG_FILE" 2>/dev/null || true
     if [[ "${enforce_mfa:-false}" == "true" ]]; then
-        echo -e "${GREEN}✅ MFA Enforcement: ACTIVE${NC}"
+        echo -e "${GREEN} MFA Enforcement: ACTIVE${NC}"
         echo "   Enforced on: ${enforcement_date:-unknown}"
         echo "   Enforced by: ${enforced_by:-unknown}"
     else
@@ -424,7 +424,7 @@ echo
 // ConfigureEnforcedMFA sets up MFA with proper enforcement and user guidance
 func ConfigureEnforcedMFA(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔐 Configuring enforced Multi-Factor Authentication")
+	logger.Info(" Configuring enforced Multi-Factor Authentication")
 
 	// First, install required packages
 	if err := installMFAPackages(rc); err != nil {
@@ -461,7 +461,7 @@ func ConfigureEnforcedMFA(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("user MFA setup: %w", err)
 	}
 
-	logger.Info("✅ Enforced MFA configuration completed",
+	logger.Info(" Enforced MFA configuration completed",
 		zap.String("setup_script", "/usr/local/bin/setup-mfa"),
 		zap.String("status_script", "/usr/local/bin/mfa-status"),
 		zap.String("enforcement_script", "/usr/local/bin/enforce-mfa-strict"))
@@ -513,7 +513,7 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	fmt.Println()
-	fmt.Println("🔐 MANDATORY MFA SETUP REQUIRED")
+	fmt.Println(" MANDATORY MFA SETUP REQUIRED")
 	fmt.Println("═══════════════════════════════════════════════════════════════════════")
 	fmt.Println()
 	fmt.Println("⚠️  Multi-Factor Authentication (MFA) must be configured for secure")
@@ -541,12 +541,12 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 		fmt.Println("   sudo setup-mfa")
 		fmt.Println()
 		fmt.Println("   Note: MFA will be enforced in 24 hours for security.")
-		
+
 		// Schedule enforcement for later
 		if err := scheduleGracePeriod(rc); err != nil {
 			logger.Warn("Failed to schedule grace period", zap.Error(err))
 		}
-		
+
 		return nil
 	}
 
@@ -559,7 +559,7 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("run MFA setup script: %w", err)
 	}
 
-	logger.Info("✅ User MFA setup completed successfully")
+	logger.Info(" User MFA setup completed successfully")
 	return nil
 }
 
@@ -676,7 +676,7 @@ echo "enforce_mfa=true" > "$CONFIG_FILE"
 echo "enforcement_date=$(date)" >> "$CONFIG_FILE"
 echo "enforced_by=$(whoami)" >> "$CONFIG_FILE"
 
-echo "✅ Strict MFA enforcement is now active."
+echo " Strict MFA enforcement is now active."
 echo "   All sudo operations now require MFA authentication."
 `
 

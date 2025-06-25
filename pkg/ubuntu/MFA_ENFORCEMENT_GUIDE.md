@@ -4,7 +4,7 @@
 
 Eos now implements **enforced Multi-Factor Authentication (MFA)** by default for all sudo and root access on Ubuntu systems. This provides enterprise-grade security while maintaining usability through guided setup and graceful enforcement options.
 
-## 🔐 Default Behavior
+##  Default Behavior
 
 **By default, `eos secure ubuntu` now:**
 1. **Guides users through MFA setup interactively**
@@ -55,7 +55,7 @@ When you run `eos secure ubuntu`, you'll be guided through:
 
 ### 2. MFA Configuration Prompt
 ```
-🔐 MANDATORY MFA SETUP REQUIRED
+ MANDATORY MFA SETUP REQUIRED
 ═══════════════════════════════════════════════════════════════════════
 
 ⚠️  Multi-Factor Authentication (MFA) must be configured for secure
@@ -176,18 +176,18 @@ mfa-status
 
 Output example:
 ```
-🔐 MFA Status Report for username
+ MFA Status Report for username
 ============================================================================
-✅ User MFA Configuration: CONFIGURED
+ User MFA Configuration: CONFIGURED
    Secret file: /home/username/.google_authenticator
    Last modified: 2024-01-15 10:30:00
 
 🔧 PAM Configuration Status:
-✅ sudo MFA: ENFORCED (strict mode)
-✅ su MFA: ENFORCED (strict mode)
+ sudo MFA: ENFORCED (strict mode)
+ su MFA: ENFORCED (strict mode)
 
 ⚖️ Enforcement Policy:
-✅ MFA Enforcement: ACTIVE
+ MFA Enforcement: ACTIVE
    Enforced on: Mon Jan 15 10:30:00 UTC 2024
    Enforced by: admin
 ```

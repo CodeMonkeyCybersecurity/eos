@@ -6,6 +6,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/delete"
 	read "github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/unseal"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora/update"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -31,6 +32,7 @@ func init() {
 	PandoraCmd.AddCommand(create.CreateCmd)
 	PandoraCmd.AddCommand(delete.DeleteCmd)
 	PandoraCmd.AddCommand(read.ReadCmd)
+	PandoraCmd.AddCommand(unseal.UnsealCmd)
 	PandoraCmd.AddCommand(update.UpdateCmd)
 }
 

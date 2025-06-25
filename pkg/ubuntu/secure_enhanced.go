@@ -11,7 +11,7 @@ import (
 // SecureUbuntuEnhanced performs comprehensive security hardening with enhanced MFA options
 func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔐 Starting Enhanced Ubuntu security hardening",
+	logger.Info(" Starting Enhanced Ubuntu security hardening",
 		zap.String("mfa_mode", mfaMode))
 
 	// Check Ubuntu version
@@ -93,23 +93,23 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	// 11. Configure MFA based on mode
 	switch mfaMode {
 	case "enforced":
-		logger.Info("🔐 Configuring ENFORCED Multi-Factor Authentication")
+		logger.Info(" Configuring ENFORCED Multi-Factor Authentication")
 		if err := ConfigureEnforcedMFA(rc); err != nil {
 			return fmt.Errorf("configure enforced MFA: %w", err)
 		}
-		logger.Info("✅ ENFORCED MFA configured successfully")
-		
+		logger.Info(" ENFORCED MFA configured successfully")
+
 	case "standard":
-		logger.Info("🔐 Configuring standard Multi-Factor Authentication")
+		logger.Info(" Configuring standard Multi-Factor Authentication")
 		if err := configureMFA(rc); err != nil {
 			return fmt.Errorf("configure standard MFA: %w", err)
 		}
-		logger.Info("✅ Standard MFA configured successfully")
-		
+		logger.Info(" Standard MFA configured successfully")
+
 	case "disabled":
 		logger.Warn("⚠️  MFA configuration skipped - this reduces security")
 		logger.Warn("⚠️  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
-		
+
 	default:
 		return fmt.Errorf("unknown MFA mode: %s", mfaMode)
 	}
@@ -117,7 +117,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	// Final security summary
 	printSecuritySummary(rc, mfaMode)
 
-	logger.Info("✅ Enhanced Ubuntu security hardening completed successfully",
+	logger.Info(" Enhanced Ubuntu security hardening completed successfully",
 		zap.String("mfa_mode", mfaMode),
 		zap.String("next_steps", "Run 'security-report' for a comprehensive security overview"))
 
@@ -129,10 +129,10 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	fmt.Println()
-	fmt.Println("🔐 UBUNTU SECURITY HARDENING COMPLETED")
+	fmt.Println(" UBUNTU SECURITY HARDENING COMPLETED")
 	fmt.Println("═══════════════════════════════════════════════════════════════════════")
 	fmt.Println()
-	fmt.Println("✅ Security Tools Installed & Configured:")
+	fmt.Println(" Security Tools Installed & Configured:")
 	fmt.Println("   • auditd - System activity monitoring and logging")
 	fmt.Println("   • osquery - Operating system instrumentation framework")
 	fmt.Println("   • AIDE - File integrity monitoring")
@@ -142,38 +142,38 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println("   • unattended-upgrades - Automatic security updates")
 	fmt.Println("   • restic - Backup solution")
 	fmt.Println()
-	
+
 	switch mfaMode {
 	case "enforced":
-		fmt.Println("🔐 Multi-Factor Authentication: ENFORCED")
+		fmt.Println(" Multi-Factor Authentication: ENFORCED")
 		fmt.Println("   • All sudo operations require MFA")
 		fmt.Println("   • Password-only fallback disabled")
 		fmt.Println("   • Emergency access: disable-mfa-emergency")
 		fmt.Println("   • Status check: mfa-status")
 		fmt.Println("   • User setup: setup-mfa")
-		
+
 	case "standard":
-		fmt.Println("🔐 Multi-Factor Authentication: ENABLED")
+		fmt.Println(" Multi-Factor Authentication: ENABLED")
 		fmt.Println("   • MFA required for sudo operations")
 		fmt.Println("   • Password fallback available")
 		fmt.Println("   • User setup: setup-mfa")
-		
+
 	case "disabled":
 		fmt.Println("⚠️  Multi-Factor Authentication: DISABLED")
 		fmt.Println("   • Consider enabling: eos secure ubuntu --enforce-mfa --mfa-only")
 	}
-	
+
 	fmt.Println()
 	fmt.Println("📋 Available Commands:")
 	fmt.Println("   • security-report     - Generate comprehensive security report")
 	fmt.Println("   • mfa-status          - Check MFA configuration status")
 	fmt.Println("   • setup-mfa           - Configure MFA for current user")
-	
+
 	if mfaMode == "enforced" {
 		fmt.Println("   • enforce-mfa-strict  - Enable strict MFA enforcement")
 		fmt.Println("   • disable-mfa-emergency - Emergency MFA disable (admin only)")
 	}
-	
+
 	fmt.Println()
 	fmt.Println("🔧 System Hardening Applied:")
 	fmt.Println("   • Kernel security parameters optimized")
@@ -181,7 +181,7 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println("   • File permissions hardened")
 	fmt.Println("   • Security monitoring enabled")
 	fmt.Println()
-	
+
 	if mfaMode == "enforced" {
 		fmt.Println("🚨 IMPORTANT NEXT STEPS:")
 		fmt.Println("   1. Ensure all users run 'setup-mfa' to configure their accounts")
