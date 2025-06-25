@@ -1,12 +1,25 @@
 -- /opt/schema.sql
 -- 0644 stanley:stanley
 
--- ENUM types for state (Note: 'agent_status' removed to match provided d/agents output)
+-- ENUM types for state
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'alert_state') THEN
     CREATE TYPE alert_state AS ENUM ('new', 'summarized', 'sent', 'failed', 'archived');
   END IF;
+
+  -- Add 'STRUCTURED' to the alert_state enum if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'alert_state') AND enumlabel = 'STRUCTURED') THEN
+    -- Place 'STRUCTURED' after 'summarized'
+    ALTER TYPE alert_state ADD VALUE 'STRUCTURED' AFTER 'summarized';
+  END IF;
+
+  -- Add 'formatted' to the alert_state enum if it doesn't exist
+  IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumtypid = (SELECT oid FROM pg_type WHERE typname = 'alert_state') AND enumlabel = 'formatted') THEN
+    -- Place 'formatted' after 'STRUCTURED'
+    ALTER TYPE alert_state ADD VALUE 'formatted' AFTER 'STRUCTURED';
+  END IF;
+
 END$$;
 
 
@@ -63,9 +76,16 @@ CREATE TABLE IF NOT EXISTS alerts (
   completion_tokens    INTEGER,                               -- Tokens used for completion (NULLABLE)
   total_tokens         INTEGER,                               -- Total tokens (NULLABLE)
 
-  -- Notification/audit
+  -- Email formatter additions
+  formatted_data       JSONB,                                 -- Stores formatted email content (HTML/plain text)
+  formatted_at         TIMESTAMPTZ,                           -- Timestamp when email content was formatted
+
+  -- Notification/audit (email-sender additions)
   alert_sent_at        TIMESTAMPTZ,                           -- Outbound notification sent time (NULLABLE)
   alert_text           TEXT,                                  -- Formatted outbound alert (NULLABLE)
+  email_recipients     JSONB,                                 -- JSON array of recipients for the email
+  email_error          TEXT,                                  -- Last error message if email failed to send
+  email_retry_count    INTEGER DEFAULT 0,                     -- Number of times email sending was retried
 
   -- Soft-delete/archive (optional)
   archived_at          TIMESTAMPTZ                            -- If set, alert is archived (NULLABLE)
