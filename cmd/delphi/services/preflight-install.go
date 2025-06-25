@@ -26,6 +26,8 @@ This command installs the following dependencies:
 - pytz (Timezone handling)
 - ipwhois (IP WHOIS lookup functionality)
 - pyyaml (YAML parsing for configuration)
+- sdnotify (Systemd watchdog integration)
+- tabulate (Table formatting for parser-monitor)
 
 The installation method varies by operating system:
 - Ubuntu/Debian: Uses apt to install system packages
@@ -86,12 +88,13 @@ func installLinuxPackages(logger otelzap.LoggerWithCtx) error {
 func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 	// Map pip package names to Debian package names
 	debianPackages := []string{
-		"python3-psycopg2", // psycopg2-binary -> python3-psycopg2
-		"python3-dotenv",   // python-dotenv -> python3-dotenv
-		"python3-requests", // requests -> python3-requests
-		"python3-tz",       // pytz -> python3-tz
-		"python3-yaml",     // pyyaml -> python3-yaml
-		"python3-sdnotify",
+		"python3-psycopg2",    // psycopg2-binary -> python3-psycopg2
+		"python3-dotenv",      // python-dotenv -> python3-dotenv
+		"python3-requests",    // requests -> python3-requests
+		"python3-tz",          // pytz -> python3-tz
+		"python3-yaml",        // pyyaml -> python3-yaml
+		"python3-sdnotify",    // sdnotify -> python3-sdnotify (for systemd watchdog)
+		"python3-tabulate",    // tabulate -> python3-tabulate (for parser-monitor)
 		// Note: ipwhois is not available as a Debian package, will install via pip3
 	}
 
@@ -126,15 +129,20 @@ func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 
 	logger.Info(" Debian packages installed successfully")
 
-	// Install ipwhois separately with pip3 (not available as Debian package)
-	logger.Info(" Installing ipwhois separately with pip3")
-	pipCmd := exec.Command("sudo", "pip3", "install", "--break-system-packages", "ipwhois")
+	// Install packages not available as Debian packages separately with pip3
+	pipPackages := []string{"ipwhois"}
+	logger.Info(" Installing additional Python packages with pip3",
+		zap.Strings("packages", pipPackages))
+	
+	pipCmd := exec.Command("sudo", append([]string{"pip3", "install", "--break-system-packages"}, pipPackages...)...)
 	pipCmd.Stdout = os.Stdout
 	pipCmd.Stderr = os.Stderr
 	if err := pipCmd.Run(); err != nil {
-		logger.Warn("Failed to install ipwhois with pip3", zap.Error(err))
+		logger.Warn("Failed to install some pip3 packages", 
+			zap.Error(err),
+			zap.Strings("packages", pipPackages))
 	} else {
-		logger.Info(" ipwhois installed successfully")
+		logger.Info(" Additional pip3 packages installed successfully")
 	}
 
 	return verifyAllPackages(logger)
@@ -155,6 +163,8 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 		"pytz",
 		"ipwhois",
 		"pyyaml",
+		"sdnotify",
+		"tabulate",
 	}
 
 	logger.Info(" Installing Python packages with pip3",
@@ -224,6 +234,8 @@ func verifyAllPackages(logger otelzap.LoggerWithCtx) error {
 		"pytz":            "pytz",
 		"ipwhois":         "ipwhois",
 		"pyyaml":          "yaml",
+		"sdnotify":        "sdnotify",
+		"tabulate":        "tabulate",
 	}
 
 	var failedPackages []string
