@@ -18,30 +18,31 @@ import go
 predicate isCredentialString(StringLit s) {
   exists(string val | val = s.getValue() |
     // Vault tokens
-    val.regexpMatch("hvs\\.[A-Za-z0-9_-]{90,}") or
-    val.regexpMatch("hvb\\.[A-Za-z0-9_-]{90,}") or
-    
+    val.regexpMatch("hvs\\.[A-Za-z0-9_-]{90,}")
+    or
+    val.regexpMatch("hvb\\.[A-Za-z0-9_-]{90,}")
+    or
     // JWT tokens (3 base64 segments separated by dots)
-    val.regexpMatch("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+") or
-    
+    val.regexpMatch("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+")
+    or
     // API keys (common patterns)
-    val.regexpMatch("(?i)(ak_|sk_|pk_)[a-z0-9]{20,}") or
-    (val.regexpMatch("[A-Za-z0-9]{32,}") and val.length() >= 32) or
-    
+    val.regexpMatch("(?i)(ak_|sk_|pk_)[a-z0-9]{20,}")
+    or
+    val.regexpMatch("[A-Za-z0-9]{32,}") and val.length() >= 32
+    or
     // Passwords that look real (not examples)
-    (
-      val.regexpMatch("(?i).*password.*") and
-      not val.regexpMatch("(?i).*(example|test|demo|placeholder|your.?password|change.?me).*") and
-      val.length() >= 8
-    ) or
-    
+    val.regexpMatch("(?i).*password.*") and
+    not val.regexpMatch("(?i).*(example|test|demo|placeholder|your.?password|change.?me).*") and
+    val.length() >= 8
+    or
     // Database connection strings with credentials
-    val.regexpMatch("(?i).*(postgres|mysql|mongodb)://[^:]+:[^@]+@.*") or
-    
+    val.regexpMatch("(?i).*(postgres|mysql|mongodb)://[^:]+:[^@]+@.*")
+    or
     // AWS/Cloud credentials
-    val.regexpMatch("AKIA[0-9A-Z]{16}") or
-    val.regexpMatch("(?i)(aws|gcp|azure).*(key|secret|token).*") or
-    
+    val.regexpMatch("AKIA[0-9A-Z]{16}")
+    or
+    val.regexpMatch("(?i)(aws|gcp|azure).*(key|secret|token).*")
+    or
     // Private keys
     val.regexpMatch("-----BEGIN (RSA |EC |DSA )?PRIVATE KEY-----.*")
   )
@@ -51,8 +52,10 @@ predicate isCredentialString(StringLit s) {
  * A variable or field that suggests it holds credentials
  */
 predicate isCredentialIdentifier(string name) {
-  name.regexpMatch("(?i).*(password|passwd|pwd|secret|token|key|credential|auth|api.?key).*") and
-  not name.regexpMatch("(?i).*(test|example|demo|mock|fake|dummy).*")
+  exists(string n | n = name |
+    n.regexpMatch("(?i).*(password|passwd|pwd|secret|token|key|credential|auth|api.?key).*") and
+    not n.regexpMatch("(?i).*(test|example|demo|mock|fake|dummy).*")
+  )
 }
 
 /**
@@ -63,7 +66,8 @@ predicate isCredentialAssignment(AssignStmt assign, StringLit s) {
     assign.getLhs().(Ident).refersTo(v) and
     isCredentialIdentifier(v.getName()) and
     s = assign.getRhs()
-  ) or
+  )
+  or
   exists(SelectorExpr se |
     assign.getLhs() = se and
     isCredentialIdentifier(se.getSelector().getName()) and
@@ -72,13 +76,13 @@ predicate isCredentialAssignment(AssignStmt assign, StringLit s) {
 }
 
 /**
- * A field declaration that might hold credentials
+ * A variable declaration that might hold credentials
  */
-predicate isCredentialField(Field f, StringLit init) {
-  isCredentialIdentifier(f.getName()) and
-  exists(ValueSpec vs |
-    vs.getType() = f.getType() and
-    init = vs.getInit()
+predicate isCredentialVarAssignment(AssignStmt assign, StringLit s) {
+  exists(Variable v |
+    assign.getLhs().getAChild*() = v.getAReference() and
+    isCredentialIdentifier(v.getName()) and
+    s = assign.getRhs()
   )
 }
 
@@ -96,32 +100,20 @@ where
   not isInTestFile(node) and
   (
     // Hard-coded credential strings in non-test files
-    (
-      isCredentialString(node) and
-      message = "Hard-coded credential found in string literal"
-    ) or
-    
+    isCredentialString(node) and
+    message = "Hard-coded credential found in string literal"
+    or
     // Assignment of credential strings to credential variables
-    (
-      exists(AssignStmt assign, StringLit s |
-        isCredentialAssignment(assign, s) and
-        node = assign and
-        (
-          isCredentialString(s) or
-          (s.getValue().length() >= 8 and not s.getValue().regexpMatch("(?i).*(example|test|demo|placeholder).*"))
-        ) and
-        message = "Hard-coded credential assigned to variable"
-      )
-    ) or
-    
-    // Struct fields initialized with credentials
-    (
-      exists(Field f, StringLit s |
-        isCredentialField(f, s) and
-        node = s and
-        isCredentialString(s) and
-        message = "Credential field initialized with hard-coded value"
-      )
+    exists(AssignStmt assign, StringLit s |
+      (isCredentialAssignment(assign, s) or isCredentialVarAssignment(assign, s)) and
+      node = assign and
+      (
+        isCredentialString(s)
+        or
+        s.getValue().length() >= 8 and
+        not s.getValue().regexpMatch("(?i).*(example|test|demo|placeholder).*")
+      ) and
+      message = "Hard-coded credential assigned to variable"
     )
   )
 select node, message

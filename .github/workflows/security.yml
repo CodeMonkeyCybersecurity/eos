@@ -12,7 +12,7 @@ on:
       full_scan:
         description: 'Run full security scan including CodeQL'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:
