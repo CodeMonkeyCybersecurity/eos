@@ -454,7 +454,7 @@ func BenchmarkQueueThroughput(b *testing.B) {
 		processed := 0
 		handler := MessageHandlerFunc(func(ctx context.Context, msg *StreamMessage) error {
 			// Simulate light processing
-			_ = json.Marshal(msg.Data)
+			_, _ = json.Marshal(msg.Data)
 			processed++
 			return nil
 		})

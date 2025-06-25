@@ -38,12 +38,17 @@ func HTTPClientScenario() TestScenario {
 				Action: func(s *IntegrationTestSuite) error {
 					rc := s.CreateTestContext("http-transport")
 
-					// Test that context has required attributes
-					requiredAttrs := []string{"command", "timestamp"}
-					for _, attr := range requiredAttrs {
-						if rc.Attributes[attr] == "" {
-							return fmt.Errorf("context missing required attribute: %s", attr)
-						}
+					// Test that context has required fields
+					if rc.Command == "" {
+						return fmt.Errorf("context missing required field: command")
+					}
+					if rc.Timestamp.IsZero() {
+						return fmt.Errorf("context missing required field: timestamp")
+					}
+					
+					// Test that attributes map is initialized
+					if rc.Attributes == nil {
+						return fmt.Errorf("context attributes map is nil")
 					}
 
 					return nil

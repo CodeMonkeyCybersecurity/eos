@@ -136,8 +136,8 @@ func TestEnsureRuntimeDirectory_ExistingDirectory(t *testing.T) {
 func isWritableDir(path string) bool {
 	testFile := filepath.Join(path, ".test_write_access")
 	if file, err := os.Create(testFile); err == nil {
-		file.Close()
-		os.Remove(testFile)
+		_ = file.Close()
+		_ = os.Remove(testFile)
 		return true
 	}
 	return false
