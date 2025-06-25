@@ -54,6 +54,14 @@ try:
 except ImportError:
     load_dotenv = None
 
+# --- Import sdnotify for Systemd Watchdog Integration ---
+try:
+    import sdnotify # ADDED: Import sdnotify
+except ImportError:
+    # Fallback for systems without sdnotify
+    sdnotify = None
+    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.")
+
 # --- Configuration & Environment Variables ---
 
 if load_dotenv is not None:
@@ -62,7 +70,11 @@ if load_dotenv is not None:
 # PostgreSQL Database Connection
 PG_DSN = os.getenv("PG_DSN")
 if not PG_DSN:
-    raise ValueError("PG_DSN environment variable not set.")
+    print("FATAL: PG_DSN environment variable not set.", file=sys.stderr)
+    if sdnotify:
+        notifier.notify("STATUS=FATAL: PG_DSN environment variable not set. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
+    sys.exit(1)
 
 # Azure OpenAI API Configuration
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
@@ -71,7 +83,11 @@ DEPLOYMENT_NAME = os.getenv("DEPLOYMENT_NAME")
 AZURE_API_VERSION = os.getenv("AZURE_API_VERSION")
 
 if not all([AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSION]):
-    raise ValueError("Missing required Azure OpenAI environment variables.")
+    print("FATAL: Missing required Azure OpenAI environment variables.", file=sys.stderr)
+    if sdnotify:
+        notifier.notify("STATUS=FATAL: Missing Azure OpenAI env vars. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
+    sys.exit(1)
 
 # A/B Testing Configuration
 EXPERIMENT_CONFIG_FILE = os.environ.get("EXPERIMENT_CONFIG_FILE", "/opt/delphi/ab-test-config.json")
@@ -80,12 +96,54 @@ DEFAULT_PROMPT_FILE = os.environ.get("DEFAULT_PROMPT_FILE", "/srv/eos/system-pro
 
 # Logging and Monitoring
 LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/prompt-ab-tester.log")
-HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/prompt-ab-tester.heartbeat")
+# HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/prompt-ab-tester.heartbeat") # REMOVED: Replaced by sdnotify
 METRICS_FILE = os.environ.get("METRICS_FILE", "/var/log/stackstorm/ab-test-metrics.log")
 MAX_LOG_SIZE = int(os.environ.get("MAX_LOG_SIZE", 10485760))
 
 # PostgreSQL LISTEN channel
 LISTEN_CHANNEL = "agent_enriched"
+
+# --- Logger Setup ---
+def setup_logging() -> logging.Logger:
+    """Configure logging for the A/B testing worker"""
+    logger = logging.getLogger("prompt-ab-tester")
+    logger.setLevel(logging.INFO)
+    
+    # Ensure log directory exists
+    log_dir = os.path.dirname(LOG_FILE)
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # File handler with rotation
+    file_handler = RotatingFileHandler(
+        LOG_FILE,
+        maxBytes=MAX_LOG_SIZE,
+        backupCount=3
+    )
+    file_formatter = logging.Formatter(
+        "%(asctime)s %(levelname)s [%(name)s] %(message)s",
+        "%Y-%m-%d %H:%M:%S"
+    )
+    file_handler.setFormatter(file_formatter)
+    logger.addHandler(file_handler)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(file_formatter)
+    logger.addHandler(console_handler)
+    
+    return logger
+
+log = setup_logging()
+
+# --- Initialize Systemd Notifier ---
+if sdnotify:
+    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
+else:
+    class DummyNotifier: # Dummy class if sdnotify isn't available
+        def notify(self, message):
+            pass
+    notifier = DummyNotifier()
+
 
 # --- Data Structures ---
 
@@ -159,9 +217,13 @@ class PromptVariant:
                 with open(prompt_path, 'r', encoding='utf-8') as f:
                     self._prompt_content = f.read().strip()
             except FileNotFoundError:
-                raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
+                log.error(f"Prompt file not found: {prompt_path}")
+                notifier.notify(f"STATUS=Error: Prompt file {prompt_path} not found.") # ADDED: sdnotify
+                raise
             except Exception as e:
-                raise Exception(f"Error loading prompt from {prompt_path}: {e}")
+                log.error(f"Error loading prompt from {prompt_path}: {e}")
+                notifier.notify(f"STATUS=Error loading prompt from {prompt_path}. See logs.") # ADDED: sdnotify
+                raise
         
         return self._prompt_content
 
@@ -199,12 +261,15 @@ class ABTestManager:
                     
         except FileNotFoundError:
             log.warning(f"Experiment config file not found: {self.config_file}. Using fallback mode.")
+            notifier.notify(f"STATUS=Warning: Experiment config file {self.config_file} not found. Using fallback.") # ADDED: sdnotify
             self.experiment = None
         except json.JSONDecodeError as e:
             log.error(f"Invalid JSON in experiment config: {e}. Using fallback mode.")
+            notifier.notify(f"STATUS=Error: Invalid JSON in experiment config. Using fallback.") # ADDED: sdnotify
             self.experiment = None
         except Exception as e:
             log.error(f"Error loading experiment config: {e}. Using fallback mode.")
+            notifier.notify(f"STATUS=Error loading experiment config. Using fallback.") # ADDED: sdnotify
             self.experiment = None
     
     def get_user_cohort_id(self, alert_data: Dict) -> str:
@@ -292,15 +357,18 @@ class ABTestManager:
         try:
             with open(DEFAULT_PROMPT_FILE, 'r', encoding='utf-8') as f:
                 default_content = f.read().strip()
+            log.info(f"Using default prompt from {DEFAULT_PROMPT_FILE}")
             return "default", default_content
         except Exception as e:
-            log.error(f"Error loading default prompt: {e}")
+            log.error(f"Error loading default prompt from {DEFAULT_PROMPT_FILE}: {e}")
+            notifier.notify("STATUS=Error loading default prompt. Using hardcoded fallback.") # ADDED: sdnotify
             return "fallback", "You are a helpful AI assistant for security analysis."
     
     def record_usage_metrics(self, variant_name: str, success: bool, 
                            response_time: float, token_count: int):
         """Record metrics for a variant usage"""
         if variant_name not in self.variant_metrics:
+            log.warning(f"Attempted to record metrics for unknown variant: {variant_name}")
             return
         
         metrics = self.variant_metrics[variant_name]
@@ -313,13 +381,13 @@ class ABTestManager:
         
         # Update average response time
         total_responses = metrics["successful_responses"] + metrics["failed_responses"]
-        if total_responses > 1:
+        if total_responses > 0: # Ensure no division by zero
             metrics["avg_response_time"] = (
                 (metrics["avg_response_time"] * (total_responses - 1) + response_time) 
                 / total_responses
             )
         else:
-            metrics["avg_response_time"] = response_time
+            metrics["avg_response_time"] = response_time # Should only happen if total_responses is 0 initially
         
         metrics["total_tokens"] += token_count
         
@@ -359,38 +427,6 @@ class ABTestManager:
         
         return summary
 
-# --- Logger Setup ---
-def setup_logging() -> logging.Logger:
-    """Configure logging for the A/B testing worker"""
-    logger = logging.getLogger("prompt-ab-tester")
-    logger.setLevel(logging.INFO)
-    
-    # Ensure log directory exists
-    log_dir = os.path.dirname(LOG_FILE)
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # File handler with rotation
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=MAX_LOG_SIZE,
-        backupCount=3
-    )
-    file_formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        "%Y-%m-%d %H:%M:%S"
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-    
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(file_formatter)
-    logger.addHandler(console_handler)
-    
-    return logger
-
-log = setup_logging()
-
 # --- Metrics Logging ---
 def log_metrics(metrics_data: Dict):
     """Log metrics to dedicated metrics file"""
@@ -401,16 +437,18 @@ def log_metrics(metrics_data: Dict):
         with open(METRICS_FILE, 'a', encoding='utf-8') as f:
             f.write(json.dumps(metrics_data) + '\n')
     except Exception as e:
-        log.error(f"Failed to write metrics: {e}")
+        log.error(f"Failed to write metrics to {METRICS_FILE}: {e}")
+        notifier.notify("STATUS=Error writing metrics to file. See logs.") # ADDED: sdnotify
 
-# --- Heartbeat Management ---
-def update_heartbeat_file():
-    """Update heartbeat file with current timestamp"""
-    try:
-        with open(HEARTBEAT_FILE, 'w', encoding='utf-8') as f:
-            f.write(datetime.now(timezone.utc).isoformat())
-    except IOError as e:
-        log.error(f"Failed to update heartbeat file: {e}")
+
+# --- Heartbeat Management (REMOVED: Replaced by sdnotify) ---
+# def update_heartbeat_file():
+#     """Update heartbeat file with current timestamp"""
+#     try:
+#         with open(HEARTBEAT_FILE, 'w', encoding='utf-8') as f:
+#             f.write(datetime.now(timezone.utc).isoformat())
+#     except IOError as e:
+#         log.error(f"Failed to update heartbeat file: {e}")
 
 # --- Initialize A/B Test Manager ---
 ab_test_manager = ABTestManager(EXPERIMENT_CONFIG_FILE, SYSTEM_PROMPTS_DIR)
@@ -423,6 +461,7 @@ def get_llm_response_with_testing(raw_alert_json: Dict, agent_details_json: Dict
     """
     if requests is None:
         log.error("requests module not available")
+        notifier.notify("STATUS=FATAL: 'requests' module not available for LLM. Exiting.") # ADDED: sdnotify
         return None
     
     start_time = time.time()
@@ -465,6 +504,8 @@ def get_llm_response_with_testing(raw_alert_json: Dict, agent_details_json: Dict
         }
         
         log.info(f"Alert {alert_id}: Sending request to Azure OpenAI API...")
+        # Ping watchdog before potentially long network call
+        notifier.notify("WATCHDOG=1") # ADDED: sdnotify before LLM API call
         response = requests.post(api_url, headers=headers, json=payload, timeout=60)
         response.raise_for_status()
         
@@ -514,7 +555,8 @@ def get_llm_response_with_testing(raw_alert_json: Dict, agent_details_json: Dict
     except Exception as e:
         response_time = time.time() - start_time
         
-        log.error(f"Alert {alert_id}: LLM API error with variant '{variant_name}': {e}")
+        log.error(f"Alert {alert_id}: LLM API error with variant '{variant_name}': {e}", exc_info=True)
+        notifier.notify(f"STATUS=Error: LLM API call failed for alert {alert_id}. See logs.") # ADDED: sdnotify
         
         # Record failure metrics
         if variant_name:
@@ -544,6 +586,7 @@ def process_alert_for_llm_with_testing(alert_id: int) -> Optional[Dict]:
     """
     if psycopg2 is None:
         log.error("psycopg2 module not available")
+        notifier.notify("STATUS=FATAL: 'psycopg2' module not available. Exiting.") # ADDED: sdnotify
         return None
     
     conn = None
@@ -563,7 +606,7 @@ def process_alert_for_llm_with_testing(alert_id: int) -> Optional[Dict]:
         
         # Check if already processed
         if isinstance(alert_record, tuple):
-            current_state = alert_record[8] if len(alert_record) > 8 else None  # Adjust index
+            current_state = alert_record[8] if len(alert_record) > 8 else None  # Adjust index if needed
             agent_id = alert_record[5] if len(alert_record) > 5 else None
             raw_alert = alert_record[3] if len(alert_record) > 3 else {}
         else:
@@ -609,16 +652,16 @@ def process_alert_for_llm_with_testing(alert_id: int) -> Optional[Dict]:
         """
         
         # Store the variant information in prompt_text field as metadata
-        prompt_metadata = {
-            "variant_name": variant_name,
-            "system_prompt": "A/B test variant",
-            "response_time": response_time,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }
-        
+        # Reconstruct the full prompt text that was sent to LLM for logging/audit
+        full_prompt_text_for_db = json.dumps([
+            {"role": "system", "content": ab_test_manager._get_variant_by_name(variant_name).get_prompt_content(ab_test_manager.prompts_dir) if ab_test_manager._get_variant_by_name(variant_name) else "Default/Fallback"},
+            {"role": "user", "content": json.dumps({"alert": raw_alert, "agent_details": agent_details}, indent=2)}
+        ], indent=2)
+
+
         cur.execute(update_query, (
             datetime.now(timezone.utc),
-            json.dumps(prompt_metadata),
+            full_prompt_text_for_db, # Store full prompt, including variant info if desired
             datetime.now(timezone.utc),
             llm_response.get('parsed_response'),
             llm_response.get('prompt_tokens'),
@@ -641,6 +684,7 @@ def process_alert_for_llm_with_testing(alert_id: int) -> Optional[Dict]:
         
     except Exception as e:
         log.error(f"Alert {alert_id}: Processing error: {e}", exc_info=True)
+        notifier.notify(f"STATUS=Error processing alert {alert_id}. See logs.") # ADDED: sdnotify
         if conn:
             conn.rollback()
         return None
@@ -655,6 +699,8 @@ def listen_for_enriched_alerts():
     """Listen for agent_enriched notifications and process with A/B testing"""
     if psycopg2 is None:
         log.error("psycopg2 module not available")
+        notifier.notify("STATUS=FATAL: 'psycopg2' module not available. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
         return
     
     log.info(f"Starting A/B Testing worker - listening on '{LISTEN_CHANNEL}'")
@@ -663,10 +709,13 @@ def listen_for_enriched_alerts():
     
     # Log current experiment status
     if ab_test_manager.experiment:
+        metrics_summary = ab_test_manager.get_metrics_summary()
         log.info(f"Active experiment: {ab_test_manager.experiment.name} "
                 f"({len(ab_test_manager.experiment.variants)} variants)")
+        notifier.notify(f"STATUS=Active experiment: {ab_test_manager.experiment.name} ({len(ab_test_manager.experiment.variants)} variants).") # ADDED: sdnotify
     else:
         log.info("No active experiment - using fallback mode")
+        notifier.notify("STATUS=No active experiment - using fallback mode.") # ADDED: sdnotify
     
     conn = None
     cur = None
@@ -678,15 +727,18 @@ def listen_for_enriched_alerts():
         cur.execute(f"LISTEN {LISTEN_CHANNEL};")
         
         log.info("A/B Testing worker ready - listening for notifications...")
+        notifier.notify(f"STATUS=Listening for notifications on {LISTEN_CHANNEL}...") # ADDED: sdnotify
         
         while True:
+            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each loop iteration
+
             conn.poll()
             while conn.notifies:
                 notify = conn.notifies.pop(0)
                 alert_id_str = notify.payload
                 
                 log.info(f"Received notification: channel='{notify.channel}', payload='{alert_id_str}'")
-                update_heartbeat_file()
+                # update_heartbeat_file() # REMOVED: Replaced by sdnotify
                 
                 try:
                     alert_id = int(alert_id_str)
@@ -694,18 +746,24 @@ def listen_for_enriched_alerts():
                     
                     if processed_alert:
                         log.info(f"Alert {alert_id}: A/B testing processing complete")
+                        notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping after successful processing
                     else:
                         log.error(f"Alert {alert_id}: A/B testing processing failed")
+                        notifier.notify(f"STATUS=Error: A/B processing failed for alert {alert_id}. See logs.") # ADDED: sdnotify
                         
                 except ValueError:
                     log.error(f"Invalid alert_id in notification: {alert_id_str}")
+                    notifier.notify(f"STATUS=Error: Invalid alert ID {alert_id_str} received.") # ADDED: sdnotify
                 except Exception as e:
                     log.error(f"Error processing alert {alert_id_str}: {e}", exc_info=True)
+                    notifier.notify(f"STATUS=Error processing notification for alert {alert_id_str}. See logs.") # ADDED: sdnotify
             
-            time.sleep(0.1)
+            # time.sleep(0.1) # REMOVED: Not strictly needed if watchdog is handled by sdnotify and select.select timeout
             
     except Exception as e:
         log.critical(f"Critical error in listener: {e}", exc_info=True)
+        notifier.notify(f"STATUS=CRITICAL ERROR in listener: {e}. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     finally:
         if conn:
@@ -717,14 +775,20 @@ def listen_for_enriched_alerts():
 def main():
     """Main entry point for the A/B testing worker"""
     log.info("=== Starting Delphi Prompt A/B Testing Worker ===")
+    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
+    notifier.notify("STATUS=Starting A/B Testing Worker...")
     
     # Validate dependencies
     if psycopg2 is None:
         log.critical("psycopg2 module not available")
+        notifier.notify("STATUS=FATAL: 'psycopg2' module not available. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     
     if requests is None:
         log.critical("requests module not available")
+        notifier.notify("STATUS=FATAL: 'requests' module not available. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     
     # Test database connection
@@ -732,27 +796,42 @@ def main():
         test_conn = psycopg2.connect(PG_DSN, connect_timeout=5)
         test_conn.close()
         log.info("Database connection test: SUCCESS")
+        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after successful DB connection
+        notifier.notify("STATUS=Database connection successful.")
     except Exception as e:
         log.critical(f"Database connection test: FAILED - {e}")
+        notifier.notify(f"STATUS=FATAL: Database connection failed: {e}. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     
     # Test prompts directory
     if os.path.isdir(SYSTEM_PROMPTS_DIR):
         prompt_files = list(Path(SYSTEM_PROMPTS_DIR).glob("*.txt"))
         log.info(f"Found {len(prompt_files)} prompt files in {SYSTEM_PROMPTS_DIR}")
+        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after prompt directory check
+        notifier.notify(f"STATUS=Loaded {len(prompt_files)} prompt files.")
     else:
         log.warning(f"Prompts directory not found: {SYSTEM_PROMPTS_DIR}")
-    
+        notifier.notify(f"STATUS=Warning: Prompts directory {SYSTEM_PROMPTS_DIR} not found.")
+
     # Log experiment summary
     if ab_test_manager.experiment:
         metrics_summary = ab_test_manager.get_metrics_summary()
         log.info(f"Experiment status: {json.dumps(metrics_summary, indent=2)}")
-    
-    # Initial heartbeat
-    update_heartbeat_file()
+        notifier.notify(f"STATUS=Experiment '{ab_test_manager.experiment.name}' active: {ab_test_manager.experiment.is_active()}.") # ADDED: sdnotify
+    else:
+        log.info("No active experiment - using fallback mode")
+        notifier.notify("STATUS=No active experiment - using fallback mode.")
+
+    # Initial heartbeat (REMOVED: Replaced by sdnotify)
+    # update_heartbeat_file() 
     
     # Start listening
     listen_for_enriched_alerts()
+
+    log.info("=== Delphi Prompt A/B Testing Worker Shutting Down ===")
+    notifier.notify("STATUS=Shutting down gracefully.") # ADDED: Final status update
+    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
 
 if __name__ == "__main__":
     main()

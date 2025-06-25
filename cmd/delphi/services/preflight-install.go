@@ -91,6 +91,7 @@ func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 		"python3-requests", // requests -> python3-requests
 		"python3-tz",       // pytz -> python3-tz
 		"python3-yaml",     // pyyaml -> python3-yaml
+		"sdnotify",
 		// Note: ipwhois is not available as a Debian package, will install via pip3
 	}
 

@@ -31,7 +31,15 @@ try:
     from psycopg2.extras import RealDictCursor
 except ImportError:
     logging.error("Required dependency 'psycopg2' not found.")
-    sys.exit(1)
+    sys.exit(1) # This exit will not be caught by sdnotify if it's not imported yet
+
+# --- Import sdnotify for Systemd Watchdog Integration ---
+try:
+    import sdnotify # ADDED: Import sdnotify
+except ImportError:
+    # Fallback for systems without sdnotify
+    sdnotify = None
+    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.")
 
 # ───── CONFIGURATION ─────────────────────────────────────
 # Load environment variables from the .env file
@@ -42,6 +50,9 @@ REQUIRED_ENV = ["PG_DSN", "MAILCOW_SMTP_HOST", "MAILCOW_SMTP_PORT", "MAILCOW_FRO
 _missing = [var for var in REQUIRED_ENV if not os.getenv(var)]
 if _missing:
     print(f"FATAL: Missing environment variables: {', '.join(_missing)}", file=sys.stderr)
+    if sdnotify:
+        notifier.notify(f"STATUS=FATAL: Missing environment variables: {', '.join(_missing)}. Exiting.") # ADDED: sdnotify on missing env vars
+        notifier.notify("STOPPING=1")
     sys.exit(1)
 
 # FIX: Retrieve environment variables using their correct names from the .env file
@@ -84,6 +95,15 @@ def setup_logging() -> logging.Logger:
     return logger
 
 log = setup_logging()
+
+# --- Initialize Systemd Notifier ---
+if sdnotify:
+    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
+else:
+    class DummyNotifier: # Dummy class if sdnotify isn't available
+        def notify(self, message):
+            pass
+    notifier = DummyNotifier()
 
 # ───── EMAIL SENDER CLASS ─────────────────────────────────
 class EmailSender:
@@ -161,15 +181,19 @@ class EmailSender:
 
         except smtplib.SMTPAuthenticationError as e:
             log.error("SMTP authentication failed: %s", e)
+            notifier.notify("STATUS=SMTP authentication failed. Check credentials.") # ADDED: sdnotify on auth failure
             return False
         except smtplib.SMTPRecipientsRefused as e:
             log.error("SMTP recipients refused: %s", e)
+            notifier.notify("STATUS=SMTP recipients refused. Check recipients.") # ADDED: sdnotify on recipient refusal
             return False
         except smtplib.SMTPException as e:
             log.error("SMTP error: %s", e)
+            notifier.notify(f"STATUS=SMTP error: {e}. Check server config.") # ADDED: sdnotify on SMTP errors
             return False
         except Exception as e:
             log.exception("Unexpected error sending email: %s", e)
+            notifier.notify("STATUS=Unexpected error during email sending. See logs.") # ADDED: sdnotify on unexpected errors
             return False
 
     def test_connection(self) -> bool:
@@ -186,6 +210,7 @@ class EmailSender:
             return True
         except Exception as e:
             log.error("SMTP connection test failed: %s", e)
+            notifier.notify(f"STATUS=SMTP connection test failed: {e}. Exiting.") # ADDED: sdnotify on connection test failure
             return False
 
 
@@ -199,6 +224,8 @@ def connect_db() -> psycopg2.extensions.connection:
         return conn
     except Exception:
         log.exception("Could not connect to Postgres")
+        notifier.notify("STATUS=FATAL: Could not connect to PostgreSQL. Exiting.") # ADDED: sdnotify on DB connection failure
+        notifier.notify("STOPPING=1")
         sys.exit(1)
 
 
@@ -292,6 +319,7 @@ def save_email_sent(conn, alert_id: int, recipients: List[str],
 
     except Exception as e:
         log.error("Failed to update alert %d send status: %s", alert_id, e)
+        notifier.notify(f"STATUS=DB update failed for alert {alert_id}. See logs.") # ADDED: sdnotify on DB update failure
         raise # Re-raise to ensure transaction is rolled back if autocommit is off or for external logging
 
 
@@ -309,6 +337,8 @@ def catch_up(conn, sender: EmailSender):
     if alert_ids:
         log.info("Processing backlog of %d alerts", len(alert_ids))
         for alert_id in alert_ids:
+            # Ping watchdog during backlog processing if it takes a long time
+            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping during backlog processing
             try:
                 process_email_alert(conn, sender, alert_id)
             except Exception as e:
@@ -341,6 +371,7 @@ def process_email_alert(conn, sender: EmailSender, alert_id: int):
     error_message = None
 
     for attempt in range(RETRY_ATTEMPTS):
+        notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping before each send attempt
         try:
             success = sender.send_email(recipients, subject, html_body, plain_body)
             if success:
@@ -354,7 +385,7 @@ def process_email_alert(conn, sender: EmailSender, alert_id: int):
 
         if attempt < RETRY_ATTEMPTS - 1:
             log.info("Retrying email send in %d seconds...", RETRY_DELAY)
-            time.sleep(RETRY_DELAY)
+            time.sleep(RETRY_DELAY) # This sleep naturally pauses execution
 
     # Record result
     save_email_sent(conn, alert_id, recipients, success, error_message)
@@ -367,6 +398,7 @@ def on_signal(signum, _frame):
     global shutdown
     shutdown = True
     log.info("Signal %d received; shutting down", signum)
+    notifier.notify("STOPPING=1") # ADDED: sdnotify on signal received
 
 signal.signal(signal.SIGINT, on_signal)
 signal.signal(signal.SIGTERM, on_signal)
@@ -376,8 +408,8 @@ signal.signal(signal.SIGTERM, on_signal)
 def main():
     """Main event loop"""
     log.info("Email Sender starting up...")
-    log.info("SMTP: %s:%d (TLS: %s)", SMTP_HOST, SMTP_PORT, SMTP_TLS)
-    log.info("From: %s", FROM_EMAIL)
+    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
+    notifier.notify(f"STATUS=Starting up. SMTP: {SMTP_HOST}:{SMTP_PORT} (TLS: {SMTP_TLS}). From: {FROM_EMAIL}")
 
     # Initialize email sender
     sender = EmailSender()
@@ -385,83 +417,112 @@ def main():
     # Test SMTP connection
     if not sender.test_connection():
         log.error("SMTP connection test failed - check configuration")
+        notifier.notify("STATUS=SMTP connection test failed. Exiting.") # ADDED: sdnotify on SMTP test failure
+        notifier.notify("STOPPING=1")
         sys.exit(1)
 
     # Connect to database
-    conn = connect_db()
+    conn = connect_db() # This function already calls sys.exit(1) on failure, which will trigger STOPPING=1 via the notifier in its call stack.
 
     # Ensure email tracking columns exist (This block is kept for backward compatibility/idempotency,
     # but the primary creation of these columns is now expected from the main schema.sql)
-    with conn.cursor() as cur:
-        # FIX: Changed DO $ to DO $$ and END $; to END $$; for correct PostgreSQL dollar-quoting syntax
-        cur.execute("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='alerts' AND column_name='alert_sent_at'
-                ) THEN
-                    ALTER TABLE alerts ADD COLUMN alert_sent_at TIMESTAMP WITH TIME ZONE;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='alerts' AND column_name='email_recipients'
-                ) THEN
-                    ALTER TABLE alerts ADD COLUMN email_recipients JSONB;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='alerts' AND column_name='email_error'
-                ) THEN
-                    ALTER TABLE alerts ADD COLUMN email_error TEXT;
-                END IF;
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='alerts' AND column_name='email_retry_count'
-                ) THEN
-                    ALTER TABLE alerts ADD COLUMN email_retry_count INTEGER DEFAULT 0;
-                END IF;
-            END $$;
-        """)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='alerts' AND column_name='alert_sent_at'
+                    ) THEN
+                        ALTER TABLE alerts ADD COLUMN alert_sent_at TIMESTAMP WITH TIME ZONE;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='alerts' AND column_name='email_recipients'
+                    ) THEN
+                        ALTER TABLE alerts ADD COLUMN email_recipients JSONB;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='alerts' AND column_name='email_error'
+                    ) THEN
+                        ALTER TABLE alerts ADD COLUMN email_error TEXT;
+                    END IF;
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='alerts' AND column_name='email_retry_count'
+                    ) THEN
+                        ALTER TABLE alerts ADD COLUMN email_retry_count INTEGER DEFAULT 0;
+                    END IF;
+                END $$;
+            """)
+        conn.commit() # Ensure changes are committed if autocommit is not strictly on here
+        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after schema check/update
+    except Exception as e:
+        log.critical(f"Failed to ensure DB columns exist: {e}", exc_info=True)
+        notifier.notify("STATUS=FATAL: Failed to ensure DB columns. Exiting.") # ADDED: sdnotify on schema check failure
+        notifier.notify("STOPPING=1")
+        sys.exit(1)
+
 
     # Process backlog
+    log.info("Processing backlog...")
     catch_up(conn, sender)
+    notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after backlog processing
 
     # Listen for formatted alerts
     cur = conn.cursor()
     cur.execute(f"LISTEN {LISTEN_CHANNEL};")
     log.info("Listening for alerts to send")
+    notifier.notify(f"STATUS=Listening on {LISTEN_CHANNEL} for alerts to send...") # ADDED: Update status
 
     while not shutdown:
         try:
-            if not select.select([conn], [], [], 5)[0]:
-                continue
+            # Ping watchdog before polling for events. This keeps systemd happy during idle times.
+            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each poll cycle
+
+            # The select.select with 5s timeout is good; no need for extra sleep if watchdog pings.
+            if not select.select([conn], [], [], 5)[0]: # Wait up to 5 seconds for events
+                continue # If no events, loop back and ping watchdog again
 
             conn.poll()
 
             for notify in conn.notifies:
+                notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping before processing each notification
                 try:
                     alert_id = int(notify.payload)
                     log.info("Processing alert %d", alert_id)
-
                     process_email_alert(conn, sender, alert_id)
-
                 except Exception as e:
                     log.exception("Failed to process alert %s: %s", notify.payload, e)
+                    notifier.notify(f"STATUS=Error processing alert {alert_id}. See logs.") # ADDED: sdnotify on processing error
 
             conn.notifies.clear()
 
         except psycopg2.OperationalError:
             log.exception("DB connection lost; reconnecting in 5s")
-            time.sleep(5)
-            conn = connect_db()
-            cur = conn.cursor()
-            cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+            notifier.notify("STATUS=DB connection lost. Attempting to reconnect...") # ADDED: sdnotify on DB connection loss
+            time.sleep(5) # Keep this sleep for reconnection back-off
+            try:
+                conn = connect_db() # This function will call sys.exit if reconnect fails
+                cur = conn.cursor()
+                cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+                log.info("Reconnected to Postgres and re-listening.")
+                notifier.notify("STATUS=Reconnected to DB. Listening for alerts to send...") # ADDED: sdnotify on successful reconnect
+            except Exception: # Catch the sys.exit from connect_db
+                log.critical("Failed to reconnect to database. Exiting.")
+                notifier.notify("STOPPING=1")
+                sys.exit(1)
         except Exception:
             log.exception("Unexpected error in main loop")
-            raise
+            notifier.notify("STATUS=Unexpected error in main loop. Exiting.") # ADDED: sdnotify on unexpected errors
+            notifier.notify("STOPPING=1")
+            raise # Re-raise the exception after notifying systemd for debugging/crash reporting
 
     log.info("Shutting down gracefully")
+    notifier.notify("STATUS=Shutting down gracefully.") # ADDED: Final status update
+    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
 
 
 if __name__ == "__main__":

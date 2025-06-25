@@ -8,9 +8,17 @@ import os
 import sys
 import argparse
 import psycopg2
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone # Import timezone for consistency
 from tabulate import tabulate
 from typing import Dict, List, Any
+
+# --- Import sdnotify for Systemd Watchdog Integration ---
+try:
+    import sdnotify # ADDED: Import sdnotify
+except ImportError:
+    # Fallback for systems without sdnotify
+    sdnotify = None
+    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.", file=sys.stderr)
 
 try:
     from dotenv import load_dotenv
@@ -20,14 +28,46 @@ except:
 
 PG_DSN = os.getenv("PG_DSN", "")
 
+# --- Initialize Systemd Notifier ---
+if sdnotify:
+    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
+else:
+    class DummyNotifier: # Dummy class if sdnotify isn't available
+        def notify(self, message):
+            pass
+    notifier = DummyNotifier()
+
+
 class ParserMonitor:
     def __init__(self, dsn: str):
         self.dsn = dsn
+        self.logger = self._setup_logging() # Initialize logger here
     
+    def _setup_logging(self) -> logging.Logger:
+        """Setup logging for the analyzer"""
+        logger = logging.getLogger("parser-monitor") # Use a specific logger name
+        logger.setLevel(logging.INFO)
+        
+        handler = logging.StreamHandler(sys.stdout)
+        formatter = logging.Formatter(
+            "%(asctime)s %(levelname)s [%(name)s] %(message)s" # Added logger name to format
+        )
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        
+        return logger
+
     def connect(self):
         """Connect to database"""
-        return psycopg2.connect(self.dsn)
-    
+        try:
+            conn = psycopg2.connect(self.dsn)
+            return conn
+        except Exception as e:
+            self.logger.critical(f"Failed to connect to PostgreSQL: {e}") # Log critical error
+            notifier.notify(f"STATUS=CRITICAL: Failed to connect to DB. Exiting.") # ADDED: sdnotify on DB connection failure
+            notifier.notify("STOPPING=1") # ADDED: sdnotify
+            sys.exit(1) # Exit if cannot connect to DB
+
     def get_parser_performance(self, days: int = 7) -> List[Dict]:
         """Get parser performance metrics"""
         with self.connect() as conn:
@@ -154,29 +194,29 @@ class ParserMonitor:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT 
-                        prompt_type,
-                        parser_used as current_parser,
+                        pm.prompt_type, # Use alias to avoid ambiguity
+                        pm.parser_used as current_parser,
                         CASE 
-                            WHEN prompt_type = 'delphi_notify_short' THEN 'DelphiNotifyShortParser'
-                            WHEN prompt_type = 'security_analysis' THEN 'SecurityIncidentParser'
-                            WHEN prompt_type = 'numbered_investigation' THEN 'NumberedListParser'
-                            WHEN prompt_type = 'json_response' THEN 'JSONResponseParser'
-                            WHEN prompt_type = 'conversational' THEN 'ConversationalParser'
+                            WHEN pm.prompt_type = 'delphi_notify_short' THEN 'DelphiNotifyShortParser'
+                            WHEN pm.prompt_type = 'security_analysis' THEN 'SecurityIncidentParser'
+                            WHEN pm.prompt_type = 'numbered_investigation' THEN 'NumberedListParser'
+                            WHEN pm.prompt_type = 'json_response' THEN 'JSONResponseParser'
+                            WHEN pm.prompt_type = 'conversational' THEN 'ConversationalParser'
                             ELSE 'HybridParser'
                         END as recommended_parser,
                         COUNT(*) as mismatch_count
                     FROM parser_metrics pm
-                    WHERE success = FALSE
-                      AND created_at > NOW() - INTERVAL '7 days'
-                      AND parser_used != CASE 
-                            WHEN prompt_type = 'delphi_notify_short' THEN 'DelphiNotifyShortParser'
-                            WHEN prompt_type = 'security_analysis' THEN 'SecurityIncidentParser'
-                            WHEN prompt_type = 'numbered_investigation' THEN 'NumberedListParser'
-                            WHEN prompt_type = 'json_response' THEN 'JSONResponseParser'
-                            WHEN prompt_type = 'conversational' THEN 'ConversationalParser'
+                    WHERE pm.success = FALSE # Use alias
+                      AND pm.created_at > NOW() - INTERVAL '7 days' # Use alias
+                      AND pm.parser_used != CASE 
+                            WHEN pm.prompt_type = 'delphi_notify_short' THEN 'DelphiNotifyShortParser'
+                            WHEN pm.prompt_type = 'security_analysis' THEN 'SecurityIncidentParser'
+                            WHEN pm.prompt_type = 'numbered_investigation' THEN 'NumberedListParser'
+                            WHEN pm.prompt_type = 'json_response' THEN 'JSONResponseParser'
+                            WHEN pm.prompt_type = 'conversational' THEN 'ConversationalParser'
                             ELSE 'HybridParser'
                         END
-                    GROUP BY prompt_type, parser_used
+                    GROUP BY pm.prompt_type, pm.parser_used
                     ORDER BY mismatch_count DESC
                     LIMIT %s
                 """, (limit,))
@@ -232,7 +272,7 @@ class ParserMonitor:
                     'active_prompt_types': result[0] or 0,
                     'total_parses_24h': result[1] or 0,
                     'successful_parses_24h': result[2] or 0,
-                    'success_rate_24h': (result[2] / result[1] * 100) if result[1] else 0,
+                    'success_rate_24h': (result[2] / result[1] * 100) if result[1] and result[1] > 0 else 0, # Handle division by zero
                     'avg_parse_time_ms': round(result[3], 2) if result[3] else 0,
                     'last_parse': result[4],
                     'stuck_alerts': stuck_count
@@ -333,9 +373,12 @@ class ParserMonitor:
         failures = self.get_recent_failures(5)
         if failures:
             for failure in failures:
-                print(f"Alert {failure['alert_id']} | {failure['prompt_type']} | "
-                      f"{failure['parser_used']} | {failure['created_at'].strftime('%H:%M:%S')}")
-                print(f"   Error: {failure['error'][:100]}...")
+                print(f"\n{'='*60}")
+                print(f"Alert ID: {failure['alert_id']}")
+                print(f"Prompt Type: {failure['prompt_type']}")
+                print(f"Parser Used: {failure['parser_used']}")
+                print(f"Time: {failure['created_at'].strftime('%Y-%m-%d %H:%M:%S')}") # Ensure datetime format
+                print(f"Error: {failure['error'][:100]}...")
         else:
             print(" No recent failures")
         
@@ -381,7 +424,9 @@ def main():
     args = parser.parse_args()
     
     if not PG_DSN:
-        print("ERROR: PG_DSN environment variable not set")
+        print("ERROR: PG_DSN environment variable not set", file=sys.stderr)
+        notifier.notify("STATUS=FATAL: PG_DSN environment variable not set. Exiting.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1") # ADDED: sdnotify
         sys.exit(1)
     
     monitor = ParserMonitor(PG_DSN)
@@ -389,7 +434,10 @@ def main():
     try:
         if args.continuous:
             import time
+            notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready in continuous mode
+            notifier.notify(f"STATUS=Running in continuous mode, refreshing every {args.interval}s...") # ADDED: sdnotify status update
             while True:
+                notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping before each refresh cycle
                 os.system('clear' if os.name == 'posix' else 'cls')
                 monitor.display_dashboard()
                 print(f"\nRefreshing in {args.interval} seconds... (Ctrl+C to exit)")
@@ -423,8 +471,12 @@ def main():
             monitor.display_dashboard()
     except KeyboardInterrupt:
         print("\nMonitoring stopped.")
+        notifier.notify("STATUS=Monitoring stopped by user (KeyboardInterrupt).") # ADDED: sdnotify
+        notifier.notify("STOPPING=1") # ADDED: sdnotify
     except Exception as e:
-        print(f"ERROR: {e}")
+        print(f"ERROR: {e}", file=sys.stderr)
+        notifier.notify(f"STATUS=ERROR: An unhandled exception occurred: {e}. See logs.") # ADDED: sdnotify
+        notifier.notify("STOPPING=1") # ADDED: sdnotify
         sys.exit(1)
 
 if __name__ == "__main__":

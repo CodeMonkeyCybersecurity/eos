@@ -40,6 +40,14 @@ except ModuleNotFoundError:
     logging.warning("Pytz module not found. Timezone conversions might be limited. Please install it using: pip install pytz")
     pytz = None # Set pytz to None if not found, to handle gracefully
 
+# --- Import sdnotify for Systemd Watchdog Integration ---
+try:
+    import sdnotify # ADDED: Import sdnotify
+except ImportError:
+    # Fallback for systems without sdnotify
+    sdnotify = None
+    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.")
+
 # ───── CONFIGURATION ─────────────────────────────────────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
@@ -47,6 +55,9 @@ REQUIRED_ENV = ["PG_DSN"]
 _missing = [var for var in REQUIRED_ENV if not os.getenv(var)]
 if _missing:
     print(f"FATAL: Missing environment variables: {', '.join(_missing)}", file=sys.stderr)
+    if sdnotify:
+        notifier.notify(f"STATUS=FATAL: Missing environment variables: {', '.join(_missing)}. Exiting.") # ADDED: sdnotify on missing env vars
+        notifier.notify("STOPPING=1")
     sys.exit(1)
 
 PG_DSN = os.getenv("PG_DSN", "").strip()
@@ -82,6 +93,16 @@ def setup_logging() -> logging.Logger:
 
 log = setup_logging()
 
+# --- Initialize Systemd Notifier ---
+if sdnotify:
+    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
+else:
+    class DummyNotifier: # Dummy class if sdnotify isn't available
+        def notify(self, message):
+            pass
+    notifier = DummyNotifier()
+
+
 # ───── EMAIL TEMPLATE CLASSES ─────────────────────────────────────
 class EmailTemplate(ABC):
     """Abstract base class for email templates"""
@@ -115,6 +136,7 @@ class FileBasedTemplate(EmailTemplate):
                 return Template(fallback)
             else:
                 # Default minimal template
+                log.warning("Using default minimal HTML template as no file was found and no fallback was provided.")
                 return Template("""<!DOCTYPE html>
 <html>
 <head><title>$subject</title></head>
@@ -145,11 +167,18 @@ class FileBasedTemplate(EmailTemplate):
                 if pytz:
                     tz = pytz.timezone(TIMEZONE)
                     if isinstance(timestamp, str):
-                        timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        # Ensure string timestamp is parsed as UTC if it lacks timezone info
+                        if timestamp.endswith('Z'):
+                            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        elif '+' not in timestamp and '-' not in timestamp[-6:]: # Simple check for offset presence
+                             timestamp = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc) # Assume UTC if no tzinfo
+                        else:
+                            timestamp = datetime.fromisoformat(timestamp)
                     sent_at = timestamp.astimezone(tz).strftime("%A, %d %B %Y %I:%M %p AWST")
                 else:
                     sent_at = str(timestamp) # Fallback if pytz not available
-            except Exception: # Catch broader exceptions for timezone/datetime issues
+            except Exception as e: # Catch broader exceptions for timezone/datetime issues
+                log.error(f"Error formatting timestamp '{timestamp}': {e}", exc_info=True)
                 sent_at = str(timestamp)
         else:
             sent_at = "Unknown time"
@@ -176,15 +205,33 @@ class FileBasedTemplate(EmailTemplate):
         # Timestamp
         timestamp = metadata.get('timestamp')
         if timestamp:
-            lines.append(f"Sent at: {timestamp}")
+            # Attempt to convert timestamp for plain text too, similar to HTML
+            if pytz and isinstance(timestamp, (str, datetime)):
+                try:
+                    tz = pytz.timezone(TIMEZONE)
+                    if isinstance(timestamp, str):
+                        if timestamp.endswith('Z'):
+                            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        elif '+' not in timestamp and '-' not in timestamp[-6:]:
+                             timestamp = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
+                        else:
+                            timestamp = datetime.fromisoformat(timestamp)
+                    formatted_ts = timestamp.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S %Z")
+                    lines.append(f"Sent at: {formatted_ts}")
+                except Exception as e:
+                    log.error(f"Error formatting timestamp for plain text '{timestamp}': {e}", exc_info=True)
+                    lines.append(f"Sent at: {str(timestamp)}")
+            else:
+                lines.append(f"Sent at: {str(timestamp)}")
 
         lines.append("\n--- Alert Details ---\n")
 
         # Sections
         sections = data.get('sections', {})
         for section, content in sections.items():
-            lines.append(f"\n{section}:")
-            lines.append(content)
+            if content:
+                lines.append(f"\n{section}:")
+                lines.append(content) # No HTML escaping/conversion needed for plain text
 
         # Agent info
         lines.append("\n--- Agent Information ---")
@@ -213,7 +260,7 @@ class FileBasedTemplate(EmailTemplate):
                 # FIX: Used raw string literal r'\n\n' to avoid Pylance warning about escape sequences in f-string
                 paragraphs = [
                     f"<p>{html_lib.escape(p)}</p>"
-                    for p in content.split(r'\n\n') if p.strip()
+                    for p in content.split('\n\n') if p.strip() # Correct split for newlines
                 ]
                 if paragraphs:
                     html_parts.append(f"<h2>{html_lib.escape(heading)}:</h2>")
@@ -237,27 +284,42 @@ class FileBasedTemplate(EmailTemplate):
             ('name', 'Agent Name'),
             ('id', 'Agent ID'),
             ('ip', 'IP Address'),
-            ('version', 'Wazuh Version'),
+            ('version', 'Wazuh Version'), # Changed from 'version' to 'wazuh_version' if that's the key
             ('status', 'Status'),
             ('os', 'Operating System'),
             ('manager', 'Manager'),
         ]
 
+        # Use actual keys from agent_info if they exist, otherwise map from field_mappings
+        # Assuming agent_info keys like 'agent_version', 'status_text', 'manager_name' from previous schemas
+        agent_info_normalized = {
+            'name': agent_info.get('name'),
+            'id': agent_info.get('id'),
+            'ip': agent_info.get('ip'),
+            'version': agent_info.get('agent_version') or agent_info.get('version'), # Use agent_version if present
+            'status': agent_info.get('status_text') or agent_info.get('status'), # Use status_text if present
+            'os': agent_info.get('os'),
+            'manager': agent_info.get('manager_name') or agent_info.get('manager'), # Use manager_name if present
+        }
+
+
         for field, label in field_mappings:
-            if field in agent_info and agent_info[field]:
-                value = html_lib.escape(str(agent_info[field]))
-                html_parts.append(f"<li><strong>{label}:</strong> {value}</li>")
+            value = agent_info_normalized.get(field)
+            if value:
+                value_str = html_lib.escape(str(value))
+                html_parts.append(f"<li><strong>{label}:</strong> {value_str}</li>")
+
 
         # Groups
-        if agent_info.get('groups'):
+        if agent_info.get('groups'): # Assuming 'groups' is a list of strings
             groups_str = ", ".join([html_lib.escape(g) for g in agent_info['groups']])
             html_parts.append(f"<li><strong>Groups:</strong> {groups_str}</li>")
 
         # Timestamps
         for field, label in [
-            ('registered_at', 'Registered'),
+            ('registered', 'Registered'), # Adjusted from 'registered_at' to 'registered'
             ('last_seen', 'Last Seen'),
-            ('disconnected_at', 'Disconnected')
+            ('disconnection_time', 'Disconnected') # Adjusted from 'disconnected_at' to 'disconnection_time'
         ]:
             if field in agent_info:
                 value = agent_info[field]
@@ -269,7 +331,8 @@ class FileBasedTemplate(EmailTemplate):
                             value = value.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
                         else:
                             value = str(value) # Fallback if pytz not available
-                    except Exception: # Catch broader exceptions for timezone/datetime issues
+                    except Exception as e: # Catch broader exceptions for timezone/datetime issues
+                        log.error(f"Error formatting agent timestamp '{value}' for field '{field}': {e}", exc_info=True)
                         value = str(value)
                 html_parts.append(f"<li><strong>{label}:</strong> {html_lib.escape(str(value))}</li>")
 
@@ -286,15 +349,40 @@ class ModernCardTemplate(EmailTemplate):
         agent_info = data.get('agent_info', {})
         metadata = data.get('metadata', {})
 
+        # Format timestamp for header
+        header_timestamp = metadata.get('timestamp')
+        if header_timestamp:
+            try:
+                if pytz:
+                    tz = pytz.timezone(TIMEZONE)
+                    if isinstance(header_timestamp, str):
+                        if header_timestamp.endswith('Z'):
+                            header_timestamp = datetime.fromisoformat(header_timestamp.replace('Z', '+00:00'))
+                        elif '+' not in header_timestamp and '-' not in header_timestamp[-6:]:
+                             header_timestamp = datetime.fromisoformat(header_timestamp).replace(tzinfo=timezone.utc)
+                        else:
+                            header_timestamp = datetime.fromisoformat(header_timestamp)
+                    header_timestamp_str = header_timestamp.astimezone(tz).strftime("%A, %d %B %Y %I:%M %p AWST")
+                else:
+                    header_timestamp_str = str(header_timestamp)
+            except Exception as e:
+                log.error(f"Error formatting header timestamp '{header_timestamp}': {e}", exc_info=True)
+                header_timestamp_str = str(header_timestamp)
+        else:
+            header_timestamp_str = "Unknown time"
+
+
         # Build cards for each section
         cards_html = []
         for heading, content in sections.items():
             if content:
+                # Replace newlines with <br><br> for HTML rendering in cards
+                formatted_content = html_lib.escape(content).replace('\n\n', '<br><br>')
                 card = f"""
                 <div style="background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <h3 style="color: #2c3e50; margin-top: 0;">{html_lib.escape(heading)}</h3>
                     <div style="color: #555; line-height: 1.6;">
-                        {html_lib.escape(content).replace(r'\n\n', '<br><br>')}
+                        {formatted_content}
                     </div>
                 </div>
                 """
@@ -302,14 +390,45 @@ class ModernCardTemplate(EmailTemplate):
 
         # Agent info card
         if agent_info:
+            agent_details_list = []
+            # Use the same normalization and formatting logic as in FileBasedTemplate for consistency
+            field_mappings = [
+                ('name', 'Agent'), ('id', 'ID'), ('ip', 'IP'),
+                ('agent_version', 'Wazuh Version'), ('status_text', 'Status'),
+                ('os', 'OS'), ('manager_name', 'Manager'),
+            ]
+            for field, label in field_mappings:
+                value = agent_info.get(field)
+                if value:
+                    agent_details_list.append(f"<tr><td><strong>{label}:</strong></td><td>{html_lib.escape(str(value))}</td></tr>")
+
+            if agent_info.get('groups'):
+                groups_str = ", ".join([html_lib.escape(g) for g in agent_info['groups']])
+                agent_details_list.append(f"<tr><td><strong>Groups:</strong></td><td>{groups_str}</td></tr>")
+
+            for field, label in [
+                ('registered', 'Registered'), ('last_seen', 'Last Seen'), ('disconnection_time', 'Disconnected')
+            ]:
+                if field in agent_info:
+                    value = agent_info[field]
+                    if isinstance(value, datetime):
+                        try:
+                            if pytz:
+                                tz = pytz.timezone(TIMEZONE)
+                                value = value.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
+                            else:
+                                value = str(value)
+                        except Exception as e:
+                            log.error(f"Error formatting agent timestamp for modern card '{value}' for field '{field}': {e}", exc_info=True)
+                            value = str(value)
+                    agent_details_list.append(f"<tr><td><strong>{label}:</strong></td><td>{html_lib.escape(str(value))}</td></tr>")
+
+
             agent_card = f"""
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+            <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <h3 style="color: #2c3e50; margin-top: 0;">System Information</h3>
-                <table style="width: 100%; color: #555;">
-                    <tr><td><strong>Agent:</strong></td><td>{html_lib.escape(str(agent_info.get('name', 'Unknown')))}</td></tr>
-                    <tr><td><strong>OS:</strong></td><td>{html_lib.escape(str(agent_info.get('os', 'Unknown')))}</td></tr>
-                    <tr><td><strong>IP:</strong></td><td>{html_lib.escape(str(agent_info.get('ip', 'N/A')))}</td></tr>
-                    <tr><td><strong>Status:</strong></td><td>{html_lib.escape(str(agent_info.get('status', 'Unknown')))}</td></tr>
+                <table style="width: 100%; color: #555; border-collapse: collapse;">
+                    {''.join(agent_details_list)}
                 </table>
             </div>
             """
@@ -321,25 +440,43 @@ class ModernCardTemplate(EmailTemplate):
         <html>
         <head>
             <meta charset="utf-8">
-            <title>{html_lib.escape(data.get('subject', 'Alert'))}</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{html_lib.escape(data.get('subject', 'Security Alert'))}</title>
+            <style>
+                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #e9ecef; padding: 20px; margin: 0; }}
+                .container {{ max-width: 600px; margin: 0 auto; }}
+                .header {{ background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                .header h1 {{ color: #2c3e50; margin: 0; font-size: 24px; }}
+                .header p {{ color: #7f8c8d; margin: 8px 0; font-size: 14px; }}
+                .card {{ background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                .card h3 {{ color: #2c3e50; margin-top: 0; }}
+                .card div {{ color: #555; line-height: 1.6; }}
+                .agent-card {{ background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
+                .agent-card table {{ width: 100%; color: #555; border-collapse: collapse; }}
+                .agent-card td {{ padding: 8px 0; border-bottom: 1px solid #eee; }}
+                .agent-card tr:last-child td {{ border-bottom: none; }}
+                .footer {{ text-align: center; color: #7f8c8d; font-size: 14px; margin-top: 32px; }}
+            </style>
         </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #e9ecef; padding: 20px; margin: 0;">
-            <div style="max-width: 600px; margin: 0 auto;">
-                <div style="background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 20px; text-align: center;">
-                    <h1 style="color: #2c3e50; margin: 0; font-size: 24px;">Security Alert</h1>
-                    <p style="color: #7f8c8d; margin: 8px 0;">Alert ID: {html_lib.escape(str(metadata.get('alert_hash', 'Unknown')))}</p>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>Security Alert</h1>
+                    <p style="font-size: 16px; font-weight: bold;">{html_lib.escape(data.get('subject', 'General Alert'))}</p>
+                    <p>Alert ID: {html_lib.escape(str(metadata.get('alert_hash', 'Unknown')))}</p>
+                    <p>Generated at: {header_timestamp_str}</p>
                 </div>
 
                 {''.join(cards_html)}
 
-                <div style="text-align: center; color: #7f8c8d; font-size: 14px; margin-top: 32px;">
+                <div class="footer">
                     <p>This alert was generated by Delphi Security Monitoring</p>
+                    <p>For support, contact: <a href="mailto:{html_lib.escape(SUPPORT_EMAIL)}" style="color: #007bff; text-decoration: none;">{html_lib.escape(SUPPORT_EMAIL)}</a></p>
                 </div>
             </div>
         </body>
         </html>
         """
-
         return body
 
     def format_plain(self, data: Dict[str, Any]) -> str:
@@ -363,13 +500,19 @@ class EmailFormatter:
                 "/usr/local/share/eos/email.html",
             ]
 
+            found_template_path = None
             for path in template_paths:
                 if os.path.exists(path):
-                    template = FileBasedTemplate(path)
+                    found_template_path = path
                     break
+            
+            if found_template_path:
+                template = FileBasedTemplate(found_template_path)
+                log.info(f"Using template from path: {found_template_path}")
             else:
                 # Use fallback with empty string for template_path (relies on internal fallback)
                 template = FileBasedTemplate(template_path="")
+                log.warning("No specific email template file found, using default minimal template.")
 
         self.template = template
 
@@ -397,6 +540,8 @@ def connect_db() -> psycopg2.extensions.connection:
         return conn
     except Exception:
         log.exception("Could not connect to Postgres")
+        notifier.notify("STATUS=FATAL: Could not connect to PostgreSQL. Exiting.") # ADDED: sdnotify on DB connection failure
+        notifier.notify("STOPPING=1")
         sys.exit(1)
 
 
@@ -444,6 +589,7 @@ def save_formatted_data(conn, alert_id: int, formatted_data: Dict[str, Any]):
         log.info("Saved formatted data for alert %d", alert_id)
     except Exception as e:
         log.error("Failed to save formatted data for alert %d: %s", alert_id, e)
+        notifier.notify(f"STATUS=DB update failed for alert {alert_id}. See logs.") # ADDED: sdnotify on DB update failure
         raise
 
 
@@ -461,6 +607,8 @@ def catch_up(conn, formatter: EmailFormatter):
     if alert_ids:
         log.info("Processing backlog of %d alerts", len(alert_ids))
         for alert_id in alert_ids:
+            # Ping watchdog during backlog processing if it takes a long time
+            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping during backlog processing
             try:
                 alert_data = fetch_alert_to_format(conn, alert_id)
                 if alert_data and alert_data.get('structured_data'):
@@ -479,8 +627,11 @@ def catch_up(conn, formatter: EmailFormatter):
                     }
 
                     save_formatted_data(conn, alert_id, formatted_data)
+                else:
+                    log.debug("Alert %d not in correct state or missing structured data during backlog processing, skipping.", alert_id)
             except Exception as e:
                 log.error("Failed to process backlog alert %d: %s", alert_id, e)
+                notifier.notify(f"STATUS=Error processing backlog alert {alert_id}. See logs.") # ADDED: sdnotify on backlog error
 
 
 # ───── SIGNAL HANDLING ─────────────────────────────────
@@ -490,6 +641,7 @@ def on_signal(signum, _frame):
     global shutdown
     shutdown = True
     log.info("Signal %d received; shutting down", signum)
+    notifier.notify("STOPPING=1") # ADDED: sdnotify on signal received
 
 signal.signal(signal.SIGINT, on_signal)
 signal.signal(signal.SIGTERM, on_signal)
@@ -512,47 +664,62 @@ def create_formatter():
 def main():
     """Main event loop"""
     log.info("Email Formatter starting up...")
-    log.info("Using template type: %s", TEMPLATE_TYPE)
-    log.info("Template path: %s", TEMPLATE_PATH)
+    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
+    notifier.notify(f"STATUS=Starting up. Template type: {TEMPLATE_TYPE}. Path: {TEMPLATE_PATH}")
 
     # Initialize formatter
     formatter = create_formatter()
 
     # Connect to database
-    conn = connect_db()
+    conn = connect_db() # This function already calls sys.exit(1) on failure.
 
     # Ensure formatted_data column exists
-    with conn.cursor() as cur:
-        # FIX: Changed DO $ to DO $$ and END $; to END $$; for correct PostgreSQL dollar-quoting syntax
-        cur.execute("""
-            DO $$
-            BEGIN
-                IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns
-                    WHERE table_name='alerts' AND column_name='formatted_data'
-                ) THEN
-                    ALTER TABLE alerts ADD COLUMN formatted_data JSONB;
-                    ALTER TABLE alerts ADD COLUMN formatted_at TIMESTAMP;
-                END IF;
-            END $$;
-        """)
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM information_schema.columns
+                        WHERE table_name='alerts' AND column_name='formatted_data'
+                    ) THEN
+                        ALTER TABLE alerts ADD COLUMN formatted_data JSONB;
+                        ALTER TABLE alerts ADD COLUMN formatted_at TIMESTAMP WITH TIME ZONE; -- Ensure TIMESTAMPTZ
+                    END IF;
+                END $$;
+            """)
+        conn.commit() # Ensure changes are committed if autocommit is not strictly on here
+        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after schema check/update
+    except Exception as e:
+        log.critical(f"Failed to ensure DB columns exist: {e}", exc_info=True)
+        notifier.notify("STATUS=FATAL: Failed to ensure DB columns. Exiting.") # ADDED: sdnotify on schema check failure
+        notifier.notify("STOPPING=1")
+        sys.exit(1)
+
 
     # Process backlog
+    log.info("Processing backlog...")
     catch_up(conn, formatter)
+    notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after backlog processing
 
     # Listen for structured alerts
     cur = conn.cursor()
     cur.execute(f"LISTEN {LISTEN_CHANNEL};")
     log.info("Listening for alerts to format")
+    notifier.notify(f"STATUS=Listening on {LISTEN_CHANNEL} for alerts to format...") # ADDED: Update status
 
     while not shutdown:
         try:
-            if not select.select([conn], [], [], 5)[0]:
-                continue
+            # Ping watchdog before polling for events. This keeps systemd happy during idle times.
+            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each poll cycle
+
+            if not select.select([conn], [], [], 5)[0]: # Wait up to 5 seconds for events
+                continue # If no events, loop back and ping watchdog again
 
             conn.poll()
 
             for notify in conn.notifies:
+                notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping before processing each notification
                 try:
                     alert_id = int(notify.payload)
                     log.info("Processing alert %d", alert_id)
@@ -580,20 +747,33 @@ def main():
 
                 except Exception as e:
                     log.exception("Failed to process alert %s: %s", notify.payload, e)
+                    notifier.notify(f"STATUS=Error processing alert {alert_id}. See logs.") # ADDED: sdnotify on processing error
 
             conn.notifies.clear()
 
         except psycopg2.OperationalError:
             log.exception("DB connection lost; reconnecting in 5s")
-            time.sleep(5)
-            conn = connect_db()
-            cur = conn.cursor()
-            cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+            notifier.notify("STATUS=DB connection lost. Attempting to reconnect...") # ADDED: sdnotify on DB connection loss
+            time.sleep(5) # Keep this sleep for reconnection back-off
+            try:
+                conn = connect_db() # This function will call sys.exit if reconnect fails
+                cur = conn.cursor()
+                cur.execute(f"LISTEN {LISTEN_CHANNEL};")
+                log.info("Reconnected to Postgres and re-listening.")
+                notifier.notify("STATUS=Reconnected to DB. Listening for alerts to format...") # ADDED: sdnotify on successful reconnect
+            except Exception: # Catch the sys.exit from connect_db
+                log.critical("Failed to reconnect to database. Exiting.")
+                notifier.notify("STOPPING=1")
+                sys.exit(1)
         except Exception:
             log.exception("Unexpected error in main loop")
-            raise
+            notifier.notify("STATUS=Unexpected error in main loop. Exiting.") # ADDED: sdnotify on unexpected errors
+            notifier.notify("STOPPING=1")
+            raise # Re-raise the exception after notifying systemd for debugging/crash reporting
 
     log.info("Shutting down gracefully")
+    notifier.notify("STATUS=Shutting down gracefully.") # ADDED: Final status update
+    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
 
 
 if __name__ == "__main__":

@@ -21,6 +21,9 @@ except ImportError:
     DictCursor = None
 from datetime import datetime, timezone
 
+# --- Import sdnotify for Systemd Watchdog Integration ---
+import sdnotify # ADDED: Import sdnotify
+
 # Handle dotenv import gracefully
 try:
     from dotenv import load_dotenv # type: ignore
@@ -53,7 +56,7 @@ if not all([AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSI
 # Paths & Quotas
 PROMPT_FILE = os.environ.get("PROMPT_FILE", "/srv/eos/system-prompts/default.txt")
 LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/llm-worker.log") # Ensure this is correct
-HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/llm-worker.heartbeat")
+# HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/llm-worker.heartbeat") # REMOVED: No longer needed with sdnotify
 MAX_LOG_SIZE = int(os.environ.get("MAX_LOG_SIZE", 10485760)) # Default 10 MB
 
 # PostgreSQL LISTEN channel for enriched alerts
@@ -87,14 +90,12 @@ def setup_logging() -> logging.Logger:
 
 log = setup_logging()
 
-# --- Heartbeat File Management ---
-def update_heartbeat_file():
-    """Updates a heartbeat file with the current timestamp."""
-    try:
-        with open(HEARTBEAT_FILE, 'w') as f:
-            f.write(datetime.now(timezone.utc).isoformat())
-    except IOError as e:
-        log.error(f"Failed to update heartbeat file {HEARTBEAT_FILE}: {e}")
+# --- Initialize Systemd Notifier ---
+notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
+
+# --- Heartbeat File Management (REMOVED or adapted if needed elsewhere) ---
+# Removed update_heartbeat_file function and its calls from the main loop
+# as sdnotify will handle this.
 
 # --- Load System Prompt ---
 def load_system_prompt(file_path: str) -> str:
@@ -106,9 +107,13 @@ def load_system_prompt(file_path: str) -> str:
             return prompt
     except FileNotFoundError:
         log.critical(f"System prompt file not found at {file_path}. Please ensure it exists.")
+        notifier.notify("STATUS=System prompt file not found. Exiting.") # ADDED: sdnotify on critical error
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     except Exception as e:
         log.critical(f"Error loading system prompt from {file_path}: {e}")
+        notifier.notify("STATUS=Error loading system prompt. Exiting.") # ADDED: sdnotify on critical error
+        notifier.notify("STOPPING=1")
         sys.exit(1)
 
 SYSTEM_PROMPT_CONTENT = load_system_prompt(PROMPT_FILE)
@@ -160,6 +165,10 @@ def get_llm_response(raw_alert_json: dict, agent_details_json: dict) -> Union[di
         }
 
         log.info("Sending request to Azure OpenAI API...")
+        # During this potentially long operation, the watchdog might timeout.
+        # If your WatchdogSec is very short and LLM calls are long, you might
+        # consider a separate thread for watchdog pings, but usually Systemd's
+        # 1-minute default for WatchdogSec is enough for network calls.
         response = requests.post(api_url, headers=headers, json=payload, timeout=60) # Increased timeout
         response.raise_for_status() # Raise an exception for HTTP errors (4xx or 5xx)
 
@@ -173,7 +182,6 @@ def get_llm_response(raw_alert_json: dict, agent_details_json: dict) -> Union[di
 
         log.info(f"LLM Response received. Tokens: Prompt={prompt_tokens}, Completion={completion_tokens}, Total={total_tokens}")
 
-        # MODIFIED: Do NOT attempt to parse as JSON. Store the raw text.
         return {
             "parsed_response": completion_content, # Store raw string, not parsed JSON
             "prompt_tokens": prompt_tokens,
@@ -334,9 +342,11 @@ def process_alert_for_llm(alert_id: int) -> Union[dict, None]:
         log.critical(f"Database error in process_alert_for_llm for alert ID {alert_id}: {db_err}", exc_info=True)
         if conn:
             conn.rollback()
+        notifier.notify("STATUS=Database error during alert processing. See logs.") # ADDED: sdnotify on DB error
         return None
     except Exception as e:
         log.critical(f"An unexpected error occurred in process_alert_for_llm for alert ID {alert_id}: {e}", exc_info=True)
+        notifier.notify("STATUS=Unexpected error during alert processing. See logs.") # ADDED: sdnotify on unexpected error
         return None
     finally:
         if conn:
@@ -352,6 +362,8 @@ def listen_for_enriched_alerts():
     """
     if psycopg2 is None:
         log.error("psycopg2 module not available")
+        notifier.notify("STATUS=psycopg2 module not available. Exiting.") # ADDED: sdnotify on missing psycopg2
+        notifier.notify("STOPPING=1")
         return
         
     log.info(f"Starting PostgreSQL listener for channel '{LISTEN_CHANNEL}'...")
@@ -365,12 +377,15 @@ def listen_for_enriched_alerts():
         log.info("Listening for notifications...")
 
         while True:
+            # Ping watchdog regularly, especially when waiting for notifications
+            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each loop iteration
+
             conn.poll() # Check for new notifications
             while conn.notifies:            # consume queue
                 notify = conn.notifies.pop(0)
                 alert_id_str = notify.payload
                 log.info(f"Received notification on channel '{notify.channel}' with payload: {alert_id_str}")
-                update_heartbeat_file() # Update heartbeat on activity
+                # update_heartbeat_file() # REMOVED: No longer needed with sdnotify
                 try:
                     alert_id = int(alert_id_str)
                     processed_alert = process_alert_for_llm(alert_id)
@@ -382,13 +397,19 @@ def listen_for_enriched_alerts():
                     log.error(f"Invalid alert_id received in notification payload: {alert_id_str}")
                 except Exception as e:
                     log.error(f"Error processing notification for alert ID {alert_id_str}: {e}", exc_info=True)
-            time.sleep(0.1) # Sleep briefly to avoid busy-waiting
+            # Removed time.sleep(0.1) as select.select's implicit block or more explicit watchdog pings cover it
+            # If your loop is extremely tight and CPU usage is high, you might re-introduce a *small* sleep,
+            # but rely on watchdog for aliveness.
 
     except psycopg2.Error as db_err:
         log.critical(f"Database error during listener setup or operation: {db_err}", exc_info=True)
+        notifier.notify("STATUS=Database error in listener. Exiting.") # ADDED: sdnotify on DB error
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     except Exception as e:
         log.critical(f"An unexpected error occurred in the listener: {e}", exc_info=True)
+        notifier.notify("STATUS=Unexpected error in listener. Exiting.") # ADDED: sdnotify on unexpected error
+        notifier.notify("STOPPING=1")
         sys.exit(1)
     finally:
         if conn:
@@ -399,25 +420,34 @@ def listen_for_enriched_alerts():
 # --- Main function to run the script ---
 def main():
     log.info("--- Starting LLM Worker Script ---")
+    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
 
     # Test database connection immediately
     if psycopg2 is None:
         log.critical("psycopg2 module not available. Cannot connect to database.")
+        notifier.notify("STATUS=psycopg2 module not available. Exiting.") # ADDED: sdnotify on missing psycopg2
+        notifier.notify("STOPPING=1")
         sys.exit(1)
         
     try:
         conn_test = psycopg2.connect(PG_DSN, connect_timeout=5)
         conn_test.close()
         log.info("Successfully connected to PostgreSQL database using DSN.")
+        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after successful DB connection
     except psycopg2.Error as e:
         log.critical(f"ERROR: Could not connect to PostgreSQL database. Please check PG_DSN environment variable. Error: {e}")
+        notifier.notify("STATUS=Failed to connect to DB. Exiting.") # ADDED: sdnotify on DB connection failure
+        notifier.notify("STOPPING=1")
         sys.exit(1)
 
-    # Initial heartbeat update
-    update_heartbeat_file()
+    # Initial heartbeat update (REMOVED: No longer needed with sdnotify)
+    # update_heartbeat_file() 
 
     # Start the listener (this will block and run continuously)
     listen_for_enriched_alerts()
+
+    log.info("--- LLM Worker Script Shutting Down ---")
+    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
 
 if __name__ == "__main__":
     main()
