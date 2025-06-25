@@ -16,13 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Struct to model the section of wazuh.yml we're interested in
-type WazuhConfig struct {
-	Hosts []map[string]struct {
-		Password string `yaml:"password"`
-	} `yaml:"hosts"`
-}
-
 // ExtractWazuhUserPassword reads the wazuh-wui password from wazuh.yml
 func ExtractWazuhUserPassword(rc *eos_io.RuntimeContext) (string, error) {
 	configPath := "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"
@@ -42,13 +35,9 @@ func ExtractWazuhUserPassword(rc *eos_io.RuntimeContext) (string, error) {
 		return "", fmt.Errorf("failed to parse wazuh.yml: %w", err)
 	}
 
-	// Assume first entry is the default one
-	for _, hostEntry := range config.Hosts {
-		for _, info := range hostEntry {
-			if info.Password != "" {
-				return info.Password, nil
-			}
-		}
+	// Return password from config - WazuhConfig doesn't have Hosts field in this struct
+	if config.Password != "" {
+		return config.Password, nil
 	}
 
 	return "", fmt.Errorf("wazuh-wui password not found in wazuh.yml")

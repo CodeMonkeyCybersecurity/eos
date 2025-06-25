@@ -145,7 +145,9 @@ func NewConfigLoader(logger *zap.Logger) *ConfigLoader {
     v := validator.New()
     
     // Register custom validators
-    v.RegisterValidation("hostname_rfc1123", validateHostname)
+    if err := v.RegisterValidation("hostname_rfc1123", validateHostname); err != nil {
+        logger.Error("Failed to register hostname validator", zap.Error(err))
+    }
     
     return &ConfigLoader{
         validator: v,

@@ -86,6 +86,10 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 	secretIDRaw := strings.TrimSpace(string(secretIDBytes))
 
 	if strings.HasPrefix(secretIDRaw, "s.") {
+		if client == nil {
+			log.Error(" Cannot unwrap token: Vault client is nil")
+			return "", "", cerr.New("failed to unwrap credential: Vault client is nil")
+		}
 		log.Info(" Detected wrapped SecretID token — unwrapping")
 		secret, err := client.Logical().Unwrap(secretIDRaw)
 		if err != nil {
@@ -111,6 +115,12 @@ func readAppRoleCredsFromDisk(rc *eos_io.RuntimeContext, client *api.Client) (st
 
 // PhaseCreateAppRole provisions (or reuses) an AppRole and writes its creds to disk.
 func PhaseCreateAppRole(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger, opts shared.AppRoleOptions) (string, string, error) {
+	if log == nil {
+		return "", "", cerr.New("logger cannot be nil")
+	}
+	if client == nil {
+		return "", "", cerr.New("Vault client cannot be nil")
+	}
 
 	log.Info(" [Phase 10] Creating AppRole for Eos")
 

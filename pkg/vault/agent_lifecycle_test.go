@@ -132,11 +132,11 @@ func TestSecureFileCreation(t *testing.T) {
 	// Verify file permissions
 	roleIDStat, err := os.Stat(roleIDPath)
 	require.NoError(t, err)
-	assert.Equal(t, shared.OwnerReadOnly, roleIDStat.Mode())
+	assert.Equal(t, os.FileMode(shared.OwnerReadOnly), roleIDStat.Mode())
 	
 	secretIDStat, err := os.Stat(secretIDPath)
 	require.NoError(t, err)
-	assert.Equal(t, shared.OwnerReadOnly, secretIDStat.Mode())
+	assert.Equal(t, os.FileMode(shared.OwnerReadOnly), secretIDStat.Mode())
 }
 
 func TestConfigValidation(t *testing.T) {

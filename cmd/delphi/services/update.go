@@ -137,7 +137,7 @@ func detectEosRoot(logger otelzap.LoggerWithCtx) (string, error) {
 		logger.Warn("Failed to get current working directory for EOS_ROOT auto-detection", zap.Error(err))
 	}
 
-	return "", fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory. Please set EOS_ROOT to the path of your eos project (e.g., /opt/eos) or ensure 'eos' is installed in a standard location.")
+	return "", fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory. Please set EOS_ROOT to the path of your eos project (e.g., /opt/eos) or ensure 'eos' is installed in a standard location")
 }
 
 // NewUpdateCmd creates the update command

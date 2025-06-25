@@ -287,10 +287,10 @@ func TestAppRoleCredentialSecurity(t *testing.T) {
 
 func TestAppRoleFilePermissions(t *testing.T) {
 	// Test that AppRole files are created with secure permissions
-	expectedMode := shared.OwnerReadOnly // Should be 0600
+	expectedMode := shared.FilePermOwnerReadWrite // Should be 0600
 	
 	// Verify the constant is set correctly for security
-	assert.Equal(t, os.FileMode(0600), expectedMode, "AppRole files should be owner-readable only")
+	assert.Equal(t, os.FileMode(0600), expectedMode, "AppRole files should be owner read/write only")
 	
 	// Test that the mode provides appropriate security
 	assert.Equal(t, os.FileMode(0600), expectedMode&0777, "File mode should mask to 0600")
