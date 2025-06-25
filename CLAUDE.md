@@ -288,6 +288,8 @@ Eos creates and manages the following system directories during installation:
 #### Core System Directories
 - **`/var/lib/eos/secrets`** - Local secrets storage (fallback when Vault is unavailable)
 - **`/etc/eos`** - Configuration files and system settings
+- **`/opt/eos`** - Default install directory
+- **`/srv`** - Location for data/images to be worked on (eg. cloud-init, operating system ISOs, prompts.txt, etc.)
 - **`/var/log/eos`** - Application logs and audit trails
 - **`/usr/local/bin/eos`** - Main executable binary location
 - **`/run/eos`** - Runtime directory for Vault Agent tokens and temporary files (managed by `/etc/tmpfiles.d/eos.conf`)

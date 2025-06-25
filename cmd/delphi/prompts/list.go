@@ -26,15 +26,8 @@ type PromptInfo struct {
 
 // GetSystemPromptsDir returns the system prompts directory path
 func GetSystemPromptsDir() (string, error) {
-	eosRoot := os.Getenv("EOS_ROOT")
-	if eosRoot == "" {
-		if pwd, err := os.Getwd(); err == nil && fileExists(filepath.Join(pwd, "assets")) {
-			eosRoot = pwd
-		} else {
-			return "", fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory")
-		}
-	}
-	return filepath.Join(eosRoot, "assets", "system-prompts"), nil
+	// Use /srv as the working directory for prompts and other stateful information
+	return "/srv/eos/system-prompts", nil
 }
 
 // GetPromptDescription returns a description for known prompts
