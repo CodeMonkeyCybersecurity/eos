@@ -128,7 +128,7 @@ type DockerVolume struct {
 	Labels     map[string]string `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
-// ComposeFile represents a docker-compose configuration
+// ComposeFile represents a docker compose configuration
 type ComposeFile struct {
 	Path     string                 `yaml:"path" json:"path"`
 	Services map[string]interface{} `yaml:"services" json:"services"`

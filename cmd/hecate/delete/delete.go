@@ -47,7 +47,7 @@ var deleteResourcesCmd = &cobra.Command{
 	Long: `This command deletes various resources for Hecate:
 
   1) Delete Certificates
-  2) Delete docker-compose modifications/backups
+  2) Delete docker compose modifications/backups
   3) Delete Eos backend web apps configuration files
   4) Delete (or revert) Nginx defaults
   5) Delete all specified resources`,
@@ -67,7 +67,7 @@ func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Delete Resources Menu")
 	logger.Info("Select the resource you want to delete:")
 	logger.Info("1) Delete Certificates")
-	logger.Info("2) Delete docker-compose modifications/backups")
+	logger.Info("2) Delete docker compose modifications/backups")
 	logger.Info("3) Delete Eos backend web apps configuration files")
 	logger.Info("4) Delete (or revert) Nginx defaults")
 	logger.Info("5) Delete all specified resources")
@@ -115,7 +115,7 @@ func deleteCertificates(rc *eos_io.RuntimeContext) {
 func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info(" Deleting docker-compose modifications/backups")
+	logger.Info(" Deleting docker compose modifications/backups")
 
 	matches, err := filepath.Glob("/opt/hecate/*_docker-compose.yml.bak")
 	if err != nil {
@@ -134,9 +134,9 @@ func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 	// Also remove the main docker-compose.yml file
 	mainCompose := "/opt/hecate/docker-compose.yml"
 	if err := os.Remove(mainCompose); err != nil {
-		logger.Error(" Error removing docker-compose file", zap.String("file", mainCompose), zap.Error(err))
+		logger.Error(" Error removing docker compose file", zap.String("file", mainCompose), zap.Error(err))
 	} else {
-		logger.Info(" Removed main docker-compose file", zap.String("file", mainCompose))
+		logger.Info(" Removed main docker compose file", zap.String("file", mainCompose))
 	}
 }
 

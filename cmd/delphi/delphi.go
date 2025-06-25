@@ -6,6 +6,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/monitor"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/prompts"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read" // This is delphi's 'read' subcommand
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/services"
@@ -43,6 +44,7 @@ func init() {
 	DelphiCmd.AddCommand(services.ServicesCmd)
 	DelphiCmd.AddCommand(watch.WatchCmd)
 	DelphiCmd.AddCommand(prompts.PromptsCmd)
+	DelphiCmd.AddCommand(monitor.NewMonitorCmd())
 
 	// TODO: Example persistent flags: DelphiCmd.PersistentFlags().String("config", "", "Path to the Delphi configuration file")
 }

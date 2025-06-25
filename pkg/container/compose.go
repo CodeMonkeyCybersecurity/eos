@@ -81,7 +81,7 @@ func UncommentSegment(segmentComment string) error {
 	return nil
 }
 
-// RunDockerComposeAllServices starts a specific service from a docker-compose file.
+// RunDockerComposeAllServices starts a specific service from a docker compose file.
 func RunDockerComposeAllServices(composeFile, service string) error {
 	args := []string{"-f", composeFile, "up", "-d"}
 	cmd, err := GetDockerComposeCmd(args...)
@@ -91,7 +91,7 @@ func RunDockerComposeAllServices(composeFile, service string) error {
 	output, err := cmd.CombinedOutput()
 	fmt.Println(string(output))
 	if err != nil {
-		return fmt.Errorf("docker-compose up failed: %s", output)
+		return fmt.Errorf("docker compose up failed: %s", output)
 	}
 	return nil
 }
@@ -107,7 +107,7 @@ func GetDockerComposeCmd(args ...string) (*exec.Cmd, error) {
 		fullArgs := append([]string{"compose"}, args...)
 		return exec.Command("docker", fullArgs...), nil
 	}
-	return nil, fmt.Errorf("neither docker-compose nor docker CLI with compose plugin found in PATH")
+	return nil, fmt.Errorf("neither docker compose nor docker CLI with compose plugin found in PATH")
 }
 
 func FindDockerComposeFile() (string, error) {
@@ -125,7 +125,7 @@ func FindDockerComposeFile() (string, error) {
 	return "", fmt.Errorf("could not find docker-compose.yaml or docker-compose.yml")
 }
 
-// ParseComposeFile attempts to read and parse the docker-compose file.
+// ParseComposeFile attempts to read and parse the docker compose file.
 // It returns the file contents as a byte slice.
 func ParseComposeFile(composePath string) ([]byte, error) {
 	data, err := os.ReadFile(composePath)
@@ -135,7 +135,7 @@ func ParseComposeFile(composePath string) ([]byte, error) {
 	return data, nil
 }
 
-// ExtractComposeMetadata is a stub function that simulates parsing docker-compose metadata.
+// ExtractComposeMetadata is a stub function that simulates parsing docker compose metadata.
 // You can replace this with real YAML parsing later.
 func ExtractComposeMetadata(data []byte) ([]string, []string, []string) {
 	// Example dummy data for testing

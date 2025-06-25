@@ -22,17 +22,17 @@ The backup is stored in /srv/container-volume-backups/{timestamp}_jenkins_data.t
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Starting Jenkins deletion process using Eos")
 
-		// Define the path to the docker-compose file used during installation.
+		// Define the path to the docker compose file used during installation.
 		composePath := shared.JenkinsComposeYML
 
 		// Parse the compose file to retrieve container names, images, and volumes.
 		data, err := container.ParseComposeFile(composePath)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Fatal("Error parsing docker-compose file", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Error parsing docker compose file", zap.Error(err))
 		}
 		containers, images, volumes := container.ExtractComposeMetadata(data)
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Fatal("Error parsing docker-compose file", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Fatal("Error parsing docker compose file", zap.Error(err))
 		}
 
 		// Backup all volumes defined in the compose file.

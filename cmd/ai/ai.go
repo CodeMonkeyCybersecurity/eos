@@ -30,7 +30,7 @@ The AI assistant can:
 - Provide interactive conversational support
 
 Examples:
-  eos ai ask "Why isn't my docker-compose working?"
+  eos ai ask "Why isn't my docker compose working?"
   eos ai analyze --directory /opt
   eos ai fix "My containers keep crashing"
   eos ai chat
@@ -49,7 +49,7 @@ var aiAskCmd = &cobra.Command{
 The AI will analyze your current environment and provide specific, actionable advice.
 
 Examples:
-  eos ai ask "Why is my docker-compose file not working?"
+  eos ai ask "Why is my docker compose file not working?"
   eos ai ask "How can I improve my Terraform configuration?"
   eos ai ask "What's wrong with my vault setup?"
   eos ai ask "My containers keep restarting, what should I check?"`,

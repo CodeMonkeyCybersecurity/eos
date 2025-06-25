@@ -36,12 +36,17 @@ var CreateJenkinsCmd = &cobra.Command{
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Starting Jenkins installation using Eos")
 
-		// Step 1: Ensure the installation directory exists
+		// Step 1: Ensure Docker is installed and running
+		if err := container.EnsureDockerInstalled(rc); err != nil {
+			return fmt.Errorf("docker dependency check failed: %w", err)
+		}
+
+		// Step 2: Ensure the installation directory exists
 		if err := os.MkdirAll(shared.JenkinsDir, shared.DirPermStandard); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to create installation directory", zap.Error(err))
 		}
 
-		// Step 2: Prepare output path
+		// Step 3: Prepare output path
 		destPath := filepath.Join(shared.JenkinsDir, "docker-compose.yml")
 
 		// Remove: password generation — not used or needed
@@ -95,7 +100,7 @@ var CreateJenkinsCmd = &cobra.Command{
 			fmt.Printf(" Admin password:\n\n%s\n\n", strings.TrimSpace(out))
 		}
 
-		// Step 7: Launch Jenkins
+		// Step 4: Launch Jenkins
 		otelzap.Ctx(rc.Ctx).Info("Running docker compose up")
 		if err := execute.RunSimple(rc.Ctx, shared.JenkinsDir, "docker", "compose", "-f", destPath, "up", "-d"); err != nil {
 			otelzap.Ctx(rc.Ctx).Fatal("Failed to start Jenkins via Docker Compose", zap.Error(err))
@@ -107,7 +112,7 @@ var CreateJenkinsCmd = &cobra.Command{
 			otelzap.Ctx(rc.Ctx).Fatal("Error checking containers", zap.Error(err))
 		}
 
-		// Step 8: Print Jenkins default admin password
+		// Step 5: Print Jenkins default admin password
 		cmdOut := exec.Command("docker", "exec", "jenkins", "cat", "/var/jenkins_home/secrets/initialAdminPassword")
 		rawOut, err := cmdOut.CombinedOutput()
 		if pwErr != nil {

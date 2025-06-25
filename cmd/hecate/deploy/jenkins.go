@@ -85,7 +85,7 @@ that are not relevant to Jenkins into the "other" directory at the project root.
 			// Now use the compose file for starting the services.
 			if err := container.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
 				otelzap.Ctx(rc.Ctx).Error("Failed to start Docker services", zap.Error(err))
-				fmt.Printf("Failed to run docker-compose up: %v\n", err)
+				fmt.Printf("Failed to run docker compose up: %v\n", err)
 				return err
 			}
 

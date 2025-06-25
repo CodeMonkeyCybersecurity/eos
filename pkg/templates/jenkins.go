@@ -16,7 +16,7 @@ var funcMap = template.FuncMap{
 	},
 }
 
-// JenkinsComposeTemplate is a text/template for rendering a Jenkins + SSH Agent docker-compose file.
+// JenkinsComposeTemplate is a text/template for rendering a Jenkins + SSH Agent docker compose file.
 var JenkinsComposeTemplate = template.Must(template.New("jenkins-compose").Funcs(funcMap).Parse(`
 version: '3.8'
 

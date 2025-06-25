@@ -382,7 +382,7 @@ runcmd:
     # Your original docker-compose.yml content would go here
     # This is managed by Terraform instead
     EOF
-  - docker-compose up -d
+  - docker compose up -d
 
 write_files:
   - path: /opt/hecate/Caddyfile

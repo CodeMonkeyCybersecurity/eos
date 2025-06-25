@@ -38,15 +38,15 @@ func InspectDockerCompose(ctx context.Context) {
 	logger := otelzap.Ctx(ctx)
 	configFile := "/opt/hecate/docker-compose.yml"
 
-	logger.Info(" Inspecting docker-compose file", zap.String("file", configFile))
+	logger.Info(" Inspecting docker compose file", zap.String("file", configFile))
 
 	data, err := os.ReadFile(configFile)
 	if err != nil {
-		logger.Error(" Error reading docker-compose file", zap.String("file", configFile), zap.Error(err))
+		logger.Error(" Error reading docker compose file", zap.String("file", configFile), zap.Error(err))
 		return
 	}
 
-	logger.Info(" Docker-compose file contents", zap.String("content", string(data)))
+	logger.Info(" docker compose file contents", zap.String("content", string(data)))
 }
 
 func InspectEosConfig(ctx context.Context) {

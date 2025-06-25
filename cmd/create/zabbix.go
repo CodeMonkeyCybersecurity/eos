@@ -34,14 +34,14 @@ var CreateZabbixCmd = &cobra.Command{
 
 func deployZabbix(rc *eos_io.RuntimeContext) error {
 
-	// Ensure Docker is installed
-	if err := container.CheckIfDockerInstalled(rc); err != nil {
-		return fmt.Errorf("docker check failed: %w", err)
+	// Ensure Docker is installed and running (install if needed)
+	if err := container.EnsureDockerInstalled(rc); err != nil {
+		return fmt.Errorf("docker dependency check failed: %w", err)
 	}
 
 	// Ensure Docker Compose is installed
 	if err := container.CheckIfDockerComposeInstalled(rc); err != nil {
-		return fmt.Errorf("docker-compose check failed: %w", err)
+		return fmt.Errorf("docker compose check failed: %w", err)
 	}
 
 	// Create target directory

@@ -27,7 +27,7 @@ var CreateHeraCmd = &cobra.Command{
 	Use:   "hera",
 	Short: "Deploy Hera (Authentik) for self-service identity & access management",
 	Long: `Deploy Hera (Authentik) to /opt/hera by:
-- Using a local docker-compose file if available, otherwise downloading the latest from goauthentik.io
+- Using a local docker compose file if available, otherwise downloading the latest from goauthentik.io
 - Generating secrets and writing them to a .env file
 - Creating the external Docker network 'arachne-net'
 - Fixing directory ownership for proper volume permissions
@@ -44,7 +44,7 @@ var CreateHeraCmd = &cobra.Command{
 			}
 		}
 
-		// Check for a local docker-compose file in current directory
+		// Check for a local docker compose file in current directory
 		var composeFiles []string
 		localYml, err := filepath.Glob("docker-compose.yml")
 		if err != nil {
@@ -58,12 +58,12 @@ var CreateHeraCmd = &cobra.Command{
 		composeFiles = append(composeFiles, localYaml...)
 
 		if len(composeFiles) > 0 {
-			// Use local docker-compose file(s)
+			// Use local docker compose file(s)
 			for _, file := range composeFiles {
 				destFile := filepath.Join(shared.HeraDir, filepath.Base(file))
-				otelzap.Ctx(rc.Ctx).Info(" Copying local docker-compose file", zap.String("source", file), zap.String("destination", destFile))
+				otelzap.Ctx(rc.Ctx).Info(" Copying local docker compose file", zap.String("source", file), zap.String("destination", destFile))
 				if err := eos_unix.CopyFile(rc.Ctx, file, destFile, 0); err != nil {
-					otelzap.Ctx(rc.Ctx).Fatal("Failed to copy docker-compose file", zap.Error(err))
+					otelzap.Ctx(rc.Ctx).Fatal("Failed to copy docker compose file", zap.Error(err))
 				}
 			}
 		} else {

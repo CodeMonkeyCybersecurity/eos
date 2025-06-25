@@ -364,7 +364,7 @@ func (i *Inspector) discoverVolumes() ([]DockerVolume, error) {
 	return volumes, nil
 }
 
-// discoverComposeFiles finds docker-compose files
+// discoverComposeFiles finds docker compose files
 func (i *Inspector) discoverComposeFiles() ([]ComposeFile, error) {
 	var composeFiles []ComposeFile
 

@@ -6,7 +6,7 @@ import subprocess
 def find_compose_directories(root_dir):
     """
     Walk the directory tree starting at root_dir and return a set of directories
-    that contain a docker-compose file (either docker-compose.yaml or docker-compose.yml).
+    that contain a docker compose file (either docker-compose.yaml or docker-compose.yml).
     """
     compose_dirs = set()
     for current_dir, _, files in os.walk(root_dir):
@@ -90,21 +90,21 @@ def main():
         print("No common directories to search. Exiting.", file=sys.stderr)
         sys.exit(1)
 
-    print("Searching for docker-compose files in common directories:")
+    print("Searching for docker compose files in common directories:")
     for d in common_dirs:
         print("  " + d)
 
 
-    # Collect all directories that contain a docker-compose file.
+    # Collect all directories that contain a docker compose file.
     all_compose_dirs = set()
     for root in common_dirs:
         found_dirs = find_compose_directories(root)
         if found_dirs:
-            print(f"Found {len(found_dirs)} docker-compose project(s) in '{root}'.")
+            print(f"Found {len(found_dirs)} docker compose project(s) in '{root}'.")
             all_compose_dirs.update(found_dirs)
 
     if not all_compose_dirs:
-        print("No docker-compose files were found in the common directories.")
+        print("No docker compose files were found in the common directories.")
         sys.exit(0)
 
 

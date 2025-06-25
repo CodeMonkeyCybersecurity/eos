@@ -69,6 +69,14 @@ func GetServiceConfigurations() map[string]ServiceConfiguration {
 			Dependencies: []string{"python3", "psycopg2", "python-dotenv", "smtplib"},
 			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env"},
 		},
+		"parser-monitor": {
+			Name:        "parser-monitor",
+			ServiceFile: "/etc/systemd/system/parser-monitor.service",
+			WorkerFile:  "/usr/local/bin/parser-monitor.py",
+			Description: "Parser health monitoring dashboard (provides observability for prompt-aware parsing system)",
+			Dependencies: []string{"python3", "psycopg2", "python-dotenv", "tabulate"},
+			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env"},
+		},
 		"delphi-emailer": {
 			Name:        "delphi-emailer",
 			ServiceFile: "/etc/systemd/system/delphi-emailer.service",
@@ -116,6 +124,7 @@ Available services:
 - email-structurer: Email structuring service (processes alerts from summarized to structured state)
 - email-formatter: Email formatting service (formats structured data into HTML/plain text emails)
 - email-sender: Email sending service (delivers formatted emails via SMTP)
+- parser-monitor: Parser health monitoring dashboard (provides observability for prompt-aware parsing system)
 - delphi-emailer: Email notification service (DEPRECATED - being replaced by modular email workers)
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization

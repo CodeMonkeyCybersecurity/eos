@@ -23,7 +23,7 @@ var jenkinsCmd = &cobra.Command{
 	Long: `Update the Jenkins backend IP in the Hecate configuration.
 
 This command recursively replaces the backend IP token in the assets directory and
-redeploys Hecate using "docker-compose up -d".
+redeploys Hecate using "docker compose up -d".
 
 Example configuration:
   Base Domain: domain.com
@@ -51,8 +51,8 @@ Usage:
 		}
 		fmt.Println("Assets updated successfully with new backend IP.")
 
-		// Redeploy Hecate via docker-compose up -d
-		fmt.Println("Redeploying Hecate using docker-compose up -d...")
+		// Redeploy Hecate via docker compose up -d
+		fmt.Println("Redeploying Hecate using docker compose up -d...")
 		cmdDocker := exec.Command("docker-compose", "up", "-d")
 		cmdDocker.Stdout = os.Stdout
 		cmdDocker.Stderr = os.Stderr
