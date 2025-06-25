@@ -1,4 +1,3 @@
-// cmd/delphi/services/update.go
 package services
 
 import (
@@ -26,6 +25,7 @@ type ServiceWorkerInfo struct {
 }
 
 // GetServiceWorkers returns information about all delphi service workers
+// This function needs the eosRoot to correctly determine source paths.
 func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 	timestamp := time.Now().Format("20060102_150405")
 
@@ -57,13 +57,13 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 		{
 			ServiceName: "prompt-ab-tester",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "prompt-ab-tester.py"),
-			TargetPath:  "/usr/local/bin/prompt-ab-tester.py",
+			TargetPath:  "/usr/local/bin/prompt-ab-tester.py", // Note: This one goes to /usr/local/bin
 			BackupPath:  fmt.Sprintf("/usr/local/bin/prompt-ab-tester.py.%s.bak", timestamp),
 		},
 		{
 			ServiceName: "ab-test-analyzer",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "ab-test-analyzer.py"),
-			TargetPath:  "/usr/local/bin/ab-test-analyzer.py",
+			TargetPath:  "/usr/local/bin/ab-test-analyzer.py", // Note: This one goes to /usr/local/bin
 			BackupPath:  fmt.Sprintf("/usr/local/bin/ab-test-analyzer.py.%s.bak", timestamp),
 		},
 		{
@@ -72,7 +72,64 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 			TargetPath:  "/opt/stackstorm/packs/delphi/alert-to-db.py",
 			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/alert-to-db.py.%s.bak", timestamp),
 		},
+		{
+			ServiceName: "email-structurer", // Add email-structurer to the list
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-structurer.py"),
+			TargetPath:  "/usr/local/bin/email-structurer.py", // Assuming this is its target path
+			BackupPath:  fmt.Sprintf("/usr/local/bin/email-structurer.py.%s.bak", timestamp),
+		},
 	}
+}
+
+// detectEosRoot attempts to find the EOS root directory.
+// It checks the EOS_ROOT env var, then relative to the executable, then current working dir.
+func detectEosRoot(logger otelzap.LoggerWithCtx) (string, error) {
+	// 1. Check EOS_ROOT environment variable
+	if eosRoot := os.Getenv("EOS_ROOT"); eosRoot != "" {
+		logger.Debug("EOS_ROOT found from environment variable", zap.String("path", eosRoot))
+		// Check if the provided EOS_ROOT actually contains the 'assets' directory
+		if fileExists(filepath.Join(eosRoot, "assets")) {
+			return eosRoot, nil
+		}
+		logger.Warn("EOS_ROOT environment variable set, but 'assets' directory not found inside it, trying auto-detection.", zap.String("path", eosRoot))
+		// Continue to other detection methods if the set path doesn't look valid for assets
+	}
+
+	// 2. Try to deduce from executable path (e.g., if installed in /usr/local/bin)
+	exePath, err := os.Executable()
+	if err == nil {
+		// Common installation locations for the executable and corresponding project root
+		// This list assumes 'eos' binary is in /usr/local/bin and the project root
+		// is typically in /opt/eos or /srv/eos.
+		possibleRoots := []string{
+			filepath.Join(filepath.Dir(exePath), "..", "..", "opt", "eos"), // e.g., /usr/local/bin/eos -> /opt/eos
+			filepath.Join(filepath.Dir(exePath), "..", "..", "srv", "eos"), // e.g., /usr/local/bin/eos -> /srv/eos
+			filepath.Join(filepath.Dir(exePath), "..", "eos"),              // e.g., /usr/local/bin/eos -> /usr/local/eos (less common)
+			"/opt/eos", // Direct check for common /opt/eos
+			"/srv/eos", // Direct check for common /srv/eos
+		}
+		for _, root := range possibleRoots {
+			absRoot, _ := filepath.Abs(root)
+			if fileExists(filepath.Join(absRoot, "assets")) {
+				logger.Debug("EOS_ROOT auto-detected relative to executable", zap.String("path", absRoot))
+				return absRoot, nil
+			}
+		}
+	} else {
+		logger.Warn("Failed to get executable path for EOS_ROOT auto-detection", zap.Error(err))
+	}
+
+	// 3. Try current working directory (only if it looks like the root)
+	if pwd, err := os.Getwd(); err == nil {
+		if fileExists(filepath.Join(pwd, "assets")) {
+			logger.Debug("EOS_ROOT auto-detected from current working directory", zap.String("path", pwd))
+			return pwd, nil
+		}
+	} else {
+		logger.Warn("Failed to get current working directory for EOS_ROOT auto-detection", zap.Error(err))
+	}
+
+	return "", fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory. Please set EOS_ROOT to the path of your eos project (e.g., /opt/eos) or ensure 'eos' is installed in a standard location.")
 }
 
 // NewUpdateCmd creates the update command
@@ -97,11 +154,12 @@ This command:
 
 Available services:
 - delphi-listener: Webhook listener for Wazuh alerts
-- delphi-agent-enricher: Agent enrichment service  
+- delphi-agent-enricher: Agent enrichment service
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
 - alert-to-db: Database operations for alerts
+- email-structurer: Email structuring service (Added)
 
 Examples:
   eos delphi services update delphi-listener
@@ -109,7 +167,15 @@ Examples:
   eos delphi services update --all --dry-run
   eos delphi services update delphi-emailer --skip-backup --skip-restart`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			workers := GetServiceWorkers("")
+			// Call detectEosRoot here as well to get an accurate list for autocompletion
+			logger := otelzap.Ctx(cmd.Context()) // Use command context for logger
+			eosRoot, err := detectEosRoot(logger)
+			if err != nil {
+				// Log the error but don't fail autocompletion
+				logger.Error("Failed to detect EOS_ROOT for autocompletion", zap.Error(err))
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+			workers := GetServiceWorkers(eosRoot)
 			var services []string
 			for _, w := range workers {
 				services = append(services, w.ServiceName)
@@ -118,20 +184,16 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting Delphi services update",
+			logger.Info("Starting Delphi services update",
 				zap.Bool("all", all),
 				zap.Bool("dry_run", dryRun),
 				zap.Bool("skip_backup", skipBackup),
 				zap.Bool("skip_restart", skipRestart))
 
-			// Get EOS root directory
-			eosRoot := os.Getenv("EOS_ROOT")
-			if eosRoot == "" {
-				if pwd, err := os.Getwd(); err == nil && fileExists(filepath.Join(pwd, "assets")) {
-					eosRoot = pwd
-				} else {
-					return fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory")
-				}
+			// Get EOS root directory using the new robust detection function
+			eosRoot, err := detectEosRoot(logger)
+			if err != nil {
+				return err // Return the error if EOS_ROOT cannot be determined
 			}
 
 			// Get all service workers
@@ -176,7 +238,7 @@ Examples:
 }
 
 func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
-	logger.Info(" Planning to update workers",
+	logger.Info("Planning to update workers",
 		zap.Int("worker_count", len(workers)),
 		zap.Bool("dry_run", dryRun))
 
@@ -190,19 +252,24 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		// Check target directory exists
 		targetDir := filepath.Dir(worker.TargetPath)
 		if !fileExists(targetDir) {
-			return fmt.Errorf("target directory does not exist: %s", targetDir)
+			// Attempt to create the target directory if it doesn't exist
+			logger.Info("Target directory does not exist, attempting to create it",
+				zap.String("directory", targetDir))
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
+			}
 		}
 
-		logger.Info(" Pre-flight check passed",
+		logger.Info("Pre-flight check passed",
 			zap.String("service", worker.ServiceName),
 			zap.String("source", worker.SourcePath),
 			zap.String("target", worker.TargetPath))
 	}
 
 	if dryRun {
-		logger.Info(" DRY RUN - would perform the following actions:")
+		logger.Info("DRY RUN - would perform the following actions:")
 		for _, worker := range workers {
-			logger.Info(" Service worker update plan",
+			logger.Info("Service worker update plan",
 				zap.String("service", worker.ServiceName),
 				zap.String("source", worker.SourcePath),
 				zap.String("target", worker.TargetPath),
@@ -218,12 +285,12 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 	// Update each worker
 	for _, worker := range workers {
-		logger.Info(" Updating service worker",
+		logger.Info("Updating service worker",
 			zap.String("service", worker.ServiceName))
 
 		// Step 1: Backup existing file if it exists and backup is not skipped
 		if !skipBackup && fileExists(worker.TargetPath) {
-			logger.Info(" Creating backup",
+			logger.Info("Creating backup",
 				zap.String("source", worker.TargetPath),
 				zap.String("backup", worker.BackupPath))
 
@@ -231,12 +298,12 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
 			}
 
-			logger.Info(" Backup created",
+			logger.Info("Backup created",
 				zap.String("backup_path", worker.BackupPath))
 		}
 
 		// Step 2: Deploy new version
-		logger.Info(" Deploying updated worker",
+		logger.Info("Deploying updated worker",
 			zap.String("source", worker.SourcePath),
 			zap.String("target", worker.TargetPath))
 
@@ -266,7 +333,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				zap.Error(err))
 		}
 
-		logger.Info(" Service worker updated successfully",
+		logger.Info("Service worker updated successfully",
 			zap.String("service", worker.ServiceName),
 			zap.String("target", worker.TargetPath))
 
@@ -281,44 +348,44 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 	// Step 3: Restart services if not skipped
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info(" Restarting updated services",
+		logger.Info("Restarting updated services",
 			zap.Strings("services", servicesToRestart))
 
 		for _, service := range servicesToRestart {
-			logger.Info(" Restarting service",
+			logger.Info("Restarting service",
 				zap.String("service", service))
 
 			if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
-				logger.Error(" Failed to restart service",
+				logger.Error("Failed to restart service",
 					zap.String("service", service),
 					zap.Error(err))
 				return fmt.Errorf("failed to restart %s: %w", service, err)
 			}
 
-			logger.Info(" Service restarted successfully",
+			logger.Info("Service restarted successfully",
 				zap.String("service", service))
 		}
 	}
 
 	// Step 4: Verify services are running
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info(" Verifying service status")
+		logger.Info("Verifying service status")
 
 		for _, service := range servicesToRestart {
 			if err := eos_unix.CheckServiceStatus(rc.Ctx, service); err != nil {
 				logger.Warn("Service is not active after restart",
 					zap.String("service", service),
 					zap.Error(err))
-				logger.Info(" Check service logs with: eos delphi services logs",
+				logger.Info("Check service logs with: eos delphi services logs",
 					zap.String("service", service))
 			} else {
-				logger.Info(" Service is running",
+				logger.Info("Service is running",
 					zap.String("service", service))
 			}
 		}
 	}
 
-	logger.Info(" Service worker update completed successfully",
+	logger.Info("Service worker update completed successfully",
 		zap.Int("workers_updated", len(workers)),
 		zap.Int("services_restarted", len(servicesToRestart)))
 
