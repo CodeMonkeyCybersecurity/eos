@@ -5,7 +5,6 @@ package create
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -82,62 +81,65 @@ var CreateJenkinsCmd = &cobra.Command{
 		}
 
 		// Start Jenkins
-		if err := execute.RunSimple(rc.Ctx, shared.JenkinsDir, "docker", "compose", "up", "-d"); err != nil {
+		otelzap.Ctx(rc.Ctx).Info(" Starting Jenkins with Docker Compose",
+			zap.String("working_directory", shared.JenkinsDir),
+			zap.String("compose_file", destPath))
+		
+		if _, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"compose", "up", "-d"},
+			Dir:     shared.JenkinsDir,
+		}); err != nil {
 			return fmt.Errorf("docker compose up: %w", err)
 		}
 
-		// Wait and fetch admin password
-		time.Sleep(5 * time.Second)
+		// Wait for Jenkins to start up
+		otelzap.Ctx(rc.Ctx).Info(" Waiting for Jenkins to initialize...")
+		time.Sleep(10 * time.Second)
+
+		// Check containers are running
+		if err := container.CheckDockerContainers(rc); err != nil {
+			otelzap.Ctx(rc.Ctx).Warn(" Warning: Container check failed", zap.Error(err))
+		}
+
+		// Fetch Jenkins admin password
+		otelzap.Ctx(rc.Ctx).Info(" Retrieving Jenkins admin password...")
 		out, pwErr := container.ExecCommandInContainer(rc, container.ExecConfig{
 			ContainerName: "jenkins",
 			Cmd:           []string{"cat", "/var/jenkins_home/secrets/initialAdminPassword"},
-			Tty:           false, // or true if you need a TTY
+			Tty:           false,
 		})
-		if err != nil {
-			fmt.Println(" Could not get admin password. Run manually:")
-			fmt.Println("   docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword")
-		} else {
-			fmt.Printf(" Admin password:\n\n%s\n\n", strings.TrimSpace(out))
-		}
-
-		// Step 4: Launch Jenkins
-		otelzap.Ctx(rc.Ctx).Info("Running docker compose up")
-		if err := execute.RunSimple(rc.Ctx, shared.JenkinsDir, "docker", "compose", "-f", destPath, "up", "-d"); err != nil {
-			otelzap.Ctx(rc.Ctx).Fatal("Failed to start Jenkins via Docker Compose", zap.Error(err))
-		}
-
-		time.Sleep(5 * time.Second)
-
-		if err := container.CheckDockerContainers(rc); err != nil {
-			otelzap.Ctx(rc.Ctx).Fatal("Error checking containers", zap.Error(err))
-		}
-
-		// Step 5: Print Jenkins default admin password
-		cmdOut := exec.Command("docker", "exec", "jenkins", "cat", "/var/jenkins_home/secrets/initialAdminPassword")
-		rawOut, err := cmdOut.CombinedOutput()
+		
 		if pwErr != nil {
-			otelzap.Ctx(rc.Ctx).Warn("Could not retrieve initial admin password", zap.Error(err))
-			fmt.Println(" Could not retrieve admin password automatically. Check with:")
-			fmt.Println("   docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword")
+			otelzap.Ctx(rc.Ctx).Warn(" Could not retrieve initial admin password automatically", zap.Error(pwErr))
+			otelzap.Ctx(rc.Ctx).Info(" Manual password retrieval command",
+				zap.String("command", "docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword"))
 		} else {
-			password := strings.TrimSpace(string(rawOut))
-			fmt.Printf("\n Jenkins is ready!\nVisit: http://localhost:8059\nUnlock with password:\n\n%s\n\n", password)
+			password := strings.TrimSpace(out)
+			otelzap.Ctx(rc.Ctx).Info("✨ Jenkins is ready!",
+				zap.String("url", "http://localhost:8059"),
+				zap.String("password", password))
 		}
-		vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
-		if err != nil {
-			return fmt.Errorf("failed to create Vault client: %w", err)
-		}
+
+		// Store password in Vault if successfully retrieved
 		if pwErr == nil {
-			// stash in Vault under "secret/jenkins"
-			if err := container.StoreJenkinsAdminPassword(rc, vaultClient, strings.TrimSpace(out)); err != nil {
-				otelzap.Ctx(rc.Ctx).Warn("failed to write Jenkins password to Vault", zap.Error(err))
+			vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
+			if err != nil {
+				otelzap.Ctx(rc.Ctx).Warn(" Failed to create Vault client", zap.Error(err))
 			} else {
-				otelzap.Ctx(rc.Ctx).Info("Jenkins admin password stored in Vault", zap.String("path", "secret/jenkins"))
+				password := strings.TrimSpace(out)
+				if err := container.StoreJenkinsAdminPassword(rc, vaultClient, password); err != nil {
+					otelzap.Ctx(rc.Ctx).Warn(" Failed to store Jenkins password in Vault", zap.Error(err))
+				} else {
+					otelzap.Ctx(rc.Ctx).Info(" Jenkins admin password stored in Vault",
+						zap.String("vault_path", "secret/jenkins"))
+				}
 			}
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("Jenkins deployment complete",
-			zap.String("url", fmt.Sprintf("http://%s:8059", eos_unix.GetInternalHostname())))
+		otelzap.Ctx(rc.Ctx).Info("🚀 Jenkins deployment complete",
+			zap.String("web_url", fmt.Sprintf("http://%s:8059", eos_unix.GetInternalHostname())),
+			zap.String("status", "ready"))
 		return nil
 	}),
 }
