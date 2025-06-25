@@ -34,25 +34,28 @@ except ImportError:
     sys.exit(1)
 
 # ───── CONFIGURATION ─────────────────────────────────────
+# Load environment variables from the .env file
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
-REQUIRED_ENV = ["PG_DSN", "SMTP_HOST", "SMTP_PORT", "FROM_EMAIL"]
+# FIX: Update REQUIRED_ENV to reflect the actual variable names in your .env file
+REQUIRED_ENV = ["PG_DSN", "MAILCOW_SMTP_HOST", "MAILCOW_SMTP_PORT", "MAILCOW_FROM"]
 _missing = [var for var in REQUIRED_ENV if not os.getenv(var)]
 if _missing:
     print(f"FATAL: Missing environment variables: {', '.join(_missing)}", file=sys.stderr)
     sys.exit(1)
 
+# FIX: Retrieve environment variables using their correct names from the .env file
 PG_DSN = os.getenv("PG_DSN", "").strip()
 LISTEN_CHANNEL = "alert_formatted"     # Channel for alerts needing sending
 
 # SMTP Configuration
-SMTP_HOST = os.getenv("SMTP_HOST")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() == "true"
-FROM_EMAIL = os.getenv("FROM_EMAIL")
-DEFAULT_TO_EMAIL = os.getenv("DEFAULT_TO_EMAIL", "")
+SMTP_HOST = os.getenv("MAILCOW_SMTP_HOST") # Use MAILCOW_SMTP_HOST
+SMTP_PORT = int(os.getenv("MAILCOW_SMTP_PORT", "587")) # Use MAILCOW_SMTP_PORT
+SMTP_USER = os.getenv("MAILCOW_SMTP_USER", "") # Use MAILCOW_SMTP_USER
+SMTP_PASS = os.getenv("MAILCOW_SMTP_PASS", "") # Use MAILCOW_SMTP_PASS
+SMTP_TLS = os.getenv("SMTP_TLS", "true").lower() == "true" # This one is fine if it's consistently named
+FROM_EMAIL = os.getenv("MAILCOW_FROM") # Use MAILCOW_FROM
+DEFAULT_TO_EMAIL = os.getenv("MAILCOW_TO", "") # Use MAILCOW_TO for default recipient
 
 # Email configuration
 MAX_RECIPIENTS = int(os.getenv("MAX_RECIPIENTS", "10"))
@@ -63,7 +66,7 @@ RETRY_DELAY = int(os.getenv("EMAIL_RETRY_DELAY", "60"))
 def setup_logging() -> logging.Logger:
     logger = logging.getLogger("email-sender")
     logger.setLevel(logging.INFO)
-    
+
     handler = RotatingFileHandler(
         "/var/log/stackstorm/email-sender.log",
         maxBytes=5 * 1024 * 1024,
@@ -72,12 +75,12 @@ def setup_logging() -> logging.Logger:
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S")
     handler.setFormatter(fmt)
     logger.addHandler(handler)
-    
+
     if sys.stdout.isatty():
         console = logging.StreamHandler(sys.stdout)
         console.setFormatter(fmt)
         logger.addHandler(console)
-    
+
     return logger
 
 log = setup_logging()
@@ -85,7 +88,7 @@ log = setup_logging()
 # ───── EMAIL SENDER CLASS ─────────────────────────────────
 class EmailSender:
     """Handles SMTP email delivery"""
-    
+
     def __init__(self):
         self.smtp_host = SMTP_HOST
         self.smtp_port = SMTP_PORT
@@ -94,68 +97,68 @@ class EmailSender:
         self.smtp_tls = SMTP_TLS
         self.from_email = FROM_EMAIL
         self.max_recipients = MAX_RECIPIENTS
-    
-    def send_email(self, to_emails: List[str], subject: str, 
+
+    def send_email(self, to_emails: List[str], subject: str,
                    html_body: str, plain_body: str = None,
                    reply_to: str = None) -> bool:
         """
         Send email via SMTP
-        
+
         Args:
             to_emails: List of recipient email addresses
             subject: Email subject
             html_body: HTML email body
             plain_body: Plain text email body (optional)
             reply_to: Reply-to address (optional)
-            
+
         Returns:
             True if sent successfully, False otherwise
         """
         if not to_emails:
             log.warning("No recipients specified")
             return False
-        
+
         # Limit recipients to prevent abuse
         if len(to_emails) > self.max_recipients:
-            log.warning("Too many recipients (%d), limiting to %d", 
+            log.warning("Too many recipients (%d), limiting to %d",
                        len(to_emails), self.max_recipients)
             to_emails = to_emails[:self.max_recipients]
-        
+
         try:
             # Create message
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
             msg['From'] = self.from_email
             msg['To'] = ', '.join(to_emails)
-            
+
             if reply_to:
                 msg['Reply-To'] = reply_to
-            
+
             # Add plain text part
             if plain_body:
                 text_part = MIMEText(plain_body, 'plain', 'utf-8')
                 msg.attach(text_part)
-            
+
             # Add HTML part
             html_part = MIMEText(html_body, 'html', 'utf-8')
             msg.attach(html_part)
-            
+
             # Connect to SMTP server
             log.info("Connecting to SMTP server %s:%d", self.smtp_host, self.smtp_port)
-            
+
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 if self.smtp_tls:
                     server.starttls()
-                
+
                 if self.smtp_user and self.smtp_pass:
                     server.login(self.smtp_user, self.smtp_pass)
-                
+
                 # Send email
                 server.send_message(msg, to_addrs=to_emails)
-                
+
             log.info("Email sent successfully to %d recipients", len(to_emails))
             return True
-            
+
         except smtplib.SMTPAuthenticationError as e:
             log.error("SMTP authentication failed: %s", e)
             return False
@@ -168,17 +171,17 @@ class EmailSender:
         except Exception as e:
             log.exception("Unexpected error sending email: %s", e)
             return False
-    
+
     def test_connection(self) -> bool:
         """Test SMTP connection"""
         try:
             with smtplib.SMTP(self.smtp_host, self.smtp_port) as server:
                 if self.smtp_tls:
                     server.starttls()
-                
+
                 if self.smtp_user and self.smtp_pass:
                     server.login(self.smtp_user, self.smtp_pass)
-                
+
             log.info("SMTP connection test successful")
             return True
         except Exception as e:
@@ -216,7 +219,7 @@ def fetch_alert_to_send(conn, alert_id: int) -> Optional[Dict]:
     with conn.cursor(cursor_factory=RealDictCursor) as cur:
         cur.execute(sql, (alert_id,))
         row = cur.fetchone()
-        
+
         if row and row.get('formatted_data'):
             if isinstance(row['formatted_data'], str):
                 try:
@@ -224,45 +227,45 @@ def fetch_alert_to_send(conn, alert_id: int) -> Optional[Dict]:
                 except json.JSONDecodeError:
                     log.warning("Failed to parse formatted_data JSON for alert %d", alert_id)
                     row['formatted_data'] = {}
-        
+
         return row
 
 
 def get_email_recipients(conn, alert_data: Dict[str, Any]) -> List[str]:
     """Determine email recipients based on alert and configuration"""
     recipients = []
-    
+
     # Add default recipient if configured
     if DEFAULT_TO_EMAIL:
         recipients.append(DEFAULT_TO_EMAIL)
-    
+
     # You can add more sophisticated recipient logic here:
     # - Based on rule level
     # - Based on agent groups
     # - From a recipients table in the database
     # - From environment variables
-    
+
     # Example: Add rule-level specific recipients
     rule_level = alert_data.get('rule_level', 0)
     if rule_level >= 10:  # Critical alerts
         critical_email = os.getenv("CRITICAL_ALERTS_EMAIL")
         if critical_email:
             recipients.append(critical_email)
-    
+
     # Remove duplicates and validate
     recipients = list(set(recipients))
     valid_recipients = []
-    
+
     for email in recipients:
         if email and '@' in email:
             valid_recipients.append(email)
         else:
             log.warning("Invalid email address: %s", email)
-    
+
     return valid_recipients
 
 
-def save_email_sent(conn, alert_id: int, recipients: List[str], 
+def save_email_sent(conn, alert_id: int, recipients: List[str],
                    success: bool, error_message: str = None):
     """Record email sending result"""
     try:
@@ -270,9 +273,9 @@ def save_email_sent(conn, alert_id: int, recipients: List[str],
             # Update alert state
             if success:
                 cur.execute("""
-                    UPDATE alerts 
+                    UPDATE alerts
                     SET state = 'sent',
-                        sent_at = NOW(),
+                        alert_sent_at = NOW(), # Corrected column name from 'sent_at' to 'alert_sent_at'
                         email_recipients = %s
                     WHERE id = %s
                 """, (json.dumps(recipients), alert_id))
@@ -280,28 +283,29 @@ def save_email_sent(conn, alert_id: int, recipients: List[str],
             else:
                 # Increment retry count or mark as failed
                 cur.execute("""
-                    UPDATE alerts 
+                    UPDATE alerts
                     SET email_error = %s,
                         email_retry_count = COALESCE(email_retry_count, 0) + 1
                     WHERE id = %s
                 """, (error_message, alert_id))
                 log.error("Alert %d email sending failed: %s", alert_id, error_message)
-            
+
     except Exception as e:
         log.error("Failed to update alert %d send status: %s", alert_id, e)
+        raise # Re-raise to ensure transaction is rolled back if autocommit is off or for external logging
 
 
 def catch_up(conn, sender: EmailSender):
     """Process any backlog of unsent alerts"""
     sql = """
-        SELECT id FROM alerts 
-        WHERE state = 'formatted' 
+        SELECT id FROM alerts
+        WHERE state = 'formatted'
         ORDER BY formatted_at
     """
     with conn.cursor() as cur:
         cur.execute(sql)
         alert_ids = [row[0] for row in cur.fetchall()]
-    
+
     if alert_ids:
         log.info("Processing backlog of %d alerts", len(alert_ids))
         for alert_id in alert_ids:
@@ -317,25 +321,25 @@ def process_email_alert(conn, sender: EmailSender, alert_id: int):
     if not alert_data or not alert_data.get('formatted_data'):
         log.debug("Alert %d not in correct state or missing formatted data", alert_id)
         return
-    
+
     formatted_data = alert_data['formatted_data']
-    
+
     # Get recipients
     recipients = get_email_recipients(conn, alert_data)
     if not recipients:
         log.warning("No recipients found for alert %d", alert_id)
         save_email_sent(conn, alert_id, [], False, "No recipients configured")
         return
-    
+
     # Extract email components
     subject = formatted_data.get('subject', 'Delphi Alert')
     html_body = formatted_data.get('html_body', '')
     plain_body = formatted_data.get('plain_body', '')
-    
+
     # Send email with retries
     success = False
     error_message = None
-    
+
     for attempt in range(RETRY_ATTEMPTS):
         try:
             success = sender.send_email(recipients, subject, html_body, plain_body)
@@ -343,15 +347,15 @@ def process_email_alert(conn, sender: EmailSender, alert_id: int):
                 break
             else:
                 error_message = f"SMTP sending failed (attempt {attempt + 1})"
-                
+
         except Exception as e:
             error_message = f"Email sending error (attempt {attempt + 1}): {str(e)}"
             log.warning(error_message)
-        
+
         if attempt < RETRY_ATTEMPTS - 1:
             log.info("Retrying email send in %d seconds...", RETRY_DELAY)
             time.sleep(RETRY_DELAY)
-    
+
     # Record result
     save_email_sent(conn, alert_id, recipients, success, error_message)
 
@@ -374,62 +378,79 @@ def main():
     log.info("Email Sender starting up...")
     log.info("SMTP: %s:%d (TLS: %s)", SMTP_HOST, SMTP_PORT, SMTP_TLS)
     log.info("From: %s", FROM_EMAIL)
-    
+
     # Initialize email sender
     sender = EmailSender()
-    
+
     # Test SMTP connection
     if not sender.test_connection():
         log.error("SMTP connection test failed - check configuration")
         sys.exit(1)
-    
+
     # Connect to database
     conn = connect_db()
-    
-    # Ensure email tracking columns exist
+
+    # Ensure email tracking columns exist (This block is kept for backward compatibility/idempotency,
+    # but the primary creation of these columns is now expected from the main schema.sql)
     with conn.cursor() as cur:
+        # FIX: Changed DO $ to DO $$ and END $; to END $$; for correct PostgreSQL dollar-quoting syntax
         cur.execute("""
-            DO $ 
+            DO $$
             BEGIN
                 IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.columns 
-                    WHERE table_name='alerts' AND column_name='sent_at'
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='alerts' AND column_name='alert_sent_at'
                 ) THEN
-                    ALTER TABLE alerts ADD COLUMN sent_at TIMESTAMP;
+                    ALTER TABLE alerts ADD COLUMN alert_sent_at TIMESTAMP WITH TIME ZONE;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='alerts' AND column_name='email_recipients'
+                ) THEN
                     ALTER TABLE alerts ADD COLUMN email_recipients JSONB;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='alerts' AND column_name='email_error'
+                ) THEN
                     ALTER TABLE alerts ADD COLUMN email_error TEXT;
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.columns
+                    WHERE table_name='alerts' AND column_name='email_retry_count'
+                ) THEN
                     ALTER TABLE alerts ADD COLUMN email_retry_count INTEGER DEFAULT 0;
                 END IF;
-            END $;
+            END $$;
         """)
-    
+
     # Process backlog
     catch_up(conn, sender)
-    
+
     # Listen for formatted alerts
     cur = conn.cursor()
     cur.execute(f"LISTEN {LISTEN_CHANNEL};")
     log.info("Listening for alerts to send")
-    
+
     while not shutdown:
         try:
             if not select.select([conn], [], [], 5)[0]:
                 continue
-            
+
             conn.poll()
-            
+
             for notify in conn.notifies:
                 try:
                     alert_id = int(notify.payload)
                     log.info("Processing alert %d", alert_id)
-                    
+
                     process_email_alert(conn, sender, alert_id)
-                    
+
                 except Exception as e:
                     log.exception("Failed to process alert %s: %s", notify.payload, e)
-            
+
             conn.notifies.clear()
-            
+
         except psycopg2.OperationalError:
             log.exception("DB connection lost; reconnecting in 5s")
             time.sleep(5)
@@ -439,7 +460,7 @@ def main():
         except Exception:
             log.exception("Unexpected error in main loop")
             raise
-    
+
     log.info("Shutting down gracefully")
 
 
