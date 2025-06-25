@@ -17,7 +17,8 @@ import (
 var DelphiServices = []string{
 	"delphi-listener",
 	"delphi-agent-enricher",
-	"delphi-emailer",
+	"email-structurer",
+	"delphi-emailer", // DEPRECATED - being replaced by modular email workers
 	"llm-worker",
 	"prompt-ab-tester",
 }
@@ -33,13 +34,15 @@ func NewStartCmd() *cobra.Command {
 
 Available services:
 - delphi-listener: Webhook listener for Wazuh alerts
-- delphi-agent-enricher: Agent enrichment service  
-- delphi-emailer: Email notification service
+- delphi-agent-enricher: Agent enrichment service
+- email-structurer: Email structuring service (processes alerts from summarized to structured state)
+- delphi-emailer: Email notification service (DEPRECATED)
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
 
 Examples:
   eos delphi services start delphi-listener
+  eos delphi services start email-structurer
   eos delphi services start --all`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			return DelphiServices, cobra.ShellCompDirectiveNoFileComp

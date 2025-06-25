@@ -1,0 +1,68 @@
+[Unit]
+Description=Delphi Email Formatter Worker
+Documentation=https://wiki.cybermonkey.net.au/delphi/email-formatter
+After=network.target postgresql.service email-structurer.service
+Wants=postgresql.service
+Requires=network.target
+
+[Service]
+Type=simple
+User=stanley
+Group=stanley
+WorkingDirectory=/opt/stackstorm/packs/delphi
+
+# Main executable
+ExecStart=/usr/local/bin/email-formatter.py
+
+# Environment configuration
+Environment="PYTHONPATH=/usr/local/lib/python3.11/site-packages:/opt/stackstorm/packs/delphi"
+Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=-/opt/stackstorm/packs/delphi/.env
+
+# Email formatter specific configuration
+Environment="DELPHI_EMAIL_TEMPLATE_TYPE=file"
+Environment="DELPHI_EMAIL_TEMPLATE_PATH=/opt/stackstorm/packs/delphi/email.html"
+Environment="DELPHI_TIMEZONE=Australia/Perth"
+Environment="SUPPORT_EMAIL=support@cybermonkey.net.au"
+
+# Logging configuration
+Environment="LOG_FILE=/var/log/stackstorm/email-formatter.log"
+Environment="MAX_LOG_SIZE=5242880"
+
+# Process management
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# Resource limits
+LimitNOFILE=8192
+LimitNPROC=256
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/stackstorm /opt/stackstorm/packs/delphi /tmp
+
+# Monitoring and health checks
+TimeoutStartSec=30
+TimeoutStopSec=15
+WatchdogSec=60
+
+# Standard streams
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=email-formatter
+
+[Install]
+WantedBy=multi-user.target
+Alias=delphi-email-formatter.service
+
+# Service management commands:
+# sudo systemctl enable email-formatter.service
+# sudo systemctl start email-formatter.service  
+# sudo systemctl status email-formatter.service
+# sudo systemctl logs -f email-formatter.service
+# sudo systemctl reload email-formatter.service

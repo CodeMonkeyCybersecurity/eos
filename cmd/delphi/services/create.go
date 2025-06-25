@@ -45,11 +45,35 @@ func GetServiceConfigurations() map[string]ServiceConfiguration {
 			Dependencies: []string{"python3", "requests", "psycopg2"},
 			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env"},
 		},
+		"email-structurer": {
+			Name:        "email-structurer",
+			ServiceFile: "/etc/systemd/system/email-structurer.service",
+			WorkerFile:  "/usr/local/bin/email-structurer.py",
+			Description: "Email structuring service (processes alerts from summarized to structured state)",
+			Dependencies: []string{"python3", "psycopg2", "python-dotenv"},
+			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env"},
+		},
+		"email-formatter": {
+			Name:        "email-formatter",
+			ServiceFile: "/etc/systemd/system/email-formatter.service",
+			WorkerFile:  "/usr/local/bin/email-formatter.py",
+			Description: "Email formatting service (formats structured data into HTML/plain text emails)",
+			Dependencies: []string{"python3", "psycopg2", "python-dotenv"},
+			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env", "/opt/stackstorm/packs/delphi/email.html"},
+		},
+		"email-sender": {
+			Name:        "email-sender",
+			ServiceFile: "/etc/systemd/system/email-sender.service",
+			WorkerFile:  "/usr/local/bin/email-sender.py",
+			Description: "Email sending service (delivers formatted emails via SMTP)",
+			Dependencies: []string{"python3", "psycopg2", "python-dotenv", "smtplib"},
+			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env"},
+		},
 		"delphi-emailer": {
 			Name:        "delphi-emailer",
 			ServiceFile: "/etc/systemd/system/delphi-emailer.service",
 			WorkerFile:  "/usr/local/bin/delphi-emailer.py",
-			Description: "Email notification service",
+			Description: "Email notification service (DEPRECATED - being replaced by modular email workers)",
 			Dependencies: []string{"python3", "smtplib", "psycopg2"},
 			ConfigFiles: []string{"/opt/stackstorm/packs/delphi/.env", "/opt/delphi/email-template.html"},
 		},
@@ -89,7 +113,10 @@ This command will:
 Available services:
 - delphi-listener: Webhook listener for Wazuh alerts
 - delphi-agent-enricher: Agent enrichment service
-- delphi-emailer: Email notification service
+- email-structurer: Email structuring service (processes alerts from summarized to structured state)
+- email-formatter: Email formatting service (formats structured data into HTML/plain text emails)
+- email-sender: Email sending service (delivers formatted emails via SMTP)
+- delphi-emailer: Email notification service (DEPRECATED - being replaced by modular email workers)
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
 
