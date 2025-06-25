@@ -10,6 +10,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ func ListSystemPrompts() ([]PromptInfo, error) {
 		return nil, err
 	}
 
-	if !fileExists(promptsDir) {
+	if !pipeline.FileExists(promptsDir) {
 		return nil, fmt.Errorf("system prompts directory not found: %s", promptsDir)
 	}
 
@@ -91,7 +92,7 @@ func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available system prompts",
-		Long: `List all system prompts available in the assets/system-prompts directory.
+		Long: `List all system prompts available in the /srv/eos/system-prompts directory.
 
 This shows all .txt files in the system prompts directory with metadata including:
 - Name and description
@@ -103,7 +104,24 @@ Examples:
   eos delphi prompts list --detailed`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Listing system prompts")
+			logger.Info("Listing system prompts")
+
+			// --- NEW INTEGRATION START ---
+			// Ensure the system prompts directory is ready before attempting to list prompts.
+			// You might want to make "stanley" configurable via a flag or global config.
+			// Default permissions for a directory are 0755, for files 0644.
+			err := pipeline.EnsureSystemPromptsDirectory(
+				pipeline.DefaultSystemPromptsDir,
+				"stanley", // Assuming 'stanley' is the user, based on previous context.
+				"stanley", // Assuming 'stanley' is the group.
+				0644,      // rwx for owner, rx for group and others
+				logger,
+			)
+			if err != nil {
+				// This is a critical error, as the directory cannot be prepared.
+				return fmt.Errorf("failed to ensure system prompts directory: %w", err)
+			}
+			// --- NEW INTEGRATION END ---
 
 			prompts, err := ListSystemPrompts()
 			if err != nil {
@@ -111,16 +129,16 @@ Examples:
 			}
 
 			if len(prompts) == 0 {
-				logger.Info(" No system prompts found")
+				logger.Info("No system prompts found")
 				return nil
 			}
 
-			logger.Info(" Available system prompts",
+			logger.Info("Available system prompts",
 				zap.Int("count", len(prompts)))
 
 			for _, prompt := range prompts {
 				if detailed {
-					logger.Info(" System prompt details",
+					logger.Info("System prompt details",
 						zap.String("name", prompt.Name),
 						zap.String("description", prompt.Description),
 						zap.String("path", prompt.Path),
@@ -129,8 +147,8 @@ Examples:
 				} else {
 					logger.Info(" "+prompt.Name,
 						zap.String("description", prompt.Description),
-						zap.String("size", formatFileSize(prompt.Size)),
-						zap.String("modified", formatRelativeTime(prompt.Modified)))
+						zap.String("size", pipeline.FormatFileSize(prompt.Size)),
+						zap.String("modified", pipeline.FormatRelativeTime(prompt.Modified)))
 				}
 			}
 
@@ -140,38 +158,4 @@ Examples:
 
 	cmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed information including full paths")
 	return cmd
-}
-
-// formatFileSize formats file size in human readable format
-func formatFileSize(bytes int64) string {
-	if bytes < 1024 {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	if bytes < 1024*1024 {
-		return fmt.Sprintf("%.1f KB", float64(bytes)/1024)
-	}
-	return fmt.Sprintf("%.1f MB", float64(bytes)/(1024*1024))
-}
-
-// formatRelativeTime formats time relative to now
-func formatRelativeTime(t time.Time) string {
-	now := time.Now()
-	diff := now.Sub(t)
-
-	if diff < time.Hour {
-		return fmt.Sprintf("%d minutes ago", int(diff.Minutes()))
-	}
-	if diff < 24*time.Hour {
-		return fmt.Sprintf("%d hours ago", int(diff.Hours()))
-	}
-	if diff < 30*24*time.Hour {
-		return fmt.Sprintf("%d days ago", int(diff.Hours()/24))
-	}
-	return t.Format("2006-01-02")
-}
-
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
 }

@@ -11,6 +11,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -229,7 +230,7 @@ func validatePrompt(promptName string, _ bool) (ValidationResult, error) {
 	}
 
 	promptPath := filepath.Join(promptsDir, filename)
-	if !fileExists(promptPath) {
+	if !pipeline.FileExists(promptPath) {
 		result.Errors = append(result.Errors, "Prompt file not found")
 		result.IsValid = false
 		return result, nil

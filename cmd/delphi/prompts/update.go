@@ -11,6 +11,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -77,7 +78,7 @@ Examples:
 			promptPath := filepath.Join(promptsDir, filename)
 
 			// Check if prompt exists
-			if !fileExists(promptPath) {
+			if !pipeline.FileExists(promptPath) {
 				return fmt.Errorf("system prompt not found: %s", promptName)
 			}
 
@@ -90,7 +91,7 @@ Examples:
 			logger.Info(" Current prompt information",
 				zap.String("name", promptName),
 				zap.String("path", promptPath),
-				zap.String("size", formatFileSize(originalStat.Size())),
+				zap.String("size", pipeline.FormatFileSize(originalStat.Size())),
 				zap.String("modified", originalStat.ModTime().Format("2006-01-02 15:04:05")))
 
 			// Create backup if requested
@@ -126,7 +127,7 @@ Examples:
 				newContent = string(contentBytes)
 
 				logger.Info(" Content loaded from file",
-					zap.String("size", formatFileSize(int64(len(newContent)))))
+					zap.String("size", pipeline.FormatFileSize(int64(len(newContent)))))
 			} else if interactive {
 				// Interactive mode
 				logger.Info(" Entering interactive mode")
@@ -196,7 +197,7 @@ Examples:
 					newContent = strings.Join(lines, "\n")
 					logger.Info(" Content entered interactively",
 						zap.Int("lines", len(lines)),
-						zap.String("size", formatFileSize(int64(len(newContent)))))
+						zap.String("size", pipeline.FormatFileSize(int64(len(newContent)))))
 				}
 			} else {
 				return fmt.Errorf("must specify either --interactive or --from-file")
@@ -218,13 +219,13 @@ Examples:
 
 				logger.Info(" Content appended from file",
 					zap.String("mode", "append"),
-					zap.String("total_size", formatFileSize(int64(len(newContent)))))
+					zap.String("total_size", pipeline.FormatFileSize(int64(len(newContent)))))
 			}
 
 			// Write the updated prompt file
 			logger.Info(" Writing updated prompt file",
 				zap.String("file_path", promptPath),
-				zap.String("new_size", formatFileSize(int64(len(newContent)))))
+				zap.String("new_size", pipeline.FormatFileSize(int64(len(newContent)))))
 
 			if err := os.WriteFile(promptPath, []byte(newContent), originalStat.Mode()); err != nil {
 				return fmt.Errorf("failed to write updated prompt file: %w", err)
@@ -235,8 +236,8 @@ Examples:
 				logger.Info(" Prompt updated successfully",
 					zap.String("name", promptName),
 					zap.String("path", promptPath),
-					zap.String("old_size", formatFileSize(originalStat.Size())),
-					zap.String("new_size", formatFileSize(stat.Size())),
+					zap.String("old_size", pipeline.FormatFileSize(originalStat.Size())),
+					zap.String("new_size", pipeline.FormatFileSize(stat.Size())),
 					zap.String("size_change", formatSizeChange(originalStat.Size(), stat.Size())),
 					zap.String("modified", stat.ModTime().Format("2006-01-02 15:04:05")))
 			}
@@ -268,8 +269,8 @@ func formatSizeChange(oldSize, newSize int64) string {
 	if diff == 0 {
 		return "no change"
 	} else if diff > 0 {
-		return fmt.Sprintf("+%s", formatFileSize(diff))
+		return fmt.Sprintf("+%s", pipeline.FormatFileSize(diff))
 	} else {
-		return fmt.Sprintf("-%s", formatFileSize(-diff))
+		return fmt.Sprintf("-%s", pipeline.FormatFileSize(-diff))
 	}
 }

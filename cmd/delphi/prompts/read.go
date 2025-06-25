@@ -9,6 +9,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -64,7 +65,7 @@ Examples:
 			}
 
 			promptPath := filepath.Join(promptsDir, filename)
-			if !fileExists(promptPath) {
+			if !pipeline.FileExists(promptPath) {
 				return fmt.Errorf("system prompt not found: %s", promptName)
 			}
 
@@ -84,7 +85,7 @@ Examples:
 				logger.Info(" Prompt information",
 					zap.String("name", promptName),
 					zap.String("description", GetPromptDescription(promptName)),
-					zap.String("size", formatFileSize(stat.Size())),
+					zap.String("size", pipeline.FormatFileSize(stat.Size())),
 					zap.String("modified", stat.ModTime().Format("2006-01-02 15:04:05")))
 			}
 
