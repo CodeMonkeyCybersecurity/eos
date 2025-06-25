@@ -257,7 +257,7 @@ class ParserMonitor:
             print(f"⚠️  Stuck Alerts: {health['stuck_alerts']} alerts waiting >1 hour for processing")
         
         # Pipeline Status
-        print("\n📊 PIPELINE STATUS (Last 24 hours)")
+        print("\n PIPELINE STATUS (Last 24 hours)")
         print("-" * 80)
         pipeline = self.get_pipeline_status()
         if pipeline:
@@ -283,7 +283,7 @@ class ParserMonitor:
                       f"({breaker['failure_count']} failures, "
                       f"last: {seconds_ago}s ago)")
         else:
-            print("✅ All circuits operational")
+            print(" All circuits operational")
         
         # Parser Performance
         print("\n📈 PARSER PERFORMANCE (Last 7 days)")
@@ -302,7 +302,7 @@ class ParserMonitor:
                           tablefmt='grid'))
         
         # Prompt Distribution
-        print("\n📊 PROMPT TYPE DISTRIBUTION (Last 7 days)")
+        print("\n PROMPT TYPE DISTRIBUTION (Last 7 days)")
         print("-" * 80)
         distribution = self.get_prompt_distribution()
         if distribution:
@@ -325,10 +325,10 @@ class ParserMonitor:
             print(f"WARNING: {missing['missing']} alerts have no prompt_type "
                   f"({missing['missing']/missing['total']*100:.1f}% of recent alerts)")
         else:
-            print("✅ All recent alerts have prompt_type assigned")
+            print(" All recent alerts have prompt_type assigned")
         
         # Recent Failures
-        print("\n❌ RECENT PARSER FAILURES")
+        print("\n RECENT PARSER FAILURES")
         print("-" * 80)
         failures = self.get_recent_failures(5)
         if failures:
@@ -337,7 +337,7 @@ class ParserMonitor:
                       f"{failure['parser_used']} | {failure['created_at'].strftime('%H:%M:%S')}")
                 print(f"   Error: {failure['error'][:100]}...")
         else:
-            print("✅ No recent failures")
+            print(" No recent failures")
         
         # Parser Recommendations
         print("\n💡 PARSER EFFECTIVENESS ANALYSIS")
@@ -355,7 +355,7 @@ class ParserMonitor:
                           headers=['Prompt Type', 'Current Parser', 'Recommended', 'Count'],
                           tablefmt='grid'))
         else:
-            print("✅ All parsers appear to be correctly matched")
+            print(" All parsers appear to be correctly matched")
         
         print("\n" + "="*80)
         print("Use 'parser-monitor.py --help' for more options")

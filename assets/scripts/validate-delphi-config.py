@@ -50,7 +50,7 @@ class DelphiConfigValidator:
     
     def validate_database(self):
         """Validate database connectivity and schema"""
-        print("\n📊 Database Configuration")
+        print("\n Database Configuration")
         
         pg_dsn = os.getenv("PG_DSN")
         if not pg_dsn:
@@ -82,7 +82,7 @@ class DelphiConfigValidator:
                 if missing_states:
                     self.errors.append(f"Missing alert_state enum values: {missing_states}")
                 else:
-                    self.info.append(f"✅ Alert states: {states}")
+                    self.info.append(f" Alert states: {states}")
                 
                 # Check required columns
                 cur.execute("""
@@ -99,7 +99,7 @@ class DelphiConfigValidator:
                 if missing_columns:
                     self.errors.append(f"Missing alerts table columns: {missing_columns}")
                 else:
-                    self.info.append("✅ All required columns present")
+                    self.info.append(" All required columns present")
                 
                 # Check parser_metrics table
                 cur.execute("""
@@ -109,7 +109,7 @@ class DelphiConfigValidator:
                 if not cur.fetchone():
                     self.warnings.append("parser_metrics table does not exist")
                 else:
-                    self.info.append("✅ parser_metrics table exists")
+                    self.info.append(" parser_metrics table exists")
                 
                 # Check triggers
                 cur.execute("""
@@ -120,10 +120,10 @@ class DelphiConfigValidator:
                 if not triggers:
                     self.warnings.append("No triggers found on alerts table")
                 else:
-                    self.info.append(f"✅ Found {len(triggers)} triggers")
+                    self.info.append(f" Found {len(triggers)} triggers")
             
             conn.close()
-            self.info.append("✅ Database connectivity successful")
+            self.info.append(" Database connectivity successful")
             
         except Exception as e:
             self.errors.append(f"Database connection failed: {e}")
@@ -160,7 +160,7 @@ class DelphiConfigValidator:
                 if missing_functions:
                     self.warnings.append(f"Missing notification functions: {missing_functions}")
                 else:
-                    self.info.append("✅ All notification functions present")
+                    self.info.append(" All notification functions present")
             
             conn.close()
             
@@ -185,7 +185,7 @@ class DelphiConfigValidator:
             if not os.getenv(var):
                 self.errors.append(f"Missing critical variable {var}: {desc}")
             else:
-                self.info.append(f"✅ {var} is set")
+                self.info.append(f" {var} is set")
         
         # Check LLM config
         has_openai = all(os.getenv(var) for var in llm_vars_openai)
@@ -194,9 +194,9 @@ class DelphiConfigValidator:
         if not (has_openai or has_azure):
             self.errors.append("Missing LLM configuration: Need either OpenAI or Azure OpenAI credentials")
         elif has_openai:
-            self.info.append("✅ OpenAI configuration detected")
+            self.info.append(" OpenAI configuration detected")
         elif has_azure:
-            self.info.append("✅ Azure OpenAI configuration detected")
+            self.info.append(" Azure OpenAI configuration detected")
     
     def validate_llm_config(self):
         """Validate LLM configuration"""
@@ -206,7 +206,7 @@ class DelphiConfigValidator:
         if not Path(prompt_file).exists():
             self.warnings.append(f"Prompt file not found: {prompt_file}")
         else:
-            self.info.append(f"✅ Prompt file exists: {prompt_file}")
+            self.info.append(f" Prompt file exists: {prompt_file}")
         
         # Check prompt directory
         prompt_dir = os.getenv("PROMPT_DIR", "/srv/eos/system-prompts/")
@@ -214,7 +214,7 @@ class DelphiConfigValidator:
             self.warnings.append(f"Prompt directory not found: {prompt_dir}")
         else:
             prompt_files = list(Path(prompt_dir).glob("*.txt"))
-            self.info.append(f"✅ Found {len(prompt_files)} prompt files in {prompt_dir}")
+            self.info.append(f" Found {len(prompt_files)} prompt files in {prompt_dir}")
     
     def validate_smtp_config(self):
         """Validate SMTP configuration"""
@@ -226,7 +226,7 @@ class DelphiConfigValidator:
         if missing_smtp:
             self.warnings.append(f"Missing SMTP variables: {missing_smtp}")
         else:
-            self.info.append("✅ SMTP configuration complete")
+            self.info.append(" SMTP configuration complete")
     
     def validate_file_paths(self):
         """Validate file paths and directories"""
@@ -237,7 +237,7 @@ class DelphiConfigValidator:
         if not Path(log_dir).exists():
             self.warnings.append(f"Log directory does not exist: {log_dir}")
         else:
-            self.info.append(f"✅ Log directory exists: {log_dir}")
+            self.info.append(f" Log directory exists: {log_dir}")
         
         # Check template path
         template_path = os.getenv("DELPHI_EMAIL_TEMPLATE_PATH", 
@@ -245,7 +245,7 @@ class DelphiConfigValidator:
         if not Path(template_path).exists():
             self.warnings.append(f"Email template not found: {template_path}")
         else:
-            self.info.append(f"✅ Email template exists: {template_path}")
+            self.info.append(f" Email template exists: {template_path}")
     
     def validate_parser_config(self):
         """Validate parser configuration"""
@@ -265,7 +265,7 @@ class DelphiConfigValidator:
             if timeout_int < 60 or timeout_int > 3600:
                 self.warnings.append(f"PARSER_FAILURE_TIMEOUT should be 60-3600 seconds, got {timeout_int}")
                 
-            self.info.append(f"✅ Circuit breaker: {threshold_int} failures, {timeout_int}s timeout")
+            self.info.append(f" Circuit breaker: {threshold_int} failures, {timeout_int}s timeout")
             
         except ValueError:
             self.errors.append("Invalid parser configuration: threshold and timeout must be integers")
@@ -275,7 +275,7 @@ class DelphiConfigValidator:
         try:
             ab_percentage = int(ab_test)
             if 0 <= ab_percentage <= 100:
-                self.info.append(f"✅ A/B testing: {ab_percentage}%")
+                self.info.append(f" A/B testing: {ab_percentage}%")
             else:
                 self.warnings.append(f"A/B test percentage should be 0-100, got {ab_percentage}")
         except ValueError:
@@ -291,7 +291,7 @@ class DelphiConfigValidator:
         elif len(auth_token) < 16:
             self.warnings.append("WEBHOOK_AUTH_TOKEN should be at least 16 characters")
         else:
-            self.info.append("✅ Webhook authentication configured")
+            self.info.append(" Webhook authentication configured")
         
         # Check Wazuh API config
         wazuh_vars = ['WAZUH_API_URL', 'WAZUH_API_USER', 'WAZUH_API_PASSWD']
@@ -300,16 +300,16 @@ class DelphiConfigValidator:
         if missing_wazuh:
             self.warnings.append(f"Missing Wazuh API variables: {missing_wazuh}")
         else:
-            self.info.append("✅ Wazuh API configuration complete")
+            self.info.append(" Wazuh API configuration complete")
     
     def print_results(self):
         """Print validation results"""
         print("\n" + "=" * 50)
-        print("📋 VALIDATION RESULTS")
+        print(" VALIDATION RESULTS")
         print("=" * 50)
         
         if self.errors:
-            print(f"\n❌ ERRORS ({len(self.errors)}):")
+            print(f"\n ERRORS ({len(self.errors)}):")
             for error in self.errors:
                 print(f"   • {error}")
         
@@ -319,7 +319,7 @@ class DelphiConfigValidator:
                 print(f"   • {warning}")
         
         if self.info:
-            print(f"\n✅ SUCCESS ({len(self.info)}):")
+            print(f"\n SUCCESS ({len(self.info)}):")
             for info in self.info:
                 print(f"   • {info}")
         
@@ -330,7 +330,7 @@ class DelphiConfigValidator:
         elif not self.errors:
             print("⚠️  WARNINGS FOUND - Delphi should work but check warnings")
         else:
-            print("❌ CRITICAL ERRORS FOUND - Fix errors before running Delphi")
+            print(" CRITICAL ERRORS FOUND - Fix errors before running Delphi")
             
         print("=" * 50)
 

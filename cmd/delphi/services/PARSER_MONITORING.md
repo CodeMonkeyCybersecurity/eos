@@ -60,7 +60,7 @@ eos delphi parser-health --circuit-breaker  # Circuit breaker status
 - Active prompt types
 - Stuck alerts (waiting >1 hour)
 
-### 📊 Pipeline Status
+###  Pipeline Status
 Shows alert counts by processing state:
 - `summarized` → Ready for structuring
 - `structured` → Ready for formatting  
@@ -80,13 +80,13 @@ Metrics by prompt type:
 - Average parsing time
 - Last used timestamp
 
-### 📊 Prompt Type Distribution
+###  Prompt Type Distribution
 Shows usage patterns:
 - Alert counts by prompt type
 - End-to-end success rates
 - Average processing time
 
-### ❌ Recent Parser Failures
+###  Recent Parser Failures
 Lists recent parsing errors with:
 - Alert ID and prompt type
 - Parser used

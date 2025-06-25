@@ -745,16 +745,16 @@ date
 # Check services
 for service in delphi-listener delphi-agent-enricher llm-worker email-structurer email-formatter email-sender; do
     if systemctl is-active --quiet $service; then
-        echo "✅ $service: Running"
+        echo " $service: Running"
     else
-        echo "❌ $service: Failed"
+        echo " $service: Failed"
     fi
 done
 
 # Check parser performance
 parser_health=$(eos delphi parser-health --health | grep "Success Rate" | awk '{print $4}')
 if (( $(echo "$parser_health > 90" | bc -l) )); then
-    echo "✅ Parser success rate: $parser_health%"
+    echo " Parser success rate: $parser_health%"
 else
     echo "⚠️  Parser success rate: $parser_health% (below threshold)"
 fi
@@ -764,7 +764,7 @@ stuck_alerts=$(psql -d delphi -t -c "SELECT COUNT(*) FROM alerts WHERE created_a
 if [ "$stuck_alerts" -gt 10 ]; then
     echo "⚠️  $stuck_alerts alerts stuck in pipeline"
 else
-    echo "✅ Pipeline flowing normally"
+    echo " Pipeline flowing normally"
 fi
 ```
 
@@ -873,19 +873,19 @@ def register_custom_parser(prompt_type, parser_class):
 
 The Delphi end-to-end pipeline represents a comprehensive evolution from a monolithic alert processing system to a sophisticated, modular, AI-powered security notification platform. Key achievements include:
 
-### ✅ **Architecture Benefits**
+###  **Architecture Benefits**
 - **Modularity**: Independent, scalable services with clear responsibilities
 - **Reliability**: Circuit breakers, fallback mechanisms, and comprehensive error handling
 - **Observability**: Real-time monitoring, detailed metrics, and health dashboards
 - **Intelligence**: Prompt-aware parsing with AI-driven content analysis
 
-### ✅ **Operational Excellence**
+###  **Operational Excellence**
 - **Zero-Downtime Deployments**: Services can be updated independently
 - **Horizontal Scaling**: Each component scales based on demand
 - **Comprehensive Monitoring**: End-to-end visibility from webhook to delivery
 - **Automated Recovery**: Self-healing components with intelligent fallbacks
 
-### ✅ **Performance Improvements**
+###  **Performance Improvements**
 - **Parse Success Rate**: >95% with prompt-specific parsers
 - **Processing Speed**: <2 minute average end-to-end processing time
 - **Resource Efficiency**: 60% reduction in memory usage vs monolithic system
@@ -897,7 +897,7 @@ The Delphi end-to-end pipeline represents a comprehensive evolution from a monol
 - **Advanced Analytics**: Predictive threat analysis and trend detection
 - **Integration Ecosystem**: Support for Slack, Teams, JIRA, and other platforms
 
-### 📊 **Key Metrics**
+###  **Key Metrics**
 - **Uptime**: 99.9% service availability
 - **Accuracy**: 95%+ parser success rate across all prompt types
 - **Performance**: <5 second average processing time per service

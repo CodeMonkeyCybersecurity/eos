@@ -65,7 +65,7 @@ Examples:
 			}
 
 			// Display basic service information
-			logger.Info("📋 Service Information",
+			logger.Info(" Service Information",
 				zap.String("name", config.Name),
 				zap.String("description", config.Description))
 
@@ -253,7 +253,7 @@ func showServiceConfiguration(rc *eos_io.RuntimeContext, config ServiceConfigura
 			return err
 		}
 
-		logger.Info(" "+filepath.Base(config.ServiceFile)+" content:")
+		logger.Info(" " + filepath.Base(config.ServiceFile) + " content:")
 		lines := strings.Split(string(content), "\n")
 		for _, line := range lines {
 			logger.Info("  " + line)

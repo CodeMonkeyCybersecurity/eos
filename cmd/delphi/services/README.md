@@ -105,10 +105,10 @@ eos delphi services list [--detailed]
 - Summary statistics
 
 **Status Icons:**
-- ✅ Active and running
-- ⏹️ Installed but stopped
+-  Active and running
+-  Installed but stopped
 - 🔥 Failed state
-- ❌ Not installed
+-  Not installed
 
 **Examples:**
 ```bash

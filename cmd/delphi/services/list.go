@@ -37,7 +37,7 @@ Examples:
   eos delphi services list --detailed`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("📋 Listing Delphi services")
+			logger.Info(" Listing Delphi services")
 
 			// Get all service configurations
 			configs := GetServiceConfigurations()
@@ -83,13 +83,13 @@ Examples:
 						zap.String("worker_path", config.WorkerFile),
 						zap.String("service_path", config.ServiceFile))
 				} else {
-					statusIcon := "❌"
+					statusIcon := ""
 					if status.Active == "active" {
-						statusIcon = "✅"
+						statusIcon = ""
 					} else if status.Active == "failed" {
 						statusIcon = "🔥"
 					} else if isInstalled {
-						statusIcon = "⏹️"
+						statusIcon = ""
 					}
 
 					enabledIcon := ""
@@ -109,7 +109,7 @@ Examples:
 			}
 
 			// Display summary
-			logger.Info("📊 Summary",
+			logger.Info(" Summary",
 				zap.Int("total_services", totalServices),
 				zap.Int("installed", installedServices),
 				zap.Int("active", activeServices),

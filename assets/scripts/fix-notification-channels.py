@@ -102,9 +102,9 @@ class ChannelStandardizer:
                 
                 # Write updated content
                 worker_path.write_text(content)
-                self.changes_made.append(f"✅ Updated {worker_path.name} (backup: {backup_path.name})")
+                self.changes_made.append(f" Updated {worker_path.name} (backup: {backup_path.name})")
             else:
-                print(f"   ✅ {worker_path.name} already correct")
+                print(f"    {worker_path.name} already correct")
                 
         except Exception as e:
             self.errors.append(f"Error processing {worker_path.name}: {e}")
@@ -192,21 +192,21 @@ class ChannelStandardizer:
     def print_results(self):
         """Print standardization results"""
         print("\n" + "=" * 50)
-        print("📋 STANDARDIZATION RESULTS")
+        print(" STANDARDIZATION RESULTS")
         print("=" * 50)
         
         if self.changes_made:
-            print(f"\n✅ CHANGES MADE ({len(self.changes_made)}):")
+            print(f"\n CHANGES MADE ({len(self.changes_made)}):")
             for change in self.changes_made:
                 print(f"   {change}")
         
         if self.errors:
-            print(f"\n❌ ERRORS ({len(self.errors)}):")
+            print(f"\n ERRORS ({len(self.errors)}):")
             for error in self.errors:
                 print(f"   • {error}")
         
         if not self.changes_made and not self.errors:
-            print("\n✅ All workers already use correct notification channels!")
+            print("\n All workers already use correct notification channels!")
         
         print("\n📡 STANDARD NOTIFICATION FLOW:")
         for channel, description in STANDARD_CHANNELS.items():

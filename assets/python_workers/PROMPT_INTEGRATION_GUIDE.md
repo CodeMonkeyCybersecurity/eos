@@ -98,7 +98,7 @@ def get_prompt_type_from_file(filename: str) -> str:
     return PROMPT_TYPE_MAPPING.get(filename, 'delphi_notify_short')
 ```
 
-## 📊 Monitoring Integration
+##  Monitoring Integration
 
 ### View Parser Performance
 
