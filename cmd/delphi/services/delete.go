@@ -78,7 +78,7 @@ Examples:
 				if err == nil && status.Active == "active" {
 					logger.Info(" Stopping service",
 						zap.String("service", serviceName))
-					
+
 					if err := eos_unix.StopSystemdUnitWithRetry(rc.Ctx, serviceName, 3, 2); err != nil {
 						if !force {
 							return fmt.Errorf("failed to stop service %s (use --force to ignore): %w", serviceName, err)
@@ -95,7 +95,7 @@ Examples:
 				// Disable the service
 				logger.Info(" Disabling service",
 					zap.String("service", serviceName))
-				
+
 				if err := exec.Command("systemctl", "disable", serviceName).Run(); err != nil {
 					if !force {
 						return fmt.Errorf("failed to disable service %s (use --force to ignore): %w", serviceName, err)
@@ -113,7 +113,7 @@ Examples:
 			if eos_unix.FileExists(config.ServiceFile) {
 				logger.Info(" Removing service file",
 					zap.String("file", config.ServiceFile))
-				
+
 				if err := os.Remove(config.ServiceFile); err != nil {
 					if !force {
 						return fmt.Errorf("failed to remove service file %s (use --force to ignore): %w", config.ServiceFile, err)
@@ -134,7 +134,7 @@ Examples:
 			if eos_unix.FileExists(config.WorkerFile) {
 				logger.Info(" Removing worker script",
 					zap.String("file", config.WorkerFile))
-				
+
 				if err := os.Remove(config.WorkerFile); err != nil {
 					if !force {
 						return fmt.Errorf("failed to remove worker script %s (use --force to ignore): %w", config.WorkerFile, err)
@@ -159,7 +159,7 @@ Examples:
 				logger.Info(" Systemd daemon reloaded")
 			}
 
-			logger.Info("✨ Service deleted successfully",
+			logger.Info(" Service deleted successfully",
 				zap.String("service", serviceName),
 				zap.String("description", config.Description))
 

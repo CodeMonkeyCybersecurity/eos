@@ -85,7 +85,7 @@ var CreateJenkinsCmd = &cobra.Command{
 			zap.String("working_directory", shared.JenkinsDir),
 			zap.String("compose_file", destPath),
 			zap.String("command", "sudo docker compose up -d"))
-		
+
 		if _, err := execute.Run(rc.Ctx, execute.Options{
 			Command: "sudo",
 			Args:    []string{"docker", "compose", "up", "-d"},
@@ -110,20 +110,20 @@ var CreateJenkinsCmd = &cobra.Command{
 
 		// Fetch Jenkins admin password with fallback methods
 		otelzap.Ctx(rc.Ctx).Info(" Retrieving Jenkins admin password...")
-		
+
 		var password string
 		var pwErr error
-		
+
 		// Method 1: Try using the container exec function
 		out, pwErr := container.ExecCommandInContainer(rc, container.ExecConfig{
 			ContainerName: "jenkins",
 			Cmd:           []string{"cat", "/var/jenkins_home/secrets/initialAdminPassword"},
 			Tty:           false,
 		})
-		
+
 		if pwErr != nil {
 			otelzap.Ctx(rc.Ctx).Warn(" Primary password retrieval failed, trying direct docker exec", zap.Error(pwErr))
-			
+
 			// Method 2: Fallback to direct docker exec using execute package
 			if execOut, execErr := execute.Run(rc.Ctx, execute.Options{
 				Command: "sudo",
@@ -144,9 +144,9 @@ var CreateJenkinsCmd = &cobra.Command{
 			password = strings.TrimSpace(out)
 			otelzap.Ctx(rc.Ctx).Info(" Password retrieved successfully using primary method")
 		}
-		
+
 		if pwErr == nil && password != "" {
-			otelzap.Ctx(rc.Ctx).Info("✨ Jenkins is ready!",
+			otelzap.Ctx(rc.Ctx).Info(" Jenkins is ready!",
 				zap.String("url", "http://localhost:8059"),
 				zap.String("password", password))
 		}
@@ -169,12 +169,12 @@ var CreateJenkinsCmd = &cobra.Command{
 		otelzap.Ctx(rc.Ctx).Info("🚀 Jenkins deployment complete",
 			zap.String("web_url", fmt.Sprintf("http://%s:8059", eos_unix.GetInternalHostname())),
 			zap.String("status", "ready"))
-		
+
 		otelzap.Ctx(rc.Ctx).Info(" Manual verification commands",
 			zap.String("check_containers", "sudo docker ps"),
 			zap.String("view_logs", "cd /opt/jenkins && sudo docker compose logs"),
 			zap.String("restart_if_needed", "cd /opt/jenkins && sudo docker compose restart"))
-		
+
 		return nil
 	}),
 }

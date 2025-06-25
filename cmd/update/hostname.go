@@ -107,7 +107,7 @@ func UpdateHostname(rc *eos_io.RuntimeContext) error {
 	}
 	logger.Info(" /etc/hosts file updated")
 
-	logger.Info("✨ Hostname change complete",
+	logger.Info(" Hostname change complete",
 		zap.String("old_hostname", currentHostname),
 		zap.String("new_hostname", newHostname))
 	return nil

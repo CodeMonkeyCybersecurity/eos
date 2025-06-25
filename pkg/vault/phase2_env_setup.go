@@ -204,7 +204,7 @@ func PrepareVaultAgentEnvironment(rc *eos_io.RuntimeContext) error {
 	}
 	otelzap.Ctx(rc.Ctx).Info("Ensured secrets directory", zap.String("path", shared.SecretsDir))
 
-	// ✨ NEW: Validate runtime readiness
+	//  NEW: Validate runtime readiness
 	if err := ValidateVaultAgentRuntimeEnvironment(rc); err != nil {
 		return err
 	}

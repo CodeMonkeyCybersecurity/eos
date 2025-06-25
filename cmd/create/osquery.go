@@ -99,7 +99,7 @@ var createOsQueryCmd = &cobra.Command{
 					zap.Error(err),
 					zap.String("action", "Proceeding with reinstallation"))
 			} else {
-				logger.Info("✨ osquery is already installed and verified",
+				logger.Info(" osquery is already installed and verified",
 					zap.Duration("total_duration", time.Since(start)))
 				return nil
 			}
@@ -162,7 +162,7 @@ var createOsQueryCmd = &cobra.Command{
 
 		// Log successful completion with summary
 		paths := osquery.GetOsqueryPaths()
-		logger.Info("✨ osquery installation complete",
+		logger.Info(" osquery installation complete",
 			zap.Duration("total_duration", time.Since(start)),
 			zap.Duration("install_duration", time.Since(installStart)),
 			zap.String("config_path", paths.ConfigPath),

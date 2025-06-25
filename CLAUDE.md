@@ -241,7 +241,7 @@ logger.Info(" File written successfully",
     zap.String("validation", "passed"))
 
 // Operation completion with summary
-logger.Info("✨ [Operation] complete",
+logger.Info(" [Operation] complete",
     zap.Duration("total_duration", totalElapsed),
     zap.String("output_file", outputPath),
     zap.Int("resources_found", totalResources),

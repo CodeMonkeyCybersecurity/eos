@@ -267,7 +267,7 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		}
 	}
 
-	logger.Info("✨ Infrastructure inspection complete",
+	logger.Info(" Infrastructure inspection complete",
 		zap.String("output_path", infraOutputPath),
 		zap.String("format", map[bool]string{true: "terraform", false: "yaml"}[infraTerraformFlag]),
 		zap.String("type", map[bool]string{true: "modular_directory", false: "single_file"}[infraTerraformFlag]),

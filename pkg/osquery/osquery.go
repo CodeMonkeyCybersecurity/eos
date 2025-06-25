@@ -55,7 +55,7 @@ func InstallOsquery(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Log successful completion
-	logger.Info("✨ osquery installation completed successfully",
+	logger.Info(" osquery installation completed successfully",
 		zap.String("platform", osPlat),
 		zap.Duration("total_duration", time.Since(start)))
 
