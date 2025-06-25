@@ -324,3 +324,21 @@ func RunTableTests[T any](t *testing.T, tests []TableTest[T], testFunc func(t *t
 func Contains(s, substr string) bool {
 	return strings.Contains(s, substr)
 }
+
+// AssertContains checks that a string contains a specific substring
+func AssertContains(t *testing.T, str, substring string) {
+	t.Helper()
+	if !strings.Contains(str, substring) {
+		t.Fatalf("expected string to contain '%s', got: %s", substring, str)
+	}
+}
+
+// Timeout creates a timeout channel for testing slow operations
+func Timeout(t *testing.T, duration string) <-chan time.Time {
+	t.Helper()
+	d, err := time.ParseDuration(duration)
+	if err != nil {
+		t.Fatalf("invalid duration '%s': %v", duration, err)
+	}
+	return time.After(d)
+}
