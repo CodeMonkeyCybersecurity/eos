@@ -73,10 +73,16 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/alert-to-db.py.%s.bak", timestamp),
 		},
 		{
-			ServiceName: "email-structurer", // Add email-structurer to the list
+			ServiceName: "email-structurer",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-structurer.py"),
-			TargetPath:  "/usr/local/bin/email-structurer.py", // Assuming this is its target path
+			TargetPath:  "/usr/local/bin/email-structurer.py",
 			BackupPath:  fmt.Sprintf("/usr/local/bin/email-structurer.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "email-formatter", // ADDED: New entry for email-formatter
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-formatter.py"),
+			TargetPath:  "/usr/local/bin/email-formatter.py", // Assuming this is its target path
+			BackupPath:  fmt.Sprintf("/usr/local/bin/email-formatter.py.%s.bak", timestamp),
 		},
 	}
 }
@@ -158,8 +164,10 @@ Available services:
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
+- ab-test-analyzer: A/B test analysis worker
 - alert-to-db: Database operations for alerts
-- email-structurer: Email structuring service (Added)
+- email-structurer: Email structuring service
+- email-formatter: Email formatting service (Added)
 
 Examples:
   eos delphi services update delphi-listener
