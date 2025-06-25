@@ -75,8 +75,8 @@ if not all([AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSI
 
 # A/B Testing Configuration
 EXPERIMENT_CONFIG_FILE = os.environ.get("EXPERIMENT_CONFIG_FILE", "/opt/delphi/ab-test-config.json")
-SYSTEM_PROMPTS_DIR = os.environ.get("SYSTEM_PROMPTS_DIR", "/opt/eos/assets/system-prompts")
-DEFAULT_PROMPT_FILE = os.environ.get("DEFAULT_PROMPT_FILE", "/opt/system-prompt.txt")
+SYSTEM_PROMPTS_DIR = os.environ.get("SYSTEM_PROMPTS_DIR", "/srv/eos/system-prompts")
+DEFAULT_PROMPT_FILE = os.environ.get("DEFAULT_PROMPT_FILE", "/srv/eos/system-prompts/default.txt")
 
 # Logging and Monitoring
 LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/prompt-ab-tester.log")

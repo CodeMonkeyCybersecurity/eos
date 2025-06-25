@@ -96,7 +96,7 @@ sudo chown stanley:stanley /opt/delphi/ab-test-config.json
 ```bash
 sudo mkdir -p /var/log/stackstorm/ab-test-reports
 sudo chown stanley:stanley /var/log/stackstorm/ab-test-reports
-sudo mkdir -p /opt/eos/assets/system-prompts
+sudo mkdir -p /srv/eos/system-prompts
 ```
 
 ### 3. Environment Variables
@@ -106,8 +106,8 @@ Add to `/opt/stackstorm/packs/delphi/.env`:
 ```bash
 # A/B Testing Configuration
 EXPERIMENT_CONFIG_FILE=/opt/delphi/ab-test-config.json
-SYSTEM_PROMPTS_DIR=/opt/eos/assets/system-prompts
-DEFAULT_PROMPT_FILE=/opt/system-prompt.txt
+SYSTEM_PROMPTS_DIR=/srv/eos/system-prompts
+DEFAULT_PROMPT_FILE=/srv/eos/system-prompts/default.txt
 
 # Logging
 AB_TEST_METRICS_FILE=/var/log/stackstorm/ab-test-metrics.log
@@ -290,7 +290,7 @@ print('Config loaded successfully:', config['name'])
 "
 
 # Verify prompt files
-ls -la /opt/eos/assets/system-prompts/
+ls -la /srv/eos/system-prompts/
 
 # Check database connectivity
 python3 -c "
@@ -309,7 +309,7 @@ To migrate from the standard `llm-worker.py`:
 
 1. **Backup current configuration**:
    ```bash
-   sudo cp /opt/system-prompt.txt /opt/system-prompt.txt.backup
+   sudo cp /srv/eos/system-prompts/default.txt /srv/eos/system-prompts/default.txt.backup
    ```
 
 2. **Stop existing service**:

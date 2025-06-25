@@ -51,7 +51,7 @@ if not all([AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSI
     raise ValueError("One or more Azure OpenAI environment variables (AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSION) not set.")
 
 # Paths & Quotas
-PROMPT_FILE = os.environ.get("PROMPT_FILE", "/opt/system-prompt.txt")
+PROMPT_FILE = os.environ.get("PROMPT_FILE", "/srv/eos/system-prompts/default.txt")
 LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/llm-worker.log") # Ensure this is correct
 HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/llm-worker.heartbeat")
 MAX_LOG_SIZE = int(os.environ.get("MAX_LOG_SIZE", 10485760)) # Default 10 MB

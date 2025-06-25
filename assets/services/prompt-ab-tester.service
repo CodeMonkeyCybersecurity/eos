@@ -21,8 +21,8 @@ EnvironmentFile=-/opt/stackstorm/packs/delphi/.env
 
 # A/B Testing specific configuration
 Environment="EXPERIMENT_CONFIG_FILE=/opt/delphi/ab-test-config.json"
-Environment="SYSTEM_PROMPTS_DIR=/opt/eos/assets/system-prompts"
-Environment="DEFAULT_PROMPT_FILE=/opt/system-prompt.txt"
+Environment="SYSTEM_PROMPTS_DIR=/srv/eos/system-prompts"
+Environment="DEFAULT_PROMPT_FILE=/srv/eos/system-prompts/default.txt"
 
 # Logging configuration
 Environment="LOG_FILE=/var/log/stackstorm/prompt-ab-tester.log"
