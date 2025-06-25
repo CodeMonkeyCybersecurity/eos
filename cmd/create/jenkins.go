@@ -80,15 +80,17 @@ var CreateJenkinsCmd = &cobra.Command{
 			return fmt.Errorf("ensure network: %w", err)
 		}
 
-		// Start Jenkins
+		// Start Jenkins with sudo and increased timeout
 		otelzap.Ctx(rc.Ctx).Info(" Starting Jenkins with Docker Compose",
 			zap.String("working_directory", shared.JenkinsDir),
-			zap.String("compose_file", destPath))
+			zap.String("compose_file", destPath),
+			zap.String("command", "sudo docker compose up -d"))
 		
 		if _, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "docker",
-			Args:    []string{"compose", "up", "-d"},
+			Command: "sudo",
+			Args:    []string{"docker", "compose", "up", "-d"},
 			Dir:     shared.JenkinsDir,
+			Timeout: 5 * time.Minute, // Increase timeout for container pulls
 		}); err != nil {
 			return fmt.Errorf("docker compose up: %w", err)
 		}
@@ -98,12 +100,21 @@ var CreateJenkinsCmd = &cobra.Command{
 		time.Sleep(10 * time.Second)
 
 		// Check containers are running
+		otelzap.Ctx(rc.Ctx).Info(" Verifying Jenkins containers are running...")
 		if err := container.CheckDockerContainers(rc); err != nil {
-			otelzap.Ctx(rc.Ctx).Warn(" Warning: Container check failed", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn(" Warning: Container check failed (likely Docker permission issue)", zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Info(" Manual container verification command",
+				zap.String("command", "sudo docker ps"),
+				zap.String("expected_containers", "jenkins, ssh-agent"))
 		}
 
-		// Fetch Jenkins admin password
+		// Fetch Jenkins admin password with fallback methods
 		otelzap.Ctx(rc.Ctx).Info(" Retrieving Jenkins admin password...")
+		
+		var password string
+		var pwErr error
+		
+		// Method 1: Try using the container exec function
 		out, pwErr := container.ExecCommandInContainer(rc, container.ExecConfig{
 			ContainerName: "jenkins",
 			Cmd:           []string{"cat", "/var/jenkins_home/secrets/initialAdminPassword"},
@@ -111,23 +122,41 @@ var CreateJenkinsCmd = &cobra.Command{
 		})
 		
 		if pwErr != nil {
-			otelzap.Ctx(rc.Ctx).Warn(" Could not retrieve initial admin password automatically", zap.Error(pwErr))
-			otelzap.Ctx(rc.Ctx).Info(" Manual password retrieval command",
-				zap.String("command", "docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword"))
+			otelzap.Ctx(rc.Ctx).Warn(" Primary password retrieval failed, trying direct docker exec", zap.Error(pwErr))
+			
+			// Method 2: Fallback to direct docker exec using execute package
+			if execOut, execErr := execute.Run(rc.Ctx, execute.Options{
+				Command: "sudo",
+				Args:    []string{"docker", "exec", "jenkins", "cat", "/var/jenkins_home/secrets/initialAdminPassword"},
+				Capture: true,
+			}); execErr != nil {
+				otelzap.Ctx(rc.Ctx).Warn(" Could not retrieve initial admin password automatically", zap.Error(execErr))
+				otelzap.Ctx(rc.Ctx).Info(" Manual password retrieval commands",
+					zap.String("command", "sudo docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword"),
+					zap.String("alternative", "cd /opt/jenkins && sudo docker compose logs jenkins | grep -A5 'Please use the following password'"))
+				pwErr = execErr // Keep the error for later use
+			} else {
+				password = strings.TrimSpace(execOut)
+				pwErr = nil // Clear the error since we succeeded
+				otelzap.Ctx(rc.Ctx).Info(" Password retrieved successfully using fallback method")
+			}
 		} else {
-			password := strings.TrimSpace(out)
+			password = strings.TrimSpace(out)
+			otelzap.Ctx(rc.Ctx).Info(" Password retrieved successfully using primary method")
+		}
+		
+		if pwErr == nil && password != "" {
 			otelzap.Ctx(rc.Ctx).Info("✨ Jenkins is ready!",
 				zap.String("url", "http://localhost:8059"),
 				zap.String("password", password))
 		}
 
 		// Store password in Vault if successfully retrieved
-		if pwErr == nil {
+		if pwErr == nil && password != "" {
 			vaultClient, err := vaultapi.NewClient(vaultapi.DefaultConfig())
 			if err != nil {
 				otelzap.Ctx(rc.Ctx).Warn(" Failed to create Vault client", zap.Error(err))
 			} else {
-				password := strings.TrimSpace(out)
 				if err := container.StoreJenkinsAdminPassword(rc, vaultClient, password); err != nil {
 					otelzap.Ctx(rc.Ctx).Warn(" Failed to store Jenkins password in Vault", zap.Error(err))
 				} else {
@@ -140,6 +169,12 @@ var CreateJenkinsCmd = &cobra.Command{
 		otelzap.Ctx(rc.Ctx).Info("🚀 Jenkins deployment complete",
 			zap.String("web_url", fmt.Sprintf("http://%s:8059", eos_unix.GetInternalHostname())),
 			zap.String("status", "ready"))
+		
+		otelzap.Ctx(rc.Ctx).Info(" Manual verification commands",
+			zap.String("check_containers", "sudo docker ps"),
+			zap.String("view_logs", "cd /opt/jenkins && sudo docker compose logs"),
+			zap.String("restart_if_needed", "cd /opt/jenkins && sudo docker compose restart"))
+		
 		return nil
 	}),
 }

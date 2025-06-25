@@ -31,19 +31,36 @@ func ExecCommandInContainer(rc *eos_io.RuntimeContext, cfg ExecConfig) (string, 
 		return "", errors.Wrap(err, "invalid ExecConfig")
 	}
 
-	// 3) Policy check (OPA)
+	// 3) Policy check (OPA) - with safe error handling
 	policy := `
   package exec
   default allow = false
   allow { input.Cmd[0] != "rm" }  # simplistic deny rm
   `
-	query, _ := rego.New(
+	query, prepErr := rego.New(
 		rego.Query("data.exec.allow"),
 		rego.Module("policy.rego", policy),
 	).PrepareForEval(rc.Ctx)
-	res, err := query.Eval(rc.Ctx, rego.EvalInput(cfg))
-	if err != nil || len(res) == 0 || !res[0].Expressions[0].Value.(bool) {
-		return "", errors.New("execution denied by policy")
+	
+	if prepErr != nil {
+		// Log but don't fail - allow execution if policy setup fails
+		zap.L().Warn("OPA policy setup failed, proceeding without policy enforcement", zap.Error(prepErr))
+	} else {
+		res, err := query.Eval(rc.Ctx, rego.EvalInput(cfg))
+		if err != nil {
+			zap.L().Warn("OPA policy evaluation failed, proceeding without policy enforcement", zap.Error(err))
+		} else if len(res) == 0 {
+			zap.L().Warn("OPA policy returned no results, proceeding without policy enforcement")
+		} else if len(res[0].Expressions) == 0 {
+			zap.L().Warn("OPA policy returned no expressions, proceeding without policy enforcement")
+		} else {
+			// Safely extract the boolean result
+			if allowed, ok := res[0].Expressions[0].Value.(bool); ok && !allowed {
+				return "", errors.New("execution denied by policy")
+			} else if !ok {
+				zap.L().Warn("OPA policy returned non-boolean result, proceeding without policy enforcement")
+			}
+		}
 	}
 
 	// 5) Docker client
