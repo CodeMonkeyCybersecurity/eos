@@ -56,8 +56,9 @@ LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/llm-worker.log") # En
 HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/llm-worker.heartbeat")
 MAX_LOG_SIZE = int(os.environ.get("MAX_LOG_SIZE", 10485760)) # Default 10 MB
 
-# PostgreSQL LISTEN channel for new alerts (MODIFIED: now listens for 'agent_enriched')
-LISTEN_CHANNEL = "agent_enriched" # This script now listens for alerts with enriched agent data
+# PostgreSQL LISTEN channel for enriched alerts
+LISTEN_CHANNEL = "agent_enriched"  # Listen for alerts with enriched agent data
+NOTIFY_CHANNEL = "new_response"    # Notify when LLM response is ready
 
 # --- Logger Setup ---
 def setup_logging() -> logging.Logger:

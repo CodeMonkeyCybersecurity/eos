@@ -41,8 +41,8 @@ if _missing:
     sys.exit(1)
 
 PG_DSN = os.getenv("PG_DSN", "").strip()
-LISTEN_CHANNEL = "alert_to_structure"
-NOTIFY_CHANNEL = "alert_structured"
+LISTEN_CHANNEL = "new_response"        # Listen for LLM responses
+NOTIFY_CHANNEL = "alert_structured"   # Notify when structuring complete
 
 # Circuit breaker configuration
 CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("PARSER_FAILURE_THRESHOLD", "5"))
@@ -746,12 +746,13 @@ def ensure_columns_exist(conn):
                 CREATE TABLE IF NOT EXISTS parser_metrics (
                     id SERIAL PRIMARY KEY,
                     alert_id INTEGER REFERENCES alerts(id),
-                    prompt_type VARCHAR(50),
-                    parser_used VARCHAR(100),
-                    success BOOLEAN,
-                    parse_time_ms FLOAT,
-                    error TEXT,
-                    created_at TIMESTAMP DEFAULT NOW()
+                    prompt_type VARCHAR(100) NOT NULL,
+                    parser_used VARCHAR(100) NOT NULL,
+                    success BOOLEAN NOT NULL,
+                    parse_time_ms INTEGER NOT NULL,
+                    sections_extracted INTEGER DEFAULT 0,
+                    error_message TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
                 );
                 
                 -- Create index for metrics
@@ -809,14 +810,15 @@ def save_structured_data(conn, alert_id: int, structured_data: Dict[str, Any]):
             metadata = structured_data.get('metadata', {})
             cur.execute("""
                 INSERT INTO parser_metrics 
-                (alert_id, prompt_type, parser_used, success, parse_time_ms)
-                VALUES (%s, %s, %s, %s, %s)
+                (alert_id, prompt_type, parser_used, success, parse_time_ms, sections_extracted)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (
                 alert_id,
                 metadata.get('prompt_type'),
                 metadata.get('parser_used'),
                 True,
-                metadata.get('parse_time_ms', 0)
+                int(metadata.get('parse_time_ms', 0)),
+                len(structured_data.get('sections', {}))
             ))
             
             # Notify next worker
@@ -835,9 +837,9 @@ def save_parser_failure(conn, alert_id: int, prompt_type: str,
         with conn.cursor() as cur:
             cur.execute("""
                 INSERT INTO parser_metrics 
-                (alert_id, prompt_type, parser_used, success, error)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (alert_id, prompt_type, parser_used, False, error))
+                (alert_id, prompt_type, parser_used, success, parse_time_ms, error_message)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (alert_id, prompt_type, parser_used, False, 0, error))
     except Exception as e:
         log.error(f"Failed to save parser failure metrics: {e}")
 
@@ -925,8 +927,7 @@ def main():
     # Listen for new alerts
     cur = conn.cursor()
     cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-    cur.execute("LISTEN new_response;")  # Also listen to original channel
-    log.info("Listening for alerts to structure")
+    log.info(f"Listening on channel '{LISTEN_CHANNEL}' for alerts to structure")
     
     # Statistics logging
     last_stats_log = time.time()
@@ -980,7 +981,6 @@ def main():
             conn = connect_db()
             cur = conn.cursor()
             cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-            cur.execute("LISTEN new_response;")
         except Exception:
             log.exception("Unexpected error in main loop")
             raise
