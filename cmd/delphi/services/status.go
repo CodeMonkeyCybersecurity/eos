@@ -28,16 +28,22 @@ Available services:
 - delphi-emailer: Email notification service
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
+- ab-test-analyzer: A/B test analysis worker
+- alert-to-db: Database operations for alerts
+- email-structurer: Email structuring service
+- email-formatter: Email formatting service
+- email-sender: Email sending service
 
 Examples:
   eos delphi services status delphi-listener
   eos delphi services status --all`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+			// Use the DelphiServices slice for autocompletion
 			return DelphiServices, cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Checking Delphi services status")
+			logger.Info("Checking Delphi services status")
 
 			var services []string
 			if all {

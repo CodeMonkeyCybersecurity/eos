@@ -17,10 +17,14 @@ import (
 var DelphiServices = []string{
 	"delphi-listener",
 	"delphi-agent-enricher",
-	"email-structurer",
 	"delphi-emailer", // DEPRECATED - being replaced by modular email workers
 	"llm-worker",
+	"ab-test-analyzer", // Assuming this is also part of your suite based on other commands
+    "alert-to-db",      // Assuming this is also part of your suite based on other commands
 	"prompt-ab-tester",
+    "email-structurer",
+    "email-formatter",
+    "email-sender",     // ADDED: email-sender to the list
 }
 
 // NewStartCmd creates the start command
