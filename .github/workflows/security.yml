@@ -1,12 +1,19 @@
-name: Security Testing
+name: Security Testing and Analysis
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
   schedule:
     # Run security tests daily at 2 AM UTC
     - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      full_scan:
+        description: 'Run full security scan including CodeQL'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   security-tests:
@@ -38,7 +45,37 @@ jobs:
       - name: Run static security analysis with gosec
         run: |
           go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec -fmt json -out gosec-report.json ./... || echo '{"issues": [], "errors": []}' > gosec-report.json
+          gosec -fmt json -out gosec-report.json -stdout -verbose ./...
+          
+      - name: Run additional security tools
+        continue-on-error: true
+        run: |
+          # Install and run nancy for dependency vulnerability scanning
+          go install github.com/sonatypecommunity/nancy@latest
+          go list -json -m all | nancy sleuth
+          
+          # Install and run staticcheck for additional static analysis
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck -f json ./... > staticcheck-report.json || true
+          
+          # Install and run semgrep for additional security rules
+          pip install semgrep
+          semgrep --config=auto --json --output=semgrep-report.json . || true
+
+      - name: Validate security configurations
+        run: |
+          echo "Validating security-related configurations..."
+          
+          # Check for proper file permissions in code
+          echo "Checking for secure file permission patterns..."
+          if grep -r "0777\|0666\|0644.*secret\|0644.*token" --include="*.go" . || true; then
+            echo "Warning: Found potentially insecure file permissions"
+          fi
+          
+          # Check for hardcoded secrets patterns
+          echo "Scanning for potential hardcoded secrets..."
+          go install github.com/trufflesecurity/trufflehog/v3@latest
+          trufflehog filesystem . --json > trufflehog-report.json || true
 
       - name: Upload security artifacts
         uses: actions/upload-artifact@v4
@@ -47,6 +84,25 @@ jobs:
           name: security-reports
           path: |
             gosec-report.json
+            staticcheck-report.json
+            semgrep-report.json
+            trufflehog-report.json
+            
+      - name: Security report summary
+        if: always()
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "### GoSec Results" >> $GITHUB_STEP_SUMMARY
+          if [ -f gosec-report.json ]; then
+            issues=$(jq '.Issues | length' gosec-report.json 2>/dev/null || echo "0")
+            echo "- Found $issues potential security issues" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### Vulnerability Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Dependency vulnerability scan completed" >> $GITHUB_STEP_SUMMARY
+          
+          echo "### Configuration Validation" >> $GITHUB_STEP_SUMMARY
+          echo "- Security configuration checks completed" >> $GITHUB_STEP_SUMMARY
 
   file-security-validation:
     runs-on: ubuntu-latest
@@ -77,3 +133,69 @@ jobs:
         run: |
           echo "Testing error handling security..."
           go test -v -run "ErrorHandling" ./integration_scenarios_test.go
+
+  codeql-integration:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.full_scan == 'true' || github.event_name == 'schedule'
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache: true
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go
+          config-file: ./.github/codeql/codeql-config.yml
+          queries: +security-and-quality,security-experimental
+
+      - name: Build for CodeQL analysis
+        run: |
+          go build -v ./...
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:go"
+          upload: true
+
+  security-baseline:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go  
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run security baseline tests
+        run: |
+          echo "Running security baseline validation..."
+          
+          # Test that no test tokens or secrets are committed
+          if find . -name "*.go" -exec grep -l "hvs\." {} \; | grep -v test | head -1; then
+            echo "Error: Found potential vault tokens in non-test code"
+            exit 1
+          fi
+          
+          # Ensure proper logging practices
+          if grep -r "fmt\.Print\|log\.Print" --include="*.go" pkg/ cmd/; then
+            echo "Warning: Found non-structured logging in production code"
+          fi
+          
+          # Check for proper error handling
+          echo "Validating error handling patterns..."
+          go test -v -run "Security" ./pkg/...

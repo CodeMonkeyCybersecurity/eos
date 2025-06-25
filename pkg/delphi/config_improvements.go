@@ -20,7 +20,7 @@ type DelphiConfig struct {
     Queue QueueConfig `validate:"required"`
     
     // Wazuh Integration
-    Wazuh WazuhConfig `validate:"required"`
+    Wazuh WazuhAPIConfig `validate:"required"`
     
     // LLM Configuration
     LLM LLMConfig `validate:"required"`
@@ -61,7 +61,7 @@ type QueueConfig struct {
     ReadTimeout   time.Duration `validate:"min=1s,max=60s" env:"DELPHI_READ_TIMEOUT"`
 }
 
-type WazuhConfig struct {
+type WazuhAPIConfig struct {
     BaseURL      string        `validate:"required,url" env:"WAZUH_API_URL"`
     Username     string        `validate:"required,min=1" env:"WAZUH_API_USER"`
     Password     string        `validate:"required,min=8" env:"WAZUH_API_PASSWORD"`

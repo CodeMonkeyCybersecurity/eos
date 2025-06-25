@@ -73,7 +73,7 @@ func TestQueueIntegration(t *testing.T) {
 	// Start Redis container
 	redisContainer, err := NewTestRedisContainer(ctx)
 	require.NoError(t, err)
-	defer redisContainer.Close(ctx)
+	defer func() { _ = redisContainer.Close(ctx) }()
 
 	// Create stream handler
 	streamHandler, err := NewStreamHandler(
@@ -82,7 +82,7 @@ func TestQueueIntegration(t *testing.T) {
 		logger,
 	)
 	require.NoError(t, err)
-	defer streamHandler.Close()
+	defer func() { _ = streamHandler.Close() }()
 
 	t.Run("PublishAndConsume", func(t *testing.T) {
 		// Test message publishing and consumption
@@ -112,7 +112,7 @@ func TestQueueIntegration(t *testing.T) {
 
 		// Start consumer in goroutine
 		go func() {
-			streamHandler.ConsumeMessages(ctx, "new_alert", "test-consumer", handler)
+			_ = streamHandler.ConsumeMessages(ctx, "new_alert", "test-consumer", handler)
 		}()
 
 		// Wait for message
@@ -150,7 +150,7 @@ func TestQueueIntegration(t *testing.T) {
 		defer cancel()
 
 		go func() {
-			streamHandler.ConsumeMessages(consumerCtx, "new_alert", "persistent-consumer", handler)
+			_ = streamHandler.ConsumeMessages(consumerCtx, "new_alert", "persistent-consumer", handler)
 		}()
 
 		// Message should be received even though consumer started after publish
@@ -171,13 +171,13 @@ func TestCircuitBreakerIntegration(t *testing.T) {
 	// Start Redis container
 	redisContainer, err := NewTestRedisContainer(ctx)
 	require.NoError(t, err)
-	defer redisContainer.Close(ctx)
+	defer func() { _ = redisContainer.Close(ctx) }()
 
 	// Create Redis client
 	opts, err := redis.ParseURL(redisContainer.GetConnectionString())
 	require.NoError(t, err)
 	client := redis.NewClient(opts)
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	t.Run("CircuitBreakerFlow", func(t *testing.T) {
 		config := CircuitBreakerConfig{
@@ -254,7 +254,7 @@ func TestCircuitBreakerIntegration(t *testing.T) {
 
 		// Open the circuit
 		for i := 0; i < 5; i++ {
-			cb.Execute(ctx, func() error {
+			_ = cb.Execute(ctx, func() error {
 				return fmt.Errorf("failure %d", i)
 			})
 		}
@@ -297,7 +297,7 @@ func TestWorkerIntegration(t *testing.T) {
 	// Start Redis container
 	redisContainer, err := NewTestRedisContainer(ctx)
 	require.NoError(t, err)
-	defer redisContainer.Close(ctx)
+	defer func() { _ = redisContainer.Close(ctx) }()
 
 	t.Run("WorkerProcessing", func(t *testing.T) {
 		// Create test processor
@@ -319,7 +319,7 @@ func TestWorkerIntegration(t *testing.T) {
 		// Create enhanced worker
 		worker, err := NewEnhancedWorker(config, processor, logger)
 		require.NoError(t, err)
-		defer worker.Stop(ctx)
+		defer func() { _ = worker.Stop(ctx) }()
 
 		// Create test alert
 		testAlert := &Alert{
@@ -351,7 +351,7 @@ func TestWorkerIntegration(t *testing.T) {
 		defer cancel()
 
 		go func() {
-			worker.Start(workerCtx)
+			_ = worker.Start(workerCtx)
 		}()
 
 		// Wait a bit for processing
@@ -402,7 +402,7 @@ func BenchmarkQueueThroughput(b *testing.B) {
 	// Start Redis container
 	redisContainer, err := NewTestRedisContainer(ctx)
 	require.NoError(b, err)
-	defer redisContainer.Close(ctx)
+	defer func() { _ = redisContainer.Close(ctx) }()
 
 	// Create stream handler
 	streamHandler, err := NewStreamHandler(
@@ -411,7 +411,7 @@ func BenchmarkQueueThroughput(b *testing.B) {
 		logger,
 	)
 	require.NoError(b, err)
-	defer streamHandler.Close()
+	defer func() { _ = streamHandler.Close() }()
 
 	b.ResetTimer()
 
@@ -446,7 +446,7 @@ func BenchmarkQueueThroughput(b *testing.B) {
 					"iteration": i,
 				},
 			}
-			streamHandler.PublishMessage(ctx, "new_alert", msg)
+			_ = streamHandler.PublishMessage(ctx, "new_alert", msg)
 		}
 
 		b.ResetTimer()
@@ -462,7 +462,7 @@ func BenchmarkQueueThroughput(b *testing.B) {
 		// Start consumer
 		consumerCtx, cancel := context.WithCancel(ctx)
 		go func() {
-			streamHandler.ConsumeMessages(consumerCtx, "new_alert", "bench-consumer", handler)
+			_ = streamHandler.ConsumeMessages(consumerCtx, "new_alert", "bench-consumer", handler)
 		}()
 
 		// Wait for all messages to be processed
@@ -482,7 +482,7 @@ func TestEndToEndPipeline(t *testing.T) {
 	// Start Redis container
 	redisContainer, err := NewTestRedisContainer(ctx)
 	require.NoError(t, err)
-	defer redisContainer.Close(ctx)
+	defer func() { _ = redisContainer.Close(ctx) }()
 
 	// Create processors for each stage
 	enricher := &TestAlertProcessor{
@@ -524,23 +524,23 @@ func TestEndToEndPipeline(t *testing.T) {
 
 	enricherWorker, err := NewEnhancedWorker(enricherConfig, enricher, logger)
 	require.NoError(t, err)
-	defer enricherWorker.Stop(ctx)
+	defer func() { _ = enricherWorker.Stop(ctx) }()
 
 	analyzerWorker, err := NewEnhancedWorker(analyzerConfig, analyzer, logger)
 	require.NoError(t, err)
-	defer analyzerWorker.Stop(ctx)
+	defer func() { _ = analyzerWorker.Stop(ctx) }()
 
 	formatterWorker, err := NewEnhancedWorker(formatterConfig, formatter, logger)
 	require.NoError(t, err)
-	defer formatterWorker.Stop(ctx)
+	defer func() { _ = formatterWorker.Stop(ctx) }()
 
 	// Start all workers
 	workerCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	go enricherWorker.Start(workerCtx)
-	go analyzerWorker.Start(workerCtx)
-	go formatterWorker.Start(workerCtx)
+	go func() { _ = enricherWorker.Start(workerCtx) }()
+	go func() { _ = analyzerWorker.Start(workerCtx) }()
+	go func() { _ = formatterWorker.Start(workerCtx) }()
 
 	// Create and inject initial alert
 	testAlert := &Alert{

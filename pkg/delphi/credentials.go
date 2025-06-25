@@ -16,6 +16,13 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// WazuhConfig represents the wazuh.yml configuration file structure
+type WazuhConfig struct {
+	Password string `yaml:"password"`
+	Username string `yaml:"username,omitempty"`
+	URL      string `yaml:"url,omitempty"`
+}
+
 // ExtractWazuhUserPassword reads the wazuh-wui password from wazuh.yml
 func ExtractWazuhUserPassword(rc *eos_io.RuntimeContext) (string, error) {
 	configPath := "/usr/share/wazuh-dashboard/data/wazuh/config/wazuh.yml"

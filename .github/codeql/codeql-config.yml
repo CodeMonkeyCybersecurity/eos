@@ -1,0 +1,84 @@
+# CodeQL configuration for Eos security analysis
+name: "Eos Security Analysis Configuration"
+
+# Disable default queries to use only security-focused ones
+disable-default-queries: false
+
+# Include additional security-focused query suites
+queries:
+  - uses: security-and-quality
+  - uses: security-experimental
+  - uses: ./.github/codeql/custom-queries/eos-security-queries.qls
+  
+# Custom query filters for Go-specific security issues
+query-filters:
+  - include:
+      kind: problem
+      precision: 
+        - high
+        - very-high
+  - exclude:
+      # Exclude informational findings to focus on actionable security issues
+      precision: low
+      
+# Path filters to focus analysis on critical security components
+paths:
+  - include: "pkg/vault/**"     # Vault integration (high security impact)
+  - include: "pkg/crypto/**"    # Cryptographic operations
+  - include: "pkg/delphi/**"    # Security monitoring platform
+  - include: "pkg/hecate/**"    # Reverse proxy management
+  - include: "pkg/shared/**"    # Shared security utilities
+  - include: "cmd/**"           # CLI entry points
+  - include: "pkg/eos_io/**"    # I/O operations with potential security impact
+  - include: "pkg/eos_unix/**"  # Unix system operations
+  - exclude: "**/*_test.go"     # Exclude test files from security analysis
+  - exclude: "**/testutil/**"   # Exclude test utilities
+  - exclude: "**/testdata/**"   # Exclude test data
+  - exclude: "**/.git/**"       # Exclude git metadata
+
+# Custom extraction configuration
+extraction:
+  go:
+    # Ensure all Go packages are analyzed
+    index:
+      build_command: "go build ./..."
+      # Include indirect dependencies for comprehensive analysis
+      include_indirect: true
+    # Custom build flags for security analysis
+    build_flags:
+      - "-tags=security"
+      - "-gcflags=-l"  # Disable inlining for better analysis
+
+# Advanced security scanning options
+advanced:
+  # Enable experimental security analysis features
+  experimental: true
+  # Increase analysis depth for security-critical paths
+  max_paths: 1000
+  # Extended timeout for thorough analysis
+  timeout: 3600
+
+# Specific security categories to focus on
+security_categories:
+  - "CWE-78"   # OS Command Injection
+  - "CWE-79"   # Cross-site Scripting
+  - "CWE-89"   # SQL Injection
+  - "CWE-90"   # LDAP Injection
+  - "CWE-22"   # Path Traversal
+  - "CWE-200"  # Information Exposure
+  - "CWE-326"  # Inadequate Encryption Strength
+  - "CWE-327"  # Use of Broken Cryptographic Algorithm
+  - "CWE-352"  # CSRF
+  - "CWE-502"  # Deserialization Vulnerabilities
+  - "CWE-611"  # XML External Entity
+  - "CWE-798"  # Hard-coded Credentials
+  - "CWE-915"  # Dynamic Code Execution
+
+# Custom severity thresholds
+severity:
+  error:
+    - "security"
+    - "correctness"
+  warning:
+    - "maintainability"
+    - "reliability"

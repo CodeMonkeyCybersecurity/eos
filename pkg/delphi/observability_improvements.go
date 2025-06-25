@@ -15,8 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// PipelineMetrics provides comprehensive observability for the Delphi pipeline
-type PipelineMetrics struct {
+// ObservabilityMetrics provides comprehensive observability for the Delphi pipeline
+type ObservabilityMetrics struct {
 	// Counters
 	alertsReceived  metric.Int64Counter
 	alertsProcessed metric.Int64Counter
@@ -36,7 +36,7 @@ type PipelineMetrics struct {
 	logger *zap.Logger
 }
 
-func NewPipelineMetrics(logger *zap.Logger) (*PipelineMetrics, error) {
+func NewObservabilityMetrics(logger *zap.Logger) (*ObservabilityMetrics, error) {
 	meter := otel.Meter("delphi-pipeline")
 	tracer := otel.Tracer("delphi-pipeline")
 
@@ -94,7 +94,7 @@ func NewPipelineMetrics(logger *zap.Logger) (*PipelineMetrics, error) {
 		return nil, fmt.Errorf("failed to create circuit_breaker_status gauge: %w", err)
 	}
 
-	return &PipelineMetrics{
+	return &ObservabilityMetrics{
 		alertsReceived:       alertsReceived,
 		alertsProcessed:      alertsProcessed,
 		alertsFailed:         alertsFailed,
@@ -117,11 +117,11 @@ type ProcessingContext struct {
 	Attributes []attribute.KeyValue
 	span       trace.Span
 	ctx        context.Context
-	metrics    *PipelineMetrics
+	metrics    *ObservabilityMetrics
 }
 
-func (pm *PipelineMetrics) StartProcessing(ctx context.Context, alertID, stage string) *ProcessingContext {
-	ctx, span := pm.tracer.Start(ctx, fmt.Sprintf("delphi.%s", stage),
+func (om *ObservabilityMetrics) StartProcessing(ctx context.Context, alertID, stage string) *ProcessingContext {
+	ctx, span := om.tracer.Start(ctx, fmt.Sprintf("delphi.%s", stage),
 		trace.WithAttributes(
 			attribute.String("alert.id", alertID),
 			attribute.String("pipeline.stage", stage),
@@ -132,7 +132,7 @@ func (pm *PipelineMetrics) StartProcessing(ctx context.Context, alertID, stage s
 		attribute.String("alert_id", alertID),
 	}
 
-	pm.logger.Info("Processing stage started",
+	om.logger.Info("Processing stage started",
 		zap.String("alert_id", alertID),
 		zap.String("stage", stage))
 
@@ -143,7 +143,7 @@ func (pm *PipelineMetrics) StartProcessing(ctx context.Context, alertID, stage s
 		Attributes: attrs,
 		span:       span,
 		ctx:        ctx,
-		metrics:    pm,
+		metrics:    om,
 	}
 }
 

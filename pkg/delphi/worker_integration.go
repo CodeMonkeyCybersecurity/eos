@@ -52,7 +52,7 @@ type EnhancedWorker struct {
 	config          WorkerConfig
 	streamHandler   *StreamHandler
 	circuitBreaker  *CircuitBreaker
-	metrics         *PipelineMetrics
+	metrics         *ObservabilityMetrics
 	logger          *zap.Logger
 	
 	// Worker-specific processor
@@ -93,7 +93,7 @@ func NewEnhancedWorker(config WorkerConfig, processor AlertProcessor, logger *za
 	}
 	
 	// Initialize metrics
-	metrics, err := NewPipelineMetrics(logger)
+	metrics, err := NewObservabilityMetrics(logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create metrics: %w", err)
 	}

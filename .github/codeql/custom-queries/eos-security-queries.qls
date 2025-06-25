@@ -1,0 +1,21 @@
+# Eos Security Query Suite
+# Custom security queries for the Eos CLI application
+
+- description: "Security queries specific to Eos application"
+
+# Include our custom queries
+- queries: .
+- include:
+    id:
+      - go/vault-token-exposure
+      - go/insecure-file-permissions  
+      - go/command-injection
+      - go/hardcoded-credentials
+
+# Standard Go security queries from the standard library
+- include:
+    tags contain: security
+
+# Include CWE-specific queries
+- include:
+    tags contain: external/cwe
