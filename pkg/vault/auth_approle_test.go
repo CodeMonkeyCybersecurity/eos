@@ -290,11 +290,11 @@ func TestAppRoleFilePermissions(t *testing.T) {
 	expectedMode := shared.FilePermOwnerReadWrite // Should be 0600
 	
 	// Verify the constant is set correctly for security
-	assert.Equal(t, os.FileMode(0600), expectedMode, "AppRole files should be owner read/write only")
+	assert.Equal(t, os.FileMode(0600), os.FileMode(expectedMode), "AppRole files should be owner read/write only")
 	
 	// Test that the mode provides appropriate security
-	assert.Equal(t, os.FileMode(0600), expectedMode&0777, "File mode should mask to 0600")
+	assert.Equal(t, os.FileMode(0600), os.FileMode(expectedMode)&0777, "File mode should mask to 0600")
 	
 	// Verify no group or world access
-	assert.Equal(t, os.FileMode(0), expectedMode&0077, "No group or world access should be allowed")
+	assert.Equal(t, os.FileMode(0), os.FileMode(expectedMode)&0077, "No group or world access should be allowed")
 }

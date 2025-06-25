@@ -264,7 +264,7 @@ func TestCircuitBreakerIntegration(t *testing.T) {
 
 		// Test concurrent call limiting in half-open state
 		results := make(chan error, 5)
-		
+
 		for i := 0; i < 5; i++ {
 			go func(id int) {
 				err := cb.Execute(ctx, func() error {
