@@ -43,12 +43,6 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-agent-enricher.py.%s.bak", timestamp),
 		},
 		{
-			ServiceName: "delphi-emailer",
-			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-emailer.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-emailer.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-emailer.py.%s.bak", timestamp),
-		},
-		{
 			ServiceName: "llm-worker",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "llm-worker.py"),
 			TargetPath:  "/opt/stackstorm/packs/delphi/llm-worker.py",

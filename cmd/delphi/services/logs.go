@@ -29,7 +29,6 @@ func NewLogsCmd() *cobra.Command {
 Available services:
 - delphi-listener: Webhook listener for Wazuh alerts
 - delphi-agent-enricher: Agent enrichment service  
-- delphi-emailer: Email notification service
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
 

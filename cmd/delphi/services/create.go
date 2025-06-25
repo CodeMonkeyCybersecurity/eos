@@ -77,14 +77,6 @@ func GetServiceConfigurations() map[string]ServiceConfiguration {
 			Dependencies: []string{"python3", "psycopg2", "python-dotenv", "tabulate"},
 			ConfigFiles:  []string{"/opt/stackstorm/packs/delphi/.env"},
 		},
-		"delphi-emailer": {
-			Name:         "delphi-emailer",
-			ServiceFile:  "/etc/systemd/system/delphi-emailer.service",
-			WorkerFile:   "/usr/local/bin/delphi-emailer.py",
-			Description:  "Email notification service (DEPRECATED - being replaced by modular email workers)",
-			Dependencies: []string{"python3", "smtplib", "psycopg2"},
-			ConfigFiles:  []string{"/opt/stackstorm/packs/delphi/.env", "/opt/delphi/email-template.html"},
-		},
 		"llm-worker": {
 			Name:         "llm-worker",
 			ServiceFile:  "/etc/systemd/system/llm-worker.service",
@@ -125,7 +117,6 @@ Available services:
 - email-formatter: Email formatting service (formats structured data into HTML/plain text emails)
 - email-sender: Email sending service (delivers formatted emails via SMTP)
 - parser-monitor: Parser health monitoring dashboard (provides observability for prompt-aware parsing system)
-- delphi-emailer: Email notification service (DEPRECATED - being replaced by modular email workers)
 - llm-worker: LLM processing service
 - prompt-ab-tester: A/B testing worker for prompt optimization
 
