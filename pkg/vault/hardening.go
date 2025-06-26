@@ -290,7 +290,7 @@ func disableSwap(rc *eos_io.RuntimeContext) error {
 
 func disableCoreDumps(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🚫 Disabling core dumps for security")
+	log.Info(" Disabling core dumps for security")
 
 	// Set core dump size to 0
 	if err := execute.RunSimple(rc.Ctx, "ulimit", "-c", "0"); err != nil {

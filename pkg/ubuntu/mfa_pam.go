@@ -1,6 +1,7 @@
 package ubuntu
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 
 // configurePAMSafely configures PAM with safety mechanisms and rollback
 func (m *MFAManager) configurePAMSafely() error {
-	m.logger.Info("⚙️ Configuring PAM with safety mechanisms")
+	m.logger.Info(" Configuring PAM with safety mechanisms")
 
 	// PAM files to modify
 	pamFiles := map[string]string{
@@ -24,7 +25,7 @@ func (m *MFAManager) configurePAMSafely() error {
 	// Exclude login if console bypass is enabled
 	if m.config.ConsoleBypassMFA {
 		delete(pamFiles, "/etc/pam.d/login")
-		m.logger.Info("🖥️ Console login will bypass MFA as configured")
+		m.logger.Info(" Console login will bypass MFA as configured")
 	}
 
 	// Update each PAM file atomically
@@ -211,7 +212,7 @@ func (m *MFAManager) updatePAMFileSafely(pamFile string, content string) error {
 	}
 
 	// Validate PAM configuration syntax
-	if err := m.validatePAMSyntax(tmpFile); err != nil {
+	if err := m.validatePAMConfig(tmpFile); err != nil {
 		os.Remove(tmpFile)
 		return fmt.Errorf("PAM validation failed: %w", err)
 	}
@@ -222,50 +223,51 @@ func (m *MFAManager) updatePAMFileSafely(pamFile string, content string) error {
 		return fmt.Errorf("replace PAM file: %w", err)
 	}
 
-	m.logger.Info("✅ Updated PAM file successfully", zap.String("file", pamFile))
+	m.logger.Info(" Updated PAM file successfully", zap.String("file", pamFile))
 	return nil
 }
 
-// validatePAMSyntax validates PAM configuration syntax
-func (m *MFAManager) validatePAMSyntax(pamFile string) error {
-	// Basic syntax validation - check for required PAM format
-	content, err := os.ReadFile(pamFile)
+func (m *MFAManager) validatePAMConfig(path string) error {
+	file, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("read PAM file: %w", err)
+		return err
 	}
+	defer file.Close()
 
-	lines := strings.Split(string(content), "\n")
-	for i, line := range lines {
-		line = strings.TrimSpace(line)
+	scanner := bufio.NewScanner(file)
+	lineNum := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Basic PAM line validation
-		parts := strings.Fields(line)
-		if len(parts) < 3 {
-			return fmt.Errorf("line %d: invalid PAM line format: %s", i+1, line)
+		// PAM includes are valid! Add this check
+		if strings.HasPrefix(line, "@include") || strings.HasPrefix(line, "include") {
+			continue
 		}
 
-		// Check module type
-		moduleType := parts[0]
-		validTypes := []string{"auth", "account", "password", "session", "@include"}
-		if !m.contains(validTypes, moduleType) {
-			return fmt.Errorf("line %d: invalid module type: %s", i+1, moduleType)
+		// Check for basic PAM line format
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			return fmt.Errorf("line %d: invalid PAM line format: %s", lineNum, line)
 		}
 
-		// Check control flags for non-include lines
-		if moduleType != "@include" {
-			control := parts[1]
-			validControls := []string{"required", "requisite", "sufficient", "optional", "include", "substack"}
-			// Also allow complex controls like [success=ok default=ignore]
-			if !m.contains(validControls, control) && !strings.HasPrefix(control, "[") {
-				return fmt.Errorf("line %d: invalid control flag: %s", i+1, control)
+		// Validate service type
+		validTypes := []string{"auth", "account", "password", "session"}
+		if !contains(validTypes, fields[0]) {
+			// Could be a continuation line with [...]
+			if !strings.HasPrefix(fields[0], "[") {
+				return fmt.Errorf("line %d: invalid service type: %s", lineNum, fields[0])
 			}
 		}
 	}
 
-	return nil
+	return scanner.Err()
 }
 
 // contains checks if a slice contains a string
@@ -304,6 +306,6 @@ func (m *MFAManager) installMFAPackages() error {
 		m.logger.Warn("Failed to enable at daemon", zap.Error(err))
 	}
 
-	m.logger.Info("✅ MFA packages installed successfully")
+	m.logger.Info(" MFA packages installed successfully")
 	return nil
 }

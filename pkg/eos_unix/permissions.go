@@ -39,7 +39,7 @@ func IsPrivilegedUser(ctx context.Context) bool {
 func EnforceSecretsAccess(ctx context.Context, show bool) bool {
 	if show && !IsPrivilegedUser(ctx) {
 		otelzap.Ctx(ctx).Warn("Non-root user attempted to use --show-secrets")
-		fmt.Fprintln(os.Stderr, "🚫 --show-secrets can only be used by root or sudo.")
+		fmt.Fprintln(os.Stderr, " --show-secrets can only be used by root or sudo.")
 		return false
 	}
 	return true

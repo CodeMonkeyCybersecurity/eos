@@ -53,63 +53,64 @@ func (m *MFAManager) parseSudoersComplete() ([]SudoersEntry, error) {
 		}
 	}
 
-	m.logger.Info("📋 Parsed sudoers files",
+	m.logger.Info(" Parsed sudoers files",
 		zap.Int("total_entries", len(entries)))
 
 	return entries, nil
 }
 
 // parseSudoersFile parses a single sudoers file
-func (m *MFAManager) parseSudoersFile(filename string) ([]SudoersEntry, error) {
-	file, err := os.Open(filename)
+func (m *MFAManager) parseSudoersFile(path string) ([]SudoersEntry, error) {
+	file, err := os.Open(path)
 	if err != nil {
-		return nil, fmt.Errorf("open %s: %w", filename, err)
+		return nil, err
 	}
 	defer file.Close()
 
 	var entries []SudoersEntry
 	scanner := bufio.NewScanner(file)
-	lineNum := 0
 
 	for scanner.Scan() {
-		lineNum++
 		line := strings.TrimSpace(scanner.Text())
 
-		// Skip empty lines and comments
+		// Skip comments and empty lines
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
 
-		// Skip aliases and defaults
-		if strings.HasPrefix(line, "Defaults") ||
-			strings.HasPrefix(line, "User_Alias") ||
-			strings.HasPrefix(line, "Host_Alias") ||
-			strings.HasPrefix(line, "Cmnd_Alias") ||
-			strings.HasPrefix(line, "Runas_Alias") {
+		// Handle @include and @includedir directives
+		if strings.HasPrefix(line, "@include") {
+			if strings.HasPrefix(line, "@includedir") {
+				// Parse directory includes
+				parts := strings.Fields(line)
+				if len(parts) == 2 {
+					includeDir := parts[1]
+					files, _ := filepath.Glob(filepath.Join(includeDir, "*"))
+					for _, f := range files {
+						if !strings.HasSuffix(f, "~") && !strings.HasPrefix(filepath.Base(f), ".") {
+							subEntries, _ := m.parseSudoersFile(f)
+							entries = append(entries, subEntries...)
+						}
+					}
+				}
+			}
 			continue
 		}
 
-		// Parse user specification line
+		// Parse regular sudoers entries
 		entry, err := m.parseSudoersLine(line)
 		if err != nil {
 			m.logger.Warn("Failed to parse sudoers line",
-				zap.String("file", filename),
-				zap.Int("line", lineNum),
-				zap.String("content", line),
+				zap.String("file", path),
+				zap.String("line", line),
 				zap.Error(err))
 			continue
 		}
 
-		if entry != nil {
-			entries = append(entries, *entry)
-		}
+		entries = append(entries, entry)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("scan %s: %w", filename, err)
-	}
-
-	return entries, nil
+	return entries, scanner.Err()
 }
 
 // parseSudoersLine parses a single sudoers user specification line
@@ -125,7 +126,7 @@ func (m *MFAManager) parseSudoersLine(line string) (*SudoersEntry, error) {
 
 	// Basic sudoers format: user hosts = (runas) commands
 	// More complex: user hosts = (runas) NOPASSWD: commands
-	
+
 	// Split on '=' to separate user/hosts from runas/commands
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) != 2 {
@@ -190,14 +191,14 @@ func (m *MFAManager) parseCommandsWithTags(commandStr string, entry *SudoersEntr
 
 		// Look for tags followed by colon
 		tagRegex := regexp.MustCompile(`^([A-Z_]+):\s*(.*)$`)
-		
+
 		if matches := tagRegex.FindStringSubmatch(spec); matches != nil {
 			// Has tag
 			tag := strings.TrimSpace(matches[1])
 			commands := strings.TrimSpace(matches[2])
-			
+
 			entry.Tags = append(entry.Tags, tag)
-			
+
 			if commands != "" {
 				entry.Commands = append(entry.Commands, commands)
 			}
@@ -217,20 +218,20 @@ func (m *MFAManager) validateSudoersFile(filename string) error {
 		Command: "visudo",
 		Args:    []string{"-c", "-f", filename},
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("visudo validation failed: %s", output)
 	}
-	
+
 	return nil
 }
 
 // backupSudoersFile creates a backup of a sudoers file
 func (m *MFAManager) backupSudoersFile(filename string) error {
-	backupName := filepath.Base(filename) + ".backup-" + 
+	backupName := filepath.Base(filename) + ".backup-" +
 		time.Now().Format("20060102-150405")
 	backupPath := filepath.Join(m.backupDir, backupName)
-	
+
 	return m.copyFile(filename, backupPath)
 }
 

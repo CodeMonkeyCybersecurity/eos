@@ -27,29 +27,29 @@ type MFAManager struct {
 // MFAConfig defines configuration for safe MFA implementation
 type MFAConfig struct {
 	// Safety settings
-	EnableRecoveryCodes  bool
-	RecoveryCodeCount    int
-	CreateBackupAdmin    bool
-	BackupAdminUser      string
-	TestBeforeEnforce    bool
+	EnableRecoveryCodes bool
+	RecoveryCodeCount   int
+	CreateBackupAdmin   bool
+	BackupAdminUser     string
+	TestBeforeEnforce   bool
 
 	// Emergency access
-	EmergencyGroupName   string
-	ConsoleBypassMFA     bool
-	EmergencyTimeout     time.Duration
+	EmergencyGroupName string
+	ConsoleBypassMFA   bool
+	EmergencyTimeout   time.Duration
 
 	// Automation handling
-	ServiceAccountGroup  string
-	PreserveNOPASSWD     bool
+	ServiceAccountGroup string
+	PreserveNOPASSWD    bool
 
 	// Rollback settings
-	BackupRetentionDays  int
-	AutoRollbackOnError  bool
+	BackupRetentionDays int
+	AutoRollbackOnError bool
 }
 
 // SudoersEntry represents a parsed sudoers entry
 type SudoersEntry struct {
-	User     string   // username, %group, or +netgroup
+	User     string // username, %group, or +netgroup
 	Hosts    []string
 	RunAs    []string
 	Commands []string
@@ -73,24 +73,24 @@ func NewMFAManager(rc *eos_io.RuntimeContext) *MFAManager {
 		logger: otelzap.Ctx(rc.Ctx),
 		config: MFAConfig{
 			// Safety settings
-			EnableRecoveryCodes:  true,
-			RecoveryCodeCount:    10,
-			CreateBackupAdmin:    true,
-			BackupAdminUser:      "emergency-admin",
-			TestBeforeEnforce:    true,
+			EnableRecoveryCodes: true,
+			RecoveryCodeCount:   10,
+			CreateBackupAdmin:   true,
+			BackupAdminUser:     "emergency-admin",
+			TestBeforeEnforce:   true,
 
 			// Emergency access
-			EmergencyGroupName:   "mfa-emergency",
-			ConsoleBypassMFA:     true,
-			EmergencyTimeout:     60 * time.Minute,
+			EmergencyGroupName: "mfa-emergency",
+			ConsoleBypassMFA:   true,
+			EmergencyTimeout:   60 * time.Minute,
 
 			// Automation handling
-			ServiceAccountGroup:  "mfa-service-accounts",
-			PreserveNOPASSWD:     true,
+			ServiceAccountGroup: "mfa-service-accounts",
+			PreserveNOPASSWD:    true,
 
 			// Rollback
-			BackupRetentionDays:  30,
-			AutoRollbackOnError:  true,
+			BackupRetentionDays: 30,
+			AutoRollbackOnError: true,
 		},
 		rollbackEnabled: true,
 		testMode:        false, // Will be set based on enforcement mode
@@ -100,8 +100,8 @@ func NewMFAManager(rc *eos_io.RuntimeContext) *MFAManager {
 // ImplementMFASecurely implements MFA with comprehensive safety mechanisms
 func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	m.testMode = !enforced // Start in test mode if not enforced
-	
-	m.logger.Info("🔐 Starting comprehensive MFA implementation",
+
+	m.logger.Info(" Starting comprehensive MFA implementation",
 		zap.Bool("enforced", enforced),
 		zap.Bool("test_mode", m.testMode))
 
@@ -115,7 +115,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}()
 
 	// Phase 1: Pre-flight checks and backup
-	m.logger.Info("📋 Phase 1: Pre-flight checks and backup")
+	m.logger.Info(" Phase 1: Pre-flight checks and backup")
 	if err := m.preFlightChecks(); err != nil {
 		return fmt.Errorf("pre-flight checks failed: %w", err)
 	}
@@ -125,7 +125,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}
 
 	// Phase 2: Create safety mechanisms
-	m.logger.Info("🚨 Phase 2: Creating emergency access mechanisms")
+	m.logger.Info(" Phase 2: Creating emergency access mechanisms")
 	if err := m.createEmergencyAccess(); err != nil {
 		return fmt.Errorf("emergency access creation failed: %w", err)
 	}
@@ -138,7 +138,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}
 
 	// Phase 4: Identify and setup users
-	m.logger.Info("👥 Phase 4: Identifying and configuring users")
+	m.logger.Info(" Phase 4: Identifying and configuring users")
 	users, err := m.identifyAllSudoUsers()
 	if err != nil {
 		m.rollback()
@@ -151,7 +151,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}
 
 	// Phase 5: Configure PAM safely
-	m.logger.Info("⚙️ Phase 5: Configuring PAM authentication")
+	m.logger.Info(" Phase 5: Configuring PAM authentication")
 	if err := m.configurePAMSafely(); err != nil {
 		m.rollback()
 		return fmt.Errorf("PAM configuration failed: %w", err)
@@ -174,7 +174,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}
 
 	// Phase 8: Finalize
-	m.logger.Info("✅ Phase 8: Finalizing configuration")
+	m.logger.Info(" Phase 8: Finalizing configuration")
 	if err := m.finalizeConfiguration(); err != nil {
 		m.rollback()
 		return fmt.Errorf("finalization failed: %w", err)
@@ -186,7 +186,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 
 // preFlightChecks validates the system is ready for MFA
 func (m *MFAManager) preFlightChecks() error {
-	m.logger.Info("🔍 Running pre-flight checks")
+	m.logger.Info(" Running pre-flight checks")
 
 	// Check if running as root
 	if os.Geteuid() != 0 {
@@ -222,7 +222,7 @@ func (m *MFAManager) preFlightChecks() error {
 		return fmt.Errorf("cannot read /etc/sudoers: %w", err)
 	}
 
-	m.logger.Info("✅ Pre-flight checks passed")
+	m.logger.Info(" Pre-flight checks passed")
 	return nil
 }
 
@@ -257,7 +257,7 @@ func (m *MFAManager) createBackups() error {
 					zap.String("file", file),
 					zap.Error(err))
 			} else {
-				m.logger.Info("📋 Backed up file",
+				m.logger.Info(" Backed up file",
 					zap.String("file", file),
 					zap.String("backup", backupPath))
 			}
@@ -271,7 +271,7 @@ func (m *MFAManager) createBackups() error {
 		return fmt.Errorf("write restore script: %w", err)
 	}
 
-	m.logger.Info("📋 Backups created successfully", zap.String("directory", m.backupDir))
+	m.logger.Info(" Backups created successfully", zap.String("directory", m.backupDir))
 	return nil
 }
 
@@ -354,7 +354,7 @@ echo "Test sudo access: sudo whoami"
 
 // identifyAllSudoUsers finds all users with sudo privileges
 func (m *MFAManager) identifyAllSudoUsers() ([]SudoUser, error) {
-	m.logger.Info("🔍 Identifying all sudo users")
+	m.logger.Info(" Identifying all sudo users")
 
 	users := make(map[string]*SudoUser)
 
@@ -364,7 +364,7 @@ func (m *MFAManager) identifyAllSudoUsers() ([]SudoUser, error) {
 		return nil, fmt.Errorf("parse sudoers: %w", err)
 	}
 
-	m.logger.Info("📋 Found sudoers entries", zap.Int("count", len(entries)))
+	m.logger.Info(" Found sudoers entries", zap.Int("count", len(entries)))
 
 	// Process each entry
 	for _, entry := range entries {
@@ -432,7 +432,7 @@ func (m *MFAManager) identifyAllSudoUsers() ([]SudoUser, error) {
 		result = append(result, *userObj)
 	}
 
-	m.logger.Info("👥 Identified sudo users",
+	m.logger.Info(" Identified sudo users",
 		zap.Int("total_users", len(result)))
 
 	for _, u := range result {
@@ -465,15 +465,18 @@ func (m *MFAManager) getUserHome(username string) (string, error) {
 }
 
 func (m *MFAManager) getGroupMembers(groupName string) ([]string, error) {
+	// Get group members using getent
 	output, err := execute.Run(m.rc.Ctx, execute.Options{
 		Command: "getent",
 		Args:    []string{"group", groupName},
 	})
 	if err != nil {
-		return nil, err
+		// Group doesn't exist, return empty list instead of error
+		m.logger.Debug("Group does not exist", zap.String("group", groupName))
+		return []string{}, nil
 	}
 
-	// Parse group entry: groupname:x:gid:member1,member2,member3
+	// Parse: groupname:x:gid:user1,user2,user3
 	parts := strings.Split(strings.TrimSpace(output), ":")
 	if len(parts) < 4 {
 		return []string{}, nil

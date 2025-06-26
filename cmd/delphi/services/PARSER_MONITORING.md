@@ -67,7 +67,7 @@ Shows alert counts by processing state:
 - `formatted` → Ready for sending
 - `sent` → Successfully delivered
 
-### 🚨 Circuit Breaker Status
+###  Circuit Breaker Status
 Monitors parser reliability:
 - 🟢 **CLOSED**: Normal operation
 - 🟡 **HALF_OPEN**: Recent failures, monitoring

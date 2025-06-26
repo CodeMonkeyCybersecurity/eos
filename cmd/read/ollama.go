@@ -42,7 +42,7 @@ var InspectOllamaCmd = &cobra.Command{
 		logFile := "/tmp/ollama.log"
 		fmt.Println("\n Last 20 lines of Ollama log:")
 		if _, err := os.Stat(logFile); os.IsNotExist(err) {
-			fmt.Println("🚫 Ollama log not found at", logFile)
+			fmt.Println(" Ollama log not found at", logFile)
 		} else {
 			logOut, _ := execute.RunShell(rc.Ctx, "tail -n 20 "+logFile)
 			fmt.Println(logOut)

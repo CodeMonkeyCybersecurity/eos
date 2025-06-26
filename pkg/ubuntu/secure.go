@@ -63,7 +63,7 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 	}
 
 	// 6. Configure fail2ban
-	logger.Info("🚫 Installing and configuring fail2ban")
+	logger.Info(" Installing and configuring fail2ban")
 	if err := configureFail2ban(rc); err != nil {
 		return fmt.Errorf("configure fail2ban: %w", err)
 	}

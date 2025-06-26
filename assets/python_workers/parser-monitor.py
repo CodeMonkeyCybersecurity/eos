@@ -312,7 +312,7 @@ class ParserMonitor:
                           tablefmt='grid'))
         
         # Circuit Breaker Status
-        print("\n🚨 CIRCUIT BREAKER STATUS")
+        print("\n CIRCUIT BREAKER STATUS")
         print("-" * 80)
         breakers = self.get_circuit_breaker_status()
         if breakers:

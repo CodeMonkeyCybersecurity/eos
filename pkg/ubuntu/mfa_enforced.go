@@ -263,7 +263,7 @@ show_post_setup_info() {
     echo "  • If locked out: sudo disable-mfa-emergency"
     echo "  • Or contact your system administrator"
     echo
-    echo -e "${BLUE}🔄 MFA Management Commands:${NC}"
+    echo -e "${BLUE} MFA Management Commands:${NC}"
     echo "  • Reconfigure MFA: setup-mfa"
     echo "  • Check MFA status: mfa-status"
     echo "  • Emergency disable: disable-mfa-emergency"
@@ -810,9 +810,9 @@ echo
 		return fmt.Errorf("write emergency recovery script: %w", err)
 	}
 
-	logger.Info("🚨 Created emergency recovery script", 
+	logger.Info(" Created emergency recovery script",
 		zap.String("path", scriptPath),
 		zap.String("usage", "sudo bash /usr/local/bin/emergency-mfa-recovery"))
-	
+
 	return nil
 }

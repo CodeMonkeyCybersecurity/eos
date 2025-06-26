@@ -26,14 +26,14 @@ type PAMConfigSet struct {
 
 // AtomicMFAConfig manages atomic MFA configuration with rollback capability
 type AtomicMFAConfig struct {
-	rc                 *eos_io.RuntimeContext
-	logger             otelzap.LoggerWithCtx
-	backupDir          string
-	originalConfigs    PAMConfigSet
-	newConfigs         PAMConfigSet
-	configFiles        map[string]string
+	rc                *eos_io.RuntimeContext
+	logger            otelzap.LoggerWithCtx
+	backupDir         string
+	originalConfigs   PAMConfigSet
+	newConfigs        PAMConfigSet
+	configFiles       map[string]string
 	transactionActive bool
-	testUser           string
+	testUser          string
 }
 
 // NewAtomicMFAConfig creates a new atomic MFA configuration manager
@@ -145,7 +145,7 @@ func (a *AtomicMFAConfig) BeginTransaction() error {
 		return fmt.Errorf("transaction already active")
 	}
 
-	a.logger.Info("🔄 Beginning atomic MFA configuration transaction")
+	a.logger.Info(" Beginning atomic MFA configuration transaction")
 
 	// Create backup directory
 	if err := os.MkdirAll(a.backupDir, 0700); err != nil {
@@ -158,7 +158,7 @@ func (a *AtomicMFAConfig) BeginTransaction() error {
 	}
 
 	a.transactionActive = true
-	a.logger.Info("✅ Transaction started", zap.String("backup_dir", a.backupDir))
+	a.logger.Info(" Transaction started", zap.String("backup_dir", a.backupDir))
 	return nil
 }
 
@@ -166,13 +166,13 @@ func (a *AtomicMFAConfig) BeginTransaction() error {
 func (a *AtomicMFAConfig) backupCurrentConfigs() error {
 	for name, path := range a.configFiles {
 		backupPath := filepath.Join(a.backupDir, name+".backup")
-		
+
 		// Read current config
 		if content, err := os.ReadFile(path); err == nil {
 			if err := os.WriteFile(backupPath, content, 0644); err != nil {
 				return fmt.Errorf("backup %s: %w", name, err)
 			}
-			a.logger.Info("📋 Backed up PAM config", 
+			a.logger.Info(" Backed up PAM config",
 				zap.String("file", name),
 				zap.String("backup_path", backupPath))
 		} else if !os.IsNotExist(err) {
@@ -188,7 +188,7 @@ func (a *AtomicMFAConfig) ConfigureGracefulMFA() error {
 		return fmt.Errorf("no active transaction - call BeginTransaction() first")
 	}
 
-	a.logger.Info("⚙️ Configuring graceful MFA (password fallback allowed)")
+	a.logger.Info(" Configuring graceful MFA (password fallback allowed)")
 
 	// Set graceful configurations
 	a.newConfigs = PAMConfigSet{
@@ -242,12 +242,12 @@ func (a *AtomicMFAConfig) writeNewConfigs() error {
 		if content == "" {
 			continue // Skip empty configs
 		}
-		
+
 		tempPath := filepath.Join(a.backupDir, name+".new")
 		if err := os.WriteFile(tempPath, []byte(content), 0644); err != nil {
 			return fmt.Errorf("write temp config for %s: %w", name, err)
 		}
-		
+
 		a.logger.Info("📝 Prepared new PAM config", zap.String("file", name))
 	}
 
@@ -292,7 +292,7 @@ for config in sudo su polkit-1 login sshd passwd chpasswd; do
     fi
 done
 
-echo "✅ All PAM configurations validated successfully"
+echo " All PAM configurations validated successfully"
 `
 
 	testPath := filepath.Join(a.backupDir, "test-pam.sh")
@@ -306,7 +306,7 @@ echo "✅ All PAM configurations validated successfully"
 		return fmt.Errorf("PAM configuration test failed: %w", err)
 	}
 
-	a.logger.Info("✅ MFA configuration test passed")
+	a.logger.Info(" MFA configuration test passed")
 	return nil
 }
 
@@ -320,20 +320,20 @@ func (a *AtomicMFAConfig) CommitTransaction() error {
 
 	// Apply all configurations atomically
 	tempFiles := []string{"sudo", "su", "polkit", "login", "sshd", "passwd", "chpasswd"}
-	
+
 	for _, name := range tempFiles {
 		tempPath := filepath.Join(a.backupDir, name+".new")
 		targetPath := a.configFiles[name]
-		
+
 		if _, err := os.Stat(tempPath); os.IsNotExist(err) {
 			continue // Skip if temp file doesn't exist
 		}
-		
+
 		// Atomic move
 		if err := os.Rename(tempPath, targetPath); err != nil {
 			// Rollback on any failure
-			a.logger.Error("❌ Failed to apply config, rolling back", 
-				zap.String("file", name), 
+			a.logger.Error("❌ Failed to apply config, rolling back",
+				zap.String("file", name),
 				zap.Error(err))
 			if rollbackErr := a.RollbackTransaction(); rollbackErr != nil {
 				a.logger.Error("💥 CRITICAL: Rollback also failed", zap.Error(rollbackErr))
@@ -341,8 +341,8 @@ func (a *AtomicMFAConfig) CommitTransaction() error {
 			}
 			return fmt.Errorf("commit failed, rolled back: %w", err)
 		}
-		
-		a.logger.Info("✅ Applied PAM config", zap.String("file", name))
+
+		a.logger.Info(" Applied PAM config", zap.String("file", name))
 	}
 
 	a.transactionActive = false
@@ -356,24 +356,24 @@ func (a *AtomicMFAConfig) RollbackTransaction() error {
 		return fmt.Errorf("no active transaction")
 	}
 
-	a.logger.Warn("🔄 Rolling back MFA configuration...")
+	a.logger.Warn(" Rolling back MFA configuration...")
 
 	var errors []string
-	
+
 	for name, targetPath := range a.configFiles {
 		backupPath := filepath.Join(a.backupDir, name+".backup")
-		
+
 		if _, err := os.Stat(backupPath); os.IsNotExist(err) {
 			continue // Skip if backup doesn't exist
 		}
-		
+
 		if err := execute.RunSimple(a.rc.Ctx, "cp", backupPath, targetPath); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", name, err))
-			a.logger.Error("❌ Failed to restore config", 
-				zap.String("file", name), 
+			a.logger.Error("❌ Failed to restore config",
+				zap.String("file", name),
 				zap.Error(err))
 		} else {
-			a.logger.Info("✅ Restored original config", zap.String("file", name))
+			a.logger.Info(" Restored original config", zap.String("file", name))
 		}
 	}
 
@@ -383,7 +383,7 @@ func (a *AtomicMFAConfig) RollbackTransaction() error {
 		return fmt.Errorf("rollback partially failed: %s", strings.Join(errors, "; "))
 	}
 
-	a.logger.Info("✅ Rollback completed successfully")
+	a.logger.Info(" Rollback completed successfully")
 	return nil
 }
 

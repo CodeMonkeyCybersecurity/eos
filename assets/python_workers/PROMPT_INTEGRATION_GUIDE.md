@@ -227,7 +227,7 @@ The email-structurer now requires:
 - Database schema migration `002_add_prompt_tracking.sql` applied
 - Updated prompt randomizer storing `prompt_type`
 
-## 🚨 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 
@@ -302,7 +302,7 @@ ON alerts (prompt_type, parser_success, created_at);
 -- (Advanced - only for >1M alerts/day)
 ```
 
-## 🔄 Migration Path
+##  Migration Path
 
 ### Gradual Rollout Strategy
 

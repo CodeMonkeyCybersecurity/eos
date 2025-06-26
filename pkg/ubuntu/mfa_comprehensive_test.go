@@ -15,11 +15,11 @@ import (
 
 // MFATestFramework provides comprehensive testing for MFA configurations
 type MFATestFramework struct {
-	rc              *eos_io.RuntimeContext
-	logger          otelzap.LoggerWithCtx
-	testUser        string
-	hasGoogleAuth   bool
-	emergencyToken  string
+	rc             *eos_io.RuntimeContext
+	logger         otelzap.LoggerWithCtx
+	testUser       string
+	hasGoogleAuth  bool
+	emergencyToken string
 }
 
 // NewMFATestFramework creates a new MFA testing framework
@@ -34,7 +34,7 @@ func NewMFATestFramework(rc *eos_io.RuntimeContext) *MFATestFramework {
 
 // PreFlightCheck validates the system is ready for MFA configuration
 func (t *MFATestFramework) PreFlightCheck() error {
-	t.logger.Info("🔍 Running MFA pre-flight checks...")
+	t.logger.Info(" Running MFA pre-flight checks...")
 
 	checks := []struct {
 		name string
@@ -51,15 +51,15 @@ func (t *MFATestFramework) PreFlightCheck() error {
 	for _, check := range checks {
 		t.logger.Info("  Checking: " + check.name)
 		if err := check.fn(); err != nil {
-			t.logger.Error("❌ Pre-flight check failed", 
-				zap.String("check", check.name), 
+			t.logger.Error("❌ Pre-flight check failed",
+				zap.String("check", check.name),
 				zap.Error(err))
 			return fmt.Errorf("pre-flight check '%s' failed: %w", check.name, err)
 		}
-		t.logger.Info("  ✅ " + check.name)
+		t.logger.Info("   " + check.name)
 	}
 
-	t.logger.Info("✅ All pre-flight checks passed")
+	t.logger.Info(" All pre-flight checks passed")
 	return nil
 }
 
@@ -123,11 +123,11 @@ func (t *MFATestFramework) checkPAMModules() error {
 // checkBackupAccess verifies we can create backup directories
 func (t *MFATestFramework) checkBackupAccess() error {
 	testDir := "/etc/eos/test-" + fmt.Sprintf("%d", time.Now().Unix())
-	
+
 	if err := os.MkdirAll(testDir, 0700); err != nil {
 		return fmt.Errorf("cannot create backup directory: %w", err)
 	}
-	
+
 	// Clean up test directory
 	_ = os.RemoveAll(testDir)
 	return nil
@@ -176,7 +176,7 @@ func (t *MFATestFramework) checkUserPrivileges() error {
 
 // TestAuthentication performs comprehensive authentication testing
 func (t *MFATestFramework) TestAuthentication() error {
-	t.logger.Info("🔐 Testing authentication mechanisms...")
+	t.logger.Info(" Testing authentication mechanisms...")
 
 	tests := []struct {
 		name string
@@ -196,16 +196,16 @@ func (t *MFATestFramework) TestAuthentication() error {
 				t.logger.Warn("⚠️ MFA test skipped (user not configured)", zap.Error(err))
 				continue
 			}
-			
-			t.logger.Error("❌ Authentication test failed", 
-				zap.String("test", test.name), 
+
+			t.logger.Error("❌ Authentication test failed",
+				zap.String("test", test.name),
 				zap.Error(err))
 			return fmt.Errorf("authentication test '%s' failed: %w", test.name, err)
 		}
-		t.logger.Info("  ✅ " + test.name)
+		t.logger.Info("   " + test.name)
 	}
 
-	t.logger.Info("✅ All authentication tests passed")
+	t.logger.Info(" All authentication tests passed")
 	return nil
 }
 
@@ -258,7 +258,7 @@ func (t *MFATestFramework) testMFAAuth() error {
 func (t *MFATestFramework) testEmergencyAccess() error {
 	// Check that emergency recovery script exists and is executable
 	emergencyScript := "/usr/local/bin/emergency-mfa-recovery"
-	
+
 	info, err := os.Stat(emergencyScript)
 	if err != nil {
 		return fmt.Errorf("emergency recovery script not found: %w", err)
@@ -290,7 +290,7 @@ func (t *MFATestFramework) testPrivilegeEscalation() error {
 	for _, path := range privilegePaths {
 		// Test that the command exists
 		if err := execute.RunSimple(t.rc.Ctx, "which", path.cmd); err != nil {
-			t.logger.Warn("Privilege escalation method not available", 
+			t.logger.Warn("Privilege escalation method not available",
 				zap.String("method", path.name))
 			continue
 		}
@@ -313,29 +313,29 @@ Test User: %s
 System: Ubuntu
 
 PRE-FLIGHT CHECKS:
-✅ MFA packages installed (libpam-google-authenticator, qrencode)
-✅ PAM modules available
-✅ Backup directory accessible
-✅ User privileges verified
+ MFA packages installed (libpam-google-authenticator, qrencode)
+ PAM modules available
+ Backup directory accessible
+ User privileges verified
 
 AUTHENTICATION STATUS:
 %s Google Authenticator configured for user: %s
-✅ Password authentication functional
-✅ Emergency recovery mechanisms in place
+ Password authentication functional
+ Emergency recovery mechanisms in place
 
 PRIVILEGE ESCALATION COVERAGE:
-✅ sudo - MFA configured
-✅ su - MFA configured  
-✅ pkexec/polkit - MFA configured
-✅ console login - MFA configured
-✅ SSH - MFA configured
-✅ password changes - MFA protected
+ sudo - MFA configured
+ su - MFA configured  
+ pkexec/polkit - MFA configured
+ console login - MFA configured
+ SSH - MFA configured
+ password changes - MFA protected
 
 SECURITY ASSESSMENT:
-✅ All major privilege escalation paths protected
-✅ Emergency recovery available via console access
-✅ Atomic configuration with rollback capability
-✅ Comprehensive backup system in place
+ All major privilege escalation paths protected
+ Emergency recovery available via console access
+ Atomic configuration with rollback capability
+ Comprehensive backup system in place
 
 RECOMMENDATIONS:
 1. Test MFA authentication manually: sudo setup-mfa
@@ -347,7 +347,7 @@ RECOMMENDATIONS:
 `,
 		time.Now().Format("2006-01-02 15:04:05"),
 		t.testUser,
-		map[bool]string{true: "✅", false: "⚠️"}[t.hasGoogleAuth],
+		map[bool]string{true: "", false: "⚠️"}[t.hasGoogleAuth],
 		t.testUser,
 	)
 
@@ -427,9 +427,9 @@ func (t *MFATestFramework) ValidateSystemSecurity() error {
 		if err := check.check(); err != nil {
 			return fmt.Errorf("security check failed - %s: %w", check.description, err)
 		}
-		t.logger.Info("🔍 ✅ " + check.description)
+		t.logger.Info("  " + check.description)
 	}
 
-	t.logger.Info("✅ System security validation passed")
+	t.logger.Info(" System security validation passed")
 	return nil
 }

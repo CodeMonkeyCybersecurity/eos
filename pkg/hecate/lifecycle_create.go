@@ -66,7 +66,7 @@ func OrchestrateHecateWizard(rc *eos_io.RuntimeContext) error {
 // ShouldExitNoServicesSelected checks if no services were selected and logs a friendly exit message.
 func ShouldExitNoServicesSelected(rc *eos_io.RuntimeContext, keycloak, nextcloud, wazuh, jenkins bool) bool {
 	if !keycloak && !nextcloud && !wazuh && !jenkins {
-		otelzap.Ctx(rc.Ctx).Warn("🚫 No services selected. Exiting without making any changes.")
+		otelzap.Ctx(rc.Ctx).Warn(" No services selected. Exiting without making any changes.")
 		return true
 	}
 	return false

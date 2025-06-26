@@ -200,7 +200,7 @@ class DelphiConfigValidator:
     
     def validate_llm_config(self):
         """Validate LLM configuration"""
-        print("\n🤖 LLM Configuration")
+        print("\n LLM Configuration")
         
         prompt_file = os.getenv("PROMPT_FILE", "/srv/eos/system-prompts/default.txt")
         if not Path(prompt_file).exists():

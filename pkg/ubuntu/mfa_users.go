@@ -13,18 +13,18 @@ import (
 
 // setupMFAForUsers configures MFA for all identified sudo users
 func (m *MFAManager) setupMFAForUsers(users []SudoUser) error {
-	m.logger.Info("👥 Setting up MFA for users", zap.Int("user_count", len(users)))
+	m.logger.Info(" Setting up MFA for users", zap.Int("user_count", len(users)))
 
 	for _, user := range users {
 		if user.HasMFA {
-			m.logger.Info("✅ User already has MFA configured",
+			m.logger.Info(" User already has MFA configured",
 				zap.String("user", user.Username))
 			continue
 		}
 
 		// Handle service accounts with NOPASSWD commands
 		if len(user.NOPASSWDCmds) > 0 && m.config.PreserveNOPASSWD {
-			m.logger.Info("🤖 Adding user to service account group (has NOPASSWD commands)",
+			m.logger.Info(" Adding user to service account group (has NOPASSWD commands)",
 				zap.String("user", user.Username),
 				zap.Strings("commands", user.NOPASSWDCmds))
 
@@ -61,7 +61,7 @@ func (m *MFAManager) addToServiceGroup(username string) error {
 		return fmt.Errorf("add user to service group: %w", err)
 	}
 
-	m.logger.Info("✅ Added user to service account group",
+	m.logger.Info(" Added user to service account group",
 		zap.String("user", username),
 		zap.String("group", m.config.ServiceAccountGroup))
 
@@ -129,7 +129,7 @@ Generated: %s
 		m.logger.Warn("Failed to set ownership of instructions file", zap.Error(err))
 	}
 
-	m.logger.Info("📋 Created MFA setup instructions",
+	m.logger.Info(" Created MFA setup instructions",
 		zap.String("user", user.Username),
 		zap.String("file", instructionsPath))
 
@@ -159,10 +159,10 @@ func (m *MFAManager) testConfiguration() error {
 				zap.Error(err))
 			return fmt.Errorf("test '%s' failed: %w", test.name, err)
 		}
-		m.logger.Info("  ✅ " + test.name)
+		m.logger.Info("   " + test.name)
 	}
 
-	m.logger.Info("✅ All configuration tests passed")
+	m.logger.Info(" All configuration tests passed")
 	return nil
 }
 
@@ -178,7 +178,7 @@ func (m *MFAManager) testPAMConfiguration() error {
 	}
 
 	for _, file := range pamFiles {
-		if err := m.validatePAMSyntax(file); err != nil {
+		if err := m.validatePAMConfig(file); err != nil {
 			return fmt.Errorf("PAM file %s validation failed: %w", file, err)
 		}
 
@@ -352,7 +352,7 @@ func (m *MFAManager) configureAuditLogging() error {
 		return fmt.Errorf("write audit rules: %w", err)
 	}
 
-	m.logger.Info("✅ Configured audit logging for sudo usage")
+	m.logger.Info(" Configured audit logging for sudo usage")
 	return nil
 }
 
@@ -376,13 +376,13 @@ func (m *MFAManager) configureSecurityLimits() error {
 		return fmt.Errorf("write security limits: %w", err)
 	}
 
-	m.logger.Info("✅ Configured security limits")
+	m.logger.Info(" Configured security limits")
 	return nil
 }
 
 // finalizeConfiguration completes the MFA implementation
 func (m *MFAManager) finalizeConfiguration() error {
-	m.logger.Info("✅ Finalizing MFA configuration")
+	m.logger.Info(" Finalizing MFA configuration")
 
 	// Create summary report
 	if err := m.createImplementationReport(); err != nil {
@@ -470,7 +470,7 @@ Implementation completed successfully by Eos MFA Manager
 // displayCompletionMessage shows the completion message to the user
 func (m *MFAManager) displayCompletionMessage() {
 	fmt.Println("\n" + strings.Repeat("=", 80))
-	fmt.Println("                   🔐 MFA IMPLEMENTATION COMPLETE 🔐")
+	fmt.Println("                    MFA IMPLEMENTATION COMPLETE ")
 	fmt.Println(strings.Repeat("=", 80))
 
 	if m.testMode {
@@ -485,13 +485,13 @@ func (m *MFAManager) displayCompletionMessage() {
 	}
 
 	fmt.Println("\n🛡️ PROTECTED PRIVILEGE ESCALATION METHODS:")
-	fmt.Println("   ✅ sudo - Multi-factor authentication required")
-	fmt.Println("   ✅ su - Multi-factor authentication required")
+	fmt.Println("    sudo - Multi-factor authentication required")
+	fmt.Println("    su - Multi-factor authentication required")
 	if !m.config.ConsoleBypassMFA {
-		fmt.Println("   ✅ console login - Multi-factor authentication required")
+		fmt.Println("    console login - Multi-factor authentication required")
 	}
 
-	fmt.Println("\n🚨 EMERGENCY ACCESS METHODS:")
+	fmt.Println("\n EMERGENCY ACCESS METHODS:")
 	fmt.Printf("   • Emergency bypass: sudo emergency-mfa-bypass enable\n")
 	if m.config.EmergencyGroupName != "" {
 		fmt.Printf("   • Emergency group: %s\n", m.config.EmergencyGroupName)
@@ -502,14 +502,14 @@ func (m *MFAManager) displayCompletionMessage() {
 	}
 	fmt.Printf("   • Manual restore: bash %s/restore.sh\n", m.backupDir)
 
-	fmt.Println("\n👥 USER SETUP REQUIRED:")
+	fmt.Println("\n USER SETUP REQUIRED:")
 	fmt.Println("   All sudo users must configure MFA:")
 	fmt.Println("   1. Run: sudo setup-mfa")
 	fmt.Println("   2. Install authenticator app and scan QR code")
 	fmt.Println("   3. Save emergency backup codes")
 	fmt.Println("   4. Test: sudo whoami")
 
-	fmt.Println("\n📋 MANAGEMENT COMMANDS:")
+	fmt.Println("\n MANAGEMENT COMMANDS:")
 	fmt.Println("   • sudo setup-mfa - Configure MFA for current user")
 	fmt.Println("   • sudo mfa-status - Check MFA configuration status")
 	fmt.Println("   • sudo emergency-mfa-bypass - Emergency access controls")

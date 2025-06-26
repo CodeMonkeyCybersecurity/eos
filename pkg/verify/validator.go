@@ -20,7 +20,7 @@ func Struct(v interface{}) error {
 
 func MustValid(ctx context.Context, v interface{}) {
 	if err := validate.Struct(v); err != nil {
-		otelzap.Ctx(context.Background()).Fatal("🚫 Invalid input", zap.Error(err))
+		otelzap.Ctx(context.Background()).Fatal(" Invalid input", zap.Error(err))
 	}
 }
 

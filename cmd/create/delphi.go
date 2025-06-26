@@ -80,7 +80,7 @@ func runDelphiInstall(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		log.Warn("Could not extract Wazuh credentials", zap.Error(err))
 	}
 
-	log.Info("🚫 Disabling Wazuh repo updates")
+	log.Info(" Disabling Wazuh repo updates")
 	distro := platform.DetectLinuxDistro(rc)
 	switch distro {
 	case "debian", "ubuntu":

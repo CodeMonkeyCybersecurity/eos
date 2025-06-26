@@ -55,13 +55,13 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	}
 
 	// 5. Install needrestart
-	logger.Info("🔄 Installing needrestart")
+	logger.Info(" Installing needrestart")
 	if err := installNeedrestart(rc); err != nil {
 		return fmt.Errorf("install needrestart: %w", err)
 	}
 
 	// 6. Configure fail2ban
-	logger.Info("🚫 Installing and configuring fail2ban")
+	logger.Info(" Installing and configuring fail2ban")
 	if err := configureFail2ban(rc); err != nil {
 		return fmt.Errorf("configure fail2ban: %w", err)
 	}
@@ -98,7 +98,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		if err := mfaManager.ImplementMFASecurely(true); err != nil {
 			return fmt.Errorf("configure enforced MFA: %w", err)
 		}
-		logger.Info("✅ ENFORCED MFA configured successfully")
+		logger.Info(" ENFORCED MFA configured successfully")
 
 	case "standard":
 		logger.Info("⚡ Configuring GRACEFUL Multi-Factor Authentication")
@@ -106,7 +106,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		if err := mfaManager.ImplementMFASecurely(false); err != nil {
 			return fmt.Errorf("configure graceful MFA: %w", err)
 		}
-		logger.Info("✅ GRACEFUL MFA configured successfully")
+		logger.Info(" GRACEFUL MFA configured successfully")
 
 	case "disabled":
 		logger.Warn("⚠️  MFA configuration skipped - this reduces security")
@@ -184,7 +184,7 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println()
 
 	if mfaMode == "enforced" {
-		fmt.Println("🚨 IMPORTANT NEXT STEPS:")
+		fmt.Println(" IMPORTANT NEXT STEPS:")
 		fmt.Println("   1. Ensure all users run 'setup-mfa' to configure their accounts")
 		fmt.Println("   2. Test sudo access in a separate terminal before logging out")
 		fmt.Println("   3. Store emergency backup codes securely")

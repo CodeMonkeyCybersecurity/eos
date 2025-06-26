@@ -48,7 +48,7 @@ func Run(ctx context.Context, opts Options) (string, error) {
 	if opts.Struct != nil {
 		if err := verify.Struct(opts.Struct); err != nil {
 			span.RecordError(err)
-			logError(logger, "🚫 Struct validation failed", err)
+			logError(logger, " Struct validation failed", err)
 			return "", cerr.WithHint(err, "Struct-level validation failed")
 		}
 	}

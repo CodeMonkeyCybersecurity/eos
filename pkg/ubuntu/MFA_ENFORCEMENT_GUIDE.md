@@ -204,7 +204,7 @@ Provides comprehensive security analysis including:
 - Recent authentication activity
 - Recommendations
 
-## 🔄 Migration from Standard MFA
+##  Migration from Standard MFA
 
 If you have existing standard MFA setup:
 
@@ -218,7 +218,7 @@ sudo eos secure ubuntu --enforce-mfa --mfa-only
 sudo eos secure ubuntu --enable-mfa --mfa-only
 ```
 
-## 🚨 Security Best Practices
+##  Security Best Practices
 
 ### For Administrators:
 1. **Test MFA setup** in development environment first
