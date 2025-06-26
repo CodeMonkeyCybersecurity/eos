@@ -35,21 +35,23 @@ func (m *MFAManager) createEmergencyAccess() error {
 			zap.String("group", m.config.ServiceAccountGroup))
 	}
 
-	// Method 3: Backup admin account
+	// Method 3: Backup admin account (non-fatal if fails)
 	if m.config.CreateBackupAdmin {
 		if err := m.createBackupAdmin(); err != nil {
-			return fmt.Errorf("create backup admin: %w", err)
+			m.logger.Warn("Failed to create backup admin (continuing with other methods)",
+				zap.Error(err))
 		}
 	}
 
-	// Method 4: Emergency bypass script
+	// Method 4: Emergency bypass script (critical - must succeed)
 	if err := m.createEmergencyBypassScript(); err != nil {
 		return fmt.Errorf("create emergency bypass script: %w", err)
 	}
 
-	// Method 5: Recovery documentation
+	// Method 5: Recovery documentation (non-fatal if fails)
 	if err := m.createRecoveryDocumentation(); err != nil {
-		return fmt.Errorf("create recovery documentation: %w", err)
+		m.logger.Warn("Failed to create recovery documentation",
+			zap.Error(err))
 	}
 
 	return nil
@@ -65,14 +67,30 @@ func (m *MFAManager) createBackupAdmin() error {
 	// Generate secure password
 	password := m.generateSecurePassword(32)
 
-	// Create the user
-	if err := execute.RunSimple(m.rc.Ctx, "useradd",
-		"-m", // Create home
-		"-s", "/bin/bash",
-		"-G", "sudo", // Add to sudo group
-		username); err != nil {
-		// User might already exist
-		m.logger.Warn("Failed to create backup admin (may already exist)", zap.Error(err))
+	// Check if user already exists first
+	userExists := false
+	if err := execute.RunSimple(m.rc.Ctx, "id", username); err == nil {
+		userExists = true
+		m.logger.Info(" Backup admin user already exists",
+			zap.String("username", username))
+	}
+
+	// Create the user if it doesn't exist
+	if !userExists {
+		if err := execute.RunSimple(m.rc.Ctx, "useradd",
+			"-m", // Create home
+			"-s", "/bin/bash",
+			"-G", "sudo", // Add to sudo group
+			username); err != nil {
+			return fmt.Errorf("create backup admin user: %w", err)
+		}
+		m.logger.Info(" Created backup admin user",
+			zap.String("username", username))
+	} else {
+		// Ensure existing user is in sudo group
+		if err := execute.RunSimple(m.rc.Ctx, "usermod", "-a", "-G", "sudo", username); err != nil {
+			m.logger.Warn("Failed to add existing user to sudo group", zap.Error(err))
+		}
 	}
 
 	// Set password

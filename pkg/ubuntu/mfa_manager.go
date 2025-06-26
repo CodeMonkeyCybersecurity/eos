@@ -426,9 +426,11 @@ func (m *MFAManager) identifyAllSudoUsers() ([]SudoUser, error) {
 		}
 	}
 
-	// Convert to slice
+	// Convert to slice and deduplicate NOPASSWD commands
 	result := make([]SudoUser, 0, len(users))
 	for _, userObj := range users {
+		// Deduplicate NOPASSWD commands
+		userObj.NOPASSWDCmds = m.deduplicateCommands(userObj.NOPASSWDCmds)
 		result = append(result, *userObj)
 	}
 
@@ -496,4 +498,20 @@ func (m *MFAManager) getGroupMembers(groupName string) ([]string, error) {
 	}
 
 	return result, nil
+}
+
+// deduplicateCommands removes duplicate commands from a slice
+func (m *MFAManager) deduplicateCommands(commands []string) []string {
+	seen := make(map[string]bool)
+	result := []string{}
+	
+	for _, cmd := range commands {
+		normalizedCmd := strings.TrimSpace(cmd)
+		if normalizedCmd != "" && !seen[normalizedCmd] {
+			seen[normalizedCmd] = true
+			result = append(result, normalizedCmd)
+		}
+	}
+	
+	return result
 }

@@ -15,19 +15,42 @@ import (
 
 var ubuntuCmd = &cobra.Command{
 	Use:   "ubuntu",
-	Short: "Harden Ubuntu system with security tools and ENFORCED MFA",
-	Long: `Install and configure essential security tools for Ubuntu including:
-- auditd for system auditing
-- osquery for OS instrumentation  
-- AIDE for file integrity monitoring
-- Lynis for security auditing
-- fail2ban for brute force protection
-- Automatic security updates
-- Kernel hardening and sysctl settings
-- ENFORCED Multi-Factor Authentication (MFA) for sudo/root access (default)
+	Short: "Comprehensive Ubuntu security hardening with MFA",
+	Long: `Comprehensive security hardening for Ubuntu 24.04 LTS servers with production-ready
+Multi-Factor Authentication (MFA) implementation.
 
-By default, this command will guide you through MFA setup and enforce it.
-Use --no-mfa to skip MFA configuration (not recommended for production).`,
+SECURITY TOOLS INSTALLED:
+• auditd - Comprehensive system auditing
+• osquery - OS instrumentation and monitoring  
+• AIDE - File integrity monitoring
+• Lynis - Security vulnerability scanning
+• fail2ban - Brute force attack protection
+• UFW firewall - Network security
+• SSH hardening - Secure remote access
+• Kernel hardening - System-level security
+• Automatic security updates
+
+MFA IMPLEMENTATION:
+• Google Authenticator TOTP for sudo/su access
+• Preserves ALL existing sudoers authorizations
+• Handles service accounts automatically (NOPASSWD preserved)
+• Multiple emergency recovery methods prevent lockouts
+• Atomic operations with automatic rollback on failure
+
+EMERGENCY ACCESS METHODS:
+• Time-based bypass: sudo emergency-mfa-bypass enable
+• Emergency group: mfa-emergency (bypass MFA)
+• Backup admin account with secure credentials
+• Console access (configurable to bypass MFA)
+• Complete restoration scripts in /etc/eos/mfa-backup-*/
+
+USAGE EXAMPLES:
+• sudo eos secure ubuntu                    # Full hardening + enforced MFA (recommended)
+• sudo eos secure ubuntu --enable-mfa       # Graceful MFA (password fallback allowed)
+• sudo eos secure ubuntu --mfa-only         # Only configure MFA, skip other hardening
+• sudo eos secure ubuntu --no-mfa           # Skip MFA entirely (dev/test only)
+
+For detailed documentation: /docs/commands/secure-ubuntu.md`,
 	RunE: eos.WrapExtended(7*time.Minute, func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info(" Starting Ubuntu security hardening with extended timeout",
@@ -91,11 +114,11 @@ func init() {
 	SecureCmd.AddCommand(ubuntuCmd)
 
 	// MFA Configuration Flags
-	ubuntuCmd.Flags().Bool("enforce-mfa", false, "Enable ENFORCED Multi-Factor Authentication (default if no MFA flags specified)")
-	ubuntuCmd.Flags().Bool("enable-mfa", false, "Enable standard Multi-Factor Authentication for sudo/root access")
-	ubuntuCmd.Flags().Bool("disable-mfa", false, "Disable Multi-Factor Authentication for sudo/root access")
-	ubuntuCmd.Flags().Bool("no-mfa", false, "Skip MFA configuration entirely (not recommended for production)")
-	ubuntuCmd.Flags().Bool("mfa-only", false, "Only configure MFA settings without running full hardening")
+	ubuntuCmd.Flags().Bool("enforce-mfa", false, "Strict MFA: require password + MFA token for all sudo access (default)")
+	ubuntuCmd.Flags().Bool("enable-mfa", false, "Graceful MFA: allow password fallback during initial setup period")
+	ubuntuCmd.Flags().Bool("disable-mfa", false, "Disable existing MFA enforcement (removes MFA requirement)")
+	ubuntuCmd.Flags().Bool("no-mfa", false, "Skip MFA configuration entirely (development/testing only)")
+	ubuntuCmd.Flags().Bool("mfa-only", false, "Configure MFA only, skip other security hardening")
 
 	// Mark mutually exclusive flags
 	ubuntuCmd.MarkFlagsMutuallyExclusive("enforce-mfa", "enable-mfa", "disable-mfa", "no-mfa")
