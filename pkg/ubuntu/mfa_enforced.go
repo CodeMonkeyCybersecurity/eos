@@ -552,7 +552,7 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 
 	// Run the interactive setup script
 	fmt.Println()
-	fmt.Println("🚀 Starting interactive MFA setup...")
+	fmt.Println(" Starting interactive MFA setup...")
 	fmt.Println()
 
 	if err := execute.RunSimple(rc.Ctx, "/usr/local/bin/setup-mfa"); err != nil {

@@ -166,7 +166,7 @@ var CreateJenkinsCmd = &cobra.Command{
 			}
 		}
 
-		otelzap.Ctx(rc.Ctx).Info("🚀 Jenkins deployment complete",
+		otelzap.Ctx(rc.Ctx).Info(" Jenkins deployment complete",
 			zap.String("web_url", fmt.Sprintf("http://%s:8059", eos_unix.GetInternalHostname())),
 			zap.String("status", "ready"))
 

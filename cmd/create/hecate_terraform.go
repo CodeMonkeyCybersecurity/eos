@@ -418,7 +418,7 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	// Interactive prompts for missing values
 	if domain == "" {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔤 Domain name required for mail server configuration")
+		logger.Info(" Domain name required for mail server configuration")
 		fmt.Print("Enter domain name for mail server: ")
 		if _, err := fmt.Scanln(&domain); err != nil {
 			logger.Error(" Failed to read domain input", zap.Error(err))
@@ -430,7 +430,7 @@ func generateHecateTerraform(rc *eos_io.RuntimeContext, cmd *cobra.Command) erro
 	serverName := "hecate-mail"
 	if useCloud {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔤 Server name configuration for cloud deployment")
+		logger.Info(" Server name configuration for cloud deployment")
 		fmt.Printf("Enter server name [%s]: ", serverName)
 		var input string
 		if _, err := fmt.Scanln(&input); err != nil {

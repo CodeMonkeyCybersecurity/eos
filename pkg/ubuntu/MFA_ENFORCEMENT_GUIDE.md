@@ -41,7 +41,7 @@ sudo eos secure ubuntu --enable-mfa --mfa-only
 sudo eos secure ubuntu --disable-mfa --mfa-only
 ```
 
-## 🚀 Interactive Setup Process
+##  Interactive Setup Process
 
 When you run `eos secure ubuntu`, you'll be guided through:
 

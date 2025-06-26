@@ -51,7 +51,7 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 	// Interactive prompts for missing values
 	if domain == "" {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info("🔤 Primary domain required for cluster configuration")
+		logger.Info(" Primary domain required for cluster configuration")
 		fmt.Print("Enter primary domain for the cluster: ")
 		if _, err := fmt.Scanln(&domain); err != nil {
 			logger.Error(" Failed to read domain input", zap.Error(err))
@@ -63,7 +63,7 @@ func generateK3sCaddyNginx(rc *eos_io.RuntimeContext, cmd *cobra.Command) error 
 	if clusterName == "" {
 		logger := otelzap.Ctx(rc.Ctx)
 		clusterName = "k3s-cluster"
-		logger.Info("🔤 Cluster name configuration")
+		logger.Info(" Cluster name configuration")
 		fmt.Printf("Enter cluster name [%s]: ", clusterName)
 		var input string
 		if _, err := fmt.Scanln(&input); err != nil {

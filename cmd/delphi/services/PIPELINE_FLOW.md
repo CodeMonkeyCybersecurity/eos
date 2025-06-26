@@ -891,7 +891,7 @@ The Delphi end-to-end pipeline represents a comprehensive evolution from a monol
 - **Resource Efficiency**: 60% reduction in memory usage vs monolithic system
 - **Throughput**: Handles 1000+ alerts/hour with linear scaling
 
-### 🚀 **Future Roadmap**
+###  **Future Roadmap**
 - **Machine Learning**: Auto-parser selection based on content analysis
 - **Multi-tenant Support**: Isolated processing for different organizations
 - **Advanced Analytics**: Predictive threat analysis and trend detection
