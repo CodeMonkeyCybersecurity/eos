@@ -259,7 +259,7 @@ func (m *MFAManager) validatePAMConfig(path string) error {
 
 		// Validate service type
 		validTypes := []string{"auth", "account", "password", "session"}
-		if !contains(validTypes, fields[0]) {
+		if !m.contains(validTypes, fields[0]) {
 			// Could be a continuation line with [...]
 			if !strings.HasPrefix(fields[0], "[") {
 				return fmt.Errorf("line %d: invalid service type: %s", lineNum, fields[0])

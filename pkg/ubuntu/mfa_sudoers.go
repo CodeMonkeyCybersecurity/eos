@@ -107,7 +107,9 @@ func (m *MFAManager) parseSudoersFile(path string) ([]SudoersEntry, error) {
 			continue
 		}
 
-		entries = append(entries, entry)
+		if entry != nil {
+			entries = append(entries, *entry)
+		}
 	}
 
 	return entries, scanner.Err()
@@ -124,13 +126,19 @@ func (m *MFAManager) parseSudoersLine(line string) (*SudoersEntry, error) {
 		return nil, nil
 	}
 
+	// Skip directives that aren't user specifications
+	if strings.HasPrefix(line, "Defaults") || strings.HasPrefix(line, "@") {
+		return nil, nil
+	}
+
 	// Basic sudoers format: user hosts = (runas) commands
 	// More complex: user hosts = (runas) NOPASSWD: commands
 
 	// Split on '=' to separate user/hosts from runas/commands
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) != 2 {
-		return nil, fmt.Errorf("invalid sudoers line format")
+		// Not a user specification line
+		return nil, nil
 	}
 
 	leftSide := strings.TrimSpace(parts[0])
