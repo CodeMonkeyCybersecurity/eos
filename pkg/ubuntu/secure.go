@@ -44,10 +44,10 @@ func SecureUbuntu(rc *eos_io.RuntimeContext, enableMFA, disableMFA bool) error {
 		return fmt.Errorf("install osquery: %w", err)
 	}
 
-	// 3. Install and configure AIDE
-	logger.Info(" Installing AIDE for file integrity monitoring")
-	if err := configureAIDE(rc); err != nil {
-		return fmt.Errorf("configure AIDE: %w", err)
+	// 3. Configure enhanced security monitoring with Osquery and Auditd
+	logger.Info(" Configuring enhanced security monitoring")
+	if err := configureEnhancedMonitoring(rc); err != nil {
+		return fmt.Errorf("configure enhanced monitoring: %w", err)
 	}
 
 	// 4. Install Lynis

@@ -72,7 +72,7 @@ func NewExtendedContext(ctx context.Context, cmdName string, timeout time.Durati
 		zap.String("action", action),
 		zap.Duration("extended_timeout", timeout)).Named(cmdName)
 
-	log.Info("🕐 Created extended runtime context", zap.Duration("timeout", timeout))
+	log.Info(" Created extended runtime context", zap.Duration("timeout", timeout))
 
 	return &RuntimeContext{
 		Ctx:        extendedCtx,

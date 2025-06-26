@@ -42,10 +42,10 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		return fmt.Errorf("install osquery: %w", err)
 	}
 
-	// 3. Install and configure AIDE
-	logger.Info("🛡️ Installing AIDE for file integrity monitoring")
-	if err := configureAIDE(rc); err != nil {
-		return fmt.Errorf("configure AIDE: %w", err)
+	// 3. Configure enhanced security monitoring with Osquery and Auditd
+	logger.Info("🛡️ Configuring enhanced security monitoring")
+	if err := configureEnhancedMonitoring(rc); err != nil {
+		return fmt.Errorf("configure enhanced monitoring: %w", err)
 	}
 
 	// 4. Install Lynis
@@ -133,9 +133,8 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println("═══════════════════════════════════════════════════════════════════════")
 	fmt.Println()
 	fmt.Println(" Security Tools Installed & Configured:")
-	fmt.Println("   • auditd - System activity monitoring and logging")
-	fmt.Println("   • osquery - Operating system instrumentation framework")
-	fmt.Println("   • AIDE - File integrity monitoring")
+	fmt.Println("   • auditd - Enhanced system activity monitoring and logging")
+	fmt.Println("   • osquery - File integrity monitoring and system instrumentation")
 	fmt.Println("   • Lynis - Security auditing and hardening recommendations")
 	fmt.Println("   • fail2ban - Brute force attack protection")
 	fmt.Println("   • needrestart - Service restart recommendations")

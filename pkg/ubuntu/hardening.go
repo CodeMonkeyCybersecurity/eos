@@ -157,7 +157,16 @@ echo "=== Fail2ban Status ==="
 fail2ban-client status
 echo
 
+echo "=== Osquery File Integrity Monitoring ==="
+if command -v security-monitor >/dev/null 2>&1; then
+    security-monitor files
+else
+    echo "  security-monitor not available"
+fi
+echo
+
 echo "=== Run 'lynis audit system' for detailed security audit ==="
+echo "=== Run 'security-monitor' for real-time security monitoring ==="
 `
 
 func createSecurityReportScript(rc *eos_io.RuntimeContext) error {

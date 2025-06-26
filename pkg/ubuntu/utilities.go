@@ -7,42 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
-
-const aideCronScript = `#!/bin/bash
-/usr/bin/aide --check | /usr/bin/mail -s "AIDE Daily Report for $(hostname)" root
-`
-
-func configureAIDE(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Install AIDE
-	if err := execute.RunSimple(rc.Ctx, "apt-get", "install", "-y", "aide", "aide-common"); err != nil {
-		return fmt.Errorf("install AIDE: %w", err)
-	}
-
-	// Initialize AIDE database
-	logger.Info("Initializing AIDE database (this may take a while)")
-	if err := execute.RunSimple(rc.Ctx, "aideinit"); err != nil {
-		return fmt.Errorf("initialize AIDE: %w", err)
-	}
-
-	// Copy the new database to the production location
-	if err := execute.RunSimple(rc.Ctx, "cp", "/var/lib/aide/aide.db.new", "/var/lib/aide/aide.db"); err != nil {
-		return fmt.Errorf("copy AIDE database: %w", err)
-	}
-
-	// Create daily AIDE check cron job
-	cronPath := "/etc/cron.daily/aide-check"
-	if err := os.WriteFile(cronPath, []byte(aideCronScript), 0755); err != nil {
-		return fmt.Errorf("write AIDE cron script: %w", err)
-	}
-	logger.Info("AIDE daily check configured", zap.String("path", cronPath))
-
-	logger.Info(" AIDE configured for file integrity monitoring")
-	return nil
-}
 
 func installLynis(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
