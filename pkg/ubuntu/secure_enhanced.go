@@ -90,25 +90,27 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		return fmt.Errorf("create security report script: %w", err)
 	}
 
-	// 11. Configure MFA based on mode
+	// 11. Configure MFA based on mode using the new secure implementation
 	switch mfaMode {
 	case "enforced":
-		logger.Info(" Configuring ENFORCED Multi-Factor Authentication")
-		if err := ConfigureEnforcedMFA(rc); err != nil {
+		logger.Info("🔒 Configuring ENFORCED Multi-Factor Authentication")
+		mfaManager := NewMFAManager(rc)
+		if err := mfaManager.ImplementMFASecurely(true); err != nil {
 			return fmt.Errorf("configure enforced MFA: %w", err)
 		}
-		logger.Info(" ENFORCED MFA configured successfully")
+		logger.Info("✅ ENFORCED MFA configured successfully")
 
 	case "standard":
-		logger.Info(" Configuring standard Multi-Factor Authentication")
-		if err := configureMFA(rc); err != nil {
-			return fmt.Errorf("configure standard MFA: %w", err)
+		logger.Info("⚡ Configuring GRACEFUL Multi-Factor Authentication")
+		mfaManager := NewMFAManager(rc)
+		if err := mfaManager.ImplementMFASecurely(false); err != nil {
+			return fmt.Errorf("configure graceful MFA: %w", err)
 		}
-		logger.Info(" Standard MFA configured successfully")
+		logger.Info("✅ GRACEFUL MFA configured successfully")
 
 	case "disabled":
-		logger.Warn("  MFA configuration skipped - this reduces security")
-		logger.Warn("  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
+		logger.Warn("⚠️  MFA configuration skipped - this reduces security")
+		logger.Warn("⚠️  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
 
 	default:
 		return fmt.Errorf("unknown MFA mode: %s", mfaMode)

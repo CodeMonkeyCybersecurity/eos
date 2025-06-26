@@ -53,8 +53,8 @@ session    include    system-session
 
 const gracefulPAMSudoConfig = `# PAM configuration for sudo with GRACEFUL MFA (temporary)
 # /etc/pam.d/sudo - Allows password fallback during grace period
-auth       sufficient pam_unix.so
-auth       sufficient pam_google_authenticator.so nullok
+auth       sufficient pam_unix.so try_first_pass
+auth       optional   pam_google_authenticator.so nullok
 account    include    system-account
 session    include    system-session
 `
@@ -505,6 +505,11 @@ func configureGracefulPAM(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write su PAM config: %w", err)
 	}
 
+	// Create emergency recovery script
+	if err := createEmergencyRecoveryScript(rc); err != nil {
+		logger.Warn("Failed to create emergency recovery script", zap.Error(err))
+	}
+
 	logger.Info("  Applied graceful MFA PAM configuration")
 	return nil
 }
@@ -713,4 +718,101 @@ echo "   All sudo operations now require MFA authentication."
 func isInteractiveTerminal() bool {
 	// Check if stdin is a terminal
 	return term.IsTerminal(int(os.Stdin.Fd()))
+}
+
+// createEmergencyRecoveryScript creates a script to restore sudo access in case of MFA lockout
+func createEmergencyRecoveryScript(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	emergencyScript := `#!/bin/bash
+# Emergency MFA Recovery Script
+# Use this script to restore sudo access if locked out due to MFA issues
+# 
+# USAGE: Run this script as root from a console/recovery mode
+#        sudo bash /usr/local/bin/emergency-mfa-recovery
+#
+# This script restores the original PAM configurations
+
+set -euo pipefail
+
+echo "=============================================================================="
+echo "                      EMERGENCY MFA RECOVERY"
+echo "=============================================================================="
+echo
+echo "This script will restore the original sudo/su configurations"
+echo "WARNING: This will disable MFA enforcement temporarily"
+echo
+
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+    echo "ERROR: This script must be run as root"
+    echo "Try: sudo bash $0"
+    exit 1
+fi
+
+# Restore original sudo PAM configuration
+if [[ -f "/etc/pam.d/sudo.backup-before-mfa" ]]; then
+    echo "Restoring original sudo PAM configuration..."
+    cp "/etc/pam.d/sudo.backup-before-mfa" "/etc/pam.d/sudo"
+    echo "✓ sudo PAM configuration restored"
+else
+    echo "⚠ No sudo backup found, creating safe default..."
+    cat > /etc/pam.d/sudo << 'EOF'
+#%PAM-1.0
+
+session    required   pam_env.so readenv=1 user_readenv=0
+session    required   pam_env.so readenv=1 envfile=/etc/default/locale user_readenv=0
+@include common-auth
+@include common-account
+@include common-session-noninteractive
+EOF
+    echo "✓ Safe sudo PAM configuration created"
+fi
+
+# Restore original su PAM configuration  
+if [[ -f "/etc/pam.d/su.backup-before-mfa" ]]; then
+    echo "Restoring original su PAM configuration..."
+    cp "/etc/pam.d/su.backup-before-mfa" "/etc/pam.d/su"
+    echo "✓ su PAM configuration restored"
+else
+    echo "⚠ No su backup found, creating safe default..."
+    cat > /etc/pam.d/su << 'EOF'
+#%PAM-1.0
+
+auth       sufficient pam_rootok.so
+auth       required   pam_unix.so
+account    required   pam_unix.so
+session    required   pam_unix.so
+EOF
+    echo "✓ Safe su PAM configuration created"
+fi
+
+echo
+echo "=============================================================================="
+echo "                           RECOVERY COMPLETE"
+echo "=============================================================================="
+echo
+echo "✓ sudo and su access has been restored"
+echo "✓ You should now be able to use sudo normally"
+echo
+echo "NEXT STEPS:"
+echo "1. Test sudo access: sudo whoami"
+echo "2. Configure MFA properly: sudo setup-mfa"
+echo "3. Re-enable MFA: sudo eos secure ubuntu --enforce-mfa --mfa-only"
+echo
+echo "SECURITY NOTICE: MFA enforcement has been temporarily disabled"
+echo "Re-enable it as soon as possible for security"
+echo
+`
+
+	scriptPath := "/usr/local/bin/emergency-mfa-recovery"
+	if err := os.WriteFile(scriptPath, []byte(emergencyScript), 0755); err != nil {
+		return fmt.Errorf("write emergency recovery script: %w", err)
+	}
+
+	logger.Info("🚨 Created emergency recovery script", 
+		zap.String("path", scriptPath),
+		zap.String("usage", "sudo bash /usr/local/bin/emergency-mfa-recovery"))
+	
+	return nil
 }
