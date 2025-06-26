@@ -26,7 +26,7 @@ class DelphiConfigValidator:
         
     def validate_all(self) -> bool:
         """Run all validation checks"""
-        print("🔍 Delphi Configuration Validator")
+        print(" Delphi Configuration Validator")
         print("=" * 50)
         
         # Critical validations
@@ -249,7 +249,7 @@ class DelphiConfigValidator:
     
     def validate_parser_config(self):
         """Validate parser configuration"""
-        print("\n🔍 Parser Configuration")
+        print("\n Parser Configuration")
         
         # Check circuit breaker settings
         threshold = os.getenv("PARSER_FAILURE_THRESHOLD", "5")

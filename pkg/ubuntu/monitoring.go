@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -281,9 +282,13 @@ func configureOsqueryFIM(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("create osquery log directory: %w", err)
 	}
 
-	// Set proper ownership for osquery directories
-	if err := execute.RunSimple(rc.Ctx, "chown", "-R", "osquery:osquery", logDir); err != nil {
-		logger.Warn(" Failed to set osquery log directory ownership", zap.Error(err))
+	// Set proper ownership for osquery directories (only if osquery user exists)
+	if err := execute.RunSimple(rc.Ctx, "id", "osquery"); err == nil {
+		if err := execute.RunSimple(rc.Ctx, "chown", "-R", "osquery:osquery", logDir); err != nil {
+			logger.Warn(" Failed to set osquery log directory ownership", zap.Error(err))
+		}
+	} else {
+		logger.Info(" Osquery user not found, skipping ownership change")
 	}
 
 	// Restart osquery to apply new configuration
@@ -381,12 +386,15 @@ func enhanceAuditdConfig(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Verify total audit rules are loaded
-	output, err := execute.RunShell(rc.Ctx, "auditctl -l | wc -l")
-	if err != nil {
+	if output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "sh",
+		Args:    []string{"-c", "auditctl -l | wc -l"},
+		Shell:   true,
+	}); err != nil {
 		logger.Warn(" Failed to verify audit rules", zap.Error(err))
 	} else {
 		logger.Info(" Total audit rules loaded",
-			zap.String("rule_count", output))
+			zap.String("rule_count", strings.TrimSpace(output)))
 	}
 
 	return nil

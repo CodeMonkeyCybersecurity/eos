@@ -115,7 +115,7 @@ sudo enforce-mfa-strict
 sudo disable-mfa-emergency
 ```
 
-## 🛡️ Enforcement Modes
+##  Enforcement Modes
 
 ### Graceful Mode (Default)
 - **Password fallback allowed** during transition period
@@ -167,7 +167,7 @@ Password: [your-password]
 Verification code: [backup-code]
 ```
 
-## 📊 Monitoring and Status
+##  Monitoring and Status
 
 ### Check MFA Status
 ```bash

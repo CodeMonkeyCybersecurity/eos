@@ -131,10 +131,9 @@ func checkUbuntuVersion(rc *eos_io.RuntimeContext) error {
 }
 
 func extractVersion(osRelease string) string {
-	lines := strings.Split(osRelease, "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "VERSION=") {
-			return strings.Trim(strings.TrimPrefix(line, "VERSION="), "\"")
+	for line := range strings.SplitSeq(osRelease, "\n") {
+		if value, found := strings.CutPrefix(line, "VERSION="); found {
+			return strings.Trim(value, "\"")
 		}
 	}
 	return "unknown"

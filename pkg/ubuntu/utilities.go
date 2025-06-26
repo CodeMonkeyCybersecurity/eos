@@ -10,6 +10,9 @@ import (
 )
 
 func installLynis(rc *eos_io.RuntimeContext) error {
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("runtime context is nil")
+	}
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Add Lynis repository key
@@ -44,6 +47,9 @@ func installLynis(rc *eos_io.RuntimeContext) error {
 }
 
 func installNeedrestart(rc *eos_io.RuntimeContext) error {
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("runtime context is nil")
+	}
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Install needrestart

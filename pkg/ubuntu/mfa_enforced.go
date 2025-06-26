@@ -405,7 +405,7 @@ fi
 echo
 
 # Show recent authentication attempts
-echo -e "${BLUE}📊 Recent Authentication Activity:${NC}"
+echo -e "${BLUE} Recent Authentication Activity:${NC}"
 if command -v journalctl >/dev/null 2>&1; then
     echo "Last 5 sudo attempts:"
     journalctl -u sudo --since "1 hour ago" --no-pager -n 5 2>/dev/null | tail -n 5 || echo "No recent sudo activity found"
@@ -638,7 +638,7 @@ func createMFAStatusScript(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write MFA status script: %w", err)
 	}
 
-	logger.Info("📊 Created MFA status script", zap.String("path", scriptPath))
+	logger.Info(" Created MFA status script", zap.String("path", scriptPath))
 	return nil
 }
 

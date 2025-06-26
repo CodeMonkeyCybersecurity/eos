@@ -31,19 +31,19 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	}
 
 	// 1. Configure auditd
-	logger.Info("📊 Installing and configuring auditd")
+	logger.Info(" Installing and configuring auditd")
 	if err := configureAuditd(rc); err != nil {
 		return fmt.Errorf("configure auditd: %w", err)
 	}
 
 	// 2. Install osquery
-	logger.Info("🔍 Installing osquery")
+	logger.Info(" Installing osquery")
 	if err := installOsquery(rc); err != nil {
 		return fmt.Errorf("install osquery: %w", err)
 	}
 
 	// 3. Configure enhanced security monitoring with Osquery and Auditd
-	logger.Info("🛡️ Configuring enhanced security monitoring")
+	logger.Info(" Configuring enhanced security monitoring")
 	if err := configureEnhancedMonitoring(rc); err != nil {
 		return fmt.Errorf("configure enhanced monitoring: %w", err)
 	}
