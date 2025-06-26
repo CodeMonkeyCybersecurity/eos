@@ -394,16 +394,20 @@ func enhanceAuditdConfig(rc *eos_io.RuntimeContext) error {
 		logger.Info(" Auditd restarted with enhanced rules")
 	}
 
-	// Verify total audit rules are loaded
+	// Verify total audit rules are loaded - count lines from auditctl output
 	if output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "sh",
-		Args:    []string{"-c", "auditctl -l | wc -l"},
-		Shell:   true,
+		Command: "auditctl",
+		Args:    []string{"-l"},
 	}); err != nil {
 		logger.Warn(" Failed to verify audit rules", zap.Error(err))
 	} else {
+		lines := strings.Split(strings.TrimSpace(output), "\n")
+		ruleCount := len(lines)
+		if output == "" {
+			ruleCount = 0
+		}
 		logger.Info(" Total audit rules loaded",
-			zap.String("rule_count", strings.TrimSpace(output)))
+			zap.Int("rule_count", ruleCount))
 	}
 
 	return nil

@@ -15,15 +15,21 @@ func installLynis(rc *eos_io.RuntimeContext) error {
 	}
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Add Lynis repository key
+	// Add Lynis repository key using wget and gpg commands
 	keyURL := "https://packages.cisofy.com/keys/cisofy-software-public.key"
-	if _, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "sh",
-		Args:    []string{"-c", fmt.Sprintf("wget -O - %s | gpg --dearmor | tee /usr/share/keyrings/cisofy-archive-keyring.gpg >/dev/null", keyURL)},
-		Shell:   true,
-	}); err != nil {
+	
+	// Download the key first
+	if err := execute.RunSimple(rc.Ctx, "wget", "-O", "/tmp/cisofy-key.asc", keyURL); err != nil {
+		return fmt.Errorf("download Lynis GPG key: %w", err)
+	}
+	
+	// Dearmor and install the key
+	if err := execute.RunSimple(rc.Ctx, "gpg", "--dearmor", "--output", "/usr/share/keyrings/cisofy-archive-keyring.gpg", "/tmp/cisofy-key.asc"); err != nil {
 		return fmt.Errorf("add Lynis GPG key: %w", err)
 	}
+	
+	// Clean up temporary file
+	_ = os.Remove("/tmp/cisofy-key.asc") // Ignore error for cleanup
 
 	// Add Lynis repository
 	repoLine := "deb [signed-by=/usr/share/keyrings/cisofy-archive-keyring.gpg] https://packages.cisofy.com/community/lynis/deb/ stable main"
