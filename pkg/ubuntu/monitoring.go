@@ -235,6 +235,9 @@ esac
 `
 
 func configureEnhancedMonitoring(rc *eos_io.RuntimeContext) error {
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("runtime context is nil")
+	}
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Configuring enhanced security monitoring with Osquery")
 
@@ -258,6 +261,9 @@ func configureEnhancedMonitoring(rc *eos_io.RuntimeContext) error {
 }
 
 func configureOsqueryFIM(rc *eos_io.RuntimeContext) error {
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("runtime context is nil")
+	}
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Configuring Osquery for file integrity monitoring")
 
@@ -305,6 +311,9 @@ func configureOsqueryFIM(rc *eos_io.RuntimeContext) error {
 }
 
 func enhanceAuditdConfig(rc *eos_io.RuntimeContext) error {
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("runtime context is nil")
+	}
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Enhancing existing Auditd configuration with additional security rules")
 
@@ -401,6 +410,9 @@ func enhanceAuditdConfig(rc *eos_io.RuntimeContext) error {
 }
 
 func createMonitoringScript(rc *eos_io.RuntimeContext) error {
+	if rc == nil || rc.Ctx == nil {
+		return fmt.Errorf("runtime context is nil")
+	}
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Creating security monitoring management script")
 
