@@ -283,7 +283,7 @@ class DelphiConfigValidator:
     
     def validate_security_config(self):
         """Validate security configuration"""
-        print("\n🔒 Security Configuration")
+        print("\n Security Configuration")
         
         auth_token = os.getenv("WEBHOOK_AUTH_TOKEN")
         if not auth_token:
@@ -314,7 +314,7 @@ class DelphiConfigValidator:
                 print(f"   • {error}")
         
         if self.warnings:
-            print(f"\n⚠️  WARNINGS ({len(self.warnings)}):")
+            print(f"\n  WARNINGS ({len(self.warnings)}):")
             for warning in self.warnings:
                 print(f"   • {warning}")
         
@@ -328,7 +328,7 @@ class DelphiConfigValidator:
         if not self.errors and not self.warnings:
             print("🎉 ALL CHECKS PASSED - Delphi is ready for production!")
         elif not self.errors:
-            print("⚠️  WARNINGS FOUND - Delphi should work but check warnings")
+            print("  WARNINGS FOUND - Delphi should work but check warnings")
         else:
             print(" CRITICAL ERRORS FOUND - Fix errors before running Delphi")
             

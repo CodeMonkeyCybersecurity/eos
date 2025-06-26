@@ -411,7 +411,7 @@ fi
 	}
 	fmt.Printf("  %s/deploy.sh - Deployment script\n", outputDir)
 
-	fmt.Println("\n⚡ Quick start:")
+	fmt.Println("\n Quick start:")
 	fmt.Printf("  cd %s\n", outputDir)
 	if cloudDeploy {
 		fmt.Println("  export HCLOUD_TOKEN='your-token'")

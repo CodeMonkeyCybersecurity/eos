@@ -54,7 +54,7 @@ if [[ -f "$GOOGLE_AUTH_FILE" ]]; then
 fi
 
 echo " Installing Google Authenticator for this user..."
-echo "⚡ Please scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)"
+echo " Please scan the QR code with your authenticator app (Google Authenticator, Authy, etc.)"
 echo
 
 # Run google-authenticator with recommended security settings

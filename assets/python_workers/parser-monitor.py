@@ -294,7 +294,7 @@ class ParserMonitor:
         print(f"Average Parse Time: {health['avg_parse_time_ms']}ms")
         print(f"Last Parse: {health['last_parse'].strftime('%H:%M:%S') if health['last_parse'] else 'Never'}")
         if health['stuck_alerts'] > 0:
-            print(f"⚠️  Stuck Alerts: {health['stuck_alerts']} alerts waiting >1 hour for processing")
+            print(f"  Stuck Alerts: {health['stuck_alerts']} alerts waiting >1 hour for processing")
         
         # Pipeline Status
         print("\n PIPELINE STATUS (Last 24 hours)")
@@ -358,7 +358,7 @@ class ParserMonitor:
                           tablefmt='grid'))
         
         # Missing Prompt Types
-        print("\n⚠️  MISSING PROMPT TYPES")
+        print("\n  MISSING PROMPT TYPES")
         print("-" * 80)
         missing = self.check_missing_prompt_types()
         if missing['missing'] > 0:

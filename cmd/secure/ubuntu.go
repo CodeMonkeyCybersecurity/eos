@@ -64,7 +64,7 @@ Use --no-mfa to skip MFA configuration (not recommended for production).`,
 		var mfaMode string
 		if noMFA {
 			mfaMode = "disabled"
-			logger.Warn("⚠️  MFA disabled - this reduces security significantly")
+			logger.Warn("  MFA disabled - this reduces security significantly")
 		} else if enforceMFA || (!enableMFA && !disableMFA) {
 			// Default to enforced MFA
 			mfaMode = "enforced"

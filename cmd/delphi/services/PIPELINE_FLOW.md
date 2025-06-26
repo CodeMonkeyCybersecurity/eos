@@ -756,13 +756,13 @@ parser_health=$(eos delphi parser-health --health | grep "Success Rate" | awk '{
 if (( $(echo "$parser_health > 90" | bc -l) )); then
     echo " Parser success rate: $parser_health%"
 else
-    echo "⚠️  Parser success rate: $parser_health% (below threshold)"
+    echo "  Parser success rate: $parser_health% (below threshold)"
 fi
 
 # Check for stuck alerts
 stuck_alerts=$(psql -d delphi -t -c "SELECT COUNT(*) FROM alerts WHERE created_at < NOW() - INTERVAL '1 hour' AND alert_state != 'sent';")
 if [ "$stuck_alerts" -gt 10 ]; then
-    echo "⚠️  $stuck_alerts alerts stuck in pipeline"
+    echo "  $stuck_alerts alerts stuck in pipeline"
 else
     echo " Pipeline flowing normally"
 fi

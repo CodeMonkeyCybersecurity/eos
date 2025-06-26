@@ -49,7 +49,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	}
 
 	// 4. Install Lynis
-	logger.Info("🔎 Installing Lynis security auditing tool")
+	logger.Info(" Installing Lynis security auditing tool")
 	if err := installLynis(rc); err != nil {
 		return fmt.Errorf("install Lynis: %w", err)
 	}
@@ -67,25 +67,25 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	}
 
 	// 7. Configure unattended upgrades
-	logger.Info("⚡ Configuring automatic security updates")
+	logger.Info(" Configuring automatic security updates")
 	if err := configureUnattendedUpgrades(rc); err != nil {
 		return fmt.Errorf("configure unattended-upgrades: %w", err)
 	}
 
 	// 8. Install restic for backups
-	logger.Info("💾 Installing restic backup solution")
+	logger.Info(" Installing restic backup solution")
 	if err := installRestic(rc); err != nil {
 		return fmt.Errorf("install restic: %w", err)
 	}
 
 	// 9. Apply system hardening
-	logger.Info("🔒 Applying system hardening configurations")
+	logger.Info(" Applying system hardening configurations")
 	if err := applySystemHardening(rc); err != nil {
 		return fmt.Errorf("apply system hardening: %w", err)
 	}
 
 	// 10. Create security report script
-	logger.Info("📋 Creating security report script")
+	logger.Info(" Creating security report script")
 	if err := createSecurityReportScript(rc); err != nil {
 		return fmt.Errorf("create security report script: %w", err)
 	}
@@ -107,8 +107,8 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		logger.Info(" Standard MFA configured successfully")
 
 	case "disabled":
-		logger.Warn("⚠️  MFA configuration skipped - this reduces security")
-		logger.Warn("⚠️  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
+		logger.Warn("  MFA configuration skipped - this reduces security")
+		logger.Warn("  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
 
 	default:
 		return fmt.Errorf("unknown MFA mode: %s", mfaMode)
@@ -158,12 +158,12 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 		fmt.Println("   • User setup: setup-mfa")
 
 	case "disabled":
-		fmt.Println("⚠️  Multi-Factor Authentication: DISABLED")
+		fmt.Println("  Multi-Factor Authentication: DISABLED")
 		fmt.Println("   • Consider enabling: eos secure ubuntu --enforce-mfa --mfa-only")
 	}
 
 	fmt.Println()
-	fmt.Println("📋 Available Commands:")
+	fmt.Println(" Available Commands:")
 	fmt.Println("   • security-report     - Generate comprehensive security report")
 	fmt.Println("   • mfa-status          - Check MFA configuration status")
 	fmt.Println("   • setup-mfa           - Configure MFA for current user")

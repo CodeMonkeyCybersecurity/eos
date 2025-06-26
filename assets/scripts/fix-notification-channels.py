@@ -63,7 +63,7 @@ class ChannelStandardizer:
         for worker_file, config in WORKER_CONFIGS.items():
             worker_path = self.workers_dir / worker_file
             if worker_path.exists():
-                print(f"\n📝 Processing {worker_file}")
+                print(f"\n Processing {worker_file}")
                 self.standardize_worker(worker_path, config)
             else:
                 self.errors.append(f"Worker file not found: {worker_file}")

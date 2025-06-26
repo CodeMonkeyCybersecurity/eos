@@ -12,7 +12,7 @@ Eos now implements **enforced Multi-Factor Authentication (MFA)** by default for
 3. **Provides emergency access procedures**
 4. **Offers 24-hour grace period for setup**
 
-## 📋 Command Options
+##  Command Options
 
 ### Basic Usage
 ```bash
@@ -58,7 +58,7 @@ When you run `eos secure ubuntu`, you'll be guided through:
  MANDATORY MFA SETUP REQUIRED
 ═══════════════════════════════════════════════════════════════════════
 
-⚠️  Multi-Factor Authentication (MFA) must be configured for secure
+  Multi-Factor Authentication (MFA) must be configured for secure
    sudo and root access on this system.
 
 This setup will:
@@ -82,7 +82,7 @@ Proceed with MFA setup now? (Y/n):
 
 ### 5. Enforcement Mode Selection
 ```
-🔒 Enforcement Options:
+ Enforcement Options:
 
 1. Graceful Mode (recommended): Allow password fallback during transition
 2. Strict Mode: Require MFA immediately (no password fallback)
@@ -141,7 +141,7 @@ auth       required   pam_google_authenticator.so forward_pass
 auth       required   pam_unix.so use_first_pass
 ```
 
-## 📱 Supported Authenticator Apps
+##  Supported Authenticator Apps
 
 - **Google Authenticator** (iOS/Android)
 - **Microsoft Authenticator** (iOS/Android) 

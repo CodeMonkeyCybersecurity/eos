@@ -11,6 +11,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 )
 
 // EnforcedMFAConfig represents the enforced MFA configuration
@@ -87,7 +88,7 @@ print_header() {
     echo -e "${BLUE}║                                                                              ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════════════════════════════════╝${NC}"
     echo
-    echo -e "${YELLOW}⚠️  SECURITY NOTICE: Multi-Factor Authentication (MFA) is now REQUIRED${NC}"
+    echo -e "${YELLOW}  SECURITY NOTICE: Multi-Factor Authentication (MFA) is now REQUIRED${NC}"
     echo -e "${YELLOW}    for all sudo and root access on this system.${NC}"
     echo
 }
@@ -103,7 +104,7 @@ check_mfa_status() {
 }
 
 setup_mfa_interactive() {
-    echo -e "${BLUE}📱 Starting Interactive MFA Setup${NC}"
+    echo -e "${BLUE} Starting Interactive MFA Setup${NC}"
     echo "============================================================================"
     echo
     echo "This process will:"
@@ -112,7 +113,7 @@ setup_mfa_interactive() {
     echo "  3. Create emergency backup codes"
     echo "  4. Test the configuration"
     echo
-    echo "📱 Supported Authenticator Apps:"
+    echo " Supported Authenticator Apps:"
     echo "  • Google Authenticator (iOS/Android)"
     echo "  • Microsoft Authenticator (iOS/Android)"
     echo "  • Authy (iOS/Android/Desktop)"
@@ -125,7 +126,7 @@ setup_mfa_interactive() {
     
     # Backup existing config if present
     if [[ -f "$GOOGLE_AUTH_FILE" ]]; then
-        echo -e "${YELLOW}⚠️  Existing MFA configuration found. Creating backup...${NC}"
+        echo -e "${YELLOW}  Existing MFA configuration found. Creating backup...${NC}"
         cp "$GOOGLE_AUTH_FILE" "$GOOGLE_AUTH_FILE.backup.$(date +%s)"
     fi
     
@@ -156,7 +157,7 @@ test_mfa_configuration() {
     echo
     echo "We'll now test your MFA setup to ensure it's working correctly."
     echo
-    echo -e "${YELLOW}⚠️  IMPORTANT: Keep this terminal session open during testing!${NC}"
+    echo -e "${YELLOW}  IMPORTANT: Keep this terminal session open during testing!${NC}"
     echo "   If the test fails, you can still disable MFA from this session."
     echo
     
@@ -193,10 +194,10 @@ test_mfa_configuration() {
 
 enforce_mfa_strict() {
     echo
-    echo -e "${RED}🔒 ENFORCING STRICT MFA MODE${NC}"
+    echo -e "${RED} ENFORCING STRICT MFA MODE${NC}"
     echo "============================================================================"
     echo
-    echo -e "${YELLOW}⚠️  After this point, password-only authentication will be DISABLED.${NC}"
+    echo -e "${YELLOW}  After this point, password-only authentication will be DISABLED.${NC}"
     echo "   You MUST use your authenticator app for all sudo operations."
     echo
     echo -e "${GREEN} Emergency access available via: sudo disable-mfa-emergency${NC}"
@@ -248,13 +249,13 @@ show_post_setup_info() {
     echo -e "${GREEN}🎉 MFA Setup Complete!${NC}"
     echo "============================================================================"
     echo
-    echo -e "${BLUE}📋 Important Information:${NC}"
+    echo -e "${BLUE} Important Information:${NC}"
     echo
     echo "• Your MFA secret is stored in: $GOOGLE_AUTH_FILE"
     echo "• Emergency backup codes are saved in the same file"
     echo "• Each backup code can only be used once"
     echo
-    echo -e "${BLUE}📱 Next time you use sudo, you'll need:${NC}"
+    echo -e "${BLUE} Next time you use sudo, you'll need:${NC}"
     echo "  1. Your user password"
     echo "  2. Your 6-digit TOTP code from your authenticator app"
     echo
@@ -267,7 +268,7 @@ show_post_setup_info() {
     echo "  • Check MFA status: mfa-status"
     echo "  • Emergency disable: disable-mfa-emergency"
     echo
-    echo -e "${YELLOW}⚠️  BACKUP YOUR RECOVERY CODES IN A SECURE LOCATION!${NC}"
+    echo -e "${YELLOW}  BACKUP YOUR RECOVERY CODES IN A SECURE LOCATION!${NC}"
     echo
 }
 
@@ -299,7 +300,7 @@ main() {
     show_post_setup_info
     
     # Offer to enforce strict mode immediately
-    echo -e "${BLUE}🔒 Enforcement Options:${NC}"
+    echo -e "${BLUE} Enforcement Options:${NC}"
     echo
     echo "1. Graceful Mode (recommended): Allow password fallback during transition"
     echo "2. Strict Mode: Require MFA immediately (no password fallback)"
@@ -311,7 +312,7 @@ main() {
             enforce_mfa_strict
             ;;
         *)
-            echo -e "${YELLOW}⚠️  Graceful mode active. MFA will be strictly enforced in 24 hours.${NC}"
+            echo -e "${YELLOW}  Graceful mode active. MFA will be strictly enforced in 24 hours.${NC}"
             echo "   Run 'sudo enforce-mfa-strict' to enable strict mode sooner."
             log_message "MFA configured in graceful mode for user: $(whoami)"
             ;;
@@ -365,7 +366,7 @@ if grep -q "pam_google_authenticator.so" /etc/pam.d/sudo 2>/dev/null; then
     if grep -q "required.*pam_google_authenticator.so" /etc/pam.d/sudo; then
         echo -e "${GREEN} sudo MFA: ENFORCED (strict mode)${NC}"
     elif grep -q "nullok" /etc/pam.d/sudo; then
-        echo -e "${YELLOW}⚠️  sudo MFA: GRACEFUL (fallback allowed)${NC}"
+        echo -e "${YELLOW}  sudo MFA: GRACEFUL (fallback allowed)${NC}"
     else
         echo -e "${GREEN} sudo MFA: CONFIGURED${NC}"
     fi
@@ -377,7 +378,7 @@ if grep -q "pam_google_authenticator.so" /etc/pam.d/su 2>/dev/null; then
     if grep -q "required.*pam_google_authenticator.so" /etc/pam.d/su; then
         echo -e "${GREEN} su MFA: ENFORCED (strict mode)${NC}"
     elif grep -q "nullok" /etc/pam.d/su; then
-        echo -e "${YELLOW}⚠️  su MFA: GRACEFUL (fallback allowed)${NC}"
+        echo -e "${YELLOW}  su MFA: GRACEFUL (fallback allowed)${NC}"
     else
         echo -e "${GREEN} su MFA: CONFIGURED${NC}"
     fi
@@ -396,10 +397,10 @@ if [[ -f "$CONFIG_FILE" ]]; then
         echo "   Enforced on: ${enforcement_date:-unknown}"
         echo "   Enforced by: ${enforced_by:-unknown}"
     else
-        echo -e "${YELLOW}⚠️  MFA Enforcement: GRACEFUL MODE${NC}"
+        echo -e "${YELLOW}  MFA Enforcement: GRACEFUL MODE${NC}"
     fi
 else
-    echo -e "${YELLOW}⚠️  MFA Enforcement: NO POLICY SET${NC}"
+    echo -e "${YELLOW}  MFA Enforcement: NO POLICY SET${NC}"
 fi
 
 echo
@@ -484,7 +485,7 @@ func configureGracefulPAM(rc *eos_io.RuntimeContext) error {
 		if err := execute.RunSimple(rc.Ctx, "cp", sudoOriginal, sudoBackup); err != nil {
 			return fmt.Errorf("backup sudo PAM: %w", err)
 		}
-		logger.Info("📋 Backed up original sudo PAM configuration")
+		logger.Info(" Backed up original sudo PAM configuration")
 	}
 
 	// Backup su config
@@ -492,7 +493,7 @@ func configureGracefulPAM(rc *eos_io.RuntimeContext) error {
 		if err := execute.RunSimple(rc.Ctx, "cp", suOriginal, suBackup); err != nil {
 			return fmt.Errorf("backup su PAM: %w", err)
 		}
-		logger.Info("📋 Backed up original su PAM configuration")
+		logger.Info(" Backed up original su PAM configuration")
 	}
 
 	// Apply graceful configurations
@@ -504,7 +505,7 @@ func configureGracefulPAM(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write su PAM config: %w", err)
 	}
 
-	logger.Info("⚙️  Applied graceful MFA PAM configuration")
+	logger.Info("  Applied graceful MFA PAM configuration")
 	return nil
 }
 
@@ -516,7 +517,7 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 	fmt.Println(" MANDATORY MFA SETUP REQUIRED")
 	fmt.Println("═══════════════════════════════════════════════════════════════════════")
 	fmt.Println()
-	fmt.Println("⚠️  Multi-Factor Authentication (MFA) must be configured for secure")
+	fmt.Println("  Multi-Factor Authentication (MFA) must be configured for secure")
 	fmt.Println("   sudo and root access on this system.")
 	fmt.Println()
 	fmt.Println("This setup will:")
@@ -526,18 +527,36 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 	fmt.Println("  • Test the configuration")
 	fmt.Println()
 
-	// Check if user wants to proceed with interactive setup
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Proceed with MFA setup now? (Y/n): ")
-	response, err := reader.ReadString('\n')
-	if err != nil {
-		return fmt.Errorf("read user input: %w", err)
-	}
+	// Check if running in an interactive terminal
+	if isInteractiveTerminal() {
+		// Check if user wants to proceed with interactive setup
+		reader := bufio.NewReader(os.Stdin)
+		fmt.Print("Proceed with MFA setup now? (Y/n): ")
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return fmt.Errorf("read user input: %w", err)
+		}
 
-	response = strings.TrimSpace(strings.ToLower(response))
-	if response == "n" || response == "no" {
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response == "n" || response == "no" {
+			fmt.Println()
+			fmt.Println("  MFA setup deferred. You can configure it later by running:")
+			fmt.Println("   sudo setup-mfa")
+			fmt.Println()
+			fmt.Println("   Note: MFA will be enforced in 24 hours for security.")
+
+			// Schedule enforcement for later
+			if err := scheduleGracePeriod(rc); err != nil {
+				logger.Warn("Failed to schedule grace period", zap.Error(err))
+			}
+
+			return nil
+		}
+	} else {
+		// Non-interactive mode - defer setup for later
 		fmt.Println()
-		fmt.Println("⚠️  MFA setup deferred. You can configure it later by running:")
+		fmt.Println("  Non-interactive environment detected.")
+		fmt.Println("  MFA setup deferred. Configure it later by running:")
 		fmt.Println("   sudo setup-mfa")
 		fmt.Println()
 		fmt.Println("   Note: MFA will be enforced in 24 hours for security.")
@@ -547,6 +566,7 @@ func promptUserMFASetup(rc *eos_io.RuntimeContext) error {
 			logger.Warn("Failed to schedule grace period", zap.Error(err))
 		}
 
+		logger.Info(" MFA setup deferred for later manual configuration")
 		return nil
 	}
 
@@ -626,7 +646,7 @@ func createEnforcedMFASetupScript(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("write enforced MFA setup script: %w", err)
 	}
 
-	logger.Info("📝 Created enforced MFA setup script", zap.String("path", scriptPath))
+	logger.Info(" Created enforced MFA setup script", zap.String("path", scriptPath))
 	return nil
 }
 
@@ -651,7 +671,7 @@ set -euo pipefail
 
 CONFIG_FILE="/etc/eos/mfa-enforcement.conf"
 
-echo "🔒 Enabling strict MFA enforcement..."
+echo " Enabling strict MFA enforcement..."
 
 # Apply strict PAM configurations
 cat > /etc/pam.d/sudo << 'EOF'
@@ -685,6 +705,12 @@ echo "   All sudo operations now require MFA authentication."
 		return fmt.Errorf("write MFA enforcement script: %w", err)
 	}
 
-	logger.Info("🔒 Created MFA enforcement script", zap.String("path", scriptPath))
+	logger.Info(" Created MFA enforcement script", zap.String("path", scriptPath))
 	return nil
+}
+
+// isInteractiveTerminal checks if the current environment supports interactive input
+func isInteractiveTerminal() bool {
+	// Check if stdin is a terminal
+	return term.IsTerminal(int(os.Stdin.Fd()))
 }
