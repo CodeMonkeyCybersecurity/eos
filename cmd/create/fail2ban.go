@@ -699,11 +699,31 @@ esac
 }
 
 func parseDuration(s string) (time.Duration, error) {
-	// If it's already a number, assume seconds
-	if _, err := fmt.Sscanf(s, "%d", new(int)); err == nil {
-		return time.ParseDuration(s + "s")
+	// Handle common duration formats
+	switch s {
+	case "10m", "30m", "1h", "2h", "6h", "12h", "24h", "48h", "72h":
+		return time.ParseDuration(s)
+	case "1d":
+		return 24 * time.Hour, nil
+	case "2d":
+		return 48 * time.Hour, nil
+	case "3d":
+		return 72 * time.Hour, nil
+	case "7d", "1w":
+		return 7 * 24 * time.Hour, nil
+	case "14d", "2w":
+		return 14 * 24 * time.Hour, nil
+	case "30d", "1mo":
+		return 30 * 24 * time.Hour, nil
 	}
-	// Otherwise try parsing as duration
+
+	// If it's a plain number, assume seconds
+	var num int
+	if _, err := fmt.Sscanf(s, "%d", &num); err == nil && s == fmt.Sprintf("%d", num) {
+		return time.Duration(num) * time.Second, nil
+	}
+
+	// Try parsing as standard Go duration
 	return time.ParseDuration(s)
 }
 
