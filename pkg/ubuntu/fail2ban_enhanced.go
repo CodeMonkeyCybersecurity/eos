@@ -53,8 +53,7 @@ func ConfigureFail2banEnhanced(rc *eos_io.RuntimeContext, config *Fail2banConfig
 	}{
 		{"Update package lists", func() error {
 			logger.Info(" Updating package lists")
-			_, err := execute.RunShell(rc.Ctx, "apt-get update")
-			return err
+			return execute.RunSimple(rc.Ctx, "apt-get", "update")
 		}},
 		{"Install fail2ban and dependencies", func() error {
 			logger.Info(" Installing fail2ban and dependencies")
@@ -469,15 +468,17 @@ func verifyFail2banStatus(rc *eos_io.RuntimeContext) error {
 	logger.Info(" Verifying fail2ban installation and status")
 
 	// Check service status
-	if output, err := execute.RunShell(rc.Ctx, "systemctl is-active fail2ban"); err != nil {
+	if err := execute.RunSimple(rc.Ctx, "systemctl", "is-active", "fail2ban"); err != nil {
 		logger.Error(" Fail2ban service is not active",
-			zap.Error(err),
-			zap.String("output", output))
+			zap.Error(err))
 		return fmt.Errorf("fail2ban service not active: %w", err)
 	}
 
 	// Get jail status
-	if output, err := execute.RunShell(rc.Ctx, "fail2ban-client status"); err != nil {
+	if output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "fail2ban-client",
+		Args:    []string{"status"},
+	}); err != nil {
 		logger.Error(" Failed to get fail2ban status",
 			zap.Error(err),
 			zap.String("output", output))
@@ -488,7 +489,10 @@ func verifyFail2banStatus(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Check sshd jail specifically
-	if output, err := execute.RunShell(rc.Ctx, "fail2ban-client status sshd"); err != nil {
+	if output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "fail2ban-client",
+		Args:    []string{"status", "sshd"},
+	}); err != nil {
 		logger.Warn(" SSH jail not active yet",
 			zap.Error(err),
 			zap.String("output", output),
