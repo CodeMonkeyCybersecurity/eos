@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -100,20 +101,82 @@ func (t *MFATestFramework) checkGoogleAuthConfig() error {
 
 // checkPAMModules verifies PAM modules are available
 func (t *MFATestFramework) checkPAMModules() error {
-	modules := []string{
-		"/lib/*/security/pam_google_authenticator.so",
-		"/lib/*/security/pam_unix.so",
-		"/lib/*/security/pam_rootok.so",
+	modules := []struct {
+		name string
+		paths []string
+		patterns []string
+	}{
+		{
+			name: "pam_google_authenticator.so",
+			paths: []string{
+				"/lib/security/pam_google_authenticator.so",
+				"/lib64/security/pam_google_authenticator.so",
+				"/usr/lib/security/pam_google_authenticator.so",
+				"/usr/lib64/security/pam_google_authenticator.so",
+				"/lib/x86_64-linux-gnu/security/pam_google_authenticator.so",
+				"/usr/lib/x86_64-linux-gnu/security/pam_google_authenticator.so",
+				"/lib/aarch64-linux-gnu/security/pam_google_authenticator.so",
+				"/usr/lib/aarch64-linux-gnu/security/pam_google_authenticator.so",
+				"/lib/arm-linux-gnueabihf/security/pam_google_authenticator.so",
+				"/usr/lib/arm-linux-gnueabihf/security/pam_google_authenticator.so",
+			},
+			patterns: []string{
+				"/lib/*/security/pam_google_authenticator.so",
+				"/usr/lib/*/security/pam_google_authenticator.so",
+			},
+		},
+		{
+			name: "pam_unix.so",
+			paths: []string{
+				"/lib/security/pam_unix.so",
+				"/lib64/security/pam_unix.so",
+				"/usr/lib/security/pam_unix.so",
+				"/usr/lib64/security/pam_unix.so",
+			},
+			patterns: []string{
+				"/lib/*/security/pam_unix.so",
+				"/usr/lib/*/security/pam_unix.so",
+			},
+		},
+		{
+			name: "pam_rootok.so",
+			paths: []string{
+				"/lib/security/pam_rootok.so",
+				"/lib64/security/pam_rootok.so",
+				"/usr/lib/security/pam_rootok.so",
+				"/usr/lib64/security/pam_rootok.so",
+			},
+			patterns: []string{
+				"/lib/*/security/pam_rootok.so",
+				"/usr/lib/*/security/pam_rootok.so",
+			},
+		},
 	}
 
-	for _, pattern := range modules {
-		// Use shell expansion to find modules
-		output, err := execute.Run(t.rc.Ctx, execute.Options{
-			Command: "ls",
-			Args:    []string{pattern},
-		})
-		if err != nil || output == "" {
-			return fmt.Errorf("PAM module not found: %s", pattern)
+	for _, module := range modules {
+		found := false
+		
+		// First try direct paths
+		for _, path := range module.paths {
+			if _, err := os.Stat(path); err == nil {
+				found = true
+				break
+			}
+		}
+		
+		// If not found, try glob patterns
+		if !found {
+			for _, pattern := range module.patterns {
+				matches, err := filepath.Glob(pattern)
+				if err == nil && len(matches) > 0 {
+					found = true
+					break
+				}
+			}
+		}
+		
+		if !found {
+			return fmt.Errorf("PAM module not found: %s", module.name)
 		}
 	}
 

@@ -276,24 +276,63 @@ func (m *MFAManager) testMFAPackages() error {
 
 // testSystemSecurity performs additional security validation
 func (m *MFAManager) testSystemSecurity() error {
-	// Check PAM module exists
+	// Check PAM module exists using dynamic discovery
 	pamModulePaths := []string{
-		"/lib/x86_64-linux-gnu/security/pam_google_authenticator.so",
+		"/lib/security/pam_google_authenticator.so",
 		"/lib64/security/pam_google_authenticator.so",
+		"/usr/lib/security/pam_google_authenticator.so",
+		"/usr/lib64/security/pam_google_authenticator.so",
+		// x86_64 specific paths
+		"/lib/x86_64-linux-gnu/security/pam_google_authenticator.so",
 		"/usr/lib/x86_64-linux-gnu/security/pam_google_authenticator.so",
+		// ARM64 specific paths
+		"/lib/aarch64-linux-gnu/security/pam_google_authenticator.so",
+		"/usr/lib/aarch64-linux-gnu/security/pam_google_authenticator.so",
+		// Other common architectures
+		"/lib/arm-linux-gnueabihf/security/pam_google_authenticator.so",
+		"/usr/lib/arm-linux-gnueabihf/security/pam_google_authenticator.so",
 	}
 
 	found := false
+	var foundPath string
 	for _, path := range pamModulePaths {
 		if _, err := os.Stat(path); err == nil {
 			found = true
+			foundPath = path
 			break
 		}
 	}
 
 	if !found {
-		return fmt.Errorf("pam_google_authenticator.so module not found")
+		// Try dynamic discovery using glob patterns
+		globPatterns := []string{
+			"/lib/*/security/pam_google_authenticator.so",
+			"/usr/lib/*/security/pam_google_authenticator.so",
+		}
+		
+		for _, pattern := range globPatterns {
+			matches, err := filepath.Glob(pattern)
+			if err == nil && len(matches) > 0 {
+				found = true
+				foundPath = matches[0]
+				break
+			}
+		}
 	}
+
+	if !found {
+		// Enhanced error message with debugging information
+		output, err := execute.Run(m.rc.Ctx, execute.Options{
+			Command: "find",
+			Args:    []string{"/lib", "/usr/lib", "-name", "pam_google_authenticator.so", "-type", "f"},
+		})
+		if err == nil && strings.TrimSpace(output) != "" {
+			return fmt.Errorf("pam_google_authenticator.so module found at non-standard location: %s (please report this to support)", strings.TrimSpace(output))
+		}
+		return fmt.Errorf("pam_google_authenticator.so module not found in any standard location")
+	}
+
+	m.logger.Info(" PAM module found", zap.String("path", foundPath))
 
 	// Check that /etc/security directory exists with proper permissions
 	securityDir := "/etc/security"
