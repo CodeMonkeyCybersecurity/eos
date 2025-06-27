@@ -35,7 +35,7 @@ func (m *MFAManager) setupMFAForUsers(users []SudoUser) error {
 				}
 				continue
 			} else {
-				m.logger.Warn("⚠️ User has NOPASSWD commands but requiring MFA for security",
+				m.logger.Warn(" User has NOPASSWD commands but requiring MFA for security",
 					zap.String("user", user.Username),
 					zap.Strings("nopasswd_commands", user.NOPASSWDCmds),
 					zap.String("reason", "Commands too broad or security-critical"))
@@ -43,7 +43,7 @@ func (m *MFAManager) setupMFAForUsers(users []SudoUser) error {
 		}
 
 		// Handle interactive users - defer MFA setup to manual process
-		m.logger.Info("📱 User needs MFA configuration",
+		m.logger.Info(" User needs MFA configuration",
 			zap.String("user", user.Username),
 			zap.String("home", user.HomeDir))
 
@@ -146,7 +146,7 @@ Generated: %s
 
 // testConfiguration performs comprehensive testing of the MFA setup
 func (m *MFAManager) testConfiguration() error {
-	m.logger.Info("🧪 Testing MFA configuration")
+	m.logger.Info(" Testing MFA configuration")
 
 	tests := []struct {
 		name string
@@ -162,7 +162,7 @@ func (m *MFAManager) testConfiguration() error {
 	for _, test := range tests {
 		m.logger.Info("  Running test: " + test.name)
 		if err := test.fn(); err != nil {
-			m.logger.Error("❌ Test failed",
+			m.logger.Error(" Test failed",
 				zap.String("test", test.name),
 				zap.Error(err))
 			return fmt.Errorf("test '%s' failed: %w", test.name, err)
@@ -347,7 +347,7 @@ func (m *MFAManager) configureAuditLogging() error {
 		Command: "auditctl",
 		Args:    []string{"-s"},
 	})
-	
+
 	isImmutable := false
 	if err == nil && strings.Contains(auditStatus, "enabled 2") {
 		isImmutable = true
@@ -367,7 +367,7 @@ func (m *MFAManager) configureAuditLogging() error {
 				rulesAdded++
 			}
 		}
-		
+
 		if rulesAdded > 0 {
 			m.logger.Info(" Added audit rules to active session",
 				zap.Int("rules_added", rulesAdded),
@@ -394,7 +394,7 @@ func (m *MFAManager) configureAuditLogging() error {
 		m.logger.Info(" Configured audit logging for sudo usage",
 			zap.String("persistent_file", rulesFile))
 	}
-	
+
 	return nil
 }
 
@@ -430,20 +430,20 @@ func (m *MFAManager) shouldBypassMFA(user SudoUser) bool {
 			return false
 		}
 	}
-	
+
 	// Define safe service command patterns
 	safeServicePatterns := []string{
-		"/usr/sbin/smartctl",       // Disk monitoring
-		"/usr/sbin/nvme",           // NVMe monitoring
+		"/usr/sbin/smartctl",        // Disk monitoring
+		"/usr/sbin/nvme",            // NVMe monitoring
 		"/usr/bin/systemctl status", // Read-only service status
-		"/usr/bin/journalctl",      // Log reading
-		"/bin/cat /proc/",          // System info reading
-		"/bin/ls",                  // Directory listing
-		"/usr/bin/docker ps",       // Container status
-		"/usr/bin/docker images",   // Container image listing
-		"/usr/bin/kubectl get",     // K8s read-only operations
+		"/usr/bin/journalctl",       // Log reading
+		"/bin/cat /proc/",           // System info reading
+		"/bin/ls",                   // Directory listing
+		"/usr/bin/docker ps",        // Container status
+		"/usr/bin/docker images",    // Container image listing
+		"/usr/bin/kubectl get",      // K8s read-only operations
 	}
-	
+
 	// Check if all commands match safe patterns
 	for _, cmd := range user.NOPASSWDCmds {
 		isSafe := false
@@ -453,7 +453,7 @@ func (m *MFAManager) shouldBypassMFA(user SudoUser) bool {
 				break
 			}
 		}
-		
+
 		// If any command doesn't match safe patterns, require MFA
 		if !isSafe {
 			m.logger.Debug("Command requires MFA",
@@ -462,7 +462,7 @@ func (m *MFAManager) shouldBypassMFA(user SudoUser) bool {
 			return false
 		}
 	}
-	
+
 	// Only bypass if all commands are safe and user appears to be service account
 	return len(user.NOPASSWDCmds) > 0 && m.looksLikeServiceAccount(user.Username)
 }
@@ -476,16 +476,16 @@ func (m *MFAManager) looksLikeServiceAccount(username string) bool {
 		"ceph", "mysql", "postgres", "redis", "elasticsearch", "kibana", "logstash",
 		"nginx", "apache", "www-data", "httpd", "tomcat", "application", "app",
 	}
-	
+
 	lowerUsername := strings.ToLower(username)
-	
+
 	// Check if username matches common service patterns
 	for _, pattern := range servicePatterns {
 		if strings.Contains(lowerUsername, pattern) {
 			return true
 		}
 	}
-	
+
 	// Check if username ends with common service suffixes
 	serviceSuffixes := []string{"_service", "_daemon", "_worker", "_agent", "_bot"}
 	for _, suffix := range serviceSuffixes {
@@ -493,7 +493,7 @@ func (m *MFAManager) looksLikeServiceAccount(username string) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -591,7 +591,7 @@ func (m *MFAManager) displayCompletionMessage() {
 	fmt.Println(strings.Repeat("=", 80))
 
 	if m.testMode {
-		fmt.Println("\n🧪 TEST MODE ACTIVE")
+		fmt.Println("\n TEST MODE ACTIVE")
 		fmt.Println("   • MFA is configured but allows fallback during testing")
 		fmt.Println("   • Users without MFA can still access sudo with password only")
 		fmt.Println("   • Switch to enforced mode when ready: eos secure ubuntu --enforce-mfa")
@@ -636,7 +636,7 @@ func (m *MFAManager) displayCompletionMessage() {
 	fmt.Printf("   • Recovery guide: /usr/local/share/eos/mfa-recovery.md\n")
 	fmt.Printf("   • User instructions: ~/MFA_SETUP_REQUIRED.txt\n")
 
-	fmt.Println("\n⚠️  IMPORTANT REMINDERS:")
+	fmt.Println("\n  IMPORTANT REMINDERS:")
 	fmt.Println("   1. Test MFA access in a NEW terminal before closing this session")
 	fmt.Println("   2. Ensure all users complete MFA setup")
 	fmt.Println("   3. Keep emergency access credentials secure but accessible")

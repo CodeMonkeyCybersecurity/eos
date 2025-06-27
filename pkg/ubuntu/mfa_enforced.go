@@ -152,7 +152,7 @@ setup_mfa_interactive() {
 
 test_mfa_configuration() {
     echo
-    echo -e "${BLUE}🧪 Testing MFA Configuration${NC}"
+    echo -e "${BLUE} Testing MFA Configuration${NC}"
     echo "============================================================================"
     echo
     echo "We'll now test your MFA setup to ensure it's working correctly."

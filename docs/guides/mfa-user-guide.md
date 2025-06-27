@@ -40,7 +40,7 @@ Proceed? (Y/n): Y
 ## Step 2: Scan QR Code
 
 ```
-📱 Setting up Google Authenticator
+ Setting up Google Authenticator
 ════════════════════════════════════════════════
 
 Scan this QR code with your authenticator app:
@@ -97,7 +97,7 @@ Press ENTER to continue...
 ## Step 4: Test Your Setup
 
 ```
-🧪 Testing MFA Configuration
+ Testing MFA Configuration
 ════════════════════════════════════════════════
 
 Enter the 6-digit code from your authenticator app: 123456
@@ -213,11 +213,11 @@ If you cannot sudo at all:
 ✅ Test MFA works before logging out
 
 ### DON'T:
-❌ Share your MFA codes with anyone
-❌ Store backup codes in plain text
-❌ Disable phone lock screen
-❌ Use SMS for MFA (not supported here)
-❌ Ignore time sync warnings
+ Share your MFA codes with anyone
+ Store backup codes in plain text
+ Disable phone lock screen
+ Use SMS for MFA (not supported here)
+ Ignore time sync warnings
 
 ## Managing Multiple Servers
 

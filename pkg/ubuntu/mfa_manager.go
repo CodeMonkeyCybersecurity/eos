@@ -131,7 +131,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}
 
 	// Phase 3: Install and configure MFA packages
-	m.logger.Info("📦 Phase 3: Installing MFA packages")
+	m.logger.Info(" Phase 3: Installing MFA packages")
 	if err := m.installMFAPackages(); err != nil {
 		m.rollback()
 		return fmt.Errorf("package installation failed: %w", err)
@@ -159,7 +159,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 
 	// Phase 6: Test configuration
 	if m.config.TestBeforeEnforce {
-		m.logger.Info("🧪 Phase 6: Testing configuration")
+		m.logger.Info(" Phase 6: Testing configuration")
 		if err := m.testConfiguration(); err != nil {
 			m.rollback()
 			return fmt.Errorf("configuration test failed: %w", err)
@@ -504,7 +504,7 @@ func (m *MFAManager) getGroupMembers(groupName string) ([]string, error) {
 func (m *MFAManager) deduplicateCommands(commands []string) []string {
 	seen := make(map[string]bool)
 	result := []string{}
-	
+
 	for _, cmd := range commands {
 		normalizedCmd := strings.TrimSpace(cmd)
 		if normalizedCmd != "" && !seen[normalizedCmd] {
@@ -512,6 +512,6 @@ func (m *MFAManager) deduplicateCommands(commands []string) []string {
 			result = append(result, normalizedCmd)
 		}
 	}
-	
+
 	return result
 }

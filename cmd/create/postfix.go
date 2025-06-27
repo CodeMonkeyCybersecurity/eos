@@ -62,14 +62,29 @@ var CreatePostfixCmd = &cobra.Command{
 func installPostfix(rc *eos_io.RuntimeContext, osType string) error {
 	switch osType {
 	case "debian":
-		_, err := execute.RunShell(rc.Ctx, `DEBIAN_FRONTEND=noninteractive apt update && apt install -y postfix bsd-mailx libsasl2-modules`)
+		// Set environment variable for non-interactive install
+		_ = os.Setenv("DEBIAN_FRONTEND", "noninteractive")
+		defer func() { _ = os.Unsetenv("DEBIAN_FRONTEND") }()
+		
+		// Update package lists
+		err := execute.RunSimple(rc.Ctx, "apt", "update")
+		if err != nil {
+			return fmt.Errorf("apt update failed: %w", err)
+		}
+		// Install packages
+		err = execute.RunSimple(rc.Ctx, "apt", "install", "-y", "postfix", "bsd-mailx", "libsasl2-modules")
 		if err != nil {
 			return fmt.Errorf("debian install failed: %w", err)
 		}
 		return execute.RunSimple(rc.Ctx, "cp", "/usr/share/postfix/main.cf.debian", "/etc/postfix/main.cf")
 	case "rhel":
-		_, err := execute.RunShell(rc.Ctx, `yum update -y && yum install -y postfix mailx cyrus-sasl cyrus-sasl-plain`)
-		return err
+		// Update package lists
+		err := execute.RunSimple(rc.Ctx, "yum", "update", "-y")
+		if err != nil {
+			return fmt.Errorf("yum update failed: %w", err)
+		}
+		// Install packages
+		return execute.RunSimple(rc.Ctx, "yum", "install", "-y", "postfix", "mailx", "cyrus-sasl", "cyrus-sasl-plain")
 	default:
 		otelzap.Ctx(rc.Ctx).Warn("Unknown OS type; skipping install")
 		return nil
@@ -165,8 +180,7 @@ func restartPostfix(rc *eos_io.RuntimeContext, osType string) error {
 			return execute.RunSimple(rc.Ctx, "postfix", "reload")
 		}
 	case "rhel":
-		_, err := execute.RunShell(rc.Ctx, "service postfix restart")
-		return err
+		return execute.RunSimple(rc.Ctx, "service", "postfix", "restart")
 	default:
 		return fmt.Errorf("unsupported OS type: %s", osType)
 	}

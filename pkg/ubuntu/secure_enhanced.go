@@ -109,8 +109,8 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		logger.Info(" GRACEFUL MFA configured successfully")
 
 	case "disabled":
-		logger.Warn("⚠️  MFA configuration skipped - this reduces security")
-		logger.Warn("⚠️  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
+		logger.Warn("  MFA configuration skipped - this reduces security")
+		logger.Warn("  Consider enabling MFA later with: eos secure ubuntu --enforce-mfa --mfa-only")
 
 	default:
 		return fmt.Errorf("unknown MFA mode: %s", mfaMode)

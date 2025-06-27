@@ -248,7 +248,7 @@ func (a *AtomicMFAConfig) writeNewConfigs() error {
 			return fmt.Errorf("write temp config for %s: %w", name, err)
 		}
 
-		a.logger.Info("📝 Prepared new PAM config", zap.String("file", name))
+		a.logger.Info(" Prepared new PAM config", zap.String("file", name))
 	}
 
 	return nil
@@ -260,7 +260,7 @@ func (a *AtomicMFAConfig) TestConfiguration() error {
 		return fmt.Errorf("no active transaction")
 	}
 
-	a.logger.Info("🧪 Testing MFA configuration...")
+	a.logger.Info(" Testing MFA configuration...")
 
 	// Create a test script that validates authentication
 	testScript := `#!/bin/bash
@@ -302,7 +302,7 @@ echo " All PAM configurations validated successfully"
 
 	// Run the test
 	if err := execute.RunSimple(a.rc.Ctx, "bash", testPath); err != nil {
-		a.logger.Error("❌ PAM configuration test failed", zap.Error(err))
+		a.logger.Error(" PAM configuration test failed", zap.Error(err))
 		return fmt.Errorf("PAM configuration test failed: %w", err)
 	}
 
@@ -332,7 +332,7 @@ func (a *AtomicMFAConfig) CommitTransaction() error {
 		// Atomic move
 		if err := os.Rename(tempPath, targetPath); err != nil {
 			// Rollback on any failure
-			a.logger.Error("❌ Failed to apply config, rolling back",
+			a.logger.Error(" Failed to apply config, rolling back",
 				zap.String("file", name),
 				zap.Error(err))
 			if rollbackErr := a.RollbackTransaction(); rollbackErr != nil {
@@ -369,7 +369,7 @@ func (a *AtomicMFAConfig) RollbackTransaction() error {
 
 		if err := execute.RunSimple(a.rc.Ctx, "cp", backupPath, targetPath); err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", name, err))
-			a.logger.Error("❌ Failed to restore config",
+			a.logger.Error(" Failed to restore config",
 				zap.String("file", name),
 				zap.Error(err))
 		} else {

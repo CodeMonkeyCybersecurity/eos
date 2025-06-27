@@ -26,10 +26,9 @@ var DockerListenerCmd = &cobra.Command{
 			desc string
 			fn   func() error
 		}{
-			{" apt update", func() error { _, err := execute.RunShell(rc.Ctx, "apt update"); return err }},
+			{" apt update", func() error { return execute.RunSimple(rc.Ctx, "apt", "update") }},
 			{" install python3-venv + pip", func() error {
-				_, err := execute.RunShell(rc.Ctx, "apt install -y python3-venv python3-pip")
-				return err
+				return execute.RunSimple(rc.Ctx, "apt", "install", "-y", "python3-venv", "python3-pip")
 			}},
 			{" create venv dir", func() error {
 				return execute.RunSimple(rc.Ctx, "mkdir", "-p", shared.VenvPath)

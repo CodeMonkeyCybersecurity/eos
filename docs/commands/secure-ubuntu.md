@@ -222,10 +222,10 @@ $ sudo eos secure ubuntu --enable-mfa
 ⚙️ Starting comprehensive MFA implementation
 ✅ Phase 1: Pre-flight checks passed
 🚨 Phase 2: Emergency access configured
-📦 Phase 3: MFA packages installed
+ Phase 3: MFA packages installed
 👥 Phase 4: Users identified (3 sudo users)
 ⚙️ Phase 5: PAM configured safely
-🧪 Phase 6: Tests passed
+ Phase 6: Tests passed
 🛡️ Phase 7: Additional hardening applied
 ✅ Phase 8: Configuration finalized
 
@@ -243,7 +243,7 @@ $ sudo setup-mfa
 🔐 MFA Setup for john
 ====================
 
-📱 Setting up authenticator app...
+ Setting up authenticator app...
 [QR Code displayed]
 
 Secret key: ABCD EFGH IJKL MNOP

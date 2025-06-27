@@ -51,7 +51,7 @@ func (t *MFATestFramework) PreFlightCheck() error {
 	for _, check := range checks {
 		t.logger.Info("  Checking: " + check.name)
 		if err := check.fn(); err != nil {
-			t.logger.Error("❌ Pre-flight check failed",
+			t.logger.Error(" Pre-flight check failed",
 				zap.String("check", check.name),
 				zap.Error(err))
 			return fmt.Errorf("pre-flight check '%s' failed: %w", check.name, err)
@@ -89,10 +89,10 @@ func (t *MFATestFramework) checkGoogleAuthConfig() error {
 	googleAuthFile := homeDir + "/.google_authenticator"
 	if _, err := os.Stat(googleAuthFile); err == nil {
 		t.hasGoogleAuth = true
-		t.logger.Info("📱 User has Google Authenticator configured")
+		t.logger.Info(" User has Google Authenticator configured")
 	} else {
 		t.hasGoogleAuth = false
-		t.logger.Info("📱 User does NOT have Google Authenticator configured")
+		t.logger.Info(" User does NOT have Google Authenticator configured")
 	}
 
 	return nil
@@ -150,13 +150,13 @@ func (t *MFATestFramework) checkEmergencyRecovery() error {
 	}
 
 	if !foundBackups {
-		t.logger.Warn("⚠️ No existing MFA backups found - this is expected for first-time setup")
+		t.logger.Warn(" No existing MFA backups found - this is expected for first-time setup")
 	}
 
 	// Check if emergency recovery script exists
 	emergencyScript := "/usr/local/bin/emergency-mfa-recovery"
 	if _, err := os.Stat(emergencyScript); err != nil {
-		t.logger.Warn("⚠️ Emergency recovery script not found - will be created during setup")
+		t.logger.Warn(" Emergency recovery script not found - will be created during setup")
 	}
 
 	return nil
@@ -193,11 +193,11 @@ func (t *MFATestFramework) TestAuthentication() error {
 		if err := test.fn(); err != nil {
 			// Non-fatal for some tests
 			if test.name == "MFA authentication" && !t.hasGoogleAuth {
-				t.logger.Warn("⚠️ MFA test skipped (user not configured)", zap.Error(err))
+				t.logger.Warn(" MFA test skipped (user not configured)", zap.Error(err))
 				continue
 			}
 
-			t.logger.Error("❌ Authentication test failed",
+			t.logger.Error(" Authentication test failed",
 				zap.String("test", test.name),
 				zap.Error(err))
 			return fmt.Errorf("authentication test '%s' failed: %w", test.name, err)
@@ -347,7 +347,7 @@ RECOMMENDATIONS:
 `,
 		time.Now().Format("2006-01-02 15:04:05"),
 		t.testUser,
-		map[bool]string{true: "", false: "⚠️"}[t.hasGoogleAuth],
+		map[bool]string{true: "", false: ""}[t.hasGoogleAuth],
 		t.testUser,
 	)
 

@@ -25,7 +25,10 @@ var InspectOllamaCmd = &cobra.Command{
 		}
 
 		log.Info(" Inspecting Docker container for Ollama Web UI...")
-		out, err := execute.RunShell(rc.Ctx, "docker ps --filter name=ollama-webui")
+		out, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "docker",
+			Args:    []string{"ps", "--filter", "name=ollama-webui"},
+		})
 		if err != nil {
 			return fmt.Errorf("failed to inspect container: %w", err)
 		}
@@ -44,7 +47,10 @@ var InspectOllamaCmd = &cobra.Command{
 		if _, err := os.Stat(logFile); os.IsNotExist(err) {
 			fmt.Println(" Ollama log not found at", logFile)
 		} else {
-			logOut, _ := execute.RunShell(rc.Ctx, "tail -n 20 "+logFile)
+			logOut, _ := execute.Run(rc.Ctx, execute.Options{
+				Command: "tail",
+				Args:    []string{"-n", "20", logFile},
+			})
 			fmt.Println(logOut)
 		}
 

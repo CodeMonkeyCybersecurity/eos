@@ -196,7 +196,7 @@ auth required pam_unix.so use_first_pass
 
 // updatePAMFileSafely updates a PAM file with atomic operations and validation
 func (m *MFAManager) updatePAMFileSafely(pamFile string, content string) error {
-	m.logger.Info("📝 Updating PAM file", zap.String("file", pamFile))
+	m.logger.Info(" Updating PAM file", zap.String("file", pamFile))
 
 	// Create backup
 	backupName := strings.ReplaceAll(pamFile[1:], "/", "_") + ".backup"
@@ -282,7 +282,7 @@ func (m *MFAManager) contains(slice []string, item string) bool {
 
 // installMFAPackages installs required MFA packages
 func (m *MFAManager) installMFAPackages() error {
-	m.logger.Info("📦 Installing MFA packages")
+	m.logger.Info(" Installing MFA packages")
 
 	// Update package list
 	if err := execute.RunSimple(m.rc.Ctx, "apt-get", "update"); err != nil {

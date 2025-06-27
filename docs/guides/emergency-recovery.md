@@ -4,7 +4,7 @@
 
 This guide provides step-by-step procedures for recovering from MFA lockouts. The Eos MFA implementation includes multiple independent recovery methods to ensure administrators are never permanently locked out.
 
-⚠️ **IMPORTANT**: These procedures should only be used in genuine emergencies. All recovery actions are logged and audited.
+ **IMPORTANT**: These procedures should only be used in genuine emergencies. All recovery actions are logged and audited.
 
 ## Quick Reference
 
@@ -50,8 +50,8 @@ for 60 minutes.
 Continue? (y/N): y
 
 ✓ Emergency MFA bypass enabled for 60 minutes
-⚠️  Please establish permanent access within this time!
-⚠️  Bypass will auto-disable or run: sudo emergency-mfa-bypass disable
+  Please establish permanent access within this time!
+  Bypass will auto-disable or run: sudo emergency-mfa-bypass disable
 
 # Step 2: Verify bypass is active
 sudo emergency-mfa-bypass status

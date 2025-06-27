@@ -21,7 +21,7 @@ import (
 func EnsureInstalled(rc *eos_io.RuntimeContext) error {
 	if !platform.IsCommandAvailable("ollama") {
 		zap.L().Info(" Installing Ollama via Homebrew")
-		_, err := execute.RunShell(rc.Ctx, "brew install ollama")
+		err := execute.RunSimple(rc.Ctx, "brew", "install", "ollama")
 		if err != nil {
 			return fmt.Errorf("failed to install Ollama: %w", err)
 		}
@@ -49,11 +49,31 @@ func EnsureInstalled(rc *eos_io.RuntimeContext) error {
 }
 
 func StartServeProcess(rc *eos_io.RuntimeContext, serveLog string) error {
-	cmd := fmt.Sprintf("nohup ollama serve > %s 2>&1 &", serveLog)
-	_, err := execute.RunShell(rc.Ctx, cmd)
+	// Open log file for writing
+	logFile, err := os.OpenFile(serveLog, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer func() { _ = logFile.Close() }()
+
+	// Create command to run ollama serve
+	cmd := exec.CommandContext(rc.Ctx, "ollama", "serve")
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+	
+	// Start the process in background
+	err = cmd.Start()
 	if err != nil {
 		zap.L().Warn("Ollama serve may not have started", zap.Error(err))
+		return err
 	}
+	
+	// Detach from the process so it continues running
+	err = cmd.Process.Release()
+	if err != nil {
+		zap.L().Warn("Failed to detach ollama serve process", zap.Error(err))
+	}
+	
 	zap.L().Info(" Ollama logs: " + serveLog)
 	return nil
 }
