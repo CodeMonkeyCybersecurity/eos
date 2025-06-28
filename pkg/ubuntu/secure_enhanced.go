@@ -137,9 +137,10 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 
 	switch mfaMode {
 	case "enforced", "standard":
-		fmt.Println(" Multi-Factor Authentication: CONFIGURED")
+		fmt.Println(" Multi-Factor Authentication: ENFORCED")
 		fmt.Println("   • Google Authenticator configured for root user")
-		fmt.Println("   • Root account has MFA enabled")
+		fmt.Println("   • PAM configured to require password + MFA token")
+		fmt.Println("   • sudo and su commands now require MFA")
 		fmt.Println("   • Emergency backup codes generated")
 		fmt.Println("   • Other users can configure MFA manually with: google-authenticator")
 
@@ -167,9 +168,10 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	if mfaMode == "enforced" || mfaMode == "standard" {
 		fmt.Println(" IMPORTANT NEXT STEPS:")
 		fmt.Println("   1. Save the emergency backup codes in a secure location")
-		fmt.Println("   2. Test root access with MFA in a separate terminal")
-		fmt.Println("   3. Configure MFA for other users: sudo -u username google-authenticator")
-		fmt.Println("   4. Store the MFA secret key securely for backup purposes")
+		fmt.Println("   2. Test 'sudo -i' or 'su' in a NEW terminal (should ask for password + MFA token)")
+		fmt.Println("   3. Keep this terminal open until you confirm MFA is working")
+		fmt.Println("   4. Configure MFA for other users: sudo -u username google-authenticator")
+		fmt.Println("   5. Store the MFA secret key securely for backup purposes")
 		fmt.Println()
 	}
 

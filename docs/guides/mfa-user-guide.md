@@ -102,7 +102,7 @@ Press ENTER to continue...
 
 Enter the 6-digit code from your authenticator app: 123456
 
-✅ MFA test successful! Your configuration is working correctly.
+ MFA test successful! Your configuration is working correctly.
 ```
 
 If the test fails:
@@ -113,7 +113,7 @@ If the test fails:
 ## Step 5: Confirmation
 
 ```
-✅ MFA Setup Complete!
+ MFA Setup Complete!
 ════════════════════════════════════════════════
 
 Your account is now protected with MFA.
@@ -206,11 +206,11 @@ If you cannot sudo at all:
 ## Best Practices
 
 ### DO:
-✅ Keep authenticator app updated
-✅ Enable cloud backup in your authenticator app
-✅ Store backup codes securely
-✅ Set up MFA on multiple devices (tablet as backup)
-✅ Test MFA works before logging out
+ Keep authenticator app updated
+ Enable cloud backup in your authenticator app
+ Store backup codes securely
+ Set up MFA on multiple devices (tablet as backup)
+ Test MFA works before logging out
 
 ### DON'T:
  Share your MFA codes with anyone
