@@ -35,7 +35,7 @@ func Run(ctx context.Context, opts Options) (string, error) {
 	rc, cancel := context.WithTimeout(ctx, defaultTimeout(opts.Timeout))
 	defer cancel()
 
-	// 📈 Start telemetry span
+	//  Start telemetry span
 	rc, span := telemetry.Start(rc, "execute.Run")
 	defer span.End()
 	span.SetAttributes(

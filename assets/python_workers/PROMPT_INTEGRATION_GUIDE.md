@@ -2,9 +2,42 @@
 
 This document explains how to integrate the new prompt-aware parsing system into your existing Delphi pipeline.
 
-## 🎯 Quick Start
+##  Quick Start
 
 The new system allows each alert to use a different prompt format and automatically selects the appropriate parser based on the `prompt_type` stored in the database.
+
+### Alert Processing Schema
+
+The alerts table tracks the complete lifecycle of an alert through timestamp fields:
+
+| Column | Type | Purpose |
+|--------|------|---------|
+| id | bigint | Unique identifier |
+| alert_hash | text | Deduplication hash |
+| state | alert_state | Current processing state |
+| ingest_timestamp | timestamp | When alert was received |
+| prompt_sent_at | timestamp | When sent to LLM |
+| prompt_type | varchar(50) | Type of prompt used |
+| prompt_template | text | Full prompt template |
+| response_received_at | timestamp | When LLM responded |
+| response_text | text | Raw LLM response |
+| structured_data | jsonb | Parsed email structure |
+| structured_at | timestamp | When parsing completed |
+| formatted_data | jsonb | Formatted email content |
+| formatted_at | timestamp | When formatting completed |
+| alert_sent_at | timestamp | When email was sent |
+| parser_used | text | Which parser was used |
+
+### State Progression
+
+Alerts progress through states based on which timestamps are populated:
+- `new` → Initial state (only ingest_timestamp set)
+- `processing` → LLM processing (prompt_sent_at set)
+- `responded` → LLM complete (response_received_at set)
+- `structured` → Parsed (structured_at set)
+- `formatted` → Ready to send (formatted_at set)
+- `sent` → Delivered (alert_sent_at set)
+
 
 ### Step 1: Update Your Prompt Randomizer
 
@@ -150,7 +183,7 @@ HAVING COUNT(*) >= 10  -- Only show prompts with enough data
 ORDER BY success_rate ASC;
 ```
 
-## 🛠️ Custom Parser Development
+##  Custom Parser Development
 
 ### Adding a New Parser
 
@@ -203,7 +236,7 @@ prompt_configs.append({
 })
 ```
 
-## 🔧 Environment Configuration
+##  Environment Configuration
 
 ### Email Structurer Environment Variables
 
@@ -282,7 +315,7 @@ for section, content in sections.items():
     print(f"  {section}: {content[:100]}...")
 ```
 
-## 📈 Performance Optimization
+##  Performance Optimization
 
 ### Parser Performance Tips
 

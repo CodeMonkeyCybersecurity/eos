@@ -169,7 +169,7 @@ class DelphiConfigValidator:
     
     def validate_required_env_vars(self):
         """Validate required environment variables"""
-        print("\n🔧 Environment Variables")
+        print("\n Environment Variables")
         
         # Critical variables
         critical_vars = {

@@ -73,7 +73,7 @@ Monitors parser reliability:
 - 🟡 **HALF_OPEN**: Recent failures, monitoring
 - 🔴 **OPEN**: Parser disabled due to failures
 
-### 📈 Parser Performance
+###  Parser Performance
 Metrics by prompt type:
 - Total attempts
 - Success rate percentage

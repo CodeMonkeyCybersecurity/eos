@@ -168,7 +168,7 @@ health := compositeStore.HealthCheck(ctx)
 - Operations continue seamlessly
 - User gets clear feedback about which store was used
 
-#### 📈 **Performance Benefits**
+####  **Performance Benefits**
 
 1. **Faster Compilation**
    - Reduced import cycles

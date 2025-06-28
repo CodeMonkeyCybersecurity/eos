@@ -99,6 +99,6 @@ func GetServerMetrics(rc *eos_io.RuntimeContext, client *hcloud.Client, log *zap
 		log.Error("Failed to fetch server metrics", zap.String("metric", metric), zap.Error(err))
 		return nil, err
 	}
-	log.Info("📈 Server metrics fetched", zap.String("metric", metric), zap.Time("start", start), zap.Time("end", end))
+	log.Info(" Server metrics fetched", zap.String("metric", metric), zap.Time("start", start), zap.Time("end", end))
 	return metrics, nil
 }

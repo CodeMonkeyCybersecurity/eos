@@ -152,13 +152,13 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println()
 	fmt.Println(" Available Commands:")
 	fmt.Println("   • security-report     - Generate comprehensive security report")
-	
+
 	if mfaMode == "enforced" || mfaMode == "standard" {
 		fmt.Println("   • google-authenticator - Configure MFA for additional users")
 	}
 
 	fmt.Println()
-	fmt.Println("🔧 System Hardening Applied:")
+	fmt.Println(" System Hardening Applied:")
 	fmt.Println("   • Kernel security parameters optimized")
 	fmt.Println("   • Network security settings configured")
 	fmt.Println("   • File permissions hardened")

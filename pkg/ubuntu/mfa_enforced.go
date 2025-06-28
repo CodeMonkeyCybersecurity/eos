@@ -360,7 +360,7 @@ fi
 echo
 
 # Check PAM configuration
-echo -e "${BLUE}🔧 PAM Configuration Status:${NC}"
+echo -e "${BLUE} PAM Configuration Status:${NC}"
 
 if grep -q "pam_google_authenticator.so" /etc/pam.d/sudo 2>/dev/null; then
     if grep -q "required.*pam_google_authenticator.so" /etc/pam.d/sudo; then

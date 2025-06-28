@@ -101,7 +101,7 @@ The entities file provides comprehensive domain models including:
 - Plugin-style configuration with settings maps
 - Template and variable systems for flexibility
 
-### 📈 **Domain Model Statistics**
+###  **Domain Model Statistics**
 
 - **100+ Entity Types**: Comprehensive domain coverage
 - **15+ Service Interfaces**: Complete business logic abstraction

@@ -57,7 +57,7 @@ class ChannelStandardizer:
     
     def standardize_all(self):
         """Standardize channels in all worker files"""
-        print("🔧 Standardizing Notification Channels")
+        print(" Standardizing Notification Channels")
         print("=" * 50)
         
         for worker_file, config in WORKER_CONFIGS.items():

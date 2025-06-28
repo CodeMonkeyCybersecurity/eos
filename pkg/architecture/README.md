@@ -188,7 +188,7 @@ See `vault_refactor_example.go` for a complete transformation showing:
 - **Easy Onboarding**: Well-defined interfaces and examples
 - **Debugging**: Clear data flow and error boundaries
 
-## 📈 Gradual Adoption
+##  Gradual Adoption
 
 The architecture supports gradual migration:
 

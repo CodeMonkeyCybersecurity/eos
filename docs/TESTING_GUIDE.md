@@ -305,7 +305,7 @@ func TestWithDebugLogging(t *testing.T) {
 }
 ```
 
-## 📈 Measuring Success
+##  Measuring Success
 
 ### Key Metrics
 - **Coverage percentage** by package priority

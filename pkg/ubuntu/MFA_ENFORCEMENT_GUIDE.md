@@ -90,7 +90,7 @@ Proceed with MFA setup now? (Y/n):
 Choose enforcement mode (1/2):
 ```
 
-## 🔧 Available Commands
+##  Available Commands
 
 After setup, these commands are available:
 
@@ -182,7 +182,7 @@ Output example:
    Secret file: /home/username/.google_authenticator
    Last modified: 2024-01-15 10:30:00
 
-🔧 PAM Configuration Status:
+ PAM Configuration Status:
  sudo MFA: ENFORCED (strict mode)
  su MFA: ENFORCED (strict mode)
 
@@ -234,7 +234,7 @@ sudo eos secure ubuntu --enable-mfa --mfa-only
 4. **Have multiple devices** configured if possible
 5. **Report issues immediately** to prevent lockouts
 
-## 🔧 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues:
 
@@ -298,7 +298,7 @@ sudo tail -f /var/log/eos-mfa-enforcement.log
 - `/var/log/auth.log` - System authentication events
 - `journalctl -u sudo` - Sudo authentication events
 
-## 🎯 Use Cases
+##  Use Cases
 
 ### Enterprise Deployment:
 ```bash

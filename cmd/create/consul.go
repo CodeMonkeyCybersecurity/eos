@@ -53,16 +53,16 @@ USAGE:
 }
 
 var (
-	datacenterName      string
+	datacenterName          string
 	disableVaultIntegration bool
-	enableDebugLogging  bool
+	enableDebugLogging      bool
 )
 
 func init() {
 	CreateConsulCmd.Flags().StringVarP(&datacenterName, "datacenter", "d", "dc1", "Datacenter name for Consul cluster")
 	CreateConsulCmd.Flags().BoolVar(&disableVaultIntegration, "no-vault-integration", false, "Disable automatic Vault integration")
 	CreateConsulCmd.Flags().BoolVar(&enableDebugLogging, "debug", false, "Enable debug logging for Consul")
-	
+
 	// Register the command with the create command
 	CreateCmd.AddCommand(CreateConsulCmd)
 }
@@ -155,7 +155,7 @@ func installConsulBinary(rc *eos_io.RuntimeContext) error {
 	// Detect architecture
 	arch := eos_unix.GetArchitecture()
 	consulVersion := "1.17.1"
-	
+
 	log.Info(" Downloading Consul",
 		zap.String("version", consulVersion),
 		zap.String("architecture", arch))
@@ -165,7 +165,7 @@ func installConsulBinary(rc *eos_io.RuntimeContext) error {
 			Command: "wget",
 			Args: []string{
 				"-O", "/tmp/consul.zip",
-				fmt.Sprintf("https://releases.hashicorp.com/consul/%s/consul_%s_linux_%s.zip", 
+				fmt.Sprintf("https://releases.hashicorp.com/consul/%s/consul_%s_linux_%s.zip",
 					consulVersion, consulVersion, arch),
 			},
 		},
@@ -658,7 +658,7 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	log.Info(" ║                    CONSUL INSTALLATION COMPLETE                     ║")
 	log.Info(" ╚══════════════════════════════════════════════════════════════════════╝")
 	log.Info(" ")
-	log.Info(" 🎯 CONSUL FEATURES ENABLED:")
+	log.Info("  CONSUL FEATURES ENABLED:")
 	log.Info("   • Service discovery with DNS and HTTP API")
 	log.Info("   • Health monitoring and automatic failover")
 	log.Info("   • Consul Connect service mesh ready")
@@ -675,7 +675,7 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	log.Info("   • DNS:         127.0.0.1:8600")
 	log.Info(" ")
 
-	log.Info(" 🔧 USEFUL COMMANDS:")
+	log.Info("  USEFUL COMMANDS:")
 	log.Info("   • consul-vault-helper status    # Check status")
 	log.Info("   • consul-vault-helper discover  # Test service discovery")
 	log.Info("   • consul-vault-helper services  # List all services")
