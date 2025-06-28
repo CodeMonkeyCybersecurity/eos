@@ -28,32 +28,24 @@ var (
 
 var CreateFail2banCmd = &cobra.Command{
 	Use:   "fail2ban",
-	Short: "Deploy and configure Fail2Ban with comprehensive protection",
-	Long: `Install and configure Fail2Ban with enhanced security settings.
+	Short: "Install and configure Fail2Ban with basic protection",
+	Long: `Install and configure Fail2Ban with basic default settings.
 
-This command installs Fail2Ban and configures it with:
-- SSH brute force protection (sshd, sshd-ddos)
-- Optional web server protection (nginx, apache)
-- Optional application protection (docker, postgresql, etc.)
-- Customizable ban times and retry limits
-- Email notifications (optional)
-- IP whitelist management
+This command performs the essential Fail2Ban installation:
+- Updates package lists
+- Installs fail2ban package
+- Copies default jail.conf to jail.local
+- Starts and enables the fail2ban service
+- Verifies installation with status and configuration test
+
+This provides fundamental brute force protection with the default Fail2Ban configuration.
 
 Examples:
-  # Basic installation with SSH protection
-  eos create fail2ban
-
-  # With email notifications
-  eos create fail2ban --enable-email --email security@example.com
-
-  # With custom ban time and additional services
-  eos create fail2ban --ban-time 24h --enable-services nginx,docker
-
-  # With IP whitelist
-  eos create fail2ban --ignore-ips "10.0.0.0/8,192.168.0.0/16"`,
+  # Basic installation (recommended)
+  eos create fail2ban`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		logger.Info(" Starting enhanced Fail2Ban setup",
+		logger.Info(" Starting basic Fail2Ban setup",
 			zap.String("user", os.Getenv("USER")),
 			zap.String("command_line", strings.Join(os.Args, " ")),
 			zap.Bool("enable_email", enableEmail),
