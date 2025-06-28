@@ -309,7 +309,7 @@ func (m *MFAManager) testSystemSecurity() error {
 			"/lib/*/security/pam_google_authenticator.so",
 			"/usr/lib/*/security/pam_google_authenticator.so",
 		}
-		
+
 		for _, pattern := range globPatterns {
 			matches, err := filepath.Glob(pattern)
 			if err == nil && len(matches) > 0 {
@@ -356,7 +356,7 @@ func (m *MFAManager) testSystemSecurity() error {
 
 // additionalHardening applies additional security measures
 func (m *MFAManager) additionalHardening() error {
-	m.logger.Info("🛡️ Applying additional security hardening")
+	m.logger.Info(" Applying additional security hardening")
 
 	// Configure audit logging for sudo
 	if err := m.configureAuditLogging(); err != nil {
@@ -617,7 +617,7 @@ Implementation completed successfully by Eos MFA Manager
 		return fmt.Errorf("write implementation report: %w", err)
 	}
 
-	m.logger.Info("📊 Created implementation report",
+	m.logger.Info(" Created implementation report",
 		zap.String("path", reportPath))
 
 	return nil
@@ -635,12 +635,12 @@ func (m *MFAManager) displayCompletionMessage() {
 		fmt.Println("   • Users without MFA can still access sudo with password only")
 		fmt.Println("   • Switch to enforced mode when ready: eos secure ubuntu --enforce-mfa")
 	} else {
-		fmt.Println("\n🔒 ENFORCED MODE ACTIVE")
+		fmt.Println("\n ENFORCED MODE ACTIVE")
 		fmt.Println("   • MFA is required for ALL sudo/su operations")
 		fmt.Println("   • Password-only access is disabled")
 	}
 
-	fmt.Println("\n🛡️ PROTECTED PRIVILEGE ESCALATION METHODS:")
+	fmt.Println("\n PROTECTED PRIVILEGE ESCALATION METHODS:")
 	fmt.Println("    sudo - Multi-factor authentication required")
 	fmt.Println("    su - Multi-factor authentication required")
 	if !m.config.ConsoleBypassMFA {
@@ -670,7 +670,7 @@ func (m *MFAManager) displayCompletionMessage() {
 	fmt.Println("   • sudo mfa-status - Check MFA configuration status")
 	fmt.Println("   • sudo emergency-mfa-bypass - Emergency access controls")
 
-	fmt.Printf("\n📚 DOCUMENTATION:")
+	fmt.Printf("\n DOCUMENTATION:")
 	fmt.Printf("   • Implementation report: %s/implementation-report.md\n", m.backupDir)
 	fmt.Printf("   • Recovery guide: /usr/local/share/eos/mfa-recovery.md\n")
 	fmt.Printf("   • User instructions: ~/MFA_SETUP_REQUIRED.txt\n")
@@ -683,5 +683,5 @@ func (m *MFAManager) displayCompletionMessage() {
 
 	fmt.Println("\n" + strings.Repeat("=", 80))
 
-	m.logger.Info("🎉 MFA implementation completed successfully")
+	m.logger.Info(" MFA implementation completed successfully")
 }

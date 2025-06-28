@@ -102,8 +102,8 @@ func (t *MFATestFramework) checkGoogleAuthConfig() error {
 // checkPAMModules verifies PAM modules are available
 func (t *MFATestFramework) checkPAMModules() error {
 	modules := []struct {
-		name string
-		paths []string
+		name     string
+		paths    []string
 		patterns []string
 	}{
 		{
@@ -155,7 +155,7 @@ func (t *MFATestFramework) checkPAMModules() error {
 
 	for _, module := range modules {
 		found := false
-		
+
 		// First try direct paths
 		for _, path := range module.paths {
 			if _, err := os.Stat(path); err == nil {
@@ -163,7 +163,7 @@ func (t *MFATestFramework) checkPAMModules() error {
 				break
 			}
 		}
-		
+
 		// If not found, try glob patterns
 		if !found {
 			for _, pattern := range module.patterns {
@@ -174,7 +174,7 @@ func (t *MFATestFramework) checkPAMModules() error {
 				}
 			}
 		}
-		
+
 		if !found {
 			return fmt.Errorf("PAM module not found: %s", module.name)
 		}
@@ -366,7 +366,7 @@ func (t *MFATestFramework) testPrivilegeEscalation() error {
 
 // GenerateTestReport creates a comprehensive test report
 func (t *MFATestFramework) GenerateTestReport() (string, error) {
-	t.logger.Info("📊 Generating MFA test report...")
+	t.logger.Info(" Generating MFA test report...")
 
 	report := fmt.Sprintf(`
 =================== MFA CONFIGURATION TEST REPORT ===================
@@ -418,7 +418,7 @@ RECOMMENDATIONS:
 	reportPath := fmt.Sprintf("/var/log/eos/mfa-test-report-%d.txt", time.Now().Unix())
 	if err := os.MkdirAll("/var/log/eos", 0755); err == nil {
 		if err := os.WriteFile(reportPath, []byte(report), 0644); err == nil {
-			t.logger.Info("📊 Test report written", zap.String("path", reportPath))
+			t.logger.Info(" Test report written", zap.String("path", reportPath))
 		}
 	}
 
@@ -427,7 +427,7 @@ RECOMMENDATIONS:
 
 // ValidateSystemSecurity performs final security validation
 func (t *MFATestFramework) ValidateSystemSecurity() error {
-	t.logger.Info("🛡️ Performing final security validation...")
+	t.logger.Info(" Performing final security validation...")
 
 	// Check that all critical PAM files have been modified
 	criticalFiles := []string{
@@ -447,7 +447,7 @@ func (t *MFATestFramework) ValidateSystemSecurity() error {
 			return fmt.Errorf("MFA not configured in %s", file)
 		}
 
-		t.logger.Info("🔒 MFA configured", zap.String("file", file))
+		t.logger.Info(" MFA configured", zap.String("file", file))
 	}
 
 	// Verify no obvious security bypasses exist

@@ -210,7 +210,7 @@ func (a *AtomicMFAConfig) ConfigureEnforcedMFA() error {
 		return fmt.Errorf("no active transaction - call BeginTransaction() first")
 	}
 
-	a.logger.Info("🔒 Configuring enforced MFA (password + token required)")
+	a.logger.Info(" Configuring enforced MFA (password + token required)")
 
 	// Set enforced configurations
 	a.newConfigs = PAMConfigSet{
@@ -346,7 +346,7 @@ func (a *AtomicMFAConfig) CommitTransaction() error {
 	}
 
 	a.transactionActive = false
-	a.logger.Info("🎉 MFA configuration committed successfully")
+	a.logger.Info(" MFA configuration committed successfully")
 	return nil
 }
 

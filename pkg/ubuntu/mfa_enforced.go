@@ -246,7 +246,7 @@ EOF
 
 show_post_setup_info() {
     echo
-    echo -e "${GREEN}🎉 MFA Setup Complete!${NC}"
+    echo -e "${GREEN} MFA Setup Complete!${NC}"
     echo "============================================================================"
     echo
     echo -e "${BLUE} Important Information:${NC}"

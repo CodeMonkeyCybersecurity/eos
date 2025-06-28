@@ -262,57 +262,6 @@ func createMFABackupScript(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-// _checkMFAStatus verifies if MFA is properly configured
-// Prefixed with underscore to indicate it's intentionally unused (future functionality)
-//
-//nolint:unused
-func _checkMFAStatus(rc *eos_io.RuntimeContext) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check if libpam-google-authenticator is installed
-	if err := execute.RunSimple(rc.Ctx, "dpkg", "-l", "libpam-google-authenticator"); err != nil {
-		logger.Warn("libpam-google-authenticator package not found")
-		return fmt.Errorf("MFA package not installed")
-	}
-
-	// Check sudo PAM configuration
-	sudoPAMPath := "/etc/pam.d/sudo"
-	content, err := os.ReadFile(sudoPAMPath)
-	if err != nil {
-		return fmt.Errorf("read sudo PAM config: %w", err)
-	}
-
-	if !_contains(string(content), "pam_google_authenticator.so") {
-		logger.Warn("sudo PAM configuration does not include MFA")
-		return fmt.Errorf("sudo MFA not configured")
-	}
-
-	logger.Info(" MFA status check passed")
-	return nil
-}
-
-// _contains checks if a string contains a substring
-// Prefixed with underscore to indicate it's intentionally unused (helper for future functionality)
-//
-//nolint:unused
-func _contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr ||
-		(len(s) > len(substr) && (s[:len(substr)] == substr || s[len(s)-len(substr):] == substr ||
-			_findSubstring(s, substr))))
-}
-
-// _findSubstring finds a substring within a string
-// Prefixed with underscore to indicate it's intentionally unused (helper for future functionality)
-//
-//nolint:unused
-func _findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
 
 // disableMFAFunction removes MFA configuration and restores original PAM settings
 func disableMFAFunction(rc *eos_io.RuntimeContext) error {

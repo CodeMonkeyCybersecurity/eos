@@ -226,10 +226,10 @@ $ sudo eos secure ubuntu --enable-mfa
 👥 Phase 4: Users identified (3 sudo users)
 ⚙️ Phase 5: PAM configured safely
  Phase 6: Tests passed
-🛡️ Phase 7: Additional hardening applied
+ Phase 7: Additional hardening applied
 ✅ Phase 8: Configuration finalized
 
-🎉 MFA implementation completed successfully!
+ MFA implementation completed successfully!
 
 Next steps:
 1. Run 'sudo setup-mfa' to configure your MFA

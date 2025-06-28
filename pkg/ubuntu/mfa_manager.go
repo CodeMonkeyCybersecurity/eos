@@ -167,7 +167,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	}
 
 	// Phase 7: Additional security hardening
-	m.logger.Info("🛡️ Phase 7: Additional security hardening")
+	m.logger.Info(" Phase 7: Additional security hardening")
 	if err := m.additionalHardening(); err != nil {
 		m.logger.Warn("Additional hardening had issues", zap.Error(err))
 		// Not fatal - continue
@@ -180,7 +180,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 		return fmt.Errorf("finalization failed: %w", err)
 	}
 
-	m.logger.Info("🎉 MFA implementation completed successfully")
+	m.logger.Info(" MFA implementation completed successfully")
 	return nil
 }
 

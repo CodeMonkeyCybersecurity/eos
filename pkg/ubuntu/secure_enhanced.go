@@ -93,7 +93,7 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	// 11. Configure MFA based on mode using the new secure implementation
 	switch mfaMode {
 	case "enforced":
-		logger.Info("🔒 Configuring ENFORCED Multi-Factor Authentication")
+		logger.Info(" Configuring ENFORCED Multi-Factor Authentication")
 		mfaManager := NewMFAManager(rc)
 		if err := mfaManager.ImplementMFASecurely(true); err != nil {
 			return fmt.Errorf("configure enforced MFA: %w", err)

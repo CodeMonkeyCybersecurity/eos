@@ -326,7 +326,7 @@ class DelphiConfigValidator:
         print("\n" + "=" * 50)
         
         if not self.errors and not self.warnings:
-            print("🎉 ALL CHECKS PASSED - Delphi is ready for production!")
+            print(" ALL CHECKS PASSED - Delphi is ready for production!")
         elif not self.errors:
             print("  WARNINGS FOUND - Delphi should work but check warnings")
         else:
