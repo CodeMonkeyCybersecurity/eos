@@ -233,7 +233,26 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 
 	logger.Info(" User added to docker group successfully",
 		zap.String("user", user))
-	logger.Info(" Note: Log out and log back in or run 'newgrp docker' to apply group membership")
+	
+	// Verify the user was added to the group
+	if output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "groups",
+		Args:    []string{user},
+	}); err == nil {
+		if strings.Contains(output, "docker") {
+			logger.Info(" Confirmed: User is now in docker group",
+				zap.String("user", user))
+		} else {
+			logger.Warn(" Warning: User does not appear in docker group yet",
+				zap.String("user", user),
+				zap.String("groups", output))
+		}
+	}
+	
+	logger.Info(" IMPORTANT: To use Docker without sudo, you must:")
+	logger.Info("   1. Log out and log back in (recommended), OR")
+	logger.Info("   2. Run 'newgrp docker' in your current shell")
+	logger.Info("   3. Test with: docker ps")
 
 	return nil
 }
@@ -286,7 +305,12 @@ func InstallDocker(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Info(" Docker installation completed successfully")
-	logger.Info(" Remember: Users need to log out and back in to use Docker without sudo")
+	logger.Info(" ")
+	logger.Info(" NEXT STEPS:")
+	logger.Info("   • Log out and log back in to activate Docker group membership")
+	logger.Info("   • OR run: newgrp docker")
+	logger.Info("   • Test Docker access: docker ps")
+	logger.Info("   • If you still get permission denied, reboot the system")
 
 	return nil
 }
