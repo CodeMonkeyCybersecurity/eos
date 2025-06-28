@@ -25,7 +25,8 @@ func NewInspectCmd() *cobra.Command {
 		Long: `Interactive inspection tools for Delphi monitoring system.
 		
 Available commands:
-  pipeline-functionality - Interactive dashboard for pipeline monitoring`,
+  pipeline-functionality - Interactive dashboard for pipeline monitoring
+  verify-pipeline-schema  - Verify database schema matches schema.sql`,
 		Aliases: []string{"get", "read"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return cmd.Help()
@@ -34,6 +35,7 @@ Available commands:
 
 	// Add subcommands
 	cmd.AddCommand(NewPipelineFunctionalityCmd())
+	cmd.AddCommand(NewVerifyPipelineSchemaCmd())
 
 	return cmd
 }
@@ -252,5 +254,101 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 	}
 
 	logger.Info("✅ Database schema verification completed")
+	return nil
+}
+
+// NewVerifyPipelineSchemaCmd creates the verify-pipeline-schema command
+func NewVerifyPipelineSchemaCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "verify-pipeline-schema",
+		Short: "Verify database schema matches schema.sql requirements",
+		Long: `Comprehensive verification of the Delphi database schema.
+
+This command systematically checks your PostgreSQL database to ensure it matches
+the expected schema.sql structure required for proper pipeline operation.
+
+The verification includes:
+- ENUM types (alert_state, parser_type)
+- Core tables (agents, alerts, parser_metrics) with column validation
+- Performance indexes for optimal query speed
+- Monitoring views (pipeline_health, parser_performance, etc.)
+- Pipeline functions (archive_old_alerts, get_pipeline_stats, etc.)
+- State change triggers for real-time notifications
+
+For each component, the tool reports:
+✓ EXISTS       - Component is properly configured
+⚠ EXISTS BUT BROKEN - Component exists but may need recreation
+✗ MISSING      - Component needs to be created
+✗ CANNOT VERIFY - Prerequisites are missing
+
+The tool provides specific SQL commands to fix any issues found.`,
+		Example: `  # Verify the complete schema
+  eos delphi inspect verify-pipeline-schema
+  
+  # Example output:
+  # ✅ Database fully matches schema.sql!
+  # OR
+  # ❌ Database requires updates: 3 missing objects, 1 warnings
+  #
+  # The report will show exactly what needs to be fixed:
+  # - Missing enum types with CREATE TYPE commands
+  # - Missing tables with references to schema.sql
+  # - Missing indexes affecting performance
+  # - Broken views that need recreation`,
+		RunE: eos_cli.Wrap(runVerifyPipelineSchema),
+	}
+
+	return cmd
+}
+
+// runVerifyPipelineSchema performs comprehensive schema verification
+func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("🔍 Starting database schema verification")
+
+	// Connect to database
+	db, err := connectToDelphiDatabase(rc)
+	if err != nil {
+		logger.Error("❌ Failed to connect to Delphi database",
+			zap.Error(err),
+			zap.String("troubleshooting", "Ensure PostgreSQL is running and connection parameters are correct"))
+		return fmt.Errorf("database connection failed: %w", err)
+	}
+	defer func() {
+		if closeErr := db.Close(); closeErr != nil {
+			logger.Warn("⚠️ Failed to close database connection", zap.Error(closeErr))
+		}
+	}()
+
+	logger.Info("✅ Database connection established")
+
+	// Create schema verifier and run verification
+	verifier := delphi.NewSchemaVerifier(db)
+	result, err := verifier.VerifyCompleteSchema(rc)
+	if err != nil {
+		logger.Error("❌ Schema verification failed",
+			zap.Error(err))
+		return fmt.Errorf("verification failed: %w", err)
+	}
+
+	// Generate and display the report
+	report := result.GenerateReport()
+	
+	// Log the summary
+	logger.Info("📋 Schema verification completed",
+		zap.String("overall_status", result.OverallStatus),
+		zap.Int("missing_objects", result.MissingCount),
+		zap.Time("verification_time", result.Timestamp))
+
+	// Print the full report to stdout (this is what users will see)
+	fmt.Print(report)
+
+	// Return non-zero exit code if there are missing objects
+	if result.MissingCount > 0 {
+		logger.Warn("⚠️ Schema verification found issues - see report above")
+		return fmt.Errorf("schema verification found %d missing objects", result.MissingCount)
+	}
+
+	logger.Info("✅ Schema verification passed - database is properly configured")
 	return nil
 }
