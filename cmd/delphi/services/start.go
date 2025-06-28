@@ -13,19 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// DelphiServices lists all Delphi pipeline services
-var DelphiServices = []string{
-	"delphi-listener",
-	"delphi-agent-enricher",
-	"delphi-emailer", // DEPRECATED - being replaced by modular email workers
-	"llm-worker",
-	"ab-test-analyzer", // Assuming this is also part of your suite based on other commands
-    "alert-to-db",      // Assuming this is also part of your suite based on other commands
-	"prompt-ab-tester",
-    "email-structurer",
-    "email-formatter",
-    "email-sender",     // ADDED: email-sender to the list
-}
+// DelphiServices is now sourced from the service registry for backward compatibility
+var DelphiServices = GetGlobalRegistry().GetActiveServiceNames()
 
 // NewStartCmd creates the start command
 func NewStartCmd() *cobra.Command {

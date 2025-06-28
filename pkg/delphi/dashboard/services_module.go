@@ -21,16 +21,18 @@ import (
 )
 
 // DelphiServices contains the list of all Delphi pipeline services
+// This should match the service registry in cmd/delphi/services/service_registry.go
 var DelphiServices = []string{
 	"delphi-listener",
-	"delphi-agent-enricher",
-	"llm-worker",
-	"prompt-ab-tester",
-	"ab-test-analyzer",
+	"delphi-agent-enricher", 
 	"alert-to-db",
+	"prompt-ab-tester",
+	"llm-worker",
+	"ab-test-analyzer",
 	"email-structurer",
 	"email-formatter",
 	"email-sender",
+	"parser-monitor",
 }
 
 // ServiceStatus represents the status of a single service

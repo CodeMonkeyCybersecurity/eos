@@ -70,4 +70,5 @@ func init() {
 	// Note: checkCmd and installCmd add themselves via their own init() functions
 	ServicesCmd.AddCommand(NewDeployABConfigCmd())
 	ServicesCmd.AddCommand(NewAnalyzeABResultsCmd())
+	ServicesCmd.AddCommand(NewABConfigCmd())  // Enhanced A/B testing management
 }
