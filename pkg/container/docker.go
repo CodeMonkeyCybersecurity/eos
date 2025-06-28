@@ -169,17 +169,41 @@ func VerifyDockerInstallation(rc *eos_io.RuntimeContext) error {
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "docker",
 		Args:    []string{"run", "--rm", "hello-world"},
+		Capture: true,
 	})
 	if err != nil {
 		logger.Error(" Docker hello-world verification failed", zap.Error(err))
 		return cerr.Wrap(err, "run Docker hello-world")
 	}
 
-	logger.Debug(" Docker hello-world output",
-		zap.String("output", strings.TrimSpace(output)))
+	// Clean and normalize the output for verification
+	cleanOutput := strings.TrimSpace(output)
+	logger.Info(" Docker hello-world output received",
+		zap.String("output", cleanOutput),
+		zap.Int("output_length", len(cleanOutput)))
 
-	if !strings.Contains(output, "Hello from Docker!") {
-		logger.Error(" Docker hello-world output doesn't contain expected message")
+	// Check for multiple possible success indicators
+	successIndicators := []string{
+		"Hello from Docker!",
+		"Hello from Docker",
+		"installation appears to be working correctly",
+		"Docker took the following steps",
+	}
+
+	found := false
+	for _, indicator := range successIndicators {
+		if strings.Contains(cleanOutput, indicator) {
+			logger.Info(" Docker verification successful",
+				zap.String("found_indicator", indicator))
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		logger.Error(" Docker hello-world output doesn't contain expected success message",
+			zap.String("output", cleanOutput),
+			zap.Strings("expected_indicators", successIndicators))
 		return cerr.New("Docker hello-world verification failed - unexpected output")
 	}
 
@@ -202,20 +226,41 @@ func SetupDockerNonRoot(rc *eos_io.RuntimeContext) error {
 		// This is not a critical error as the group might already exist
 	}
 
-	// Determine the user to add to docker group
+	// Determine the user to add to docker group with improved detection
 	user := os.Getenv("SUDO_USER")
 	if user == "" {
 		user = os.Getenv("USER")
 	}
+	
+	// Additional fallback: check who actually invoked sudo
+	originalUser := ""
+	if logname, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "logname",
+		Args:    []string{},
+		Capture: true,
+	}); err == nil {
+		originalUser = strings.TrimSpace(logname)
+	}
 
-	logger.Debug(" Detected user information",
+	logger.Info(" Detected user information",
 		zap.String("sudo_user", os.Getenv("SUDO_USER")),
 		zap.String("user", os.Getenv("USER")),
+		zap.String("logname", originalUser),
 		zap.String("selected_user", user))
 
+	// Use logname as fallback if SUDO_USER is not available
+	if (user == "" || user == "root") && originalUser != "" && originalUser != "root" {
+		user = originalUser
+		logger.Info(" Using logname as fallback user", zap.String("user", user))
+	}
+
 	if user == "" || user == "root" {
-		logger.Warn("No non-root user detected; skipping usermod step",
-			zap.String("user", user))
+		logger.Warn(" No non-root user detected; skipping usermod step",
+			zap.String("sudo_user", os.Getenv("SUDO_USER")),
+			zap.String("user_env", os.Getenv("USER")),
+			zap.String("logname", originalUser))
+		logger.Warn(" IMPORTANT: You may need to manually add your user to docker group:")
+		logger.Warn("   sudo usermod -aG docker YOUR_USERNAME")
 		return nil
 	}
 
