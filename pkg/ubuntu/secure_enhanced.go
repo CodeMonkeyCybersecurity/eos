@@ -90,23 +90,14 @@ func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 		return fmt.Errorf("create security report script: %w", err)
 	}
 
-	// 11. Configure MFA based on mode using the new secure implementation
+	// 11. Configure simple MFA for root user only
 	switch mfaMode {
-	case "enforced":
-		logger.Info(" Configuring ENFORCED Multi-Factor Authentication")
-		mfaManager := NewMFAManager(rc)
-		if err := mfaManager.ImplementMFASecurely(true); err != nil {
-			return fmt.Errorf("configure enforced MFA: %w", err)
+	case "enforced", "standard":
+		logger.Info(" Configuring simple Multi-Factor Authentication for root user")
+		if err := ConfigureSimpleMFA(rc); err != nil {
+			return fmt.Errorf("configure simple MFA: %w", err)
 		}
-		logger.Info(" ENFORCED MFA configured successfully")
-
-	case "standard":
-		logger.Info("⚡ Configuring GRACEFUL Multi-Factor Authentication")
-		mfaManager := NewMFAManager(rc)
-		if err := mfaManager.ImplementMFASecurely(false); err != nil {
-			return fmt.Errorf("configure graceful MFA: %w", err)
-		}
-		logger.Info(" GRACEFUL MFA configured successfully")
+		logger.Info(" Simple MFA configured successfully for root user")
 
 	case "disabled":
 		logger.Warn("  MFA configuration skipped - this reduces security")
@@ -145,19 +136,12 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println()
 
 	switch mfaMode {
-	case "enforced":
-		fmt.Println(" Multi-Factor Authentication: ENFORCED")
-		fmt.Println("   • All sudo operations require MFA")
-		fmt.Println("   • Password-only fallback disabled")
-		fmt.Println("   • Emergency access: disable-mfa-emergency")
-		fmt.Println("   • Status check: mfa-status")
-		fmt.Println("   • User setup: setup-mfa")
-
-	case "standard":
-		fmt.Println(" Multi-Factor Authentication: ENABLED")
-		fmt.Println("   • MFA required for sudo operations")
-		fmt.Println("   • Password fallback available")
-		fmt.Println("   • User setup: setup-mfa")
+	case "enforced", "standard":
+		fmt.Println(" Multi-Factor Authentication: CONFIGURED")
+		fmt.Println("   • Google Authenticator configured for root user")
+		fmt.Println("   • Root account has MFA enabled")
+		fmt.Println("   • Emergency backup codes generated")
+		fmt.Println("   • Other users can configure MFA manually with: google-authenticator")
 
 	case "disabled":
 		fmt.Println("  Multi-Factor Authentication: DISABLED")
@@ -167,12 +151,9 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println()
 	fmt.Println(" Available Commands:")
 	fmt.Println("   • security-report     - Generate comprehensive security report")
-	fmt.Println("   • mfa-status          - Check MFA configuration status")
-	fmt.Println("   • setup-mfa           - Configure MFA for current user")
-
-	if mfaMode == "enforced" {
-		fmt.Println("   • enforce-mfa-strict  - Enable strict MFA enforcement")
-		fmt.Println("   • disable-mfa-emergency - Emergency MFA disable (admin only)")
+	
+	if mfaMode == "enforced" || mfaMode == "standard" {
+		fmt.Println("   • google-authenticator - Configure MFA for additional users")
 	}
 
 	fmt.Println()
@@ -183,12 +164,12 @@ func printSecuritySummary(rc *eos_io.RuntimeContext, mfaMode string) {
 	fmt.Println("   • Security monitoring enabled")
 	fmt.Println()
 
-	if mfaMode == "enforced" {
+	if mfaMode == "enforced" || mfaMode == "standard" {
 		fmt.Println(" IMPORTANT NEXT STEPS:")
-		fmt.Println("   1. Ensure all users run 'setup-mfa' to configure their accounts")
-		fmt.Println("   2. Test sudo access in a separate terminal before logging out")
-		fmt.Println("   3. Store emergency backup codes securely")
-		fmt.Println("   4. Run 'mfa-status' to verify configuration")
+		fmt.Println("   1. Save the emergency backup codes in a secure location")
+		fmt.Println("   2. Test root access with MFA in a separate terminal")
+		fmt.Println("   3. Configure MFA for other users: sudo -u username google-authenticator")
+		fmt.Println("   4. Store the MFA secret key securely for backup purposes")
 		fmt.Println()
 	}
 

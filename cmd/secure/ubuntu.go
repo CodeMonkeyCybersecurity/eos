@@ -15,9 +15,9 @@ import (
 
 var ubuntuCmd = &cobra.Command{
 	Use:   "ubuntu",
-	Short: "Comprehensive Ubuntu security hardening with MFA",
-	Long: `Comprehensive security hardening for Ubuntu 24.04 LTS servers with production-ready
-Multi-Factor Authentication (MFA) implementation.
+	Short: "Comprehensive Ubuntu security hardening with simple MFA setup",
+	Long: `Comprehensive security hardening for Ubuntu 24.04 LTS servers with simple
+Multi-Factor Authentication (MFA) setup for the root user.
 
 SECURITY TOOLS INSTALLED:
 • auditd - Comprehensive system auditing
@@ -31,22 +31,15 @@ SECURITY TOOLS INSTALLED:
 • Automatic security updates
 
 MFA IMPLEMENTATION:
-• Google Authenticator TOTP for sudo/su access
-• Preserves ALL existing sudoers authorizations
-• Handles service accounts automatically (NOPASSWD preserved)
-• Multiple emergency recovery methods prevent lockouts
-• Atomic operations with automatic rollback on failure
-
-EMERGENCY ACCESS METHODS:
-• Time-based bypass: sudo emergency-mfa-bypass enable
-• Emergency group: mfa-emergency (bypass MFA)
-• Backup admin account with secure credentials
-• Console access (configurable to bypass MFA)
-• Complete restoration scripts in /etc/eos/mfa-backup-*/
+• Installs Google Authenticator package
+• Runs interactive google-authenticator setup for root user
+• User guided through QR code scanning and backup code generation
+• Simple, straightforward MFA configuration
+• Other users can run 'google-authenticator' manually to set up MFA
 
 USAGE EXAMPLES:
-• sudo eos secure ubuntu                    # Full hardening + enforced MFA (recommended)
-• sudo eos secure ubuntu --enable-mfa       # Graceful MFA (password fallback allowed)
+• sudo eos secure ubuntu                    # Full hardening + root MFA setup (recommended)
+• sudo eos secure ubuntu --enable-mfa       # Same as above (MFA enabled by default)
 • sudo eos secure ubuntu --mfa-only         # Only configure MFA, skip other hardening
 • sudo eos secure ubuntu --no-mfa           # Skip MFA entirely (dev/test only)
 
@@ -72,14 +65,11 @@ For detailed documentation: /docs/commands/secure-ubuntu.md`,
 		// Handle MFA-only configuration
 		if mfaOnly {
 			if disableMFA {
-				logger.Info(" Disabling MFA for sudo/root access")
-				return ubuntu.DisableMFA(rc)
-			} else if enforceMFA {
-				logger.Info(" Configuring ENFORCED MFA for sudo/root access")
-				return ubuntu.ConfigureEnforcedMFA(rc)
+				logger.Info(" MFA disable not implemented in simple mode")
+				return fmt.Errorf("MFA disable not available - use --no-mfa for new installations")
 			} else {
-				logger.Info(" Configuring standard MFA for sudo/root access")
-				return ubuntu.ConfigureMFA(rc)
+				logger.Info(" Configuring simple MFA for root user only")
+				return ubuntu.ConfigureSimpleMFA(rc)
 			}
 		}
 
