@@ -6,6 +6,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/monitor"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/prompts"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/read" // This is delphi's 'read' subcommand
@@ -38,6 +39,7 @@ func init() {
 	// Register subcommands to DelphiCmd
 	DelphiCmd.AddCommand(create.CreateCmd)
 	DelphiCmd.AddCommand(read.ReadCmd) // This 'read' is specific to 'delphi'
+	DelphiCmd.AddCommand(inspect.NewInspectCmd()) // Add the new inspect command
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(sync.SyncCmd)
