@@ -1,327 +1,204 @@
-# Delphi Pipeline: Target Architecture
+Delphi Alert Processing Pipeline
+Overview: Intelligent Security Alert Communication
+The Delphi pipeline transforms raw Wazuh security alerts into intelligent, contextually-aware email notifications using Large Language Model (LLM) enrichment. Think of it as a sophisticated translation service that takes technical security alerts and converts them into clear, actionable communications tailored for different audiences.
 
-## The Vision: A Smart, Self-Adapting Alert Pipeline
+Core Architecture Philosophy
+Rather than sending the same generic alert to everyone, Delphi intelligently selects different communication approaches based on alert characteristics. A critical system breach might warrant a detailed investigation guide, while a routine policy violation could use a concise executive summary. This intelligent routing ensures that each recipient gets the right level of detail in the right format.
 
-Think of your pipeline like a sophisticated translation service. Raw security alerts come in speaking a technical language, and your pipeline translates them into clear, actionable emails that different audiences can understand. The key innovation you're working towards is having multiple "translators" (parsers) that specialize in different communication styles.
+Pipeline States and Flow
+Your alerts progress through eight distinct states, each representing a completed processing phase:
 
-## Complete Pipeline Architecture
+new → enriched → analyzed → structured → formatted → sent
+                                                    ↓
+                                                 failed
+                                                    ↓
+                                               archived
+Each state transition is atomic and tracked with precise timestamps, creating a complete audit trail for every alert that enters your system.
 
-### Phase 1: Alert Ingestion & Initial Processing
-```
-Wazuh Alert → Webhook Listener → Database (state: 'new')
-                                     ↓
-                            Agent Enricher adds context
-                                     ↓
-                            Database (state: 'agent_enriched')
-```
+State Definitions
+new: Alert just received from Wazuh, contains raw security event data enriched: Agent context added (OS, network info, group memberships)
+analyzed: LLM has processed the alert and provided intelligent analysis structured: LLM response parsed into actionable sections (summary, details, recommendations) formatted: Email content generated with proper styling and recipients sent: Successfully delivered to intended recipients failed: Processing failed at some point, requires intervention archived: Successfully processed alerts moved to long-term storage
 
-At this stage, your raw alert has been received and enriched with information about the agent that generated it. This is like receiving a letter in a foreign language and noting who sent it and where it came from.
+Database Schema Architecture
+Core Tables
+agents: Comprehensive tracking of your Wazuh endpoints
 
-### Phase 2: Intelligent Prompt Selection & LLM Processing
-```
-Alert Ready for Analysis → Prompt Selector chooses approach
-                                     ↓
-                          Random selection from:
-                          - Security Analysis (detailed technical)
-                          - Executive Summary (business-focused)
-                          - Investigation Guide (step-by-step)
-                          - Concise Notification (your current format)
-                                     ↓
-                          LLM processes with selected prompt
-                                     ↓
-                 Database (state: 'responded', prompt_type set)
-```
+Stores agent metadata, network information, and current status
+Enables intelligent context enrichment for alerts
+Tracks API fetch timestamps for efficient caching
+alerts: The backbone of your pipeline
 
-This is where the magic happens. Instead of using the same prompt for every alert, your system should intelligently select different prompts based on factors like:
-- Alert severity
-- Time of day (executives might prefer summaries during business hours)
-- Alert type (some alerts benefit from investigation guides)
-- Historical effectiveness (which formats get the best response?)
+Complete audit trail from ingestion to delivery
+Stores raw Wazuh data, LLM interactions, parsing results, and email content
+Tracks processing times, token usage, and error conditions
+Uses JSONB for flexible data structures that can evolve
+parser_metrics: Performance tracking for continuous improvement
 
-### Phase 3: Smart Parsing with Fallback Protection
-```
-LLM Response → Parser Registry checks prompt_type
-                        ↓
-              Selects appropriate parser:
-              - SecurityAnalysisParser
-              - ExecutiveSummaryParser
-              - InvestigationGuideParser
-              - DelphiNotifyShortParser
-                        ↓
-              Attempts parsing with validation
-                        ↓
-    Success?  ──No──→ Circuit breaker counts failure
-       ↓                        ↓
-      Yes              After 5 failures: Open circuit
-       ↓                        ↓
-Store structured data    Use fallback parser
-       ↓                        ↓
-Database (state: 'structured', parser_used recorded)
-```
+Records parsing success rates by prompt type
+Tracks processing times and error patterns
+Enables data-driven optimization of your LLM prompts
+Intelligent Processing Features
+Parser Type Selection: Your system can choose from six different communication approaches:
 
-The parsing phase is like having specialized editors who know how to format different types of documents. Each parser understands the structure its corresponding prompt produces.
+security_analysis: Detailed technical breakdown for security teams
+executive_summary: Business-focused summaries for leadership
+investigation_guide: Step-by-step response procedures
+delphi_notify_short: Concise notifications for routine alerts
+hybrid: Adaptive format based on alert characteristics
+custom: Specialized formatting for unique requirements
+Real-time Coordination: PostgreSQL notification channels enable seamless handoffs between workers:
 
-### Phase 4: Email Generation & Delivery
-```
-Structured Data → Email Formatter applies template
-                            ↓
-                   Creates HTML and plain text
-                            ↓
-              Database (state: 'formatted')
-                            ↓
-                     Email Sender
-                            ↓
-              Database (state: 'sent')
-```
+new_alert: Triggers initial processing
+alert_enriched: Signals readiness for LLM analysis
+alert_analyzed: Initiates parsing phase
+alert_structured: Begins email formatting
+alert_formatted: Starts delivery process
+Worker Components and Responsibilities
+Phase 1: Alert Ingestion
+custom-delphi-webhook.py
 
-## Database Schema: The Complete Picture
+Entry point for Wazuh webhooks
+Validates incoming alert data
+Forwards to processing pipeline
+alert-to-db.py
 
-Your database should track the entire journey of each alert. Here's what each field means and why it matters:
+Creates initial database record with state = 'new'
+Generates unique alert_hash for deduplication
+Populates core fields: agent_id, rule_id, rule_level, rule_desc
+Stores complete raw alert in raw JSONB field
+Triggers new_alert notification
+Phase 2: Context Enrichment
+delphi-agent-enricher.py
 
-```sql
-CREATE TABLE alerts (
-    -- Identity & Deduplication
-    id BIGINT PRIMARY KEY,
-    alert_hash TEXT UNIQUE,      -- Prevents duplicate processing
-    
-    -- Source Information
-    agent_id TEXT,               -- Which system generated this?
-    rule_id INTEGER,             -- What rule triggered?
-    rule_level INTEGER,          -- How severe? (1-15 scale)
-    rule_desc TEXT,              -- Human-readable rule description
-    raw JSONB,                   -- Original Wazuh data (for debugging)
-    
-    -- Processing Timeline
-    ingest_timestamp TIMESTAMP,  -- When did we receive this?
-    prompt_sent_at TIMESTAMP,    -- When sent to LLM?
-    response_received_at TIMESTAMP, -- When did LLM respond?
-    structured_at TIMESTAMP,     -- When was it parsed?
-    formatted_at TIMESTAMP,      -- When was email created?
-    alert_sent_at TIMESTAMP,     -- When was it delivered?
-    
-    -- Intelligent Processing
-    state alert_state,           -- Current processing stage
-    prompt_type VARCHAR(50),     -- Which prompt approach?
-    prompt_template TEXT,        -- Actual prompt used
-    prompt_text TEXT,            -- Prompt with alert data
-    
-    -- LLM Interaction
-    response_text TEXT,          -- Raw LLM response
-    prompt_tokens INTEGER,       -- Cost tracking
-    completion_tokens INTEGER,   -- Cost tracking
-    total_tokens INTEGER,        -- Total API usage
-    
-    -- Parsing Results
-    parser_used TEXT,            -- Which parser processed this?
-    structured_data JSONB,       -- Parsed email structure
-    
-    -- Email Generation
-    formatted_data JSONB,        -- Final email content
-    email_recipients JSONB,      -- Who received this?
-    email_error TEXT,            -- Any delivery issues?
-    email_retry_count INTEGER    -- Delivery attempts
-);
-```
+Listens for new_alert notifications
+Queries agents table for endpoint context
+Updates agent_data JSONB field with enriched information
+Sets enriched_at timestamp
+Transitions state to 'enriched'
+Triggers alert_enriched notification
+Phase 3: LLM Analysis
+llm-worker.py
 
+Listens for alert_enriched notifications
+Selects appropriate prompt_type based on alert characteristics
+Constructs intelligent prompts combining alert data with agent context
+Manages LLM API interactions with comprehensive error handling
+Records detailed metrics: prompt_tokens, completion_tokens, total_tokens
+Stores full conversation: prompt_text, response_text
+Transitions state to 'analyzed'
+Triggers alert_analyzed notification
+prompt-ab-tester.py
 
-1. Agent Enricher (First in the pipeline)
-This worker needs to:
+Coordinates with LLM worker for systematic prompt optimization
+Implements A/B testing across different prompt approaches
+Records experimental data for analysis
+Phase 4: Response Structuring
+email-structurer.py
 
-Change from setting state to 'agent_enriched' to 'enriched'
-Use the notification channel 'alert_enriched' instead of any old channel names
-Properly set the enriched_at timestamp
+Listens for alert_analyzed notifications
+Selects parser based on prompt_type field
+Applies specialized parsing logic for each communication format
+Extracts structured sections (summary, details, recommendations)
+Records performance metrics: parser_duration_ms, parser_success
+Stores results in structured_data JSONB field
+Handles failures gracefully with detailed error logging
+Transitions state to 'structured'
+Triggers alert_structured notification
+parser-monitor.py
 
-2. LLM Worker (The current bottleneck)
-This is your most critical fix because it's where everything is stuck. The worker needs to:
+Continuously tracks parsing performance
+Records detailed metrics in parser_metrics table
+Provides operational intelligence for optimization
+Phase 5: Email Formatting
+email-formatter.py
 
-Listen for alerts in 'enriched' state (not 'agent_enriched')
-Set the prompt_type field when selecting a prompt
-Change state to 'analyzed' (not 'summarized') when complete
-Notify on 'alert_analyzed' channel
+Listens for alert_structured notifications
+Transforms structured data into professional email content
+Applies formatting rules for visual appeal and readability
+Manages recipient selection and personalization
+Stores complete email in formatted_data JSONB field
+Sets formatted_at timestamp
+Transitions state to 'formatted'
+Triggers alert_formatted notification
+Phase 6: Email Delivery
+email-sender.py
 
-3. Email Structurer (Parser)
-This worker needs to:
+Listens for alert_formatted notifications
+Manages email service provider integration
+Handles delivery retries with exponential backoff
+Tracks delivery attempts in email_retry_count
+Records delivery errors in email_error field
+Sets alert_sent_at on successful delivery
+Transitions state to 'sent' (success) or 'failed' (exhausted retries)
+Orchestration and Monitoring
+delphi-listener.py
 
-Listen for 'alert_analyzed' notifications
-Read the prompt_type field to select the appropriate parser
-Set parser_used, parser_success, and related fields
-Change state to 'structured' when complete
-Notify on 'alert_structured' channel
+Central coordination service for the entire pipeline
+Maintains persistent connections to all notification channels
+Ensures proper handoffs between processing phases
+Provides centralized logging and error handling
+ab-test-analyzer.py
 
-4. Email Formatter
-This worker needs to:
+Analyzes A/B test results for continuous improvement
+Examines parser effectiveness across different prompt types
+Provides insights for optimizing communication strategies
+Operational Monitoring
+Your schema includes comprehensive monitoring views that provide real-time operational visibility:
 
-Listen for 'alert_structured' notifications
-Change state to 'formatted' when complete
-Notify on 'alert_formatted' channel
+pipeline_health
+Real-time dashboard showing alert counts by state, processing times, and health indicators. Automatically flags states where alerts are aging beyond acceptable thresholds.
 
-5. Email Sender
-This worker needs to:
+pipeline_bottlenecks
+Identifies where alerts are getting stuck by counting how many have been in each state for extended periods (10 minutes, 30 minutes, 1 hour).
 
-Listen for 'alert_formatted' notifications
-Change state to 'sent' when complete
-Use alert_sent_at instead of any old timestamp fields
+parser_performance
+Tracks success rates, average processing times, and usage patterns for each prompt type and parser combination. Essential for optimizing your LLM prompts.
 
-## State Flow: Understanding Alert Lifecycle
+parser_error_analysis
+Groups recent parsing errors for pattern detection, helping you identify systematic issues that need attention.
 
-Your alerts should flow through these states, with clear rules about progression:
+recent_failures
+Shows recent failures with automatic diagnostic suggestions, accelerating troubleshooting when problems occur.
 
-```
-NEW → AGENT_ENRICHED → RESPONDED → STRUCTURED → FORMATTED → SENT
- ↓         ↓              ↓            ↓           ↓          ↓
-Can fail  Can fail    Can fail    Can fail    Can fail   Success!
-and retry and retry   and retry   and retry   and retry
-```
+failure_summary
+High-level failure pattern analysis for understanding systemic issues and trends.
 
-Each state represents a completed phase of processing. If an alert gets stuck, you know exactly where to look.
+Key Design Principles
+Reliability Through State Management: Every processing step is tracked with atomic state transitions. If something fails, you know exactly where and can resume processing without losing work.
 
-## Prompt Types: Your Communication Palette
+Comprehensive Audit Trail: Every LLM interaction, parsing attempt, and delivery attempt is recorded with detailed metrics. This enables both troubleshooting and continuous improvement.
 
-### Security Analysis Format
-**Purpose**: Detailed technical analysis for security teams
-**When to use**: High-severity alerts, complex attacks, compliance events
-**Key sections**: Threat Analysis, Technical Details, IoCs, Remediation Steps
+Flexible Data Structures: JSONB fields allow your data structures to evolve as your understanding of the problem space deepens, without requiring schema migrations.
 
-### Executive Summary Format
-**Purpose**: Business-focused summaries for leadership
-**When to use**: Critical alerts, business hours, C-suite recipients
-**Key sections**: Business Impact, Risk Assessment, Required Decisions
+Real-time Coordination: PostgreSQL's notification system enables workers to coordinate in real-time without polling, reducing latency and database load.
 
-### Investigation Guide Format
-**Purpose**: Step-by-step response procedures
-**When to use**: Alerts requiring investigation, junior staff on duty
-**Key sections**: Numbered Steps, Verification Procedures, Escalation Criteria
+Intelligent Processing: The prompt_type system allows you to apply different communication strategies based on alert characteristics, ensuring recipients get appropriately formatted information.
 
-### Concise Notification Format
-**Purpose**: Quick notifications for routine alerts
-**When to use**: Low-severity alerts, high-volume periods
-**Key sections**: What Happened, Why It Matters, What To Do
+Utility Functions
+archive_old_alerts(days_to_keep): Automatically archives successfully sent alerts older than the specified number of days, keeping your active dataset manageable.
 
-## Implementation Roadmap
+get_pipeline_stats(): Returns key operational metrics including 24-hour alert volume, successful deliveries, average processing time, and current backlog size.
 
-### Step 1: Database Migration (Week 1)
-First, ensure your database has all necessary columns. Run this check:
+Configuration and Deployment
+The pipeline is designed to run as a collection of independent Python workers that communicate through your PostgreSQL database. Each worker can be deployed, scaled, and monitored independently, providing operational flexibility.
 
-```sql
--- Check what's missing
-SELECT column_name 
-FROM information_schema.columns 
-WHERE table_name = 'alerts' 
-  AND column_name IN ('parser_success', 'parser_error', 'parser_duration_ms', 'agent_data');
-```
+Workers listen to specific database notification channels and process alerts in their designated phase. The notification system ensures that work flows smoothly from one phase to the next without requiring complex orchestration logic.
 
-If columns are missing, create a migration to add them.
+Success Metrics
+Your pipeline is operating optimally when:
 
-### Step 2: Fix State Management (Week 1)
-Your current states don't match the expected flow. Update your services to use the correct state names:
+95% of alerts complete end-to-end processing within 5 minutes
+Parser success rates exceed 90% for each prompt type
+No alerts remain stuck in any state for more than 30 minutes
+LLM token usage remains within expected cost parameters
+Email delivery success rates exceed 98%
+Future Evolution
+This architecture is designed to support advanced features like:
 
-```python
-# In each service, ensure consistent state usage
-STATES = {
-    'NEW': 'new',
-    'AGENT_ENRICHED': 'agent_enriched',
-    'RESPONDED': 'responded',
-    'STRUCTURED': 'structured',
-    'FORMATTED': 'formatted',
-    'SENT': 'sent'
-}
-```
+Machine learning-based prompt type selection
+Dynamic parser selection based on LLM response characteristics
+Recipient preference learning for communication style optimization
+Advanced A/B testing across the entire pipeline
+Integration with additional security tools and notification channels
+The Delphi pipeline represents a sophisticated approach to security alert communication that goes far beyond simple forwarding, creating intelligent, contextual communications that help recipients understand and respond to security events effectively.
 
-### Step 3: Implement Prompt Randomization (Week 2)
-Update your LLM worker to properly set prompt types:
-
-```python
-def process_alert(alert_id):
-    # Load available prompts
-    prompts = load_prompt_configurations()
-    
-    # Select based on alert characteristics
-    selected_prompt = select_prompt_intelligently(alert, prompts)
-    
-    # CRITICAL: Store the prompt type!
-    cur.execute("""
-        UPDATE alerts 
-        SET prompt_type = %s,
-            prompt_template = %s,
-            state = 'responded'
-        WHERE id = %s
-    """, (selected_prompt.type, selected_prompt.template, alert_id))
-```
-
-### Step 4: Deploy Parser Registry (Week 2)
-Ensure your email-structurer has all necessary parsers registered and can handle failures gracefully.
-
-### Step 5: Monitoring & Optimization (Week 3)
-Create dashboards to track:
-- Parser success rates by prompt type
-- Average processing times
-- Circuit breaker states
-- Alert volume by state
-
-## Monitoring Queries for Daily Operations
-
-### Health Check Dashboard
-```sql
--- Overall pipeline health
-CREATE VIEW pipeline_health AS
-SELECT 
-    COUNT(*) FILTER (WHERE state = 'new') as awaiting_enrichment,
-    COUNT(*) FILTER (WHERE state = 'agent_enriched') as awaiting_llm,
-    COUNT(*) FILTER (WHERE state = 'responded') as awaiting_parse,
-    COUNT(*) FILTER (WHERE state = 'structured') as awaiting_format,
-    COUNT(*) FILTER (WHERE state = 'formatted') as awaiting_send,
-    COUNT(*) FILTER (WHERE state = 'sent') as completed_today
-FROM alerts
-WHERE ingest_timestamp > CURRENT_DATE;
-
--- Parser effectiveness
-CREATE VIEW parser_effectiveness AS
-SELECT 
-    prompt_type,
-    parser_used,
-    COUNT(*) as attempts,
-    COUNT(*) FILTER (WHERE structured_data IS NOT NULL) as successes,
-    ROUND(AVG(EXTRACT(EPOCH FROM (structured_at - response_received_at))), 2) as avg_parse_seconds
-FROM alerts
-WHERE response_received_at > CURRENT_DATE - INTERVAL '7 days'
-GROUP BY prompt_type, parser_used;
-```
-
-## Troubleshooting Playbook
-
-### When Alerts Get Stuck
-
-**Stuck in 'agent_enriched'**:
-- Check: Is the LLM worker running?
-- Check: Are you hitting OpenAI rate limits?
-- Fix: Restart LLM worker, check API keys
-
-**Stuck in 'responded'**:
-- Check: Is prompt_type being set?
-- Check: Is email-structurer running?
-- Fix: Verify prompt_type is populated, restart structurer
-
-**Circuit Breaker Open**:
-- Check: Parser error patterns
-- Check: LLM response format changes
-- Fix: Update parser or prompt to match
-
-## Success Metrics
-
-Your pipeline is working optimally when:
-- 95%+ of alerts complete within 5 minutes
-- Parser success rate exceeds 90% for each prompt type
-- No alerts remain stuck for more than 30 minutes
-- Circuit breakers open less than once per week
-
-## The Future State
-
-Imagine your pipeline in six months:
-- Machine learning selects optimal prompt types based on alert characteristics
-- Parsers self-heal by analyzing successful parses
-- Recipients can indicate preference for communication style
-- The system learns which formats drive fastest remediation
-
-This is not just an alert pipeline—it's an intelligent security communication system that adapts to your organization's needs.
-
-Would you like me to create specific implementation scripts for any of these components, or help you diagnose why your current system is only using the `delphi_notify_short` parser?

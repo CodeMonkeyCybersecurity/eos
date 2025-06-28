@@ -2,7 +2,16 @@
 # /usr/local/bin/email-structurer.py
 # stanley:stanley 0750
 """
-Email Structurer Worker V2 - Prompt-aware structuring with multiple parsers
+Email Structurer Worker - Phase 4 of Delphi Pipeline
+Parses LLM responses into structured sections for email formatting
+
+IMPROVEMENTS:
+- Fixed state/channel alignment to match schema.sql ('analyzed' not 'summarized') 
+- Simplified parser system focused on actual prompt formats
+- Enhanced error handling with intelligent fallbacks
+- Improved database schema alignment
+- Streamlined circuit breaker implementation
+- Better performance through targeted parsing
 """
 import os
 import sys
@@ -12,71 +21,86 @@ import select
 import signal
 import logging
 import json
-import psycopg2 # Pylance: If this import cannot be resolved, ensure psycopg2-binary is installed
+import psycopg2
 import psycopg2.extensions
+import psycopg2.extras
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from logging.handlers import RotatingFileHandler
-from typing import Dict, List, Any, Optional, Type
+from typing import Dict, List, Any, Optional, Tuple
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import Enum
 
-# Pylance: If 'load_dotenv' is an unknown import symbol, ensure python-dotenv is installed.
-# The try-except handles runtime, but Pylance needs to see it defined statically.
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:
-    # Define a dummy load_dotenv if the module is not found, for static analysis
     def load_dotenv(*_a, **_kw): pass
 
 try:
-    import psycopg2
-    import psycopg2.extensions
-    from psycopg2.extras import RealDictCursor
+    import sdnotify
 except ImportError:
-    logging.error("Required dependency 'psycopg2' not found. Please install it using: pip install psycopg2-binary")
-    sys.exit(1) # This exit will not be caught by sdnotify if it's not imported yet
-
-
-# --- Import sdnotify for Systemd Watchdog Integration ---
-try:
-    import sdnotify # ADDED: Import sdnotify
-except ImportError:
-    # Fallback for systems without sdnotify
     sdnotify = None
-    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.", file=sys.stderr)
-
 
 # ───── CONFIGURATION ─────────────────────────────────────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
+# Environment validation
 REQUIRED_ENV = ["PG_DSN"]
-_missing = [var for var in REQUIRED_ENV if not os.getenv(var)]
-if _missing:
-    print(f"FATAL: Missing environment variables: {', '.join(_missing)}", file=sys.stderr)
+missing_vars = [var for var in REQUIRED_ENV if not os.getenv(var)]
+if missing_vars:
+    print(f"FATAL: Missing environment variables: {', '.join(missing_vars)}", file=sys.stderr)
     sys.exit(1)
 
 PG_DSN = os.getenv("PG_DSN", "").strip()
-LISTEN_CHANNEL = "new_response"        # Listen for LLM responses
-NOTIFY_CHANNEL = "alert_structured"   # Notify when structuring complete
 
-# Circuit breaker configuration
+# Pipeline configuration - FIXED: Aligned with schema.sql notification channels
+LISTEN_CHANNEL = "alert_analyzed"      # FIXED: Match schema.sql trigger
+NOTIFY_CHANNEL = "alert_structured"   # Notify formatter when complete
+STATE_ANALYZED = "analyzed"           # FIXED: Match schema.sql enum value
+STATE_STRUCTURED = "structured"
+
+# Performance configuration
+BATCH_SIZE = int(os.getenv("STRUCTURER_BATCH_SIZE", "10"))
 CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("PARSER_FAILURE_THRESHOLD", "5"))
-CIRCUIT_BREAKER_TIMEOUT = int(os.getenv("PARSER_FAILURE_TIMEOUT", "300"))  # 5 minutes
+CIRCUIT_BREAKER_TIMEOUT = int(os.getenv("PARSER_FAILURE_TIMEOUT", "300"))
 
-# A/B testing configuration
-AB_TEST_PERCENTAGE = int(os.getenv("PARSER_AB_TEST_PERCENTAGE", "0"))  # 0 = disabled
+class PromptType(Enum):
+    """Known prompt types from your LLM worker"""
+    ISOBAR = "security_analysis"
+    DELPHI_NOTIFY = "delphi_notify_short" 
+    DELPHI_BRIEF = "delphi_notify_brief"
+    EXECUTIVE = "executive_summary"
+    INVESTIGATION = "investigation_guide"
+    HYBRID = "hybrid"
+    CUSTOM = "custom"
+
+@dataclass
+class ParseResult:
+    """Container for parsing results"""
+    success: bool
+    sections: Dict[str, str]
+    subject: str
+    metadata: Dict[str, Any]
+    error: Optional[str] = None
+    parse_time_ms: float = 0.0
 
 # ───── LOGGER SETUP ─────────────────────────────────────
 def setup_logging() -> logging.Logger:
+    """Configure structured logging"""
     logger = logging.getLogger("email-structurer")
     logger.setLevel(logging.INFO)
 
     handler = RotatingFileHandler(
         "/var/log/stackstorm/email-structurer.log",
-        maxBytes=5 * 1024 * 1024,
-        backupCount=3
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5
     )
-    fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S")
+    
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s",
+        "%Y-%m-%d %H:%M:%S"
+    )
     handler.setFormatter(fmt)
     logger.addHandler(handler)
 
@@ -89,1143 +113,741 @@ def setup_logging() -> logging.Logger:
 
 log = setup_logging()
 
-# --- Initialize Systemd Notifier ---
-if sdnotify:
-    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
-else:
-    class DummyNotifier: # Dummy class if sdnotify isn't available
-        def notify(self, message):
-            pass
-    notifier = DummyNotifier()
+# ───── SYSTEMD INTEGRATION ─────────────────────────────
+class SystemdNotifier:
+    """Wrapper for systemd notifications"""
+    def __init__(self):
+        if sdnotify:
+            self.notifier = sdnotify.SystemdNotifier()
+        else:
+            self.notifier = None
+            
+    def notify(self, message: str):
+        """Send notification to systemd"""
+        if self.notifier:
+            try:
+                self.notifier.notify(message)
+            except Exception as e:
+                log.warning("Failed to send systemd notification: %s", e)
+    
+    def ready(self):
+        """Signal that service is ready"""
+        self.notify("READY=1")
+        
+    def watchdog(self):
+        """Send watchdog ping"""
+        self.notify("WATCHDOG=1")
+        
+    def status(self, status: str):
+        """Update service status"""
+        self.notify(f"STATUS={status}")
+        
+    def stopping(self):
+        """Signal that service is stopping"""
+        self.notify("STOPPING=1")
 
+notifier = SystemdNotifier()
 
 # ───── PARSER BASE CLASS ─────────────────────────────────
-class ResponseParser(ABC):
-    """Base parser interface - all parsers must implement these methods"""
-
+class BaseParser(ABC):
+    """Abstract base class for response parsers"""
+    
     @abstractmethod
-    def parse(self, response_text: str) -> Dict[str, str]:
+    def parse(self, response_text: str, alert_context: Dict[str, Any]) -> ParseResult:
+        """Parse LLM response into structured format"""
         pass
-
+        
     @abstractmethod
     def get_expected_sections(self) -> List[str]:
+        """Get list of expected section names"""
         pass
-
-    def validate_output(self, sections: Dict[str, str]) -> bool:
-        """Validate that required sections are present"""
-        # Override in subclasses for specific validation
-        return len(sections) > 0
-
-
-# ───── DELPHI NOTIFY SHORT PARSER ─────────────────────────────
-class DelphiNotifyShortParser(ResponseParser):
-    """
-    Parser specifically for the delphi-notify-short.txt prompt format.
-
-    Handles the structured format with sections like:
-    Summary: [RISK LEVEL] description...
-    What happened: explanation...
-    Further investigation: steps...
-    What to do: MOST IMPORTANT: action...
-    How to check: GOOD SIGNS/BAD SIGNS...
-    How to prevent this in future: prevention...
-    What to ask next: question...
-    """
-
-    def get_expected_sections(self) -> List[str]:
-        return [
-            "Summary",
-            "What happened",
-            "Further investigation",
-            "What to do",
-            "How to check",
-            "How to prevent this in future",
-            "What to ask next"
-        ]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        sections = {}
-
-        # Clean the response - remove extra whitespace but preserve structure
-        response_text = re.sub(r'\s+', ' ', response_text.strip())
-
-        # Pattern to match section headers (flexible with punctuation)
-        section_pattern = r'(' + '|'.join([
-            re.escape(section) for section in self.get_expected_sections()
-        ]) + r')[:.]?\s*'
-
-        # Split by section headers
-        parts = re.split(section_pattern, response_text, flags=re.IGNORECASE)
-
-        # Process the splits
-        for i in range(1, len(parts), 2):
-            if i + 1 < len(parts):
-                header = parts[i].strip()
-                content = parts[i + 1].strip()
-
-                # Clean up trailing separators
-                content = re.sub(r'^[:.]\s*', '', content)
-                content = content.rstrip('.,')
-
-                # Map to exact expected section names
-                for expected in self.get_expected_sections():
-                    if header.lower() == expected.lower():
-                        sections[expected] = content
-                        break
-
-        # If no structured sections found, try to extract key information
-        if not sections:
-            sections = self._fallback_parse(response_text)
-
-        return sections
-
-    def _fallback_parse(self, response_text: str) -> Dict[str, str]:
-        """Fallback parsing for unstructured responses"""
-        sections = {}
-
-        # Look for risk level indicators
-        risk_match = re.search(r'\[(LOW|MEDIUM|HIGH)\s+RISK[^\]]*\]', response_text, re.IGNORECASE)
-        if risk_match:
-            # Extract summary from beginning
-            summary_end = min(response_text.find('.') + 1, 200)
-            sections["Summary"] = response_text[:summary_end].strip()
-
-        # Look for "MOST IMPORTANT" actions
-        action_match = re.search(r'MOST IMPORTANT:([^.]+\.)', response_text, re.IGNORECASE)
-        if action_match:
-            sections["What to do"] = f"MOST IMPORTANT: {action_match.group(1).strip()}"
-
-        # If still no content, use the whole response as summary
-        if not sections:
-            sections["Summary"] = response_text[:300] + "..." if len(response_text) > 300 else response_text
-
-        return sections
-
-    def validate_output(self, sections: Dict[str, str]) -> bool:
-        """Validate Delphi Notify Short format requirements"""
-        # Must have at least Summary and one action section
-        return ("Summary" in sections and
-                any(key in sections for key in ["What to do", "What happened"]) and
-                len(sections) >= 2)
-
-
-# ───── STANDARD DELPHI PARSER ─────────────────────────────
-class StandardDelphiParser(ResponseParser):
-    """Original Delphi format parser (legacy compatibility)"""
-
-    def get_expected_sections(self) -> List[str]:
-        return [
-            "Summary",
-            "What happened",
-            "Further investigation",
-            "What to do",
-            "How to check",
-            "How to prevent this in future",
-            "What to ask next"
-        ]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        pattern = r'(' + '|'.join(f"{section}:" for section in self.get_expected_sections()) + ')'
-        parts = re.split(pattern, response_text)
-
-        sections = {}
-        for i in range(1, len(parts), 2):
-            if i + 1 < len(parts):
-                key = parts[i].rstrip(':')
-                value = parts[i + 1].strip()
-                sections[key] = value
-
-        return sections
-
-    def validate_output(self, sections: Dict[str, str]) -> bool:
-        # Must have at least Summary and What happened
-        return "Summary" in sections and "What happened" in sections
-
-
-# ───── SECURITY INCIDENT PARSER ─────────────────────────────
-class SecurityIncidentParser(ResponseParser):
-    """Parser for security-focused analysis prompts"""
-
-    def get_expected_sections(self) -> List[str]:
-        return [
-            "Threat Level",
-            "Attack Type",
-            "Compromised Assets",
-            "Immediate Response Required",
-            "Investigation Steps",
-            "Prevention Measures"
-        ]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        sections = {}
-
-        # Handle both "Section:" and "Section -" formats
-        pattern = r'(?:^|\n)(' + '|'.join(
-            f"(?:{re.escape(section)}[:-])" for section in self.get_expected_sections() # Used re.escape
-        ) + ')'
-
-        parts = re.split(pattern, response_text, flags=re.MULTILINE | re.IGNORECASE)
-
-        for i in range(1, len(parts), 2):
-            if i + 1 < len(parts):
-                header = parts[i].strip().rstrip(':-').strip()
-                content = parts[i + 1].strip()
-
-                # Match to expected sections (case-insensitive)
-                for expected in self.get_expected_sections():
-                    if header.lower() == expected.lower():
-                        sections[expected] = content
-                        break
-
-        return sections
-
-    def validate_output(self, sections: Dict[str, str]) -> bool:
-        # Must have Threat Level and Attack Type
-        return "Threat Level" in sections and "Attack Type" in sections
-
-
-# ───── NUMBERED LIST PARSER ─────────────────────────────
-class NumberedListParser(ResponseParser):
-    """Parser for numbered list format responses"""
-
-    def get_expected_sections(self) -> List[str]:
-        return [
-            "What is happening",
-            "Why this is important",
-            "What to do next",
-            "How to verify the fix"
-        ]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        sections = {}
-
-        # Match numbered items: "1. ", "1) ", "1: "
-        pattern = r'\n?\d+[\.\):\s]+([^\n]+)'
-        matches = re.finditer(pattern, response_text)
-
-        # Extract content between numbered items
-        positions = []
-        for match in matches:
-            positions.append((match.start(), match.group(1).strip()))
-
-        # Get content for each numbered item
-        for i, (start, header) in enumerate(positions):
-            if i + 1 < len(positions):
-                end = positions[i + 1][0]
-            else:
-                end = len(response_text)
-
-            full_content = response_text[start:end].strip()
-            content_match = re.match(r'\d+[\.\):\s]+[^\n]+\n?(.*)', full_content, re.DOTALL)
-            if content_match:
-                content = content_match.group(1).strip()
-            else:
-                content = full_content
-
-            # Try to match header to expected sections
-            header_lower = header.lower()
-            matched = False
-            for expected in self.get_expected_sections():
-                if expected.lower() in header_lower or header_lower in expected.lower():
-                    sections[expected] = content
-                    matched = True
-                    break
-
-            if not matched:
-                sections[header] = content
-
-        return sections
-
-    def validate_output(self, sections: Dict[str, str]) -> bool:
-        # Must have at least "What is happening"
-        return "What is happening" in sections or any("what" in k.lower() for k in sections.keys())
-
-
-# ───── JSON RESPONSE PARSER ─────────────────────────────
-class JSONResponseParser(ResponseParser):
-    """
-    Parser for JSON-formatted LLM responses.
-    Improved to more robustly extract JSON from mixed text.
-    """
-
-    def get_expected_sections(self) -> List[str]:
-        return ["severity", "summary", "technical_details", "recommendations", "related_systems"]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        sections = {}
-        json_data = None
-
-        # --- IMPROVED JSON EXTRACTION ---
-        # Find the first opening curly brace and the last closing curly brace
-        # This is more robust than a fixed regex for varying JSON outputs
-        first_brace = response_text.find('{')
-        last_brace = response_text.rfind('}')
-
-        if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-            json_substring = response_text[first_brace : last_brace + 1]
-            try:
-                json_data = json.loads(json_substring)
-                log.debug("Successfully extracted and parsed JSON from LLM response.")
-            except json.JSONDecodeError as e:
-                log.warning(f"Failed to parse extracted JSON substring: {e}. Falling back to line-by-line.")
-                json_data = None
+        
+    def generate_subject(self, sections: Dict[str, str], alert_context: Dict[str, Any]) -> str:
+        """Generate email subject from parsed sections"""
+        agent_name = alert_context.get('agent_name', 'Unknown System')
+        rule_level = alert_context.get('rule_level', 0)
+        
+        # Default subject generation
+        if rule_level >= 12:
+            severity = "CRITICAL"
+        elif rule_level >= 9:
+            severity = "HIGH"
+        elif rule_level >= 6:
+            severity = "MEDIUM"
         else:
-            log.debug("No valid JSON object structure found in response_text. Falling back to line-by-line.")
+            severity = "LOW"
+            
+        return f"[{severity}] Security Alert - {agent_name}"
 
-
-        if json_data:
-            # Convert all values to strings and format lists/dicts
-            for key, value in json_data.items():
-                if isinstance(value, list):
-                    # For lists, join items with bullet points for readability
-                    sections[key] = "\n• " + "\n• ".join(str(item) for item in value)
-                elif isinstance(value, dict):
-                    # For nested dictionaries, format as key-value pairs
-                    sections[key] = "\n".join(f"{k}: {v}" for k, v in value.items())
-                else:
-                    sections[key] = str(value)
-        else:
-            # --- FALLBACK PARSING (Original logic from your script) ---
-            # This handles cases where LLM output is not strictly JSON but has "key: value" lines
-            log.debug("Using line-by-line fallback parsing for JSONResponseParser.")
-            for line in response_text.split('\n'):
-                if ':' in line:
-                    key, value = line.split(':', 1)
-                    key = key.strip().strip('"\'')
-                    value = value.strip().strip('",\'')
-                    if key.lower() in [s.lower() for s in self.get_expected_sections()]:
-                        sections[key] = value
-
-            if not sections:
-                # If even fallback fails, put entire response into a 'content' section
-                sections["content"] = response_text
-
-        return sections
-
-
-# ───── CONVERSATIONAL PARSER ─────────────────────────────
-class ConversationalParser(ResponseParser):
-    """Parser for natural language responses"""
-
+# ───── ISOBAR FRAMEWORK PARSER ─────────────────────────────
+class ISOBARParser(BaseParser):
+    """Parser for ISOBAR framework responses (security_analysis prompt)"""
+    
     def get_expected_sections(self) -> List[str]:
-        return ["What's Wrong", "Why It Matters", "What To Do", "Additional Info"]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        sections = {
-            "What's Wrong": "",
-            "Why It Matters": "",
-            "What To Do": "",
-            "Additional Info": ""
-        }
-
-        # Keywords that indicate each section
-        indicators = {
-            "What's Wrong": [
-                "what's happening", "the problem is", "detected", "found",
-                "alert shows", "issue is", "what's wrong", "the situation"
-            ],
-            "Why It Matters": [
-                "this matters because", "important because", "risk is",
-                "could lead to", "impact", "why you should care", "this means"
-            ],
-            "What To Do": [
-                "you should", "recommend", "to fix", "action items",
-                "next steps", "to resolve", "what to do"
-            ]
-        }
-
-        # Split into sentences
-        sentences = re.split(r'(?<=[.!?])\s+', response_text)
-
-        current_section = "What's Wrong"  # Default section
-
-        for sentence in sentences:
-            sentence_lower = sentence.lower()
-
-            # Check if this sentence starts a new section
-            for section, keywords in indicators.items():
-                if any(keyword in sentence_lower for keyword in keywords):
-                    current_section = section
-                    break
-
-            # Add sentence to current section
-            if sections[current_section]:
-                sections[current_section] += " " + sentence
-            else:
-                sections[current_section] = sentence
-
-        # Clean up sections
-        for key in sections:
-            sections[key] = sections[key].strip()
-
-        # If everything ended up in one section, split by paragraphs
-        if sum(1 for v in sections.values() if v) == 1:
-            paragraphs = response_text.split('\n\n')
-            if len(paragraphs) >= 3:
-                sections["What's Wrong"] = paragraphs[0]
-                sections["Why It Matters"] = paragraphs[1]
-                sections["What To Do"] = '\n\n'.join(paragraphs[2:])
-
-        # Remove empty sections
-        return {k: v for k, v in sections.items() if v}
-
-
-# ───── HYBRID FALLBACK PARSER ─────────────────────────────
-class HybridParser(ResponseParser):
-    """Fallback parser that tries multiple strategies"""
-
-    def get_expected_sections(self) -> List[str]:
-        return ["Summary", "Details", "Actions", "Notes"]
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        sections = {}
-
-        # Try various header patterns
-        header_patterns = [
-            r'^(\w[\w\s]+):\s*',  # "Section:"
-            r'^(?:#+\s+)?(\w[\w\s]+)$',  # "## Section"
-            r'^\[(\w[\w\s]+)\]',  # "[Section]"
-            r'^(?:\d+\.?\s+)?(\w[\w\s]+):',  # "1. Section:"
+        return [
+            "identify", "situation", "observations", 
+            "background", "assessment", "recommendations"
         ]
-
-        for pattern in header_patterns:
-            matches = list(re.finditer(pattern, response_text, re.MULTILINE))
-            if len(matches) >= 2:
-                for i, match in enumerate(matches):
-                    header = match.group(1).strip()
-                    start = match.end()
-                    end = matches[i + 1].start() if i + 1 < len(matches) else len(response_text)
-                    content = response_text[start:end].strip()
-
-                    header_lower = header.lower()
-                    if 'summ' in header_lower:
-                        sections["Summary"] = content
-                    elif 'detail' in header_lower or 'analy' in header_lower:
-                        sections["Details"] = content
-                    elif 'action' in header_lower or 'step' in header_lower:
-                        sections["Actions"] = content
-                    else:
-                        sections["Notes"] = sections.get("Notes", "") + "\n" + content
-
-                if sections:
-                    break
-
-        # If no structured content, use paragraphs
-        if not sections:
-            paragraphs = [p.strip() for p in response_text.split('\n\n') if p.strip()]
-            if paragraphs:
-                sections["Summary"] = paragraphs[0]
-                if len(paragraphs) > 1:
-                    sections["Details"] = '\n\n'.join(paragraphs[1:])
-
-        # Last resort
-        if not sections:
-            sections["Details"] = response_text
-
-        return sections
-
-
-# ───── DefaultFallbackParser (Now inherits from ResponseParser ABC) ─────────────────────────────
-class DefaultFallbackParser(ResponseParser): # CONSOLIDATED: Inherits from ResponseParser
-    """Simple fallback parser when no specific parser is matched or fails."""
-
-    def get_expected_sections(self) -> List[str]:
-        return ["Summary", "Details"] # Define some generic sections
-
-    def parse(self, response_text: str) -> Dict[str, str]:
-        # Simple fallback: put the whole response into a summary or details section
-        return {
-            "Summary": response_text[:300] + "..." if len(response_text) > 300 else response_text,
-            "Details": response_text
+    
+    def parse(self, response_text: str, alert_context: Dict[str, Any]) -> ParseResult:
+        """Parse ISOBAR framework response"""
+        start_time = time.perf_counter()
+        
+        try:
+            sections = self._extract_isobar_sections(response_text)
+            subject = self._generate_isobar_subject(sections, alert_context)
+            
+            metadata = {
+                "format_type": "ISOBAR",
+                "confidence_ratings": self._extract_confidence_ratings(response_text),
+                "references": self._extract_references(response_text)
+            }
+            
+            parse_time_ms = (time.perf_counter() - start_time) * 1000
+            
+            return ParseResult(
+                success=len(sections) >= 3,  # Minimum viable ISOBAR report
+                sections=sections,
+                subject=subject,
+                metadata=metadata,
+                parse_time_ms=parse_time_ms
+            )
+            
+        except Exception as e:
+            parse_time_ms = (time.perf_counter() - start_time) * 1000
+            return ParseResult(
+                success=False,
+                sections={},
+                subject="Failed to Parse ISOBAR Response",
+                metadata={"format_type": "ISOBAR"},
+                error=str(e),
+                parse_time_ms=parse_time_ms
+            )
+    
+    def _extract_isobar_sections(self, text: str) -> Dict[str, str]:
+        """Extract ISOBAR sections using pattern matching"""
+        sections = {}
+        
+        # ISOBAR section patterns - flexible but specific
+        patterns = {
+            "identify": r"(?:^|\n)\*?\*?I\s*[-–—]\s*IDENTIFY\*?\*?(?:\s*\*?\*?Section Confidence[^\n]*)?[:\n](.*?)(?=(?:\n\*?\*?[SOBARD]\s*[-–—]|\Z))",
+            "situation": r"(?:^|\n)\*?\*?S\s*[-–—]\s*SITUATION\*?\*?(?:\s*\*?\*?Section Confidence[^\n]*)?[:\n](.*?)(?=(?:\n\*?\*?[IOBARD]\s*[-–—]|\Z))",
+            "observations": r"(?:^|\n)\*?\*?O\s*[-–—]\s*OBSERVATIONS\*?\*?(?:\s*\*?\*?Section Confidence[^\n]*)?[:\n](.*?)(?=(?:\n\*?\*?[ISOBABD]\s*[-–—]|\Z))",
+            "background": r"(?:^|\n)\*?\*?B\s*[-–—]\s*BACKGROUND\*?\*?(?:\s*\*?\*?Section Confidence[^\n]*)?[:\n](.*?)(?=(?:\n\*?\*?[ISOAARD]\s*[-–—]|\Z))",
+            "assessment": r"(?:^|\n)\*?\*?A\s*[-–—]\s*ASSESSMENT[^:\n]*\*?\*?(?:\s*\*?\*?Section Confidence[^\n]*)?[:\n](.*?)(?=(?:\n\*?\*?[ISOBBRD]\s*[-–—]|\Z))",
+            "recommendations": r"(?:^|\n)\*?\*?R\s*[-–—]\s*RECOMMENDATIONS[^:\n]*\*?\*?(?:\s*\*?\*?Section Confidence[^\n]*)?[:\n](.*?)(?=(?:\n\*?\*?[ISOBAD]\s*[-–—]|\Z))"
         }
+        
+        for section_name, pattern in patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                # Clean up the content
+                content = re.sub(r'\n+', '\n', content)  # Collapse multiple newlines
+                content = content.strip()
+                if content:
+                    sections[section_name] = content
+        
+        return sections
+    
+    def _generate_isobar_subject(self, sections: Dict[str, str], alert_context: Dict[str, Any]) -> str:
+        """Generate subject for ISOBAR reports"""
+        agent_name = alert_context.get('agent_name', 'Unknown System')
+        rule_level = alert_context.get('rule_level', 0)
+        
+        # Try to extract severity from IDENTIFY section
+        identify_section = sections.get('identify', '')
+        severity_match = re.search(r'Severity Level:\s*([A-Z]+)', identify_section, re.IGNORECASE)
+        
+        if severity_match:
+            severity = severity_match.group(1).upper()
+        else:
+            # Fallback to rule level mapping
+            if rule_level >= 12:
+                severity = "CRITICAL"
+            elif rule_level >= 9:
+                severity = "HIGH"  
+            elif rule_level >= 6:
+                severity = "MEDIUM"
+            else:
+                severity = "LOW"
+                
+        return f"[{severity}] Security Incident Analysis - {agent_name}"
+    
+    def _extract_confidence_ratings(self, text: str) -> Dict[str, str]:
+        """Extract confidence ratings from ISOBAR sections"""
+        confidence_pattern = r"Section Confidence:\s*\[?(\d+%?)\]?"
+        matches = re.findall(confidence_pattern, text, re.IGNORECASE)
+        
+        # Map confidence ratings to sections (rough approximation)
+        ratings = {}
+        section_names = self.get_expected_sections()
+        for i, match in enumerate(matches[:len(section_names)]):
+            if i < len(section_names):
+                ratings[section_names[i]] = match
+                
+        return ratings
+    
+    def _extract_references(self, text: str) -> List[str]:
+        """Extract reference citations from ISOBAR text"""
+        reference_patterns = [
+            r"Reference:\s*([^\n]+)",
+            r"References?:\s*([^\n]+)",
+            r"\*Reference[s]?:\s*([^\n]+)"
+        ]
+        
+        references = []
+        for pattern in reference_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            references.extend(matches)
+            
+        return [ref.strip() for ref in references if ref.strip()]
 
-    def validate_output(self, sections: Dict[str, str]) -> bool:
-        return "Summary" in sections or "Details" in sections
+# ───── DELPHI NOTIFY PARSER ─────────────────────────────
+class DelphiNotifyParser(BaseParser):
+    """Parser for Delphi Notify responses (user-friendly format)"""
+    
+    def get_expected_sections(self) -> List[str]:
+        return [
+            "summary", "what_happened", "further_investigation", 
+            "what_to_do", "how_to_check", "how_to_prevent", "what_to_ask_next"
+        ]
+    
+    def parse(self, response_text: str, alert_context: Dict[str, Any]) -> ParseResult:
+        """Parse Delphi Notify response format"""
+        start_time = time.perf_counter()
+        
+        try:
+            sections = self._extract_delphi_sections(response_text)
+            subject = self._generate_delphi_subject(sections, alert_context)
+            
+            metadata = {
+                "format_type": "DELPHI_NOTIFY",
+                "risk_level": self._extract_risk_level(sections.get('summary', '')),
+                "confidence_indicators": self._extract_confidence_indicators(response_text)
+            }
+            
+            parse_time_ms = (time.perf_counter() - start_time) * 1000
+            
+            return ParseResult(
+                success=len(sections) >= 2 and 'summary' in sections,
+                sections=sections,
+                subject=subject,
+                metadata=metadata,
+                parse_time_ms=parse_time_ms
+            )
+            
+        except Exception as e:
+            parse_time_ms = (time.perf_counter() - start_time) * 1000
+            return ParseResult(
+                success=False,
+                sections={},
+                subject="Failed to Parse Delphi Notify Response",
+                metadata={"format_type": "DELPHI_NOTIFY"},
+                error=str(e),
+                parse_time_ms=parse_time_ms
+            )
+    
+    def _extract_delphi_sections(self, text: str) -> Dict[str, str]:
+        """Extract Delphi Notify sections"""
+        sections = {}
+        
+        # Section patterns for Delphi format
+        section_patterns = {
+            "summary": r"(?:^|\n)Summary:\s*(.*?)(?=(?:\n(?:What happened|Further investigation|What to do|How to check|How to prevent|What to ask):|$))",
+            "what_happened": r"(?:^|\n)What happened(?:\s*\([^)]*\))?:\s*(.*?)(?=(?:\n(?:Summary|Further investigation|What to do|How to check|How to prevent|What to ask):|$))",
+            "further_investigation": r"(?:^|\n)Further investigation(?:\s*\([^)]*\))?:\s*(.*?)(?=(?:\n(?:Summary|What happened|What to do|How to check|How to prevent|What to ask):|$))",
+            "what_to_do": r"(?:^|\n)What to do(?:\s*\([^)]*\))?:\s*(.*?)(?=(?:\n(?:Summary|What happened|Further investigation|How to check|How to prevent|What to ask):|$))",
+            "how_to_check": r"(?:^|\n)How to check(?:\s*\([^)]*\))?:\s*(.*?)(?=(?:\n(?:Summary|What happened|Further investigation|What to do|How to prevent|What to ask):|$))",
+            "how_to_prevent": r"(?:^|\n)How to prevent this in future(?:\s*\([^)]*\))?:\s*(.*?)(?=(?:\n(?:Summary|What happened|Further investigation|What to do|How to check|What to ask):|$))",
+            "what_to_ask_next": r"(?:^|\n)What to ask next:\s*(.*?)(?=(?:\n(?:Summary|What happened|Further investigation|What to do|How to check|How to prevent):|$))"
+        }
+        
+        for section_name, pattern in section_patterns.items():
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                content = match.group(1).strip()
+                if content:
+                    sections[section_name] = content
+        
+        return sections
+    
+    def _extract_risk_level(self, summary: str) -> str:
+        """Extract risk level from summary"""
+        risk_pattern = r"\[(LOW|MEDIUM|HIGH)\s+RISK[^\]]*\]"
+        match = re.search(risk_pattern, summary, re.IGNORECASE)
+        return match.group(1).upper() if match else "UNKNOWN"
+    
+    def _extract_confidence_indicators(self, text: str) -> Dict[str, str]:
+        """Extract confidence indicators from Delphi text"""
+        # Pattern for confidence expressions like "fairly sure - 80%"
+        confidence_pattern = r"(?:very likely|probably|might be|unsure|fairly confident|very sure|best guess)(?:\s*[-–—]\s*\d+%?)?"
+        matches = re.findall(confidence_pattern, text, re.IGNORECASE)
+        
+        return {"confidence_expressions": matches}
+    
+    def _generate_delphi_subject(self, sections: Dict[str, str], alert_context: Dict[str, Any]) -> str:
+        """Generate user-friendly subject for Delphi Notify"""
+        agent_name = alert_context.get('agent_name', 'Your Computer')
+        
+        # Extract risk level from summary
+        summary = sections.get('summary', '')
+        risk_level = self._extract_risk_level(summary)
+        
+        if risk_level == "HIGH":
+            return f"🚨 High Risk Security Alert - {agent_name}"
+        elif risk_level == "MEDIUM":
+            return f"⚠️  Medium Risk Security Alert - {agent_name}"
+        elif risk_level == "LOW":
+            return f"ℹ️  Low Risk Security Notice - {agent_name}"
+        else:
+            return f"🛡️ Security Alert - {agent_name}"
 
-
-# ───── PARSER REGISTRY ─────────────────────────────────
-class ParserRegistry:
-    """Central registry for all parsers"""
-
-    _parsers: Dict[str, Type[ResponseParser]] = { # Type hint for _parsers
-        'delphi_notify_short': DelphiNotifyShortParser,
-        'standard': StandardDelphiParser,
-        'standard_delphi': StandardDelphiParser,
-        'security_analysis': SecurityIncidentParser,
-        'security_incident': SecurityIncidentParser,
-        'numbered_investigation': NumberedListParser,
-        'numbered_list': NumberedListParser,
-        'json_response': JSONResponseParser,
-        'json': JSONResponseParser,
-        'conversational': ConversationalParser,
-        'executive_summary': ConversationalParser,
-        'hybrid': HybridParser,
-        'fallback': HybridParser,
-        'default': DefaultFallbackParser, # CONSOLIDATED: Added DefaultFallbackParser
-    }
-
-    @classmethod
-    def register(cls, prompt_type: str, parser_class: Type[ResponseParser]):
-        """Register a parser for a prompt type"""
-        if not issubclass(parser_class, ResponseParser): # Ensure it's a ResponseParser subclass
-            raise TypeError(f"Parser class {parser_class.__name__} must inherit from ResponseParser.")
-        cls._parsers[prompt_type] = parser_class
-        log.info(f"Registered parser {parser_class.__name__} for prompt type: {prompt_type}")
-
-    @classmethod
-    def get_parser(cls, prompt_type: str) -> ResponseParser:
-        """Get parser instance for prompt type"""
-        parser_class = cls._parsers.get(prompt_type)
-        if not parser_class:
-            log.warning(f"No parser registered for prompt_type: {prompt_type}, using DefaultFallbackParser")
-            return cls._parsers["default"]() # CONSOLIDATED: Use the properly defined DefaultFallbackParser
-        return parser_class()
-
-    @classmethod
-    def list_parsers(cls) -> List[str]:
-        """List all registered prompt types"""
-        return list(cls._parsers.keys())
-
+# ───── PARSER FACTORY ─────────────────────────────────
+class ParserFactory:
+    """Factory for creating appropriate parsers based on prompt type"""
+    
+    @staticmethod
+    def create_parser(prompt_type: str) -> BaseParser:
+        """Create parser based on prompt type"""
+        if prompt_type in ['security_analysis', 'isobar']:
+            return ISOBARParser()
+        elif prompt_type in ['delphi_notify_short', 'delphi_notify_brief', 'delphi_brief']:
+            return DelphiNotifyParser()
+        elif prompt_type in ['executive_summary', 'investigation_guide']:
+            return ISOBARParser()  # These use similar structured format
+        else:
+            log.warning("Unknown prompt type '%s', using Delphi Notify parser", prompt_type)
+            return DelphiNotifyParser()  # Safe default for user-facing content
 
 # ───── CIRCUIT BREAKER ─────────────────────────────────
-class ParserCircuitBreaker:
-    """
-    Circuit breaker to prevent cascading parser failures.
-    Implemented as a three-state (CLOSED, OPEN, HALF_OPEN) pattern.
-    """
-
-    def __init__(self, failure_threshold: int = 5, timeout: int = 300):
+class SimpleCircuitBreaker:
+    """Simplified circuit breaker for parser failures"""
+    
+    def __init__(self, failure_threshold: int = 5, timeout_seconds: int = 300):
         self.failure_threshold = failure_threshold
-        self.timeout = timedelta(seconds=timeout) # Use timedelta for easier comparison
+        self.timeout = timedelta(seconds=timeout_seconds)
         self.failures: Dict[str, List[datetime]] = defaultdict(list)
-        self.state: Dict[str, str] = defaultdict(lambda: "CLOSED") # CLOSED, OPEN, HALF_OPEN
-        self.last_state_change: Dict[str, datetime] = defaultdict(lambda: datetime.min.replace(tzinfo=timezone.utc))
-
-    def record_failure(self, prompt_type: str):
-        """Record a parser failure for a given prompt type."""
-        now = datetime.now(timezone.utc)
-        self.failures[prompt_type].append(now)
-        # Keep only failures within the last hour to prevent unbounded list growth
-        self.failures[prompt_type] = [
-            f for f in self.failures[prompt_type]
-            if f > now - timedelta(hours=1) # Keep failures for the last hour
-        ]
-        self._update_state(prompt_type)
-        log.warning(f"Circuit for '{prompt_type}' recorded failure. Current failures: {len(self.failures[prompt_type])}")
-
-    def record_success(self, prompt_type: str):
-        """Record a parser success for a given prompt type."""
-        if self.state[prompt_type] != "CLOSED":
-            log.info(f"Circuit for '{prompt_type}' moved to CLOSED after success.")
-            notifier.notify(f"STATUS=Circuit for '{prompt_type}' is CLOSED.") # ADDED: sdnotify on circuit closed
-        self.failures[prompt_type].clear() # Reset failures on success
-        self.state[prompt_type] = "CLOSED"
-        self.last_state_change[prompt_type] = datetime.now(timezone.utc)
-
-
-    def allow_request(self, prompt_type: str) -> bool:
-        """
-        Determines if a request for the given prompt_type should be allowed based on circuit breaker state.
-        Handles state transitions: CLOSED -> OPEN, OPEN -> HALF_OPEN, HALF_OPEN -> (CLOSED/OPEN).
-        """
-        now = datetime.now(timezone.utc)
-        current_state = self.state[prompt_type]
+        self.state: Dict[str, str] = defaultdict(lambda: "CLOSED")
+        self.last_failure: Dict[str, datetime] = {}
         
-        # Prune old failures for accurate count
-        self.failures[prompt_type] = [
-            f for f in self.failures[prompt_type]
-            if f > now - timedelta(hours=1) # Only count failures within the last hour
+    def record_failure(self, parser_type: str):
+        """Record a parser failure"""
+        now = datetime.now(timezone.utc)
+        self.failures[parser_type].append(now)
+        self.last_failure[parser_type] = now
+        
+        # Keep only recent failures
+        self.failures[parser_type] = [
+            f for f in self.failures[parser_type] 
+            if f > now - timedelta(hours=1)
         ]
         
-        recent_failures_count = len(self.failures[prompt_type])
-
-        # State transitions based on current state and recent failures
-        if current_state == "CLOSED":
-            # If failures accumulate beyond threshold in CLOSED state, trip to OPEN
-            if recent_failures_count >= self.failure_threshold:
-                self.state[prompt_type] = "OPEN"
-                self.last_state_change[prompt_type] = now
-                log.error(f"Circuit for '{prompt_type}' tripped to OPEN due to {recent_failures_count} failures.")
-                notifier.notify(f"STATUS=Circuit for '{prompt_type}' tripped to OPEN.") # ADDED: sdnotify on circuit open
-                return False # Do not allow request immediately after tripping
-            return True # Allow request if CLOSED and below threshold
-
-        elif current_state == "OPEN":
-            # If timeout period has passed in OPEN state, move to HALF_OPEN
-            if now > self.last_state_change[prompt_type] + self.timeout:
-                self.state[prompt_type] = "HALF_OPEN"
-                log.warning(f"Circuit for '{prompt_type}' moved to HALF_OPEN. Allowing a single test request.")
-                notifier.notify(f"STATUS=Circuit for '{prompt_type}' is HALF_OPEN. Allowing test.") # ADDED: sdnotify on circuit half-open
-                return True # Allow ONE request to test the system
-            log.warning(f"Circuit for '{prompt_type}' is OPEN. Blocking request.")
-            return False # Continue blocking if timeout not reached
-
-        elif current_state == "HALF_OPEN":
-            # In HALF_OPEN, only one request should be allowed since last transition.
-            # If this request succeeds, circuit closes. If it fails, circuit re-opens.
-            # We already allowed the request when transitioning to HALF_OPEN.
-            # Subsequent requests while in HALF_OPEN (before the first one resolves) should wait.
-            # For this synchronous parser, this typically means the first parser call after timeout.
-            log.info(f"Circuit for '{prompt_type}' is HALF_OPEN. Test request is being processed.")
-            # The logic that calls this method should ensure only one request is made
-            # per HALF_OPEN cycle. For a simple synchronous loop, the `time.sleep`
-            # and next poll cycle will naturally limit it.
-            return True # Allow the request that triggered the HALF_OPEN state
+        # Check if we should trip the breaker
+        if len(self.failures[parser_type]) >= self.failure_threshold:
+            self.state[parser_type] = "OPEN"
+            log.error("Circuit breaker OPEN for parser type: %s", parser_type)
+            
+    def record_success(self, parser_type: str):
+        """Record a parser success"""
+        if self.state[parser_type] != "CLOSED":
+            log.info("Circuit breaker CLOSED for parser type: %s", parser_type)
+        self.failures[parser_type].clear()
+        self.state[parser_type] = "CLOSED"
         
-        return False # Default safe fallback
-
-
-    def _update_state(self, prompt_type: str):
-        """Internal helper to ensure state is consistent based on failures."""
-        now = datetime.now(timezone.utc)
-        recent_failures = len([
-            f for f in self.failures[prompt_type]
-            if f > now - timedelta(hours=1) # Recalculate based on 1-hour window
-        ])
-
-        # This method is primarily called by record_failure.
-        # Its main role is to trip the circuit to OPEN if threshold is met.
-        if recent_failures >= self.failure_threshold and self.state[prompt_type] != "OPEN":
-            self.state[prompt_type] = "OPEN"
-            self.last_state_change[prompt_type] = now
-            log.error(f"Circuit for '{prompt_type}' tripped to OPEN due to {recent_failures} failures.")
-            notifier.notify(f"STATUS=Circuit for '{prompt_type}' tripped to OPEN (from _update_state).") # ADDED: sdnotify
-
-    def get_status(self) -> Dict[str, Any]:
-        """Get circuit breaker status for monitoring"""
-        now = datetime.now(timezone.utc)
-        status_summary = {}
-        for prompt_type in self.failures.keys() | self.state.keys(): # Include all tracked prompt types
-            recent_failures_count = len([
-                f for f in self.failures[prompt_type]
-                if f > now - timedelta(hours=1) # Failures in the last hour
+    def allow_request(self, parser_type: str) -> bool:
+        """Check if requests are allowed for this parser type"""
+        if self.state[parser_type] == "CLOSED":
+            return True
+            
+        # Check if timeout has passed
+        if parser_type in self.last_failure:
+            time_since_failure = datetime.now(timezone.utc) - self.last_failure[parser_type]
+            if time_since_failure > self.timeout:
+                log.info("Circuit breaker timeout expired for parser type: %s", parser_type)
+                self.state[parser_type] = "CLOSED"
+                return True
+                
+        return False
+        
+    def get_status(self) -> Dict[str, Dict[str, Any]]:
+        """Get current circuit breaker status"""
+        status = {}
+        for parser_type in set(self.failures.keys()) | set(self.state.keys()):
+            now = datetime.now(timezone.utc)
+            recent_failures = len([
+                f for f in self.failures[parser_type] 
+                if f > now - timedelta(hours=1)
             ])
-            is_open_state = self.state[prompt_type] == "OPEN"
-            is_half_open_state = self.state[prompt_type] == "HALF_OPEN"
             
-            status_summary[prompt_type] = {
-                'state': self.state[prompt_type],
-                'failures_in_last_hour': recent_failures_count,
-                'last_failure_time_utc': max(self.failures[prompt_type]).isoformat() if self.failures[prompt_type] else None,
-                'time_since_last_state_change_sec': (now - self.last_state_change[prompt_type]).total_seconds() if self.last_state_change.get(prompt_type) else None
+            status[parser_type] = {
+                "state": self.state[parser_type],
+                "recent_failures": recent_failures,
+                "last_failure": self.last_failure.get(parser_type)
             }
-        return status_summary
-
-
-class AlertStructurer:
-    """Orchestrates alert structuring using dynamic parsers"""
-
-    def __init__(self, circuit_breaker: ParserCircuitBreaker):
-        self.circuit_breaker = circuit_breaker
-
-    def determine_prompt_type(self, llm_response_text: str, rule_level: int) -> str:
-        """
-        Determines the prompt type based on rule level or LLM response analysis.
-        For now, primarily based on rule_level and A/B test logic for 'security_analysis'.
-        """
-        # A/B Test for 'security_analysis'
-        if rule_level >= 7 and AB_TEST_PERCENTAGE > 0 and random.randint(1, 100) <= AB_TEST_PERCENTAGE:
-            log.info("A/B test activated for security_analysis prompt type.")
-            # This would dynamically select between A/B variants defined in your A/B testing system.
-            # For this example, we'll assign a specific parser name that ParserRegistry understands
-            # You might return a specific variant name like 'security_analysis_variant_A'
-            return "security_analysis_AB_TEST" # This would then map to a specific parser in ParserRegistry
-
-        if rule_level >= 10:
-            return "security_analysis" # Critical alerts
-        elif rule_level >= 7:
-            return "delphi_notify_short" # Important operational alerts
-        elif rule_level >= 5:
-            return "numbered_investigation" # General investigation
-        else:
-            return "json_response" # Default for lower levels. Consider a 'hybrid' or 'conversational' as default.
-
-    def structure_alert(self, alert_data: Dict) -> Dict:
-        """
-        Structures the LLM response based on determined prompt type and parser.
-        """
-        llm_response_text = alert_data.get('response_text', '')
-        rule_level = alert_data.get('rule_level', 0)
-        alert_id = alert_data.get('id')
-        
-        prompt_type = self.determine_prompt_type(llm_response_text, rule_level)
-        
-        # Determine which parser to use based on prompt_type
-        # This is simplified; in a real scenario, prompt_type would map to parser names
-        # Default to 'hybrid' for unknown types for better resilience than a specific parser
-        parser_name = prompt_type 
-        if prompt_type not in ParserRegistry.list_parsers():
-             log.warning(f"No direct parser mapping for prompt_type '{prompt_type}'. Falling back to 'hybrid'.")
-             parser_name = 'hybrid' # Use hybrid or default fallback if direct mapping is missing
-        elif prompt_type == "security_analysis_AB_TEST":
-            # This is where your A/B test manager would decide which specific parser to use
-            # e.g., parser_name = ab_test_manager.get_parser_for_variant(alert_data)
-            # For simplicity, let's hardcode a specific A/B test parser here if such a parser exists
-            log.info(f"A/B test prompt type '{prompt_type}' detected. Assigning a specific parser for test.")
-            parser_name = "security_analysis" # Assuming security_analysis parser handles both
-        
-        parser = ParserRegistry.get_parser(parser_name) # Get parser instance
-        
-        structured_data = {}
-        parse_success = False
-        parse_error = ""
-        parse_time_ms = 0.0
-        
-        # Check circuit breaker before attempting to parse
-        if not self.circuit_breaker.allow_request(prompt_type):
-            log.warning(f"Circuit breaker OPEN for {prompt_type}. Skipping parsing for alert {alert_id}.")
-            parse_error = f"Circuit breaker OPEN for {prompt_type}."
-            # Provide a basic structured output even if circuit is open
-            structured_data = {
-                "subject": f"Circuit Breaker Open: {prompt_type} Parser Disabled",
-                "sections": {
-                    "Raw LLM Response": llm_response_text,
-                    "Error": parse_error,
-                    "Recommendation": "The parser for this prompt type is temporarily disabled due to consecutive failures. It will automatically re-enable for testing after a timeout."
-                },
-                ""
-"metadata": {
-                    "alert_id": alert_id,
-                    "prompt_type": prompt_type,
-                    "parser_used": parser_name,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "status": "circuit_breaker_blocked"
-                }
-            }
-            # Record circuit breaker block as a failure in parser_metrics for audit
-            save_parser_metrics(
-                conn_for_metrics, alert_id, prompt_type, parser_name,
-                False, parse_time_ms, parse_error
-            )
-            return structured_data
-
-        start_time = time.perf_counter()
-        try:
-            structured_data = parser.parse(llm_response_text) # Rule ID isn't always available/needed by parsers
-            parse_success = parser.validate_output(structured_data) # Validate output after parsing
-            if not parse_success:
-                parse_error = "Parser produced invalid or incomplete output."
-                raise ValueError(parse_error) # Raise error to trigger failure handling
             
-            log.info(f"Successfully parsed alert {alert_id} using {parser_name} for prompt type {prompt_type}")
-            self.circuit_breaker.record_success(prompt_type)
-        except Exception as e:
-            parse_error = str(e)
-            log.error(f"Failed to parse alert {alert_id} using {parser_name} for prompt type {prompt_type}: {e}")
-            self.circuit_breaker.record_failure(prompt_type)
-            # Fallback to a default structure on parse failure
-            structured_data = {
-                "subject": f"Failed to Parse Alert: {alert_id}",
-                "sections": {
-                    "Raw LLM Response": llm_response_text,
-                    "Error Details": parse_error,
-                    "Recommendation": "The system failed to extract structured information. Please review the raw LLM response and error details."
-                },
-                "metadata": {
-                    "alert_id": alert_id,
-                    "prompt_type": prompt_type,
-                    "parser_used": parser_name,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "status": "parse_failed"
-                }
-            }
-        finally:
-            parse_time_ms = (time.perf_counter() - start_time) * 1000
-            # Save metrics to DB
-            save_parser_metrics(
-                conn_for_metrics, alert_id, prompt_type, parser_name,
-                parse_success, parse_time_ms, parse_error
-            )
+        return status
+
+# ───── DATABASE OPERATIONS ─────────────────────────────────
+class DatabaseManager:
+    """Manage database operations with proper error handling"""
+    
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+        self.conn = None
         
-        # Add metadata to the structured_data
-        if 'metadata' not in structured_data:
-            structured_data['metadata'] = {}
-        structured_data['metadata'].update({
-            "alert_id": alert_id,
-            "prompt_type": prompt_type,
-            "parser_used": parser_name,
-            "parse_success": parse_success,
-            "parse_time_ms": parse_time_ms,
-            "parse_error": parse_error if parse_error else None,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-
-        return structured_data
-
-
-# Global variable for connection within AlertStructurer.structure_alert
-# This is a bit of a hack for simplicity, but in a real app,
-# you'd pass the connection down or use a connection pool.
-conn_for_metrics: Optional[psycopg2.extensions.connection] = None
-
-
-# ───── DATABASE FUNCTIONS ─────────────────────────────────
-def connect_db() -> psycopg2.extensions.connection:
-    """Connect to Postgres with auto-commit enabled"""
-    try:
-        conn = psycopg2.connect(PG_DSN)
-        conn.autocommit = True
-        log.info("Connected to Postgres")
-        return conn
-    except Exception:
-        log.exception("Could not connect to Postgres")
-        notifier.notify("STATUS=FATAL: Could not connect to PostgreSQL. Exiting.") # ADDED: sdnotify on DB connection failure
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-
-
-def ensure_columns_exist(conn: psycopg2.extensions.connection):
-    """Ensure necessary columns exist in alerts and parser_metrics tables."""
-    try:
-        with conn.cursor() as cur:
-            # Alerts table updates
-            cur.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='alerts' AND column_name='structured_data') THEN
-                        ALTER TABLE alerts ADD COLUMN structured_data JSONB;
-                    END IF;
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='alerts' AND column_name='structured_at') THEN
-                        ALTER TABLE alerts ADD COLUMN structured_at TIMESTAMP WITH TIME ZONE;
-                    END IF;
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='alerts' AND column_name='prompt_type') THEN
-                        ALTER TABLE alerts ADD COLUMN prompt_type TEXT;
-                    END IF;
-                    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='alerts' AND column_name='parser_used') THEN
-                        ALTER TABLE alerts ADD COLUMN parser_used TEXT;
-                    END IF;
-                END $$;
-            """)
-
-            # Parser Metrics table creation
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS parser_metrics (
-                    id SERIAL PRIMARY KEY,
-                    alert_id INTEGER NOT NULL REFERENCES alerts(id) ON DELETE CASCADE,
-                    prompt_type TEXT NOT NULL,
-                    parser_used TEXT NOT NULL,
-                    success BOOLEAN NOT NULL,
-                    parse_time_ms NUMERIC(10, 2),
-                    error_message TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                );
-            """)
-            conn.commit()
-        log.info("Ensured alerts and parser_metrics columns/tables exist.")
-    except Exception as e:
-        log.critical(f"Failed to ensure database schema exists: {e}", exc_info=True)
-        notifier.notify("STATUS=FATAL: Failed to ensure DB schema. Exiting.") # ADDED: sdnotify on schema ensure failure
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-
-
-def fetch_alert_to_structure(conn, alert_id: int) -> Optional[Dict]:
-    """Fetch an alert that needs structuring"""
-    sql = """
-        SELECT
-            id,
-            raw,
-            response_text,
-            prompt_text,
-            response_received_at,
-            prompt_type, -- Fetch existing prompt_type if available
-            rule_level,
-            agent_id -- Needed for A/B testing cohort assignment
-        FROM alerts
-        WHERE state = 'summarized' AND id = %s
-    """
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(sql, (alert_id,))
-        row = cur.fetchone()
-        return row
-
-def save_structured_data(conn, alert_id: int, structured_data: Dict[str, Any]):
-    """Save structured data and update alert state"""
-    try:
-        with conn.cursor() as cur:
-            prompt_type = structured_data.get('metadata', {}).get('prompt_type', 'unknown')
-            parser_used = structured_data.get('metadata', {}).get('parser_used', 'unknown')
-
-            cur.execute("""
-                UPDATE alerts
-                SET structured_data = %s,
-                    state = 'STRUCTURED', -- FIX: Set to 'STRUCTURED' enum value
-                    structured_at = NOW(),
-                    prompt_type = %s,
-                    parser_used = %s
-                WHERE id = %s
-            """, (json.dumps(structured_data), prompt_type, parser_used, alert_id))
-
-            # Notify next worker (email formatter)
-            cur.execute(f"NOTIFY {NOTIFY_CHANNEL}, %s", (str(alert_id),))
-
-        log.info(f"Saved structured data for alert {alert_id} (Type: {prompt_type}, Parser: {parser_used})")
-    except Exception as e:
-        log.error(f"Failed to save structured data for alert {alert_id}: {e}")
-        notifier.notify(f"STATUS=DB update failed for alert {alert_id}. See logs.") # ADDED: sdnotify on DB update failure
-        raise
-
-
-def save_parser_metrics(conn, alert_id: int, prompt_type: str,
-                       parser_used: str, success: bool,
-                       parse_time_ms: float, error_message: Optional[str] = None):
-    """Record parser success/failure in metrics"""
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                INSERT INTO parser_metrics
-                (alert_id, prompt_type, parser_used, success, parse_time_ms, error_message)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (alert_id, prompt_type, parser_used, success, parse_time_ms, error_message))
-    except Exception as e:
-        log.error(f"Failed to save parser metrics for alert {alert_id}: {e}")
-        notifier.notify(f"STATUS=Error saving parser metrics for alert {alert_id}. See logs.") # ADDED: sdnotify
-
-
-def get_circuit_breaker_status(conn) -> List[Dict[str, Any]]: # Changed return type to List[Dict[str, Any]]
-    """Get circuit breaker status from database (for monitoring/logging, not internal CB logic)"""
-    sql = """
-        SELECT
-            prompt_type,
-            COUNT(*) FILTER (WHERE NOT success) as failures_last_hour,
-            MAX(created_at) FILTER (WHERE NOT success) as last_failure_ts
-        FROM parser_metrics
-        WHERE created_at > NOW() - INTERVAL '1 hour'
-        GROUP BY prompt_type
-    """
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(sql)
-        return list(cur.fetchall()) # Ensure it returns a list of dicts
-
-
-# ───── MONITORING FUNCTIONS ─────────────────────────────
-def log_parser_statistics(conn):
-    """Log parser performance statistics"""
-    sql = """
-        SELECT
-            prompt_type,
-            parser_used,
-            COUNT(*) as total,
-            COUNT(*) FILTER (WHERE success) as successful,
-            AVG(parse_time_ms) FILTER (WHERE success) as avg_parse_time_ms,
-            MAX(created_at) as last_used
-        FROM parser_metrics
-        WHERE created_at > NOW() - INTERVAL '24 hours'
-        GROUP BY prompt_type, parser_used
-        ORDER BY prompt_type, total DESC
-    """
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(sql)
-        stats = cur.fetchall()
-
-        log.info("=== Parser Statistics (Last 24h) ===")
-        for stat in stats:
-            success_rate = (stat['successful'] / stat['total'] * 100) if stat['total'] > 0 else 0
-            log.info(
-                f"{stat['prompt_type']}/{stat['parser_used']}: "
-                f"{stat['successful']}/{stat['total']} ({success_rate:.1f}%), "
-                f"avg: {stat['avg_parse_time_ms']:.1f}ms" if stat['avg_parse_time_ms'] is not None else "N/A"
-            )
-        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after logging stats
-
-# ───── SIGNAL HANDLING ─────────────────────────────────
-shutdown = False
-
-def on_signal(signum, _frame):
-    global shutdown
-    shutdown = True
-    log.info(f"Signal {signum} received; shutting down")
-    notifier.notify("STOPPING=1") # ADDED: sdnotify on signal received
-
-
-signal.signal(signal.SIGINT, on_signal)
-signal.signal(signal.SIGTERM, on_signal)
-
-
-# ───── MAIN LOOP ─────────────────────────────────────────
-def main():
-    """Main event loop"""
-    global conn_for_metrics # ADDED: Declare global usage
-
-    log.info("Email Structurer starting up...")
-    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
-    notifier.notify("STATUS=Starting up...")
-
-    # Connect to database
-    conn = connect_db()
-    conn_for_metrics = conn # Assign to global variable for use in structure_alert
-    ensure_columns_exist(conn)
-    notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after DB connection and schema check
-
-    # Initialize components
-    circuit_breaker = ParserCircuitBreaker(
-        failure_threshold=CIRCUIT_BREAKER_THRESHOLD,
-        timeout=CIRCUIT_BREAKER_TIMEOUT
-    )
-    structurer = AlertStructurer(circuit_breaker)
-
-    # Log available parsers
-    log.info(f"Available parsers for prompt types: {ParserRegistry.list_parsers()}")
-    log.info(f"Circuit breaker config: threshold={CIRCUIT_BREAKER_THRESHOLD}, timeout={CIRCUIT_BREAKER_TIMEOUT}s")
-    log.info(f"A/B testing: {AB_TEST_PERCENTAGE}% for security_analysis prompts")
-    notifier.notify(f"STATUS=Initialized. Parsers: {ParserRegistry.list_parsers()}. CB Config: T={CIRCUIT_BREAKER_THRESHOLD}, TO={CIRCUIT_BREAKER_TIMEOUT}s. A/B Test: {AB_TEST_PERCENTAGE}%.") # ADDED: sdnotify status update
-
-    # Process any backlog
-    log.info("Processing backlog...")
-    catch_up(conn, structurer)
-    notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after backlog processing
-
-    # Listen for new alerts
-    cur = conn.cursor()
-    cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-    log.info(f"Listening on channel '{LISTEN_CHANNEL}' for alerts to structure")
-    notifier.notify(f"STATUS=Listening on '{LISTEN_CHANNEL}' for alerts...") # ADDED: sdnotify status update
-
-    # Statistics logging
-    last_stats_log = time.time()
-    stats_interval = 3600  # Log stats every hour
-
-    while not shutdown:
-        notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each loop iteration
-
-        # Initialize alert_data for each iteration to avoid "possibly unbound" warning
-        alert_data: Optional[Dict[str, Any]] = None # Pylance fix: initialize here
-
-        try:
-            # Log statistics periodically
-            if time.time() - last_stats_log > stats_interval:
-                log_parser_statistics(conn)
-                cb_status = circuit_breaker.get_status()
-                log.info(f"Circuit breaker status: {cb_status}")
-                notifier.notify(f"STATUS=Logging stats. CB Status: {json.dumps(cb_status)}.") # ADDED: sdnotify for stats/CB status
-                last_stats_log = time.time()
-
-            if not select.select([conn], [], [], 5)[0]: # Wait up to 5 seconds for events
-                continue # If no events, loop back and ping watchdog again
-
-            conn.poll()
-
-            for notify in conn.notifies:
-                notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping before processing each notification
-                try:
-                    alert_id = int(notify.payload)
-                    log.info(f"Processing alert {alert_id}")
-
-                    alert_data = fetch_alert_to_structure(conn, alert_id)
-                    if not alert_data:
-                        log.debug(f"Alert {alert_id} not in correct state or not found")
-                        continue
-
-                    # Structure the alert
-                    structured_data = structurer.structure_alert(alert_data)
-                    save_structured_data(conn, alert_id, structured_data)
-                    notifier.notify("WATCHDOG=1") # ADDED: Ping after successful processing
-
-                except Exception as e:
-                    log.exception(f"Failed to process alert {notify.payload}: {e}")
-                    notifier.notify(f"STATUS=Error processing alert {notify.payload}. See logs.") # ADDED: sdnotify on processing error
-                    # Try to save failure metrics
-                    try:
-                        alert_id_for_failure = int(notify.payload) # Ensure it's an int
-                        
-                        prompt_type_for_failure = 'unknown'
-                        # Check if alert_data was successfully retrieved before trying to access it
-                        if alert_data: # Pylance fix: check if alert_data is not None
-                            prompt_type_for_failure = alert_data.get('prompt_type', 'unknown')
-                        
-                        parser_used_for_failure = 'unknown' # Default value
-
-                        save_parser_metrics( # Changed from save_parser_failure
-                            conn, alert_id_for_failure,
-                            prompt_type_for_failure,
-                            parser_used_for_failure, False, 0, str(e) # Pass success=False, parse_time_ms=0
-                        )
-                    except Exception as inner_e: # Catch errors in saving failure metrics
-                        log.error(f"Failed to save inner parser failure metrics for alert {notify.payload}: {inner_e}")
-            conn.notifies.clear()
-
-        except psycopg2.OperationalError:
-            log.exception("DB connection lost; reconnecting in 5s")
-            notifier.notify("STATUS=DB connection lost. Attempting to reconnect...") # ADDED: sdnotify on DB connection loss
-            time.sleep(5) # Keep this sleep for reconnection back-off
+    def connect(self) -> psycopg2.extensions.connection:
+        """Connect to database with retry logic"""
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
-                conn = connect_db()
-                conn_for_metrics = conn # Re-assign global connection on reconnect
-                cur = conn.cursor()
-                cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-                log.info("Reconnected to Postgres and re-listening.")
-                notifier.notify("STATUS=Reconnected to DB. Listening for alerts...") # ADDED: sdnotify on successful reconnect
-            except Exception: # Catch the sys.exit from connect_db
-                log.critical("Failed to reconnect to database. Exiting.")
-                notifier.notify("STOPPING=1")
-                sys.exit(1)
-        except Exception:
-            log.exception("Unexpected error in main loop")
-            notifier.notify("STATUS=Unexpected error in main loop. Exiting.") # ADDED: sdnotify on unexpected errors
-            notifier.notify("STOPPING=1")
-            raise # Re-raise the exception after notifying systemd for debugging/crash reporting
-
-    log.info("Shutting down gracefully")
-    notifier.notify("STATUS=Shutting down gracefully.") # ADDED: Final status update
-    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
-
-
-def catch_up(conn, structurer: AlertStructurer):
-    """Process any backlog of unstructured alerts"""
-    sql = """
-        SELECT id FROM alerts
-        WHERE state = 'summarized'
-        ORDER BY response_received_at
-        LIMIT 100  -- Process in batches to avoid memory issues
-    """
-
-    processed = 0
-    while True:
-        with conn.cursor() as cur:
-            cur.execute(sql)
-            alert_ids = [row[0] for row in cur.fetchall()]
-
-        if not alert_ids:
-            break
-
-        log.info(f"Processing batch of {len(alert_ids)} backlog alerts")
-        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog at start of batch processing
-
-        for alert_id in alert_ids:
-            notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog for each item in batch
-
-            # Initialize alert_data for each iteration to avoid "possibly unbound" warning
-            alert_data: Optional[Dict[str, Any]] = None # Pylance fix: initialize here
-
-            try:
-                alert_data = fetch_alert_to_structure(conn, alert_id)
-                if alert_data:
-                    structured_data = structurer.structure_alert(alert_data)
-                    save_structured_data(conn, alert_id, structured_data)
-                    processed += 1
+                self.conn = psycopg2.connect(self.dsn)
+                self.conn.autocommit = True
+                log.info("Connected to PostgreSQL")
+                return self.conn
+            except psycopg2.OperationalError as e:
+                if attempt < max_retries - 1:
+                    wait_time = 5 * (attempt + 1)
+                    log.warning("Database connection failed, retrying in %ds: %s", wait_time, e)
+                    time.sleep(wait_time)
                 else:
-                    log.debug(f"Backlog alert {alert_id} not found or not in 'summarized' state during catch-up.")
-            except Exception as e:
-                log.error(f"Failed to process backlog alert {alert_id}: {e}")
-                notifier.notify(f"STATUS=Error processing backlog alert {alert_id}. See logs.") # ADDED: sdnotify on backlog error
-                # Record failure for backlog processing as well
-                try:
-                    prompt_type_for_failure = 'unknown'
-                    # Check if alert_data was successfully retrieved before trying to access it
-                    if alert_data: # Pylance fix: check if alert_data is not None
-                        prompt_type_for_failure = alert_data.get('prompt_type', 'unknown')
-                    parser_used_for_failure = 'unknown' # Default value
-                    save_parser_metrics( # Changed from save_parser_failure
-                        conn, alert_id,
-                        prompt_type_for_failure,
-                        parser_used_for_failure, False, 0, str(e) # Pass success=False, parse_time_ms=0
-                    )
-                except Exception as inner_e:
-                    log.error(f"Failed to save inner parser failure metrics for backlog alert {alert_id}: {inner_e}")
+                    log.critical("Failed to connect to database after %d attempts", max_retries)
+                    raise
+                    
+    def ensure_connection(self):
+        """Ensure database connection is alive"""
+        try:
+            if self.conn and not self.conn.closed:
+                self.conn.cursor().execute("SELECT 1")
+            else:
+                self.connect()
+        except Exception:
+            log.warning("Database connection lost, reconnecting...")
+            self.connect()
+            
+    def fetch_alerts_to_structure(self, batch_size: int) -> List[Dict[str, Any]]:
+        """Fetch batch of alerts ready for structuring"""
+        self.ensure_connection()
+        
+        # FIXED: Query aligned with schema.sql structure and correct state value
+        sql = """
+            SELECT
+                a.id,
+                a.alert_hash,
+                a.rule_id,
+                a.rule_level,
+                a.rule_desc,
+                a.response_text,
+                a.prompt_type,
+                a.response_received_at,
+                a.ingest_timestamp,
+                ag.name as agent_name,
+                ag.ip as agent_ip,
+                ag.os as agent_os
+            FROM alerts a
+            JOIN agents ag ON ag.id = a.agent_id
+            WHERE a.state = %s
+              AND a.response_text IS NOT NULL
+              AND a.archived_at IS NULL
+            ORDER BY a.rule_level DESC, a.response_received_at ASC
+            LIMIT %s
+            FOR UPDATE SKIP LOCKED
+        """
+        
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, (STATE_ANALYZED, batch_size))
+                alerts = cur.fetchall()
+                return [dict(alert) for alert in alerts]
+                
+        except Exception as e:
+            log.error("Failed to fetch alerts: %s", e)
+            return []
+            
+    def save_structured_data(self, alert_id: int, parse_result: ParseResult):
+        """Save structured data and update alert state"""
+        self.ensure_connection()
+        
+        # Build the structured data format expected by email formatter
+        structured_data = {
+            "subject": parse_result.subject,
+            "sections": parse_result.sections,
+            "metadata": {
+                **parse_result.metadata,
+                "parse_success": parse_result.success,
+                "parse_time_ms": parse_result.parse_time_ms,
+                "parse_error": parse_result.error,
+                "structured_at": datetime.now(timezone.utc).isoformat()
+            }
+        }
+        
+        sql = """
+            UPDATE alerts
+            SET structured_data = %s::jsonb,
+                parser_success = %s,
+                parser_error = %s,
+                parser_duration_ms = %s,
+                structured_at = NOW(),
+                state = %s
+            WHERE id = %s
+        """
+        
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(sql, (
+                    json.dumps(structured_data),
+                    parse_result.success,
+                    parse_result.error,
+                    parse_result.parse_time_ms,
+                    STATE_STRUCTURED,
+                    alert_id
+                ))
+                
+                # Notify next worker (email formatter)
+                cur.execute("SELECT pg_notify(%s, %s)", (NOTIFY_CHANNEL, str(alert_id)))
+                
+            log.info("Structured alert %s and notified %s", alert_id, NOTIFY_CHANNEL)
+            
+        except Exception as e:
+            log.error("Failed to save structured data for alert %s: %s", alert_id, e)
+            raise
+            
+    def save_parser_metrics(self, alert_id: int, prompt_type: str, parser_used: str, 
+                           success: bool, parse_time_ms: float, error_message: Optional[str] = None):
+        """Record parser metrics for monitoring"""
+        self.ensure_connection()
+        
+        sql = """
+            INSERT INTO parser_metrics 
+            (alert_id, prompt_type, parser_used, success, parse_time_ms, error_message)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """
+        
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(sql, (
+                    alert_id, prompt_type, parser_used, 
+                    success, parse_time_ms, error_message
+                ))
+        except Exception as e:
+            log.warning("Failed to save parser metrics for alert %s: %s", alert_id, e)
+            
+    def get_parser_stats(self) -> Dict[str, Any]:
+        """Get parser performance statistics"""
+        self.ensure_connection()
+        
+        sql = """
+            SELECT 
+                prompt_type,
+                parser_used,
+                COUNT(*) as total_attempts,
+                COUNT(*) FILTER (WHERE success) as successes,
+                AVG(parse_time_ms) FILTER (WHERE success) as avg_parse_time_ms
+            FROM parser_metrics
+            WHERE created_at > NOW() - INTERVAL '24 hours'
+            GROUP BY prompt_type, parser_used
+            ORDER BY total_attempts DESC
+        """
+        
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql)
+                return [dict(row) for row in cur.fetchall()]
+        except Exception as e:
+            log.warning("Failed to get parser stats: %s", e)
+            return []
 
-    if processed > 0:
-        log.info(f"Processed {processed} backlog alerts")
+# ───── MAIN SERVICE LOGIC ─────────────────────────────────
+class EmailStructurerService:
+    """Main service orchestrator"""
+    
+    def __init__(self):
+        self.shutdown = False
+        self.db = DatabaseManager(PG_DSN)
+        self.circuit_breaker = SimpleCircuitBreaker(
+            failure_threshold=CIRCUIT_BREAKER_THRESHOLD,
+            timeout_seconds=CIRCUIT_BREAKER_TIMEOUT
+        )
+        self.stats = {
+            'structured': 0,
+            'failed': 0,
+            'circuit_breaker_blocks': 0
+        }
+        self.stats_report_interval = 300  # 5 minutes
+        self.last_stats_report = time.time()
+        
+        # Signal handlers
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully"""
+        log.info("Received signal %d, initiating shutdown", signum)
+        self.shutdown = True
+        notifier.status("Shutting down gracefully")
+        notifier.stopping()
+        
+    def run(self):
+        """Main service loop"""
+        log.info("Email Structurer Service starting...")
+        notifier.ready()
+        notifier.status("Starting email structurer service")
+        
+        # Connect to database
+        try:
+            self.db.connect()
+        except Exception as e:
+            log.critical("Database connection failed: %s", e)
+            notifier.status("Database connection failed")
+            sys.exit(1)
+            
+        # Process any backlog
+        self._process_backlog()
+        
+        # Main event loop
+        self._run_event_loop()
+        
+    def _process_backlog(self):
+        """Process any queued alerts on startup"""
+        log.info("Processing backlog...")
+        backlog_count = 0
+        
+        while not self.shutdown:
+            alerts = self.db.fetch_alerts_to_structure(BATCH_SIZE)
+            if not alerts:
+                break
+                
+            for alert in alerts:
+                if self.shutdown:
+                    break
+                self._process_alert(alert)
+                backlog_count += 1
+                notifier.watchdog()
+                
+        if backlog_count > 0:
+            log.info("Processed %d alerts from backlog", backlog_count)
+            
+    def _run_event_loop(self):
+        """Main event loop with PostgreSQL LISTEN/NOTIFY"""
+        listen_conn = self.db.connect()
+        cursor = listen_conn.cursor()
+        cursor.execute(f"LISTEN {LISTEN_CHANNEL};")
+        
+        log.info("Listening for notifications on channel: %s", LISTEN_CHANNEL)
+        notifier.status(f"Listening on {LISTEN_CHANNEL}")
+        
+        while not self.shutdown:
+            notifier.watchdog()
+            
+            # Report statistics periodically
+            if time.time() - self.last_stats_report > self.stats_report_interval:
+                self._report_statistics()
+                
+            # Wait for notifications
+            if select.select([listen_conn], [], [], 5.0)[0]:
+                listen_conn.poll()
+                
+                # Process all pending notifications
+                while listen_conn.notifies:
+                    notify = listen_conn.notifies.pop(0)
+                    try:
+                        self._process_notification_batch()
+                    except Exception as e:
+                        log.exception("Error processing notification: %s", e)
+                        
+    def _process_notification_batch(self):
+        """Process a batch of alerts when notified"""
+        alerts = self.db.fetch_alerts_to_structure(BATCH_SIZE)
+        
+        for alert in alerts:
+            if self.shutdown:
+                break
+            self._process_alert(alert)
+            notifier.watchdog()
+            
+    def _process_alert(self, alert: Dict[str, Any]):
+        """Process a single alert"""
+        alert_id = alert['id']
+        prompt_type = alert.get('prompt_type', 'unknown')
+        response_text = alert.get('response_text', '')
+        
+        log.info("Structuring alert %s (prompt_type: %s)", alert_id, prompt_type)
+        
+        # Check circuit breaker
+        if not self.circuit_breaker.allow_request(prompt_type):
+            log.warning("Circuit breaker blocking parser for type: %s", prompt_type)
+            self.stats['circuit_breaker_blocks'] += 1
+            
+            # Create fallback structure
+            parse_result = ParseResult(
+                success=False,
+                sections={"Raw Response": response_text},
+                subject=f"Parser Temporarily Disabled - Alert {alert_id}",
+                metadata={"format_type": "FALLBACK"},
+                error=f"Circuit breaker open for {prompt_type}"
+            )
+        else:
+            # Create appropriate parser and process
+            parser = ParserFactory.create_parser(prompt_type)
+            parse_result = parser.parse(response_text, alert)
+            
+            # Record result with circuit breaker
+            if parse_result.success:
+                self.circuit_breaker.record_success(prompt_type)
+                self.stats['structured'] += 1
+            else:
+                self.circuit_breaker.record_failure(prompt_type)
+                self.stats['failed'] += 1
+        
+        try:
+            # Save to database
+            self.db.save_structured_data(alert_id, parse_result)
+            
+            # Record metrics
+            self.db.save_parser_metrics(
+                alert_id, prompt_type, parse_result.metadata.get('format_type', 'unknown'),
+                parse_result.success, parse_result.parse_time_ms, parse_result.error
+            )
+            
+            log.info("Successfully processed alert %s", alert_id)
+            
+        except Exception as e:
+            log.error("Failed to save structured data for alert %s: %s", alert_id, e)
+            
+    def _report_statistics(self):
+        """Report service statistics"""
+        parser_stats = self.db.get_parser_stats()
+        cb_status = self.circuit_breaker.get_status()
+        
+        log.info("Structurer statistics: structured=%d, failed=%d, cb_blocks=%d",
+                self.stats['structured'], self.stats['failed'], self.stats['circuit_breaker_blocks'])
+        
+        # Log parser performance
+        for stat in parser_stats[:5]:  # Top 5 parsers
+            success_rate = (stat['successes'] / stat['total_attempts'] * 100) if stat['total_attempts'] > 0 else 0
+            log.info("Parser %s/%s: %d/%d (%.1f%%) avg: %.1fms",
+                    stat['prompt_type'], stat['parser_used'],
+                    stat['successes'], stat['total_attempts'], success_rate,
+                    stat['avg_parse_time_ms'] or 0)
+        
+        notifier.status(f"Structured: {self.stats['structured']}, CB blocks: {self.stats['circuit_breaker_blocks']}")
+        self.last_stats_report = time.time()
 
+# ───── ENTRY POINT ─────────────────────────────────────
+def main():
+    """Service entry point"""
+    try:
+        service = EmailStructurerService()
+        service.run()
+    except KeyboardInterrupt:
+        log.info("Interrupted by user")
+    except Exception as e:
+        log.critical("Fatal error: %s", e, exc_info=True)
+        notifier.status(f"Fatal error: {e}")
+        sys.exit(1)
+    finally:
+        log.info("Email Structurer Service stopped")
+        notifier.stopping()
 
 if __name__ == "__main__":
     main()

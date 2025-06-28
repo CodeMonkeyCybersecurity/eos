@@ -1,837 +1,760 @@
 #!/usr/bin/env python3
 # /usr/local/bin/prompt-ab-tester.py
 # stanley:stanley 0750
-
 """
-Advanced A/B/C Testing Worker for Delphi System Prompts
+Prompt A/B Testing Coordinator - Pipeline Phase 2.5
+Coordinates prompt selection experiments without duplicating LLM processing
 
-This worker replaces the static prompt loading in llm-worker.py with dynamic 
-prompt selection for A/B/C testing. It:
+IMPROVEMENTS:
+- Fixed state/channel alignment with schema.sql
+- Separated prompt selection from LLM API calls
+- Integrated properly with existing llm-worker.py
+- Enhanced experiment tracking and metrics collection
+- Streamlined database operations
+- Improved error handling and monitoring
 
-* Monitors the 'agent_enriched' PostgreSQL notification channel
-* Randomly selects prompts from configured test groups
-* Tracks prompt performance and effectiveness metrics
-* Supports weighted distribution and cohort testing
-* Maintains experiment state and controls
-* Logs detailed metrics for analysis
-
-Features:
-- Multi-variant testing (A/B/C/D/etc.)
-- Weighted prompt selection
-- User cohort assignment (sticky sessions)
-- Performance metrics collection
-- Experiment configuration via JSON
-- Fallback to default prompt on errors
-- Comprehensive logging and monitoring
+This worker acts as a "prompt selection service" that:
+1. Listens for enriched alerts
+2. Selects appropriate prompt variants based on A/B test configuration
+3. Records prompt assignments in the database
+4. Tracks experiment metrics and performance
+5. Coordinates with LLM worker for actual processing
 """
-
 import os
 import sys
 import json
 import time
+import select
+import signal
 import logging
 import hashlib
 import random
-from datetime import datetime, timezone
+import psycopg2
+import psycopg2.extensions
+import psycopg2.extras
+from datetime import datetime, timezone, timedelta
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass, asdict
+from enum import Enum
 
 try:
-    import requests  # type: ignore
-except ImportError:
-    requests = None
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    def load_dotenv(*_a, **_kw): pass
 
 try:
-    import psycopg2  # type: ignore
-    from psycopg2.extras import DictCursor  # type: ignore
+    import sdnotify
 except ImportError:
-    psycopg2 = None
-    DictCursor = None
-
-try:
-    from dotenv import load_dotenv  # type: ignore
-except ImportError:
-    load_dotenv = None
-
-# --- Import sdnotify for Systemd Watchdog Integration ---
-try:
-    import sdnotify # ADDED: Import sdnotify
-except ImportError:
-    # Fallback for systems without sdnotify
     sdnotify = None
-    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.")
 
-# --- Configuration & Environment Variables ---
+# ───── CONFIGURATION ─────────────────────────────────────
+load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
-if load_dotenv is not None:
-    load_dotenv("/opt/stackstorm/packs/delphi/.env")
-
-# PostgreSQL Database Connection
-PG_DSN = os.getenv("PG_DSN")
-if not PG_DSN:
-    print("FATAL: PG_DSN environment variable not set.", file=sys.stderr)
-    if sdnotify:
-        notifier.notify("STATUS=FATAL: PG_DSN environment variable not set. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
+# Environment validation
+REQUIRED_ENV = ["PG_DSN"]
+missing_vars = [var for var in REQUIRED_ENV if not os.getenv(var)]
+if missing_vars:
+    print(f"FATAL: Missing environment variables: {', '.join(missing_vars)}", file=sys.stderr)
     sys.exit(1)
 
-# Azure OpenAI API Configuration
-AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-ENDPOINT_URL = os.getenv("ENDPOINT_URL")
-DEPLOYMENT_NAME = os.getenv("DEPLOYMENT_NAME")
-AZURE_API_VERSION = os.getenv("AZURE_API_VERSION")
+PG_DSN = os.getenv("PG_DSN", "").strip()
 
-if not all([AZURE_OPENAI_API_KEY, ENDPOINT_URL, DEPLOYMENT_NAME, AZURE_API_VERSION]):
-    print("FATAL: Missing required Azure OpenAI environment variables.", file=sys.stderr)
-    if sdnotify:
-        notifier.notify("STATUS=FATAL: Missing Azure OpenAI env vars. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
-    sys.exit(1)
+# Pipeline configuration - FIXED: Aligned with schema.sql
+LISTEN_CHANNEL = "alert_enriched"     # FIXED: Listen for enriched alerts from schema trigger
+NOTIFY_CHANNEL = "alert_analyzed"     # FIXED: Notify LLM worker when prompt assigned
+STATE_ENRICHED = "enriched"          # FIXED: Match schema enum values  
+STATE_PROMPT_ASSIGNED = "enriched"   # Keep in enriched state until LLM processes
 
-# A/B Testing Configuration
-EXPERIMENT_CONFIG_FILE = os.environ.get("EXPERIMENT_CONFIG_FILE", "/opt/delphi/ab-test-config.json")
-SYSTEM_PROMPTS_DIR = os.environ.get("SYSTEM_PROMPTS_DIR", "/srv/eos/system-prompts")
-DEFAULT_PROMPT_FILE = os.environ.get("DEFAULT_PROMPT_FILE", "/srv/eos/system-prompts/default.txt")
+# A/B Testing configuration
+EXPERIMENT_CONFIG_FILE = os.getenv("EXPERIMENT_CONFIG_FILE", "/opt/delphi/ab-test-config.json")
+PROMPTS_BASE_DIR = os.getenv("PROMPTS_BASE_DIR", "/opt/stackstorm/packs/delphi/prompts")
+DEFAULT_PROMPT_TYPE = os.getenv("DEFAULT_PROMPT_TYPE", "delphi_notify_short")
 
-# Logging and Monitoring
-LOG_FILE = os.environ.get("LOG_FILE", "/var/log/stackstorm/prompt-ab-tester.log")
-# HEARTBEAT_FILE = os.environ.get("HEARTBEAT_FILE", "/var/log/stackstorm/prompt-ab-tester.heartbeat") # REMOVED: Replaced by sdnotify
-METRICS_FILE = os.environ.get("METRICS_FILE", "/var/log/stackstorm/ab-test-metrics.log")
-MAX_LOG_SIZE = int(os.environ.get("MAX_LOG_SIZE", 10485760))
+# Performance configuration
+BATCH_SIZE = int(os.getenv("AB_TESTER_BATCH_SIZE", "5"))
+METRICS_FLUSH_INTERVAL = int(os.getenv("METRICS_FLUSH_INTERVAL", "300"))  # 5 minutes
+EXPERIMENT_REFRESH_INTERVAL = int(os.getenv("EXPERIMENT_REFRESH_INTERVAL", "3600"))  # 1 hour
 
-# PostgreSQL LISTEN channel
-LISTEN_CHANNEL = "agent_enriched"
+class ExperimentStatus(Enum):
+    """Experiment status states"""
+    ACTIVE = "active"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    DRAFT = "draft"
 
-# --- Logger Setup ---
-def setup_logging() -> logging.Logger:
-    """Configure logging for the A/B testing worker"""
-    logger = logging.getLogger("prompt-ab-tester")
-    logger.setLevel(logging.INFO)
+@dataclass
+class PromptVariant:
+    """Configuration for a single prompt variant"""
+    name: str
+    prompt_type: str  # Maps to parser_type enum values
+    weight: float
+    description: str = ""
+    parameters: Dict[str, Any] = None
     
-    # Ensure log directory exists
-    log_dir = os.path.dirname(LOG_FILE)
-    os.makedirs(log_dir, exist_ok=True)
-    
-    # File handler with rotation
-    file_handler = RotatingFileHandler(
-        LOG_FILE,
-        maxBytes=MAX_LOG_SIZE,
-        backupCount=3
-    )
-    file_formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        "%Y-%m-%d %H:%M:%S"
-    )
-    file_handler.setFormatter(file_formatter)
-    logger.addHandler(file_handler)
-    
-    # Console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(file_formatter)
-    logger.addHandler(console_handler)
-    
-    return logger
+    def __post_init__(self):
+        if self.parameters is None:
+            self.parameters = {}
 
-log = setup_logging()
-
-# --- Initialize Systemd Notifier ---
-if sdnotify:
-    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
-else:
-    class DummyNotifier: # Dummy class if sdnotify isn't available
-        def notify(self, message):
-            pass
-    notifier = DummyNotifier()
-
-
-# --- Data Structures ---
-
+@dataclass
 class ExperimentConfig:
-    """Configuration for A/B/C testing experiments"""
+    """A/B test experiment configuration"""
+    name: str
+    description: str
+    status: ExperimentStatus
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+    variants: List[PromptVariant]
+    cohort_strategy: str = "agent_rule"  # How to assign cohorts
+    sticky_sessions: bool = True
+    target_rules: List[int] = None  # Specific rule IDs to test, None = all
+    min_rule_level: int = 0  # Minimum rule level for inclusion
+    sample_rate: float = 1.0  # Percentage of eligible alerts to include
     
-    def __init__(self, config_data: Dict):
-        self.name = config_data.get("name", "default")
-        self.description = config_data.get("description", "")
-        self.enabled = config_data.get("enabled", True)
-        self.start_date = config_data.get("start_date")
-        self.end_date = config_data.get("end_date")
-        self.cohort_assignment = config_data.get("cohort_assignment", "random")
-        self.sticky_sessions = config_data.get("sticky_sessions", True)
-        self.variants = self._parse_variants(config_data.get("variants", []))
-        self.metrics_tracking = config_data.get("metrics_tracking", {})
-        
-    def _parse_variants(self, variants_data: List[Dict]) -> List['PromptVariant']:
-        """Parse variant configurations into PromptVariant objects"""
-        variants = []
-        total_weight = sum(v.get("weight", 1) for v in variants_data)
-        
-        for variant_data in variants_data:
-            variant = PromptVariant(
-                name=variant_data.get("name", ""),
-                prompt_file=variant_data.get("prompt_file", ""),
-                weight=variant_data.get("weight", 1) / total_weight,
-                description=variant_data.get("description", ""),
-                parameters=variant_data.get("parameters", {})
-            )
-            variants.append(variant)
-        
-        return variants
+    def __post_init__(self):
+        if self.target_rules is None:
+            self.target_rules = []
     
     def is_active(self) -> bool:
         """Check if experiment is currently active"""
-        if not self.enabled:
+        if self.status != ExperimentStatus.ACTIVE:
             return False
             
         now = datetime.now(timezone.utc)
         
-        if self.start_date:
-            start = datetime.fromisoformat(self.start_date.replace('Z', '+00:00'))
-            if now < start:
+        if self.start_date and now < self.start_date:
+            return False
+            
+        if self.end_date and now > self.end_date:
+            return False
+            
+        return True
+    
+    def is_alert_eligible(self, alert_data: Dict[str, Any]) -> bool:
+        """Check if alert is eligible for this experiment"""
+        if not self.is_active():
+            return False
+        
+        rule_id = alert_data.get('rule_id', 0)
+        rule_level = alert_data.get('rule_level', 0)
+        
+        # Check rule level requirement
+        if rule_level < self.min_rule_level:
+            return False
+        
+        # Check specific rule targeting
+        if self.target_rules and rule_id not in self.target_rules:
+            return False
+        
+        # Check sample rate
+        if self.sample_rate < 1.0:
+            # Use alert hash for consistent sampling
+            alert_hash = alert_data.get('alert_hash', '')
+            sample_seed = int(hashlib.md5(alert_hash.encode()).hexdigest()[:8], 16)
+            if (sample_seed % 100) / 100.0 > self.sample_rate:
                 return False
-                
-        if self.end_date:
-            end = datetime.fromisoformat(self.end_date.replace('Z', '+00:00'))
-            if now > end:
-                return False
-                
+        
         return True
 
-class PromptVariant:
-    """Individual prompt variant in an A/B test"""
-    
-    def __init__(self, name: str, prompt_file: str, weight: float, 
-                 description: str = "", parameters: Dict = None):
-        self.name = name
-        self.prompt_file = prompt_file
-        self.weight = weight
-        self.description = description
-        self.parameters = parameters or {}
-        self._prompt_content: Optional[str] = None
-    
-    def get_prompt_content(self, prompts_dir: str) -> str:
-        """Load and return prompt content, with caching"""
-        if self._prompt_content is None:
-            prompt_path = Path(prompts_dir) / self.prompt_file
-            try:
-                with open(prompt_path, 'r', encoding='utf-8') as f:
-                    self._prompt_content = f.read().strip()
-            except FileNotFoundError:
-                log.error(f"Prompt file not found: {prompt_path}")
-                notifier.notify(f"STATUS=Error: Prompt file {prompt_path} not found.") # ADDED: sdnotify
-                raise
-            except Exception as e:
-                log.error(f"Error loading prompt from {prompt_path}: {e}")
-                notifier.notify(f"STATUS=Error loading prompt from {prompt_path}. See logs.") # ADDED: sdnotify
-                raise
-        
-        return self._prompt_content
+# ───── LOGGER SETUP ─────────────────────────────────────
+def setup_logging() -> logging.Logger:
+    """Configure structured logging"""
+    logger = logging.getLogger("prompt-ab-tester")
+    logger.setLevel(logging.INFO)
 
-class ABTestManager:
-    """Manages A/B/C testing logic and prompt selection"""
+    handler = RotatingFileHandler(
+        "/var/log/stackstorm/prompt-ab-tester.log",
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5
+    )
     
-    def __init__(self, config_file: str, prompts_dir: str):
-        self.config_file = config_file
-        self.prompts_dir = prompts_dir
-        self.experiment: Optional[ExperimentConfig] = None
-        self.user_assignments: Dict[str, str] = {}  # user_id -> variant_name
-        self.variant_metrics: Dict[str, Dict] = {}  # variant_name -> metrics
-        self._load_experiment_config()
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s",
+        "%Y-%m-%d %H:%M:%S"
+    )
+    handler.setFormatter(fmt)
+    logger.addHandler(handler)
+
+    if sys.stdout.isatty():
+        console = logging.StreamHandler(sys.stdout)
+        console.setFormatter(fmt)
+        logger.addHandler(console)
+
+    return logger
+
+log = setup_logging()
+
+# ───── SYSTEMD INTEGRATION ─────────────────────────────
+class SystemdNotifier:
+    """Wrapper for systemd notifications"""
+    def __init__(self):
+        if sdnotify:
+            self.notifier = sdnotify.SystemdNotifier()
+        else:
+            self.notifier = None
+            
+    def notify(self, message: str):
+        """Send notification to systemd"""
+        if self.notifier:
+            try:
+                self.notifier.notify(message)
+            except Exception as e:
+                log.warning("Failed to send systemd notification: %s", e)
+    
+    def ready(self):
+        """Signal that service is ready"""
+        self.notify("READY=1")
         
-    def _load_experiment_config(self):
-        """Load experiment configuration from JSON file"""
+    def watchdog(self):
+        """Send watchdog ping"""
+        self.notify("WATCHDOG=1")
+        
+    def status(self, status: str):
+        """Update service status"""
+        self.notify(f"STATUS={status}")
+        
+    def stopping(self):
+        """Signal that service is stopping"""
+        self.notify("STOPPING=1")
+
+notifier = SystemdNotifier()
+
+# ───── EXPERIMENT MANAGER ─────────────────────────────────
+class ExperimentManager:
+    """Manages A/B testing experiments and prompt selection"""
+    
+    def __init__(self, config_file: str):
+        self.config_file = config_file
+        self.experiments: List[ExperimentConfig] = []
+        self.cohort_assignments: Dict[str, str] = {}  # cohort_id -> variant_name
+        self.variant_metrics: Dict[str, Dict[str, Any]] = {}
+        self.last_config_refresh = datetime.min.replace(tzinfo=timezone.utc)
+        self._load_experiments()
+        
+    def _load_experiments(self):
+        """Load experiment configurations from file"""
         try:
+            if not os.path.exists(self.config_file):
+                log.warning("Experiment config file not found: %s", self.config_file)
+                self.experiments = []
+                return
+                
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 config_data = json.load(f)
             
-            self.experiment = ExperimentConfig(config_data)
+            self.experiments = []
+            experiments_data = config_data.get('experiments', [])
             
-            # Initialize metrics tracking for each variant
-            for variant in self.experiment.variants:
-                if variant.name not in self.variant_metrics:
-                    self.variant_metrics[variant.name] = {
-                        "total_uses": 0,
-                        "successful_responses": 0,
-                        "failed_responses": 0,
-                        "avg_response_time": 0.0,
-                        "total_tokens": 0,
-                        "first_used": None,
-                        "last_used": None
-                    }
-                    
-        except FileNotFoundError:
-            log.warning(f"Experiment config file not found: {self.config_file}. Using fallback mode.")
-            notifier.notify(f"STATUS=Warning: Experiment config file {self.config_file} not found. Using fallback.") # ADDED: sdnotify
-            self.experiment = None
-        except json.JSONDecodeError as e:
-            log.error(f"Invalid JSON in experiment config: {e}. Using fallback mode.")
-            notifier.notify(f"STATUS=Error: Invalid JSON in experiment config. Using fallback.") # ADDED: sdnotify
-            self.experiment = None
-        except Exception as e:
-            log.error(f"Error loading experiment config: {e}. Using fallback mode.")
-            notifier.notify(f"STATUS=Error loading experiment config. Using fallback.") # ADDED: sdnotify
-            self.experiment = None
-    
-    def get_user_cohort_id(self, alert_data: Dict) -> str:
-        """Generate a consistent cohort ID for sticky sessions"""
-        # Use agent_id + rule_id for consistency
-        agent_id = str(alert_data.get('agent_id', ''))
-        rule_id = str(alert_data.get('rule', {}).get('id', ''))
-        
-        # Create a stable hash for cohort assignment
-        cohort_data = f"{agent_id}:{rule_id}"
-        return hashlib.md5(cohort_data.encode()).hexdigest()[:8]
-    
-    def select_prompt_variant(self, alert_data: Dict) -> Tuple[str, str]:
-        """
-        Select which prompt variant to use for this alert.
-        Returns: (variant_name, prompt_content)
-        """
-        # Fallback to default if no experiment configured
-        if not self.experiment or not self.experiment.is_active():
-            return self._get_default_prompt()
-        
-        # Get user cohort for sticky sessions
-        cohort_id = self.get_user_cohort_id(alert_data)
-        
-        # Check if user already has a variant assignment (sticky sessions)
-        if self.experiment.sticky_sessions and cohort_id in self.user_assignments:
-            assigned_variant = self.user_assignments[cohort_id]
-            variant = self._get_variant_by_name(assigned_variant)
-            if variant:
+            for exp_data in experiments_data:
                 try:
-                    prompt_content = variant.get_prompt_content(self.prompts_dir)
-                    return assigned_variant, prompt_content
+                    # Parse dates
+                    start_date = None
+                    if exp_data.get('start_date'):
+                        start_date = datetime.fromisoformat(
+                            exp_data['start_date'].replace('Z', '+00:00')
+                        )
+                    
+                    end_date = None  
+                    if exp_data.get('end_date'):
+                        end_date = datetime.fromisoformat(
+                            exp_data['end_date'].replace('Z', '+00:00')
+                        )
+                    
+                    # Parse variants
+                    variants = []
+                    total_weight = sum(v.get('weight', 1) for v in exp_data.get('variants', []))
+                    
+                    for variant_data in exp_data.get('variants', []):
+                        variant = PromptVariant(
+                            name=variant_data.get('name', ''),
+                            prompt_type=variant_data.get('prompt_type', DEFAULT_PROMPT_TYPE),
+                            weight=variant_data.get('weight', 1) / total_weight,
+                            description=variant_data.get('description', ''),
+                            parameters=variant_data.get('parameters', {})
+                        )
+                        variants.append(variant)
+                    
+                    experiment = ExperimentConfig(
+                        name=exp_data.get('name', ''),
+                        description=exp_data.get('description', ''),
+                        status=ExperimentStatus(exp_data.get('status', 'draft')),
+                        start_date=start_date,
+                        end_date=end_date,
+                        variants=variants,
+                        cohort_strategy=exp_data.get('cohort_strategy', 'agent_rule'),
+                        sticky_sessions=exp_data.get('sticky_sessions', True),
+                        target_rules=exp_data.get('target_rules', []),
+                        min_rule_level=exp_data.get('min_rule_level', 0),
+                        sample_rate=exp_data.get('sample_rate', 1.0)
+                    )
+                    
+                    self.experiments.append(experiment)
+                    log.info("Loaded experiment: %s (%d variants)", 
+                            experiment.name, len(experiment.variants))
+                    
                 except Exception as e:
-                    log.error(f"Error loading assigned variant {assigned_variant}: {e}")
-                    # Fall through to new assignment
+                    log.error("Failed to parse experiment config: %s", e)
+                    continue
+            
+            self.last_config_refresh = datetime.now(timezone.utc)
+            log.info("Loaded %d experiments from config", len(self.experiments))
+            
+        except Exception as e:
+            log.error("Failed to load experiment config: %s", e)
+            self.experiments = []
+    
+    def refresh_config_if_needed(self):
+        """Refresh configuration if enough time has passed"""
+        if (datetime.now(timezone.utc) - self.last_config_refresh).total_seconds() > EXPERIMENT_REFRESH_INTERVAL:
+            log.info("Refreshing experiment configuration...")
+            self._load_experiments()
+    
+    def get_cohort_id(self, alert_data: Dict[str, Any], strategy: str = "agent_rule") -> str:
+        """Generate cohort ID for consistent assignment"""
+        if strategy == "agent_rule":
+            # Combine agent_id and rule_id for sticky assignment per agent/rule combo
+            agent_id = str(alert_data.get('agent_id', ''))
+            rule_id = str(alert_data.get('rule_id', ''))
+            cohort_data = f"{agent_id}:{rule_id}"
+        elif strategy == "agent_only":
+            # Only use agent_id (same prompt for all rules on an agent)
+            cohort_data = str(alert_data.get('agent_id', ''))
+        elif strategy == "rule_only":
+            # Only use rule_id (same prompt for all agents with this rule)
+            cohort_data = str(alert_data.get('rule_id', ''))
+        else:
+            # Default fallback
+            cohort_data = str(alert_data.get('alert_hash', ''))
+        
+        return hashlib.md5(cohort_data.encode()).hexdigest()[:12]
+    
+    def select_prompt_variant(self, alert_data: Dict[str, Any]) -> Tuple[str, Optional[str]]:
+        """
+        Select prompt variant for an alert
+        Returns: (prompt_type, experiment_name)
+        """
+        # Find eligible experiment
+        active_experiment = None
+        for experiment in self.experiments:
+            if experiment.is_alert_eligible(alert_data):
+                active_experiment = experiment
+                break
+        
+        if not active_experiment:
+            log.debug("No active experiment for alert %s, using default", 
+                     alert_data.get('id'))
+            return DEFAULT_PROMPT_TYPE, None
+        
+        # Get cohort ID
+        cohort_id = self.get_cohort_id(alert_data, active_experiment.cohort_strategy)
+        
+        # Check for existing assignment (sticky sessions)
+        if active_experiment.sticky_sessions:
+            assignment_key = f"{active_experiment.name}:{cohort_id}"
+            if assignment_key in self.cohort_assignments:
+                assigned_variant = self.cohort_assignments[assignment_key]
+                # Verify variant still exists in experiment
+                for variant in active_experiment.variants:
+                    if variant.name == assigned_variant:
+                        log.debug("Using sticky assignment for cohort %s: %s", 
+                                 cohort_id, variant.prompt_type)
+                        return variant.prompt_type, active_experiment.name
         
         # Select new variant based on weights
-        selected_variant = self._weighted_variant_selection()
+        selected_variant = self._weighted_selection(active_experiment.variants)
         
         if not selected_variant:
-            return self._get_default_prompt()
+            log.warning("No variant selected from experiment %s, using default", 
+                       active_experiment.name)
+            return DEFAULT_PROMPT_TYPE, None
         
-        try:
-            prompt_content = selected_variant.get_prompt_content(self.prompts_dir)
-            
-            # Record assignment for sticky sessions
-            if self.experiment.sticky_sessions:
-                self.user_assignments[cohort_id] = selected_variant.name
-            
-            return selected_variant.name, prompt_content
-            
-        except Exception as e:
-            log.error(f"Error loading variant {selected_variant.name}: {e}")
-            return self._get_default_prompt()
+        # Record assignment for sticky sessions
+        if active_experiment.sticky_sessions:
+            assignment_key = f"{active_experiment.name}:{cohort_id}"
+            self.cohort_assignments[assignment_key] = selected_variant.name
+        
+        log.info("Selected variant for alert %s: %s (experiment: %s)", 
+                alert_data.get('id'), selected_variant.prompt_type, active_experiment.name)
+        
+        return selected_variant.prompt_type, active_experiment.name
     
-    def _weighted_variant_selection(self) -> Optional[PromptVariant]:
-        """Select variant based on configured weights"""
-        if not self.experiment or not self.experiment.variants:
+    def _weighted_selection(self, variants: List[PromptVariant]) -> Optional[PromptVariant]:
+        """Select variant using weighted random selection"""
+        if not variants:
             return None
         
-        # Generate random number for selection
         rand = random.random()
         cumulative_weight = 0.0
         
-        for variant in self.experiment.variants:
+        for variant in variants:
             cumulative_weight += variant.weight
             if rand <= cumulative_weight:
                 return variant
         
         # Fallback to last variant
-        return self.experiment.variants[-1] if self.experiment.variants else None
+        return variants[-1] if variants else None
     
-    def _get_variant_by_name(self, name: str) -> Optional[PromptVariant]:
-        """Get variant by name"""
-        if not self.experiment:
-            return None
+    def record_assignment(self, alert_id: int, prompt_type: str, experiment_name: Optional[str]):
+        """Record prompt assignment for metrics tracking"""
+        # Initialize metrics if needed
+        metric_key = f"{experiment_name or 'default'}:{prompt_type}"
+        if metric_key not in self.variant_metrics:
+            self.variant_metrics[metric_key] = {
+                "assignments": 0,
+                "successes": 0,
+                "failures": 0,
+                "total_tokens": 0,
+                "avg_response_time": 0.0,
+                "first_used": datetime.now(timezone.utc).isoformat(),
+                "last_used": None
+            }
         
-        for variant in self.experiment.variants:
-            if variant.name == name:
-                return variant
-        return None
-    
-    def _get_default_prompt(self) -> Tuple[str, str]:
-        """Load default prompt as fallback"""
-        try:
-            with open(DEFAULT_PROMPT_FILE, 'r', encoding='utf-8') as f:
-                default_content = f.read().strip()
-            log.info(f"Using default prompt from {DEFAULT_PROMPT_FILE}")
-            return "default", default_content
-        except Exception as e:
-            log.error(f"Error loading default prompt from {DEFAULT_PROMPT_FILE}: {e}")
-            notifier.notify("STATUS=Error loading default prompt. Using hardcoded fallback.") # ADDED: sdnotify
-            return "fallback", "You are a helpful AI assistant for security analysis."
-    
-    def record_usage_metrics(self, variant_name: str, success: bool, 
-                           response_time: float, token_count: int):
-        """Record metrics for a variant usage"""
-        if variant_name not in self.variant_metrics:
-            log.warning(f"Attempted to record metrics for unknown variant: {variant_name}")
-            return
+        # Update assignment count
+        self.variant_metrics[metric_key]["assignments"] += 1
+        self.variant_metrics[metric_key]["last_used"] = datetime.now(timezone.utc).isoformat()
         
-        metrics = self.variant_metrics[variant_name]
-        metrics["total_uses"] += 1
+        log.debug("Recorded assignment for alert %s: %s", alert_id, metric_key)
+    
+    def record_result(self, prompt_type: str, experiment_name: Optional[str], 
+                     success: bool, response_time: float = 0.0, token_count: int = 0):
+        """Record processing result for metrics"""
+        metric_key = f"{experiment_name or 'default'}:{prompt_type}"
+        
+        if metric_key not in self.variant_metrics:
+            return  # No assignment recorded
+        
+        metrics = self.variant_metrics[metric_key]
         
         if success:
-            metrics["successful_responses"] += 1
+            metrics["successes"] += 1
         else:
-            metrics["failed_responses"] += 1
+            metrics["failures"] += 1
         
         # Update average response time
-        total_responses = metrics["successful_responses"] + metrics["failed_responses"]
-        if total_responses > 0: # Ensure no division by zero
+        total_responses = metrics["successes"] + metrics["failures"]
+        if total_responses > 1:
             metrics["avg_response_time"] = (
                 (metrics["avg_response_time"] * (total_responses - 1) + response_time) 
                 / total_responses
             )
         else:
-            metrics["avg_response_time"] = response_time # Should only happen if total_responses is 0 initially
+            metrics["avg_response_time"] = response_time
         
         metrics["total_tokens"] += token_count
-        
-        now = datetime.now(timezone.utc).isoformat()
-        if not metrics["first_used"]:
-            metrics["first_used"] = now
-        metrics["last_used"] = now
+        metrics["last_used"] = datetime.now(timezone.utc).isoformat()
     
-    def get_metrics_summary(self) -> Dict:
-        """Get comprehensive metrics summary for reporting"""
-        if not self.experiment:
-            return {"error": "No active experiment"}
-        
+    def get_metrics_summary(self) -> Dict[str, Any]:
+        """Get comprehensive metrics summary"""
         summary = {
-            "experiment": {
-                "name": self.experiment.name,
-                "description": self.experiment.description,
-                "active": self.experiment.is_active(),
-                "variants_count": len(self.experiment.variants)
-            },
-            "variants": {},
-            "total_assignments": len(self.user_assignments),
+            "experiments": len(self.experiments),
+            "active_experiments": len([e for e in self.experiments if e.is_active()]),
+            "total_assignments": len(self.cohort_assignments),
+            "variant_metrics": {},
             "generated_at": datetime.now(timezone.utc).isoformat()
         }
         
-        for variant_name, metrics in self.variant_metrics.items():
-            success_rate = 0.0
-            total_responses = metrics["successful_responses"] + metrics["failed_responses"]
-            if total_responses > 0:
-                success_rate = metrics["successful_responses"] / total_responses
+        for metric_key, metrics in self.variant_metrics.items():
+            total_responses = metrics["successes"] + metrics["failures"]
+            success_rate = metrics["successes"] / max(total_responses, 1)
             
-            summary["variants"][variant_name] = {
+            summary["variant_metrics"][metric_key] = {
                 **metrics,
                 "success_rate": success_rate,
-                "avg_tokens_per_use": metrics["total_tokens"] / max(metrics["total_uses"], 1)
+                "total_responses": total_responses
             }
         
         return summary
 
-# --- Metrics Logging ---
-def log_metrics(metrics_data: Dict):
-    """Log metrics to dedicated metrics file"""
-    try:
-        metrics_dir = os.path.dirname(METRICS_FILE)
-        os.makedirs(metrics_dir, exist_ok=True)
-        
-        with open(METRICS_FILE, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(metrics_data) + '\n')
-    except Exception as e:
-        log.error(f"Failed to write metrics to {METRICS_FILE}: {e}")
-        notifier.notify("STATUS=Error writing metrics to file. See logs.") # ADDED: sdnotify
-
-
-# --- Heartbeat Management (REMOVED: Replaced by sdnotify) ---
-# def update_heartbeat_file():
-#     """Update heartbeat file with current timestamp"""
-#     try:
-#         with open(HEARTBEAT_FILE, 'w', encoding='utf-8') as f:
-#             f.write(datetime.now(timezone.utc).isoformat())
-#     except IOError as e:
-#         log.error(f"Failed to update heartbeat file: {e}")
-
-# --- Initialize A/B Test Manager ---
-ab_test_manager = ABTestManager(EXPERIMENT_CONFIG_FILE, SYSTEM_PROMPTS_DIR)
-
-# --- LLM Interaction with A/B Testing ---
-def get_llm_response_with_testing(raw_alert_json: Dict, agent_details_json: Dict, 
-                                 alert_id: int) -> Optional[Dict]:
-    """
-    Enhanced LLM response function with A/B testing capabilities
-    """
-    if requests is None:
-        log.error("requests module not available")
-        notifier.notify("STATUS=FATAL: 'requests' module not available for LLM. Exiting.") # ADDED: sdnotify
-        return None
+# ───── DATABASE OPERATIONS ─────────────────────────────────
+class DatabaseManager:
+    """Manage database operations for A/B testing"""
     
-    start_time = time.time()
-    variant_name = None
-    
-    try:
-        # Select prompt variant using A/B testing logic
-        variant_name, system_prompt = ab_test_manager.select_prompt_variant(raw_alert_json)
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+        self.conn = None
         
-        log.info(f"Alert {alert_id}: Using prompt variant '{variant_name}'")
-        
-        # Construct user message
-        user_message_content = {
-            "alert": raw_alert_json,
-            "agent_details": agent_details_json
-        }
-        user_message_str = json.dumps(user_message_content, indent=2)
-        
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message_str}
-        ]
-        
-        # API call setup
-        headers = {
-            "api-key": AZURE_OPENAI_API_KEY,
-            "Content-Type": "application/json"
-        }
-        
-        api_url = f"{ENDPOINT_URL}/openai/deployments/{DEPLOYMENT_NAME}/chat/completions?api-version={AZURE_API_VERSION}"
-        
-        payload = {
-            "messages": messages,
-            "max_tokens": 1024,
-            "temperature": 0.7,
-            "top_p": 0.95,
-            "frequency_penalty": 0,
-            "presence_penalty": 0,
-            "stop": ["<|im_end|>"]
-        }
-        
-        log.info(f"Alert {alert_id}: Sending request to Azure OpenAI API...")
-        # Ping watchdog before potentially long network call
-        notifier.notify("WATCHDOG=1") # ADDED: sdnotify before LLM API call
-        response = requests.post(api_url, headers=headers, json=payload, timeout=60)
-        response.raise_for_status()
-        
-        response_data = response.json()
-        
-        # Extract response details
-        completion_content = response_data['choices'][0]['message']['content']
-        prompt_tokens = response_data['usage']['prompt_tokens']
-        completion_tokens = response_data['usage']['completion_tokens']
-        total_tokens = response_data['usage']['total_tokens']
-        
-        response_time = time.time() - start_time
-        
-        log.info(f"Alert {alert_id}: LLM response received. "
-                f"Variant: {variant_name}, Tokens: {total_tokens}, "
-                f"Response time: {response_time:.2f}s")
-        
-        # Record metrics for this variant
-        ab_test_manager.record_usage_metrics(
-            variant_name, True, response_time, total_tokens
-        )
-        
-        # Log metrics for analysis
-        metrics_entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "alert_id": alert_id,
-            "variant_name": variant_name,
-            "success": True,
-            "response_time": response_time,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": total_tokens,
-            "agent_id": raw_alert_json.get('agent_id'),
-            "rule_level": raw_alert_json.get('rule', {}).get('level')
-        }
-        log_metrics(metrics_entry)
-        
-        return {
-            "parsed_response": completion_content,
-            "prompt_tokens": prompt_tokens,
-            "completion_tokens": completion_tokens,
-            "total_tokens": total_tokens,
-            "variant_name": variant_name,
-            "response_time": response_time
-        }
-        
-    except Exception as e:
-        response_time = time.time() - start_time
-        
-        log.error(f"Alert {alert_id}: LLM API error with variant '{variant_name}': {e}", exc_info=True)
-        notifier.notify(f"STATUS=Error: LLM API call failed for alert {alert_id}. See logs.") # ADDED: sdnotify
-        
-        # Record failure metrics
-        if variant_name:
-            ab_test_manager.record_usage_metrics(
-                variant_name, False, response_time, 0
-            )
+    def connect(self) -> psycopg2.extensions.connection:
+        """Connect to database with retry logic"""
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                self.conn = psycopg2.connect(self.dsn)
+                self.conn.autocommit = True
+                log.info("Connected to PostgreSQL")
+                return self.conn
+            except psycopg2.OperationalError as e:
+                if attempt < max_retries - 1:
+                    wait_time = 5 * (attempt + 1)
+                    log.warning("Database connection failed, retrying in %ds: %s", wait_time, e)
+                    time.sleep(wait_time)
+                else:
+                    log.critical("Failed to connect to database after %d attempts", max_retries)
+                    raise
+                    
+    def ensure_connection(self):
+        """Ensure database connection is alive"""
+        try:
+            if self.conn and not self.conn.closed:
+                self.conn.cursor().execute("SELECT 1")
+            else:
+                self.connect()
+        except Exception:
+            log.warning("Database connection lost, reconnecting...")
+            self.connect()
             
-            # Log failure metrics
-            metrics_entry = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "alert_id": alert_id,
-                "variant_name": variant_name,
-                "success": False,
-                "response_time": response_time,
-                "error": str(e),
-                "agent_id": raw_alert_json.get('agent_id'),
-                "rule_level": raw_alert_json.get('rule', {}).get('level')
-            }
-            log_metrics(metrics_entry)
+    def fetch_enriched_alerts(self, batch_size: int) -> List[Dict[str, Any]]:
+        """Fetch alerts ready for prompt assignment"""
+        self.ensure_connection()
         
-        return None
-
-# --- Enhanced Alert Processing ---
-def process_alert_for_llm_with_testing(alert_id: int) -> Optional[Dict]:
-    """
-    Enhanced alert processing with A/B testing integration
-    """
-    if psycopg2 is None:
-        log.error("psycopg2 module not available")
-        notifier.notify("STATUS=FATAL: 'psycopg2' module not available. Exiting.") # ADDED: sdnotify
-        return None
-    
-    conn = None
-    cur = None
-    
-    try:
-        conn = psycopg2.connect(PG_DSN)
-        cur = conn.cursor(cursor_factory=DictCursor)
-        
-        # Fetch alert record
-        cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
-        alert_record = cur.fetchone()
-        
-        if not alert_record:
-            log.error(f"Alert {alert_id} not found in database")
-            return None
-        
-        # Check if already processed
-        if isinstance(alert_record, tuple):
-            current_state = alert_record[8] if len(alert_record) > 8 else None  # Adjust index if needed
-            agent_id = alert_record[5] if len(alert_record) > 5 else None
-            raw_alert = alert_record[3] if len(alert_record) > 3 else {}
-        else:
-            current_state = alert_record.get('state')
-            agent_id = alert_record.get('agent_id')
-            raw_alert = alert_record.get('raw', {})
-        
-        if current_state != 'agent_enriched':
-            log.info(f"Alert {alert_id} state is '{current_state}', skipping")
-            return dict(alert_record) if alert_record else None
-        
-        # Fetch agent details
-        agent_details = {}
-        if agent_id:
-            cur.execute("SELECT api_response FROM agents WHERE id = %s;", (agent_id,))
-            agent_data = cur.fetchone()
-            if agent_data:
-                agent_details = agent_data[0] if isinstance(agent_data, tuple) else agent_data.get('api_response', {})
-        
-        # Process with A/B testing
-        llm_response = get_llm_response_with_testing(raw_alert, agent_details, alert_id)
-        
-        if not llm_response:
-            log.error(f"Alert {alert_id}: No valid LLM response received")
-            return dict(alert_record) if alert_record else None
-        
-        # Update database with A/B testing metadata
-        variant_name = llm_response.get('variant_name', 'unknown')
-        response_time = llm_response.get('response_time', 0.0)
-        
-        update_query = """
-        UPDATE alerts
-        SET
-            prompt_sent_at = %s,
-            prompt_text = %s,
-            response_received_at = %s,
-            response_text = %s,
-            prompt_tokens = %s,
-            completion_tokens = %s,
-            total_tokens = %s,
-            state = %s
-        WHERE id = %s;
+        sql = """
+            SELECT
+                a.id,
+                a.alert_hash,
+                a.agent_id,
+                a.rule_id,
+                a.rule_level,
+                a.rule_desc,
+                a.raw,
+                a.enriched_at,
+                a.prompt_type,
+                ag.name as agent_name
+            FROM alerts a
+            JOIN agents ag ON ag.id = a.agent_id
+            WHERE a.state = %s
+              AND a.prompt_type IS NULL
+              AND a.archived_at IS NULL
+            ORDER BY a.rule_level DESC, a.enriched_at ASC
+            LIMIT %s
+            FOR UPDATE SKIP LOCKED
         """
         
-        # Store the variant information in prompt_text field as metadata
-        # Reconstruct the full prompt text that was sent to LLM for logging/audit
-        full_prompt_text_for_db = json.dumps([
-            {"role": "system", "content": ab_test_manager._get_variant_by_name(variant_name).get_prompt_content(ab_test_manager.prompts_dir) if ab_test_manager._get_variant_by_name(variant_name) else "Default/Fallback"},
-            {"role": "user", "content": json.dumps({"alert": raw_alert, "agent_details": agent_details}, indent=2)}
-        ], indent=2)
-
-
-        cur.execute(update_query, (
-            datetime.now(timezone.utc),
-            full_prompt_text_for_db, # Store full prompt, including variant info if desired
-            datetime.now(timezone.utc),
-            llm_response.get('parsed_response'),
-            llm_response.get('prompt_tokens'),
-            llm_response.get('completion_tokens'),
-            llm_response.get('total_tokens'),
-            'summarized',
-            alert_id
-        ))
-        conn.commit()
-        
-        log.info(f"Alert {alert_id}: Successfully processed with variant '{variant_name}'")
-        
-        # Notify next stage
-        cur.execute("SELECT pg_notify('new_response', %s);", (str(alert_id),))
-        conn.commit()
-        
-        # Return updated record
-        cur.execute("SELECT * FROM alerts WHERE id = %s;", (alert_id,))
-        return dict(cur.fetchone()) if cur.fetchone() else None
-        
-    except Exception as e:
-        log.error(f"Alert {alert_id}: Processing error: {e}", exc_info=True)
-        notifier.notify(f"STATUS=Error processing alert {alert_id}. See logs.") # ADDED: sdnotify
-        if conn:
-            conn.rollback()
-        return None
-    finally:
-        if conn:
-            if cur:
-                cur.close()
-            conn.close()
-
-# --- PostgreSQL Listener ---
-def listen_for_enriched_alerts():
-    """Listen for agent_enriched notifications and process with A/B testing"""
-    if psycopg2 is None:
-        log.error("psycopg2 module not available")
-        notifier.notify("STATUS=FATAL: 'psycopg2' module not available. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
-        return
-    
-    log.info(f"Starting A/B Testing worker - listening on '{LISTEN_CHANNEL}'")
-    log.info(f"Experiment config: {EXPERIMENT_CONFIG_FILE}")
-    log.info(f"Prompts directory: {SYSTEM_PROMPTS_DIR}")
-    
-    # Log current experiment status
-    if ab_test_manager.experiment:
-        metrics_summary = ab_test_manager.get_metrics_summary()
-        log.info(f"Active experiment: {ab_test_manager.experiment.name} "
-                f"({len(ab_test_manager.experiment.variants)} variants)")
-        notifier.notify(f"STATUS=Active experiment: {ab_test_manager.experiment.name} ({len(ab_test_manager.experiment.variants)} variants).") # ADDED: sdnotify
-    else:
-        log.info("No active experiment - using fallback mode")
-        notifier.notify("STATUS=No active experiment - using fallback mode.") # ADDED: sdnotify
-    
-    conn = None
-    cur = None
-    
-    try:
-        conn = psycopg2.connect(PG_DSN)
-        conn.autocommit = True
-        cur = conn.cursor()
-        cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-        
-        log.info("A/B Testing worker ready - listening for notifications...")
-        notifier.notify(f"STATUS=Listening for notifications on {LISTEN_CHANNEL}...") # ADDED: sdnotify
-        
-        while True:
-            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each loop iteration
-
-            conn.poll()
-            while conn.notifies:
-                notify = conn.notifies.pop(0)
-                alert_id_str = notify.payload
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, (STATE_ENRICHED, batch_size))
+                alerts = cur.fetchall()
+                return [dict(alert) for alert in alerts]
                 
-                log.info(f"Received notification: channel='{notify.channel}', payload='{alert_id_str}'")
-                # update_heartbeat_file() # REMOVED: Replaced by sdnotify
+        except Exception as e:
+            log.error("Failed to fetch enriched alerts: %s", e)
+            return []
+    
+    def assign_prompt_type(self, alert_id: int, prompt_type: str) -> bool:
+        """Assign prompt type to alert and trigger LLM processing"""
+        self.ensure_connection()
+        
+        sql = """
+            UPDATE alerts
+            SET prompt_type = %s,
+                prompt_template = %s
+            WHERE id = %s
+              AND state = %s
+              AND prompt_type IS NULL
+        """
+        
+        try:
+            with self.conn.cursor() as cur:
+                # Use prompt_type as template identifier for now
+                cur.execute(sql, (prompt_type, prompt_type, alert_id, STATE_ENRICHED))
                 
-                try:
-                    alert_id = int(alert_id_str)
-                    processed_alert = process_alert_for_llm_with_testing(alert_id)
-                    
-                    if processed_alert:
-                        log.info(f"Alert {alert_id}: A/B testing processing complete")
-                        notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping after successful processing
-                    else:
-                        log.error(f"Alert {alert_id}: A/B testing processing failed")
-                        notifier.notify(f"STATUS=Error: A/B processing failed for alert {alert_id}. See logs.") # ADDED: sdnotify
+                if cur.rowcount == 0:
+                    log.warning("Alert %s was not updated (already processed or wrong state)", alert_id)
+                    return False
+                
+                # Notify LLM worker that prompt is assigned
+                cur.execute("SELECT pg_notify(%s, %s)", (NOTIFY_CHANNEL, str(alert_id)))
+                
+            log.debug("Assigned prompt type %s to alert %s", prompt_type, alert_id)
+            return True
+            
+        except Exception as e:
+            log.error("Failed to assign prompt type to alert %s: %s", alert_id, e)
+            return False
+    
+    def save_ab_test_metrics(self, metrics_data: Dict[str, Any]):
+        """Save A/B test metrics to database or file"""
+        # For now, save to a JSON file. In production, you might want a dedicated metrics table
+        try:
+            metrics_file = "/var/log/stackstorm/ab-test-metrics.jsonl"
+            os.makedirs(os.path.dirname(metrics_file), exist_ok=True)
+            
+            with open(metrics_file, 'a') as f:
+                f.write(json.dumps(metrics_data) + '\n')
+                
+        except Exception as e:
+            log.error("Failed to save A/B test metrics: %s", e)
+
+# ───── MAIN SERVICE LOGIC ─────────────────────────────────
+class PromptABTesterService:
+    """Main A/B testing service orchestrator"""
+    
+    def __init__(self):
+        self.shutdown = False
+        self.db = DatabaseManager(PG_DSN)
+        self.experiment_manager = ExperimentManager(EXPERIMENT_CONFIG_FILE)
+        self.stats = {
+            'assignments': 0,
+            'experiments_used': 0,
+            'defaults_used': 0
+        }
+        self.last_metrics_flush = time.time()
+        
+        # Signal handlers
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully"""
+        log.info("Received signal %d, initiating shutdown", signum)
+        self.shutdown = True
+        self._flush_metrics()
+        notifier.status("Shutting down gracefully")
+        notifier.stopping()
+        
+    def run(self):
+        """Main service loop"""
+        log.info("Prompt A/B Tester Service starting...")
+        notifier.ready()
+        notifier.status("Starting prompt A/B testing service")
+        
+        # Connect to database
+        try:
+            self.db.connect()
+        except Exception as e:
+            log.critical("Database connection failed: %s", e)
+            notifier.status("Database connection failed")
+            sys.exit(1)
+            
+        # Process any backlog
+        self._process_backlog()
+        
+        # Main event loop
+        self._run_event_loop()
+        
+    def _process_backlog(self):
+        """Process any alerts waiting for prompt assignment"""
+        log.info("Processing backlog...")
+        backlog_count = 0
+        
+        while not self.shutdown:
+            alerts = self.db.fetch_enriched_alerts(BATCH_SIZE)
+            if not alerts:
+                break
+                
+            for alert in alerts:
+                if self.shutdown:
+                    break
+                self._process_alert(alert)
+                backlog_count += 1
+                notifier.watchdog()
+                
+        if backlog_count > 0:
+            log.info("Processed %d alerts from backlog", backlog_count)
+            
+    def _run_event_loop(self):
+        """Main event loop with PostgreSQL LISTEN/NOTIFY"""
+        listen_conn = self.db.connect()
+        cursor = listen_conn.cursor()
+        cursor.execute(f"LISTEN {LISTEN_CHANNEL};")
+        
+        log.info("Listening for notifications on channel: %s", LISTEN_CHANNEL)
+        notifier.status(f"Listening on {LISTEN_CHANNEL}")
+        
+        while not self.shutdown:
+            notifier.watchdog()
+            
+            # Refresh config and flush metrics periodically
+            current_time = time.time()
+            if current_time - self.last_metrics_flush > METRICS_FLUSH_INTERVAL:
+                self.experiment_manager.refresh_config_if_needed()
+                self._flush_metrics()
+                
+            # Wait for notifications
+            if select.select([listen_conn], [], [], 5.0)[0]:
+                listen_conn.poll()
+                
+                # Process all pending notifications
+                while listen_conn.notifies:
+                    notify = listen_conn.notifies.pop(0)
+                    try:
+                        self._process_notification_batch()
+                    except Exception as e:
+                        log.exception("Error processing notification: %s", e)
                         
-                except ValueError:
-                    log.error(f"Invalid alert_id in notification: {alert_id_str}")
-                    notifier.notify(f"STATUS=Error: Invalid alert ID {alert_id_str} received.") # ADDED: sdnotify
-                except Exception as e:
-                    log.error(f"Error processing alert {alert_id_str}: {e}", exc_info=True)
-                    notifier.notify(f"STATUS=Error processing notification for alert {alert_id_str}. See logs.") # ADDED: sdnotify
+    def _process_notification_batch(self):
+        """Process a batch of alerts when notified"""
+        alerts = self.db.fetch_enriched_alerts(BATCH_SIZE)
+        
+        for alert in alerts:
+            if self.shutdown:
+                break
+            self._process_alert(alert)
+            notifier.watchdog()
             
-            # time.sleep(0.1) # REMOVED: Not strictly needed if watchdog is handled by sdnotify and select.select timeout
+    def _process_alert(self, alert: Dict[str, Any]):
+        """Process a single alert for prompt assignment"""
+        alert_id = alert['id']
+        
+        log.info("Processing alert %s for prompt assignment", alert_id)
+        
+        try:
+            # Select prompt variant
+            prompt_type, experiment_name = self.experiment_manager.select_prompt_variant(alert)
             
+            # Assign prompt type in database
+            if self.db.assign_prompt_type(alert_id, prompt_type):
+                # Record assignment metrics
+                self.experiment_manager.record_assignment(alert_id, prompt_type, experiment_name)
+                
+                self.stats['assignments'] += 1
+                if experiment_name:
+                    self.stats['experiments_used'] += 1
+                else:
+                    self.stats['defaults_used'] += 1
+                
+                log.info("Assigned prompt %s to alert %s (experiment: %s)", 
+                        prompt_type, alert_id, experiment_name or "default")
+            else:
+                log.warning("Failed to assign prompt to alert %s", alert_id)
+                
+        except Exception as e:
+            log.error("Failed to process alert %s: %s", alert_id, e)
+            
+    def _flush_metrics(self):
+        """Flush current metrics to storage"""
+        try:
+            metrics_summary = self.experiment_manager.get_metrics_summary()
+            metrics_summary['service_stats'] = self.stats.copy()
+            
+            self.db.save_ab_test_metrics(metrics_summary)
+            
+            log.info("A/B test metrics: assignments=%d, experiments=%d, defaults=%d",
+                    self.stats['assignments'], self.stats['experiments_used'], 
+                    self.stats['defaults_used'])
+            
+            notifier.status(f"Assignments: {self.stats['assignments']}, "
+                          f"Experiments: {self.stats['experiments_used']}")
+            
+            self.last_metrics_flush = time.time()
+            
+        except Exception as e:
+            log.error("Failed to flush metrics: %s", e)
+
+# ───── ENTRY POINT ─────────────────────────────────────
+def main():
+    """Service entry point"""
+    try:
+        service = PromptABTesterService()
+        service.run()
+    except KeyboardInterrupt:
+        log.info("Interrupted by user")
     except Exception as e:
-        log.critical(f"Critical error in listener: {e}", exc_info=True)
-        notifier.notify(f"STATUS=CRITICAL ERROR in listener: {e}. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
+        log.critical("Fatal error: %s", e, exc_info=True)
+        notifier.status(f"Fatal error: {e}")
         sys.exit(1)
     finally:
-        if conn:
-            if cur:
-                cur.close()
-            conn.close()
-
-# --- Main Function ---
-def main():
-    """Main entry point for the A/B testing worker"""
-    log.info("=== Starting Delphi Prompt A/B Testing Worker ===")
-    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
-    notifier.notify("STATUS=Starting A/B Testing Worker...")
-    
-    # Validate dependencies
-    if psycopg2 is None:
-        log.critical("psycopg2 module not available")
-        notifier.notify("STATUS=FATAL: 'psycopg2' module not available. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-    
-    if requests is None:
-        log.critical("requests module not available")
-        notifier.notify("STATUS=FATAL: 'requests' module not available. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-    
-    # Test database connection
-    try:
-        test_conn = psycopg2.connect(PG_DSN, connect_timeout=5)
-        test_conn.close()
-        log.info("Database connection test: SUCCESS")
-        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after successful DB connection
-        notifier.notify("STATUS=Database connection successful.")
-    except Exception as e:
-        log.critical(f"Database connection test: FAILED - {e}")
-        notifier.notify(f"STATUS=FATAL: Database connection failed: {e}. Exiting.") # ADDED: sdnotify
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-    
-    # Test prompts directory
-    if os.path.isdir(SYSTEM_PROMPTS_DIR):
-        prompt_files = list(Path(SYSTEM_PROMPTS_DIR).glob("*.txt"))
-        log.info(f"Found {len(prompt_files)} prompt files in {SYSTEM_PROMPTS_DIR}")
-        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after prompt directory check
-        notifier.notify(f"STATUS=Loaded {len(prompt_files)} prompt files.")
-    else:
-        log.warning(f"Prompts directory not found: {SYSTEM_PROMPTS_DIR}")
-        notifier.notify(f"STATUS=Warning: Prompts directory {SYSTEM_PROMPTS_DIR} not found.")
-
-    # Log experiment summary
-    if ab_test_manager.experiment:
-        metrics_summary = ab_test_manager.get_metrics_summary()
-        log.info(f"Experiment status: {json.dumps(metrics_summary, indent=2)}")
-        notifier.notify(f"STATUS=Experiment '{ab_test_manager.experiment.name}' active: {ab_test_manager.experiment.is_active()}.") # ADDED: sdnotify
-    else:
-        log.info("No active experiment - using fallback mode")
-        notifier.notify("STATUS=No active experiment - using fallback mode.")
-
-    # Initial heartbeat (REMOVED: Replaced by sdnotify)
-    # update_heartbeat_file() 
-    
-    # Start listening
-    listen_for_enriched_alerts()
-
-    log.info("=== Delphi Prompt A/B Testing Worker Shutting Down ===")
-    notifier.notify("STATUS=Shutting down gracefully.") # ADDED: Final status update
-    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
+        log.info("Prompt A/B Tester Service stopped")
+        notifier.stopping()
 
 if __name__ == "__main__":
     main()

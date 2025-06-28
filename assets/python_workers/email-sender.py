@@ -4,6 +4,14 @@
 """
 Email Sender Worker - Final stage of the Delphi pipeline
 Sends formatted security alerts via SMTP with intelligent routing
+
+IMPROVEMENTS:
+- Fixed state transition logic for failed alerts
+- Aligned environment variables with .env template
+- Added missing imports and proper error handling
+- Implemented circuit breaker pattern for SMTP failures
+- Enhanced batch processing and connection management
+- Added comprehensive monitoring and health checks
 """
 import os
 import sys
@@ -15,7 +23,8 @@ import json
 import smtplib
 import psycopg2
 import psycopg2.extensions
-from datetime import datetime, timezone
+import psycopg2.extras  # FIXED: Added missing import
+from datetime import datetime, timezone, timedelta
 from logging.handlers import RotatingFileHandler
 from typing import Dict, Any, Optional, List, Tuple
 from email.mime.text import MIMEText
@@ -35,7 +44,6 @@ except ImportError:
     sdnotify = None
 
 # ───── CONFIGURATION CLASSES ─────────────────────────────
-# Using dataclasses for better configuration management
 @dataclass
 class SMTPConfig:
     """SMTP configuration with validation"""
@@ -77,6 +85,49 @@ class AlertPriority(Enum):
         else:
             return cls.LOW
 
+class CircuitBreaker:
+    """Circuit breaker pattern for SMTP failures"""
+    def __init__(self, failure_threshold: int = 5, timeout: int = 300):
+        self.failure_threshold = failure_threshold
+        self.timeout = timeout
+        self.failure_count = 0
+        self.last_failure = None
+        self.state = "closed"  # closed, open, half-open
+        
+    def call(self, func, *args, **kwargs):
+        """Execute function with circuit breaker protection"""
+        if self.state == "open":
+            if self.last_failure and (time.time() - self.last_failure) > self.timeout:
+                self.state = "half-open"
+                log.info("Circuit breaker transitioning to half-open")
+            else:
+                raise Exception("Circuit breaker is open - SMTP temporarily disabled")
+                
+        try:
+            result = func(*args, **kwargs)
+            if self.state == "half-open":
+                self.reset()
+            return result
+        except Exception as e:
+            self.record_failure()
+            raise e
+            
+    def record_failure(self):
+        """Record a failure and potentially open the circuit"""
+        self.failure_count += 1
+        self.last_failure = time.time()
+        
+        if self.failure_count >= self.failure_threshold:
+            self.state = "open"
+            log.error("Circuit breaker opened after %d failures", self.failure_count)
+            
+    def reset(self):
+        """Reset the circuit breaker to closed state"""
+        self.failure_count = 0
+        self.last_failure = None
+        self.state = "closed"
+        log.info("Circuit breaker reset to closed state")
+
 # ───── ENVIRONMENT SETUP ─────────────────────────────────
 # Load environment variables with clear naming
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
@@ -87,15 +138,15 @@ if not PG_DSN:
     print("FATAL: PG_DSN environment variable is required", file=sys.stderr)
     sys.exit(1)
 
-# SMTP configuration with consistent naming
+# FIXED: SMTP configuration aligned with .env template
 smtp_config = SMTPConfig(
-    host=os.getenv("SMTP_HOST", "localhost"),
-    port=int(os.getenv("SMTP_PORT", "587")),
-    user=os.getenv("SMTP_USER", ""),
-    password=os.getenv("SMTP_PASSWORD", ""),
-    use_tls=os.getenv("SMTP_USE_TLS", "true").lower() == "true",
-    from_email=os.getenv("SMTP_FROM", "alerts@example.com"),
-    from_name=os.getenv("SMTP_FROM_NAME", "Delphi Security Alerts")
+    host=os.getenv("MAILCOW_SMTP_HOST", "localhost"),
+    port=int(os.getenv("MAILCOW_SMTP_PORT", "587")),
+    user=os.getenv("MAILCOW_SMTP_USER", ""),
+    password=os.getenv("MAILCOW_SMTP_PASS", ""),
+    use_tls=os.getenv("MAILCOW_USE_TLS", "true").lower() == "true",
+    from_email=os.getenv("MAILCOW_FROM", "alerts@example.com"),
+    from_name=os.getenv("MAILCOW_FROM_NAME", "Delphi Security Alerts")
 )
 
 # Validate configuration
@@ -104,14 +155,16 @@ if config_errors:
     print(f"FATAL: Configuration errors: {'; '.join(config_errors)}", file=sys.stderr)
     sys.exit(1)
 
-# Pipeline configuration
+# Pipeline configuration - matches schema.sql notification channels
 LISTEN_CHANNEL = "alert_formatted"
-STATE_FORMATTED = "formatted"  # This should match your actual state enum
+STATE_FORMATTED = "formatted"
 STATE_SENT = "sent"
+STATE_FAILED = "failed"  # ADDED: Explicit failed state
 
 # Email routing configuration
-DEFAULT_RECIPIENTS = os.getenv("DEFAULT_RECIPIENTS", "").split(",")
-CRITICAL_RECIPIENTS = os.getenv("CRITICAL_RECIPIENTS", "").split(",")
+DEFAULT_RECIPIENTS = [r.strip() for r in os.getenv("MAILCOW_TO", "").split(",") if r.strip()]
+CRITICAL_RECIPIENTS = [r.strip() for r in os.getenv("CRITICAL_RECIPIENTS", "").split(",") if r.strip()]
+SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "")
 BUSINESS_HOURS_START = int(os.getenv("BUSINESS_HOURS_START", "9"))
 BUSINESS_HOURS_END = int(os.getenv("BUSINESS_HOURS_END", "17"))
 
@@ -193,46 +246,55 @@ class IntelligentEmailSender:
     
     def __init__(self, config: SMTPConfig):
         self.config = config
+        self.circuit_breaker = CircuitBreaker()
         self.stats = {
             "sent": 0,
             "failed": 0,
-            "retried": 0
+            "retried": 0,
+            "circuit_breaker_opens": 0
         }
         
     def determine_recipients(self, alert_data: Dict[str, Any]) -> List[str]:
         """
         Intelligently determine recipients based on alert characteristics
         
-        This is where you implement your routing logic:
+        This implements your routing logic based on:
         - Rule severity mapping
-        - Time-based routing
-        - Team assignments
+        - Time-based routing  
+        - Agent characteristics
         - Escalation paths
         """
         recipients = set()
         
         # Always include default recipients
-        recipients.update(r.strip() for r in DEFAULT_RECIPIENTS if r.strip())
+        recipients.update(DEFAULT_RECIPIENTS)
         
         # Add critical recipients for high-severity alerts
         priority = AlertPriority.from_rule_level(alert_data.get('rule_level', 0))
         if priority in [AlertPriority.HIGH, AlertPriority.CRITICAL]:
-            recipients.update(r.strip() for r in CRITICAL_RECIPIENTS if r.strip())
+            recipients.update(CRITICAL_RECIPIENTS)
         
-        # Time-based routing example
+        # Time-based routing - different teams for different hours
         current_hour = datetime.now().hour
         if not (BUSINESS_HOURS_START <= current_hour < BUSINESS_HOURS_END):
-            # Outside business hours - you might want different recipients
+            # Outside business hours - add on-call if configured
             on_call_email = os.getenv("ON_CALL_EMAIL")
             if on_call_email:
                 recipients.add(on_call_email)
         
-        # Agent-based routing example
-        agent_name = alert_data.get('agent_name', '')
-        if 'production' in agent_name.lower():
+        # Agent-based routing - production systems get special attention
+        agent_name = alert_data.get('agent_name', '').lower()
+        if any(keyword in agent_name for keyword in ['production', 'prod', 'critical']):
             prod_team_email = os.getenv("PRODUCTION_TEAM_EMAIL")
             if prod_team_email:
                 recipients.add(prod_team_email)
+        
+        # Rule-based routing - certain rules go to specialized teams
+        rule_id = alert_data.get('rule_id', 0)
+        if rule_id in range(87000, 88000):  # Example: malware detection rules
+            malware_team = os.getenv("MALWARE_TEAM_EMAIL")
+            if malware_team:
+                recipients.add(malware_team)
         
         # Validate and limit recipients
         valid_recipients = [r for r in recipients if self._is_valid_email(r)]
@@ -240,17 +302,29 @@ class IntelligentEmailSender:
             log.warning("Limiting recipients from %d to %d", 
                        len(valid_recipients), MAX_RECIPIENTS)
             valid_recipients = valid_recipients[:MAX_RECIPIENTS]
+        
+        # Always include support email for critical alerts
+        if priority == AlertPriority.CRITICAL and SUPPORT_EMAIL:
+            if self._is_valid_email(SUPPORT_EMAIL) and SUPPORT_EMAIL not in valid_recipients:
+                valid_recipients.append(SUPPORT_EMAIL)
             
         return valid_recipients
     
     def _is_valid_email(self, email: str) -> bool:
-        """Basic email validation"""
-        return bool(email and '@' in email and '.' in email.split('@')[1])
+        """Enhanced email validation"""
+        if not email or not isinstance(email, str):
+            return False
+        if '@' not in email:
+            return False
+        local, domain = email.split('@', 1)
+        if not local or not domain or '.' not in domain:
+            return False
+        return True
     
     def send_email(self, alert_data: Dict[str, Any], 
                    recipients: List[str]) -> Tuple[bool, Optional[str]]:
         """
-        Send email with proper error handling and monitoring
+        Send email with circuit breaker protection and proper error handling
         
         Returns:
             Tuple of (success: bool, error_message: Optional[str])
@@ -259,64 +333,71 @@ class IntelligentEmailSender:
             return False, "No valid recipients"
             
         formatted_data = alert_data.get('formatted_data', {})
-        subject = formatted_data.get('subject', 'Delphi Security Alert')
+        if not formatted_data:
+            return False, "No formatted data available"
+            
+        subject = formatted_data.get('subject', f"Delphi Security Alert - Rule {alert_data.get('rule_id', 'Unknown')}")
         html_body = formatted_data.get('html_body', '')
         plain_body = formatted_data.get('plain_body', '')
         
-        # Create message with proper headers
+        if not html_body and not plain_body:
+            return False, "No email content available"
+        
+        # Create message with comprehensive headers
+        msg = self._create_message(alert_data, recipients, subject, html_body, plain_body)
+        
+        # Send with circuit breaker protection
+        try:
+            self.circuit_breaker.call(self._send_via_smtp, msg, recipients)
+            self.stats['sent'] += 1
+            log.info("Email sent successfully for alert %s to %d recipients",
+                    alert_data.get('id'), len(recipients))
+            return True, None
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Circuit breaker is open" in error_msg:
+                self.stats['circuit_breaker_opens'] += 1
+                return False, "SMTP service temporarily unavailable"
+            else:
+                self.stats['failed'] += 1
+                return False, error_msg
+    
+    def _create_message(self, alert_data: Dict[str, Any], recipients: List[str], 
+                       subject: str, html_body: str, plain_body: str) -> MIMEMultipart:
+        """Create properly formatted email message"""
         msg = MIMEMultipart('alternative')
         msg['Subject'] = subject
         msg['From'] = formataddr((self.config.from_name, self.config.from_email))
         msg['To'] = ', '.join(recipients)
+        
+        # Headers for tracking and filtering
         msg['X-Alert-ID'] = str(alert_data.get('id', 'unknown'))
         msg['X-Alert-Priority'] = AlertPriority.from_rule_level(
             alert_data.get('rule_level', 0)
         ).value
+        msg['X-Alert-Rule-ID'] = str(alert_data.get('rule_id', 'unknown'))
+        msg['X-Agent-Name'] = alert_data.get('agent_name', 'unknown')
         
-        # Add message ID for tracking
-        msg['Message-ID'] = f"<alert-{alert_data.get('id')}@{self.config.host}>"
+        # Message ID for tracking
+        timestamp = int(time.time())
+        msg['Message-ID'] = f"<alert-{alert_data.get('id', 'unknown')}-{timestamp}@delphi.security>"
         
-        # Attach parts
+        # Add reply-to if support email is configured
+        if SUPPORT_EMAIL:
+            msg['Reply-To'] = SUPPORT_EMAIL
+        
+        # Attach content parts
         if plain_body:
             msg.attach(MIMEText(plain_body, 'plain', 'utf-8'))
         if html_body:
             msg.attach(MIMEText(html_body, 'html', 'utf-8'))
             
-        # Send with connection pooling and retry logic
-        for attempt in range(RETRY_ATTEMPTS):
-            try:
-                self._send_via_smtp(msg, recipients)
-                self.stats['sent'] += 1
-                log.info("Email sent successfully for alert %s to %d recipients",
-                        alert_data.get('id'), len(recipients))
-                return True, None
-                
-            except smtplib.SMTPAuthenticationError as e:
-                error = f"SMTP authentication failed: {e}"
-                log.error(error)
-                return False, error  # Don't retry auth failures
-                
-            except smtplib.SMTPRecipientsRefused as e:
-                error = f"Recipients refused: {e}"
-                log.error(error)
-                return False, error  # Don't retry recipient issues
-                
-            except Exception as e:
-                error = f"Send attempt {attempt + 1} failed: {e}"
-                log.warning(error)
-                self.stats['retried'] += 1
-                
-                if attempt < RETRY_ATTEMPTS - 1:
-                    time.sleep(RETRY_DELAY * (attempt + 1))  # Exponential backoff
-                else:
-                    self.stats['failed'] += 1
-                    return False, error
-                    
-        return False, "Max retry attempts exceeded"
+        return msg
     
     def _send_via_smtp(self, msg: MIMEMultipart, recipients: List[str]):
         """Send message via SMTP with proper connection handling"""
-        with smtplib.SMTP(self.config.host, self.config.port) as server:
+        with smtplib.SMTP(self.config.host, self.config.port, timeout=30) as server:
             server.set_debuglevel(0)  # Set to 1 for SMTP debugging
             
             if self.config.use_tls:
@@ -374,21 +455,26 @@ class DatabaseManager:
         """Fetch batch of alerts ready for sending"""
         self.ensure_connection()
         
-        # Note: You'll need to adjust this query based on your actual state names
+        # Query aligned with schema.sql structure
         sql = """
             SELECT
                 a.id,
                 a.alert_hash,
+                a.rule_id,
                 a.rule_level,
+                a.rule_desc,
                 a.formatted_data,
                 a.formatted_at,
                 a.email_retry_count,
+                a.ingest_timestamp,
                 ag.name as agent_name,
-                ag.ip as agent_ip
+                ag.ip as agent_ip,
+                ag.os as agent_os
             FROM alerts a
             JOIN agents ag ON ag.id = a.agent_id
             WHERE a.state = %s
               AND (a.email_retry_count IS NULL OR a.email_retry_count < %s)
+              AND a.archived_at IS NULL
             ORDER BY a.rule_level DESC, a.formatted_at ASC
             LIMIT %s
             FOR UPDATE SKIP LOCKED
@@ -399,7 +485,7 @@ class DatabaseManager:
                 cur.execute(sql, (STATE_FORMATTED, RETRY_ATTEMPTS, batch_size))
                 alerts = cur.fetchall()
                 
-                # Parse JSON fields
+                # Parse JSON fields safely
                 for alert in alerts:
                     if isinstance(alert.get('formatted_data'), str):
                         try:
@@ -409,7 +495,7 @@ class DatabaseManager:
                                        alert['id'])
                             alert['formatted_data'] = {}
                             
-                return alerts
+                return [dict(alert) for alert in alerts]
                 
         except Exception as e:
             log.error("Failed to fetch alerts: %s", e)
@@ -430,31 +516,64 @@ class DatabaseManager:
         try:
             with self.conn.cursor() as cur:
                 cur.execute(sql, (STATE_SENT, json.dumps(recipients), alert_id))
-            log.debug("Alert %s marked as sent", alert_id)
+            log.debug("Alert %s marked as sent to %d recipients", alert_id, len(recipients))
         except Exception as e:
             log.error("Failed to mark alert %s as sent: %s", alert_id, e)
             
-    def mark_alert_failed(self, alert_id: int, error_message: str):
-        """Record email sending failure"""
+    def mark_alert_failed(self, alert_id: int, error_message: str, is_final: bool = False):
+        """FIXED: Record email sending failure with proper state management"""
         self.ensure_connection()
         
-        sql = """
+        # First update: increment retry count and record error
+        sql_update_error = """
             UPDATE alerts
             SET email_error = %s,
                 email_retry_count = COALESCE(email_retry_count, 0) + 1
             WHERE id = %s
+            RETURNING email_retry_count
         """
         
         try:
             with self.conn.cursor() as cur:
-                cur.execute(sql, (error_message[:500], alert_id))  # Limit error length
-            log.debug("Alert %s marked as failed: %s", alert_id, error_message)
+                cur.execute(sql_update_error, (error_message[:500], alert_id))
+                result = cur.fetchone()
+                retry_count = result[0] if result else 0
+                
+                # If we've exhausted retries OR this is marked as final, transition to failed
+                if retry_count >= RETRY_ATTEMPTS or is_final:
+                    sql_fail = """
+                        UPDATE alerts
+                        SET state = %s
+                        WHERE id = %s
+                    """
+                    cur.execute(sql_fail, (STATE_FAILED, alert_id))
+                    log.error("Alert %s transitioned to failed state after %d attempts: %s", 
+                             alert_id, retry_count, error_message)
+                else:
+                    log.warning("Alert %s failed (attempt %d/%d): %s", 
+                               alert_id, retry_count, RETRY_ATTEMPTS, error_message)
+                    
         except Exception as e:
             log.error("Failed to record error for alert %s: %s", alert_id, e)
+    
+    def get_pipeline_health(self) -> Dict[str, Any]:
+        """Get current pipeline health metrics"""
+        self.ensure_connection()
+        
+        sql = "SELECT * FROM pipeline_health WHERE state = %s"
+        
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, (STATE_FORMATTED,))
+                result = cur.fetchone()
+                return dict(result) if result else {}
+        except Exception as e:
+            log.warning("Failed to get pipeline health: %s", e)
+            return {}
 
 # ───── MAIN SERVICE LOGIC ─────────────────────────────────
 class EmailSenderService:
-    """Main service orchestrator"""
+    """Main service orchestrator with enhanced monitoring"""
     
     def __init__(self):
         self.shutdown = False
@@ -462,6 +581,8 @@ class EmailSenderService:
         self.sender = IntelligentEmailSender(smtp_config)
         self.stats_report_interval = 300  # Report stats every 5 minutes
         self.last_stats_report = time.time()
+        self.health_check_interval = 60  # Check health every minute
+        self.last_health_check = time.time()
         
         # Signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -475,29 +596,34 @@ class EmailSenderService:
         notifier.stopping()
         
     def run(self):
-        """Main service loop with batch processing"""
+        """Main service loop with comprehensive startup checks"""
         log.info("Email Sender Service starting...")
+        log.info("Configuration: Host=%s, Port=%d, TLS=%s", 
+                smtp_config.host, smtp_config.port, smtp_config.use_tls)
+        
         notifier.ready()
         notifier.status(f"Connected to {smtp_config.host}:{smtp_config.port}")
         
-        # Test SMTP connection
-        try:
-            self.sender._send_via_smtp(
-                self._create_test_message(),
-                [smtp_config.from_email]
-            )
-            log.info("SMTP test successful")
-        except Exception as e:
-            log.critical("SMTP test failed: %s", e)
-            notifier.status("SMTP test failed - check configuration")
-            sys.exit(1)
-            
-        # Connect to database
+        # Test database connection
         try:
             self.db.connect()
+            log.info("Database connection successful")
         except Exception as e:
             log.critical("Database connection failed: %s", e)
             notifier.status("Database connection failed")
+            sys.exit(1)
+        
+        # Test SMTP connection (but don't send actual email)
+        try:
+            with smtplib.SMTP(smtp_config.host, smtp_config.port, timeout=10) as server:
+                if smtp_config.use_tls:
+                    server.starttls()
+                if smtp_config.user and smtp_config.password:
+                    server.login(smtp_config.user, smtp_config.password)
+            log.info("SMTP connection test successful")
+        except Exception as e:
+            log.critical("SMTP connection test failed: %s", e)
+            notifier.status("SMTP test failed - check configuration")
             sys.exit(1)
             
         # Process any backlog
@@ -505,15 +631,6 @@ class EmailSenderService:
         
         # Main event loop
         self._run_event_loop()
-        
-    def _create_test_message(self) -> MIMEMultipart:
-        """Create a test message for SMTP validation"""
-        msg = MIMEMultipart()
-        msg['Subject'] = "Delphi Email Sender - Test Message"
-        msg['From'] = formataddr((smtp_config.from_name, smtp_config.from_email))
-        msg['To'] = smtp_config.from_email
-        msg.attach(MIMEText("This is a test message from Delphi Email Sender", 'plain'))
-        return msg
         
     def _process_backlog(self):
         """Process any queued alerts on startup"""
@@ -526,6 +643,8 @@ class EmailSenderService:
                 break
                 
             for alert in alerts:
+                if self.shutdown:
+                    break
                 self._process_alert(alert)
                 backlog_count += 1
                 notifier.watchdog()
@@ -545,9 +664,13 @@ class EmailSenderService:
         while not self.shutdown:
             notifier.watchdog()
             
-            # Report statistics periodically
-            if time.time() - self.last_stats_report > self.stats_report_interval:
+            # Periodic health and stats reporting
+            current_time = time.time()
+            if current_time - self.last_stats_report > self.stats_report_interval:
                 self._report_statistics()
+                
+            if current_time - self.last_health_check > self.health_check_interval:
+                self._check_health()
                 
             # Wait for notifications with timeout
             if select.select([listen_conn], [], [], 5.0)[0]:
@@ -557,7 +680,6 @@ class EmailSenderService:
                 while listen_conn.notifies:
                     notify = listen_conn.notifies.pop(0)
                     try:
-                        # Process batch instead of single alert
                         self._process_notification_batch()
                     except Exception as e:
                         log.exception("Error processing notification: %s", e)
@@ -573,36 +695,76 @@ class EmailSenderService:
             notifier.watchdog()
             
     def _process_alert(self, alert: Dict[str, Any]):
-        """Process a single alert"""
+        """Process a single alert with comprehensive error handling"""
         alert_id = alert['id']
-        log.info("Processing alert %s (level %d)", alert_id, alert['rule_level'])
+        log.info("Processing alert %s (rule %d, level %d)", 
+                alert_id, alert.get('rule_id', 0), alert['rule_level'])
         
-        # Determine recipients
+        # Determine recipients using intelligent routing
         recipients = self.sender.determine_recipients(alert)
         if not recipients:
-            log.warning("No recipients for alert %s", alert_id)
-            self.db.mark_alert_failed(alert_id, "No recipients configured")
+            log.warning("No recipients determined for alert %s", alert_id)
+            self.db.mark_alert_failed(alert_id, "No recipients configured", is_final=True)
             return
             
-        # Send email
+        # Send email with proper error classification
         success, error = self.sender.send_email(alert, recipients)
         
         if success:
             self.db.mark_alert_sent(alert_id, recipients)
+            log.info("Alert %s sent successfully to %d recipients", alert_id, len(recipients))
         else:
-            self.db.mark_alert_failed(alert_id, error or "Unknown error")
+            # Classify error types for appropriate handling
+            is_final = self._is_final_error(error)
+            self.db.mark_alert_failed(alert_id, error or "Unknown error", is_final)
+            
+    def _is_final_error(self, error: str) -> bool:
+        """Determine if an error should cause immediate failure (no retries)"""
+        if not error:
+            return False
+            
+        final_error_patterns = [
+            "authentication failed",
+            "recipients refused",
+            "No recipients configured",
+            "No formatted data available",
+            "No email content available",
+            "temporarily unavailable"  # Circuit breaker
+        ]
+        
+        return any(pattern in error.lower() for pattern in final_error_patterns)
+            
+    def _check_health(self):
+        """Perform health checks and report status"""
+        try:
+            health = self.db.get_pipeline_health()
+            if health:
+                count = health.get('count', 0)
+                health_status = health.get('health_status', 'Unknown')
+                notifier.status(f"Health: {health_status}, Pending: {count}")
+                
+                if health_status == 'ATTENTION NEEDED':
+                    log.warning("Pipeline health needs attention: %d alerts pending", count)
+                    
+            self.last_health_check = time.time()
+        except Exception as e:
+            log.warning("Health check failed: %s", e)
             
     def _report_statistics(self):
-        """Report service statistics"""
+        """Report comprehensive service statistics"""
         stats = self.sender.get_stats()
-        log.info("Email statistics: sent=%d, failed=%d, retried=%d",
-                stats['sent'], stats['failed'], stats['retried'])
-        notifier.status(f"Sent: {stats['sent']}, Failed: {stats['failed']}")
+        circuit_breaker_state = self.sender.circuit_breaker.state
+        
+        log.info("Email statistics: sent=%d, failed=%d, retried=%d, cb_opens=%d, cb_state=%s",
+                stats['sent'], stats['failed'], stats['retried'], 
+                stats['circuit_breaker_opens'], circuit_breaker_state)
+        
+        notifier.status(f"Sent: {stats['sent']}, Failed: {stats['failed']}, CB: {circuit_breaker_state}")
         self.last_stats_report = time.time()
 
 # ───── ENTRY POINT ─────────────────────────────────────
 def main():
-    """Service entry point"""
+    """Service entry point with comprehensive error handling"""
     try:
         service = EmailSenderService()
         service.run()

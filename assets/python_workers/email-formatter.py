@@ -2,7 +2,17 @@
 # /usr/local/bin/email-formatter.py
 # stanley:stanley 0750
 """
-Email Formatter Worker - Formats structured alert data into HTML/plain text emails
+Email Formatter Worker - Phase 5 of Delphi Pipeline
+Formats structured alert data into professional HTML/plain text emails
+
+IMPROVEMENTS:
+- Fixed state case sensitivity to match schema.sql ('structured' not 'STRUCTURED')
+- Simplified template system focused on actual LLM response formats
+- Added proper handling for ISOBAR, Delphi Notify, and Brief formats
+- Enhanced error handling and recovery
+- Improved database schema alignment
+- Added comprehensive monitoring and health checks
+- Streamlined systemd integration
 """
 import os
 import sys
@@ -12,75 +22,86 @@ import signal
 import logging
 import json
 import html as html_lib
-import psycopg2 # Pylance: If this import cannot be resolved, ensure psycopg2-binary is installed
+import psycopg2
 import psycopg2.extensions
+import psycopg2.extras
 from string import Template
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
-from typing import Dict, Any, Optional, Tuple
-from abc import ABC, abstractmethod
+from typing import Dict, Any, Optional, Tuple, List
+from dataclasses import dataclass
+from enum import Enum
 
-# Pylance: If 'load_dotenv' is an unknown import symbol, ensure python-dotenv is installed.
-# The try-except handles runtime, but Pylance needs to see it defined statically.
 try:
     from dotenv import load_dotenv
 except ModuleNotFoundError:
     def load_dotenv(*_a, **_kw): pass
 
 try:
-    from psycopg2.extras import RealDictCursor
-except ImportError:
-    logging.error("Required dependency 'psycopg2' not found. Please install it using: pip install psycopg2-binary")
-    sys.exit(1)
-
-# Pylance: If 'pytz' could not be resolved, ensure pytz is installed.
-try:
     import pytz
 except ModuleNotFoundError:
-    logging.warning("Pytz module not found. Timezone conversions might be limited. Please install it using: pip install pytz")
-    pytz = None # Set pytz to None if not found, to handle gracefully
+    logging.warning("pytz not found - timezone conversions will be limited")
+    pytz = None
 
-# --- Import sdnotify for Systemd Watchdog Integration ---
 try:
-    import sdnotify # ADDED: Import sdnotify
+    import sdnotify
 except ImportError:
-    # Fallback for systems without sdnotify
     sdnotify = None
-    print("WARNING: sdnotify module not found. Systemd watchdog integration will be disabled.")
 
 # ───── CONFIGURATION ─────────────────────────────────────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 
+# Environment validation
 REQUIRED_ENV = ["PG_DSN"]
-_missing = [var for var in REQUIRED_ENV if not os.getenv(var)]
-if _missing:
-    print(f"FATAL: Missing environment variables: {', '.join(_missing)}", file=sys.stderr)
-    if sdnotify:
-        notifier.notify(f"STATUS=FATAL: Missing environment variables: {', '.join(_missing)}. Exiting.") # ADDED: sdnotify on missing env vars
-        notifier.notify("STOPPING=1")
+missing_vars = [var for var in REQUIRED_ENV if not os.getenv(var)]
+if missing_vars:
+    print(f"FATAL: Missing environment variables: {', '.join(missing_vars)}", file=sys.stderr)
     sys.exit(1)
 
 PG_DSN = os.getenv("PG_DSN", "").strip()
-LISTEN_CHANNEL = "alert_structured"    # Channel for alerts needing formatting
-NOTIFY_CHANNEL = "alert_formatted"     # Channel to notify when done
 
-# Template configuration
-TEMPLATE_TYPE = os.getenv("DELPHI_EMAIL_TEMPLATE_TYPE", "file")
-TEMPLATE_PATH = os.getenv("DELPHI_EMAIL_TEMPLATE_PATH", "/opt/stackstorm/packs/delphi/email.html")
+# Pipeline configuration - FIXED: Aligned with schema.sql notification channels
+LISTEN_CHANNEL = "alert_structured"
+NOTIFY_CHANNEL = "alert_formatted"
+STATE_STRUCTURED = "structured"  # FIXED: Lowercase to match schema.sql enum
+STATE_FORMATTED = "formatted"
+
+# Template and formatting configuration
 TIMEZONE = os.getenv("DELPHI_TIMEZONE", "Australia/Perth")
 SUPPORT_EMAIL = os.getenv("SUPPORT_EMAIL", "support@cybermonkey.net.au")
+ORGANIZATION_NAME = os.getenv("ORGANIZATION_NAME", "Delphi Security")
+BRAND_COLOR = os.getenv("BRAND_COLOR", "#2c3e50")
+
+# Performance configuration
+BATCH_SIZE = int(os.getenv("FORMATTER_BATCH_SIZE", "5"))
+MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", "50000"))  # Prevent massive emails
+
+class PromptType(Enum):
+    """Supported prompt types for specialized formatting"""
+    ISOBAR = "security_analysis"
+    DELPHI_NOTIFY = "delphi_notify_short"
+    DELPHI_BRIEF = "delphi_notify_brief"
+    EXECUTIVE = "executive_summary"
+    INVESTIGATION = "investigation_guide"
+    HYBRID = "hybrid"
+    CUSTOM = "custom"
 
 # ───── LOGGER SETUP ─────────────────────────────────────
 def setup_logging() -> logging.Logger:
+    """Configure structured logging"""
     logger = logging.getLogger("email-formatter")
     logger.setLevel(logging.INFO)
 
     handler = RotatingFileHandler(
         "/var/log/stackstorm/email-formatter.log",
-        maxBytes=5 * 1024 * 1024,
-        backupCount=3
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5
     )
-    fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s", "%Y-%m-%d %H:%M:%S")
+    
+    fmt = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(funcName)s:%(lineno)d - %(message)s",
+        "%Y-%m-%d %H:%M:%S"
+    )
     handler.setFormatter(fmt)
     logger.addHandler(handler)
 
@@ -93,688 +114,732 @@ def setup_logging() -> logging.Logger:
 
 log = setup_logging()
 
-# --- Initialize Systemd Notifier ---
-if sdnotify:
-    notifier = sdnotify.SystemdNotifier() # ADDED: Initialize sdnotify notifier
-else:
-    class DummyNotifier: # Dummy class if sdnotify isn't available
-        def notify(self, message):
-            pass
-    notifier = DummyNotifier()
-
-
-# ───── EMAIL TEMPLATE CLASSES ─────────────────────────────────────
-class EmailTemplate(ABC):
-    """Abstract base class for email templates"""
-
-    @abstractmethod
-    def format_html(self, data: Dict[str, Any]) -> str:
-        """Format data as HTML"""
-        pass
-
-    @abstractmethod
-    def format_plain(self, data: Dict[str, Any]) -> str:
-        """Format data as plain text"""
-        pass
-
-
-class FileBasedTemplate(EmailTemplate):
-    """Template that loads from an HTML file"""
-
-    def __init__(self, template_path: str, fallback_html: Optional[str] = None):
-        """Initialize with template file path"""
-        self.template = self._load_template(template_path, fallback_html)
-
-    def _load_template(self, path: str, fallback: Optional[str]) -> Template:
-        """Load template from file with fallback"""
-        try:
-            with open(path, encoding="utf-8") as f:
-                return Template(f.read())
-        except (FileNotFoundError, PermissionError) as e:
-            log.warning("Could not load template from %r: %s", path, e)
-            if fallback:
-                return Template(fallback)
-            else:
-                # Default minimal template
-                log.warning("Using default minimal HTML template as no file was found and no fallback was provided.")
-                return Template("""<!DOCTYPE html>
-<html>
-<head><title>$subject</title></head>
-<body>
-<h1>$subject</h1>
-<div>$body</div>
-<hr>
-<p>Sent at: $sent_at | Alert ID: $alert_id</p>
-</body>
-</html>""")
-
-    def format_html(self, data: Dict[str, Any]) -> str:
-        """Format using the HTML template"""
-        # Build the body content
-        body_html = self._build_body_html(
-            data.get('sections', {}),
-            data.get('agent_info', {})
-        )
-
-        # Get metadata
-        metadata = data.get('metadata', {})
-
-        # Format timestamp
-        timestamp = metadata.get('timestamp')
-        if timestamp:
-            try:
-                # Use pytz only if it was successfully imported
-                if pytz:
-                    tz = pytz.timezone(TIMEZONE)
-                    if isinstance(timestamp, str):
-                        # Ensure string timestamp is parsed as UTC if it lacks timezone info
-                        if timestamp.endswith('Z'):
-                            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                        elif '+' not in timestamp and '-' not in timestamp[-6:]: # Simple check for offset presence
-                             timestamp = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc) # Assume UTC if no tzinfo
-                        else:
-                            timestamp = datetime.fromisoformat(timestamp)
-                    sent_at = timestamp.astimezone(tz).strftime("%A, %d %B %Y %I:%M %p AWST")
-                else:
-                    sent_at = str(timestamp) # Fallback if pytz not available
-            except Exception as e: # Catch broader exceptions for timezone/datetime issues
-                log.error(f"Error formatting timestamp '{timestamp}': {e}", exc_info=True)
-                sent_at = str(timestamp)
+# ───── SYSTEMD INTEGRATION ─────────────────────────────
+class SystemdNotifier:
+    """Wrapper for systemd notifications"""
+    def __init__(self):
+        if sdnotify:
+            self.notifier = sdnotify.SystemdNotifier()
         else:
-            sent_at = "Unknown time"
-
-        # Substitute into template
-        return self.template.safe_substitute(
-            subject=html_lib.escape(data.get('subject', 'Delphi Alert')),
-            sent_at=html_lib.escape(sent_at),
-            alert_id=html_lib.escape(str(metadata.get('alert_hash', 'Unknown'))), # Ensure alert_id is string
-            body=body_html,
-            support_email=html_lib.escape(SUPPORT_EMAIL)
-        )
-
-    def format_plain(self, data: Dict[str, Any]) -> str:
-        """Format as plain text"""
-        lines = []
-
-        # Header
-        lines.append(f"Subject: {data.get('subject', 'Delphi Alert')}")
-
-        metadata = data.get('metadata', {})
-        lines.append(f"Alert ID: {metadata.get('alert_hash', 'Unknown')}")
-
-        # Timestamp
-        timestamp = metadata.get('timestamp')
-        if timestamp:
-            # Attempt to convert timestamp for plain text too, similar to HTML
-            if pytz and isinstance(timestamp, (str, datetime)):
-                try:
-                    tz = pytz.timezone(TIMEZONE)
-                    if isinstance(timestamp, str):
-                        if timestamp.endswith('Z'):
-                            timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                        elif '+' not in timestamp and '-' not in timestamp[-6:]:
-                             timestamp = datetime.fromisoformat(timestamp).replace(tzinfo=timezone.utc)
-                        else:
-                            timestamp = datetime.fromisoformat(timestamp)
-                    formatted_ts = timestamp.astimezone(tz).strftime("%Y-%m-%d %H:%M:%S %Z")
-                    lines.append(f"Sent at: {formatted_ts}")
-                except Exception as e:
-                    log.error(f"Error formatting timestamp for plain text '{timestamp}': {e}", exc_info=True)
-                    lines.append(f"Sent at: {str(timestamp)}")
-            else:
-                lines.append(f"Sent at: {str(timestamp)}")
-
-        lines.append("\n--- Alert Details ---\n")
-
-        # Sections
-        sections = data.get('sections', {})
-        for section, content in sections.items():
-            if content:
-                lines.append(f"\n{section}:")
-                lines.append(content) # No HTML escaping/conversion needed for plain text
-
-        # Agent info
-        lines.append("\n--- Agent Information ---")
-        agent_info = data.get('agent_info', {})
-        if agent_info:
-            for key, value in agent_info.items():
-                if value and key not in ['groups']:  # Skip complex fields
-                    lines.append(f"{key.replace('_', ' ').title()}: {value}")
-
-            if agent_info.get('groups'):
-                lines.append(f"Groups: {', '.join(agent_info['groups'])}")
-        else:
-            lines.append("No agent information available")
-
-        return "\n".join(lines)
-
-    def _build_body_html(self, sections: Dict[str, str],
-                        agent_info: Dict[str, Any]) -> str:
-        """Build HTML body content"""
-        html_parts = []
-
-        # Add sections
-        for heading, content in sections.items():
-            if content:
-                # Convert newlines to paragraphs
-                # FIX: Used raw string literal r'\n\n' to avoid Pylance warning about escape sequences in f-string
-                paragraphs = [
-                    f"<p>{html_lib.escape(p)}</p>"
-                    for p in content.split('\n\n') if p.strip() # Correct split for newlines
-                ]
-                if paragraphs:
-                    html_parts.append(f"<h2>{html_lib.escape(heading)}:</h2>")
-                    html_parts.extend(paragraphs)
-
-        # Add agent details
-        if agent_info:
-            html_parts.append(self._format_agent_details_html(agent_info))
-
-        return "\n".join(html_parts)
-
-    def _format_agent_details_html(self, agent_info: Dict[str, Any]) -> str:
-        """Format agent details as HTML"""
-        if not agent_info:
-            return "<p>No agent information available.</p>"
-
-        html_parts = ["<h2>Agent Details:</h2>", "<ul>"]
-
-        # Simple fields
-        field_mappings = [
-            ('name', 'Agent Name'),
-            ('id', 'Agent ID'),
-            ('ip', 'IP Address'),
-            ('version', 'Wazuh Version'), # Changed from 'version' to 'wazuh_version' if that's the key
-            ('status', 'Status'),
-            ('os', 'Operating System'),
-            ('manager', 'Manager'),
-        ]
-
-        # Use actual keys from agent_info if they exist, otherwise map from field_mappings
-        # Assuming agent_info keys like 'agent_version', 'status_text', 'manager_name' from previous schemas
-        agent_info_normalized = {
-            'name': agent_info.get('name'),
-            'id': agent_info.get('id'),
-            'ip': agent_info.get('ip'),
-            'version': agent_info.get('agent_version') or agent_info.get('version'), # Use agent_version if present
-            'status': agent_info.get('status_text') or agent_info.get('status'), # Use status_text if present
-            'os': agent_info.get('os'),
-            'manager': agent_info.get('manager_name') or agent_info.get('manager'), # Use manager_name if present
-        }
-
-
-        for field, label in field_mappings:
-            value = agent_info_normalized.get(field)
-            if value:
-                value_str = html_lib.escape(str(value))
-                html_parts.append(f"<li><strong>{label}:</strong> {value_str}</li>")
-
-
-        # Groups
-        if agent_info.get('groups'): # Assuming 'groups' is a list of strings
-            groups_str = ", ".join([html_lib.escape(g) for g in agent_info['groups']])
-            html_parts.append(f"<li><strong>Groups:</strong> {groups_str}</li>")
-
-        # Timestamps
-        for field, label in [
-            ('registered', 'Registered'), # Adjusted from 'registered_at' to 'registered'
-            ('last_seen', 'Last Seen'),
-            ('disconnection_time', 'Disconnected') # Adjusted from 'disconnected_at' to 'disconnection_time'
-        ]:
-            if field in agent_info:
-                value = agent_info[field]
-                if isinstance(value, datetime):
-                    try:
-                        # Use pytz only if it was successfully imported
-                        if pytz:
-                            tz = pytz.timezone(TIMEZONE)
-                            value = value.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-                        else:
-                            value = str(value) # Fallback if pytz not available
-                    except Exception as e: # Catch broader exceptions for timezone/datetime issues
-                        log.error(f"Error formatting agent timestamp '{value}' for field '{field}': {e}", exc_info=True)
-                        value = str(value)
-                html_parts.append(f"<li><strong>{label}:</strong> {html_lib.escape(str(value))}</li>")
-
-        html_parts.append("</ul>")
-        return "\n".join(html_parts)
-
-
-class ModernCardTemplate(EmailTemplate):
-    """A more modern card-based email template"""
-
-    def format_html(self, data: Dict[str, Any]) -> str:
-        """Format using a modern card-based layout"""
-        sections = data.get('sections', {})
-        agent_info = data.get('agent_info', {})
-        metadata = data.get('metadata', {})
-
-        # Format timestamp for header
-        header_timestamp = metadata.get('timestamp')
-        if header_timestamp:
+            self.notifier = None
+            
+    def notify(self, message: str):
+        """Send notification to systemd"""
+        if self.notifier:
             try:
-                if pytz:
-                    tz = pytz.timezone(TIMEZONE)
-                    if isinstance(header_timestamp, str):
-                        if header_timestamp.endswith('Z'):
-                            header_timestamp = datetime.fromisoformat(header_timestamp.replace('Z', '+00:00'))
-                        elif '+' not in header_timestamp and '-' not in header_timestamp[-6:]:
-                             header_timestamp = datetime.fromisoformat(header_timestamp).replace(tzinfo=timezone.utc)
-                        else:
-                            header_timestamp = datetime.fromisoformat(header_timestamp)
-                    header_timestamp_str = header_timestamp.astimezone(tz).strftime("%A, %d %B %Y %I:%M %p AWST")
-                else:
-                    header_timestamp_str = str(header_timestamp)
+                self.notifier.notify(message)
             except Exception as e:
-                log.error(f"Error formatting header timestamp '{header_timestamp}': {e}", exc_info=True)
-                header_timestamp_str = str(header_timestamp)
+                log.warning("Failed to send systemd notification: %s", e)
+    
+    def ready(self):
+        """Signal that service is ready"""
+        self.notify("READY=1")
+        
+    def watchdog(self):
+        """Send watchdog ping"""
+        self.notify("WATCHDOG=1")
+        
+    def status(self, status: str):
+        """Update service status"""
+        self.notify(f"STATUS={status}")
+        
+    def stopping(self):
+        """Signal that service is stopping"""
+        self.notify("STOPPING=1")
+
+notifier = SystemdNotifier()
+
+# ───── EMAIL FORMATTER CLASSES ─────────────────────────────
+@dataclass
+class FormattedEmail:
+    """Container for formatted email components"""
+    subject: str
+    html_body: str
+    plain_body: str
+    metadata: Dict[str, Any]
+
+class BaseEmailFormatter:
+    """Base formatter with common functionality"""
+    
+    def __init__(self):
+        self.timezone = self._get_timezone()
+        
+    def _get_timezone(self):
+        """Get timezone object with fallback"""
+        if pytz:
+            try:
+                return pytz.timezone(TIMEZONE)
+            except Exception as e:
+                log.warning("Invalid timezone %s: %s", TIMEZONE, e)
+                return pytz.UTC
+        return None
+    
+    def _format_timestamp(self, timestamp_str: str) -> str:
+        """Format timestamp with timezone conversion"""
+        if not timestamp_str:
+            return "Unknown time"
+            
+        try:
+            # Parse ISO timestamp
+            if timestamp_str.endswith('Z'):
+                dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            elif '+' in timestamp_str[-6:] or timestamp_str.count('-') > 2:
+                dt = datetime.fromisoformat(timestamp_str)
+            else:
+                dt = datetime.fromisoformat(timestamp_str).replace(tzinfo=timezone.utc)
+            
+            # Convert to local timezone
+            if self.timezone:
+                dt = dt.astimezone(self.timezone)
+                return dt.strftime("%A, %d %B %Y %I:%M %p %Z")
+            else:
+                return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+                
+        except Exception as e:
+            log.warning("Failed to parse timestamp '%s': %s", timestamp_str, e)
+            return str(timestamp_str)
+    
+    def _truncate_content(self, content: str, max_length: int = MAX_CONTENT_LENGTH) -> str:
+        """Truncate content that's too long"""
+        if len(content) <= max_length:
+            return content
+        
+        truncated = content[:max_length - 100]
+        last_sentence = truncated.rfind('.')
+        if last_sentence > max_length * 0.8:  # Keep if we can preserve most content
+            truncated = truncated[:last_sentence + 1]
+        
+        truncated += f"\n\n[Content truncated - original was {len(content)} characters]"
+        return truncated
+
+class ISOBARFormatter(BaseEmailFormatter):
+    """Formatter for ISOBAR framework responses"""
+    
+    def format(self, data: Dict[str, Any]) -> FormattedEmail:
+        """Format ISOBAR structured data"""
+        sections = data.get('sections', {})
+        metadata = data.get('metadata', {})
+        
+        # Extract alert metadata
+        alert_id = metadata.get('alert_id', 'Unknown')
+        rule_level = metadata.get('rule_level', 0)
+        agent_name = metadata.get('agent_name', 'Unknown System')
+        timestamp = metadata.get('timestamp', '')
+        
+        # Generate subject based on severity
+        severity = self._determine_severity(rule_level)
+        subject = f"[{severity}] Security Alert - {agent_name} - Alert #{alert_id}"
+        
+        # Build HTML content
+        html_body = self._build_isobar_html(sections, metadata, subject)
+        
+        # Build plain text content
+        plain_body = self._build_isobar_plain(sections, metadata, subject)
+        
+        return FormattedEmail(
+            subject=subject,
+            html_body=html_body,
+            plain_body=plain_body,
+            metadata={
+                'prompt_type': 'ISOBAR',
+                'severity': severity,
+                'formatted_at': datetime.now(timezone.utc).isoformat()
+            }
+        )
+    
+    def _determine_severity(self, rule_level: int) -> str:
+        """Map rule level to severity"""
+        if rule_level >= 12:
+            return "CRITICAL"
+        elif rule_level >= 9:
+            return "HIGH"
+        elif rule_level >= 6:
+            return "MEDIUM"
         else:
-            header_timestamp_str = "Unknown time"
-
-
-        # Build cards for each section
-        cards_html = []
-        for heading, content in sections.items():
+            return "LOW"
+    
+    def _build_isobar_html(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
+        """Build HTML for ISOBAR format"""
+        timestamp_str = self._format_timestamp(metadata.get('timestamp', ''))
+        
+        # Header section
+        header = f"""
+        <div style="background: linear-gradient(135deg, {BRAND_COLOR} 0%, #34495e 100%); color: white; padding: 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 600;">Security Alert - ISOBAR Analysis</h1>
+            <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 16px;">{html_lib.escape(subject)}</p>
+            <p style="margin: 4px 0 0 0; opacity: 0.8; font-size: 14px;">Generated: {timestamp_str}</p>
+        </div>
+        """
+        
+        # Section mapping for ISOBAR
+        isobar_sections = [
+            ('identify', 'I - IDENTIFY', '#e74c3c'),
+            ('situation', 'S - SITUATION', '#f39c12'),
+            ('observations', 'O - OBSERVATIONS', '#3498db'),
+            ('background', 'B - BACKGROUND', '#9b59b6'),
+            ('assessment', 'A - ASSESSMENT & ACTIONS', '#e67e22'),
+            ('recommendations', 'R - RECOMMENDATIONS & RESPONSE', '#27ae60')
+        ]
+        
+        cards = []
+        for section_key, section_title, color in isobar_sections:
+            content = sections.get(section_key, sections.get(section_title.lower(), ''))
             if content:
-                # Replace newlines with <br><br> for HTML rendering in cards
-                formatted_content = html_lib.escape(content).replace('\n\n', '<br><br>')
+                content = self._truncate_content(content)
+                formatted_content = html_lib.escape(content).replace('\n\n', '<br><br>').replace('\n', '<br>')
+                
                 card = f"""
-                <div style="background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <h3 style="color: #2c3e50; margin-top: 0;">{html_lib.escape(heading)}</h3>
-                    <div style="color: #555; line-height: 1.6;">
+                <div style="background: white; border-left: 4px solid {color}; border-radius: 0 8px 8px 0; padding: 20px; margin: 16px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <h2 style="color: {color}; margin: 0 0 12px 0; font-size: 18px; font-weight: 600;">{section_title}</h2>
+                    <div style="color: #555; line-height: 1.6; font-size: 14px;">
                         {formatted_content}
                     </div>
                 </div>
                 """
-                cards_html.append(card)
-
-        # Agent info card
-        if agent_info:
-            agent_details_list = []
-            # Use the same normalization and formatting logic as in FileBasedTemplate for consistency
-            field_mappings = [
-                ('name', 'Agent'), ('id', 'ID'), ('ip', 'IP'),
-                ('agent_version', 'Wazuh Version'), ('status_text', 'Status'),
-                ('os', 'OS'), ('manager_name', 'Manager'),
-            ]
-            for field, label in field_mappings:
-                value = agent_info.get(field)
-                if value:
-                    agent_details_list.append(f"<tr><td><strong>{label}:</strong></td><td>{html_lib.escape(str(value))}</td></tr>")
-
-            if agent_info.get('groups'):
-                groups_str = ", ".join([html_lib.escape(g) for g in agent_info['groups']])
-                agent_details_list.append(f"<tr><td><strong>Groups:</strong></td><td>{groups_str}</td></tr>")
-
-            for field, label in [
-                ('registered', 'Registered'), ('last_seen', 'Last Seen'), ('disconnection_time', 'Disconnected')
-            ]:
-                if field in agent_info:
-                    value = agent_info[field]
-                    if isinstance(value, datetime):
-                        try:
-                            if pytz:
-                                tz = pytz.timezone(TIMEZONE)
-                                value = value.astimezone(tz).strftime('%Y-%m-%d %H:%M:%S %Z')
-                            else:
-                                value = str(value)
-                        except Exception as e:
-                            log.error(f"Error formatting agent timestamp for modern card '{value}' for field '{field}': {e}", exc_info=True)
-                            value = str(value)
-                    agent_details_list.append(f"<tr><td><strong>{label}:</strong></td><td>{html_lib.escape(str(value))}</td></tr>")
-
-
-            agent_card = f"""
-            <div style="background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <h3 style="color: #2c3e50; margin-top: 0;">System Information</h3>
-                <table style="width: 100%; color: #555; border-collapse: collapse;">
-                    {''.join(agent_details_list)}
-                </table>
-            </div>
-            """
-            cards_html.append(agent_card)
-
-        # Combine everything
-        body = f"""
+                cards.append(card)
+        
+        # Footer
+        footer = f"""
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; text-align: center; border-top: 1px solid #e9ecef;">
+            <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                Generated by {ORGANIZATION_NAME} | For support: <a href="mailto:{SUPPORT_EMAIL}" style="color: {BRAND_COLOR};">{SUPPORT_EMAIL}</a>
+            </p>
+        </div>
+        """
+        
+        return f"""
         <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{html_lib.escape(data.get('subject', 'Security Alert'))}</title>
-            <style>
-                body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #e9ecef; padding: 20px; margin: 0; }}
-                .container {{ max-width: 600px; margin: 0 auto; }}
-                .header {{ background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                .header h1 {{ color: #2c3e50; margin: 0; font-size: 24px; }}
-                .header p {{ color: #7f8c8d; margin: 8px 0; font-size: 14px; }}
-                .card {{ background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                .card h3 {{ color: #2c3e50; margin-top: 0; }}
-                .card div {{ color: #555; line-height: 1.6; }}
-                .agent-card {{ background: #f8f9fa; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
-                .agent-card table {{ width: 100%; color: #555; border-collapse: collapse; }}
-                .agent-card td {{ padding: 8px 0; border-bottom: 1px solid #eee; }}
-                .agent-card tr:last-child td {{ border-bottom: none; }}
-                .footer {{ text-align: center; color: #7f8c8d; font-size: 14px; margin-top: 32px; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h1>Security Alert</h1>
-                    <p style="font-size: 16px; font-weight: bold;">{html_lib.escape(data.get('subject', 'General Alert'))}</p>
-                    <p>Alert ID: {html_lib.escape(str(metadata.get('alert_hash', 'Unknown')))}</p>
-                    <p>Generated at: {header_timestamp_str}</p>
+        <html><head><meta charset="utf-8"><title>{html_lib.escape(subject)}</title></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+            <div style="max-width: 800px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                {header}
+                <div style="padding: 0 24px 24px 24px;">
+                    {''.join(cards)}
                 </div>
-
-                {''.join(cards_html)}
-
-                <div class="footer">
-                    <p>This alert was generated by Delphi Security Monitoring</p>
-                    <p>For support, contact: <a href="mailto:{html_lib.escape(SUPPORT_EMAIL)}" style="color: #007bff; text-decoration: none;">{html_lib.escape(SUPPORT_EMAIL)}</a></p>
-                </div>
+                {footer}
             </div>
-        </body>
-        </html>
+        </body></html>
         """
-        return body
+    
+    def _build_isobar_plain(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
+        """Build plain text for ISOBAR format"""
+        lines = [
+            f"SECURITY ALERT - ISOBAR ANALYSIS",
+            f"=" * 50,
+            f"Subject: {subject}",
+            f"Generated: {self._format_timestamp(metadata.get('timestamp', ''))}",
+            f"Alert ID: {metadata.get('alert_id', 'Unknown')}",
+            f"System: {metadata.get('agent_name', 'Unknown')}",
+            "",
+        ]
+        
+        isobar_sections = [
+            ('identify', 'I - IDENTIFY'),
+            ('situation', 'S - SITUATION'),
+            ('observations', 'O - OBSERVATIONS'),
+            ('background', 'B - BACKGROUND'),
+            ('assessment', 'A - ASSESSMENT & ACTIONS'),
+            ('recommendations', 'R - RECOMMENDATIONS & RESPONSE')
+        ]
+        
+        for section_key, section_title in isobar_sections:
+            content = sections.get(section_key, sections.get(section_title.lower(), ''))
+            if content:
+                content = self._truncate_content(content)
+                lines.extend([
+                    f"{section_title}",
+                    "-" * len(section_title),
+                    content,
+                    ""
+                ])
+        
+        lines.extend([
+            f"Generated by {ORGANIZATION_NAME}",
+            f"Support: {SUPPORT_EMAIL}"
+        ])
+        
+        return "\n".join(lines)
 
-    def format_plain(self, data: Dict[str, Any]) -> str:
-        """Simple plain text format"""
-        # Instantiate FileBasedTemplate with an empty string as path/fallback for plain text
-        # This prevents unnecessary file loading when only plain text is needed and no specific file template is required
-        return FileBasedTemplate(template_path="", fallback_html="").format_plain(data)
-
-
-# ───── EMAIL FORMATTER ─────────────────────────────────
-class EmailFormatter:
-    """Main formatter class that coordinates email formatting"""
-
-    def __init__(self, template: Optional[EmailTemplate] = None):
-        """Initialize with a template"""
-        if template is None:
-            # Try to load default template
-            template_paths = [
-                TEMPLATE_PATH,
-                "/opt/stackstorm/packs/delphi/email.html",
-                "/usr/local/share/eos/email.html",
-            ]
-
-            found_template_path = None
-            for path in template_paths:
-                if os.path.exists(path):
-                    found_template_path = path
-                    break
-            
-            if found_template_path:
-                template = FileBasedTemplate(found_template_path)
-                log.info(f"Using template from path: {found_template_path}")
-            else:
-                # Use fallback with empty string for template_path (relies on internal fallback)
-                template = FileBasedTemplate(template_path="")
-                log.warning("No specific email template file found, using default minimal template.")
-
-        self.template = template
-
-    def format_email(self, structured_data: Dict[str, Any]) -> Tuple[str, str, str]:
+class DelphiNotifyFormatter(BaseEmailFormatter):
+    """Formatter for Delphi Notify responses (user-friendly)"""
+    
+    def format(self, data: Dict[str, Any]) -> FormattedEmail:
+        """Format Delphi Notify structured data"""
+        sections = data.get('sections', {})
+        metadata = data.get('metadata', {})
+        
+        # Extract key information
+        agent_name = metadata.get('agent_name', 'Your Computer')
+        alert_id = metadata.get('alert_id', 'Unknown')
+        
+        # Create user-friendly subject
+        summary = sections.get('summary', '')
+        if 'LOW RISK' in summary.upper():
+            risk_level = "Low Risk"
+        elif 'MEDIUM RISK' in summary.upper():
+            risk_level = "Medium Risk"
+        elif 'HIGH RISK' in summary.upper():
+            risk_level = "High Risk"
+        else:
+            risk_level = "Security Notice"
+        
+        subject = f"{risk_level} - Security Alert for {agent_name}"
+        
+        # Build content
+        html_body = self._build_delphi_html(sections, metadata, subject)
+        plain_body = self._build_delphi_plain(sections, metadata, subject)
+        
+        return FormattedEmail(
+            subject=subject,
+            html_body=html_body,
+            plain_body=plain_body,
+            metadata={
+                'prompt_type': 'DELPHI_NOTIFY',
+                'risk_level': risk_level,
+                'formatted_at': datetime.now(timezone.utc).isoformat()
+            }
+        )
+    
+    def _build_delphi_html(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
+        """Build HTML for Delphi Notify format"""
+        timestamp_str = self._format_timestamp(metadata.get('timestamp', ''))
+        
+        # Friendly header
+        header = f"""
+        <div style="background: linear-gradient(135deg, #3498db 0%, #2980b9 100%); color: white; padding: 24px; border-radius: 8px 8px 0 0;">
+            <h1 style="margin: 0; font-size: 22px; font-weight: 600;">🛡️ Security Alert</h1>
+            <p style="margin: 8px 0 0 0; opacity: 0.9; font-size: 16px;">{html_lib.escape(subject)}</p>
+            <p style="margin: 4px 0 0 0; opacity: 0.8; font-size: 14px;">{timestamp_str}</p>
+        </div>
         """
-        Format structured data into email components
-
-        Returns:
-            Tuple of (subject, plain_body, html_body)
+        
+        # Delphi section mapping
+        delphi_sections = [
+            ('summary', 'Summary', '#3498db', '📋'),
+            ('what_happened', 'What Happened', '#e74c3c', '🔍'),
+            ('further_investigation', 'Further Investigation', '#f39c12', '🔎'),
+            ('what_to_do', 'What To Do', '#27ae60', '✅'),
+            ('how_to_check', 'How To Check', '#9b59b6', '👀'),
+            ('how_to_prevent', 'How To Prevent This In Future', '#34495e', '🛡️'),
+            ('what_to_ask_next', 'What To Ask Next', '#16a085', '❓')
+        ]
+        
+        cards = []
+        for section_key, section_title, color, icon in delphi_sections:
+            content = sections.get(section_key, '')
+            if content:
+                content = self._truncate_content(content)
+                formatted_content = html_lib.escape(content).replace('\n\n', '<br><br>').replace('\n', '<br>')
+                
+                card = f"""
+                <div style="background: white; border-radius: 8px; padding: 20px; margin: 16px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 4px solid {color};">
+                    <h2 style="color: {color}; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+                        {icon} {section_title}
+                    </h2>
+                    <div style="color: #555; line-height: 1.6; font-size: 14px;">
+                        {formatted_content}
+                    </div>
+                </div>
+                """
+                cards.append(card)
+        
+        # Friendly footer
+        footer = f"""
+        <div style="background: #f8f9fa; padding: 20px; border-radius: 0 0 8px 8px; text-align: center;">
+            <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 14px;">
+                This alert was created to help keep you safe online.
+            </p>
+            <p style="margin: 0; color: #6c757d; font-size: 14px;">
+                Questions? Contact us: <a href="mailto:{SUPPORT_EMAIL}" style="color: #3498db;">{SUPPORT_EMAIL}</a>
+            </p>
+        </div>
         """
-        subject = structured_data.get('subject', 'Delphi Alert')
-        plain_body = self.template.format_plain(structured_data)
-        html_body = self.template.format_html(structured_data)
+        
+        return f"""
+        <!DOCTYPE html>
+        <html><head><meta charset="utf-8"><title>{html_lib.escape(subject)}</title></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                {header}
+                <div style="padding: 0 24px 24px 24px;">
+                    {''.join(cards)}
+                </div>
+                {footer}
+            </div>
+        </body></html>
+        """
+    
+    def _build_delphi_plain(self, sections: Dict[str, str], metadata: Dict[str, Any], subject: str) -> str:
+        """Build plain text for Delphi Notify format"""
+        lines = [
+            f"SECURITY ALERT",
+            f"=" * 30,
+            f"{subject}",
+            f"Generated: {self._format_timestamp(metadata.get('timestamp', ''))}",
+            "",
+        ]
+        
+        delphi_sections = [
+            ('summary', 'SUMMARY'),
+            ('what_happened', 'WHAT HAPPENED'),
+            ('further_investigation', 'FURTHER INVESTIGATION'),
+            ('what_to_do', 'WHAT TO DO'),
+            ('how_to_check', 'HOW TO CHECK'),
+            ('how_to_prevent', 'HOW TO PREVENT THIS IN FUTURE'),
+            ('what_to_ask_next', 'WHAT TO ASK NEXT')
+        ]
+        
+        for section_key, section_title in delphi_sections:
+            content = sections.get(section_key, '')
+            if content:
+                content = self._truncate_content(content)
+                lines.extend([
+                    f"{section_title}:",
+                    content,
+                    ""
+                ])
+        
+        lines.extend([
+            "This alert was created to help keep you safe online.",
+            f"Questions? Contact: {SUPPORT_EMAIL}"
+        ])
+        
+        return "\n".join(lines)
 
-        return subject, plain_body, html_body
+class EmailFormatterFactory:
+    """Factory for creating appropriate formatters based on prompt type"""
+    
+    @staticmethod
+    def create_formatter(prompt_type: str) -> BaseEmailFormatter:
+        """Create formatter based on prompt type"""
+        if prompt_type in ['security_analysis', 'isobar']:
+            return ISOBARFormatter()
+        elif prompt_type in ['delphi_notify_short', 'delphi_notify_brief', 'delphi_brief']:
+            return DelphiNotifyFormatter()
+        elif prompt_type in ['executive_summary', 'investigation_guide']:
+            return ISOBARFormatter()  # These use similar structured format
+        else:
+            log.warning("Unknown prompt type '%s', using Delphi Notify formatter", prompt_type)
+            return DelphiNotifyFormatter()
 
-
-# ───── DATABASE FUNCTIONS ─────────────────────────────────
-def connect_db() -> psycopg2.extensions.connection:
-    """Connect to Postgres with auto-commit enabled"""
-    try:
-        conn = psycopg2.connect(PG_DSN)
-        conn.autocommit = True
-        log.info("Connected to Postgres")
-        return conn
-    except Exception:
-        log.exception("Could not connect to Postgres")
-        notifier.notify("STATUS=FATAL: Could not connect to PostgreSQL. Exiting.") # ADDED: sdnotify on DB connection failure
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-
-
-def fetch_alert_to_format(conn, alert_id: int) -> Optional[Dict]:
-    """Fetch an alert that needs formatting"""
-    sql = """
-        SELECT
-            id,
-            structured_data,
-            structured_at
-        FROM alerts
-        WHERE state = 'STRUCTURED' -- FIX: Changed 'structured' to 'STRUCTURED' to match enum
-        AND id = %s
-    """
-    with conn.cursor(cursor_factory=RealDictCursor) as cur:
-        cur.execute(sql, (alert_id,))
-        row = cur.fetchone()
-
-        if row and row.get('structured_data'):
-            if isinstance(row['structured_data'], str):
-                try:
-                    row['structured_data'] = json.loads(row['structured_data'])
-                except json.JSONDecodeError:
-                    log.warning("Failed to parse structured_data JSON for alert %d", alert_id)
-                    row['structured_data'] = {}
-
-        return row
-
-
-def save_formatted_data(conn, alert_id: int, formatted_data: Dict[str, Any]):
-    """Save formatted data and update alert state"""
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE alerts
-                SET formatted_data = %s,
-                    state = 'formatted', -- Assuming 'formatted' is a valid enum value
-                    formatted_at = NOW()
-                WHERE id = %s
-            """, (json.dumps(formatted_data), alert_id))
-
-            # Notify next worker (email sender)
-            cur.execute(f"NOTIFY {NOTIFY_CHANNEL}, %s", (str(alert_id),))
-
-        log.info("Saved formatted data for alert %d", alert_id)
-    except Exception as e:
-        log.error("Failed to save formatted data for alert %d: %s", alert_id, e)
-        notifier.notify(f"STATUS=DB update failed for alert {alert_id}. See logs.") # ADDED: sdnotify on DB update failure
-        raise
-
-
-def catch_up(conn, formatter: EmailFormatter):
-    """Process any backlog of unformatted alerts"""
-    sql = """
-        SELECT id FROM alerts
-        WHERE state = 'STRUCTURED' -- FIX: Changed 'structured' to 'STRUCTURED' to match enum
-        ORDER BY structured_at
-    """
-    with conn.cursor() as cur:
-        cur.execute(sql)
-        alert_ids = [row[0] for row in cur.fetchall()]
-
-    if alert_ids:
-        log.info("Processing backlog of %d alerts", len(alert_ids))
-        for alert_id in alert_ids:
-            # Ping watchdog during backlog processing if it takes a long time
-            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping during backlog processing
+# ───── DATABASE OPERATIONS ─────────────────────────────────
+class DatabaseManager:
+    """Manage database operations with proper error handling"""
+    
+    def __init__(self, dsn: str):
+        self.dsn = dsn
+        self.conn = None
+        
+    def connect(self) -> psycopg2.extensions.connection:
+        """Connect to database with retry logic"""
+        max_retries = 3
+        for attempt in range(max_retries):
             try:
-                alert_data = fetch_alert_to_format(conn, alert_id)
-                if alert_data and alert_data.get('structured_data'):
-                    subject, plain_body, html_body = formatter.format_email(alert_data['structured_data'])
-
-                    formatted_data = {
-                        'subject': subject,
-                        'html_body': html_body,
-                        'plain_body': plain_body,
-                        'template_used': TEMPLATE_TYPE,
-                        'formatting_metadata': {
-                            'template_path': TEMPLATE_PATH,
-                            'formatted_at': datetime.now(timezone.utc).isoformat(),
-                            'timezone': TIMEZONE
-                        }
-                    }
-
-                    save_formatted_data(conn, alert_id, formatted_data)
+                self.conn = psycopg2.connect(self.dsn)
+                self.conn.autocommit = True
+                log.info("Connected to PostgreSQL")
+                return self.conn
+            except psycopg2.OperationalError as e:
+                if attempt < max_retries - 1:
+                    wait_time = 5 * (attempt + 1)
+                    log.warning("Database connection failed, retrying in %ds: %s", wait_time, e)
+                    time.sleep(wait_time)
                 else:
-                    log.debug("Alert %d not in correct state or missing structured data during backlog processing, skipping.", alert_id)
-            except Exception as e:
-                log.error("Failed to process backlog alert %d: %s", alert_id, e)
-                notifier.notify(f"STATUS=Error processing backlog alert {alert_id}. See logs.") # ADDED: sdnotify on backlog error
-
-
-# ───── SIGNAL HANDLING ─────────────────────────────────
-shutdown = False
-
-def on_signal(signum, _frame):
-    global shutdown
-    shutdown = True
-    log.info("Signal %d received; shutting down", signum)
-    notifier.notify("STOPPING=1") # ADDED: sdnotify on signal received
-
-signal.signal(signal.SIGINT, on_signal)
-signal.signal(signal.SIGTERM, on_signal)
-
-
-# ───── MAIN LOOP ─────────────────────────────────────────
-def create_formatter():
-    """Create formatter based on configuration"""
-    if TEMPLATE_TYPE == 'file':
-        template = FileBasedTemplate(TEMPLATE_PATH)
-    elif TEMPLATE_TYPE == 'modern':
-        template = ModernCardTemplate()
-    else:
-        log.warning("Unknown template type %s, using file", TEMPLATE_TYPE)
-        template = FileBasedTemplate(TEMPLATE_PATH)
-
-    return EmailFormatter(template)
-
-
-def main():
-    """Main event loop"""
-    log.info("Email Formatter starting up...")
-    notifier.notify("READY=1") # ADDED: Signal Systemd that the service is ready
-    notifier.notify(f"STATUS=Starting up. Template type: {TEMPLATE_TYPE}. Path: {TEMPLATE_PATH}")
-
-    # Initialize formatter
-    formatter = create_formatter()
-
-    # Connect to database
-    conn = connect_db() # This function already calls sys.exit(1) on failure.
-
-    # Ensure formatted_data column exists
-    try:
-        with conn.cursor() as cur:
-            cur.execute("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM information_schema.columns
-                        WHERE table_name='alerts' AND column_name='formatted_data'
-                    ) THEN
-                        ALTER TABLE alerts ADD COLUMN formatted_data JSONB;
-                        ALTER TABLE alerts ADD COLUMN formatted_at TIMESTAMP WITH TIME ZONE; -- Ensure TIMESTAMPTZ
-                    END IF;
-                END $$;
-            """)
-        conn.commit() # Ensure changes are committed if autocommit is not strictly on here
-        notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after schema check/update
-    except Exception as e:
-        log.critical(f"Failed to ensure DB columns exist: {e}", exc_info=True)
-        notifier.notify("STATUS=FATAL: Failed to ensure DB columns. Exiting.") # ADDED: sdnotify on schema check failure
-        notifier.notify("STOPPING=1")
-        sys.exit(1)
-
-
-    # Process backlog
-    log.info("Processing backlog...")
-    catch_up(conn, formatter)
-    notifier.notify("WATCHDOG=1") # ADDED: Ping watchdog after backlog processing
-
-    # Listen for structured alerts
-    cur = conn.cursor()
-    cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-    log.info("Listening for alerts to format")
-    notifier.notify(f"STATUS=Listening on {LISTEN_CHANNEL} for alerts to format...") # ADDED: Update status
-
-    while not shutdown:
+                    log.critical("Failed to connect to database after %d attempts", max_retries)
+                    raise
+                    
+    def ensure_connection(self):
+        """Ensure database connection is alive"""
         try:
-            # Ping watchdog before polling for events. This keeps systemd happy during idle times.
-            notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping at the start of each poll cycle
-
-            if not select.select([conn], [], [], 5)[0]: # Wait up to 5 seconds for events
-                continue # If no events, loop back and ping watchdog again
-
-            conn.poll()
-
-            for notify in conn.notifies:
-                notifier.notify("WATCHDOG=1") # ADDED: Watchdog ping before processing each notification
-                try:
-                    alert_id = int(notify.payload)
-                    log.info("Processing alert %d", alert_id)
-
-                    alert_data = fetch_alert_to_format(conn, alert_id)
-                    if not alert_data or not alert_data.get('structured_data'):
-                        log.debug("Alert %d not in correct state or missing structured data", alert_id)
-                        continue
-
-                    subject, plain_body, html_body = formatter.format_email(alert_data['structured_data'])
-
-                    formatted_data = {
-                        'subject': subject,
-                        'html_body': html_body,
-                        'plain_body': plain_body,
-                        'template_used': TEMPLATE_TYPE,
-                        'formatting_metadata': {
-                            'template_path': TEMPLATE_PATH,
-                            'formatted_at': datetime.now(timezone.utc).isoformat(),
-                            'timezone': TIMEZONE
-                        }
-                    }
-
-                    save_formatted_data(conn, alert_id, formatted_data)
-
-                except Exception as e:
-                    log.exception("Failed to process alert %s: %s", notify.payload, e)
-                    notifier.notify(f"STATUS=Error processing alert {alert_id}. See logs.") # ADDED: sdnotify on processing error
-
-            conn.notifies.clear()
-
-        except psycopg2.OperationalError:
-            log.exception("DB connection lost; reconnecting in 5s")
-            notifier.notify("STATUS=DB connection lost. Attempting to reconnect...") # ADDED: sdnotify on DB connection loss
-            time.sleep(5) # Keep this sleep for reconnection back-off
-            try:
-                conn = connect_db() # This function will call sys.exit if reconnect fails
-                cur = conn.cursor()
-                cur.execute(f"LISTEN {LISTEN_CHANNEL};")
-                log.info("Reconnected to Postgres and re-listening.")
-                notifier.notify("STATUS=Reconnected to DB. Listening for alerts to format...") # ADDED: sdnotify on successful reconnect
-            except Exception: # Catch the sys.exit from connect_db
-                log.critical("Failed to reconnect to database. Exiting.")
-                notifier.notify("STOPPING=1")
-                sys.exit(1)
+            if self.conn and not self.conn.closed:
+                self.conn.cursor().execute("SELECT 1")
+            else:
+                self.connect()
         except Exception:
-            log.exception("Unexpected error in main loop")
-            notifier.notify("STATUS=Unexpected error in main loop. Exiting.") # ADDED: sdnotify on unexpected errors
-            notifier.notify("STOPPING=1")
-            raise # Re-raise the exception after notifying systemd for debugging/crash reporting
+            log.warning("Database connection lost, reconnecting...")
+            self.connect()
+            
+    def fetch_alerts_to_format(self, batch_size: int) -> List[Dict[str, Any]]:
+        """Fetch batch of alerts ready for formatting"""
+        self.ensure_connection()
+        
+        # FIXED: Query aligned with schema.sql structure and correct state value
+        sql = """
+            SELECT
+                a.id,
+                a.alert_hash,
+                a.rule_id,
+                a.rule_level,
+                a.rule_desc,
+                a.structured_data,
+                a.structured_at,
+                a.prompt_type,
+                a.ingest_timestamp,
+                ag.name as agent_name,
+                ag.ip as agent_ip,
+                ag.os as agent_os
+            FROM alerts a
+            JOIN agents ag ON ag.id = a.agent_id
+            WHERE a.state = %s
+              AND a.structured_data IS NOT NULL
+              AND a.archived_at IS NULL
+            ORDER BY a.rule_level DESC, a.structured_at ASC
+            LIMIT %s
+            FOR UPDATE SKIP LOCKED
+        """
+        
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, (STATE_STRUCTURED, batch_size))
+                alerts = cur.fetchall()
+                
+                # Parse JSON fields safely
+                for alert in alerts:
+                    if isinstance(alert.get('structured_data'), str):
+                        try:
+                            alert['structured_data'] = json.loads(alert['structured_data'])
+                        except json.JSONDecodeError as e:
+                            log.warning("Invalid JSON in structured_data for alert %s: %s", 
+                                       alert['id'], e)
+                            alert['structured_data'] = {}
+                            
+                return [dict(alert) for alert in alerts]
+                
+        except Exception as e:
+            log.error("Failed to fetch alerts: %s", e)
+            return []
+            
+    def save_formatted_data(self, alert_id: int, formatted_email: FormattedEmail):
+        """Save formatted data and update alert state"""
+        self.ensure_connection()
+        
+        formatted_data = {
+            'subject': formatted_email.subject,
+            'html_body': formatted_email.html_body,
+            'plain_body': formatted_email.plain_body,
+            'metadata': formatted_email.metadata
+        }
+        
+        sql = """
+            UPDATE alerts
+            SET formatted_data = %s::jsonb,
+                state = %s,
+                formatted_at = NOW()
+            WHERE id = %s
+        """
+        
+        try:
+            with self.conn.cursor() as cur:
+                cur.execute(sql, (json.dumps(formatted_data), STATE_FORMATTED, alert_id))
+                
+                # Notify next worker (email sender)
+                cur.execute("SELECT pg_notify(%s, %s)", (NOTIFY_CHANNEL, str(alert_id)))
+                
+            log.info("Formatted alert %s and notified %s", alert_id, NOTIFY_CHANNEL)
+            
+        except Exception as e:
+            log.error("Failed to save formatted data for alert %s: %s", alert_id, e)
+            raise
+            
+    def get_formatting_stats(self) -> Dict[str, Any]:
+        """Get formatting statistics for monitoring"""
+        self.ensure_connection()
+        
+        sql = """
+            SELECT 
+                COUNT(*) FILTER (WHERE state = %s) as pending_formatting,
+                COUNT(*) FILTER (WHERE state = %s AND formatted_at > NOW() - INTERVAL '1 hour') as formatted_last_hour,
+                COUNT(*) FILTER (WHERE state = %s AND formatted_at > NOW() - INTERVAL '24 hours') as formatted_last_day
+            FROM alerts
+            WHERE archived_at IS NULL
+        """
+        
+        try:
+            with self.conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                cur.execute(sql, (STATE_STRUCTURED, STATE_FORMATTED, STATE_FORMATTED))
+                result = cur.fetchone()
+                return dict(result) if result else {}
+        except Exception as e:
+            log.warning("Failed to get formatting stats: %s", e)
+            return {}
 
-    log.info("Shutting down gracefully")
-    notifier.notify("STATUS=Shutting down gracefully.") # ADDED: Final status update
-    notifier.notify("STOPPING=1") # ADDED: Signal Systemd that the service is stopping
+# ───── MAIN SERVICE LOGIC ─────────────────────────────────
+class EmailFormatterService:
+    """Main service orchestrator"""
+    
+    def __init__(self):
+        self.shutdown = False
+        self.db = DatabaseManager(PG_DSN)
+        self.stats = {
+            'formatted': 0,
+            'failed': 0,
+            'errors': 0
+        }
+        self.stats_report_interval = 300  # 5 minutes
+        self.last_stats_report = time.time()
+        
+        # Signal handlers
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully"""
+        log.info("Received signal %d, initiating shutdown", signum)
+        self.shutdown = True
+        notifier.status("Shutting down gracefully")
+        notifier.stopping()
+        
+    def run(self):
+        """Main service loop"""
+        log.info("Email Formatter Service starting...")
+        notifier.ready()
+        notifier.status("Starting email formatter service")
+        
+        # Connect to database
+        try:
+            self.db.connect()
+        except Exception as e:
+            log.critical("Database connection failed: %s", e)
+            notifier.status("Database connection failed")
+            sys.exit(1)
+            
+        # Process any backlog
+        self._process_backlog()
+        
+        # Main event loop
+        self._run_event_loop()
+        
+    def _process_backlog(self):
+        """Process any queued alerts on startup"""
+        log.info("Processing backlog...")
+        backlog_count = 0
+        
+        while not self.shutdown:
+            alerts = self.db.fetch_alerts_to_format(BATCH_SIZE)
+            if not alerts:
+                break
+                
+            for alert in alerts:
+                if self.shutdown:
+                    break
+                self._process_alert(alert)
+                backlog_count += 1
+                notifier.watchdog()
+                
+        if backlog_count > 0:
+            log.info("Processed %d alerts from backlog", backlog_count)
+            
+    def _run_event_loop(self):
+        """Main event loop with PostgreSQL LISTEN/NOTIFY"""
+        listen_conn = self.db.connect()
+        cursor = listen_conn.cursor()
+        cursor.execute(f"LISTEN {LISTEN_CHANNEL};")
+        
+        log.info("Listening for notifications on channel: %s", LISTEN_CHANNEL)
+        notifier.status(f"Listening on {LISTEN_CHANNEL}")
+        
+        while not self.shutdown:
+            notifier.watchdog()
+            
+            # Report statistics periodically
+            if time.time() - self.last_stats_report > self.stats_report_interval:
+                self._report_statistics()
+                
+            # Wait for notifications
+            if select.select([listen_conn], [], [], 5.0)[0]:
+                listen_conn.poll()
+                
+                # Process all pending notifications
+                while listen_conn.notifies:
+                    notify = listen_conn.notifies.pop(0)
+                    try:
+                        self._process_notification_batch()
+                    except Exception as e:
+                        log.exception("Error processing notification: %s", e)
+                        self.stats['errors'] += 1
+                        
+    def _process_notification_batch(self):
+        """Process a batch of alerts when notified"""
+        alerts = self.db.fetch_alerts_to_format(BATCH_SIZE)
+        
+        for alert in alerts:
+            if self.shutdown:
+                break
+            self._process_alert(alert)
+            notifier.watchdog()
+            
+    def _process_alert(self, alert: Dict[str, Any]):
+        """Process a single alert"""
+        alert_id = alert['id']
+        prompt_type = alert.get('prompt_type', 'unknown')
+        
+        log.info("Formatting alert %s (prompt_type: %s)", alert_id, prompt_type)
+        
+        try:
+            # Get structured data
+            structured_data = alert.get('structured_data', {})
+            if not structured_data:
+                log.warning("Alert %s has no structured data", alert_id)
+                self.stats['failed'] += 1
+                return
+            
+            # Add metadata
+            structured_data['metadata'] = {
+                'alert_id': alert_id,
+                'alert_hash': alert.get('alert_hash'),
+                'rule_id': alert.get('rule_id'),
+                'rule_level': alert.get('rule_level'),
+                'rule_desc': alert.get('rule_desc'),
+                'agent_name': alert.get('agent_name'),
+                'agent_ip': alert.get('agent_ip'),
+                'agent_os': alert.get('agent_os'),
+                'timestamp': alert.get('structured_at'),
+                'prompt_type': prompt_type
+            }
+            
+            # Create appropriate formatter
+            formatter = EmailFormatterFactory.create_formatter(prompt_type)
+            
+            # Format the email
+            formatted_email = formatter.format(structured_data)
+            
+            # Save to database
+            self.db.save_formatted_data(alert_id, formatted_email)
+            
+            self.stats['formatted'] += 1
+            log.info("Successfully formatted alert %s", alert_id)
+            
+        except Exception as e:
+            log.error("Failed to format alert %s: %s", alert_id, e)
+            self.stats['failed'] += 1
+            
+    def _report_statistics(self):
+        """Report service statistics"""
+        db_stats = self.db.get_formatting_stats()
+        
+        log.info("Formatting statistics: formatted=%d, failed=%d, errors=%d",
+                self.stats['formatted'], self.stats['failed'], self.stats['errors'])
+        
+        pending = db_stats.get('pending_formatting', 0)
+        notifier.status(f"Formatted: {self.stats['formatted']}, Pending: {pending}")
+        
+        self.last_stats_report = time.time()
 
+# ───── ENTRY POINT ─────────────────────────────────────
+def main():
+    """Service entry point"""
+    try:
+        service = EmailFormatterService()
+        service.run()
+    except KeyboardInterrupt:
+        log.info("Interrupted by user")
+    except Exception as e:
+        log.critical("Fatal error: %s", e, exc_info=True)
+        notifier.status(f"Fatal error: {e}")
+        sys.exit(1)
+    finally:
+        log.info("Email Formatter Service stopped")
+        notifier.stopping()
 
 if __name__ == "__main__":
     main()

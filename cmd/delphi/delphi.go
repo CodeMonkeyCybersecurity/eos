@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/dashboard"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/monitor"
@@ -40,6 +41,7 @@ func init() {
 	DelphiCmd.AddCommand(create.CreateCmd)
 	DelphiCmd.AddCommand(read.ReadCmd) // This 'read' is specific to 'delphi'
 	DelphiCmd.AddCommand(inspect.NewInspectCmd()) // Add the new inspect command
+	DelphiCmd.AddCommand(dashboard.NewDashboardCmd()) // Add the new dashboard command
 	DelphiCmd.AddCommand(delete.DeleteCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(sync.SyncCmd)

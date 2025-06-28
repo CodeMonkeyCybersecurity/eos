@@ -1,19 +1,31 @@
 #!/usr/bin/env python3
 # /usr/local/bin/alert-to-db.py
-# st2ctl reload --register-all
+"""
+Alert Database Loader - Phase 1 of Delphi Pipeline
 
-# stdlib
+This script receives Wazuh alerts from the webhook listener and stores them
+in PostgreSQL, initiating the alert processing pipeline.
+
+Key responsibilities:
+1. Validate incoming alert data against schema constraints
+2. Create minimal agent records to satisfy foreign key requirements
+3. Implement deduplication to prevent alert flooding
+4. Insert alerts with 'new' state to trigger pipeline processing
+"""
+
 import sys
 import json
 import os
 import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
+from typing import Dict, Any, Optional, Tuple
 
 # ───── Third-party imports with graceful fallbacks ─────
 try:
-    import psycopg2  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
+    import psycopg2
+    from psycopg2.extras import Json
+except ModuleNotFoundError:
     sys.stderr.write(
         "ERROR: Missing dependency 'psycopg2-binary'. "
         "Install it with:\n\n    pip install psycopg2-binary\n\n"
@@ -21,23 +33,20 @@ except ModuleNotFoundError:  # pragma: no cover
     sys.exit(1)
 
 try:
-    from dotenv import load_dotenv  # type: ignore
-except ModuleNotFoundError:  # pragma: no cover
-    # Provide a stub so Pylance/mypy are happy and runtime doesn’t break
-    def load_dotenv(*_args, **_kwargs):  # type: ignore
+    from dotenv import load_dotenv
+except ModuleNotFoundError:
+    # Provide a stub for environments without python-dotenv
+    def load_dotenv(*_args, **_kwargs):
         pass
     logging.warning(
         "Optional dependency 'python-dotenv' not found; "
         "continuing without loading a .env file."
     )
 
-# ───── Load Environment Variables ─────
-# (If python-dotenv is installed this loads overrides from the file;
-# otherwise we rely solely on real env vars, as logged above.)
+# ───── Configuration and Environment ─────
 load_dotenv("/opt/stackstorm/packs/delphi/.env")
 PG_DSN = os.getenv("PG_DSN")
 
-# Abort early if the DSN is still missing
 if not PG_DSN:
     sys.stderr.write(
         "ERROR: Environment variable PG_DSN is not set "
@@ -45,231 +54,288 @@ if not PG_DSN:
     )
     sys.exit(1)
 
-# ───── Set Up Logging ─────
+# ───── Logging Configuration ─────
 LOG_FILE = "/var/log/stackstorm/alert-to-db.log"
 logging.basicConfig(
     filename=LOG_FILE,
-    level=logging.INFO, # Capture all operational messages
+    level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S"
 )
 log = logging.getLogger("alert-to-db")
 
-def compute_alert_hash(alert_data):
-    """Generate SHA-256 hash of alert JSON string."""
-    try:
-        # Sort items to ensure consistent hash regardless of key order
-        # Exclude 'id' and 'ingest_timestamp' if they were accidentally included in the raw alert
-        # as they would change the hash on retries/updates, but generally raw data shouldn't have them.
-        # This function should hash the *alert content itself*, not database-assigned metadata.
-        sorted_items = sorted(alert_data.items())
-        alert_string = json.dumps(sorted_items)
-        return hashlib.sha256(alert_string.encode('utf-8')).hexdigest()
-    except Exception as e:
-        log.error(f"Error computing alert hash: {e}")
-        return None # Return None on error
-        
-def main():
-    script_start_time = datetime.now(timezone.utc) # Log script start time in UTC
-    log.info(f"=== alert-to-db.py start at {script_start_time.strftime('%Y-%m-%d %H:%M:%S')} ===")
+# ───── Constants Based on Schema Constraints ─────
+MIN_RULE_LEVEL = 0
+MAX_RULE_LEVEL = 15
+DEDUP_WINDOW_MINUTES = 30
 
-    raw_input = sys.stdin.read()
-    if not raw_input.strip():
-        log.warning("No input received on stdin. Exiting gracefully.")
-        sys.exit(0)
 
-    try:
-        alert = json.loads(raw_input)
-        log.debug(f"Received raw alert: {json.dumps(alert, indent=2)}") 
-    except json.JSONDecodeError as e:
-        log.error(f"Failed to parse JSON from stdin: {e}. Raw input snippet: {raw_input[:500]}...")
-        sys.exit(1)
-    except Exception as e:
-        log.error(f"An unexpected error occurred during JSON parsing: {e}. Raw input snippet: {raw_input[:500]}...")
-        sys.exit(1)
-
-    agent = alert.get("agent", {})
-    agent_id   = agent.get("id")
-    agent_name = agent.get("name")
-    agent_ip   = agent.get("ip")
-    # For OS, use the 'os' field as a dictionary and let the agents table handle its parsing
-    # as the agent_enrichment_agent.py will handle the string conversion for the DB
-    agent_os   = agent.get("os") 
-
-    rule_id = alert.get("rule", {}).get("id")
-    rule_level = alert.get("rule", {}).get("level")
-    rule_desc = alert.get("rule", {}).get("description")
-
-    if not agent_id:
-        log.error(f"Alert missing 'agent.id'. Cannot process alert. Rule details: {json.dumps(alert.get('rule', {}))}")
-        sys.exit(1)
+class AlertProcessor:
+    """Encapsulates alert processing logic with proper validation and error handling"""
     
-    if not rule_id:
-        log.warning(f"Alert for agent '{agent_id}' is missing 'rule.id'. This alert might be harder to trace.")
-
-    alert_hash = compute_alert_hash(alert)
-    if alert_hash is None:
-        log.error(f"Failed to compute alert hash for agent ID '{agent_id}'. Skipping alert insertion.")
-        sys.exit(1)
-
-    log.info(f"Processing alert (agent={agent_id}, rule_id={rule_id}, hash={alert_hash})")
-
-    conn = None
-    cur = None
-
-    try:
-        conn = psycopg2.connect(PG_DSN)
-        cur = conn.cursor()
-
-        # 1) Upsert agent into agents table
-        # We don't set 'os' here because the agent_enrichment_agent.py will provide a full JSON representation
-        # and more detailed breakdown of OS. This initial insert is minimal for FK constraint.
-        log.debug(f"Attempting to upsert agent '{agent_id}' (name={agent_name}, ip={agent_ip}) for initial record.")
+    def __init__(self, pg_dsn: str):
+        self.pg_dsn = pg_dsn
+        
+    def compute_alert_hash(self, alert_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Generate a consistent SHA-256 hash of alert content.
+        
+        This hash is used for deduplication - identical alerts will produce
+        the same hash regardless of when they arrive or in what order the
+        JSON keys appear.
+        """
+        try:
+            # Create a deterministic representation by sorting items
+            # This ensures the same alert always produces the same hash
+            sorted_items = sorted(alert_data.items())
+            alert_string = json.dumps(sorted_items)
+            return hashlib.sha256(alert_string.encode('utf-8')).hexdigest()
+        except Exception as e:
+            log.error(f"Error computing alert hash: {e}")
+            return None
+    
+    def validate_alert(self, alert: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """
+        Validate alert data against schema constraints.
+        
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        # Check required agent fields
+        agent_data = alert.get("agent", {})
+        agent_id = agent_data.get("id")
+        if not agent_id:
+            return False, "Alert missing required field 'agent.id'"
+        
+        # Check required rule fields
+        rule_data = alert.get("rule", {})
+        rule_id = rule_data.get("id")
+        rule_level = rule_data.get("level")
+        
+        if rule_id is None:  # Allow 0 as a valid rule_id
+            return False, "Alert missing required field 'rule.id'"
+        
+        # Validate rule_level against schema constraint
+        if rule_level is None:
+            return False, "Alert missing required field 'rule.level'"
+        
+        try:
+            rule_level_int = int(rule_level)
+        except (ValueError, TypeError):
+            return False, f"Rule level must be numeric, got: {rule_level}"
+        
+        if not (MIN_RULE_LEVEL <= rule_level_int <= MAX_RULE_LEVEL):
+            return False, f"Rule level {rule_level_int} outside valid range [{MIN_RULE_LEVEL}, {MAX_RULE_LEVEL}]"
+        
+        return True, None
+    
+    def check_recent_duplicate(self, cur, alert_hash: str) -> Optional[Tuple[int, datetime]]:
+        """
+        Check if this alert was already processed recently.
+        
+        This implements our Tier 1 deduplication - we skip alerts that are
+        exact duplicates of alerts received in the last 30 minutes to prevent
+        alert flooding from misconfigured systems.
+        """
+        dedup_cutoff = datetime.now(timezone.utc) - timedelta(minutes=DEDUP_WINDOW_MINUTES)
+        
+        cur.execute("""
+            SELECT id, ingest_timestamp 
+            FROM alerts
+            WHERE alert_hash = %s AND ingest_timestamp >= %s
+            LIMIT 1
+        """, (alert_hash, dedup_cutoff))
+        
+        return cur.fetchone()
+    
+    def ensure_agent_exists(self, cur, agent_data: Dict[str, Any]) -> None:
+        """
+        Create or update minimal agent record to satisfy foreign key constraint.
+        
+        The full agent enrichment happens later in the pipeline - we just need
+        enough data here to allow the alert to be inserted.
+        """
+        agent_id = agent_data.get("id")
+        agent_name = agent_data.get("name")
+        agent_ip = agent_data.get("ip")
+        
+        log.debug(f"Ensuring agent '{agent_id}' exists (name={agent_name}, ip={agent_ip})")
+        
         cur.execute("""
             INSERT INTO agents (id, name, ip, registered, last_seen)
             VALUES (%s, %s, %s, now(), now())
             ON CONFLICT (id) DO UPDATE
-              SET name       = EXCLUDED.name,
-                  ip         = EXCLUDED.ip,
-                  last_seen  = now()
-        """, (
-            agent_id,
-            agent_name,
-            agent_ip
-        ))
-        if cur.rowcount == 1:
-            log.info(f"Agent '{agent_id}' **inserted** into 'agents' table (minimal record).")
-        elif cur.rowcount == 0:
-            log.info(f"Agent '{agent_id}' **updated** (last_seen) in 'agents' table.")
-        else:
-            log.warning(f"Unexpected rowcount ({cur.rowcount}) after upserting agent '{agent_id}'. This should not happen for a single upsert.")
-
-
-        # --- Deduplication Logic: Tier 1 (Python Script / Time-based) ---
-        thirty_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=30) # Use UTC for comparison
+            SET name = EXCLUDED.name,
+                ip = EXCLUDED.ip,
+                last_seen = now()
+        """, (agent_id, agent_name, agent_ip))
         
-        log.debug(f"Tier 1 Check: Looking for existing alert with hash '{alert_hash}' ingested after {thirty_minutes_ago.isoformat()}...")
-        cur.execute("""
-            SELECT id, ingest_timestamp FROM alerts
-            WHERE alert_hash = %s AND ingest_timestamp >= %s
-            LIMIT 1
-        """, (alert_hash, thirty_minutes_ago))
-
-        existing_alert = cur.fetchone()
-
-        if existing_alert:
-            existing_alert_db_id = existing_alert[0]
-            existing_ingest_timestamp = existing_alert[1]
-            log.info(
-                f"Tier 1 Result: Alert **SKIPPED by business logic**. "
-                f"Reason: Identical alert (Hash: '{alert_hash}', Rule ID: '{rule_id}', Agent: '{agent_id}') "
-                f"found in database (DB ID: {existing_alert_db_id}, Ingested: {existing_ingest_timestamp.isoformat()}) "
-                f"within the last 30 minutes. No new insertion needed as per policy."
-            )
+        if cur.rowcount == 1:
+            log.info(f"Agent '{agent_id}' created in database")
         else:
-            log.info(f"Tier 1 Result: No recent identical alert (within 30 min) found for hash '{alert_hash}'. Proceeding to Tier 2 (Database Insert).")
-            new_alert_db_id = None # Initialize to None
-
-            try:
-                # --- Deduplication Logic: Tier 2 (Database Constraint / Race Condition Handler) ---
-                cur.execute("""
-                    INSERT INTO alerts (
-                      alert_hash,
-                      agent_id,
-                      rule_id,
-                      rule_level,
-                      rule_desc,
-                      raw,
-                      state,
-                      ingest_timestamp
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, now())
-                    ON CONFLICT (alert_hash) DO NOTHING
-                    RETURNING id, ingest_timestamp
-                """, (
+            log.debug(f"Agent '{agent_id}' updated (last_seen refreshed)")
+    
+    def insert_alert(self, cur, alert: Dict[str, Any], alert_hash: str) -> Optional[Tuple[int, datetime]]:
+        """
+        Insert alert into database with proper deduplication handling.
+        
+        This implements Tier 2 deduplication using the database's UNIQUE
+        constraint. If another process inserts the same alert simultaneously,
+        the database will prevent duplication.
+        """
+        agent_id = alert.get("agent", {}).get("id")
+        rule_data = alert.get("rule", {})
+        rule_id = rule_data.get("id")
+        rule_level = int(rule_data.get("level"))  # Already validated
+        rule_desc = rule_data.get("description", "")
+        
+        try:
+            cur.execute("""
+                INSERT INTO alerts (
                     alert_hash,
                     agent_id,
                     rule_id,
                     rule_level,
                     rule_desc,
-                    json.dumps(alert),
-                    "new" # Initial state for new alerts
-                ))
-                new_alert_data = cur.fetchone() # Fetch the returned values
-
-                if new_alert_data:
-                    new_alert_db_id, new_ingest_timestamp = new_alert_data
+                    raw,
+                    state,
+                    ingest_timestamp
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                ON CONFLICT (alert_hash) DO NOTHING
+                RETURNING id, ingest_timestamp
+            """, (
+                alert_hash,
+                agent_id,
+                rule_id,
+                rule_level,
+                rule_desc,
+                Json(alert),  # Use psycopg2's Json adapter for proper JSONB handling
+                "new"  # Initial state - triggers pipeline processing
+            ))
+            
+            return cur.fetchone()
+            
+        except psycopg2.IntegrityError as e:
+            # This catches any other integrity violations beyond the hash uniqueness
+            # For example, if the agent_id foreign key is somehow invalid
+            log.warning(f"Integrity error inserting alert: {e}")
+            raise
+    
+    def process_alert(self, alert: Dict[str, Any]) -> bool:
+        """
+        Main processing logic for a single alert.
+        
+        Returns True if alert was successfully processed (either inserted or
+        deduplicated), False if there was an error.
+        """
+        # Validate the alert first
+        is_valid, error_msg = self.validate_alert(alert)
+        if not is_valid:
+            log.error(f"Alert validation failed: {error_msg}")
+            log.debug(f"Invalid alert data: {json.dumps(alert)}")
+            return False
+        
+        # Compute hash for deduplication
+        alert_hash = self.compute_alert_hash(alert)
+        if not alert_hash:
+            log.error("Failed to compute alert hash")
+            return False
+        
+        # Extract key fields for logging
+        agent_id = alert.get("agent", {}).get("id")
+        rule_id = alert.get("rule", {}).get("id")
+        
+        log.info(f"Processing alert (agent={agent_id}, rule_id={rule_id}, hash={alert_hash[:8]}...)")
+        
+        conn = None
+        try:
+            conn = psycopg2.connect(self.pg_dsn)
+            with conn.cursor() as cur:
+                # Tier 1: Check for recent duplicates
+                existing = self.check_recent_duplicate(cur, alert_hash)
+                if existing:
+                    existing_id, existing_timestamp = existing
                     log.info(
-                        f"Tier 2 Result: Alert **inserted successfully**. "
-                        f"DB ID: {new_alert_db_id}, "
-                        f"Agent ID: '{agent_id}', "
-                        f"Rule ID: '{rule_id}', "
-                        f"Alert Hash: '{alert_hash}', "
-                        f"Ingest Timestamp: {new_ingest_timestamp.isoformat()}."
+                        f"Alert skipped - duplicate of alert {existing_id} "
+                        f"from {existing_timestamp.isoformat()} "
+                        f"(within {DEDUP_WINDOW_MINUTES} minute window)"
                     )
-                    # --- ADDED: pg_notify for 'new_alert' channel ---
-                    try:
-                        cur.execute("SELECT pg_notify('new_alert', %s);", (str(new_alert_db_id),))
-                        # The conn.commit() below will also commit this notification
-                        log.info(f"Queued pg_notify('new_alert', {new_alert_db_id}) for alert-enrichment-agent.py.")
-                    except Exception as notify_err:
-                        log.error(f"Failed to queue pg_notify for alert ID {new_alert_db_id}: {notify_err}", exc_info=True)
-                        # Don't rollback the main alert insertion if notification fails, just log.
-                    # --- END ADDED ---
+                    # This is not an error - deduplication is working as intended
+                    return True
+                
+                # Ensure agent exists
+                self.ensure_agent_exists(cur, alert.get("agent", {}))
+                
+                # Tier 2: Insert with database-level deduplication
+                result = self.insert_alert(cur, alert, alert_hash)
+                
+                if result:
+                    new_id, new_timestamp = result
+                    log.info(
+                        f"Alert inserted successfully - "
+                        f"ID: {new_id}, "
+                        f"Hash: {alert_hash[:8]}..., "
+                        f"Timestamp: {new_timestamp.isoformat()}"
+                    )
+                    # Note: We do NOT call pg_notify here - the database trigger handles it!
+                    # This prevents duplicate notifications
                 else:
-                    # This branch is taken if ON CONFLICT DO NOTHING happened (i.e., a concurrent insert won the race)
+                    # Another process inserted this alert concurrently
                     log.info(
-                        f"Tier 2 Result: Alert **skipped due to database integrity constraint** (Hash: '{alert_hash}'). "
-                        f"Reason: Another process concurrently inserted this exact alert (same hash) into the DB "
-                        f"before this script's transaction could commit. No new insertion needed."
+                        f"Alert skipped - concurrent insert detected "
+                        f"(hash: {alert_hash[:8]}...)"
                     )
-                    # Re-query to get the DB ID of the winning alert for debug logging
-                    cur.execute("""
-                        SELECT id, ingest_timestamp FROM alerts
-                        WHERE alert_hash = %s
-                        LIMIT 1
-                    """, (alert_hash,)) # Removed timestamp filter here, as we know it's in the DB now.
-                    existing_alert_recheck = cur.fetchone()
-                    if existing_alert_recheck:
-                        log.debug(f"Confirmed existing alert DB ID: {existing_alert_recheck[0]}, Ingested: {existing_alert_recheck[1].isoformat()} (from concurrent insert).")
-                        # If a concurrent insert occurred, get its ID to potentially notify if the process chain allows for existing IDs
-                        new_alert_db_id = existing_alert_recheck[0] # Set new_alert_db_id to the existing one
+                
+                conn.commit()
+                return True
+                
+        except psycopg2.Error as e:
+            log.error(f"Database error processing alert: {e}", exc_info=True)
+            if conn:
+                conn.rollback()
+            return False
+        except Exception as e:
+            log.error(f"Unexpected error processing alert: {e}", exc_info=True)
+            if conn:
+                conn.rollback()
+            return False
+        finally:
+            if conn:
+                conn.close()
 
-            # The psycopg2.IntegrityError exception block will now rarely, if ever, be hit for unique constraint violations
-            # because ON CONFLICT handles it. It might still be useful for other types of integrity errors.
-            except psycopg2.IntegrityError as e:
-                conn.rollback() # Rollback the transaction
-                log.warning(
-                    f"Tier 2 Error: Alert **skipped due to other database integrity error** (Hash: '{alert_hash}', Rule ID: '{rule_id}'). "
-                    f"Reason: Not a unique constraint violation, but potentially a foreign key or check constraint issue. Error: {e}"
-                )
-            except Exception as e:
-                conn.rollback() # Rollback the transaction
-                log.error(
-                    f"Tier 2 Critical Error: **Unhandled exception during alert insertion** (hash: '{alert_hash}', agent: '{agent_id}', rule: '{rule_id}'): {e}",
-                    exc_info=True
-                )
-                sys.exit(1)
 
-        conn.commit() # Commit the main transaction (including the notification)
-        # Removed print("ok")
-
-    except psycopg2.Error as e:
-        log.error(f"**Database connection or transaction error occurred**: {e}", exc_info=True)
-        if conn:
-            conn.rollback()
+def main():
+    """Main entry point - reads alert from stdin and processes it"""
+    start_time = datetime.now(timezone.utc)
+    log.info(f"=== alert-to-db.py started at {start_time.isoformat()} ===")
+    
+    # Read input from stdin
+    raw_input = sys.stdin.read()
+    if not raw_input.strip():
+        log.warning("No input received on stdin - exiting gracefully")
+        sys.exit(0)
+    
+    # Parse JSON input
+    try:
+        alert = json.loads(raw_input)
+        log.debug(f"Received alert: {json.dumps(alert)[:500]}...")  # Log first 500 chars
+    except json.JSONDecodeError as e:
+        log.error(f"Failed to parse JSON from stdin: {e}")
+        log.debug(f"Raw input: {raw_input[:500]}...")
         sys.exit(1)
-    except Exception as e:
-        log.error(f"**An unexpected non-database error occurred during main execution**: {e}", exc_info=True)
-        if conn:
-            conn.rollback()
-        sys.exit(1)
-    finally:
-        if cur:
-            cur.close()
-        if conn:
-            conn.close()
-        log.info(f"=== alert-to-db.py end at {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} ===") # Use UTC for end time
+    
+    # Process the alert
+    processor = AlertProcessor(PG_DSN)
+    success = processor.process_alert(alert)
+    
+    end_time = datetime.now(timezone.utc)
+    duration_ms = (end_time - start_time).total_seconds() * 1000
+    log.info(f"=== alert-to-db.py completed in {duration_ms:.1f}ms ===")
+    
+    # Exit with appropriate code
+    sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()
