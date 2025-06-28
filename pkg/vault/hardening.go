@@ -751,7 +751,7 @@ func revokeRootTokenSafely(rc *eos_io.RuntimeContext, client *api.Client) error 
 	}
 
 	log.Info(" Root token revoked successfully")
-	log.Info("🔔 Use alternative authentication methods for future access")
+	log.Info(" Use alternative authentication methods for future access")
 
 	return nil
 }

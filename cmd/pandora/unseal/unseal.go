@@ -301,10 +301,10 @@ func performSecureManualUnseal(rc *eos_io.RuntimeContext, client *api.Client, au
 
 		if !status.Sealed {
 			log.Info(" ")
-			log.Info(" ✅ Vault successfully unsealed!",
+			log.Info("  Vault successfully unsealed!",
 				zap.Int("keys_provided", keysProvided),
 				zap.Duration("duration", time.Since(startTime)))
-			
+
 			if auditor != nil {
 				auditor.LogEvent("unseal_successful", map[string]interface{}{
 					"keys_provided": keysProvided,
@@ -335,20 +335,20 @@ func performSecureManualUnseal(rc *eos_io.RuntimeContext, client *api.Client, au
 
 		// Apply the key
 		log.Info(" Applying unseal key", zap.Int("key_number", keysProvided+1))
-		
+
 		resp, err := client.Sys().Unseal(key)
 		if err != nil {
 			log.Error(" Failed to apply unseal key",
 				zap.Int("key_number", keysProvided+1),
 				zap.Error(err))
-			
+
 			if auditor != nil {
 				auditor.LogEvent("key_application_failed", map[string]interface{}{
 					"key_number": keysProvided + 1,
 					"error":      err.Error(),
 				})
 			}
-			
+
 			// Ask user if they want to continue or abort
 			if !askContinueAfterError(rc) {
 				return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("unseal aborted by user"))
@@ -357,7 +357,7 @@ func performSecureManualUnseal(rc *eos_io.RuntimeContext, client *api.Client, au
 		}
 
 		keysProvided++
-		
+
 		if auditor != nil {
 			auditor.LogEvent("key_applied_successfully", map[string]interface{}{
 				"key_number": keysProvided,
@@ -376,10 +376,10 @@ func performSecureManualUnseal(rc *eos_io.RuntimeContext, client *api.Client, au
 
 		if !resp.Sealed {
 			log.Info(" ")
-			log.Info(" ✅ Vault successfully unsealed!",
+			log.Info("  Vault successfully unsealed!",
 				zap.Int("keys_provided", keysProvided),
 				zap.Duration("duration", time.Since(startTime)))
-			
+
 			if auditor != nil {
 				auditor.LogEvent("unseal_successful", map[string]interface{}{
 					"keys_provided": keysProvided,
@@ -404,7 +404,7 @@ func performSecureManualUnseal(rc *eos_io.RuntimeContext, client *api.Client, au
 // promptForUnsealKey securely prompts for an unseal key
 func promptForUnsealKey(keyNumber int) (string, error) {
 	fmt.Printf(" Enter unseal key #%d (input will be hidden): ", keyNumber)
-	
+
 	// Use terminal package for secure input
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
@@ -428,13 +428,13 @@ func promptForUnsealKey(keyNumber int) (string, error) {
 // askContinueAfterError asks the user if they want to continue after a key application error
 func askContinueAfterError(rc *eos_io.RuntimeContext) bool {
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	fmt.Print(" Key application failed. Continue with next key? [y/N]: ")
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return false
 	}
-	
+
 	response = strings.TrimSpace(strings.ToLower(response))
 	return response == "y" || response == "yes"
 }

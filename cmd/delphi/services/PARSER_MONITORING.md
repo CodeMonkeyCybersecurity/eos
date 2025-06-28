@@ -54,7 +54,7 @@ eos delphi parser-health --circuit-breaker  # Circuit breaker status
 
 ## Dashboard Sections
 
-### 🏥 Parser Health Summary
+###  Parser Health Summary
 - Success rate over last 24 hours
 - Average parse time
 - Active prompt types

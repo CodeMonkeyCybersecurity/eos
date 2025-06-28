@@ -104,7 +104,7 @@ func verifyAgentPrerequisites(rc *eos_io.RuntimeContext, client *api.Client) err
 	}
 
 	// Verify Vault is healthy
-	log.Info("🏥 Checking Vault health status")
+	log.Info(" Checking Vault health status")
 	health, err := client.Sys().Health()
 	if err != nil {
 		log.Error(" Failed to check Vault health", zap.Error(err))

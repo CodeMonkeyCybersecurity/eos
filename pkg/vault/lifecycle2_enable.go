@@ -149,7 +149,7 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 }
 
 func PrintEnableNextSteps() {
-	fmt.Println("\n🔔 Vault setup is now complete!")
+	fmt.Println("\n Vault setup is now complete!")
 	fmt.Println(" Next steps:")
 	fmt.Println("   1. Run: eos secure vault   (to finalize hardening and cleanup)")
 	fmt.Println("   2. Test Vault Agent: eos read vault agent")

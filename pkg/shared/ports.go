@@ -32,7 +32,11 @@ var AppProxies = []AppProxy{
 	{AppName: "nextcloud", Subdomain: "cloud", BackendPort: 11000},
 }
 
-// n8n 8147 8161 8167 8171 8179 8191 8209 8219, 8221, 8231
+// n8n 8147 
+// 8161 consul
+// 8167 gitea
+// 8171 
+// 8179 8191 8209 8219, 8221, 8231
 
 // Centralized service stream blocks.
 var (

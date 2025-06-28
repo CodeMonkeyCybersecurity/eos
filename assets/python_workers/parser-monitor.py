@@ -286,7 +286,7 @@ class ParserMonitor:
         print("="*80)
         
         # Health Summary
-        print("\n🏥 PARSER HEALTH SUMMARY")
+        print("\n PARSER HEALTH SUMMARY")
         print("-" * 80)
         health = self.get_parser_health_summary()
         print(f"Active Prompt Types: {health['active_prompt_types']}")

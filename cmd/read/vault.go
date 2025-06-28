@@ -426,7 +426,7 @@ func displayAgentStatus(status *vault.AgentStatus) {
 	}
 
 	// Overall health
-	fmt.Printf("\n🏥 Overall Health: ")
+	fmt.Printf("\n Overall Health: ")
 	switch status.HealthStatus {
 	case "healthy":
 		fmt.Println(" Healthy")
