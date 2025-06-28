@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"go.uber.org/zap"
@@ -232,15 +231,6 @@ func (m *MFAManager) validateSudoersFile(filename string) error {
 	}
 
 	return nil
-}
-
-// backupSudoersFile creates a backup of a sudoers file
-func (m *MFAManager) backupSudoersFile(filename string) error {
-	backupName := filepath.Base(filename) + ".backup-" +
-		time.Now().Format("20060102-150405")
-	backupPath := filepath.Join(m.backupDir, backupName)
-
-	return m.copyFile(filename, backupPath)
 }
 
 // getSudoersFingerprint creates a fingerprint of current sudoers configuration
