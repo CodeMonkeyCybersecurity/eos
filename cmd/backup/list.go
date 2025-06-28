@@ -1,0 +1,278 @@
+// cmd/backup/list.go
+
+package backup
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List backup resources",
+}
+
+var listReposCmd = &cobra.Command{
+	Use:   "repositories",
+	Short: "List configured backup repositories",
+	RunE:  eos.Wrap(listRepositories),
+}
+
+var listProfilesCmd = &cobra.Command{
+	Use:   "profiles",
+	Short: "List configured backup profiles",
+	RunE:  eos.Wrap(listProfiles),
+}
+
+var listSnapshotsCmd = &cobra.Command{
+	Use:   "snapshots",
+	Short: "List snapshots in a repository",
+	Long: `List all snapshots in the specified repository.
+
+Examples:
+  # List snapshots in default repository
+  eos backup list snapshots
+  
+  # List snapshots in specific repository
+  eos backup list snapshots --repo remote
+  
+  # List snapshots with specific tags
+  eos backup list snapshots --tags system,daily`,
+	RunE: eos.Wrap(listSnapshots),
+}
+
+func init() {
+	listCmd.AddCommand(listReposCmd)
+	listCmd.AddCommand(listProfilesCmd)
+	listCmd.AddCommand(listSnapshotsCmd)
+
+	// Snapshot list flags
+	listSnapshotsCmd.Flags().String("repo", "", "Repository to list snapshots from")
+	listSnapshotsCmd.Flags().StringSlice("tags", nil, "Filter by tags")
+	listSnapshotsCmd.Flags().String("host", "", "Filter by hostname")
+	listSnapshotsCmd.Flags().String("path", "", "Filter by path")
+}
+
+func listRepositories(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Listing backup repositories")
+
+	config, err := backup.LoadConfig(rc)
+	if err != nil {
+		return fmt.Errorf("loading configuration: %w", err)
+	}
+
+	if len(config.Repositories) == 0 {
+		logger.Info("No repositories configured")
+		return nil
+	}
+
+	logger.Info("Configured repositories",
+		zap.Int("count", len(config.Repositories)))
+
+	// Display repositories
+	fmt.Println("\nConfigured Repositories:")
+	fmt.Println(strings.Repeat("-", 80))
+	fmt.Printf("%-20s %-10s %-40s\n", "NAME", "BACKEND", "URL")
+	fmt.Println(strings.Repeat("-", 80))
+
+	for name, repo := range config.Repositories {
+		isDefault := ""
+		if name == config.DefaultRepository {
+			isDefault = " (default)"
+		}
+		fmt.Printf("%-20s %-10s %-40s%s\n",
+			name, repo.Backend, repo.URL, isDefault)
+	}
+	fmt.Println()
+
+	return nil
+}
+
+func listProfiles(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Listing backup profiles")
+
+	config, err := backup.LoadConfig(rc)
+	if err != nil {
+		return fmt.Errorf("loading configuration: %w", err)
+	}
+
+	if len(config.Profiles) == 0 {
+		logger.Info("No profiles configured")
+		return nil
+	}
+
+	logger.Info("Configured profiles",
+		zap.Int("count", len(config.Profiles)))
+
+	// Display profiles
+	fmt.Println("\nConfigured Profiles:")
+	fmt.Println(strings.Repeat("-", 100))
+	fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
+		"NAME", "REPOSITORY", "PATHS", "SCHEDULE", "RETENTION")
+	fmt.Println(strings.Repeat("-", 100))
+
+	for name, profile := range config.Profiles {
+		paths := strings.Join(profile.Paths, ", ")
+		if len(paths) > 30 {
+			paths = paths[:27] + "..."
+		}
+
+		schedule := "-"
+		if profile.Schedule != nil && profile.Schedule.Cron != "" {
+			schedule = profile.Schedule.Cron
+		}
+
+		retention := "-"
+		if profile.Retention != nil {
+			parts := []string{}
+			if profile.Retention.KeepLast > 0 {
+				parts = append(parts, fmt.Sprintf("L:%d", profile.Retention.KeepLast))
+			}
+			if profile.Retention.KeepDaily > 0 {
+				parts = append(parts, fmt.Sprintf("D:%d", profile.Retention.KeepDaily))
+			}
+			if profile.Retention.KeepWeekly > 0 {
+				parts = append(parts, fmt.Sprintf("W:%d", profile.Retention.KeepWeekly))
+			}
+			if profile.Retention.KeepMonthly > 0 {
+				parts = append(parts, fmt.Sprintf("M:%d", profile.Retention.KeepMonthly))
+			}
+			retention = strings.Join(parts, " ")
+		}
+
+		fmt.Printf("%-20s %-15s %-30s %-20s %s\n",
+			name, profile.Repository, paths, schedule, retention)
+	}
+	fmt.Println()
+
+	return nil
+}
+
+func listSnapshots(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	repoName, _ := cmd.Flags().GetString("repo")
+	filterTags, _ := cmd.Flags().GetStringSlice("tags")
+	filterHost, _ := cmd.Flags().GetString("host")
+	filterPath, _ := cmd.Flags().GetString("path")
+
+	// Use default repository if not specified
+	if repoName == "" {
+		config, err := backup.LoadConfig(rc)
+		if err != nil {
+			return fmt.Errorf("loading configuration: %w", err)
+		}
+		repoName = config.DefaultRepository
+		if repoName == "" {
+			return fmt.Errorf("no repository specified and no default configured")
+		}
+	}
+
+	logger.Info("Listing snapshots",
+		zap.String("repository", repoName),
+		zap.Strings("filter_tags", filterTags),
+		zap.String("filter_host", filterHost))
+
+	// Create backup client
+	client, err := backup.NewClient(rc, repoName)
+	if err != nil {
+		return fmt.Errorf("creating backup client: %w", err)
+	}
+
+	// List snapshots
+	snapshots, err := client.ListSnapshots()
+	if err != nil {
+		return fmt.Errorf("listing snapshots: %w", err)
+	}
+
+	// Apply filters
+	filtered := []backup.Snapshot{}
+	for _, snap := range snapshots {
+		// Tag filter
+		if len(filterTags) > 0 {
+			hasTag := false
+			for _, tag := range filterTags {
+				for _, snapTag := range snap.Tags {
+					if tag == snapTag {
+						hasTag = true
+						break
+					}
+				}
+				if hasTag {
+					break
+				}
+			}
+			if !hasTag {
+				continue
+			}
+		}
+
+		// Host filter
+		if filterHost != "" && snap.Hostname != filterHost {
+			continue
+		}
+
+		// Path filter
+		if filterPath != "" {
+			hasPath := false
+			for _, path := range snap.Paths {
+				if strings.Contains(path, filterPath) {
+					hasPath = true
+					break
+				}
+			}
+			if !hasPath {
+				continue
+			}
+		}
+
+		filtered = append(filtered, snap)
+	}
+
+	logger.Info("Found snapshots",
+		zap.Int("total", len(snapshots)),
+		zap.Int("filtered", len(filtered)))
+
+	if len(filtered) == 0 {
+		fmt.Println("No snapshots found matching criteria")
+		return nil
+	}
+
+	// Display snapshots
+	fmt.Println("\nSnapshots:")
+	fmt.Println(strings.Repeat("-", 120))
+	fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
+		"ID", "TIME", "HOST", "PATHS", "TAGS")
+	fmt.Println(strings.Repeat("-", 120))
+
+	for _, snap := range filtered {
+		id := snap.ID
+		if len(id) > 16 {
+			id = id[:16]
+		}
+
+		timeStr := snap.Time.Format("2006-01-02 15:04:05")
+
+		paths := strings.Join(snap.Paths, ", ")
+		if len(paths) > 40 {
+			paths = paths[:37] + "..."
+		}
+
+		tags := strings.Join(snap.Tags, ", ")
+
+		fmt.Printf("%-16s %-20s %-15s %-40s %s\n",
+			id, timeStr, snap.Hostname, paths, tags)
+	}
+	fmt.Println()
+
+	return nil
+}
