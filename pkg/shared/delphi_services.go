@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // DelphiServiceDefinition represents a complete service definition
@@ -362,13 +363,25 @@ func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName strin
 	}
 	
 	// Check if worker file exists
+	workerStart := time.Now()
 	if _, err := os.Stat(service.WorkerScript); err == nil {
 		status.WorkerInstalled = true
 	}
+	workerDuration := time.Since(workerStart)
 	
 	// Check if service file exists
+	serviceStart := time.Now()
 	if _, err := os.Stat(service.ServiceFile); err == nil {
 		status.ServiceInstalled = true
+	}
+	serviceDuration := time.Since(serviceStart)
+	
+	// Log slow file system operations
+	if workerDuration > 2*time.Second {
+		fmt.Printf("SLOW: os.Stat(%s) took %v\n", service.WorkerScript, workerDuration)
+	}
+	if serviceDuration > 2*time.Second {
+		fmt.Printf("SLOW: os.Stat(%s) took %v\n", service.ServiceFile, serviceDuration)
 	}
 	
 	// Check if service is enabled and active (would require systemctl calls)

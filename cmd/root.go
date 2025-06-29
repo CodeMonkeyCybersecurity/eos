@@ -97,7 +97,23 @@ func Execute(rc *eos_io.RuntimeContext) {
 	_ = telemetry.Init("eos")
 
 	otelzap.Ctx(rc.Ctx).Info("Eos CLI starting")
-	startGlobalWatchdog(rc, 3*time.Minute)
+	
+	// Check for extended timeout from environment variable
+	globalTimeout := 3 * time.Minute
+	if envTimeout := os.Getenv("EOS_GLOBAL_TIMEOUT"); envTimeout != "" {
+		if parsedTimeout, err := time.ParseDuration(envTimeout); err == nil {
+			globalTimeout = parsedTimeout
+			otelzap.Ctx(rc.Ctx).Info("⏱️  Using extended global timeout from environment",
+				zap.Duration("timeout", globalTimeout),
+				zap.String("source", "EOS_GLOBAL_TIMEOUT"))
+		} else {
+			otelzap.Ctx(rc.Ctx).Warn("Invalid EOS_GLOBAL_TIMEOUT format, using default",
+				zap.String("invalid_value", envTimeout),
+				zap.Duration("default_timeout", globalTimeout))
+		}
+	}
+	
+	startGlobalWatchdog(rc, globalTimeout)
 
 	RegisterCommands(rc)
 

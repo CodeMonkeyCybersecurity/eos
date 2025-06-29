@@ -38,12 +38,29 @@ type EnhancedServiceStatus struct {
 // GetEnhancedServiceStatus returns comprehensive status for a service
 func (sm *ServiceManager) GetEnhancedServiceStatus(ctx context.Context, serviceName string) (EnhancedServiceStatus, error) {
 	logger := otelzap.Ctx(ctx)
+	statusStart := time.Now()
+	
+	logger.Debug("🔍 Starting enhanced service status check",
+		zap.String("service", serviceName))
 	
 	// Get basic installation status
+	basicStatusStart := time.Now()
 	basicStatus, err := sm.registry.CheckServiceInstallationStatus(serviceName)
+	basicStatusDuration := time.Since(basicStatusStart)
+	
 	if err != nil {
+		logger.Error("❌ Failed to get basic service status",
+			zap.String("service", serviceName),
+			zap.Duration("duration", basicStatusDuration),
+			zap.Error(err))
 		return EnhancedServiceStatus{}, err
 	}
+	
+	logger.Debug("✅ Basic service status check completed",
+		zap.String("service", serviceName),
+		zap.Bool("worker_installed", basicStatus.WorkerInstalled),
+		zap.Bool("service_installed", basicStatus.ServiceInstalled),
+		zap.Duration("duration", basicStatusDuration))
 	
 	enhancedStatus := EnhancedServiceStatus{
 		ServiceInstallationStatus: basicStatus,
@@ -53,28 +70,74 @@ func (sm *ServiceManager) GetEnhancedServiceStatus(ctx context.Context, serviceN
 	
 	// Check systemd status if service is installed
 	if basicStatus.ServiceInstalled {
+		systemdStart := time.Now()
+		
+		logger.Debug("🔧 Checking systemd status",
+			zap.String("service", serviceName))
+		
 		// Check if service is active
+		activeStart := time.Now()
 		if isActive, err := sm.isServiceActive(serviceName); err == nil {
 			enhancedStatus.SystemdActive = isActive
+			logger.Debug("✅ Service active check completed",
+				zap.String("service", serviceName),
+				zap.Bool("is_active", isActive),
+				zap.Duration("duration", time.Since(activeStart)))
+		} else {
+			logger.Warn("⚠️  Service active check failed",
+				zap.String("service", serviceName),
+				zap.Duration("duration", time.Since(activeStart)),
+				zap.Error(err))
 		}
 		
 		// Check if service is enabled
+		enabledStart := time.Now()
 		if isEnabled, err := sm.isServiceEnabled(serviceName); err == nil {
 			enhancedStatus.SystemdEnabled = isEnabled
+			logger.Debug("✅ Service enabled check completed",
+				zap.String("service", serviceName),
+				zap.Bool("is_enabled", isEnabled),
+				zap.Duration("duration", time.Since(enabledStart)))
+		} else {
+			logger.Warn("⚠️  Service enabled check failed",
+				zap.String("service", serviceName),
+				zap.Duration("duration", time.Since(enabledStart)),
+				zap.Error(err))
 		}
 		
 		// Get detailed systemd status
+		statusCheckStart := time.Now()
 		if status, err := sm.getServiceStatus(serviceName); err == nil {
 			enhancedStatus.SystemdStatus = status
+			logger.Debug("✅ Service status check completed",
+				zap.String("service", serviceName),
+				zap.String("status", status),
+				zap.Duration("duration", time.Since(statusCheckStart)))
+		} else {
+			logger.Warn("⚠️  Service status check failed",
+				zap.String("service", serviceName),
+				zap.Duration("duration", time.Since(statusCheckStart)),
+				zap.Error(err))
 		}
+		
+		logger.Debug("🎯 All systemd checks completed",
+			zap.String("service", serviceName),
+			zap.Duration("systemd_checks_duration", time.Since(systemdStart)))
+	} else {
+		logger.Debug("⏭️  Skipping systemd checks (service not installed)",
+			zap.String("service", serviceName))
 	}
 	
-	logger.Debug("Enhanced service status check completed",
+	totalDuration := time.Since(statusStart)
+	
+	logger.Info("✅ Enhanced service status check completed",
 		zap.String("service", serviceName),
 		zap.Bool("worker_installed", enhancedStatus.WorkerInstalled),
 		zap.Bool("service_installed", enhancedStatus.ServiceInstalled),
 		zap.Bool("systemd_active", enhancedStatus.SystemdActive),
-		zap.Bool("systemd_enabled", enhancedStatus.SystemdEnabled))
+		zap.Bool("systemd_enabled", enhancedStatus.SystemdEnabled),
+		zap.String("systemd_status", enhancedStatus.SystemdStatus),
+		zap.Duration("total_duration", totalDuration))
 	
 	return enhancedStatus, nil
 }
@@ -83,27 +146,92 @@ func (sm *ServiceManager) GetEnhancedServiceStatus(ctx context.Context, serviceN
 func (sm *ServiceManager) GetServicesRequiringInstallation(ctx context.Context) (map[string]EnhancedServiceStatus, error) {
 	logger := otelzap.Ctx(ctx)
 	
-	logger.Info("🔍 Scanning for services requiring installation")
+	scanStart := time.Now()
+	allServices := sm.registry.GetActiveServices()
+	
+	logger.Info("🔍 Starting comprehensive service installation scan",
+		zap.Int("total_services", len(allServices)),
+		zap.String("scan_phase", "initialization"))
 	
 	needingInstallation := make(map[string]EnhancedServiceStatus)
 	
-	for serviceName := range sm.registry.GetActiveServices() {
+	for i, serviceName := range sm.registry.GetActiveServiceNames() {
+		serviceStart := time.Now()
+		
+		logger.Info("🔍 Checking service installation status",
+			zap.String("service", serviceName),
+			zap.Int("progress", i+1),
+			zap.Int("total", len(allServices)),
+			zap.Duration("elapsed_total", time.Since(scanStart)))
+		
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			logger.Error("❌ Service installation scan cancelled",
+				zap.String("reason", "context_cancelled"),
+				zap.Error(ctx.Err()),
+				zap.Duration("scan_duration", time.Since(scanStart)),
+				zap.Int("services_checked", i))
+			return nil, ctx.Err()
+		default:
+			// Continue with scan
+		}
+		
 		status, err := sm.GetEnhancedServiceStatus(ctx, serviceName)
+		serviceDuration := time.Since(serviceStart)
+		
 		if err != nil {
-			logger.Warn("Failed to check service status",
+			logger.Error("❌ Failed to check service status",
 				zap.String("service", serviceName),
+				zap.Duration("check_duration", serviceDuration),
 				zap.Error(err))
 			continue
 		}
 		
+		logger.Info("✅ Service status check completed",
+			zap.String("service", serviceName),
+			zap.Bool("worker_installed", status.WorkerInstalled),
+			zap.Bool("service_installed", status.ServiceInstalled),
+			zap.Bool("systemd_active", status.SystemdActive),
+			zap.Bool("systemd_enabled", status.SystemdEnabled),
+			zap.Duration("check_duration", serviceDuration))
+		
 		if !status.WorkerInstalled || !status.ServiceInstalled {
 			needingInstallation[serviceName] = status
+			logger.Info("📦 Service requires installation",
+				zap.String("service", serviceName),
+				zap.Bool("worker_missing", !status.WorkerInstalled),
+				zap.Bool("service_missing", !status.ServiceInstalled))
+		}
+		
+		// Add progress logging every few services
+		if i > 0 && (i+1)%3 == 0 {
+			logger.Info("📊 Service scan progress update",
+				zap.Int("services_checked", i+1),
+				zap.Int("total_services", len(allServices)),
+				zap.Int("needing_installation", len(needingInstallation)),
+				zap.Duration("elapsed", time.Since(scanStart)),
+				zap.Duration("avg_per_service", time.Since(scanStart)/time.Duration(i+1)))
 		}
 	}
 	
-	logger.Info("📊 Service installation scan completed",
+	scanDuration := time.Since(scanStart)
+	
+	logger.Info("🎯 Service installation scan completed",
 		zap.Int("services_needing_installation", len(needingInstallation)),
-		zap.Int("total_services", len(sm.registry.GetActiveServices())))
+		zap.Int("total_services", len(allServices)),
+		zap.Duration("total_scan_duration", scanDuration),
+		zap.Duration("avg_per_service", scanDuration/time.Duration(len(allServices))))
+	
+	// Log details of services needing installation
+	if len(needingInstallation) > 0 {
+		var missingServices []string
+		for serviceName := range needingInstallation {
+			missingServices = append(missingServices, serviceName)
+		}
+		logger.Info("📋 Services requiring installation",
+			zap.Strings("services", missingServices))
+	}
 	
 	return needingInstallation, nil
 }
@@ -199,8 +327,16 @@ func (sm *ServiceManager) AutoInstallServices(ctx context.Context, servicesToIns
 
 // Helper functions for systemd checks
 func (sm *ServiceManager) isServiceActive(serviceName string) (bool, error) {
+	start := time.Now()
 	cmd := exec.Command("systemctl", "is-active", serviceName)
 	output, err := cmd.Output()
+	duration := time.Since(start)
+	
+	if duration > 5*time.Second {
+		// Log slow systemctl commands - this might indicate a problem
+		fmt.Printf("SLOW: systemctl is-active %s took %v\n", serviceName, duration)
+	}
+	
 	if err != nil {
 		return false, err
 	}
@@ -208,8 +344,15 @@ func (sm *ServiceManager) isServiceActive(serviceName string) (bool, error) {
 }
 
 func (sm *ServiceManager) isServiceEnabled(serviceName string) (bool, error) {
+	start := time.Now()
 	cmd := exec.Command("systemctl", "is-enabled", serviceName)
 	output, err := cmd.Output()
+	duration := time.Since(start)
+	
+	if duration > 5*time.Second {
+		fmt.Printf("SLOW: systemctl is-enabled %s took %v\n", serviceName, duration)
+	}
+	
 	if err != nil {
 		return false, err
 	}
@@ -218,8 +361,15 @@ func (sm *ServiceManager) isServiceEnabled(serviceName string) (bool, error) {
 }
 
 func (sm *ServiceManager) getServiceStatus(serviceName string) (string, error) {
+	start := time.Now()
 	cmd := exec.Command("systemctl", "show", serviceName, "--property=ActiveState", "--value")
 	output, err := cmd.Output()
+	duration := time.Since(start)
+	
+	if duration > 5*time.Second {
+		fmt.Printf("SLOW: systemctl show %s took %v\n", serviceName, duration)
+	}
+	
 	if err != nil {
 		return "unknown", err
 	}

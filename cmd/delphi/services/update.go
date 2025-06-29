@@ -96,11 +96,12 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 // NewUpdateCmd creates the update command
 func NewUpdateCmd() *cobra.Command {
 	var (
-		all         bool
-		dryRun      bool
-		skipBackup  bool
-		skipRestart bool
-		timeout     time.Duration
+		all                     bool
+		dryRun                  bool
+		skipBackup              bool
+		skipRestart             bool
+		skipInstallationCheck   bool
+		timeout                 time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -130,7 +131,9 @@ Examples:
   eos delphi services update delphi-listener
   eos delphi services update --all
   eos delphi services update --all --dry-run
-  eos delphi services update delphi-emailer --skip-backup --skip-restart`,
+  eos delphi services update --all --skip-installation-check
+  eos delphi services update delphi-emailer --skip-backup --skip-restart
+  eos delphi services update --all --timeout 15m`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			// Use centralized service registry for autocompletion
 			serviceManager := shared.GetGlobalServiceManager()
@@ -150,7 +153,24 @@ Examples:
 					zap.Duration("requested_timeout", timeout),
 					zap.String("reason", "service update operations can take significant time"))
 				
-				// Create new context with extended timeout
+				// Set environment variable for global watchdog extension
+				// Note: This only affects subprocess calls, not the current process
+				originalTimeout := os.Getenv("EOS_GLOBAL_TIMEOUT")
+				os.Setenv("EOS_GLOBAL_TIMEOUT", timeout.String())
+				defer func() {
+					if originalTimeout == "" {
+						os.Unsetenv("EOS_GLOBAL_TIMEOUT")
+					} else {
+						os.Setenv("EOS_GLOBAL_TIMEOUT", originalTimeout)
+					}
+				}()
+				
+				logger.Warn("⚠️  Global watchdog timeout cannot be extended for current process",
+					zap.Duration("global_watchdog", 3*time.Minute),
+					zap.Duration("requested_timeout", timeout),
+					zap.String("suggestion", "Use shorter operations or split into multiple commands if timeout is exceeded"))
+				
+				// Create new context with extended timeout for the command operations
 				ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 				defer cancel()
 				rc.Ctx = ctx
@@ -166,30 +186,36 @@ Examples:
 			// Use centralized service management
 			serviceManager := shared.GetGlobalServiceManager()
 			
-			// Phase 0: Check for missing services and offer installation
-			logger.Info("🔍 Phase 0: Service installation verification",
-				zap.String("phase", "pre-check"))
-			
-			missingServices, err := serviceManager.GetServicesRequiringInstallation(rc.Ctx)
-			if err != nil {
-				logger.Warn("Failed to check service installation status",
-					zap.Error(err))
-			} else if len(missingServices) > 0 {
-				logger.Info("🛠️  Detected services requiring installation",
-					zap.Int("missing_count", len(missingServices)))
+			// Phase 0: Check for missing services and offer installation (if not skipped)
+			if !skipInstallationCheck {
+				logger.Info("🔍 Phase 0: Service installation verification",
+					zap.String("phase", "pre-check"))
 				
-				servicesToInstall, err := serviceManager.PromptForServiceInstallation(rc.Ctx, missingServices)
+				missingServices, err := serviceManager.GetServicesRequiringInstallation(rc.Ctx)
 				if err != nil {
-					return fmt.Errorf("failed to determine services to install: %w", err)
-				}
-				
-				if len(servicesToInstall) > 0 {
-					logger.Info("🚀 Installing missing services automatically")
-					if err := serviceManager.AutoInstallServices(rc.Ctx, servicesToInstall); err != nil {
-						return fmt.Errorf("failed to auto-install services: %w", err)
+					logger.Warn("Failed to check service installation status",
+						zap.Error(err))
+				} else if len(missingServices) > 0 {
+					logger.Info("🛠️  Detected services requiring installation",
+						zap.Int("missing_count", len(missingServices)))
+					
+					servicesToInstall, err := serviceManager.PromptForServiceInstallation(rc.Ctx, missingServices)
+					if err != nil {
+						return fmt.Errorf("failed to determine services to install: %w", err)
 					}
-					logger.Info("✅ Service installation completed")
+					
+					if len(servicesToInstall) > 0 {
+						logger.Info("🚀 Installing missing services automatically")
+						if err := serviceManager.AutoInstallServices(rc.Ctx, servicesToInstall); err != nil {
+							return fmt.Errorf("failed to auto-install services: %w", err)
+						}
+						logger.Info("✅ Service installation completed")
+					}
 				}
+			} else {
+				logger.Info("⏭️  Skipping service installation check",
+					zap.String("reason", "skip-installation-check flag enabled"),
+					zap.String("note", "assuming all required services are already installed"))
 			}
 
 			// Get all service workers from centralized registry
@@ -229,6 +255,7 @@ Examples:
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Show what would be done without making changes")
 	cmd.Flags().BoolVar(&skipBackup, "skip-backup", false, "Skip backing up existing workers")
 	cmd.Flags().BoolVar(&skipRestart, "skip-restart", false, "Skip restarting services after update")
+	cmd.Flags().BoolVar(&skipInstallationCheck, "skip-installation-check", false, "Skip checking if services need installation (faster, assumes services are installed)")
 	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Operation timeout (default 10m, set to 0 to use global 3m timeout)")
 
 	return cmd
