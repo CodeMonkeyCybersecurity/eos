@@ -33,6 +33,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	// Internal packages
 )
 
@@ -86,6 +87,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		hecate.HecateCmd,
 		delphi.DelphiCmd, // This is the top-level 'delphi'
 		pandora.PandoraCmd,
+		ragequit.RagequitCmd,
 	} {
 		RootCmd.AddCommand(subCmd)
 	}

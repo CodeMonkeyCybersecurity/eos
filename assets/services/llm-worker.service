@@ -19,7 +19,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/log
-Type=simple
+Type=notify
 User=stanley
 Environment="PYTHONUNBUFFERED=1"
 StandardOutput=journal

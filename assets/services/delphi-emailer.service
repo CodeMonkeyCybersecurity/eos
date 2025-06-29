@@ -5,7 +5,7 @@ After=network.target
 StartLimitIntervalSec=300
 
 [Service]
-Type=simple
+Type=notify
 User=stanley
 ExecStart=/usr/bin/python3 /usr/local/bin/delphi-emailer.py
 WorkingDirectory=/home/ubuntu

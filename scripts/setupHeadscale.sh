@@ -59,7 +59,7 @@ Description=Headscale
 After=network.target
 
 [Service]
-Type=simple
+Type=notify
 User=root
 ExecStart=/usr/local/bin/headscale serve
 Restart=on-failure

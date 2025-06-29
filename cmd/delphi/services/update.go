@@ -186,7 +186,39 @@ Examples:
 			// Use centralized service management
 			serviceManager := shared.GetGlobalServiceManager()
 			
-			// Phase 0: Check for missing services and offer installation (if not skipped)
+			// Phase 0.1: Check for zombie services first (critical safety check)
+			logger.Info("🧟 Phase 0.1: Zombie service detection",
+				zap.String("phase", "zombie-check"))
+			
+			lifecycleManager := shared.GetGlobalServiceLifecycleManager()
+			zombieServices, err := lifecycleManager.DetectZombieServices(rc.Ctx)
+			if err != nil {
+				logger.Warn("Failed to check for zombie services",
+					zap.Error(err))
+			} else if len(zombieServices) > 0 {
+				logger.Error("💥 DANGER: Zombie services detected - update aborted",
+					zap.Int("zombie_count", len(zombieServices)),
+					zap.String("reason", "zombie services can cause systemd loops and system instability"))
+				
+				for _, zombie := range zombieServices {
+					logger.Error("🧟 Zombie service found",
+						zap.String("service", zombie.ServiceName),
+						zap.Int("pid", zombie.PID),
+						zap.String("problem", "running without unit file"))
+				}
+				
+				logger.Error("❌ Service update cannot proceed with zombie services present")
+				logger.Info("💡 To fix this issue:")
+				logger.Info("  1. Run: eos delphi services cleanup --dry-run")
+				logger.Info("  2. Then: eos delphi services cleanup --auto-fix")
+				logger.Info("  3. Finally retry: eos delphi services update --all")
+				
+				return fmt.Errorf("zombie services detected - clean up required before update can proceed")
+			} else {
+				logger.Info("✅ No zombie services detected - safe to proceed")
+			}
+			
+			// Phase 0.2: Check for missing services and offer installation (if not skipped)
 			if !skipInstallationCheck {
 				logger.Info("🔍 Phase 0: Service installation verification",
 					zap.String("phase", "pre-check"))

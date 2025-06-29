@@ -6,7 +6,7 @@ Wants=postgresql.service
 Requires=network.target
 
 [Service]
-Type=simple
+Type=notify
 User=stanley
 Group=stanley
 WorkingDirectory=/opt/stackstorm/packs/delphi

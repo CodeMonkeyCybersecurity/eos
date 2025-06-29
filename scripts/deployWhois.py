@@ -9,7 +9,7 @@ Description=WHOIS Lookup Script Service
 After=network.target
 
 [Service]
-Type=simple
+Type=notify
 User=root
 WorkingDirectory=/opt/eos/scripts
 ExecStart=/opt/whois/venv/bin/python3 /opt/eos/scripts/whois.py

@@ -34,6 +34,7 @@ Service Management:
 - enable/disable: Configure service autostart
 - status: View service status and health
 - logs: View service logs and troubleshooting info
+- cleanup: Detect and fix zombie services (running without unit files)
 
 Special Operations:
 - deploy-ab-config: Deploy A/B testing configuration for prompt optimization
@@ -65,6 +66,7 @@ func init() {
 	ServicesCmd.AddCommand(NewEnableCmd())
 	ServicesCmd.AddCommand(NewDisableCmd())
 	ServicesCmd.AddCommand(NewLogsCmd())
+	ServicesCmd.AddCommand(NewCleanupCmd()) // Zombie service cleanup
 	
 	// Special operations
 	// Note: checkCmd and installCmd add themselves via their own init() functions

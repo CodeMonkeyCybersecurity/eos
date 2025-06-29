@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -67,91 +68,48 @@ Examples:
 				return fmt.Errorf("unknown service: %s", serviceName)
 			}
 
-			// Check if service exists
-			if !eos_unix.ServiceExists(serviceName) {
-				logger.Warn(" Service not found in systemd",
-					zap.String("service", serviceName))
+			// Use safe service removal process
+			logger.Info("🔧 Using safe service removal process",
+				zap.String("service", serviceName),
+				zap.String("method", "lifecycle_manager"))
+
+			lifecycleManager := shared.GetGlobalServiceLifecycleManager()
+			
+			if err := lifecycleManager.SafelyRemoveService(rc.Ctx, serviceName); err != nil {
+				if !force {
+					return fmt.Errorf("failed to safely remove service %s (use --force to ignore): %w", serviceName, err)
+				}
+				logger.Warn("⚠️  Safe removal failed, continuing due to --force flag",
+					zap.String("service", serviceName),
+					zap.Error(err))
 			} else {
-				// Stop the service if running
-				status, err := getServiceStatus(rc, serviceName)
-				if err == nil && status.Active == "active" {
-					logger.Info(" Stopping service",
-						zap.String("service", serviceName))
-
-					if err := eos_unix.StopSystemdUnitWithRetry(rc.Ctx, serviceName, 3, 2); err != nil {
-						if !force {
-							return fmt.Errorf("failed to stop service %s (use --force to ignore): %w", serviceName, err)
-						}
-						logger.Warn(" Failed to stop service, continuing due to --force flag",
-							zap.String("service", serviceName),
-							zap.Error(err))
-					} else {
-						logger.Info(" Service stopped successfully",
-							zap.String("service", serviceName))
-					}
-				}
-
-				// Disable the service
-				logger.Info(" Disabling service",
+				logger.Info("✅ Service safely removed via lifecycle manager",
 					zap.String("service", serviceName))
-
-				if err := exec.Command("systemctl", "disable", serviceName).Run(); err != nil {
-					if !force {
-						return fmt.Errorf("failed to disable service %s (use --force to ignore): %w", serviceName, err)
-					}
-					logger.Warn(" Failed to disable service, continuing due to --force flag",
-						zap.String("service", serviceName),
-						zap.Error(err))
-				} else {
-					logger.Info(" Service disabled successfully",
-						zap.String("service", serviceName))
-				}
 			}
 
-			// Remove service file
-			if eos_unix.FileExists(config.ServiceFile) {
-				logger.Info(" Removing service file",
-					zap.String("file", config.ServiceFile))
-
-				if err := os.Remove(config.ServiceFile); err != nil {
-					if !force {
-						return fmt.Errorf("failed to remove service file %s (use --force to ignore): %w", config.ServiceFile, err)
-					}
-					logger.Warn(" Failed to remove service file, continuing due to --force flag",
-						zap.String("file", config.ServiceFile),
-						zap.Error(err))
-				} else {
-					logger.Info(" Service file removed successfully",
-						zap.String("file", config.ServiceFile))
-				}
-			} else {
-				logger.Info(" Service file not found (already removed)",
-					zap.String("file", config.ServiceFile))
-			}
-
-			// Remove worker script
+			// Additional cleanup for worker script (lifecycle manager handles systemd parts)
 			if eos_unix.FileExists(config.WorkerFile) {
-				logger.Info(" Removing worker script",
+				logger.Info("🗑️  Removing worker script",
 					zap.String("file", config.WorkerFile))
 
 				if err := os.Remove(config.WorkerFile); err != nil {
 					if !force {
 						return fmt.Errorf("failed to remove worker script %s (use --force to ignore): %w", config.WorkerFile, err)
 					}
-					logger.Warn(" Failed to remove worker script, continuing due to --force flag",
+					logger.Warn("⚠️  Failed to remove worker script, continuing due to --force flag",
 						zap.String("file", config.WorkerFile),
 						zap.Error(err))
 				} else {
-					logger.Info(" Worker script removed successfully",
+					logger.Info("✅ Worker script removed successfully",
 						zap.String("file", config.WorkerFile))
 				}
 			} else {
-				logger.Info(" Worker script not found (already removed)",
+				logger.Info("ℹ️  Worker script not found (already removed)",
 					zap.String("file", config.WorkerFile))
 			}
 
-			// Reload systemd daemon
-			logger.Info(" Reloading systemd daemon")
+			// Final systemd daemon reload (lifecycle manager may have already done this, but safe to repeat)
+			logger.Info("🔄 Final systemd daemon reload")
 			if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
 				logger.Warn(" Failed to reload systemd daemon", zap.Error(err))
 			} else {
