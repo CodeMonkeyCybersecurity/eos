@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -89,56 +91,7 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 	}
 }
 
-// detectEosRoot attempts to find the EOS root directory.
-// It checks the EOS_ROOT env var, then relative to the executable, then current working dir.
-func detectEosRoot(logger otelzap.LoggerWithCtx) (string, error) {
-	// 1. Check EOS_ROOT environment variable
-	if eosRoot := os.Getenv("EOS_ROOT"); eosRoot != "" {
-		logger.Debug("EOS_ROOT found from environment variable", zap.String("path", eosRoot))
-		// Check if the provided EOS_ROOT actually contains the 'assets' directory
-		if fileExists(filepath.Join(eosRoot, "assets")) {
-			return eosRoot, nil
-		}
-		logger.Warn("EOS_ROOT environment variable set, but 'assets' directory not found inside it, trying auto-detection.", zap.String("path", eosRoot))
-		// Continue to other detection methods if the set path doesn't look valid for assets
-	}
-
-	// 2. Try to deduce from executable path (e.g., if installed in /usr/local/bin)
-	exePath, err := os.Executable()
-	if err == nil {
-		// Common installation locations for the executable and corresponding project root
-		// This list assumes 'eos' binary is in /usr/local/bin and the project root
-		// is typically in /opt/eos or /srv/eos.
-		possibleRoots := []string{
-			filepath.Join(filepath.Dir(exePath), "..", "..", "opt", "eos"), // e.g., /usr/local/bin/eos -> /opt/eos
-			filepath.Join(filepath.Dir(exePath), "..", "..", "srv", "eos"), // e.g., /usr/local/bin/eos -> /srv/eos
-			filepath.Join(filepath.Dir(exePath), "..", "eos"),              // e.g., /usr/local/bin/eos -> /usr/local/eos (less common)
-			"/opt/eos", // Direct check for common /opt/eos
-			"/srv/eos", // Direct check for common /srv/eos
-		}
-		for _, root := range possibleRoots {
-			absRoot, _ := filepath.Abs(root)
-			if fileExists(filepath.Join(absRoot, "assets")) {
-				logger.Debug("EOS_ROOT auto-detected relative to executable", zap.String("path", absRoot))
-				return absRoot, nil
-			}
-		}
-	} else {
-		logger.Warn("Failed to get executable path for EOS_ROOT auto-detection", zap.Error(err))
-	}
-
-	// 3. Try current working directory (only if it looks like the root)
-	if pwd, err := os.Getwd(); err == nil {
-		if fileExists(filepath.Join(pwd, "assets")) {
-			logger.Debug("EOS_ROOT auto-detected from current working directory", zap.String("path", pwd))
-			return pwd, nil
-		}
-	} else {
-		logger.Warn("Failed to get current working directory for EOS_ROOT auto-detection", zap.Error(err))
-	}
-
-	return "", fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory. Please set EOS_ROOT to the path of your eos project (e.g., /opt/eos) or ensure 'eos' is installed in a standard location")
-}
+// REMOVED: detectEosRoot function - now using centralized service registry in pkg/shared
 
 // NewUpdateCmd creates the update command
 func NewUpdateCmd() *cobra.Command {
@@ -147,6 +100,7 @@ func NewUpdateCmd() *cobra.Command {
 		dryRun      bool
 		skipBackup  bool
 		skipRestart bool
+		timeout     time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -178,15 +132,9 @@ Examples:
   eos delphi services update --all --dry-run
   eos delphi services update delphi-emailer --skip-backup --skip-restart`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			// Call detectEosRoot here as well to get an accurate list for autocompletion
-			logger := otelzap.Ctx(cmd.Context()) // Use command context for logger
-			eosRoot, err := detectEosRoot(logger)
-			if err != nil {
-				// Log the error but don't fail autocompletion
-				logger.Error("Failed to detect EOS_ROOT for autocompletion", zap.Error(err))
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-			workers := GetServiceWorkers(eosRoot)
+			// Use centralized service registry for autocompletion
+			serviceManager := shared.GetGlobalServiceManager()
+			workers := serviceManager.GetServiceWorkersForUpdate()
 			var services []string
 			for _, w := range workers {
 				services = append(services, w.ServiceName)
@@ -195,23 +143,60 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
+			
+			// Extend timeout if specified
+			if timeout > 0 {
+				logger.Info("⏱️  Extending operation timeout",
+					zap.Duration("requested_timeout", timeout),
+					zap.String("reason", "service update operations can take significant time"))
+				
+				// Create new context with extended timeout
+				ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
+				defer cancel()
+				rc.Ctx = ctx
+			}
+			
 			logger.Info("Starting Delphi services update",
 				zap.Bool("all", all),
 				zap.Bool("dry_run", dryRun),
 				zap.Bool("skip_backup", skipBackup),
-				zap.Bool("skip_restart", skipRestart))
+				zap.Bool("skip_restart", skipRestart),
+				zap.Duration("timeout", timeout))
 
-			// Get EOS root directory using the new robust detection function
-			eosRoot, err := detectEosRoot(logger)
+			// Use centralized service management
+			serviceManager := shared.GetGlobalServiceManager()
+			
+			// Phase 0: Check for missing services and offer installation
+			logger.Info("🔍 Phase 0: Service installation verification",
+				zap.String("phase", "pre-check"))
+			
+			missingServices, err := serviceManager.GetServicesRequiringInstallation(rc.Ctx)
 			if err != nil {
-				return err // Return the error if EOS_ROOT cannot be determined
+				logger.Warn("Failed to check service installation status",
+					zap.Error(err))
+			} else if len(missingServices) > 0 {
+				logger.Info("🛠️  Detected services requiring installation",
+					zap.Int("missing_count", len(missingServices)))
+				
+				servicesToInstall, err := serviceManager.PromptForServiceInstallation(rc.Ctx, missingServices)
+				if err != nil {
+					return fmt.Errorf("failed to determine services to install: %w", err)
+				}
+				
+				if len(servicesToInstall) > 0 {
+					logger.Info("🚀 Installing missing services automatically")
+					if err := serviceManager.AutoInstallServices(rc.Ctx, servicesToInstall); err != nil {
+						return fmt.Errorf("failed to auto-install services: %w", err)
+					}
+					logger.Info("✅ Service installation completed")
+				}
 			}
 
-			// Get all service workers
-			allWorkers := GetServiceWorkers(eosRoot)
+			// Get all service workers from centralized registry
+			allWorkers := serviceManager.GetServiceWorkersForUpdate()
 
 			// Determine which workers to update
-			var workersToUpdate []ServiceWorkerInfo
+			var workersToUpdate []shared.ServiceWorkerInfo
 			if all {
 				workersToUpdate = allWorkers
 			} else if len(args) == 0 {
@@ -222,7 +207,7 @@ Examples:
 				found := false
 				for _, worker := range allWorkers {
 					if worker.ServiceName == serviceName {
-						workersToUpdate = []ServiceWorkerInfo{worker}
+						workersToUpdate = []shared.ServiceWorkerInfo{worker}
 						found = true
 						break
 					}
@@ -244,11 +229,12 @@ Examples:
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Show what would be done without making changes")
 	cmd.Flags().BoolVar(&skipBackup, "skip-backup", false, "Skip backing up existing workers")
 	cmd.Flags().BoolVar(&skipRestart, "skip-restart", false, "Skip restarting services after update")
+	cmd.Flags().DurationVar(&timeout, "timeout", 10*time.Minute, "Operation timeout (default 10m, set to 0 to use global 3m timeout)")
 
 	return cmd
 }
 
-func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
+func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []shared.ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
 	logger.Info(" Starting enhanced service update process",
 		zap.Int("worker_count", len(workers)),
 		zap.Bool("dry_run", dryRun),
@@ -388,12 +374,14 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 			zap.String("service", worker.ServiceName),
 			zap.String("target", worker.TargetPath))
 
-		// Add to restart list if service exists
-		if eos_unix.ServiceExists(worker.ServiceName) {
+		// Add to restart list if service exists using centralized service manager
+		serviceManager := shared.GetGlobalServiceManager()
+		if serviceManager.CheckServiceExists(worker.ServiceName) {
 			servicesToRestart = append(servicesToRestart, worker.ServiceName)
 		} else {
 			logger.Warn("Service unit file not found, skipping restart",
-				zap.String("service", worker.ServiceName))
+				zap.String("service", worker.ServiceName),
+				zap.String("suggestion", "Run 'eos delphi services create "+worker.ServiceName+"' to install the service"))
 		}
 	}
 

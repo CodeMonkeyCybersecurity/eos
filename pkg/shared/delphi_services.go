@@ -1,5 +1,6 @@
-// cmd/delphi/services/service_registry.go
-package services
+// pkg/shared/delphi_services.go
+
+package shared
 
 import (
 	"fmt"
@@ -8,11 +9,13 @@ import (
 	"strings"
 )
 
-// ServiceMetadata represents comprehensive service information
-type ServiceMetadata struct {
+// DelphiServiceDefinition represents a complete service definition
+type DelphiServiceDefinition struct {
 	Name            string            `json:"name"`
 	WorkerScript    string            `json:"worker_script"`
 	ServiceFile     string            `json:"service_file"`
+	SourceWorker    string            `json:"source_worker"`    // Source path in assets/
+	SourceService   string            `json:"source_service"`   // Source service file in assets/
 	Description     string            `json:"description"`
 	PipelineStage   string            `json:"pipeline_stage"`
 	Dependencies    []string          `json:"dependencies"`
@@ -22,7 +25,6 @@ type ServiceMetadata struct {
 	User            string            `json:"user"`
 	Group           string            `json:"group"`
 	Permissions     string            `json:"permissions"`
-	Status          ServiceState      `json:"status,omitempty"`
 	ABTestEnabled   bool              `json:"ab_test_enabled"`
 	Deprecated      bool              `json:"deprecated"`
 	ReplacedBy      string            `json:"replaced_by,omitempty"`
@@ -35,15 +37,6 @@ type ConfigFile struct {
 	Template    string `json:"template,omitempty"`
 	Required    bool   `json:"required"`
 	Description string `json:"description"`
-}
-
-// ServiceState represents current service state (renamed to avoid conflict)
-type ServiceState struct {
-	Active      string `json:"active"`       // active, inactive, failed
-	Enabled     string `json:"enabled"`      // enabled, disabled  
-	Installed   bool   `json:"installed"`    // worker and service files exist
-	Healthy     bool   `json:"healthy"`      // passing health checks
-	LastChecked string `json:"last_checked"` // timestamp of last status check
 }
 
 // ServiceCategory for organizing services
@@ -61,22 +54,37 @@ const (
 	CategoryDeprecated  ServiceCategory = "deprecated"
 )
 
-// ServiceRegistry provides a single source of truth for all Delphi services
-type ServiceRegistry struct {
-	services map[string]ServiceMetadata
+// ServiceInstallationStatus represents the installation state of a service
+type ServiceInstallationStatus struct {
+	ServiceName       string `json:"service_name"`
+	WorkerInstalled   bool   `json:"worker_installed"`
+	ServiceInstalled  bool   `json:"service_installed"`
+	ServiceEnabled    bool   `json:"service_enabled"`
+	ServiceActive     bool   `json:"service_active"`
+	WorkerPath        string `json:"worker_path"`
+	ServicePath       string `json:"service_path"`
+	SourceWorkerPath  string `json:"source_worker_path"`
+	SourceServicePath string `json:"source_service_path"`
 }
 
-// NewServiceRegistry creates a registry with all known Delphi services
-func NewServiceRegistry() *ServiceRegistry {
-	registry := &ServiceRegistry{
-		services: make(map[string]ServiceMetadata),
+// DelphiServiceRegistry provides centralized service management
+type DelphiServiceRegistry struct {
+	services map[string]DelphiServiceDefinition
+}
+
+// GetDelphiServiceRegistry returns the global service registry
+func GetDelphiServiceRegistry() *DelphiServiceRegistry {
+	registry := &DelphiServiceRegistry{
+		services: make(map[string]DelphiServiceDefinition),
 	}
 	
-	// Core pipeline services - aligned with assets/python_workers/*
-	registry.registerService(ServiceMetadata{
+	// Core pipeline services - centralized definitions
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "delphi-listener",
-		WorkerScript:  "/usr/local/bin/delphi-listener.py",
+		WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
 		ServiceFile:   "/etc/systemd/system/delphi-listener.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/delphi-listener.py",
+		SourceService: "/opt/eos/assets/services/delphi-listener.service",
 		Description:   "Webhook listener for Wazuh alerts - Pipeline entry point",
 		PipelineStage: "ingestion",
 		Dependencies:  []string{"python3", "requests", "psycopg2", "python-dotenv"},
@@ -86,15 +94,17 @@ func NewServiceRegistry() *ServiceRegistry {
 		EnvironmentVars: []string{"PG_DSN", "WEBHOOK_PORT"},
 		Ports:          []int{8080},
 		User:           "stanley",
-		Group:          "stanley", 
+		Group:          "stanley",
 		Permissions:    "0750",
 		Categories:     []ServiceCategory{CategoryIngestion},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "delphi-agent-enricher",
-		WorkerScript:  "/usr/local/bin/delphi-agent-enricher.py",
+		WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
 		ServiceFile:   "/etc/systemd/system/delphi-agent-enricher.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/delphi-agent-enricher.py",
+		SourceService: "/opt/eos/assets/services/delphi-agent-enricher.service",
 		Description:   "Agent metadata enrichment service - Adds agent context to alerts",
 		PipelineStage: "enrichment",
 		Dependencies:  []string{"python3", "requests", "psycopg2", "python-dotenv"},
@@ -108,10 +118,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryEnrichment},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "alert-to-db",
-		WorkerScript:  "/usr/local/bin/alert-to-db.py",
+		WorkerScript:  "/opt/stackstorm/packs/delphi/alert-to-db.py",
 		ServiceFile:   "/etc/systemd/system/alert-to-db.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/alert-to-db.py",
+		SourceService: "/opt/eos/assets/services/alert-to-db.service",
 		Description:   "Database operations for alerts - Handles alert persistence and state transitions",
 		PipelineStage: "processing",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
@@ -125,10 +137,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryProcessing},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "prompt-ab-tester",
 		WorkerScript:  "/usr/local/bin/prompt-ab-tester.py",
 		ServiceFile:   "/etc/systemd/system/prompt-ab-tester.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/prompt-ab-tester.py",
+		SourceService: "/opt/eos/assets/services/prompt-ab-tester.service",
 		Description:   "A/B testing coordinator for prompt optimization - Assigns prompt variants and tracks experiments",
 		PipelineStage: "analysis",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
@@ -145,10 +159,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryTesting, CategoryAnalysis},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "llm-worker",
-		WorkerScript:  "/usr/local/bin/llm-worker.py",
+		WorkerScript:  "/opt/stackstorm/packs/delphi/llm-worker.py",
 		ServiceFile:   "/etc/systemd/system/llm-worker.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/llm-worker.py",
+		SourceService: "/opt/eos/assets/services/llm-worker.service",
 		Description:   "LLM processing service - Analyzes alerts using OpenAI API with prompt-aware parsing",
 		PipelineStage: "analysis",
 		Dependencies:  []string{"python3", "requests", "psycopg2", "openai", "python-dotenv"},
@@ -164,10 +180,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryAnalysis, CategoryProcessing},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "ab-test-analyzer",
 		WorkerScript:  "/usr/local/bin/ab-test-analyzer.py",
 		ServiceFile:   "/etc/systemd/system/ab-test-analyzer.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/ab-test-analyzer.py",
+		SourceService: "/opt/eos/assets/services/ab-test-analyzer.service",
 		Description:   "A/B test results analyzer - Evaluates experiment performance and provides insights",
 		PipelineStage: "analysis",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "numpy", "scipy"},
@@ -183,10 +201,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryTesting, CategoryAnalysis},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-structurer",
 		WorkerScript:  "/usr/local/bin/email-structurer.py",
 		ServiceFile:   "/etc/systemd/system/email-structurer.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/email-structurer.py",
+		SourceService: "/opt/eos/assets/services/email-structurer.service",
 		Description:   "Email structuring service - Converts analyzed alerts to structured email data",
 		PipelineStage: "formatting",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
@@ -200,10 +220,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryFormatting},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-formatter",
 		WorkerScript:  "/usr/local/bin/email-formatter.py",
 		ServiceFile:   "/etc/systemd/system/email-formatter.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/email-formatter.py",
+		SourceService: "/opt/eos/assets/services/email-formatter.service",
 		Description:   "Email formatting service - Renders structured data into HTML/text email templates",
 		PipelineStage: "formatting",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "jinja2"},
@@ -218,10 +240,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryFormatting},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-sender",
 		WorkerScript:  "/usr/local/bin/email-sender.py",
 		ServiceFile:   "/etc/systemd/system/email-sender.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/email-sender.py",
+		SourceService: "/opt/eos/assets/services/email-sender.service",
 		Description:   "Email delivery service - Sends formatted emails via SMTP with delivery tracking",
 		PipelineStage: "delivery",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "smtplib"},
@@ -235,10 +259,12 @@ func NewServiceRegistry() *ServiceRegistry {
 		Categories:     []ServiceCategory{CategoryDelivery},
 	})
 	
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "parser-monitor",
 		WorkerScript:  "/usr/local/bin/parser-monitor.py",
 		ServiceFile:   "/etc/systemd/system/parser-monitor.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/parser-monitor.py",
+		SourceService: "/opt/eos/assets/services/parser-monitor.service",
 		Description:   "Parser health monitoring service - Provides observability for prompt-aware parsing system",
 		PipelineStage: "monitoring",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "tabulate"},
@@ -253,10 +279,12 @@ func NewServiceRegistry() *ServiceRegistry {
 	})
 	
 	// Deprecated services
-	registry.registerService(ServiceMetadata{
+	registry.registerService(DelphiServiceDefinition{
 		Name:          "delphi-emailer",
 		WorkerScript:  "/usr/local/bin/delphi-emailer.py",
 		ServiceFile:   "/etc/systemd/system/delphi-emailer.service",
+		SourceWorker:  "/opt/eos/assets/python_workers/delphi-emailer.py",
+		SourceService: "/opt/eos/assets/services/delphi-emailer.service",
 		Description:   "Legacy email service - DEPRECATED: Use email-structurer, email-formatter, email-sender instead",
 		PipelineStage: "deprecated",
 		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
@@ -272,24 +300,24 @@ func NewServiceRegistry() *ServiceRegistry {
 }
 
 // registerService adds a service to the registry
-func (r *ServiceRegistry) registerService(service ServiceMetadata) {
+func (r *DelphiServiceRegistry) registerService(service DelphiServiceDefinition) {
 	r.services[service.Name] = service
 }
 
 // GetService retrieves a service by name
-func (r *ServiceRegistry) GetService(name string) (ServiceMetadata, bool) {
+func (r *DelphiServiceRegistry) GetService(name string) (DelphiServiceDefinition, bool) {
 	service, exists := r.services[name]
 	return service, exists
 }
 
 // GetAllServices returns all services
-func (r *ServiceRegistry) GetAllServices() map[string]ServiceMetadata {
+func (r *DelphiServiceRegistry) GetAllServices() map[string]DelphiServiceDefinition {
 	return r.services
 }
 
 // GetActiveServices returns non-deprecated services
-func (r *ServiceRegistry) GetActiveServices() map[string]ServiceMetadata {
-	active := make(map[string]ServiceMetadata)
+func (r *DelphiServiceRegistry) GetActiveServices() map[string]DelphiServiceDefinition {
+	active := make(map[string]DelphiServiceDefinition)
 	for name, service := range r.services {
 		if !service.Deprecated {
 			active[name] = service
@@ -298,22 +326,8 @@ func (r *ServiceRegistry) GetActiveServices() map[string]ServiceMetadata {
 	return active
 }
 
-// GetServicesByCategory returns services in a specific category
-func (r *ServiceRegistry) GetServicesByCategory(category ServiceCategory) map[string]ServiceMetadata {
-	filtered := make(map[string]ServiceMetadata)
-	for name, service := range r.services {
-		for _, cat := range service.Categories {
-			if cat == category {
-				filtered[name] = service
-				break
-			}
-		}
-	}
-	return filtered
-}
-
-// GetServiceNames returns a list of all service names (for command validation)
-func (r *ServiceRegistry) GetServiceNames() []string {
+// GetServiceNames returns a list of all service names
+func (r *DelphiServiceRegistry) GetServiceNames() []string {
 	var names []string
 	for name := range r.services {
 		names = append(names, name)
@@ -322,7 +336,7 @@ func (r *ServiceRegistry) GetServiceNames() []string {
 }
 
 // GetActiveServiceNames returns names of non-deprecated services only
-func (r *ServiceRegistry) GetActiveServiceNames() []string {
+func (r *DelphiServiceRegistry) GetActiveServiceNames() []string {
 	var names []string
 	for name, service := range r.services {
 		if !service.Deprecated {
@@ -332,8 +346,57 @@ func (r *ServiceRegistry) GetActiveServiceNames() []string {
 	return names
 }
 
+// CheckServiceInstallationStatus checks the installation status of a service
+func (r *DelphiServiceRegistry) CheckServiceInstallationStatus(serviceName string) (ServiceInstallationStatus, error) {
+	service, exists := r.GetService(serviceName)
+	if !exists {
+		return ServiceInstallationStatus{}, fmt.Errorf("service %s not found in registry", serviceName)
+	}
+	
+	status := ServiceInstallationStatus{
+		ServiceName:       serviceName,
+		WorkerPath:        service.WorkerScript,
+		ServicePath:       service.ServiceFile,
+		SourceWorkerPath:  service.SourceWorker,
+		SourceServicePath: service.SourceService,
+	}
+	
+	// Check if worker file exists
+	if _, err := os.Stat(service.WorkerScript); err == nil {
+		status.WorkerInstalled = true
+	}
+	
+	// Check if service file exists
+	if _, err := os.Stat(service.ServiceFile); err == nil {
+		status.ServiceInstalled = true
+	}
+	
+	// Check if service is enabled and active (would require systemctl calls)
+	// This is handled by eos_unix.ServiceExists and eos_unix.CheckServiceStatus
+	
+	return status, nil
+}
+
+// GetServicesRequiringInstallation returns services that need installation
+func (r *DelphiServiceRegistry) GetServicesRequiringInstallation() ([]string, error) {
+	var needingInstallation []string
+	
+	for serviceName := range r.GetActiveServices() {
+		status, err := r.CheckServiceInstallationStatus(serviceName)
+		if err != nil {
+			continue
+		}
+		
+		if !status.WorkerInstalled || !status.ServiceInstalled {
+			needingInstallation = append(needingInstallation, serviceName)
+		}
+	}
+	
+	return needingInstallation, nil
+}
+
 // ValidateService checks if a service name is valid and provides helpful feedback
-func (r *ServiceRegistry) ValidateService(name string) error {
+func (r *DelphiServiceRegistry) ValidateService(name string) error {
 	if service, exists := r.services[name]; exists {
 		if service.Deprecated {
 			replacement := service.ReplacedBy
@@ -360,7 +423,7 @@ func (r *ServiceRegistry) ValidateService(name string) error {
 }
 
 // GetPipelineOrder returns services in pipeline execution order
-func (r *ServiceRegistry) GetPipelineOrder() []string {
+func (r *DelphiServiceRegistry) GetPipelineOrder() []string {
 	stageOrder := []string{"ingestion", "enrichment", "processing", "analysis", "formatting", "delivery"}
 	var orderedServices []string
 	
@@ -375,29 +438,8 @@ func (r *ServiceRegistry) GetPipelineOrder() []string {
 	return orderedServices
 }
 
-// CheckServiceFilesExist checks if worker and service files exist for a service
-func (r *ServiceRegistry) CheckServiceFilesExist(name string) (bool, bool, error) {
-	service, exists := r.GetService(name)
-	if !exists {
-		return false, false, fmt.Errorf("service %s not found", name)
-	}
-	
-	workerExists := false
-	serviceExists := false
-	
-	if _, err := os.Stat(service.WorkerScript); err == nil {
-		workerExists = true
-	}
-	
-	if _, err := os.Stat(service.ServiceFile); err == nil {
-		serviceExists = true
-	}
-	
-	return workerExists, serviceExists, nil
-}
-
 // GetMissingServices returns services that exist in python_workers but not deployed
-func (r *ServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]string, error) {
+func (r *DelphiServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]string, error) {
 	var missing []string
 	
 	files, err := filepath.Glob(filepath.Join(pythonWorkersPath, "*.py"))
@@ -421,57 +463,9 @@ func (r *ServiceRegistry) GetMissingServices(pythonWorkersPath string) ([]string
 }
 
 // Global registry instance
-var globalRegistry = NewServiceRegistry()
+var globalDelphiServiceRegistry = GetDelphiServiceRegistry()
 
-// GetGlobalRegistry returns the global service registry
-func GetGlobalRegistry() *ServiceRegistry {
-	return globalRegistry
-}
-
-// Legacy compatibility functions for existing code
-func GetDelphiServicesFromRegistry() []string {
-	return globalRegistry.GetActiveServiceNames()
-}
-
-func GetServiceConfigurationsFromRegistry() map[string]ServiceConfiguration {
-	// Convert new ServiceMetadata to legacy ServiceConfiguration for backward compatibility
-	configs := make(map[string]ServiceConfiguration)
-	
-	for name, meta := range globalRegistry.GetActiveServices() {
-		var configPaths []string
-		for _, cf := range meta.ConfigFiles {
-			configPaths = append(configPaths, cf.Path)
-		}
-		
-		configs[name] = ServiceConfiguration{
-			Name:         meta.Name,
-			ServiceFile:  meta.ServiceFile,
-			WorkerFile:   meta.WorkerScript,
-			Description:  meta.Description,
-			Dependencies: meta.Dependencies,
-			ConfigFiles:  configPaths,
-		}
-	}
-	
-	return configs
-}
-
-// Updated DelphiServices for backward compatibility - now sourced from registry
-var DelphiServicesFromRegistry = GetDelphiServicesFromRegistry()
-
-// DEPRECATION NOTICE: The functions below are deprecated and redirect to pkg/shared
-// Use pkg/shared.GetGlobalDelphiServiceRegistry() for new code
-
-// GetDelphiServicesFromCentralRegistry redirects to centralized service system
-func GetDelphiServicesFromCentralRegistry() []string {
-	// Import is handled at runtime to avoid circular dependencies
-	// This is a compatibility shim - new code should import pkg/shared directly
-	return GetDelphiServicesFromRegistry() // Falls back to local registry for now
-}
-
-// GetServiceConfigurationsFromCentralRegistry redirects to centralized service system  
-func GetServiceConfigurationsFromCentralRegistry() map[string]ServiceConfiguration {
-	// Import is handled at runtime to avoid circular dependencies
-	// This is a compatibility shim - new code should import pkg/shared directly
-	return GetServiceConfigurationsFromRegistry() // Falls back to local registry for now
+// GetGlobalDelphiServiceRegistry returns the global service registry
+func GetGlobalDelphiServiceRegistry() *DelphiServiceRegistry {
+	return globalDelphiServiceRegistry
 }
