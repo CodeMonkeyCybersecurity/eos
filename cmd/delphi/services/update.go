@@ -249,12 +249,48 @@ Examples:
 }
 
 func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
-	logger.Info("Planning to update workers",
+	logger.Info("🚀 Starting enhanced service update process",
 		zap.Int("worker_count", len(workers)),
-		zap.Bool("dry_run", dryRun))
+		zap.Bool("dry_run", dryRun),
+		zap.Bool("backup_enabled", !skipBackup),
+		zap.Bool("restart_enabled", !skipRestart),
+		zap.String("phase", "initialization"))
 
-	// Pre-flight checks
-	for _, worker := range workers {
+	overallStart := time.Now()
+	
+	logger.Info("📋 Update process configuration",
+		zap.String("mode", func() string {
+			if dryRun {
+				return "DRY_RUN"
+			}
+			return "LIVE"
+		}()),
+		zap.String("backup_policy", func() string {
+			if skipBackup {
+				return "SKIP"
+			}
+			return "ENABLED"
+		}()),
+		zap.String("restart_policy", func() string {
+			if skipRestart {
+				return "SKIP"
+			}
+			return "ENHANCED_VISIBILITY"
+		}()))
+
+	// Phase 1: Pre-flight checks
+	logger.Info("🔍 Phase 1: Pre-flight validation",
+		zap.String("phase", "pre-flight"),
+		zap.Int("services_to_check", len(workers)))
+	
+	preflightStart := time.Now()
+	
+	for i, worker := range workers {
+		logger.Info("🔍 Validating service",
+			zap.String("service", worker.ServiceName),
+			zap.Int("progress", i+1),
+			zap.Int("total", len(workers)))
+		
 		// Check source file exists
 		if !fileExists(worker.SourcePath) {
 			return fmt.Errorf("source file not found: %s", worker.SourcePath)
@@ -264,18 +300,22 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		targetDir := filepath.Dir(worker.TargetPath)
 		if !fileExists(targetDir) {
 			// Attempt to create the target directory if it doesn't exist
-			logger.Info("Target directory does not exist, attempting to create it",
+			logger.Info("📁 Target directory does not exist, creating it",
 				zap.String("directory", targetDir))
 			if err := os.MkdirAll(targetDir, 0755); err != nil {
 				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
 			}
 		}
 
-		logger.Info("Pre-flight check passed",
+		logger.Info("✅ Pre-flight check passed",
 			zap.String("service", worker.ServiceName),
 			zap.String("source", worker.SourcePath),
 			zap.String("target", worker.TargetPath))
 	}
+	
+	logger.Info("🎯 Phase 1 completed: Pre-flight validation",
+		zap.Duration("duration", time.Since(preflightStart)),
+		zap.Int("services_validated", len(workers)))
 
 	if dryRun {
 		logger.Info("DRY RUN - would perform the following actions:")
@@ -357,48 +397,75 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		}
 	}
 
-	// Step 3: Restart services if not skipped
+	// Phase 3: Enhanced service restart
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info("Restarting updated services",
-			zap.Strings("services", servicesToRestart))
+		logger.Info("🔄 Phase 3: Enhanced service restart",
+			zap.String("phase", "restart"),
+			zap.Strings("services", servicesToRestart),
+			zap.Int("services_to_restart", len(servicesToRestart)),
+			zap.String("restart_mode", "enhanced_visibility"))
+		
+		restartPhaseStart := time.Now()
 
 		for _, service := range servicesToRestart {
-			logger.Info("Restarting service",
-				zap.String("service", service))
+			logger.Info("⚡ Preparing enhanced service restart",
+				zap.String("service", service),
+				zap.String("enhanced_features", "real-time logs, state monitoring, graceful stop analysis"))
 
-			if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, service, 3, 2); err != nil {
-				logger.Error("Failed to restart service",
+			if err := eos_unix.RestartSystemdUnitWithVisibility(rc.Ctx, service, 3, 2); err != nil {
+				logger.Error("❌ Enhanced service restart failed",
 					zap.String("service", service),
 					zap.Error(err))
 				return fmt.Errorf("failed to restart %s: %w", service, err)
 			}
 
-			logger.Info("Service restarted successfully",
+			logger.Info("✅ Enhanced service restart completed",
 				zap.String("service", service))
 		}
+		
+		logger.Info("🎯 Phase 3 completed: Enhanced service restart",
+			zap.Duration("restart_phase_duration", time.Since(restartPhaseStart)),
+			zap.Int("services_restarted", len(servicesToRestart)))
 	}
 
-	// Step 4: Verify services are running
+	// Phase 4: Service verification
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info("Verifying service status")
+		logger.Info("🔍 Phase 4: Service health verification",
+			zap.String("phase", "verification"),
+			zap.Int("services_to_verify", len(servicesToRestart)))
+		
+		verificationStart := time.Now()
 
+		healthyServices := 0
 		for _, service := range servicesToRestart {
 			if err := eos_unix.CheckServiceStatus(rc.Ctx, service); err != nil {
-				logger.Warn("Service is not active after restart",
+				logger.Warn("⚠️  Service health check failed",
 					zap.String("service", service),
 					zap.Error(err))
-				logger.Info("Check service logs with: eos delphi services logs",
-					zap.String("service", service))
+				logger.Info("💡 Troubleshooting suggestion",
+					zap.String("service", service),
+					zap.String("command", "eos delphi services logs"),
+					zap.String("alt_command", fmt.Sprintf("journalctl -u %s -f", service)))
 			} else {
-				logger.Info("Service is running",
-					zap.String("service", service))
+				logger.Info("✅ Service health check passed",
+					zap.String("service", service),
+					zap.String("status", "active"))
+				healthyServices++
 			}
 		}
+		
+		logger.Info("🎯 Phase 4 completed: Service health verification",
+			zap.Duration("verification_duration", time.Since(verificationStart)),
+			zap.Int("services_verified", len(servicesToRestart)),
+			zap.Int("healthy_services", healthyServices),
+			zap.Int("unhealthy_services", len(servicesToRestart)-healthyServices))
 	}
 
-	logger.Info("Service worker update completed successfully",
+	logger.Info("🎉 Service worker update completed successfully",
 		zap.Int("workers_updated", len(workers)),
-		zap.Int("services_restarted", len(servicesToRestart)))
+		zap.Int("services_restarted", len(servicesToRestart)),
+		zap.Duration("total_duration", time.Since(overallStart)),
+		zap.String("phase", "completion"))
 
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -34,7 +35,7 @@ FEATURES:
 • Production-ready security settings
 
 CONFIGURATION:
-• HTTP API on port 8161 (instead of default 8500)
+• HTTP API on port " + strconv.Itoa(shared.PortConsul) + " (instead of default 8500)
 • Consul Connect enabled for service mesh
 • UI enabled for management
 • Automatic Vault service registration
@@ -288,7 +289,7 @@ bootstrap_expect = 1  # Will change to 3-5 when you add servers
 
 # Custom ports configuration for EOS
 ports {
-  http = 8161      # HTTP API (EOS standard instead of 8500)
+  http = %d      # HTTP API (EOS standard instead of 8500)
   https = -1       # Disabled for now
   grpc = 8502      # Keep default for internal communication
   dns = 8600       # Keep default DNS
@@ -389,7 +390,7 @@ watches = [
     args = ["/usr/local/bin/consul-vault-helper", "watch"]
   }
 ]
-`, time.Now().Format(time.RFC3339), datacenterName, nodeName, logLevel)
+`, time.Now().Format(time.RFC3339), datacenterName, nodeName, shared.PortConsul, logLevel)
 
 	configPath := "/etc/consul.d/consul.hcl"
 	if err := os.WriteFile(configPath, []byte(config), 0640); err != nil {
@@ -481,7 +482,7 @@ func createConsulSystemdService(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Creating Consul systemd service")
 
-	serviceContent := `[Unit]
+	serviceContent := fmt.Sprintf(`[Unit]
 Description=Consul Service Discovery and Configuration
 Documentation=https://www.consul.io/
 Requires=network-online.target
@@ -499,10 +500,10 @@ KillMode=process
 Restart=on-failure
 RestartSec=5
 LimitNOFILE=65536
-Environment="CONSUL_HTTP_ADDR=127.0.0.1:8161"
+Environment="CONSUL_HTTP_ADDR=127.0.0.1:%d"
 
 [Install]
-WantedBy=multi-user.target`
+WantedBy=multi-user.target`, shared.PortConsul)
 
 	servicePath := "/etc/systemd/system/consul.service"
 	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
@@ -522,11 +523,11 @@ func createConsulHelperScript(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Creating Consul helper script")
 
-	helperScript := `#!/bin/bash
+	helperScript := fmt.Sprintf(`#!/bin/bash
 # /usr/local/bin/consul-vault-helper
 # Consul and Vault integration helper script
 
-CONSUL_ADDR="http://localhost:8161"
+CONSUL_ADDR="http://localhost:%d"
 VAULT_ADDR="${VAULT_ADDR:-https://localhost:8200}"
 
 case "$1" in
@@ -600,7 +601,7 @@ EOF
     echo "  CONSUL_ADDR: $CONSUL_ADDR"
     echo "  VAULT_ADDR:  $VAULT_ADDR"
     ;;
-esac`
+esac`, shared.PortConsul)
 
 	scriptPath := "/usr/local/bin/consul-vault-helper"
 	if err := os.WriteFile(scriptPath, []byte(helperScript), 0755); err != nil {
@@ -637,7 +638,7 @@ func waitForConsulReady(rc *eos_io.RuntimeContext) error {
 	maxAttempts := 30
 	for i := 0; i < maxAttempts; i++ {
 		// Check if Consul is responding
-		if err := execute.RunSimple(rc.Ctx, "curl", "-f", "http://localhost:8161/v1/status/leader"); err == nil {
+		if err := execute.RunSimple(rc.Ctx, "curl", "-f", fmt.Sprintf("http://localhost:%d/v1/status/leader", shared.PortConsul)); err == nil {
 			log.Info(" Consul is ready", zap.Int("attempts", i+1))
 			return nil
 		}
@@ -670,8 +671,8 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	log.Info(" ")
 
 	log.Info(" 🌐 ACCESS POINTS:")
-	log.Info(fmt.Sprintf("   • Web UI:      http://%s:8161/ui", hostname))
-	log.Info("   • HTTP API:    http://localhost:8161")
+	log.Info(fmt.Sprintf("   • Web UI:      http://%s:%d/ui", hostname, shared.PortConsul))
+	log.Info(fmt.Sprintf("   • HTTP API:    http://localhost:%d", shared.PortConsul))
 	log.Info("   • DNS:         127.0.0.1:8600")
 	log.Info(" ")
 
@@ -707,6 +708,6 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	// Set environment variables for current session
 	log.Info(" 💡 ENVIRONMENT:")
 	log.Info("   Add to your ~/.bashrc:")
-	log.Info("     export CONSUL_HTTP_ADDR=\"127.0.0.1:8161\"")
+	log.Info(fmt.Sprintf("     export CONSUL_HTTP_ADDR=\"127.0.0.1:%d\"", shared.PortConsul))
 	log.Info(" ")
 }

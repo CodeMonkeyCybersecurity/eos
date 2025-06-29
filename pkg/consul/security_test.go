@@ -4,10 +4,12 @@ package consul
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +21,7 @@ func TestSecurityValidator_ValidateConfig(t *testing.T) {
 
 	t.Run("Secure Configuration", func(t *testing.T) {
 		config := &EnhancedConfig{
-			Address:    "127.0.0.1:8161",
+			Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
 			Datacenter: "dc1",
 			Token:      "550e8400-e29b-41d4-a716-446655440000", // Valid UUID
 			TLSConfig: &TLSConfig{
@@ -74,7 +76,7 @@ func TestSecurityValidator_ValidateConfig(t *testing.T) {
 
 	t.Run("Missing TLS Configuration", func(t *testing.T) {
 		config := &EnhancedConfig{
-			Address:    "127.0.0.1:8161",
+			Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
 			Datacenter: "dc1",
 			TLSConfig:  nil, // Missing TLS config
 		}
@@ -191,7 +193,7 @@ func TestSecurityValidator_ValidateAddress(t *testing.T) {
 	}{
 		{
 			name:         "Secure Custom Port",
-			address:      "127.0.0.1:8161",
+			address:      fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
 			expectErrors: false,
 			minScore:     90,
 		},
@@ -204,7 +206,7 @@ func TestSecurityValidator_ValidateAddress(t *testing.T) {
 		},
 		{
 			name:           "Wildcard Binding Warning",
-			address:        "0.0.0.0:8161",
+			address:        fmt.Sprintf("0.0.0.0:%d", shared.PortConsul),
 			expectErrors:   false,
 			expectWarnings: true,
 			minScore:       85,
@@ -371,7 +373,7 @@ func BenchmarkSecurityValidation(b *testing.B) {
 	}
 
 	config := &EnhancedConfig{
-		Address:    "127.0.0.1:8161",
+		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),
 		Datacenter: "dc1",
 		Token:      "550e8400-e29b-41d4-a716-446655440000",
 		TLSConfig: &TLSConfig{

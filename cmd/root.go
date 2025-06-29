@@ -128,7 +128,7 @@ func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
 			gracefulTimer := time.NewTimer(5 * time.Second)
 			<-gracefulTimer.C
 
-			fmt.Fprintf(os.Stderr, "💣 Cleanup timeout exceeded. Forcing exit.\n")
+			fmt.Fprintf(os.Stderr, " Cleanup timeout exceeded. Forcing exit.\n")
 			os.Exit(1) // Use normal exit instead of SIGKILL
 		case <-rc.Ctx.Done():
 			// Context was cancelled normally, cleanup watchdog

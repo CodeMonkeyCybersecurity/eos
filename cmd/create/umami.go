@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,7 +31,7 @@ var CreateUmamiCmd = &cobra.Command{
 - Replacing all instances of "changeme" with a strong random alphanumeric password
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
-- Informing the user to navigate to :8117 and log in with default credentials (admin/umami) and change the password immediately.`,
+- Informing the user to navigate to :` + strconv.Itoa(shared.PortUmami) + ` and log in with default credentials (admin/umami) and change the password immediately.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
 		otelzap.Ctx(rc.Ctx).Info("Starting Umami installation using Eos")
@@ -104,7 +105,7 @@ var CreateUmamiCmd = &cobra.Command{
 
 		// Final congratulatory message with instructions
 		otelzap.Ctx(rc.Ctx).Info("Umami installation complete",
-			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:8117 to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", eos_unix.GetInternalHostname())))
+			zap.String("message", fmt.Sprintf("Congratulations! Navigate to http://%s:%d to access Umami. Login with username 'admin' and password 'umami'. Change your password immediately.", eos_unix.GetInternalHostname(), shared.PortUmami)))
 		return nil
 	}),
 }

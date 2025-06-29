@@ -65,7 +65,7 @@ Examples:
 
 		if err := deployZabbix(rc); err != nil {
 			logger.Error(" Zabbix deployment failed", zap.Error(err))
-			return fmt.Errorf("Zabbix deployment failed: %w", err)
+			return fmt.Errorf("zabbix deployment failed: %w", err)
 		}
 
 		logger.Info(" Zabbix monitoring stack deployed successfully")

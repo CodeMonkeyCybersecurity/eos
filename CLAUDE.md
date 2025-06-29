@@ -159,6 +159,54 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 
+### Port Management Convention
+**CRITICAL**: Eos uses a specialized port allocation system to prevent service collisions defined in `/pkg/shared/ports.go`:
+
+#### Port Allocation Rules
+- **Base Range**: All internal service ports start from 8000
+- **Prime Number Increments**: Each new service gets the next prime number starting from 8000
+- **Centralized Definition**: All ports MUST be defined in `/pkg/shared/ports.go`
+- **DRY Principle**: NO hardcoded ports anywhere else in codebase - always reference constants
+
+#### Current Port Assignments
+Standard service ports following prime number convention:
+- helen: 8009
+- wazuh: 8011  
+- mattermost: 8017
+- mailcow: 8053
+- grafana: 8069
+- keycloak: 8080
+- elk: 8081
+- stack: 8087
+- arachne: 8089
+- soc: 8093
+- restic: 8101
+- umami: 8117
+- minio: 8123
+- n8n: 8147 (planned)
+- consul: 8161 (not 8500)
+- gitea: 8167 (planned)
+- gophish: 8171 (planned, migrating from 8080→8171 and 3333→8209)
+- vault: 8179 (not 8200)
+- consul: 8191
+- consulapi: 8209
+- zabbix: 8233
+- zabbixapi: 8237
+
+#### Special Cases
+Legacy services with non-standard ports (to be migrated):
+- jenkins: 55000 → should move to 8xxx range
+- nextcloud: 11000 → should move to 8xxx range
+- resticapi: 9101
+- minio-api: 9123
+
+#### Implementation Requirements
+1. **New Services**: Always assign the next prime number in sequence (8219, 8221, 8231...)
+2. **Port Constants**: Define individual constants in `ports.go` for easy reference
+3. **No Hardcoding**: Never use hardcoded port numbers in service configurations
+4. **External vs Internal**: This convention is for INTERNAL service exposure only - external HTTPS remains on standard ports
+5. **Reference**: Always import and use `pkg/shared` constants throughout codebase
+
 ### CRUD Architecture Pattern
 - **CRITICAL**: Every module in Eos MUST implement CRUD-like operations as its foundation
 - **Required Operations**: create, read, update, delete, list

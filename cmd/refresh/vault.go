@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -42,7 +43,7 @@ var VaultRefreshCmd = &cobra.Command{
 		}
 
 		log.Info(" Vault service restarted successfully")
-		log.Info(" You can check Vault health at https://127.0.0.1:8179/v1/sys/health")
+		log.Info(fmt.Sprintf(" You can check Vault health at https://127.0.0.1:%d/v1/sys/health", shared.PortVault))
 
 		if shouldUnseal {
 			log.Info(" Attempting unseal because --unseal flag was provided")

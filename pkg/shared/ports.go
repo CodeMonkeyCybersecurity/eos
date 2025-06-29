@@ -1,6 +1,43 @@
 // pkg/shared/ports.go
+// Centralized port management for Eos services
+// Convention: Prime numbers starting from 8000 for internal service ports
 
 package shared
+
+// Port constants following prime number convention starting from 8000
+const (
+	PortHelen       = 8009
+	PortWazuh       = 8011
+	PortMattermost  = 8017
+	PortMailcow     = 8053
+	PortGrafana     = 8069
+	PortKeycloak    = 8080
+	PortElk         = 8081
+	PortStack       = 8087
+	PortArachne     = 8089
+	PortSoc         = 8093
+	PortRestic      = 8101
+	PortUmami       = 8117
+	PortMinio       = 8123
+	PortN8n         = 8147 // Planned
+	PortConsul      = 8161 // Not 8500
+	PortGitea       = 8167 // Planned
+	PortGophish     = 8171 // Planned, migrating from 8080
+	PortVault       = 8179 // Not 8200
+	PortConsulWeb   = 8191
+	PortConsulAPI   = 8209
+	PortGophishAPI  = 8209 // Legacy Gophish port 3333→8209
+	PortZabbix      = 8233
+	PortZabbixAPI   = 8237
+	
+	// Next available primes: 8219, 8221, 8231, 8233, 8237, 8243, 8263, 8269...
+	
+	// Legacy ports to be migrated
+	PortJenkinsLegacy   = 55000  // Should move to 8xxx range
+	PortNextcloudLegacy = 11000  // Should move to 8xxx range
+	PortResticAPI       = 9101   // Should move to 8xxx range
+	PortMinioAPI        = 9123   // Should move to 8xxx range
+)
 
 type AppProxy struct {
 	AppName     string
@@ -9,34 +46,33 @@ type AppProxy struct {
 }
 
 var AppProxies = []AppProxy{
-	{AppName: "helen", Subdomain: "", BackendPort: 8009},
-	{AppName: "wazuh", Subdomain: "delphi", BackendPort: 8011},
-	{AppName: "mattermost", Subdomain: "m", BackendPort: 8017},
-	{AppName: "mailcow", Subdomain: "mail", BackendPort: 8053},
-	{AppName: "grafana", Subdomain: "g", BackendPort: 8069},
-	{AppName: "keycloak", Subdomain: "hera", BackendPort: 8080},
-	{AppName: "elk", Subdomain: "e", BackendPort: 8081},
-	{AppName: "stack", Subdomain: "e", BackendPort: 8087},
-	{AppName: "arachne", Subdomain: "arachne", BackendPort: 8089},
-	{AppName: "soc", Subdomain: "e", BackendPort: 8093},
-	{AppName: "restic", Subdomain: "persephone", BackendPort: 8101},
-	{AppName: "resticapi", Subdomain: "persephoneapi", BackendPort: 9101},
-	{AppName: "zabbix", Subdomain: "z", BackendPort: 8233},
-	{AppName: "zabbixapi", Subdomain: "z-api", BackendPort: 8237},
-	{AppName: "consul", Subdomain: "c", BackendPort: 8191},
-	{AppName: "consulapi", Subdomain: "c-api", BackendPort: 8209},
-	{AppName: "umami", Subdomain: "u", BackendPort: 8117},
-	{AppName: "minio", Subdomain: "s3", BackendPort: 8123},
-	{AppName: "minio-api", Subdomain: "s3api", BackendPort: 9123},
-	{AppName: "jenkins", Subdomain: "j-api", BackendPort: 55000},
-	{AppName: "nextcloud", Subdomain: "cloud", BackendPort: 11000},
+	{AppName: "helen", Subdomain: "", BackendPort: PortHelen},
+	{AppName: "wazuh", Subdomain: "delphi", BackendPort: PortWazuh},
+	{AppName: "mattermost", Subdomain: "m", BackendPort: PortMattermost},
+	{AppName: "mailcow", Subdomain: "mail", BackendPort: PortMailcow},
+	{AppName: "grafana", Subdomain: "g", BackendPort: PortGrafana},
+	{AppName: "keycloak", Subdomain: "hera", BackendPort: PortKeycloak},
+	{AppName: "elk", Subdomain: "e", BackendPort: PortElk},
+	{AppName: "stack", Subdomain: "e", BackendPort: PortStack},
+	{AppName: "arachne", Subdomain: "arachne", BackendPort: PortArachne},
+	{AppName: "soc", Subdomain: "e", BackendPort: PortSoc},
+	{AppName: "restic", Subdomain: "persephone", BackendPort: PortRestic},
+	{AppName: "resticapi", Subdomain: "persephoneapi", BackendPort: PortResticAPI},
+	{AppName: "zabbix", Subdomain: "z", BackendPort: PortZabbix},
+	{AppName: "zabbixapi", Subdomain: "z-api", BackendPort: PortZabbixAPI},
+	{AppName: "consul", Subdomain: "c", BackendPort: PortConsulWeb},
+	{AppName: "consulapi", Subdomain: "c-api", BackendPort: PortConsulAPI},
+	{AppName: "umami", Subdomain: "u", BackendPort: PortUmami},
+	{AppName: "minio", Subdomain: "s3", BackendPort: PortMinio},
+	{AppName: "minio-api", Subdomain: "s3api", BackendPort: PortMinioAPI},
+	{AppName: "jenkins", Subdomain: "j-api", BackendPort: PortJenkinsLegacy},
+	{AppName: "nextcloud", Subdomain: "cloud", BackendPort: PortNextcloudLegacy},
 }
 
 // n8n 8147 
-// 8161 consul
 // 8167 gitea
-// 8171 
-// 8179 8191 8209 8219, 8221, 8231
+// 8171:80 , 8209:3333  gophish
+//    8219, 8221, 8231
 
 // Centralized service stream blocks.
 var (

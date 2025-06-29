@@ -4,10 +4,12 @@ package consul
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -143,7 +145,7 @@ func TestHealthCheckTypes(t *testing.T) {
 
 func TestEnhancedConfig_Defaults(t *testing.T) {
 	config := &EnhancedConfig{
-		Address:    "127.0.0.1:8161",  // EOS custom port
+		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),  // EOS custom port
 		Datacenter: "dc1",
 		CircuitBreakerConfig: &CBConfig{
 			MaxRequests: 5,
@@ -162,7 +164,7 @@ func TestEnhancedConfig_Defaults(t *testing.T) {
 		},
 	}
 
-	assert.Equal(t, "127.0.0.1:8161", config.Address)
+	assert.Equal(t, fmt.Sprintf("127.0.0.1:%d", shared.PortConsul), config.Address)
 	assert.True(t, config.SecurityConfig.EncryptionEnabled)
 	assert.True(t, config.SecurityConfig.DenyByDefault)
 	assert.Len(t, config.SecurityConfig.AllowedCIDRs, 2)

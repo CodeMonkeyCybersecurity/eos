@@ -9,6 +9,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -45,7 +46,7 @@ This creates Terraform configuration that:
 		if vaultAddr == "" {
 			vaultAddr = os.Getenv("VAULT_ADDR")
 			if vaultAddr == "" {
-				vaultAddr = "https://127.0.0.1:8179"
+				vaultAddr = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
 			}
 		}
 
@@ -135,7 +136,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 		if vaultAddr == "" {
 			vaultAddr = os.Getenv("VAULT_ADDR")
 			if vaultAddr == "" {
-				vaultAddr = "https://127.0.0.1:8179"
+				vaultAddr = fmt.Sprintf("https://127.0.0.1:%d", shared.PortVault)
 			}
 		}
 

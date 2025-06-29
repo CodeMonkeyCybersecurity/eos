@@ -18,7 +18,7 @@ import (
 var StopVaultCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Stops the Vault Agent and cleans residual files",
-	Long:  "Disables vault‑agent‑eos.service, kills anything on port 8179, then purges Vault runtime artefacts.",
+	Long:  "Disables vault‑agent‑eos.service, kills anything on port " + strconv.Itoa(shared.PortVault) + ", then purges Vault runtime artefacts.",
 	RunE:  eos.Wrap(runStopVault),
 }
 

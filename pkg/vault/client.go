@@ -32,7 +32,7 @@ func NewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 	// Fallback to default VAULT_ADDR if not set
 	addr, ok := os.LookupEnv(shared.VaultAddrEnv)
 	if !ok || addr == "" {
-		addr = "http://127.0.0.1:8179"
+		addr = fmt.Sprintf("http://127.0.0.1:%d", shared.PortVault)
 		log.Warn("VAULT_ADDR not set, falling back to default", zap.String("addr", addr))
 	}
 
