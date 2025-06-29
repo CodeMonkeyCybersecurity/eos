@@ -93,5 +93,6 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 
 func init() {
 	SelfCmd.AddCommand(updateCmd)
+	SelfCmd.AddCommand(NewSecretsCmd())
 	// Add SelfCmd to ConfigCmd so 'eos config self' works
 }

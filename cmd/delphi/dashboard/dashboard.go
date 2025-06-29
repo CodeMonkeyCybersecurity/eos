@@ -3,18 +3,16 @@
 package dashboard
 
 import (
-	"database/sql"
 	"fmt"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/dashboard"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/database"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	
-	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 // NewDashboardCmd creates the main dashboard command
@@ -78,10 +76,16 @@ Navigation:
 				}
 			}
 
-			// Connect to database
+			// Connect to database using Vault integration
 			logger.Info("Connecting to Delphi database")
-			db, err := connectToDatabase(rc)
+			db, err := database.Connect(rc)
 			if err != nil {
+				logger.Error("Database connection failed", zap.Error(err))
+				logger.Info("Troubleshooting steps:",
+					zap.String("step_1", "Check if database credentials are set: eos self secrets status"),
+					zap.String("step_2", "Configure database credentials: eos self secrets set delphi-db"),
+					zap.String("step_3", "Test Vault connectivity: eos self secrets test"),
+					zap.String("step_4", "Verify database server is running and accessible"))
 				return fmt.Errorf("failed to connect to database: %w", err)
 			}
 			defer func() {
@@ -144,43 +148,4 @@ Navigation:
 	}
 
 	return cmd
-}
-
-// connectToDatabase establishes a connection to the Delphi PostgreSQL database
-func connectToDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// TODO: Get database connection string from configuration
-	// For now, use environment variables or default values
-	
-	// This would typically come from:
-	// - Environment variables (DELPHI_DB_*)
-	// - Configuration files
-	// - Vault secrets
-	// - Command line flags
-	
-	connStr := "postgres://delphi:delphi@localhost/delphi?sslmode=disable"
-	
-	logger.Info("Connecting to PostgreSQL database",
-		zap.String("connection", "localhost/delphi"))
-	
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
-	
-	// Test the connection
-	if err := db.Ping(); err != nil {
-		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn("Failed to close database after ping failure", zap.Error(closeErr))
-		}
-		return nil, fmt.Errorf("failed to ping database: %w", err)
-	}
-	
-	// Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	
-	logger.Info("Database connection established successfully")
-	return db, nil
 }
