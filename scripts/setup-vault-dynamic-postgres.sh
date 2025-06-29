@@ -200,10 +200,10 @@ show_completion_summary() {
     print_success "🎉 Vault Dynamic PostgreSQL Credentials Setup Complete!"
     echo
     print_status "What was configured:"
-    echo "  ✅ Vault database secrets engine enabled"
-    echo "  ✅ PostgreSQL connection configured for guest VM"
-    echo "  ✅ Read-only role 'delphi-readonly' created"
-    echo "  ✅ Dynamic credential generation tested"
+    echo "   Vault database secrets engine enabled"
+    echo "   PostgreSQL connection configured for guest VM"
+    echo "   Read-only role 'delphi-readonly' created"
+    echo "   Dynamic credential generation tested"
     echo
     print_status "Next steps:"
     echo "  1. Launch the Delphi dashboard:"

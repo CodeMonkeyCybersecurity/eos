@@ -11,10 +11,10 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	tea "github.com/charmbracelet/bubbletea"
+	_ "github.com/lib/pq" // PostgreSQL driver
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
 // NewInspectCmd creates the inspect command with subcommands
@@ -80,7 +80,7 @@ defined in schema.sql to provide comprehensive visibility into your alert proces
 // runPipelineFunctionalityDashboard launches the interactive Bubble Tea dashboard
 func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🚀 Starting Delphi pipeline functionality dashboard")
+	logger.Info(" Starting Delphi pipeline functionality dashboard")
 
 	// Get database connection from Delphi configuration
 	db, err := connectToDelphiDatabase(rc)
@@ -96,7 +96,7 @@ func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Com
 		}
 	}()
 
-	logger.Info("✅ Database connection established")
+	logger.Info(" Database connection established")
 
 	// Verify database schema
 	if err := verifyDatabaseSchema(rc, db); err != nil {
@@ -110,7 +110,7 @@ func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Com
 		zap.String("controls", "Use ←/→ to navigate, 'r' to refresh, 'q' to quit"))
 
 	dashboardModel := delphi.InitializeDashboard(db, rc)
-	
+
 	// Create a Bubble Tea program
 	program := tea.NewProgram(
 		dashboardModel,
@@ -125,14 +125,14 @@ func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Com
 		return fmt.Errorf("dashboard error: %w", err)
 	}
 
-	logger.Info("✅ Dashboard session completed")
+	logger.Info(" Dashboard session completed")
 	return nil
 }
 
 // connectToDelphiDatabase establishes a connection to the Delphi PostgreSQL database
 func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Build database connection string
 	// Default to standard PostgreSQL settings, but allow override from environment
 	dbHost := "localhost"
@@ -190,11 +190,11 @@ func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 // verifyDatabaseSchema checks that required views and tables exist
 func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Verifying database schema")
+	logger.Info(" Verifying database schema")
 
 	requiredViews := []string{
 		"pipeline_health",
-		"pipeline_bottlenecks", 
+		"pipeline_bottlenecks",
 		"parser_performance",
 		"recent_failures",
 	}
@@ -212,14 +212,14 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 			SELECT 1 FROM information_schema.views 
 			WHERE table_schema = 'public' AND table_name = $1
 		)`
-		
+
 		if err := db.QueryRow(query, view).Scan(&exists); err != nil {
 			logger.Error("❌ Error checking view existence",
 				zap.String("view", view),
 				zap.Error(err))
 			return fmt.Errorf("error checking view %s: %w", view, err)
 		}
-		
+
 		if !exists {
 			logger.Warn("⚠️ Required view missing",
 				zap.String("view", view),
@@ -236,14 +236,14 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 			SELECT 1 FROM information_schema.tables 
 			WHERE table_schema = 'public' AND table_name = $1
 		)`
-		
+
 		if err := db.QueryRow(query, table).Scan(&exists); err != nil {
 			logger.Error("❌ Error checking table existence",
 				zap.String("table", table),
 				zap.Error(err))
 			return fmt.Errorf("error checking table %s: %w", table, err)
 		}
-		
+
 		if !exists {
 			logger.Warn("⚠️ Required table missing",
 				zap.String("table", table),
@@ -253,7 +253,7 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 		}
 	}
 
-	logger.Info("✅ Database schema verification completed")
+	logger.Info(" Database schema verification completed")
 	return nil
 }
 
@@ -286,7 +286,7 @@ The tool provides specific SQL commands to fix any issues found.`,
   eos delphi inspect verify-pipeline-schema
   
   # Example output:
-  # ✅ Database fully matches schema.sql!
+  #  Database fully matches schema.sql!
   # OR
   # ❌ Database requires updates: 3 missing objects, 1 warnings
   #
@@ -304,7 +304,7 @@ The tool provides specific SQL commands to fix any issues found.`,
 // runVerifyPipelineSchema performs comprehensive schema verification
 func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Starting database schema verification")
+	logger.Info(" Starting database schema verification")
 
 	// Connect to database
 	db, err := connectToDelphiDatabase(rc)
@@ -320,7 +320,7 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		}
 	}()
 
-	logger.Info("✅ Database connection established")
+	logger.Info(" Database connection established")
 
 	// Create schema verifier and run verification
 	verifier := delphi.NewSchemaVerifier(db)
@@ -333,7 +333,7 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 
 	// Generate and display the report
 	report := result.GenerateReport()
-	
+
 	// Log the summary
 	logger.Info("📋 Schema verification completed",
 		zap.String("overall_status", result.OverallStatus),
@@ -349,6 +349,6 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 		return fmt.Errorf("schema verification found %d missing objects", result.MissingCount)
 	}
 
-	logger.Info("✅ Schema verification passed - database is properly configured")
+	logger.Info(" Schema verification passed - database is properly configured")
 	return nil
 }

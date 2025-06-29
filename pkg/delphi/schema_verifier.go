@@ -16,24 +16,24 @@ import (
 
 // SchemaObject represents a database object that needs verification
 type SchemaObject struct {
-	Name        string
-	Type        string
-	Status      string
-	Details     string
+	Name         string
+	Type         string
+	Status       string
+	Details      string
 	ActionNeeded string
 }
 
 // SchemaVerificationResult holds the complete verification results
 type SchemaVerificationResult struct {
-	EnumTypes      []SchemaObject
-	Tables         []SchemaObject
-	Indexes        []SchemaObject
-	Views          []SchemaObject
-	Functions      []SchemaObject
-	Triggers       []SchemaObject
-	OverallStatus  string
-	MissingCount   int
-	Timestamp      time.Time
+	EnumTypes     []SchemaObject
+	Tables        []SchemaObject
+	Indexes       []SchemaObject
+	Views         []SchemaObject
+	Functions     []SchemaObject
+	Triggers      []SchemaObject
+	OverallStatus string
+	MissingCount  int
+	Timestamp     time.Time
 }
 
 // SchemaVerifier handles database schema verification
@@ -51,7 +51,7 @@ func NewSchemaVerifier(db *sql.DB) *SchemaVerifier {
 // VerifyCompleteSchema performs comprehensive schema verification
 func (sv *SchemaVerifier) VerifyCompleteSchema(rc *eos_io.RuntimeContext) (*SchemaVerificationResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Starting comprehensive schema verification")
+	logger.Info(" Starting comprehensive schema verification")
 
 	result := &SchemaVerificationResult{
 		Timestamp: time.Now(),
@@ -59,7 +59,7 @@ func (sv *SchemaVerifier) VerifyCompleteSchema(rc *eos_io.RuntimeContext) (*Sche
 
 	// Verify each component type
 	var err error
-	
+
 	result.EnumTypes, err = sv.verifyEnumTypes(rc)
 	if err != nil {
 		logger.Error("Failed to verify enum types", zap.Error(err))
@@ -99,7 +99,7 @@ func (sv *SchemaVerifier) VerifyCompleteSchema(rc *eos_io.RuntimeContext) (*Sche
 	// Calculate overall status
 	result.calculateOverallStatus()
 
-	logger.Info("✅ Schema verification completed",
+	logger.Info(" Schema verification completed",
 		zap.String("status", result.OverallStatus),
 		zap.Int("missing_objects", result.MissingCount))
 
@@ -156,7 +156,7 @@ func (sv *SchemaVerifier) verifyEnumTypes(rc *eos_io.RuntimeContext) ([]SchemaOb
 		} else {
 			obj.Status = "✗ MISSING"
 			obj.ActionNeeded = fmt.Sprintf("CREATE TYPE %s AS ENUM (...)", enumName)
-			
+
 			// Provide specific creation commands
 			switch enumName {
 			case "alert_state":
@@ -229,7 +229,7 @@ func (sv *SchemaVerifier) verifyTables(rc *eos_io.RuntimeContext) ([]SchemaObjec
 		if columnCount, exists := existingTables[tableName]; exists {
 			obj.Status = "✓ EXISTS"
 			obj.Details = fmt.Sprintf("%d columns", columnCount)
-			
+
 			// Verify critical columns for alerts table
 			if tableName == "alerts" {
 				if err := sv.verifyAlertsTableColumns(rc, &obj); err != nil {
@@ -306,13 +306,13 @@ func (sv *SchemaVerifier) verifyIndexes(rc *eos_io.RuntimeContext) ([]SchemaObje
 	logger.Info("Verifying indexes")
 
 	expectedIndexes := map[string]string{
-		"idx_agents_status":             "agents",
-		"idx_agents_last_seen":          "agents",
-		"idx_agents_groups":             "agents",
-		"idx_alerts_state_timestamp":    "alerts",
-		"idx_alerts_agent_rule":         "alerts",
-		"idx_alerts_prompt_type":        "alerts",
-		"idx_alerts_parser_performance": "alerts",
+		"idx_agents_status":              "agents",
+		"idx_agents_last_seen":           "agents",
+		"idx_agents_groups":              "agents",
+		"idx_alerts_state_timestamp":     "alerts",
+		"idx_alerts_agent_rule":          "alerts",
+		"idx_alerts_prompt_type":         "alerts",
+		"idx_alerts_parser_performance":  "alerts",
 		"idx_parser_metrics_performance": "parser_metrics",
 	}
 
@@ -356,8 +356,8 @@ func (sv *SchemaVerifier) verifyIndexes(rc *eos_io.RuntimeContext) ([]SchemaObje
 	// Check each expected index
 	for indexName, tableName := range expectedIndexes {
 		obj := SchemaObject{
-			Name: indexName,
-			Type: "INDEX",
+			Name:    indexName,
+			Type:    "INDEX",
 			Details: fmt.Sprintf("on table %s", tableName),
 		}
 
@@ -425,7 +425,7 @@ func (sv *SchemaVerifier) verifyViews(rc *eos_io.RuntimeContext) ([]SchemaObject
 
 		if existingViews[viewName] {
 			obj.Status = "✓ EXISTS"
-			
+
 			// Test if view is functional
 			if err := sv.testViewFunctionality(rc, viewName); err != nil {
 				obj.Status = "⚠ EXISTS BUT BROKEN"
@@ -448,7 +448,7 @@ func (sv *SchemaVerifier) verifyViews(rc *eos_io.RuntimeContext) ([]SchemaObject
 // testViewFunctionality tests if a view can be queried
 func (sv *SchemaVerifier) testViewFunctionality(rc *eos_io.RuntimeContext, viewName string) error {
 	query := fmt.Sprintf("SELECT 1 FROM %s LIMIT 1", viewName)
-	
+
 	ctx, cancel := context.WithTimeout(rc.Ctx, 5*time.Second)
 	defer cancel()
 
@@ -511,7 +511,7 @@ func (sv *SchemaVerifier) verifyFunctions(rc *eos_io.RuntimeContext) ([]SchemaOb
 			obj.Details = fmt.Sprintf("Arguments: %s", args)
 		} else {
 			obj.Status = "✗ MISSING"
-			
+
 			switch funcName {
 			case "notify_state_change", "notify_new_alert":
 				obj.ActionNeeded = "Pipeline notifications will not work"
@@ -544,7 +544,7 @@ func (sv *SchemaVerifier) verifyTriggers(rc *eos_io.RuntimeContext) ([]SchemaObj
 			WHERE table_schema = 'public' AND table_name = 'alerts'
 		)
 	`).Scan(&alertsExists)
-	
+
 	if err != nil || !alertsExists {
 		for _, triggerName := range expectedTriggers {
 			results = append(results, SchemaObject{
@@ -591,8 +591,8 @@ func (sv *SchemaVerifier) verifyTriggers(rc *eos_io.RuntimeContext) ([]SchemaObj
 	// Check each expected trigger
 	for _, triggerName := range expectedTriggers {
 		obj := SchemaObject{
-			Name: triggerName,
-			Type: "TRIGGER",
+			Name:    triggerName,
+			Type:    "TRIGGER",
 			Details: "on alerts table",
 		}
 
@@ -600,7 +600,7 @@ func (sv *SchemaVerifier) verifyTriggers(rc *eos_io.RuntimeContext) ([]SchemaObj
 			obj.Status = "✓ EXISTS"
 		} else {
 			obj.Status = "✗ MISSING"
-			
+
 			switch triggerName {
 			case "trg_alert_state_change":
 				obj.ActionNeeded = "State change notifications will not fire"
@@ -639,7 +639,7 @@ func (result *SchemaVerificationResult) calculateOverallStatus() {
 	result.MissingCount = missingCount
 
 	if missingCount == 0 && warningCount == 0 {
-		result.OverallStatus = "✅ Database fully matches schema.sql!"
+		result.OverallStatus = " Database fully matches schema.sql!"
 	} else if missingCount == 0 {
 		result.OverallStatus = fmt.Sprintf("⚠️  Database has %d warnings but no missing objects", warningCount)
 	} else {
@@ -672,14 +672,14 @@ func (result *SchemaVerificationResult) GenerateReport() string {
 
 	for _, cat := range categories {
 		report.WriteString(fmt.Sprintf("\n── %s ──────────────────────────────\n", cat.name))
-		
+
 		for _, obj := range cat.objects {
 			report.WriteString(fmt.Sprintf("\n  %s: %s\n", obj.Name, obj.Status))
-			
+
 			if obj.Details != "" {
 				report.WriteString(fmt.Sprintf("    Details: %s\n", obj.Details))
 			}
-			
+
 			if obj.ActionNeeded != "" {
 				report.WriteString(fmt.Sprintf("    Action: %s\n", obj.ActionNeeded))
 			}

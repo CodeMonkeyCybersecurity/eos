@@ -294,14 +294,14 @@ eos delphi parser-health                   # → dashboard parsers
 ## Migration Strategy
 
 ### Phase 1: Foundation (Implemented)
-- ✅ Core dashboard framework with module system
-- ✅ Pipeline monitoring module (replaces `inspect pipeline-functionality`)
-- ✅ Database integration and real-time updates
+-  Core dashboard framework with module system
+-  Pipeline monitoring module (replaces `inspect pipeline-functionality`)
+-  Database integration and real-time updates
 
 ### Phase 2: Service Integration
-- 🔄 Services management module (enhances `services` commands)
-- 🔄 Parser performance module (replaces `parser-health`)
-- 🔄 Interactive service controls
+-  Services management module (enhances `services` commands)
+-  Parser performance module (replaces `parser-health`)
+-  Interactive service controls
 
 ### Phase 3: Advanced Features
 - ⏳ Alert analysis module

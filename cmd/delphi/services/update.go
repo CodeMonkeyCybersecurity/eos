@@ -249,7 +249,7 @@ Examples:
 }
 
 func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
-	logger.Info("🚀 Starting enhanced service update process",
+	logger.Info(" Starting enhanced service update process",
 		zap.Int("worker_count", len(workers)),
 		zap.Bool("dry_run", dryRun),
 		zap.Bool("backup_enabled", !skipBackup),
@@ -257,7 +257,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		zap.String("phase", "initialization"))
 
 	overallStart := time.Now()
-	
+
 	logger.Info("📋 Update process configuration",
 		zap.String("mode", func() string {
 			if dryRun {
@@ -279,18 +279,18 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		}()))
 
 	// Phase 1: Pre-flight checks
-	logger.Info("🔍 Phase 1: Pre-flight validation",
+	logger.Info(" Phase 1: Pre-flight validation",
 		zap.String("phase", "pre-flight"),
 		zap.Int("services_to_check", len(workers)))
-	
+
 	preflightStart := time.Now()
-	
+
 	for i, worker := range workers {
-		logger.Info("🔍 Validating service",
+		logger.Info(" Validating service",
 			zap.String("service", worker.ServiceName),
 			zap.Int("progress", i+1),
 			zap.Int("total", len(workers)))
-		
+
 		// Check source file exists
 		if !fileExists(worker.SourcePath) {
 			return fmt.Errorf("source file not found: %s", worker.SourcePath)
@@ -307,13 +307,13 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 			}
 		}
 
-		logger.Info("✅ Pre-flight check passed",
+		logger.Info(" Pre-flight check passed",
 			zap.String("service", worker.ServiceName),
 			zap.String("source", worker.SourcePath),
 			zap.String("target", worker.TargetPath))
 	}
-	
-	logger.Info("🎯 Phase 1 completed: Pre-flight validation",
+
+	logger.Info(" Phase 1 completed: Pre-flight validation",
 		zap.Duration("duration", time.Since(preflightStart)),
 		zap.Int("services_validated", len(workers)))
 
@@ -399,12 +399,12 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 	// Phase 3: Enhanced service restart
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info("🔄 Phase 3: Enhanced service restart",
+		logger.Info(" Phase 3: Enhanced service restart",
 			zap.String("phase", "restart"),
 			zap.Strings("services", servicesToRestart),
 			zap.Int("services_to_restart", len(servicesToRestart)),
 			zap.String("restart_mode", "enhanced_visibility"))
-		
+
 		restartPhaseStart := time.Now()
 
 		for _, service := range servicesToRestart {
@@ -419,21 +419,21 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				return fmt.Errorf("failed to restart %s: %w", service, err)
 			}
 
-			logger.Info("✅ Enhanced service restart completed",
+			logger.Info(" Enhanced service restart completed",
 				zap.String("service", service))
 		}
-		
-		logger.Info("🎯 Phase 3 completed: Enhanced service restart",
+
+		logger.Info(" Phase 3 completed: Enhanced service restart",
 			zap.Duration("restart_phase_duration", time.Since(restartPhaseStart)),
 			zap.Int("services_restarted", len(servicesToRestart)))
 	}
 
 	// Phase 4: Service verification
 	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info("🔍 Phase 4: Service health verification",
+		logger.Info(" Phase 4: Service health verification",
 			zap.String("phase", "verification"),
 			zap.Int("services_to_verify", len(servicesToRestart)))
-		
+
 		verificationStart := time.Now()
 
 		healthyServices := 0
@@ -447,14 +447,14 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 					zap.String("command", "eos delphi services logs"),
 					zap.String("alt_command", fmt.Sprintf("journalctl -u %s -f", service)))
 			} else {
-				logger.Info("✅ Service health check passed",
+				logger.Info(" Service health check passed",
 					zap.String("service", service),
 					zap.String("status", "active"))
 				healthyServices++
 			}
 		}
-		
-		logger.Info("🎯 Phase 4 completed: Service health verification",
+
+		logger.Info(" Phase 4 completed: Service health verification",
 			zap.Duration("verification_duration", time.Since(verificationStart)),
 			zap.Int("services_verified", len(servicesToRestart)),
 			zap.Int("healthy_services", healthyServices),

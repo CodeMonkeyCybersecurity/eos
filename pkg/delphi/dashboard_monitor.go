@@ -28,7 +28,7 @@ func NewDashboardMonitor(db *sql.DB) *DashboardMonitor {
 // GetPipelineHealth fetches current pipeline health from the database view
 func (dm *DashboardMonitor) GetPipelineHealth(rc *eos_io.RuntimeContext) ([]PipelineHealth, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Fetching pipeline health data")
+	logger.Info(" Fetching pipeline health data")
 
 	query := `
 		SELECT 
@@ -92,7 +92,7 @@ func (dm *DashboardMonitor) GetPipelineHealth(rc *eos_io.RuntimeContext) ([]Pipe
 		return nil, fmt.Errorf("error iterating pipeline health rows: %w", err)
 	}
 
-	logger.Info("✅ Pipeline health data fetched",
+	logger.Info(" Pipeline health data fetched",
 		zap.Int("record_count", len(results)))
 
 	return results, nil
@@ -101,7 +101,7 @@ func (dm *DashboardMonitor) GetPipelineHealth(rc *eos_io.RuntimeContext) ([]Pipe
 // GetPipelineBottlenecks fetches current bottlenecks from the database view
 func (dm *DashboardMonitor) GetPipelineBottlenecks(rc *eos_io.RuntimeContext) ([]PipelineBottleneck, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Fetching pipeline bottleneck data")
+	logger.Info(" Fetching pipeline bottleneck data")
 
 	query := `
 		SELECT 
@@ -154,7 +154,7 @@ func (dm *DashboardMonitor) GetPipelineBottlenecks(rc *eos_io.RuntimeContext) ([
 		return nil, fmt.Errorf("error iterating bottleneck rows: %w", err)
 	}
 
-	logger.Info("✅ Pipeline bottleneck data fetched",
+	logger.Info(" Pipeline bottleneck data fetched",
 		zap.Int("record_count", len(results)))
 
 	return results, nil
@@ -163,7 +163,7 @@ func (dm *DashboardMonitor) GetPipelineBottlenecks(rc *eos_io.RuntimeContext) ([
 // GetParserPerformance fetches parser performance metrics from the database view
 func (dm *DashboardMonitor) GetParserPerformance(rc *eos_io.RuntimeContext) (*ParserPerformance, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Fetching parser performance data")
+	logger.Info(" Fetching parser performance data")
 
 	query := `
 		SELECT 
@@ -200,7 +200,7 @@ func (dm *DashboardMonitor) GetParserPerformance(rc *eos_io.RuntimeContext) (*Pa
 		return nil, fmt.Errorf("failed to query parser performance: %w", err)
 	}
 
-	logger.Info("✅ Parser performance data fetched",
+	logger.Info(" Parser performance data fetched",
 		zap.Int("parsed_count", pp.ParsedCount),
 		zap.Float64("success_rate", pp.SuccessRate))
 
@@ -210,7 +210,7 @@ func (dm *DashboardMonitor) GetParserPerformance(rc *eos_io.RuntimeContext) (*Pa
 // GetRecentFailures fetches recent failures from the database view
 func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit int) ([]RecentFailure, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Fetching recent failures data",
+	logger.Info(" Fetching recent failures data",
 		zap.Int("limit", limit))
 
 	query := `
@@ -284,7 +284,7 @@ func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit i
 		return nil, fmt.Errorf("error iterating recent failure rows: %w", err)
 	}
 
-	logger.Info("✅ Recent failures data fetched",
+	logger.Info(" Recent failures data fetched",
 		zap.Int("record_count", len(results)))
 
 	return results, nil
@@ -293,7 +293,7 @@ func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit i
 // GetDailySummary fetches daily operations summary
 func (dm *DashboardMonitor) GetDailySummary(rc *eos_io.RuntimeContext, date time.Time) (*DailyOperationsSummary, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🔍 Fetching daily summary data",
+	logger.Info(" Fetching daily summary data",
 		zap.String("date", date.Format("2006-01-02")))
 
 	// For now, we'll create a basic summary by aggregating from alerts table
@@ -358,15 +358,15 @@ func (dm *DashboardMonitor) GetDailySummary(rc *eos_io.RuntimeContext, date time
 		logger.Warn("⚠️ No daily summary data available for date",
 			zap.String("date", date.Format("2006-01-02")))
 		return &DailyOperationsSummary{
-			Date:                date,
-			TotalAlertsProcessed: 0,
+			Date:                  date,
+			TotalAlertsProcessed:  0,
 			TotalAlertsSuccessful: 0,
-			TotalAlertsFailed:    0,
-			SuccessRate:          0,
-			AvgProcessingTime:    0,
-			TopFailureReasons:    []string{},
-			PeakHour:             0,
-			PeakHourAlertCount:   0,
+			TotalAlertsFailed:     0,
+			SuccessRate:           0,
+			AvgProcessingTime:     0,
+			TopFailureReasons:     []string{},
+			PeakHour:              0,
+			PeakHourAlertCount:    0,
 		}, nil
 	} else if err != nil {
 		logger.Error("❌ Failed to query daily summary",
@@ -387,7 +387,7 @@ func (dm *DashboardMonitor) GetDailySummary(rc *eos_io.RuntimeContext, date time
 	// TODO: Implement top failure reasons query
 	ds.TopFailureReasons = []string{}
 
-	logger.Info("✅ Daily summary data fetched",
+	logger.Info(" Daily summary data fetched",
 		zap.Int("total_processed", ds.TotalAlertsProcessed),
 		zap.Float64("success_rate", ds.SuccessRate))
 
@@ -397,7 +397,7 @@ func (dm *DashboardMonitor) GetDailySummary(rc *eos_io.RuntimeContext, date time
 // GetAllDashboardData fetches all dashboard data in one operation
 func (dm *DashboardMonitor) GetAllDashboardData(rc *eos_io.RuntimeContext) (*DashboardData, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🚀 Fetching all dashboard data")
+	logger.Info(" Fetching all dashboard data")
 
 	start := time.Now()
 
@@ -468,7 +468,7 @@ func (dm *DashboardMonitor) GetAllDashboardData(rc *eos_io.RuntimeContext) (*Das
 			LastUpdated:       time.Now(),
 		}
 
-		logger.Info("✅ All dashboard data fetched successfully",
+		logger.Info(" All dashboard data fetched successfully",
 			zap.Duration("total_duration", time.Since(start)),
 			zap.Int("pipeline_health_records", len(dashboardData.PipelineHealth)),
 			zap.Int("bottleneck_records", len(dashboardData.Bottlenecks)),

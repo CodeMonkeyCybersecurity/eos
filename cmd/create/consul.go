@@ -692,7 +692,7 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 		log.Info(" ")
 	}
 
-	log.Info(" 🚀 SCALING READY:")
+	log.Info("  SCALING READY:")
 	log.Info("   • Add more servers by updating bootstrap_expect")
 	log.Info("   • Consul Connect ready for service mesh")
 	log.Info("   • ACLs prepared for security")

@@ -171,8 +171,8 @@ func CheckServiceStatus(ctx context.Context, unit string) error {
 // It streams journalctl output and shows service state transitions in real-time
 func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries int, delaySeconds int) error {
 	logger := otelzap.Ctx(ctx)
-	
-	logger.Info(" 🔄 Starting enhanced service restart",
+
+	logger.Info("  Starting enhanced service restart",
 		zap.String("unit", unit),
 		zap.Int("max_retries", retries),
 		zap.Int("retry_delay_seconds", delaySeconds))
@@ -198,7 +198,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 			time.Sleep(time.Duration(delaySeconds) * time.Second)
 		}
 
-		logger.Info(" 🚀 Attempting service restart",
+		logger.Info("  Attempting service restart",
 			zap.String("unit", unit),
 			zap.Int("attempt", attempt+1),
 			zap.Int("of", retries))
@@ -206,7 +206,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 		// Start journalctl streaming in background
 		journalCtx, journalCancel := context.WithCancel(ctx)
 		journalDone := make(chan struct{})
-		
+
 		go func() {
 			defer close(journalDone)
 			streamJournalLogs(journalCtx, unit, logger)
@@ -224,15 +224,15 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 		if err == nil {
 			// Verify service is active
 			finalState, _ := getServiceState(unit)
-			logger.Info(" ✅ Service restart completed successfully",
+			logger.Info("  Service restart completed successfully",
 				zap.String("unit", unit),
 				zap.String("initial_state", initialState),
 				zap.String("final_state", finalState),
 				zap.Duration("restart_duration", restartDuration))
-			
+
 			// Give service a moment to fully initialize
 			time.Sleep(2 * time.Second)
-			
+
 			// Final health check
 			if err := CheckServiceStatus(ctx, unit); err != nil {
 				logger.Warn(" ⚠️  Service is not active after restart",
@@ -241,7 +241,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 				lastErr = err
 				continue
 			}
-			
+
 			return nil
 		}
 
@@ -257,10 +257,10 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 		zap.String("unit", unit),
 		zap.Int("total_attempts", retries),
 		zap.Error(lastErr))
-	
+
 	// Show final diagnostic info
 	showServiceDiagnostics(ctx, unit, logger)
-	
+
 	return fmt.Errorf("failed to restart %s after %d attempts: %w", unit, retries, lastErr)
 }
 
@@ -271,25 +271,25 @@ func executeRestartWithStateMonitoring(ctx context.Context, unit string, logger 
 		zap.String("unit", unit),
 		zap.String("phase", "stop"),
 		zap.String("graceful_stop_explanation", "Sending SIGTERM to allow clean shutdown before SIGKILL"))
-	
+
 	stopStart := time.Now()
-	
+
 	// Get systemd's TimeoutStopSec for this unit
 	timeoutStopSec := getUnitTimeoutStopSec(unit)
 	logger.Info(" ⏱️  Service stop timeout configuration",
 		zap.String("unit", unit),
 		zap.String("timeout_stop_sec", timeoutStopSec),
 		zap.String("explanation", "systemd will wait this long for graceful shutdown before SIGKILL"))
-	
+
 	// Monitor state during stop
 	stopCmd := exec.Command("systemctl", "stop", unit)
 	if err := stopCmd.Start(); err != nil {
 		return fmt.Errorf("failed to initiate stop: %w", err)
 	}
-	
+
 	// Monitor service state changes during stop
 	go monitorServiceStateChanges(ctx, unit, logger, "stopping")
-	
+
 	if err := stopCmd.Wait(); err != nil {
 		logger.Error(" Failed to stop service",
 			zap.String("unit", unit),
@@ -297,25 +297,25 @@ func executeRestartWithStateMonitoring(ctx context.Context, unit string, logger 
 			zap.Error(err))
 		return fmt.Errorf("stop failed: %w", err)
 	}
-	
+
 	stopDuration := time.Since(stopStart)
 	logger.Info(" 🛑 Service stopped",
 		zap.String("unit", unit),
 		zap.Duration("stop_duration", stopDuration))
-	
+
 	// Brief pause between stop and start
 	time.Sleep(500 * time.Millisecond)
-	
+
 	// Start the service
-	logger.Info(" 🚀 Starting service",
+	logger.Info("  Starting service",
 		zap.String("unit", unit),
 		zap.String("phase", "start"))
-	
+
 	startTime := time.Now()
 	startCmd := exec.Command("systemctl", "start", unit)
 	startOut, err := startCmd.CombinedOutput()
 	startDuration := time.Since(startTime)
-	
+
 	if err != nil {
 		logger.Error(" Failed to start service",
 			zap.String("unit", unit),
@@ -324,12 +324,12 @@ func executeRestartWithStateMonitoring(ctx context.Context, unit string, logger 
 			zap.Error(err))
 		return fmt.Errorf("start failed: %w", err)
 	}
-	
-	logger.Info(" ✅ Service started",
+
+	logger.Info("  Service started",
 		zap.String("unit", unit),
 		zap.Duration("start_duration", startDuration),
 		zap.Duration("total_restart_duration", time.Since(stopStart)))
-	
+
 	return nil
 }
 
@@ -344,14 +344,14 @@ func streamJournalLogs(ctx context.Context, unit string, logger otelzap.LoggerWi
 			zap.Error(err))
 		return
 	}
-	
+
 	if err := cmd.Start(); err != nil {
 		logger.Error(" Failed to start journalctl",
 			zap.String("unit", unit),
 			zap.Error(err))
 		return
 	}
-	
+
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -360,7 +360,7 @@ func streamJournalLogs(ctx context.Context, unit string, logger otelzap.LoggerWi
 			zap.String("unit", unit),
 			zap.String("journal_line", line))
 	}
-	
+
 	if err := cmd.Wait(); err != nil {
 		logger.Debug("journalctl command exited",
 			zap.String("unit", unit),
@@ -372,10 +372,10 @@ func streamJournalLogs(ctx context.Context, unit string, logger otelzap.LoggerWi
 func monitorServiceStateChanges(ctx context.Context, unit string, logger otelzap.LoggerWithCtx, expectedTransition string) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	
+
 	lastState := ""
 	transitionStart := time.Now()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -383,13 +383,13 @@ func monitorServiceStateChanges(ctx context.Context, unit string, logger otelzap
 		case <-ticker.C:
 			currentState, _ := getServiceState(unit)
 			if currentState != lastState {
-				logger.Info(" 🔄 Service state transition",
+				logger.Info("  Service state transition",
 					zap.String("unit", unit),
 					zap.String("from", lastState),
 					zap.String("to", currentState),
 					zap.Duration("after", time.Since(transitionStart)))
 				lastState = currentState
-				
+
 				// Stop monitoring once we reach expected end state
 				if expectedTransition == "stopping" && currentState == "inactive" {
 					return
@@ -397,7 +397,7 @@ func monitorServiceStateChanges(ctx context.Context, unit string, logger otelzap
 					return
 				}
 			}
-			
+
 			// Timeout after 30 seconds
 			if time.Since(transitionStart) > 30*time.Second {
 				logger.Warn(" ⚠️  Service state transition timeout",
@@ -427,13 +427,13 @@ func getUnitTimeoutStopSec(unit string) string {
 	if err != nil {
 		return "90s (default)"
 	}
-	
+
 	// Convert microseconds to human-readable format
 	valueStr := strings.TrimSpace(string(output))
 	if valueStr == "infinity" {
 		return "infinity"
 	}
-	
+
 	// systemd returns microseconds, convert to seconds
 	return valueStr
 }
@@ -442,7 +442,7 @@ func getUnitTimeoutStopSec(unit string) string {
 func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.LoggerWithCtx) {
 	logger.Info(" 🩺 Service diagnostics",
 		zap.String("unit", unit))
-	
+
 	// Get service status
 	statusCmd := exec.Command("systemctl", "status", unit, "--no-pager", "-l")
 	statusOut, _ := statusCmd.Output()
@@ -451,7 +451,7 @@ func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.Log
 			zap.String("unit", unit),
 			zap.ByteString("status", statusOut))
 	}
-	
+
 	// Get recent logs
 	logsCmd := exec.Command("journalctl", "-u", unit, "--no-pager", "-n", "20")
 	logsOut, _ := logsCmd.Output()
@@ -460,7 +460,7 @@ func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.Log
 			zap.String("unit", unit),
 			zap.ByteString("logs", logsOut))
 	}
-	
+
 	logger.Info(" 💡 Troubleshooting commands",
 		zap.String("status_cmd", fmt.Sprintf("systemctl status %s -l", unit)),
 		zap.String("logs_cmd", fmt.Sprintf("journalctl -u %s -f", unit)),
