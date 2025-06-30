@@ -5,6 +5,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -142,8 +143,8 @@ func init() {
 	terraformGraphCmd.Flags().String("terraform-dir", ".", "Directory containing Terraform configuration")
 	terraformGraphCmd.Flags().StringP("format", "f", "ascii", "Output format (ascii, dot)")
 	terraformGraphCmd.Flags().StringP("output", "o", "terraform-graph.txt", "Output file path")
-	terraformGraphCmd.Flags().String("vault-addr", "http://localhost:8179", "Vault server address")
-	terraformGraphCmd.Flags().String("nomad-addr", "http://localhost:4646", "Nomad server address")
+	terraformGraphCmd.Flags().String("vault-addr", fmt.Sprintf("http://localhost:%d", shared.PortVault), "Vault server address")
+	terraformGraphCmd.Flags().String("nomad-addr", fmt.Sprintf("http://localhost:%d", shared.PortNomad), "Nomad server address")
 	terraformGraphCmd.Flags().String("namespace", "terraform-graph", "Namespace for metadata storage")
 	
 	// Set flag usage examples

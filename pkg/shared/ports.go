@@ -29,19 +29,18 @@ const (
 	PortGophishAPI  = 8209 // Legacy Gophish port 3333→8209
 	PortZabbix      = 8233
 	PortZabbixAPI   = 8237
-	
-
 	PortPenpot      = 8239 // Design platform
+	PortNomad       = 8243 // Nomad API server (not 4646)
+
 //	Next available:
-// 	1.	8243
-// 	3.	8263
-// 	4.	8269
-// 	5.	8273
-// 	6.	8287
-// 	7.	8291
-// 	8.	8293
-// 	9.	8297
-// 	10.	8311
+// 	1.	8263
+// 	3.	8269
+// 	4.	8273
+// 	5.	8287
+// 	6.	8291
+// 	7.	8293
+// 	8.	8297
+// 	9.	8311
 
 
 

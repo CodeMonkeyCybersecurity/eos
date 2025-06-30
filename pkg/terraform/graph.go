@@ -12,6 +12,8 @@ import (
 	vault "github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // GraphConfig represents the configuration for Terraform graph generation
@@ -33,8 +35,8 @@ func DefaultGraphConfig() *GraphConfig {
 		WorkingDir:    ".",
 		OutputFormat:  "ascii",
 		OutputFile:    "terraform-graph.txt",
-		VaultAddr:     "http://localhost:8179", // Use Eos standard port
-		NomadAddr:     "http://localhost:4646",
+		VaultAddr:     fmt.Sprintf("http://localhost:%d", shared.PortVault),
+		NomadAddr:     fmt.Sprintf("http://localhost:%d", shared.PortNomad),
 		Namespace:     "terraform-graph",
 	}
 }
