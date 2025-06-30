@@ -30,6 +30,21 @@ const (
 	PortZabbix      = 8233
 	PortZabbixAPI   = 8237
 	
+
+	PortPenpot      = 8239 // Design platform
+//	Next available:
+// 	1.	8243
+// 	3.	8263
+// 	4.	8269
+// 	5.	8273
+// 	6.	8287
+// 	7.	8291
+// 	8.	8293
+// 	9.	8297
+// 	10.	8311
+
+
+
 	// Next available primes: 8219, 8221, 8231, 8233, 8237, 8243, 8263, 8269...
 	
 	// Legacy ports to be migrated

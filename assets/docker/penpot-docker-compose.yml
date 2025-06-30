@@ -1,0 +1,329 @@
+version: "3.8"
+
+# Penpot Docker Compose configuration for Eos integration
+# This configuration provides a complete Penpot deployment with:
+# - PostgreSQL database
+# - Redis cache
+# - Penpot backend API
+# - Penpot frontend
+# - Penpot exporter for PDF/PNG generation
+# 
+# Usage:
+#   docker-compose -f penpot-docker-compose.yml up -d
+#   docker-compose -f penpot-docker-compose.yml --profile tools up -d  # Include management tools
+
+networks:
+  penpot:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  penpot_postgres:
+    driver: local
+  penpot_assets:
+    driver: local
+  penpot_redis:
+    driver: local
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: penpot-postgres
+    restart: unless-stopped
+    stop_signal: SIGINT
+    environment:
+      POSTGRES_USER: penpot
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-penpot_secure_password_123}
+      POSTGRES_DB: penpot
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - penpot_postgres:/var/lib/postgresql/data
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.10
+    ports:
+      - "127.0.0.1:5432:5432"  # Only bind to localhost for security
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U penpot"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: penpot-redis
+    restart: unless-stopped
+    command: |
+      redis-server
+      --save 60 1
+      --loglevel warning
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - penpot_redis:/data
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.11
+    ports:
+      - "127.0.0.1:6379:6379"  # Only bind to localhost for security
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # Penpot Backend API
+  backend:
+    image: penpotapp/backend:latest
+    container_name: penpot-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Database Configuration
+      PENPOT_DATABASE_URI: postgresql://penpot:${POSTGRES_PASSWORD:-penpot_secure_password_123}@postgres:5432/penpot
+      PENPOT_REDIS_URI: redis://redis:6379/0
+      
+      # Security Configuration
+      PENPOT_SECRET_KEY: ${PENPOT_SECRET_KEY:-your-256-bit-secret-key-change-in-production}
+      
+      # Public URI Configuration (matches Eos port allocation)
+      PENPOT_PUBLIC_URI: http://localhost:8239
+      
+      # Feature Flags
+      PENPOT_FLAGS: ${PENPOT_FLAGS:-enable-registration enable-login disable-email-verification}
+      
+      # Storage Configuration
+      PENPOT_ASSETS_STORAGE_BACKEND: fs
+      PENPOT_STORAGE_ASSETS_FS_DIRECTORY: /opt/penpot/assets
+      
+      # Email Configuration (disabled for local deployment)
+      PENPOT_EMAIL_ENABLED: "false"
+      
+      # Telemetry (disabled for privacy)
+      PENPOT_TELEMETRY_ENABLED: "false"
+      
+      # Performance Settings
+      PENPOT_HTTP_SERVER_PORT: 6060
+      PENPOT_HTTP_SERVER_HOST: 0.0.0.0
+      
+      # Registration Settings
+      PENPOT_REGISTRATION_ENABLED: "true"
+      PENPOT_LOGIN_ENABLED: "true"
+      
+      # Demo Configuration
+      PENPOT_DEMO_ENABLED: "false"
+      
+      # OIDC Configuration (disabled by default)
+      PENPOT_OIDC_ENABLED: "false"
+      
+      # LDAP Configuration (disabled by default)
+      PENPOT_LDAP_ENABLED: "false"
+      
+    volumes:
+      - penpot_assets:/opt/penpot/assets
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.12
+    ports:
+      - "127.0.0.1:6060:6060"  # Backend API port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6060/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+  # Penpot Frontend
+  frontend:
+    image: penpotapp/frontend:latest
+    container_name: penpot-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      # Backend configuration
+      PENPOT_BACKEND_URI: http://backend:6060
+      PENPOT_EXPORTER_URI: http://exporter:6061
+      
+      # Feature flags (must match backend)
+      PENPOT_FLAGS: ${PENPOT_FLAGS:-enable-registration enable-login disable-email-verification}
+      
+      # Demo configuration
+      PENPOT_DEMO_ENABLED: "false"
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.13
+    ports:
+      - "8239:80"  # Main Penpot web interface (Eos standard port)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Penpot Exporter (for PDF/PNG export)
+  exporter:
+    image: penpotapp/exporter:latest
+    container_name: penpot-exporter
+    restart: unless-stopped
+    environment:
+      # Public URI for exporter
+      PENPOT_PUBLIC_URI: http://frontend
+      
+      # Exporter specific configuration
+      PENPOT_EXPORTER_CONCURRENCY: 2
+      
+      # Browser configuration
+      PENPOT_EXPORTER_BROWSER_TIMEOUT: 30000
+      
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.14
+    ports:
+      - "127.0.0.1:6061:6061"  # Exporter service port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6061/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Optional: Mailcatcher for local email testing
+  mailcatcher:
+    image: schickling/mailcatcher:latest
+    container_name: penpot-mailcatcher
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1080:1080"  # Web interface
+      - "127.0.0.1:1025:1025"  # SMTP port
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.20
+    profiles:
+      - mail
+      - tools
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Optional: pgAdmin for database management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: penpot-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@local.dev
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "127.0.0.1:5050:80"
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.21
+    depends_on:
+      - postgres
+    profiles:
+      - tools
+    volumes:
+      - ./pgadmin:/var/lib/pgadmin
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # Optional: Redis Commander for Redis management
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: penpot-redis-commander
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "127.0.0.1:8081:8081"
+    networks:
+      penpot:
+        ipv4_address: 172.20.0.22
+    depends_on:
+      - redis
+    profiles:
+      - tools
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+# Usage Instructions:
+# 
+# 1. Basic startup (just Penpot):
+#    docker-compose -f penpot-docker-compose.yml up -d
+#
+# 2. With email testing:
+#    docker-compose -f penpot-docker-compose.yml --profile mail up -d
+#
+# 3. With database and Redis management tools:
+#    docker-compose -f penpot-docker-compose.yml --profile tools up -d
+#
+# 4. With everything:
+#    docker-compose -f penpot-docker-compose.yml --profile mail --profile tools up -d
+#
+# 5. View logs:
+#    docker-compose -f penpot-docker-compose.yml logs -f [service_name]
+#
+# 6. Stop everything:
+#    docker-compose -f penpot-docker-compose.yml down
+#
+# 7. Stop and remove volumes (full cleanup):
+#    docker-compose -f penpot-docker-compose.yml down -v
+#
+# Environment Variables:
+# - POSTGRES_PASSWORD: PostgreSQL password (default: penpot_secure_password_123)
+# - PENPOT_SECRET_KEY: Penpot secret key (default: your-256-bit-secret-key-change-in-production)
+# - PENPOT_FLAGS: Feature flags (default: enable-registration enable-login disable-email-verification)
+# - PGADMIN_PASSWORD: pgAdmin password (default: admin123)
+#
+# Access URLs:
+# - Penpot: http://localhost:8239
+# - pgAdmin (tools profile): http://localhost:5050
+# - Redis Commander (tools profile): http://localhost:8081
+# - Mailcatcher (mail profile): http://localhost:1080
