@@ -3,7 +3,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 	"time"
 
@@ -25,6 +24,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read" // NOTE: This `read` is a TOP-LEVEL command, not delphi/read
@@ -86,6 +86,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		sync.SyncCmd,
 		hecate.HecateCmd,
 		delphi.DelphiCmd, // This is the top-level 'delphi'
+		inspect.InspectCmd, // This is the top-level 'inspect'
 		pandora.PandoraCmd,
 		ragequit.RagequitCmd,
 	} {
@@ -98,60 +99,54 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 func Execute(rc *eos_io.RuntimeContext) {
 	_ = telemetry.Init("eos")
 
-	otelzap.Ctx(rc.Ctx).Info("Eos CLI starting")
-	
-	// Check for extended timeout from environment variable
-	globalTimeout := 3 * time.Minute
-	if envTimeout := os.Getenv("EOS_GLOBAL_TIMEOUT"); envTimeout != "" {
-		if parsedTimeout, err := time.ParseDuration(envTimeout); err == nil {
-			globalTimeout = parsedTimeout
-			otelzap.Ctx(rc.Ctx).Info("⏱️  Using extended global timeout from environment",
-				zap.Duration("timeout", globalTimeout),
-				zap.String("source", "EOS_GLOBAL_TIMEOUT"))
-		} else {
-			otelzap.Ctx(rc.Ctx).Warn("Invalid EOS_GLOBAL_TIMEOUT format, using default",
-				zap.String("invalid_value", envTimeout),
-				zap.Duration("default_timeout", globalTimeout))
-		}
-	}
-	
-	startGlobalWatchdog(rc, globalTimeout)
-
+	// Register all subcommands first
 	RegisterCommands(rc)
 
-	if err := RootCmd.Execute(); err != nil {
-		if eos_err.IsExpectedUserError(err) {
-			otelzap.Ctx(rc.Ctx).Warn("CLI completed with user error", zap.Error(err))
-			os.Exit(0)
-		} else {
-			otelzap.Ctx(rc.Ctx).Error("CLI execution error", zap.Error(err))
-			os.Exit(1)
-		}
-	}
-}
+	// Start global watchdog timer for command execution
+	watchdogDuration := 3 * time.Minute
+	timer := time.NewTimer(watchdogDuration)
+	defer timer.Stop()
 
-func startGlobalWatchdog(rc *eos_io.RuntimeContext, max time.Duration) {
+	// Channel to signal completion
+	done := make(chan bool)
+
+	// Execute command in goroutine
 	go func() {
-		timer := time.NewTimer(max)
-		select {
-		case <-timer.C:
-			fmt.Fprintf(os.Stderr, "Eos watchdog: global timeout (%s) exceeded. Initiating graceful shutdown.\n", max)
-			otelzap.Ctx(rc.Ctx).Error("Global timeout exceeded, initiating graceful shutdown",
-				zap.Duration("timeout", max))
+		defer func() {
+			done <- true
+		}()
 
-			// Log the timeout and attempt graceful shutdown
-			otelzap.Ctx(rc.Ctx).Warn("Attempting graceful shutdown due to watchdog timeout")
-
-			// Give cleanup 5 seconds, then exit normally
-			gracefulTimer := time.NewTimer(5 * time.Second)
-			<-gracefulTimer.C
-
-			fmt.Fprintf(os.Stderr, " Cleanup timeout exceeded. Forcing exit.\n")
-			os.Exit(1) // Use normal exit instead of SIGKILL
-		case <-rc.Ctx.Done():
-			// Context was cancelled normally, cleanup watchdog
-			timer.Stop()
-			return
+		// Execute the command
+		if err := RootCmd.Execute(); err != nil {
+			if eos_err.IsExpectedUserError(err) {
+				// Expected error (bad usage, file not found, etc.)
+				// Show the error but don't use ERROR level logging
+				logger := otelzap.Ctx(rc.Ctx)
+				logger.Info("Command completed with expected error",
+					zap.Error(err),
+					zap.String("error_type", "user_error"))
+				os.Exit(0) // Exit with success code for user errors
+			} else {
+				// Unexpected system error
+				logger := otelzap.Ctx(rc.Ctx)
+				logger.Error("Command failed with system error",
+					zap.Error(err),
+					zap.String("error_type", "system_error"))
+				os.Exit(1) // Exit with error code for system errors
+			}
 		}
 	}()
+
+	// Wait for either completion or timeout
+	select {
+	case <-done:
+		// Command completed normally
+		return
+	case <-timer.C:
+		// Watchdog timeout
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Fatal("Command execution timeout exceeded",
+			zap.Duration("timeout", watchdogDuration),
+			zap.String("component", rc.Component))
+	}
 }
