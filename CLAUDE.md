@@ -164,4 +164,6 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 
 ### Port Management Convention
-[... rest of the existing content remains unchanged ...]
+
+## Memories
+- No use of emojis in code or documentation
