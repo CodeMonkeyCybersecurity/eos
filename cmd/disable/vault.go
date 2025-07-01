@@ -30,7 +30,7 @@ func init() { DisableCmd.AddCommand(StopVaultCmd) }
 
 func runStopVault(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("🛑 Stopping Vault Agent and cleaning up…")
+	log.Info(" Stopping Vault Agent and cleaning up…")
 
 	// ① stop+disable the systemd unit
 	if err := systemctl("disable", "--now", shared.VaultAgentService); err != nil {

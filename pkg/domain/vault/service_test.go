@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"go.uber.org/zap/zaptest"
 )
 
@@ -519,4 +521,115 @@ func TestService_validateSecret(t *testing.T) {
 			}
 		})
 	}
+}
+
+// MockVaultService provides a mock implementation for testing
+type MockVaultService struct {
+	mock.Mock
+}
+
+func (m *MockVaultService) CheckHealth(ctx context.Context) error {
+	args := m.Called(ctx)
+	return args.Error(0)
+}
+
+func (m *MockVaultService) GetStatus(ctx context.Context) (*VaultStatus, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*VaultStatus), args.Error(1)
+}
+
+func (m *MockVaultService) GetSecret(ctx context.Context, path string) (*Secret, error) {
+	args := m.Called(ctx, path)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*Secret), args.Error(1)
+}
+
+// Test suite for vault domain logic
+func TestVaultService(t *testing.T) {
+	t.Run("health_check", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			setupMock   func(*MockVaultService)
+			expectError bool
+			errorType   error
+		}{
+			{
+				name: "healthy_vault",
+				setupMock: func(m *MockVaultService) {
+					m.On("CheckHealth", mock.Anything).Return(nil)
+				},
+				expectError: false,
+			},
+			{
+				name: "sealed_vault",
+				setupMock: func(m *MockVaultService) {
+					m.On("CheckHealth", mock.Anything).Return(ErrVaultSealed)
+				},
+				expectError: true,
+				errorType:   ErrVaultSealed,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				mockService := new(MockVaultService)
+				tt.setupMock(mockService)
+
+				err := mockService.CheckHealth(context.Background())
+
+				if tt.expectError {
+					assert.Error(t, err)
+					if tt.errorType != nil {
+						assert.ErrorIs(t, err, tt.errorType)
+					}
+				} else {
+					assert.NoError(t, err)
+				}
+
+				mockService.AssertExpectations(t)
+			})
+		}
+	})
+
+	t.Run("secret_operations", func(t *testing.T) {
+		t.Run("get_existing_secret", func(t *testing.T) {
+			mockService := new(MockVaultService)
+			expectedSecret := &Secret{
+				Path: "secret/data/test",
+				Data: map[string]interface{}{
+					"username": "admin",
+					"password": "secret123",
+				},
+				Version: 1,
+			}
+
+			mockService.On("GetSecret", mock.Anything, "secret/data/test").
+				Return(expectedSecret, nil)
+
+			secret, err := mockService.GetSecret(context.Background(), "secret/data/test")
+
+			assert.NoError(t, err)
+			assert.Equal(t, expectedSecret, secret)
+			mockService.AssertExpectations(t)
+		})
+
+		t.Run("get_non_existing_secret", func(t *testing.T) {
+			mockService := new(MockVaultService)
+
+			mockService.On("GetSecret", mock.Anything, "secret/data/missing").
+				Return(nil, ErrSecretNotFound)
+
+			secret, err := mockService.GetSecret(context.Background(), "secret/data/missing")
+
+			assert.Error(t, err)
+			assert.ErrorIs(t, err, ErrSecretNotFound)
+			assert.Nil(t, secret)
+			mockService.AssertExpectations(t)
+		})
+	})
 }

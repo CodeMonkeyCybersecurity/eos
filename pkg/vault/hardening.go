@@ -583,7 +583,7 @@ func setupLogRotation(rc *eos_io.RuntimeContext) error {
 
 func enableRateLimiting(rc *eos_io.RuntimeContext, client *api.Client) error {
 	log := otelzap.Ctx(rc.Ctx)
-	log.Info("⏱️ Enabling rate limiting")
+	log.Info(" Enabling rate limiting")
 
 	// Configure rate limiting quotas
 	quotaConfigs := []struct {

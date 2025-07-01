@@ -122,7 +122,7 @@ func init() {
 
 func stopVaultServices(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("🛑 Stopping and disabling Vault services")
+	logger.Info(" Stopping and disabling Vault services")
 
 	services := []string{
 		"vault-agent-eos.service",

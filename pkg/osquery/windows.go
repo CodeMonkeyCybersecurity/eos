@@ -145,7 +145,7 @@ func configureWindowsService(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Stop service if running
-	logger.Info("🛑 Stopping osquery service if running")
+	logger.Info(" Stopping osquery service if running")
 	if err := execute.RunSimple(rc.Ctx, "sc", "stop", "osqueryd"); err != nil {
 		logger.Debug(" Service was not running", zap.Error(err))
 	}

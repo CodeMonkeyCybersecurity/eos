@@ -336,7 +336,7 @@ func (a *AtomicMFAConfig) CommitTransaction() error {
 				zap.String("file", name),
 				zap.Error(err))
 			if rollbackErr := a.RollbackTransaction(); rollbackErr != nil {
-				a.logger.Error("💥 CRITICAL: Rollback also failed", zap.Error(rollbackErr))
+				a.logger.Error(" CRITICAL: Rollback also failed", zap.Error(rollbackErr))
 				return fmt.Errorf("commit failed AND rollback failed: commit=%w, rollback=%w", err, rollbackErr)
 			}
 			return fmt.Errorf("commit failed, rolled back: %w", err)

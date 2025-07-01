@@ -118,11 +118,11 @@ func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("🛑 Context cancelled, stopping agents watch")
+			logger.Info(" Context cancelled, stopping agents watch")
 			return nil
 
 		case sig := <-sigChan:
-			logger.Info("🛑 Received signal, stopping agents watch", zap.String("signal", sig.String()))
+			logger.Info(" Received signal, stopping agents watch", zap.String("signal", sig.String()))
 			return nil
 
 		case <-ticker.C:

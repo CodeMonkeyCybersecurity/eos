@@ -16,7 +16,7 @@ Eos_USER="eos"
 Eos_GROUP="eos"
 SUDOERS_FILE="/etc/sudoers.d/eos"
 
-echo "🛑 Stopping and disabling Eos services..."
+echo " Stopping and disabling Eos services..."
 sudo systemctl stop eos.service || true
 sudo systemctl disable eos.service || true
 sudo systemctl stop vault.service || true

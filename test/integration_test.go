@@ -1,5 +1,5 @@
 // Integration tests for Eos CLI - End-to-end workflow testing
-package main
+package test
 
 import (
 	"errors"

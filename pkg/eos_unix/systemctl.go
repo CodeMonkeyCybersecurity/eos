@@ -106,7 +106,7 @@ func RunSystemctlWithRetry(ctx context.Context, action, unit string, retries, de
 		zap.String("unit", unit),
 		zap.Error(lastErr),
 	)
-	otelzap.Ctx(ctx).Info("🩺 Run `systemctl status " + unit + " -l` or `journalctl -u " + unit + "` to investigate further")
+	otelzap.Ctx(ctx).Info(" Run `systemctl status " + unit + " -l` or `journalctl -u " + unit + "` to investigate further")
 
 	return fmt.Errorf("systemctl %s for unit %q failed: %w", action, unit, lastErr)
 }
@@ -192,7 +192,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 	var lastErr error
 	for attempt := 0; attempt < retries; attempt++ {
 		if attempt > 0 {
-			logger.Info(" ⏱️  Waiting before retry",
+			logger.Info("   Waiting before retry",
 				zap.Int("attempt", attempt+1),
 				zap.Int("delay_seconds", delaySeconds))
 			time.Sleep(time.Duration(delaySeconds) * time.Second)
@@ -253,7 +253,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 		lastErr = err
 	}
 
-	logger.Error(" 💥 Service restart failed after all retries",
+	logger.Error("  Service restart failed after all retries",
 		zap.String("unit", unit),
 		zap.Int("total_attempts", retries),
 		zap.Error(lastErr))
@@ -267,7 +267,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 // executeRestartWithStateMonitoring performs the restart while monitoring state changes
 func executeRestartWithStateMonitoring(ctx context.Context, unit string, logger otelzap.LoggerWithCtx) error {
 	// First, attempt graceful stop
-	logger.Info(" 🛑 Initiating graceful stop",
+	logger.Info("  Initiating graceful stop",
 		zap.String("unit", unit),
 		zap.String("phase", "stop"),
 		zap.String("graceful_stop_explanation", "Sending SIGTERM to allow clean shutdown before SIGKILL"))
@@ -276,7 +276,7 @@ func executeRestartWithStateMonitoring(ctx context.Context, unit string, logger 
 
 	// Get systemd's TimeoutStopSec for this unit
 	timeoutStopSec := getUnitTimeoutStopSec(unit)
-	logger.Info(" ⏱️  Service stop timeout configuration",
+	logger.Info("   Service stop timeout configuration",
 		zap.String("unit", unit),
 		zap.String("timeout_stop_sec", timeoutStopSec),
 		zap.String("explanation", "systemd will wait this long for graceful shutdown before SIGKILL"))
@@ -299,7 +299,7 @@ func executeRestartWithStateMonitoring(ctx context.Context, unit string, logger 
 	}
 
 	stopDuration := time.Since(stopStart)
-	logger.Info(" 🛑 Service stopped",
+	logger.Info("  Service stopped",
 		zap.String("unit", unit),
 		zap.Duration("stop_duration", stopDuration))
 
@@ -356,7 +356,7 @@ func streamJournalLogs(ctx context.Context, unit string, logger otelzap.LoggerWi
 	for scanner.Scan() {
 		line := scanner.Text()
 		// Log each journal line with appropriate metadata
-		logger.Info(" 📜 Service log",
+		logger.Info("  Service log",
 			zap.String("unit", unit),
 			zap.String("journal_line", line))
 	}
@@ -440,7 +440,7 @@ func getUnitTimeoutStopSec(unit string) string {
 
 // showServiceDiagnostics displays diagnostic information for troubleshooting
 func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.LoggerWithCtx) {
-	logger.Info(" 🩺 Service diagnostics",
+	logger.Info("  Service diagnostics",
 		zap.String("unit", unit))
 
 	// Get service status
@@ -456,12 +456,12 @@ func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.Log
 	logsCmd := exec.Command("journalctl", "-u", unit, "--no-pager", "-n", "20")
 	logsOut, _ := logsCmd.Output()
 	if len(logsOut) > 0 {
-		logger.Info(" 📜 Recent service logs",
+		logger.Info("  Recent service logs",
 			zap.String("unit", unit),
 			zap.ByteString("logs", logsOut))
 	}
 
-	logger.Info(" 💡 Troubleshooting commands",
+	logger.Info("  Troubleshooting commands",
 		zap.String("status_cmd", fmt.Sprintf("systemctl status %s -l", unit)),
 		zap.String("logs_cmd", fmt.Sprintf("journalctl -u %s -f", unit)),
 		zap.String("full_logs_cmd", fmt.Sprintf("journalctl -u %s --since '10 minutes ago'", unit)))

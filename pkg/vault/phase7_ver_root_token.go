@@ -67,7 +67,7 @@ func recoverVaultHealth(rc *eos_io.RuntimeContext, client *api.Client) error {
 
 	switch {
 	case !status.Initialized:
-		otelzap.Ctx(rc.Ctx).Info("💥 Vault uninitialized — running init + unseal flow")
+		otelzap.Ctx(rc.Ctx).Info(" Vault uninitialized — running init + unseal flow")
 		_, err := UnsealVault(rc)
 		return err
 	case status.Sealed:

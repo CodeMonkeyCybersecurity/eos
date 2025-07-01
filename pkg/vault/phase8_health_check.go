@@ -54,7 +54,7 @@ func probeVaultHealthUntilReady(rc *eos_io.RuntimeContext, client *api.Client) e
 
 		status, err := client.Sys().Health()
 		if err != nil {
-			otelzap.Ctx(rc.Ctx).Warn("🛑 Vault health API error", zap.Int("attempt", attempt), zap.Error(err))
+			otelzap.Ctx(rc.Ctx).Warn(" Vault health API error", zap.Int("attempt", attempt), zap.Error(err))
 			time.Sleep(shared.VaultRetryDelay)
 			continue
 		}

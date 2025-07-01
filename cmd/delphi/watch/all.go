@@ -133,11 +133,11 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("🛑 Context cancelled, stopping combined watch")
+			logger.Info(" Context cancelled, stopping combined watch")
 			return nil
 
 		case sig := <-sigChan:
-			logger.Info("🛑 Received signal, stopping combined watch", zap.String("signal", sig.String()))
+			logger.Info(" Received signal, stopping combined watch", zap.String("signal", sig.String()))
 			return nil
 
 		case notification := <-listener.Notify:

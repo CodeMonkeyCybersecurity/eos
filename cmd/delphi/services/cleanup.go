@@ -59,11 +59,11 @@ Examples:
 			}
 
 			// Report findings
-			logger.Error("💥 Zombie services detected",
+			logger.Error(" Zombie services detected",
 				zap.Int("zombie_count", len(zombieServices)))
 
 			for _, zombie := range zombieServices {
-				logger.Error("🧟 Zombie service details",
+				logger.Error(" Zombie service details",
 					zap.String("service", zombie.ServiceName),
 					zap.Bool("is_running", zombie.IsRunning),
 					zap.Bool("has_unit_file", zombie.HasUnitFile),
@@ -86,7 +86,7 @@ Examples:
 
 			if !autoFix {
 				logger.Error(" Zombie services require manual intervention")
-				logger.Info("💡 Options to fix:")
+				logger.Info(" Options to fix:")
 				logger.Info("  1. Run with --auto-fix to automatically clean up zombie services")
 				logger.Info("  2. Run with --dry-run first to see what would be done")
 				logger.Info("  3. Manually stop processes and clean up unit files")

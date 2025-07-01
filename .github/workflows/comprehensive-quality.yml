@@ -1,0 +1,381 @@
+# .github/workflows/comprehensive-quality.yml
+name: Comprehensive Quality Pipeline
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main]
+  schedule:
+    # Run daily security scans
+    - cron: '0 2 * * *'
+
+env:
+  GO_VERSION: '1.24'
+  COVERAGE_THRESHOLD: 70
+  CRITICAL_COVERAGE_THRESHOLD: 90
+
+jobs:
+  # Stage 1: Code Quality
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      
+      - name: Check formatting
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "::error::The following files are not properly formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+      
+      - name: Run go vet
+        run: go vet ./...
+      
+      - name: Run staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+      
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=10m --config=.golangci.yml
+      
+      - name: Check for TODO/FIXME
+        run: |
+          COUNT=$(grep -r "TODO\|FIXME" --include="*.go" . | wc -l)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "::warning::Found $COUNT TODO/FIXME comments"
+            grep -r "TODO\|FIXME" --include="*.go" . || true
+          fi
+
+  # Stage 2: Security Scanning
+  security:
+    name: Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: '-fmt sarif -out gosec-results.sarif ./...'
+      
+      - name: Upload Gosec results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gosec-results.sarif
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+      
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+      
+      - name: Check for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+      
+      - name: Dependency vulnerability check
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+
+  # Stage 3: Test Coverage
+  test-coverage:
+    name: Test Coverage Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Run unit tests with coverage
+        run: |
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./pkg/...
+          go tool cover -func=coverage.out -o coverage.txt
+      
+      - name: Check overall coverage
+        run: |
+          COVERAGE=$(cat coverage.txt | grep total | awk '{print $3}' | sed 's/%//')
+          echo "Overall coverage: ${COVERAGE}%"
+          echo "coverage=${COVERAGE}" >> $GITHUB_OUTPUT
+          
+          if (( $(echo "$COVERAGE < $COVERAGE_THRESHOLD" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below ${COVERAGE_THRESHOLD}% threshold"
+            exit 1
+          fi
+        id: coverage
+      
+      - name: Check critical package coverage
+        run: |
+          FAILED=0
+          for pkg in vault crypto eos_io eos_err; do
+            go test -coverprofile=${pkg}.coverage.out ./pkg/${pkg}/... || true
+            
+            if [ -f "${pkg}.coverage.out" ]; then
+              PKG_COV=$(go tool cover -func=${pkg}.coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+              echo "${pkg} coverage: ${PKG_COV}%"
+              
+              if (( $(echo "$PKG_COV < $CRITICAL_COVERAGE_THRESHOLD" | bc -l) )); then
+                echo "::error::${pkg} coverage ${PKG_COV}% is below ${CRITICAL_COVERAGE_THRESHOLD}% threshold"
+                FAILED=1
+              fi
+            else
+              echo "::error::No coverage data for ${pkg}"
+              FAILED=1
+            fi
+          done
+          
+          exit $FAILED
+      
+      - name: Generate coverage badge
+        if: github.ref == 'refs/heads/main'
+        run: |
+          COVERAGE=${{ steps.coverage.outputs.coverage }}
+          COLOR="red"
+          if (( $(echo "$COVERAGE >= 90" | bc -l) )); then
+            COLOR="brightgreen"
+          elif (( $(echo "$COVERAGE >= 80" | bc -l) )); then
+            COLOR="green"
+          elif (( $(echo "$COVERAGE >= 70" | bc -l) )); then
+            COLOR="yellow"
+          elif (( $(echo "$COVERAGE >= 60" | bc -l) )); then
+            COLOR="orange"
+          fi
+          
+          curl -s "https://img.shields.io/badge/coverage-${COVERAGE}%25-${COLOR}" > coverage-badge.svg
+      
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: |
+            coverage.out
+            coverage.txt
+            *.coverage.out
+            coverage-badge.svg
+
+  # Stage 4: Integration Tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      vault:
+        image: hashicorp/vault:latest
+        env:
+          VAULT_DEV_ROOT_TOKEN_ID: test-token
+          VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+        ports:
+          - 8200:8200
+        options: >-
+          --health-cmd "vault status"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Run integration tests
+        env:
+          VAULT_ADDR: http://localhost:8200
+          VAULT_TOKEN: test-token
+        run: |
+          go test -v -timeout=10m -tags=integration ./...
+
+  # Stage 5: Build and Package
+  build:
+    name: Build and Package
+    needs: [code-quality, security, test-coverage]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          OUTPUT_NAME=eos-${{ matrix.goos }}-${{ matrix.goarch }}
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            OUTPUT_NAME="${OUTPUT_NAME}.exe"
+          fi
+          
+          go build -ldflags="-s -w -X main.version=${{ github.sha }}" \
+                   -o ${OUTPUT_NAME} .
+          
+          # Create checksum
+          sha256sum ${OUTPUT_NAME} > ${OUTPUT_NAME}.sha256
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eos-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            eos-${{ matrix.goos }}-${{ matrix.goarch }}*
+
+  # Stage 6: Documentation
+  documentation:
+    name: Documentation Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check markdown links
+        uses: gaurav-nelson/github-action-markdown-link-check@v1
+        with:
+          use-quiet-mode: 'yes'
+          use-verbose-mode: 'no'
+      
+      - name: Check for missing documentation
+        run: |
+          # Check if all commands have documentation
+          COMMANDS=$(find cmd -name "*.go" -type f | grep -v test | wc -l)
+          DOCS=$(find docs/commands -name "*.md" -type f | wc -l)
+          
+          echo "Found $COMMANDS command files and $DOCS documentation files"
+          
+          if [ "$DOCS" -lt "$COMMANDS" ]; then
+            echo "::warning::Some commands may be missing documentation"
+          fi
+      
+      - name: Validate code examples
+        run: |
+          # Extract and validate Go code blocks from markdown
+          find docs -name "*.md" -type f -exec awk '/```go/{flag=1;next}/```/{flag=0}flag' {} \; > code-examples.go
+          
+          if [ -s code-examples.go ]; then
+            # Add package declaration and check syntax
+            echo "package main" | cat - code-examples.go > temp.go
+            go fmt temp.go > /dev/null || echo "::warning::Some code examples may have syntax issues"
+          fi
+
+  # Stage 7: Release Preparation
+  release-ready:
+    name: Release Readiness Check
+    if: github.ref == 'refs/heads/main'
+    needs: [build, integration-tests, documentation]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check CHANGELOG
+        run: |
+          if [ ! -f "CHANGELOG.md" ]; then
+            echo "::error::CHANGELOG.md is missing"
+            exit 1
+          fi
+          
+          # Check if CHANGELOG has been updated recently
+          LAST_CHANGE=$(git log -1 --format=%at CHANGELOG.md)
+          NOW=$(date +%s)
+          DAYS_OLD=$(( ($NOW - $LAST_CHANGE) / 86400 ))
+          
+          if [ $DAYS_OLD -gt 30 ]; then
+            echo "::warning::CHANGELOG.md hasn't been updated in $DAYS_OLD days"
+          fi
+      
+      - name: Version consistency check
+        run: |
+          # Check version consistency across files
+          VERSION_FILES=("version.go" "cmd/root.go" "CHANGELOG.md")
+          VERSIONS=()
+          
+          for file in "${VERSION_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              VERSION=$(grep -E 'version|Version' "$file" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+              if [ ! -z "$VERSION" ]; then
+                VERSIONS+=("$file:$VERSION")
+              fi
+            fi
+          done
+          
+          # Check if all versions match
+          if [ ${#VERSIONS[@]} -gt 1 ]; then
+            FIRST_VERSION=$(echo ${VERSIONS[0]} | cut -d: -f2)
+            for v in "${VERSIONS[@]}"; do
+              CURRENT_VERSION=$(echo $v | cut -d: -f2)
+              if [ "$CURRENT_VERSION" != "$FIRST_VERSION" ]; then
+                echo "::error::Version mismatch: $v (expected $FIRST_VERSION)"
+                exit 1
+              fi
+            done
+          fi
+
+  # Final Summary Job
+  pipeline-summary:
+    name: Pipeline Summary
+    if: always()
+    needs: [code-quality, security, test-coverage, integration-tests, build, documentation, release-ready]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        run: |
+          echo "## Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Add status for each job
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code Quality | ${{ needs.code-quality.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security | ${{ needs.security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Coverage | ${{ needs.test-coverage.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Documentation | ${{ needs.documentation.result }} |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "| Release Ready | ${{ needs.release-ready.result }} |" >> $GITHUB_STEP_SUMMARY
+          fi

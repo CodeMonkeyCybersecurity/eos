@@ -149,7 +149,7 @@ Examples:
 
 			// Extend timeout if specified
 			if timeout > 0 {
-				logger.Info("⏱️  Extending operation timeout",
+				logger.Info("  Extending operation timeout",
 					zap.Duration("requested_timeout", timeout),
 					zap.String("reason", "service update operations can take significant time"))
 
@@ -187,7 +187,7 @@ Examples:
 			serviceManager := shared.GetGlobalServiceManager()
 
 			// Phase 0.1: Check for zombie services first (critical safety check)
-			logger.Info("🧟 Phase 0.1: Zombie service detection",
+			logger.Info(" Phase 0.1: Zombie service detection",
 				zap.String("phase", "zombie-check"))
 
 			lifecycleManager := shared.GetGlobalServiceLifecycleManager()
@@ -196,19 +196,19 @@ Examples:
 				logger.Warn("Failed to check for zombie services",
 					zap.Error(err))
 			} else if len(zombieServices) > 0 {
-				logger.Error("💥 DANGER: Zombie services detected - update aborted",
+				logger.Error(" DANGER: Zombie services detected - update aborted",
 					zap.Int("zombie_count", len(zombieServices)),
 					zap.String("reason", "zombie services can cause systemd loops and system instability"))
 
 				for _, zombie := range zombieServices {
-					logger.Error("🧟 Zombie service found",
+					logger.Error(" Zombie service found",
 						zap.String("service", zombie.ServiceName),
 						zap.Int("pid", zombie.PID),
 						zap.String("problem", "running without unit file"))
 				}
 
 				logger.Error(" Service update cannot proceed with zombie services present")
-				logger.Info("💡 To fix this issue:")
+				logger.Info(" To fix this issue:")
 				logger.Info("  1. Run: eos delphi services cleanup --dry-run")
 				logger.Info("  2. Then: eos delphi services cleanup --auto-fix")
 				logger.Info("  3. Finally retry: eos delphi services update --all")
@@ -455,7 +455,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		restartPhaseStart := time.Now()
 
 		for _, service := range servicesToRestart {
-			logger.Info("⚡ Preparing enhanced service restart",
+			logger.Info(" Preparing enhanced service restart",
 				zap.String("service", service),
 				zap.String("enhanced_features", "real-time logs, state monitoring, graceful stop analysis"))
 
@@ -489,7 +489,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				logger.Warn("  Service health check failed",
 					zap.String("service", service),
 					zap.Error(err))
-				logger.Info("💡 Troubleshooting suggestion",
+				logger.Info(" Troubleshooting suggestion",
 					zap.String("service", service),
 					zap.String("command", "eos delphi services logs"),
 					zap.String("alt_command", fmt.Sprintf("journalctl -u %s -f", service)))

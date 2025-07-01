@@ -388,7 +388,7 @@ Shows:
 				_, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly")
 				if err != nil {
 					fmt.Printf("    database/creds/delphi-readonly (not configured)\n")
-					fmt.Printf("   💡 Run: eos self secrets set delphi-db-engine\n")
+					fmt.Printf("    Run: eos self secrets set delphi-db-engine\n")
 				} else {
 					fmt.Printf("    database/creds/delphi-readonly (dynamic credentials available)\n")
 				}
@@ -812,7 +812,7 @@ func setupDatabaseEngine(rc *eos_io.RuntimeContext, reader *bufio.Reader) error 
 	fmt.Printf("  Admin User: %s\n", adminUser)
 	fmt.Printf("  Dynamic Role: delphi-readonly\n\n")
 
-	fmt.Printf("⚡ To complete the setup, run these Vault commands on your host:\n\n")
+	fmt.Printf(" To complete the setup, run these Vault commands on your host:\n\n")
 
 	// Generate the Vault commands for the user
 	fmt.Printf("# Enable the database secrets engine\n")

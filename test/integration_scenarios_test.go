@@ -1,5 +1,5 @@
 // Integration scenario tests using predefined scenarios
-package main
+package test
 
 import (
 	"fmt"

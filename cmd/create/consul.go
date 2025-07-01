@@ -706,7 +706,7 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	log.Info(" ")
 
 	// Set environment variables for current session
-	log.Info(" 💡 ENVIRONMENT:")
+	log.Info("  ENVIRONMENT:")
 	log.Info("   Add to your ~/.bashrc:")
 	log.Info(fmt.Sprintf("     export CONSUL_HTTP_ADDR=\"127.0.0.1:%d\"", shared.PortConsul))
 	log.Info(" ")

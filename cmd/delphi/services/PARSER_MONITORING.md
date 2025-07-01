@@ -93,7 +93,7 @@ Lists recent parsing errors with:
 - Error details
 - Timestamp
 
-### 💡 Parser Effectiveness Analysis
+###  Parser Effectiveness Analysis
 Identifies optimization opportunities:
 - Parser/prompt type mismatches
 - Recommended parser changes

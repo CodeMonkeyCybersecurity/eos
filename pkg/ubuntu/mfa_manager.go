@@ -108,7 +108,7 @@ func (m *MFAManager) ImplementMFASecurely(enforced bool) error {
 	// Set up panic recovery
 	defer func() {
 		if r := recover(); r != nil {
-			m.logger.Error("💥 Panic during MFA implementation",
+			m.logger.Error(" Panic during MFA implementation",
 				zap.Any("panic", r))
 			m.rollback()
 		}

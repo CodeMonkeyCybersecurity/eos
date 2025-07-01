@@ -1,0 +1,133 @@
+#!/bin/bash
+# .git/hooks/pre-commit
+# Pre-commit hook to ensure code quality and coverage
+
+set -euo pipefail
+
+# Color codes
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+print_color() {
+    local color=$1
+    shift
+    echo -e "${color}$@${NC}"
+}
+
+print_color $BLUE "🚀 Running pre-commit checks..."
+
+# Check if we're in the repository root
+if [ ! -f "go.mod" ]; then
+    print_color $RED "Error: Not in repository root"
+    exit 1
+fi
+
+# 1. Check formatting
+print_color $BLUE "\n📝 Checking code formatting..."
+UNFORMATTED=$(gofmt -l .)
+if [ -n "$UNFORMATTED" ]; then
+    print_color $RED "❌ The following files are not properly formatted:"
+    echo "$UNFORMATTED"
+    print_color $YELLOW "💡 Run 'gofmt -w .' to fix formatting"
+    exit 1
+else
+    print_color $GREEN "✅ Code formatting OK"
+fi
+
+# 2. Run go vet
+print_color $BLUE "\n🔍 Running go vet..."
+if ! go vet ./...; then
+    print_color $RED "❌ go vet found issues"
+    exit 1
+else
+    print_color $GREEN "✅ go vet passed"
+fi
+
+# 3. Check for changed Go files
+CHANGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
+
+if [ -z "$CHANGED_GO_FILES" ]; then
+    print_color $YELLOW "\n⚠️  No Go files changed, skipping coverage check"
+    exit 0
+fi
+
+# 4. Determine which packages need testing
+PACKAGES_TO_TEST=""
+for file in $CHANGED_GO_FILES; do
+    # Extract package path
+    if [[ $file == pkg/* ]]; then
+        PKG_PATH=$(dirname "$file" | sed 's|^|./|')
+        if [[ ! " $PACKAGES_TO_TEST " =~ " $PKG_PATH " ]]; then
+            PACKAGES_TO_TEST="$PACKAGES_TO_TEST $PKG_PATH"
+        fi
+    fi
+done
+
+if [ -z "$PACKAGES_TO_TEST" ]; then
+    print_color $YELLOW "\n⚠️  No testable packages changed"
+    exit 0
+fi
+
+# 5. Run tests for changed packages
+print_color $BLUE "\n🧪 Running tests for changed packages..."
+FAILED_TESTS=0
+
+for pkg in $PACKAGES_TO_TEST; do
+    print_color $BLUE "Testing $pkg..."
+    if ! go test -race -timeout=30s "$pkg/..."; then
+        print_color $RED "❌ Tests failed in $pkg"
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+done
+
+if [ $FAILED_TESTS -gt 0 ]; then
+    print_color $RED "\n❌ $FAILED_TESTS package(s) have failing tests"
+    exit 1
+fi
+
+# 6. Quick coverage check for critical packages if modified
+print_color $BLUE "\n📊 Checking coverage for modified critical packages..."
+CRITICAL_PACKAGES=("vault" "crypto" "eos_io" "eos_err")
+CRITICAL_MODIFIED=false
+
+for pkg in "${CRITICAL_PACKAGES[@]}"; do
+    if echo "$CHANGED_GO_FILES" | grep -q "pkg/$pkg/"; then
+        CRITICAL_MODIFIED=true
+        print_color $YELLOW "  Critical package modified: $pkg"
+        
+        # Run coverage for this package
+        if go test -coverprofile="${pkg}.coverage.out" "./pkg/${pkg}/..." >/dev/null 2>&1; then
+            COV=$(go tool cover -func="${pkg}.coverage.out" | grep total | awk '{print $3}' | sed 's/%//')
+            rm -f "${pkg}.coverage.out"
+            
+            # Check if coverage is above 90%
+            if awk "BEGIN {exit !($COV < 90)}"; then
+                print_color $RED "  ❌ ${pkg}: ${COV}% (minimum 90% required)"
+                print_color $YELLOW "  💡 Add more tests to increase coverage"
+                exit 1
+            else
+                print_color $GREEN "  ✅ ${pkg}: ${COV}%"
+            fi
+        fi
+    fi
+done
+
+if ! $CRITICAL_MODIFIED; then
+    print_color $GREEN "✅ No critical packages modified"
+fi
+
+# 7. Check for debugging artifacts
+print_color $BLUE "\n🔍 Checking for debugging artifacts..."
+if git diff --cached --name-only | xargs grep -l "fmt\.Print\|debug\|TODO\|FIXME\|XXX" 2>/dev/null; then
+    print_color $YELLOW "⚠️  Found potential debugging artifacts:"
+    git diff --cached --name-only | xargs grep -n "fmt\.Print\|debug\|TODO\|FIXME\|XXX" 2>/dev/null || true
+    print_color $YELLOW "💡 Review these before committing"
+fi
+
+print_color $GREEN "\n✅ All pre-commit checks passed!"
+print_color $BLUE "📊 For full coverage report, run: make coverage-html"
+
+exit 0

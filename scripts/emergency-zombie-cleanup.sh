@@ -44,7 +44,7 @@ echo " Checking for delphi-llm-worker zombie process..."
 ZOMBIE_PID=$(pgrep -f "delphi-llm-worker" || echo "")
 
 if [ -n "$ZOMBIE_PID" ]; then
-    echo "🧟 Found zombie process: PID $ZOMBIE_PID"
+    echo " Found zombie process: PID $ZOMBIE_PID"
     echo "   Process details:"
     ps -p "$ZOMBIE_PID" -o pid,ppid,cmd || echo "   Could not get process details"
     
@@ -83,7 +83,7 @@ for pattern in "${ZOMBIE_PATTERNS[@]}"; do
             
             # Check if systemd unit file exists
             if ! systemctl cat "$SERVICE_NAME" >/dev/null 2>&1; then
-                echo "   🧟 Zombie detected: PID $pid (no unit file for $SERVICE_NAME)"
+                echo "    Zombie detected: PID $pid (no unit file for $SERVICE_NAME)"
                 if kill_process_safely "$pid" "$SERVICE_NAME"; then
                     echo "    Zombie eliminated"
                 else
@@ -120,7 +120,7 @@ fi
 echo ""
 echo "🎉 Emergency cleanup completed!"
 echo ""
-echo "💡 To prevent this in the future:"
+echo " To prevent this in the future:"
 echo "   1. Always use: eos delphi services cleanup --dry-run"
 echo "   2. Then use: eos delphi services cleanup --auto-fix"  
 echo "   3. Before running: eos delphi services update --all"

@@ -36,7 +36,7 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info("🛑 Stopping Delphi services")
+			logger.Info(" Stopping Delphi services")
 
 			var services []string
 			if all {

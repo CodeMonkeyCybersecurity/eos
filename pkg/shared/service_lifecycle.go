@@ -70,7 +70,7 @@ func (slm *ServiceLifecycleManager) DetectZombieServices(ctx context.Context) ([
 
 		// Check if this is a zombie (running but no unit file)
 		if plan.IsRunning && !plan.HasUnitFile {
-			logger.Warn("🧟 Zombie service detected",
+			logger.Warn(" Zombie service detected",
 				zap.String("service", serviceName),
 				zap.Bool("is_running", plan.IsRunning),
 				zap.Bool("has_unit_file", plan.HasUnitFile),
@@ -80,7 +80,7 @@ func (slm *ServiceLifecycleManager) DetectZombieServices(ctx context.Context) ([
 	}
 
 	if len(zombieServices) > 0 {
-		logger.Error("💥 Zombie services found - these need immediate attention",
+		logger.Error(" Zombie services found - these need immediate attention",
 			zap.Int("zombie_count", len(zombieServices)))
 	} else {
 		logger.Info(" No zombie services detected")
@@ -93,7 +93,7 @@ func (slm *ServiceLifecycleManager) DetectZombieServices(ctx context.Context) ([
 func (slm *ServiceLifecycleManager) SafelyRemoveService(ctx context.Context, serviceName string) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🛑 Starting safe service removal process",
+	logger.Info(" Starting safe service removal process",
 		zap.String("service", serviceName))
 
 	plan, err := slm.analyzeServiceForRemoval(ctx, serviceName)
@@ -156,7 +156,7 @@ func (slm *ServiceLifecycleManager) executeRemovalPlan(ctx context.Context, plan
 
 	// Step 1: Stop the service if running
 	if plan.RequiresStop {
-		logger.Info("🛑 Step 1: Stopping service",
+		logger.Info(" Step 1: Stopping service",
 			zap.String("service", plan.ServiceName),
 			zap.Int("pid", plan.PID))
 

@@ -97,7 +97,7 @@ done
 
 echo " Total interesting inputs found: ${total_inputs}"
 echo ""
-echo "💡 To run a quick test: ./scripts/run-fuzz-tests.sh 30s"
-echo "💡 To run specific test: go test -run=^$ -fuzz=^FuzzAllEOSCommands$ -fuzztime=1h ./test"
+echo " To run a quick test: ./scripts/run-fuzz-tests.sh 30s"
+echo " To run specific test: go test -run=^$ -fuzz=^FuzzAllEOSCommands$ -fuzztime=1h ./test"
 echo ""
 echo " Ready for production deployment!"
