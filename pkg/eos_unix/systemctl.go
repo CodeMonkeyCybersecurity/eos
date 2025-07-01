@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -233,12 +234,42 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 			// Give service a moment to fully initialize
 			time.Sleep(2 * time.Second)
 
-			// Final health check
-			if err := CheckServiceStatus(ctx, unit); err != nil {
-				logger.Warn("   Service is not active after restart",
+			// Final health check - use appropriate check based on service type
+			isOneshot, err := isOneshotService(unit)
+			if err != nil {
+				logger.Warn("Could not determine service type, using standard check",
 					zap.String("unit", unit),
 					zap.Error(err))
-				lastErr = err
+				isOneshot = false
+			}
+
+			var healthCheckErr error
+			if isOneshot {
+				// For oneshot services, check exit code rather than active state
+				healthCheckErr = checkOneshotServiceHealth(ctx, unit)
+				if healthCheckErr != nil {
+					logger.Warn("   Oneshot service health check failed after restart",
+						zap.String("unit", unit),
+						zap.String("service_type", "oneshot"),
+						zap.Error(healthCheckErr))
+				} else {
+					logger.Info("   Oneshot service completed successfully",
+						zap.String("unit", unit),
+						zap.String("service_type", "oneshot"))
+				}
+			} else {
+				// For regular services, use the standard active state check
+				healthCheckErr = CheckServiceStatus(ctx, unit)
+				if healthCheckErr != nil {
+					logger.Warn("   Service is not active after restart",
+						zap.String("unit", unit),
+						zap.String("service_type", "standard"),
+						zap.Error(healthCheckErr))
+				}
+			}
+
+			if healthCheckErr != nil {
+				lastErr = healthCheckErr
 				continue
 			}
 
@@ -465,4 +496,63 @@ func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.Log
 		zap.String("status_cmd", fmt.Sprintf("systemctl status %s -l", unit)),
 		zap.String("logs_cmd", fmt.Sprintf("journalctl -u %s -f", unit)),
 		zap.String("full_logs_cmd", fmt.Sprintf("journalctl -u %s --since '10 minutes ago'", unit)))
+}
+
+// isOneshotService checks if a systemd service is configured as Type=oneshot
+func isOneshotService(serviceName string) (bool, error) {
+	output, err := execute.Run(context.Background(), execute.Options{
+		Command: "systemctl",
+		Args:    []string{"show", serviceName, "--property=Type", "--value"},
+		Capture: true,
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to check service type: %w", err)
+	}
+
+	serviceType := strings.TrimSpace(output)
+	return serviceType == "oneshot", nil
+}
+
+// checkOneshotServiceHealth checks the health of a oneshot service by examining its exit status
+func checkOneshotServiceHealth(ctx context.Context, serviceName string) error {
+	// For oneshot services, we need to check:
+	// 1. The service executed successfully (exit code 0)
+	// 2. The service is in "inactive" state (which is normal for completed oneshot services)
+	
+	// Check the exit status of the last execution
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"show", serviceName, "--property=ExecMainStatus", "--value"},
+		Capture: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to check service exit status: %w", err)
+	}
+
+	exitStatus := strings.TrimSpace(output)
+	if exitStatus != "0" && exitStatus != "" {
+		return fmt.Errorf("oneshot service exited with non-zero status: %s", exitStatus)
+	}
+
+	// Check that the service is in inactive state (normal for completed oneshot)
+	output, err = execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", serviceName},
+		Capture: true,
+	})
+	if err != nil {
+		// For oneshot services, is-active returning an error is expected
+		// Check if it's in "inactive" state specifically
+		if strings.Contains(output, "inactive") {
+			return nil // This is normal for completed oneshot services
+		}
+		return fmt.Errorf("oneshot service in unexpected state: %w", err)
+	}
+
+	state := strings.TrimSpace(output)
+	if state == "inactive" {
+		return nil // This is the expected state for completed oneshot services
+	}
+
+	return fmt.Errorf("oneshot service in unexpected active state: %s", state)
 }

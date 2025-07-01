@@ -384,9 +384,9 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		logger.Info("Updating service worker",
 			zap.String("service", worker.ServiceName))
 
-		// Step 1: Backup existing file if it exists and backup is not skipped
+		// Step 1: Backup existing Python worker file if it exists and backup is not skipped
 		if !skipBackup && fileExists(worker.TargetPath) {
-			logger.Info("Creating backup",
+			logger.Info("Creating Python worker backup",
 				zap.String("source", worker.TargetPath),
 				zap.String("backup", worker.BackupPath))
 
@@ -394,8 +394,32 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
 			}
 
-			logger.Info("Backup created",
+			logger.Info("Python worker backup created",
 				zap.String("backup_path", worker.BackupPath))
+		}
+
+		// Step 1.5: Backup systemd service file if it exists and backup is not skipped
+		if !skipBackup {
+			serviceFilePath := fmt.Sprintf("/etc/systemd/system/%s.service", worker.ServiceName)
+			if fileExists(serviceFilePath) {
+				// Extract timestamp from worker.BackupPath to use the same timestamp for service file
+				timestamp := extractTimestampFromBackupPath(worker.BackupPath)
+				serviceBackupPath := fmt.Sprintf("%s.%s.bak", serviceFilePath, timestamp)
+
+				logger.Info("Creating systemd service backup",
+					zap.String("source", serviceFilePath),
+					zap.String("backup", serviceBackupPath))
+
+				if err := copyFile(serviceFilePath, serviceBackupPath); err != nil {
+					logger.Warn("Failed to backup systemd service file (continuing)",
+						zap.String("service", worker.ServiceName),
+						zap.String("service_file", serviceFilePath),
+						zap.Error(err))
+				} else {
+					logger.Info("Systemd service backup created",
+						zap.String("backup_path", serviceBackupPath))
+				}
+			}
 		}
 
 		// Step 2: Deploy new version
@@ -485,19 +509,53 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 		healthyServices := 0
 		for _, service := range servicesToRestart {
-			if err := eos_unix.CheckServiceStatus(rc.Ctx, service); err != nil {
-				logger.Warn("  Service health check failed",
+			// Check if this is a oneshot service
+			isOneshot, err := isOneshotService(service)
+			if err != nil {
+				logger.Warn("Could not determine service type, using standard check",
 					zap.String("service", service),
 					zap.Error(err))
+				isOneshot = false
+			}
+
+			var checkErr error
+			if isOneshot {
+				// For oneshot services, check the exit code rather than active state
+				checkErr = checkOneshotServiceHealth(rc.Ctx, service)
+				if checkErr != nil {
+					logger.Warn("  Oneshot service health check failed",
+						zap.String("service", service),
+						zap.String("service_type", "oneshot"),
+						zap.Error(checkErr))
+				} else {
+					logger.Info(" Oneshot service health check passed",
+						zap.String("service", service),
+						zap.String("service_type", "oneshot"),
+						zap.String("status", "completed successfully"))
+					healthyServices++
+				}
+			} else {
+				// For regular services, use the standard active state check
+				checkErr = eos_unix.CheckServiceStatus(rc.Ctx, service)
+				if checkErr != nil {
+					logger.Warn("  Service health check failed",
+						zap.String("service", service),
+						zap.String("service_type", "standard"),
+						zap.Error(checkErr))
+				} else {
+					logger.Info(" Service health check passed",
+						zap.String("service", service),
+						zap.String("service_type", "standard"),
+						zap.String("status", "active"))
+					healthyServices++
+				}
+			}
+
+			if checkErr != nil {
 				logger.Info(" Troubleshooting suggestion",
 					zap.String("service", service),
 					zap.String("command", "eos delphi services logs"),
 					zap.String("alt_command", fmt.Sprintf("journalctl -u %s -f", service)))
-			} else {
-				logger.Info(" Service health check passed",
-					zap.String("service", service),
-					zap.String("status", "active"))
-				healthyServices++
 			}
 		}
 
@@ -521,6 +579,82 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// extractTimestampFromBackupPath extracts the timestamp from a backup path like "/path/file.20250701_212225.bak"
+func extractTimestampFromBackupPath(backupPath string) string {
+	// Find the last occurrence of a timestamp pattern in the backup path
+	// Expected format: filename.YYYYMMDD_HHMMSS.bak
+	parts := strings.Split(filepath.Base(backupPath), ".")
+	if len(parts) >= 3 {
+		// Look for the timestamp part (should be second to last before .bak)
+		timestampPart := parts[len(parts)-2]
+		// Validate it looks like a timestamp (YYYYMMDD_HHMMSS)
+		if len(timestampPart) == 15 && strings.Contains(timestampPart, "_") {
+			return timestampPart
+		}
+	}
+	// Fallback: generate new timestamp if we can't extract one
+	return time.Now().Format("20060102_150405")
+}
+
+// isOneshotService checks if a systemd service is configured as Type=oneshot
+func isOneshotService(serviceName string) (bool, error) {
+	output, err := execute.Run(context.Background(), execute.Options{
+		Command: "systemctl",
+		Args:    []string{"show", serviceName, "--property=Type", "--value"},
+		Capture: true,
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to check service type: %w", err)
+	}
+
+	serviceType := strings.TrimSpace(output)
+	return serviceType == "oneshot", nil
+}
+
+// checkOneshotServiceHealth checks the health of a oneshot service by examining its exit status
+func checkOneshotServiceHealth(ctx context.Context, serviceName string) error {
+	// For oneshot services, we need to check:
+	// 1. The service executed successfully (exit code 0)
+	// 2. The service is in "inactive" state (which is normal for completed oneshot services)
+	
+	// Check the exit status of the last execution
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"show", serviceName, "--property=ExecMainStatus", "--value"},
+		Capture: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to check service exit status: %w", err)
+	}
+
+	exitStatus := strings.TrimSpace(output)
+	if exitStatus != "0" && exitStatus != "" {
+		return fmt.Errorf("oneshot service exited with non-zero status: %s", exitStatus)
+	}
+
+	// Check that the service is in inactive state (normal for completed oneshot)
+	output, err = execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", serviceName},
+		Capture: true,
+	})
+	if err != nil {
+		// For oneshot services, is-active returning an error is expected
+		// Check if it's in "inactive" state specifically
+		if strings.Contains(output, "inactive") {
+			return nil // This is normal for completed oneshot services
+		}
+		return fmt.Errorf("oneshot service in unexpected state: %w", err)
+	}
+
+	state := strings.TrimSpace(output)
+	if state == "inactive" {
+		return nil // This is the expected state for completed oneshot services
+	}
+
+	return fmt.Errorf("oneshot service in unexpected active state: %s", state)
 }
 
 // copyFile copies a file from src to dst
