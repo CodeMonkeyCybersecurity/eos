@@ -160,12 +160,13 @@ class ParserMonitor:
                         pm.alert_id,
                         pm.prompt_type,
                         pm.parser_used,
-                        pm.error,
+                        pm.error_message as error,
                         pm.created_at,
-                        a.rule_description,
-                        a.agent_name
+                        a.rule_desc,
+                        ag.name as agent_name
                     FROM parser_metrics pm
                     LEFT JOIN alerts a ON pm.alert_id = a.id
+                    LEFT JOIN agents ag ON a.agent_id = ag.id
                     WHERE pm.success = FALSE
                     ORDER BY pm.created_at DESC
                     LIMIT %s
@@ -182,19 +183,19 @@ class ParserMonitor:
                 cur.execute("""
                     SELECT 
                         COALESCE(a.prompt_type, 'None') as prompt_type,
-                        COALESCE(a.experiment_id, 'No Experiment') as experiment,
+                        'No Experiments' as experiment,
                         COUNT(*) as alert_count,
                         COUNT(*) FILTER (WHERE a.state = 'sent') as sent_count,
-                        COUNT(*) FILTER (WHERE a.state IN ('failed', 'send_failed')) as failed_count,
+                        COUNT(*) FILTER (WHERE a.state = 'failed') as failed_count,
                         AVG(
                             EXTRACT(EPOCH FROM (
-                                COALESCE(a.structured_at, CURRENT_TIMESTAMP) - a.analyzed_at
+                                COALESCE(a.structured_at, CURRENT_TIMESTAMP) - a.response_received_at
                             ))
                         ) FILTER (WHERE a.structured_at IS NOT NULL) as avg_parse_time_sec
                     FROM alerts a
-                    WHERE a.created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'
+                    WHERE a.ingest_timestamp > CURRENT_TIMESTAMP - INTERVAL '7 days'
                       AND a.state IN ('analyzed', 'structured', 'formatted', 'sent', 'failed')
-                    GROUP BY a.prompt_type, a.experiment_id
+                    GROUP BY a.prompt_type
                     ORDER BY alert_count DESC
                 """)
                 
@@ -210,28 +211,29 @@ class ParserMonitor:
                     SELECT 
                         state,
                         COUNT(*) as count,
-                        MIN(created_at) as oldest,
-                        MAX(created_at) as newest,
+                        MIN(ingest_timestamp) as oldest,
+                        MAX(ingest_timestamp) as newest,
                         AVG(
                             CASE 
-                                WHEN state = 'structured' AND analyzed_at IS NOT NULL 
-                                THEN EXTRACT(EPOCH FROM (structured_at - analyzed_at))
+                                WHEN state = 'structured' AND response_received_at IS NOT NULL 
+                                THEN EXTRACT(EPOCH FROM (structured_at - response_received_at))
                                 ELSE NULL 
                             END
                         ) as avg_processing_time
                     FROM alerts
-                    WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
+                    WHERE ingest_timestamp > CURRENT_TIMESTAMP - INTERVAL '24 hours'
                     GROUP BY state
                     ORDER BY 
                         CASE state
-                            WHEN 'enriched' THEN 1
-                            WHEN 'analyzed' THEN 2
-                            WHEN 'structured' THEN 3
-                            WHEN 'formatted' THEN 4
-                            WHEN 'sent' THEN 5
-                            WHEN 'failed' THEN 6
-                            WHEN 'send_failed' THEN 7
-                            ELSE 8
+                            WHEN 'new' THEN 1
+                            WHEN 'enriched' THEN 2
+                            WHEN 'analyzed' THEN 3
+                            WHEN 'structured' THEN 4
+                            WHEN 'formatted' THEN 5
+                            WHEN 'sent' THEN 6
+                            WHEN 'failed' THEN 7
+                            WHEN 'archived' THEN 8
+                            ELSE 9
                         END
                 """)
                 
@@ -296,10 +298,10 @@ class ParserMonitor:
                 stuck_counts = {}
                 for state, threshold in stuck_thresholds.items():
                     cur.execute("""
-                        SELECT COUNT(*), MIN(created_at)
+                        SELECT COUNT(*), MIN(ingest_timestamp)
                         FROM alerts
                         WHERE state = %s 
-                          AND created_at < CURRENT_TIMESTAMP - INTERVAL %s
+                          AND ingest_timestamp < CURRENT_TIMESTAMP - INTERVAL %s
                     """, (state, threshold))
                     count, oldest = cur.fetchone()
                     stuck_counts[state] = {
@@ -311,30 +313,9 @@ class ParserMonitor:
                 return stuck_counts
     
     def get_ab_test_metrics(self) -> List[Dict]:
-        """Get A/B testing metrics from the new experiment system"""
-        with self.connect() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT 
-                        e.experiment_name,
-                        e.variant_name,
-                        COUNT(DISTINCT a.id) as alert_count,
-                        COUNT(DISTINCT a.id) FILTER (WHERE a.state = 'sent') as success_count,
-                        AVG(
-                            EXTRACT(EPOCH FROM (a.sent_at - a.created_at))
-                        ) FILTER (WHERE a.sent_at IS NOT NULL) as avg_total_time,
-                        COUNT(DISTINCT pm.alert_id) FILTER (WHERE pm.success) as parse_success_count
-                    FROM alerts a
-                    LEFT JOIN experiments e ON a.experiment_id = e.experiment_id
-                    LEFT JOIN parser_metrics pm ON a.id = pm.alert_id
-                    WHERE a.created_at > CURRENT_TIMESTAMP - INTERVAL '7 days'
-                      AND e.experiment_name IS NOT NULL
-                    GROUP BY e.experiment_name, e.variant_name
-                    ORDER BY e.experiment_name, alert_count DESC
-                """)
-                
-                columns = [desc[0] for desc in cur.description]
-                return [dict(zip(columns, row)) for row in cur.fetchall()]
+        """Get A/B testing metrics - currently no experiments table in schema"""
+        # Return empty list since experiments table doesn't exist in current schema
+        return []
     
     def get_parser_health_summary(self) -> Dict[str, Any]:
         """Get overall parser health summary with pipeline awareness"""
@@ -356,14 +337,8 @@ class ParserMonitor:
                 # Get stuck alerts by state
                 stuck_alerts = self.check_stuck_alerts()
                 
-                # Get A/B test summary
-                cur.execute("""
-                    SELECT COUNT(DISTINCT experiment_id)
-                    FROM alerts
-                    WHERE created_at > CURRENT_TIMESTAMP - INTERVAL '24 hours'
-                      AND experiment_id IS NOT NULL
-                """)
-                active_experiments = cur.fetchone()[0] or 0
+                # A/B test summary - no experiments in current schema
+                active_experiments = 0
                 
                 return {
                     'active_prompt_types': result[0] or 0,
@@ -479,7 +454,7 @@ class ParserMonitor:
         if failures:
             for failure in failures:
                 print(f"\nAlert ID: {failure['alert_id']}")
-                print(f"Rule: {failure['rule_description'] or 'Unknown'}")
+                print(f"Rule: {failure['rule_desc'] or 'Unknown'}")
                 print(f"Agent: {failure['agent_name'] or 'Unknown'}")
                 print(f"Parser: {failure['parser_used']} (prompt: {failure['prompt_type']})")
                 print(f"Time: {failure['created_at'].strftime('%Y-%m-%d %H:%M:%S')}")
