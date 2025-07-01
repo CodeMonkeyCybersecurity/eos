@@ -641,9 +641,9 @@ func (result *SchemaVerificationResult) calculateOverallStatus() {
 	if missingCount == 0 && warningCount == 0 {
 		result.OverallStatus = " Database fully matches schema.sql!"
 	} else if missingCount == 0 {
-		result.OverallStatus = fmt.Sprintf("⚠️  Database has %d warnings but no missing objects", warningCount)
+		result.OverallStatus = fmt.Sprintf("  Database has %d warnings but no missing objects", warningCount)
 	} else {
-		result.OverallStatus = fmt.Sprintf("❌ Database requires updates: %d missing objects, %d warnings", missingCount, warningCount)
+		result.OverallStatus = fmt.Sprintf(" Database requires updates: %d missing objects, %d warnings", missingCount, warningCount)
 	}
 }
 

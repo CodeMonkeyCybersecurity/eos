@@ -35,5 +35,21 @@ echo " Fuzzing parse package..."
 go test -run=^FuzzSplitAndTrim$ -fuzz=^FuzzSplitAndTrim$ -fuzztime="${FUZZTIME}" ./pkg/parse
 
 echo ""
+echo " Fuzzing CLI package..."
+go test -run=^$ -fuzz=^FuzzCommandParsing$ -fuzztime="${FUZZTIME}" ./pkg/eos_cli
+
+echo ""
+echo " Fuzzing Delphi services package..."
+go test -run=^$ -fuzz=^FuzzUpdateCommand$ -fuzztime="${FUZZTIME}" ./cmd/delphi/services
+go test -run=^$ -fuzz=^FuzzServiceWorkerPaths$ -fuzztime="${FUZZTIME}" ./cmd/delphi/services
+go test -run=^$ -fuzz=^FuzzFileOperations$ -fuzztime="${FUZZTIME}" ./cmd/delphi/services
+
+echo ""
+echo " Fuzzing comprehensive EOS command test..."
+go test -run=^$ -fuzz=^FuzzAllEOSCommands$ -fuzztime="${FUZZTIME}" ./test
+go test -run=^$ -fuzz=^FuzzEOSCommandFlags$ -fuzztime="${FUZZTIME}" ./test
+go test -run=^$ -fuzz=^FuzzDelphiServicesCommands$ -fuzztime="${FUZZTIME}" ./test
+
+echo ""
 echo " All fuzz tests completed successfully!"
 echo " No issues found during fuzzing with ${FUZZTIME} duration."

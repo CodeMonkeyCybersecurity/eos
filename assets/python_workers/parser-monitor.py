@@ -396,13 +396,13 @@ class ParserMonitor:
         # Stuck alerts
         total_stuck = sum(s['count'] for s in health['stuck_alerts'].values())
         if total_stuck > 0:
-            print(f"\n⚠️  STUCK ALERTS: {total_stuck} total")
+            print(f"\n  STUCK ALERTS: {total_stuck} total")
             for state, info in health['stuck_alerts'].items():
                 if info['count'] > 0:
                     print(f"  - {state}: {info['count']} alerts (threshold: {info['threshold']})")
         
         # Pipeline Status
-        print("\n📊 PIPELINE STATUS (Last 24 hours)")
+        print("\n PIPELINE STATUS (Last 24 hours)")
         print("-" * 80)
         pipeline = self.get_pipeline_status()
         if pipeline:
@@ -421,7 +421,7 @@ class ParserMonitor:
                           tablefmt='grid'))
         
         # A/B Test Metrics (NEW)
-        print("\n🧪 A/B TESTING METRICS")
+        print("\n A/B TESTING METRICS")
         print("-" * 80)
         ab_metrics = self.get_ab_test_metrics()
         if ab_metrics:
@@ -473,7 +473,7 @@ class ParserMonitor:
                           tablefmt='grid'))
         
         # Recent Failures
-        print("\n❌ RECENT PARSER FAILURES")
+        print("\n RECENT PARSER FAILURES")
         print("-" * 80)
         failures = self.get_recent_failures(5)
         if failures:

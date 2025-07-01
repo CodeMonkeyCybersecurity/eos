@@ -256,31 +256,31 @@ func TestDelphiServiceRegistry_GetPipelineOrder(t *testing.T) {
 	}
 }
 
-func TestDelphiServiceRegistry_GetServiceType(t *testing.T) {
+func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
 	registry := GetDelphiServiceRegistry()
 	
 	tests := []struct {
 		name         string
 		serviceName  string
-		expectedType string
+		expectedStage string
 		shouldExist  bool
 	}{
 		{
-			name:         "delphi-listener type",
+			name:         "delphi-listener stage",
 			serviceName:  "delphi-listener",
-			expectedType: "ingestion",
+			expectedStage: "ingestion",
 			shouldExist:  true,
 		},
 		{
-			name:         "alert-to-db type", 
+			name:         "alert-to-db stage", 
 			serviceName:  "alert-to-db",
-			expectedType: "processing",
+			expectedStage: "processing",
 			shouldExist:  true,
 		},
 		{
-			name:         "ab-test-analyzer type",
+			name:         "ab-test-analyzer stage",
 			serviceName:  "ab-test-analyzer", 
-			expectedType: "analysis",
+			expectedStage: "analysis",
 			shouldExist:  true,
 		},
 		{
@@ -292,12 +292,12 @@ func TestDelphiServiceRegistry_GetServiceType(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			serviceType, exists := registry.GetServiceType(tt.serviceName)
+			service, exists := registry.GetService(tt.serviceName)
 			
 			assert.Equal(t, tt.shouldExist, exists)
 			
 			if tt.shouldExist {
-				assert.Equal(t, tt.expectedType, serviceType)
+				assert.Equal(t, tt.expectedStage, service.PipelineStage)
 			}
 		})
 	}

@@ -184,7 +184,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 
 	// Get initial service state
 	initialState, _ := getServiceState(unit)
-	logger.Info(" 📊 Initial service state",
+	logger.Info("  Initial service state",
 		zap.String("unit", unit),
 		zap.String("state", initialState),
 		zap.String("timestamp", time.Now().Format(time.RFC3339)))
@@ -235,7 +235,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 
 			// Final health check
 			if err := CheckServiceStatus(ctx, unit); err != nil {
-				logger.Warn(" ⚠️  Service is not active after restart",
+				logger.Warn("   Service is not active after restart",
 					zap.String("unit", unit),
 					zap.Error(err))
 				lastErr = err
@@ -245,7 +245,7 @@ func RestartSystemdUnitWithVisibility(ctx context.Context, unit string, retries 
 			return nil
 		}
 
-		logger.Error(" ❌ Service restart failed",
+		logger.Error("  Service restart failed",
 			zap.String("unit", unit),
 			zap.Int("attempt", attempt+1),
 			zap.Duration("restart_duration", restartDuration),
@@ -400,7 +400,7 @@ func monitorServiceStateChanges(ctx context.Context, unit string, logger otelzap
 
 			// Timeout after 30 seconds
 			if time.Since(transitionStart) > 30*time.Second {
-				logger.Warn(" ⚠️  Service state transition timeout",
+				logger.Warn("   Service state transition timeout",
 					zap.String("unit", unit),
 					zap.String("expected_transition", expectedTransition),
 					zap.String("current_state", currentState))
@@ -447,7 +447,7 @@ func showServiceDiagnostics(ctx context.Context, unit string, logger otelzap.Log
 	statusCmd := exec.Command("systemctl", "status", unit, "--no-pager", "-l")
 	statusOut, _ := statusCmd.Output()
 	if len(statusOut) > 0 {
-		logger.Info(" 📋 Service status output",
+		logger.Info("  Service status output",
 			zap.String("unit", unit),
 			zap.ByteString("status", statusOut))
 	}

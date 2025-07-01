@@ -699,7 +699,7 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	log.Info("   • Prepared queries for intelligent routing")
 	log.Info(" ")
 
-	log.Info(" 📊 MONITORING:")
+	log.Info("  MONITORING:")
 	log.Info("   • Prometheus metrics available")
 	log.Info("   • Logs: /var/log/consul/")
 	log.Info("   • Telemetry enabled")

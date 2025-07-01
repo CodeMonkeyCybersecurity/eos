@@ -113,7 +113,7 @@ that require access to secrets, including the Delphi dashboard.`,
 			// Initialize Vault service facade
 			if err := vault.InitializeServiceFacade(rc); err != nil {
 				logger.Warn("Failed to initialize Vault service", zap.Error(err))
-				fmt.Printf("❌ Vault connection failed: %v\n", err)
+				fmt.Printf(" Vault connection failed: %v\n", err)
 				fmt.Printf("\nTroubleshooting:\n")
 				fmt.Printf("- Check if Vault server is running at %s\n", vaultAddr)
 				fmt.Printf("- Verify network connectivity\n")
@@ -255,13 +255,13 @@ This command will:
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Testing Vault connectivity")
 
-			fmt.Printf("🧪 Vault Connectivity Test\n")
+			fmt.Printf(" Vault Connectivity Test\n")
 			fmt.Printf("===========================\n\n")
 
 			// Test 1: Check environment variables
 			vaultAddr := os.Getenv("VAULT_ADDR")
 			if vaultAddr == "" {
-				fmt.Printf("❌ VAULT_ADDR not set\n")
+				fmt.Printf(" VAULT_ADDR not set\n")
 				fmt.Printf("   Run: eos self secrets configure\n\n")
 				return fmt.Errorf("VAULT_ADDR environment variable not set")
 			}
@@ -269,7 +269,7 @@ This command will:
 
 			// Test 2: Initialize Vault service
 			if err := vault.InitializeServiceFacade(rc); err != nil {
-				fmt.Printf("❌ Vault service initialization failed: %v\n", err)
+				fmt.Printf(" Vault service initialization failed: %v\n", err)
 				return fmt.Errorf("vault initialization failed: %w", err)
 			}
 			fmt.Printf(" Vault service initialized\n")
@@ -277,7 +277,7 @@ This command will:
 			// Test 3: Test secret access
 			facade := vault.GetServiceFacade()
 			if facade == nil {
-				fmt.Printf("❌ Vault service facade not available\n")
+				fmt.Printf(" Vault service facade not available\n")
 				return fmt.Errorf("vault service not available")
 			}
 
@@ -287,7 +287,7 @@ This command will:
 			testKey := "delphi/database/username"
 			_, err := secretStore.Get(rc.Ctx, testKey)
 			if err != nil {
-				fmt.Printf("⚠️  Secret access test: %v\n", err)
+				fmt.Printf("  Secret access test: %v\n", err)
 				fmt.Printf("   This is normal if no secrets have been set yet\n")
 			} else {
 				fmt.Printf(" Secret access working\n")
@@ -325,7 +325,7 @@ Shows:
 			// Check basic configuration
 			vaultAddr := os.Getenv("VAULT_ADDR")
 			if vaultAddr == "" {
-				fmt.Printf("❌ Vault not configured\n")
+				fmt.Printf(" Vault not configured\n")
 				fmt.Printf("   Run: eos self secrets configure\n")
 				return nil
 			}
@@ -334,14 +334,14 @@ Shows:
 
 			// Check Vault service
 			if err := vault.InitializeServiceFacade(rc); err != nil {
-				fmt.Printf("Status: ❌ Connection failed (%v)\n", err)
+				fmt.Printf("Status:  Connection failed (%v)\n", err)
 				return nil
 			}
 
 			fmt.Printf("Status:  Connected\n\n")
 
 			// Check available secrets
-			fmt.Printf("📋 Available Secrets:\n")
+			fmt.Printf(" Available Secrets:\n")
 
 			facade := vault.GetServiceFacade()
 			if facade != nil {
@@ -367,7 +367,7 @@ Shows:
 				for _, secretPath := range staticSecrets {
 					_, err := secretStore.Get(rc.Ctx, secretPath)
 					if err != nil {
-						fmt.Printf("   ❌ %s (not set)\n", secretPath)
+						fmt.Printf("    %s (not set)\n", secretPath)
 					} else {
 						fmt.Printf("    %s\n", secretPath)
 					}
@@ -377,7 +377,7 @@ Shows:
 				for _, secretPath := range configSecrets {
 					_, err := secretStore.Get(rc.Ctx, secretPath)
 					if err != nil {
-						fmt.Printf("   ❌ %s (not set)\n", secretPath)
+						fmt.Printf("    %s (not set)\n", secretPath)
 					} else {
 						fmt.Printf("    %s\n", secretPath)
 					}
@@ -387,7 +387,7 @@ Shows:
 				// Test if dynamic credentials are available
 				_, err := secretStore.Get(rc.Ctx, "database/creds/delphi-readonly")
 				if err != nil {
-					fmt.Printf("   ❌ database/creds/delphi-readonly (not configured)\n")
+					fmt.Printf("    database/creds/delphi-readonly (not configured)\n")
 					fmt.Printf("   💡 Run: eos self secrets set delphi-db-engine\n")
 				} else {
 					fmt.Printf("    database/creds/delphi-readonly (dynamic credentials available)\n")
@@ -768,7 +768,7 @@ func setupDatabaseEngine(rc *eos_io.RuntimeContext, reader *bufio.Reader) error 
 	fmt.Printf("This will guide you through configuring Vault's database secrets engine\n")
 	fmt.Printf("for dynamic PostgreSQL credential generation.\n\n")
 
-	fmt.Printf("⚠️  IMPORTANT: This requires PostgreSQL admin access on the target database.\n")
+	fmt.Printf("  IMPORTANT: This requires PostgreSQL admin access on the target database.\n")
 	fmt.Printf("The database should be running in your guest VM.\n\n")
 
 	fmt.Printf("Database admin username (e.g., postgres): ")
@@ -806,7 +806,7 @@ func setupDatabaseEngine(rc *eos_io.RuntimeContext, reader *bufio.Reader) error 
 		dbName = "delphi"
 	}
 
-	fmt.Printf("\n📋 Configuration Summary:\n")
+	fmt.Printf("\n Configuration Summary:\n")
 	fmt.Printf("  Host: %s:%s\n", dbHost, dbPort)
 	fmt.Printf("  Database: %s\n", dbName)
 	fmt.Printf("  Admin User: %s\n", adminUser)

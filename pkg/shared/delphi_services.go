@@ -89,9 +89,9 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		ServiceFile:   "/etc/systemd/system/delphi-listener.service",
 		SourceWorker:  "/opt/eos/assets/python_workers/delphi-listener.py",
 		SourceService: "/opt/eos/assets/services/delphi-listener.service",
-		Description:   "Webhook listener for Wazuh alerts - Pipeline entry point",
+		Description:   "Webhook listener for Wazuh alerts - Pipeline entry point (includes alert-to-db dependency)",
 		PipelineStage: "ingestion",
-		Dependencies:  []string{"python3", "requests", "psycopg2", "python-dotenv"},
+		Dependencies:  []string{"python3", "requests", "psycopg2", "python-dotenv", "alert-to-db"},
 		ConfigFiles: []ConfigFile{
 			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database and webhook configuration"},
 		},
@@ -122,24 +122,6 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:     []ServiceCategory{CategoryEnrichment},
 	})
 	
-	registry.registerService(DelphiServiceDefinition{
-		Name:          "alert-to-db",
-		WorkerScript:  "/opt/stackstorm/packs/delphi/alert-to-db.py",
-		ServiceFile:   "/etc/systemd/system/alert-to-db.service",
-		SourceWorker:  "/opt/eos/assets/python_workers/alert-to-db.py",
-		SourceService: "/opt/eos/assets/services/alert-to-db.service",
-		Description:   "Database operations for alerts - Handles alert persistence and state transitions",
-		PipelineStage: "processing",
-		Dependencies:  []string{"python3", "psycopg2", "python-dotenv"},
-		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
-		},
-		EnvironmentVars: []string{"PG_DSN"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		Categories:     []ServiceCategory{CategoryProcessing},
-	})
 	
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "prompt-ab-tester",
@@ -184,26 +166,6 @@ func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 		Categories:     []ServiceCategory{CategoryAnalysis, CategoryProcessing},
 	})
 	
-	registry.registerService(DelphiServiceDefinition{
-		Name:          "ab-test-analyzer",
-		WorkerScript:  "/usr/local/bin/ab-test-analyzer.py",
-		ServiceFile:   "/etc/systemd/system/ab-test-analyzer.service",
-		SourceWorker:  "/opt/eos/assets/python_workers/ab-test-analyzer.py",
-		SourceService: "/opt/eos/assets/services/ab-test-analyzer.service",
-		Description:   "A/B test results analyzer - Evaluates experiment performance and provides insights",
-		PipelineStage: "analysis",
-		Dependencies:  []string{"python3", "psycopg2", "python-dotenv", "numpy", "scipy"},
-		ConfigFiles: []ConfigFile{
-			{Path: "/opt/stackstorm/packs/delphi/.env", Required: true, Description: "Database configuration"},
-			{Path: "/opt/delphi/ab-test-config.json", Required: true, Description: "A/B testing configuration"},
-		},
-		EnvironmentVars: []string{"PG_DSN", "EXPERIMENT_CONFIG_FILE"},
-		User:           "stanley",
-		Group:          "stanley",
-		Permissions:    "0750",
-		ABTestEnabled:  true,
-		Categories:     []ServiceCategory{CategoryTesting, CategoryAnalysis},
-	})
 	
 	registry.registerService(DelphiServiceDefinition{
 		Name:          "email-structurer",

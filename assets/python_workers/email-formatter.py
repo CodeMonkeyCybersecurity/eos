@@ -415,7 +415,7 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
         
         # Delphi section mapping
         delphi_sections = [
-            ('summary', 'Summary', '#3498db', '📋'),
+            ('summary', 'Summary', '#3498db', ''),
             ('what_happened', 'What Happened', '#e74c3c', ''),
             ('further_investigation', 'Further Investigation', '#f39c12', '🔎'),
             ('what_to_do', 'What To Do', '#27ae60', ''),

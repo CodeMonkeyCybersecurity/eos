@@ -57,14 +57,14 @@ func (dm *DashboardMonitor) GetPipelineHealth(rc *eos_io.RuntimeContext) ([]Pipe
 
 	rows, err := dm.db.QueryContext(ctx, query)
 	if err != nil {
-		logger.Error("❌ Failed to query pipeline health",
+		logger.Error(" Failed to query pipeline health",
 			zap.Error(err),
 			zap.String("query", query))
 		return nil, fmt.Errorf("failed to query pipeline health: %w", err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			logger.Warn("⚠️ Failed to close rows", zap.Error(closeErr))
+			logger.Warn(" Failed to close rows", zap.Error(closeErr))
 		}
 	}()
 
@@ -79,7 +79,7 @@ func (dm *DashboardMonitor) GetPipelineHealth(rc *eos_io.RuntimeContext) ([]Pipe
 			&ph.OldestTimestamp,
 		)
 		if err != nil {
-			logger.Error("❌ Failed to scan pipeline health row",
+			logger.Error(" Failed to scan pipeline health row",
 				zap.Error(err))
 			return nil, fmt.Errorf("failed to scan pipeline health row: %w", err)
 		}
@@ -87,7 +87,7 @@ func (dm *DashboardMonitor) GetPipelineHealth(rc *eos_io.RuntimeContext) ([]Pipe
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Error("❌ Error iterating pipeline health rows",
+		logger.Error(" Error iterating pipeline health rows",
 			zap.Error(err))
 		return nil, fmt.Errorf("error iterating pipeline health rows: %w", err)
 	}
@@ -119,14 +119,14 @@ func (dm *DashboardMonitor) GetPipelineBottlenecks(rc *eos_io.RuntimeContext) ([
 
 	rows, err := dm.db.QueryContext(ctx, query)
 	if err != nil {
-		logger.Error("❌ Failed to query pipeline bottlenecks",
+		logger.Error(" Failed to query pipeline bottlenecks",
 			zap.Error(err),
 			zap.String("query", query))
 		return nil, fmt.Errorf("failed to query pipeline bottlenecks: %w", err)
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			logger.Warn("⚠️ Failed to close rows", zap.Error(closeErr))
+			logger.Warn(" Failed to close rows", zap.Error(closeErr))
 		}
 	}()
 
@@ -141,7 +141,7 @@ func (dm *DashboardMonitor) GetPipelineBottlenecks(rc *eos_io.RuntimeContext) ([
 			&pb.BottleneckSeverity,
 		)
 		if err != nil {
-			logger.Error("❌ Failed to scan bottleneck row",
+			logger.Error(" Failed to scan bottleneck row",
 				zap.Error(err))
 			return nil, fmt.Errorf("failed to scan bottleneck row: %w", err)
 		}
@@ -149,7 +149,7 @@ func (dm *DashboardMonitor) GetPipelineBottlenecks(rc *eos_io.RuntimeContext) ([
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Error("❌ Error iterating bottleneck rows",
+		logger.Error(" Error iterating bottleneck rows",
 			zap.Error(err))
 		return nil, fmt.Errorf("error iterating bottleneck rows: %w", err)
 	}
@@ -191,10 +191,10 @@ func (dm *DashboardMonitor) GetParserPerformance(rc *eos_io.RuntimeContext) (*Pa
 	)
 
 	if err == sql.ErrNoRows {
-		logger.Warn("⚠️ No parser performance data available")
+		logger.Warn(" No parser performance data available")
 		return &ParserPerformance{}, nil
 	} else if err != nil {
-		logger.Error("❌ Failed to query parser performance",
+		logger.Error(" Failed to query parser performance",
 			zap.Error(err),
 			zap.String("query", query))
 		return nil, fmt.Errorf("failed to query parser performance: %w", err)
@@ -233,7 +233,7 @@ func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit i
 
 	rows, err := dm.db.QueryContext(ctx, query, limit)
 	if err != nil {
-		logger.Error("❌ Failed to query recent failures",
+		logger.Error(" Failed to query recent failures",
 			zap.Error(err),
 			zap.String("query", query),
 			zap.Int("limit", limit))
@@ -241,7 +241,7 @@ func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit i
 	}
 	defer func() {
 		if closeErr := rows.Close(); closeErr != nil {
-			logger.Warn("⚠️ Failed to close rows", zap.Error(closeErr))
+			logger.Warn(" Failed to close rows", zap.Error(closeErr))
 		}
 	}()
 
@@ -264,7 +264,7 @@ func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit i
 			&ruleID,
 		)
 		if err != nil {
-			logger.Error("❌ Failed to scan recent failure row",
+			logger.Error(" Failed to scan recent failure row",
 				zap.Error(err))
 			return nil, fmt.Errorf("failed to scan recent failure row: %w", err)
 		}
@@ -279,7 +279,7 @@ func (dm *DashboardMonitor) GetRecentFailures(rc *eos_io.RuntimeContext, limit i
 	}
 
 	if err = rows.Err(); err != nil {
-		logger.Error("❌ Error iterating recent failure rows",
+		logger.Error(" Error iterating recent failure rows",
 			zap.Error(err))
 		return nil, fmt.Errorf("error iterating recent failure rows: %w", err)
 	}
@@ -355,7 +355,7 @@ func (dm *DashboardMonitor) GetDailySummary(rc *eos_io.RuntimeContext, date time
 	)
 
 	if err == sql.ErrNoRows {
-		logger.Warn("⚠️ No daily summary data available for date",
+		logger.Warn(" No daily summary data available for date",
 			zap.String("date", date.Format("2006-01-02")))
 		return &DailyOperationsSummary{
 			Date:                  date,
@@ -369,7 +369,7 @@ func (dm *DashboardMonitor) GetDailySummary(rc *eos_io.RuntimeContext, date time
 			PeakHourAlertCount:    0,
 		}, nil
 	} else if err != nil {
-		logger.Error("❌ Failed to query daily summary",
+		logger.Error(" Failed to query daily summary",
 			zap.Error(err),
 			zap.String("query", query),
 			zap.String("date", date.Format("2006-01-02")))
@@ -453,7 +453,7 @@ func (dm *DashboardMonitor) GetAllDashboardData(rc *eos_io.RuntimeContext) (*Das
 	select {
 	case r := <-resultChan:
 		if r.err != nil {
-			logger.Error("❌ Failed to fetch dashboard data",
+			logger.Error(" Failed to fetch dashboard data",
 				zap.Error(r.err),
 				zap.Duration("duration", time.Since(start)))
 			return nil, r.err
@@ -477,7 +477,7 @@ func (dm *DashboardMonitor) GetAllDashboardData(rc *eos_io.RuntimeContext) (*Das
 		return dashboardData, nil
 
 	case <-time.After(30 * time.Second):
-		logger.Error("❌ Timeout fetching dashboard data",
+		logger.Error(" Timeout fetching dashboard data",
 			zap.Duration("timeout", 30*time.Second))
 		return nil, fmt.Errorf("timeout fetching dashboard data after 30 seconds")
 	}

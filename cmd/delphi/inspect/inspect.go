@@ -85,14 +85,14 @@ func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Com
 	// Get database connection from Delphi configuration
 	db, err := connectToDelphiDatabase(rc)
 	if err != nil {
-		logger.Error("❌ Failed to connect to Delphi database",
+		logger.Error(" Failed to connect to Delphi database",
 			zap.Error(err),
 			zap.String("troubleshooting", "Ensure PostgreSQL is running and Delphi configuration is correct"))
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn("⚠️ Failed to close database connection", zap.Error(closeErr))
+			logger.Warn(" Failed to close database connection", zap.Error(closeErr))
 		}
 	}()
 
@@ -100,7 +100,7 @@ func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Com
 
 	// Verify database schema
 	if err := verifyDatabaseSchema(rc, db); err != nil {
-		logger.Warn("⚠️ Database schema verification failed",
+		logger.Warn(" Database schema verification failed",
 			zap.Error(err),
 			zap.String("note", "Some dashboard features may not work correctly"))
 	}
@@ -120,7 +120,7 @@ func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Com
 
 	// Run the program
 	if _, err := program.Run(); err != nil {
-		logger.Error("❌ Dashboard terminated with error",
+		logger.Error(" Dashboard terminated with error",
 			zap.Error(err))
 		return fmt.Errorf("dashboard error: %w", err)
 	}
@@ -175,7 +175,7 @@ func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 	// Test the connection
 	if err := db.Ping(); err != nil {
 		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn("⚠️ Failed to close database connection after ping failure", zap.Error(closeErr))
+			logger.Warn(" Failed to close database connection after ping failure", zap.Error(closeErr))
 		}
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
@@ -214,14 +214,14 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 		)`
 
 		if err := db.QueryRow(query, view).Scan(&exists); err != nil {
-			logger.Error("❌ Error checking view existence",
+			logger.Error(" Error checking view existence",
 				zap.String("view", view),
 				zap.Error(err))
 			return fmt.Errorf("error checking view %s: %w", view, err)
 		}
 
 		if !exists {
-			logger.Warn("⚠️ Required view missing",
+			logger.Warn(" Required view missing",
 				zap.String("view", view),
 				zap.String("recommendation", "Run database migrations to create monitoring views"))
 		} else {
@@ -238,14 +238,14 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 		)`
 
 		if err := db.QueryRow(query, table).Scan(&exists); err != nil {
-			logger.Error("❌ Error checking table existence",
+			logger.Error(" Error checking table existence",
 				zap.String("table", table),
 				zap.Error(err))
 			return fmt.Errorf("error checking table %s: %w", table, err)
 		}
 
 		if !exists {
-			logger.Warn("⚠️ Required table missing",
+			logger.Warn(" Required table missing",
 				zap.String("table", table),
 				zap.String("recommendation", "Run database migrations to create required tables"))
 		} else {
@@ -288,7 +288,7 @@ The tool provides specific SQL commands to fix any issues found.`,
   # Example output:
   #  Database fully matches schema.sql!
   # OR
-  # ❌ Database requires updates: 3 missing objects, 1 warnings
+  #  Database requires updates: 3 missing objects, 1 warnings
   #
   # The report will show exactly what needs to be fixed:
   # - Missing enum types with CREATE TYPE commands
@@ -309,14 +309,14 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	// Connect to database
 	db, err := connectToDelphiDatabase(rc)
 	if err != nil {
-		logger.Error("❌ Failed to connect to Delphi database",
+		logger.Error(" Failed to connect to Delphi database",
 			zap.Error(err),
 			zap.String("troubleshooting", "Ensure PostgreSQL is running and connection parameters are correct"))
 		return fmt.Errorf("database connection failed: %w", err)
 	}
 	defer func() {
 		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn("⚠️ Failed to close database connection", zap.Error(closeErr))
+			logger.Warn(" Failed to close database connection", zap.Error(closeErr))
 		}
 	}()
 
@@ -326,7 +326,7 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	verifier := delphi.NewSchemaVerifier(db)
 	result, err := verifier.VerifyCompleteSchema(rc)
 	if err != nil {
-		logger.Error("❌ Schema verification failed",
+		logger.Error(" Schema verification failed",
 			zap.Error(err))
 		return fmt.Errorf("verification failed: %w", err)
 	}
@@ -335,7 +335,7 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 	report := result.GenerateReport()
 
 	// Log the summary
-	logger.Info("📋 Schema verification completed",
+	logger.Info(" Schema verification completed",
 		zap.String("overall_status", result.OverallStatus),
 		zap.Int("missing_objects", result.MissingCount),
 		zap.Time("verification_time", result.Timestamp))
@@ -345,7 +345,7 @@ func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args
 
 	// Return non-zero exit code if there are missing objects
 	if result.MissingCount > 0 {
-		logger.Warn("⚠️ Schema verification found issues - see report above")
+		logger.Warn(" Schema verification found issues - see report above")
 		return fmt.Errorf("schema verification found %d missing objects", result.MissingCount)
 	}
 

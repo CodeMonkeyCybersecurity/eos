@@ -96,12 +96,12 @@ func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 // NewUpdateCmd creates the update command
 func NewUpdateCmd() *cobra.Command {
 	var (
-		all                     bool
-		dryRun                  bool
-		skipBackup              bool
-		skipRestart             bool
-		skipInstallationCheck   bool
-		timeout                 time.Duration
+		all                   bool
+		dryRun                bool
+		skipBackup            bool
+		skipRestart           bool
+		skipInstallationCheck bool
+		timeout               time.Duration
 	)
 
 	cmd := &cobra.Command{
@@ -146,13 +146,13 @@ Examples:
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			// Extend timeout if specified
 			if timeout > 0 {
 				logger.Info("⏱️  Extending operation timeout",
 					zap.Duration("requested_timeout", timeout),
 					zap.String("reason", "service update operations can take significant time"))
-				
+
 				// Set environment variable for global watchdog extension
 				// Note: This only affects subprocess calls, not the current process
 				originalTimeout := os.Getenv("EOS_GLOBAL_TIMEOUT")
@@ -164,18 +164,18 @@ Examples:
 						os.Setenv("EOS_GLOBAL_TIMEOUT", originalTimeout)
 					}
 				}()
-				
-				logger.Warn("⚠️  Global watchdog timeout cannot be extended for current process",
+
+				logger.Warn("  Global watchdog timeout cannot be extended for current process",
 					zap.Duration("global_watchdog", 3*time.Minute),
 					zap.Duration("requested_timeout", timeout),
 					zap.String("suggestion", "Use shorter operations or split into multiple commands if timeout is exceeded"))
-				
+
 				// Create new context with extended timeout for the command operations
 				ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 				defer cancel()
 				rc.Ctx = ctx
 			}
-			
+
 			logger.Info("Starting Delphi services update",
 				zap.Bool("all", all),
 				zap.Bool("dry_run", dryRun),
@@ -185,11 +185,11 @@ Examples:
 
 			// Use centralized service management
 			serviceManager := shared.GetGlobalServiceManager()
-			
+
 			// Phase 0.1: Check for zombie services first (critical safety check)
 			logger.Info("🧟 Phase 0.1: Zombie service detection",
 				zap.String("phase", "zombie-check"))
-			
+
 			lifecycleManager := shared.GetGlobalServiceLifecycleManager()
 			zombieServices, err := lifecycleManager.DetectZombieServices(rc.Ctx)
 			if err != nil {
@@ -199,49 +199,49 @@ Examples:
 				logger.Error("💥 DANGER: Zombie services detected - update aborted",
 					zap.Int("zombie_count", len(zombieServices)),
 					zap.String("reason", "zombie services can cause systemd loops and system instability"))
-				
+
 				for _, zombie := range zombieServices {
 					logger.Error("🧟 Zombie service found",
 						zap.String("service", zombie.ServiceName),
 						zap.Int("pid", zombie.PID),
 						zap.String("problem", "running without unit file"))
 				}
-				
-				logger.Error("❌ Service update cannot proceed with zombie services present")
+
+				logger.Error(" Service update cannot proceed with zombie services present")
 				logger.Info("💡 To fix this issue:")
 				logger.Info("  1. Run: eos delphi services cleanup --dry-run")
 				logger.Info("  2. Then: eos delphi services cleanup --auto-fix")
 				logger.Info("  3. Finally retry: eos delphi services update --all")
-				
+
 				return fmt.Errorf("zombie services detected - clean up required before update can proceed")
 			} else {
-				logger.Info("✅ No zombie services detected - safe to proceed")
+				logger.Info(" No zombie services detected - safe to proceed")
 			}
-			
+
 			// Phase 0.2: Check for missing services and offer installation (if not skipped)
 			if !skipInstallationCheck {
-				logger.Info("🔍 Phase 0: Service installation verification",
+				logger.Info(" Phase 0: Service installation verification",
 					zap.String("phase", "pre-check"))
-				
+
 				missingServices, err := serviceManager.GetServicesRequiringInstallation(rc.Ctx)
 				if err != nil {
 					logger.Warn("Failed to check service installation status",
 						zap.Error(err))
 				} else if len(missingServices) > 0 {
-					logger.Info("🛠️  Detected services requiring installation",
+					logger.Info(" Detected services requiring installation",
 						zap.Int("missing_count", len(missingServices)))
-					
+
 					servicesToInstall, err := serviceManager.PromptForServiceInstallation(rc.Ctx, missingServices)
 					if err != nil {
 						return fmt.Errorf("failed to determine services to install: %w", err)
 					}
-					
+
 					if len(servicesToInstall) > 0 {
-						logger.Info("🚀 Installing missing services automatically")
+						logger.Info(" Installing missing services automatically")
 						if err := serviceManager.AutoInstallServices(rc.Ctx, servicesToInstall); err != nil {
 							return fmt.Errorf("failed to auto-install services: %w", err)
 						}
-						logger.Info("✅ Service installation completed")
+						logger.Info(" Service installation completed")
 					}
 				}
 			} else {
@@ -303,7 +303,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 
 	overallStart := time.Now()
 
-	logger.Info("📋 Update process configuration",
+	logger.Info(" Update process configuration",
 		zap.String("mode", func() string {
 			if dryRun {
 				return "DRY_RUN"
@@ -460,7 +460,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 				zap.String("enhanced_features", "real-time logs, state monitoring, graceful stop analysis"))
 
 			if err := eos_unix.RestartSystemdUnitWithVisibility(rc.Ctx, service, 3, 2); err != nil {
-				logger.Error("❌ Enhanced service restart failed",
+				logger.Error(" Enhanced service restart failed",
 					zap.String("service", service),
 					zap.Error(err))
 				return fmt.Errorf("failed to restart %s: %w", service, err)
@@ -486,7 +486,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 		healthyServices := 0
 		for _, service := range servicesToRestart {
 			if err := eos_unix.CheckServiceStatus(rc.Ctx, service); err != nil {
-				logger.Warn("⚠️  Service health check failed",
+				logger.Warn("  Service health check failed",
 					zap.String("service", service),
 					zap.Error(err))
 				logger.Info("💡 Troubleshooting suggestion",

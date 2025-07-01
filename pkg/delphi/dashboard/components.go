@@ -51,7 +51,7 @@ func (s StatusIndicator) String() string {
 	case StatusActive:
 		return ""
 	case StatusInactive:
-		return "❌"
+		return ""
 	case StatusEnabled:
 		return "🔛"
 	case StatusDisabled:

@@ -12,7 +12,7 @@ Successfully implemented an enterprise-grade enhanced Consul integration for Eos
 - **`pkg/consul/alerting.go`** - Alert management with webhook integration  
 - **`pkg/consul/security.go`** - Security validation framework with scoring
 
-### 🧪 **Test Coverage**
+###  **Test Coverage**
 - **`pkg/consul/enhanced_integration_test.go`** - Core functionality tests
 - **`pkg/consul/security_test.go`** - Security validation tests with benchmarks
 

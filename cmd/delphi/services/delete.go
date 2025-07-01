@@ -74,16 +74,16 @@ Examples:
 				zap.String("method", "lifecycle_manager"))
 
 			lifecycleManager := shared.GetGlobalServiceLifecycleManager()
-			
+
 			if err := lifecycleManager.SafelyRemoveService(rc.Ctx, serviceName); err != nil {
 				if !force {
 					return fmt.Errorf("failed to safely remove service %s (use --force to ignore): %w", serviceName, err)
 				}
-				logger.Warn("⚠️  Safe removal failed, continuing due to --force flag",
+				logger.Warn("  Safe removal failed, continuing due to --force flag",
 					zap.String("service", serviceName),
 					zap.Error(err))
 			} else {
-				logger.Info("✅ Service safely removed via lifecycle manager",
+				logger.Info(" Service safely removed via lifecycle manager",
 					zap.String("service", serviceName))
 			}
 
@@ -96,11 +96,11 @@ Examples:
 					if !force {
 						return fmt.Errorf("failed to remove worker script %s (use --force to ignore): %w", config.WorkerFile, err)
 					}
-					logger.Warn("⚠️  Failed to remove worker script, continuing due to --force flag",
+					logger.Warn("  Failed to remove worker script, continuing due to --force flag",
 						zap.String("file", config.WorkerFile),
 						zap.Error(err))
 				} else {
-					logger.Info("✅ Worker script removed successfully",
+					logger.Info(" Worker script removed successfully",
 						zap.String("file", config.WorkerFile))
 				}
 			} else {
