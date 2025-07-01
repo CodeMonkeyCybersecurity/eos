@@ -197,7 +197,7 @@ test_eos_integration() {
 
 # Function to show completion summary
 show_completion_summary() {
-    print_success "🎉 Vault Dynamic PostgreSQL Credentials Setup Complete!"
+    print_success " Vault Dynamic PostgreSQL Credentials Setup Complete!"
     echo
     print_status "What was configured:"
     echo "   Vault database secrets engine enabled"

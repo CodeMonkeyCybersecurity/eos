@@ -86,7 +86,7 @@ Examples:
 		}
 
 		// Display success information
-		logger.Info("🎉 Penpot deployment completed successfully",
+		logger.Info(" Penpot deployment completed successfully",
 			zap.String("url", fmt.Sprintf("http://localhost:%d", config.Port)),
 			zap.String("namespace", config.Namespace))
 

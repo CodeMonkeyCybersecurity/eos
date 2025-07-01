@@ -319,7 +319,7 @@ func (sm *ServiceManager) AutoInstallServices(ctx context.Context, servicesToIns
 		}
 	}
 
-	logger.Info("🎉 Automatic service installation completed",
+	logger.Info(" Automatic service installation completed",
 		zap.Int("services_installed", len(servicesToInstall)))
 
 	return nil
@@ -399,7 +399,7 @@ func (sm *ServiceManager) GetServiceWorkersForUpdate() []ServiceWorkerInfo {
 			Dependencies: service.Dependencies,
 			BackupPath:   backupPath,
 		})
-		
+
 		// Add dependency workers that need to be updated together
 		workers = append(workers, sm.getDependencyWorkers(service, timestamp)...)
 	}

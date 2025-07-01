@@ -213,7 +213,7 @@ func (slm *ServiceLifecycleManager) executeRemovalPlan(ctx context.Context, plan
 		logger.Info(" Systemd daemon reloaded")
 	}
 
-	logger.Info("🎉 Service removal completed successfully",
+	logger.Info(" Service removal completed successfully",
 		zap.String("service", plan.ServiceName))
 
 	return nil

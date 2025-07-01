@@ -113,7 +113,7 @@ Examples:
 					zap.String("service", zombie.ServiceName))
 			}
 
-			logger.Info("🎉 Zombie service cleanup completed",
+			logger.Info(" Zombie service cleanup completed",
 				zap.Int("services_cleaned", len(zombieServices)))
 
 			// Verify cleanup was successful

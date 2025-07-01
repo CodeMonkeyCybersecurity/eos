@@ -293,7 +293,7 @@ This command will:
 				fmt.Printf(" Secret access working\n")
 			}
 
-			fmt.Printf("\n🎉 Vault connectivity test completed\n")
+			fmt.Printf("\n Vault connectivity test completed\n")
 			fmt.Printf("Vault is ready for use with Eos services\n")
 
 			return nil

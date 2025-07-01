@@ -56,7 +56,7 @@ func Create(rc *eos_io.RuntimeContext, config *Config) error {
 		return fmt.Errorf("deployment failed: %w", err)
 	}
 
-	logger.Info("🎉 Penpot deployment completed successfully",
+	logger.Info(" Penpot deployment completed successfully",
 		zap.String("url", fmt.Sprintf("http://localhost:%d", config.Port)),
 		zap.String("namespace", config.Namespace))
 

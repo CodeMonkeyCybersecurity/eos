@@ -118,7 +118,7 @@ else
 fi
 
 echo ""
-echo "🎉 Emergency cleanup completed!"
+echo " Emergency cleanup completed!"
 echo ""
 echo " To prevent this in the future:"
 echo "   1. Always use: eos delphi services cleanup --dry-run"

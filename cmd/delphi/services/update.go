@@ -566,7 +566,7 @@ func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCt
 			zap.Int("unhealthy_services", len(servicesToRestart)-healthyServices))
 	}
 
-	logger.Info("🎉 Service worker update completed successfully",
+	logger.Info(" Service worker update completed successfully",
 		zap.Int("workers_updated", len(workers)),
 		zap.Int("services_restarted", len(servicesToRestart)),
 		zap.Duration("total_duration", time.Since(overallStart)),
@@ -618,7 +618,7 @@ func checkOneshotServiceHealth(ctx context.Context, serviceName string) error {
 	// For oneshot services, we need to check:
 	// 1. The service executed successfully (exit code 0)
 	// 2. The service is in "inactive" state (which is normal for completed oneshot services)
-	
+
 	// Check the exit status of the last execution
 	output, err := execute.Run(ctx, execute.Options{
 		Command: "systemctl",
