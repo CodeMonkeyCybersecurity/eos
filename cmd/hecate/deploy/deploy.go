@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/apps"
+	apps "github.com/CodeMonkeyCybersecurity/eos/pkg/application"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
 

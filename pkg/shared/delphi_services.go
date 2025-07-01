@@ -73,6 +73,9 @@ type DelphiServiceRegistry struct {
 	services map[string]DelphiServiceDefinition
 }
 
+// Ensure DelphiServiceRegistry implements ServiceRegistryInterface
+var _ ServiceRegistryInterface = (*DelphiServiceRegistry)(nil)
+
 // GetDelphiServiceRegistry returns the global service registry
 func GetDelphiServiceRegistry() *DelphiServiceRegistry {
 	registry := &DelphiServiceRegistry{

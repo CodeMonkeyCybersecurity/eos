@@ -15,7 +15,7 @@ import (
 
 // ServiceManager provides enhanced service management capabilities
 type ServiceManager struct {
-	registry *DelphiServiceRegistry
+	registry ServiceRegistryInterface
 }
 
 // NewServiceManager creates a new service manager

@@ -14,6 +14,8 @@ type Secret struct {
 	CreatedAt time.Time         `json:"created_at"`
 	UpdatedAt time.Time         `json:"updated_at"`
 	ExpiresAt *time.Time        `json:"expires_at,omitempty"`
+	Path      string
+	Data      map[string]interface{}
 }
 
 // AuthResult represents the result of an authentication attempt
@@ -60,21 +62,6 @@ type InitResult struct {
 	Timestamp    time.Time `json:"timestamp"`
 	KeyThreshold int       `json:"key_threshold"`
 	KeyShares    int       `json:"key_shares"`
-}
-
-// VaultStatus represents vault health and status
-type VaultStatus struct {
-	Initialized     bool      `json:"initialized"`
-	Sealed          bool      `json:"sealed"`
-	Standby         bool      `json:"standby"`
-	ReplicationMode string    `json:"replication_mode,omitempty"`
-	Version         string    `json:"version,omitempty"`
-	ClusterName     string    `json:"cluster_name,omitempty"`
-	ClusterID       string    `json:"cluster_id,omitempty"`
-	Timestamp       time.Time `json:"timestamp"`
-	Progress        int       `json:"progress,omitempty"`
-	Threshold       int       `json:"threshold,omitempty"`
-	Nonce           string    `json:"nonce,omitempty"`
 }
 
 // AuditEvent represents an audit log entry

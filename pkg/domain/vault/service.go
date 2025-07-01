@@ -3,12 +3,92 @@ package vault
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"go.uber.org/zap"
 )
+
+// Domain errors
+var (
+	ErrSecretNotFound = errors.New("secret not found")
+	ErrUnauthorized   = errors.New("unauthorized access")
+	ErrVaultSealed    = errors.New("vault is sealed")
+)
+
+// SecretMetadata contains additional secret information
+type SecretMetadata struct {
+	CreatedBy   string
+	UpdatedBy   string
+	Tags        []string
+	TTL         time.Duration
+	MaxVersions int
+}
+
+// VaultService defines the domain service interface
+type VaultService interface {
+	// Health operations
+	CheckHealth(ctx context.Context) error
+	GetStatus(ctx context.Context) (*VaultStatus, error)
+
+	// Secret operations
+	GetSecret(ctx context.Context, path string) (*Secret, error)
+	CreateSecret(ctx context.Context, path string, data map[string]interface{}) error
+	UpdateSecret(ctx context.Context, path string, data map[string]interface{}) error
+	DeleteSecret(ctx context.Context, path string) error
+	ListSecrets(ctx context.Context, prefix string) ([]*SecretMetadata, error)
+
+	// Authentication
+	Login(ctx context.Context, auth AuthMethod) (*AuthToken, error)
+	Renew(ctx context.Context, token string) (*AuthToken, error)
+	Logout(ctx context.Context, token string) error
+}
+
+// VaultStatus represents the vault cluster status
+type VaultStatus struct {
+	Initialized     bool      `json:"initialized"`
+	Sealed          bool      `json:"sealed"`
+	Standby         bool      `json:"standby"`
+	ReplicationMode string    `json:"replication_mode,omitempty"`
+	Version         string    `json:"version,omitempty"`
+	ClusterName     string    `json:"cluster_name,omitempty"`
+	ClusterID       string    `json:"cluster_id,omitempty"`
+	Timestamp       time.Time `json:"timestamp"`
+	Progress        int       `json:"progress,omitempty"`
+	Threshold       int       `json:"threshold,omitempty"`
+	Nonce           string    `json:"nonce,omitempty"`
+}
+
+// AuthMethod represents different authentication methods
+type AuthMethod interface {
+	Type() string
+	Validate() error
+}
+
+// AppRoleAuth implements AuthMethod for AppRole authentication
+type AppRoleAuth struct {
+	RoleID   string
+	SecretID string
+}
+
+func (a *AppRoleAuth) Type() string { return "approle" }
+func (a *AppRoleAuth) Validate() error {
+	if a.RoleID == "" || a.SecretID == "" {
+		return errors.New("role_id and secret_id are required")
+	}
+	return nil
+}
+
+// AuthToken represents an authentication token
+type AuthToken struct {
+	Token     string
+	Accessor  string
+	TTL       time.Duration
+	Renewable bool
+	Policies  []string
+}
 
 // Service contains the business logic for vault operations
 type Service struct {
