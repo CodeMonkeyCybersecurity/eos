@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -211,4 +212,15 @@ func PromptInputWithReader(ctx context.Context, prompt, defaultVal string, reade
 		return defaultVal
 	}
 	return input
+}
+
+// PromptUser prompts the user for input using the runtime context for logging
+func PromptUser(rc *eos_io.RuntimeContext, prompt string) (string, error) {
+	reader := bufio.NewReader(os.Stdin)
+	input, err := ReadLine(rc.Ctx, reader, prompt)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to read user input", zap.Error(err))
+		return "", err
+	}
+	return strings.TrimSpace(input), nil
 }
