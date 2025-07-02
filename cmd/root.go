@@ -26,6 +26,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/manage"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read" // NOTE: This `read` is a TOP-LEVEL command, not delphi/read
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
@@ -87,6 +88,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		hecate.HecateCmd,
 		delphi.DelphiCmd, // This is the top-level 'delphi'
 		inspect.InspectCmd, // This is the top-level 'inspect'
+		manage.ManageCmd, // System management via SaltStack
 		pandora.PandoraCmd,
 		ragequit.RagequitCmd,
 	} {
