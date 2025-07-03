@@ -66,6 +66,12 @@ As of March 7, 2025, the following high-priority scripts have been successfully 
   - `eos read users` - List system users, SSH users, and user-hostname stamps
 - **Features**: User account creation, password management, SSH access control, interactive prompts, username validation, sudo group management
 
+#### Docker Management
+- **Source Scripts**: `docker/` directory (9 backup scripts) - `backupDocker.mjs`, `backupDockerContainers.mjs`, `backupDockerImages.mjs`, `backupDockerVolumesWithCp.mjs`, `backupDockerEnvVars.mjs`, `backupDockerNetworks.mjs`, `backupDockerSwarm.mjs`, `backupDockerfiles.mjs`, `backupsDockerComposeFiles.mjs`
+- **New Package**: Pre-existing `pkg/container/backup.go` (already implemented)
+- **Commands Added**: `eos backup docker` - Comprehensive Docker environment backup
+- **Features**: Container export, image archival, volume backup with versioning, network configuration export, environment variable extraction, Swarm configuration backup, compose file discovery, parallel execution, compression, retention policies
+
 ### 🔄 Remaining Scripts (Phases 2-4)
 
 ## Detailed Migration Plan
@@ -274,7 +280,7 @@ For each script migration:
 
 | Phase | Duration | Scripts | Packages | Completion Target |
 |-------|----------|---------|----------|-------------------|
-| Phase 1 | 16 weeks | 17 scripts | 6 packages | ✅ **Complete** (March 2025) |
+| Phase 1 | 16 weeks | 26 scripts | 6 packages | ✅ **Complete** (March 2025) |
 | Phase 2 | 16 weeks | ~40 scripts | 3 packages | Q2 2025 |
 | Phase 3 | 12 weeks | ~50 scripts | 3 packages | Q3 2025 |
 | Phase 4 | 10 weeks | ~35 scripts | 3 packages | Q4 2025 |
