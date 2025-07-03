@@ -91,7 +91,6 @@ eos secure audit --ssh-users --remote-access
 **Complexity**: High  
 **Scripts to Migrate**:
 - `installOpenStack.sh`, `installMicroCloud.sh` - Cloud platforms
-- `docker/` directory (12 scripts) - Docker management utilities
 
 **Proposed Commands**:
 ```bash
