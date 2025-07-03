@@ -56,6 +56,16 @@ As of March 7, 2025, the following high-priority scripts have been successfully 
   - `eos create microk8s` - MicroK8s installation and configuration
 - **Features**: Kubernetes prerequisite installation, firewall configuration, swap management, cluster initialization, addon management, status monitoring
 
+#### User Management
+- **Source Scripts**: `addUser.sh`, `changeUserPassword.sh`, `usersWithRemoteSsh.sh`, `userHostnameStamp.sh`
+- **New Package**: `pkg/users/management.go`
+- **Commands Added**:
+  - `eos create user-simple` - Interactive user creation with sudo and SSH options
+  - `eos update users password` - Change user passwords securely
+  - `eos update users ssh-access` - Grant SSH access to users
+  - `eos read users` - List system users, SSH users, and user-hostname stamps
+- **Features**: User account creation, password management, SSH access control, interactive prompts, username validation, sudo group management
+
 ### 🔄 Remaining Scripts (Phases 2-4)
 
 ## Detailed Migration Plan
@@ -66,9 +76,7 @@ As of March 7, 2025, the following high-priority scripts have been successfully 
 **Timeline**: 8 weeks  
 **Complexity**: High  
 **Scripts to Migrate**:
-- `setupTerminal2FA.sh` - Terminal 2FA setup  
-- `usersWithRemoteSsh.sh` - SSH user audit
-- `addUser.sh`, `changeUserPassword.sh` - User management
+- `setupTerminal2FA.sh` - Terminal 2FA setup
 
 **Proposed Commands**:
 ```bash
@@ -267,7 +275,7 @@ For each script migration:
 
 | Phase | Duration | Scripts | Packages | Completion Target |
 |-------|----------|---------|----------|-------------------|
-| Phase 1 | 16 weeks | 13 scripts | 5 packages | ✅ **Complete** (March 2025) |
+| Phase 1 | 16 weeks | 17 scripts | 6 packages | ✅ **Complete** (March 2025) |
 | Phase 2 | 16 weeks | ~40 scripts | 3 packages | Q2 2025 |
 | Phase 3 | 12 weeks | ~50 scripts | 3 packages | Q3 2025 |
 | Phase 4 | 10 weeks | ~35 scripts | 3 packages | Q4 2025 |
