@@ -127,12 +127,17 @@ func RunHook(ctx context.Context, logger otelzap.LoggerWithCtx, hook string) err
 
 // BackupOperation implements AIE pattern for backup operations
 type BackupOperation struct {
-	Client      *Client
+	Client      BackupClient
 	ProfileName string
 	Profile     Profile
 	RepoName    string
 	DryRun      bool
 	Logger      otelzap.LoggerWithCtx
+}
+
+// BackupClient interface for testing
+type BackupClient interface {
+	Backup(profileName string) error
 }
 
 // Assess checks if backup can proceed
