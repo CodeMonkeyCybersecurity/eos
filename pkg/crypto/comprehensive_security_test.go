@@ -230,9 +230,9 @@ func TestPasswordSecurity_EdgeCases(t *testing.T) {
 	})
 	
 	t.Run("control_characters", func(t *testing.T) {
-		password := "Valid1!@#" + string(rune(0x00)) + string(rune(0x1F))
+		password := "Valid1!@#ABC" + string(rune(0x00)) + string(rune(0x1F)) + "def"
 		err := ValidateStrongPassword(context.Background(), password)
-		// Should still pass if other requirements met
+		// Should still pass if other requirements met and length is sufficient
 		assert.NoError(t, err)
 	})
 	
