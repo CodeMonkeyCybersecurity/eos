@@ -1,0 +1,597 @@
+package container
+
+import (
+	"fmt"
+	"os"
+	"os/exec"
+	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+// KubernetesInstallOptions represents installation configuration for Kubernetes
+type KubernetesInstallOptions struct {
+	Type              string // "kubeadm" or "microk8s"
+	ControlPlaneEndpoint string
+	PodNetworkCIDR    string
+	EnableAddons      []string
+	Version           string
+}
+
+// InstallKubeadm installs Kubernetes using kubeadm
+func InstallKubeadm(rc *eos_io.RuntimeContext, options *KubernetesInstallOptions) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.InstallKubeadm")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Starting kubeadm installation")
+
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		logger.Error("Root privileges required")
+		return eos_err.NewExpectedError(ctx, fmt.Errorf("this operation requires root privileges. Try using sudo"))
+	}
+
+	// Step 1: Update packages and install prerequisites
+	if err := installKubeadmPrerequisites(rc); err != nil {
+		return err
+	}
+
+	// Step 2: Add Kubernetes repository and install packages
+	if err := installKubernetesPackages(rc, options.Version); err != nil {
+		return err
+	}
+
+	// Step 3: Configure firewall
+	if err := configureKubernetesFirewall(rc); err != nil {
+		return err
+	}
+
+	// Step 4: Disable swap
+	if err := disableSwap(rc); err != nil {
+		return err
+	}
+
+	// Step 5: Initialize cluster
+	if err := initializeKubeadmCluster(rc, options); err != nil {
+		return err
+	}
+
+	// Step 6: Configure kubectl for user
+	if err := configureKubectl(rc); err != nil {
+		return err
+	}
+
+	logger.Info("Kubeadm installation completed successfully")
+	return nil
+}
+
+// InstallMicroK8s installs MicroK8s
+func InstallMicroK8s(rc *eos_io.RuntimeContext, options *KubernetesInstallOptions) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.InstallMicroK8s")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Starting MicroK8s installation")
+
+	// Check if running as root
+	if os.Geteuid() != 0 {
+		logger.Error("Root privileges required")
+		return eos_err.NewExpectedError(ctx, fmt.Errorf("this operation requires root privileges. Try using sudo"))
+	}
+
+	// Step 1: Configure firewall
+	if err := configureMicroK8sFirewall(rc); err != nil {
+		return err
+	}
+
+	// Step 2: Install MicroK8s via snap
+	if err := installMicroK8sSnap(rc); err != nil {
+		return err
+	}
+
+	// Step 3: Configure user permissions
+	if err := configureMicroK8sPermissions(rc); err != nil {
+		return err
+	}
+
+	// Step 4: Wait for MicroK8s to be ready
+	if err := waitForMicroK8s(rc); err != nil {
+		return err
+	}
+
+	// Step 5: Enable addons
+	if err := enableMicroK8sAddons(rc, options.EnableAddons); err != nil {
+		return err
+	}
+
+	logger.Info("MicroK8s installation completed successfully")
+	return nil
+}
+
+// installKubeadmPrerequisites installs necessary packages for kubeadm
+func installKubeadmPrerequisites(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.installKubeadmPrerequisites")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Installing kubeadm prerequisites")
+
+	// Update package list
+	cmd := exec.CommandContext(ctx, "apt", "update")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to update package list", zap.Error(err))
+		return fmt.Errorf("failed to update package list: %w", err)
+	}
+
+	// Install required packages
+	packages := []string{"apt-transport-https", "ca-certificates", "curl", "cri-tools"}
+	for _, pkg := range packages {
+		logger.Info("Installing package", zap.String("package", pkg))
+		cmd := exec.CommandContext(ctx, "apt", "install", "-y", pkg)
+		if err := cmd.Run(); err != nil {
+			logger.Error("Failed to install package", zap.String("package", pkg), zap.Error(err))
+			return fmt.Errorf("failed to install package %s: %w", pkg, err)
+		}
+	}
+
+	logger.Info("Prerequisites installed successfully")
+	return nil
+}
+
+// installKubernetesPackages adds Kubernetes repository and installs packages
+func installKubernetesPackages(rc *eos_io.RuntimeContext, version string) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.installKubernetesPackages")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Installing Kubernetes packages", zap.String("version", version))
+
+	// Use default version if not specified
+	if version == "" {
+		version = "v1.32"
+	}
+
+	// Add Kubernetes signing key
+	keyCmd := fmt.Sprintf("curl -fsSL https://pkgs.k8s.io/core:/stable:/%s/deb/Release.key | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg", version)
+	cmd := exec.CommandContext(ctx, "bash", "-c", keyCmd)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to add Kubernetes signing key", zap.Error(err))
+		return fmt.Errorf("failed to add Kubernetes signing key: %w", err)
+	}
+
+	// Add Kubernetes repository
+	repoLine := fmt.Sprintf("deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/%s/deb/ /", version)
+	repoCmd := fmt.Sprintf("echo '%s' | tee /etc/apt/sources.list.d/kubernetes.list", repoLine)
+	cmd = exec.CommandContext(ctx, "bash", "-c", repoCmd)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to add Kubernetes repository", zap.Error(err))
+		return fmt.Errorf("failed to add Kubernetes repository: %w", err)
+	}
+
+	// Update package list
+	cmd = exec.CommandContext(ctx, "apt-get", "update")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to update package list after adding repository", zap.Error(err))
+		return fmt.Errorf("failed to update package list: %w", err)
+	}
+
+	// Install Kubernetes packages
+	kubernetesPackages := []string{"kubelet", "kubeadm", "kubectl", "containerd"}
+	cmd = exec.CommandContext(ctx, "apt-get", "install", "-y")
+	cmd.Args = append(cmd.Args, kubernetesPackages...)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to install Kubernetes packages", zap.Error(err))
+		return fmt.Errorf("failed to install Kubernetes packages: %w", err)
+	}
+
+	// Hold packages to prevent automatic updates
+	cmd = exec.CommandContext(ctx, "apt-mark", "hold", "kubelet", "kubeadm", "kubectl")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to hold Kubernetes packages", zap.Error(err))
+		return fmt.Errorf("failed to hold Kubernetes packages: %w", err)
+	}
+
+	// Enable kubelet service
+	cmd = exec.CommandContext(ctx, "systemctl", "enable", "--now", "kubelet")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to enable kubelet service", zap.Error(err))
+		return fmt.Errorf("failed to enable kubelet service: %w", err)
+	}
+
+	logger.Info("Kubernetes packages installed successfully")
+	return nil
+}
+
+// configureKubernetesFirewall configures firewall for Kubernetes
+func configureKubernetesFirewall(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.configureKubernetesFirewall")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Configuring firewall for Kubernetes")
+
+	// Test connectivity before opening ports
+	cmd := exec.CommandContext(ctx, "nc", "127.0.0.1", "6443", "-v")
+	if err := cmd.Run(); err != nil {
+		logger.Debug("Port 6443 not yet accessible", zap.Error(err))
+	}
+
+	// Allow Kubernetes API server port
+	cmd = exec.CommandContext(ctx, "ufw", "allow", "6443")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to allow port 6443", zap.Error(err))
+		return fmt.Errorf("failed to allow port 6443: %w", err)
+	}
+
+	// Reload firewall
+	cmd = exec.CommandContext(ctx, "ufw", "reload")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to reload firewall", zap.Error(err))
+		return fmt.Errorf("failed to reload firewall: %w", err)
+	}
+
+	// Test connectivity after opening ports
+	cmd = exec.CommandContext(ctx, "nc", "127.0.0.1", "6443", "-v")
+	if err := cmd.Run(); err != nil {
+		logger.Debug("Port 6443 still not accessible after firewall change", zap.Error(err))
+	}
+
+	logger.Info("Firewall configured successfully")
+	return nil
+}
+
+// disableSwap disables swap and updates fstab
+func disableSwap(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.disableSwap")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Disabling swap for Kubernetes")
+
+	// Disable swap temporarily
+	cmd := exec.CommandContext(ctx, "swapoff", "-a")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to disable swap", zap.Error(err))
+		return fmt.Errorf("failed to disable swap: %w", err)
+	}
+
+	// Comment out swap entries in fstab
+	logger.Info("Please edit /etc/fstab to comment out swap entries")
+	logger.Info("Look for lines like '/swapfile swap swap defaults 0 0'")
+	logger.Info("Comment them out by adding # at the beginning: '#/swapfile swap swap defaults 0 0'")
+
+	// Prompt user to edit fstab
+	confirm, err := interaction.PromptUser(rc, "Would you like to edit /etc/fstab now? (y/n): ")
+	if err != nil {
+		return fmt.Errorf("failed to get user confirmation: %w", err)
+	}
+
+	if strings.ToLower(strings.TrimSpace(confirm)) == "y" {
+		cmd = exec.CommandContext(ctx, "nano", "/etc/fstab")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			logger.Error("Failed to open fstab for editing", zap.Error(err))
+			return fmt.Errorf("failed to open fstab for editing: %w", err)
+		}
+	}
+
+	logger.Info("Swap disabled successfully")
+	return nil
+}
+
+// initializeKubeadmCluster initializes the Kubernetes cluster
+func initializeKubeadmCluster(rc *eos_io.RuntimeContext, options *KubernetesInstallOptions) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.initializeKubeadmCluster")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Initializing Kubernetes cluster")
+
+	// Build kubeadm init command
+	args := []string{"init"}
+	
+	if options.ControlPlaneEndpoint != "" {
+		args = append(args, fmt.Sprintf("--control-plane-endpoint=%s", options.ControlPlaneEndpoint))
+	}
+	
+	if options.PodNetworkCIDR != "" {
+		args = append(args, fmt.Sprintf("--pod-network-cidr=%s", options.PodNetworkCIDR))
+	} else {
+		args = append(args, "--pod-network-cidr=192.168.0.0/16")
+	}
+
+	cmd := exec.CommandContext(ctx, "kubeadm", args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	logger.Info("Running kubeadm init", zap.Strings("args", args))
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to initialize Kubernetes cluster", zap.Error(err))
+		return fmt.Errorf("failed to initialize Kubernetes cluster: %w", err)
+	}
+
+	logger.Info("Kubernetes cluster initialized successfully")
+	return nil
+}
+
+// configureKubectl configures kubectl for the user
+func configureKubectl(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.configureKubectl")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Configuring kubectl for user")
+
+	// Get current user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Error("Failed to get home directory", zap.Error(err))
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	kubeDir := fmt.Sprintf("%s/.kube", homeDir)
+
+	// Create .kube directory
+	cmd := exec.CommandContext(ctx, "mkdir", "-p", kubeDir)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to create .kube directory", zap.Error(err))
+		return fmt.Errorf("failed to create .kube directory: %w", err)
+	}
+
+	// Copy admin.conf
+	configPath := fmt.Sprintf("%s/config", kubeDir)
+	cmd = exec.CommandContext(ctx, "cp", "-i", "/etc/kubernetes/admin.conf", configPath)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to copy kubectl config", zap.Error(err))
+		return fmt.Errorf("failed to copy kubectl config: %w", err)
+	}
+
+	// Get current user and group
+	userID := os.Getuid()
+	groupID := os.Getgid()
+	
+	// Change ownership
+	cmd = exec.CommandContext(ctx, "chown", fmt.Sprintf("%d:%d", userID, groupID), configPath)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to change kubectl config ownership", zap.Error(err))
+		return fmt.Errorf("failed to change kubectl config ownership: %w", err)
+	}
+
+	// Restart kubelet
+	cmd = exec.CommandContext(ctx, "systemctl", "restart", "kubelet")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to restart kubelet", zap.Error(err))
+		return fmt.Errorf("failed to restart kubelet: %w", err)
+	}
+
+	logger.Info("kubectl configured successfully")
+	return nil
+}
+
+// configureMicroK8sFirewall configures firewall for MicroK8s
+func configureMicroK8sFirewall(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.configureMicroK8sFirewall")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Configuring firewall for MicroK8s")
+
+	// Allow MicroK8s ports
+	ports := []string{"10443", "25000:25010/tcp"}
+	for _, port := range ports {
+		cmd := exec.CommandContext(ctx, "ufw", "allow", port)
+		if err := cmd.Run(); err != nil {
+			logger.Error("Failed to allow port", zap.String("port", port), zap.Error(err))
+			return fmt.Errorf("failed to allow port %s: %w", port, err)
+		}
+	}
+
+	// Reload firewall
+	cmd := exec.CommandContext(ctx, "ufw", "reload")
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to reload firewall", zap.Error(err))
+		return fmt.Errorf("failed to reload firewall: %w", err)
+	}
+
+	logger.Info("MicroK8s firewall configured successfully")
+	return nil
+}
+
+// installMicroK8sSnap installs MicroK8s via snap
+func installMicroK8sSnap(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.installMicroK8sSnap")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Installing MicroK8s via snap")
+
+	cmd := exec.CommandContext(ctx, "snap", "install", "microk8s", "--classic")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to install MicroK8s", zap.Error(err))
+		return fmt.Errorf("failed to install MicroK8s: %w", err)
+	}
+
+	logger.Info("MicroK8s installed successfully")
+	return nil
+}
+
+// configureMicroK8sPermissions configures user permissions for MicroK8s
+func configureMicroK8sPermissions(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.configureMicroK8sPermissions")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Configuring MicroK8s permissions")
+
+	// Get current user
+	currentUser := os.Getenv("USER")
+	if currentUser == "" {
+		currentUser = os.Getenv("LOGNAME")
+	}
+	if currentUser == "" {
+		logger.Error("Could not determine current user")
+		return fmt.Errorf("could not determine current user")
+	}
+
+	// Add user to microk8s group
+	cmd := exec.CommandContext(ctx, "usermod", "-a", "-G", "microk8s", currentUser)
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to add user to microk8s group", zap.Error(err))
+		return fmt.Errorf("failed to add user to microk8s group: %w", err)
+	}
+
+	// Get user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		logger.Error("Failed to get home directory", zap.Error(err))
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Change ownership of .kube directory
+	kubeDir := fmt.Sprintf("%s/.kube", homeDir)
+	cmd = exec.CommandContext(ctx, "chown", "-R", currentUser, kubeDir)
+	if err := cmd.Run(); err != nil {
+		logger.Warn("Failed to change .kube ownership", zap.Error(err))
+		// This is not fatal, continue
+	}
+
+	logger.Info("MicroK8s permissions configured successfully")
+	logger.Info("Note: You may need to log out and back in for group changes to take effect")
+	return nil
+}
+
+// waitForMicroK8s waits for MicroK8s to be ready
+func waitForMicroK8s(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.waitForMicroK8s")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Waiting for MicroK8s to be ready")
+
+	cmd := exec.CommandContext(ctx, "microk8s", "status", "--wait-ready")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Error("MicroK8s failed to become ready", zap.Error(err))
+		return fmt.Errorf("MicroK8s failed to become ready: %w", err)
+	}
+
+	logger.Info("MicroK8s is ready")
+	return nil
+}
+
+// enableMicroK8sAddons enables specified MicroK8s addons
+func enableMicroK8sAddons(rc *eos_io.RuntimeContext, addons []string) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.enableMicroK8sAddons")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+
+	// Default addons if none specified
+	if len(addons) == 0 {
+		addons = []string{"dashboard", "dns", "rbac", "registry", "istio", "rook-ceph", "ingress"}
+	}
+
+	logger.Info("Enabling MicroK8s addons", zap.Strings("addons", addons))
+
+	// Enable each addon
+	for _, addon := range addons {
+		logger.Info("Enabling addon", zap.String("addon", addon))
+		cmd := exec.CommandContext(ctx, "microk8s", "enable", addon)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			logger.Error("Failed to enable addon", zap.String("addon", addon), zap.Error(err))
+			return fmt.Errorf("failed to enable addon %s: %w", addon, err)
+		}
+	}
+
+	logger.Info("All addons enabled successfully")
+	return nil
+}
+
+// GetKubernetesStatus gets the status of Kubernetes cluster
+func GetKubernetesStatus(rc *eos_io.RuntimeContext, kubernetesType string) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.GetKubernetesStatus")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Getting Kubernetes status", zap.String("type", kubernetesType))
+
+	switch kubernetesType {
+	case "kubeadm":
+		return getKubeadmStatus(rc)
+	case "microk8s":
+		return getMicroK8sStatus(rc)
+	default:
+		return eos_err.NewExpectedError(ctx, fmt.Errorf("unknown Kubernetes type: %s", kubernetesType))
+	}
+}
+
+// getKubeadmStatus gets status for kubeadm-based cluster
+func getKubeadmStatus(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.getKubeadmStatus")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Getting kubeadm cluster status")
+
+	// Check cluster info
+	cmd := exec.CommandContext(ctx, "kubectl", "cluster-info")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to get cluster info", zap.Error(err))
+		return fmt.Errorf("failed to get cluster info: %w", err)
+	}
+
+	// Get nodes
+	cmd = exec.CommandContext(ctx, "kubectl", "get", "nodes")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to get nodes", zap.Error(err))
+		return fmt.Errorf("failed to get nodes: %w", err)
+	}
+
+	// Get pods in kube-system
+	cmd = exec.CommandContext(ctx, "kubectl", "get", "pods", "-n", "kube-system")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to get system pods", zap.Error(err))
+		return fmt.Errorf("failed to get system pods: %w", err)
+	}
+
+	return nil
+}
+
+// getMicroK8sStatus gets status for MicroK8s
+func getMicroK8sStatus(rc *eos_io.RuntimeContext) error {
+	ctx, span := telemetry.Start(rc.Ctx, "container.getMicroK8sStatus")
+	defer span.End()
+
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Getting MicroK8s status")
+
+	// Get MicroK8s status
+	cmd := exec.CommandContext(ctx, "microk8s", "kubectl", "get", "all", "--all-namespaces")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		logger.Error("Failed to get MicroK8s status", zap.Error(err))
+		return fmt.Errorf("failed to get MicroK8s status: %w", err)
+	}
+
+	return nil
+}

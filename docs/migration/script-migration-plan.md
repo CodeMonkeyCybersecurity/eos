@@ -14,12 +14,15 @@ This document outlines the comprehensive migration plan for converting legacy sh
 As of March 7, 2025, the following high-priority scripts have been successfully migrated:
 
 #### SSH Security & Diagnostics
-- **Source Scripts**: `checkSshCredentials.sh`, `troubleshootSsh.sh`
+- **Source Scripts**: `checkSshCredentials.sh`, `troubleshootSsh.sh`, `disableSSHIntoRoot.py`, `copySshIds.sh`, `distributeSshKeys.sh`
 - **New Package**: `pkg/ssh/diagnostics.go`
 - **Commands Added**:
   - `eos secure ssh` - Comprehensive SSH troubleshooting
   - `eos secure ssh check-credentials` - Quick credential validation
-- **Features**: SSH key validation, network connectivity testing, service status checking, permission fixing
+  - `eos secure ssh disable-root` - Disable SSH root login for security hardening
+  - `eos secure ssh copy-keys` - Copy SSH keys to multiple remote hosts
+  - `eos secure ssh distribute-keys` - Distribute SSH keys to Tailscale network peers
+- **Features**: SSH key validation, network connectivity testing, service status checking, permission fixing, root login hardening, SSH key distribution, Tailscale integration
 
 #### Storage Management
 - **Source Scripts**: `manageFstab.sh`, `resizeFilesystems.sh`
@@ -45,6 +48,14 @@ As of March 7, 2025, the following high-priority scripts have been successfully 
   - `eos read tailscale` - Display network status
 - **Features**: Headscale installation, Tailscale peer management, multiple output formats (YAML, JSON, Ansible)
 
+#### Container Orchestration
+- **Source Scripts**: `installKubeadm.sh`, `installMicroK8s.sh`
+- **New Packages**: `pkg/container/kubernetes.go`, enhanced `cmd/create/k3s.go`
+- **Commands Added**:
+  - `eos create kubeadm` - Complete Kubernetes installation using kubeadm
+  - `eos create microk8s` - MicroK8s installation and configuration
+- **Features**: Kubernetes prerequisite installation, firewall configuration, swap management, cluster initialization, addon management, status monitoring
+
 ### 🔄 Remaining Scripts (Phases 2-4)
 
 ## Detailed Migration Plan
@@ -55,9 +66,7 @@ As of March 7, 2025, the following high-priority scripts have been successfully 
 **Timeline**: 8 weeks  
 **Complexity**: High  
 **Scripts to Migrate**:
-- `setupTerminal2FA.sh` - Terminal 2FA setup
-- `disableSSHIntoRoot.py` - SSH security hardening
-- `copySshIds.sh`, `distributeSshKeys.sh` - SSH key distribution
+- `setupTerminal2FA.sh` - Terminal 2FA setup  
 - `usersWithRemoteSsh.sh` - SSH user audit
 - `addUser.sh`, `changeUserPassword.sh` - User management
 
@@ -73,7 +82,6 @@ eos secure audit --ssh-users --remote-access
 **Timeline**: 4 weeks  
 **Complexity**: High  
 **Scripts to Migrate**:
-- `installKubeadm.sh`, `installMicroK8s.sh` - Kubernetes variants
 - `installOpenStack.sh`, `installMicroCloud.sh` - Cloud platforms
 - `docker/` directory (12 scripts) - Docker management utilities
 
@@ -259,7 +267,7 @@ For each script migration:
 
 | Phase | Duration | Scripts | Packages | Completion Target |
 |-------|----------|---------|----------|-------------------|
-| Phase 1 | 16 weeks | 8 scripts | 4 packages | ✅ **Complete** (March 2025) |
+| Phase 1 | 16 weeks | 13 scripts | 5 packages | ✅ **Complete** (March 2025) |
 | Phase 2 | 16 weeks | ~40 scripts | 3 packages | Q2 2025 |
 | Phase 3 | 12 weeks | ~50 scripts | 3 packages | Q3 2025 |
 | Phase 4 | 10 weeks | ~35 scripts | 3 packages | Q4 2025 |

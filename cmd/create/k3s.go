@@ -9,8 +9,10 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
@@ -54,9 +56,55 @@ Supports Hetzner Cloud provider with automated server provisioning and K3s insta
 	}),
 }
 
+var CreateKubeadmCmd = &cobra.Command{
+	Use:   "kubeadm",
+	Short: "Install Kubernetes using kubeadm",
+	Long: `Install and configure Kubernetes using kubeadm.
+This command will:
+- Install prerequisites and Kubernetes packages
+- Configure firewall settings
+- Disable swap (required for Kubernetes)
+- Initialize the cluster
+- Configure kubectl for the current user
+
+Requires root privileges (sudo).
+
+Examples:
+  sudo eos create kubeadm
+  sudo eos create kubeadm --control-plane-endpoint=192.168.1.100:6443
+  sudo eos create kubeadm --pod-network-cidr=10.244.0.0/16`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		return runCreateKubeadm(rc, cmd, args)
+	}),
+}
+
+var CreateMicroK8sCmd = &cobra.Command{
+	Use:   "microk8s",
+	Short: "Install MicroK8s Kubernetes distribution",
+	Long: `Install and configure MicroK8s, a lightweight Kubernetes distribution.
+This command will:
+- Configure firewall for MicroK8s ports
+- Install MicroK8s via snap
+- Configure user permissions
+- Wait for MicroK8s to be ready
+- Enable common addons
+
+Requires root privileges (sudo).
+
+Examples:
+  sudo eos create microk8s
+  sudo eos create microk8s --addons=dns,dashboard,registry
+  sudo eos create microk8s --no-addons`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		return runCreateMicroK8s(rc, cmd, args)
+	}),
+}
+
 func init() {
 	CreateCmd.AddCommand(CreateK3sCmd)
 	CreateCmd.AddCommand(k3sTerraformCmd)
+	CreateCmd.AddCommand(CreateKubeadmCmd)
+	CreateCmd.AddCommand(CreateMicroK8sCmd)
 
 	// Add terraform flag to k3s command
 	CreateK3sCmd.Flags().Bool("terraform", false, "Generate Terraform configuration instead of direct installation")
@@ -67,6 +115,15 @@ func init() {
 	k3sTerraformCmd.Flags().String("location", "nbg1", "Location for cloud instance")
 	k3sTerraformCmd.Flags().String("ssh-key", "", "SSH key name in cloud provider")
 	k3sTerraformCmd.Flags().String("output-dir", "./terraform-k3s", "Output directory for Terraform files")
+
+	// Add flags for kubeadm command
+	CreateKubeadmCmd.Flags().String("control-plane-endpoint", "", "Control plane endpoint (IP:port)")
+	CreateKubeadmCmd.Flags().String("pod-network-cidr", "192.168.0.0/16", "Pod network CIDR")
+	CreateKubeadmCmd.Flags().String("version", "v1.32", "Kubernetes version")
+
+	// Add flags for microk8s command
+	CreateMicroK8sCmd.Flags().String("addons", "", "Comma-separated list of addons to enable")
+	CreateMicroK8sCmd.Flags().Bool("no-addons", false, "Skip enabling default addons")
 }
 
 func deployK3s(rc *eos_io.RuntimeContext) {
@@ -355,6 +412,97 @@ k3s_token = "%s"`, serverURL, token)
 		fmt.Println("terraform output server_ip")
 		fmt.Println("ssh root@$(terraform output -raw server_ip) 'cat /var/lib/rancher/k3s/server/node-token'")
 	}
+
+	return nil
+}
+
+func runCreateKubeadm(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	otelzap.Ctx(rc.Ctx).Info("Starting kubeadm installation")
+
+	// Get flags
+	controlPlaneEndpoint, _ := cmd.Flags().GetString("control-plane-endpoint")
+	podNetworkCIDR, _ := cmd.Flags().GetString("pod-network-cidr")
+	version, _ := cmd.Flags().GetString("version")
+
+	// Prompt for control plane endpoint if not provided
+	if controlPlaneEndpoint == "" {
+		var err error
+		controlPlaneEndpoint, err = interaction.PromptUser(rc, "Enter control plane endpoint (IP:port, optional): ")
+		if err != nil {
+			return fmt.Errorf("failed to get control plane endpoint: %w", err)
+		}
+		controlPlaneEndpoint = strings.TrimSpace(controlPlaneEndpoint)
+	}
+
+	// Create installation options
+	options := &container.KubernetesInstallOptions{
+		Type:                 "kubeadm",
+		ControlPlaneEndpoint: controlPlaneEndpoint,
+		PodNetworkCIDR:       podNetworkCIDR,
+		Version:              version,
+	}
+
+	// Install kubeadm
+	if err := container.InstallKubeadm(rc, options); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to install kubeadm", zap.Error(err))
+		return err
+	}
+
+	// Get cluster status
+	if err := container.GetKubernetesStatus(rc, "kubeadm"); err != nil {
+		otelzap.Ctx(rc.Ctx).Warn("Failed to get cluster status", zap.Error(err))
+	}
+
+	otelzap.Ctx(rc.Ctx).Info("Kubeadm installation completed successfully")
+	otelzap.Ctx(rc.Ctx).Info("Next steps:")
+	otelzap.Ctx(rc.Ctx).Info("1. Install a pod network addon (e.g., Calico, Flannel)")
+	otelzap.Ctx(rc.Ctx).Info("2. Join worker nodes using the join command from kubeadm init output")
+	otelzap.Ctx(rc.Ctx).Info("3. Verify cluster: kubectl get nodes")
+
+	return nil
+}
+
+func runCreateMicroK8s(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	otelzap.Ctx(rc.Ctx).Info("Starting MicroK8s installation")
+
+	// Get flags
+	addonsFlag, _ := cmd.Flags().GetString("addons")
+	noAddons, _ := cmd.Flags().GetBool("no-addons")
+
+	// Parse addons
+	var addons []string
+	if !noAddons {
+		if addonsFlag != "" {
+			addons = strings.Split(addonsFlag, ",")
+			for i, addon := range addons {
+				addons[i] = strings.TrimSpace(addon)
+			}
+		}
+		// If no specific addons provided, use defaults (handled in InstallMicroK8s)
+	}
+
+	// Create installation options
+	options := &container.KubernetesInstallOptions{
+		Type:         "microk8s",
+		EnableAddons: addons,
+	}
+
+	// Install MicroK8s
+	if err := container.InstallMicroK8s(rc, options); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to install MicroK8s", zap.Error(err))
+		return err
+	}
+
+	// Get cluster status
+	if err := container.GetKubernetesStatus(rc, "microk8s"); err != nil {
+		otelzap.Ctx(rc.Ctx).Warn("Failed to get cluster status", zap.Error(err))
+	}
+
+	otelzap.Ctx(rc.Ctx).Info("MicroK8s installation completed successfully")
+	otelzap.Ctx(rc.Ctx).Info("Next steps:")
+	otelzap.Ctx(rc.Ctx).Info("1. Use 'microk8s kubectl' or set up kubectl alias")
+	otelzap.Ctx(rc.Ctx).Info("2. Access dashboard: microk8s dashboard-proxy")
+	otelzap.Ctx(rc.Ctx).Info("3. Enable additional addons: microk8s enable <addon>")
 
 	return nil
 }
