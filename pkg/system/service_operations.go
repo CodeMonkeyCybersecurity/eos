@@ -18,7 +18,7 @@ type ServiceOperation struct {
 	ServiceName string
 	Action      string // start, stop, enable, disable, mask, unmask
 	Target      string
-	SaltClient  *saltstack.Client
+	SaltClient  saltstack.ClientInterface
 	Logger      otelzap.LoggerWithCtx
 }
 
@@ -250,7 +250,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 // SleepDisableOperation implements AIE pattern for disabling system sleep
 type SleepDisableOperation struct {
 	Target     string
-	SaltClient *saltstack.Client
+	SaltClient saltstack.ClientInterface
 	Logger     otelzap.LoggerWithCtx
 }
 
@@ -414,7 +414,7 @@ func (s *SleepDisableOperation) Evaluate(ctx context.Context, intervention *patt
 type PortKillOperation struct {
 	Port       int
 	Target     string
-	SaltClient *saltstack.Client
+	SaltClient saltstack.ClientInterface
 	Logger     otelzap.LoggerWithCtx
 }
 
@@ -525,7 +525,7 @@ func (p *PortKillOperation) Evaluate(ctx context.Context, intervention *patterns
 // Helper functions for common service operations
 
 // ManageService performs a service operation using AIE pattern
-func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient *saltstack.Client, 
+func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface, 
 	target, serviceName, action string) error {
 	
 	operation := &ServiceOperation{
@@ -541,7 +541,7 @@ func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient
 }
 
 // DisableSystemSleep disables system sleep functionality using AIE pattern
-func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient *saltstack.Client, 
+func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface, 
 	target string) error {
 	
 	operation := &SleepDisableOperation{
@@ -555,7 +555,7 @@ func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, saltC
 }
 
 // KillProcessesByPort kills processes using a specific port using AIE pattern
-func KillProcessesByPort(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient *saltstack.Client, 
+func KillProcessesByPort(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface, 
 	target string, port int) error {
 	
 	operation := &PortKillOperation{

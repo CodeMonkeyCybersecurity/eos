@@ -18,7 +18,7 @@ import (
 type UserExistenceCheck struct {
 	Username  string
 	Target    string
-	SaltClient *saltstack.Client
+	SaltClient saltstack.ClientInterface
 	Logger    otelzap.LoggerWithCtx
 }
 
@@ -90,7 +90,7 @@ type UserCreationOperation struct {
 	Shell      string
 	HomeDir    string
 	Target     string
-	SaltClient *saltstack.Client
+	SaltClient saltstack.ClientInterface
 	VaultClient VaultClient
 	Logger     otelzap.LoggerWithCtx
 }
@@ -295,7 +295,7 @@ func GenerateSecurePassword(length int) (string, error) {
 }
 
 // GetSystemUsers retrieves system users via Salt
-func GetSystemUsers(ctx context.Context, saltClient *saltstack.Client, target string, logger otelzap.LoggerWithCtx) ([]string, error) {
+func GetSystemUsers(ctx context.Context, saltClient saltstack.ClientInterface, target string, logger otelzap.LoggerWithCtx) ([]string, error) {
 	logger.Info("Getting system users",
 		zap.String("target", target))
 
@@ -321,7 +321,7 @@ type PasswordUpdateOperation struct {
 	Username    string
 	NewPassword string
 	Target      string
-	SaltClient  *saltstack.Client
+	SaltClient  saltstack.ClientInterface
 	VaultClient VaultClient
 	Logger      otelzap.LoggerWithCtx
 }
@@ -416,7 +416,7 @@ type UserDeletionOperation struct {
 	Username   string
 	RemoveHome bool
 	Target     string
-	SaltClient *saltstack.Client
+	SaltClient saltstack.ClientInterface
 	Logger     otelzap.LoggerWithCtx
 }
 

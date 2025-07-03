@@ -12,6 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// ClientInterface defines the interface for Salt Stack operations
+type ClientInterface interface {
+	StateApply(ctx context.Context, target string, state string, pillar map[string]interface{}) error
+	TestPing(ctx context.Context, target string) (bool, error)
+	GrainGet(ctx context.Context, target string, grain string) (map[string]interface{}, error)
+	CmdRun(ctx context.Context, target string, command string) (string, error)
+	CheckMinion(ctx context.Context, minion string) (bool, error)
+}
+
 // Client provides Salt Stack operations
 type Client struct {
 	logger otelzap.LoggerWithCtx
