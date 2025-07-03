@@ -29,13 +29,15 @@ func (sh *SystemHardener) HardenSystem(ctx context.Context) error {
 	sh.logger.Info("Starting system hardening")
 
 	// Log audit event
-	sh.auditLogger.LogEvent(ctx, AuditEvent{
+	if err := sh.auditLogger.LogEvent(ctx, AuditEvent{
 		EventType: "system_hardening",
 		Actor:     "eos",
 		Action:    "start",
 		Resource:  "system",
 		Result:    "started",
-	})
+	}); err != nil {
+		sh.logger.Warn("Failed to log audit event", zap.Error(err))
+	}
 
 	steps := []struct {
 		name string
@@ -59,7 +61,7 @@ func (sh *SystemHardener) HardenSystem(ctx context.Context) error {
 				zap.String("step", step.name),
 				zap.Error(err))
 
-			sh.auditLogger.LogEvent(ctx, AuditEvent{
+			if auditErr := sh.auditLogger.LogEvent(ctx, AuditEvent{
 				EventType: "system_hardening",
 				Actor:     "eos",
 				Action:    step.name,
@@ -67,7 +69,9 @@ func (sh *SystemHardener) HardenSystem(ctx context.Context) error {
 				Result:    "failure",
 				Details:   map[string]interface{}{"error": err.Error()},
 				RiskScore: 60,
-			})
+			}); auditErr != nil {
+				sh.logger.Warn("Failed to log audit event", zap.Error(auditErr))
+			}
 
 			return fmt.Errorf("%s: %w", step.name, err)
 		}
@@ -75,13 +79,15 @@ func (sh *SystemHardener) HardenSystem(ctx context.Context) error {
 		sh.logger.Info("Hardening step completed", zap.String("step", step.name))
 	}
 
-	sh.auditLogger.LogEvent(ctx, AuditEvent{
+	if err := sh.auditLogger.LogEvent(ctx, AuditEvent{
 		EventType: "system_hardening",
 		Actor:     "eos",
 		Action:    "complete",
 		Resource:  "system",
 		Result:    "success",
-	})
+	}); err != nil {
+		sh.logger.Warn("Failed to log audit event", zap.Error(err))
+	}
 
 	return nil
 }

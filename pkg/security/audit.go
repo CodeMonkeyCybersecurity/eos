@@ -93,7 +93,11 @@ func (al *AuditLogger) writeToFile(event AuditEvent) error {
 	if err != nil {
 		return fmt.Errorf("opening audit log file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Log error if needed
+		}
+	}()
 
 	// Check file size for rotation
 	info, err := file.Stat()
