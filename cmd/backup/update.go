@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -140,17 +141,17 @@ func runBackup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		return fmt.Errorf("creating backup client: %w", err)
 	}
 
-	// Run pre-backup hooks
+	// Run pre-backup hooks using the modular helper
 	if profile.Hooks != nil && len(profile.Hooks.PreBackup) > 0 {
 		logger.Info("Running pre-backup hooks")
 		for _, hook := range profile.Hooks.PreBackup {
-			if err := runHook(rc, hook); err != nil {
+			if err := backup.RunHook(rc.Ctx, logger, hook); err != nil {
 				logger.Error("Pre-backup hook failed",
 					zap.String("hook", hook),
 					zap.Error(err))
 				if profile.Hooks.OnError != nil {
 					for _, errorHook := range profile.Hooks.OnError {
-						_ = runHook(rc, errorHook)
+						_ = backup.RunHook(rc.Ctx, logger, errorHook)
 					}
 				}
 				return fmt.Errorf("pre-backup hook failed: %w", err)
@@ -158,28 +159,32 @@ func runBackup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 		}
 	}
 
-	// Perform backup
-	if dryRun {
-		logger.Info("Dry run mode - showing what would be backed up")
-		// TODO: Implement dry run
-		return nil
+	// Perform backup using AIE pattern
+	backupOp := &backup.BackupOperation{
+		Client:      client,
+		ProfileName: profileName,
+		Profile:     profile,
+		RepoName:    repoName,
+		DryRun:      dryRun,
+		Logger:      logger,
 	}
 
-	if err := client.Backup(profileName); err != nil {
+	executor := patterns.NewExecutor(logger)
+	if err := executor.Execute(rc.Ctx, backupOp, "backup_profile"); err != nil {
 		// Run error hooks
 		if profile.Hooks != nil && profile.Hooks.OnError != nil {
 			for _, hook := range profile.Hooks.OnError {
-				_ = runHook(rc, hook)
+				_ = backup.RunHook(rc.Ctx, logger, hook)
 			}
 		}
-		return fmt.Errorf("backup failed: %w", err)
+		return err
 	}
 
 	// Run post-backup hooks
 	if profile.Hooks != nil && len(profile.Hooks.PostBackup) > 0 {
 		logger.Info("Running post-backup hooks")
 		for _, hook := range profile.Hooks.PostBackup {
-			if err := runHook(rc, hook); err != nil {
+			if err := backup.RunHook(rc.Ctx, logger, hook); err != nil {
 				logger.Warn("Post-backup hook failed",
 					zap.String("hook", hook),
 					zap.Error(err))
@@ -189,7 +194,10 @@ func runBackup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) err
 
 	// Send notifications if configured
 	if config.Settings.Notifications.OnSuccess {
-		sendNotification(rc, config.Settings.Notifications, "Backup completed successfully", profileName)
+		if err := backup.SendNotification(rc.Ctx, logger, config.Settings.Notifications, 
+			"Backup completed successfully", profileName); err != nil {
+			logger.Warn("Failed to send notification", zap.Error(err))
+		}
 	}
 
 	logger.Info("Backup completed successfully",
@@ -354,21 +362,3 @@ func updateProfile(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string)
 	return nil
 }
 
-func runHook(rc *eos_io.RuntimeContext, hook string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Running hook",
-		zap.String("command", hook))
-	
-	// TODO: Implement hook execution
-	return nil
-}
-
-func sendNotification(rc *eos_io.RuntimeContext, notif backup.Notifications, subject, body string) {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Sending notification",
-		zap.String("method", notif.Method),
-		zap.String("target", notif.Target),
-		zap.String("subject", subject))
-	
-	// TODO: Implement notification sending
-}
