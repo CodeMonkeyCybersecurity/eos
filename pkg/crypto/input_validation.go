@@ -34,6 +34,7 @@ var dangerousChars = []string{
 	";", "&", "|", "$", "`", "\\", "'", "\"",
 	"\n", "\r", "\t", " ", "<", ">", "*", "?",
 	"(", ")", "[", "]", "{", "}", "!", "~",
+	"\x00", // null byte
 }
 
 // ValidateDomainName performs comprehensive validation of domain names for certificate generation
@@ -47,16 +48,58 @@ func ValidateDomainName(domain string) error {
 		return fmt.Errorf("domain name too long: %d characters (max %d)", len(domain), MaxDomainLength)
 	}
 
+	// Check for localhost and internal domains (security concern) FIRST
+	// This takes priority over character/format validation for security
+	lowercaseDomain := strings.ToLower(domain)
+	suspiciousDomains := []string{
+		"localhost", "127.0.0.1", "::1", "0.0.0.0",
+		"internal", "local",
+		"*.local", "*.internal",
+	}
+
+	for _, suspicious := range suspiciousDomains {
+		if lowercaseDomain == suspicious || strings.Contains(lowercaseDomain, suspicious) {
+			return fmt.Errorf("domain name contains suspicious pattern")
+		}
+	}
+
 	// Check for dangerous characters that could be used for injection
 	for _, char := range dangerousChars {
 		if strings.Contains(domain, char) {
-			return fmt.Errorf("domain name contains invalid character: %s", char)
+			return fmt.Errorf("domain name contains invalid character")
 		}
+	}
+
+	// Check individual label lengths and count (DNS labels limited to 63 characters)
+	labels := strings.Split(domain, ".")
+	
+	// Limit number of labels to prevent DoS attacks
+	if len(labels) > 10 {
+		return fmt.Errorf("domain has too many labels: %d (max 10)", len(labels))
+	}
+	
+	maxLengthLabels := 0
+	for _, label := range labels {
+		if len(label) > 63 {
+			return fmt.Errorf("domain label too long: %d characters (max 63)", len(label))
+		}
+		if len(label) == 0 {
+			return fmt.Errorf("domain cannot contain empty labels")
+		}
+		// Count labels that are near maximum length (potential DoS)
+		if len(label) >= 60 {
+			maxLengthLabels++
+		}
+	}
+	
+	// Prevent domains with multiple near-maximum length labels (DoS prevention)
+	if maxLengthLabels >= 2 {
+		return fmt.Errorf("domain has too many long labels")
 	}
 
 	// Check against regex pattern
 	if !ValidDomainPattern.MatchString(domain) {
-		return fmt.Errorf("domain name format is invalid: %s", domain)
+		return fmt.Errorf("domain name format is invalid")
 	}
 
 	// Additional security checks
@@ -71,20 +114,6 @@ func ValidateDomainName(domain string) error {
 	if strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
 		return fmt.Errorf("domain name cannot start or end with dot")
 	}
-
-	// Check for localhost and internal domains (security concern)
-	lowercaseDomain := strings.ToLower(domain)
-	suspiciousDomains := []string{
-		"localhost", "127.0.0.1", "::1", "0.0.0.0",
-		"internal", "local",
-		"*.local", "*.internal",
-	}
-
-	for _, suspicious := range suspiciousDomains {
-		if lowercaseDomain == suspicious || strings.Contains(lowercaseDomain, suspicious) {
-			return fmt.Errorf("domain name contains suspicious pattern: %s", suspicious)
-		}
-	}
 	
 	// Check for test domains that should only be blocked in production
 	// Allow example.com in test environments as it's commonly used for testing
@@ -92,7 +121,7 @@ func ValidateDomainName(domain string) error {
 		testDomains := []string{"test"}
 		for _, testDomain := range testDomains {
 			if lowercaseDomain == testDomain {
-				return fmt.Errorf("domain name contains suspicious pattern: %s", testDomain)
+				return fmt.Errorf("domain name contains suspicious pattern")
 			}
 		}
 	}
@@ -116,14 +145,14 @@ func ValidateEmailAddress(email string) error {
 		if strings.Contains(email, char) {
 			// Allow some characters that are valid in emails
 			if char != "." && char != "+" && char != "-" && char != "_" {
-				return fmt.Errorf("email address contains invalid character: %s", char)
+				return fmt.Errorf("email address contains invalid character")
 			}
 		}
 	}
 
 	// Check against regex pattern
 	if !ValidEmailPattern.MatchString(email) {
-		return fmt.Errorf("email address format is invalid: %s", email)
+		return fmt.Errorf("email address format is invalid")
 	}
 
 	// Additional security checks
@@ -141,7 +170,7 @@ func ValidateEmailAddress(email string) error {
 
 	// Validate local part (before @)
 	if len(localPart) == 0 || len(localPart) > 64 {
-		return fmt.Errorf("email local part must be 1-64 characters")
+		return fmt.Errorf("email local part length must be 1-64 characters")
 	}
 
 	if strings.HasPrefix(localPart, ".") || strings.HasSuffix(localPart, ".") {
@@ -172,14 +201,14 @@ func ValidateAppName(appName string) error {
 		if strings.Contains(appName, char) {
 			// Only allow hyphens as special characters in app names
 			if char != "-" {
-				return fmt.Errorf("application name contains invalid character: %s", char)
+				return fmt.Errorf("application name contains invalid character")
 			}
 		}
 	}
 
 	// Check against regex pattern
 	if !ValidAppNamePattern.MatchString(appName) {
-		return fmt.Errorf("application name format is invalid: %s", appName)
+		return fmt.Errorf("application name format is invalid")
 	}
 
 	// Additional checks
@@ -202,7 +231,7 @@ func ValidateAppName(appName string) error {
 	// Always block critical reserved names
 	for _, reserved := range criticalReservedNames {
 		if lowerAppName == reserved {
-			return fmt.Errorf("application name '%s' is reserved", appName)
+			return fmt.Errorf("application name is reserved")
 		}
 	}
 	
@@ -216,7 +245,7 @@ func ValidateAppName(appName string) error {
 	if !isInTest {
 		for _, reserved := range testAllowedReservedNames {
 			if lowerAppName == reserved {
-				return fmt.Errorf("application name '%s' is reserved", appName)
+				return fmt.Errorf("application name is reserved")
 			}
 		}
 	}

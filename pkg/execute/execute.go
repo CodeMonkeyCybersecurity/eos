@@ -29,6 +29,10 @@ func Run(ctx context.Context, opts Options) (string, error) {
 	if logger == nil {
 		logger = DefaultLogger
 	}
+	if logger == nil {
+		// Create a no-op logger if both opts.Logger and DefaultLogger are nil
+		logger = zap.NewNop()
+	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
