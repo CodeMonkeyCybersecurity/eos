@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/stretchr/testify/assert"
@@ -319,7 +320,12 @@ func TestFileExists(t *testing.T) {
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := fileExists(tt.path)
+			// Create file service container
+			rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+			fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
+			require.NoError(t, err)
+			
+			result := fileContainer.FileExists(tt.path)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -389,7 +395,12 @@ func TestCopyFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			src, dst := tt.setupFunc()
-			err := copyFile(src, dst)
+			// Create file service container
+			rc := &eos_io.RuntimeContext{Ctx: context.Background()}
+			fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
+			require.NoError(t, err)
+			
+			err = fileContainer.CopyFile(src, dst)
 			
 			if tt.expectError {
 				assert.Error(t, err)

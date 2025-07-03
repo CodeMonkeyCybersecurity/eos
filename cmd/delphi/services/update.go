@@ -10,12 +10,13 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
+
 )
 
 // ServiceWorkerInfo contains information about a service worker
@@ -293,293 +294,48 @@ Examples:
 	return cmd
 }
 
-func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workers []shared.ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
-	logger.Info(" Starting enhanced service update process",
-		zap.Int("worker_count", len(workers)),
-		zap.Bool("dry_run", dryRun),
-		zap.Bool("backup_enabled", !skipBackup),
-		zap.Bool("restart_enabled", !skipRestart),
-		zap.String("phase", "initialization"))
-
-	overallStart := time.Now()
-
-	logger.Info(" Update process configuration",
-		zap.String("mode", func() string {
-			if dryRun {
-				return "DRY_RUN"
-			}
-			return "LIVE"
-		}()),
-		zap.String("backup_policy", func() string {
-			if skipBackup {
-				return "SKIP"
-			}
-			return "ENABLED"
-		}()),
-		zap.String("restart_policy", func() string {
-			if skipRestart {
-				return "SKIP"
-			}
-			return "ENHANCED_VISIBILITY"
-		}()))
-
-	// Phase 1: Pre-flight checks
-	logger.Info(" Phase 1: Pre-flight validation",
-		zap.String("phase", "pre-flight"),
-		zap.Int("services_to_check", len(workers)))
-
-	preflightStart := time.Now()
-
-	for i, worker := range workers {
-		logger.Info(" Validating service",
-			zap.String("service", worker.ServiceName),
-			zap.Int("progress", i+1),
-			zap.Int("total", len(workers)))
-
-		// Check source file exists
-		if !fileExists(worker.SourcePath) {
-			return fmt.Errorf("source file not found: %s", worker.SourcePath)
-		}
-
-		// Check target directory exists
-		targetDir := filepath.Dir(worker.TargetPath)
-		if !fileExists(targetDir) {
-			// Attempt to create the target directory if it doesn't exist
-			logger.Info("📁 Target directory does not exist, creating it",
-				zap.String("directory", targetDir))
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
-				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
-			}
-		}
-
-		logger.Info(" Pre-flight check passed",
-			zap.String("service", worker.ServiceName),
-			zap.String("source", worker.SourcePath),
-			zap.String("target", worker.TargetPath))
-	}
-
-	logger.Info(" Phase 1 completed: Pre-flight validation",
-		zap.Duration("duration", time.Since(preflightStart)),
-		zap.Int("services_validated", len(workers)))
-
-	if dryRun {
-		logger.Info("DRY RUN - would perform the following actions:")
-		for _, worker := range workers {
-			logger.Info("Service worker update plan",
-				zap.String("service", worker.ServiceName),
-				zap.String("source", worker.SourcePath),
-				zap.String("target", worker.TargetPath),
-				zap.String("backup", worker.BackupPath),
-				zap.Bool("will_backup", !skipBackup && fileExists(worker.TargetPath)),
-				zap.Bool("will_restart", !skipRestart))
-		}
-		return nil
-	}
-
-	// Track services that need restarting
-	var servicesToRestart []string
-
-	// Update each worker
-	for _, worker := range workers {
-		logger.Info("Updating service worker",
-			zap.String("service", worker.ServiceName))
-
-		// Step 1: Backup existing Python worker file if it exists and backup is not skipped
-		if !skipBackup && fileExists(worker.TargetPath) {
-			logger.Info("Creating Python worker backup",
-				zap.String("source", worker.TargetPath),
-				zap.String("backup", worker.BackupPath))
-
-			if err := copyFile(worker.TargetPath, worker.BackupPath); err != nil {
-				return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
-			}
-
-			logger.Info("Python worker backup created",
-				zap.String("backup_path", worker.BackupPath))
-		}
-
-		// Step 1.5: Backup systemd service file if it exists and backup is not skipped
-		if !skipBackup {
-			serviceFilePath := fmt.Sprintf("/etc/systemd/system/%s.service", worker.ServiceName)
-			if fileExists(serviceFilePath) {
-				// Extract timestamp from worker.BackupPath to use the same timestamp for service file
-				timestamp := extractTimestampFromBackupPath(worker.BackupPath)
-				serviceBackupPath := fmt.Sprintf("%s.%s.bak", serviceFilePath, timestamp)
-
-				logger.Info("Creating systemd service backup",
-					zap.String("source", serviceFilePath),
-					zap.String("backup", serviceBackupPath))
-
-				if err := copyFile(serviceFilePath, serviceBackupPath); err != nil {
-					logger.Warn("Failed to backup systemd service file (continuing)",
-						zap.String("service", worker.ServiceName),
-						zap.String("service_file", serviceFilePath),
-						zap.Error(err))
-				} else {
-					logger.Info("Systemd service backup created",
-						zap.String("backup_path", serviceBackupPath))
-				}
-			}
-		}
-
-		// Step 2: Deploy new version
-		logger.Info("Deploying updated worker",
-			zap.String("source", worker.SourcePath),
-			zap.String("target", worker.TargetPath))
-
-		if err := copyFile(worker.SourcePath, worker.TargetPath); err != nil {
-			return fmt.Errorf("failed to deploy updated %s: %w", worker.ServiceName, err)
-		}
-
-		// Set appropriate permissions
-		_, err := execute.Run(rc.Ctx, execute.Options{
-			Command: "chmod",
-			Args:    []string{"755", worker.TargetPath},
-		})
-		if err != nil {
-			logger.Warn("Failed to set permissions (continuing)",
-				zap.String("file", worker.TargetPath),
-				zap.Error(err))
-		}
-
-		// Set ownership to stanley (if running as root)
-		_, err = execute.Run(rc.Ctx, execute.Options{
-			Command: "chown",
-			Args:    []string{"stanley:stanley", worker.TargetPath},
-		})
-		if err != nil {
-			logger.Warn("Failed to set ownership (continuing)",
-				zap.String("file", worker.TargetPath),
-				zap.Error(err))
-		}
-
-		logger.Info("Service worker updated successfully",
-			zap.String("service", worker.ServiceName),
-			zap.String("target", worker.TargetPath))
-
-		// Add to restart list if service exists using centralized service manager
-		serviceManager := shared.GetGlobalServiceManager()
-		if serviceManager.CheckServiceExists(worker.ServiceName) {
-			servicesToRestart = append(servicesToRestart, worker.ServiceName)
-		} else {
-			logger.Warn("Service unit file not found, skipping restart",
-				zap.String("service", worker.ServiceName),
-				zap.String("suggestion", "Run 'eos delphi services create "+worker.ServiceName+"' to install the service"))
-		}
-	}
-
-	// Phase 3: Enhanced service restart
-	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info(" Phase 3: Enhanced service restart",
-			zap.String("phase", "restart"),
-			zap.Strings("services", servicesToRestart),
-			zap.Int("services_to_restart", len(servicesToRestart)),
-			zap.String("restart_mode", "enhanced_visibility"))
-
-		restartPhaseStart := time.Now()
-
-		for _, service := range servicesToRestart {
-			logger.Info(" Preparing enhanced service restart",
-				zap.String("service", service),
-				zap.String("enhanced_features", "real-time logs, state monitoring, graceful stop analysis"))
-
-			if err := eos_unix.RestartSystemdUnitWithVisibility(rc.Ctx, service, 3, 2); err != nil {
-				logger.Error(" Enhanced service restart failed",
-					zap.String("service", service),
-					zap.Error(err))
-				return fmt.Errorf("failed to restart %s: %w", service, err)
-			}
-
-			logger.Info(" Enhanced service restart completed",
-				zap.String("service", service))
-		}
-
-		logger.Info(" Phase 3 completed: Enhanced service restart",
-			zap.Duration("restart_phase_duration", time.Since(restartPhaseStart)),
-			zap.Int("services_restarted", len(servicesToRestart)))
-	}
-
-	// Phase 4: Service verification
-	if !skipRestart && len(servicesToRestart) > 0 {
-		logger.Info(" Phase 4: Service health verification",
-			zap.String("phase", "verification"),
-			zap.Int("services_to_verify", len(servicesToRestart)))
-
-		verificationStart := time.Now()
-
-		healthyServices := 0
-		for _, service := range servicesToRestart {
-			// Check if this is a oneshot service
-			isOneshot, err := isOneshotService(service)
-			if err != nil {
-				logger.Warn("Could not determine service type, using standard check",
-					zap.String("service", service),
-					zap.Error(err))
-				isOneshot = false
-			}
-
-			var checkErr error
-			if isOneshot {
-				// For oneshot services, check the exit code rather than active state
-				checkErr = checkOneshotServiceHealth(rc.Ctx, service)
-				if checkErr != nil {
-					logger.Warn("  Oneshot service health check failed",
-						zap.String("service", service),
-						zap.String("service_type", "oneshot"),
-						zap.Error(checkErr))
-				} else {
-					logger.Info(" Oneshot service health check passed",
-						zap.String("service", service),
-						zap.String("service_type", "oneshot"),
-						zap.String("status", "completed successfully"))
-					healthyServices++
-				}
-			} else {
-				// For regular services, use the standard active state check
-				checkErr = eos_unix.CheckServiceStatus(rc.Ctx, service)
-				if checkErr != nil {
-					logger.Warn("  Service health check failed",
-						zap.String("service", service),
-						zap.String("service_type", "standard"),
-						zap.Error(checkErr))
-				} else {
-					logger.Info(" Service health check passed",
-						zap.String("service", service),
-						zap.String("service_type", "standard"),
-						zap.String("status", "active"))
-					healthyServices++
-				}
-			}
-
-			if checkErr != nil {
-				logger.Info(" Troubleshooting suggestion",
-					zap.String("service", service),
-					zap.String("command", "eos delphi services logs"),
-					zap.String("alt_command", fmt.Sprintf("journalctl -u %s -f", service)))
-			}
-		}
-
-		logger.Info(" Phase 4 completed: Service health verification",
-			zap.Duration("verification_duration", time.Since(verificationStart)),
-			zap.Int("services_verified", len(servicesToRestart)),
-			zap.Int("healthy_services", healthyServices),
-			zap.Int("unhealthy_services", len(servicesToRestart)-healthyServices))
-	}
-
-	logger.Info(" Service worker update completed successfully",
-		zap.Int("workers_updated", len(workers)),
-		zap.Int("services_restarted", len(servicesToRestart)),
-		zap.Duration("total_duration", time.Since(overallStart)),
-		zap.String("phase", "completion"))
-
-	return nil
+// In the command function:
+func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workersToUpdate []shared.ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
+    // Create file service container
+    fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
+    if err != nil {
+        return fmt.Errorf("failed to initialize file operations: %w", err)
+    }
+    
+    // Process each worker
+    for _, worker := range workersToUpdate {
+        logger.Info("Processing service worker", 
+            zap.String("service", worker.ServiceName),
+            zap.Bool("dry_run", dryRun))
+        
+        if dryRun {
+            logger.Info("Would update service worker", zap.String("service", worker.ServiceName))
+            continue
+        }
+        
+        // Check if source file exists
+        if !fileContainer.FileExists(worker.SourcePath) {
+            return fmt.Errorf("source file not found: %s", worker.SourcePath)
+        }
+        
+        // Create backup if not skipped
+        if !skipBackup {
+            if err := fileContainer.CopyFile(worker.TargetPath, worker.BackupPath); err != nil {
+                return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
+            }
+        }
+        
+        // Deploy updated file
+        if err := fileContainer.CopyFileWithBackup(worker.SourcePath, worker.TargetPath); err != nil {
+            return fmt.Errorf("failed to deploy updated %s: %w", worker.ServiceName, err)
+        }
+        
+        logger.Info("Successfully updated service worker", zap.String("service", worker.ServiceName))
+    }
+    
+    return nil
 }
 
-// fileExists checks if a file exists
-func fileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
 
 // extractTimestampFromBackupPath extracts the timestamp from a backup path like "/path/file.20250701_212225.bak"
 func extractTimestampFromBackupPath(backupPath string) string {
@@ -655,24 +411,4 @@ func checkOneshotServiceHealth(ctx context.Context, serviceName string) error {
 	}
 
 	return fmt.Errorf("oneshot service in unexpected active state: %s", state)
-}
-
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	input, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-
-	// Create directory if it doesn't exist
-	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-		return err
-	}
-
-	err = os.WriteFile(dst, input, 0755)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

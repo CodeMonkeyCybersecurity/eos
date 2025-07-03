@@ -1,4 +1,4 @@
-// Package fileops defines domain entities for file operations
+// Package fileops contains domain entities and value objects
 package fileops
 
 import (
@@ -6,119 +6,234 @@ import (
 	"time"
 )
 
-// FileMetadata represents metadata about a file
-type FileMetadata struct {
-	Path        string      `json:"path"`
-	Name        string      `json:"name"`
-	Size        int64       `json:"size"`
-	Mode        os.FileMode `json:"mode"`
-	ModTime     time.Time   `json:"mod_time"`
-	IsDir       bool        `json:"is_dir"`
-	Owner       string      `json:"owner,omitempty"`
-	Group       string      `json:"group,omitempty"`
-	Permissions string      `json:"permissions"`
-	Checksum    string      `json:"checksum,omitempty"`
+// ArchiveFormat represents supported archive formats
+type ArchiveFormat string
+
+const (
+	FormatTar   ArchiveFormat = "tar"
+	FormatTarGz ArchiveFormat = "tar.gz"
+	FormatZip   ArchiveFormat = "zip"
+	Format7z    ArchiveFormat = "7z"
+)
+
+// FileOperation represents a single file operation for transactions
+type FileOperation struct {
+	Type      OperationType
+	Source    string
+	Target    string
+	Data      []byte
+	Mode      os.FileMode
+	Recursive bool
 }
 
-// DirectoryInfo represents information about a directory
-type DirectoryInfo struct {
-	Path        string         `json:"path"`
-	FileCount   int            `json:"file_count"`
-	DirCount    int            `json:"dir_count"`
-	TotalSize   int64          `json:"total_size"`
-	Files       []FileMetadata `json:"files,omitempty"`
-	Directories []FileMetadata `json:"directories,omitempty"`
-}
+// OperationType defines types of file operations
+type OperationType string
 
-// CopyOptions represents options for file copy operations
+const (
+	OpCreate OperationType = "create"
+	OpCopy   OperationType = "copy"
+	OpMove   OperationType = "move"
+	OpDelete OperationType = "delete"
+	OpMkdir  OperationType = "mkdir"
+	OpChmod  OperationType = "chmod"
+	OpChown  OperationType = "chown"
+)
+
+// CopyOptions defines options for file copying
 type CopyOptions struct {
-	Overwrite      bool        `json:"overwrite"`
-	PreserveMode   bool        `json:"preserve_mode"`
-	PreserveOwner  bool        `json:"preserve_owner"`
-	PreserveTimes  bool        `json:"preserve_times"`
-	CreateDirs     bool        `json:"create_dirs"`
-	FollowSymlinks bool        `json:"follow_symlinks"`
-	DefaultMode    os.FileMode `json:"default_mode"`
+	// PreserveMode preserves original file permissions
+	PreserveMode bool
+
+	// PreserveOwner preserves file ownership (requires privileges)
+	PreserveOwner bool
+
+	// PreserveTimes preserves modification times
+	PreserveTimes bool
+
+	// CreateDirs creates missing parent directories
+	CreateDirs bool
+
+	// DefaultMode is used when PreserveMode is false
+	DefaultMode os.FileMode
+
+	// Overwrite allows overwriting existing files
+	Overwrite bool
+
+	// FollowSymlinks follows symbolic links
+	FollowSymlinks bool
 }
 
-// WatchEvent represents a file system watch event
-type WatchEvent struct {
-	Path      string    `json:"path"`
-	Operation string    `json:"operation"` // create, write, remove, rename, chmod
-	Timestamp time.Time `json:"timestamp"`
-	OldPath   string    `json:"old_path,omitempty"` // for rename operations
+// FileFilter defines criteria for filtering files
+type FileFilter struct {
+	// IncludePatterns are glob patterns to include
+	IncludePatterns []string
+
+	// ExcludePatterns are glob patterns to exclude
+	ExcludePatterns []string
+
+	// MinSize is minimum file size in bytes
+	MinSize int64
+
+	// MaxSize is maximum file size in bytes
+	MaxSize int64
+
+	// ModifiedAfter filters files modified after this time
+	ModifiedAfter *time.Time
+
+	// ModifiedBefore filters files modified before this time
+	ModifiedBefore *time.Time
+
+	// FileTypes filters by file type (regular, directory, symlink)
+	FileTypes []FileType
+
+	// IncludeHidden includes hidden files (starting with .)
+	IncludeHidden bool
+}
+
+// FileType represents types of files
+type FileType string
+
+const (
+	TypeRegular   FileType = "regular"
+	TypeDirectory FileType = "directory"
+	TypeSymlink   FileType = "symlink"
+	TypeDevice    FileType = "device"
+	TypePipe      FileType = "pipe"
+	TypeSocket    FileType = "socket"
+)
+
+// FileMetadata contains detailed file information
+type FileMetadata struct {
+	Path        string
+	Name        string
+	Size        int64
+	Mode        os.FileMode
+	ModTime     time.Time
+	IsDir       bool
+	IsSymlink   bool
+	LinkTarget  string
+	Owner       string
+	Group       string
+	Checksum    string
+	MimeType    string
+	Permissions string
+}
+
+// DirectoryInfo contains information about a directory
+type DirectoryInfo struct {
+	Path        string
+	FileCount   int
+	DirCount    int
+	TotalSize   int64
+	Files       []FileMetadata
+	Directories []FileMetadata
 }
 
 // ArchiveEntry represents an entry in an archive
 type ArchiveEntry struct {
-	Path     string      `json:"path"`
-	Size     int64       `json:"size"`
-	Mode     os.FileMode `json:"mode"`
-	ModTime  time.Time   `json:"mod_time"`
-	IsDir    bool        `json:"is_dir"`
-	Checksum string      `json:"checksum,omitempty"`
+	Path     string
+	Size     int64
+	Mode     os.FileMode
+	ModTime  time.Time
+	IsDir    bool
+	Checksum string
 }
 
-// TemplateData represents data for template processing
-type TemplateData struct {
-	Variables   map[string]string      `json:"variables"`
-	Lists       map[string][]string    `json:"lists"`
-	Objects     map[string]interface{} `json:"objects"`
-	Environment map[string]string      `json:"environment"`
-}
-
-// FileOperationResult represents the result of a file operation
+// FileOperationResult contains the result of a file operation
 type FileOperationResult struct {
-	Success      bool          `json:"success"`
-	Path         string        `json:"path"`
-	Operation    string        `json:"operation"`
-	BytesWritten int64         `json:"bytes_written,omitempty"`
-	BytesRead    int64         `json:"bytes_read,omitempty"`
-	Duration     time.Duration `json:"duration"`
-	Error        error         `json:"error,omitempty"`
+	Path         string
+	Operation    string
+	Success      bool
+	Error        error
+	BackupPath   string
+	BytesRead    int64
+	BytesWritten int64
+	Duration     time.Duration
 }
 
-// BatchOperationResult represents the result of batch file operations
+// BatchOperationResult contains results of batch operations
 type BatchOperationResult struct {
-	TotalFiles      int                   `json:"total_files"`
-	SuccessfulFiles int                   `json:"successful_files"`
-	FailedFiles     int                   `json:"failed_files"`
-	Results         []FileOperationResult `json:"results"`
-	Duration        time.Duration         `json:"duration"`
+	TotalFiles      int
+	SuccessfulFiles int
+	FailedFiles     int
+	Results         []FileOperationResult
+	Duration        time.Duration
 }
 
-// FileFilter represents criteria for filtering files
-type FileFilter struct {
-	IncludePatterns []string   `json:"include_patterns"`
-	ExcludePatterns []string   `json:"exclude_patterns"`
-	MinSize         int64      `json:"min_size"`
-	MaxSize         int64      `json:"max_size"`
-	ModifiedAfter   *time.Time `json:"modified_after,omitempty"`
-	ModifiedBefore  *time.Time `json:"modified_before,omitempty"`
-	FileTypes       []string   `json:"file_types"` // extensions
-	IncludeHidden   bool       `json:"include_hidden"`
+// TemplateData contains data for template processing
+type TemplateData struct {
+	Variables   map[string]string
+	Environment map[string]string
+	Functions   map[string]interface{}
+}
+
+// BackupOptions defines options for backup operations
+type BackupOptions struct {
+	// BackupDir specifies where to store backups
+	BackupDir string
+
+	// KeepBackups specifies how many backups to keep
+	KeepBackups int
+
+	// CompressBackups enables backup compression
+	CompressBackups bool
+
+	// BackupExtension is the extension for backup files
+	BackupExtension string
+}
+
+// TransactionOptions defines options for transactional operations
+type TransactionOptions struct {
+	// Rollback on any error
+	RollbackOnError bool
+
+	// Continue on non-fatal errors
+	ContinueOnError bool
+
+	// Verify operations after completion
+	Verify bool
 }
 
 // DefaultCopyOptions returns default copy options
 func DefaultCopyOptions() CopyOptions {
 	return CopyOptions{
-		Overwrite:      false,
-		PreserveMode:   true,
+		PreserveMode:   false,
 		PreserveOwner:  false,
-		PreserveTimes:  true,
+		PreserveTimes:  false,
 		CreateDirs:     true,
-		FollowSymlinks: true,
 		DefaultMode:    0644,
+		Overwrite:      true,
+		FollowSymlinks: false,
 	}
 }
 
 // DefaultFileFilter returns a default file filter
 func DefaultFileFilter() FileFilter {
 	return FileFilter{
-		IncludePatterns: []string{"*"},
-		ExcludePatterns: []string{},
-		MinSize:         0,
-		MaxSize:         0,
-		IncludeHidden:   false,
+		IncludeHidden: false,
+		FileTypes:     []FileType{TypeRegular, TypeDirectory},
 	}
+}
+
+// DefaultBackupOptions returns default backup options
+func DefaultBackupOptions() BackupOptions {
+	return BackupOptions{
+		BackupDir:       "",
+		KeepBackups:     3,
+		CompressBackups: false,
+		BackupExtension: ".backup",
+	}
+}
+
+// IsError returns true if the operation failed
+func (r *FileOperationResult) IsError() bool {
+	return !r.Success || r.Error != nil
+}
+
+// SuccessRate returns the success rate as a percentage
+func (r *BatchOperationResult) SuccessRate() float64 {
+	if r.TotalFiles == 0 {
+		return 100.0
+	}
+	return float64(r.SuccessfulFiles) / float64(r.TotalFiles) * 100
 }

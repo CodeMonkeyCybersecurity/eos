@@ -12,12 +12,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// Service implements file operations domain logic
+// Service provides high-level file operation services
 type Service struct {
 	fileOps     FileOperations
 	pathOps     PathOperations
 	templateOps TemplateOperations
-	archiveOps  ArchiveOperations
 	safeOps     SafeOperations
 	logger      *zap.Logger
 }
@@ -27,7 +26,6 @@ func NewService(
 	fileOps FileOperations,
 	pathOps PathOperations,
 	templateOps TemplateOperations,
-	archiveOps ArchiveOperations,
 	safeOps SafeOperations,
 	logger *zap.Logger,
 ) *Service {
@@ -35,45 +33,55 @@ func NewService(
 		fileOps:     fileOps,
 		pathOps:     pathOps,
 		templateOps: templateOps,
-		archiveOps:  archiveOps,
 		safeOps:     safeOps,
-		logger:      logger,
+		logger:      logger.Named("fileops.service"),
 	}
 }
 
-// CopyFileWithOptions copies a file with the specified options
+// Basic operations delegated to infrastructure
+
+// ReadFile reads a file
+func (s *Service) ReadFile(ctx context.Context, path string) ([]byte, error) {
+	return s.fileOps.ReadFile(ctx, path)
+}
+
+// WriteFile writes a file
+func (s *Service) WriteFile(ctx context.Context, path string, data []byte, perm os.FileMode) error {
+	return s.fileOps.WriteFile(ctx, path, data, perm)
+}
+
+// Exists checks if a file exists
+func (s *Service) Exists(ctx context.Context, path string) (bool, error) {
+	return s.fileOps.Exists(ctx, path)
+}
+
+// DeleteFile deletes a file
+func (s *Service) DeleteFile(ctx context.Context, path string) error {
+	return s.fileOps.DeleteFile(ctx, path)
+}
+
+// High-level operations with business logic
+
+// CopyFile copies a file with default options
+func (s *Service) CopyFile(ctx context.Context, src, dst string) error {
+	opts := DefaultCopyOptions()
+	result, err := s.CopyFileWithOptions(ctx, src, dst, opts)
+	if err != nil {
+		return err
+	}
+	if !result.Success {
+		return fmt.Errorf("copy operation failed: %v", result.Error)
+	}
+	return nil
+}
+
+// CopyFileWithOptions copies a file with custom options
 func (s *Service) CopyFileWithOptions(ctx context.Context, src, dst string, opts CopyOptions) (*FileOperationResult, error) {
 	start := time.Now()
 	result := &FileOperationResult{
 		Path:      dst,
 		Operation: "copy",
-	}
-
-	// Expand paths
-	src = s.pathOps.ExpandPath(src)
-	dst = s.pathOps.ExpandPath(dst)
-
-	// Check if source exists
-	exists, err := s.fileOps.Exists(ctx, src)
-	if err != nil {
-		result.Error = fmt.Errorf("failed to check source existence: %w", err)
-		return result, result.Error
-	}
-	if !exists {
-		result.Error = fmt.Errorf("source file does not exist: %s", src)
-		return result, result.Error
-	}
-
-	// Check if destination exists
-	dstExists, err := s.fileOps.Exists(ctx, dst)
-	if err != nil {
-		result.Error = fmt.Errorf("failed to check destination existence: %w", err)
-		return result, result.Error
-	}
-
-	if dstExists && !opts.Overwrite {
-		result.Error = fmt.Errorf("destination already exists: %s", dst)
-		return result, result.Error
+		Success:   false,
 	}
 
 	// Create destination directory if needed
@@ -113,8 +121,7 @@ func (s *Service) CopyFileWithOptions(ctx context.Context, src, dst string, opts
 		zap.String("source", src),
 		zap.String("destination", dst),
 		zap.Int64("size", srcInfo.Size()),
-		zap.Duration("duration", result.Duration),
-	)
+		zap.Duration("duration", result.Duration))
 
 	return result, nil
 }
@@ -185,8 +192,7 @@ func (s *Service) CopyDirectory(ctx context.Context, src, dst string, opts CopyO
 		zap.Int("total_files", batchResult.TotalFiles),
 		zap.Int("successful", batchResult.SuccessfulFiles),
 		zap.Int("failed", batchResult.FailedFiles),
-		zap.Duration("duration", batchResult.Duration),
-	)
+		zap.Duration("duration", batchResult.Duration))
 
 	return batchResult, nil
 }
@@ -335,8 +341,7 @@ func (s *Service) SafeWriteFile(ctx context.Context, path string, data []byte, p
 			s.logger.Warn("Failed to create backup",
 				zap.String("path", path),
 				zap.String("backup", backupPath),
-				zap.Error(err),
-			)
+				zap.Error(err))
 		}
 	}
 
@@ -348,8 +353,7 @@ func (s *Service) SafeWriteFile(ctx context.Context, path string, data []byte, p
 	s.logger.Info("File written safely",
 		zap.String("path", path),
 		zap.Int("size", len(data)),
-		zap.Bool("backup_created", exists),
-	)
+		zap.Bool("backup_created", exists))
 
 	return nil
 }
@@ -378,11 +382,37 @@ func (s *Service) matchesFilter(path string, info os.FileInfo, filter FileFilter
 	}
 
 	// Check file types
-	if len(filter.FileTypes) > 0 && !info.IsDir() {
-		ext := filepath.Ext(path)
+	if len(filter.FileTypes) > 0 {
 		matched := false
 		for _, ft := range filter.FileTypes {
-			if ext == ft || ext == "."+ft {
+			switch ft {
+			case TypeRegular:
+				if info.Mode().IsRegular() {
+					matched = true
+				}
+			case TypeDirectory:
+				if info.IsDir() {
+					matched = true
+				}
+			case TypeSymlink:
+				if info.Mode()&os.ModeSymlink != 0 {
+					matched = true
+				}
+			}
+			if matched {
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	// Check include patterns
+	if len(filter.IncludePatterns) > 0 {
+		matched := false
+		for _, pattern := range filter.IncludePatterns {
+			if match, _ := filepath.Match(pattern, s.pathOps.BaseName(path)); match {
 				matched = true
 				break
 			}
@@ -392,62 +422,36 @@ func (s *Service) matchesFilter(path string, info os.FileInfo, filter FileFilter
 		}
 	}
 
-	// Check patterns
-	baseName := s.pathOps.BaseName(path)
-
-	// Check exclude patterns first
+	// Check exclude patterns
 	for _, pattern := range filter.ExcludePatterns {
-		if matched, _ := filepath.Match(pattern, baseName); matched {
+		if match, _ := filepath.Match(pattern, s.pathOps.BaseName(path)); match {
 			return false
 		}
 	}
 
-	// Check include patterns
-	if len(filter.IncludePatterns) == 0 {
-		return true
-	}
-
-	for _, pattern := range filter.IncludePatterns {
-		if matched, _ := filepath.Match(pattern, baseName); matched {
-			return true
-		}
-	}
-
-	return false
+	return true
 }
 
-// CleanupOldFiles removes files older than the specified duration
-func (s *Service) CleanupOldFiles(ctx context.Context, dir string, maxAge time.Duration, dryRun bool) (*BatchOperationResult, error) {
-	cutoffTime := time.Now().Add(-maxAge)
-	filter := FileFilter{
-		ModifiedBefore: &cutoffTime,
-		IncludeHidden:  true,
+// Batch operations with progress reporting
+
+// BatchCopy performs multiple copy operations
+func (s *Service) BatchCopy(ctx context.Context, operations []struct{ Src, Dst string }, opts CopyOptions) (*BatchOperationResult, error) {
+	start := time.Now()
+	batchResult := &BatchOperationResult{
+		Results:    make([]FileOperationResult, 0, len(operations)),
+		TotalFiles: len(operations),
 	}
 
-	if dryRun {
-		// Just list files that would be deleted
-		info, err := s.GetDirectoryInfo(ctx, dir)
-		if err != nil {
-			return nil, err
+	for _, op := range operations {
+		result, err := s.CopyFileWithOptions(ctx, op.Src, op.Dst, opts)
+		if err != nil || !result.Success {
+			batchResult.FailedFiles++
+		} else {
+			batchResult.SuccessfulFiles++
 		}
-
-		result := &BatchOperationResult{
-			Results: []FileOperationResult{},
-		}
-
-		for _, file := range info.Files {
-			if file.ModTime.Before(cutoffTime) {
-				result.TotalFiles++
-				result.Results = append(result.Results, FileOperationResult{
-					Path:      file.Path,
-					Operation: "would_delete",
-					Success:   true,
-				})
-			}
-		}
-
-		return result, nil
+		batchResult.Results = append(batchResult.Results, *result)
 	}
 
-	return s.DeleteFiles(ctx, dir, filter)
+	batchResult.Duration = time.Since(start)
+	return batchResult, nil
 }

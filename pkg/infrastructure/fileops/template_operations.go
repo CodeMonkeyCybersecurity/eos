@@ -1,10 +1,11 @@
-// Package fileops provides template operations infrastructure
+// pkg/domain/fileops/template_operations.go
+
 package fileops
 
 import (
+	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
@@ -13,156 +14,138 @@ import (
 	"go.uber.org/zap"
 )
 
-// TemplateOperationsImpl implements fileops.TemplateOperations
+// TemplateOperationsImpl implements TemplateOperations
 type TemplateOperationsImpl struct {
 	fileOps fileops.FileOperations
+	pathOps fileops.PathOperations
 	logger  *zap.Logger
 }
 
 // NewTemplateOperations creates a new template operations implementation
-func NewTemplateOperations(fileOps fileops.FileOperations, logger *zap.Logger) *TemplateOperationsImpl {
+func NewTemplateOperations(fileOps fileops.FileOperations, pathOps fileops.PathOperations, logger *zap.Logger) fileops.TemplateOperations {
 	return &TemplateOperationsImpl{
 		fileOps: fileOps,
-		logger:  logger,
+		pathOps: pathOps,
+		logger:  logger.Named("fileops.template"),
 	}
 }
 
 // ReplaceTokensInFile replaces tokens in a file
 func (t *TemplateOperationsImpl) ReplaceTokensInFile(ctx context.Context, path string, replacements map[string]string) error {
+	t.logger.Debug("Replacing tokens in file",
+		zap.String("path", path),
+		zap.Int("replacements", len(replacements)))
+
 	// Read file content
 	content, err := t.fileOps.ReadFile(ctx, path)
 	if err != nil {
-		return fmt.Errorf("failed to read file %s: %w", path, err)
+		return fmt.Errorf("failed to read file: %w", err)
 	}
-
-	// Convert to string for processing
-	text := string(content)
-	originalText := text
 
 	// Replace tokens
+	contentStr := string(content)
 	for token, value := range replacements {
-		// Support different token formats
-		text = strings.ReplaceAll(text, "{{"+token+"}}", value)
-		text = strings.ReplaceAll(text, "${"+token+"}", value)
-		text = strings.ReplaceAll(text, "__"+token+"__", value)
+		// Support both ${TOKEN} and {{TOKEN}} formats
+		contentStr = strings.ReplaceAll(contentStr, "${"+token+"}", value)
+		contentStr = strings.ReplaceAll(contentStr, "{{"+token+"}}", value)
+		contentStr = strings.ReplaceAll(contentStr, "[["+token+"]]", value)
 	}
 
-	// Only write if content changed
-	if text != originalText {
-		// Get original file permissions
-		info, err := t.fileOps.GetFileInfo(ctx, path)
-		if err != nil {
-			return fmt.Errorf("failed to get file info: %w", err)
-		}
-
-		// Write updated content
-		if err := t.fileOps.WriteFile(ctx, path, []byte(text), info.Mode()); err != nil {
-			return fmt.Errorf("failed to write file %s: %w", path, err)
-		}
-
-		t.logger.Info("Tokens replaced in file",
-			zap.String("path", path),
-			zap.Int("replacements", len(replacements)),
-		)
+	// Write back
+	if err := t.fileOps.WriteFile(ctx, path, []byte(contentStr), 0644); err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
 	}
+
+	t.logger.Info("Tokens replaced successfully",
+		zap.String("path", path))
 
 	return nil
 }
 
 // ReplaceTokensInDirectory replaces tokens in all files in a directory
 func (t *TemplateOperationsImpl) ReplaceTokensInDirectory(ctx context.Context, dir string, replacements map[string]string, patterns []string) error {
-	// Default patterns if none provided
-	if len(patterns) == 0 {
-		patterns = []string{"*"}
+	t.logger.Info("Replacing tokens in directory",
+		zap.String("dir", dir),
+		zap.Strings("patterns", patterns))
+
+	// List all files in directory
+	entries, err := t.fileOps.ListDirectory(ctx, dir)
+	if err != nil {
+		return fmt.Errorf("failed to list directory: %w", err)
 	}
 
-	// Walk directory
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	processedCount := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
 		}
 
-		// Skip directories
-		if info.IsDir() {
-			return nil
-		}
+		path := t.pathOps.JoinPath(dir, entry.Name())
 
-		// Check if file matches any pattern
-		matched := false
-		baseName := filepath.Base(path)
-		for _, pattern := range patterns {
-			if ok, _ := filepath.Match(pattern, baseName); ok {
-				matched = true
-				break
+		// Check if file matches patterns
+		if len(patterns) > 0 {
+			matched := false
+			for _, pattern := range patterns {
+				if match, _ := filepath.Match(pattern, entry.Name()); match {
+					matched = true
+					break
+				}
 			}
-		}
-
-		if !matched {
-			return nil
+			if !matched {
+				continue
+			}
 		}
 
 		// Process file
 		if err := t.ReplaceTokensInFile(ctx, path, replacements); err != nil {
-			t.logger.Warn("Failed to replace tokens in file",
+			t.logger.Warn("Failed to process file",
 				zap.String("path", path),
-				zap.Error(err),
-			)
-			// Continue with other files
+				zap.Error(err))
+			continue
 		}
 
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to walk directory %s: %w", dir, err)
+		processedCount++
 	}
 
-	t.logger.Info("Token replacement completed",
-		zap.String("directory", dir),
-		zap.Int("patterns", len(patterns)),
-		zap.Int("replacements", len(replacements)),
-	)
+	t.logger.Info("Directory token replacement completed",
+		zap.String("dir", dir),
+		zap.Int("files_processed", processedCount))
 
 	return nil
 }
 
 // ProcessTemplate processes a template file with the given data
 func (t *TemplateOperationsImpl) ProcessTemplate(ctx context.Context, templatePath, outputPath string, data interface{}) error {
-	// Read template content
+	t.logger.Debug("Processing template",
+		zap.String("template", templatePath),
+		zap.String("output", outputPath))
+
+	// Read template file
 	templateContent, err := t.fileOps.ReadFile(ctx, templatePath)
 	if err != nil {
-		return fmt.Errorf("failed to read template file %s: %w", templatePath, err)
+		return fmt.Errorf("failed to read template: %w", err)
 	}
 
 	// Parse template
-	tmpl, err := template.New(filepath.Base(templatePath)).Parse(string(templateContent))
+	tmpl, err := template.New(t.pathOps.BaseName(templatePath)).Parse(string(templateContent))
 	if err != nil {
-		return fmt.Errorf("failed to parse template %s: %w", templatePath, err)
+		return fmt.Errorf("failed to parse template: %w", err)
 	}
-
-	// Create output file
-	file, err := t.fileOps.OpenFile(ctx, outputPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to create output file %s: %w", outputPath, err)
-	}
-	defer func() {
-		if cerr := file.Close(); cerr != nil {
-			t.logger.Error("failed to close template output file", zap.String("outputPath", outputPath), zap.Error(cerr))
-		}
-	}()
 
 	// Execute template
-	if err := tmpl.Execute(file, data); err != nil {
+	var buf bytes.Buffer
+	if err := tmpl.Execute(&buf, data); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)
+	}
+
+	// Write output
+	if err := t.fileOps.WriteFile(ctx, outputPath, buf.Bytes(), 0644); err != nil {
+		return fmt.Errorf("failed to write output: %w", err)
 	}
 
 	t.logger.Info("Template processed successfully",
 		zap.String("template", templatePath),
-		zap.String("output", outputPath),
-	)
+		zap.String("output", outputPath))
 
 	return nil
 }
-
-// Ensure interface is implemented
-var _ fileops.TemplateOperations = (*TemplateOperationsImpl)(nil)

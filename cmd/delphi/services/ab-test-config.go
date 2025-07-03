@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -47,14 +48,16 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info(" Deploying A/B testing configuration")
 
+			// Create file service container
+			fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
+			if err != nil {
+				return fmt.Errorf("failed to initialize file operations: %w", err)
+			}
+
 			// Get EOS root directory
 			eosRoot := os.Getenv("EOS_ROOT")
 			if eosRoot == "" {
-				if pwd, err := os.Getwd(); err == nil && fileExists(filepath.Join(pwd, "assets")) {
-					eosRoot = pwd
-				} else {
-					return fmt.Errorf("EOS_ROOT environment variable not set and cannot auto-detect Eos directory")
-				}
+				eosRoot = "/usr/local/share/eos" // Default installation path
 			}
 
 			// Source and target paths
@@ -64,7 +67,7 @@ Examples:
 			reportsDir := "/var/log/stackstorm/ab-test-reports"
 
 			// Validate source file exists
-			if !fileExists(sourceConfig) {
+			if !fileContainer.FileExists(sourceConfig) {
 				return fmt.Errorf("source A/B config file not found: %s", sourceConfig)
 			}
 
@@ -81,7 +84,7 @@ Examples:
 			}
 
 			// Check if target already exists
-			if fileExists(targetConfig) && !force {
+			if fileContainer.FileExists(targetConfig) && !force {
 				return fmt.Errorf("target configuration already exists: %s (use --force to overwrite)", targetConfig)
 			}
 
@@ -101,7 +104,7 @@ Examples:
 				zap.String("source", sourceConfig),
 				zap.String("target", targetConfig))
 
-			if err := copyFile(sourceConfig, targetConfig); err != nil {
+			if err := fileContainer.CopyFile(sourceConfig, targetConfig); err != nil {
 				return fmt.Errorf("failed to deploy configuration: %w", err)
 			}
 
@@ -116,7 +119,7 @@ Examples:
 			}
 
 			// Set ownership to stanley
-			_, err := execute.Run(rc.Ctx, execute.Options{
+			_, err = execute.Run(rc.Ctx, execute.Options{
 				Command: "chown",
 				Args:    []string{"stanley:stanley", targetConfig},
 			})

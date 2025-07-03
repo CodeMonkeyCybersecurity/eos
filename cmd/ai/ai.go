@@ -83,7 +83,7 @@ Examples:
 		ctx := ai.NewConversationContext(ai.GetInfrastructureSystemPrompt())
 
 		// Analyze environment if requested or if it's a technical question
-		if analyze || containsTechnicalTerms(question) {
+		if analyze || ai.ContainsTechnicalTerms(question) {
 			fmt.Println(" Analyzing current environment...")
 
 			analyzer := ai.NewEnvironmentAnalyzer(workingDir)
@@ -142,7 +142,7 @@ Examples:
 		fmt.Print("\n Do you have any follow-up questions? [y/N]: ")
 		reader := bufio.NewReader(os.Stdin)
 		if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
-			return startInteractiveChat(rc, assistant, ctx)
+			return ai.StartInteractiveChat(rc, assistant, ctx)
 		}
 
 		return nil
@@ -191,7 +191,7 @@ Examples:
 		}
 
 		// Display analysis results
-		displayEnvironmentAnalysis(env, detailed)
+		ai.DisplayEnvironmentAnalysis(env, detailed)
 
 		// Get AI analysis if requested
 		if askAI {
@@ -307,12 +307,12 @@ Focus on actionable solutions that I can implement immediately.`, issue)
 
 			if autoFix {
 				fmt.Println(" Auto-fix enabled, implementing suggestions...")
-				return implementActions(rc, actions, workingDir, false)
+				return ai.ImplementActions(rc, actions, workingDir, false)
 			} else {
 				fmt.Print(" Would you like me to implement these fixes? [y/N]: ")
 				reader := bufio.NewReader(os.Stdin)
 				if response, _ := reader.ReadString('\n'); strings.ToLower(strings.TrimSpace(response)) == "y" {
-					return implementActions(rc, actions, workingDir, false)
+					return ai.ImplementActions(rc, actions, workingDir, false)
 				}
 			}
 		}
@@ -366,7 +366,7 @@ Example:
 		}
 		fmt.Println()
 
-		return startInteractiveChat(rc, assistant, ctx)
+		return ai.StartInteractiveChat(rc, assistant, ctx)
 	}),
 }
 
@@ -479,7 +479,7 @@ Examples:
 			}
 			fmt.Printf("Provider: %s\n", provider)
 
-			fmt.Printf("API Key: %s\n", maskAPIKey(config.APIKey))
+			fmt.Printf("API Key: %s\n", ai.MaskAPIKey(config.APIKey))
 			if config.APIKeyVault != "" {
 				fmt.Printf("API Key Vault Path: %s\n", config.APIKeyVault)
 			}
@@ -705,230 +705,6 @@ Examples:
 
 		return nil
 	}),
-}
-
-// Helper functions
-
-func containsTechnicalTerms(text string) bool {
-	technicalTerms := []string{
-		"docker", "compose", "container", "terraform", "vault", "consul",
-		"k3s", "kubernetes", "service", "config", "log", "error", "fail",
-		"port", "network", "ssl", "tls", "certificate", "nginx", "apache",
-	}
-
-	lowText := strings.ToLower(text)
-	for _, term := range technicalTerms {
-		if strings.Contains(lowText, term) {
-			return true
-		}
-	}
-	return false
-}
-
-func displayEnvironmentAnalysis(env *ai.EnvironmentContext, detailed bool) {
-	fmt.Println(" Environment Analysis Results")
-	fmt.Println(strings.Repeat("-", 40))
-
-	// File System Analysis
-	if env.FileSystem != nil {
-		fs := env.FileSystem
-		fmt.Printf(" Files Found:\n")
-		if len(fs.ComposeFiles) > 0 {
-			fmt.Printf("    Docker Compose: %d files\n", len(fs.ComposeFiles))
-			if detailed {
-				for _, file := range fs.ComposeFiles {
-					fmt.Printf("      - %s (modified: %s)\n", file.Path, file.ModTime.Format("2006-01-02 15:04"))
-				}
-			}
-		}
-		if len(fs.TerraformFiles) > 0 {
-			fmt.Printf("     Terraform: %d files\n", len(fs.TerraformFiles))
-			if detailed {
-				for _, file := range fs.TerraformFiles {
-					fmt.Printf("      - %s\n", file.Path)
-				}
-			}
-		}
-		if len(fs.ConfigFiles) > 0 {
-			fmt.Printf("     Configuration: %d files\n", len(fs.ConfigFiles))
-		}
-		fmt.Println()
-	}
-
-	// Services Analysis
-	if env.Services != nil {
-		services := env.Services
-		fmt.Printf(" Services:\n")
-		if len(services.DockerContainers) > 0 {
-			fmt.Printf("    Docker Containers: %d\n", len(services.DockerContainers))
-			if detailed {
-				for _, container := range services.DockerContainers {
-					fmt.Printf("      - %s: %s (%s)\n", container.Name, container.Status, container.Image)
-				}
-			}
-		}
-		if len(services.SystemdServices) > 0 {
-			fmt.Printf("     Systemd Services: %d\n", len(services.SystemdServices))
-		}
-		if len(services.NetworkPorts) > 0 {
-			fmt.Printf("   🌐 Listening Ports: %d\n", len(services.NetworkPorts))
-		}
-		fmt.Println()
-	}
-
-	// Infrastructure Status
-	if env.Infrastructure != nil {
-		infra := env.Infrastructure
-		fmt.Printf("  Infrastructure:\n")
-		if infra.VaultStatus != nil {
-			status := " Unavailable"
-			if infra.VaultStatus.Initialized {
-				if infra.VaultStatus.Sealed {
-					status = " Sealed"
-				} else {
-					status = " Ready"
-				}
-			}
-			fmt.Printf("    Vault: %s\n", status)
-		}
-		if infra.ConsulStatus != nil && infra.ConsulStatus.Leader != "" {
-			fmt.Printf("    Consul:  Ready (leader: %s)\n", infra.ConsulStatus.Leader)
-		}
-		fmt.Println()
-	}
-
-	// Recent Issues
-	if env.Logs != nil && len(env.Logs.ErrorLogs) > 0 {
-		fmt.Printf(" Recent Issues: %d errors found\n", len(env.Logs.ErrorLogs))
-		if detailed {
-			for i, log := range env.Logs.ErrorLogs {
-				if i >= 5 {
-					fmt.Printf("      ... and %d more\n", len(env.Logs.ErrorLogs)-5)
-					break
-				}
-				fmt.Printf("      - [%s] %s\n", log.Service, log.Message[:min(80, len(log.Message))])
-			}
-		}
-		fmt.Println()
-	}
-}
-
-func startInteractiveChat(rc *eos_io.RuntimeContext, assistant *ai.AIAssistant, ctx *ai.ConversationContext) error {
-	reader := bufio.NewReader(os.Stdin)
-
-	for {
-		fmt.Print("You: ")
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			return err
-		}
-
-		input = strings.TrimSpace(input)
-		if input == "" {
-			continue
-		}
-
-		// Check for exit commands
-		if strings.ToLower(input) == "exit" || strings.ToLower(input) == "quit" || strings.ToLower(input) == "bye" {
-			fmt.Println(" Goodbye! Feel free to ask for help anytime.")
-			break
-		}
-
-		// Special commands
-		if strings.ToLower(input) == "analyze" {
-			fmt.Println(" Re-analyzing environment...")
-			analyzer := ai.NewEnvironmentAnalyzer(ctx.Environment.WorkingDirectory)
-			if env, err := analyzer.AnalyzeEnvironment(rc); err == nil {
-				ctx.Environment = env
-				fmt.Println(" Environment analysis updated.")
-				continue
-			}
-		}
-
-		fmt.Println(" Thinking...")
-
-		// Get AI response
-		response, err := assistant.Chat(rc, ctx, input)
-		if err != nil {
-			fmt.Printf(" Error: %v\n", err)
-			continue
-		}
-
-		if len(response.Choices) == 0 {
-			fmt.Println(" No response from AI")
-			continue
-		}
-
-		fmt.Println("\n AI:")
-		fmt.Println(response.Choices[0].Message.Content)
-		fmt.Println()
-
-		// Check for actions
-		if actions, err := ai.ParseActionsFromResponse(response.Choices[0].Message.Content); err == nil && len(actions) > 0 {
-			fmt.Printf(" I have %d suggestion(s). Type 'implement' to execute them.\n\n", len(actions))
-		}
-	}
-
-	return nil
-}
-
-func implementActions(rc *eos_io.RuntimeContext, actions []*ai.Action, workingDir string, dryRun bool) error {
-	if len(actions) == 0 {
-		fmt.Println("No actions to implement.")
-		return nil
-	}
-
-	executor := ai.NewActionExecutor(workingDir, dryRun)
-
-	fmt.Printf(" Implementing %d action(s)...\n\n", len(actions))
-
-	for i, action := range actions {
-		fmt.Printf("Action %d/%d: %s\n", i+1, len(actions), action.Description)
-
-		result, err := executor.ExecuteAction(rc, action)
-		if err != nil {
-			fmt.Printf(" Failed: %v\n", err)
-			continue
-		}
-
-		if result.Success {
-			fmt.Printf(" Success: %s\n", result.Message)
-			if result.Output != "" {
-				fmt.Printf("   Output: %s\n", result.Output)
-			}
-		} else {
-			fmt.Printf(" Failed: %s\n", result.Message)
-		}
-		fmt.Println()
-	}
-
-	return nil
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-// maskAPIKey masks an API key for display purposes
-func maskAPIKey(apiKey string) string {
-	if apiKey == "" {
-		return "[not configured]"
-	}
-
-	// Show first few characters and last few characters
-	if len(apiKey) > 10 {
-		return apiKey[:6] + "..." + apiKey[len(apiKey)-4:]
-	}
-
-	// For shorter keys, just show partial
-	if len(apiKey) > 4 {
-		return apiKey[:3] + "..."
-	}
-
-	return "***"
 }
 
 func init() {

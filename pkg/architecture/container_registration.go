@@ -26,13 +26,15 @@ func RegisterFileOperationsServices(builder *ContainerBuilder) *ContainerBuilder
 
 	builder.WithSingleton("fileops:safe_operations", func(ctx context.Context, c *EnhancedContainer) (interface{}, error) {
 		logger, _ := GetTyped[*zap.Logger](c, "logger")
-		return fileopsInfra.NewSafeFileOperations(logger), nil
+		fileOps, _ := GetTyped[fileops.FileOperations](c, "fileops:file_operations")
+		return fileopsInfra.NewSafeFileOperations(fileOps, logger), nil
 	})
 
 	builder.WithSingleton("fileops:template_operations", func(ctx context.Context, c *EnhancedContainer) (interface{}, error) {
 		logger, _ := GetTyped[*zap.Logger](c, "logger")
 		fileOps, _ := GetTyped[fileops.FileOperations](c, "fileops:file_operations")
-		return fileopsInfra.NewTemplateOperations(fileOps, logger), nil
+		pathOps, _ := GetTyped[fileops.PathOperations](c, "fileops:path_operations")
+		return fileopsInfra.NewTemplateOperations(fileOps, pathOps, logger), nil
 	})
 
 	// Register archive operations (stub for now)
@@ -49,13 +51,13 @@ func RegisterFileOperationsServices(builder *ContainerBuilder) *ContainerBuilder
 		templateOps, _ := GetTyped[fileops.TemplateOperations](c, "fileops:template_operations")
 		safeOps, _ := GetTyped[fileops.SafeOperations](c, "fileops:safe_operations")
 
-		// Archive ops is optional for now
-		var archiveOps fileops.ArchiveOperations
-		if ops, err := GetTyped[fileops.ArchiveOperations](c, "fileops:archive_operations"); err == nil {
-			archiveOps = ops
-		}
+		// Archive ops is optional for now (TODO: add to service when implemented)
+		// var archiveOps fileops.ArchiveOperations
+		// if ops, err := GetTyped[fileops.ArchiveOperations](c, "fileops:archive_operations"); err == nil {
+		//	archiveOps = ops
+		// }
 
-		return fileops.NewService(fileOps, pathOps, templateOps, archiveOps, safeOps, logger), nil
+		return fileops.NewService(fileOps, pathOps, templateOps, safeOps, logger), nil
 	})
 
 	return builder
