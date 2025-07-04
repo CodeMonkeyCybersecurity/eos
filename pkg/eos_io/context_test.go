@@ -309,3 +309,128 @@ func TestLogRuntimeExecutionContext(t *testing.T) {
 		LogRuntimeExecutionContext(rc)
 	})
 }
+
+func TestNewExtendedContext(t *testing.T) {
+	t.Run("creates_extended_context_with_timeout", func(t *testing.T) {
+		ctx := context.Background()
+		timeout := 30 * time.Second
+
+		rc := NewExtendedContext(ctx, "test-command", timeout)
+
+		if rc == nil {
+			t.Fatal("expected non-nil runtime context")
+		}
+		if rc.Ctx == nil {
+			t.Fatal("expected non-nil context")
+		}
+		if rc.Log == nil {
+			t.Fatal("expected non-nil logger")
+		}
+		if rc.Command == "" {
+			t.Error("expected non-empty command")
+		}
+		if rc.Attributes == nil {
+			t.Fatal("expected non-nil attributes map")
+		}
+
+		// Verify the context has a timeout
+		deadline, ok := rc.Ctx.Deadline()
+		if !ok {
+			t.Error("expected context to have a deadline")
+		}
+		
+		// The deadline should be approximately timeout from now
+		expectedDeadline := time.Now().Add(timeout)
+		if deadline.Before(expectedDeadline.Add(-time.Second)) || deadline.After(expectedDeadline.Add(time.Second)) {
+			t.Errorf("deadline not within expected range: got %v, expected around %v", deadline, expectedDeadline)
+		}
+	})
+
+	t.Run("creates_extended_context_with_short_timeout", func(t *testing.T) {
+		ctx := context.Background()
+		timeout := 100 * time.Millisecond
+
+		rc := NewExtendedContext(ctx, "test-command", timeout)
+
+		if rc == nil {
+			t.Fatal("expected non-nil runtime context")
+		}
+		
+		// Verify context will timeout
+		select {
+		case <-rc.Ctx.Done():
+			// Should timeout quickly
+			if rc.Ctx.Err() != context.DeadlineExceeded {
+				t.Errorf("expected deadline exceeded, got %v", rc.Ctx.Err())
+			}
+		case <-time.After(200 * time.Millisecond):
+			t.Error("context did not timeout as expected")
+		}
+	})
+
+	t.Run("creates_extended_context_with_zero_timeout", func(t *testing.T) {
+		ctx := context.Background()
+		timeout := 0 * time.Second
+
+		rc := NewExtendedContext(ctx, "test-command", timeout)
+
+		if rc == nil {
+			t.Fatal("expected non-nil runtime context")
+		}
+		
+		// Context should be immediately cancelled with zero timeout
+		select {
+		case <-rc.Ctx.Done():
+			// Should be cancelled immediately
+		case <-time.After(10 * time.Millisecond):
+			t.Error("context with zero timeout should be cancelled immediately")
+		}
+	})
+}
+
+func TestValidateAll(t *testing.T) {
+	t.Run("validates_context_successfully", func(t *testing.T) {
+		ctx := context.Background()
+		rc := NewContext(ctx, "test-command")
+
+		err := rc.ValidateAll()
+		if err != nil {
+			t.Errorf("expected no error, got %v", err)
+		}
+	})
+
+	t.Run("validates_context_with_nil_validate", func(t *testing.T) {
+		rc := &RuntimeContext{
+			Ctx: context.Background(),
+			Log: NewContext(context.Background(), "test").Log,
+			Validate: nil, // This should return nil
+		}
+
+		err := rc.ValidateAll()
+		if err != nil {
+			t.Errorf("expected no error for nil validate, got %v", err)
+		}
+	})
+
+	t.Run("validates_context_with_empty_context", func(t *testing.T) {
+		rc := &RuntimeContext{
+			Ctx: context.Background(),
+			Log: nil,
+			Validate: nil, // ValidateAll returns nil when Validate is nil
+		}
+
+		err := rc.ValidateAll()
+		if err != nil {
+			t.Errorf("expected no error for nil validate, got %v", err)
+		}
+	})
+
+	t.Run("validates_context_with_all_nil", func(t *testing.T) {
+		rc := &RuntimeContext{}
+
+		err := rc.ValidateAll()
+		if err != nil {
+			t.Errorf("expected no error for nil validate, got %v", err)
+		}
+	})
+}

@@ -32,6 +32,16 @@ func TestAIAssistantCreation(t *testing.T) {
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("AI_API_KEY")
 		
+		// Create isolated config manager with temp directory
+		tempDir, err := os.MkdirTemp("", "ai-config-test")
+		require.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+		
+		// Mock the config path for this test
+		originalConfigDir := os.Getenv("HOME")
+		os.Setenv("HOME", tempDir)
+		defer os.Setenv("HOME", originalConfigDir)
+		
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
 		require.NotNil(t, assistant)
@@ -80,6 +90,16 @@ func TestAIAssistantCreation(t *testing.T) {
 	})
 
 	t.Run("timeout_configuration", func(t *testing.T) {
+		// Create isolated config manager with temp directory
+		tempDir, err := os.MkdirTemp("", "timeout-config-test")
+		require.NoError(t, err)
+		defer os.RemoveAll(tempDir)
+		
+		// Mock the config path for this test
+		originalConfigDir := os.Getenv("HOME")
+		os.Setenv("HOME", tempDir)
+		defer os.Setenv("HOME", originalConfigDir)
+		
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
 		

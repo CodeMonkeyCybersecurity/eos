@@ -4,6 +4,8 @@ package ai
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -486,7 +488,17 @@ func NewConversationContext(systemPrompt string) *ConversationContext {
 
 // generateConversationID generates a unique conversation ID
 func generateConversationID() string {
-	return fmt.Sprintf("eos-ai-%d", time.Now().Unix())
+	// Generate random bytes for uniqueness
+	randomBytes := make([]byte, 8)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback to timestamp if random generation fails
+		return fmt.Sprintf("eos-ai-%d", time.Now().UnixNano())
+	}
+	
+	// Combine timestamp and random bytes for uniqueness
+	timestamp := time.Now().Unix()
+	randomHex := hex.EncodeToString(randomBytes)
+	return fmt.Sprintf("eos-ai-%d-%s", timestamp, randomHex)
 }
 
 // GetInfrastructureSystemPrompt returns the system prompt for infrastructure management

@@ -192,4 +192,16 @@ func TestExtractSummary_EdgeCases(t *testing.T) {
 	if !strings.Contains(summary, "Error: connection failed") {
 		t.Error("Should handle unicode and extract error lines")
 	}
+	
+	// Test fallback to first non-empty line when no error keywords found
+	summary = ExtractSummary(ctx, "\n\nOperation completed successfully\nAll good\n", 3)
+	if summary != "Operation completed successfully" {
+		t.Errorf("Expected 'Operation completed successfully', got %q", summary)
+	}
+	
+	// Test with maxCandidates = 0 (should truncate error candidates to empty slice)
+	summary = ExtractSummary(ctx, "Error: test\nFailed: test", 0)
+	if summary != "" { // Empty slice joined becomes empty string
+		t.Errorf("Expected empty string for maxCandidates=0, got %q", summary)
+	}
 }

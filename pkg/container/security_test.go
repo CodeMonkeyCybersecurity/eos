@@ -367,6 +367,10 @@ func TestDockerCommandSecurity(t *testing.T) {
 		Ctx: ctx,
 		Log: logger,
 	}
+	
+	// Use rc to verify runtime context is properly initialized
+	assert.NotNil(t, rc.Ctx)
+	assert.NotNil(t, rc.Log)
 
 	t.Run("command_validation", func(t *testing.T) {
 		// Test valid Docker commands

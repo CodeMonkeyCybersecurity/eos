@@ -121,16 +121,34 @@ malicious_field: !!python/object/apply:os.system ["rm -rf /"]
 			"..\\..\\windows\\system32\\config\\sam",
 		}
 
+		var createdFiles []string
+		defer func() {
+			// Clean up any files that were actually created
+			for _, file := range createdFiles {
+				os.Remove(file)
+				// Also try to remove parent directories if they're empty
+				dir := filepath.Dir(file)
+				for dir != "." && dir != "/" {
+					os.Remove(dir) // Will fail if not empty, which is fine
+					dir = filepath.Dir(dir)
+				}
+			}
+		}()
+
 		for _, maliciousPath := range maliciousPaths {
 			configManager := &ConfigManager{
 				configPath: maliciousPath,
-				config:     &AIConfig{},
+				config:     &AIConfig{Provider: "test"},
 			}
 
 			// Should fail to create config in system directories
 			err := configManager.SaveConfig()
 			// Might succeed or fail depending on permissions, but shouldn't overwrite system files
 			if err == nil {
+				// Track created files for cleanup
+				if _, err := os.Stat(maliciousPath); err == nil {
+					createdFiles = append(createdFiles, maliciousPath)
+				}
 				// If it succeeds, verify it didn't overwrite a system file
 				assert.NotEqual(t, "/etc/passwd", configManager.configPath)
 			}
@@ -627,6 +645,20 @@ func TestFileSystemSecurity(t *testing.T) {
 			"/proc/self/mem",
 		}
 
+		var createdFiles []string
+		defer func() {
+			// Clean up any files that were actually created
+			for _, file := range createdFiles {
+				os.Remove(file)
+				// Also try to remove parent directories if they're empty
+				dir := filepath.Dir(file)
+				for dir != "." && dir != "/" {
+					os.Remove(dir) // Will fail if not empty, which is fine
+					dir = filepath.Dir(dir)
+				}
+			}
+		}()
+
 		for _, path := range maliciousPaths {
 			configManager := &ConfigManager{
 				configPath: path,
@@ -634,8 +666,14 @@ func TestFileSystemSecurity(t *testing.T) {
 			}
 
 			// Should handle malicious paths safely
-			_ = configManager.SaveConfig()
+			err := configManager.SaveConfig()
 			// May succeed or fail, but should not overwrite system files
+			if err == nil {
+				// Track created files for cleanup
+				if _, err := os.Stat(path); err == nil {
+					createdFiles = append(createdFiles, path)
+				}
+			}
 		}
 	})
 }
