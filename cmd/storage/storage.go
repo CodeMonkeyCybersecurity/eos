@@ -34,4 +34,5 @@ Examples:
 func init() {
 	// Add subcommands to StorageCmd
 	StorageCmd.AddCommand(NewZFSCmd())
+	StorageCmd.AddCommand(NewDiskCmd())
 }

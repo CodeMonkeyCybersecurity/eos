@@ -60,4 +60,5 @@ func init() {
 	BackupCmd.AddCommand(restoreCmd)
 	BackupCmd.AddCommand(verifyCmd)
 	BackupCmd.AddCommand(scheduleCmd)
+	BackupCmd.AddCommand(newFileCmd())
 }
