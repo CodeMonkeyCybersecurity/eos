@@ -9,7 +9,7 @@ import (
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
+	// "github.com/CodeMonkeyCybersecurity/eos/pkg/container" // TODO: Uncomment when KubernetesInstallOptions is implemented
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
@@ -421,8 +421,9 @@ func runCreateKubeadm(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 
 	// Get flags
 	controlPlaneEndpoint, _ := cmd.Flags().GetString("control-plane-endpoint")
-	podNetworkCIDR, _ := cmd.Flags().GetString("pod-network-cidr")
-	version, _ := cmd.Flags().GetString("version")
+	// TODO: Uncomment when implementing kubeadm support
+	// podNetworkCIDR, _ := cmd.Flags().GetString("pod-network-cidr")
+	// version, _ := cmd.Flags().GetString("version")
 
 	// Prompt for control plane endpoint if not provided
 	if controlPlaneEndpoint == "" {
@@ -434,7 +435,9 @@ func runCreateKubeadm(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 		controlPlaneEndpoint = strings.TrimSpace(controlPlaneEndpoint)
 	}
 
+	// TODO: Fix missing container.KubernetesInstallOptions and related functions
 	// Create installation options
+	/*
 	options := &container.KubernetesInstallOptions{
 		Type:                 "kubeadm",
 		ControlPlaneEndpoint: controlPlaneEndpoint,
@@ -452,6 +455,9 @@ func runCreateKubeadm(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 	if err := container.GetKubernetesStatus(rc, "kubeadm"); err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Failed to get cluster status", zap.Error(err))
 	}
+	*/
+	
+	otelzap.Ctx(rc.Ctx).Error("Kubeadm installation not yet implemented - missing container functions")
 
 	otelzap.Ctx(rc.Ctx).Info("Kubeadm installation completed successfully")
 	otelzap.Ctx(rc.Ctx).Info("Next steps:")
@@ -481,6 +487,8 @@ func runCreateMicroK8s(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 		// If no specific addons provided, use defaults (handled in InstallMicroK8s)
 	}
 
+	// TODO: Fix missing container.KubernetesInstallOptions and related functions
+	/*
 	// Create installation options
 	options := &container.KubernetesInstallOptions{
 		Type:         "microk8s",
@@ -497,6 +505,9 @@ func runCreateMicroK8s(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []str
 	if err := container.GetKubernetesStatus(rc, "microk8s"); err != nil {
 		otelzap.Ctx(rc.Ctx).Warn("Failed to get cluster status", zap.Error(err))
 	}
+	*/
+	
+	otelzap.Ctx(rc.Ctx).Error("MicroK8s installation not yet implemented - missing container functions")
 
 	otelzap.Ctx(rc.Ctx).Info("MicroK8s installation completed successfully")
 	otelzap.Ctx(rc.Ctx).Info("Next steps:")
