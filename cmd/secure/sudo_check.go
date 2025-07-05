@@ -121,7 +121,7 @@ func handleInfoMode(rc *eos_io.RuntimeContext, manager *privilege_check.Privileg
 }
 
 // outputJSONSudoResult outputs the result in JSON format
-func outputJSONSudoResult(result interface{}) error {
+func outputJSONSudoResult(result any) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)

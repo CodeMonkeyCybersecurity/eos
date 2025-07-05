@@ -17,6 +17,7 @@ import (
 	// Subcommands
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ai"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/container"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
@@ -74,6 +75,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	for _, subCmd := range []*cobra.Command{
 		ai.AICmd,
 		create.CreateCmd,
+		container.ContainerCmd,
 		crypto.CryptoCmd,
 		read.ReadCmd, // This is the top-level 'read'
 		list.ListCmd,
