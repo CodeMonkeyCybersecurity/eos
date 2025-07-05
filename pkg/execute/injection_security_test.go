@@ -81,6 +81,7 @@ func TestCommandInjectionPrevention(t *testing.T) {
 				Command: "echo",
 				Args:    []string{attempt},
 				Shell:   false,
+				Capture: true, // Enable capture to get output
 			}
 
 			output, err := Run(ctx, opts)
