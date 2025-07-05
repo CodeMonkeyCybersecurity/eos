@@ -7,6 +7,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/dashboard"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/delete"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/deploy"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/monitor"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/prompts"
@@ -45,6 +46,7 @@ func init() {
 	DelphiCmd.AddCommand(inspect.NewInspectCmd()) // Add the new inspect command
 	DelphiCmd.AddCommand(dashboard.NewDashboardCmd()) // Add the new dashboard command
 	DelphiCmd.AddCommand(delete.DeleteCmd)
+	DelphiCmd.AddCommand(deploy.DeployCmd)
 	DelphiCmd.AddCommand(update.UpdateCmd)
 	DelphiCmd.AddCommand(sync.SyncCmd)
 	DelphiCmd.AddCommand(services.ServicesCmd)
