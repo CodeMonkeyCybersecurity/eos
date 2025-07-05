@@ -30,4 +30,5 @@ For example:
 func init() {
 	// Add subcommands to SecureCmd
 	SecureCmd.AddCommand(NewPermissionsCmd())
+	SecureCmd.AddCommand(NewSudoCheckCmd())
 }
