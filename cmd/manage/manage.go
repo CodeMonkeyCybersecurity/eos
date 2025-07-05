@@ -34,5 +34,7 @@ Examples:
 }
 
 func init() {
-	// Initialize the manage package
+	// Add subcommands to ManageCmd
+	ManageCmd.AddCommand(NewServicesCmd())
+	ManageCmd.AddCommand(NewCronCmd())
 }
