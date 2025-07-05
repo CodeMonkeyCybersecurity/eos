@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/services"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/update"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/validate"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi/watch"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -49,6 +50,7 @@ func init() {
 	DelphiCmd.AddCommand(watch.WatchCmd)
 	DelphiCmd.AddCommand(prompts.PromptsCmd)
 	DelphiCmd.AddCommand(monitor.NewMonitorCmd())
+	DelphiCmd.AddCommand(validate.NewValidateCmd())
 
 	// TODO: Example persistent flags: DelphiCmd.PersistentFlags().String("config", "", "Path to the Delphi configuration file")
 }

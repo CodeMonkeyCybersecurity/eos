@@ -73,4 +73,5 @@ func init() {
 	ServicesCmd.AddCommand(NewDeployABConfigCmd())
 	ServicesCmd.AddCommand(NewAnalyzeABResultsCmd())
 	ServicesCmd.AddCommand(NewABConfigCmd())  // Enhanced A/B testing management
+	ServicesCmd.AddCommand(NewFixChannelsCmd()) // Notification channel standardization
 }

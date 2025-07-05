@@ -28,6 +28,6 @@ For example:
 }
 
 func init() {
-	// Initialize the shared logger for the entire install package
-
+	// Add subcommands to SecureCmd
+	SecureCmd.AddCommand(NewPermissionsCmd())
 }
