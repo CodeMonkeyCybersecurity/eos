@@ -24,7 +24,7 @@ import (
 // This should match the service registry in cmd/delphi/services/service_registry.go
 var DelphiServices = []string{
 	"delphi-listener",
-	"delphi-agent-enricher", 
+	"delphi-agent-enricher",
 	"alert-to-db",
 	"prompt-ab-tester",
 	"llm-worker",
@@ -154,37 +154,37 @@ type serviceOperation struct {
 // ServicesModule implements the services management dashboard
 type ServicesModule struct {
 	BaseModule
-	
+
 	// State
-	rc             *eos_io.RuntimeContext
-	db             *sql.DB
-	services       []ServiceStatus
-	selectedIndex  int
-	showDetails    bool
-	lastRefresh    time.Time
-	
+	rc            *eos_io.RuntimeContext
+	db            *sql.DB
+	services      []ServiceStatus
+	selectedIndex int
+	showDetails   bool
+	lastRefresh   time.Time
+
 	// UI components
-	table          table.Model
-	help           help.Model
-	keys           servicesKeyMap
-	
+	table table.Model
+	help  help.Model
+	keys  servicesKeyMap
+
 	// Operations
 	currentOp      *serviceOperation
 	operationQueue []serviceOperation
-	
+
 	// Styles
-	titleStyle     lipgloss.Style
-	tableStyle     lipgloss.Style
-	detailsStyle   lipgloss.Style
-	statusStyle    lipgloss.Style
-	errorStyle     lipgloss.Style
-	successStyle   lipgloss.Style
+	titleStyle   lipgloss.Style
+	tableStyle   lipgloss.Style
+	detailsStyle lipgloss.Style
+	statusStyle  lipgloss.Style
+	errorStyle   lipgloss.Style
+	successStyle lipgloss.Style
 }
 
 // NewServicesModule creates a new services management module
 func NewServicesModule(rc *eos_io.RuntimeContext, db *sql.DB) *ServicesModule {
 	base := NewBaseModule("Services", ModuleServices, "Interactive management of Delphi pipeline services")
-	
+
 	// Initialize table
 	columns := []table.Column{
 		{Title: "Service", Width: 20},
@@ -195,13 +195,13 @@ func NewServicesModule(rc *eos_io.RuntimeContext, db *sql.DB) *ServicesModule {
 		{Title: "Uptime", Width: 12},
 		{Title: "PID", Width: 8},
 	}
-	
+
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithFocused(true),
 		table.WithHeight(15),
 	)
-	
+
 	// Set table styles
 	s := table.DefaultStyles()
 	s.Header = s.Header.
@@ -214,36 +214,36 @@ func NewServicesModule(rc *eos_io.RuntimeContext, db *sql.DB) *ServicesModule {
 		Background(lipgloss.Color("57")).
 		Bold(false)
 	t.SetStyles(s)
-	
+
 	// Define styles
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("205")).
 		Background(lipgloss.Color("235")).
 		Padding(0, 1)
-		
+
 	tableStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("238"))
-		
+
 	detailsStyle := lipgloss.NewStyle().
 		BorderStyle(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("238")).
 		Padding(1).
 		MarginTop(1)
-		
+
 	statusStyle := lipgloss.NewStyle().
 		Padding(0, 1).
 		MarginBottom(1)
-		
+
 	errorStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("196")).
 		Bold(true)
-		
+
 	successStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("46")).
 		Bold(true)
-	
+
 	return &ServicesModule{
 		BaseModule:     base,
 		rc:             rc,
@@ -280,7 +280,7 @@ type serviceOperationMsg struct {
 func (m *ServicesModule) Init() tea.Cmd {
 	logger := otelzap.Ctx(m.rc.Ctx)
 	logger.Info("Initializing services management module")
-	
+
 	return tea.Batch(
 		m.refreshServices(),
 		tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
@@ -292,7 +292,7 @@ func (m *ServicesModule) Init() tea.Cmd {
 // Update handles services module events
 func (m *ServicesModule) Update(msg tea.Msg) (DashboardModule, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case refreshServicesMsg:
 		// Auto-refresh services data
@@ -300,12 +300,12 @@ func (m *ServicesModule) Update(msg tea.Msg) (DashboardModule, tea.Cmd) {
 		cmds = append(cmds, tea.Tick(time.Second*10, func(t time.Time) tea.Msg {
 			return refreshServicesMsg{}
 		}))
-		
+
 	case serviceOperationMsg:
 		// Handle completed service operation
 		m.handleOperationComplete(msg)
 		m.processNextOperation()
-		
+
 	case tea.KeyMsg:
 		switch {
 		case key.Matches(msg, m.keys.SelectUp):
@@ -313,55 +313,55 @@ func (m *ServicesModule) Update(msg tea.Msg) (DashboardModule, tea.Cmd) {
 				m.selectedIndex--
 				m.updateTableCursor()
 			}
-			
+
 		case key.Matches(msg, m.keys.SelectDown):
 			if m.selectedIndex < len(m.services)-1 {
 				m.selectedIndex++
 				m.updateTableCursor()
 			}
-			
+
 		case key.Matches(msg, m.keys.ToggleDetails):
 			m.showDetails = !m.showDetails
-			
+
 		case key.Matches(msg, m.keys.RefreshData):
 			cmds = append(cmds, m.refreshServices())
-			
+
 		case key.Matches(msg, m.keys.StartService):
 			if m.currentOp == nil && len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
 				cmds = append(cmds, m.performServiceOperation(serviceName, "start"))
 			}
-			
+
 		case key.Matches(msg, m.keys.StopService):
 			if m.currentOp == nil && len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
 				cmds = append(cmds, m.performServiceOperation(serviceName, "stop"))
 			}
-			
+
 		case key.Matches(msg, m.keys.RestartService):
 			if m.currentOp == nil && len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
 				cmds = append(cmds, m.performServiceOperation(serviceName, "restart"))
 			}
-			
+
 		case key.Matches(msg, m.keys.EnableService):
 			if m.currentOp == nil && len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
 				cmds = append(cmds, m.performServiceOperation(serviceName, "enable"))
 			}
-			
+
 		case key.Matches(msg, m.keys.DisableService):
 			if m.currentOp == nil && len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
 				cmds = append(cmds, m.performServiceOperation(serviceName, "disable"))
 			}
-			
+
 		case key.Matches(msg, m.keys.ViewLogs):
 			if len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
 				cmds = append(cmds, m.viewServiceLogs(serviceName))
 			}
-			
+
 		case key.Matches(msg, m.keys.HealthCheck):
 			if len(m.services) > 0 {
 				serviceName := m.services[m.selectedIndex].Name
@@ -369,14 +369,14 @@ func (m *ServicesModule) Update(msg tea.Msg) (DashboardModule, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	// Update table
 	var tableCmd tea.Cmd
 	m.table, tableCmd = m.table.Update(msg)
 	if tableCmd != nil {
 		cmds = append(cmds, tableCmd)
 	}
-	
+
 	return m, tea.Batch(cmds...)
 }
 
@@ -385,10 +385,10 @@ func (m *ServicesModule) View() string {
 	if len(m.services) == 0 {
 		return m.statusStyle.Render("Loading services...")
 	}
-	
+
 	// Build header
-	header := m.titleStyle.Render("🔧 Services Management")
-	
+	header := m.titleStyle.Render(" Services Management")
+
 	// Add current operation status
 	if m.currentOp != nil {
 		// Capitalize first letter manually to avoid deprecated strings.Title
@@ -399,27 +399,27 @@ func (m *ServicesModule) View() string {
 		opStatus := fmt.Sprintf("⚙️  %s %s...", operation, m.currentOp.serviceName)
 		header += "\n" + m.statusStyle.Render(opStatus)
 	}
-	
+
 	// Build main table view
 	tableView := m.tableStyle.Render(m.table.View())
-	
+
 	// Build details view if enabled
 	detailsView := ""
 	if m.showDetails && len(m.services) > 0 {
 		service := m.services[m.selectedIndex]
 		detailsView = m.renderServiceDetails(service)
 	}
-	
+
 	// Build help view
 	helpView := m.help.ShortHelpView(m.keys.ShortHelp())
-	
+
 	// Combine all sections
 	sections := []string{header, tableView}
 	if detailsView != "" {
 		sections = append(sections, detailsView)
 	}
 	sections = append(sections, helpView)
-	
+
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }
 
@@ -428,22 +428,22 @@ func (m *ServicesModule) refreshServices() tea.Cmd {
 	return tea.Cmd(func() tea.Msg {
 		logger := otelzap.Ctx(m.rc.Ctx)
 		logger.Debug("Refreshing services data")
-		
+
 		var services []ServiceStatus
-		
+
 		for _, serviceName := range DelphiServices {
 			status := m.getServiceStatus(serviceName)
 			services = append(services, status)
 		}
-		
+
 		m.services = services
 		m.lastRefresh = time.Now()
 		m.updateTableRows()
-		
+
 		logger.Debug("Services data refreshed",
 			zap.Int("service_count", len(services)),
 			zap.Time("last_refresh", m.lastRefresh))
-		
+
 		return refreshServicesMsg{}
 	})
 }
@@ -451,7 +451,7 @@ func (m *ServicesModule) refreshServices() tea.Cmd {
 // getServiceStatus retrieves the current status of a service
 func (m *ServicesModule) getServiceStatus(serviceName string) ServiceStatus {
 	logger := otelzap.Ctx(m.rc.Ctx)
-	
+
 	status := ServiceStatus{
 		Name:        serviceName,
 		Status:      "⚫ not installed",
@@ -464,12 +464,12 @@ func (m *ServicesModule) getServiceStatus(serviceName string) ServiceStatus {
 		PID:         0,
 		Description: m.getServiceDescription(serviceName),
 	}
-	
+
 	// Check if service exists
 	if !eos_unix.ServiceExists(serviceName) {
 		return status
 	}
-	
+
 	// Check if service is active
 	err := eos_unix.CheckServiceStatus(m.rc.Ctx, serviceName)
 	if err == nil {
@@ -479,23 +479,23 @@ func (m *ServicesModule) getServiceStatus(serviceName string) ServiceStatus {
 		status.Status = "🔴 inactive"
 		status.IsActive = false
 	}
-	
+
 	// Check if service is enabled
 	if m.isServiceEnabled(serviceName) {
 		status.IsEnabled = true
 	}
-	
+
 	// Get additional metrics if service is active
 	if status.IsActive {
 		status.CPU, status.Memory, status.Uptime, status.PID = m.getServiceMetrics(serviceName)
 	}
-	
+
 	logger.Debug("Retrieved service status",
 		zap.String("service", serviceName),
 		zap.String("status", status.Status),
 		zap.Bool("active", status.IsActive),
 		zap.Bool("enabled", status.IsEnabled))
-	
+
 	return status
 }
 
@@ -512,7 +512,7 @@ func (m *ServicesModule) getServiceDescription(serviceName string) string {
 		"email-formatter":       "HTML/text email generation",
 		"email-sender":          "SMTP delivery service",
 	}
-	
+
 	if desc, exists := descriptions[serviceName]; exists {
 		return desc
 	}
@@ -526,7 +526,7 @@ func (m *ServicesModule) isServiceEnabled(serviceName string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	return strings.TrimSpace(string(output)) == "enabled"
 }
 
@@ -541,20 +541,20 @@ func (m *ServicesModule) getServiceMetrics(serviceName string) (float64, int64, 
 // updateTableRows updates the table with current services data
 func (m *ServicesModule) updateTableRows() {
 	rows := make([]table.Row, len(m.services))
-	
+
 	for i, service := range m.services {
 		enabledStr := "No"
 		if service.IsEnabled {
 			enabledStr = "Yes"
 		}
-		
+
 		cpuStr := fmt.Sprintf("%.1f", service.CPU)
 		memoryStr := fmt.Sprintf("%d MB", service.Memory)
 		pidStr := fmt.Sprintf("%d", service.PID)
 		if service.PID == 0 {
 			pidStr = "-"
 		}
-		
+
 		rows[i] = table.Row{
 			service.Name,
 			service.Status,
@@ -565,7 +565,7 @@ func (m *ServicesModule) updateTableRows() {
 			pidStr,
 		}
 	}
-	
+
 	m.table.SetRows(rows)
 	m.updateTableCursor()
 }
@@ -598,7 +598,7 @@ Last Updated: %s`,
 		service.Uptime,
 		service.PID,
 		service.LastUpdate.Format("15:04:05"))
-	
+
 	return m.detailsStyle.Render(details)
 }
 
@@ -609,16 +609,16 @@ func (m *ServicesModule) performServiceOperation(serviceName, operation string) 
 		logger.Info("Performing service operation",
 			zap.String("service", serviceName),
 			zap.String("operation", operation))
-		
+
 		m.currentOp = &serviceOperation{
 			serviceName: serviceName,
 			operation:   operation,
 			inProgress:  true,
 		}
-		
+
 		var err error
 		var message string
-		
+
 		switch operation {
 		case "start":
 			err = eos_unix.StartSystemdUnitWithRetry(m.rc.Ctx, serviceName, 3, 2)
@@ -638,7 +638,7 @@ func (m *ServicesModule) performServiceOperation(serviceName, operation string) 
 		default:
 			err = fmt.Errorf("unknown operation: %s", operation)
 		}
-		
+
 		success := err == nil
 		if err != nil {
 			message = fmt.Sprintf("Failed to %s service %s: %v", operation, serviceName, err)
@@ -651,7 +651,7 @@ func (m *ServicesModule) performServiceOperation(serviceName, operation string) 
 				zap.String("service", serviceName),
 				zap.String("operation", operation))
 		}
-		
+
 		return serviceOperationMsg{
 			serviceName: serviceName,
 			operation:   operation,
@@ -670,7 +670,7 @@ func (m *ServicesModule) handleOperationComplete(msg serviceOperationMsg) {
 		m.currentOp.err = msg.err
 		m.currentOp = nil
 	}
-	
+
 	// Refresh services data after operation
 	go func() {
 		time.Sleep(time.Second) // Brief delay to allow service state to settle
@@ -694,7 +694,7 @@ func (m *ServicesModule) viewServiceLogs(serviceName string) tea.Cmd {
 		logger := otelzap.Ctx(m.rc.Ctx)
 		logger.Info("Viewing service logs",
 			zap.String("service", serviceName))
-		
+
 		// This would typically open logs in a separate view or external tool
 		// For now, just log the action
 		return serviceOperationMsg{
@@ -712,13 +712,13 @@ func (m *ServicesModule) performHealthCheck(serviceName string) tea.Cmd {
 		logger := otelzap.Ctx(m.rc.Ctx)
 		logger.Info("Performing health check",
 			zap.String("service", serviceName))
-		
+
 		// This would typically perform a comprehensive health check
 		// For now, just check if the service is running
 		err := eos_unix.CheckServiceStatus(m.rc.Ctx, serviceName)
 		success := err == nil
 		message := fmt.Sprintf("Health check for %s: %s", serviceName, map[bool]string{true: "Healthy", false: "Unhealthy"}[success])
-		
+
 		return serviceOperationMsg{
 			serviceName: serviceName,
 			operation:   "health-check",

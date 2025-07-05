@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi_channels"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -63,7 +63,7 @@ Standard notification flow:
   eos delphi services fix-channels --no-backups`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			logger.Info("Starting notification channel standardization",
 				zap.String("workers_dir", workersDir),
 				zap.Bool("dry_run", dryRun),
@@ -72,9 +72,9 @@ Standard notification flow:
 
 			// Create configuration
 			config := &delphi_channels.ChannelStandardizerConfig{
-				WorkersDir:    workersDir,
-				CreateBackups: createBackups,
-				DryRun:        dryRun,
+				WorkersDir:      workersDir,
+				CreateBackups:   createBackups,
+				DryRun:          dryRun,
 				ExcludePatterns: []string{"*.bak", "*.old", "__pycache__", ".git"},
 			}
 
@@ -89,13 +89,13 @@ Standard notification flow:
 		}),
 	}
 
-	cmd.Flags().StringVar(&workersDir, "workers-dir", "/opt/stackstorm/packs/delphi/actions/python_workers", 
+	cmd.Flags().StringVar(&workersDir, "workers-dir", "/opt/stackstorm/packs/delphi/actions/python_workers",
 		"Directory containing Delphi worker Python files")
 	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output results in JSON format")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be changed without making modifications")
 	cmd.Flags().BoolVar(&createBackups, "backups", true, "Create backup files before modification")
 	cmd.Flags().BoolVar(&analyze, "analyze", false, "Analyze current configuration without making changes")
-	
+
 	// Create alias for --no-backups
 	cmd.Flags().BoolVar(&createBackups, "no-backups", true, "Disable backup creation")
 	cmd.Flag("no-backups").NoOptDefVal = "false"
@@ -142,7 +142,7 @@ func outputWorkerAnalysisJSON(infos []delphi_channels.WorkerChannelInfo) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(map[string]interface{}{
-		"analysis": infos,
+		"analysis":          infos,
 		"standard_channels": delphi_channels.StandardChannels,
 	})
 }
@@ -155,9 +155,9 @@ func outputWorkerAnalysisText(infos []delphi_channels.WorkerChannelInfo) error {
 	correctCount := 0
 	for _, info := range infos {
 		fmt.Printf("\n📄 %s\n", info.Filename)
-		
+
 		if info.IsCorrect {
-			fmt.Println("   ✅ Configuration is correct")
+			fmt.Println("    Configuration is correct")
 			correctCount++
 		} else {
 			fmt.Println("   ❌ Configuration needs fixing")
@@ -166,13 +166,13 @@ func outputWorkerAnalysisText(infos []delphi_channels.WorkerChannelInfo) error {
 		if len(info.ListenChannels) > 0 {
 			fmt.Printf("   📥 Listen: %s\n", strings.Join(info.ListenChannels, ", "))
 		}
-		
+
 		if len(info.NotifyChannels) > 0 {
 			fmt.Printf("   📤 Notify: %s\n", strings.Join(info.NotifyChannels, ", "))
 		}
 
 		if len(info.Issues) > 0 {
-			fmt.Println("   🔍 Issues:")
+			fmt.Println("    Issues:")
 			for _, issue := range info.Issues {
 				fmt.Printf("      • %s\n", issue)
 			}
@@ -180,10 +180,10 @@ func outputWorkerAnalysisText(infos []delphi_channels.WorkerChannelInfo) error {
 	}
 
 	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Printf("📊 Summary: %d/%d workers correctly configured\n", correctCount, len(infos))
+	fmt.Printf(" Summary: %d/%d workers correctly configured\n", correctCount, len(infos))
 
 	if correctCount < len(infos) {
-		fmt.Println("\n💡 To fix issues, run: eos delphi services fix-channels")
+		fmt.Println("\n To fix issues, run: eos delphi services fix-channels")
 	}
 
 	fmt.Println("\n📡 STANDARD NOTIFICATION FLOW:")
@@ -205,9 +205,9 @@ func outputStandardizationJSON(result *delphi_channels.StandardizationResult) er
 // outputStandardizationText outputs standardization results in human-readable format
 func outputStandardizationText(result *delphi_channels.StandardizationResult, dryRun bool) error {
 	if dryRun {
-		fmt.Println("🔍 Notification Channel Standardization (DRY RUN)")
+		fmt.Println(" Notification Channel Standardization (DRY RUN)")
 	} else {
-		fmt.Println("🔧 Notification Channel Standardization")
+		fmt.Println(" Notification Channel Standardization")
 	}
 	fmt.Println(strings.Repeat("=", 50))
 
@@ -216,16 +216,16 @@ func outputStandardizationText(result *delphi_channels.StandardizationResult, dr
 		if dryRun {
 			fmt.Printf("\n📋 CHANGES THAT WOULD BE MADE (%d):\n", len(result.Changes))
 		} else {
-			fmt.Printf("\n✅ CHANGES MADE (%d):\n", len(result.Changes))
+			fmt.Printf("\n CHANGES MADE (%d):\n", len(result.Changes))
 		}
-		
+
 		changesByFile := groupChangesByFile(result.Changes)
 		for file, changes := range changesByFile {
 			fmt.Printf("   📄 %s:\n", file)
 			for _, change := range changes {
-				fmt.Printf("      %s: %s → %s\n", 
-					getChangeTypeEmoji(change.Type), 
-					change.OldValue, 
+				fmt.Printf("      %s: %s → %s\n",
+					getChangeTypeEmoji(change.Type),
+					change.OldValue,
 					change.NewValue)
 			}
 		}
@@ -269,15 +269,15 @@ func outputStandardizationText(result *delphi_channels.StandardizationResult, dr
 
 	// Summary
 	fmt.Println("\n" + strings.Repeat("=", 50))
-	
+
 	if result.Success {
 		if len(result.Changes) == 0 {
-			fmt.Println("✅ All workers already use correct notification channels!")
+			fmt.Println(" All workers already use correct notification channels!")
 		} else if dryRun {
-			fmt.Printf("🔍 Analysis complete: %d changes needed\n", len(result.Changes))
-			fmt.Println("💡 Run without --dry-run to apply changes")
+			fmt.Printf(" Analysis complete: %d changes needed\n", len(result.Changes))
+			fmt.Println(" Run without --dry-run to apply changes")
 		} else {
-			fmt.Printf("✅ Standardization complete: %d changes applied\n", len(result.Changes))
+			fmt.Printf(" Standardization complete: %d changes applied\n", len(result.Changes))
 		}
 	} else {
 		fmt.Println("❌ Standardization completed with errors")
@@ -323,6 +323,6 @@ func getChangeTypeEmoji(changeType string) string {
 	case "listen_statement":
 		return "👂"
 	default:
-		return "🔧"
+		return ""
 	}
 }

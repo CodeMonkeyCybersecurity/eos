@@ -679,7 +679,7 @@ func setOpenAICredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.Sec
 }
 
 func setCustomSecret(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
-	fmt.Printf("\n🔧 Custom Secret Setup\n")
+	fmt.Printf("\n Custom Secret Setup\n")
 	fmt.Printf("======================\n")
 
 	fmt.Printf("Secret path (e.g., myapp/config/key): ")
@@ -840,7 +840,7 @@ func setupDatabaseEngine(rc *eos_io.RuntimeContext, reader *bufio.Reader) error 
 	fmt.Printf("# Test the configuration\n")
 	fmt.Printf("vault read database/creds/delphi-readonly\n\n")
 
-	fmt.Printf("🔧 After running these commands:\n")
+	fmt.Printf(" After running these commands:\n")
 	fmt.Printf("- Test with: eos self secrets test\n")
 	fmt.Printf("- Run dashboard: eos delphi dashboard\n")
 	fmt.Printf("- The dashboard will automatically use dynamic credentials\n\n")

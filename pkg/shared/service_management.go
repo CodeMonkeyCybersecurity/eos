@@ -72,7 +72,7 @@ func (sm *ServiceManager) GetEnhancedServiceStatus(ctx context.Context, serviceN
 	if basicStatus.ServiceInstalled {
 		systemdStart := time.Now()
 
-		logger.Debug("🔧 Checking systemd status",
+		logger.Debug(" Checking systemd status",
 			zap.String("service", serviceName))
 
 		// Check if service is active
@@ -278,7 +278,7 @@ func (sm *ServiceManager) AutoInstallServices(ctx context.Context, servicesToIns
 		return nil
 	}
 
-	logger.Info("🔧 Starting automatic service installation",
+	logger.Info(" Starting automatic service installation",
 		zap.Strings("services", servicesToInstall),
 		zap.Int("count", len(servicesToInstall)))
 

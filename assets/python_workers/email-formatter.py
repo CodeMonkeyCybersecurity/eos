@@ -417,7 +417,7 @@ class DelphiNotifyFormatter(BaseEmailFormatter):
         delphi_sections = [
             ('summary', 'Summary', '#3498db', ''),
             ('what_happened', 'What Happened', '#e74c3c', ''),
-            ('further_investigation', 'Further Investigation', '#f39c12', '🔎'),
+            ('further_investigation', 'Further Investigation', '#f39c12', ''),
             ('what_to_do', 'What To Do', '#27ae60', ''),
             ('how_to_check', 'How To Check', '#9b59b6', '👀'),
             ('how_to_prevent', 'How To Prevent This In Future', '#34495e', '🛡️'),

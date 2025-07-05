@@ -80,7 +80,7 @@ Examples:
 						zap.Bool("would_disable", zombie.RequiresDisable),
 						zap.Bool("would_remove_unit", zombie.RequiresRemoval))
 				}
-				logger.Info("🔧 To actually fix these issues, run: eos delphi services cleanup --auto-fix")
+				logger.Info(" To actually fix these issues, run: eos delphi services cleanup --auto-fix")
 				return nil
 			}
 
@@ -97,7 +97,7 @@ Examples:
 			logger.Info(" Auto-fixing zombie services")
 
 			for i, zombie := range zombieServices {
-				logger.Info("🔧 Cleaning up zombie service",
+				logger.Info(" Cleaning up zombie service",
 					zap.String("service", zombie.ServiceName),
 					zap.Int("progress", i+1),
 					zap.Int("total", len(zombieServices)))

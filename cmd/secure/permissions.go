@@ -6,10 +6,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/spf13/cobra"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/security_permissions"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -72,7 +72,7 @@ Available categories: ssh, system, ssl`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			logger.Info("Checking security permissions",
 				zap.Strings("categories", args),
 				zap.String("ssh_dir", sshDir))
@@ -131,7 +131,7 @@ Creates backups by default before making changes.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			logger.Info("Fixing security permissions",
 				zap.Strings("categories", args),
 				zap.String("ssh_dir", sshDir),
@@ -184,20 +184,20 @@ func outputTextResult(result *security_permissions.PermissionFixResult, dryRun b
 
 	for category, scanResult := range result.Results {
 		fmt.Printf("\n📁 %s (%d files checked)\n", strings.ToUpper(category), scanResult.TotalChecks)
-		
+
 		for _, check := range scanResult.Checks {
 			if check.Error != "" {
 				fmt.Printf("   ❌ %s: %s\n", check.Rule.Description, check.Error)
 			} else if check.NeedsChange {
 				if dryRun {
-					fmt.Printf("   🔧 %s: %o → %o (would fix)\n", 
+					fmt.Printf("    %s: %o → %o (would fix)\n",
 						check.Rule.Description, check.CurrentMode, check.ExpectedMode)
 				} else {
-					fmt.Printf("   ✅ %s: %o → %o (fixed)\n", 
+					fmt.Printf("    %s: %o → %o (fixed)\n",
 						check.Rule.Description, check.CurrentMode, check.ExpectedMode)
 				}
 			} else {
-				fmt.Printf("   ✅ %s: %o (correct)\n", 
+				fmt.Printf("    %s: %o (correct)\n",
 					check.Rule.Description, check.CurrentMode)
 			}
 		}
@@ -205,7 +205,7 @@ func outputTextResult(result *security_permissions.PermissionFixResult, dryRun b
 
 	// Summary
 	fmt.Println("\n" + strings.Repeat("=", 50))
-	fmt.Printf("📊 Summary: %d files processed, %d fixed, %d skipped\n", 
+	fmt.Printf(" Summary: %d files processed, %d fixed, %d skipped\n",
 		result.Summary.TotalFiles, result.Summary.FilesFixed, result.Summary.FilesSkipped)
 
 	if len(result.Summary.Errors) > 0 {
@@ -217,11 +217,11 @@ func outputTextResult(result *security_permissions.PermissionFixResult, dryRun b
 
 	if result.Summary.Success {
 		if dryRun && result.Summary.FilesFixed > 0 {
-			fmt.Println("💡 Run without --dry-run to apply changes")
+			fmt.Println(" Run without --dry-run to apply changes")
 		} else if !dryRun {
-			fmt.Println("✅ Permission fixes completed successfully")
+			fmt.Println(" Permission fixes completed successfully")
 		} else {
-			fmt.Println("✅ All permissions are correctly configured")
+			fmt.Println(" All permissions are correctly configured")
 		}
 	} else {
 		fmt.Println("❌ Permission operation completed with errors")
@@ -237,7 +237,7 @@ func outputJSON(result *security_permissions.PermissionFixResult) error {
 	return outputJSONResult(result)
 }
 
-// Helper function for legacy outputText calls  
+// Helper function for legacy outputText calls
 func outputText(result *security_permissions.PermissionFixResult, isCheck bool) error {
 	return outputTextResult(result, isCheck)
 }

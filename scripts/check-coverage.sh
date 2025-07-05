@@ -63,7 +63,7 @@ check_package_coverage() {
         fi
         
         if $passed; then
-            print_color $GREEN "  ✅ ${pkg}: ${coverage}% (threshold: ${threshold}%)"
+            print_color $GREEN "   ${pkg}: ${coverage}% (threshold: ${threshold}%)"
         else
             print_color $RED "  ❌ ${pkg}: ${coverage}% (threshold: ${threshold}%)"
             return 1
@@ -89,7 +89,7 @@ main() {
     # Change to repository root
     cd "$(git rev-parse --show-toplevel)" || exit 1
     
-    print_color $BLUE "\n📊 Running overall coverage check..."
+    print_color $BLUE "\n Running overall coverage check..."
     
     # Run overall coverage
     if go test -coverprofile=coverage.out -covermode=atomic ./pkg/... >/dev/null 2>&1; then
@@ -104,7 +104,7 @@ main() {
         fi
         
         if $overall_passed; then
-            print_color $GREEN "\n✅ Overall coverage: ${OVERALL_COV}% (threshold: ${OVERALL_THRESHOLD}%)"
+            print_color $GREEN "\n Overall coverage: ${OVERALL_COV}% (threshold: ${OVERALL_THRESHOLD}%)"
         else
             print_color $RED "\n❌ Overall coverage: ${OVERALL_COV}% (threshold: ${OVERALL_THRESHOLD}%)"
         fi
@@ -135,7 +135,7 @@ main() {
     if [[ "${1:-}" == "--html" ]]; then
         print_color $BLUE "\n📄 Generating HTML report..."
         go tool cover -html=coverage.out -o coverage.html
-        print_color $GREEN "✅ Report saved to coverage.html"
+        print_color $GREEN " Report saved to coverage.html"
         
         # Try to open in browser
         if command_exists open; then
@@ -163,10 +163,10 @@ main() {
     # Exit with appropriate code
     if ! $overall_passed || [ $CRITICAL_FAILED -gt 0 ]; then
         print_color $RED "\n❌ Coverage check failed!"
-        print_color $YELLOW "💡 Tip: Run '$0 --html' to see detailed coverage report"
+        print_color $YELLOW " Tip: Run '$0 --html' to see detailed coverage report"
         exit 1
     else
-        print_color $GREEN "\n✅ All coverage checks passed!"
+        print_color $GREEN "\n All coverage checks passed!"
         exit 0
     fi
 }

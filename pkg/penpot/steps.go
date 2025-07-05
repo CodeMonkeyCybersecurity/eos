@@ -155,7 +155,7 @@ func (m *Manager) assessDeploymentHealth(ctx context.Context, mgr *Manager) erro
 func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🔧 Ensuring prerequisites are met")
+	logger.Info(" Ensuring prerequisites are met")
 
 	// Check Nomad connectivity
 	if _, err := m.nomadClient.Agent().Self(); err != nil {

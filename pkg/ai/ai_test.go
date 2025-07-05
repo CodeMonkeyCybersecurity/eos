@@ -31,21 +31,21 @@ func TestAIAssistantCreation(t *testing.T) {
 		// Clear environment variables
 		os.Unsetenv("ANTHROPIC_API_KEY")
 		os.Unsetenv("AI_API_KEY")
-		
+
 		// Create isolated config manager with temp directory
 		tempDir, err := os.MkdirTemp("", "ai-config-test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
-		
+
 		// Mock the config path for this test
 		originalConfigDir := os.Getenv("HOME")
 		os.Setenv("HOME", tempDir)
 		defer os.Setenv("HOME", originalConfigDir)
-		
+
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
 		require.NotNil(t, assistant)
-		
+
 		// Verify default Anthropic configuration
 		assert.Equal(t, "anthropic", assistant.provider)
 		assert.Equal(t, "https://api.anthropic.com/v1", assistant.baseURL)
@@ -70,19 +70,19 @@ func TestAIAssistantCreation(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "azure-config-test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
-		
+
 		_ = &ConfigManager{
 			configPath: filepath.Join(tempDir, "azure-config.yaml"),
 			config: &AIConfig{
 				Provider: "azure-openai",
 			},
 		}
-		
+
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
 		require.NotNil(t, assistant)
-		
-		// Note: Since environment variables override config, 
+
+		// Note: Since environment variables override config,
 		// we can't guarantee Azure configuration in isolation
 		// Just verify assistant was created successfully
 		assert.NotEmpty(t, assistant.provider)
@@ -94,15 +94,15 @@ func TestAIAssistantCreation(t *testing.T) {
 		tempDir, err := os.MkdirTemp("", "timeout-config-test")
 		require.NoError(t, err)
 		defer os.RemoveAll(tempDir)
-		
+
 		// Mock the config path for this test
 		originalConfigDir := os.Getenv("HOME")
 		os.Setenv("HOME", tempDir)
 		defer os.Setenv("HOME", originalConfigDir)
-		
+
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
-		
+
 		// Verify HTTP client timeout is set
 		assert.NotNil(t, assistant.client)
 		assert.Equal(t, 60*time.Second, assistant.client.Timeout)
@@ -186,7 +186,7 @@ func TestAPIKeySecurity(t *testing.T) {
 				// Create config manager with specific provider
 				configManager := NewConfigManager()
 				configManager.config.Provider = tc.provider
-				
+
 				apiKey, err := configManager.GetAPIKey(rc)
 				assert.NoError(t, err)
 				assert.Equal(t, tc.expectedKey, apiKey)
@@ -224,12 +224,12 @@ func TestAPIKeySecurity(t *testing.T) {
 			apiKey    string
 			shouldErr bool
 		}{
-			{"", true},                                             // Empty key
-			{"  ", true},                                           // Whitespace only
-			{"short", true},                                        // Too short
-			{"sk-1234567890123456789012345678901234567890", false}, // Valid OpenAI style
+			{"", true},      // Empty key
+			{"  ", true},    // Whitespace only
+			{"short", true}, // Too short
+			{"sk-1234567890123456789012345678901234567890", false},     // Valid OpenAI style
 			{"claude-1234567890123456789012345678901234567890", false}, // Valid Anthropic style
-			{"valid-api-key-that-is-long-enough-1234567890", false}, // Valid general key
+			{"valid-api-key-that-is-long-enough-1234567890", false},    // Valid general key
 		}
 
 		for _, tc := range testCases {
@@ -264,10 +264,10 @@ func TestAPIKeySecurity(t *testing.T) {
 
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
-		
+
 		// Should create assistant but API key should be empty
 		assert.Equal(t, "", assistant.apiKey)
-		
+
 		// Chat should fail with meaningful error
 		ctx := NewConversationContext("test")
 		_, err = assistant.Chat(rc, ctx, "test message")
@@ -291,7 +291,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			// Verify headers are set correctly
 			contentType := r.Header.Get("Content-Type")
 			assert.Equal(t, "application/json", contentType)
-			
+
 			// Check provider-specific headers
 			if strings.Contains(r.URL.Path, "azure") {
 				apiKey := r.Header.Get("api-key")
@@ -302,7 +302,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 				anthropicVersion := r.Header.Get("anthropic-version")
 				assert.NotEmpty(t, anthropicVersion)
 			}
-			
+
 			// Return a mock response
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
@@ -346,7 +346,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 		start := time.Now()
 		_, err := assistant.Chat(rc, ctx, "test message")
 		elapsed := time.Since(start)
-		
+
 		// Should timeout quickly and return error
 		assert.Error(t, err)
 		assert.Less(t, elapsed, 2*time.Second, "Request should timeout before server delay")
@@ -405,7 +405,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 
 				ctx := NewConversationContext("test")
 				_, err := assistant.Chat(rc, ctx, "test message")
-				
+
 				if tc.shouldErr {
 					assert.Error(t, err)
 				} else {
@@ -448,7 +448,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 
 		// Cancel context before making request
 		cancel()
-		
+
 		convCtx := NewConversationContext("test")
 		_, err := assistant.Chat(rc, convCtx, "test message")
 		assert.Error(t, err)
@@ -461,25 +461,25 @@ func TestConfigurationSecurity(t *testing.T) {
 	t.Run("config_file_permissions", func(t *testing.T) {
 		// Test that config files are created with secure permissions
 		configManager := NewConfigManager()
-		
+
 		// Save a test configuration
 		configManager.config = &AIConfig{
 			Provider: "anthropic",
 			APIKey:   "test-api-key",
 		}
-		
+
 		err := configManager.SaveConfig()
 		require.NoError(t, err)
-		
+
 		// Check file permissions
 		configPath := configManager.GetConfigPath()
 		fileInfo, err := os.Stat(configPath)
 		require.NoError(t, err)
-		
+
 		// File should be readable/writable by owner only (0600)
 		mode := fileInfo.Mode().Perm()
 		assert.Equal(t, os.FileMode(0600), mode, "Config file should have 0600 permissions")
-		
+
 		// Cleanup
 		os.Remove(configPath)
 		os.RemoveAll(configManager.configPath)
@@ -487,21 +487,21 @@ func TestConfigurationSecurity(t *testing.T) {
 
 	t.Run("config_directory_permissions", func(t *testing.T) {
 		configManager := NewConfigManager()
-		
+
 		err := configManager.SaveConfig()
 		require.NoError(t, err)
-		
+
 		// Check directory permissions
 		configDir := configManager.configPath
 		configDir = configDir[:strings.LastIndex(configDir, "/")]
-		
+
 		dirInfo, err := os.Stat(configDir)
 		require.NoError(t, err)
-		
+
 		// Directory should be accessible by owner only (0700)
 		mode := dirInfo.Mode().Perm()
 		assert.Equal(t, os.FileMode(0700), mode, "Config directory should have 0700 permissions")
-		
+
 		// Cleanup
 		os.RemoveAll(configDir)
 	})
@@ -515,11 +515,11 @@ func TestConfigurationSecurity(t *testing.T) {
 
 		// API key should not be logged or printed directly
 		configStr := fmt.Sprintf("%+v", config)
-		
+
 		// In a real implementation, we might want to implement
 		// custom String() methods that mask sensitive fields
 		assert.Contains(t, configStr, "sk-1234567890123456789012345678901234567890")
-		
+
 		// But when masked, it should be secure
 		masked := MaskAPIKey(config.APIKey)
 		assert.NotContains(t, masked, "1234567890123456789012345678901234567890")
@@ -532,7 +532,7 @@ func TestConfigurationSecurity(t *testing.T) {
 		assert.Equal(t, "anthropic", anthropicDefaults.Provider)
 		assert.True(t, strings.HasPrefix(anthropicDefaults.BaseURL, "https://"))
 		assert.Empty(t, anthropicDefaults.APIKey, "Default config should not contain API key")
-		
+
 		azureDefaults := GetProviderDefaults("azure-openai")
 		assert.Equal(t, "azure-openai", azureDefaults.Provider)
 		assert.Empty(t, azureDefaults.APIKey, "Default config should not contain API key")
@@ -546,16 +546,16 @@ func TestConversationSecurity(t *testing.T) {
 		// Test that conversation contexts are properly isolated
 		ctx1 := NewConversationContext("system prompt 1")
 		ctx2 := NewConversationContext("system prompt 2")
-		
+
 		// Contexts should have different IDs
 		assert.NotEqual(t, ctx1.ConversationID, ctx2.ConversationID)
-		
+
 		// Add messages to first context
 		ctx1.Messages = append(ctx1.Messages, AIMessage{
 			Role:    "user",
 			Content: "secret message 1",
 		})
-		
+
 		// Second context should not have access to first context's messages
 		assert.Empty(t, ctx2.Messages)
 		assert.NotContains(t, fmt.Sprintf("%+v", ctx2), "secret message 1")
@@ -571,15 +571,15 @@ func TestConversationSecurity(t *testing.T) {
 		}
 
 		ctx := NewConversationContext("test")
-		
+
 		for _, input := range maliciousInputs {
 			message := AIMessage{
 				Role:    "user",
 				Content: input,
 			}
-			
+
 			ctx.Messages = append(ctx.Messages, message)
-			
+
 			// Message should be stored as-is but handled safely
 			assert.Equal(t, input, message.Content)
 		}
@@ -588,18 +588,18 @@ func TestConversationSecurity(t *testing.T) {
 	t.Run("conversation_id_generation", func(t *testing.T) {
 		// Test conversation ID generation is secure and unique
 		ids := make(map[string]bool)
-		
+
 		for i := 0; i < 100; i++ {
 			ctx := NewConversationContext("test")
 			id := ctx.ConversationID
-			
+
 			// ID should not be empty
 			assert.NotEmpty(t, id)
-			
+
 			// ID should be unique
 			assert.False(t, ids[id], "Conversation ID should be unique: %s", id)
 			ids[id] = true
-			
+
 			// ID should have expected format
 			assert.True(t, strings.HasPrefix(id, "eos-ai-"))
 		}
@@ -627,7 +627,7 @@ func TestEnvironmentContextSecurity(t *testing.T) {
 
 		// Verify file information is stored
 		assert.Len(t, fsContext.RecentFiles, 2)
-		
+
 		// In a real implementation, we might want to filter out
 		// sensitive files or mask their content
 		for _, file := range fsContext.RecentFiles {
@@ -660,7 +660,7 @@ func TestEnvironmentContextSecurity(t *testing.T) {
 		// Verify service information is available but sanitized
 		assert.Len(t, servicesContext.DockerContainers, 1)
 		assert.Len(t, servicesContext.NetworkPorts, 1)
-		
+
 		// Sensitive ports should be noted for security review
 		for _, port := range servicesContext.NetworkPorts {
 			if port.Port == 22 {
@@ -686,7 +686,7 @@ func TestEnvironmentContextSecurity(t *testing.T) {
 
 		// Logs should be available but might need sanitization
 		assert.Len(t, logContext.ErrorLogs, 2)
-		
+
 		// In a real implementation, we might want to sanitize
 		// logs to remove passwords and other sensitive data
 		for _, log := range logContext.ErrorLogs {
@@ -746,7 +746,7 @@ func TestDataStructures(t *testing.T) {
 		// Test that critical structures have expected fields
 		aiConfig := reflect.TypeOf(AIConfig{})
 		fields := make(map[string]bool)
-		
+
 		for i := 0; i < aiConfig.NumField(); i++ {
 			field := aiConfig.Field(i)
 			fields[field.Name] = true
@@ -765,15 +765,15 @@ func TestInputValidation(t *testing.T) {
 	t.Run("message_length_validation", func(t *testing.T) {
 		// Test handling of very long messages
 		longMessage := strings.Repeat("A", 100000) // 100KB message
-		
+
 		ctx := NewConversationContext("test")
 		message := AIMessage{
 			Role:    "user",
 			Content: longMessage,
 		}
-		
+
 		ctx.Messages = append(ctx.Messages, message)
-		
+
 		// Should handle long messages without crashing
 		assert.Equal(t, longMessage, ctx.Messages[0].Content)
 		assert.Len(t, ctx.Messages, 1)
@@ -782,21 +782,21 @@ func TestInputValidation(t *testing.T) {
 	t.Run("special_character_handling", func(t *testing.T) {
 		// Test handling of special characters and encoding
 		specialChars := []string{
-			"Hello 世界",           // Unicode
-			"emoji test 🚀🔥💻",    // Emojis
-			"newlines\nand\ttabs", // Control characters
+			"Hello 世界",                     // Unicode
+			"emoji test 🔥💻",                // Emojis
+			"newlines\nand\ttabs",          // Control characters
 			"quotes \"and\" 'apostrophes'", // Quotes
 			"backslashes\\and/slashes",     // Slashes
 		}
 
 		ctx := NewConversationContext("test")
-		
+
 		for _, chars := range specialChars {
 			message := AIMessage{
 				Role:    "user",
 				Content: chars,
 			}
-			
+
 			ctx.Messages = append(ctx.Messages, message)
 		}
 
@@ -810,12 +810,12 @@ func TestInputValidation(t *testing.T) {
 	t.Run("configuration_validation", func(t *testing.T) {
 		// Test configuration validation
 		configManager := NewConfigManager()
-		
+
 		// Test invalid configurations
 		invalidUpdates := map[string]any{
-			"provider":   123,     // Should be string
+			"provider":   123,       // Should be string
 			"max_tokens": "invalid", // Should be int
-			"timeout":    -1,      // Should be positive
+			"timeout":    -1,        // Should be positive
 		}
 
 		err := configManager.UpdateConfig(invalidUpdates)
@@ -831,7 +831,7 @@ func TestInputValidation(t *testing.T) {
 
 		err = configManager.UpdateConfig(validUpdates)
 		assert.NoError(t, err)
-		
+
 		config := configManager.GetConfig()
 		assert.Equal(t, "anthropic", config.Provider)
 		assert.Equal(t, 2048, config.MaxTokens)

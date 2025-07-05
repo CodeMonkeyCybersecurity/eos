@@ -32,6 +32,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/storage"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
@@ -84,6 +85,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		disable.DisableCmd,
 		backup.BackupCmd,
 		enable.EnableCmd,
+		storage.StorageCmd,
 		sync.SyncCmd,
 		hecate.HecateCmd,
 		delphi.DelphiCmd, // This is the top-level 'delphi'

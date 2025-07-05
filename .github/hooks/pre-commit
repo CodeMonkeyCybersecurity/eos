@@ -17,7 +17,7 @@ print_color() {
     echo -e "${color}$@${NC}"
 }
 
-print_color $BLUE "🚀 Running pre-commit checks..."
+print_color $BLUE " Running pre-commit checks..."
 
 # Check if we're in the repository root
 if [ ! -f "go.mod" ]; then
@@ -31,19 +31,19 @@ UNFORMATTED=$(gofmt -l .)
 if [ -n "$UNFORMATTED" ]; then
     print_color $RED "❌ The following files are not properly formatted:"
     echo "$UNFORMATTED"
-    print_color $YELLOW "💡 Run 'gofmt -w .' to fix formatting"
+    print_color $YELLOW " Run 'gofmt -w .' to fix formatting"
     exit 1
 else
-    print_color $GREEN "✅ Code formatting OK"
+    print_color $GREEN " Code formatting OK"
 fi
 
 # 2. Run go vet
-print_color $BLUE "\n🔍 Running go vet..."
+print_color $BLUE "\n Running go vet..."
 if ! go vet ./...; then
     print_color $RED "❌ go vet found issues"
     exit 1
 else
-    print_color $GREEN "✅ go vet passed"
+    print_color $GREEN " go vet passed"
 fi
 
 # 3. Check for changed Go files
@@ -89,7 +89,7 @@ if [ $FAILED_TESTS -gt 0 ]; then
 fi
 
 # 6. Quick coverage check for critical packages if modified
-print_color $BLUE "\n📊 Checking coverage for modified critical packages..."
+print_color $BLUE "\n Checking coverage for modified critical packages..."
 CRITICAL_PACKAGES=("vault" "crypto" "eos_io" "eos_err")
 CRITICAL_MODIFIED=false
 
@@ -106,28 +106,28 @@ for pkg in "${CRITICAL_PACKAGES[@]}"; do
             # Check if coverage is above 90%
             if awk "BEGIN {exit !($COV < 90)}"; then
                 print_color $RED "  ❌ ${pkg}: ${COV}% (minimum 90% required)"
-                print_color $YELLOW "  💡 Add more tests to increase coverage"
+                print_color $YELLOW "   Add more tests to increase coverage"
                 exit 1
             else
-                print_color $GREEN "  ✅ ${pkg}: ${COV}%"
+                print_color $GREEN "   ${pkg}: ${COV}%"
             fi
         fi
     fi
 done
 
 if ! $CRITICAL_MODIFIED; then
-    print_color $GREEN "✅ No critical packages modified"
+    print_color $GREEN " No critical packages modified"
 fi
 
 # 7. Check for debugging artifacts
-print_color $BLUE "\n🔍 Checking for debugging artifacts..."
+print_color $BLUE "\n Checking for debugging artifacts..."
 if git diff --cached --name-only | xargs grep -l "fmt\.Print\|debug\|TODO\|FIXME\|XXX" 2>/dev/null; then
     print_color $YELLOW "⚠️  Found potential debugging artifacts:"
     git diff --cached --name-only | xargs grep -n "fmt\.Print\|debug\|TODO\|FIXME\|XXX" 2>/dev/null || true
-    print_color $YELLOW "💡 Review these before committing"
+    print_color $YELLOW " Review these before committing"
 fi
 
-print_color $GREEN "\n✅ All pre-commit checks passed!"
-print_color $BLUE "📊 For full coverage report, run: make coverage-html"
+print_color $GREEN "\n All pre-commit checks passed!"
+print_color $BLUE " For full coverage report, run: make coverage-html"
 
 exit 0

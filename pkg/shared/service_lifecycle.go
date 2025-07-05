@@ -173,7 +173,7 @@ func (slm *ServiceLifecycleManager) executeRemovalPlan(ctx context.Context, plan
 
 	// Step 2: Disable the service if enabled
 	if plan.RequiresDisable {
-		logger.Info("🔧 Step 2: Disabling service",
+		logger.Info(" Step 2: Disabling service",
 			zap.String("service", plan.ServiceName))
 
 		if err := slm.disableService(ctx, plan.ServiceName); err != nil {

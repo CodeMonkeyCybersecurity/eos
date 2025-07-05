@@ -142,12 +142,12 @@ jobs:
           const criticalReport = `${{ steps.coverage-check.outputs.critical_report }}`;
           
           // Construct the comment body
-          let body = `## 📊 Test Coverage Report\n\n`;
+          let body = `##  Test Coverage Report\n\n`;
           body += `**Overall Coverage**: ${coverage}% `;
           
           // Add emoji based on coverage
           if (parseFloat(coverage) >= 90) {
-            body += '✅';
+            body += '';
           } else if (parseFloat(coverage) >= 80) {
             body += '🟢';
           } else if (parseFloat(coverage) >= 70) {

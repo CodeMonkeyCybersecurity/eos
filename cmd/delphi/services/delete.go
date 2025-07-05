@@ -69,7 +69,7 @@ Examples:
 			}
 
 			// Use safe service removal process
-			logger.Info("🔧 Using safe service removal process",
+			logger.Info(" Using safe service removal process",
 				zap.String("service", serviceName),
 				zap.String("method", "lifecycle_manager"))
 

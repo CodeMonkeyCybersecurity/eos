@@ -48,7 +48,7 @@ run_fuzz_test "FuzzAllEOSCommands" "./test" "${FUZZTIME_LONG}"
 run_fuzz_test "FuzzDelphiServicesCommands" "./test" "${FUZZTIME_LONG}"
 
 # Medium-priority specific tests (medium duration)
-echo "🔧 Running specific component tests..."
+echo " Running specific component tests..."
 run_fuzz_test "FuzzUpdateCommand" "./cmd/delphi/services" "${FUZZTIME_SHORT}"
 run_fuzz_test "FuzzServiceWorkerPaths" "./cmd/delphi/services" "${FUZZTIME_SHORT}"
 run_fuzz_test "FuzzCommandParsing" "./pkg/eos_cli" "${FUZZTIME_SHORT}"

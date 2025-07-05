@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/cobra"
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi_config"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -63,7 +63,7 @@ errors, warnings, and informational messages about the configuration state.`,
   eos delphi validate config --check-only`,
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
-			
+
 			logger.Info("Starting Delphi configuration validation",
 				zap.String("env_file", envFile),
 				zap.Bool("json_output", outputJSON),
@@ -73,8 +73,8 @@ errors, warnings, and informational messages about the configuration state.`,
 			// Load environment file if specified
 			if envFile != "" {
 				if err := loadEnvFile(envFile); err != nil {
-					logger.Warn("Failed to load environment file", 
-						zap.String("file", envFile), 
+					logger.Warn("Failed to load environment file",
+						zap.String("file", envFile),
 						zap.Error(err))
 				} else {
 					logger.Info("Loaded environment file", zap.String("file", envFile))
@@ -83,7 +83,7 @@ errors, warnings, and informational messages about the configuration state.`,
 
 			// Create configuration from environment and defaults
 			config := createConfigFromEnvironment()
-			
+
 			// Create validator and run validation
 			validator := delphi_config.NewConfigValidator(config)
 			summary := validator.ValidateAll()
@@ -123,14 +123,14 @@ func loadEnvFile(filename string) error {
 		if len(parts) == 2 {
 			key := strings.TrimSpace(parts[0])
 			value := strings.TrimSpace(parts[1])
-			
+
 			// Remove quotes if present
-			if len(value) >= 2 && 
+			if len(value) >= 2 &&
 				((value[0] == '"' && value[len(value)-1] == '"') ||
-				 (value[0] == '\'' && value[len(value)-1] == '\'')) {
+					(value[0] == '\'' && value[len(value)-1] == '\'')) {
 				value = value[1 : len(value)-1]
 			}
-			
+
 			os.Setenv(key, value)
 		}
 	}
@@ -162,7 +162,7 @@ func createConfigFromEnvironment() *delphi_config.DelphiConfig {
 	config.SMTP.Password = os.Getenv("SMTP_PASS")
 	config.SMTP.FromEmail = os.Getenv("SMTP_FROM")
 	config.SMTP.FromName = os.Getenv("SMTP_FROM_NAME")
-	
+
 	if port := os.Getenv("SMTP_PORT"); port != "" {
 		if p, err := strconv.Atoi(port); err == nil {
 			config.SMTP.Port = p
@@ -213,8 +213,8 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 	if !verbose {
 		// Simplified output without info messages
 		simplified := struct {
-			Success   bool                              `json:"success"`
-			Timestamp time.Time                         `json:"timestamp"`
+			Success   bool                             `json:"success"`
+			Timestamp time.Time                        `json:"timestamp"`
 			Errors    []delphi_config.ValidationResult `json:"errors"`
 			Warnings  []delphi_config.ValidationResult `json:"warnings"`
 		}{
@@ -223,7 +223,7 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 			Errors:    summary.Errors,
 			Warnings:  summary.Warnings,
 		}
-		
+
 		encoder := json.NewEncoder(os.Stdout)
 		encoder.SetIndent("", "  ")
 		return encoder.Encode(simplified)
@@ -237,7 +237,7 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 // outputTextResults outputs validation results in human-readable format
 func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkOnly bool) error {
 	if !checkOnly {
-		fmt.Println("🔍 Delphi Configuration Validator")
+		fmt.Println(" Delphi Configuration Validator")
 		fmt.Println(strings.Repeat("=", 50))
 	}
 
@@ -261,7 +261,7 @@ func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkO
 
 	// Show info messages if verbose
 	if verbose && len(summary.Info) > 0 && !checkOnly {
-		fmt.Printf("\n✅ SUCCESS (%d):\n", len(summary.Info))
+		fmt.Printf("\n SUCCESS (%d):\n", len(summary.Info))
 		for _, info := range summary.Info {
 			fmt.Printf("   • [%s] %s\n", info.Source, info.Message)
 		}
@@ -273,12 +273,12 @@ func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkO
 	}
 
 	if summary.Success {
-		fmt.Println("✅ ALL CHECKS PASSED - Delphi is ready for production!")
+		fmt.Println(" ALL CHECKS PASSED - Delphi is ready for production!")
 	} else if len(summary.Errors) == 0 {
 		fmt.Println("⚠️  WARNINGS FOUND - Delphi should work but check warnings")
 	} else {
 		fmt.Println("❌ CRITICAL ERRORS FOUND - Fix errors before running Delphi")
-		
+
 		// Return error exit code for CI/CD integration
 		os.Exit(1)
 	}
