@@ -24,6 +24,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/git"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
@@ -89,6 +90,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		enable.EnableCmd,
 		storage.StorageCmd,
 		sync.SyncCmd,
+		git.GitCmd, // Git repository management
 		hecate.HecateCmd,
 		delphi.DelphiCmd, // This is the top-level 'delphi'
 		inspect.InspectCmd, // This is the top-level 'inspect'
