@@ -20,6 +20,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/container"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/crypto"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/database"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
@@ -78,6 +79,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		create.CreateCmd,
 		container.ContainerCmd,
 		crypto.CryptoCmd,
+		database.DatabaseCmd, // Database management
 		read.ReadCmd, // This is the top-level 'read'
 		list.ListCmd,
 		update.UpdateCmd,
