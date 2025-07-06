@@ -161,12 +161,12 @@ The framework automatically sets up:
 
 ### Environment Variables Set:
 
-- `EOS_TEST_MODE=true`
+- `Eos_TEST_MODE=true`
 - `VAULT_SKIP_VERIFY=true`
 - `VAULT_ADDR=http://127.0.0.1:8200`
 - `VAULT_CACERT=<temp-cert-path>`
-- `EOS_DATA_DIR=<temp-data-dir>`
-- `EOS_LOG_LEVEL=debug`
+- `Eos_DATA_DIR=<temp-data-dir>`
+- `Eos_LOG_LEVEL=debug`
 
 ## Mock Services
 

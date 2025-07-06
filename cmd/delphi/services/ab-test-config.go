@@ -54,8 +54,8 @@ Examples:
 				return fmt.Errorf("failed to initialize file operations: %w", err)
 			}
 
-			// Get EOS root directory
-			eosRoot := os.Getenv("EOS_ROOT")
+			// Get Eos root directory
+			eosRoot := os.Getenv("Eos_ROOT")
 			if eosRoot == "" {
 				eosRoot = "/usr/local/share/eos" // Default installation path
 			}

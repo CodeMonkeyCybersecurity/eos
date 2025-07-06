@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -15,8 +16,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
-
 )
 
 // ServiceWorkerInfo contains information about a service worker
@@ -156,13 +155,13 @@ Examples:
 
 				// Set environment variable for global watchdog extension
 				// Note: This only affects subprocess calls, not the current process
-				originalTimeout := os.Getenv("EOS_GLOBAL_TIMEOUT")
-				os.Setenv("EOS_GLOBAL_TIMEOUT", timeout.String())
+				originalTimeout := os.Getenv("Eos_GLOBAL_TIMEOUT")
+				os.Setenv("Eos_GLOBAL_TIMEOUT", timeout.String())
 				defer func() {
 					if originalTimeout == "" {
-						os.Unsetenv("EOS_GLOBAL_TIMEOUT")
+						os.Unsetenv("Eos_GLOBAL_TIMEOUT")
 					} else {
-						os.Setenv("EOS_GLOBAL_TIMEOUT", originalTimeout)
+						os.Setenv("Eos_GLOBAL_TIMEOUT", originalTimeout)
 					}
 				}()
 
@@ -296,46 +295,45 @@ Examples:
 
 // In the command function:
 func updateServiceWorkers(rc *eos_io.RuntimeContext, logger otelzap.LoggerWithCtx, workersToUpdate []shared.ServiceWorkerInfo, dryRun, skipBackup, skipRestart bool) error {
-    // Create file service container
-    fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
-    if err != nil {
-        return fmt.Errorf("failed to initialize file operations: %w", err)
-    }
-    
-    // Process each worker
-    for _, worker := range workersToUpdate {
-        logger.Info("Processing service worker", 
-            zap.String("service", worker.ServiceName),
-            zap.Bool("dry_run", dryRun))
-        
-        if dryRun {
-            logger.Info("Would update service worker", zap.String("service", worker.ServiceName))
-            continue
-        }
-        
-        // Check if source file exists
-        if !fileContainer.FileExists(worker.SourcePath) {
-            return fmt.Errorf("source file not found: %s", worker.SourcePath)
-        }
-        
-        // Create backup if not skipped
-        if !skipBackup {
-            if err := fileContainer.CopyFile(worker.TargetPath, worker.BackupPath); err != nil {
-                return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
-            }
-        }
-        
-        // Deploy updated file
-        if err := fileContainer.CopyFileWithBackup(worker.SourcePath, worker.TargetPath); err != nil {
-            return fmt.Errorf("failed to deploy updated %s: %w", worker.ServiceName, err)
-        }
-        
-        logger.Info("Successfully updated service worker", zap.String("service", worker.ServiceName))
-    }
-    
-    return nil
-}
+	// Create file service container
+	fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
+	if err != nil {
+		return fmt.Errorf("failed to initialize file operations: %w", err)
+	}
 
+	// Process each worker
+	for _, worker := range workersToUpdate {
+		logger.Info("Processing service worker",
+			zap.String("service", worker.ServiceName),
+			zap.Bool("dry_run", dryRun))
+
+		if dryRun {
+			logger.Info("Would update service worker", zap.String("service", worker.ServiceName))
+			continue
+		}
+
+		// Check if source file exists
+		if !fileContainer.FileExists(worker.SourcePath) {
+			return fmt.Errorf("source file not found: %s", worker.SourcePath)
+		}
+
+		// Create backup if not skipped
+		if !skipBackup {
+			if err := fileContainer.CopyFile(worker.TargetPath, worker.BackupPath); err != nil {
+				return fmt.Errorf("failed to backup %s: %w", worker.ServiceName, err)
+			}
+		}
+
+		// Deploy updated file
+		if err := fileContainer.CopyFileWithBackup(worker.SourcePath, worker.TargetPath); err != nil {
+			return fmt.Errorf("failed to deploy updated %s: %w", worker.ServiceName, err)
+		}
+
+		logger.Info("Successfully updated service worker", zap.String("service", worker.ServiceName))
+	}
+
+	return nil
+}
 
 // extractTimestampFromBackupPath extracts the timestamp from a backup path like "/path/file.20250701_212225.bak"
 func extractTimestampFromBackupPath(backupPath string) string {

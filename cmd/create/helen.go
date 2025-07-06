@@ -8,15 +8,15 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/helen"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 var helenCmd = &cobra.Command{
 	Use:   "helen",
 	Short: "Deploy Helen nginx static website with secure Nomad and Vault integration",
 	Long: `Deploy Helen, a secure nginx-based static website platform, using HashiCorp's 
-enterprise stack for reliable, scalable deployment on localhost.
+stack for reliable, scalable deployment on localhost.
 
 Helen provides:
 - Secure nginx container with read-only filesystem
@@ -51,18 +51,18 @@ Examples:
   eos create helen --cpu 1000 --memory 256`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		logger.Info("Starting Helen nginx deployment",
 			zap.String("command", "create helen"),
 			zap.String("component", rc.Component))
-		
+
 		// Parse command line flags
 		config, err := parseHelenFlags(cmd)
 		if err != nil {
 			logger.Error("Failed to parse command flags", zap.Error(err))
 			return fmt.Errorf("flag parsing failed: %w", err)
 		}
-		
+
 		// Log configuration
 		logger.Info("Helen deployment configuration",
 			zap.Int("port", config.Port),
@@ -71,27 +71,27 @@ Examples:
 			zap.String("vault_addr", config.VaultAddr),
 			zap.String("nomad_addr", config.NomadAddr),
 			zap.String("work_dir", config.WorkDir))
-		
+
 		// Execute deployment
 		if err := helen.Create(rc, config); err != nil {
 			logger.Error("Helen deployment failed", zap.Error(err))
 			return fmt.Errorf("helen deployment failed: %w", err)
 		}
-		
+
 		// Display success information
 		logger.Info("Helen deployment completed successfully",
 			zap.String("url", fmt.Sprintf("http://localhost:%d", config.Port)),
 			zap.String("namespace", config.Namespace))
-		
+
 		logger.Info("Access Helen",
 			zap.String("web_interface", fmt.Sprintf("http://localhost:%d", config.Port)),
 			zap.String("serving_from", config.PublicHTMLPath))
-		
+
 		logger.Info("Next steps",
 			zap.String("status_check", fmt.Sprintf("eos read helen --namespace %s", config.Namespace)),
 			zap.String("health_check", fmt.Sprintf("eos status helen --namespace %s", config.Namespace)),
 			zap.String("logs", "nomad alloc logs <alloc-id>"))
-		
+
 		return nil
 	}),
 }
@@ -100,56 +100,56 @@ Examples:
 func parseHelenFlags(cmd *cobra.Command) (*helen.Config, error) {
 	// Start with default configuration
 	config := helen.DefaultConfig()
-	
+
 	// Parse flags
 	if port, err := cmd.Flags().GetInt("port"); err == nil && port != 0 {
 		config.Port = port
 	}
-	
+
 	if namespace, err := cmd.Flags().GetString("namespace"); err == nil && namespace != "" {
 		config.Namespace = namespace
 	}
-	
+
 	if vaultAddr, err := cmd.Flags().GetString("vault-addr"); err == nil && vaultAddr != "" {
 		config.VaultAddr = vaultAddr
 	}
-	
+
 	if nomadAddr, err := cmd.Flags().GetString("nomad-addr"); err == nil && nomadAddr != "" {
 		config.NomadAddr = nomadAddr
 	}
-	
+
 	if workDir, err := cmd.Flags().GetString("work-dir"); err == nil && workDir != "" {
 		config.WorkDir = workDir
 	}
-	
+
 	if host, err := cmd.Flags().GetString("host"); err == nil && host != "" {
 		config.Host = host
 	}
-	
+
 	if htmlPath, err := cmd.Flags().GetString("html-path"); err == nil && htmlPath != "" {
 		config.PublicHTMLPath = htmlPath
 	}
-	
+
 	if projectName, err := cmd.Flags().GetString("project-name"); err == nil && projectName != "" {
 		config.ProjectName = projectName
 	}
-	
+
 	// Resource configuration
 	if cpu, err := cmd.Flags().GetInt("cpu"); err == nil && cpu > 0 {
 		config.Resources.Nginx.CPU = cpu
 	}
-	
+
 	if memory, err := cmd.Flags().GetInt("memory"); err == nil && memory > 0 {
 		config.Resources.Nginx.Memory = memory
 	}
-	
+
 	return config, nil
 }
 
 func init() {
 	// Add helen command to create
 	CreateCmd.AddCommand(helenCmd)
-	
+
 	// Basic configuration flags
 	helenCmd.Flags().IntP("port", "p", shared.PortHelen, "Port to expose Helen on")
 	helenCmd.Flags().String("namespace", "helen", "Nomad namespace for deployment")
@@ -159,11 +159,11 @@ func init() {
 	helenCmd.Flags().String("host", "0.0.0.0", "Host to bind services to")
 	helenCmd.Flags().String("html-path", "./public", "Path to HTML files to serve")
 	helenCmd.Flags().String("project-name", "helen", "Project name for the deployment")
-	
+
 	// Resource configuration flags
 	helenCmd.Flags().Int("cpu", 500, "CPU allocation in MHz for nginx")
 	helenCmd.Flags().Int("memory", 128, "Memory allocation in MB for nginx")
-	
+
 	// Set flag usage examples
 	helenCmd.Example = `  # Deploy Helen with default settings
   eos create helen

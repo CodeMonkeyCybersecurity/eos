@@ -15,8 +15,8 @@ import (
 // TestLDAPIntegration tests LDAP operations in integration scenarios
 func TestLDAPIntegration(t *testing.T) {
 	// Skip integration tests if not in integration test mode
-	if os.Getenv("EOS_INTEGRATION_TESTS") != "true" {
-		t.Skip("Skipping integration tests. Set EOS_INTEGRATION_TESTS=true to run.")
+	if os.Getenv("Eos_INTEGRATION_TESTS") != "true" {
+		t.Skip("Skipping integration tests. Set Eos_INTEGRATION_TESTS=true to run.")
 	}
 
 	ctx := context.Background()
@@ -84,12 +84,12 @@ func TestLDAPIntegration(t *testing.T) {
 	t.Run("configuration_discovery", func(t *testing.T) {
 		// Test configuration discovery methods
 		cfg, source, err := ReadConfig(rc)
-		
+
 		// Should find configuration from some source
 		assert.NoError(t, err)
 		assert.NotNil(t, cfg)
 		assert.NotEmpty(t, source)
-		
+
 		// Configuration should be valid
 		assert.NotEmpty(t, cfg.FQDN)
 		assert.NotEmpty(t, cfg.BindDN)
@@ -145,7 +145,7 @@ func TestLDAPIntegration(t *testing.T) {
 
 	t.Run("error_handling_integration", func(t *testing.T) {
 		// Test error handling in integration scenarios
-		
+
 		// Test invalid server
 		invalidCfg := &LDAPConfig{
 			FQDN:     "invalid.server.that.does.not.exist",
@@ -163,7 +163,7 @@ func TestLDAPIntegration(t *testing.T) {
 		if cfg := getTestLDAPConfig(t); cfg != nil {
 			badCfg := *cfg
 			badCfg.Password = "invalid_password"
-			
+
 			err := CheckConnection(rc, &badCfg)
 			assert.Error(t, err)
 		}
@@ -248,8 +248,8 @@ func TestLDAPMockIntegration(t *testing.T) {
 	t.Run("mock_group_operations", func(t *testing.T) {
 		// Test group operations with mock data
 		group := LDAPGroup{
-			CN:      "MockGroup",
-			DN:      "cn=MockGroup,ou=Groups,dc=mock,dc=com",
+			CN: "MockGroup",
+			DN: "cn=MockGroup,ou=Groups,dc=mock,dc=com",
 			Members: []string{
 				"uid=user1,ou=Users,dc=mock,dc=com",
 				"uid=user2,ou=Users,dc=mock,dc=com",
@@ -260,7 +260,7 @@ func TestLDAPMockIntegration(t *testing.T) {
 		assert.Equal(t, "MockGroup", group.CN)
 		assert.Contains(t, group.DN, "cn=MockGroup")
 		assert.Len(t, group.Members, 2)
-		
+
 		for _, member := range group.Members {
 			assert.Contains(t, member, "uid=")
 			assert.Contains(t, member, "dc=mock,dc=com")
@@ -269,7 +269,7 @@ func TestLDAPMockIntegration(t *testing.T) {
 
 	t.Run("mock_error_scenarios", func(t *testing.T) {
 		// Test error scenarios with mock data
-		
+
 		// Test empty configuration
 		emptyCfg := &LDAPConfig{}
 		err := CheckConnection(rc, emptyCfg)
@@ -323,7 +323,7 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 		assert.True(t, cfg.UseTLS, "Should use TLS for secure connections")
 		assert.Equal(t, 636, cfg.Port, "Should use secure LDAPS port")
 		assert.NotEmpty(t, cfg.Password, "Password should not be empty")
-		
+
 		// Test role separation
 		assert.NotEqual(t, cfg.AdminRole, cfg.ReadonlyRole, "Admin and readonly roles should be different")
 	})
@@ -339,7 +339,7 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 
 		// Test that password is not logged or exposed
 		assert.NotEmpty(t, cfg.Password, "Password should be available for authentication")
-		
+
 		// Test password field metadata
 		passwordMeta := LDAPFieldMeta["Password"]
 		assert.True(t, passwordMeta.Sensitive, "Password should be marked as sensitive")
@@ -347,13 +347,13 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 
 	t.Run("connection_security_validation", func(t *testing.T) {
 		// Test connection security validation
-		
+
 		// Test TLS configuration security
-		os.Unsetenv("EOS_INSECURE_TLS")
+		os.Unsetenv("Eos_INSECURE_TLS")
 		os.Unsetenv("GO_ENV")
-		
+
 		tlsConfig := getSecureTLSConfig()
-		
+
 		// Verify secure TLS settings
 		assert.False(t, tlsConfig.InsecureSkipVerify, "Should not skip TLS verification")
 		assert.NotEmpty(t, tlsConfig.CipherSuites, "Should have secure cipher suites")
@@ -362,7 +362,7 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 
 	t.Run("injection_prevention_integration", func(t *testing.T) {
 		// Test injection prevention in integration context
-		
+
 		// Test with potentially malicious input
 		maliciousInputs := []string{
 			"admin)(|(objectClass=*))",
@@ -373,7 +373,7 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 		for _, input := range maliciousInputs {
 			// Test user search with malicious input
 			users, err := readUsersWithFilter(rc, fmt.Sprintf("(uid=%s)", input))
-			
+
 			// Should handle malicious input safely
 			if err != nil {
 				assert.NotContains(t, err.Error(), "panic", "Should not panic on malicious input")
@@ -387,7 +387,7 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 	t.Run("timeout_security_integration", func(t *testing.T) {
 		// Test timeout security in integration context
 		start := time.Now()
-		
+
 		// Test with unreachable server
 		unreachableCfg := &LDAPConfig{
 			FQDN:     "192.0.2.1", // Test network (RFC 3330)
@@ -470,11 +470,11 @@ func TestLDAPHealthChecks(t *testing.T) {
 	t.Run("systemd_service_detection", func(t *testing.T) {
 		// Test systemd service detection
 		services := []string{"slapd", "389-ds", "openldap"}
-		
+
 		for _, service := range services {
 			isActive := IsSystemdUnitActive(service)
 			t.Logf("Service %s active: %v", service, isActive)
-			
+
 			// Should return boolean without error
 			assert.IsType(t, true, isActive)
 		}
@@ -488,7 +488,7 @@ func TestLDAPHealthChecks(t *testing.T) {
 		} else {
 			t.Log("LDAP probe succeeded")
 		}
-		
+
 		// Test authentication probe
 		err = runLDAPAuthProbe("cn=admin,dc=example,dc=com", "testpassword")
 		if err != nil {
@@ -501,8 +501,8 @@ func TestLDAPHealthChecks(t *testing.T) {
 
 // BenchmarkLDAPOperations benchmarks LDAP operations
 func BenchmarkLDAPOperations(b *testing.B) {
-	if os.Getenv("EOS_BENCHMARK_TESTS") != "true" {
-		b.Skip("Skipping benchmark tests. Set EOS_BENCHMARK_TESTS=true to run.")
+	if os.Getenv("Eos_BENCHMARK_TESTS") != "true" {
+		b.Skip("Skipping benchmark tests. Set Eos_BENCHMARK_TESTS=true to run.")
 	}
 
 	ctx := context.Background()

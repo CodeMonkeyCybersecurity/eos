@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// EnhancedConsulManager provides enterprise-grade Consul integration
+// EnhancedConsulManager provides safe, high-quality and effective Consul integration
 type EnhancedConsulManager struct {
 	client         *api.Client
 	config         *EnhancedConfig
@@ -26,7 +26,7 @@ type EnhancedConsulManager struct {
 	alerting       *AlertManager
 }
 
-// EnhancedConfig extends basic Consul configuration with enterprise features
+// EnhancedConfig extends basic Consul configuration with features
 type EnhancedConfig struct {
 	Address              string            `yaml:"address"`
 	Datacenter           string            `yaml:"datacenter"`

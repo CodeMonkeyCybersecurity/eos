@@ -214,7 +214,7 @@ func WriteConfigFile(path string, v interface{}) error {
 func getEncryptionKey() []byte {
 	// In production, this should come from a secure source
 	// like environment variable or key management service
-	key := os.Getenv("EOS_CONFIG_KEY")
+	key := os.Getenv("Eos_CONFIG_KEY")
 	if key == "" {
 		// Use a default key for development (NOT FOR PRODUCTION)
 		return []byte("eos-config-encryption-key-32char")

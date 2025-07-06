@@ -120,13 +120,13 @@ func (s *IntegrationTestSuite) setTestEnvironment() {
 
 	// Store original values for cleanup
 	envVars := map[string]string{
-		"EOS_TEST_MODE":     "true",
+		"Eos_TEST_MODE":     "true",
 		"VAULT_SKIP_VERIFY": "true",
 		"VAULT_CACERT":      filepath.Join(s.tempDir, "vault/tls/tls.crt"),
 		shared.VaultAddrEnv: "http://127.0.0.1:8200",
-		"EOS_DATA_DIR":      filepath.Join(s.tempDir, "eos"),
-		"EOS_LOG_LEVEL":     "debug",
-		"EOS_LOG_PATH":      filepath.Join(s.tempDir, "logs/eos.log"),
+		"Eos_DATA_DIR":      filepath.Join(s.tempDir, "eos"),
+		"Eos_LOG_LEVEL":     "debug",
+		"Eos_LOG_PATH":      filepath.Join(s.tempDir, "logs/eos.log"),
 	}
 
 	originalValues := make(map[string]string)

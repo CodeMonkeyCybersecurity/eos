@@ -163,8 +163,8 @@ Commands use structured logging throughout:
 ### Dependencies
 - **Cobra CLI**: Command structure and flag handling
 - **Delphi Package**: Core Wazuh integration functionality
-- **EOS CLI**: Runtime context and command wrapping
-- **EOS Unix**: System-level security controls
+- **Eos CLI**: Runtime context and command wrapping
+- **Eos Unix**: System-level security controls
 - **OpenTelemetry**: Structured logging and observability
 - **Zap**: High-performance logging library
 

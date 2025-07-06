@@ -101,7 +101,7 @@ func canConnectTLS(rc *eos_io.RuntimeContext, raw string, d time.Duration) bool 
 	}
 
 	// Only skip verification in development/testing environments
-	if os.Getenv("EOS_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
+	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		tlsConfig.InsecureSkipVerify = true
 		otelzap.Ctx(rc.Ctx).Debug("Using insecure TLS for development/testing", zap.String("host", u.Host))
 	}

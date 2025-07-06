@@ -307,19 +307,19 @@ type WazuhAPIResponse[T any] struct {
 
 // Rule represents the structure of a Wazuh rule.
 type Rule struct {
-	Filename        string                 `json:"filename"`
-	RelativeDirname string                 `json:"relative_dirname"`
-	ID              int                    `json:"id"`
-	Level           int                    `json:"level"`
-	Status          string                 `json:"status"`
+	Filename        string         `json:"filename"`
+	RelativeDirname string         `json:"relative_dirname"`
+	ID              int            `json:"id"`
+	Level           int            `json:"level"`
+	Status          string         `json:"status"`
 	Details         map[string]any `json:"details"` // Can be more specific if schema is known
-	PCIDSS          []string               `json:"pci_dss"`
-	GPG13           []string               `json:"gpg13"`
-	GDPR            []string               `json:"gdpr"`
-	HIPAA           []string               `json:"hipaa"`
-	NIST80053       []string               `json:"nist_800_53"`
-	Groups          []string               `json:"groups"`
-	Description     string                 `json:"description"`
+	PCIDSS          []string       `json:"pci_dss"`
+	GPG13           []string       `json:"gpg13"`
+	GDPR            []string       `json:"gdpr"`
+	HIPAA           []string       `json:"hipaa"`
+	NIST80053       []string       `json:"nist_800_53"`
+	Groups          []string       `json:"groups"`
+	Description     string         `json:"description"`
 }
 
 // LogtestResponse represents the response from the /logtest endpoint.
@@ -621,13 +621,13 @@ func SearchRules(rc *eos_io.RuntimeContext, cfg *Config, token string, search, g
 // getDelphiTLSConfig returns TLS configuration with proper security settings for Delphi/Wazuh API
 func getDelphiTLSConfig() *tls.Config {
 	// Allow insecure TLS only in development/testing environments
-	if os.Getenv("EOS_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
+	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		return &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
-	
+
 	// Secure TLS configuration for production Delphi/Wazuh API connections
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,

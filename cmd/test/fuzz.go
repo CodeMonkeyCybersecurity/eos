@@ -1,0 +1,116 @@
+// cmd/test/fuzz.go
+package test
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/testing"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+var fuzzCmd = &cobra.Command{
+	Use:   "fuzz",
+	Short: "Run fuzz tests",
+	Long: `Execute all fuzz tests across the Eos codebase.
+	
+This command runs comprehensive fuzz testing on critical security-related
+functions throughout the Eos project, including crypto operations, input
+validation, command parsing, and more.`,
+	RunE: eos_cli.Wrap(runFuzzTests),
+}
+
+var (
+	fuzzDuration string
+	fuzzParallel int
+	reportFile   string
+)
+
+func init() {
+	TestCmd.AddCommand(fuzzCmd)
+
+	fuzzCmd.Flags().StringVarP(&fuzzDuration, "duration", "d", "10s",
+		"Duration for each fuzz test (e.g., 10s, 1m, 5m)")
+	fuzzCmd.Flags().IntVarP(&fuzzParallel, "parallel", "p", 4,
+		"Number of parallel fuzz tests to run")
+	fuzzCmd.Flags().StringVarP(&reportFile, "report-file", "r", "",
+		"Save detailed report to file")
+}
+
+func runFuzzTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	duration, err := time.ParseDuration(fuzzDuration)
+	if err != nil {
+		return fmt.Errorf("invalid duration: %w", err)
+	}
+
+	runner, err := testing.NewFuzzRunner(rc)
+	if err != nil {
+		return fmt.Errorf("failed to create fuzz runner: %w", err)
+	}
+
+	// Set parallelism
+	runner.SetParallelism(fuzzParallel)
+
+	logger.Info("Starting fuzz test execution",
+		zap.Duration("duration", duration),
+		zap.Int("parallel", fuzzParallel))
+
+	fmt.Printf("🧪 Running fuzz tests with %s duration...\n", duration)
+	fmt.Printf("📍 Parallel execution: %d tests\n", fuzzParallel)
+	fmt.Printf("📁 Working directory: %s\n\n", rc.Ctx.Value("workdir"))
+
+	report, err := runner.RunAll(duration)
+	if err != nil {
+		return fmt.Errorf("fuzz tests failed: %w", err)
+	}
+
+	// Display summary
+	fmt.Println(report.Summary())
+
+	// Save detailed report if requested
+	if reportFile != "" {
+		if err := report.SaveReport(reportFile); err != nil {
+			logger.Warn("Failed to save report file",
+				zap.String("file", reportFile),
+				zap.Error(err))
+		} else {
+			fmt.Printf("\n📊 Detailed report saved to: %s\n", reportFile)
+		}
+	}
+
+	// Exit with error if any tests failed
+	for _, test := range report.Tests {
+		if !test.Success {
+			logger.Error("Some fuzz tests failed",
+				zap.Int("failed_tests", countFailedTests(report.Tests)),
+				zap.Duration("total_duration", report.Duration))
+			return fmt.Errorf("some fuzz tests failed")
+		}
+	}
+
+	logger.Info("All fuzz tests completed successfully",
+		zap.Int("total_tests", len(report.Tests)),
+		zap.Duration("total_duration", report.Duration))
+
+	fmt.Println("\n✅ All fuzz tests completed successfully!")
+	fmt.Printf("🎯 No issues found during fuzzing with %s duration.\n", duration)
+
+	return nil
+}
+
+// countFailedTests counts the number of failed tests
+func countFailedTests(tests []testing.FuzzResult) int {
+	count := 0
+	for _, test := range tests {
+		if !test.Success {
+			count++
+		}
+	}
+	return count
+}

@@ -16,7 +16,7 @@ import (
 
 func TestDefaultLDAPConfig(t *testing.T) {
 	cfg := DefaultLDAPConfig()
-	
+
 	assert.Equal(t, "localhost", cfg.FQDN)
 	assert.Equal(t, 389, cfg.Port)
 	assert.False(t, cfg.UseTLS)
@@ -91,7 +91,7 @@ func TestTryLoadFromEnv(t *testing.T) {
 			}
 
 			cfg := TryLoadFromEnv()
-			
+
 			if tt.expected == nil {
 				assert.Nil(t, cfg)
 			} else {
@@ -110,7 +110,7 @@ func TestTryLoadFromEnv(t *testing.T) {
 func TestIsPortOpen(t *testing.T) {
 	// Test with a port that should be closed
 	assert.False(t, IsPortOpen(65432))
-	
+
 	// Test with a port that might be open (common HTTP port)
 	// Note: This test may be flaky depending on the environment
 	// In a real test environment, you might want to start a test server
@@ -118,8 +118,8 @@ func TestIsPortOpen(t *testing.T) {
 
 func TestGetSecureTLSConfig(t *testing.T) {
 	tests := []struct {
-		name        string
-		envVars     map[string]string
+		name           string
+		envVars        map[string]string
 		expectInsecure bool
 	}{
 		{
@@ -130,7 +130,7 @@ func TestGetSecureTLSConfig(t *testing.T) {
 		{
 			name: "insecure development config",
 			envVars: map[string]string{
-				"EOS_INSECURE_TLS": "true",
+				"Eos_INSECURE_TLS": "true",
 			},
 			expectInsecure: true,
 		},
@@ -146,7 +146,7 @@ func TestGetSecureTLSConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Clear environment variables
-			os.Unsetenv("EOS_INSECURE_TLS")
+			os.Unsetenv("Eos_INSECURE_TLS")
 			os.Unsetenv("GO_ENV")
 
 			// Set test environment variables
@@ -184,7 +184,7 @@ func TestTryReadFromVault(t *testing.T) {
 
 	// Note: This test would require a mock Vault client
 	// For now, we'll test the error cases
-	
+
 	t.Run("nil client", func(t *testing.T) {
 		cfg, err := TryReadFromVault(rc, nil)
 		assert.Nil(t, cfg)
@@ -222,7 +222,7 @@ func TestTryDetectFromHost(t *testing.T) {
 	// This test depends on the actual host environment
 	// In a real test setup, you might want to mock the network calls
 	cfg := TryDetectFromHost()
-	
+
 	// The result depends on whether LDAP is running on localhost:389
 	// We can't make strong assertions without controlling the environment
 	if cfg != nil {
@@ -234,9 +234,9 @@ func TestTryDetectFromHost(t *testing.T) {
 
 func TestLDAPConfigValidation(t *testing.T) {
 	tests := []struct {
-		name     string
-		cfg      *LDAPConfig
-		isValid  bool
+		name    string
+		cfg     *LDAPConfig
+		isValid bool
 	}{
 		{
 			name: "valid configuration",
@@ -256,22 +256,22 @@ func TestLDAPConfigValidation(t *testing.T) {
 		{
 			name: "missing FQDN",
 			cfg: &LDAPConfig{
-				Port:         389,
-				BindDN:       "cn=admin,dc=example,dc=com",
-				Password:     "secret123",
-				UserBase:     "ou=Users,dc=example,dc=com",
-				RoleBase:     "ou=Groups,dc=example,dc=com",
+				Port:     389,
+				BindDN:   "cn=admin,dc=example,dc=com",
+				Password: "secret123",
+				UserBase: "ou=Users,dc=example,dc=com",
+				RoleBase: "ou=Groups,dc=example,dc=com",
 			},
 			isValid: false,
 		},
 		{
 			name: "missing BindDN",
 			cfg: &LDAPConfig{
-				FQDN:         "ldap.example.com",
-				Port:         389,
-				Password:     "secret123",
-				UserBase:     "ou=Users,dc=example,dc=com",
-				RoleBase:     "ou=Groups,dc=example,dc=com",
+				FQDN:     "ldap.example.com",
+				Port:     389,
+				Password: "secret123",
+				UserBase: "ou=Users,dc=example,dc=com",
+				RoleBase: "ou=Groups,dc=example,dc=com",
 			},
 			isValid: false,
 		},
@@ -342,20 +342,20 @@ func TestLDAPFieldMeta(t *testing.T) {
 
 func TestSecureTLSConfiguration(t *testing.T) {
 	// Test that secure TLS configuration uses appropriate settings
-	os.Unsetenv("EOS_INSECURE_TLS")
+	os.Unsetenv("Eos_INSECURE_TLS")
 	os.Unsetenv("GO_ENV")
-	
+
 	cfg := getSecureTLSConfig()
-	
+
 	// Verify minimum TLS version
 	assert.Equal(t, uint16(tls.VersionTLS12), cfg.MinVersion)
-	
+
 	// Verify cipher suites are configured
 	assert.NotEmpty(t, cfg.CipherSuites)
-	
+
 	// Verify server cipher suite preference
 	assert.True(t, cfg.PreferServerCipherSuites)
-	
+
 	// Verify secure connection (not skipping verification)
 	assert.False(t, cfg.InsecureSkipVerify)
 }
@@ -364,7 +364,7 @@ func TestPasswordSensitivity(t *testing.T) {
 	// Test that password is properly marked as sensitive in field metadata
 	passwordMeta := LDAPFieldMeta["Password"]
 	assert.True(t, passwordMeta.Sensitive, "Password field must be marked as sensitive")
-	
+
 	// Test that other fields are not unnecessarily marked as sensitive
 	nonsensitiveFields := []string{"FQDN", "BindDN", "UserBase", "RoleBase", "AdminRole", "ReadonlyRole"}
 	for _, field := range nonsensitiveFields {
@@ -376,7 +376,7 @@ func TestPasswordSensitivity(t *testing.T) {
 func TestConnectionTimeout(t *testing.T) {
 	// Test that connection attempts have appropriate timeouts
 	start := time.Now()
-	
+
 	// Try to connect to a non-existent server
 	cfg := &LDAPConfig{
 		FQDN:     "192.0.2.1", // RFC 3330 test address
@@ -385,10 +385,10 @@ func TestConnectionTimeout(t *testing.T) {
 		BindDN:   "cn=admin,dc=example,dc=com",
 		Password: "test",
 	}
-	
+
 	_, err := ConnectWithGivenConfig(cfg)
 	elapsed := time.Since(start)
-	
+
 	// Should fail due to network timeout
 	assert.Error(t, err)
 	// Should not hang indefinitely - should timeout within reasonable time
@@ -402,14 +402,14 @@ func TestBindDNValidation(t *testing.T) {
 		"uid=user,ou=People,dc=example,dc=org",
 		"cn=service,ou=Services,dc=company,dc=net",
 	}
-	
+
 	for _, dn := range validDNs {
 		cfg := &LDAPConfig{
 			FQDN:   "ldap.example.com",
 			Port:   389,
 			BindDN: dn,
 		}
-		
+
 		// Basic validation - should contain DC components
 		assert.Contains(t, cfg.BindDN, "dc=", "BindDN should contain DC component: %s", dn)
 	}
@@ -419,14 +419,14 @@ func TestBindDNValidation(t *testing.T) {
 func TestMockLDAPOperations(t *testing.T) {
 	// This would be expanded with actual mock LDAP server for integration testing
 	// For now, we test the error handling paths
-	
+
 	ctx := context.Background()
 	logger := zap.NewNop()
 	rc := &eos_io.RuntimeContext{
 		Ctx: ctx,
 		Log: logger,
 	}
-	
+
 	// Test connection failure handling
 	invalidCfg := &LDAPConfig{
 		FQDN:     "invalid.domain.that.does.not.exist",
@@ -435,7 +435,7 @@ func TestMockLDAPOperations(t *testing.T) {
 		BindDN:   "cn=admin,dc=example,dc=com",
 		Password: "test",
 	}
-	
+
 	err := CheckConnection(rc, invalidCfg)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "connection test failed")
@@ -445,7 +445,7 @@ func TestLDAPConfigReflection(t *testing.T) {
 	// Test that LDAPConfig struct has expected fields with proper types
 	cfg := &LDAPConfig{}
 	v := reflect.ValueOf(cfg).Elem()
-	
+
 	expectedFields := map[string]string{
 		"FQDN":         "string",
 		"Port":         "int",
@@ -457,7 +457,7 @@ func TestLDAPConfigReflection(t *testing.T) {
 		"AdminRole":    "string",
 		"ReadonlyRole": "string",
 	}
-	
+
 	for fieldName, expectedType := range expectedFields {
 		field := v.FieldByName(fieldName)
 		assert.True(t, field.IsValid(), "Field %s should exist", fieldName)

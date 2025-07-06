@@ -1,6 +1,6 @@
 # Fuzz Testing Deployment Guide
 
-This guide explains how to deploy and implement the comprehensive fuzz testing suite for the EOS CLI tool.
+This guide explains how to deploy and implement the comprehensive fuzz testing suite for the Eos CLI tool.
 
 ## Overview
 

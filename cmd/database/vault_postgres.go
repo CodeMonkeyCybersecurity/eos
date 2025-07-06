@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -38,7 +38,7 @@ This command provides comprehensive Vault database integration:
 - Configure PostgreSQL connection parameters
 - Create read-only database roles with TTL
 - Test dynamic credential generation
-- Integration with EOS secret management
+- Integration with Eos secret management
 
 Examples:
   eos database vault-postgres --interactive                    # Interactive setup

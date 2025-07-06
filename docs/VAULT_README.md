@@ -1,6 +1,6 @@
 # Vault Package Documentation
 
-This package provides comprehensive HashiCorp Vault integration for Eos with enterprise-grade security features.
+This package provides comprehensive HashiCorp Vault integration for Eos with safe, high-quality and effective security features.
 
 ## Core Modules
 
@@ -109,7 +109,7 @@ Vault Agent provides automatic token renewal and authentication. Configuration i
 - **Enhanced Error Handling**: Comprehensive logging and troubleshooting capabilities
 
 #### Systemd Integration
-The agent service includes robust systemd integration with proper EOS paths:
+The agent service includes robust systemd integration with proper Eos paths:
 ```bash
 # Runtime directory creation via tmpfiles.d
 /etc/tmpfiles.d/eos.conf:

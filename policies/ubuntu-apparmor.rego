@@ -17,7 +17,7 @@ required_profiles := {
     "/usr/local/bin/eos"
 }
 
-# Custom EOS profiles that must be created
+# Custom Eos profiles that must be created
 eos_profiles := {
     "eos-cli": {
         "path": "/usr/local/bin/eos",
@@ -126,7 +126,7 @@ missing_required_profiles := required_profiles - {profile |
     profile := input.apparmor.loaded_profiles[_]
 }
 
-# Validate EOS custom profiles
+# Validate Eos custom profiles
 validate_eos_profiles if {
     every profile_name, profile_config in eos_profiles {
         profile_name in input.apparmor.loaded_profiles
@@ -171,7 +171,7 @@ recommendations contains "Address critical profile violations immediately" if {
     critical_violation
 }
 
-recommendations contains "Update EOS custom profiles" if {
+recommendations contains "Update Eos custom profiles" if {
     not validate_eos_profiles
 }
 
@@ -191,7 +191,7 @@ deny contains reason if {
 
 deny contains reason if {
     not validate_eos_profiles  
-    reason := "EOS AppArmor profiles are invalid or missing"
+    reason := "Eos AppArmor profiles are invalid or missing"
 }
 
 deny contains reason if {

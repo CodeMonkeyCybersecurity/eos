@@ -37,7 +37,7 @@ func DeployDelphiWebhook(ctx context.Context, logger otelzap.LoggerWithCtx, targ
 	// Check if source files exist
 	for _, src := range []string{pythonScript, bashScript} {
 		if !fileContainer.FileExists(src) {
-			return fmt.Errorf("source file not found: %s (ensure EOS assets are properly installed)", src)
+			return fmt.Errorf("source file not found: %s (ensure Eos assets are properly installed)", src)
 		}
 	}
 

@@ -38,7 +38,7 @@ func TestNewEnhancedConsulManager(t *testing.T) {
 
 	// Test manager creation
 	manager, err := NewEnhancedConsulManager(rc, config)
-	
+
 	// Note: This will fail if Consul is not running, which is expected in CI
 	if err != nil {
 		t.Skipf("Skipping test - Consul not available: %v", err)
@@ -115,10 +115,10 @@ func TestConnectConfiguration_Validation(t *testing.T) {
 
 func TestHealthCheckTypes(t *testing.T) {
 	testCases := []struct {
-		name     string
+		name      string
 		checkType string
-		target   string
-		valid    bool
+		target    string
+		valid     bool
 	}{
 		{"HTTP Check", "http", "http://127.0.0.1:8080/health", true},
 		{"HTTPS Check", "https", "https://127.0.0.1:8443/health", true},
@@ -145,7 +145,7 @@ func TestHealthCheckTypes(t *testing.T) {
 
 func TestEnhancedConfig_Defaults(t *testing.T) {
 	config := &EnhancedConfig{
-		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul),  // EOS custom port
+		Address:    fmt.Sprintf("127.0.0.1:%d", shared.PortConsul), // Eos custom port
 		Datacenter: "dc1",
 		CircuitBreakerConfig: &CBConfig{
 			MaxRequests: 5,

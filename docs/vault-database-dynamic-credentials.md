@@ -266,4 +266,4 @@ def get_postgres_connection():
         return psycopg2.connect(os.getenv('PG_DSN'))
 ```
 
-This approach provides enterprise-grade security for database access while maintaining compatibility with existing setups through graceful fallbacks.
+This approach provides safe, high-quality and effective security for database access while maintaining compatibility with existing setups through graceful fallbacks.

@@ -11,8 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// FuzzAllEOSCommands tests all legitimate EOS commands to prevent crashes
-func FuzzAllEOSCommands(f *testing.F) {
+// FuzzAllEosCommands tests all legitimate Eos commands to prevent crashes
+func FuzzAllEosCommands(f *testing.F) {
 	// Seed with all main commands from root.go
 	f.Add("ai", "", "")
 	f.Add("create", "hcl", "terraform")
@@ -50,7 +50,7 @@ func FuzzAllEOSCommands(f *testing.F) {
 	f.Fuzz(func(t *testing.T, cmd1, cmd2, cmd3 string) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("EOS command crashed with panic: %v, args: [%q, %q, %q]", r, cmd1, cmd2, cmd3)
+				t.Errorf("Eos command crashed with panic: %v, args: [%q, %q, %q]", r, cmd1, cmd2, cmd3)
 			}
 		}()
 
@@ -66,8 +66,8 @@ func FuzzAllEOSCommands(f *testing.F) {
 			args = append(args, cmd3)
 		}
 
-		// Create comprehensive command structure matching actual EOS
-		rootCmd := createTestEOSCommandTree()
+		// Create comprehensive command structure matching actual Eos
+		rootCmd := createTestEosCommandTree()
 
 		// Set up context
 		ctx := context.Background()
@@ -90,8 +90,8 @@ func FuzzAllEOSCommands(f *testing.F) {
 	})
 }
 
-// FuzzEOSCommandFlags tests various flag combinations
-func FuzzEOSCommandFlags(f *testing.F) {
+// FuzzEosCommandFlags tests various flag combinations
+func FuzzEosCommandFlags(f *testing.F) {
 	// Seed with common flag patterns
 	f.Add("--help")
 	f.Add("--version")
@@ -109,12 +109,12 @@ func FuzzEOSCommandFlags(f *testing.F) {
 	f.Fuzz(func(t *testing.T, flag string) {
 		defer func() {
 			if r := recover(); r != nil {
-				t.Errorf("EOS flag parsing crashed with panic: %v, flag: %q", r, flag)
+				t.Errorf("Eos flag parsing crashed with panic: %v, flag: %q", r, flag)
 			}
 		}()
 
 		// Create test command
-		rootCmd := createTestEOSCommandTree()
+		rootCmd := createTestEosCommandTree()
 		ctx := context.Background()
 		rootCmd.SetContext(ctx)
 
@@ -161,7 +161,7 @@ func FuzzDelphiServicesCommands(f *testing.F) {
 		// Always add dry-run and skip-installation-check for safety
 		args = append(args, "--dry-run", "--skip-installation-check")
 
-		rootCmd := createTestEOSCommandTree()
+		rootCmd := createTestEosCommandTree()
 		ctx := context.Background()
 		rootCmd.SetContext(ctx)
 		rootCmd.SetArgs(args)
@@ -172,11 +172,11 @@ func FuzzDelphiServicesCommands(f *testing.F) {
 	})
 }
 
-// createTestEOSCommandTree creates a minimal but comprehensive command tree for testing
-func createTestEOSCommandTree() *cobra.Command {
+// createTestEosCommandTree creates a minimal but comprehensive command tree for testing
+func createTestEosCommandTree() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "eos",
-		Short: "EOS CLI Tool",
+		Short: "Eos CLI Tool",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return nil // Safe no-op
 		},

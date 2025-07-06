@@ -17,7 +17,7 @@ func TestPasswordSecurityRequirements(t *testing.T) {
 	t.Run("password_length_security", func(t *testing.T) {
 		// Current minimum is 12, but security best practice is 14+
 		if MinPasswordLen < 14 {
-			t.Errorf("MinPasswordLen is %d, should be at least 14 for enterprise security", MinPasswordLen)
+			t.Errorf("MinPasswordLen is %d, should be at least 14 for security", MinPasswordLen)
 		}
 
 		// Test that we can't generate passwords shorter than minimum
@@ -227,7 +227,7 @@ func TestSecureEraseEffectiveness(t *testing.T) {
 		if os.Getenv("CI") != "" {
 			t.Skip("Skipping secure erase test in CI environment")
 		}
-		
+
 		// Skip this test if shred command is not available (e.g., on macOS)
 		if _, err := exec.LookPath("shred"); err != nil {
 			t.Skip("Skipping secure erase test - shred command not available")

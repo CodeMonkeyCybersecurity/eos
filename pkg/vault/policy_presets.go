@@ -6,12 +6,12 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
-// BuildEosDefaultPolicy creates the default EOS user policy using the builder
+// BuildEosDefaultPolicy creates the default Eos user policy using the builder
 func BuildEosDefaultPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
 
 	policy := builder.
-		AddComment("EOS Default Policy - Standard user access with security restrictions").
+		AddComment("Eos Default Policy - Standard user access with security restrictions").
 		AddTokenCapabilities().
 		AddIdentityCapabilities().
 		AddCubbyholeAccess().
@@ -40,7 +40,7 @@ func BuildEosAdminPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
 
 	policy := builder.
-		AddComment("EOS Admin Policy - Infrastructure management with elevated privileges").
+		AddComment("Eos Admin Policy - Infrastructure management with elevated privileges").
 		AddSection("Full Token Management").
 		AddPath("auth/token/*", "create", "read", "update", "delete", "list").
 		AddPath("sys/capabilities", "update").
@@ -89,7 +89,7 @@ func BuildEosEmergencyPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
 
 	policy := builder.
-		AddComment("EOS Emergency Policy - Broad access for emergency response").
+		AddComment("Eos Emergency Policy - Broad access for emergency response").
 		AddSection("Emergency Read Access").
 		AddPath("*", "read", "list").
 		AddSection("Emergency Write Access").
@@ -118,7 +118,7 @@ func BuildEosReadOnlyPolicy(rc *eos_io.RuntimeContext) (string, error) {
 	builder := NewPolicyBuilder()
 
 	policy := builder.
-		AddComment("EOS Read-Only Policy - Monitoring and auditing access").
+		AddComment("Eos Read-Only Policy - Monitoring and auditing access").
 		AddSection("Read-Only Secrets Access").
 		AddPath("secret/data/*", "read", "list").
 		AddPath("secret/metadata/*", "read", "list").

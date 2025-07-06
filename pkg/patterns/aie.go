@@ -1,4 +1,4 @@
-// Package patterns provides common design patterns for EOS operations
+// Package patterns provides common design patterns for Eos operations
 package patterns
 
 import (
@@ -13,35 +13,35 @@ import (
 type AIEOperation interface {
 	// Assess checks if the operation can be performed
 	Assess(ctx context.Context) (*AssessmentResult, error)
-	
+
 	// Intervene performs the actual operation
 	Intervene(ctx context.Context, assessment *AssessmentResult) (*InterventionResult, error)
-	
+
 	// Evaluate verifies the operation completed successfully
 	Evaluate(ctx context.Context, intervention *InterventionResult) (*EvaluationResult, error)
 }
 
 // AssessmentResult contains the results of the assessment phase
 type AssessmentResult struct {
-	CanProceed   bool
-	Reason       string
+	CanProceed    bool
+	Reason        string
 	Prerequisites map[string]bool
-	Context      map[string]interface{}
+	Context       map[string]interface{}
 }
 
 // InterventionResult contains the results of the intervention phase
 type InterventionResult struct {
-	Success     bool
-	Message     string
-	Changes     []Change
+	Success      bool
+	Message      string
+	Changes      []Change
 	RollbackData interface{}
 }
 
 // EvaluationResult contains the results of the evaluation phase
 type EvaluationResult struct {
-	Success      bool
-	Message      string
-	Validations  map[string]ValidationResult
+	Success       bool
+	Message       string
+	Validations   map[string]ValidationResult
 	NeedsRollback bool
 }
 
@@ -140,13 +140,13 @@ func (e *Executor) Execute(ctx context.Context, operation AIEOperation, operatio
 			zap.String("operation", operationName),
 			zap.String("message", evaluation.Message),
 			zap.Bool("needs_rollback", evaluation.NeedsRollback))
-		
+
 		if evaluation.NeedsRollback {
 			// TODO: Implement rollback mechanism
 			e.logger.Warn("Rollback needed but not implemented",
 				zap.String("operation", operationName))
 		}
-		
+
 		return fmt.Errorf("evaluation failed: %s", evaluation.Message)
 	}
 
@@ -164,7 +164,7 @@ func (e *Executor) ExecuteWithRollback(ctx context.Context, operation AIEOperati
 		e.logger.Warn("Operation failed, attempting rollback",
 			zap.String("operation", operationName),
 			zap.Error(err))
-		
+
 		rollbackErr := rollback.Rollback(ctx)
 		if rollbackErr != nil {
 			e.logger.Error("Rollback failed",
@@ -172,11 +172,11 @@ func (e *Executor) ExecuteWithRollback(ctx context.Context, operation AIEOperati
 				zap.Error(rollbackErr))
 			return fmt.Errorf("operation failed: %w, rollback failed: %w", err, rollbackErr)
 		}
-		
+
 		e.logger.Info("Rollback completed successfully",
 			zap.String("operation", operationName))
 	}
-	
+
 	return err
 }
 

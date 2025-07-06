@@ -54,7 +54,7 @@ func init() {
 
 func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Warn("🚨 EMERGENCY: Ragequit initiated",
 		zap.String("user", os.Getenv("USER")),
 		zap.String("hostname", getHostname()),
@@ -79,7 +79,7 @@ func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 		zap.String("output_dir", getHomeDir()))
 
 	var wg sync.WaitGroup
-	
+
 	// Run all diagnostic functions in parallel for speed
 	diagnosticFuncs := []func(*eos_io.RuntimeContext){
 		detectEnvironment,
@@ -133,13 +133,13 @@ func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 		logger.Error("🔥 INITIATING EMERGENCY REBOOT",
 			zap.String("countdown", "5 seconds"),
 			zap.String("reason", reason))
-		
+
 		// Final countdown
 		for i := 5; i > 0; i-- {
 			logger.Warn("Rebooting in", zap.Int("seconds", i))
 			time.Sleep(1 * time.Second)
 		}
-		
+
 		// Execute reboot
 		return executeReboot(rc)
 	} else {
@@ -151,7 +151,7 @@ func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 
 func confirmRagequit(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	fmt.Print("🚨 EMERGENCY RAGEQUIT 🚨\n")
 	fmt.Print("This will:\n")
 	fmt.Print("1. Collect comprehensive system diagnostics\n")
@@ -160,14 +160,14 @@ func confirmRagequit(rc *eos_io.RuntimeContext) bool {
 		fmt.Print("3. REBOOT THE SYSTEM IMMEDIATELY\n")
 	}
 	fmt.Print("\nAre you sure you want to continue? (yes/no): ")
-	
+
 	reader := bufio.NewReader(os.Stdin)
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		logger.Error("Failed to read user input", zap.Error(err))
 		return false
 	}
-	
+
 	response = strings.TrimSpace(strings.ToLower(response))
 	return response == "yes" || response == "y"
 }
@@ -176,13 +176,13 @@ func createTimestampFile(rc *eos_io.RuntimeContext, reason string) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	timestampFile := filepath.Join(homeDir, "ragequit-timestamp.txt")
-	
+
 	content := fmt.Sprintf("Ragequit executed at: %s\nTriggered by: %s\nReason: %s\nHostname: %s\n",
 		time.Now().Format(time.RFC3339),
 		os.Getenv("USER"),
 		reason,
 		getHostname())
-	
+
 	if err := os.WriteFile(timestampFile, []byte(content), 0644); err != nil {
 		logger.Error("Failed to create timestamp file", zap.Error(err))
 	} else {
@@ -194,10 +194,10 @@ func detectEnvironment(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-environment.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Environment Detection ===\n")
-	
+
 	// Container detection
 	if fileExists("/.dockerenv") {
 		output.WriteString("Environment: Docker Container\n")
@@ -214,7 +214,7 @@ func detectEnvironment(rc *eos_io.RuntimeContext) {
 	} else {
 		output.WriteString("Environment: Bare Metal/VM\n")
 	}
-	
+
 	// Cloud provider detection
 	if commandExists("ec2-metadata") {
 		output.WriteString("Cloud: AWS EC2\n")
@@ -226,7 +226,7 @@ func detectEnvironment(rc *eos_io.RuntimeContext) {
 	} else if containsString("/sys/class/dmi/id/sys_vendor", "Microsoft Corporation") {
 		output.WriteString("Cloud: Azure\n")
 	}
-	
+
 	// Init system detection
 	if dirExists("/run/systemd/system") {
 		output.WriteString("Init: systemd\n")
@@ -235,7 +235,7 @@ func detectEnvironment(rc *eos_io.RuntimeContext) {
 	} else if fileExists("/etc/init.d/rc") {
 		output.WriteString("Init: sysvinit\n")
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write environment detection", zap.Error(err))
 	} else {
@@ -247,21 +247,21 @@ func checkResources(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-resources.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Resource Exhaustion Check ===\n")
-	
+
 	// Disk space
 	if diskInfo := runCommandWithTimeout("df", []string{"-h"}, 5*time.Second); diskInfo != "" {
 		output.WriteString("\n--- Disk Space ---\n")
 		output.WriteString(diskInfo)
 	}
-	
+
 	if inodeInfo := runCommandWithTimeout("df", []string{"-i"}, 5*time.Second); inodeInfo != "" {
 		output.WriteString("\n--- Inode Usage ---\n")
 		output.WriteString(inodeInfo)
 	}
-	
+
 	// Memory details
 	if memInfo := readFile("/proc/meminfo"); memInfo != "" {
 		output.WriteString("\n--- Memory Information ---\n")
@@ -273,7 +273,7 @@ func checkResources(rc *eos_io.RuntimeContext) {
 			}
 		}
 	}
-	
+
 	// Top CPU consumers
 	if topInfo := runCommandWithTimeout("ps", []string{"aux", "--sort=-%cpu"}, 5*time.Second); topInfo != "" {
 		output.WriteString("\n--- Top CPU Consumers ---\n")
@@ -284,7 +284,7 @@ func checkResources(rc *eos_io.RuntimeContext) {
 			}
 		}
 	}
-	
+
 	// Zombie processes
 	if zombies := runCommandWithTimeout("ps", []string{"aux"}, 5*time.Second); zombies != "" {
 		output.WriteString("\n--- Zombie Processes ---\n")
@@ -295,7 +295,7 @@ func checkResources(rc *eos_io.RuntimeContext) {
 			}
 		}
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write resource check", zap.Error(err))
 	} else {
@@ -307,10 +307,10 @@ func checkQueues(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-queues.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Queue Systems Status ===\n")
-	
+
 	// Redis
 	if commandExists("redis-cli") {
 		output.WriteString("\n--- Redis ---\n")
@@ -321,7 +321,7 @@ func checkQueues(rc *eos_io.RuntimeContext) {
 			output.WriteString("\nClient List:\n" + clientList)
 		}
 	}
-	
+
 	// RabbitMQ
 	if commandExists("rabbitmqctl") {
 		output.WriteString("\n--- RabbitMQ ---\n")
@@ -329,13 +329,13 @@ func checkQueues(rc *eos_io.RuntimeContext) {
 			output.WriteString(queueList)
 		}
 	}
-	
+
 	// Generic TCP queue detection
 	if tcpStats := runCommandWithTimeout("ss", []string{"-ant"}, 5*time.Second); tcpStats != "" {
 		output.WriteString("\n--- TCP Connection States ---\n")
 		output.WriteString(tcpStats)
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write queue check", zap.Error(err))
 	} else {
@@ -347,10 +347,10 @@ func checkDatabases(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-databases.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Database Status ===\n")
-	
+
 	// PostgreSQL
 	if commandExists("psql") {
 		output.WriteString("\n--- PostgreSQL ---\n")
@@ -358,7 +358,7 @@ func checkDatabases(rc *eos_io.RuntimeContext) {
 			output.WriteString(pgActivity)
 		}
 	}
-	
+
 	// MySQL/MariaDB
 	if commandExists("mysql") {
 		output.WriteString("\n--- MySQL/MariaDB ---\n")
@@ -366,7 +366,7 @@ func checkDatabases(rc *eos_io.RuntimeContext) {
 			output.WriteString(mysqlProc)
 		}
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write database check", zap.Error(err))
 	} else {
@@ -378,34 +378,34 @@ func securitySnapshot(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-security.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Security Snapshot ===\n")
-	
+
 	// Recent logins
 	if lastInfo := runCommandWithTimeout("last", []string{"-20"}, 5*time.Second); lastInfo != "" {
 		output.WriteString("\n--- Recent Logins ---\n")
 		output.WriteString(lastInfo)
 	}
-	
+
 	// Currently logged in users
 	if whoInfo := runCommandWithTimeout("who", []string{}, 3*time.Second); whoInfo != "" {
 		output.WriteString("\n--- Currently Logged In ---\n")
 		output.WriteString(whoInfo)
 	}
-	
+
 	// Network connections
 	if netConnections := runCommandWithTimeout("ss", []string{"-plant"}, 5*time.Second); netConnections != "" {
 		output.WriteString("\n--- Network Connections ---\n")
 		output.WriteString(netConnections)
 	}
-	
+
 	// Running processes
 	if processes := runCommandWithTimeout("ps", []string{"auxww"}, 5*time.Second); processes != "" {
 		output.WriteString("\n--- All Processes ---\n")
 		output.WriteString(processes)
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write security snapshot", zap.Error(err))
 	} else {
@@ -416,39 +416,39 @@ func securitySnapshot(rc *eos_io.RuntimeContext) {
 func containerDiagnostics(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
-	
+
 	if commandExists("docker") {
 		outputFile := filepath.Join(homeDir, "ragequit-docker.txt")
 		var output strings.Builder
 		output.WriteString("=== Docker Diagnostics ===\n")
-		
+
 		if dockerPs := runCommandWithTimeout("docker", []string{"ps", "-a"}, 10*time.Second); dockerPs != "" {
 			output.WriteString("\n--- Docker Containers ---\n")
 			output.WriteString(dockerPs)
 		}
-		
+
 		if dockerStats := runCommandWithTimeout("docker", []string{"stats", "--no-stream"}, 10*time.Second); dockerStats != "" {
 			output.WriteString("\n--- Docker Stats ---\n")
 			output.WriteString(dockerStats)
 		}
-		
+
 		if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 			logger.Error("Failed to write Docker diagnostics", zap.Error(err))
 		} else {
 			logger.Info("Docker diagnostics completed", zap.String("file", outputFile))
 		}
 	}
-	
+
 	if commandExists("kubectl") {
 		outputFile := filepath.Join(homeDir, "ragequit-k8s.txt")
 		var output strings.Builder
 		output.WriteString("=== Kubernetes Diagnostics ===\n")
-		
+
 		if k8sAll := runCommandWithTimeout("kubectl", []string{"get", "all", "--all-namespaces"}, 10*time.Second); k8sAll != "" {
 			output.WriteString("\n--- Kubernetes Resources ---\n")
 			output.WriteString(k8sAll)
 		}
-		
+
 		if k8sEvents := runCommandWithTimeout("kubectl", []string{"get", "events", "--all-namespaces", "--sort-by=.lastTimestamp"}, 10*time.Second); k8sEvents != "" {
 			output.WriteString("\n--- Recent Events ---\n")
 			lines := strings.Split(k8sEvents, "\n")
@@ -460,7 +460,7 @@ func containerDiagnostics(rc *eos_io.RuntimeContext) {
 				output.WriteString(lines[i] + "\n")
 			}
 		}
-		
+
 		if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 			logger.Error("Failed to write Kubernetes diagnostics", zap.Error(err))
 		} else {
@@ -473,10 +473,10 @@ func performanceSnapshot(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-performance.txt")
-	
+
 	var output strings.Builder
 	output.WriteString("=== Performance Snapshot ===\n")
-	
+
 	// CPU info
 	if cpuInfo := readFile("/proc/cpuinfo"); cpuInfo != "" {
 		output.WriteString("\n--- CPU Information ---\n")
@@ -487,25 +487,25 @@ func performanceSnapshot(rc *eos_io.RuntimeContext) {
 			}
 		}
 	}
-	
+
 	// Memory stats
 	if vmStat := runCommandWithTimeout("vmstat", []string{"1", "3"}, 10*time.Second); vmStat != "" {
 		output.WriteString("\n--- Memory/CPU Stats ---\n")
 		output.WriteString(vmStat)
 	}
-	
+
 	// I/O stats
 	if ioStat := runCommandWithTimeout("iostat", []string{"-x", "1", "2"}, 5*time.Second); ioStat != "" {
 		output.WriteString("\n--- I/O Stats ---\n")
 		output.WriteString(ioStat)
 	}
-	
+
 	// Network stats
 	if netStat := runCommandWithTimeout("netstat", []string{"-s"}, 5*time.Second); netStat != "" {
 		output.WriteString("\n--- Network Stats ---\n")
 		output.WriteString(netStat)
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write performance snapshot", zap.Error(err))
 	} else {
@@ -516,11 +516,11 @@ func performanceSnapshot(rc *eos_io.RuntimeContext) {
 func systemctlDiagnostics(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
-	
+
 	if !commandExists("systemctl") {
 		return
 	}
-	
+
 	// Failed units
 	if failedUnits := runCommandWithTimeout("systemctl", []string{"list-units", "--failed", "--no-pager"}, 5*time.Second); failedUnits != "" {
 		outputFile := filepath.Join(homeDir, "failed-units.backup")
@@ -530,7 +530,7 @@ func systemctlDiagnostics(rc *eos_io.RuntimeContext) {
 			logger.Info("Failed units captured", zap.String("file", outputFile))
 		}
 	}
-	
+
 	// Pending jobs
 	if pendingJobs := runCommandWithTimeout("systemctl", []string{"list-jobs", "--no-pager"}, 5*time.Second); pendingJobs != "" {
 		outputFile := filepath.Join(homeDir, "pending-jobs.backup")
@@ -540,7 +540,7 @@ func systemctlDiagnostics(rc *eos_io.RuntimeContext) {
 			logger.Info("Pending jobs captured", zap.String("file", outputFile))
 		}
 	}
-	
+
 	// Recent journal errors
 	if journalErrors := runCommandWithTimeout("journalctl", []string{"-p", "err", "-n", "100", "--no-pager"}, 10*time.Second); journalErrors != "" {
 		outputFile := filepath.Join(homeDir, "journal-errors.backup")
@@ -555,7 +555,7 @@ func systemctlDiagnostics(rc *eos_io.RuntimeContext) {
 func networkDiagnostics(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
-	
+
 	// Network listeners
 	if netListeners := runCommandWithTimeout("ss", []string{"-tlnp"}, 5*time.Second); netListeners != "" {
 		outputFile := filepath.Join(homeDir, "network-listeners.backup")
@@ -565,7 +565,7 @@ func networkDiagnostics(rc *eos_io.RuntimeContext) {
 			logger.Info("Network listeners captured", zap.String("file", outputFile))
 		}
 	}
-	
+
 	// Network interfaces
 	if netInterfaces := runCommandWithTimeout("ip", []string{"addr"}, 5*time.Second); netInterfaces != "" {
 		outputFile := filepath.Join(homeDir, "network-interfaces.backup")
@@ -580,28 +580,28 @@ func networkDiagnostics(rc *eos_io.RuntimeContext) {
 func customHooks(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	hooksDir := "/etc/eos/ragequit-hooks"
-	
+
 	if !dirExists(hooksDir) {
 		return
 	}
-	
+
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "ragequit-custom.txt")
-	
+
 	files, err := os.ReadDir(hooksDir)
 	if err != nil {
 		logger.Error("Failed to read hooks directory", zap.Error(err))
 		return
 	}
-	
+
 	var output strings.Builder
 	output.WriteString("=== Custom Hooks Output ===\n")
-	
+
 	for _, file := range files {
 		if file.IsDir() {
 			continue
 		}
-		
+
 		hookPath := filepath.Join(hooksDir, file.Name())
 		if isExecutable(hookPath) {
 			output.WriteString(fmt.Sprintf("\n--- Hook: %s ---\n", file.Name()))
@@ -610,7 +610,7 @@ func customHooks(rc *eos_io.RuntimeContext) {
 			}
 		}
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(output.String()), 0644); err != nil {
 		logger.Error("Failed to write custom hooks output", zap.Error(err))
 	} else {
@@ -622,20 +622,20 @@ func generateRecoveryPlan(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	outputFile := filepath.Join(homeDir, "investigate-ragequit.md")
-	
+
 	var plan strings.Builder
 	plan.WriteString("# Ragequit Investigation Checklist\n\n")
 	plan.WriteString(fmt.Sprintf("Generated at: %s\n", time.Now().Format(time.RFC3339)))
 	plan.WriteString(fmt.Sprintf("Triggered by: %s\n", os.Getenv("USER")))
 	plan.WriteString(fmt.Sprintf("Reason: %s\n\n", reason))
-	
+
 	plan.WriteString("## Investigation Steps\n\n")
 	plan.WriteString("1. **Check archived logs** in ragequit-*.txt files\n")
 	plan.WriteString("2. **Review service configurations** for Type=notify with notification issues\n")
 	plan.WriteString("3. **Look for looping processes** in journal-errors.backup\n")
 	plan.WriteString("4. **Identify resource exhaustion** in ragequit-resources.txt\n")
 	plan.WriteString("5. **Check security incidents** in ragequit-security.txt\n\n")
-	
+
 	plan.WriteString("## Recovery Commands\n\n")
 	plan.WriteString("```bash\n")
 	plan.WriteString("# Monitor system health\n")
@@ -648,9 +648,9 @@ func generateRecoveryPlan(rc *eos_io.RuntimeContext) {
 	plan.WriteString("sudo systemctl unmask SERVICE_NAME\n")
 	plan.WriteString("sudo systemctl start SERVICE_NAME\n")
 	plan.WriteString("```\n\n")
-	
+
 	plan.WriteString("## Files Generated\n\n")
-	
+
 	// List all ragequit files
 	files, err := filepath.Glob(filepath.Join(homeDir, "ragequit-*.txt"))
 	if err == nil {
@@ -659,7 +659,7 @@ func generateRecoveryPlan(rc *eos_io.RuntimeContext) {
 			plan.WriteString(fmt.Sprintf("- `%s`\n", filepath.Base(file)))
 		}
 	}
-	
+
 	backupFiles, err := filepath.Glob(filepath.Join(homeDir, "*.backup"))
 	if err == nil {
 		sort.Strings(backupFiles)
@@ -667,7 +667,7 @@ func generateRecoveryPlan(rc *eos_io.RuntimeContext) {
 			plan.WriteString(fmt.Sprintf("- `%s`\n", filepath.Base(file)))
 		}
 	}
-	
+
 	if err := os.WriteFile(outputFile, []byte(plan.String()), 0644); err != nil {
 		logger.Error("Failed to write recovery plan", zap.Error(err))
 	} else {
@@ -679,7 +679,7 @@ func createPostRebootRecovery(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
 	scriptFile := filepath.Join(homeDir, "post-ragequit-recovery.sh")
-	
+
 	script := `#!/bin/bash
 # Auto-run after ragequit reboot
 
@@ -707,17 +707,17 @@ else
     echo "Normal boot detected (no ragequit timestamp found)"
 fi
 `
-	
+
 	if err := os.WriteFile(scriptFile, []byte(script), 0755); err != nil {
 		logger.Error("Failed to create post-reboot recovery script", zap.Error(err))
 	} else {
 		logger.Info("Post-reboot recovery script created", zap.String("file", scriptFile))
 	}
-	
+
 	// Add to profile for auto-execution
 	profileFile := filepath.Join(homeDir, ".bashrc")
 	profileEntry := "[ -f ~/ragequit-timestamp.txt ] && ~/post-ragequit-recovery.sh\n"
-	
+
 	// Check if entry already exists
 	if content := readFile(profileFile); !strings.Contains(content, "post-ragequit-recovery.sh") {
 		file, err := os.OpenFile(profileFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
@@ -740,9 +740,9 @@ fi
 
 func notifyRagequit(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Webhook notification
-	if webhookURL := os.Getenv("EOS_EMERGENCY_WEBHOOK"); webhookURL != "" {
+	if webhookURL := os.Getenv("Eos_EMERGENCY_WEBHOOK"); webhookURL != "" {
 		message := fmt.Sprintf("🚨 EMERGENCY: Ragequit initiated on %s by %s", getHostname(), os.Getenv("USER"))
 		if curlOutput := runCommandWithTimeout("curl", []string{
 			"-X", "POST", webhookURL,
@@ -752,13 +752,13 @@ func notifyRagequit(rc *eos_io.RuntimeContext) {
 			logger.Info("Emergency webhook notification sent", zap.String("webhook", webhookURL))
 		}
 	}
-	
+
 	// Email notification
 	if email := os.Getenv("RAGEQUIT_EMAIL"); email != "" && commandExists("mail") {
 		subject := fmt.Sprintf("EMERGENCY: Ragequit %s", getHostname())
 		message := fmt.Sprintf("Ragequit initiated on %s by %s at %s\nReason: %s",
 			getHostname(), os.Getenv("USER"), time.Now().Format(time.RFC3339), reason)
-		
+
 		// Send email via stdin
 		cmd := exec.Command("mail", "-s", subject, email)
 		cmd.Stdin = strings.NewReader(message)
@@ -766,7 +766,7 @@ func notifyRagequit(rc *eos_io.RuntimeContext) {
 			logger.Info("Emergency email notification sent", zap.String("email", email))
 		}
 	}
-	
+
 	// Create emergency flag file
 	flagFile := "/var/run/ragequit-in-progress"
 	timestamp := fmt.Sprintf("%d", time.Now().Unix())
@@ -779,21 +779,21 @@ func notifyRagequit(rc *eos_io.RuntimeContext) {
 
 func flushDataSafety(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Starting data safety procedures")
-	
+
 	// Sync filesystem
 	if syncOutput := runCommandWithTimeout("sync", []string{}, 10*time.Second); syncOutput != "" {
 		logger.Info("Filesystem sync completed")
 	}
-	
+
 	// PostgreSQL checkpoint
 	if commandExists("psql") {
 		if pgCheckpoint := runCommandWithTimeout("sudo", []string{"-u", "postgres", "psql", "-c", "CHECKPOINT;"}, 10*time.Second); pgCheckpoint != "" {
 			logger.Info("PostgreSQL checkpoint completed")
 		}
 	}
-	
+
 	// Redis background save
 	if commandExists("redis-cli") {
 		if redisSave := runCommandWithTimeout("redis-cli", []string{"BGSAVE"}, 5*time.Second); redisSave != "" {
@@ -804,15 +804,15 @@ func flushDataSafety(rc *eos_io.RuntimeContext) {
 
 func executeReboot(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Error("🔥 EXECUTING EMERGENCY REBOOT NOW")
-	
+
 	cmd := exec.Command("sudo", "reboot")
 	if err := cmd.Start(); err != nil {
 		logger.Error("Failed to execute reboot command", zap.Error(err))
 		return err
 	}
-	
+
 	// Don't wait for reboot to complete
 	return nil
 }
@@ -869,12 +869,12 @@ func readFile(path string) string {
 func runCommandWithTimeout(command string, args []string, timeout time.Duration) string {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-	
+
 	cmd := exec.CommandContext(ctx, command, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return ""
 	}
-	
+
 	return string(output)
 }

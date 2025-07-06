@@ -13,7 +13,7 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 # Create log directory
 mkdir -p "${LOG_DIR}"
 
-echo " Starting overnight EOS fuzzing at $(date)"
+echo " Starting overnight Eos fuzzing at $(date)"
 echo "📁 Logs will be saved to: ${LOG_DIR}"
 echo "⏰ Long fuzz duration: ${FUZZTIME_LONG}"
 echo "⏰ Short fuzz duration: ${FUZZTIME_SHORT}"
@@ -44,7 +44,7 @@ run_fuzz_test() {
 
 # High-priority comprehensive tests (long duration)
 echo " Running comprehensive tests with long duration..."
-run_fuzz_test "FuzzAllEOSCommands" "./test" "${FUZZTIME_LONG}"
+run_fuzz_test "FuzzAllEosCommands" "./test" "${FUZZTIME_LONG}"
 run_fuzz_test "FuzzDelphiServicesCommands" "./test" "${FUZZTIME_LONG}"
 
 # Medium-priority specific tests (medium duration)
@@ -52,7 +52,7 @@ echo " Running specific component tests..."
 run_fuzz_test "FuzzUpdateCommand" "./cmd/delphi/services" "${FUZZTIME_SHORT}"
 run_fuzz_test "FuzzServiceWorkerPaths" "./cmd/delphi/services" "${FUZZTIME_SHORT}"
 run_fuzz_test "FuzzCommandParsing" "./pkg/eos_cli" "${FUZZTIME_SHORT}"
-run_fuzz_test "FuzzEOSCommandFlags" "./test" "${FUZZTIME_SHORT}"
+run_fuzz_test "FuzzEosCommandFlags" "./test" "${FUZZTIME_SHORT}"
 
 # Security-focused crypto tests (medium duration)
 echo "🔐 Running security-focused crypto tests..."
@@ -98,6 +98,6 @@ done
 echo " Total interesting inputs found: ${total_inputs}"
 echo ""
 echo " To run a quick test: ./scripts/run-fuzz-tests.sh 30s"
-echo " To run specific test: go test -run=^$ -fuzz=^FuzzAllEOSCommands$ -fuzztime=1h ./test"
+echo " To run specific test: go test -run=^$ -fuzz=^FuzzAllEosCommands$ -fuzztime=1h ./test"
 echo ""
 echo " Ready for production deployment!"

@@ -118,7 +118,7 @@ func SetupTestEnvironment(t *testing.T) func() {
 
 	// Set test environment variables
 	testVars := map[string]string{
-		"EOS_TEST_MODE":     "true",
+		"Eos_TEST_MODE":     "true",
 		"VAULT_ADDR":        "http://127.0.0.1:8200",
 		"VAULT_SKIP_VERIFY": "true",
 	}

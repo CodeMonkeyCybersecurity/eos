@@ -9,13 +9,13 @@ import (
 // getHTTPTLSConfig returns TLS configuration with proper security settings for HTTP requests
 func getHTTPTLSConfig() *tls.Config {
 	// Allow insecure TLS only in development/testing environments
-	if os.Getenv("EOS_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
+	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
 		return &tls.Config{
 			InsecureSkipVerify: true,
 			MinVersion:         tls.VersionTLS12,
 		}
 	}
-	
+
 	// Secure TLS configuration for production HTTP requests
 	return &tls.Config{
 		MinVersion: tls.VersionTLS12,

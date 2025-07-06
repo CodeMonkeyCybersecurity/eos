@@ -37,7 +37,7 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 				Port:   389,
 				BindDN: bindDN,
 			}
-			
+
 			// Verify bind DN follows expected format
 			assert.Contains(t, cfg.BindDN, "dc=", "BindDN should contain domain component: %s", bindDN)
 			assert.NotContains(t, cfg.BindDN, ";", "BindDN should not contain semicolon injection: %s", bindDN)
@@ -56,7 +56,7 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 
 		// Verify password is not empty
 		assert.NotEmpty(t, cfg.Password, "Password should not be empty")
-		
+
 		// Test password field is marked as sensitive in metadata
 		passwordMeta := LDAPFieldMeta["Password"]
 		assert.True(t, passwordMeta.Sensitive, "Password field must be marked as sensitive")
@@ -65,16 +65,16 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 
 	t.Run("tls_security_enforcement", func(t *testing.T) {
 		// Test TLS configuration security
-		
+
 		// Test secure TLS configuration
-		os.Unsetenv("EOS_INSECURE_TLS")
+		os.Unsetenv("Eos_INSECURE_TLS")
 		os.Unsetenv("GO_ENV")
-		
+
 		tlsConfig := getSecureTLSConfig()
-		
+
 		// Verify minimum TLS version
 		assert.GreaterOrEqual(t, tlsConfig.MinVersion, uint16(tls.VersionTLS12), "Should use TLS 1.2 or higher")
-		
+
 		// Verify secure configuration
 		assert.False(t, tlsConfig.InsecureSkipVerify, "Should not skip TLS verification in production")
 		assert.True(t, tlsConfig.PreferServerCipherSuites, "Should prefer server cipher suites")
@@ -84,7 +84,7 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 	t.Run("connection_timeout_security", func(t *testing.T) {
 		// Test connection timeout to prevent hanging
 		start := time.Now()
-		
+
 		cfg := &LDAPConfig{
 			FQDN:     "192.0.2.1", // Test network address (RFC 3330)
 			Port:     389,
@@ -92,10 +92,10 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 			BindDN:   "cn=admin,dc=example,dc=com",
 			Password: "test",
 		}
-		
+
 		err := CheckConnection(rc, cfg)
 		elapsed := time.Since(start)
-		
+
 		// Should fail with timeout, not hang
 		assert.Error(t, err)
 		// Allow up to 70 seconds for timeout as network stack may vary
@@ -114,7 +114,7 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 		for _, input := range maliciousInputs {
 			// Test that malicious input in UID search doesn't cause injection
 			users, err := readUsersWithFilter(rc, fmt.Sprintf("(uid=%s)", input))
-			
+
 			// Should either fail safely or return empty results
 			if err != nil {
 				assert.NotContains(t, err.Error(), "panic", "Should not panic on malicious input")
@@ -229,7 +229,7 @@ func TestAuthenticationFlows(t *testing.T) {
 		// Verify TLS configuration
 		assert.True(t, cfg.UseTLS, "Should use TLS for secure connections")
 		assert.Equal(t, 636, cfg.Port, "Should use standard LDAPS port")
-		
+
 		// Test TLS configuration generation
 		tlsConfig := getSecureTLSConfig()
 		assert.NotNil(t, tlsConfig, "Should generate TLS configuration")
@@ -259,7 +259,7 @@ func TestAuthorizationSecurity(t *testing.T) {
 		assert.NotEmpty(t, cfg.AdminRole, "Admin role should be configured")
 		assert.NotEmpty(t, cfg.ReadonlyRole, "Readonly role should be configured")
 		assert.NotEmpty(t, cfg.RoleBase, "Role base DN should be configured")
-		
+
 		// Verify roles are different
 		assert.NotEqual(t, cfg.AdminRole, cfg.ReadonlyRole, "Admin and readonly roles should be different")
 	})
@@ -267,8 +267,8 @@ func TestAuthorizationSecurity(t *testing.T) {
 	t.Run("group_membership_validation", func(t *testing.T) {
 		// Test group membership validation
 		group := LDAPGroup{
-			CN:      "TestGroup",
-			DN:      "cn=TestGroup,ou=Groups,dc=example,dc=com",
+			CN: "TestGroup",
+			DN: "cn=TestGroup,ou=Groups,dc=example,dc=com",
 			Members: []string{
 				"uid=user1,ou=Users,dc=example,dc=com",
 				"uid=user2,ou=Users,dc=example,dc=com",
@@ -279,7 +279,7 @@ func TestAuthorizationSecurity(t *testing.T) {
 		assert.NotEmpty(t, group.CN, "Group CN should be set")
 		assert.NotEmpty(t, group.DN, "Group DN should be set")
 		assert.NotEmpty(t, group.Members, "Group should have members")
-		
+
 		// Verify member DN format
 		for _, member := range group.Members {
 			assert.Contains(t, member, "uid=", "Member should have UID component")
@@ -300,12 +300,12 @@ func TestAuthorizationSecurity(t *testing.T) {
 		assert.NotEmpty(t, user.UID, "User UID should be set")
 		assert.NotEmpty(t, user.CN, "User CN should be set")
 		assert.NotEmpty(t, user.DN, "User DN should be set")
-		
+
 		// Verify email format (basic validation)
 		if user.Mail != "" {
 			assert.Contains(t, user.Mail, "@", "Email should contain @ symbol")
 		}
-		
+
 		// Verify DN format
 		assert.Contains(t, user.DN, "uid=", "User DN should contain UID component")
 		assert.Contains(t, user.DN, "dc=", "User DN should contain domain component")
@@ -322,7 +322,7 @@ func TestConfigurationSecurity(t *testing.T) {
 		assert.Equal(t, 389, cfg.Port, "Default port should be standard LDAP port")
 		assert.False(t, cfg.UseTLS, "Default should not assume TLS is available")
 		assert.Equal(t, "", cfg.Password, "Default password should be empty")
-		
+
 		// Verify required fields are set
 		assert.NotEmpty(t, cfg.FQDN, "Default FQDN should be set")
 		assert.NotEmpty(t, cfg.BindDN, "Default BindDN should be set")
@@ -332,14 +332,14 @@ func TestConfigurationSecurity(t *testing.T) {
 
 	t.Run("environment_variable_security", func(t *testing.T) {
 		// Test environment variable handling security
-		
+
 		// Clear environment variables
 		envVars := []string{
 			"LDAP_FQDN", "LDAP_PORT", "LDAP_USE_TLS", "LDAP_BIND_DN",
 			"LDAP_PASSWORD", "LDAP_USER_BASE", "LDAP_GROUP_BASE",
 			"LDAP_ADMIN_ROLE", "LDAP_READONLY_ROLE",
 		}
-		
+
 		for _, envVar := range envVars {
 			os.Unsetenv(envVar)
 		}
@@ -359,13 +359,13 @@ func TestConfigurationSecurity(t *testing.T) {
 			os.Setenv("LDAP_FQDN", malicious)
 			os.Setenv("LDAP_BIND_DN", "cn=admin,dc=example,dc=com")
 			os.Setenv("LDAP_PASSWORD", "password123")
-			
+
 			cfg := TryLoadFromEnv()
 			if cfg != nil {
 				// Should accept the value as-is but not execute commands
 				assert.Equal(t, malicious, cfg.FQDN, "Should store the value without executing commands")
 			}
-			
+
 			os.Unsetenv("LDAP_FQDN")
 			os.Unsetenv("LDAP_BIND_DN")
 			os.Unsetenv("LDAP_PASSWORD")
@@ -375,15 +375,15 @@ func TestConfigurationSecurity(t *testing.T) {
 	t.Run("port_validation_security", func(t *testing.T) {
 		// Test port validation security
 		testCases := []struct {
-			portEnv    string
+			portEnv      string
 			expectedPort int
 		}{
 			{"389", 389},
 			{"636", 636},
 			{"invalid", 389}, // Should fall back to default
 			// Note: TryLoadFromEnv actually accepts any port that parses as int
-			{"99999", 99999},   // Large ports are accepted by strconv.Atoi
-			{"-1", -1},      // Negative ports are accepted by strconv.Atoi
+			{"99999", 99999}, // Large ports are accepted by strconv.Atoi
+			{"-1", -1},       // Negative ports are accepted by strconv.Atoi
 		}
 
 		for _, tc := range testCases {
@@ -409,7 +409,7 @@ func TestConfigurationSecurity(t *testing.T) {
 func TestNetworkSecurity(t *testing.T) {
 	t.Run("port_detection_security", func(t *testing.T) {
 		// Test port detection security
-		
+
 		// Test with common ports
 		commonPorts := []int{389, 636, 80, 443, 22}
 		for _, port := range commonPorts {
@@ -440,10 +440,10 @@ func TestNetworkSecurity(t *testing.T) {
 		start := time.Now()
 		_, err := ConnectWithGivenConfig(cfg)
 		elapsed := time.Since(start)
-		
+
 		// Should complete within reasonable time
 		assert.Less(t, elapsed, 10*time.Second, "Connection attempt should not hang")
-		
+
 		// Should fail gracefully for non-existent server
 		if err != nil {
 			assert.Contains(t, err.Error(), "failed to", "Should provide meaningful error message")
@@ -452,17 +452,17 @@ func TestNetworkSecurity(t *testing.T) {
 
 	t.Run("tls_cipher_suite_security", func(t *testing.T) {
 		// Test TLS cipher suite security
-		os.Unsetenv("EOS_INSECURE_TLS")
+		os.Unsetenv("Eos_INSECURE_TLS")
 		os.Unsetenv("GO_ENV")
-		
+
 		tlsConfig := getSecureTLSConfig()
-		
+
 		// Verify secure cipher suites are configured
 		assert.NotEmpty(t, tlsConfig.CipherSuites, "Should have cipher suites configured")
-		
+
 		// Verify minimum TLS version
 		assert.GreaterOrEqual(t, tlsConfig.MinVersion, uint16(tls.VersionTLS12), "Should use TLS 1.2 or higher")
-		
+
 		// Verify secure defaults
 		assert.True(t, tlsConfig.PreferServerCipherSuites, "Should prefer server cipher suites")
 		assert.False(t, tlsConfig.InsecureSkipVerify, "Should not skip certificate verification")
@@ -492,19 +492,19 @@ func TestLDAPInjectionPrevention(t *testing.T) {
 		for _, attempt := range injectionAttempts {
 			// Test user search with injection attempt
 			filter := fmt.Sprintf("(uid=%s)", attempt)
-			
+
 			// Should not cause panic or uncontrolled behavior
 			_, err := readUsersWithFilter(rc, filter)
-			
+
 			// Either should fail safely or return controlled results
 			if err != nil {
 				assert.NotContains(t, err.Error(), "panic", "Should not panic on injection attempt")
 			}
-			
+
 			// Test group search with injection attempt
 			groupFilter := fmt.Sprintf("(cn=%s)", attempt)
 			_, err = readGroupsWithFilter(rc, groupFilter)
-			
+
 			if err != nil {
 				assert.NotContains(t, err.Error(), "panic", "Should not panic on injection attempt")
 			}

@@ -16,7 +16,7 @@ var penpotCmd = &cobra.Command{
 	Use:   "penpot",
 	Short: "Deploy Penpot design platform with secure Terraform, Nomad, and Vault integration",
 	Long: `Deploy Penpot, an open-source design and prototyping platform, using HashiCorp's 
-enterprise stack for secure, scalable deployment.
+stack for secure, scalable deployment.
 
 Penpot provides:
 - Design and prototyping tools

@@ -324,7 +324,7 @@ func NewFallbackSecretStore(logger *zap.Logger) *FallbackSecretStore {
 
 // Get implements SecretStore interface using environment variables
 func (f *FallbackSecretStore) Get(ctx context.Context, key string) (*Secret, error) {
-	envVar := "EOS_SECRET_" + f.sanitizeKey(key)
+	envVar := "Eos_SECRET_" + f.sanitizeKey(key)
 	value := os.Getenv(envVar)
 
 	if value == "" {

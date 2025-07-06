@@ -23,29 +23,29 @@ const (
 
 // OrchestrationOptions contains configuration for Salt orchestration
 type OrchestrationOptions struct {
-	Mode          OrchestrationMode `json:"mode"`
-	Target        string            `json:"target"`
-	BatchSize     int               `json:"batch_size"`
-	Pillar        map[string]string `json:"pillar"`
-	Grains        map[string]string `json:"grains"`
-	Async         bool              `json:"async"`
-	StateTest     bool              `json:"state_test"`
-	Timeout       time.Duration     `json:"timeout"`
-	Environment   string            `json:"environment"`
-	TargetType    string            `json:"target_type"`
-	Concurrent    bool              `json:"concurrent"`
+	Mode        OrchestrationMode `json:"mode"`
+	Target      string            `json:"target"`
+	BatchSize   int               `json:"batch_size"`
+	Pillar      map[string]string `json:"pillar"`
+	Grains      map[string]string `json:"grains"`
+	Async       bool              `json:"async"`
+	StateTest   bool              `json:"state_test"`
+	Timeout     time.Duration     `json:"timeout"`
+	Environment string            `json:"environment"`
+	TargetType  string            `json:"target_type"`
+	Concurrent  bool              `json:"concurrent"`
 }
 
 // OrchestrationResult contains the result of an orchestrated operation
 type OrchestrationResult struct {
-	Mode      OrchestrationMode `json:"mode"`
-	JobID     string            `json:"job_id,omitempty"`
-	Success   bool              `json:"success"`
-	Duration  time.Duration     `json:"duration"`
-	Message   string            `json:"message"`
-	Details   interface{}       `json:"details,omitempty"`
-	Minions   []string          `json:"minions,omitempty"`
-	Failed    []string          `json:"failed,omitempty"`
+	Mode     OrchestrationMode `json:"mode"`
+	JobID    string            `json:"job_id,omitempty"`
+	Success  bool              `json:"success"`
+	Duration time.Duration     `json:"duration"`
+	Message  string            `json:"message"`
+	Details  interface{}       `json:"details,omitempty"`
+	Minions  []string          `json:"minions,omitempty"`
+	Failed   []string          `json:"failed,omitempty"`
 }
 
 // DirectExecutor represents a function that executes commands directly
@@ -132,9 +132,9 @@ func (e *Enhancer) ExecuteWithOrchestration(
 	saltOp *SaltOperation,
 ) (*OrchestrationResult, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	startTime := time.Now()
-	
+
 	logger.Info("Executing with orchestration",
 		zap.String("mode", string(options.Mode)),
 		zap.String("target", options.Target))
@@ -152,7 +152,7 @@ func (e *Enhancer) ExecuteWithOrchestration(
 // executeSaltOperation executes an operation through Salt
 func (e *Enhancer) executeSaltOperation(ctx context.Context, options *OrchestrationOptions, saltOp *SaltOperation) (*OrchestrationResult, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	if e.saltClient == nil {
 		return nil, fmt.Errorf("Salt client not configured")
 	}
@@ -163,7 +163,7 @@ func (e *Enhancer) executeSaltOperation(ctx context.Context, options *Orchestrat
 		zap.String("function", saltOp.Function))
 
 	startTime := time.Now()
-	
+
 	// Create context with timeout
 	opCtx, cancel := context.WithTimeout(ctx, options.Timeout)
 	defer cancel()
@@ -212,7 +212,7 @@ func (e *Enhancer) executeSaltOperation(ctx context.Context, options *Orchestrat
 // executeDirectOperation executes an operation directly
 func (e *Enhancer) executeDirectOperation(ctx context.Context, options *OrchestrationOptions, directExec DirectExecutor, startTime time.Time) (*OrchestrationResult, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Executing direct operation")
 
 	err := directExec(e.rc)
@@ -316,7 +316,7 @@ func (e *Enhancer) executeSaltOrchestrate(ctx context.Context, options *Orchestr
 // waitForSaltJob waits for a Salt job to complete and updates the result
 func (e *Enhancer) waitForSaltJob(ctx context.Context, result *OrchestrationResult, jobID string) (*OrchestrationResult, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Waiting for Salt job completion", zap.String("job_id", jobID))
 
 	ticker := time.NewTicker(2 * time.Second)
@@ -371,7 +371,7 @@ func (e *Enhancer) waitForSaltJob(ctx context.Context, result *OrchestrationResu
 	}
 }
 
-// CreateSaltOperation creates a Salt operation for common EOS tasks
+// CreateSaltOperation creates a Salt operation for common Eos tasks
 func CreateSaltOperation(operationType, module, function string, args []string) *SaltOperation {
 	return &SaltOperation{
 		Type:     operationType,
@@ -386,10 +386,10 @@ func CreateSaltOperation(operationType, module, function string, args []string) 
 // CreateStateOperation creates a Salt state operation
 func CreateStateOperation(stateName string, pillar map[string]interface{}) *SaltOperation {
 	return &SaltOperation{
-		Type:   "state",
-		Module: stateName,
+		Type:     "state",
+		Module:   stateName,
 		Function: "apply",
-		Pillar: pillar,
+		Pillar:   pillar,
 	}
 }
 

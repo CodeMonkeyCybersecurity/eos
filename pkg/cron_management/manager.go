@@ -26,7 +26,7 @@ func NewCronManager(config *CronConfig) *CronManager {
 	if config == nil {
 		config = DefaultCronConfig()
 	}
-	
+
 	return &CronManager{
 		config: config,
 	}
@@ -38,9 +38,9 @@ func (cm *CronManager) ListJobs(rc *eos_io.RuntimeContext) (*CronListResult, err
 	logger.Info("Listing cron jobs", zap.String("user", cm.config.User))
 
 	result := &CronListResult{
-		Jobs:      make([]CronJob, 0),
-		User:      cm.config.User,
-		Timestamp: time.Now(),
+		Jobs:       make([]CronJob, 0),
+		User:       cm.config.User,
+		Timestamp:  time.Now(),
 		HasCrontab: false,
 	}
 
@@ -80,7 +80,7 @@ func (cm *CronManager) ListJobs(rc *eos_io.RuntimeContext) (*CronListResult, err
 // AddJob adds a new cron job
 func (cm *CronManager) AddJob(rc *eos_io.RuntimeContext, job *CronJob) (*CronOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Adding cron job", 
+	logger.Info("Adding cron job",
 		zap.String("schedule", job.Schedule),
 		zap.String("command", job.Command),
 		zap.Bool("dry_run", cm.config.DryRun))
@@ -147,7 +147,7 @@ func (cm *CronManager) AddJob(rc *eos_io.RuntimeContext, job *CronJob) (*CronOpe
 // RemoveJob removes a cron job by ID or exact match
 func (cm *CronManager) RemoveJob(rc *eos_io.RuntimeContext, jobIdentifier string) (*CronOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Removing cron job", 
+	logger.Info("Removing cron job",
 		zap.String("identifier", jobIdentifier),
 		zap.Bool("dry_run", cm.config.DryRun))
 
@@ -219,7 +219,7 @@ func (cm *CronManager) RemoveJob(rc *eos_io.RuntimeContext, jobIdentifier string
 // ClearAllJobs removes all cron jobs
 func (cm *CronManager) ClearAllJobs(rc *eos_io.RuntimeContext) (*CronOperation, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Clearing all cron jobs", 
+	logger.Info("Clearing all cron jobs",
 		zap.Bool("dry_run", cm.config.DryRun))
 
 	operation := &CronOperation{
@@ -285,7 +285,7 @@ func (cm *CronManager) ValidateExpression(expression string) *CronValidationResu
 
 	result.Valid = true
 	result.Description = cm.describeCronExpression(expression)
-	
+
 	// Generate next few runs (simplified - real implementation would use cron parser)
 	// For now, just indicate it's valid
 	return result
@@ -321,7 +321,7 @@ func (cm *CronManager) parseCrontab(content string) ([]CronJob, error) {
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -363,9 +363,9 @@ func (cm *CronManager) parseCronLine(line string, lineNum int) (*CronJob, error)
 
 func (cm *CronManager) buildCrontabContent(jobs []CronJob) string {
 	var lines []string
-	
+
 	// Add header comment
-	lines = append(lines, "# Crontab managed by EOS")
+	lines = append(lines, "# Crontab managed by Eos")
 	lines = append(lines, fmt.Sprintf("# Generated on: %s", time.Now().Format("2006-01-02 15:04:05")))
 	lines = append(lines, "")
 
@@ -401,7 +401,7 @@ func (cm *CronManager) generateJobID(job *CronJob) string {
 func (cm *CronManager) validateCronExpression(expr string) error {
 	// Basic validation for standard cron expressions
 	parts := strings.Fields(expr)
-	
+
 	// Handle special expressions
 	if strings.HasPrefix(expr, "@") {
 		validSpecial := map[string]bool{
@@ -425,7 +425,7 @@ func (cm *CronManager) validateCronExpression(expr string) error {
 		if part == "*" || strings.Contains(part, "/") || strings.Contains(part, "-") || strings.Contains(part, ",") {
 			continue // Skip complex expressions for now
 		}
-		
+
 		// Simple numeric validation
 		if match, _ := regexp.MatchString(`^\d+$`, part); !match {
 			continue // Skip for now
@@ -459,7 +459,7 @@ func (cm *CronManager) describeCronExpression(expr string) string {
 
 func (cm *CronManager) createBackup(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Create backup directory
 	if err := os.MkdirAll(cm.config.BackupDir, 0755); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)

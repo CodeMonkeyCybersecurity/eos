@@ -41,7 +41,7 @@ func FuzzCommandParsing(f *testing.F) {
 		// Create a minimal root command for testing
 		rootCmd := &cobra.Command{
 			Use:   "eos",
-			Short: "EOS CLI Tool",
+			Short: "Eos CLI Tool",
 			RunE: func(cmd *cobra.Command, args []string) error {
 				return nil // Safe no-op
 			},
@@ -54,21 +54,21 @@ func FuzzCommandParsing(f *testing.F) {
 				return nil
 			},
 		}
-		
+
 		servicesCmd := &cobra.Command{
-			Use: "services", 
+			Use: "services",
 			RunE: func(cmd *cobra.Command, args []string) error {
 				return nil
 			},
 		}
-		
+
 		updateCmd := &cobra.Command{
 			Use: "update",
 			RunE: func(cmd *cobra.Command, args []string) error {
 				return nil
 			},
 		}
-		
+
 		createCmd := &cobra.Command{
 			Use: "create",
 			RunE: func(cmd *cobra.Command, args []string) error {
@@ -90,7 +90,7 @@ func FuzzCommandParsing(f *testing.F) {
 
 		// Try to parse without executing
 		rootCmd.SetArgs(args)
-		
+
 		// This should never panic, but might return errors (which is fine)
 		_, _, err := rootCmd.Find(args)
 		_ = err // Don't care about errors, just crashes

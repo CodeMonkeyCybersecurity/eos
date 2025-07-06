@@ -267,7 +267,7 @@ func (f *FallbackSecretStore) keyToEnvVar(key string) string {
 	envVar = strings.ReplaceAll(envVar, "/", "_")
 	envVar = strings.ReplaceAll(envVar, "-", "_")
 	envVar = strings.ReplaceAll(envVar, ".", "_")
-	return "EOS_SECRET_" + envVar
+	return "Eos_SECRET_" + envVar
 }
 
 // keyToFilePath converts a secret key to file path
