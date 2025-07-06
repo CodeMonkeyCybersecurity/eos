@@ -27,10 +27,7 @@ func TestSystemConfigManagerRegistration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	
-	rc, err := eos_io.NewRuntimeContext(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create runtime context: %v", err)
-	}
+	rc := eos_io.NewContext(ctx, "test")
 
 	// Create a test manager
 	config := &SystemToolsConfig{
@@ -80,10 +77,7 @@ func TestListAvailableConfigurations(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	
-	rc, err := eos_io.NewRuntimeContext(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create runtime context: %v", err)
-	}
+	rc := eos_io.NewContext(ctx, "test")
 
 	// Register a manager
 	config := &SystemToolsConfig{

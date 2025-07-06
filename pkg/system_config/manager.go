@@ -327,12 +327,37 @@ func ValidateEmail(email string) error {
 	if email == "" {
 		return fmt.Errorf("email cannot be empty")
 	}
-	if !strings.Contains(email, "@") {
-		return fmt.Errorf("email must contain @ symbol")
+	
+	// Basic email format validation
+	parts := strings.Split(email, "@")
+	if len(parts) != 2 {
+		return fmt.Errorf("email must contain exactly one @ symbol")
 	}
-	if !strings.Contains(email, ".") {
-		return fmt.Errorf("email must contain domain")
+	
+	localPart := parts[0]
+	domainPart := parts[1]
+	
+	if localPart == "" {
+		return fmt.Errorf("email local part cannot be empty")
 	}
+	
+	if domainPart == "" {
+		return fmt.Errorf("email domain part cannot be empty")
+	}
+	
+	if !strings.Contains(domainPart, ".") {
+		return fmt.Errorf("email domain must contain at least one dot")
+	}
+	
+	// Check for invalid characters at the beginning or end
+	if strings.HasPrefix(localPart, ".") || strings.HasSuffix(localPart, ".") {
+		return fmt.Errorf("email local part cannot start or end with a dot")
+	}
+	
+	if strings.HasPrefix(domainPart, ".") || strings.HasSuffix(domainPart, ".") {
+		return fmt.Errorf("email domain cannot start or end with a dot")
+	}
+	
 	return nil
 }
 
