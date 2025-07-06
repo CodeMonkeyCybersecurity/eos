@@ -35,6 +35,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/setup"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/storage"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
@@ -87,6 +88,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		self.SelfCmd,
 		refresh.RefreshCmd,
 		secure.SecureCmd,
+		setup.SetupCmd,
 		disable.DisableCmd,
 		backup.BackupCmd,
 		enable.EnableCmd,
