@@ -90,6 +90,12 @@ func (sim *ServiceInstallationManager) InstallService(rc *eos_io.RuntimeContext,
 			result.Success = false
 			result.Error = err.Error()
 		}
+	case ServiceTypeLoki:
+		err := sim.installLoki(rc, options, result)
+		if err != nil {
+			result.Success = false
+			result.Error = err.Error()
+		}
 	default:
 		return nil, fmt.Errorf("installation not implemented for service: %s", options.Type)
 	}
@@ -138,6 +144,8 @@ func (sim *ServiceInstallationManager) GetServiceStatus(rc *eos_io.RuntimeContex
 		return sim.getLxdStatus(rc, status)
 	case ServiceTypeCaddy:
 		return sim.getCaddyStatus(rc, status)
+	case ServiceTypeLoki:
+		return sim.getLokiStatus(rc, status)
 	default:
 		return nil, fmt.Errorf("status check not implemented for service: %s", serviceType)
 	}
@@ -268,6 +276,22 @@ func (sim *ServiceInstallationManager) initializeServiceConfigurations() {
 		DefaultPort:   80,
 		DefaultMethod: MethodRepository,
 		Dependencies:  []string{"curl", "gpg"},
+	}
+
+	// Loki configuration
+	sim.configurations[ServiceTypeLoki] = &ServiceConfiguration{
+		Type:          ServiceTypeLoki,
+		DefaultPort:   3100,
+		DefaultMethod: MethodCompose,
+		Dependencies:  []string{"docker", "wget"},
+		HealthCheck: &HealthCheckConfig{
+			Enabled:     true,
+			Endpoint:    "/ready",
+			Timeout:     10 * time.Second,
+			Interval:    30 * time.Second,
+			Retries:     3,
+			StartPeriod: 60 * time.Second,
+		},
 	}
 }
 
@@ -418,6 +442,8 @@ func (sim *ServiceInstallationManager) checkServiceProcess(serviceType ServiceTy
 		processName = "lxd"
 	case ServiceTypeCaddy:
 		processName = "caddy"
+	case ServiceTypeLoki:
+		processName = "loki"
 	default:
 		check.Status = "SKIPPED"
 		check.Message = "Process check not configured"
@@ -489,20 +515,9 @@ func (sim *ServiceInstallationManager) ensureDirectory(path string) error {
 	return os.MkdirAll(path, 0755)
 }
 
-// Stub method implementations for services not yet implemented
-
-func (sim *ServiceInstallationManager) installMattermost(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
-	return fmt.Errorf("mattermost installation not yet implemented")
+func (sim *ServiceInstallationManager) createCommandInDir(dir string, name string, args ...string) *exec.Cmd {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	return cmd
 }
 
-func (sim *ServiceInstallationManager) installLxd(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
-	return fmt.Errorf("lxd installation not yet implemented")
-}
-
-func (sim *ServiceInstallationManager) getMattermostStatus(rc *eos_io.RuntimeContext, status *ServiceStatus) (*ServiceStatus, error) {
-	return status, fmt.Errorf("mattermost status check not yet implemented")
-}
-
-func (sim *ServiceInstallationManager) getLxdStatus(rc *eos_io.RuntimeContext, status *ServiceStatus) (*ServiceStatus, error) {
-	return status, fmt.Errorf("lxd status check not yet implemented")
-}
