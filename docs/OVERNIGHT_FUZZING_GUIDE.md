@@ -5,14 +5,17 @@ This guide provides comprehensive instructions for setting up and running overni
 ## Quick Start
 
 ```bash
+# Quick validation (essential tests for 3-5 seconds each)
+./assets/quick-fuzz-validation.sh 5s
+
 # Run overnight fuzzing with default settings (8h long tests, 2h medium, 30m short)
-./assets/overnight-fuzz.sh
+./assets/overnight-fuzz-simple.sh
 
 # Run with custom durations for testing
-FUZZTIME_LONG=30m FUZZTIME_MEDIUM=10m FUZZTIME_SHORT=5m ./assets/overnight-fuzz.sh
+FUZZTIME_LONG=30m FUZZTIME_MEDIUM=10m FUZZTIME_SHORT=5m ./assets/overnight-fuzz-simple.sh
 
-# Run quick validation (all tests for 10 seconds each)
-./scripts/run-fuzz-tests.sh 10s
+# Individual test execution
+./scripts/run-fuzz-tests.sh 10s ./pkg/crypto FuzzHashString
 ```
 
 ## Configuration
