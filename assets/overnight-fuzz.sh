@@ -38,9 +38,24 @@ run_fuzz_test() {
     echo "⏱️  Started at: $(date)"
     echo "📄 Log: ${log_file}"
     
-    # Run test with timeout protection
-    if timeout "$(($(echo ${duration} | sed 's/[^0-9]*//g') + 300))" \
-       go test -run=^$ -fuzz=^${test_name}$ -fuzztime="${duration}" -parallel="${PARALLEL_JOBS}" "${package}" > "${log_file}" 2>&1; then
+    # Run test with timeout protection (macOS compatible)
+    timeout_cmd="timeout"
+    if command -v gtimeout >/dev/null 2>&1; then
+        timeout_cmd="gtimeout"
+    elif ! command -v timeout >/dev/null 2>&1; then
+        timeout_cmd=""  # No timeout available
+    fi
+    
+    if [ -n "${timeout_cmd}" ]; then
+        timeout_duration="$(($(echo ${duration} | sed 's/[^0-9]*//g') + 300))"
+        ${timeout_cmd} "${timeout_duration}" go test -run=^$ -fuzz=^${test_name}$ -fuzztime="${duration}" -parallel="${PARALLEL_JOBS}" "${package}" > "${log_file}" 2>&1
+        test_result=$?
+    else
+        go test -run=^$ -fuzz=^${test_name}$ -fuzztime="${duration}" -parallel="${PARALLEL_JOBS}" "${package}" > "${log_file}" 2>&1
+        test_result=$?
+    fi
+    
+    if [ ${test_result} -eq 0 ]; then
         
         local end_time=$(date +%s)
         local elapsed=$((end_time - start_time))
@@ -71,10 +86,13 @@ run_fuzz_test() {
     echo ""
 }
 
-# Parallel test runner for improved performance
+# Parallel test runner for improved performance (bash 3.x compatible)
 run_parallel_tests() {
-    local -n test_array=$1
+    local array_name="$1"
     local max_parallel=$2
+    
+    # Get array contents dynamically (bash 3.x compatible)
+    eval "local test_array=(\"\${${array_name}[@]}\")"
     
     echo "🔄 Running ${#test_array[@]} tests with ${max_parallel} parallel jobs..."
     
