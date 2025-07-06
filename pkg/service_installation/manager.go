@@ -96,6 +96,24 @@ func (sim *ServiceInstallationManager) InstallService(rc *eos_io.RuntimeContext,
 			result.Success = false
 			result.Error = err.Error()
 		}
+	case ServiceTypeTailscale:
+		err := sim.installTailscale(rc, options, result)
+		if err != nil {
+			result.Success = false
+			result.Error = err.Error()
+		}
+	case ServiceTypeQemuGuest:
+		err := sim.installQemuGuest(rc, options, result)
+		if err != nil {
+			result.Success = false
+			result.Error = err.Error()
+		}
+	case ServiceTypeGuacamole:
+		err := sim.installGuacamole(rc, options, result)
+		if err != nil {
+			result.Success = false
+			result.Error = err.Error()
+		}
 	default:
 		return nil, fmt.Errorf("installation not implemented for service: %s", options.Type)
 	}
@@ -146,6 +164,12 @@ func (sim *ServiceInstallationManager) GetServiceStatus(rc *eos_io.RuntimeContex
 		return sim.getCaddyStatus(rc, status)
 	case ServiceTypeLoki:
 		return sim.getLokiStatus(rc, status)
+	case ServiceTypeTailscale:
+		return sim.getTailscaleStatus(rc, status)
+	case ServiceTypeQemuGuest:
+		return sim.getQemuGuestStatus(rc, status)
+	case ServiceTypeGuacamole:
+		return sim.getGuacamoleStatus(rc, status)
 	default:
 		return nil, fmt.Errorf("status check not implemented for service: %s", serviceType)
 	}
@@ -291,6 +315,38 @@ func (sim *ServiceInstallationManager) initializeServiceConfigurations() {
 			Interval:    30 * time.Second,
 			Retries:     3,
 			StartPeriod: 60 * time.Second,
+		},
+	}
+
+	// Tailscale configuration
+	sim.configurations[ServiceTypeTailscale] = &ServiceConfiguration{
+		Type:          ServiceTypeTailscale,
+		DefaultPort:   0, // No default port
+		DefaultMethod: MethodNative,
+		Dependencies:  []string{"curl"},
+	}
+
+	// QEMU Guest Agent configuration
+	sim.configurations[ServiceTypeQemuGuest] = &ServiceConfiguration{
+		Type:          ServiceTypeQemuGuest,
+		DefaultPort:   0, // No default port
+		DefaultMethod: MethodNative,
+		Dependencies:  []string{"apt-get"},
+	}
+
+	// Apache Guacamole configuration
+	sim.configurations[ServiceTypeGuacamole] = &ServiceConfiguration{
+		Type:          ServiceTypeGuacamole,
+		DefaultPort:   8080,
+		DefaultMethod: MethodCompose,
+		Dependencies:  []string{"docker", "docker-compose"},
+		HealthCheck: &HealthCheckConfig{
+			Enabled:     true,
+			Endpoint:    "/guacamole",
+			Timeout:     15 * time.Second,
+			Interval:    60 * time.Second,
+			Retries:     3,
+			StartPeriod: 90 * time.Second,
 		},
 	}
 }
@@ -444,6 +500,12 @@ func (sim *ServiceInstallationManager) checkServiceProcess(serviceType ServiceTy
 		processName = "caddy"
 	case ServiceTypeLoki:
 		processName = "loki"
+	case ServiceTypeTailscale:
+		processName = "tailscaled"
+	case ServiceTypeQemuGuest:
+		processName = "qemu-ga"
+	case ServiceTypeGuacamole:
+		processName = "guacamole"
 	default:
 		check.Status = "SKIPPED"
 		check.Message = "Process check not configured"
