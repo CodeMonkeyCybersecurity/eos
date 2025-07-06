@@ -40,6 +40,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/salt"
 	// Internal packages
 )
 
@@ -101,6 +102,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 		manage.ManageCmd, // System management via SaltStack
 		pandora.PandoraCmd,
 		ragequit.RagequitCmd,
+		salt.SaltCmd, // SaltStack orchestration and management
 	} {
 		RootCmd.AddCommand(subCmd)
 	}
