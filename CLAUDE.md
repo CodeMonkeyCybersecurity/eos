@@ -126,7 +126,8 @@ Use `eos_err.IsExpectedUserError()` to distinguish between user errors and syste
 All command implementations should use `eos.Wrap()` to properly handle the runtime context and error patterns.
 
 ### Code Quality Requirements
-**CRITICAL**: Before any task can be considered completed by Claude, the following requirements MUST be met:
+**CRITICAL**
+any task can be considered completed by Claude, the following requirements MUST be met:
 
 1. **Zero Compilation Errors**: The code must compile successfully without any errors throughout the entire codebase
 2. **Linting Standards**: Run `golangci-lint run` and the entire codebase must pass all linting checks without warnings or errors
@@ -154,20 +155,23 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Refer to STACK.md for a point-of-truth reference for how the eos framework is supposed to work at an architectural level.
 
 ### Code Conventions
-- **CRITICAL**: Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, fmt.Fprintf, fmt.Print, or any fmt package output functions
-- **CRITICAL**: ALL user-facing output MUST go through structured logging - no exceptions
-- **CRITICAL**: This is a developer tool - prioritize debugging information over pretty output formatting
-- **CRITICAL**: Use zap.Error(), zap.String(), zap.Any(), zap.Int(), zap.Bool() etc. for all log fields - structured logging is mandatory
-- **CRITICAL**: Interactive prompts and user input should use appropriate logging levels (Info for prompts, Warn for important notices)
-- **CRITICAL**: Status updates, progress information, and results MUST use structured logging with appropriate fields
+**CRITICAL**
+- Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, fmt.Fprintf, fmt.Print, or any fmt package output functions
+- ALL user-facing output MUST go through structured logging - no exceptions
+- This is a developer tool - prioritize debugging information over pretty output formatting
+- Use zap.Error(), zap.String(), zap.Any(), zap.Int(), zap.Bool() etc. for all log fields - structured logging is mandatory
+- Interactive prompts and user input should use appropriate logging levels (Info for prompts, Warn for important notices)
+- Status updates, progress information, and results MUST use structured logging with appropriate fields
 - Follow Go module structure with clear package separation
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
 - Each helper function needs to check whether it can execute the function it need to, execute that function, then verify that function has executed correctly. This follows the assessment -> intervention -> evaluation model.
-- all helper functions should be under the pkg/* directory, with files in the cmd/* directory really only acting as an orchestrator for the helper functions defined in pkg/. This helps keep the code modular and universal and adhere to DRY (dont repeat yourself) coding best practices 
+- all helper functions should be under the pkg/* directory, with files in the cmd/* directory really only acting as an orchestrator for the helper functions defined in pkg/. This helps keep the code modular and universal and adhere to DRY (dont repeat yourself) coding best practices
+- where user input is needed but not provided by specifying it with the appropriate `--flag`, ask the user input the appropraite information with a `terminal prompt: ...` asking for user input before executing the command.
 
 ### Port Management Convention
+- see `pkg/shared/ports.go` for ports for internal service allocation and discovery
 
 ## Memories
 - No use of emojis in code or documentation

@@ -1,0 +1,109 @@
+job "minio" {
+  datacenters = ["{{.Datacenter}}"]
+  type        = "service"
+
+  group "minio" {
+    count = 1
+
+    network {
+      mode = "host"
+      port "api" {
+        static = {{.APIPort}}
+      }
+      port "console" {
+        static = {{.ConsolePort}}
+      }
+    }
+
+    volume "minio-data" {
+      type      = "host"
+      read_only = false
+      source    = "minio-data"
+    }
+
+    task "minio" {
+      driver = "docker"
+
+      config {
+        image = "minio/minio:latest"
+        ports = ["api", "console"]
+        args = [
+          "server",
+          "/data",
+          "--console-address", ":9001"
+        ]
+        volumes = [
+          "{{.StoragePath}}:/data"
+        ]
+      }
+
+      volume_mount {
+        volume      = "minio-data"
+        destination = "/data"
+        read_only   = false
+      }
+
+      vault {
+        policies = ["minio-policy"]
+        change_mode = "restart"
+      }
+
+      template {
+        data = <<EOF
+{{- with secret "kv/data/minio/root" -}}
+MINIO_ROOT_USER={{ .Data.data.MINIO_ROOT_USER }}
+MINIO_ROOT_PASSWORD={{ .Data.data.MINIO_ROOT_PASSWORD }}
+{{- end -}}
+MINIO_PROMETHEUS_URL=http://prometheus.service.consul:9090
+MINIO_PROMETHEUS_JOB_ID=minio
+MINIO_BROWSER_REDIRECT_URL=http://{{ env "NOMAD_IP_console" }}:{{ env "NOMAD_PORT_console" }}
+EOF
+        destination = "secrets/env"
+        env         = true
+      }
+
+      resources {
+        cpu    = 500
+        memory = 1024
+      }
+
+      service {
+        name = "minio"
+        port = "api"
+        tags = ["minio", "api", "s3", "prometheus"]
+
+        check {
+          type     = "http"
+          path     = "/minio/health/live"
+          interval = "10s"
+          timeout  = "2s"
+        }
+
+        meta {
+          prometheus_port = "$${NOMAD_PORT_api}"
+          prometheus_path = "/minio/v2/metrics/cluster"
+        }
+      }
+
+      service {
+        name = "minio-console"
+        port = "console"
+        tags = ["minio", "console", "ui"]
+
+        check {
+          type     = "http"
+          path     = "/"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+    }
+  }
+
+  # Host volume definition
+  constraint {
+    attribute = "$${node.unique.name}"
+    operator  = "set_contains_any"
+    value     = "nomad-client-1,nomad-client-2,nomad-client-3"
+  }
+}

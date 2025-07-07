@@ -1,0 +1,24 @@
+output "minio_api_endpoint" {
+  description = "MinIO S3 API endpoint"
+  value       = "http://${var.node_address}:${var.api_port}"
+}
+
+output "minio_console_endpoint" {
+  description = "MinIO Console UI endpoint"
+  value       = "http://${var.node_address}:${var.console_port}"
+}
+
+output "vault_credentials_path" {
+  description = "Vault path for MinIO root credentials"
+  value       = "kv/minio/root"
+}
+
+output "mc_alias_command" {
+  description = "Command to configure mc client"
+  value       = "mc alias set local http://${var.node_address}:${var.api_port} $MINIO_ROOT_USER $MINIO_ROOT_PASSWORD"
+}
+
+output "nomad_job_id" {
+  description = "Nomad job ID"
+  value       = nomad_job.minio.id
+}

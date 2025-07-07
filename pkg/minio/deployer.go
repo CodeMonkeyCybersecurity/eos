@@ -1,16 +1,16 @@
 package minio
 
 import (
-	"context"
 	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
 	"text/template"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -44,7 +44,7 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 	if !opts.SkipSalt {
 		logger.Info("Applying SaltStack states for MinIO")
 		if err := d.applySaltStates(rc); err != nil {
-			return eos_err.NewUserErr(fmt.Errorf("failed to apply Salt states: %w", err))
+			return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to apply Salt states: %w", err))
 		}
 	}
 
@@ -52,21 +52,21 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 	logger.Info("Generating deployment files")
 	deployDir, err := d.generateDeploymentFiles(rc, opts)
 	if err != nil {
-		return eos_err.NewUserErr(fmt.Errorf("failed to generate deployment files: %w", err))
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to generate deployment files: %w", err))
 	}
 
 	// Step 3: Run Terraform deployment
 	if !opts.SkipTerraform {
 		logger.Info("Running Terraform deployment")
 		if err := d.runTerraformDeployment(rc, deployDir); err != nil {
-			return eos_err.NewUserErr(fmt.Errorf("failed to run Terraform: %w", err))
+			return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to run Terraform: %w", err))
 		}
 	}
 
 	// Step 4: Verify deployment
 	logger.Info("Verifying MinIO deployment")
 	if err := d.verifyDeployment(rc, opts); err != nil {
-		return eos_err.NewUserErr(fmt.Errorf("deployment verification failed: %w", err))
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("deployment verification failed: %w", err))
 	}
 
 	// Display access information
@@ -81,14 +81,27 @@ func (d *Deployer) applySaltStates(rc *eos_io.RuntimeContext) error {
 
 	// Apply MinIO setup states
 	logger.Info("Applying MinIO Salt states")
-	if _, err := eos_unix.RunCommandWithTimeout(rc.Ctx, 300, "salt", "*", "state.apply", "minio"); err != nil {
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "salt",
+		Args:    []string{"*", "state.apply", "minio"},
+		Timeout: 300 * time.Second,
+	})
+	if err != nil {
 		return fmt.Errorf("failed to apply minio state: %w", err)
 	}
+	logger.Debug("Salt state output", zap.String("output", output))
 
 	// Apply Vault policy states
 	logger.Info("Applying Vault policy Salt states")
-	if _, err := eos_unix.RunCommandWithTimeout(rc.Ctx, 300, "salt", "salt-master", "state.apply", "minio.vault_policy"); err != nil {
+	output, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "salt",
+		Args:    []string{"salt-master", "state.apply", "minio.vault_policy"},
+		Timeout: 300 * time.Second,
+	})
+	if err != nil {
 		logger.Warn("Failed to apply vault policy state (this may be expected if not running on salt-master)", zap.Error(err))
+	} else {
+		logger.Debug("Vault policy state output", zap.String("output", output))
 	}
 
 	return nil
@@ -166,15 +179,29 @@ func (d *Deployer) runTerraformDeployment(rc *eos_io.RuntimeContext, deployDir s
 
 	// Initialize Terraform
 	logger.Info("Initializing Terraform")
-	if _, err := eos_unix.RunCommandInDirWithTimeout(rc.Ctx, terraformDir, 300, "terraform", "init"); err != nil {
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "terraform",
+		Args:    []string{"init"},
+		Dir:     terraformDir,
+		Timeout: 300 * time.Second,
+	})
+	if err != nil {
 		return fmt.Errorf("terraform init failed: %w", err)
 	}
+	logger.Debug("Terraform init output", zap.String("output", output))
 
 	// Apply Terraform configuration
 	logger.Info("Applying Terraform configuration")
-	if _, err := eos_unix.RunCommandInDirWithTimeout(rc.Ctx, terraformDir, 600, "terraform", "apply", "-auto-approve"); err != nil {
+	output, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "terraform",
+		Args:    []string{"apply", "-auto-approve"},
+		Dir:     terraformDir,
+		Timeout: 600 * time.Second,
+	})
+	if err != nil {
 		return fmt.Errorf("terraform apply failed: %w", err)
 	}
+	logger.Debug("Terraform apply output", zap.String("output", output))
 
 	return nil
 }
@@ -185,7 +212,11 @@ func (d *Deployer) verifyDeployment(rc *eos_io.RuntimeContext, opts *DeploymentO
 
 	// Check Nomad job status
 	logger.Info("Checking Nomad job status")
-	output, err := eos_unix.RunCommandWithTimeout(rc.Ctx, 30, "nomad", "job", "status", "minio")
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "nomad",
+		Args:    []string{"job", "status", "minio"},
+		Timeout: 30 * time.Second,
+	})
 	if err != nil {
 		return fmt.Errorf("failed to check Nomad job status: %w", err)
 	}
@@ -194,7 +225,12 @@ func (d *Deployer) verifyDeployment(rc *eos_io.RuntimeContext, opts *DeploymentO
 	// Check MinIO health endpoint
 	logger.Info("Checking MinIO health endpoint")
 	healthURL := fmt.Sprintf("http://localhost:%d/minio/health/live", opts.APIPort)
-	if _, err := eos_unix.RunCommandWithTimeout(rc.Ctx, 30, "curl", "-f", "-s", healthURL); err != nil {
+	_, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "curl",
+		Args:    []string{"-f", "-s", healthURL},
+		Timeout: 30 * time.Second,
+	})
+	if err != nil {
 		logger.Warn("MinIO health check failed (service may still be starting)", zap.Error(err))
 	}
 
