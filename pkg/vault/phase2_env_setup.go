@@ -44,9 +44,7 @@ func PrepareEnvironment(rc *eos_io.RuntimeContext) error {
 	if _, err := EnsureVaultEnv(rc); err != nil {
 		return err
 	}
-	if err := eos_unix.EnsureEosUser(rc.Ctx, true, false); err != nil {
-		return err
-	}
+
 	if err := EnsureVaultDirs(rc); err != nil {
 		return err
 	}

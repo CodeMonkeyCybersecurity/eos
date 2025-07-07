@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/platform"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -127,56 +128,13 @@ func (i *Installer) Verify(rc *eos_io.RuntimeContext) error {
 	return i.verifier.Verify(rc)
 }
 
-// detectUbuntuRelease detects the current Ubuntu version and codename
-func (i *Installer) detectUbuntuRelease(rc *eos_io.RuntimeContext) (*UbuntuRelease, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Read /etc/os-release
-	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "cat",
-		Args:    []string{"/etc/os-release"},
-		Timeout: 10 * time.Second,
-	})
-	
-	if err != nil {
-		return nil, fmt.Errorf("failed to read /etc/os-release: %w", err)
-	}
-	
-	release := &UbuntuRelease{Arch: "amd64"}
-	
-	// Parse the output
-	for _, line := range strings.Split(output, "\n") {
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		
-		key := parts[0]
-		value := strings.Trim(parts[1], "\"")
-		
-		switch key {
-		case "VERSION_ID":
-			release.Version = value
-		case "VERSION_CODENAME":
-			release.Codename = value
-		}
-	}
-	
-	// Validate we got the required information
-	if release.Version == "" || release.Codename == "" {
-		return nil, fmt.Errorf("could not determine Ubuntu version")
-	}
-	
-	logger.Debug("Detected Ubuntu release",
-		zap.String("version", release.Version),
-		zap.String("codename", release.Codename),
-	)
-	
-	return release, nil
+// detectUbuntuRelease detects the current Ubuntu version and codename using platform utility
+func (i *Installer) detectUbuntuRelease(rc *eos_io.RuntimeContext) (*platform.UbuntuRelease, error) {
+	return platform.DetectUbuntuRelease(rc)
 }
 
 // addRepository adds the Salt repository to apt sources
-func (i *Installer) addRepository(rc *eos_io.RuntimeContext, release *UbuntuRelease) error {
+func (i *Installer) addRepository(rc *eos_io.RuntimeContext, release *platform.UbuntuRelease) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Step 1: Download and add the repository key
@@ -208,9 +166,8 @@ func (i *Installer) addRepository(rc *eos_io.RuntimeContext, release *UbuntuRele
 	logger.Info("Creating apt sources list entry")
 	
 	repoLine := fmt.Sprintf(
-		"deb [signed-by=/usr/share/keyrings/salt-archive-keyring.gpg arch=amd64] %s %s main",
-		release.GetSaltRepoURL(),
-		release.Codename,
+		"deb [signed-by=/usr/share/keyrings/salt-archive-keyring.gpg arch=amd64] %s",
+		platform.GetSaltRepoURL(release.Version, release.Codename),
 	)
 	
 	// Write to sources list

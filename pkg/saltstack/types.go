@@ -48,10 +48,10 @@ const (
 	SaltPillarDir    = "/srv/pillar"
 	EosStatesDir     = "/srv/salt/eos"
 	
-	// Repository information
+	// Repository information  
 	SaltRepoKey     = "https://packages.broadcom.com/artifactory/api/gpg/key/public"
 	SaltRepoKeyID   = "BCAA30E340B057F0FB2D97CB754C4B3A8C3095CF"
-	SaltRepoBaseURL = "https://packages.broadcom.com/artifactory/saltproject-deb/"
+	SaltRepoBaseURL = "https://packages.broadcom.com/artifactory/saltproject-deb"
 	
 	// Default configuration values
 	DefaultLogLevel    = "warning"
@@ -77,18 +77,11 @@ eos_test_command:
 `
 )
 
-// Ubuntu release information
-type UbuntuRelease struct {
-	Version  string
-	Codename string
-	Arch     string
-}
-
 // GetSaltRepoURL returns the appropriate Salt repository URL for the Ubuntu release
-func (r *UbuntuRelease) GetSaltRepoURL() string {
-	// Map Ubuntu codenames to Salt repository paths
-	// Salt uses specific paths for each Ubuntu release
-	return SaltRepoBaseURL + "stable/ubuntu/" + r.Version + "/amd64/latest"
+func GetSaltRepoURL(version, codename string) string {
+	// Current Salt repository structure uses codename-based URLs
+	// Format: https://packages.broadcom.com/artifactory/saltproject-deb [codename] main
+	return SaltRepoBaseURL + " " + codename + " main"
 }
 
 // GetRepoListPath returns the path to the apt sources list file for Salt

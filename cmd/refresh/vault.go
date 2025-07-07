@@ -30,13 +30,6 @@ var VaultRefreshCmd = &cobra.Command{
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
-		// Check if we are root or have sudo privileges
-		if err := eos_unix.EnsureEosSudoReady(rc.Ctx); err != nil {
-			log.Error(" Required privileges not available", zap.Error(err))
-			fmt.Println(" Please run: sudo -v && eos refresh vault --unseal")
-			return fmt.Errorf("insufficient privileges: %w", err)
-		}
-
 		log.Info(" Refreshing Vault service...")
 		if err := eos_unix.RestartSystemdUnitWithRetry(rc.Ctx, "vault", 3, 2); err != nil {
 			return fmt.Errorf("vault restart failed: %w", err)

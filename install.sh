@@ -329,41 +329,6 @@ create_directories() {
   # This part is installing for the system service user.
 }
 
-setup_linux_user() {
-  if $IS_LINUX; then
-    if ! id "$Eos_USER" &>/dev/null; then
-      log INFO " Creating system user: $Eos_USER (for service operations)"
-      useradd --system --no-create-home --shell /usr/sbin/nologin "$Eos_USER" || log ERR "Failed to create user $Eos_USER."
-    fi
-
-    # Check if syslog group exists and user is not already in it
-    if getent group syslog >/dev/null && ! id -nG "$Eos_USER" | grep -qw syslog; then
-      log INFO " Adding $Eos_USER to syslog group (for log access)"
-      usermod -aG syslog "$Eos_USER" || log ERR "Failed to add user $Eos_USER to syslog group."
-    fi
-
-    # Crucial: These directories are now owned by the 'eos' system user.
-    # If the CLI is run by 'ubuntu' user and needs to write here, it will fail.
-    chown -R "$Eos_USER:$Eos_USER" /var/lib/eos || log ERR "Failed to change ownership of /var/lib/eos."
-    chmod 750 /var/lib/eos || log ERR "Failed to set permissions on /var/lib/eos."
-    chown "$Eos_USER:$Eos_USER" "$LOG_DIR" || log ERR "Failed to change ownership of $LOG_DIR."
-    chmod 750 "$LOG_DIR" || log ERR "Failed to set permissions on $LOG_DIR."
-  fi
-}
-
-add_sudoers_entry() {
-  if $IS_LINUX && [ ! -f /etc/sudoers.d/eos ]; then
-    log INFO " Adding sudoers entry for $Eos_USER (to allow passwordless sudo for the 'eos' system user)"
-    echo "$Eos_USER ALL=(ALL) NOPASSWD: $INSTALL_PATH" | tee /etc/sudoers.d/eos > /dev/null \
-      || { log ERR "Failed to write sudoers entry."; exit 1; }
-    chmod 440 /etc/sudoers.d/eos || { log ERR "Failed to set permissions on sudoers file."; exit 1; }
-    visudo -c || { log ERR " Sudoers validation failed. Please check /etc/sudoers.d/eos manually."; exit 1; }
-    log INFO "Sudoers entry validated."
-  else
-    log INFO "Sudoers entry already exists or not applicable for this OS."
-  fi
-}
-
 main() {
   detect_platform
   

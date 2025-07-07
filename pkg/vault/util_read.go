@@ -11,7 +11,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/hashicorp/vault/api"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -82,9 +81,6 @@ func ReadFallbackJSON[T any](path string, target *T) error {
 // ReadVaultSecureData loads vault_init and userpass fallback files.
 func ReadVaultSecureData(rc *eos_io.RuntimeContext, client *api.Client) (*api.InitResponse, shared.UserpassCreds, []string, string) {
 	otelzap.Ctx(rc.Ctx).Info(" Starting secure Vault bootstrap sequence")
-	if err := eos_unix.EnsureEosUser(rc.Ctx, true, false); err != nil {
-		otelzap.Ctx(rc.Ctx).Fatal("Failed to ensure eos system user", zap.Error(err))
-	}
 
 	initRes := mustReadTypedFile(rc, "vault_init", &api.InitResponse{})
 	creds := mustReadTypedFile(rc, shared.EosUserPassFallback, &shared.UserpassCreds{})
