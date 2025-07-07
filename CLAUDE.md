@@ -129,9 +129,9 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 **CRITICAL**: Before any task can be considered completed by Claude, the following requirements MUST be met:
 
 1. **Zero Compilation Errors**: The code must compile successfully without any errors throughout the entire codebase
-2. **Linting Standards**: Run `golangci-lint run` and the code MUST pass all linting checks without warnings or errors
-3. **Test Compliance**: The code MUST pass all existing test modules relevant to the changes made
-4. **Fix Code, Not Tests**: When tests fail, the production code must be corrected unless the test is clearly invalid or unreliable
+2. **Linting Standards**: Run `golangci-lint run` and the entire codebase must pass all linting checks without warnings or errors
+3. **Test Compliance**: The entire codebase MUST pass all existing test modules relevant to the changes made
+4. **Fix Code, Not Tests**: When tests fail, the production codebase must be corrected unless the test is clearly invalid or unreliable
 5. **Verification Commands**: Before marking a task complete, run:
    ```bash
    # Verify compilation
@@ -162,8 +162,24 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Implement proper context handling for cancellation
 - Use the established error handling patterns
 - Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
+- Each helper function needs to check whether it can execute the function it need to, execute that function, then verify that function has executed correctly. This follows the assessment -> intervention -> evaluation model.
+- all helper functions should be under the pkg/* directory, with files in the cmd/* directory really only acting as an orchestrator for the helper functions defined in pkg/. This helps keep the code modular and universal and adhere to DRY (dont repeat yourself) coding best practices 
 
 ### Port Management Convention
 
 ## Memories
 - No use of emojis in code or documentation
+
+## The stack
+- Caddy as a reverse proxy for http/s traffic 
+- Nginx to be used alongside Caddy for non-http/s traffic (eg.UDP, TCP, SMTP, IMAP, etc.)
+- Authentik as SSO provider to make Caddy identity aware as a reverse proxy
+- Saltstack for orchestration commands (including backup and recovery, Terraform, etc)
+- Terraform instruments the hashicorp stack includes: Nomad for container orchestration, Vault with a file backend for secrets management, Consul for service discovery, Boundary for zero trust control plane access
+- Restic for backup and recovery 
+- Clusterfuzz for fuzzing of the eos tool (this codebase)
+- Minio for S3 storage
+- Wazuh for XDR/SEIM (implemented in this stack as Delphi)
+- Docker for containers
+- PostgreSQL for databases 
+- CephFS as a distributed file system
