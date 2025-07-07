@@ -102,7 +102,7 @@ type DaemonStatus struct {
 
 // SaltStackConfig represents the SaltStack configuration for CephFS
 type SaltStackConfig struct {
-	PillarData    map[string]interface{} // Pillar data for Salt states
+	PillarData    map[string]any // Pillar data for Salt states
 	StateFiles    []string               // List of state files to apply
 	TemplateVars  map[string]string      // Template variables
 	TerraformPath string                 // Path to generated Terraform files
@@ -188,7 +188,7 @@ type CephServiceSpec struct {
 	ServiceType string                 `yaml:"service_type"`
 	ServiceID   string                 `yaml:"service_id"`
 	Placement   CephPlacementSpec      `yaml:"placement"`
-	Spec        map[string]interface{} `yaml:"spec"`
+	Spec        map[string]any `yaml:"spec"`
 }
 
 // CephPlacementSpec represents placement configuration for Ceph services

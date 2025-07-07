@@ -2,6 +2,7 @@ package minio
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -125,14 +126,8 @@ minio:
 	}
 	logger.Debug("Created pillar directory", zap.String("output", output))
 	
-	// Write pillar content
-	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "sudo",
-		Args:    []string{"tee", pillarPath},
-		Input:   pillarContent,
-		Timeout: 10 * time.Second,
-	})
-	if err != nil {
+	// Write pillar content to file
+	if err := os.WriteFile(pillarPath, []byte(pillarContent), 0644); err != nil {
 		return fmt.Errorf("failed to write pillar file: %w", err)
 	}
 	logger.Debug("Wrote pillar file", zap.String("path", pillarPath))
@@ -285,7 +280,6 @@ func (ad *AlignedDeployer) applyTerraformDegradedMode(rc *eos_io.RuntimeContext,
 		Command: "terraform",
 		Args:    []string{"apply", "-auto-approve", "-var", "skip_vault=true"},
 		Dir:     terraformDir,
-		Env:     []string{"TF_VAR_skip_vault=true"},
 		Timeout: 600 * time.Second,
 	})
 	if err != nil {
@@ -400,7 +394,7 @@ func (ad *AlignedDeployer) WorkaroundVolumeManagement(rc *eos_io.RuntimeContext,
 	logger.Info("Ensuring Nomad host volume exists")
 	
 	// Create the storage directory if it doesn't exist
-	output, err := execute.Run(rc.Ctx, execute.Options{
+	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "sudo",
 		Args:    []string{"mkdir", "-p", storagePath},
 		Timeout: 10 * time.Second,
@@ -410,7 +404,7 @@ func (ad *AlignedDeployer) WorkaroundVolumeManagement(rc *eos_io.RuntimeContext,
 	}
 	
 	// Set proper permissions for MinIO
-	output, err = execute.Run(rc.Ctx, execute.Options{
+	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "sudo",
 		Args:    []string{"chown", "-R", "1000:1000", storagePath},
 		Timeout: 10 * time.Second,
@@ -435,11 +429,11 @@ host_volume "%s" {
 }
 
 // WorkaroundResourceConstraints adjusts resource allocations based on available resources
-func (ad *AlignedDeployer) WorkaroundResourceConstraints(rc *eos_io.RuntimeContext) (memory int, cpu int, error) {
+func (ad *AlignedDeployer) WorkaroundResourceConstraints(rc *eos_io.RuntimeContext) (memory int, cpu int, err error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Query Nomad for available resources
-	output, err := execute.Run(rc.Ctx, execute.Options{
+	_, err = execute.Run(rc.Ctx, execute.Options{
 		Command: "nomad",
 		Args:    []string{"node", "status", "-json"},
 		Timeout: 10 * time.Second,

@@ -131,7 +131,7 @@ func createSaltDirectoryStructure(rc *eos_io.RuntimeContext) error {
 }
 
 // generatePillarData creates the pillar data for CephFS configuration
-func generatePillarData(rc *eos_io.RuntimeContext, config *Config) (map[string]interface{}, error) {
+func generatePillarData(rc *eos_io.RuntimeContext, config *Config) (map[string]any, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	logger.Debug("Generating pillar data for CephFS deployment")
@@ -147,8 +147,8 @@ func generatePillarData(rc *eos_io.RuntimeContext, config *Config) (map[string]i
 		config.ClusterFSID = fsid
 	}
 	
-	pillarData := map[string]interface{}{
-		"ceph": map[string]interface{}{
+	pillarData := map[string]any{
+		"ceph": map[string]any{
 			"cluster_fsid":    clusterFSID,
 			"admin_host":      config.AdminHost,
 			"ssh_user":        config.SSHUser,
@@ -168,7 +168,7 @@ func generatePillarData(rc *eos_io.RuntimeContext, config *Config) (map[string]i
 }
 
 // writePillarFile writes the pillar data to the pillar file
-func writePillarFile(rc *eos_io.RuntimeContext, pillarData map[string]interface{}) error {
+func writePillarFile(rc *eos_io.RuntimeContext, pillarData map[string]any) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	pillarPath := GetSaltCephPillarPath()
@@ -190,7 +190,7 @@ func writePillarFile(rc *eos_io.RuntimeContext, pillarData map[string]interface{
 }
 
 // generateStateFiles creates the SaltStack state files
-func generateStateFiles(rc *eos_io.RuntimeContext, config *Config) error {
+func generateStateFiles(rc *eos_io.RuntimeContext, _ *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Create main state file
@@ -239,7 +239,7 @@ ceph_terraform_directory:
 }
 
 // generateTerraformTemplates creates the Jinja2 templates for Terraform
-func generateTerraformTemplates(rc *eos_io.RuntimeContext, config *Config) error {
+func generateTerraformTemplates(rc *eos_io.RuntimeContext, _ *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	templateContent := `terraform {
@@ -383,7 +383,7 @@ output "osd_spec_content" {
 }
 
 // verifySaltStackConfiguration verifies the generated configuration
-func verifySaltStackConfiguration(rc *eos_io.RuntimeContext, config *Config) error {
+func verifySaltStackConfiguration(rc *eos_io.RuntimeContext, _ *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	
 	// Verify pillar file exists and is valid
