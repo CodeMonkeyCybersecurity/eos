@@ -347,8 +347,6 @@ main() {
   install_binary "$@"
   show_new_checksum
   create_directories
-  setup_linux_user
-  add_sudoers_entry
   echo
   log INFO " Eos installation complete!"
   log INFO "The 'eos' binary has been installed to '$INSTALL_PATH'."
