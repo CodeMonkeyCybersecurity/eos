@@ -6,57 +6,93 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Eos** is a Go-based CLI application for Ubuntu server administration developed by Code Monkey Cybersecurity. It provides automation, orchestration, and hardening capabilities for users who need simplified server management.
 
-## Development Commands
+## Quick Reference
 
-### Building and Installation
+### Critical Patterns
+- **Command Structure**: `cmd/create_[feature].go` → orchestrates → `pkg/[feature]/*.go` helpers
+- **Logging**: **ONLY** use `otelzap.Ctx(rc.Ctx)` - **NEVER** use `fmt.Printf/Println/Print`
+- **Error Handling**: User errors exit with code 0, system errors exit with code 1
+- **Context**: Always pass `*eos_io.RuntimeContext` (3-minute default timeout)
+- **Pattern**: Every helper follows **Assess → Intervene → Evaluate**
+
+### Testing Checklist
+Before marking any task complete:
 ```bash
-# Build the application
-go build -o eos .
-
-# Install dependencies
-go mod tidy
-
-# Install using the provided script
-./install.sh
-
-# Manual installation after build
-sudo cp eos /usr/local/bin/
+go build -o /tmp/eos-build ./cmd/        # Must compile without errors
+golangci-lint run                        # Must pass all linting checks
+go test -v ./pkg/...                     # Must pass all tests
 ```
 
-### Testing
-```bash
-# Run all unit tests with coverage
-go test -v -coverprofile=coverage.out -covermode=atomic ./pkg/...
-
-# Run integration tests
-go test -v -timeout=5m ./integration_test.go ./integration_scenarios_test.go
-
-# Generate coverage report
-go tool cover -html=coverage.out -o coverage.html
-
-# Run security-focused tests
-go test -v -run "Security|Validation|Auth" ./pkg/...
-
-# Run fuzz tests for security validation
-./scripts/run-fuzz-tests.sh          # Run all fuzz tests (10s each)
-./scripts/run-fuzz-tests.sh 30s      # Run with custom duration
-
-# Run specific fuzz tests manually
-go test -run=^FuzzValidateStrongPassword$ -fuzz=^FuzzValidateStrongPassword$ -fuzztime=10s ./pkg/crypto
-go test -run=^FuzzNormalizeYesNoInput$ -fuzz=^FuzzNormalizeYesNoInput$ -fuzztime=10s ./pkg/interaction
-
-# Run specific test files:
-# - pkg/crypto/fuzz_test.go - Cryptographic fuzzing tests
-# - pkg/parse/fuzz_test.go - Input parsing fuzzing tests
-# - pkg/delphi/provision_test.go - Delphi provisioning tests
-# - pkg/interaction/fuzz_test.go - User interaction fuzzing tests
-# - pkg/eos_io/context_test.go - Runtime context tests
-# - pkg/eos_cli/wrap_test.go - CLI wrapper tests
-# - integration_test.go - End-to-end integration tests
-# - integration_scenarios_test.go - Scenario-based integration tests
-```
+### Command Development Flow
+1. Create command file: `cmd/create_[feature].go`
+2. Create package directory: `pkg/[feature]/`
+3. Implement helpers: `types.go`, `install.go`, `configure.go`, `verify.go`
+4. Use `eos.Wrap()` for command execution
+5. Test thoroughly before completion
 
 ## Architecture
+
+### Architecture Patterns
+
+#### Command Flow
+The complete flow from user input to execution follows these steps:
+
+1. **User Input**: `eos create saltstack --log-level=debug`
+2. **Cobra Parsing**: Routes to `cmd/create_saltstack.go`
+3. **Runtime Context**: Created with timeout and logging
+4. **Orchestration**: Command calls helpers from `pkg/saltstack/`
+5. **Helper Execution**: Each helper follows Assess → Intervene → Evaluate
+6. **Error Handling**: Proper exit codes based on error type
+7. **Cleanup**: Context cancellation and resource cleanup
+
+#### Package Responsibility Boundaries
+```
+cmd/
+├── create_*.go         # Command definitions ONLY - no business logic
+├── root.go            # Root command setup and registration
+└── [operation]_*.go   # Other operation commands
+
+pkg/
+├── eos_cli/           # CLI wrapper utilities
+├── eos_io/            # RuntimeContext and I/O operations
+├── eos_err/           # Error handling and classification
+├── [feature]/         # Feature-specific business logic
+│   ├── types.go       # Types, constants, configurations
+│   ├── install.go     # Installation logic
+│   ├── configure.go   # Configuration logic
+│   └── verify.go      # Verification logic
+└── shared/            # Shared utilities (ports, common functions)
+```
+
+#### The Assess → Intervene → Evaluate Pattern
+Every helper function must follow this pattern:
+
+```go
+func PerformOperation(rc *eos_io.RuntimeContext, config *Config) error {
+    logger := otelzap.Ctx(rc.Ctx)
+    
+    // ASSESS - Check if operation is possible
+    logger.Info("Assessing prerequisites")
+    if !canPerformOperation(rc) {
+        return eos_err.NewUserError("prerequisites not met")
+    }
+    
+    // INTERVENE - Perform the actual operation
+    logger.Info("Executing operation")
+    if err := doOperation(rc, config); err != nil {
+        return fmt.Errorf("operation failed: %w", err)
+    }
+    
+    // EVALUATE - Verify operation succeeded
+    logger.Info("Verifying operation results")
+    if err := verifyOperation(rc); err != nil {
+        return fmt.Errorf("verification failed: %w", err)
+    }
+    
+    logger.Info("Operation completed successfully")
+    return nil
+}
+```
 
 ### CLI Structure (Cobra Framework)
 The application uses Cobra CLI with the following command hierarchy:
@@ -64,13 +100,6 @@ The application uses Cobra CLI with the following command hierarchy:
 - **Infrastructure Management**: vault, k3s, docker, ldap, jenkins
 - **Security Tools**: delphi (monitoring), hecate (reverse proxy)
 - **System Operations**: backup, sync, refresh, secure, config
-
-#### HashiCorp Tools (HCL Command)
-Install HashiCorp tools with official repository integration:
-```bash
-eos create hcl [terraform|vault|consul|nomad|packer|all]
-```
-See [docs/commands/hcl.md](docs/commands/hcl.md) for detailed documentation.
 
 ### Core Packages (`pkg/`)
 - **eos_cli/**: CLI wrapper utilities and command execution
@@ -107,73 +136,442 @@ See [docs/commands/hcl.md](docs/commands/hcl.md) for detailed documentation.
 - **sql/** - Database schemas and SQL dumps
 - **templates/** - Email and service templates
 
-## Important Notes
+## Development
 
 ### Development Principles
-- Code needs to be modular and universal and as dont-repeat-yourself (DRY) as possible.
-- **Modular Architecture**: All helper functions need to go in the `pkg/` directory, with files and functions in the `cmd/` directory only really to call up / orchestrate the individual helper functions. This is an effort to make the code as unified, modular and DRY as possible.
+- Code must be modular, universal, and follow DRY principles
+- **Modular Architecture**: All business logic goes in `pkg/`, command files in `cmd/` only orchestrate
+- **Runtime Context**: All operations use `*eos_io.RuntimeContext` for logging and cancellation
+- **Error Handling**: Distinguish user errors (exit 0) from system errors (exit 1)
+- **Verbose Logging**: Add extensive structured logging for debugging
 
-### Runtime Context
-All commands use `*eos_io.RuntimeContext` which provides:
-- Context for cancellation and timeouts
-- Structured logging with OpenTelemetry integration
-- Global watchdog timer (3-minute default timeout)
+### Building and Installation
+```bash
+# Build the application
+go build -o eos .
 
-### Error Handling
-Use `eos_err.IsExpectedUserError()` to distinguish between user errors and system errors. User errors exit with code 0, system errors with code 1.
+# Install dependencies
+go mod tidy
 
-### Command Wrapping
-All command implementations should use `eos.Wrap()` to properly handle the runtime context and error patterns.
+# Install using the provided script
+./install.sh
+
+# Manual installation after build
+sudo cp eos /usr/local/bin/
+```
+
+### Code Convention Examples
+
+#### Correct Logging Pattern
+```go
+// CORRECT - Using structured logging
+func InstallPackage(rc *eos_io.RuntimeContext, pkgName string) error {
+    logger := otelzap.Ctx(rc.Ctx)
+    
+    logger.Info("Installing package",
+        zap.String("package", pkgName),
+        zap.String("action", "install"),
+        zap.String("phase", "start"))
+    
+    // ... installation logic ...
+    
+    logger.Info("Package installed successfully",
+        zap.String("package", pkgName),
+        zap.Duration("duration", time.Since(start)))
+    
+    return nil
+}
+
+// INCORRECT - Never do this!
+func BadExample(pkgName string) error {
+    fmt.Printf("Installing %s\n", pkgName)  // NEVER use fmt for output!
+    return nil
+}
+```
+
+#### Interactive Prompt Pattern
+```go
+func GetUserInput(rc *eos_io.RuntimeContext, config *Config) error {
+    logger := otelzap.Ctx(rc.Ctx)
+    
+    if config.Username == "" {
+        logger.Info("Username not provided via flag, prompting user")
+        logger.Info("terminal prompt: Please enter username")
+        
+        username, err := eos_io.ReadInput(rc)
+        if err != nil {
+            return fmt.Errorf("failed to read username: %w", err)
+        }
+        config.Username = username
+    }
+    
+    return nil
+}
+```
+
+#### Command Implementation Pattern
+```go
+// cmd/create_saltstack.go
+package cmd
+
+import (
+    "github.com/spf13/cobra"
+    "your-repo/pkg/eos_cli"
+    "your-repo/pkg/saltstack"
+)
+
+var createSaltstackCmd = &cobra.Command{
+    Use:   "saltstack",
+    Short: "Install and configure SaltStack",
+    RunE: eos_cli.Wrap(runCreateSaltstack),
+}
+
+func init() {
+    createCmd.AddCommand(createSaltstackCmd)
+    
+    createSaltstackCmd.Flags().Bool("master-mode", false, "Install as master-minion instead of masterless")
+    createSaltstackCmd.Flags().String("log-level", "warning", "Salt log level")
+}
+
+func runCreateSaltstack(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+    // Parse flags
+    config := &saltstack.Config{
+        MasterMode: cmd.Flag("master-mode").Value.String() == "true",
+        LogLevel:   cmd.Flag("log-level").Value.String(),
+    }
+    
+    // Orchestrate helpers from pkg/saltstack/
+    if err := saltstack.Install(rc, config); err != nil {
+        return err
+    }
+    
+    if err := saltstack.Configure(rc, config); err != nil {
+        return err
+    }
+    
+    if err := saltstack.Verify(rc); err != nil {
+        return err
+    }
+    
+    return nil
+}
+```
+
+### Port Management Convention
+See `pkg/shared/ports.go` for ports for internal service allocation and discovery. Always use the centralized port definitions to avoid conflicts.
+
+## Testing
+
+### Testing Requirements
+
+#### Unit Tests Required For:
+- All public functions in `pkg/` directories
+- Error handling paths and edge cases
+- Input validation and sanitization
+- Business logic transformations
+
+#### Integration Tests Required When:
+- Interacting with external systems (databases, APIs, file systems)
+- Multi-step workflows that span multiple packages
+- Command-level functionality testing
+- Network operations or service deployments
+
+#### Test Structure
+```go
+// pkg/saltstack/install_test.go
+func TestInstallSaltstack(t *testing.T) {
+    tests := []struct {
+        name    string
+        config  *Config
+        setup   func()
+        wantErr bool
+    }{
+        {
+            name: "successful installation",
+            config: &Config{MasterMode: false},
+            setup: func() {
+                // Mock successful conditions
+            },
+            wantErr: false,
+        },
+        {
+            name: "fails when already installed",
+            config: &Config{MasterMode: false},
+            setup: func() {
+                // Mock already installed condition
+            },
+            wantErr: true,
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            tt.setup()
+            rc := eos_io.NewTestContext(t)
+            err := Install(rc, tt.config)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("Install() error = %v, wantErr %v", err, tt.wantErr)
+            }
+        })
+    }
+}
+```
+
+#### Coverage Requirements
+- Aim for minimum 80% coverage on new code
+- Critical paths must have 100% coverage
+- Use `go test -coverprofile=coverage.out` to verify
+
+### Testing Commands
+```bash
+# Run all unit tests with coverage
+go test -v -coverprofile=coverage.out -covermode=atomic ./pkg/...
+
+# Run integration tests
+go test -v -timeout=5m ./integration_test.go ./integration_scenarios_test.go
+
+# Generate coverage report
+go tool cover -html=coverage.out -o coverage.html
+
+# Run security-focused tests
+go test -v -run "Security|Validation|Auth" ./pkg/...
+
+# Run fuzz tests for security validation
+./scripts/run-fuzz-tests.sh          # Run all fuzz tests (10s each)
+./scripts/run-fuzz-tests.sh 30s      # Run with custom duration
+```
+
+## Code Quality
 
 ### Code Quality Requirements
-**CRITICAL**
-any task can be considered completed by Claude, the following requirements MUST be met:
 
-1. **Zero Compilation Errors**: The code must compile successfully without any errors throughout the entire codebase
-2. **Linting Standards**: Run `golangci-lint run` and the entire codebase must pass all linting checks without warnings or errors
-3. **Test Compliance**: The entire codebase MUST pass all existing test modules relevant to the changes made
-4. **Fix Code, Not Tests**: When tests fail, the production codebase must be corrected unless the test is clearly invalid or unreliable
-5. **Verification Commands**: Before marking a task complete, run:
+**CRITICAL** - Any task can be considered completed ONLY when the following requirements are met:
+
+1. **Zero Compilation Errors**: The code must compile successfully without any errors
    ```bash
-   # Verify compilation
    go build -o /tmp/eos-build ./cmd/
-   
-   # Verify linting
+   ```
+
+2. **Linting Standards**: Must pass all linting checks without warnings or errors
+   ```bash
    golangci-lint run
-   
-   # Verify tests
+   ```
+
+3. **Test Compliance**: Must pass all existing tests relevant to changes
+   ```bash
    go test -v ./pkg/...
    ```
 
-**No task should be marked as complete until ALL of these verification steps pass successfully.**
+4. **Fix Code, Not Tests**: When tests fail, fix the production code unless the test is clearly invalid
 
-### External References
+5. **Documentation**: All public functions must have proper GoDoc comments
+
+**No task should be marked as complete until ALL verification steps pass successfully.**
+
+### Code Conventions
+
+**CRITICAL** - These conventions are mandatory:
+
+1. **Structured Logging Only**
+   - Use ONLY `otelzap.Ctx(rc.Ctx)` for all logging
+   - NEVER use `fmt.Printf`, `fmt.Println`, or any `fmt` output functions
+   - Use appropriate log levels: Debug, Info, Warn, Error
+
+2. **Assess → Intervene → Evaluate Pattern**
+   - Every helper function must follow this three-step pattern
+   - Check prerequisites before acting
+   - Verify success after acting
+
+3. **Package Structure**
+   - Business logic in `pkg/[feature]/`
+   - Command orchestration in `cmd/`
+   - No business logic in command files
+
+4. **Error Handling**
+   - Return wrapped errors with context: `fmt.Errorf("failed to X: %w", err)`
+   - Use `eos_err.NewUserError()` for user-correctable issues
+   - Use `eos_err.NewSystemError()` for system failures
+
+5. **User Interaction**
+   - Use flags for configuration when possible
+   - Prompt interactively when flags not provided
+   - Always log prompts as: `logger.Info("terminal prompt: [question]")`
+
+## Common Pitfalls
+
+### Things You Must NEVER Do:
+
+1. **NEVER use fmt package for output**
+   ```go
+   // NEVER DO THIS
+   fmt.Printf("Installing package\n")
+   fmt.Println("Done!")
+   
+   // ALWAYS DO THIS
+   logger := otelzap.Ctx(rc.Ctx)
+   logger.Info("Installing package")
+   logger.Info("Done!")
+   ```
+
+2. **NEVER put business logic in cmd/**
+   ```go
+   // WRONG - Business logic in command file
+   // cmd/create_tool.go
+   func runCreateTool(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+       // Don't implement installation logic here!
+       exec.Command("apt-get", "install", "tool").Run()  // WRONG!
+   }
+   
+   // CORRECT - Orchestrate helpers
+   func runCreateTool(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+       return tool.Install(rc, config)  // Delegate to pkg/tool/
+   }
+   ```
+
+3. **NEVER ignore RuntimeContext**
+   - Always pass `rc` to all functions that might need logging or cancellation
+   - Always check `rc.Ctx.Done()` in long-running operations
+
+4. **NEVER skip verification steps**
+   - Always verify operations succeeded
+   - Don't assume external commands worked
+
+5. **NEVER hardcode values**
+   - Use configuration flags or prompts
+   - Store defaults in constants
+
+6. **NEVER assume external commands exist**
+   ```go
+   // WRONG
+   exec.Command("terraform", "init").Run()
+   
+   // CORRECT
+   if _, err := exec.LookPath("terraform"); err != nil {
+       return eos_err.NewUserError("terraform not found in PATH")
+   }
+   ```
+
+## Integration Guidelines
+
+### Adding New Tool Integrations
+
+When adding support for a new tool (like SaltStack, Terraform, etc.), follow this structure:
+
+#### 1. Package Structure
+```
+pkg/[toolname]/
+├── types.go       # Common types, constants, configurations
+├── install.go     # Installation logic
+├── configure.go   # Configuration logic
+├── verify.go      # Verification logic
+├── client.go      # API client (if needed)
+└── *_test.go      # Corresponding test files
+```
+
+#### 2. Command Structure
+```go
+// cmd/create_[toolname].go
+var create[Toolname]Cmd = &cobra.Command{
+    Use:   "[toolname]",
+    Short: "Install and configure [tool description]",
+    Long: `Detailed description of what this command does...`,
+    RunE: eos_cli.Wrap(runCreate[Toolname]),
+}
+```
+
+#### 3. Flag Patterns
+```go
+func init() {
+    createCmd.AddCommand(create[Toolname]Cmd)
+    
+    // Provide sensible defaults
+    create[Toolname]Cmd.Flags().String("version", "latest", "Tool version to install")
+    create[Toolname]Cmd.Flags().String("config-path", "/etc/[tool]", "Configuration directory")
+    create[Toolname]Cmd.Flags().Bool("skip-verify", false, "Skip verification step")
+}
+```
+
+#### 4. Error Messages
+Be specific and actionable:
+```go
+// Bad error
+return errors.New("installation failed")
+
+// Good error
+return fmt.Errorf("failed to install %s: apt-get returned exit code %d. Try running 'sudo apt-get update' first", pkgName, exitCode)
+```
+
+## Debugging Guidelines
+
+### Troubleshooting Common Issues
+
+1. **Missing Executables**
+   ```go
+   // Always check for required executables
+   logger.Debug("Checking for required executables")
+   for _, cmd := range []string{"salt", "terraform", "docker"} {
+       if _, err := exec.LookPath(cmd); err != nil {
+           logger.Warn("Required executable not found",
+               zap.String("command", cmd),
+               zap.Error(err))
+       }
+   }
+   ```
+
+2. **Permission Errors**
+   ```go
+   // Check permissions before operations
+   if os.Geteuid() != 0 {
+       return eos_err.NewUserError("this command requires root privileges, please run with sudo")
+   }
+   ```
+
+3. **Network Timeouts**
+   - Default timeout is 3 minutes via RuntimeContext
+   - For longer operations, create a new context with extended timeout
+
+4. **Debug Logging**
+   ```go
+   // Add detailed debug information
+   logger.Debug("Operation state",
+       zap.Any("config", config),
+       zap.String("phase", "pre-install"),
+       zap.Strings("environment", os.Environ()))
+   ```
+
+### Verification Patterns
+```go
+// Always verify prerequisites
+func checkPrerequisites(rc *eos_io.RuntimeContext) error {
+    logger := otelzap.Ctx(rc.Ctx)
+    
+    // Check OS version
+    if !isUbuntu() {
+        return eos_err.NewUserError("this tool requires Ubuntu")
+    }
+    
+    // Check disk space
+    if !hasEnoughDiskSpace() {
+        return eos_err.NewUserError("insufficient disk space")
+    }
+    
+    // Check network connectivity
+    if !canReachRepository() {
+        return eos_err.NewUserError("cannot reach package repository")
+    }
+    
+    logger.Debug("All prerequisites satisfied")
+    return nil
+}
+```
+
+## External References
+
 - Knowledge base: [Athena](https://wiki.cybermonkey.net.au)
 - Company website: [cybermonkey.net.au](https://cybermonkey.net.au/)
 - Contact: main@cybermonkey.net.au
-- Refer to STACK.md for a point-of-truth reference for how the eos framework is supposed to work at an architectural level.
-- Refer to STACK.md for a point-of-truth reference for how the eos framework is supposed to work at an architectural level.
-
-### Code Conventions
-**CRITICAL**
-- Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, fmt.Fprintf, fmt.Print, or any fmt package output functions
-- ALL user-facing output MUST go through structured logging - no exceptions
-- This is a developer tool - prioritize debugging information over pretty output formatting
-- Use zap.Error(), zap.String(), zap.Any(), zap.Int(), zap.Bool() etc. for all log fields - structured logging is mandatory
-- Interactive prompts and user input should use appropriate logging levels (Info for prompts, Warn for important notices)
-- Status updates, progress information, and results MUST use structured logging with appropriate fields
-- Follow Go module structure with clear package separation
-- Implement proper context handling for cancellation
-- Use the established error handling patterns
-- Verbose logging is preferred for debugging - add extensive structured logging to help troubleshoot issues
-- Each helper function needs to check whether it can execute the function it need to, execute that function, then verify that function has executed correctly. This follows the assessment -> intervention -> evaluation model.
-- all helper functions should be under the pkg/* directory, with files in the cmd/* directory really only acting as an orchestrator for the helper functions defined in pkg/. This helps keep the code modular and universal and adhere to DRY (dont repeat yourself) coding best practices
-- where user input is needed but not provided by specifying it with the appropriate `--flag`, ask the user input the appropraite information with a `terminal prompt: ...` asking for user input before executing the command.
-
-### Port Management Convention
-- see `pkg/shared/ports.go` for ports for internal service allocation and discovery
+- Architecture reference: See STACK.md for the architectural principles of the Eos framework
 
 ## Memories
+
 - No use of emojis in code or documentation
-
-
