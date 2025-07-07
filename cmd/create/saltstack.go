@@ -14,12 +14,19 @@ var saltstackCmd = &cobra.Command{
 	Short: "Install and configure SaltStack for configuration management",
 	Long: `Install and configure SaltStack in masterless mode for use by other Eos commands.
 
-This command will:
-- Add the official SaltStack repository for Ubuntu
-- Install salt-minion package
-- Configure Salt for masterless operation
-- Create necessary directory structure
-- Verify the installation with a test state
+This command uses multiple robust installation methods with automatic fallbacks:
+1. Official Salt bootstrap script (with GitHub mirrors)
+2. Local package manager (Ubuntu repositories)
+3. Version-aware external repositories
+4. Manual installation guidance
+
+Features:
+- Network connectivity testing and smart source selection
+- Content validation to prevent HTML/JSON corruption
+- Retry logic with exponential backoff for transient failures
+- Automatic masterless configuration
+- State tree structure creation
+- Comprehensive verification testing
 
 After installation, other Eos commands can use Salt for configuration management
 by placing state files in /srv/salt/eos/ and applying them with salt-call.`,
@@ -96,7 +103,7 @@ func init() {
 	// Bootstrap-specific flags
 	saltstackCmd.Flags().String("bootstrap-url", "https://bootstrap.saltstack.com", "Custom bootstrap script URL")
 	saltstackCmd.Flags().Bool("skip-checksum", false, "Skip bootstrap script checksum verification (not recommended)")
-	saltstackCmd.Flags().String("install-method", "auto", "Force specific installation method: auto, Bootstrap Script, Version-Aware Repository, Direct Package Download, Manual Installation Guide")
+	saltstackCmd.Flags().String("install-method", "auto", "Force specific installation method: auto, Bootstrap Script, Local Package Manager, Version-Aware Repository, Direct Package Download, Manual Installation Guide")
 	saltstackCmd.Flags().Bool("configure-masterless", true, "Automatically configure Salt for masterless operation")
 
 	// Register with parent command

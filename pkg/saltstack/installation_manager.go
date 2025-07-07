@@ -17,7 +17,8 @@ type InstallationManager struct {
 func NewInstallationManager(rc *eos_io.RuntimeContext) *InstallationManager {
 	return &InstallationManager{
 		strategies: []InstallationStrategy{
-			NewBootstrapInstaller(),         // Primary method (most reliable)
+			NewBootstrapInstaller(),         // Primary method (most reliable when working)
+			NewLocalPackageInstaller(),      // Local package manager (no external deps)
 			NewVersionAwareInstaller(rc),    // Legacy repository method (fallback)
 			NewDirectDownloadInstaller(),    // Direct package download
 			NewManualInstaller(),            // Manual guidance (last resort)

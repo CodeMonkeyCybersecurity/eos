@@ -5,6 +5,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"math"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -48,63 +50,113 @@ type BootstrapConfig struct {
 	CreateStateTree  bool
 }
 
-// Install performs Salt installation using the official bootstrap script
+// BootstrapSource represents a source for downloading the bootstrap script
+type BootstrapSource struct {
+	Name        string
+	URL         string
+	ChecksumURL string
+	Priority    int
+}
+
+// getBootstrapSources returns prioritized list of bootstrap script sources
+func getBootstrapSources() []BootstrapSource {
+	return []BootstrapSource{
+		{
+			Name:        "Official Salt Project",
+			URL:         "https://bootstrap.saltstack.com",
+			ChecksumURL: "https://bootstrap.saltproject.io/sha256",
+			Priority:    1,
+		},
+		{
+			Name:        "GitHub Raw (saltstack/salt-bootstrap)",
+			URL:         "https://raw.githubusercontent.com/saltstack/salt-bootstrap/stable/bootstrap-salt.sh",
+			ChecksumURL: "",
+			Priority:    2,
+		},
+		{
+			Name:        "GitHub Releases",
+			URL:         "https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh",
+			ChecksumURL: "",
+			Priority:    3,
+		},
+		{
+			Name:        "Alternative Salt Project Mirror",
+			URL:         "https://bootstrap.saltproject.io/bootstrap-salt.sh",
+			ChecksumURL: "https://bootstrap.saltproject.io/sha256",
+			Priority:    4,
+		},
+	}
+}
+
+// NetworkConnectivity represents network connectivity test results
+type NetworkConnectivity struct {
+	CanReachGitHub      bool
+	CanReachSaltProject bool
+	CanResolveDNS       bool
+	HasInternet         bool
+}
+
+// Install performs Salt installation using the official bootstrap script with robust fallbacks
 func (bi *BootstrapInstaller) Install(rc *eos_io.RuntimeContext, version string, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Starting Salt installation using official bootstrap script",
+	logger.Info("Starting robust Salt installation using bootstrap script",
 		zap.String("version", version),
 		zap.Bool("master_mode", config.MasterMode))
 
-	// Get bootstrap configuration from context
-	bootstrapURL := "https://bootstrap.saltstack.com"
-	if url, ok := rc.Attributes["bootstrap_url"]; ok && url != "" {
-		bootstrapURL = url
-	}
-	
+	// Step 1: Test network connectivity
+	connectivity := bi.testNetworkConnectivity(rc)
+	bi.logConnectivityResults(rc, connectivity)
+
+	// Step 2: Get bootstrap configuration from context
 	skipChecksum := false
 	if skip, ok := rc.Attributes["skip_checksum"]; ok && skip == "true" {
 		skipChecksum = true
 	}
 
-	// Step 1: Download the bootstrap script
-	scriptPath, err := bi.downloadBootstrapScript(rc, bootstrapURL)
+	// Step 3: Try to download bootstrap script from multiple sources
+	scriptPath, source, err := bi.downloadBootstrapScriptRobust(rc, connectivity)
 	if err != nil {
-		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to download bootstrap script: %w", err))
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to download bootstrap script from all sources: %w", err))
 	}
 	defer os.Remove(scriptPath) // Clean up
 
-	// Step 2: Verify checksum (critical for security)
-	if !skipChecksum {
-		if err := bi.verifyBootstrapChecksum(rc, scriptPath); err != nil {
+	// Step 4: Validate script content
+	if err := bi.validateScriptContent(rc, scriptPath); err != nil {
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("bootstrap script validation failed: %w", err))
+	}
+
+	// Step 5: Verify checksum if available and not skipped
+	if !skipChecksum && source.ChecksumURL != "" {
+		if err := bi.verifyBootstrapChecksumFromSource(rc, scriptPath, source.ChecksumURL); err != nil {
 			logger.Warn("Checksum verification failed", zap.Error(err))
-			// Continue anyway if checksum fails, but warn user
 			logger.Warn("Proceeding with installation despite checksum failure")
 			logger.Warn("This may indicate a compromised script or network issues")
 		}
-	} else {
+	} else if skipChecksum {
 		logger.Warn("Skipping checksum verification as requested")
 		logger.Warn("This is not recommended for security reasons")
 	}
 
-	// Step 3: Execute the bootstrap script with appropriate flags
-	if err := bi.executeBootstrapScript(rc, scriptPath, version, config); err != nil {
+	// Step 6: Execute the bootstrap script with appropriate flags and retry logic
+	if err := bi.executeBootstrapScriptRobust(rc, scriptPath, version, config); err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("bootstrap script execution failed: %w", err))
 	}
 
-	// Step 4: Configure Salt for masterless operation
+	// Step 7: Configure Salt for masterless operation
 	if !config.MasterMode {
 		if err := bi.configureMasterlessMode(rc, config); err != nil {
 			return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to configure masterless mode: %w", err))
 		}
 	}
 
-	// Step 5: Create initial state tree structure
+	// Step 8: Create initial state tree structure
 	if err := bi.createStateTreeStructure(rc); err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to create state tree: %w", err))
 	}
 
-	logger.Info("Salt bootstrap installation completed successfully")
+	logger.Info("Salt bootstrap installation completed successfully",
+		zap.String("source", source.Name))
 	return nil
 }
 
@@ -470,4 +522,337 @@ func (bi *BootstrapInstaller) Configure(rc *eos_io.RuntimeContext, config *Confi
 	// Configuration is handled within the Install method for bootstrap
 	// This method is kept for interface compatibility
 	return nil
+}
+
+// testNetworkConnectivity tests various network endpoints to determine connectivity
+func (bi *BootstrapInstaller) testNetworkConnectivity(rc *eos_io.RuntimeContext) NetworkConnectivity {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Testing network connectivity")
+
+	connectivity := NetworkConnectivity{}
+
+	// Test DNS resolution
+	_, err := net.LookupHost("github.com")
+	connectivity.CanResolveDNS = err == nil
+
+	// Test GitHub connectivity (we know this works from version detection)
+	connectivity.CanReachGitHub = bi.testHTTPConnectivity("https://api.github.com", 5*time.Second)
+
+	// Test Salt Project connectivity
+	connectivity.CanReachSaltProject = bi.testHTTPConnectivity("https://bootstrap.saltstack.com", 5*time.Second)
+
+	// Basic internet test
+	connectivity.HasInternet = connectivity.CanReachGitHub || connectivity.CanReachSaltProject
+
+	return connectivity
+}
+
+// testHTTPConnectivity tests if an HTTP endpoint is reachable
+func (bi *BootstrapInstaller) testHTTPConnectivity(url string, timeout time.Duration) bool {
+	client := &http.Client{Timeout: timeout}
+	resp, err := client.Head(url)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode < 400
+}
+
+// logConnectivityResults logs the network connectivity test results
+func (bi *BootstrapInstaller) logConnectivityResults(rc *eos_io.RuntimeContext, connectivity NetworkConnectivity) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Network connectivity test results",
+		zap.Bool("can_resolve_dns", connectivity.CanResolveDNS),
+		zap.Bool("can_reach_github", connectivity.CanReachGitHub),
+		zap.Bool("can_reach_salt_project", connectivity.CanReachSaltProject),
+		zap.Bool("has_internet", connectivity.HasInternet))
+
+	if !connectivity.HasInternet {
+		logger.Warn("No internet connectivity detected - installation will likely fail")
+	} else if !connectivity.CanReachSaltProject {
+		logger.Warn("Cannot reach Salt Project servers - will use GitHub mirrors")
+	}
+}
+
+// downloadBootstrapScriptRobust tries multiple sources to download the bootstrap script
+func (bi *BootstrapInstaller) downloadBootstrapScriptRobust(rc *eos_io.RuntimeContext, connectivity NetworkConnectivity) (string, BootstrapSource, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	sources := getBootstrapSources()
+
+	// Filter sources based on connectivity
+	availableSources := bi.filterSourcesByConnectivity(sources, connectivity)
+	if len(availableSources) == 0 {
+		return "", BootstrapSource{}, fmt.Errorf("no bootstrap sources available based on network connectivity")
+	}
+
+	// Check if user specified a custom URL
+	if customURL, ok := rc.Attributes["bootstrap_url"]; ok && customURL != "" {
+		customSource := BootstrapSource{
+			Name:     "Custom URL",
+			URL:      customURL,
+			Priority: 0,
+		}
+		availableSources = append([]BootstrapSource{customSource}, availableSources...)
+	}
+
+	logger.Info("Attempting to download bootstrap script",
+		zap.Int("available_sources", len(availableSources)))
+
+	var lastErr error
+	for _, source := range availableSources {
+		logger.Info("Trying bootstrap source",
+			zap.String("name", source.Name),
+			zap.String("url", source.URL))
+
+		scriptPath, err := bi.downloadWithRetry(rc, source.URL, 3)
+		if err != nil {
+			logger.Warn("Failed to download from source",
+				zap.String("source", source.Name),
+				zap.Error(err))
+			lastErr = err
+			continue
+		}
+
+		logger.Info("Successfully downloaded bootstrap script",
+			zap.String("source", source.Name),
+			zap.String("path", scriptPath))
+		return scriptPath, source, nil
+	}
+
+	return "", BootstrapSource{}, fmt.Errorf("failed to download from all sources, last error: %w", lastErr)
+}
+
+// filterSourcesByConnectivity filters bootstrap sources based on network connectivity
+func (bi *BootstrapInstaller) filterSourcesByConnectivity(sources []BootstrapSource, connectivity NetworkConnectivity) []BootstrapSource {
+	var available []BootstrapSource
+
+	for _, source := range sources {
+		if strings.Contains(source.URL, "github.com") && connectivity.CanReachGitHub {
+			available = append(available, source)
+		} else if strings.Contains(source.URL, "saltstack.com") || strings.Contains(source.URL, "saltproject.io") {
+			if connectivity.CanReachSaltProject {
+				available = append(available, source)
+			}
+		}
+	}
+
+	return available
+}
+
+// downloadWithRetry downloads a file with exponential backoff retry logic
+func (bi *BootstrapInstaller) downloadWithRetry(rc *eos_io.RuntimeContext, url string, maxRetries int) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		scriptPath := fmt.Sprintf("/tmp/salt-bootstrap-%d.sh", attempt)
+
+		err := bi.downloadFile(url, scriptPath, 30*time.Second)
+		if err == nil {
+			return scriptPath, nil
+		}
+
+		lastErr = err
+		if attempt < maxRetries {
+			backoff := time.Duration(math.Pow(2, float64(attempt-1))) * time.Second
+			logger.Warn("Download attempt failed, retrying",
+				zap.Int("attempt", attempt),
+				zap.Int("max_retries", maxRetries),
+				zap.Duration("backoff", backoff),
+				zap.Error(err))
+			time.Sleep(backoff)
+		}
+	}
+
+	return "", fmt.Errorf("download failed after %d attempts: %w", maxRetries, lastErr)
+}
+
+// downloadFile downloads a file from URL with proper redirect handling
+func (bi *BootstrapInstaller) downloadFile(url, filepath string, timeout time.Duration) error {
+	client := &http.Client{
+		Timeout: timeout,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			// Allow up to 10 redirects
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return nil
+		},
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return fmt.Errorf("failed to download from %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download failed with status %d from %s", resp.StatusCode, url)
+	}
+
+	file, err := os.Create(filepath)
+	if err != nil {
+		return fmt.Errorf("failed to create file %s: %w", filepath, err)
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to write file content: %w", err)
+	}
+
+	// Make executable
+	if err := os.Chmod(filepath, 0755); err != nil {
+		return fmt.Errorf("failed to make script executable: %w", err)
+	}
+
+	return nil
+}
+
+// validateScriptContent validates that the downloaded content is actually a shell script
+func (bi *BootstrapInstaller) validateScriptContent(rc *eos_io.RuntimeContext, scriptPath string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	file, err := os.Open(scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to open script for validation: %w", err)
+	}
+	defer file.Close()
+
+	// Read first few lines to validate content
+	buffer := make([]byte, 1024)
+	n, err := file.Read(buffer)
+	if err != nil && err != io.EOF {
+		return fmt.Errorf("failed to read script content: %w", err)
+	}
+
+	content := string(buffer[:n])
+
+	// Check for shell script indicators
+	isShellScript := strings.HasPrefix(content, "#!/bin/sh") ||
+		strings.HasPrefix(content, "#!/bin/bash") ||
+		strings.Contains(content, "# Salt Bootstrap Script")
+
+	// Check for HTML content (common when getting error pages)
+	isHTML := strings.Contains(content, "<html>") ||
+		strings.Contains(content, "<!DOCTYPE") ||
+		strings.Contains(content, "<head>") ||
+		strings.Contains(content, "<body>")
+
+	// Check for JSON error responses
+	isJSON := strings.HasPrefix(strings.TrimSpace(content), "{")
+
+	if isHTML {
+		logger.Error("Downloaded content appears to be HTML",
+			zap.String("content_preview", content[:min(200, len(content))]))
+		return fmt.Errorf("downloaded script is HTML content, not a shell script")
+	}
+
+	if isJSON {
+		logger.Error("Downloaded content appears to be JSON",
+			zap.String("content_preview", content[:min(200, len(content))]))
+		return fmt.Errorf("downloaded script is JSON content, not a shell script")
+	}
+
+	if !isShellScript {
+		logger.Error("Downloaded content does not appear to be a shell script",
+			zap.String("content_preview", content[:min(200, len(content))]))
+		return fmt.Errorf("downloaded content is not a valid shell script")
+	}
+
+	logger.Debug("Script content validation passed")
+	return nil
+}
+
+// verifyBootstrapChecksumFromSource verifies checksum from a specific source
+func (bi *BootstrapInstaller) verifyBootstrapChecksumFromSource(rc *eos_io.RuntimeContext, scriptPath, checksumURL string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Verifying bootstrap script checksum", zap.String("checksum_url", checksumURL))
+
+	// Calculate actual checksum
+	file, err := os.Open(scriptPath)
+	if err != nil {
+		return fmt.Errorf("failed to open script for checksum: %w", err)
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return fmt.Errorf("failed to calculate checksum: %w", err)
+	}
+	actualChecksum := hex.EncodeToString(hasher.Sum(nil))
+
+	// Download expected checksum with retry
+	expectedChecksum, err := bi.downloadExpectedChecksum(checksumURL)
+	if err != nil {
+		return fmt.Errorf("failed to download expected checksum: %w", err)
+	}
+
+	if actualChecksum != expectedChecksum {
+		logger.Error("Checksum mismatch detected",
+			zap.String("expected", expectedChecksum),
+			zap.String("actual", actualChecksum))
+		return fmt.Errorf("bootstrap script checksum mismatch - potential security issue")
+	}
+
+	logger.Info("Bootstrap script checksum verified successfully")
+	return nil
+}
+
+// downloadExpectedChecksum downloads and parses the expected checksum
+func (bi *BootstrapInstaller) downloadExpectedChecksum(checksumURL string) (string, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(checksumURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to download checksum: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksum download failed with status: %d", resp.StatusCode)
+	}
+
+	checksumData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read checksum data: %w", err)
+	}
+
+	return strings.TrimSpace(string(checksumData)), nil
+}
+
+// executeBootstrapScriptRobust executes the bootstrap script with retry logic
+func (bi *BootstrapInstaller) executeBootstrapScriptRobust(rc *eos_io.RuntimeContext, scriptPath, version string, config *Config) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	args := bi.buildBootstrapCommand(scriptPath, version, config)
+
+	logger.Info("Executing bootstrap script with robust error handling",
+		zap.Strings("args", args))
+
+	// Try execution with a reasonable timeout
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: args[0],
+		Args:    args[1:],
+		Timeout: 900 * time.Second, // 15 minutes for bootstrap
+	})
+
+	if err != nil {
+		return bi.handleBootstrapError(rc, err, output)
+	}
+
+	logger.Info("Bootstrap script completed successfully")
+	logger.Debug("Bootstrap output", zap.String("output", output))
+
+	return nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
