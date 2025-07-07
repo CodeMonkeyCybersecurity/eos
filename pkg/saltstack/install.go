@@ -242,3 +242,68 @@ func (i *Installer) installPackage(rc *eos_io.RuntimeContext, config *Config) er
 	logger.Info("Salt package installed successfully", zap.String("package", packageName))
 	return nil
 }
+
+// installVersionAware installs Salt with version awareness
+func (i *Installer) installVersionAware(rc *eos_io.RuntimeContext, config *Config, targetVersion string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Installing Salt with version awareness",
+		zap.String("target_version", targetVersion),
+		zap.Bool("master_mode", config.MasterMode))
+
+	// For now, use the standard installation process
+	// In the future, this could be enhanced to handle version-specific installation methods
+	return i.installPackage(rc, config)
+}
+
+// addRepositoryWithURLs adds the Salt repository using specific URLs
+func (i *Installer) addRepositoryWithURLs(rc *eos_io.RuntimeContext, release *platform.UbuntuRelease, repoURL, keyURL string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Step 1: Download and add the repository key using the specific URL
+	logger.Info("Adding SaltStack repository key", zap.String("key_url", keyURL))
+
+	// Create keyring directory if it doesn't exist
+	keyringDir := "/usr/share/keyrings"
+	if err := os.MkdirAll(keyringDir, 0755); err != nil {
+		return fmt.Errorf("failed to create keyring directory: %w", err)
+	}
+
+	// Download the key using the specific URL
+	_, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "curl",
+		Args: []string{
+			"-fsSL",
+			keyURL,
+			"-o",
+			"/usr/share/keyrings/salt-archive-keyring.gpg",
+		},
+		Timeout: 30 * time.Second,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to download repository key from %s: %w", keyURL, err)
+	}
+
+	// Step 2: Create apt sources list entry using the specific repository URL
+	logger.Info("Creating apt sources list entry", zap.String("repo_url", repoURL))
+
+	repoLine := fmt.Sprintf(
+		"deb [signed-by=/usr/share/keyrings/salt-archive-keyring.gpg arch=amd64] %s %s main",
+		repoURL,
+		release.Codename,
+	)
+
+	// Write to sources list
+	repoListPath := GetRepoListPath()
+	if err := os.WriteFile(repoListPath, []byte(repoLine+"\n"), 0644); err != nil {
+		return fmt.Errorf("failed to write sources list: %w", err)
+	}
+
+	logger.Debug("Repository added",
+		zap.String("path", repoListPath),
+		zap.String("repo_url", repoURL),
+		zap.String("key_url", keyURL))
+
+	return nil
+}

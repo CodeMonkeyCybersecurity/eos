@@ -397,6 +397,9 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
    - Prompt interactively when flags not provided
    - Always log prompts as: `logger.Info("terminal prompt: [question]")`
 
+6. **Deployment of new resources**
+   - use version resolver in pkg/platform/version_resolver.go when deciding what version of something to download (eg. saltstack, nomad, etc.) to programatically make sure the most recent version of something is downloaded and installed when using `eos create ...` 
+
 ## Common Pitfalls
 
 ### Things You Must NEVER Do:

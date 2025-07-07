@@ -33,65 +33,26 @@ by placing state files in /srv/salt/eos/ and applying them with salt-call.`,
 		masterMode, _ := cmd.Flags().GetBool("master-mode")
 		skipTest, _ := cmd.Flags().GetBool("skip-test")
 		logLevel, _ := cmd.Flags().GetString("log-level")
+		version, _ := cmd.Flags().GetString("version")
+		forceVersion, _ := cmd.Flags().GetBool("force-version")
 
 		// Create configuration
 		config := &saltstack.Config{
-			MasterMode: masterMode,
-			SkipTest:   skipTest,
-			LogLevel:   logLevel,
+			MasterMode:   masterMode,
+			SkipTest:     skipTest,
+			LogLevel:     logLevel,
+			Version:      version,
+			ForceVersion: forceVersion,
 		}
 
-		// Create installer
-		installer := saltstack.NewInstaller()
+		// Create version-aware installer
+		installer := saltstack.NewVersionAwareInstaller(rc)
 
-		// Check if Salt is already installed
-		logger.Info("Checking existing Salt installation")
-		isInstalled, version, err := installer.CheckInstallation(rc)
-		if err != nil {
-			logger.Error("Failed to check Salt installation", zap.Error(err))
+		// Perform version-aware installation
+		logger.Info("Installing SaltStack with version detection")
+		if err := installer.InstallWithVersionDetection(rc, config); err != nil {
+			logger.Error("Failed to install Salt", zap.Error(err))
 			return err
-		}
-
-		if isInstalled {
-			logger.Info("Salt is already installed", zap.String("version", version))
-			
-			// Ask user if they want to reconfigure
-			shouldReconfigure, err := installer.PromptReconfigure(rc)
-			if err != nil {
-				return err
-			}
-			
-			if !shouldReconfigure {
-				logger.Info("Skipping Salt installation")
-				return nil
-			}
-			
-			logger.Info("Proceeding with Salt reconfiguration")
-		}
-
-		// Perform installation
-		if !isInstalled {
-			logger.Info("Installing SaltStack")
-			if err := installer.Install(rc, config); err != nil {
-				logger.Error("Failed to install Salt", zap.Error(err))
-				return err
-			}
-		}
-
-		// Configure Salt
-		logger.Info("Configuring SaltStack")
-		if err := installer.Configure(rc, config); err != nil {
-			logger.Error("Failed to configure Salt", zap.Error(err))
-			return err
-		}
-
-		// Verify installation unless skipped
-		if !config.SkipTest {
-			logger.Info("Verifying SaltStack installation")
-			if err := installer.Verify(rc); err != nil {
-				logger.Error("Salt verification failed", zap.Error(err))
-				return err
-			}
 		}
 
 		// Display success message
@@ -113,6 +74,8 @@ func init() {
 	saltstackCmd.Flags().Bool("master-mode", false, "Install as master-minion instead of masterless")
 	saltstackCmd.Flags().Bool("skip-test", false, "Skip the verification test")
 	saltstackCmd.Flags().String("log-level", "warning", "Set Salt log level (debug, info, warning, error)")
+	saltstackCmd.Flags().String("version", "latest", "Salt version to install ('latest' for automatic detection)")
+	saltstackCmd.Flags().Bool("force-version", false, "Force installation of specified version even if newer exists")
 
 	// Register with parent command
 	CreateCmd.AddCommand(saltstackCmd)

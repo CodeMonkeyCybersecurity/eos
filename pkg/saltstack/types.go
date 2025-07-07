@@ -6,9 +6,11 @@ import (
 
 // Config represents the configuration options for SaltStack installation
 type Config struct {
-	MasterMode bool   // Install as master-minion instead of masterless
-	SkipTest   bool   // Skip the verification test
-	LogLevel   string // Salt log level (debug, info, warning, error)
+	MasterMode   bool   // Install as master-minion instead of masterless
+	SkipTest     bool   // Skip the verification test
+	LogLevel     string // Salt log level (debug, info, warning, error)
+	Version      string // Salt version to install ("latest" for automatic detection)
+	ForceVersion bool   // Force installation of specified version even if newer exists
 }
 
 // GetMode returns the installation mode as a string
@@ -48,15 +50,16 @@ const (
 	SaltPillarDir    = "/srv/pillar"
 	EosStatesDir     = "/srv/salt/eos"
 	
-	// Repository information  
-	SaltRepoKey     = "https://packages.broadcom.com/artifactory/api/gpg/key/public"
-	SaltRepoKeyID   = "BCAA30E340B057F0FB2D97CB754C4B3A8C3095CF"
-	SaltRepoBaseURL = "https://packages.broadcom.com/artifactory/saltproject-deb"
+	// Repository information - Updated for current Salt Project repositories
+	SaltRepoKey     = "https://repo.saltproject.io/salt/py3/ubuntu/22.04/amd64/SALTSTACK-GPG-KEY.pub"
+	SaltRepoKeyID   = "754A1A7AE731F165D5E6D4BD0E08A149DE57BFBE"
+	SaltRepoBaseURL = "https://repo.saltproject.io/salt/py3/ubuntu"
 	
 	// Default configuration values
 	DefaultLogLevel    = "warning"
 	DefaultFileClient  = "local"
 	DefaultMinionID    = "eos-minion"
+	DefaultSaltVersion = "3007.1" // Fallback version - updated periodically
 	
 	// Test state content
 	TestStateName = "test"
