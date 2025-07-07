@@ -35,6 +35,9 @@ by placing state files in /srv/salt/eos/ and applying them with salt-call.`,
 		logLevel, _ := cmd.Flags().GetString("log-level")
 		version, _ := cmd.Flags().GetString("version")
 		forceVersion, _ := cmd.Flags().GetBool("force-version")
+		bootstrapURL, _ := cmd.Flags().GetString("bootstrap-url")
+		skipChecksum, _ := cmd.Flags().GetBool("skip-checksum")
+		configureMasterless, _ := cmd.Flags().GetBool("configure-masterless")
 
 		// Create configuration
 		config := &saltstack.Config{
@@ -45,25 +48,38 @@ by placing state files in /srv/salt/eos/ and applying them with salt-call.`,
 			ForceVersion: forceVersion,
 		}
 
-		// Create version-aware installer
-		installer := saltstack.NewVersionAwareInstaller(rc)
-
-		// Perform version-aware installation
-		logger.Info("Installing SaltStack with version detection")
-		if err := installer.InstallWithVersionDetection(rc, config); err != nil {
-			logger.Error("Failed to install Salt", zap.Error(err))
-			return err
+		// Store bootstrap configuration in context for bootstrap installer
+		rc.Attributes["bootstrap_url"] = bootstrapURL
+		if skipChecksum {
+			rc.Attributes["skip_checksum"] = "true"
+		}
+		if !configureMasterless {
+			rc.Attributes["configure_masterless"] = "false"
 		}
 
-		// Display success message
-		logger.Info("SaltStack installation completed successfully",
-			zap.String("mode", config.GetMode()),
-			zap.String("config_path", "/etc/salt/minion"),
-			zap.String("states_path", "/srv/salt/eos"),
-		)
+		// Create installation manager with fallback strategies
+		installManager := saltstack.NewInstallationManager(rc)
 
-		logger.Info("Other Eos commands can now use Salt for configuration management")
-		logger.Info("Example: salt-call --local state.apply eos.mystate")
+		// Check for forced installation method
+		installMethod, _ := cmd.Flags().GetString("install-method")
+		
+		if installMethod != "auto" {
+			logger.Info("Using forced installation method", zap.String("method", installMethod))
+			if err := installManager.InstallWithStrategy(rc, installMethod, config); err != nil {
+				logger.Error("Forced installation method failed", zap.Error(err))
+				return err
+			}
+		} else {
+			// Use automatic installation with fallbacks
+			logger.Info("Installing SaltStack with automatic method selection and fallbacks")
+			if err := installManager.Install(rc, config); err != nil {
+				logger.Error("All installation methods failed", zap.Error(err))
+				return err
+			}
+		}
+
+		// Display success message with next steps
+		saltstack.PrintSuccessMessage(rc, config)
 
 		return nil
 	}),
@@ -76,6 +92,12 @@ func init() {
 	saltstackCmd.Flags().String("log-level", "warning", "Set Salt log level (debug, info, warning, error)")
 	saltstackCmd.Flags().String("version", "latest", "Salt version to install ('latest' for automatic detection)")
 	saltstackCmd.Flags().Bool("force-version", false, "Force installation of specified version even if newer exists")
+	
+	// Bootstrap-specific flags
+	saltstackCmd.Flags().String("bootstrap-url", "https://bootstrap.saltstack.com", "Custom bootstrap script URL")
+	saltstackCmd.Flags().Bool("skip-checksum", false, "Skip bootstrap script checksum verification (not recommended)")
+	saltstackCmd.Flags().String("install-method", "auto", "Force specific installation method: auto, Bootstrap Script, Version-Aware Repository, Direct Package Download, Manual Installation Guide")
+	saltstackCmd.Flags().Bool("configure-masterless", true, "Automatically configure Salt for masterless operation")
 
 	// Register with parent command
 	CreateCmd.AddCommand(saltstackCmd)

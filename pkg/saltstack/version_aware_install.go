@@ -24,6 +24,15 @@ func NewVersionAwareInstaller(rc *eos_io.RuntimeContext) *VersionAwareInstaller 
 	}
 }
 
+// Install performs Salt installation with automatic version detection (InstallationStrategy interface)
+func (vai *VersionAwareInstaller) Install(rc *eos_io.RuntimeContext, version string, config *Config) error {
+	// Update config with the provided version
+	if version != "" {
+		config.Version = version
+	}
+	return vai.InstallWithVersionDetection(rc, config)
+}
+
 // InstallWithVersionDetection performs Salt installation with automatic version detection
 func (vai *VersionAwareInstaller) InstallWithVersionDetection(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -276,4 +285,14 @@ func (vai *VersionAwareInstaller) getLegacyKeyURL(config *SaltRepositoryConfig) 
 	// Use the provided config for version-specific key URLs if available
 	return fmt.Sprintf("https://repo.saltproject.io/salt/py3/ubuntu/%s/%s/SALTSTACK-GPG-KEY.pub",
 		config.UbuntuVersion, config.Architecture)
+}
+
+// Name returns the name of this installation strategy
+func (vai *VersionAwareInstaller) Name() string {
+	return "Version-Aware Repository"
+}
+
+// Verify checks that Salt is working correctly after installation
+func (vai *VersionAwareInstaller) Verify(rc *eos_io.RuntimeContext) error {
+	return vai.installer.Verify(rc)
 }
