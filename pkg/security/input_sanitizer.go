@@ -282,8 +282,29 @@ func EscapeForLogging(data string) string {
 		return data
 	}
 	
-	// Remove newlines and control characters for safe logging
-	escaped := controlCharRegex.ReplaceAllString(data, "")
+	// First, ensure valid UTF-8 by using the sanitizer
+	sanitizer := NewInputSanitizer()
+	
+	// Fix UTF-8 issues first
+	validUTF8, err := sanitizer.validateAndFixUTF8(data)
+	if err != nil {
+		// If UTF-8 fixing fails, return safe placeholder
+		return "[INVALID_UTF8_DATA]"
+	}
+	
+	// Remove control characters except newlines and tabs (we'll escape those)
+	escaped := validUTF8
+	for _, r := range []rune{0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x0B, 0x0C, 0x0E, 0x0F, 
+		0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x7F} {
+		escaped = strings.ReplaceAll(escaped, string(r), "")
+	}
+	
+	// Remove C1 control characters (0x80-0x9F)
+	for i := 0x80; i <= 0x9F; i++ {
+		escaped = strings.ReplaceAll(escaped, string(rune(i)), "")
+	}
+	
+	// Escape newlines, carriage returns, and tabs for safe logging
 	escaped = strings.ReplaceAll(escaped, "\n", "\\n")
 	escaped = strings.ReplaceAll(escaped, "\r", "\\r")
 	escaped = strings.ReplaceAll(escaped, "\t", "\\t")

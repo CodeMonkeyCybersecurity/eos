@@ -8,6 +8,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/command"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/security"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -35,6 +36,8 @@ func init() {
 
 func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
+	secureOutput := security.NewSecureOutput(rc.Ctx)
+	
 	logger.Info("Listing custom commands")
 
 	installer := command.NewCommandInstaller(rc)
@@ -45,7 +48,7 @@ func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	}
 
 	if len(commands) == 0 {
-		fmt.Println("No custom commands found.")
+		secureOutput.Info("No custom commands found")
 		return nil
 	}
 
@@ -60,34 +63,47 @@ func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		commands = eosCommands
 
 		if len(commands) == 0 {
-			fmt.Println("No Eos-generated commands found. Use --all to see all commands.")
+			secureOutput.Info("No Eos-generated commands found", 
+				zap.String("suggestion", "Use --all to see all commands"))
 			return nil
 		}
 	}
 
-	// Display commands
-	fmt.Printf("Found %d custom commands:\n\n", len(commands))
-
-	for _, cmd := range commands {
-		fmt.Printf("Name: %s\n", cmd.Name)
-		fmt.Printf("Path: %s\n", cmd.Path)
-
-		if cmd.Description != "" {
-			fmt.Printf("Description: %s\n", strings.TrimSpace(cmd.Description))
-		}
-
-		fmt.Printf("Created: %s\n", cmd.CreatedAt.Format("2006-01-02 15:04:05"))
-
+	// Prepare command data for secure output
+	commandNames := make([]string, len(commands))
+	tableHeaders := []string{"Name", "Type", "Path", "Created", "Description"}
+	tableRows := make([][]string, len(commands))
+	
+	for i, cmd := range commands {
+		commandNames[i] = cmd.Name
+		
+		cmdType := "System command"
 		if cmd.IsEosGenerated {
-			fmt.Printf("Type: Eos-generated\n")
-		} else {
-			fmt.Printf("Type: System command\n")
+			cmdType = "Eos-generated"
 		}
-
-		fmt.Println()
+		
+		description := strings.TrimSpace(cmd.Description)
+		if description == "" {
+			description = "(no description)"
+		}
+		
+		tableRows[i] = []string{
+			cmd.Name,
+			cmdType,
+			cmd.Path,
+			cmd.CreatedAt.Format("2006-01-02 15:04:05"),
+			description,
+		}
 	}
 
-	logger.Info("Listed commands successfully",
+	// Use secure output for displaying results
+	secureOutput.Result("list_commands", map[string]interface{}{
+		"command_count": len(commands),
+		"show_all":      showAll,
+		"commands":      commandNames,
+	})
+	
+	secureOutput.Table("Custom Commands", tableHeaders, tableRows,
 		zap.Int("total_commands", len(commands)),
 		zap.Bool("show_all", showAll))
 
