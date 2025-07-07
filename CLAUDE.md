@@ -170,16 +170,3 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 ## Memories
 - No use of emojis in code or documentation
 
-## The stack
-- Caddy as a reverse proxy for http/s traffic 
-- Nginx to be used alongside Caddy for non-http/s traffic (eg.UDP, TCP, SMTP, IMAP, etc.)
-- Authentik as SSO provider to make Caddy identity aware as a reverse proxy
-- Saltstack for orchestration commands (including backup and recovery, Terraform, etc)
-- Terraform instruments the hashicorp stack includes: Nomad for container orchestration, Vault with a file backend for secrets management, Consul for service discovery, Boundary for zero trust control plane access
-- Restic for backup and recovery 
-- Clusterfuzz for fuzzing of the eos tool (this codebase)
-- Minio for S3 storage
-- Wazuh for XDR/SEIM (implemented in this stack as Delphi)
-- Docker for containers
-- PostgreSQL for databases 
-- CephFS as a distributed file system
