@@ -15,7 +15,7 @@ var saltstackCmd = &cobra.Command{
 	Long: `Install and configure SaltStack in masterless mode for use by other Eos commands.
 
 This command uses the official Salt bootstrap script method - the most reliable installation approach:
-- Downloads from the correct bootstrap URL (https://bootstrap.saltproject.io)
+- Downloads from GitHub releases (post-2024 migration)
 - Validates script content to prevent HTML/JSON corruption
 - Supports both masterless and master-minion configurations
 - Includes checksum verification for security
@@ -69,8 +69,8 @@ func init() {
 	saltstackCmd.Flags().String("log-level", "warning", "Set Salt log level (debug, info, warning, error)")
 	saltstackCmd.Flags().String("version", "latest", "Salt version to install ('latest' for automatic detection)")
 	
-	// Bootstrap-specific flags (using correct URL)
-	saltstackCmd.Flags().String("bootstrap-url", "https://bootstrap.saltproject.io", "Bootstrap script URL (updated to correct endpoint)")
+	// Bootstrap-specific flags (using current GitHub-hosted URL)
+	saltstackCmd.Flags().String("bootstrap-url", "https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh", "Bootstrap script URL (GitHub-hosted after 2024 migration)")
 	saltstackCmd.Flags().Bool("skip-checksum", false, "Skip bootstrap script checksum verification (not recommended)")
 
 	// Register with parent command

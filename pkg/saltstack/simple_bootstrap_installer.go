@@ -19,16 +19,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// Constants for the current, correct Salt bootstrap URLs
+// Constants for the current, correct Salt bootstrap URLs after 2024 migration
 const (
-	// This is the CURRENT correct URL as of 2024
-	DefaultBootstrapURL = "https://bootstrap.saltproject.io"
+	// This is the CURRENT correct URL as of November 2024 (GitHub-hosted)
+	// The old bootstrap.saltproject.io was decommissioned in October 2024
+	DefaultBootstrapURL = "https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh"
 	
-	// Checksum URL for verification
-	BootstrapChecksumURL = "https://bootstrap.saltproject.io/sha256"
+	// Checksum URL for verification (also moved to GitHub)
+	BootstrapChecksumURL = "https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh.sha256"
 	
-	// Old URL that redirects - DO NOT USE
-	// OldBootstrapURL = "https://bootstrap.saltstack.com" // This redirects to HTML!
+	// Decommissioned URLs - DO NOT USE (return HTML migration warnings)
+	// OldBootstrapURL = "https://bootstrap.saltstack.com"    // Redirects to HTML
+	// OldSaltProjectURL = "https://bootstrap.saltproject.io" // Decommissioned Oct 2024
 )
 
 // SimpleBootstrapInstaller handles Salt installation using only the official bootstrap script
@@ -93,53 +95,80 @@ func (sbi *SimpleBootstrapInstaller) downloadScript(rc *eos_io.RuntimeContext) (
 		bootstrapURL = customURL
 	}
 
+	// Define fallback URLs in case GitHub is not accessible
+	fallbackURLs := []string{
+		bootstrapURL,
+		"https://raw.githubusercontent.com/saltstack/salt-bootstrap/develop/bootstrap-salt.sh",
+	}
+
 	scriptPath := filepath.Join("/tmp", fmt.Sprintf("salt-bootstrap-%d.sh", time.Now().Unix()))
 
-	logger.Info("Downloading Salt bootstrap script",
-		zap.String("url", bootstrapURL),
-		zap.String("destination", scriptPath))
+	var lastErr error
+	var content []byte
 
-	// Download with proper timeout
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Get(bootstrapURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to download bootstrap script from %s: %w", bootstrapURL, err)
-	}
-	defer resp.Body.Close()
+	// Try each URL until one works
+	for i, url := range fallbackURLs {
+		logger.Info("Downloading Salt bootstrap script",
+			zap.String("url", url),
+			zap.String("destination", scriptPath),
+			zap.Int("attempt", i+1),
+			zap.Int("total_urls", len(fallbackURLs)))
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("download failed with status %d from %s", resp.StatusCode, bootstrapURL)
-	}
+		// Download with proper timeout
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Get(url)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to download from %s: %w", url, err)
+			logger.Warn("Download failed, trying next URL", zap.Error(lastErr))
+			continue
+		}
+		defer resp.Body.Close()
 
-	// Read the content
-	content, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read bootstrap script content: %w", err)
-	}
-
-	// CRITICAL: Validate it's actually a shell script
-	if !sbi.isValidShellScript(content) {
-		// Show what we got instead for debugging
-		preview := string(content)
-		if len(preview) > 200 {
-			preview = preview[:200] + "..."
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("download failed with status %d from %s", resp.StatusCode, url)
+			logger.Warn("HTTP error, trying next URL", zap.Error(lastErr))
+			continue
 		}
 
-		logger.Error("Downloaded content is not a shell script",
-			zap.String("content_preview", preview),
-			zap.String("url", bootstrapURL))
+		// Read the content
+		content, err = io.ReadAll(resp.Body)
+		if err != nil {
+			lastErr = fmt.Errorf("failed to read content from %s: %w", url, err)
+			logger.Warn("Read failed, trying next URL", zap.Error(lastErr))
+			continue
+		}
 
-		return "", fmt.Errorf("downloaded content is not a shell script. Got HTML/JSON instead of script from %s", bootstrapURL)
+		// CRITICAL: Validate it's actually a shell script
+		if !sbi.isValidShellScript(content) {
+			// Show what we got instead for debugging
+			preview := string(content)
+			if len(preview) > 200 {
+				preview = preview[:200] + "..."
+			}
+
+			lastErr = fmt.Errorf("downloaded content is not a shell script from %s", url)
+			logger.Warn("Content validation failed, trying next URL",
+				zap.String("content_preview", preview),
+				zap.String("url", url))
+			continue
+		}
+
+		// Success! Break out of the loop
+		logger.Info("Bootstrap script downloaded and validated successfully",
+			zap.String("url", url),
+			zap.Int("size_bytes", len(content)))
+		break
+	}
+
+	// Check if we succeeded with any URL
+	if content == nil {
+		return "", fmt.Errorf("failed to download valid bootstrap script from any URL, last error: %w", lastErr)
 	}
 
 	// Write to file
 	if err := os.WriteFile(scriptPath, content, 0755); err != nil {
 		return "", fmt.Errorf("failed to write bootstrap script to %s: %w", scriptPath, err)
 	}
-
-	logger.Info("Bootstrap script downloaded and validated successfully",
-		zap.String("path", scriptPath),
-		zap.Int("size_bytes", len(content)))
 
 	return scriptPath, nil
 }
