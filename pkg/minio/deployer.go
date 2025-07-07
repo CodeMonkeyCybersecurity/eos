@@ -79,11 +79,11 @@ func (d *Deployer) Deploy(rc *eos_io.RuntimeContext, opts *DeploymentOptions) er
 func (d *Deployer) applySaltStates(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	// Apply MinIO setup states
+	// Apply MinIO setup states (using masterless mode with salt-call)
 	logger.Info("Applying MinIO Salt states")
 	output, err := execute.Run(rc.Ctx, execute.Options{
-		Command: "salt",
-		Args:    []string{"*", "state.apply", "minio"},
+		Command: "salt-call",
+		Args:    []string{"--local", "state.apply", "minio"},
 		Timeout: 300 * time.Second,
 	})
 	if err != nil {
@@ -91,15 +91,15 @@ func (d *Deployer) applySaltStates(rc *eos_io.RuntimeContext) error {
 	}
 	logger.Debug("Salt state output", zap.String("output", output))
 
-	// Apply Vault policy states
+	// Apply Vault policy states (also using masterless mode)
 	logger.Info("Applying Vault policy Salt states")
 	output, err = execute.Run(rc.Ctx, execute.Options{
-		Command: "salt",
-		Args:    []string{"salt-master", "state.apply", "minio.vault_policy"},
+		Command: "salt-call",
+		Args:    []string{"--local", "state.apply", "minio.vault_policy"},
 		Timeout: 300 * time.Second,
 	})
 	if err != nil {
-		logger.Warn("Failed to apply vault policy state (this may be expected if not running on salt-master)", zap.Error(err))
+		logger.Warn("Failed to apply vault policy state (this may be expected in masterless mode)", zap.Error(err))
 	} else {
 		logger.Debug("Vault policy state output", zap.String("output", output))
 	}
