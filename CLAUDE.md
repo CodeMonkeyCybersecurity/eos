@@ -150,6 +150,8 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 - Knowledge base: [Athena](https://wiki.cybermonkey.net.au)
 - Company website: [cybermonkey.net.au](https://cybermonkey.net.au/)
 - Contact: main@cybermonkey.net.au
+- Refer to STACK.md for a point-of-truth reference for how the eos framework is supposed to work at an architectural level.
+- Refer to STACK.md for a point-of-truth reference for how the eos framework is supposed to work at an architectural level.
 
 ### Code Conventions
 - **CRITICAL**: Use ONLY structured logging with `otelzap.Ctx(rc.Ctx)` - NEVER use fmt.Printf, fmt.Println, fmt.Fprintf, fmt.Print, or any fmt package output functions
@@ -169,4 +171,5 @@ All command implementations should use `eos.Wrap()` to properly handle the runti
 
 ## Memories
 - No use of emojis in code or documentation
+
 

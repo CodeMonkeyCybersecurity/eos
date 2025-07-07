@@ -1,0 +1,99 @@
+terraform {
+  required_version = ">= 1.9"
+  required_providers {
+    nomad = {
+      source  = "hashicorp/nomad"
+      version = "~> 2.0"
+    }
+    consul = {
+      source  = "hashicorp/consul"
+      version = "~> 2.0"
+    }
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 4.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
+  }
+}
+
+# Providers config
+provider "nomad" {
+  address = var.nomad_addr
+}
+
+provider "consul" {
+  address = var.consul_addr
+}
+
+provider "vault" {
+  address = var.vault_addr
+}
+
+# Generate secure credentials
+resource "random_password" "minio_root_password" {
+  length  = 32
+  special = true
+}
+
+# Store credentials in Vault
+resource "vault_kv_secret_v2" "minio_root" {
+  mount               = "kv"
+  name                = "minio/root"
+  delete_all_versions = true
+  data_json = jsonencode({
+    MINIO_ROOT_USER     = var.minio_root_user
+    MINIO_ROOT_PASSWORD = random_password.minio_root_password.result
+  })
+}
+
+# Consul service registration
+resource "consul_service" "minio_api" {
+  name = "minio"
+  node = var.node_name
+  port = var.api_port
+  tags = ["minio", "api", "s3", "prometheus"]
+
+  check {
+    check_id = "minio-api-health"
+    name     = "MinIO API Health"
+    http     = "http://${var.node_address}:${var.api_port}/minio/health/live"
+    interval = "10s"
+    timeout  = "2s"
+  }
+}
+
+resource "consul_service" "minio_console" {
+  name = "minio-console"
+  node = var.node_name
+  port = var.console_port
+  tags = ["minio", "console", "ui"]
+
+  check {
+    check_id = "minio-console-health"
+    name     = "MinIO Console Health"
+    http     = "http://${var.node_address}:${var.console_port}"
+    interval = "10s"
+    timeout  = "2s"
+  }
+}
+
+# Deploy Nomad job
+resource "nomad_job" "minio" {
+  jobspec = templatefile("${path.module}/../../nomad/minio.nomad.hcl", {
+    datacenter   = var.datacenter
+    storage_path = var.storage_path
+    vault_addr   = var.vault_addr
+    api_port     = var.api_port
+    console_port = var.console_port
+  })
+
+  depends_on = [
+    vault_kv_secret_v2.minio_root,
+    consul_service.minio_api,
+    consul_service.minio_console
+  ]
+}
