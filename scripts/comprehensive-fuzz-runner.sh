@@ -68,41 +68,41 @@ discover_enhanced_fuzz_tests() {
     
     # Security-critical tests (highest priority)
     SECURITY_TESTS=(
-        "FuzzInputSanitizer::pkg/security"
-        "FuzzInputSanitizerStrict::pkg/security"
-        "FuzzEscapeOutput::pkg/security"
-        "FuzzEscapeForLogging::pkg/security"
-        "FuzzValidateCommandName::pkg/security"
-        "FuzzValidateFlagName::pkg/security"
-        "FuzzSanitizeArguments::pkg/security"
-        "FuzzValidateStrongPassword::pkg/crypto"
-        "FuzzHashString::pkg/crypto"
-        "FuzzRedact::pkg/crypto"
-        "FuzzSecureZero::pkg/crypto"
-        "FuzzExecuteCommand::pkg/execute"
-        "FuzzSaltStateGeneration::pkg/saltstack"
-        "FuzzSaltPillarDataValidation::pkg/saltstack"
-        "FuzzTerraformConfigGeneration::pkg/terraform"
-        "FuzzTerraformVariableValidation::pkg/terraform"
+        "FuzzInputSanitizer::./pkg/security"
+        "FuzzInputSanitizerStrict::./pkg/security"
+        "FuzzEscapeOutput::./pkg/security"
+        "FuzzEscapeForLogging::./pkg/security"
+        "FuzzValidateCommandName::./pkg/security"
+        "FuzzValidateFlagName::./pkg/security"
+        "FuzzSanitizeArguments::./pkg/security"
+        "FuzzValidateDomainName::./pkg/crypto"
+        "FuzzValidateEmailAddress::./pkg/crypto"
+        "FuzzValidateAppName::./pkg/crypto"
+        "FuzzSanitizeInputForCommand::./pkg/crypto"
+        "FuzzExecuteCommand::./pkg/execute"
+        "FuzzSaltStateGeneration::./pkg/saltstack"
+        "FuzzSaltPillarDataValidation::./pkg/saltstack"
+        "FuzzTerraformConfigGeneration::./pkg/terraform"
+        "FuzzTerraformVariableValidation::./pkg/terraform"
     )
     
     # Architecture-specific tests (STACK.md compliance)
     ARCHITECTURE_TESTS=(
-        "FuzzStackOrchestrationWorkflow::test"
-        "FuzzVaultDegradationScenarios::test"
-        "FuzzCrossBoundaryIntegration::test"
-        "FuzzResourceContentionScenarios::test"
+        "FuzzStackOrchestrationWorkflow::./test"
+        "FuzzVaultDegradationScenarios::./test"
+        "FuzzCrossBoundaryIntegration::./test"
+        "FuzzResourceContentionScenarios::./test"
     )
     
     # Standard component tests
     COMPONENT_TESTS=(
-        "FuzzNormalizeYesNoInput::pkg/interaction"
-        "FuzzValidateEmail::pkg/interaction"
-        "FuzzSplitAndTrim::pkg/parse"
-        "FuzzJSONParsing::pkg/parse"
-        "FuzzYAMLParsing::pkg/eos_io"
-        "FuzzMkdirP::pkg/eos_unix"
-        "FuzzDatabaseOperations::pkg/database_management"
+        "FuzzNormalizeYesNoInput::./pkg/interaction"
+        "FuzzValidateEmail::./pkg/interaction"
+        "FuzzSplitAndTrim::./pkg/parse"
+        "FuzzJSONParsing::./pkg/parse"
+        "FuzzYAMLParsing::./pkg/eos_io"
+        "FuzzMkdirP::./pkg/eos_unix"
+        "FuzzDatabaseOperations::./pkg/database_management"
     )
     
     echo -e "${GREEN}📋 Test Discovery Complete:${NC}"
@@ -119,7 +119,7 @@ run_enhanced_fuzz_test() {
     local duration="$3"
     
     local test_function=$(echo "$test_spec" | cut -d':' -f1)
-    local test_package=$(echo "$test_spec" | cut -d':' -f2)
+    local test_package=$(echo "$test_spec" | cut -d':' -f3)
     local log_file="${LOG_DIR}/${category}/${test_function}_${TIMESTAMP}.log"
     local corpus_dir="${LOG_DIR}/corpus/${test_function}"
     local start_time=$(date +%s)
