@@ -1,0 +1,109 @@
+// cmd/read/salt_job_status.go
+package read
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+var saltJobStatusCmd = &cobra.Command{
+	Use:     "salt-job-status <job-id>",
+	Aliases: []string{"salt-job-info", "saltstack-job-status"},
+	Short:   "Get detailed Salt job status and information",
+	Long: `Get detailed status and information for a specific Salt job.
+
+This command retrieves comprehensive information about a Salt job including:
+- Current execution status and progress
+- Function being executed and arguments
+- Target minions and their individual status
+- Start time, duration, and completion time
+- Error messages and failure details
+
+Examples:
+  eos read salt-job-status 20240112123456789      # Get job status
+  eos read salt-job-status 20240112123456789 --json  # Output in JSON format
+  eos read salt-job-status 20240112123456789 --details  # Include full response details
+
+Job States:
+  - Running: Job is currently executing
+  - Complete: Job finished successfully  
+  - Failed: Job completed with errors
+  - Killed: Job was manually terminated
+  - Timeout: Job exceeded time limit`,
+
+	Args: cobra.ExactArgs(1),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		jobID := args[0]
+
+		// Parse flags
+		outputJSON, _ := cmd.Flags().GetBool("json")
+		includeDetails, _ := cmd.Flags().GetBool("details")
+
+		logger.Info("Getting Salt job status",
+			zap.String("job_id", jobID),
+			zap.Bool("include_details", includeDetails))
+
+		// Create Salt client
+		saltClient := client.NewSaltClient()
+
+		// Create context with timeout
+		ctx, cancel := context.WithTimeout(rc.Ctx, 15*time.Second)
+		defer cancel()
+
+		// Get job status
+		status, err := saltClient.GetJobStatus(ctx, jobID)
+		if err != nil {
+			logger.Error("Failed to get Salt job status",
+				zap.String("job_id", jobID),
+				zap.Error(err))
+			return fmt.Errorf("failed to get job status for %s: %w", jobID, err)
+		}
+
+		// Output results
+		if outputJSON {
+			return outputJobStatusJSON(status)
+		}
+
+		return outputJobStatusText(status, jobID, includeDetails)
+	}),
+}
+
+func init() {
+	saltJobStatusCmd.Flags().Bool("json", false, "Output results in JSON format")
+	saltJobStatusCmd.Flags().Bool("details", false, "Include full response details from minions")
+
+	ReadCmd.AddCommand(saltJobStatusCmd)
+}
+
+func outputJobStatusJSON(status interface{}) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(status)
+}
+
+func outputJobStatusText(status interface{}, jobID string, includeDetails bool) error {
+	fmt.Printf("Salt Job Status: %s\n", jobID)
+	fmt.Println(strings.Repeat("=", 50))
+
+	// TODO: Implement actual status formatting based on Salt client response format
+	fmt.Println("(Job status formatting implementation pending Salt client structure)")
+
+	if includeDetails {
+		fmt.Println("\nDetailed Response Data:")
+		fmt.Println("(Detailed formatting implementation pending)")
+	}
+
+	return nil
+}

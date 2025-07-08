@@ -55,7 +55,7 @@ func init() {
 func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Warn("🚨 EMERGENCY: Ragequit initiated",
+	logger.Warn(" EMERGENCY: Ragequit initiated",
 		zap.String("user", os.Getenv("USER")),
 		zap.String("hostname", getHostname()),
 		zap.String("reason", reason),
@@ -152,7 +152,7 @@ func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) e
 func confirmRagequit(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	fmt.Print("🚨 EMERGENCY RAGEQUIT 🚨\n")
+	fmt.Print(" EMERGENCY RAGEQUIT \n")
 	fmt.Print("This will:\n")
 	fmt.Print("1. Collect comprehensive system diagnostics\n")
 	fmt.Print("2. Create emergency backup files\n")
@@ -743,7 +743,7 @@ func notifyRagequit(rc *eos_io.RuntimeContext) {
 
 	// Webhook notification
 	if webhookURL := os.Getenv("Eos_EMERGENCY_WEBHOOK"); webhookURL != "" {
-		message := fmt.Sprintf("🚨 EMERGENCY: Ragequit initiated on %s by %s", getHostname(), os.Getenv("USER"))
+		message := fmt.Sprintf(" EMERGENCY: Ragequit initiated on %s by %s", getHostname(), os.Getenv("USER"))
 		if curlOutput := runCommandWithTimeout("curl", []string{
 			"-X", "POST", webhookURL,
 			"-H", "Content-Type: application/json",

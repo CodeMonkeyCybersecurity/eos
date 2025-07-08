@@ -1,7 +1,6 @@
 // cmd/update/update.go
 /*
 Copyright © 2025 CODE MONKEY CYBERSECURITY git@cybermonkey.net.au
-
 */
 package update
 
@@ -21,8 +20,7 @@ var UpdateCmd = &cobra.Command{
 	Long:    `The update command allows you to modify existing resources such as processes, users, or storage.`,
 
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-
-		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for <command>.", zap.String("command", cmd.Use))
+		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for update command", zap.String("command", cmd.Use))
 		_ = cmd.Help() // Display help if no subcommand is provided
 		return nil
 	}),

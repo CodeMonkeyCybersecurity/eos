@@ -319,7 +319,7 @@ sudo -u postgres psql -c "SELECT version();"
 ### Adding New Services
 1. Create worker script in `/opt/eos/assets/python_workers/`
 2. Create service file in `/opt/eos/assets/services/`
-3. Add service configuration to `GetServiceConfigurations()` in `create.go`
+3. Add service configuration to `pipeline.GetServiceConfigurations()` in `create.go`
 4. Update service lists in commands
 
 ### Testing

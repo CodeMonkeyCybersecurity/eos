@@ -32,7 +32,7 @@ func NewInstaller() *Installer {
 // CheckInstallation checks if Salt is already installed
 func (i *Installer) CheckInstallation(rc *eos_io.RuntimeContext) (bool, string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Assessment: Check if salt-call command exists
 	logger.Debug("Checking for salt-call command")
 	output, err := execute.Run(rc.Ctx, execute.Options{
@@ -40,80 +40,80 @@ func (i *Installer) CheckInstallation(rc *eos_io.RuntimeContext) (bool, string, 
 		Args:    []string{"salt-call"},
 		Timeout: 10 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Debug("salt-call not found in PATH")
 		return false, "", nil
 	}
-	
+
 	logger.Debug("salt-call found", zap.String("path", strings.TrimSpace(output)))
-	
+
 	// Get version information
 	versionOutput, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "salt-call",
 		Args:    []string{"--version"},
 		Timeout: 10 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Warn("Failed to get Salt version", zap.Error(err))
 		return true, "unknown", nil
 	}
-	
+
 	// Parse version from output (format: "salt-call 3006.3")
 	version := "unknown"
 	if parts := strings.Fields(versionOutput); len(parts) >= 2 {
 		version = parts[1]
 	}
-	
+
 	return true, version, nil
 }
 
 // PromptReconfigure asks the user if they want to reconfigure existing Salt installation
 func (i *Installer) PromptReconfigure(rc *eos_io.RuntimeContext) (bool, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	logger.Info("Salt is already installed. Do you want to reconfigure it? (y/n)")
-	
+
 	response := interaction.PromptYesNo(rc.Ctx, "Reconfigure existing Salt installation?", false)
-	
+
 	return response, nil
 }
 
 // Install performs the Salt installation
 func (i *Installer) Install(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Step 1: Detect Ubuntu version
 	logger.Info("Detecting Ubuntu version")
 	release, err := i.detectUbuntuRelease(rc)
 	if err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to detect Ubuntu release: %w", err))
 	}
-	
-	logger.Info("Detected Ubuntu release", 
+
+	logger.Info("Detected Ubuntu release",
 		zap.String("version", release.Version),
 		zap.String("codename", release.Codename),
 	)
-	
+
 	// Step 2: Add Salt repository
 	logger.Info("Adding SaltStack repository")
 	if err := i.addRepository(rc, release); err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to add Salt repository: %w", err))
 	}
-	
+
 	// Step 3: Update package list
 	logger.Info("Updating package list")
 	if err := i.updatePackages(rc); err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to update packages: %w", err))
 	}
-	
+
 	// Step 4: Install salt-minion package
 	logger.Info("Installing salt-minion package")
 	if err := i.installPackage(rc, config); err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to install salt-minion: %w", err))
 	}
-	
+
 	logger.Info("Salt installation completed successfully")
 	return nil
 }
@@ -136,16 +136,16 @@ func (i *Installer) detectUbuntuRelease(rc *eos_io.RuntimeContext) (*platform.Ub
 // addRepository adds the Salt repository to apt sources
 func (i *Installer) addRepository(rc *eos_io.RuntimeContext, release *platform.UbuntuRelease) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Step 1: Download and add the repository key
 	logger.Info("Adding SaltStack repository key")
-	
+
 	// Create keyring directory if it doesn't exist
 	keyringDir := "/usr/share/keyrings"
 	if err := os.MkdirAll(keyringDir, 0755); err != nil {
 		return fmt.Errorf("failed to create keyring directory: %w", err)
 	}
-	
+
 	// Download the key
 	_, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "curl",
@@ -157,25 +157,25 @@ func (i *Installer) addRepository(rc *eos_io.RuntimeContext, release *platform.U
 		},
 		Timeout: 30 * time.Second,
 	})
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to download repository key: %w", err)
 	}
-	
+
 	// Step 2: Create apt sources list entry
 	logger.Info("Creating apt sources list entry")
-	
+
 	repoLine := fmt.Sprintf(
 		"deb [signed-by=/usr/share/keyrings/salt-archive-keyring.gpg arch=amd64] %s",
 		platform.GetSaltRepoURL(release.Version, release.Codename),
 	)
-	
+
 	// Write to sources list
 	repoListPath := GetRepoListPath()
 	if err := os.WriteFile(repoListPath, []byte(repoLine+"\n"), 0644); err != nil {
 		return fmt.Errorf("failed to write sources list: %w", err)
 	}
-	
+
 	logger.Debug("Repository added", zap.String("path", repoListPath))
 	return nil
 }
@@ -183,18 +183,18 @@ func (i *Installer) addRepository(rc *eos_io.RuntimeContext, release *platform.U
 // updatePackages updates the apt package list
 func (i *Installer) updatePackages(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",
 		Args:    []string{"update"},
 		Timeout: 120 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Error("Package update failed", zap.String("output", output))
 		return fmt.Errorf("apt-get update failed: %w", err)
 	}
-	
+
 	logger.Debug("Package list updated successfully")
 	return nil
 }
@@ -202,14 +202,14 @@ func (i *Installer) updatePackages(rc *eos_io.RuntimeContext) error {
 // installPackage installs the salt-minion package
 func (i *Installer) installPackage(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	// Determine which package to install
 	packageName := "salt-minion"
 	if config.MasterMode {
 		// In master mode, we still install minion but will configure it differently
 		logger.Info("Installing salt-minion for master-minion mode")
 	}
-	
+
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: "apt-get",
 		Args: []string{
@@ -220,12 +220,12 @@ func (i *Installer) installPackage(rc *eos_io.RuntimeContext, config *Config) er
 		},
 		Timeout: 300 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Error("Package installation failed", zap.String("output", output))
 		return fmt.Errorf("failed to install %s: %w", packageName, err)
 	}
-	
+
 	// Stop the salt-minion service (we'll configure it first)
 	logger.Info("Stopping salt-minion service for configuration")
 	_, err = execute.Run(rc.Ctx, execute.Options{
@@ -233,12 +233,12 @@ func (i *Installer) installPackage(rc *eos_io.RuntimeContext, config *Config) er
 		Args:    []string{"stop", "salt-minion"},
 		Timeout: 30 * time.Second,
 	})
-	
+
 	if err != nil {
 		logger.Warn("Failed to stop salt-minion service", zap.Error(err))
 		// This is not fatal, continue
 	}
-	
+
 	logger.Info("Salt package installed successfully", zap.String("package", packageName))
 	return nil
 }

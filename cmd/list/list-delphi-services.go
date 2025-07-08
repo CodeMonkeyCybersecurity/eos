@@ -1,0 +1,134 @@
+// cmd/delphi/services/list.go
+package list
+
+import (
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+// NewListCmd creates the list command
+func NewListCmd() *cobra.Command {
+	var detailed bool
+
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List all Delphi services and their status",
+		Long: `List all available Delphi services with their current status.
+
+Shows for each service:
+- Name and description
+- Current status (active/inactive)
+- Enabled status (enabled/disabled)
+- File existence (worker script and service file)
+
+Available services:
+- delphi-listener: Webhook listener for Wazuh alerts
+- delphi-agent-enricher: Agent enrichment service
+- llm-worker: LLM processing service
+- prompt-ab-tester: A/B testing worker for prompt optimization
+
+Examples:
+  eos delphi services list
+  eos delphi services list --detailed`,
+		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+			logger := otelzap.Ctx(rc.Ctx)
+			logger.Info(" Listing Delphi services")
+
+			// Get all service configurations
+			configs := pipeline.GetServiceConfigurations()
+
+			// Count totals
+			var totalServices, activeServices, enabledServices, installedServices int
+			totalServices = len(configs)
+
+			logger.Info(" Service Overview")
+			for serviceName, config := range configs {
+				// Get service status
+				status, err := getServiceStatus(rc, serviceName)
+				if err != nil {
+					logger.Warn(" Failed to get status for service",
+						zap.String("service", serviceName),
+						zap.Error(err))
+					continue
+				}
+
+				// Check if files exist
+				workerExists := eos_unix.FileExists(config.WorkerFile)
+				serviceExists := eos_unix.FileExists(config.ServiceFile)
+				isInstalled := workerExists && serviceExists
+
+				if isInstalled {
+					installedServices++
+				}
+				if status.Active == "active" {
+					activeServices++
+				}
+				if status.Enabled == "enabled" {
+					enabledServices++
+				}
+
+				// Display service information
+				if detailed {
+					logger.Info(" "+serviceName,
+						zap.String("description", config.Description),
+						zap.String("status", status.Active),
+						zap.String("enabled", status.Enabled),
+						zap.Bool("worker_exists", workerExists),
+						zap.Bool("service_exists", serviceExists),
+						zap.String("worker_path", config.WorkerFile),
+						zap.String("service_path", config.ServiceFile))
+				} else {
+					statusIcon := ""
+					if status.Active == "active" {
+						statusIcon = ""
+					} else if status.Active == "failed" {
+						statusIcon = "🔥"
+					} else if isInstalled {
+						statusIcon = ""
+					}
+
+					enabledIcon := ""
+					if status.Enabled == "enabled" {
+						enabledIcon = " (auto-start)"
+					}
+
+					installStatus := ""
+					if !isInstalled {
+						installStatus = " [NOT INSTALLED]"
+					}
+
+					logger.Info(" "+statusIcon+" "+serviceName+enabledIcon+installStatus,
+						zap.String("description", config.Description),
+						zap.String("status", status.Active))
+				}
+			}
+
+			// Display summary
+			logger.Info(" Summary",
+				zap.Int("total_services", totalServices),
+				zap.Int("installed", installedServices),
+				zap.Int("active", activeServices),
+				zap.Int("enabled", enabledServices))
+
+			// Show helpful commands
+			if installedServices < totalServices {
+				logger.Info(" Services can be created with:",
+					zap.String("example", "eos delphi services create <service-name>"))
+			}
+
+			if installedServices > activeServices {
+				logger.Info(" Inactive services can be started with:",
+					zap.String("example", "eos delphi services start <service-name>"))
+			}
+
+			return nil
+		}),
+	}
+
+	cmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed information including file paths")
+	return cmd
+}

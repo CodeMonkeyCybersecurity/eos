@@ -465,7 +465,7 @@ func (m *TUIModel) renderInputView() string {
 
 func (m *TUIModel) renderConfirmView() string {
 	var s strings.Builder
-	s.WriteString("🚨 DESTRUCTIVE OPERATION CONFIRMATION\n")
+	s.WriteString(" DESTRUCTIVE OPERATION CONFIRMATION\n")
 	s.WriteString(strings.Repeat("=", 50) + "\n")
 	s.WriteString(fmt.Sprintf("You are about to PERMANENTLY DESTROY %s\n", m.confirmTarget))
 	s.WriteString("This action CANNOT be undone and will result in DATA LOSS!\n\n")

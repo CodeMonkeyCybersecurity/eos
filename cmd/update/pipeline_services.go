@@ -1,0 +1,246 @@
+package update
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+// ServiceWorkerInfo contains information about a service worker
+type ServiceWorkerInfo struct {
+	ServiceName string
+	SourcePath  string
+	TargetPath  string
+	BackupPath  string
+}
+
+// GetServiceWorkers returns information about all delphi service workers
+// This function needs the eosRoot to correctly determine source paths.
+func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
+	timestamp := time.Now().Format("20060102_150405")
+
+	return []ServiceWorkerInfo{
+		{
+			ServiceName: "delphi-listener",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-listener.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-listener.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "delphi-agent-enricher",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-agent-enricher.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-agent-enricher.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "llm-worker",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "llm-worker.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/llm-worker.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/llm-worker.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "email-structurer",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-structurer.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/email-structurer.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/email-structurer.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "prompt-ab-tester",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "prompt-ab-tester.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/prompt-ab-tester.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/prompt-ab-tester.py.%s.bak", timestamp),
+		},
+	}
+}
+
+var PipelineServicesCmd = &cobra.Command{
+	Use:   "pipeline-services",
+	Short: "Update Delphi pipeline services (Python workers)",
+	Long: `Update Delphi pipeline services from source code to deployment.
+
+This command synchronizes Python worker scripts from the source repository to their runtime locations,
+creating backups and verifying deployment. It ensures all Delphi pipeline services are up-to-date.
+
+Example:
+  eos update pipeline-services`,
+
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info(" Starting pipeline services update")
+
+		// Get the Eos root directory for finding source files
+		eosRoot := shared.GetEosRoot()
+		if eosRoot == "" {
+			return fmt.Errorf("cannot determine Eos root directory - ensure Eos is properly installed")
+		}
+
+		logger.Info(" Eos root directory located", zap.String("root", eosRoot))
+
+		// Verify source directory exists
+		sourcePyDir := filepath.Join(eosRoot, "assets", "python_workers")
+		if _, err := os.Stat(sourcePyDir); os.IsNotExist(err) {
+			return fmt.Errorf("python workers source directory not found: %s", sourcePyDir)
+		}
+
+		logger.Info(" Source directory verified", zap.String("path", sourcePyDir))
+
+		// Get service worker configurations
+		workers := GetServiceWorkers(eosRoot)
+		logger.Info(" Service workers identified", zap.Int("count", len(workers)))
+
+		// Process each service worker
+		successCount := 0
+		for i, worker := range workers {
+			logger.Info(" Processing service worker",
+				zap.String("service", worker.ServiceName),
+				zap.Int("progress", i+1),
+				zap.Int("total", len(workers)))
+
+			if err := updateServiceWorker(rc, worker); err != nil {
+				logger.Error(" Failed to update service worker",
+					zap.String("service", worker.ServiceName),
+					zap.Error(err))
+				return fmt.Errorf("failed to update %s: %w", worker.ServiceName, err)
+			}
+
+			successCount++
+			logger.Info(" Service worker updated successfully",
+				zap.String("service", worker.ServiceName))
+		}
+
+		logger.Info(" Pipeline services update completed",
+			zap.Int("services_updated", successCount),
+			zap.Int("total_services", len(workers)))
+
+		return nil
+	}),
+}
+
+func init() {
+	UpdateCmd.AddCommand(PipelineServicesCmd)
+}
+
+// updateServiceWorker handles the update of a single service worker
+func updateServiceWorker(rc *eos_io.RuntimeContext, worker ServiceWorkerInfo) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	// Verify source file exists
+	if _, err := os.Stat(worker.SourcePath); os.IsNotExist(err) {
+		return fmt.Errorf("source file not found: %s", worker.SourcePath)
+	}
+
+	logger.Debug(" Source file verified", zap.String("path", worker.SourcePath))
+
+	// Create target directory if it doesn't exist
+	targetDir := filepath.Dir(worker.TargetPath)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
+	}
+
+	// Create backup if target file exists
+	if _, err := os.Stat(worker.TargetPath); err == nil {
+		logger.Info(" Creating backup of existing file",
+			zap.String("target", worker.TargetPath),
+			zap.String("backup", worker.BackupPath))
+
+		backupDir := filepath.Dir(worker.BackupPath)
+		if err := os.MkdirAll(backupDir, 0755); err != nil {
+			return fmt.Errorf("failed to create backup directory %s: %w", backupDir, err)
+		}
+
+		if err := cmd_helpers.CopyFile(worker.TargetPath, worker.BackupPath); err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+
+		logger.Info(" Backup created successfully", zap.String("backup", worker.BackupPath))
+	}
+
+	// Copy source to target
+	logger.Info(" Copying source to target",
+		zap.String("source", worker.SourcePath),
+		zap.String("target", worker.TargetPath))
+
+	if err := cmd_helpers.CopyFile(worker.SourcePath, worker.TargetPath); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	// Set proper permissions (executable for Python scripts)
+	if err := os.Chmod(worker.TargetPath, 0755); err != nil {
+		logger.Warn(" Failed to set executable permissions", zap.Error(err))
+	}
+
+	// Restart the service if it's running
+	if err := restartServiceIfRunning(rc.Ctx, worker.ServiceName); err != nil {
+		logger.Warn(" Failed to restart service (may not be running)",
+			zap.String("service", worker.ServiceName),
+			zap.Error(err))
+	}
+
+	logger.Info(" Service worker deployment completed",
+		zap.String("service", worker.ServiceName),
+		zap.String("target", worker.TargetPath))
+
+	return nil
+}
+
+// restartServiceIfRunning restarts a systemd service if it's currently running
+func restartServiceIfRunning(ctx context.Context, serviceName string) error {
+	// Check if service is active
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", serviceName},
+	})
+
+	if err != nil {
+		// Service is not active or doesn't exist
+		return nil
+	}
+
+	state := strings.TrimSpace(output)
+	if state == "active" {
+		// Service is running, restart it
+		_, err := execute.Run(ctx, execute.Options{
+			Command: "systemctl",
+			Args:    []string{"restart", serviceName},
+		})
+		return err
+	}
+
+	return nil
+}
+
+// verifyOneshotCompletion verifies that a oneshot service has completed successfully
+func verifyOneshotCompletion(ctx context.Context, serviceName string) error {
+	// For oneshot services, we expect them to be in "inactive" state after completion
+	output, err := execute.Run(ctx, execute.Options{
+		Command: "systemctl",
+		Args:    []string{"is-active", serviceName},
+	})
+
+	if err != nil {
+		// Check if it's inactive (expected for completed oneshot services)
+		if strings.Contains(output, "inactive") {
+			return nil // This is normal for completed oneshot services
+		}
+		return fmt.Errorf("oneshot service in unexpected state: %w", err)
+	}
+
+	state := strings.TrimSpace(output)
+	if state == "inactive" {
+		return nil // This is the expected state for completed oneshot services
+	}
+
+	return fmt.Errorf("oneshot service in unexpected active state: %s", state)
+}

@@ -9,7 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/jenkins"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/terraform"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	cerr "github.com/cockroachdb/errors"
@@ -19,17 +19,17 @@ import (
 
 // OrchestrationManager handles service deployment orchestration via SaltStack + Nomad
 type OrchestrationManager struct {
-	saltManager       *SaltStackManager
-	terraformManager  *terraform.Manager
-	vaultPath         string
-	nomadConfig       *NomadConfig
-	deploymentOrch    *DeploymentOrchestrator // Legacy Jenkins-based deployment support
+	saltManager      *SaltStackManager
+	terraformManager *terraform.Manager
+	vaultPath        string
+	nomadConfig      *NomadConfig
+	deploymentOrch   *DeploymentOrchestrator // Legacy Jenkins-based deployment support
 }
 
 // DeploymentOrchestrator coordinates deployments using Jenkins and Salt (legacy support)
 type DeploymentOrchestrator struct {
 	Jenkins *jenkins.Client
-	Salt    *salt.Client
+	Salt    *saltstack.Client
 }
 
 // DeploymentRequest represents a deployment request for legacy orchestration
@@ -62,63 +62,63 @@ type NomadTLSConfig struct {
 
 // ServiceDeployment defines a service deployment configuration
 type ServiceDeployment struct {
-	Name           string                 `json:"name"`
-	Type           string                 `json:"type"`           // nomad, docker, systemd
-	JobSpec        *NomadJobSpec          `json:"job_spec,omitempty"`
-	DockerConfig   *DockerServiceConfig   `json:"docker_config,omitempty"`
-	SystemdConfig  *SystemdServiceConfig  `json:"systemd_config,omitempty"`
-	Dependencies   []string               `json:"dependencies"`
-	HealthChecks   []HealthCheck          `json:"health_checks"`
-	Secrets        map[string]string      `json:"secrets"`        // Vault paths
-	Environment    map[string]string      `json:"environment"`
-	Volumes        []VolumeMount          `json:"volumes"`
-	Networks       []NetworkConfig        `json:"networks"`
-	Resources      ResourceRequirements   `json:"resources"`
-	Scaling        ScalingConfig          `json:"scaling"`
-	UpdateStrategy UpdateStrategy         `json:"update_strategy"`
+	Name           string                `json:"name"`
+	Type           string                `json:"type"` // nomad, docker, systemd
+	JobSpec        *NomadJobSpec         `json:"job_spec,omitempty"`
+	DockerConfig   *DockerServiceConfig  `json:"docker_config,omitempty"`
+	SystemdConfig  *SystemdServiceConfig `json:"systemd_config,omitempty"`
+	Dependencies   []string              `json:"dependencies"`
+	HealthChecks   []HealthCheck         `json:"health_checks"`
+	Secrets        map[string]string     `json:"secrets"` // Vault paths
+	Environment    map[string]string     `json:"environment"`
+	Volumes        []VolumeMount         `json:"volumes"`
+	Networks       []NetworkConfig       `json:"networks"`
+	Resources      ResourceRequirements  `json:"resources"`
+	Scaling        ScalingConfig         `json:"scaling"`
+	UpdateStrategy UpdateStrategy        `json:"update_strategy"`
 }
 
 // NomadJobSpec defines a Nomad job specification
 type NomadJobSpec struct {
-	ID          string          `json:"id"`
-	Name        string          `json:"name"`
-	Type        string          `json:"type"`         // service, batch, system
-	Priority    int             `json:"priority"`
-	Region      string          `json:"region"`
-	Datacenters []string        `json:"datacenters"`
-	Namespace   string          `json:"namespace"`
-	Groups      []TaskGroup     `json:"groups"`
-	Periodic    *PeriodicConfig `json:"periodic,omitempty"`
-	Constraints []Constraint    `json:"constraints"`
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Type        string            `json:"type"` // service, batch, system
+	Priority    int               `json:"priority"`
+	Region      string            `json:"region"`
+	Datacenters []string          `json:"datacenters"`
+	Namespace   string            `json:"namespace"`
+	Groups      []TaskGroup       `json:"groups"`
+	Periodic    *PeriodicConfig   `json:"periodic,omitempty"`
+	Constraints []Constraint      `json:"constraints"`
 	Meta        map[string]string `json:"meta"`
 }
 
 // TaskGroup defines a Nomad task group
 type TaskGroup struct {
-	Name          string            `json:"name"`
-	Count         int               `json:"count"`
-	Tasks         []Task            `json:"tasks"`
-	Volumes       map[string]Volume `json:"volumes"`
-	Networks      []Network         `json:"networks"`
-	Services      []Service         `json:"services"`
-	RestartPolicy RestartPolicy     `json:"restart_policy"`
-	ReschedulePolicy ReschedulePolicy `json:"reschedule_policy"`
+	Name             string            `json:"name"`
+	Count            int               `json:"count"`
+	Tasks            []Task            `json:"tasks"`
+	Volumes          map[string]Volume `json:"volumes"`
+	Networks         []Network         `json:"networks"`
+	Services         []Service         `json:"services"`
+	RestartPolicy    RestartPolicy     `json:"restart_policy"`
+	ReschedulePolicy ReschedulePolicy  `json:"reschedule_policy"`
 }
 
 // Task defines a Nomad task
 type Task struct {
-	Name        string            `json:"name"`
-	Driver      string            `json:"driver"`        // docker, java, exec
+	Name        string                 `json:"name"`
+	Driver      string                 `json:"driver"` // docker, java, exec
 	Config      map[string]interface{} `json:"config"`
-	Resources   Resources         `json:"resources"`
-	Env         map[string]string `json:"env"`
-	Templates   []Template        `json:"templates"`
-	Artifacts   []Artifact        `json:"artifacts"`
-	Vault       *VaultConfig      `json:"vault,omitempty"`
-	Services    []Service         `json:"services"`
-	Constraints []Constraint      `json:"constraints"`
-	KillTimeout string            `json:"kill_timeout"`
-	LogConfig   LogConfig         `json:"logs"`
+	Resources   Resources              `json:"resources"`
+	Env         map[string]string      `json:"env"`
+	Templates   []Template             `json:"templates"`
+	Artifacts   []Artifact             `json:"artifacts"`
+	Vault       *VaultConfig           `json:"vault,omitempty"`
+	Services    []Service              `json:"services"`
+	Constraints []Constraint           `json:"constraints"`
+	KillTimeout string                 `json:"kill_timeout"`
+	LogConfig   LogConfig              `json:"logs"`
 }
 
 // DockerServiceConfig defines Docker-specific service configuration
@@ -138,22 +138,22 @@ type DockerServiceConfig struct {
 
 // SystemdServiceConfig defines systemd service configuration
 type SystemdServiceConfig struct {
-	ExecStart    string            `json:"exec_start"`
-	ExecReload   string            `json:"exec_reload,omitempty"`
-	User         string            `json:"user"`
-	Group        string            `json:"group"`
-	WorkingDir   string            `json:"working_directory"`
-	Environment  map[string]string `json:"environment"`
-	Type         string            `json:"type"`         // simple, forking, oneshot
-	Restart      string            `json:"restart"`      // always, on-failure, no
-	WantedBy     []string          `json:"wanted_by"`
-	After        []string          `json:"after"`
-	Requires     []string          `json:"requires"`
+	ExecStart   string            `json:"exec_start"`
+	ExecReload  string            `json:"exec_reload,omitempty"`
+	User        string            `json:"user"`
+	Group       string            `json:"group"`
+	WorkingDir  string            `json:"working_directory"`
+	Environment map[string]string `json:"environment"`
+	Type        string            `json:"type"`    // simple, forking, oneshot
+	Restart     string            `json:"restart"` // always, on-failure, no
+	WantedBy    []string          `json:"wanted_by"`
+	After       []string          `json:"after"`
+	Requires    []string          `json:"requires"`
 }
 
 // HealthCheck defines service health check configuration
 type HealthCheck struct {
-	Type        string        `json:"type"`         // http, tcp, exec, script
+	Type        string        `json:"type"` // http, tcp, exec, script
 	Endpoint    string        `json:"endpoint,omitempty"`
 	Port        int           `json:"port,omitempty"`
 	Command     []string      `json:"command,omitempty"`
@@ -165,10 +165,10 @@ type HealthCheck struct {
 
 // VolumeMount defines volume mount configuration
 type VolumeMount struct {
-	Source      string `json:"source"`
-	Destination string `json:"destination"`
-	Type        string `json:"type"`        // bind, volume, tmpfs
-	ReadOnly    bool   `json:"read_only"`
+	Source      string   `json:"source"`
+	Destination string   `json:"destination"`
+	Type        string   `json:"type"` // bind, volume, tmpfs
+	ReadOnly    bool     `json:"read_only"`
 	Options     []string `json:"options"`
 }
 
@@ -182,32 +182,32 @@ type NetworkConfig struct {
 
 // ResourceRequirements defines resource requirements
 type ResourceRequirements struct {
-	CPU    int    `json:"cpu"`     // MHz
-	Memory int    `json:"memory"`  // MB
-	Disk   int    `json:"disk"`    // MB
-	IOPS   int    `json:"iops"`
+	CPU    int `json:"cpu"`    // MHz
+	Memory int `json:"memory"` // MB
+	Disk   int `json:"disk"`   // MB
+	IOPS   int `json:"iops"`
 }
 
 // ScalingConfig defines auto-scaling configuration
 type ScalingConfig struct {
-	MinInstances int               `json:"min_instances"`
-	MaxInstances int               `json:"max_instances"`
-	Metrics      []ScalingMetric   `json:"metrics"`
-	Enabled      bool              `json:"enabled"`
+	MinInstances int             `json:"min_instances"`
+	MaxInstances int             `json:"max_instances"`
+	Metrics      []ScalingMetric `json:"metrics"`
+	Enabled      bool            `json:"enabled"`
 }
 
 // ScalingMetric defines scaling metrics
 type ScalingMetric struct {
-	Type       string  `json:"type"`        // cpu, memory, custom
-	Threshold  float64 `json:"threshold"`
-	Direction  string  `json:"direction"`   // up, down
+	Type      string  `json:"type"` // cpu, memory, custom
+	Threshold float64 `json:"threshold"`
+	Direction string  `json:"direction"` // up, down
 }
 
 // UpdateStrategy defines deployment update strategy
 type UpdateStrategy struct {
-	Type           string        `json:"type"`            // rolling, recreate, blue_green
-	MaxUnavailable int           `json:"max_unavailable"`
-	MaxSurge       int           `json:"max_surge"`
+	Type            string        `json:"type"` // rolling, recreate, blue_green
+	MaxUnavailable  int           `json:"max_unavailable"`
+	MaxSurge        int           `json:"max_surge"`
 	ProgressTimeout time.Duration `json:"progress_timeout"`
 	RollbackOnError bool          `json:"rollback_on_error"`
 }
@@ -243,11 +243,11 @@ type PortLabel struct {
 }
 
 type Service struct {
-	Name      string        `json:"name"`
-	Tags      []string      `json:"tags"`
-	Port      string        `json:"port"`
-	Checks    []CheckConfig `json:"checks"`
-	Provider  string        `json:"provider"`
+	Name     string        `json:"name"`
+	Tags     []string      `json:"tags"`
+	Port     string        `json:"port"`
+	Checks   []CheckConfig `json:"checks"`
+	Provider string        `json:"provider"`
 }
 
 type CheckConfig struct {
@@ -265,12 +265,12 @@ type RestartPolicy struct {
 }
 
 type ReschedulePolicy struct {
-	Attempts     int           `json:"attempts"`
-	Interval     time.Duration `json:"interval"`
+	Attempts      int           `json:"attempts"`
+	Interval      time.Duration `json:"interval"`
 	DelayFunction string        `json:"delay_function"`
-	Delay        time.Duration `json:"delay"`
-	MaxDelay     time.Duration `json:"max_delay"`
-	Unlimited    bool          `json:"unlimited"`
+	Delay         time.Duration `json:"delay"`
+	MaxDelay      time.Duration `json:"max_delay"`
+	Unlimited     bool          `json:"unlimited"`
 }
 
 type Resources struct {
@@ -281,18 +281,18 @@ type Resources struct {
 }
 
 type Template struct {
-	SourcePath  string `json:"source_path"`
-	DestPath    string `json:"dest_path"`
-	EmbeddedTmpl string `json:"embedded_tmpl"`
-	ChangeMode  string `json:"change_mode"`
-	ChangeSignal string `json:"change_signal"`
-	Splay       time.Duration `json:"splay"`
-	Perms       string `json:"perms"`
+	SourcePath   string        `json:"source_path"`
+	DestPath     string        `json:"dest_path"`
+	EmbeddedTmpl string        `json:"embedded_tmpl"`
+	ChangeMode   string        `json:"change_mode"`
+	ChangeSignal string        `json:"change_signal"`
+	Splay        time.Duration `json:"splay"`
+	Perms        string        `json:"perms"`
 }
 
 type Artifact struct {
-	GetterSource string            `json:"getter_source"`
-	RelativeDest string            `json:"relative_dest"`
+	GetterSource  string            `json:"getter_source"`
+	RelativeDest  string            `json:"relative_dest"`
 	GetterOptions map[string]string `json:"getter_options"`
 }
 
@@ -303,7 +303,7 @@ type VaultConfig struct {
 }
 
 type LogConfig struct {
-	MaxFiles     int `json:"max_files"`
+	MaxFiles      int `json:"max_files"`
 	MaxFileSizeMB int `json:"max_file_size_mb"`
 }
 
@@ -315,16 +315,16 @@ type PortMapping struct {
 
 // DeploymentResult represents the result of a service deployment
 type DeploymentResult struct {
-	ServiceName     string                    `json:"service_name"`
-	Type           string                    `json:"type"`
-	Success        bool                      `json:"success"`
-	JobID          string                    `json:"job_id,omitempty"`
-	AllocationsCreated int                   `json:"allocations_created"`
-	HealthStatus   map[string]string         `json:"health_status"`
-	Endpoints      []ServiceEndpoint         `json:"endpoints"`
-	Duration       time.Duration             `json:"duration"`
-	Errors         []string                  `json:"errors"`
-	Rollback       bool                      `json:"rollback"`
+	ServiceName        string            `json:"service_name"`
+	Type               string            `json:"type"`
+	Success            bool              `json:"success"`
+	JobID              string            `json:"job_id,omitempty"`
+	AllocationsCreated int               `json:"allocations_created"`
+	HealthStatus       map[string]string `json:"health_status"`
+	Endpoints          []ServiceEndpoint `json:"endpoints"`
+	Duration           time.Duration     `json:"duration"`
+	Errors             []string          `json:"errors"`
+	Rollback           bool              `json:"rollback"`
 }
 
 // ServiceEndpoint represents a service endpoint
@@ -354,17 +354,17 @@ func NewOrchestrationManager(saltManager *SaltStackManager, terraformDir string,
 // DeployService deploys a service following assessment→intervention→evaluation
 func (o *OrchestrationManager) DeployService(rc *eos_io.RuntimeContext, deployment *ServiceDeployment) (*DeploymentResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting service deployment", 
+	logger.Info("Starting service deployment",
 		zap.String("service", deployment.Name),
 		zap.String("type", deployment.Type))
 
 	startTime := time.Now()
 	result := &DeploymentResult{
 		ServiceName:  deployment.Name,
-		Type:        deployment.Type,
+		Type:         deployment.Type,
 		HealthStatus: make(map[string]string),
-		Endpoints:   []ServiceEndpoint{},
-		Errors:      []string{},
+		Endpoints:    []ServiceEndpoint{},
+		Errors:       []string{},
 	}
 
 	// Assessment: Check deployment prerequisites and current state
@@ -385,7 +385,7 @@ func (o *OrchestrationManager) DeployService(rc *eos_io.RuntimeContext, deployme
 	if err := o.evaluateDeployment(rc, deployment, result); err != nil {
 		result.Success = false
 		result.Errors = append(result.Errors, err.Error())
-		
+
 		// Attempt rollback if configured
 		if deployment.UpdateStrategy.RollbackOnError {
 			logger.Warn("Deployment failed, attempting rollback")
@@ -395,14 +395,14 @@ func (o *OrchestrationManager) DeployService(rc *eos_io.RuntimeContext, deployme
 				result.Rollback = true
 			}
 		}
-		
+
 		return result, cerr.Wrap(err, "deployment evaluation failed")
 	}
 
 	result.Duration = time.Since(startTime)
 	result.Success = true
 
-	logger.Info("Service deployment completed successfully", 
+	logger.Info("Service deployment completed successfully",
 		zap.String("service", deployment.Name),
 		zap.Duration("duration", result.Duration))
 
@@ -566,19 +566,19 @@ func (o *OrchestrationManager) DeployMattermost(rc *eos_io.RuntimeContext, confi
 
 // Configuration types
 type GrafanaConfig struct {
-	Version      string            `json:"version"`
-	AdminPassword string           `json:"admin_password"`
-	DatabaseURL   string           `json:"database_url"`
-	Plugins       []string         `json:"plugins"`
-	Settings     map[string]string `json:"settings"`
+	Version       string            `json:"version"`
+	AdminPassword string            `json:"admin_password"`
+	DatabaseURL   string            `json:"database_url"`
+	Plugins       []string          `json:"plugins"`
+	Settings      map[string]string `json:"settings"`
 }
 
 type MattermostConfig struct {
-	Version      string            `json:"version"`
-	SiteURL      string           `json:"site_url"`
-	DatabaseURL  string           `json:"database_url"`
-	SMTPConfig   SMTPConfig       `json:"smtp_config"`
-	Settings     map[string]string `json:"settings"`
+	Version     string            `json:"version"`
+	SiteURL     string            `json:"site_url"`
+	DatabaseURL string            `json:"database_url"`
+	SMTPConfig  SMTPConfig        `json:"smtp_config"`
+	Settings    map[string]string `json:"settings"`
 }
 
 type SMTPConfig struct {
@@ -660,9 +660,9 @@ nomad_job_%s:
     - name: nomad job run /tmp/%s.nomad
     - require:
       - file: nomad_job_%s
-`, deployment.JobSpec.ID, deployment.JobSpec.ID, 
-   strings.ReplaceAll(jobHCL, "\n", "\n        "), 
-   deployment.JobSpec.ID, deployment.JobSpec.ID)
+`, deployment.JobSpec.ID, deployment.JobSpec.ID,
+		strings.ReplaceAll(jobHCL, "\n", "\n        "),
+		deployment.JobSpec.ID, deployment.JobSpec.ID)
 
 	saltResult, err := o.saltManager.client.ApplyState("*", "grains", "nomad_deploy", map[string]interface{}{
 		"sls_content": slsContent,
@@ -699,9 +699,9 @@ docker_service_%s:
     - name: cd /opt/%s && docker-compose up -d
     - require:
       - file: docker_service_%s
-`, deployment.Name, deployment.Name, 
-   strings.ReplaceAll(composeContent, "\n", "\n        "),
-   deployment.Name, deployment.Name)
+`, deployment.Name, deployment.Name,
+		strings.ReplaceAll(composeContent, "\n", "\n        "),
+		deployment.Name, deployment.Name)
 
 	saltResult, err := o.saltManager.client.ApplyState("*", "grains", "docker_deploy", map[string]interface{}{
 		"sls_content": slsContent,
@@ -732,8 +732,8 @@ systemd_service_%s:
     - require:
       - file: systemd_service_%s
 `, deployment.Name, deployment.Name,
-   strings.ReplaceAll(unitContent, "\n", "\n        "),
-   deployment.Name, deployment.Name, deployment.Name)
+		strings.ReplaceAll(unitContent, "\n", "\n        "),
+		deployment.Name, deployment.Name, deployment.Name)
 
 	saltResult, err := o.saltManager.client.ApplyState("*", "grains", "systemd_deploy", map[string]interface{}{
 		"sls_content": slsContent,
@@ -1040,7 +1040,7 @@ func (d *DeploymentOrchestrator) rollingDeployment(rc *eos_io.RuntimeContext, re
 		}
 
 		batch := minions[i:end]
-		logger.Info("Deploying to batch", 
+		logger.Info("Deploying to batch",
 			zap.Int("batch_number", i/batchSize+1),
 			zap.Int("total_batches", (len(minions)+batchSize-1)/batchSize),
 			zap.Strings("minions", batch))
@@ -1082,7 +1082,7 @@ func (d *DeploymentOrchestrator) rollingDeployment(rc *eos_io.RuntimeContext, re
 			}
 		}
 
-		logger.Info("Batch deployed successfully", 
+		logger.Info("Batch deployed successfully",
 			zap.Int("batch_number", i/batchSize+1),
 			zap.Int("total_batches", (len(minions)+batchSize-1)/batchSize))
 	}
@@ -1095,7 +1095,7 @@ func (d *DeploymentOrchestrator) canaryDeployment(rc *eos_io.RuntimeContext, req
 	logger := otelzap.Ctx(rc.Ctx)
 	// Implementation would gradually increase the percentage of servers
 	// running the new version while monitoring metrics
-	logger.Info("Canary deployment not yet implemented", 
+	logger.Info("Canary deployment not yet implemented",
 		zap.String("application", req.Application),
 		zap.String("version", req.Version))
 	return nil

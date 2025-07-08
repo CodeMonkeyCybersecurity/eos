@@ -14,6 +14,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"golang.org/x/term"
@@ -21,12 +22,12 @@ import (
 
 // UserCreationOptions represents options for creating a new user
 type UserCreationOptions struct {
-	Username    string
-	Password    string
-	SudoAccess  bool
-	HomeDir     string
-	Shell       string
-	SSHAccess   bool
+	Username   string
+	Password   string
+	SudoAccess bool
+	HomeDir    string
+	Shell      string
+	SSHAccess  bool
 }
 
 // CreateUser creates a new user account with specified options
@@ -83,7 +84,7 @@ func CreateUser(rc *eos_io.RuntimeContext, options *UserCreationOptions) error {
 		}
 	}
 
-	logger.Info("User created successfully", 
+	logger.Info("User created successfully",
 		zap.String("username", options.Username),
 		zap.Bool("sudo_access", options.SudoAccess),
 		zap.Bool("ssh_access", options.SSHAccess))
@@ -234,7 +235,7 @@ func ListUsersWithSSHAccess(rc *eos_io.RuntimeContext) ([]string, error) {
 		}
 	}
 
-	logger.Info("Found users with SSH access", 
+	logger.Info("Found users with SSH access",
 		zap.Strings("users", usersWithAccess),
 		zap.Int("count", len(usersWithAccess)))
 
@@ -361,14 +362,14 @@ func createUserAccount(rc *eos_io.RuntimeContext, options *UserCreationOptions) 
 	cmd := exec.CommandContext(ctx, "sudo", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("Failed to create user account", 
+		logger.Error("Failed to create user account",
 			zap.String("username", options.Username),
 			zap.ByteString("output", output),
 			zap.Error(err))
 		return fmt.Errorf("failed to create user account: %w", err)
 	}
 
-	logger.Debug("User account created", 
+	logger.Debug("User account created",
 		zap.String("username", options.Username),
 		zap.ByteString("output", output))
 
@@ -388,10 +389,10 @@ func setUserPassword(rc *eos_io.RuntimeContext, username, password string) error
 
 	cmd := exec.CommandContext(ctx, "sudo", "chpasswd")
 	cmd.Stdin = strings.NewReader(passwordInput)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("Failed to set user password", 
+		logger.Error("Failed to set user password",
 			zap.String("username", username),
 			zap.ByteString("output", output),
 			zap.Error(err))
@@ -413,7 +414,7 @@ func addUserToSudoGroup(rc *eos_io.RuntimeContext, username string) error {
 	cmd := exec.CommandContext(ctx, "sudo", "usermod", "-a", "-G", "sudo", username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("Failed to add user to sudo group", 
+		logger.Error("Failed to add user to sudo group",
 			zap.String("username", username),
 			zap.ByteString("output", output),
 			zap.Error(err))
@@ -432,7 +433,7 @@ func promptPassword(rc *eos_io.RuntimeContext, prompt string) (string, error) {
 	fmt.Print(prompt)
 	passwordBytes, err := term.ReadPassword(int(syscall.Stdin))
 	fmt.Println() // Add newline after password input
-	
+
 	if err != nil {
 		logger.Error("Failed to read password", zap.Error(err))
 		return "", fmt.Errorf("failed to read password: %w", err)
@@ -465,7 +466,7 @@ func getUsersWithBashShell(rc *eos_io.RuntimeContext) ([]string, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		fields := strings.Split(line, ":")
-		
+
 		// passwd format: username:password:uid:gid:gecos:home:shell
 		if len(fields) >= 7 && fields[6] == "/bin/bash" {
 			bashUsers = append(bashUsers, fields[0])
@@ -477,7 +478,7 @@ func getUsersWithBashShell(rc *eos_io.RuntimeContext) ([]string, error) {
 		return nil, fmt.Errorf("error reading /etc/passwd: %w", err)
 	}
 
-	logger.Info("Found users with bash shell", 
+	logger.Info("Found users with bash shell",
 		zap.Strings("users", bashUsers),
 		zap.Int("count", len(bashUsers)))
 
@@ -507,7 +508,7 @@ func getSSHAllowedUsers(rc *eos_io.RuntimeContext) ([]string, error) {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
-		
+
 		// Look for AllowUsers directive
 		if strings.HasPrefix(line, "AllowUsers ") {
 			// Extract users from the line
@@ -522,7 +523,7 @@ func getSSHAllowedUsers(rc *eos_io.RuntimeContext) ([]string, error) {
 		return nil, fmt.Errorf("error reading SSH config: %w", err)
 	}
 
-	logger.Info("Found SSH allowed users", 
+	logger.Info("Found SSH allowed users",
 		zap.Strings("users", allowedUsers),
 		zap.Int("count", len(allowedUsers)))
 
@@ -556,7 +557,7 @@ func addUserToSSHConfig(rc *eos_io.RuntimeContext, username string) error {
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
-		
+
 		// Check for existing AllowUsers line
 		if strings.HasPrefix(strings.TrimSpace(line), "AllowUsers ") {
 			// Add user to existing line
@@ -623,10 +624,10 @@ func reloadSSHDaemon(rc *eos_io.RuntimeContext) error {
 
 	for _, cmdArgs := range commands {
 		logger.Debug("Attempting SSH reload command", zap.Strings("command", cmdArgs))
-		
+
 		cmd := exec.CommandContext(ctx, "sudo", cmdArgs...)
 		if err := cmd.Run(); err != nil {
-			logger.Warn("SSH reload command failed", 
+			logger.Warn("SSH reload command failed",
 				zap.Strings("command", cmdArgs),
 				zap.Error(err))
 			continue
@@ -638,4 +639,52 @@ func reloadSSHDaemon(rc *eos_io.RuntimeContext) error {
 
 	logger.Error("Failed to reload SSH daemon with all attempted methods")
 	return eos_err.NewExpectedError(ctx, fmt.Errorf("could not reload SSH daemon automatically. Please reload it manually with 'sudo systemctl reload sshd' or 'sudo service ssh reload'"))
+}
+
+func runUpdateUserPassword(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	otelzap.Ctx(rc.Ctx).Info("Starting user password update")
+
+	// Use interactive mode if no username provided
+	if len(args) == 0 {
+		return users.ChangeUserPasswordInteractive(rc)
+	}
+
+	username := strings.TrimSpace(args[0])
+	if username == "" {
+		return users.ChangeUserPasswordInteractive(rc)
+	}
+
+	// Get new password interactively for security
+	newPassword, err := interaction.PromptUser(rc, "Enter new password: ")
+	if err != nil {
+		return fmt.Errorf("failed to get new password: %w", err)
+	}
+
+	return ChangeUserPassword(rc, username, newPassword)
+}
+
+func runUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	otelzap.Ctx(rc.Ctx).Info("Starting SSH access grant")
+
+	var username string
+	if len(args) > 0 {
+		username = strings.TrimSpace(args[0])
+	}
+
+	// If no username provided, prompt for it
+	if username == "" {
+		var err error
+		username, err = interaction.PromptUser(rc, "Enter username to grant SSH access: ")
+		if err != nil {
+			return fmt.Errorf("failed to get username: %w", err)
+		}
+		username = strings.TrimSpace(username)
+	}
+
+	if username == "" {
+		otelzap.Ctx(rc.Ctx).Error("No username provided")
+		return fmt.Errorf("username cannot be empty")
+	}
+
+	return GrantSSHAccess(rc, username)
 }

@@ -1,0 +1,96 @@
+// cmd/read/disk_usage.go
+package read
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"strings"
+
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+var diskUsageCmd = &cobra.Command{
+	Use:     "disk-usage",
+	Aliases: []string{"disk-space", "df"},
+	Short:   "Show disk usage for mounted filesystems",
+	Long: `Show disk usage information for all mounted filesystems.
+
+Displays filesystem, size, used space, available space, and usage percentage.
+
+Examples:
+  eos read disk-usage                   # Show disk usage
+  eos read disk-usage --json           # Output in JSON format`,
+
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Getting disk usage information")
+
+		outputJSON, _ := cmd.Flags().GetBool("json")
+
+		manager := disk_management.NewDiskManager(nil)
+		usage, err := manager.GetDiskUsage(rc)
+		if err != nil {
+			logger.Error("Failed to get disk usage", zap.Error(err))
+			return err
+		}
+
+		if outputJSON {
+			return outputDiskUsageJSON(usage)
+		}
+
+		return outputDiskUsageTable(usage)
+	}),
+}
+
+func init() {
+	diskUsageCmd.Flags().Bool("json", false, "Output in JSON format")
+	
+	ReadCmd.AddCommand(diskUsageCmd)
+}
+
+func outputDiskUsageJSON(usage map[string]disk_management.DiskUsageInfo) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(usage)
+}
+
+func outputDiskUsageTable(usage map[string]disk_management.DiskUsageInfo) error {
+	if len(usage) == 0 {
+		fmt.Println("No mounted filesystems found.")
+		return nil
+	}
+
+	fmt.Printf("Disk Usage Information (%d filesystems)\n\n", len(usage))
+
+	// Print header
+	fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n", 
+		"FILESYSTEM", "SIZE", "USED", "AVAIL", "USE%", "MOUNTED ON")
+	fmt.Println(strings.Repeat("-", 80))
+
+	// Print usage information
+	for _, info := range usage {
+		fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n",
+			truncateString(info.Filesystem, 20),
+			info.Size,
+			info.Used,
+			info.Available,
+			info.UsePercent,
+			info.MountPoint)
+	}
+
+	return nil
+}
+
+// Helper function
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}

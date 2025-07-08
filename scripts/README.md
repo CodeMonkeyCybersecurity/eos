@@ -235,7 +235,7 @@ The framework automatically detects and reports:
 - Template injection attempts
 
 When security issues are detected:
-1. Immediate logging with `🚨 SECURITY ALERT`
+1. Immediate logging with ` SECURITY ALERT`
 2. CI/CD pipeline failure
 3. Detailed crash information in logs
 4. GitHub Actions security outputs

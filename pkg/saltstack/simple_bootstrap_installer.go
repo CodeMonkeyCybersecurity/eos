@@ -24,10 +24,10 @@ const (
 	// This is the CURRENT correct URL as of November 2024 (GitHub-hosted)
 	// The old bootstrap.saltproject.io was decommissioned in October 2024
 	DefaultBootstrapURL = "https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh"
-	
+
 	// Checksum URL for verification (also moved to GitHub)
 	BootstrapChecksumURL = "https://github.com/saltstack/salt-bootstrap/releases/latest/download/bootstrap-salt.sh.sha256"
-	
+
 	// Decommissioned URLs - DO NOT USE (return HTML migration warnings)
 	// OldBootstrapURL = "https://bootstrap.saltstack.com"    // Redirects to HTML
 	// OldSaltProjectURL = "https://bootstrap.saltproject.io" // Decommissioned Oct 2024
@@ -296,7 +296,7 @@ func (sbi *SimpleBootstrapInstaller) runBootstrap(rc *eos_io.RuntimeContext, scr
 		logger.Info("Installing Salt in masterless mode")
 	} else {
 		// For master-minion mode
-		args = append(args, "-M")         // Install master
+		args = append(args, "-M")              // Install master
 		args = append(args, "-A", "localhost") // Accept local minion
 		logger.Info("Installing Salt in master-minion mode")
 	}
@@ -316,7 +316,7 @@ func (sbi *SimpleBootstrapInstaller) runBootstrap(rc *eos_io.RuntimeContext, scr
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "sh", args...)
-	
+
 	// Capture output for debugging
 	output, err := cmd.CombinedOutput()
 	if err != nil {

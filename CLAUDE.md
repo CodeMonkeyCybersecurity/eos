@@ -94,10 +94,157 @@ func PerformOperation(rc *eos_io.RuntimeContext, config *Config) error {
 }
 ```
 
-### CLI Structure (Cobra Framework)
-The application uses Cobra CLI with the following command hierarchy:
-- **CRUD Operations**: create, read, update, delete, list
-- **Infrastructure Management**: vault, k3s, docker, ldap, jenkins
+### CLI Structure (Cobra Framework) - VERB-FIRST ARCHITECTURE
+
+**CRITICAL**: Eos follows a strict **VERB-FIRST** command structure to prevent architectural drift and maintain consistency.
+
+#### Core Command Structure
+The `cmd/` directory MUST contain only these verb-based commands:
+- **create** - All creation operations (`eos create saltstack`, `eos create database`, `eos create vault`)
+- **read** - All read/inspection operations (`eos read config`, `eos read status`)
+- **list** - All listing operations (`eos list services`, `eos list users`)
+- **update** - All modification operations (`eos update config`, `eos update secrets`)
+- **delete** - All deletion operations (`eos delete user`, `eos delete service`)
+
+#### Special Case Commands
+Only these exceptions are allowed for organizational clarity:
+- **self** - Managing the Eos tool itself (`eos self update`, `eos self git commit`)
+- **backup** - Backup operations (special case due to complex nomenclature)
+
+#### Verb Synonyms and Aliases
+To handle natural language variations, use command aliases:
+- **read**: aliases = `inspect`, `show`, `get`, `status`
+- **update**: aliases = `modify`, `manage`, `clean`, `enable`, `disable`, `sync`, `migrate`, `set`
+- **create**: aliases = `deploy`, `install`, `setup`, `add`
+- **delete**: aliases = `remove`, `destroy`, `uninstall`
+- **list**: aliases = `ls`, `show-all`
+
+#### PROHIBITED: Noun-First Commands
+**NEVER** create noun-first commands like:
+- ❌ `cmd/database/` 
+- ❌ `cmd/delphi/`
+- ❌ `cmd/container/`
+- ❌ `cmd/vault/`
+
+Instead, use verb-first structure:
+- ✅ `eos create database`
+- ✅ `eos update delphi`  
+- ✅ `eos list containers`
+- ✅ `eos read vault status`
+
+#### Directory Structure
+```
+cmd/
+├── create/           # All creation operations
+│   ├── create.go    # Root create command
+│   ├── saltstack.go # eos create saltstack
+│   ├── database.go  # eos create database
+│   └── vault.go     # eos create vault
+├── read/            # All read/inspection operations
+├── list/            # All listing operations  
+├── update/          # All modification operations
+├── delete/          # All deletion operations
+├── self/            # Eos self-management (EXCEPTION)
+│   ├── self.go
+│   └── git/         # Git operations for Eos itself
+└── backup/          # Backup operations (EXCEPTION)
+```
+
+#### Migration Strategy
+When restructuring noun-first commands:
+1. Move functionality to appropriate verb directory
+2. Add aliases for backward compatibility
+3. Update imports and registrations
+4. Maintain all existing functionality
+5. Add deprecation warnings to old commands
+
+#### RESTRUCTURING PLAN - Noun-First Commands to Migrate
+
+**IMMEDIATE PRIORITY** - These noun-first commands must be restructured:
+
+**Database Operations** (`cmd/database/` → verb directories)
+- `database credentials` → `read database credentials`
+- `database health-check` → `read database health`  
+- `database query` → `read database query`
+- `database schema` → `read database schema`
+- `database status` → `read database status`
+- `database vault-postgres` → `create database vault-postgres`
+
+**Delphi Operations** (`cmd/delphi/` → verb directories)
+- `delphi create/*` → `create delphi/*`
+- `delphi dashboard` → `read delphi dashboard`
+- `delphi delete/*` → `delete delphi/*`
+- `delphi deploy` → `create delphi deploy`
+- `delphi inspect` → `read delphi inspect`
+- `delphi list` → `list delphi`
+- `delphi monitor` → `read delphi monitor`
+- `delphi read/*` → `read delphi/*`
+- `delphi services/*` → `update delphi services/*`
+- `delphi sync` → `update delphi sync`
+- `delphi update/*` → `update delphi/*`
+- `delphi validate` → `read delphi validate`
+- `delphi watch` → `read delphi watch`
+
+**Container Operations** (`cmd/container/` → verb directories)
+- `container compose` → `create container compose`
+- `container install` → `create container install`
+
+**Hecate Operations** (`cmd/hecate/` → verb directories)
+- `hecate backup` → `backup hecate` (special case)
+- `hecate create` → `create hecate`
+- `hecate delete` → `delete hecate`
+- `hecate deploy` → `create hecate deploy`
+- `hecate read` → `read hecate`
+- `hecate restore` → `backup restore hecate`
+- `hecate update` → `update hecate`
+
+**Pandora Operations** (`cmd/pandora/` → verb directories)
+- `pandora create` → `create pandora`
+- `pandora delete` → `delete pandora`
+- `pandora export` → `read pandora export`
+- `pandora read` → `read pandora`
+- `pandora unseal` → `update pandora unseal`
+- `pandora update` → `update pandora`
+
+**Storage Operations** (`cmd/storage/` → verb directories)
+- `storage disk` → `read storage disk`
+- `storage zfs` → `update storage zfs`
+
+**System Operations** (`cmd/system/` → verb directories)
+- `system cleanup` → `update clean system`
+- `system path` → `read system path`
+
+**Salt Operations** (`cmd/salt/` → `self salt` - already moved)
+- Already correctly moved to `cmd/self/` but may need salt vs saltstack cleanup
+
+**Test Operations** (`cmd/test/` → verb directories)
+- `test coverage` → `read test coverage`
+- `test fuzz` → `create test fuzz`
+
+**Crypto Operations** (`cmd/crypto/` → verb directories)
+- `crypto` → `create crypto` or `read crypto` (analyze content)
+
+**AI Operations** (`cmd/ai/` → verb directories)
+- `ai` → `create ai` or `read ai` (analyze content)
+
+#### Implementation Phases
+
+**Phase 1: Database & Delphi** (High Impact)
+- Migrate `cmd/database/` and `cmd/delphi/` 
+- These are heavily used and complex
+
+**Phase 2: Infrastructure** (Medium Impact)  
+- Migrate `cmd/container/`, `cmd/hecate/`, `cmd/pandora/`
+- Core infrastructure commands
+
+**Phase 3: System & Utilities** (Low Impact)
+- Migrate `cmd/storage/`, `cmd/system/`, `cmd/test/`, `cmd/crypto/`, `cmd/ai/`
+- Less frequently used utilities
+
+**Phase 4: Cleanup**
+- Remove old noun-first command directories
+- Update all documentation and help text
+- Verify all functionality preserved
 - **Security Tools**: delphi (monitoring), hecate (reverse proxy)
 - **System Operations**: backup, sync, refresh, secure, config
 

@@ -1,4 +1,4 @@
-// Package saltstack provides integration with Salt Stack for secure infrastructure management
+// package saltstack provides integration with Salt Stack for secure infrastructure management
 package saltstack
 
 import (
@@ -40,7 +40,7 @@ func (c *Client) StateApply(ctx context.Context, target string, state string, pi
 		zap.String("state", state))
 
 	args := []string{target, "state.apply", state}
-	
+
 	if len(pillar) > 0 {
 		pillarJSON, err := json.Marshal(pillar)
 		if err != nil {
@@ -65,7 +65,7 @@ func (c *Client) StateApply(ctx context.Context, target string, state string, pi
 
 	c.logger.Info("State applied successfully",
 		zap.String("state", state))
-	
+
 	return nil
 }
 

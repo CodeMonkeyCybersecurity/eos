@@ -15,6 +15,16 @@ import (
 	"go.uber.org/zap"
 )
 
+// IsVMRunning checks if the VM appears as 'running' in virsh output.
+func IsVMRunning(virshList string, vmName string) bool {
+	for _, line := range strings.Split(virshList, "\n") {
+		if strings.Contains(line, vmName) && strings.Contains(line, "running") {
+			return true
+		}
+	}
+	return false
+}
+
 // StartInstallStatusTicker logs ongoing status updates every 10s for disk size, VM state, and DHCP IPs.
 func StartInstallStatusTicker(ctx context.Context, log *zap.Logger, vmName, diskPath string) {
 	ticker := time.NewTicker(10 * time.Second)

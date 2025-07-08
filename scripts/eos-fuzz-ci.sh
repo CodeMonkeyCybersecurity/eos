@@ -271,7 +271,7 @@ run_ci_fuzz_test() {
         
         # Security alert for crashes
         if (( crashes > 0 )); then
-            ci_log "ERROR" "🚨 SECURITY: $test_name found $crashes crashes!"
+            ci_log "ERROR" " SECURITY: $test_name found $crashes crashes!"
             github_set_output "security_alert" "true"
             github_set_output "security_test" "$test_name"
             github_set_output "crash_count" "$crashes"
@@ -385,7 +385,7 @@ run_security_focused_ci() {
     ci_log "INFO" "Security fuzzing: $((total_tests - failed_tests))/$total_tests passed"
     
     if (( security_alerts > 0 )); then
-        ci_log "ERROR" "🚨 $security_alerts security alerts detected!"
+        ci_log "ERROR" " $security_alerts security alerts detected!"
         github_set_output "security_alerts_count" "$security_alerts"
     fi
     
@@ -485,7 +485,7 @@ EOF
     # Add security alerts if any
     if (( total_crashes > 0 )); then
         cat >> "$report_file" << EOF
-## 🚨 Security Alerts
+##  Security Alerts
 
 **$total_crashes potential security issues detected!**
 

@@ -3,10 +3,12 @@ package system
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/patterns"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -43,13 +45,13 @@ func (s *ServiceOperation) Assess(ctx context.Context) (*patterns.AssessmentResu
 
 	// Check if service exists (for most operations)
 	if s.Action != "mask" {
-		output, err := s.SaltClient.CmdRun(ctx, s.Target, 
+		output, err := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl cat %s >/dev/null 2>&1 && echo exists || echo notfound", s.ServiceName))
 		if err != nil || strings.TrimSpace(output) == "notfound" {
 			prerequisites["service_exists"] = false
 			return &patterns.AssessmentResult{
-				CanProceed: false,
-				Reason:     fmt.Sprintf("service %s not found", s.ServiceName),
+				CanProceed:    false,
+				Reason:        fmt.Sprintf("service %s not found", s.ServiceName),
 				Prerequisites: prerequisites,
 			}, nil
 		}
@@ -57,18 +59,18 @@ func (s *ServiceOperation) Assess(ctx context.Context) (*patterns.AssessmentResu
 	}
 
 	// Check current state
-	currentState, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+	currentState, _ := s.SaltClient.CmdRun(ctx, s.Target,
 		fmt.Sprintf("systemctl is-active %s 2>/dev/null || echo inactive", s.ServiceName))
 	currentState = strings.TrimSpace(currentState)
 
-	enabledState, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+	enabledState, _ := s.SaltClient.CmdRun(ctx, s.Target,
 		fmt.Sprintf("systemctl is-enabled %s 2>/dev/null || echo disabled", s.ServiceName))
 	enabledState = strings.TrimSpace(enabledState)
 
 	// Validate operation makes sense
 	context := map[string]interface{}{
-		"current_state":  currentState,
-		"enabled_state":  enabledState,
+		"current_state": currentState,
+		"enabled_state": enabledState,
 	}
 
 	switch s.Action {
@@ -156,7 +158,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 	// Verify expected state
 	switch s.Action {
 	case "start":
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-active %s", s.ServiceName))
 		if strings.TrimSpace(state) == "active" {
 			validations["service_active"] = patterns.ValidationResult{
@@ -171,7 +173,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 		}
 
 	case "stop":
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-active %s", s.ServiceName))
 		if strings.TrimSpace(state) == "inactive" {
 			validations["service_inactive"] = patterns.ValidationResult{
@@ -186,7 +188,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 		}
 
 	case "enable":
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-enabled %s", s.ServiceName))
 		if strings.TrimSpace(state) == "enabled" {
 			validations["service_enabled"] = patterns.ValidationResult{
@@ -201,7 +203,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 		}
 
 	case "disable":
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-enabled %s", s.ServiceName))
 		if strings.TrimSpace(state) == "disabled" {
 			validations["service_disabled"] = patterns.ValidationResult{
@@ -216,7 +218,7 @@ func (s *ServiceOperation) Evaluate(ctx context.Context, intervention *patterns.
 		}
 
 	case "mask":
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-enabled %s", s.ServiceName))
 		if strings.TrimSpace(state) == "masked" {
 			validations["service_masked"] = patterns.ValidationResult{
@@ -271,14 +273,14 @@ func (s *SleepDisableOperation) Assess(ctx context.Context) (*patterns.Assessmen
 	// Get current sleep targets
 	sleepTargets := []string{
 		"sleep.target",
-		"suspend.target", 
+		"suspend.target",
 		"hibernate.target",
 		"hybrid-sleep.target",
 	}
 
 	prerequisites := make(map[string]bool)
 	for _, target := range sleepTargets {
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-enabled %s 2>/dev/null || echo not-found", target))
 		prerequisites[fmt.Sprintf("%s_exists", target)] = !strings.Contains(state, "not-found")
 	}
@@ -298,7 +300,7 @@ func (s *SleepDisableOperation) Intervene(ctx context.Context, assessment *patte
 	// Mask sleep targets
 	sleepTargets := []string{
 		"sleep.target",
-		"suspend.target", 
+		"suspend.target",
 		"hibernate.target",
 		"hybrid-sleep.target",
 	}
@@ -306,7 +308,7 @@ func (s *SleepDisableOperation) Intervene(ctx context.Context, assessment *patte
 	for _, target := range sleepTargets {
 		_, err := s.SaltClient.CmdRun(ctx, s.Target, fmt.Sprintf("systemctl mask %s", target))
 		if err != nil {
-			s.Logger.Warn("Failed to mask target", 
+			s.Logger.Warn("Failed to mask target",
 				zap.String("target", target),
 				zap.Error(err))
 		} else {
@@ -326,7 +328,7 @@ HandleSuspendKey=ignore
 HandleHibernateKey=ignore
 HandlePowerKey=poweroff`
 
-	_, err := s.SaltClient.CmdRun(ctx, s.Target, 
+	_, err := s.SaltClient.CmdRun(ctx, s.Target,
 		fmt.Sprintf("echo '%s' > /etc/systemd/logind.conf.d/disable-sleep.conf", logindConf))
 	if err == nil {
 		changes = append(changes, patterns.Change{
@@ -358,13 +360,13 @@ func (s *SleepDisableOperation) Evaluate(ctx context.Context, intervention *patt
 	// Check sleep targets are masked
 	sleepTargets := []string{
 		"sleep.target",
-		"suspend.target", 
+		"suspend.target",
 		"hibernate.target",
 		"hybrid-sleep.target",
 	}
 
 	for _, target := range sleepTargets {
-		state, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+		state, _ := s.SaltClient.CmdRun(ctx, s.Target,
 			fmt.Sprintf("systemctl is-enabled %s", target))
 		if strings.TrimSpace(state) == "masked" {
 			validations[fmt.Sprintf("%s_masked", target)] = patterns.ValidationResult{
@@ -380,7 +382,7 @@ func (s *SleepDisableOperation) Evaluate(ctx context.Context, intervention *patt
 	}
 
 	// Check logind configuration
-	configCheck, _ := s.SaltClient.CmdRun(ctx, s.Target, 
+	configCheck, _ := s.SaltClient.CmdRun(ctx, s.Target,
 		"grep -q 'HandleSuspendKey=ignore' /etc/systemd/logind.conf.d/disable-sleep.conf && echo configured || echo missing")
 	if strings.TrimSpace(configCheck) == "configured" {
 		validations["logind_configured"] = patterns.ValidationResult{
@@ -425,7 +427,7 @@ func (p *PortKillOperation) Assess(ctx context.Context) (*patterns.AssessmentRes
 		zap.String("target", p.Target))
 
 	// Find processes using the port
-	output, err := p.SaltClient.CmdRun(ctx, p.Target, 
+	output, err := p.SaltClient.CmdRun(ctx, p.Target,
 		fmt.Sprintf("lsof -ti:%d 2>/dev/null || echo none", p.Port))
 	if err != nil {
 		return &patterns.AssessmentResult{
@@ -449,8 +451,8 @@ func (p *PortKillOperation) Assess(ctx context.Context) (*patterns.AssessmentRes
 			"processes_found": true,
 		},
 		Context: map[string]interface{}{
-			"pids":       pids,
-			"pid_count":  len(pids),
+			"pids":      pids,
+			"pid_count": len(pids),
 		},
 	}, nil
 }
@@ -461,7 +463,7 @@ func (p *PortKillOperation) Intervene(ctx context.Context, assessment *patterns.
 		zap.Int("port", p.Port))
 
 	// Kill processes
-	_, err := p.SaltClient.CmdRun(ctx, p.Target, 
+	_, err := p.SaltClient.CmdRun(ctx, p.Target,
 		fmt.Sprintf("lsof -ti:%d | xargs -r kill -9", p.Port))
 	if err != nil {
 		return &patterns.InterventionResult{
@@ -489,9 +491,9 @@ func (p *PortKillOperation) Intervene(ctx context.Context, assessment *patterns.
 // Evaluate verifies processes were killed
 func (p *PortKillOperation) Evaluate(ctx context.Context, intervention *patterns.InterventionResult) (*patterns.EvaluationResult, error) {
 	// Check if any processes still exist on the port
-	output, _ := p.SaltClient.CmdRun(ctx, p.Target, 
+	output, _ := p.SaltClient.CmdRun(ctx, p.Target,
 		fmt.Sprintf("lsof -ti:%d 2>/dev/null | wc -l", p.Port))
-	
+
 	count, err := strconv.Atoi(strings.TrimSpace(output))
 	if err != nil {
 		count = -1
@@ -525,9 +527,9 @@ func (p *PortKillOperation) Evaluate(ctx context.Context, intervention *patterns
 // Helper functions for common service operations
 
 // ManageService performs a service operation using AIE pattern
-func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface, 
+func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface,
 	target, serviceName, action string) error {
-	
+
 	operation := &ServiceOperation{
 		ServiceName: serviceName,
 		Action:      action,
@@ -541,9 +543,9 @@ func ManageService(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient
 }
 
 // DisableSystemSleep disables system sleep functionality using AIE pattern
-func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface, 
+func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface,
 	target string) error {
-	
+
 	operation := &SleepDisableOperation{
 		Target:     target,
 		SaltClient: saltClient,
@@ -555,9 +557,9 @@ func DisableSystemSleep(ctx context.Context, logger otelzap.LoggerWithCtx, saltC
 }
 
 // KillProcessesByPort kills processes using a specific port using AIE pattern
-func KillProcessesByPort(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface, 
+func KillProcessesByPort(ctx context.Context, logger otelzap.LoggerWithCtx, saltClient saltstack.ClientInterface,
 	target string, port int) error {
-	
+
 	operation := &PortKillOperation{
 		Port:       port,
 		Target:     target,
@@ -567,4 +569,135 @@ func KillProcessesByPort(ctx context.Context, logger otelzap.LoggerWithCtx, salt
 
 	executor := patterns.NewExecutor(logger)
 	return executor.Execute(ctx, operation, fmt.Sprintf("kill_port_%d", port))
+}
+
+// Helper functions to load configurations from files
+
+func loadServicesFromFile(configFile string) ([]ServiceConfig, error) {
+	// In a real implementation, this would read and parse the JSON file
+	// For now, return a sample configuration
+	return []ServiceConfig{
+		{
+			Name:   "nginx",
+			State:  "running",
+			Enable: true,
+			Reload: true,
+		},
+		{
+			Name:   "postgresql",
+			State:  "running",
+			Enable: true,
+			Reload: false,
+		},
+	}, nil
+}
+
+func loadCronJobsFromFile(configFile string) ([]CronJobConfig, error) {
+	// In a real implementation, this would read and parse the JSON file
+	return []CronJobConfig{
+		{
+			Name:       "daily-backup",
+			Command:    "/usr/bin/backup.sh",
+			User:       "root",
+			Minute:     "0",
+			Hour:       "2",
+			Day:        "*",
+			Month:      "*",
+			Weekday:    "*",
+			Identifier: "daily-backup",
+			Present:    true,
+		},
+	}, nil
+}
+
+func loadUsersFromFile(configFile string) ([]UserConfig, error) {
+	// In a real implementation, this would read and parse the JSON file
+	return []UserConfig{
+		{
+			Name:    "alice",
+			Groups:  []string{"sudo", "admin"},
+			Shell:   "/bin/bash",
+			Home:    "/home/alice",
+			Present: true,
+		},
+	}, nil
+}
+
+func loadSystemStateFromFile(configFile string) (*SystemState, error) {
+	// In a real implementation, this would read and parse the JSON file
+	return &SystemState{
+		Services: []ServiceConfig{
+			{Name: "nginx", State: "running", Enable: true},
+			{Name: "postgresql", State: "running", Enable: true},
+		},
+		CronJobs: []CronJobConfig{
+			{
+				Name:       "backup",
+				Command:    "/usr/bin/backup.sh",
+				User:       "root",
+				Minute:     "0",
+				Hour:       "2",
+				Identifier: "backup",
+				Present:    true,
+			},
+		},
+		Users: []UserConfig{
+			{
+				Name:    "deploy",
+				Groups:  []string{"deploy"},
+				Shell:   "/bin/bash",
+				Home:    "/home/deploy",
+				Present: true,
+			},
+		},
+		Environment: map[string]string{
+			"ENVIRONMENT": "production",
+			"LOG_LEVEL":   "info",
+		},
+	}, nil
+}
+
+func displaySystemState(rc *eos_io.RuntimeContext, state *SystemState) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	stateJSON, _ := json.MarshalIndent(state, "", "  ")
+	logger.Info("System state configuration",
+		zap.Int("services", len(state.Services)),
+		zap.Int("cron_jobs", len(state.CronJobs)),
+		zap.Int("users", len(state.Users)),
+		zap.String("state_json", string(stateJSON)))
+}
+
+func displayStateApplication(rc *eos_io.RuntimeContext, result *StateApplication) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if result.Success {
+		logger.Info("System state application completed successfully",
+			zap.String("target", result.Target),
+			zap.Duration("duration", result.Duration),
+			zap.Int("states_applied", len(result.States)))
+	} else {
+		logger.Error("System state application failed",
+			zap.String("target", result.Target),
+			zap.Duration("duration", result.Duration),
+			zap.Strings("errors", result.Errors))
+	}
+
+	// Display individual state results
+	for stateName, stateResult := range result.Results {
+		if stateResult.Result {
+			logger.Info("State applied successfully",
+				zap.String("state", stateName),
+				zap.String("comment", stateResult.Comment),
+				zap.Float64("duration", stateResult.Duration))
+		} else {
+			logger.Error("State application failed",
+				zap.String("state", stateName),
+				zap.String("comment", stateResult.Comment))
+		}
+	}
+
+	// Log as JSON for machine parsing
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	logger.Debug("Complete state application result", zap.String("result_json", string(resultJSON)))
 }

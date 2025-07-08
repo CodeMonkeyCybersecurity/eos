@@ -85,7 +85,7 @@ run_fuzz_test() {
         local elapsed=$((end_time - start_time))
         
         echo "❌ ${test_name} failed - check ${log_file}"
-        echo "🚨 CRASH DETECTED in ${test_name}!" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
+        echo " CRASH DETECTED in ${test_name}!" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
         
         # Extract crash details
         local crash_line=$(grep -n "panic\|FAIL\|fatal error" "${log_file}" | head -1 || echo "Unknown crash")
@@ -186,14 +186,14 @@ EOF
 # Check for crashes
 if [ -f "${LOG_DIR}/crashes_${TIMESTAMP}.log" ]; then
     crash_count=$(wc -l < "${LOG_DIR}/crashes_${TIMESTAMP}.log" 2>/dev/null || echo "0")
-    echo "🚨 CRITICAL: ${crash_count} CRASHES DETECTED!"
+    echo " CRITICAL: ${crash_count} CRASHES DETECTED!"
     echo ""
     echo "Crash Summary:"
     cat "${LOG_DIR}/crashes_${TIMESTAMP}.log"
     echo ""
     
     # Add crashes to report
-    echo -e "\n## 🚨 CRITICAL ISSUES DETECTED\n" >> "${REPORT_FILE}"
+    echo -e "\n##  CRITICAL ISSUES DETECTED\n" >> "${REPORT_FILE}"
     echo "\`\`\`" >> "${REPORT_FILE}"
     cat "${LOG_DIR}/crashes_${TIMESTAMP}.log" >> "${REPORT_FILE}"
     echo "\`\`\`" >> "${REPORT_FILE}"

@@ -81,7 +81,7 @@ run_fuzz_test() {
         local elapsed=$((end_time - start_time))
         
         echo "❌ ${test_name} failed - check ${log_file}"
-        echo "🚨 CRASH DETECTED in ${test_name}!" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
+        echo " CRASH DETECTED in ${test_name}!" | tee -a "${LOG_DIR}/crashes_${TIMESTAMP}.log"
         
         # Extract crash details
         local crash_line=$(grep -n "panic\|FAIL\|fatal error" "${log_file}" | head -1 || echo "Unknown crash")
@@ -291,14 +291,14 @@ EOF
 # Check for crashes and generate alerts
 if [ -f "${LOG_DIR}/crashes_${TIMESTAMP}.log" ]; then
     crash_count=$(wc -l < "${LOG_DIR}/crashes_${TIMESTAMP}.log")
-    echo "🚨 CRITICAL: ${crash_count} CRASHES DETECTED!"
+    echo " CRITICAL: ${crash_count} CRASHES DETECTED!"
     echo ""
     echo "Crash Summary:"
     cat "${LOG_DIR}/crashes_${TIMESTAMP}.log"
     echo ""
     
     # Add crashes to report
-    echo -e "\n## 🚨 CRITICAL ISSUES DETECTED\n" >> "${REPORT_FILE}"
+    echo -e "\n##  CRITICAL ISSUES DETECTED\n" >> "${REPORT_FILE}"
     echo "\`\`\`" >> "${REPORT_FILE}"
     cat "${LOG_DIR}/crashes_${TIMESTAMP}.log" >> "${REPORT_FILE}"
     echo "\`\`\`" >> "${REPORT_FILE}"
@@ -306,13 +306,13 @@ if [ -f "${LOG_DIR}/crashes_${TIMESTAMP}.log" ]; then
     # Send alert if configured
     if [ "${EMAIL_REPORT}" = "true" ] && [ -n "${EMAIL_ADDRESS}" ]; then
         echo "📧 Sending crash alert email..."
-        mail -s "🚨 Eos Fuzz Testing: ${crash_count} Crashes Detected" "${EMAIL_ADDRESS}" < "${REPORT_FILE}"
+        mail -s " Eos Fuzz Testing: ${crash_count} Crashes Detected" "${EMAIL_ADDRESS}" < "${REPORT_FILE}"
     fi
     
     if [ -n "${SLACK_WEBHOOK}" ]; then
         echo "📱 Sending Slack alert..."
         curl -X POST -H 'Content-type: application/json' \
-            --data "{\"text\":\"🚨 Eos Fuzz Testing Alert: ${crash_count} crashes detected in overnight testing session ${TIMESTAMP}\"}" \
+            --data "{\"text\":\" Eos Fuzz Testing Alert: ${crash_count} crashes detected in overnight testing session ${TIMESTAMP}\"}" \
             "${SLACK_WEBHOOK}"
     fi
     

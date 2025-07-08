@@ -1,6 +1,7 @@
 package fileops
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,4 +61,32 @@ func (p *PathOperationsImpl) ExpandPath(path string) string {
 	path = os.ExpandEnv(path)
 
 	return path
+}
+
+// updateFilesInDir recursively scans the specified directory and replaces any occurrence
+// of the provided token with the replacement value. This helper function can be moved to a
+// common utils package if desired.
+func updateFilesInDir(dir, token, replacement string) error {
+	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		// Skip directories
+		if info.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		contents := string(data)
+		if strings.Contains(contents, token) {
+			newContents := strings.ReplaceAll(contents, token, replacement)
+			if err := os.WriteFile(path, []byte(newContents), info.Mode()); err != nil {
+				return err
+			}
+			fmt.Printf("Updated file: %s\n", path)
+		}
+		return nil
+	})
 }

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,8 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/zfs_management"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -40,7 +43,7 @@ type FstabEntry struct {
 
 // ListBlockDevices lists all available block devices with their details
 func ListBlockDevices(rc *eos_io.RuntimeContext) ([]BlockDevice, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.ListBlockDevices")
+	ctx, span := telemetry.Start(rc.Ctx, "ListBlockDevices")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -56,14 +59,14 @@ func ListBlockDevices(rc *eos_io.RuntimeContext) ([]BlockDevice, error) {
 
 	var devices []BlockDevice
 	lines := strings.Split(string(output), "\n")
-	
+
 	// Skip header line
 	for i := 1; i < len(lines); i++ {
 		line := strings.TrimSpace(lines[i])
 		if line == "" {
 			continue
 		}
-		
+
 		fields := strings.Fields(line)
 		if len(fields) >= 6 {
 			device := BlockDevice{
@@ -74,7 +77,7 @@ func ListBlockDevices(rc *eos_io.RuntimeContext) ([]BlockDevice, error) {
 				Mountpoint: fields[4],
 				Size:       fields[5],
 			}
-			
+
 			// Clean up fields that might show "-" for empty values
 			if device.UUID == "-" {
 				device.UUID = ""
@@ -88,7 +91,7 @@ func ListBlockDevices(rc *eos_io.RuntimeContext) ([]BlockDevice, error) {
 			if device.Mountpoint == "-" {
 				device.Mountpoint = ""
 			}
-			
+
 			devices = append(devices, device)
 		}
 	}
@@ -99,7 +102,7 @@ func ListBlockDevices(rc *eos_io.RuntimeContext) ([]BlockDevice, error) {
 
 // GetUUIDsWithBlkid gets UUIDs using blkid command for additional verification
 func GetUUIDsWithBlkid(rc *eos_io.RuntimeContext) (map[string]string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.GetUUIDsWithBlkid")
+	ctx, span := telemetry.Start(rc.Ctx, "GetUUIDsWithBlkid")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -114,24 +117,24 @@ func GetUUIDsWithBlkid(rc *eos_io.RuntimeContext) (map[string]string, error) {
 
 	uuidMap := make(map[string]string)
 	lines := strings.Split(string(output), "\n")
-	
+
 	// Parse blkid output: /dev/sda1: UUID="..." TYPE="..." ...
 	uuidRegex := regexp.MustCompile(`UUID="([^"]+)"`)
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		// Extract device name
 		parts := strings.Split(line, ":")
 		if len(parts) < 2 {
 			continue
 		}
-		
+
 		device := strings.TrimSpace(parts[0])
-		
+
 		// Extract UUID
 		matches := uuidRegex.FindStringSubmatch(line)
 		if len(matches) > 1 {
@@ -145,11 +148,11 @@ func GetUUIDsWithBlkid(rc *eos_io.RuntimeContext) (map[string]string, error) {
 
 // BackupFstab creates a backup of /etc/fstab
 func BackupFstab(rc *eos_io.RuntimeContext) (string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.BackupFstab")
+	ctx, span := telemetry.Start(rc.Ctx, "BackupFstab")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
-	
+
 	backupDir := "/etc/fabric/fstab"
 	if err := os.MkdirAll(backupDir, 0755); err != nil {
 		logger.Error("Failed to create backup directory", zap.Error(err))
@@ -172,7 +175,7 @@ func BackupFstab(rc *eos_io.RuntimeContext) (string, error) {
 
 // AddFstabEntry adds a new entry to /etc/fstab
 func AddFstabEntry(rc *eos_io.RuntimeContext, entry FstabEntry) error {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.AddFstabEntry")
+	ctx, span := telemetry.Start(rc.Ctx, "AddFstabEntry")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -227,7 +230,7 @@ func AddFstabEntry(rc *eos_io.RuntimeContext, entry FstabEntry) error {
 
 // MountAll mounts all filesystems listed in /etc/fstab
 func MountAll(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.MountAll")
+	ctx, span := telemetry.Start(rc.Ctx, "MountAll")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -245,7 +248,7 @@ func MountAll(rc *eos_io.RuntimeContext) error {
 
 // ReloadSystemd reloads systemd daemon after fstab changes
 func ReloadSystemd(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.ReloadSystemd")
+	ctx, span := telemetry.Start(rc.Ctx, "ReloadSystemd")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -263,7 +266,7 @@ func ReloadSystemd(rc *eos_io.RuntimeContext) error {
 
 // GetDiskUsage returns disk usage information
 func GetDiskUsage(rc *eos_io.RuntimeContext) (string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.GetDiskUsage")
+	ctx, span := telemetry.Start(rc.Ctx, "GetDiskUsage")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -281,7 +284,7 @@ func GetDiskUsage(rc *eos_io.RuntimeContext) (string, error) {
 
 // InteractiveFstabManager provides an interactive interface for managing fstab entries
 func InteractiveFstabManager(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "storage.InteractiveFstabManager")
+	ctx, span := telemetry.Start(rc.Ctx, "InteractiveFstabManager")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -399,5 +402,79 @@ func InteractiveFstabManager(rc *eos_io.RuntimeContext) error {
 	}
 
 	logger.Info("Fstab management completed successfully")
+	return nil
+}
+
+func RunUpdateStorage(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	if resizeFilesystem {
+		logger.Info("Starting automatic Ubuntu LVM resize")
+		return AutoResizeUbuntuLVM(rc)
+	}
+
+	if lvPath != "" {
+		logger.Info("Extending logical volume", zap.String("lv_path", lvPath))
+		if err := ExtendLogicalVolume(rc, lvPath); err != nil {
+			return err
+		}
+
+		// If device path is provided, resize the filesystem too
+		if devicePath != "" {
+			logger.Info("Resizing filesystem", zap.String("device_path", devicePath))
+			if fsType == "xfs" && mountpoint != "" {
+				return ResizeXfsFilesystem(rc, mountpoint)
+			} else {
+				return ResizeExt4Filesystem(rc, devicePath)
+			}
+		}
+		return nil
+	}
+
+	if devicePath != "" {
+		logger.Info("Resizing filesystem", zap.String("device_path", devicePath))
+		if fsType == "xfs" && mountpoint != "" {
+			return ResizeXfsFilesystem(rc, mountpoint)
+		} else {
+			return ResizeExt4Filesystem(rc, devicePath)
+		}
+	}
+
+	// Default: show help
+	logger.Info("No specific action specified, showing help")
+	return cmd.Help()
+}
+
+func OutputZFSOperationResult(result *zfs_management.ZFSOperationResult, outputJSON bool) error {
+	if outputJSON {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		return encoder.Encode(result)
+	}
+
+	// Text output
+	fmt.Printf("ZFS Operation: %s\n", result.Operation)
+	fmt.Printf("Target: %s\n", result.Target)
+	fmt.Printf("Timestamp: %s\n", result.Timestamp.Format("2006-01-02 15:04:05"))
+	fmt.Println(strings.Repeat("=", 50))
+
+	if result.Success {
+		fmt.Println("✅ Operation completed successfully!")
+	} else {
+		fmt.Println("❌ Operation failed!")
+	}
+
+	if result.Output != "" {
+		fmt.Printf("\nOutput:\n%s\n", result.Output)
+	}
+
+	if result.Error != "" {
+		fmt.Printf("\nError:\n%s\n", result.Error)
+	}
+
+	if result.DryRun {
+		fmt.Println("\n This was a dry run - no actual changes were made.")
+	}
+
 	return nil
 }

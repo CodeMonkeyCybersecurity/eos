@@ -14,8 +14,8 @@ import (
 
 // CreateGrafanaCmd installs Grafana using Docker
 var CreateGrafanaCmd = &cobra.Command{
-	Use:     "grafana",
-	Short:   "Install Grafana monitoring and visualization platform",
+	Use:   "grafana",
+	Short: "Install Grafana monitoring and visualization platform",
 	Long: `Install Grafana using Docker with comprehensive configuration options.
 
 Grafana is a powerful monitoring and visualization platform that allows you to
@@ -39,7 +39,7 @@ Examples:
 		force, _ := cmd.Flags().GetBool("force")
 		skipHealthCheck, _ := cmd.Flags().GetBool("skip-health-check")
 
-		logger.Info("Installing Grafana", 
+		logger.Info("Installing Grafana",
 			zap.String("version", version),
 			zap.Int("port", port),
 			zap.Bool("interactive", interactive),
@@ -121,7 +121,7 @@ Examples:
 			logger.Error("Grafana installation failed", zap.String("error", result.Error))
 			fmt.Printf("\n❌ Grafana Installation Failed!\n")
 			fmt.Printf("Error: %s\n", result.Error)
-			
+
 			if len(result.Steps) > 0 {
 				fmt.Printf("\nInstallation Steps:\n")
 				for _, step := range result.Steps {

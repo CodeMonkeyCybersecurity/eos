@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -17,7 +17,7 @@ import (
 
 // SaltStackManager handles system management operations via SaltStack
 type SaltStackManager struct {
-	client    *salt.Client
+	client    *saltstack.Client
 	vaultPath string
 	pillars   map[string]interface{}
 }
@@ -134,7 +134,7 @@ func NewSaltStackManager(rc *eos_io.RuntimeContext, config *SaltStackConfig) (*S
 	}
 
 	// Create Salt API client
-	client := salt.NewClient(config.APIURL, config.Username, config.Password)
+	client := saltstack.NewClient(config.APIURL, config.Username, config.Password)
 
 	// Authenticate with Salt API
 	if err := authenticateSaltClient(rc, client); err != nil {
@@ -410,7 +410,7 @@ func retrievePasswordFromVault(rc *eos_io.RuntimeContext, vaultPath string) (str
 	return "", cerr.New("password not found in Vault")
 }
 
-func authenticateSaltClient(rc *eos_io.RuntimeContext, client *salt.Client) error {
+func authenticateSaltClient(rc *eos_io.RuntimeContext, client *saltstack.Client) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Authenticating with Salt API")
 

@@ -37,7 +37,7 @@ func init() {
 func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	secureOutput := security.NewSecureOutput(rc.Ctx)
-	
+
 	logger.Info("Listing custom commands")
 
 	installer := command.NewCommandInstaller(rc)
@@ -63,7 +63,7 @@ func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		commands = eosCommands
 
 		if len(commands) == 0 {
-			secureOutput.Info("No Eos-generated commands found", 
+			secureOutput.Info("No Eos-generated commands found",
 				zap.String("suggestion", "Use --all to see all commands"))
 			return nil
 		}
@@ -73,20 +73,20 @@ func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 	commandNames := make([]string, len(commands))
 	tableHeaders := []string{"Name", "Type", "Path", "Created", "Description"}
 	tableRows := make([][]string, len(commands))
-	
+
 	for i, cmd := range commands {
 		commandNames[i] = cmd.Name
-		
+
 		cmdType := "System command"
 		if cmd.IsEosGenerated {
 			cmdType = "Eos-generated"
 		}
-		
+
 		description := strings.TrimSpace(cmd.Description)
 		if description == "" {
 			description = "(no description)"
 		}
-		
+
 		tableRows[i] = []string{
 			cmd.Name,
 			cmdType,
@@ -102,7 +102,7 @@ func runListCommands(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		"show_all":      showAll,
 		"commands":      commandNames,
 	})
-	
+
 	secureOutput.Table("Custom Commands", tableHeaders, tableRows,
 		zap.Int("total_commands", len(commands)),
 		zap.Bool("show_all", showAll))

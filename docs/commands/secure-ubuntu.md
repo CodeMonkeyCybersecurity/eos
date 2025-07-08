@@ -221,7 +221,7 @@ jenkins ALL=(ALL) NOPASSWD: /usr/bin/docker  # Still works
 $ sudo eos secure ubuntu --enable-mfa
 ⚙️ Starting comprehensive MFA implementation
  Phase 1: Pre-flight checks passed
-🚨 Phase 2: Emergency access configured
+ Phase 2: Emergency access configured
  Phase 3: MFA packages installed
 👥 Phase 4: Users identified (3 sudo users)
 ⚙️ Phase 5: PAM configured safely

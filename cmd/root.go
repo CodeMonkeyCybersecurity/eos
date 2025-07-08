@@ -14,33 +14,18 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 
-	// Subcommands
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/ai"
+	// Subcommands - Core verb-first architecture
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/backup"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/container"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/create"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/crypto"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/database"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/delphi"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/disable"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/enable"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/git"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/hecate"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/inspect"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/manage"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/pandora"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/read" // NOTE: This `read` is a TOP-LEVEL command, not delphi/read
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/refresh"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/secure"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/setup"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/storage"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/sync"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
+
+	// "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi" // TODO: Migrate to verb directories
+	// "github.com/CodeMonkeyCybersecurity/eos/cmd/list"   // TODO: Fix package conflicts
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
-	"github.com/CodeMonkeyCybersecurity/eos/cmd/salt"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/update"
+	// "github.com/CodeMonkeyCybersecurity/eos/cmd/salt" // TODO: Migrate to verb directories
 	// Internal packages
 )
 
@@ -75,34 +60,22 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	// REMOVED: RootCmd.SetHelpFunc. This was the primary cause of generic help.
 	// Cobra's default help generation is hierarchical and contextual.
 
-	// Group subcommands for cleanliness
+	// Group subcommands for cleanliness - Core verb-first architecture
 	for _, subCmd := range []*cobra.Command{
-		ai.AICmd,
-		create.CreateCmd,
-		container.ContainerCmd,
-		crypto.CryptoCmd,
-		database.DatabaseCmd, // Database management
-		read.ReadCmd, // This is the top-level 'read'
-		list.ListCmd,
-		update.UpdateCmd,
-		delete.DeleteCmd,
-		self.SelfCmd,
-		refresh.RefreshCmd,
-		secure.SecureCmd,
-		setup.SetupCmd,
-		disable.DisableCmd,
-		backup.BackupCmd,
-		enable.EnableCmd,
-		storage.StorageCmd,
-		sync.SyncCmd,
-		git.GitCmd, // Git repository management
-		hecate.HecateCmd,
-		delphi.DelphiCmd, // This is the top-level 'delphi'
-		inspect.InspectCmd, // This is the top-level 'inspect'
-		manage.ManageCmd, // System management via SaltStack
-		pandora.PandoraCmd,
+		create.CreateCmd, // ✅ VERB-FIRST ARCHITECTURE
+		read.ReadCmd,     // ✅ VERB-FIRST ARCHITECTURE
+		// list.ListCmd,        // TODO: Fix package conflicts
+		update.UpdateCmd, // ✅ VERB-FIRST ARCHITECTURE
+		delete.DeleteCmd, // ✅ VERB-FIRST ARCHITECTURE
+		self.SelfCmd,     // ✅ SPECIAL CASE (Eos self-management)
+		backup.BackupCmd, // ✅ SPECIAL CASE (Complex nomenclature)
+
+		// TODO: Migrate these to verb directories (Phase 4)
+		// delphi.DelphiCmd,    // TODO: Migrate to verb directories (Phase 4)
+		// salt.SaltCmd,        // TODO: Migrate to verb directories (Phase 4)
+
+		// Legacy commands
 		ragequit.RagequitCmd,
-		salt.SaltCmd, // SaltStack orchestration and management
 	} {
 		RootCmd.AddCommand(subCmd)
 	}

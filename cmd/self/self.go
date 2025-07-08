@@ -11,6 +11,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/self/git"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -94,5 +95,6 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 func init() {
 	SelfCmd.AddCommand(updateCmd)
 	SelfCmd.AddCommand(NewSecretsCmd())
+	SelfCmd.AddCommand(git.GitCmd)
 	// Add SelfCmd to ConfigCmd so 'eos config self' works
 }

@@ -471,3 +471,23 @@ type DiskUsageInfo struct {
 	UsePercent string `json:"use_percent"`
 	MountPoint string `json:"mount_point"`
 }
+
+func outputFormatOpJSON(result *disk_management.FormatOperation) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(result)
+}
+
+func outputFormatOpText(result *disk_management.FormatOperation) error {
+	if result.DryRun {
+		fmt.Printf("[DRY RUN] %s\n", result.Message)
+	} else if result.Success {
+		fmt.Printf("✓ %s\n", result.Message)
+		if result.Duration > 0 {
+			fmt.Printf("  Duration: %v\n", result.Duration)
+		}
+	} else {
+		fmt.Printf("✗ %s\n", result.Message)
+	}
+	return nil
+}

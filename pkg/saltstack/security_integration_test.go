@@ -1,5 +1,5 @@
 // pkg/saltstack/security_integration_test.go - Comprehensive security tests for SaltStack integration
-package saltstack
+package saltstack_test
 
 import (
 	"context"
@@ -27,13 +27,13 @@ func TestClient_StateApply_SecurityValidation(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:   "basic_state_application",
-			target: "minion-01",
-			state:  "apache.install",
-			pillar: nil,
-			expectedCmd: "salt",
+			name:         "basic_state_application",
+			target:       "minion-01",
+			state:        "apache.install",
+			pillar:       nil,
+			expectedCmd:  "salt",
 			expectedArgs: []string{"minion-01", "state.apply", "apache.install"},
-			shouldFail: false,
+			shouldFail:   false,
 		},
 		{
 			name:   "state_with_pillar_data",
@@ -45,7 +45,7 @@ func TestClient_StateApply_SecurityValidation(t *testing.T) {
 				"shell":    "/bin/bash",
 			},
 			expectedCmd: "salt",
-			shouldFail: false,
+			shouldFail:  false,
 		},
 		{
 			name:   "complex_pillar_data",
@@ -65,20 +65,20 @@ func TestClient_StateApply_SecurityValidation(t *testing.T) {
 				"default_policy": "drop",
 			},
 			expectedCmd: "salt",
-			shouldFail: false,
+			shouldFail:  false,
 		},
 		{
-			name:   "empty_target_validation",
-			target: "",
-			state:  "test.state",
-			pillar: nil,
+			name:       "empty_target_validation",
+			target:     "",
+			state:      "test.state",
+			pillar:     nil,
 			shouldFail: false, // Salt should handle empty targets
 		},
 		{
-			name:   "empty_state_validation",
-			target: "minion-01",
-			state:  "",
-			pillar: nil,
+			name:       "empty_state_validation",
+			target:     "minion-01",
+			state:      "",
+			pillar:     nil,
 			shouldFail: false, // Salt should handle empty states
 		},
 	}
@@ -239,7 +239,7 @@ func TestClient_TestPing_ConnectivityValidation(t *testing.T) {
 			if tt.shouldTest {
 				// We expect an error in tests since salt command doesn't exist
 				// but we can verify the function doesn't panic and handles input
-				assert.Error(t, err) // Expected in test environment
+				assert.Error(t, err)       // Expected in test environment
 				assert.False(t, connected) // Expected when command fails
 			}
 		})
@@ -249,11 +249,11 @@ func TestClient_TestPing_ConnectivityValidation(t *testing.T) {
 // TestClient_CmdRun_CommandSecurityValidation tests command execution security
 func TestClient_CmdRun_CommandSecurityValidation(t *testing.T) {
 	tests := []struct {
-		name              string
-		target            string
-		command           string
-		expectValidation  bool
-		securityConcern   string
+		name             string
+		target           string
+		command          string
+		expectValidation bool
+		securityConcern  string
 	}{
 		{
 			name:             "safe_system_command",
@@ -280,37 +280,37 @@ func TestClient_CmdRun_CommandSecurityValidation(t *testing.T) {
 			expectValidation: true,
 		},
 		{
-			name:            "command_with_quotes",
-			target:          "minion-01",
-			command:         "echo 'Hello World'",
+			name:             "command_with_quotes",
+			target:           "minion-01",
+			command:          "echo 'Hello World'",
 			expectValidation: true,
 		},
 		{
-			name:            "command_with_special_chars",
-			target:          "minion-01", 
-			command:         "find /var/log -name '*.log'",
+			name:             "command_with_special_chars",
+			target:           "minion-01",
+			command:          "find /var/log -name '*.log'",
 			expectValidation: true,
 		},
 		{
-			name:            "potentially_dangerous_command",
-			target:          "minion-01",
-			command:         "rm -rf /tmp/testfile",
+			name:             "potentially_dangerous_command",
+			target:           "minion-01",
+			command:          "rm -rf /tmp/testfile",
 			expectValidation: true, // Salt should handle command validation
-			securityConcern: "destructive command",
+			securityConcern:  "destructive command",
 		},
 		{
-			name:            "command_injection_attempt",
-			target:          "minion-01",
-			command:         "ls; rm -rf /",
+			name:             "command_injection_attempt",
+			target:           "minion-01",
+			command:          "ls; rm -rf /",
 			expectValidation: true, // Salt should handle this
-			securityConcern: "command injection",
+			securityConcern:  "command injection",
 		},
 		{
-			name:            "command_substitution",
-			target:          "minion-01",
-			command:         "echo $(whoami)",
+			name:             "command_substitution",
+			target:           "minion-01",
+			command:          "echo $(whoami)",
 			expectValidation: true, // Salt should handle this
-			securityConcern: "command substitution",
+			securityConcern:  "command substitution",
 		},
 	}
 
@@ -325,12 +325,12 @@ func TestClient_CmdRun_CommandSecurityValidation(t *testing.T) {
 			if tt.expectValidation {
 				// In test environment, we expect errors due to missing salt
 				// But the function should not panic or fail validation
-				assert.Error(t, err) // Expected in test
+				assert.Error(t, err)    // Expected in test
 				assert.Empty(t, output) // Expected when command fails
 
 				// Log security concerns for awareness
 				if tt.securityConcern != "" {
-					t.Logf("Security concern noted: %s for command: %s", 
+					t.Logf("Security concern noted: %s for command: %s",
 						tt.securityConcern, tt.command)
 				}
 			}
@@ -475,7 +475,7 @@ func TestClient_ErrorHandling(t *testing.T) {
 	t.Run("context_timeout", func(t *testing.T) {
 		timeoutCtx, cancel := context.WithTimeout(ctx, 1*time.Millisecond)
 		defer cancel()
-		
+
 		time.Sleep(2 * time.Millisecond) // Ensure timeout
 
 		err := client.StateApply(timeoutCtx, "test", "test.state", nil)
@@ -517,11 +517,11 @@ func TestClient_ConcurrentAccess(t *testing.T) {
 					_, err := client.TestPing(ctx, fmt.Sprintf("minion-%d", goroutineID))
 					results <- err
 				case 1:
-					err := client.StateApply(ctx, fmt.Sprintf("group-%d", goroutineID), 
+					err := client.StateApply(ctx, fmt.Sprintf("group-%d", goroutineID),
 						"test.state", map[string]interface{}{"id": goroutineID})
 					results <- err
 				case 2:
-					_, err := client.CmdRun(ctx, fmt.Sprintf("target-%d", goroutineID), 
+					_, err := client.CmdRun(ctx, fmt.Sprintf("target-%d", goroutineID),
 						"echo concurrent test")
 					results <- err
 				}
@@ -542,17 +542,17 @@ func TestNewClient_Initialization(t *testing.T) {
 	t.Run("valid_logger", func(t *testing.T) {
 		logger := otelzap.Ctx(context.Background())
 		client := NewClient(logger)
-		
+
 		assert.NotNil(t, client)
 		assert.NotNil(t, client.logger)
 	})
 
 	t.Run("multiple_clients", func(t *testing.T) {
 		logger := otelzap.Ctx(context.Background())
-		
+
 		client1 := NewClient(logger)
 		client2 := NewClient(logger)
-		
+
 		assert.NotNil(t, client1)
 		assert.NotNil(t, client2)
 		assert.NotEqual(t, client1, client2) // Should be different instances
@@ -569,7 +569,7 @@ func TestClient_InterfaceCompliance(t *testing.T) {
 
 	t.Run("interface_methods_available", func(t *testing.T) {
 		ctx := context.Background()
-		
+
 		// All interface methods should be callable
 		err := client.StateApply(ctx, "test", "test.state", nil)
 		assert.Error(t, err) // Expected in test

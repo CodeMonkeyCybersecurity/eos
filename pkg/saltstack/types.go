@@ -23,12 +23,12 @@ func (c *Config) GetMode() string {
 
 // MinionConfig represents the Salt minion configuration
 type MinionConfig struct {
-	FileClient   string              `yaml:"file_client"`
-	FileRoots    map[string][]string `yaml:"file_roots"`
-	PillarRoots  map[string][]string `yaml:"pillar_roots"`
-	LogLevel     string              `yaml:"log_level"`
-	MasterHost   string              `yaml:"master,omitempty"`
-	MinionID     string              `yaml:"id,omitempty"`
+	FileClient  string              `yaml:"file_client"`
+	FileRoots   map[string][]string `yaml:"file_roots"`
+	PillarRoots map[string][]string `yaml:"pillar_roots"`
+	LogLevel    string              `yaml:"log_level"`
+	MasterHost  string              `yaml:"master,omitempty"`
+	MinionID    string              `yaml:"id,omitempty"`
 }
 
 // InstallStatus represents the current installation status
@@ -49,20 +49,20 @@ const (
 	SaltStatesDir    = "/srv/salt"
 	SaltPillarDir    = "/srv/pillar"
 	EosStatesDir     = "/srv/salt/eos"
-	
+
 	// Repository information - Updated for current Salt Project repositories
 	SaltRepoKey     = "https://repo.saltproject.io/salt/py3/ubuntu/22.04/amd64/SALTSTACK-GPG-KEY.pub"
 	SaltRepoKeyID   = "754A1A7AE731F165D5E6D4BD0E08A149DE57BFBE"
 	SaltRepoBaseURL = "https://repo.saltproject.io/salt/py3/ubuntu"
-	
+
 	// Default configuration values
 	DefaultLogLevel    = "warning"
 	DefaultFileClient  = "local"
 	DefaultMinionID    = "eos-minion"
 	DefaultSaltVersion = "3007.1" // Fallback version - updated periodically
-	
+
 	// Test state content
-	TestStateName = "test"
+	TestStateName    = "test"
 	TestStateContent = `# EOS Salt test state
 eos_test_file:
   file.managed:

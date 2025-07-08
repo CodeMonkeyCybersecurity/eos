@@ -30,9 +30,9 @@ Examples:
 	Args: cobra.MinimumNArgs(1),
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		serviceName := args[0]
-		logger.Info("Deploying infrastructure service", 
+		logger.Info("Deploying infrastructure service",
 			zap.String("service", serviceName))
 
 		switch serviceName {

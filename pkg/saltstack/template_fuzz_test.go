@@ -91,7 +91,7 @@ func FuzzSaltPillarDataValidation(f *testing.F) {
 
 		// Test pillar data validation
 		err := ValidatePillarData(pillarData)
-		
+
 		// Should never panic, even with malicious input
 		if err != nil {
 			// Errors are expected for invalid pillar data
@@ -160,15 +160,15 @@ func ValidatePillarData(data string) error {
 func SanitizeConfigValue(value string) string {
 	// Remove template constructs
 	value = removeTemplateConstructs(value)
-	
+
 	// Remove null bytes
 	value = strings.ReplaceAll(value, "\x00", "")
-	
+
 	// Limit length
 	if len(value) > 1000 {
 		value = value[:1000] + "[TRUNCATED]"
 	}
-	
+
 	return value
 }
 
@@ -180,7 +180,7 @@ func containsTemplateInjection(s string) bool {
 		"os.system", "subprocess", "eval", "exec",
 		"lipsum", "cycler", "range(", "import ",
 	}
-	
+
 	lower := strings.ToLower(s)
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(lower, strings.ToLower(pattern)) {
@@ -195,7 +195,7 @@ func containsDangerousYAML(s string) bool {
 		"!!python/", "!!map", "!!omap", "!!pairs", "!!set",
 		"!!binary", "!!timestamp", "!!null", "!!bool", "!!int", "!!float",
 	}
-	
+
 	for _, pattern := range dangerousPatterns {
 		if strings.Contains(s, pattern) {
 			return true

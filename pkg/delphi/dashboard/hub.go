@@ -21,17 +21,17 @@ type Hub struct {
 	rc       *eos_io.RuntimeContext
 	db       *sql.DB
 	registry *ModuleRegistry
-	
+
 	// Current state
 	currentModule ModuleType
 	width         int
 	height        int
-	
+
 	// UI components
 	help     help.Model
 	keys     hubKeyMap
 	showHelp bool
-	
+
 	// Status
 	lastUpdate time.Time
 	err        error
@@ -145,85 +145,85 @@ func (h *Hub) SwitchToModule(moduleType ModuleType) tea.Cmd {
 	if currentModule, exists := h.registry.Get(h.currentModule); exists {
 		exitCmd = currentModule.OnExit()
 	}
-	
+
 	// Switch to new module
 	h.currentModule = moduleType
-	
+
 	// Enter new module
 	var enterCmd tea.Cmd
 	if newModule, exists := h.registry.Get(h.currentModule); exists {
 		newModule.OnResize(h.width, h.height)
 		enterCmd = newModule.OnEnter()
 	}
-	
+
 	return tea.Batch(exitCmd, enterCmd)
 }
 
 // Init initializes the dashboard hub
 func (h *Hub) Init() tea.Cmd {
 	var cmds []tea.Cmd
-	
+
 	// Initialize all modules
 	for _, module := range h.registry.List() {
 		cmds = append(cmds, module.Init())
 	}
-	
+
 	// Enter the initial module
 	if currentModule, exists := h.registry.Get(h.currentModule); exists {
 		cmds = append(cmds, currentModule.OnEnter())
 	}
-	
+
 	return tea.Batch(cmds...)
 }
 
 // Update handles hub-level events and delegates to modules
 func (h *Hub) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
-	
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		// Handle hub-level navigation
 		switch {
 		case key.Matches(msg, h.keys.Quit):
 			return h, tea.Quit
-			
+
 		case key.Matches(msg, h.keys.Help):
 			h.showHelp = !h.showHelp
-			
+
 		case key.Matches(msg, h.keys.ModulePipeline):
 			cmd := h.SwitchToModule(ModulePipeline)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.ModuleServices):
 			cmd := h.SwitchToModule(ModuleServices)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.ModuleParsers):
 			cmd := h.SwitchToModule(ModuleParsers)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.ModuleAlerts):
 			cmd := h.SwitchToModule(ModuleAlerts)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.ModulePerformance):
 			cmd := h.SwitchToModule(ModulePerformance)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.ModuleOverview):
 			cmd := h.SwitchToModule(ModuleOverview)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.NextModule):
 			nextType := h.registry.NextModule(h.currentModule)
 			cmd := h.SwitchToModule(nextType)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.PrevModule):
 			prevType := h.registry.PrevModule(h.currentModule)
 			cmd := h.SwitchToModule(prevType)
 			return h, cmd
-			
+
 		case key.Matches(msg, h.keys.Refresh):
 			// Refresh all modules
 			for _, module := range h.registry.List() {
@@ -234,27 +234,27 @@ func (h *Hub) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			h.lastUpdate = time.Now()
 			return h, tea.Batch(cmds...)
 		}
-		
+
 	case tea.WindowSizeMsg:
 		h.width = msg.Width
 		h.height = msg.Height
 		h.help.Width = msg.Width
-		
+
 		// Resize all modules
 		for _, module := range h.registry.List() {
 			module.OnResize(msg.Width, msg.Height)
 		}
 	}
-	
+
 	// Delegate to current module
 	if currentModule, exists := h.registry.Get(h.currentModule); exists {
 		updatedModule, moduleCmd := currentModule.Update(msg)
-		
+
 		// Replace the module in registry with updated version
 		h.registry.Register(updatedModule)
 		cmds = append(cmds, moduleCmd)
 	}
-	
+
 	return h, tea.Batch(cmds...)
 }
 
@@ -263,15 +263,15 @@ func (h *Hub) View() string {
 	if h.width == 0 || h.height == 0 {
 		return "Initializing dashboard..."
 	}
-	
+
 	// Show help overlay if requested
 	if h.showHelp {
 		return h.renderHelpView()
 	}
-	
+
 	// Build header with module navigation
 	header := h.renderHeader()
-	
+
 	// Get current module content
 	var content string
 	if currentModule, exists := h.registry.Get(h.currentModule); exists {
@@ -279,25 +279,25 @@ func (h *Hub) View() string {
 	} else {
 		content = h.renderNoModuleView()
 	}
-	
+
 	// Build footer with status and help
 	footer := h.renderFooter()
-	
+
 	// Calculate available height for module content
 	headerHeight := lipgloss.Height(header)
 	footerHeight := lipgloss.Height(footer)
 	contentHeight := h.height - headerHeight - footerHeight
-	
+
 	if contentHeight < 1 {
 		return "Terminal too small"
 	}
-	
+
 	// Ensure content fits in available space
 	contentLines := strings.Split(content, "\n")
 	if len(contentLines) > contentHeight {
 		content = strings.Join(contentLines[:contentHeight], "\n")
 	}
-	
+
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		header,
@@ -313,18 +313,18 @@ func (h *Hub) renderHeader() string {
 		Foreground(lipgloss.Color("#00ffff")).
 		Background(lipgloss.Color("#1a1a2e")).
 		Padding(0, 1)
-		
+
 	selectedTabStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#000000")).
 		Background(lipgloss.Color("#00ffff")).
 		Padding(0, 1)
-		
+
 	inactiveTabStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#666666")).
 		Padding(0, 1)
-	
-	title := titleStyle.Render("🚨 Delphi Dashboard Hub")
-	
+
+	title := titleStyle.Render(" Delphi Dashboard Hub")
+
 	// Build module tabs
 	var tabs []string
 	for _, moduleType := range h.registry.GetOrder() {
@@ -333,20 +333,20 @@ func (h *Hub) renderHeader() string {
 			if moduleType == h.currentModule {
 				style = selectedTabStyle
 			}
-			
+
 			// Add health indicator
 			indicator := "✓"
 			if !module.IsHealthy() {
 				indicator = "✗"
 			}
-			
+
 			tab := fmt.Sprintf(" F%d:%s %s ", int(moduleType)+1, module.Name(), indicator)
 			tabs = append(tabs, style.Render(tab))
 		}
 	}
-	
+
 	navigation := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
-	
+
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		title,
@@ -361,10 +361,10 @@ func (h *Hub) renderFooter() string {
 	status := fmt.Sprintf("Last update: %s | Modules: %d",
 		h.lastUpdate.Format("15:04:05"),
 		h.registry.Count())
-	
+
 	// Help text
 	helpText := h.help.ShortHelpView(h.keys.ShortHelp())
-	
+
 	// Error message if present
 	errorText := ""
 	if h.err != nil {
@@ -373,21 +373,21 @@ func (h *Hub) renderFooter() string {
 			Bold(true)
 		errorText = errorStyle.Render("Error: " + h.err.Error())
 	}
-	
+
 	// Build footer sections
 	sections := []string{status}
 	if errorText != "" {
 		sections = append(sections, errorText)
 	}
 	sections = append(sections, helpText)
-	
+
 	footerContent := lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		sections[0],
 		strings.Repeat(" ", max(0, h.width-totalWidth(sections))),
 		strings.Join(sections[1:], " | "),
 	)
-	
+
 	return lipgloss.JoinVertical(
 		lipgloss.Top,
 		strings.Repeat("─", h.width),
@@ -398,7 +398,7 @@ func (h *Hub) renderFooter() string {
 // renderHelpView shows the help overlay
 func (h *Hub) renderHelpView() string {
 	helpContent := h.help.FullHelpView(h.keys.FullHelp())
-	
+
 	// Add module-specific help if current module exists
 	if currentModule, exists := h.registry.Get(h.currentModule); exists {
 		moduleHelp := h.help.FullHelpView(currentModule.FullHelp())
@@ -410,13 +410,13 @@ func (h *Hub) renderHelpView() string {
 			moduleHelp,
 		)
 	}
-	
+
 	helpStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#3d5a80")).
 		Padding(1).
 		Margin(1)
-	
+
 	return lipgloss.Place(
 		h.width,
 		h.height,
@@ -431,7 +431,7 @@ func (h *Hub) renderNoModuleView() string {
 	noModuleStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("#ffaa00")).
 		Bold(true)
-	
+
 	return lipgloss.Place(
 		h.width,
 		h.height-10,

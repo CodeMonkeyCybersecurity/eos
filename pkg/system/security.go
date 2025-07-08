@@ -3,6 +3,7 @@
 package system
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -32,29 +33,29 @@ const (
 
 // SecurityConfiguration defines comprehensive security settings
 type SecurityConfiguration struct {
-	Profile         SecurityProfile          `json:"profile"`
-	SSHConfig       SSHSecurityConfig        `json:"ssh_config"`
-	TwoFactorAuth   TwoFactorAuthConfig      `json:"two_factor_auth"`
-	UserSecurity    UserSecurityConfig       `json:"user_security"`
-	SystemSecurity  SystemSecurityConfig     `json:"system_security"`
-	FirewallConfig  FirewallConfig           `json:"firewall_config"`
-	AuditConfig     AuditConfig              `json:"audit_config"`
-	EmergencyAccess EmergencyAccessConfig    `json:"emergency_access"`
+	Profile         SecurityProfile       `json:"profile"`
+	SSHConfig       SSHSecurityConfig     `json:"ssh_config"`
+	TwoFactorAuth   TwoFactorAuthConfig   `json:"two_factor_auth"`
+	UserSecurity    UserSecurityConfig    `json:"user_security"`
+	SystemSecurity  SystemSecurityConfig  `json:"system_security"`
+	FirewallConfig  FirewallConfig        `json:"firewall_config"`
+	AuditConfig     AuditConfig           `json:"audit_config"`
+	EmergencyAccess EmergencyAccessConfig `json:"emergency_access"`
 }
 
 // SSHSecurityConfig defines SSH hardening configuration
 type SSHSecurityConfig struct {
-	Port                    int      `json:"port"`
-	PermitRootLogin         bool     `json:"permit_root_login"`
-	PasswordAuthentication  bool     `json:"password_authentication"`
-	PubkeyAuthentication    bool     `json:"pubkey_authentication"`
-	AllowUsers              []string `json:"allow_users"`
-	AllowGroups             []string `json:"allow_groups"`
-	MaxAuthTries            int      `json:"max_auth_tries"`
-	ClientAliveInterval     int      `json:"client_alive_interval"`
-	ClientAliveCountMax     int      `json:"client_alive_count_max"`
-	Protocol                int      `json:"protocol"`
-	HostKeyAlgorithms       []string `json:"host_key_algorithms"`
+	Port                   int      `json:"port"`
+	PermitRootLogin        bool     `json:"permit_root_login"`
+	PasswordAuthentication bool     `json:"password_authentication"`
+	PubkeyAuthentication   bool     `json:"pubkey_authentication"`
+	AllowUsers             []string `json:"allow_users"`
+	AllowGroups            []string `json:"allow_groups"`
+	MaxAuthTries           int      `json:"max_auth_tries"`
+	ClientAliveInterval    int      `json:"client_alive_interval"`
+	ClientAliveCountMax    int      `json:"client_alive_count_max"`
+	Protocol               int      `json:"protocol"`
+	HostKeyAlgorithms      []string `json:"host_key_algorithms"`
 	KexAlgorithms          []string `json:"kex_algorithms"`
 	Ciphers                []string `json:"ciphers"`
 	MACs                   []string `json:"macs"`
@@ -65,31 +66,31 @@ type SSHSecurityConfig struct {
 
 // TwoFactorAuthConfig defines 2FA configuration
 type TwoFactorAuthConfig struct {
-	Enabled         bool     `json:"enabled"`
-	Method          string   `json:"method"`          // totp, u2f, fido2
-	RequiredUsers   []string `json:"required_users"`
-	ExemptUsers     []string `json:"exempt_users"`
-	BackupCodes     bool     `json:"backup_codes"`
-	EnforceSSH      bool     `json:"enforce_ssh"`
-	EnforceSudo     bool     `json:"enforce_sudo"`
-	TOTPSettings    TOTPConfig `json:"totp_settings"`
+	Enabled       bool       `json:"enabled"`
+	Method        string     `json:"method"` // totp, u2f, fido2
+	RequiredUsers []string   `json:"required_users"`
+	ExemptUsers   []string   `json:"exempt_users"`
+	BackupCodes   bool       `json:"backup_codes"`
+	EnforceSSH    bool       `json:"enforce_ssh"`
+	EnforceSudo   bool       `json:"enforce_sudo"`
+	TOTPSettings  TOTPConfig `json:"totp_settings"`
 }
 
 // TOTPConfig defines TOTP-specific settings
 type TOTPConfig struct {
-	Issuer      string `json:"issuer"`
-	WindowSize  int    `json:"window_size"`
-	SecretBits  int    `json:"secret_bits"`
-	RateLimit   int    `json:"rate_limit"`
+	Issuer     string `json:"issuer"`
+	WindowSize int    `json:"window_size"`
+	SecretBits int    `json:"secret_bits"`
+	RateLimit  int    `json:"rate_limit"`
 }
 
 // UserSecurityConfig defines user account security settings
 type UserSecurityConfig struct {
-	PasswordPolicy      PasswordPolicy    `json:"password_policy"`
-	AccountLockout      AccountLockout    `json:"account_lockout"`
-	SessionTimeout      int               `json:"session_timeout"`
-	SudoConfiguration   SudoConfig        `json:"sudo_configuration"`
-	LoginRestrictions   LoginRestrictions `json:"login_restrictions"`
+	PasswordPolicy    PasswordPolicy    `json:"password_policy"`
+	AccountLockout    AccountLockout    `json:"account_lockout"`
+	SessionTimeout    int               `json:"session_timeout"`
+	SudoConfiguration SudoConfig        `json:"sudo_configuration"`
+	LoginRestrictions LoginRestrictions `json:"login_restrictions"`
 }
 
 // PasswordPolicy defines password requirements
@@ -106,10 +107,10 @@ type PasswordPolicy struct {
 
 // AccountLockout defines account lockout settings
 type AccountLockout struct {
-	Enabled        bool `json:"enabled"`
-	MaxAttempts    int  `json:"max_attempts"`
-	LockoutTime    int  `json:"lockout_time"`
-	ResetTime      int  `json:"reset_time"`
+	Enabled     bool `json:"enabled"`
+	MaxAttempts int  `json:"max_attempts"`
+	LockoutTime int  `json:"lockout_time"`
+	ResetTime   int  `json:"reset_time"`
 }
 
 // SudoConfig defines sudo access configuration
@@ -123,10 +124,10 @@ type SudoConfig struct {
 
 // LoginRestrictions defines login access restrictions
 type LoginRestrictions struct {
-	AllowedTimes    []string `json:"allowed_times"`
-	AllowedSources  []string `json:"allowed_sources"`
-	DeniedUsers     []string `json:"denied_users"`
-	MaxSessions     int      `json:"max_sessions"`
+	AllowedTimes   []string `json:"allowed_times"`
+	AllowedSources []string `json:"allowed_sources"`
+	DeniedUsers    []string `json:"denied_users"`
+	MaxSessions    int      `json:"max_sessions"`
 }
 
 // SystemSecurityConfig defines system-level security settings
@@ -139,27 +140,27 @@ type SystemSecurityConfig struct {
 
 // KernelHardening defines kernel security parameters
 type KernelHardening struct {
-	DisableUnusedModules   []string          `json:"disable_unused_modules"`
-	SysctlParameters       map[string]string `json:"sysctl_parameters"`
-	KernelParameters       []string          `json:"kernel_parameters"`
-	EnableKASLR           bool              `json:"enable_kaslr"`
-	EnableSMEP            bool              `json:"enable_smep"`
-	EnableSMAP            bool              `json:"enable_smap"`
+	DisableUnusedModules []string          `json:"disable_unused_modules"`
+	SysctlParameters     map[string]string `json:"sysctl_parameters"`
+	KernelParameters     []string          `json:"kernel_parameters"`
+	EnableKASLR          bool              `json:"enable_kaslr"`
+	EnableSMEP           bool              `json:"enable_smep"`
+	EnableSMAP           bool              `json:"enable_smap"`
 }
 
 // FileSystemSecurity defines filesystem security settings
 type FileSystemSecurity struct {
-	MountOptions     map[string][]string `json:"mount_options"`
-	FilePermissions  map[string]string   `json:"file_permissions"`
-	DirectoryPermissions map[string]string `json:"directory_permissions"`
-	ImmutableFiles   []string            `json:"immutable_files"`
-	NoExecMounts     []string            `json:"noexec_mounts"`
+	MountOptions         map[string][]string `json:"mount_options"`
+	FilePermissions      map[string]string   `json:"file_permissions"`
+	DirectoryPermissions map[string]string   `json:"directory_permissions"`
+	ImmutableFiles       []string            `json:"immutable_files"`
+	NoExecMounts         []string            `json:"noexec_mounts"`
 }
 
 // NetworkSecurity defines network security settings
 type NetworkSecurity struct {
-	DisableProtocols []string          `json:"disable_protocols"`
-	IPTables         IPTablesConfig    `json:"iptables"`
+	DisableProtocols  []string          `json:"disable_protocols"`
+	IPTables          IPTablesConfig    `json:"iptables"`
 	NetworkParameters map[string]string `json:"network_parameters"`
 }
 
@@ -184,8 +185,8 @@ type FirewallConfig struct {
 
 // FirewallRule defines a single firewall rule
 type FirewallRule struct {
-	Action      string `json:"action"`     // ACCEPT, DROP, REJECT
-	Protocol    string `json:"protocol"`   // tcp, udp, icmp
+	Action      string `json:"action"`   // ACCEPT, DROP, REJECT
+	Protocol    string `json:"protocol"` // tcp, udp, icmp
 	Port        string `json:"port"`
 	Source      string `json:"source"`
 	Destination string `json:"destination"`
@@ -195,58 +196,58 @@ type FirewallRule struct {
 
 // AuditConfig defines system auditing configuration
 type AuditConfig struct {
-	Enabled       bool     `json:"enabled"`
-	Rules         []string `json:"rules"`
-	LogRotation   int      `json:"log_rotation"`
-	MaxLogSize    string   `json:"max_log_size"`
-	ActionOnFull  string   `json:"action_on_full"`
+	Enabled        bool     `json:"enabled"`
+	Rules          []string `json:"rules"`
+	LogRotation    int      `json:"log_rotation"`
+	MaxLogSize     string   `json:"max_log_size"`
+	ActionOnFull   string   `json:"action_on_full"`
 	MonitoredPaths []string `json:"monitored_paths"`
 }
 
 // EmergencyAccessConfig defines emergency access methods
 type EmergencyAccessConfig struct {
-	DropbearSSH    DropbearConfig `json:"dropbear_ssh"`
-	SerialConsole  bool           `json:"serial_console"`
-	RecoveryKeys   []string       `json:"recovery_keys"`
-	BackupAccess   BackupAccess   `json:"backup_access"`
+	DropbearSSH   DropbearConfig `json:"dropbear_ssh"`
+	SerialConsole bool           `json:"serial_console"`
+	RecoveryKeys  []string       `json:"recovery_keys"`
+	BackupAccess  BackupAccess   `json:"backup_access"`
 }
 
 // DropbearConfig defines Dropbear SSH configuration for emergency access
 type DropbearConfig struct {
-	Enabled     bool     `json:"enabled"`
-	Port        int      `json:"port"`
+	Enabled        bool     `json:"enabled"`
+	Port           int      `json:"port"`
 	AuthorizedKeys []string `json:"authorized_keys"`
-	Banner      string   `json:"banner"`
+	Banner         string   `json:"banner"`
 }
 
 // BackupAccess defines backup access methods
 type BackupAccess struct {
-	LocalUser     string `json:"local_user"`
-	SSHKey        string `json:"ssh_key"`
-	VaultPath     string `json:"vault_path"`
+	LocalUser string `json:"local_user"`
+	SSHKey    string `json:"ssh_key"`
+	VaultPath string `json:"vault_path"`
 }
 
 // SecurityAssessment represents security posture assessment
 type SecurityAssessment struct {
-	Target           string                 `json:"target"`
-	Profile          SecurityProfile        `json:"profile"`
-	ComplianceScore  float64               `json:"compliance_score"`
-	Vulnerabilities  []SecurityVulnerability `json:"vulnerabilities"`
-	Recommendations  []SecurityRecommendation `json:"recommendations"`
-	CurrentConfig    map[string]interface{} `json:"current_config"`
-	RequiredChanges  []SecurityChange       `json:"required_changes"`
-	RiskLevel        string                 `json:"risk_level"`
-	Timestamp        time.Time              `json:"timestamp"`
+	Target          string                   `json:"target"`
+	Profile         SecurityProfile          `json:"profile"`
+	ComplianceScore float64                  `json:"compliance_score"`
+	Vulnerabilities []SecurityVulnerability  `json:"vulnerabilities"`
+	Recommendations []SecurityRecommendation `json:"recommendations"`
+	CurrentConfig   map[string]interface{}   `json:"current_config"`
+	RequiredChanges []SecurityChange         `json:"required_changes"`
+	RiskLevel       string                   `json:"risk_level"`
+	Timestamp       time.Time                `json:"timestamp"`
 }
 
 // SecurityVulnerability represents a security issue
 type SecurityVulnerability struct {
-	ID          string    `json:"id"`
-	Severity    string    `json:"severity"`
-	Description string    `json:"description"`
-	Component   string    `json:"component"`
-	Remediation string    `json:"remediation"`
-	CVE         string    `json:"cve,omitempty"`
+	ID          string `json:"id"`
+	Severity    string `json:"severity"`
+	Description string `json:"description"`
+	Component   string `json:"component"`
+	Remediation string `json:"remediation"`
+	CVE         string `json:"cve,omitempty"`
 }
 
 // SecurityRecommendation represents a security improvement
@@ -260,11 +261,11 @@ type SecurityRecommendation struct {
 
 // SecurityChange represents a required security configuration change
 type SecurityChange struct {
-	Component   string      `json:"component"`
-	Setting     string      `json:"setting"`
-	CurrentValue interface{} `json:"current_value"`
+	Component     string      `json:"component"`
+	Setting       string      `json:"setting"`
+	CurrentValue  interface{} `json:"current_value"`
 	RequiredValue interface{} `json:"required_value"`
-	Reason      string      `json:"reason"`
+	Reason        string      `json:"reason"`
 }
 
 // NewSecurityHardeningManager creates a new security hardening manager
@@ -278,7 +279,7 @@ func NewSecurityHardeningManager(saltManager *SaltStackManager, vaultPath string
 // HardenSystem applies comprehensive security hardening following assessment→intervention→evaluation
 func (s *SecurityHardeningManager) HardenSystem(rc *eos_io.RuntimeContext, target string, config *SecurityConfiguration) (*SecurityAssessment, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting system security hardening", 
+	logger.Info("Starting system security hardening",
 		zap.String("target", target),
 		zap.String("profile", string(config.Profile)))
 
@@ -590,7 +591,7 @@ func (s *SecurityHardeningManager) applyFirewallConfig(rc *eos_io.RuntimeContext
 
 func (s *SecurityHardeningManager) generateTwoFactorSLS(config *TwoFactorAuthConfig) string {
 	var sls strings.Builder
-	
+
 	sls.WriteString(`
 # Two-Factor Authentication Configuration
 google_authenticator:
@@ -612,7 +613,7 @@ pam_oath_config:
 
 func (s *SecurityHardeningManager) generateSSHHardeningSLS(config *SSHSecurityConfig) string {
 	var sls strings.Builder
-	
+
 	sls.WriteString(fmt.Sprintf(`
 # SSH Hardening Configuration
 sshd_config:
@@ -636,15 +637,15 @@ sshd_service:
     - reload: True
     - watch:
       - file: sshd_config
-`, config.Port, config.PermitRootLogin, config.PasswordAuthentication, 
-   config.PubkeyAuthentication, config.MaxAuthTries))
+`, config.Port, config.PermitRootLogin, config.PasswordAuthentication,
+		config.PubkeyAuthentication, config.MaxAuthTries))
 
 	return sls.String()
 }
 
 func (s *SecurityHardeningManager) generateUserSecuritySLS(config *UserSecurityConfig) string {
 	var sls strings.Builder
-	
+
 	sls.WriteString(`
 # User Security Configuration
 password_policy:
@@ -667,7 +668,7 @@ login_defs:
 
 func (s *SecurityHardeningManager) generateSystemSecuritySLS(config *SystemSecurityConfig) string {
 	var sls strings.Builder
-	
+
 	sls.WriteString(`
 # System Security Configuration
 sysctl_security:
@@ -688,7 +689,7 @@ kernel_modules_blacklist:
 
 func (s *SecurityHardeningManager) generateFirewallSLS(config *FirewallConfig) string {
 	var sls strings.Builder
-	
+
 	sls.WriteString(`
 # Firewall Configuration
 ufw_package:
@@ -765,7 +766,7 @@ dropbear_service:
 func (s *SecurityHardeningManager) calculateComplianceScore(assessment *SecurityAssessment) float64 {
 	// Calculate compliance score based on vulnerabilities and recommendations
 	baseScore := 100.0
-	
+
 	for _, vuln := range assessment.Vulnerabilities {
 		switch vuln.Severity {
 		case "critical":
@@ -801,7 +802,7 @@ func (s *SecurityHardeningManager) determineRiskLevel(score float64) string {
 
 func (s *SecurityHardeningManager) verifyCriticalSecurity(rc *eos_io.RuntimeContext, target string, config *SecurityConfiguration) error {
 	// Verify critical security measures are in place
-	
+
 	// Check SSH configuration
 	result, err := s.saltManager.client.RunCommand(target, "grains", "service.status", []interface{}{"ssh"}, nil)
 	if err != nil {
@@ -817,4 +818,135 @@ func (s *SecurityHardeningManager) verifyCriticalSecurity(rc *eos_io.RuntimeCont
 	_ = result // Process result to verify firewall is active
 
 	return nil
+}
+
+func generateSecurityConfig(profile SecurityProfile) *SecurityConfiguration {
+	config := &SecurityConfiguration{
+		Profile: profile,
+	}
+
+	// Configure based on security profile
+	switch profile {
+	case SecurityProfileBaseline:
+		config.SSHConfig = SSHSecurityConfig{
+			Port:                   22,
+			PermitRootLogin:        false,
+			PasswordAuthentication: true,
+			PubkeyAuthentication:   true,
+			MaxAuthTries:           3,
+			Protocol:               2,
+		}
+
+	case SecurityProfileIntermediate:
+		config.SSHConfig = SSHSecurityConfig{
+			Port:                   2222,
+			PermitRootLogin:        false,
+			PasswordAuthentication: false,
+			PubkeyAuthentication:   true,
+			MaxAuthTries:           3,
+			Protocol:               2,
+			AllowTcpForwarding:     false,
+			X11Forwarding:          false,
+		}
+
+	case SecurityProfileAdvanced:
+		config.SSHConfig = SSHSecurityConfig{
+			Port:                   2222,
+			PermitRootLogin:        false,
+			PasswordAuthentication: false,
+			PubkeyAuthentication:   true,
+			MaxAuthTries:           2,
+			Protocol:               2,
+			AllowTcpForwarding:     false,
+			X11Forwarding:          false,
+			HostKeyAlgorithms:      []string{"ssh-ed25519", "ecdsa-sha2-nistp256"},
+			KexAlgorithms:          []string{"curve25519-sha256", "diffie-hellman-group16-sha512"},
+			Ciphers:                []string{"chacha20-poly1305@openssh.com", "aes256-gcm@openssh.com"},
+			MACs:                   []string{"hmac-sha2-256-etm@openssh.com", "hmac-sha2-512-etm@openssh.com"},
+		}
+
+	case SecurityProfileCompliance:
+		config.SSHConfig = SSHSecurityConfig{
+			Port:                   2222,
+			PermitRootLogin:        false,
+			PasswordAuthentication: false,
+			PubkeyAuthentication:   true,
+			MaxAuthTries:           2,
+			Protocol:               2,
+			AllowTcpForwarding:     false,
+			X11Forwarding:          false,
+			ClientAliveInterval:    300,
+			ClientAliveCountMax:    2,
+			HostKeyAlgorithms:      []string{"ssh-ed25519"},
+			KexAlgorithms:          []string{"curve25519-sha256"},
+			Ciphers:                []string{"chacha20-poly1305@openssh.com"},
+			MACs:                   []string{"hmac-sha2-256-etm@openssh.com"},
+		}
+
+		// Enable audit logging for compliance
+		config.AuditConfig = AuditConfig{
+			Enabled:      true,
+			LogRotation:  7,
+			MaxLogSize:   "100M",
+			ActionOnFull: "rotate",
+			MonitoredPaths: []string{
+				"/etc/passwd", "/etc/shadow", "/etc/group",
+				"/etc/ssh/sshd_config", "/etc/sudoers",
+			},
+		}
+	}
+
+	// Common firewall rules
+	config.FirewallConfig = FirewallConfig{
+		DefaultPolicy: "deny",
+		Rules: []FirewallRule{
+			{Action: "allow", Protocol: "tcp", Port: fmt.Sprintf("%d", config.SSHConfig.Port), Source: "any", Comment: "SSH access"},
+			{Action: "allow", Protocol: "tcp", Port: "80", Source: "any", Comment: "HTTP"},
+			{Action: "allow", Protocol: "tcp", Port: "443", Source: "any", Comment: "HTTPS"},
+		},
+	}
+
+	return config
+}
+
+func displaySecurityAssessment(rc *eos_io.RuntimeContext, assessment *SecurityAssessment) {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	logger.Info("Security Assessment Results",
+		zap.String("target", assessment.Target),
+		zap.String("profile", string(assessment.Profile)),
+		zap.Float64("compliance_score", assessment.ComplianceScore),
+		zap.String("risk_level", assessment.RiskLevel))
+
+	if len(assessment.Vulnerabilities) > 0 {
+		logger.Info("Vulnerabilities Found",
+			zap.Int("count", len(assessment.Vulnerabilities)))
+
+		for _, vuln := range assessment.Vulnerabilities {
+			logger.Warn("Vulnerability",
+				zap.String("id", vuln.ID),
+				zap.String("severity", vuln.Severity),
+				zap.String("component", vuln.Component),
+				zap.String("description", vuln.Description),
+				zap.String("remediation", vuln.Remediation))
+		}
+	}
+
+	if len(assessment.Recommendations) > 0 {
+		logger.Info("Security Recommendations",
+			zap.Int("count", len(assessment.Recommendations)))
+
+		for _, rec := range assessment.Recommendations {
+			logger.Info("Recommendation",
+				zap.String("priority", rec.Priority),
+				zap.String("category", rec.Category),
+				zap.String("description", rec.Description),
+				zap.String("action", rec.Action),
+				zap.String("impact", rec.Impact))
+		}
+	}
+
+	// Log as JSON for machine parsing
+	assessmentJSON, _ := json.MarshalIndent(assessment, "", "  ")
+	logger.Debug("Complete security assessment", zap.String("assessment_json", string(assessmentJSON)))
 }

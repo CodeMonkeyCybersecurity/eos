@@ -325,7 +325,7 @@ run_enhanced_fuzz_test() {
         # Save crash details
         if grep -q "failing input" "${log_file}"; then
             echo "  - 🐛 **${test_function}**: CRASH DETECTED - see ${log_file}" >> "${REPORT_FILE}"
-            echo -e "   🚨 ${RED}CRASH DETECTED - Potential security issue!${NC}"
+            echo -e "    ${RED}CRASH DETECTED - Potential security issue!${NC}"
         fi
         
         return 1

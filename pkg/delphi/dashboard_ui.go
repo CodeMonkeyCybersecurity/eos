@@ -339,7 +339,7 @@ func (m DashboardModel) renderHeader() string {
 		tabs = append(tabs, style.Render(" "+v.String()+" "))
 	}
 
-	title := titleStyle.Render("🚨 Delphi Pipeline Monitor")
+	title := titleStyle.Render(" Delphi Pipeline Monitor")
 	navigation := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
 
 	return lipgloss.JoinVertical(

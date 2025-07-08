@@ -295,8 +295,8 @@ generate_report() {
 ```bash
 # Security-specific alerting
 if (( crashes > 0 )); then
-    log_error "🚨 SECURITY ALERT: $test_name found $crashes crashes!"
-    echo "  - 🚨 **SECURITY ALERT**: $crashes crashes detected" >> "$REPORT_FILE"
+    log_error " SECURITY ALERT: $test_name found $crashes crashes!"
+    echo "  -  **SECURITY ALERT**: $crashes crashes detected" >> "$REPORT_FILE"
 fi
 ```
 

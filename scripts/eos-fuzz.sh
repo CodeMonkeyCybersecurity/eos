@@ -357,8 +357,8 @@ EOF
         
         # Security alert for crashes
         if (( crashes > 0 )); then
-            log_error "🚨 SECURITY ALERT: $test_name found $crashes potential crashes!"
-            echo "  - 🚨 **SECURITY ALERT**: $crashes potential crashes detected" >> "$REPORT_FILE"
+            log_error " SECURITY ALERT: $test_name found $crashes potential crashes!"
+            echo "  -  **SECURITY ALERT**: $crashes potential crashes detected" >> "$REPORT_FILE"
         fi
     fi
     
@@ -542,7 +542,7 @@ EOF
     # Add security recommendations
     if (( total_crashes > 0 )); then
         cat >> "$REPORT_FILE" << EOF
-🚨 **IMMEDIATE ACTION REQUIRED**
+ **IMMEDIATE ACTION REQUIRED**
 - $total_crashes potential security issues detected
 - Review crash logs in ${SESSION_DIR}/*/
 - Investigate failing inputs for exploitability

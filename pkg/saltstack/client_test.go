@@ -28,10 +28,10 @@ func TestClient_StateApply_ArgumentValidation(t *testing.T) {
 	ctx := context.Background()
 
 	tests := []struct {
-		name     string
-		target   string
-		state    string
-		pillar   map[string]interface{}
+		name       string
+		target     string
+		state      string
+		pillar     map[string]interface{}
 		shouldSkip bool // Skip execution due to missing salt
 	}{
 		{
@@ -44,24 +44,24 @@ func TestClient_StateApply_ArgumentValidation(t *testing.T) {
 			shouldSkip: true, // Will skip due to missing salt command
 		},
 		{
-			name:   "empty target",
-			target: "",
-			state:  "test.state",
-			pillar: nil,
+			name:       "empty target",
+			target:     "",
+			state:      "test.state",
+			pillar:     nil,
 			shouldSkip: true,
 		},
 		{
-			name:   "empty state",
-			target: "test-minion",
-			state:  "",
-			pillar: nil,
+			name:       "empty state",
+			target:     "test-minion",
+			state:      "",
+			pillar:     nil,
 			shouldSkip: true,
 		},
 		{
-			name:   "nil pillar",
-			target: "test-minion",
-			state:  "test.state",
-			pillar: nil,
+			name:       "nil pillar",
+			target:     "test-minion",
+			state:      "test.state",
+			pillar:     nil,
 			shouldSkip: true,
 		},
 		{
@@ -70,7 +70,7 @@ func TestClient_StateApply_ArgumentValidation(t *testing.T) {
 			state:  "test.state",
 			pillar: map[string]interface{}{
 				"nested": map[string]interface{}{
-					"key": "value",
+					"key":  "value",
 					"list": []string{"item1", "item2"},
 				},
 				"simple": "value",
@@ -84,7 +84,7 @@ func TestClient_StateApply_ArgumentValidation(t *testing.T) {
 			if tt.shouldSkip {
 				t.Skip("Skipping test - requires salt command to be available")
 			}
-			
+
 			err := client.StateApply(ctx, tt.target, tt.state, tt.pillar)
 			// In a real environment with salt, we would check for specific error conditions
 			// For testing without salt, we expect an error
@@ -125,7 +125,7 @@ func TestClient_TestPing_ArgumentValidation(t *testing.T) {
 			if tt.shouldSkip {
 				t.Skip("Skipping test - requires salt command to be available")
 			}
-			
+
 			connected, err := client.TestPing(ctx, tt.target)
 			assert.Error(t, err, "Expected error when salt command is not available")
 			assert.False(t, connected, "Should not be connected when salt is unavailable")
@@ -175,7 +175,7 @@ func TestClient_GrainGet_ArgumentValidation(t *testing.T) {
 			if tt.shouldSkip {
 				t.Skip("Skipping test - requires salt command to be available")
 			}
-			
+
 			result, err := client.GrainGet(ctx, tt.target, tt.grain)
 			assert.Error(t, err, "Expected error when salt command is not available")
 			assert.Nil(t, result, "Should return nil result when salt is unavailable")
@@ -225,7 +225,7 @@ func TestClient_CmdRun_ArgumentValidation(t *testing.T) {
 			if tt.shouldSkip {
 				t.Skip("Skipping test - requires salt command to be available")
 			}
-			
+
 			output, err := client.CmdRun(ctx, tt.target, tt.command)
 			assert.Error(t, err, "Expected error when salt command is not available")
 			assert.Empty(t, output, "Should return empty output when salt is unavailable")
@@ -265,7 +265,7 @@ func TestClient_CheckMinion_ArgumentValidation(t *testing.T) {
 			if tt.shouldSkip {
 				t.Skip("Skipping test - requires salt command to be available")
 			}
-			
+
 			available, err := client.CheckMinion(ctx, tt.minion)
 			assert.Error(t, err, "Expected error when salt command is not available")
 			assert.False(t, available, "Should not show minion as available when salt is unavailable")
@@ -420,8 +420,8 @@ func TestHashiCorpManager_ConfigurationValidation(t *testing.T) {
 	t.Run("vault status check interface", func(t *testing.T) {
 		t.Skip("Skipping - requires salt environment")
 		status, err := manager.CheckVaultStatus(ctx, "test-target")
-		assert.Error(t, err)   // Expected due to no salt
-		assert.Nil(t, status)  // Expected due to error
+		assert.Error(t, err)  // Expected due to no salt
+		assert.Nil(t, status) // Expected due to error
 	})
 }
 

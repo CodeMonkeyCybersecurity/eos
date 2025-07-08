@@ -25,7 +25,7 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 
 	logger.Info("Salt installation completed successfully!")
 	logger.Info("Salt is now ready for use by other Eos commands")
-	
+
 	if !config.MasterMode {
 		logger.Info("Salt is configured for masterless operation")
 		logger.Info("Test with: salt-call --local test.ping")

@@ -1,4 +1,4 @@
-// Package saltstack provides integration with Salt Stack for secure infrastructure management
+// package saltstack provides integration with Salt Stack for secure infrastructure management
 package saltstack
 
 import (
@@ -31,8 +31,8 @@ func (m *HashiCorpManager) DeployVault(ctx context.Context, target string, confi
 
 	pillar := map[string]interface{}{
 		"vault": map[string]interface{}{
-			"version":     config.Version,
-			"bind_addr":   config.BindAddress,
+			"version":      config.Version,
+			"bind_addr":    config.BindAddress,
 			"cluster_addr": config.ClusterAddress,
 			"tls": map[string]interface{}{
 				"cert_file": config.TLSCertFile,
@@ -54,17 +54,17 @@ func (m *HashiCorpManager) DeployConsul(ctx context.Context, target string, conf
 
 	pillar := map[string]interface{}{
 		"consul": map[string]interface{}{
-			"version":       config.Version,
-			"datacenter":    config.Datacenter,
-			"server":        config.Server,
-			"bootstrap":     config.Bootstrap,
-			"bind_addr":     config.BindAddress,
-			"client_addr":   config.ClientAddress,
-			"encrypt":       config.EncryptKey,
-			"ca_file":       config.CAFile,
-			"cert_file":     config.CertFile,
-			"key_file":      config.KeyFile,
-			"retry_join":    config.RetryJoin,
+			"version":     config.Version,
+			"datacenter":  config.Datacenter,
+			"server":      config.Server,
+			"bootstrap":   config.Bootstrap,
+			"bind_addr":   config.BindAddress,
+			"client_addr": config.ClientAddress,
+			"encrypt":     config.EncryptKey,
+			"ca_file":     config.CAFile,
+			"cert_file":   config.CertFile,
+			"key_file":    config.KeyFile,
+			"retry_join":  config.RetryJoin,
 		},
 	}
 
@@ -79,16 +79,16 @@ func (m *HashiCorpManager) DeployNomad(ctx context.Context, target string, confi
 
 	pillar := map[string]interface{}{
 		"nomad": map[string]interface{}{
-			"version":      config.Version,
-			"datacenter":   config.Datacenter,
-			"region":       config.Region,
-			"server":       config.Server,
-			"client":       config.Client,
-			"bind_addr":    config.BindAddress,
-			"advertise":    config.AdvertiseAddress,
-			"consul_addr":  config.ConsulAddress,
-			"vault_addr":   config.VaultAddress,
-			"vault_token":  config.VaultToken,
+			"version":     config.Version,
+			"datacenter":  config.Datacenter,
+			"region":      config.Region,
+			"server":      config.Server,
+			"client":      config.Client,
+			"bind_addr":   config.BindAddress,
+			"advertise":   config.AdvertiseAddress,
+			"consul_addr": config.ConsulAddress,
+			"vault_addr":  config.VaultAddress,
+			"vault_token": config.VaultToken,
 			"tls": map[string]interface{}{
 				"ca_file":   config.TLSCAFile,
 				"cert_file": config.TLSCertFile,

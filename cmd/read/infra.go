@@ -275,3 +275,4 @@ func runInspectInfra(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 
 	return nil
 }
+

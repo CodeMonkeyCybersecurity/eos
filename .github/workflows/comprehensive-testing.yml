@@ -128,7 +128,7 @@ jobs:
     - name: Check for security violations
       run: |
         if grep -r "SECURITY VIOLATION\|CRASH DETECTED" /tmp/eos-comprehensive-fuzz/ 2>/dev/null; then
-          echo "🚨 Security violations detected!"
+          echo " Security violations detected!"
           grep -r "SECURITY VIOLATION\|CRASH DETECTED" /tmp/eos-comprehensive-fuzz/ || true
           exit 1
         fi
@@ -369,7 +369,7 @@ jobs:
         
         # Check for security violations across all artifacts
         if find . -name "*.md" -exec grep -l "SECURITY VIOLATION\|CRASH DETECTED" {} \; | head -1; then
-          echo "🚨 **SECURITY ISSUES DETECTED**" >> security_report.md
+          echo " **SECURITY ISSUES DETECTED**" >> security_report.md
           echo "" >> security_report.md
           find . -name "*.md" -exec grep -H "SECURITY VIOLATION\|CRASH DETECTED" {} \; >> security_report.md
         else
@@ -456,7 +456,7 @@ jobs:
           github.rest.issues.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            title: `🚨 Nightly Security Fuzzing Failed - ${new Date().toISOString().split('T')[0]}`,
+            title: ` Nightly Security Fuzzing Failed - ${new Date().toISOString().split('T')[0]}`,
             body: `Nightly comprehensive security fuzzing has detected potential issues.
             
             **Run Details:**
