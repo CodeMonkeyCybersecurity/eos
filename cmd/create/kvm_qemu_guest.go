@@ -62,8 +62,8 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ QEMU Guest Agent Installation Complete!\n\n")
-			fmt.Printf("🖥️ Service Details:\n")
+			fmt.Printf("\nQEMU Guest Agent Installation Complete!\n\n")
+			fmt.Printf(" Service Details:\n")
 			fmt.Printf("   Method: %s\n", result.Method)
 			fmt.Printf("   Duration: %s\n", result.Duration)
 

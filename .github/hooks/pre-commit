@@ -50,7 +50,7 @@ fi
 CHANGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.go$' || true)
 
 if [ -z "$CHANGED_GO_FILES" ]; then
-    print_color $YELLOW "\n⚠️  No Go files changed, skipping coverage check"
+    print_color $YELLOW "\nNo Go files changed, skipping coverage check"
     exit 0
 fi
 
@@ -67,7 +67,7 @@ for file in $CHANGED_GO_FILES; do
 done
 
 if [ -z "$PACKAGES_TO_TEST" ]; then
-    print_color $YELLOW "\n⚠️  No testable packages changed"
+    print_color $YELLOW "\nNo testable packages changed"
     exit 0
 fi
 
@@ -122,7 +122,7 @@ fi
 # 7. Check for debugging artifacts
 print_color $BLUE "\n Checking for debugging artifacts..."
 if git diff --cached --name-only | xargs grep -l "fmt\.Print\|debug\|TODO\|FIXME\|XXX" 2>/dev/null; then
-    print_color $YELLOW "⚠️  Found potential debugging artifacts:"
+    print_color $YELLOW "Found potential debugging artifacts:"
     git diff --cached --name-only | xargs grep -n "fmt\.Print\|debug\|TODO\|FIXME\|XXX" 2>/dev/null || true
     print_color $YELLOW " Review these before committing"
 fi

@@ -2,6 +2,7 @@
 package update
 
 import (
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/domain/sysinfo"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
@@ -12,7 +13,7 @@ var UpdateHostnameCmd = &cobra.Command{
 	Short: "Update the system hostname",
 	Long:  `Update the system hostname by modifying /etc/hostname and /etc/hosts.`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return UpdateHostname(rc)
+		return sysinfo.UpdateHostname(rc)
 	}),
 }
 

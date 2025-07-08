@@ -24,7 +24,7 @@ preflight_check() {
     
     # Check for go.mod file as indicator of project root
     if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
-        echo -e "${GREEN}✅ Already in EOS project root${NC}"
+        echo -e "${GREEN}Already in EOS project root${NC}"
         return 0
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
@@ -37,7 +37,7 @@ preflight_check() {
         echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
-        echo -e "${YELLOW}📋 To run this script correctly:${NC}"
+        echo -e "${YELLOW}To run this script correctly:${NC}"
         echo ""
         echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
         echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
@@ -57,7 +57,7 @@ preflight_check() {
 
 # Verify required tools are available
 verify_tools() {
-    echo -e "${CYAN}🔧 Verifying required tools...${NC}"
+    echo -e "${CYAN}Verifying required tools...${NC}"
     
     local missing_tools=()
     
@@ -80,7 +80,7 @@ verify_tools() {
         echo -e "${RED}❌ ERROR: Required tools are missing${NC}"
         echo -e "${RED}Missing: ${missing_tools[*]}${NC}"
         echo ""
-        echo -e "${YELLOW}📋 Installation instructions:${NC}"
+        echo -e "${YELLOW}Installation instructions:${NC}"
         echo ""
         if [[ " ${missing_tools[@]} " =~ " go " ]]; then
             echo -e "  ${CYAN}Install Go:${NC}"
@@ -100,12 +100,12 @@ verify_tools() {
         exit 1
     fi
     
-    echo -e "${GREEN}✅ All required tools are available${NC}"
+    echo -e "${GREEN}All required tools are available${NC}"
 }
 
 # Verify test files exist
 verify_test_files() {
-    echo -e "${CYAN}📦 Verifying test files exist...${NC}"
+    echo -e "${CYAN}Verifying test files exist...${NC}"
     
     local missing_packages=()
     
@@ -134,7 +134,7 @@ verify_test_files() {
     if ! find pkg -name "*fuzz*.go" -type f | grep -q .; then
         echo -e "${RED}❌ ERROR: No fuzz test files found${NC}"
         echo ""
-        echo -e "${YELLOW}📋 This could mean:${NC}"
+        echo -e "${YELLOW}This could mean:${NC}"
         echo -e "  1. You're not in the EOS project root"
         echo -e "  2. The repository is incomplete"
         echo ""
@@ -144,7 +144,7 @@ verify_test_files() {
         exit 1
     fi
     
-    echo -e "${GREEN}✅ Test files verified${NC}"
+    echo -e "${GREEN}Test files verified${NC}"
 }
 
 # Run all preflight checks
@@ -158,7 +158,7 @@ run_preflight_checks() {
     verify_test_files
     
     echo ""
-    echo -e "${GREEN}✅ All preflight checks passed!${NC}"
+    echo -e "${GREEN}All preflight checks passed!${NC}"
     echo ""
 }
 
@@ -184,7 +184,7 @@ echo -e "🔄 Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
 echo -e "🎯 Security focus: ${YELLOW}${SECURITY_FOCUS}${NC}"
 echo -e "🏗️  Architecture testing: ${YELLOW}${ARCHITECTURE_TESTING}${NC}"
 echo -e "🌪️  Chaos mode: ${YELLOW}${CHAOS_MODE}${NC}"
-echo -e "📁 Logs: ${YELLOW}${LOG_DIR}${NC}"
+echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
 echo ""
 
 # Create log directory
@@ -258,7 +258,7 @@ discover_enhanced_fuzz_tests() {
         "FuzzDatabaseOperations::./pkg/database_management"
     )
     
-    echo -e "${GREEN}📋 Test Discovery Complete:${NC}"
+    echo -e "${GREEN}Test Discovery Complete:${NC}"
     echo -e "   🔒 Security tests: ${#SECURITY_TESTS[@]}"
     echo -e "   🏗️  Architecture tests: ${#ARCHITECTURE_TESTS[@]}"
     echo -e "   🧩 Component tests: ${#COMPONENT_TESTS[@]}"
@@ -281,9 +281,9 @@ run_enhanced_fuzz_test() {
     mkdir -p "$corpus_dir"
     
     echo -e "${PURPLE}🚀 Running ${test_function} (${category})${NC}"
-    echo -e "   📦 Package: ${test_package}"
+    echo -e "   Package: ${test_package}"
     echo -e "   ⏱️  Duration: ${duration}"
-    echo -e "   📁 Corpus: ${corpus_dir}"
+    echo -e "    Corpus: ${corpus_dir}"
     
     # Set environment for enhanced fuzzing
     export GOFUZZ_CORPUS_DIR="$corpus_dir"
@@ -299,10 +299,10 @@ run_enhanced_fuzz_test() {
         local executions=$(grep -o 'execs: [0-9]*' "${log_file}" | tail -1 | grep -o '[0-9]*' || echo "0")
         local corpus_size=$(find "$corpus_dir" -type f 2>/dev/null | wc -l || echo "0")
         
-        echo -e "   ✅ ${GREEN}SUCCESS${NC} - ${inputs} inputs, ${executions} executions, ${corpus_size} corpus files"
+        echo -e "   ${GREEN}SUCCESS${NC} - ${inputs} inputs, ${executions} executions, ${corpus_size} corpus files"
         
         # Update report
-        echo "- ✅ **${test_function}** (${category}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s, corpus: ${corpus_size}" >> "${REPORT_FILE}"
+        echo "- **${test_function}** (${category}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s, corpus: ${corpus_size}" >> "${REPORT_FILE}"
         
         # Check for interesting findings
         if [ "$inputs" -gt 0 ]; then
@@ -548,7 +548,7 @@ EOF
     # Add recommendations based on results
     if [ $failed_tests -gt 0 ]; then
         cat >> "${REPORT_FILE}" << EOF
-⚠️ **${failed_tests} tests failed** - Review crash logs for potential security vulnerabilities:
+**${failed_tests} tests failed** - Review crash logs for potential security vulnerabilities:
 - Check ${LOG_DIR}/security/ for security-critical failures
 - Check ${LOG_DIR}/architecture/ for workflow issues
 - Investigate any crashes or panics immediately
@@ -558,7 +558,7 @@ EOF
     
     if [ $passed_tests -eq $total_tests ]; then
         cat >> "${REPORT_FILE}" << EOF
-✅ **All tests passed** - Consider:
+**All tests passed** - Consider:
 - Increasing fuzz duration for deeper testing
 - Adding new test cases based on recent code changes
 - Running overnight fuzzing for extended coverage
@@ -571,17 +571,17 @@ EOF
     echo "=================================="
     echo -e "📈 Tests: ${total_tests} total, ${GREEN}${passed_tests} passed${NC}, ${RED}${failed_tests} failed${NC}"
     echo -e "📄 Report: ${YELLOW}${REPORT_FILE}${NC}"
-    echo -e "📁 Logs: ${YELLOW}${LOG_DIR}${NC}"
+    echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
     echo -e "🌐 Coverage: ${YELLOW}${LOG_DIR}/coverage.html${NC}"
     
     if [ $failed_tests -gt 0 ]; then
         echo ""
-        echo -e "${RED}⚠️  SECURITY ALERT: ${failed_tests} test(s) failed${NC}"
+        echo -e "${RED}SECURITY ALERT: ${failed_tests} test(s) failed${NC}"
         echo -e "🔍 Immediate investigation required"
         exit 1
     else
         echo ""
-        echo -e "${GREEN}✅ All comprehensive fuzz tests passed!${NC}"
+        echo -e "${GREEN}All comprehensive fuzz tests passed!${NC}"
         echo -e "🚀 System appears robust against fuzzing attacks"
     fi
     

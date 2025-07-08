@@ -177,7 +177,7 @@ func (m *Manager) ensurePrerequisites(ctx context.Context, mgr *Manager) error {
 func (m *Manager) setupVaultSecrets(ctx context.Context, mgr *Manager) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🔑 Setting up Vault secrets")
+	logger.Info("Setting up Vault secrets")
 
 	// Generate secure passwords
 	dbPassword := m.generateSecurePassword(32)

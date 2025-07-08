@@ -183,7 +183,7 @@ func outputTextResult(result *security_permissions.PermissionFixResult, dryRun b
 	fmt.Println(strings.Repeat("=", 50))
 
 	for category, scanResult := range result.Results {
-		fmt.Printf("\n📁 %s (%d files checked)\n", strings.ToUpper(category), scanResult.TotalChecks)
+		fmt.Printf("\n %s (%d files checked)\n", strings.ToUpper(category), scanResult.TotalChecks)
 
 		for _, check := range scanResult.Checks {
 			if check.Error != "" {

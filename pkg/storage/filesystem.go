@@ -459,7 +459,7 @@ func OutputZFSOperationResult(result *zfs_management.ZFSOperationResult, outputJ
 	fmt.Println(strings.Repeat("=", 50))
 
 	if result.Success {
-		fmt.Println("✅ Operation completed successfully!")
+		fmt.Println("Operation completed successfully!")
 	} else {
 		fmt.Println("❌ Operation failed!")
 	}

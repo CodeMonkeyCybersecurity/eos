@@ -538,3 +538,4 @@ func (d *UserDeletionOperation) Evaluate(ctx context.Context, intervention *patt
 		Validations: validations,
 	}, nil
 }
+

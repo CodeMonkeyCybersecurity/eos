@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -87,11 +88,11 @@ func outputDiskListTable(result *disk_management.DiskListResult) error {
 
 		fmt.Printf("%-12s %-15s %-10s %-15s %-15s %s\n",
 			disk.Device,
-			truncateString(disk.Name, 15),
+			utils.TruncateString(disk.Name, 15),
 			disk.SizeHuman,
-			truncateString(disk.Vendor, 15),
-			truncateString(disk.Model, 15),
-			truncateString(mountPoints, 25))
+			utils.TruncateString(disk.Vendor, 15),
+			utils.TruncateString(disk.Model, 15),
+			utils.TruncateString(mountPoints, 25))
 	}
 
 	return nil

@@ -227,9 +227,10 @@ func RunCreateUser(ctx context.Context, opts CreateUserOptions) error {
 		}
 	}
 
-	if err := CreateSSHKeys(ctx, username); err != nil {
-		return err
-	}
+	// TODO: SSH key creation is now handled through pkg/ssh package
+	// if err := CreateSSHKeys(ctx, username); err != nil {
+	// 	return err
+	// }
 
 	fmt.Println(" User created:", username)
 	fmt.Println(" Password:", password)

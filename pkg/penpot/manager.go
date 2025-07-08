@@ -397,7 +397,7 @@ func (m *Manager) UpdateDeployment(ctx context.Context) error {
 func (m *Manager) DeleteDeployment(ctx context.Context, force bool) error {
 	logger := otelzap.Ctx(ctx)
 
-	logger.Info("🗑️ Deleting Penpot deployment",
+	logger.Info("Deleting Penpot deployment",
 		zap.String("namespace", m.config.Namespace),
 		zap.Bool("force", force))
 

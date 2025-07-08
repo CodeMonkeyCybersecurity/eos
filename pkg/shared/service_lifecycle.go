@@ -189,7 +189,7 @@ func (slm *ServiceLifecycleManager) executeRemovalPlan(ctx context.Context, plan
 
 	// Step 3: Remove unit file if it exists
 	if plan.RequiresRemoval {
-		logger.Info("🗑️  Step 3: Removing unit file",
+		logger.Info(" Step 3: Removing unit file",
 			zap.String("service", plan.ServiceName))
 
 		if err := slm.removeUnitFile(ctx, plan.ServiceName); err != nil {

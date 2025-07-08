@@ -349,8 +349,8 @@ EOF
     
     # Report results
     if (( exit_code == 0 )); then
-        log_info "✅ $test_name completed: ${inputs} inputs, ${executions} execs, ${elapsed}s"
-        echo "- ✅ **$test_name** ($test_category): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "$REPORT_FILE"
+        log_info "$test_name completed: ${inputs} inputs, ${executions} execs, ${elapsed}s"
+        echo "- **$test_name** ($test_category): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "$REPORT_FILE"
     else
         log_warn "❌ $test_name failed: exit $exit_code, ${crashes} crashes, ${elapsed}s"
         echo "- ❌ **$test_name** ($test_category): FAILED - exit $exit_code, ${crashes} crashes, ${elapsed}s" >> "$REPORT_FILE"
@@ -553,7 +553,7 @@ EOF
     
     if (( total_failed > 0 && total_crashes == 0 )); then
         cat >> "$REPORT_FILE" << EOF
-⚠️ **INVESTIGATION RECOMMENDED**
+**INVESTIGATION RECOMMENDED**
 - $total_failed tests failed without crashes
 - Review logs for configuration or logic issues
 - Consider increasing test duration or resources
@@ -563,7 +563,7 @@ EOF
     
     if (( total_tests > 0 && total_failed == 0 )); then
         cat >> "$REPORT_FILE" << EOF
-✅ **GOOD SECURITY POSTURE**
+**GOOD SECURITY POSTURE**
 - All fuzz tests passed successfully
 - Consider increasing test duration for deeper coverage
 - Regular fuzzing schedule recommended
@@ -694,7 +694,7 @@ EOF
     log_info "Logs: $SESSION_DIR"
     
     if (( overall_exit_code == 0 )); then
-        log_info "✅ All fuzz tests completed successfully"
+        log_info "All fuzz tests completed successfully"
     else
         log_error "❌ Some fuzz tests failed - review logs and report"
     fi

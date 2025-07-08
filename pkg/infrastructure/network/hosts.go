@@ -9,20 +9,21 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
 // TailscalePeer represents a peer in the Tailscale network
 type TailscalePeer struct {
-	HostName     string `json:"HostName"`
-	DNSName      string `json:"DNSName"`
-	TailAddr     string `json:"TailAddr"`
-	ID           string `json:"ID"`
-	UserID       string `json:"UserID"`
-	Online       bool   `json:"Online"`
-	ExitNode     bool   `json:"ExitNode"`
-	ExitNodeOption bool `json:"ExitNodeOption"`
+	HostName       string `json:"HostName"`
+	DNSName        string `json:"DNSName"`
+	TailAddr       string `json:"TailAddr"`
+	ID             string `json:"ID"`
+	UserID         string `json:"UserID"`
+	Online         bool   `json:"Online"`
+	ExitNode       bool   `json:"ExitNode"`
+	ExitNodeOption bool   `json:"ExitNodeOption"`
 }
 
 // TailscaleNetworkStatus represents the full Tailscale network status
@@ -40,20 +41,20 @@ type TailscaleNetworkStatus struct {
 // HostsConfig represents configuration for hosts file generation
 type HostsConfig struct {
 	OutputFile      string   `json:"output_file"`
-	Format          string   `json:"format"`         // yaml, json, conf, hosts
+	Format          string   `json:"format"` // yaml, json, conf, hosts
 	ExcludeOffline  bool     `json:"exclude_offline"`
 	ExcludeSelf     bool     `json:"exclude_self"`
 	IncludeComments bool     `json:"include_comments"`
-	FilterHosts     []string `json:"filter_hosts"`   // Only include these hosts
+	FilterHosts     []string `json:"filter_hosts"` // Only include these hosts
 }
 
 // GenerateTailscaleHostsConfig generates a hosts configuration file from Tailscale status
 func GenerateTailscaleHostsConfig(rc *eos_io.RuntimeContext, config *HostsConfig) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.GenerateTailscaleHostsConfig")
+	ctx, span := telemetry.Start(rc.Ctx, "GenerateTailscaleHostsConfig")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
-	logger.Info("Generating Tailscale hosts configuration", 
+	logger.Info("Generating Tailscale hosts configuration",
 		zap.String("output_file", config.OutputFile),
 		zap.String("format", config.Format))
 
@@ -95,7 +96,7 @@ func GenerateTailscaleHostsConfig(rc *eos_io.RuntimeContext, config *HostsConfig
 		return fmt.Errorf("failed to write hosts file: %w", err)
 	}
 
-	logger.Info("Tailscale hosts configuration generated successfully", 
+	logger.Info("Tailscale hosts configuration generated successfully",
 		zap.String("file", config.OutputFile),
 		zap.Int("peer_count", len(peers)))
 
@@ -104,7 +105,7 @@ func GenerateTailscaleHostsConfig(rc *eos_io.RuntimeContext, config *HostsConfig
 
 // getTailscaleNetworkStatus retrieves the current Tailscale network status
 func getTailscaleNetworkStatus(rc *eos_io.RuntimeContext) (*TailscaleNetworkStatus, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "network.getTailscaleNetworkStatus")
+	ctx, span := telemetry.Start(rc.Ctx, "getTailscaleNetworkStatus")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -128,7 +129,7 @@ func getTailscaleNetworkStatus(rc *eos_io.RuntimeContext) (*TailscaleNetworkStat
 		return nil, fmt.Errorf("failed to parse Tailscale status: %w", err)
 	}
 
-	logger.Info("Tailscale status retrieved", 
+	logger.Info("Tailscale status retrieved",
 		zap.String("backend_state", status.BackendState),
 		zap.Int("peer_count", len(status.Peer)),
 		zap.String("self_hostname", status.Self.HostName))
@@ -159,8 +160,8 @@ func filterPeers(status *TailscaleNetworkStatus, config *HostsConfig) []Tailscal
 		if len(config.FilterHosts) > 0 {
 			found := false
 			for _, filterHost := range config.FilterHosts {
-				if strings.Contains(peer.HostName, filterHost) || 
-				   strings.Contains(peer.DNSName, filterHost) {
+				if strings.Contains(peer.HostName, filterHost) ||
+					strings.Contains(peer.DNSName, filterHost) {
 					found = true
 					break
 				}
@@ -288,7 +289,7 @@ func generateHostsFileFormat(peers []TailscalePeer, config *HostsConfig) string 
 
 // DisplayTailscaleStatus displays the current Tailscale network status
 func DisplayTailscaleStatus(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.DisplayTailscaleStatus")
+	ctx, span := telemetry.Start(rc.Ctx, "DisplayTailscaleStatus")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -304,7 +305,7 @@ func DisplayTailscaleStatus(rc *eos_io.RuntimeContext) error {
 	logger.Info("Version", zap.String("version", status.Version))
 	logger.Info("Backend State", zap.String("state", status.BackendState))
 	logger.Info("TUN Interface", zap.Bool("enabled", status.TUN))
-	
+
 	if len(status.TailscaleIPs) > 0 {
 		logger.Info("Tailscale IPs", zap.Strings("ips", status.TailscaleIPs))
 	}
@@ -336,7 +337,7 @@ func DisplayTailscaleStatus(rc *eos_io.RuntimeContext) error {
 
 // GetTailscaleHostsForAnsible generates an Ansible inventory from Tailscale peers
 func GetTailscaleHostsForAnsible(rc *eos_io.RuntimeContext, outputFile string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.GetTailscaleHostsForAnsible")
+	ctx, span := telemetry.Start(rc.Ctx, "GetTailscaleHostsForAnsible")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -369,5 +370,52 @@ func GetTailscaleHostsForAnsible(rc *eos_io.RuntimeContext, outputFile string) e
 	}
 
 	logger.Info("Ansible inventory generated", zap.String("file", outputFile))
+	return nil
+}
+
+var (
+	hostsOutputFile      string
+	hostsFormat          string
+	hostsExcludeOffline  bool
+	hostsExcludeSelf     bool
+	hostsIncludeComments bool
+	hostsFilterHosts     []string
+	generateAnsible      bool
+)
+
+
+func RunCreateTailscaleHosts(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Generating Tailscale hosts configuration")
+
+	// Handle Ansible inventory generation
+	if generateAnsible {
+		outputFile := hostsOutputFile
+		if outputFile == "" {
+			outputFile = "/tmp/tailscale_inventory.ini"
+		}
+		return GetTailscaleHostsForAnsible(rc, outputFile)
+	}
+
+	// Create configuration
+	config := &HostsConfig{
+		OutputFile:      hostsOutputFile,
+		Format:          hostsFormat,
+		ExcludeOffline:  hostsExcludeOffline,
+		ExcludeSelf:     hostsExcludeSelf,
+		IncludeComments: hostsIncludeComments,
+		FilterHosts:     hostsFilterHosts,
+	}
+
+	// Generate hosts configuration
+	if err := GenerateTailscaleHostsConfig(rc, config); err != nil {
+		logger.Error("Failed to generate Tailscale hosts configuration", zap.Error(err))
+		return err
+	}
+
+	logger.Info("Tailscale hosts configuration generated successfully",
+		zap.String("output_file", config.OutputFile),
+		zap.String("format", config.Format))
+
 	return nil
 }

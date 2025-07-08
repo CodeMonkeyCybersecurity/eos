@@ -264,7 +264,7 @@ func displayVaultOrchestrationResult(rc *eos_io.RuntimeContext, result *orchestr
 	fmt.Printf("Mode: %s\n", result.Mode)
 	fmt.Printf("Status: ")
 	if result.Success {
-		fmt.Printf("✅ SUCCESS\n")
+		fmt.Printf("SUCCESS\n")
 	} else {
 		fmt.Printf("❌ FAILED\n")
 	}

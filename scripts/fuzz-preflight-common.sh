@@ -24,7 +24,7 @@ eos_fuzz_preflight_check() {
     
     # Check for go.mod file as indicator of project root
     if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
-        echo -e "${GREEN}✅ Already in EOS project root${NC}"
+        echo -e "${GREEN}Already in EOS project root${NC}"
         return 0
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
@@ -37,7 +37,7 @@ eos_fuzz_preflight_check() {
         echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
-        echo -e "${YELLOW}📋 To run this script correctly:${NC}"
+        echo -e "${YELLOW}To run this script correctly:${NC}"
         echo ""
         echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
         echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
@@ -60,7 +60,7 @@ eos_fuzz_preflight_check() {
 
 # Verify required tools are available
 eos_fuzz_verify_tools() {
-    echo -e "${CYAN}🔧 Verifying required tools...${NC}"
+    echo -e "${CYAN}Verifying required tools...${NC}"
     
     local missing_tools=()
     
@@ -83,7 +83,7 @@ eos_fuzz_verify_tools() {
         echo -e "${RED}❌ ERROR: Required tools are missing${NC}"
         echo -e "${RED}Missing: ${missing_tools[*]}${NC}"
         echo ""
-        echo -e "${YELLOW}📋 Installation instructions:${NC}"
+        echo -e "${YELLOW}Installation instructions:${NC}"
         echo ""
         if [[ " ${missing_tools[@]} " =~ " go " ]]; then
             echo -e "  ${CYAN}Install Go:${NC}"
@@ -104,12 +104,12 @@ eos_fuzz_verify_tools() {
         exit 1
     fi
     
-    echo -e "${GREEN}✅ All required tools are available${NC}"
+    echo -e "${GREEN}All required tools are available${NC}"
 }
 
 # Verify test files exist
 eos_fuzz_verify_test_files() {
-    echo -e "${CYAN}📦 Verifying test files exist...${NC}"
+    echo -e "${CYAN}Verifying test files exist...${NC}"
     
     local missing_packages=()
     
@@ -139,7 +139,7 @@ eos_fuzz_verify_test_files() {
     if ! find pkg -name "*fuzz*.go" -type f 2>/dev/null | grep -q .; then
         echo -e "${RED}❌ ERROR: No fuzz test files found${NC}"
         echo ""
-        echo -e "${YELLOW}📋 This could mean:${NC}"
+        echo -e "${YELLOW}This could mean:${NC}"
         echo -e "  1. You're not in the EOS project root"
         echo -e "  2. The repository is incomplete"
         echo -e "  3. Fuzz tests haven't been written yet"
@@ -151,7 +151,7 @@ eos_fuzz_verify_test_files() {
         exit 1
     fi
     
-    echo -e "${GREEN}✅ Test files verified${NC}"
+    echo -e "${GREEN}Test files verified${NC}"
 }
 
 # Run all preflight checks
@@ -168,7 +168,7 @@ eos_run_preflight_checks() {
     eos_fuzz_verify_test_files
     
     echo ""
-    echo -e "${GREEN}✅ All preflight checks passed!${NC}"
+    echo -e "${GREEN}All preflight checks passed!${NC}"
     echo -e "${GREEN}📂 Working directory: $(pwd)${NC}"
     echo ""
 }

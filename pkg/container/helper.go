@@ -7,10 +7,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	cerr "github.com/cockroachdb/errors"
 )
 
 // DeployCompose performs the following actions:
@@ -82,4 +86,112 @@ func DeployCompose(rc *eos_io.RuntimeContext) error {
 
 	fmt.Println("Docker compose is now up and running in the new directory.")
 	return nil
+}
+
+func GenerateServiceDeployment(serviceName, deploymentType, image, configFile string) (*system.ServiceDeployment, error) {
+	deployment := &system.ServiceDeployment{
+		Name: serviceName,
+		Type: deploymentType,
+		Resources: system.ResourceRequirements{
+			CPU:    500,  // 500 MHz
+			Memory: 512,  // 512 MB
+			Disk:   1024, // 1 GB
+		},
+		HealthChecks: []system.HealthCheck{
+			{
+				Type:     "http",
+				Endpoint: "/health",
+				Port:     8080,
+				Interval: 30 * time.Second,
+				Timeout:  5 * time.Second,
+				Retries:  3,
+			},
+		},
+		UpdateStrategy: system.UpdateStrategy{
+			Type:            "rolling",
+			MaxUnavailable:  1,
+			MaxSurge:        1,
+			ProgressTimeout: 5 * time.Minute,
+			RollbackOnError: true,
+		},
+	}
+
+	switch deploymentType {
+	case "nomad":
+		deployment.JobSpec = &system.NomadJobSpec{
+			ID:          serviceName,
+			Name:        serviceName,
+			Type:        "service",
+			Region:      "global",
+			Datacenters: []string{"dc1"},
+			Groups: []system.TaskGroup{
+				{
+					Name:  serviceName,
+					Count: 1,
+					Tasks: []system.Task{
+						{
+							Name:   serviceName,
+							Driver: "docker",
+							Config: map[string]interface{}{
+								"image": image,
+								"ports": []string{"http"},
+							},
+							Resources: system.Resources{
+								CPU:    500,
+								Memory: 512,
+								Ports: map[string]int{
+									"http": 8080,
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+	case "docker":
+		deployment.DockerConfig = &system.DockerServiceConfig{
+			Image: extractImageName(image),
+			Tag:   extractImageTag(image),
+			Ports: []system.PortMapping{
+				{
+					HostPort:      8080,
+					ContainerPort: 8080,
+					Protocol:      "tcp",
+				},
+			},
+			RestartPolicy: "unless-stopped",
+		}
+
+	case "systemd":
+		deployment.SystemdConfig = &system.SystemdServiceConfig{
+			ExecStart: fmt.Sprintf("/usr/bin/%s", serviceName),
+			User:      serviceName,
+			Group:     serviceName,
+			Type:      "simple",
+			Restart:   "always",
+			WantedBy:  []string{"multi-user.target"},
+		}
+
+	default:
+		return nil, cerr.New(fmt.Sprintf("unsupported deployment type: %s", deploymentType))
+	}
+
+	return deployment, nil
+}
+
+func extractImageName(image string) string {
+	// Extract image name from full image string (e.g., "nginx:1.20" -> "nginx")
+	if idx := strings.LastIndex(image, ":"); idx != -1 {
+		return image[:idx]
+	}
+	return image
+}
+
+func extractImageTag(image string) string {
+	// Extract tag from full image string (e.g., "nginx:1.20" -> "1.20")
+	if idx := strings.LastIndex(image, ":"); idx != -1 {
+		return image[idx+1:]
+	}
+	return "latest"
 }

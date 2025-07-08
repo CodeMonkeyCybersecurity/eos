@@ -2,11 +2,7 @@
 package read
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -53,34 +49,18 @@ Target Types:
 		// Parse flags
 		targetType, _ := cmd.Flags().GetString("target-type")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
-		outputJSON, _ := cmd.Flags().GetBool("json")
-		verbose, _ := cmd.Flags().GetBool("verbose")
+		_, _ = cmd.Flags().GetBool("json")
+		_, _ = cmd.Flags().GetBool("verbose")
 
 		logger.Info("Starting Salt minion ping",
 			zap.String("target", target),
 			zap.String("target_type", targetType),
 			zap.Duration("timeout", timeout))
 
-		// Create Salt client
-		saltClient := saltstack.NewSaltClient()
-
-		// Create context with timeout
-		ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
-		defer cancel()
-
-		// Execute ping
-		result, err := saltClient.Ping(ctx, target, targetType)
-		if err != nil {
-			logger.Error("Salt ping failed", zap.Error(err))
-			return fmt.Errorf("failed to ping Salt minions: %w", err)
-		}
-
-		// Output results
-		if outputJSON {
-			return outputPingResultsJSON(result)
-		}
-
-		return outputPingResultsText(result, target, verbose)
+		// Salt ping feature temporarily disabled during refactoring
+		logger.Warn("Salt ping feature temporarily disabled during refactoring",
+			zap.String("target", target))
+		return fmt.Errorf("ping method not available in current saltstack.KeyManager interface")
 	}),
 }
 
@@ -91,53 +71,4 @@ func init() {
 	saltPingCmd.Flags().BoolP("verbose", "v", false, "Verbose output with timing information")
 
 	ReadCmd.AddCommand(saltPingCmd)
-}
-
-func outputPingResultsJSON(result map[string]interface{}) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
-
-func outputPingResultsText(result map[string]interface{}, target string, verbose bool) error {
-	fmt.Printf("Salt Ping Results for target: %s\n", target)
-	fmt.Println(strings.Repeat("=", 50))
-
-	var responsive, unresponsive []string
-
-	for minion, response := range result {
-		if response == true {
-			responsive = append(responsive, minion)
-		} else {
-			unresponsive = append(unresponsive, minion)
-		}
-	}
-
-	fmt.Printf("Responsive minions (%d):\n", len(responsive))
-	if len(responsive) > 0 {
-		for _, minion := range responsive {
-			fmt.Printf("  ✓ %s\n", minion)
-		}
-	} else {
-		fmt.Println("  (none)")
-	}
-
-	if len(unresponsive) > 0 {
-		fmt.Printf("\nUnresponsive minions (%d):\n", len(unresponsive))
-		for _, minion := range unresponsive {
-			fmt.Printf("  ✗ %s\n", minion)
-		}
-	}
-
-	fmt.Printf("\nSummary: %d/%d minions responded\n",
-		len(responsive), len(responsive)+len(unresponsive))
-
-	if verbose && len(result) > 0 {
-		fmt.Println("\nDetailed Response Data:")
-		for minion, response := range result {
-			fmt.Printf("  %s: %v\n", minion, response)
-		}
-	}
-
-	return nil
 }

@@ -5,13 +5,147 @@ package hetzner
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/cockroachdb/errors"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// GetZoneIDForDomain fetches all zones from Hetzner and attempts to match the given domain.
+func GetZoneIDForDomain(rc *eos_io.RuntimeContext, token, domain string) (string, error) {
+	domain = strings.TrimSuffix(domain, ".")
+
+	req, err := http.NewRequest("GET", hetznerAPIBase+"/zones", nil)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to create request for fetching zones", zap.Error(err))
+		return "", err
+	}
+	req.Header.Set("Auth-API-Token", token)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to execute HTTP request for fetching zones", zap.Error(err))
+		return "", err
+	}
+	defer shared.SafeClose(rc.Ctx, resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		otelzap.Ctx(rc.Ctx).Error("Unexpected status from zones list",
+			zap.Int("statusCode", resp.StatusCode),
+		)
+		return "", fmt.Errorf("unexpected status from zones list: %s", resp.Status)
+	}
+
+	var zr ZonesResponse
+	if err := json.NewDecoder(resp.Body).Decode(&zr); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to decode JSON for zones response", zap.Error(err))
+		return "", err
+	}
+
+	for _, z := range zr.Zones {
+		zoneName := strings.TrimSuffix(z.Name, ".")
+		if zoneName == domain || strings.HasSuffix(domain, zoneName) {
+			return z.ID, nil
+		}
+	}
+
+	err = fmt.Errorf("zone not found for domain %q", domain)
+	otelzap.Ctx(rc.Ctx).Error("Zone not found for domain", zap.String("domain", domain), zap.Error(err))
+	return "", err
+}
+
+// CreateRecord tries to create an A record in Hetzner DNS.
+func CreateRecord(rc *eos_io.RuntimeContext, token, zoneID, name, ip string) error {
+	reqBody := CreateRecordRequest{
+		ZoneID: zoneID,
+		Type:   "A",
+		Name:   name, // "*" for wildcard or fallback subdomain
+		Value:  ip,
+		TTL:    300, // Adjust as desired
+	}
+
+	bodyBytes, err := json.Marshal(&reqBody)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to marshal CreateRecordRequest", zap.Error(err))
+		return err
+	}
+
+	req, err := http.NewRequest("POST", hetznerAPIBase+"/records", bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to create request for creating record", zap.Error(err))
+		return err
+	}
+	req.Header.Set("Auth-API-Token", token)
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to execute HTTP request for creating record", zap.Error(err))
+		return err
+	}
+	defer shared.SafeClose(rc.Ctx, resp.Body)
+
+	if resp.StatusCode != http.StatusCreated {
+		var responseBody bytes.Buffer
+		_, _ = responseBody.ReadFrom(resp.Body)
+		errMsg := fmt.Sprintf("record creation failed (%d): %s",
+			resp.StatusCode,
+			responseBody.String(),
+		)
+		otelzap.Ctx(rc.Ctx).Error("createRecord: unexpected status", zap.String("error", errMsg))
+		return err
+	}
+
+	var recordResp RecordResponse
+	if err := json.NewDecoder(resp.Body).Decode(&recordResp); err != nil {
+		otelzap.Ctx(rc.Ctx).Error("Failed to decode record creation response", zap.Error(err))
+		return err
+	}
+
+	otelzap.Ctx(rc.Ctx).Debug("Record creation response decoded successfully",
+		zap.String("recordID", recordResp.Record.ID),
+		zap.String("recordName", recordResp.Record.Name),
+		zap.String("recordType", recordResp.Record.Type),
+	)
+	return nil
+}
+
+const hetznerAPIBase = "https://dns.hetzner.com/api/v1"
+
+// CreateRecordRequest is the request body for creating or updating a DNS record.
+type CreateRecordRequest struct {
+	ZoneID string `json:"zone_id"`
+	Type   string `json:"type"` // e.g. "A", "CNAME"
+	Name   string `json:"name"`
+	Value  string `json:"value"`
+	TTL    int    `json:"ttl"`
+}
+
+// RecordResponse holds data for the record creation response.
+type RecordResponse struct {
+	Record struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+		Type string `json:"type"`
+	} `json:"record"`
+}
+
+// ZonesResponse is used to decode the JSON containing a list of zones.
+type ZonesResponse struct {
+	Zones []struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"zones"`
+}
 
 func (c *DNSClient) GetAllPrimaryServers(rc *eos_io.RuntimeContext, zoneID string) ([]PrimaryServer, error) {
 	url := hetznerDNSBaseURL + "/primary_servers"

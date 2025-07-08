@@ -627,7 +627,7 @@ func generateSimpleMessage(status *GitStatus) string {
 func showCommitSummary(rc *eos_io.RuntimeContext, status *GitStatus, message string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("📋 Commit Summary")
+	logger.Info("Commit Summary")
 	logger.Info("=================")
 	logger.Info("Branch: " + status.Branch)
 

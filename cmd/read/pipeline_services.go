@@ -11,10 +11,12 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
 
 // ReadPipelinePrompts creates the read command
 func ReadPipelinePrompts() *cobra.Command {
@@ -241,7 +243,7 @@ func showRecentLogs(rc *eos_io.RuntimeContext, serviceName string) error {
 }
 
 // showServiceConfiguration displays service configuration file content
-func showServiceConfiguration(rc *eos_io.RuntimeContext, config ServiceConfiguration) error {
+func showServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.ServiceConfiguration) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	logger.Info(" Service Configuration Content")

@@ -24,7 +24,7 @@ preflight_check() {
     
     # Check for go.mod file as indicator of project root
     if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
-        echo -e "${GREEN}✅ Already in EOS project root${NC}"
+        echo -e "${GREEN}Already in EOS project root${NC}"
         return 0
     elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
         echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
@@ -37,7 +37,7 @@ preflight_check() {
         echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
         echo -e "${RED}Current directory: $current_dir${NC}"
         echo ""
-        echo -e "${YELLOW}📋 To run this script correctly:${NC}"
+        echo -e "${YELLOW}To run this script correctly:${NC}"
         echo ""
         echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
         echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
@@ -56,18 +56,18 @@ preflight_check() {
 
 # Verify required tools
 verify_tools() {
-    echo -e "${CYAN}🔧 Verifying required tools...${NC}"
+    echo -e "${CYAN}Verifying required tools...${NC}"
     
     if ! command -v go &> /dev/null; then
         echo -e "${RED}❌ ERROR: Go is not installed${NC}"
         echo ""
-        echo -e "${YELLOW}📋 To install Go:${NC}"
+        echo -e "${YELLOW}To install Go:${NC}"
         echo -e "   ${GREEN}sudo apt-get update && sudo apt-get install -y golang-go${NC}"
         echo ""
         exit 1
     fi
     
-    echo -e "${GREEN}✅ Required tools verified${NC}"
+    echo -e "${GREEN}Required tools verified${NC}"
 }
 
 # Run preflight checks
@@ -79,7 +79,7 @@ preflight_check
 verify_tools
 
 echo ""
-echo -e "${GREEN}✅ Preflight checks passed!${NC}"
+echo -e "${GREEN}Preflight checks passed!${NC}"
 echo ""
 
 # Configuration with environment variable overrides
@@ -99,7 +99,7 @@ echo "======================="
 echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
 echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
 echo -e "🔄 Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
-echo -e "📁 Logs: ${YELLOW}${LOG_DIR}${NC}"
+echo -e " Logs: ${YELLOW}${LOG_DIR}${NC}"
 echo ""
 
 # Initialize report
@@ -130,11 +130,11 @@ run_single_fuzz_test() {
         local inputs=$(grep -c "new interesting input" "${log_file}" 2>/dev/null || echo "0")
         local executions=$(grep -o 'execs: [0-9]*' "${log_file}" | tail -1 | grep -o '[0-9]*' || echo "0")
         
-        echo "✅ ${test_function} completed successfully"
+        echo "${test_function} completed successfully"
         echo "📊 Found ${inputs} new inputs, executed ${executions} cases in ${elapsed}s"
         
         # Update report
-        echo "- ✅ **${test_function}** (${test_package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
+        echo "- **${test_function}** (${test_package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
         return 0
     else
         local end_time=$(date +%s)
@@ -187,7 +187,7 @@ FuzzExecuteCommand ./pkg/execute
 FuzzDatabaseOperations ./pkg/database_management
 EOF
     
-    echo "📋 Available fuzz tests:"
+    echo "Available fuzz tests:"
     while read -r test_func package; do
         echo "   ${test_func} (${package})"
     done < "${test_list}" | sort
@@ -233,7 +233,7 @@ if [ -n "${FUNCTION}" ] && [ -n "${PACKAGE}" ]; then
     run_single_fuzz_test "${FUNCTION}" "${PACKAGE}" "${FUZZTIME}"
     exit_code=$?
 elif [ -n "${PACKAGE}" ]; then
-    echo "📦 Running all fuzz tests in package: ${PACKAGE}"
+    echo "Running all fuzz tests in package: ${PACKAGE}"
     
     # Discover tests in the specific package
     available_tests=($(discover_fuzz_tests))
@@ -354,14 +354,14 @@ echo "📊 SUMMARY:"
 echo "==========="
 echo "📈 Tests: ${total_tests} total, ${passed_tests} passed, ${failed_tests} failed"
 echo "📄 Report: ${REPORT_FILE}"
-echo "📁 Logs: ${LOG_DIR}/*_${TIMESTAMP}.log"
+echo " Logs: ${LOG_DIR}/*_${TIMESTAMP}.log"
 echo ""
 
 if [ ${exit_code} -eq 0 ]; then
-    echo "✅ All fuzz tests completed successfully!"
+    echo "All fuzz tests completed successfully!"
     echo "🚀 Ready for overnight fuzzing: ./assets/overnight-fuzz.sh"
 else
-    echo "⚠️  ${exit_code} test(s) failed. Review logs for details."
+    echo "${exit_code} test(s) failed. Review logs for details."
     echo "🔍 Check specific logs: ls ${LOG_DIR}/*_${TIMESTAMP}.log"
 fi
 

@@ -35,7 +35,8 @@ func NewClient(logger otelzap.LoggerWithCtx) *Client {
 
 // StateApply applies a Salt state
 func (c *Client) StateApply(ctx context.Context, target string, state string, pillar map[string]interface{}) error {
-	c.logger.Info("Applying Salt state",
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Applying Salt state",
 		zap.String("target", target),
 		zap.String("state", state))
 
@@ -56,14 +57,14 @@ func (c *Client) StateApply(ctx context.Context, target string, state string, pi
 	})
 
 	if err != nil {
-		c.logger.Error("Failed to apply state",
+		logger.Error("Failed to apply state",
 			zap.String("state", state),
 			zap.Error(err),
 			zap.String("output", output))
 		return fmt.Errorf("applying state %s: %w", state, err)
 	}
 
-	c.logger.Info("State applied successfully",
+	logger.Info("State applied successfully",
 		zap.String("state", state))
 
 	return nil
@@ -71,7 +72,8 @@ func (c *Client) StateApply(ctx context.Context, target string, state string, pi
 
 // TestPing tests connectivity to Salt minions
 func (c *Client) TestPing(ctx context.Context, target string) (bool, error) {
-	c.logger.Info("Testing Salt connectivity",
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Testing Salt connectivity",
 		zap.String("target", target))
 
 	output, err := execute.Run(ctx, execute.Options{
@@ -89,7 +91,8 @@ func (c *Client) TestPing(ctx context.Context, target string) (bool, error) {
 
 // GrainGet retrieves a grain value from minions
 func (c *Client) GrainGet(ctx context.Context, target string, grain string) (map[string]interface{}, error) {
-	c.logger.Info("Getting grain value",
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Getting grain value",
 		zap.String("target", target),
 		zap.String("grain", grain))
 
@@ -113,7 +116,8 @@ func (c *Client) GrainGet(ctx context.Context, target string, grain string) (map
 
 // CmdRun executes a command on minions
 func (c *Client) CmdRun(ctx context.Context, target string, command string) (string, error) {
-	c.logger.Info("Running command via Salt",
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Running command via Salt",
 		zap.String("target", target),
 		zap.String("command", command))
 
@@ -132,7 +136,8 @@ func (c *Client) CmdRun(ctx context.Context, target string, command string) (str
 
 // CheckMinion checks if a minion is available
 func (c *Client) CheckMinion(ctx context.Context, minion string) (bool, error) {
-	c.logger.Info("Checking minion status",
+	logger := otelzap.Ctx(ctx)
+	logger.Info("Checking minion status",
 		zap.String("minion", minion))
 
 	output, err := execute.Run(ctx, execute.Options{
@@ -146,4 +151,32 @@ func (c *Client) CheckMinion(ctx context.Context, minion string) (bool, error) {
 	}
 
 	return strings.Contains(output, minion), nil
+}
+
+// Compatibility wrapper methods for existing code
+
+// ApplyState is a wrapper for StateApply to maintain compatibility
+func (c *Client) ApplyState(target, targetType, state string, pillar map[string]interface{}) error {
+	// For the simplified client, we'll ignore targetType and always use ctx.Background()
+	return c.StateApply(context.Background(), target, state, pillar)
+}
+
+// RunCommand is a wrapper for CmdRun to maintain compatibility
+func (c *Client) RunCommand(target, targetType, function string, args []interface{}, kwargs map[string]interface{}) (string, error) {
+	// For the simplified client, we'll only handle basic command execution
+	if function == "cmd.run" && len(args) > 0 {
+		if cmd, ok := args[0].(string); ok {
+			return c.CmdRun(context.Background(), target, cmd)
+		}
+	}
+	return "", fmt.Errorf("unsupported function: %s", function)
+}
+
+// GetGrains is a wrapper for GrainGet to maintain compatibility
+func (c *Client) GetGrains(target, targetType string, grains []string) (map[string]interface{}, error) {
+	// For the simplified client, get the first grain if available
+	if len(grains) > 0 {
+		return c.GrainGet(context.Background(), target, grains[0])
+	}
+	return make(map[string]interface{}), nil
 }

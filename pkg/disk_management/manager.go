@@ -2,6 +2,7 @@ package disk_management
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,26 @@ import (
 	"go.uber.org/zap"
 )
 
+func OutputMountOpJSON(result *MountOperation) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(result)
+}
+
+func OutputMountOpText(result *MountOperation) error {
+	if result.DryRun {
+		fmt.Printf("[DRY RUN] %s\n", result.Message)
+	} else if result.Success {
+		fmt.Printf("✓ %s\n", result.Message)
+		if result.Duration > 0 {
+			fmt.Printf("  Duration: %v\n", result.Duration)
+		}
+	} else {
+		fmt.Printf("✗ %s\n", result.Message)
+	}
+	return nil
+}
+
 // DiskManager handles disk and partition operations
 type DiskManager struct {
 	config *DiskManagerConfig
@@ -24,7 +45,7 @@ func NewDiskManager(config *DiskManagerConfig) *DiskManager {
 	if config == nil {
 		config = DefaultDiskManagerConfig()
 	}
-	
+
 	return &DiskManager{
 		config: config,
 	}
@@ -78,7 +99,7 @@ func (dm *DiskManager) CreatePartition(rc *eos_io.RuntimeContext, device string,
 		DryRun:    options.DryRun,
 	}
 
-	logger.Info("Creating partition", 
+	logger.Info("Creating partition",
 		zap.String("device", device),
 		zap.String("type", options.PartitionType),
 		zap.Bool("dry_run", options.DryRun))
@@ -140,7 +161,7 @@ func (dm *DiskManager) CreatePartition(rc *eos_io.RuntimeContext, device string,
 	operation.Message = fmt.Sprintf("Successfully created partition on %s", device)
 	operation.Duration = time.Since(startTime)
 
-	logger.Info("Partition created successfully", 
+	logger.Info("Partition created successfully",
 		zap.String("device", device),
 		zap.Duration("duration", operation.Duration))
 
@@ -160,7 +181,7 @@ func (dm *DiskManager) FormatPartition(rc *eos_io.RuntimeContext, device string,
 		DryRun:     dryRun,
 	}
 
-	logger.Info("Formatting partition", 
+	logger.Info("Formatting partition",
 		zap.String("device", device),
 		zap.String("filesystem", filesystem),
 		zap.String("label", label),
@@ -241,7 +262,7 @@ func (dm *DiskManager) FormatPartition(rc *eos_io.RuntimeContext, device string,
 	operation.Success = true
 	operation.Message = fmt.Sprintf("Successfully formatted %s as %s", device, filesystem)
 
-	logger.Info("Partition formatted successfully", 
+	logger.Info("Partition formatted successfully",
 		zap.String("device", device),
 		zap.String("filesystem", filesystem),
 		zap.Duration("duration", operation.Duration))
@@ -262,7 +283,7 @@ func (dm *DiskManager) MountPartition(rc *eos_io.RuntimeContext, device string, 
 		DryRun:     dryRun,
 	}
 
-	logger.Info("Mounting partition", 
+	logger.Info("Mounting partition",
 		zap.String("device", device),
 		zap.String("mount_point", mountPoint),
 		zap.String("options", options),
@@ -313,7 +334,7 @@ func (dm *DiskManager) MountPartition(rc *eos_io.RuntimeContext, device string, 
 	operation.Success = true
 	operation.Message = fmt.Sprintf("Successfully mounted %s at %s", device, mountPoint)
 
-	logger.Info("Partition mounted successfully", 
+	logger.Info("Partition mounted successfully",
 		zap.String("device", device),
 		zap.String("mount_point", mountPoint),
 		zap.Duration("duration", operation.Duration))
@@ -392,10 +413,10 @@ func (dm *DiskManager) performSafetyChecks(device string) error {
 func (dm *DiskManager) createPartitionWithFdisk(rc *eos_io.RuntimeContext, device string, options *PartitionOptions) error {
 	// This is a simplified implementation - production would need more sophisticated fdisk interaction
 	fdiskCommands := "n\np\n1\n\n\nw\n"
-	
+
 	cmd := exec.CommandContext(rc.Ctx, "fdisk", device)
 	cmd.Stdin = strings.NewReader(fdiskCommands)
-	
+
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("fdisk failed: %w, output: %s", err, string(output))
@@ -406,7 +427,7 @@ func (dm *DiskManager) createPartitionWithFdisk(rc *eos_io.RuntimeContext, devic
 
 func (dm *DiskManager) backupPartitionTable(rc *eos_io.RuntimeContext, device string) error {
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
-	backupFile := fmt.Sprintf("/tmp/partition_table_%s_%s.backup", 
+	backupFile := fmt.Sprintf("/tmp/partition_table_%s_%s.backup",
 		strings.ReplaceAll(device, "/", "_"), timestamp)
 
 	cmd := exec.CommandContext(rc.Ctx, "sfdisk", "-d", device)
@@ -439,7 +460,7 @@ func (dm *DiskManager) GetDiskUsage(rc *eos_io.RuntimeContext) (map[string]DiskU
 
 	usage := make(map[string]DiskUsageInfo)
 	lines := strings.Split(string(output), "\n")
-	
+
 	for i, line := range lines {
 		if i == 0 || strings.TrimSpace(line) == "" {
 			continue // Skip header and empty lines
@@ -472,13 +493,13 @@ type DiskUsageInfo struct {
 	MountPoint string `json:"mount_point"`
 }
 
-func outputFormatOpJSON(result *disk_management.FormatOperation) error {
+func OutputFormatOpJSON(result *FormatOperation) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
-func outputFormatOpText(result *disk_management.FormatOperation) error {
+func OutputFormatOpText(result *FormatOperation) error {
 	if result.DryRun {
 		fmt.Printf("[DRY RUN] %s\n", result.Message)
 	} else if result.Success {

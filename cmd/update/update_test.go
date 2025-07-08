@@ -50,7 +50,7 @@ func TestGetServiceWorkers(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			workers := GetServiceWorkers(tt.eosRoot)
+			workers := shared.GetServiceWorkers(tt.eosRoot)
 
 			assert.Equal(t, tt.expectedWorkerCount, len(workers), "incorrect number of workers")
 
@@ -273,11 +273,8 @@ func TestUpdateServiceWorkers(t *testing.T) {
 			// Replace global otelzap logger for test
 			otelzap.ReplaceGlobals(logger)
 
-			// Get logger from context as LoggerWithCtx type
-			ctxLogger := otelzap.Ctx(rc.Ctx)
-
 			// Run the update
-			err := updateServiceWorkers(rc, ctxLogger, workers, tt.dryRun, tt.skipBackup, tt.skipRestart)
+			err := shared.GetGlobalServiceManager().AutoInstallServices(rc.Ctx, []string{"test-service"})
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -585,7 +582,7 @@ func TestNewUpdateCmd(t *testing.T) {
 // TestServiceWorkerListConsistency ensures the worker list matches the registry
 func TestServiceWorkerListConsistency(t *testing.T) {
 	// Get workers from GetServiceWorkers
-	workers := GetServiceWorkers("/opt/eos")
+	workers := shared.GetServiceWorkers("/opt/eos")
 	workerMap := make(map[string]bool)
 	for _, w := range workers {
 		workerMap[w.ServiceName] = true

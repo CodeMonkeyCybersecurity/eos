@@ -47,7 +47,7 @@ Examples:
   eos delphi prompts update incident-response --no-backup --from-file template.txt`,
 		Args: cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			prompts, err := ListSystemPrompts()
+			prompts, err := pipeline.ListSystemPrompts()
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
@@ -64,7 +64,7 @@ Examples:
 			logger.Info(" Updating system prompt",
 				zap.String("prompt_name", promptName))
 
-			promptsDir, err := GetSystemPromptsDir()
+			promptsDir, err := pipeline.GetSystemPromptsDir()
 			if err != nil {
 				return err
 			}
@@ -238,7 +238,7 @@ Examples:
 					zap.String("path", promptPath),
 					zap.String("old_size", pipeline.FormatFileSize(originalStat.Size())),
 					zap.String("new_size", pipeline.FormatFileSize(stat.Size())),
-					zap.String("size_change", formatSizeChange(originalStat.Size(), stat.Size())),
+					zap.String("size_change", pipeline.FormatSizeChange(originalStat.Size(), stat.Size())),
 					zap.String("modified", stat.ModTime().Format("2006-01-02 15:04:05")))
 			}
 
@@ -262,5 +262,3 @@ Examples:
 
 	return cmd
 }
-
-

@@ -64,7 +64,7 @@ Examples:
 
 		// Interactive mode
 		if interactive {
-			if err := runInteractiveGrafanaSetup(options); err != nil {
+			if err := service_installation.RunInteractiveGrafanaSetup(options); err != nil {
 				return fmt.Errorf("interactive setup failed: %w", err)
 			}
 		}
@@ -90,7 +90,7 @@ Examples:
 				zap.Int("port", result.Port),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ Grafana Installation Complete!\n\n")
+			fmt.Printf("\nGrafana Installation Complete!\n\n")
 			fmt.Printf("📊 Service Details:\n")
 			fmt.Printf("   Version: %s\n", result.Version)
 			fmt.Printf("   Port: %d\n", result.Port)
@@ -105,7 +105,7 @@ Examples:
 			}
 
 			if len(result.Credentials) > 0 {
-				fmt.Printf("\n🔐 Default Credentials:\n")
+				fmt.Printf("\n Default Credentials:\n")
 				for key, value := range result.Credentials {
 					fmt.Printf("   %s: %s\n", key, value)
 				}
@@ -154,76 +154,3 @@ func init() {
 	CreateGrafanaCmd.Flags().Bool("skip-health-check", false, "Skip post-installation health check")
 }
 
-var interactive bool
-
-func runInteractiveGrafanaSetup(options *service_installation.ServiceInstallOptions) error {
-	fmt.Printf("🔧 Interactive Grafana Setup\n")
-	fmt.Printf("============================\n\n")
-
-	// Version
-	fmt.Printf("Grafana version [%s]: ", options.Version)
-	var version string
-	fmt.Scanln(&version)
-	if version != "" {
-		options.Version = version
-	}
-
-	// Port
-	fmt.Printf("Port [%d]: ", options.Port)
-	var portStr string
-	fmt.Scanln(&portStr)
-	if portStr != "" {
-		var port int
-		if _, err := fmt.Sscanf(portStr, "%d", &port); err == nil {
-			options.Port = port
-		}
-	}
-
-	// Admin password
-	fmt.Print("Set custom admin password? [y/N]: ")
-	var setPassword string
-	fmt.Scanln(&setPassword)
-	if setPassword == "y" || setPassword == "Y" {
-		fmt.Print("Admin password: ")
-		var password string
-		fmt.Scanln(&password)
-		if password != "" {
-			options.Environment["GF_SECURITY_ADMIN_PASSWORD"] = password
-		}
-	}
-
-	// Anonymous access
-	fmt.Print("Enable anonymous access? [y/N]: ")
-	var anonymous string
-	fmt.Scanln(&anonymous)
-	if anonymous == "y" || anonymous == "Y" {
-		options.Environment["GF_AUTH_ANONYMOUS_ENABLED"] = "true"
-		options.Environment["GF_AUTH_ANONYMOUS_ORG_ROLE"] = "Viewer"
-	}
-
-	// Persistence
-	fmt.Print("Enable data persistence? [Y/n]: ")
-	var persistence string
-	fmt.Scanln(&persistence)
-	if persistence != "n" && persistence != "N" {
-		options.Volumes = append(options.Volumes, service_installation.VolumeMount{
-			Source:      "grafana-data",
-			Destination: "/var/lib/grafana",
-		})
-	}
-
-	fmt.Printf("\n📋 Configuration Summary:\n")
-	fmt.Printf("   Version: %s\n", options.Version)
-	fmt.Printf("   Port: %d\n", options.Port)
-	fmt.Printf("   Persistence: %t\n", len(options.Volumes) > 0)
-	fmt.Printf("   Anonymous Access: %s\n", options.Environment["GF_AUTH_ANONYMOUS_ENABLED"])
-
-	fmt.Print("\nProceed with installation? [Y/n]: ")
-	var proceed string
-	fmt.Scanln(&proceed)
-	if proceed == "n" || proceed == "N" {
-		return fmt.Errorf("installation cancelled by user")
-	}
-
-	return nil
-}

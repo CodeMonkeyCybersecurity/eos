@@ -10,10 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
-	"go.uber.org/zap"
 )
 
 // GenerateFIPSKey creates a 4096-bit RSA key without passphrase
@@ -74,33 +71,5 @@ Host %s
 	if _, err := f.WriteString(entry); err != nil {
 		return fmt.Errorf("failed to write SSH config: %w", err)
 	}
-	return nil
-}
-
-// CreateSSHKeys creates a 4096-bit SSH key pair for a given Linux user
-func CreateSSHKeys(ctx context.Context, username string) error {
-	home := "/home/" + username
-	sshDir := filepath.Join(home, ".ssh")
-
-	otelzap.Ctx(ctx).Info("Creating SSH key for user", zap.String("username", username))
-
-	if err := os.MkdirAll(sshDir, 0700); err != nil {
-		return fmt.Errorf("mkdir failed: %w", err)
-	}
-	if err := execute.RunSimple(ctx, "chown", "-R", username+":"+username, sshDir); err != nil {
-		return fmt.Errorf("chown ssh dir failed: %w", err)
-	}
-
-	keyPath := filepath.Join(sshDir, "id_rsa")
-	if err := execute.RunSimple(ctx, "ssh-keygen", "-t", "rsa", "-b", "4096", "-N", "", "-f", keyPath); err != nil {
-		return fmt.Errorf("ssh-keygen failed: %w", err)
-	}
-	if err := execute.RunSimple(ctx, "chmod", "600", keyPath); err != nil {
-		return fmt.Errorf("chmod private key failed: %w", err)
-	}
-	if err := execute.RunSimple(ctx, "chown", username+":"+username, keyPath, keyPath+".pub"); err != nil {
-		return fmt.Errorf("chown key files failed: %w", err)
-	}
-
 	return nil
 }

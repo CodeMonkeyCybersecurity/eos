@@ -12,9 +12,71 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+var (
+	headscaleServerURL     string
+	headscaleUsername      string
+	headscaleConfigDir     string
+	headscaleInteractive   bool
+	headscaleFirewallPorts []string
+)
+
+// Exported variables for cmd package flag binding
+var (
+	HeadscaleServerURL     string
+	HeadscaleUsername      string
+	HeadscaleConfigDir     string
+	HeadscaleInteractive   bool
+	HeadscaleFirewallPorts []string
+)
+
+func RunCreateHeadscale(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting Headscale installation and configuration")
+
+	// Create configuration
+	config := &HeadscaleConfig{
+		ServerURL:     headscaleServerURL,
+		Username:      headscaleUsername,
+		ConfigDir:     headscaleConfigDir,
+		FirewallPorts: headscaleFirewallPorts,
+		Interactive:   headscaleInteractive,
+	}
+
+	// Set defaults if not provided
+	if len(config.FirewallPorts) == 0 {
+		config.FirewallPorts = []string{"80/tcp", "443/tcp", "41641/udp"}
+	}
+
+	// If no server URL provided and not interactive, prompt for it
+	if config.ServerURL == "" && !config.Interactive {
+		config.Interactive = true
+	}
+
+	// Install Headscale
+	if err := InstallHeadscale(rc, config); err != nil {
+		logger.Error("Headscale installation failed", zap.Error(err))
+		return err
+	}
+
+	// Display status
+	status, err := GetHeadscaleStatus(rc)
+	if err != nil {
+		logger.Warn("Failed to get final status", zap.Error(err))
+	} else {
+		logger.Info("Headscale installation completed successfully",
+			zap.Bool("installed", status.Installed),
+			zap.Bool("running", status.Running),
+			zap.String("version", status.Version),
+			zap.Int("users", len(status.Users)))
+	}
+
+	return nil
+}
 
 // HeadscaleConfig represents the configuration for Headscale setup
 type HeadscaleConfig struct {
@@ -28,11 +90,11 @@ type HeadscaleConfig struct {
 
 // HeadscaleStatus represents the current state of Headscale
 type HeadscaleStatus struct {
-	Installed     bool   `json:"installed"`
-	Running       bool   `json:"running"`
-	Version       string `json:"version"`
-	ConfigExists  bool   `json:"config_exists"`
-	DatabaseReady bool   `json:"database_ready"`
+	Installed     bool            `json:"installed"`
+	Running       bool            `json:"running"`
+	Version       string          `json:"version"`
+	ConfigExists  bool            `json:"config_exists"`
+	DatabaseReady bool            `json:"database_ready"`
 	Users         []HeadscaleUser `json:"users"`
 	PreAuthKeys   []PreAuthKey    `json:"preauth_keys"`
 }
@@ -54,7 +116,7 @@ type PreAuthKey struct {
 
 // InstallHeadscale performs a complete Headscale installation and setup
 func InstallHeadscale(rc *eos_io.RuntimeContext, config *HeadscaleConfig) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.InstallHeadscale")
+	ctx, span := telemetry.Start(rc.Ctx, "InstallHeadscale")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -142,7 +204,7 @@ func InstallHeadscale(rc *eos_io.RuntimeContext, config *HeadscaleConfig) error 
 
 // GetHeadscaleStatus returns the current status of Headscale
 func GetHeadscaleStatus(rc *eos_io.RuntimeContext) (*HeadscaleStatus, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "network.GetHeadscaleStatus")
+	ctx, span := telemetry.Start(rc.Ctx, "GetHeadscaleStatus")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -157,7 +219,7 @@ func GetHeadscaleStatus(rc *eos_io.RuntimeContext) (*HeadscaleStatus, error) {
 		Capture: true,
 	}); err == nil {
 		status.Installed = true
-		
+
 		// Get version
 		if output, err := execute.Run(ctx, execute.Options{
 			Command: "headscale",
@@ -195,7 +257,7 @@ func GetHeadscaleStatus(rc *eos_io.RuntimeContext) (*HeadscaleStatus, error) {
 		}
 	}
 
-	logger.Info("Headscale status checked", 
+	logger.Info("Headscale status checked",
 		zap.Bool("installed", status.Installed),
 		zap.Bool("running", status.Running),
 		zap.String("version", status.Version))
@@ -205,7 +267,7 @@ func GetHeadscaleStatus(rc *eos_io.RuntimeContext) (*HeadscaleStatus, error) {
 
 // updateSystem updates the package manager
 func updateSystem(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.updateSystem")
+	ctx, span := telemetry.Start(rc.Ctx, "updateSystem")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -228,7 +290,7 @@ func updateSystem(rc *eos_io.RuntimeContext) error {
 
 // installDependencies installs required packages
 func installDependencies(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.installDependencies")
+	ctx, span := telemetry.Start(rc.Ctx, "installDependencies")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -243,7 +305,7 @@ func installDependencies(rc *eos_io.RuntimeContext) error {
 
 // downloadAndInstallHeadscale downloads and installs the latest Headscale
 func downloadAndInstallHeadscale(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.downloadAndInstallHeadscale")
+	ctx, span := telemetry.Start(rc.Ctx, "downloadAndInstallHeadscale")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -304,7 +366,7 @@ func downloadAndInstallHeadscale(rc *eos_io.RuntimeContext) error {
 
 // generateHeadscaleConfig generates the Headscale configuration file
 func generateHeadscaleConfig(rc *eos_io.RuntimeContext, config *HeadscaleConfig) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.generateHeadscaleConfig")
+	ctx, span := telemetry.Start(rc.Ctx, "generateHeadscaleConfig")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -365,7 +427,7 @@ func generateHeadscaleConfig(rc *eos_io.RuntimeContext, config *HeadscaleConfig)
 
 // setupHeadscaleDatabase initializes the Headscale database
 func setupHeadscaleDatabase(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.setupHeadscaleDatabase")
+	ctx, span := telemetry.Start(rc.Ctx, "setupHeadscaleDatabase")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -391,7 +453,7 @@ func setupHeadscaleDatabase(rc *eos_io.RuntimeContext) error {
 
 // createHeadscaleService creates the systemd service file
 func createHeadscaleService(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.createHeadscaleService")
+	ctx, span := telemetry.Start(rc.Ctx, "createHeadscaleService")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -399,7 +461,7 @@ func createHeadscaleService(rc *eos_io.RuntimeContext) error {
 
 	serviceContent := `[Unit]
 Description=Headscale
-After=network.target
+After=target
 
 [Service]
 Type=notify
@@ -431,7 +493,7 @@ WantedBy=multi-user.target
 
 // enableAndStartHeadscale enables and starts the Headscale service
 func enableAndStartHeadscale(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.enableAndStartHeadscale")
+	ctx, span := telemetry.Start(rc.Ctx, "enableAndStartHeadscale")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -461,7 +523,7 @@ func enableAndStartHeadscale(rc *eos_io.RuntimeContext) error {
 
 // interactiveUserSetup handles interactive user creation and pre-auth key generation
 func interactiveUserSetup(rc *eos_io.RuntimeContext, config *HeadscaleConfig) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.interactiveUserSetup")
+	ctx, span := telemetry.Start(rc.Ctx, "interactiveUserSetup")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -511,7 +573,7 @@ func interactiveUserSetup(rc *eos_io.RuntimeContext, config *HeadscaleConfig) er
 		}
 	}
 
-	logger.Info("User setup completed", 
+	logger.Info("User setup completed",
 		zap.String("username", config.Username),
 		zap.String("preauth_key", preAuthKey))
 
@@ -520,7 +582,7 @@ func interactiveUserSetup(rc *eos_io.RuntimeContext, config *HeadscaleConfig) er
 
 // configureFirewall opens necessary ports
 func configureFirewall(rc *eos_io.RuntimeContext, ports []string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "network.configureFirewall")
+	ctx, span := telemetry.Start(rc.Ctx, "configureFirewall")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -542,7 +604,7 @@ func configureFirewall(rc *eos_io.RuntimeContext, ports []string) error {
 
 // listHeadscaleUsers returns the list of Headscale users
 func listHeadscaleUsers(rc *eos_io.RuntimeContext) ([]HeadscaleUser, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "network.listHeadscaleUsers")
+	ctx, span := telemetry.Start(rc.Ctx, "listHeadscaleUsers")
 	defer span.End()
 
 	output, err := execute.Run(ctx, execute.Options{

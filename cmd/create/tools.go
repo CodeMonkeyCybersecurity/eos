@@ -93,7 +93,7 @@ func init() {
 }
 
 func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
-	fmt.Printf("🔧 Interactive System Tools Setup\n")
+	fmt.Printf("Interactive System Tools Setup\n")
 	fmt.Printf("=================================\n\n")
 
 	// System update
@@ -144,7 +144,7 @@ func runInteractiveToolsSetup(config *system_config.SystemToolsConfig) error {
 		config.SetupSensors = true
 	}
 
-	fmt.Printf("\n📋 Configuration Summary:\n")
+	fmt.Printf("\nConfiguration Summary:\n")
 	fmt.Printf("   Update System: %t\n", config.UpdateSystem)
 	fmt.Printf("   Install Packages: %t\n", config.InstallPackages)
 	fmt.Printf("   Install NPM: %t\n", config.InstallNpm)

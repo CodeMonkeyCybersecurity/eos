@@ -3,16 +3,14 @@ package update
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/cmd_helpers"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -26,41 +24,56 @@ type ServiceWorkerInfo struct {
 	BackupPath  string
 }
 
-// GetServiceWorkers returns information about all delphi service workers
-// This function needs the eosRoot to correctly determine source paths.
-func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
-	timestamp := time.Now().Format("20060102_150405")
+// CopyFile copies a file from src to dst
+func CopyFile(src, dst string) error {
+	srcFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcFile.Close()
 
+	dstFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer dstFile.Close()
+
+	_, err = io.Copy(dstFile, srcFile)
+	return err
+}
+
+// GetServiceWorkers returns information about all delphi service workers
+func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
 	return []ServiceWorkerInfo{
 		{
 			ServiceName: "delphi-listener",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-listener.py"),
 			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-listener.py.%s.bak", timestamp),
+			BackupPath:  "/opt/stackstorm/packs/delphi/delphi-listener.py.bak",
 		},
 		{
 			ServiceName: "delphi-agent-enricher",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-agent-enricher.py"),
 			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-agent-enricher.py.%s.bak", timestamp),
+			BackupPath:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py.bak",
 		},
 		{
 			ServiceName: "llm-worker",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "llm-worker.py"),
 			TargetPath:  "/opt/stackstorm/packs/delphi/llm-worker.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/llm-worker.py.%s.bak", timestamp),
+			BackupPath:  "/opt/stackstorm/packs/delphi/llm-worker.py.bak",
 		},
 		{
 			ServiceName: "email-structurer",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-structurer.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/email-structurer.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/email-structurer.py.%s.bak", timestamp),
+			TargetPath:  "/usr/local/bin/email-structurer.py",
+			BackupPath:  "/usr/local/bin/email-structurer.py.bak",
 		},
 		{
 			ServiceName: "prompt-ab-tester",
 			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "prompt-ab-tester.py"),
-			TargetPath:  "/opt/stackstorm/packs/delphi/prompt-ab-tester.py",
-			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/prompt-ab-tester.py.%s.bak", timestamp),
+			TargetPath:  "/usr/local/bin/prompt-ab-tester.py",
+			BackupPath:  "/usr/local/bin/prompt-ab-tester.py.bak",
 		},
 	}
 }
@@ -80,12 +93,11 @@ Example:
 		logger := otelzap.Ctx(rc.Ctx)
 		logger.Info(" Starting pipeline services update")
 
-		// Get the Eos root directory for finding source files
-		eosRoot := shared.GetEosRoot()
-		if eosRoot == "" {
-			return fmt.Errorf("cannot determine Eos root directory - ensure Eos is properly installed")
+		// Get eos root directory
+		eosRoot := "/opt/eos"
+		if envRoot := os.Getenv("EOS_ROOT"); envRoot != "" {
+			eosRoot = envRoot
 		}
-
 		logger.Info(" Eos root directory located", zap.String("root", eosRoot))
 
 		// Verify source directory exists
@@ -160,7 +172,7 @@ func updateServiceWorker(rc *eos_io.RuntimeContext, worker ServiceWorkerInfo) er
 			return fmt.Errorf("failed to create backup directory %s: %w", backupDir, err)
 		}
 
-		if err := cmd_helpers.CopyFile(worker.TargetPath, worker.BackupPath); err != nil {
+		if err := CopyFile(worker.TargetPath, worker.BackupPath); err != nil {
 			return fmt.Errorf("failed to create backup: %w", err)
 		}
 
@@ -172,7 +184,7 @@ func updateServiceWorker(rc *eos_io.RuntimeContext, worker ServiceWorkerInfo) er
 		zap.String("source", worker.SourcePath),
 		zap.String("target", worker.TargetPath))
 
-	if err := cmd_helpers.CopyFile(worker.SourcePath, worker.TargetPath); err != nil {
+	if err := CopyFile(worker.SourcePath, worker.TargetPath); err != nil {
 		return fmt.Errorf("failed to copy file: %w", err)
 	}
 

@@ -273,7 +273,7 @@ sudo journalctl | grep pam_google_authenticator
 sudo tail -f /var/log/eos-mfa-enforcement.log
 ```
 
-## 📁 File Locations
+##  File Locations
 
 ### Configuration Files:
 - `/etc/pam.d/sudo` - Sudo PAM configuration with MFA

@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/file_backup"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -81,7 +82,7 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			filePath := args[0]
 
-			logger.Info("Creating file backup", 
+			logger.Info("Creating file backup",
 				zap.String("file", filePath),
 				zap.String("backup_dir", backupDir),
 				zap.Bool("dry_run", dryRun))
@@ -98,11 +99,11 @@ Examples:
 				BackupDir:           backupDir,
 				CustomName:          customName,
 				Interactive:         interactive,
-				Force:              force,
-				DryRun:             dryRun,
-				VerifyAfterBackup:  !noVerify,
+				Force:               force,
+				DryRun:              dryRun,
+				VerifyAfterBackup:   !noVerify,
 				PreservePermissions: !noPreserve,
-				CreateSymlink:      createSymlink,
+				CreateSymlink:       createSymlink,
 			}
 
 			manager := file_backup.NewFileBackupManager(config)
@@ -224,7 +225,7 @@ Examples:
 				}
 			}
 
-			logger.Info("Restoring file backup", 
+			logger.Info("Restoring file backup",
 				zap.String("backup_path", backupPath),
 				zap.String("restore_path", restorePath),
 				zap.Bool("dry_run", dryRun))
@@ -308,8 +309,8 @@ func outputFileListText(result *file_backup.BackupListResult) error {
 		}
 
 		fmt.Printf("%-30s %-20s %-12d %s\n",
-			truncateString(backup.Name, 30),
-			truncateString(originalFile, 20),
+			utils.TruncateString(backup.Name, 30),
+			utils.TruncateString(originalFile, 20),
 			backup.Size,
 			backupTime)
 	}
@@ -338,12 +339,4 @@ func outputFileRestoreText(result *file_backup.RestoreOperation) error {
 		fmt.Printf("✗ %s\n", result.Message)
 	}
 	return nil
-}
-
-// Helper function
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
 }

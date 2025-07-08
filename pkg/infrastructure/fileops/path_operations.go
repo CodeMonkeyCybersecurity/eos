@@ -63,10 +63,10 @@ func (p *PathOperationsImpl) ExpandPath(path string) string {
 	return path
 }
 
-// updateFilesInDir recursively scans the specified directory and replaces any occurrence
+// UpdateFilesInDir recursively scans the specified directory and replaces any occurrence
 // of the provided token with the replacement value. This helper function can be moved to a
 // common utils package if desired.
-func updateFilesInDir(dir, token, replacement string) error {
+func UpdateFilesInDir(dir, token, replacement string) error {
 	return filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

@@ -1,11 +1,7 @@
 package list
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"strings"
-
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -47,10 +43,10 @@ Examples:
 			}
 
 			if outputJSON {
-				return outputContainerJSON(result)
+				return container.OutputContainerJSON(result)
 			}
 
-			return outputContainerTable(result)
+			return container.OutputContainerTable(result)
 		}),
 	}
 
@@ -60,62 +56,47 @@ Examples:
 	return cmd
 }
 
-// outputContainerJSON outputs container list in JSON format
-func outputContainerJSON(result *container_management.ContainerListResult) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
+var containerComposeCmd = &cobra.Command{
+	Use:     "container-compose",
+	Aliases: []string{"docker-compose", "compose-projects", "compose"},
+	Short:   "List Docker Compose projects with status",
+	Long: `List all Docker Compose projects with their current status.
+
+Shows project path, compose file, and running status for each found project.
+
+Examples:
+  eos list container-compose                          # List all projects
+  eos list container-compose --path /opt             # List projects in specific path
+  eos list container-compose --json                  # Output in JSON format`,
+
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		searchPaths, _ := cmd.Flags().GetStringSlice("path")
+		outputJSON, _ := cmd.Flags().GetBool("json")
+
+		logger.Info("Listing Docker Compose projects",
+			zap.Strings("search_paths", searchPaths))
+
+		manager := container_management.NewContainerManager(nil)
+		result, err := manager.FindComposeProjects(rc, searchPaths)
+		if err != nil {
+			logger.Error("Failed to list compose projects", zap.Error(err))
+			return err
+		}
+
+		if outputJSON {
+			return container.OutputComposeListJSON(result)
+		}
+
+		return container.OutputComposeListTable(result)
+	}),
 }
 
-// outputContainerTable outputs container list in table format
-func outputContainerTable(result *container_management.ContainerListResult) error {
-	if result.Total == 0 {
-		fmt.Println("No containers found.")
-		return nil
-	}
+func init() {
+	containerComposeCmd.Flags().StringSliceP("path", "p", []string{}, "Search paths (default: $HOME, /opt, /srv, /home)")
+	containerComposeCmd.Flags().Bool("json", false, "Output in JSON format")
 
-	fmt.Printf("Containers: %d total, %d running, %d stopped\n",
-		result.Total, result.Running, result.Stopped)
-	fmt.Printf("Listed at: %s\n\n", result.Timestamp.Format("2006-01-02 15:04:05"))
-
-	// Print header
-	fmt.Printf("%-12s %-20s %-30s %-20s %s\n",
-		"CONTAINER ID", "NAME", "IMAGE", "STATUS", "PORTS")
-	fmt.Println(strings.Repeat("-", 100))
-
-	// Print containers
-	for _, container := range result.Containers {
-		portStr := formatPorts(container.Ports)
-		fmt.Printf("%-12s %-20s %-30s %-20s %s\n",
-			truncateString(container.ID, 12),
-			truncateString(container.Name, 20),
-			truncateString(container.Image, 30),
-			truncateString(container.Status, 20),
-			portStr)
-	}
-
-	return nil
-}
-
-// formatPorts formats the ports map for display
-func formatPorts(ports map[string]string) string {
-	if len(ports) == 0 {
-		return "-"
-	}
-
-	var portStrs []string
-	for containerPort, hostPort := range ports {
-		portStrs = append(portStrs, fmt.Sprintf("%s->%s", hostPort, containerPort))
-	}
-
-	result := strings.Join(portStrs, ", ")
-	return truncateString(result, 25)
-}
-
-// truncateString truncates a string if it's longer than maxLen
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
+	// Register with parent command
+	ListCmd.AddCommand(containerComposeCmd)
 }

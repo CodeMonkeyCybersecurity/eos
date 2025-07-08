@@ -25,7 +25,7 @@ SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 mkdir -p "${LOG_DIR}"
 
 echo -e "${CYAN}🌙 Starting overnight Eos fuzzing at $(date)${NC}"
-echo -e "📁 Logs will be saved to: ${YELLOW}${LOG_DIR}${NC}"
+echo -e " Logs will be saved to: ${YELLOW}${LOG_DIR}${NC}"
 echo -e "⏰ Long fuzz duration: ${YELLOW}${FUZZTIME_LONG}${NC}"
 echo -e "⏰ Medium fuzz duration: ${YELLOW}${FUZZTIME_MEDIUM}${NC}"
 echo -e "⏰ Short fuzz duration: ${YELLOW}${FUZZTIME_SHORT}${NC}"
@@ -41,7 +41,7 @@ run_fuzz_test() {
     local start_time=$(date +%s)
     
     echo "🚀 Starting ${test_name} (${duration}, priority: ${priority})..."
-    echo "📦 Package: ${package}"
+    echo "Package: ${package}"
     echo "⏱️  Started at: $(date)"
     echo "📄 Log: ${log_file}"
     
@@ -69,13 +69,13 @@ run_fuzz_test() {
         local inputs=$(grep -c "new interesting input" "${log_file}" 2>/dev/null || echo "0")
         local executions=$(grep -oP 'elapsed: \d+.*?execs: \K\d+' "${log_file}" | tail -1 || echo "0")
         
-        echo "✅ ${test_name} completed successfully"
+        echo "${test_name} completed successfully"
         echo "📊 Found ${inputs} new interesting inputs"
         echo "🔄 Executed ${executions} test cases"
         echo "⏰ Duration: ${elapsed}s"
         
         # Update report
-        echo "- ✅ **${test_name}** (${package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
+        echo "- **${test_name}** (${package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
     else
         local end_time=$(date +%s)
         local elapsed=$((end_time - start_time))
@@ -154,8 +154,8 @@ cat > "${REPORT_FILE}" << EOF
 
 EOF
 
-echo "📋 Initializing comprehensive fuzz test suite..."
-echo "📁 Report will be saved to: ${REPORT_FILE}"
+echo "Initializing comprehensive fuzz test suite..."
+echo " Report will be saved to: ${REPORT_FILE}"
 
 # Define test suites with priorities
 declare -a critical_tests=(
@@ -318,17 +318,17 @@ if [ -f "${LOG_DIR}/crashes_${TIMESTAMP}.log" ]; then
     
     exit 1
 else
-    echo "✅ SUCCESS: No crashes detected during overnight fuzzing"
+    echo "SUCCESS: No crashes detected during overnight fuzzing"
     
     # Add success summary to report
-    echo -e "\n## ✅ All Tests Passed Successfully\n" >> "${REPORT_FILE}"
+    echo -e "\n## All Tests Passed Successfully\n" >> "${REPORT_FILE}"
     echo "No crashes or critical issues were detected during this fuzzing session." >> "${REPORT_FILE}"
 fi
 
 echo ""
 echo "📊 COMPREHENSIVE SUMMARY:"
 echo "========================="
-echo "📁 Log directory: ${LOG_DIR}"
+echo " Log directory: ${LOG_DIR}"
 echo "📄 Main report: ${REPORT_FILE}"
 echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed)"
 echo "🔍 New inputs discovered: ${total_inputs}"
@@ -351,8 +351,8 @@ if [ "${failed_tests}" -eq 0 ]; then
     # Send success notification if configured
     if [ "${EMAIL_REPORT}" = "true" ] && [ -n "${EMAIL_ADDRESS}" ]; then
         echo "📧 Sending success report email..."
-        mail -s "✅ Eos Fuzz Testing: All Tests Passed" "${EMAIL_ADDRESS}" < "${REPORT_FILE}"
+        mail -s "Eos Fuzz Testing: All Tests Passed" "${EMAIL_ADDRESS}" < "${REPORT_FILE}"
     fi
 else
-    echo "⚠️  Please address the ${failed_tests} failed tests before production deployment."
+    echo "Please address the ${failed_tests} failed tests before production deployment."
 fi

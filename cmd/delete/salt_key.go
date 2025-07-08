@@ -2,13 +2,13 @@
 package delete
 
 import (
-	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -23,7 +23,7 @@ var saltKeyCmd = &cobra.Command{
 This permanently removes minion keys from the Salt master. Deleted keys
 will need to be re-accepted if the minion attempts to reconnect.
 
-⚠️  WARNING: This is a destructive operation that will prevent the minion
+WARNING: This is a destructive operation that will prevent the minion
 from communicating with the master until its key is re-accepted.
 
 Examples:
@@ -76,35 +76,33 @@ Security Notice:
 
 		// Security confirmation unless forced
 		if !force {
-			fmt.Print("WARNING: This will permanently delete Salt keys. Continue? [y/N]: ")
-			var response string
-			fmt.Scanln(&response)
-			if response != "y" && response != "Y" && response != "yes" {
+			logger.Info("terminal prompt: Confirmation for Salt key deletion")
+			if !interaction.PromptYesNo(rc.Ctx, "WARNING: This will permanently delete Salt keys. Continue?", false) {
 				return fmt.Errorf("operation cancelled by user")
 			}
 		}
 
-		// Create Salt client
-		saltClient := salt.NewSaltClient()
+		// Create Salt key manager
+		keyManager := saltstack.NewKeyManager(otelzap.Ctx(rc.Ctx))
 
-		// Create context with timeout
-		ctx, cancel := context.WithTimeout(rc.Ctx, 30*time.Second)
-		defer cancel()
-
-		// Delete keys
-		var result interface{}
-		var err error
+		// Prepare deletion options
+		opts := &saltstack.DeleteKeysOptions{
+			Force:  force,
+			DryRun: dryRun,
+		}
 
 		if includeList != "" {
 			keys := strings.Split(includeList, ",")
 			for i, key := range keys {
 				keys[i] = strings.TrimSpace(key)
 			}
-			result, err = saltClient.DeleteKeys(ctx, keys)
+			opts.Keys = keys
 		} else {
-			result, err = saltClient.DeleteKeyPattern(ctx, pattern)
+			opts.Pattern = pattern
 		}
 
+		// Delete keys using the helper function
+		result, err := keyManager.DeleteKeysWithOptions(rc, opts)
 		if err != nil {
 			logger.Error("Failed to delete Salt keys", zap.Error(err))
 			return fmt.Errorf("failed to delete Salt keys: %w", err)
@@ -119,9 +117,15 @@ Security Notice:
 		} else {
 			fmt.Printf("Include List: %s\n", includeList)
 		}
-		fmt.Printf("Result: %v\n", result)
+		fmt.Printf("Message: %s\n", result.Message)
+		fmt.Printf("Deleted Keys: %v\n", result.DeletedKeys)
+		if len(result.ErrorKeys) > 0 {
+			fmt.Printf("Failed Keys: %v\n", result.ErrorKeys)
+		}
 
-		logger.Info("Salt keys deleted successfully")
+		logger.Info("Salt keys deleted successfully",
+			zap.Int("deleted_count", len(result.DeletedKeys)),
+			zap.Int("error_count", len(result.ErrorKeys)))
 		return nil
 	}),
 }

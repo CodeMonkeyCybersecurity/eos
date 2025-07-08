@@ -63,7 +63,7 @@ func runFuzzTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 
 	fmt.Printf("🧪 Running fuzz tests with %s duration...\n", duration)
 	fmt.Printf("📍 Parallel execution: %d tests\n", fuzzParallel)
-	fmt.Printf("📁 Working directory: %s\n\n", rc.Ctx.Value("workdir"))
+	fmt.Printf(" Working directory: %s\n\n", rc.Ctx.Value("workdir"))
 
 	report, err := runner.RunAll(duration)
 	if err != nil {
@@ -98,7 +98,7 @@ func runFuzzTests(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) 
 		zap.Int("total_tests", len(report.Tests)),
 		zap.Duration("total_duration", report.Duration))
 
-	fmt.Println("\n✅ All fuzz tests completed successfully!")
+	fmt.Println("\nAll fuzz tests completed successfully!")
 	fmt.Printf("🎯 No issues found during fuzzing with %s duration.\n", duration)
 
 	return nil

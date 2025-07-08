@@ -26,12 +26,12 @@ SECURITY_FOCUS=true ARCHITECTURE_TESTING=true VERBOSE=true ./scripts/eos-fuzz.sh
 ```
 
 **Features:**
-- ✅ STACK.md Section 4.1 compliant
-- ✅ Dynamic test discovery
-- ✅ Resource monitoring and limits
-- ✅ Comprehensive error handling
-- ✅ Security hardening
-- ✅ Structured reporting
+- STACK.md Section 4.1 compliant
+- Dynamic test discovery
+- Resource monitoring and limits
+- Comprehensive error handling
+- Security hardening
+- Structured reporting
 
 #### `eos-fuzz-ci.sh` - CI/CD Optimized
 Lightweight version optimized for continuous integration environments.
@@ -51,23 +51,23 @@ Lightweight version optimized for continuous integration environments.
 ```
 
 **Features:**
-- ✅ GitHub Actions integration
-- ✅ CI-specific optimizations
-- ✅ Automated reporting
-- ✅ Security alerting
-- ✅ Performance optimized
+- GitHub Actions integration
+- CI-specific optimizations
+- Automated reporting
+- Security alerting
+- Performance optimized
 
 ### 🔄 Legacy Scripts (Deprecated)
 
 #### `run-fuzz-tests.sh` - Legacy Framework
 Original fuzzing script with architectural and security issues.
 
-⚠️ **DEPRECATED**: Use `eos-fuzz.sh` instead.
+**DEPRECATED**: Use `eos-fuzz.sh` instead.
 
 #### `comprehensive-fuzz-runner.sh` - Legacy Comprehensive
 Original comprehensive fuzzing with complexity issues.
 
-⚠️ **DEPRECATED**: Use `eos-fuzz.sh` or `eos-fuzz-ci.sh` instead.
+**DEPRECATED**: Use `eos-fuzz.sh` or `eos-fuzz-ci.sh` instead.
 
 #### `run-fuzz-tests-legacy.sh` - Migration Helper
 Backward compatibility wrapper that warns about deprecation.

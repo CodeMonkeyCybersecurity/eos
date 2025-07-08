@@ -10,37 +10,11 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-// ABTestConfig represents the structure from prompt-ab-tester.py
-type ABTestConfig struct {
-	Experiments []ABTestExperiment `json:"experiments"`
-}
-
-type ABTestExperiment struct {
-	Name           string          `json:"name"`
-	Description    string          `json:"description"`
-	Status         string          `json:"status"` // active, paused, completed, draft
-	StartDate      *string         `json:"start_date,omitempty"`
-	EndDate        *string         `json:"end_date,omitempty"`
-	Variants       []ABTestVariant `json:"variants"`
-	CohortStrategy string          `json:"cohort_strategy"` // agent_rule, agent_only, rule_only
-	StickySessions bool            `json:"sticky_sessions"`
-	TargetRules    []int           `json:"target_rules"` // specific rule IDs, empty = all
-	MinRuleLevel   int             `json:"min_rule_level"`
-	SampleRate     float64         `json:"sample_rate"` // 0.0-1.0
-}
-
-type ABTestVariant struct {
-	Name        string                 `json:"name"`
-	PromptType  string                 `json:"prompt_type"` // maps to parser_type enum
-	Weight      float64                `json:"weight"`
-	Description string                 `json:"description"`
-	Parameters  map[string]interface{} `json:"parameters"`
-}
 
 // NewABConfigCmd creates enhanced A/B configuration management command
 func NewABConfigCmd() *cobra.Command {
@@ -130,7 +104,7 @@ Examples:
 			config, err := loadABTestConfig(configPath)
 			if err != nil {
 				logger.Warn("Creating new configuration file", zap.Error(err))
-				config = &ABTestConfig{Experiments: []ABTestExperiment{}}
+				config = &pipeline.ABTestConfig{Experiments: []pipeline.ABTestExperiment{}}
 			}
 
 			// Check for duplicate names
@@ -141,9 +115,9 @@ Examples:
 			}
 
 			// Create experiment variants
-			variants := []ABTestVariant{}
+			variants := []pipeline.ABTestVariant{}
 			if variantA != "" {
-				variants = append(variants, ABTestVariant{
+				variants = append(variants, pipeline.ABTestVariant{
 					Name:        "variant_a",
 					PromptType:  variantA,
 					Weight:      weightA,
@@ -152,7 +126,7 @@ Examples:
 				})
 			}
 			if variantB != "" {
-				variants = append(variants, ABTestVariant{
+				variants = append(variants, pipeline.ABTestVariant{
 					Name:        "variant_b",
 					PromptType:  variantB,
 					Weight:      weightB,
@@ -166,7 +140,7 @@ Examples:
 			}
 
 			// Create new experiment
-			experiment := ABTestExperiment{
+			experiment := pipeline.ABTestExperiment{
 				Name:           name,
 				Description:    description,
 				Status:         "draft",
@@ -243,7 +217,7 @@ Examples:
 			}
 
 			// Filter experiments if name specified
-			var experiments []ABTestExperiment
+			var experiments []pipeline.ABTestExperiment
 			if len(args) > 0 {
 				expName := args[0]
 				for _, exp := range config.Experiments {
@@ -314,13 +288,13 @@ Examples:
 
 // Helper functions for A/B testing configuration management
 
-func loadABTestConfig(path string) (*ABTestConfig, error) {
+func loadABTestConfig(path string) (*pipeline.ABTestConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
 
-	var config ABTestConfig
+	var config pipeline.ABTestConfig
 	if err := json.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("invalid JSON in %s: %w", path, err)
 	}
@@ -328,7 +302,7 @@ func loadABTestConfig(path string) (*ABTestConfig, error) {
 	return &config, nil
 }
 
-func saveABTestConfig(path string, config *ABTestConfig) error {
+func saveABTestConfig(path string, config *pipeline.ABTestConfig) error {
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)

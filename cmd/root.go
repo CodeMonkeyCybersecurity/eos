@@ -62,13 +62,13 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 
 	// Group subcommands for cleanliness - Core verb-first architecture
 	for _, subCmd := range []*cobra.Command{
-		create.CreateCmd, // ✅ VERB-FIRST ARCHITECTURE
-		read.ReadCmd,     // ✅ VERB-FIRST ARCHITECTURE
+		create.CreateCmd, // VERB-FIRST ARCHITECTURE
+		read.ReadCmd,     // VERB-FIRST ARCHITECTURE
 		// list.ListCmd,        // TODO: Fix package conflicts
-		update.UpdateCmd, // ✅ VERB-FIRST ARCHITECTURE
-		delete.DeleteCmd, // ✅ VERB-FIRST ARCHITECTURE
-		self.SelfCmd,     // ✅ SPECIAL CASE (Eos self-management)
-		backup.BackupCmd, // ✅ SPECIAL CASE (Complex nomenclature)
+		update.UpdateCmd, // VERB-FIRST ARCHITECTURE
+		delete.DeleteCmd, // VERB-FIRST ARCHITECTURE
+		self.SelfCmd,     // SPECIAL CASE (Eos self-management)
+		backup.BackupCmd, // SPECIAL CASE (Complex nomenclature)
 
 		// TODO: Migrate these to verb directories (Phase 4)
 		// delphi.DelphiCmd,    // TODO: Migrate to verb directories (Phase 4)

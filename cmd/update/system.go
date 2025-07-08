@@ -3,13 +3,14 @@
 package update
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/config_loader"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/security_config"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/system_display"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -65,7 +66,10 @@ Examples:
 		securityManager := system.NewSecurityHardeningManager(saltManager, vaultPath)
 
 		// Generate security configuration based on profile
-		securityConfig := generateSecurityConfig(system.SecurityProfile(profile))
+		securityConfig, err := security_config.GenerateSecurityConfig(rc, system.SecurityProfile(profile))
+		if err != nil {
+			return cerr.Wrap(err, "failed to generate security configuration")
+		}
 
 		if dryRun {
 			logger.Info("Dry run mode - assessing security posture only")
@@ -75,12 +79,15 @@ Examples:
 			}
 
 			// Display assessment results
-			displaySecurityAssessment(rc, assessment)
+			if err := security_config.DisplaySecurityAssessment(rc, assessment); err != nil {
+				logger.Warn("Failed to display security assessment", zap.Error(err))
+			}
 			return nil
 		}
 
 		// Intervention: Apply security hardening
-		assessment, err := securityManager.HardenSystem(rc, target, securityConfig)
+		systemConfig := security_config.ConvertToSystemSecurityConfiguration(securityConfig)
+		assessment, err := securityManager.HardenSystem(rc, target, systemConfig)
 		if err != nil {
 			return cerr.Wrap(err, "system hardening failed")
 		}
@@ -92,7 +99,9 @@ Examples:
 			zap.Int("vulnerabilities_found", len(assessment.Vulnerabilities)),
 			zap.Int("recommendations", len(assessment.Recommendations)))
 
-		displaySecurityAssessment(rc, assessment)
+		if err := security_config.DisplaySecurityAssessment(rc, assessment); err != nil {
+			logger.Warn("Failed to display security assessment", zap.Error(err))
+		}
 
 		return nil
 	}),
@@ -245,7 +254,7 @@ Examples:
 
 		if configFile != "" {
 			// Load services from configuration file
-			services, err = loadServicesFromFile(configFile)
+			services, err = config_loader.LoadServicesFromFile(rc, configFile)
 			if err != nil {
 				return cerr.Wrap(err, "failed to load services configuration")
 			}
@@ -323,7 +332,7 @@ Examples:
 
 		if configFile != "" {
 			// Load cron jobs from configuration file
-			cronJobs, err = loadCronJobsFromFile(configFile)
+			cronJobs, err = config_loader.LoadCronJobsFromFile(rc, configFile)
 			if err != nil {
 				return cerr.Wrap(err, "failed to load cron jobs configuration")
 			}
@@ -409,7 +418,7 @@ Examples:
 
 		if configFile != "" {
 			// Load users from configuration file
-			users, err = loadUsersFromFile(configFile)
+			users, err = config_loader.LoadUsersFromFile(rc, configFile)
 			if err != nil {
 				return cerr.Wrap(err, "failed to load users configuration")
 			}
@@ -487,7 +496,7 @@ Examples:
 		}
 
 		// Load system state configuration
-		systemState, err := loadSystemStateFromFile(configFile)
+		systemState, err := config_loader.LoadSystemStateFromFile(rc, configFile)
 		if err != nil {
 			return cerr.Wrap(err, "failed to load system state configuration")
 		}
@@ -495,18 +504,23 @@ Examples:
 		if dryRun {
 			logger.Info("Dry run mode - assessing current state only")
 			// In a real implementation, this would show what changes would be made
-			displaySystemState(rc, systemState)
+			if err := system_display.DisplaySystemState(rc, systemState); err != nil {
+				logger.Warn("Failed to display system state", zap.Error(err))
+			}
 			return nil
 		}
 
 		// Apply system state
-		result, err := saltManager.ApplySystemState(rc, target, systemState)
+		convertedState := config_loader.ConvertToSystemState(systemState)
+		result, err := saltManager.ApplySystemState(rc, target, convertedState)
 		if err != nil {
 			return cerr.Wrap(err, "system state application failed")
 		}
 
 		// Display results
-		displayStateApplication(rc, result)
+		if err := system_display.DisplayStateApplication(rc, result); err != nil {
+			logger.Warn("Failed to display state application", zap.Error(err))
+		}
 
 		return nil
 	}),
@@ -554,168 +568,4 @@ func init() {
 	UpdateCmd.AddCommand(manageStateCmd)
 }
 
-var systemCleanupCmd = &cobra.Command{
-	Use:     "system-cleanup",
-	Aliases: []string{"cleanup-system", "sys-cleanup"},
-	Short:   "Clean up unused packages and system files",
-	Long: `Remove orphaned packages, unused dependencies, and old kernels.
-	
-This command performs comprehensive system cleanup by:
-- Finding and removing orphaned packages (using deborphan)
-- Running apt autoremove for unused dependencies  
-- Identifying and optionally removing unused kernel packages
-
-By default, runs in interactive mode for safety.
-
-Examples:
-  eos update system-cleanup                     # Interactive full cleanup
-  eos update system-cleanup --yes              # Non-interactive full cleanup
-  eos update system-cleanup --orphans-only     # Only remove orphaned packages
-  eos update system-cleanup --kernels-only     # Only remove unused kernels`,
-
-	RunE: eos_cli.Wrap(runSystemCleanup),
-}
-
-func init() {
-	systemCleanupCmd.Flags().BoolP("yes", "y", false, "Run in non-interactive mode (skip prompts)")
-	systemCleanupCmd.Flags().Bool("orphans-only", false, "Only remove orphaned packages")
-	systemCleanupCmd.Flags().Bool("kernels-only", false, "Only remove unused kernels")
-
-	UpdateCmd.AddCommand(systemCleanupCmd)
-}
-
-func runSystemCleanup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting system cleanup")
-
-	nonInteractive, _ := cmd.Flags().GetBool("yes")
-	orphansOnly, _ := cmd.Flags().GetBool("orphans-only")
-	kernelsOnly, _ := cmd.Flags().GetBool("kernels-only")
-
-	cleanup := system.NewPackageCleanup(rc)
-
-	// Check root privileges
-	if err := cleanup.CheckRoot(); err != nil {
-		return err
-	}
-
-	interactive := !nonInteractive
-
-	logger.Info("System cleanup configuration",
-		zap.Bool("interactive", interactive),
-		zap.Bool("orphans_only", orphansOnly),
-		zap.Bool("kernels_only", kernelsOnly))
-
-	if orphansOnly {
-		return runOrphansCleanup(cleanup, interactive)
-	}
-
-	if kernelsOnly {
-		return runKernelsCleanup(cleanup, interactive)
-	}
-
-	// Run full cleanup
-	result, err := cleanup.PerformFullCleanup(interactive)
-	if err != nil {
-		return fmt.Errorf("system cleanup failed: %w", err)
-	}
-
-	// Display results
-	fmt.Print(result.FormatResult())
-
-	logger.Info("System cleanup completed successfully",
-		zap.Int("orphaned_packages", len(result.OrphanedPackages)),
-		zap.Bool("orphans_removed", result.OrphansRemoved),
-		zap.Bool("autoremove_ran", result.AutoremoveRan),
-		zap.Int("unused_kernels", len(result.UnusedKernels)),
-		zap.Bool("kernels_removed", result.KernelsRemoved))
-
-	return nil
-}
-
-// runOrphansCleanup handles orphaned packages only
-func runOrphansCleanup(cleanup *system.PackageCleanup, interactive bool) error {
-	fmt.Println("🔍 Finding orphaned packages...")
-
-	// Ensure deborphan is available
-	if err := cleanup.EnsureDeborphan(); err != nil {
-		return fmt.Errorf("failed to ensure deborphan: %w", err)
-	}
-
-	// Find orphaned packages
-	orphans, err := cleanup.FindOrphanedPackages()
-	if err != nil {
-		return fmt.Errorf("failed to find orphaned packages: %w", err)
-	}
-
-	if len(orphans) == 0 {
-		fmt.Println("✅ No orphaned packages found")
-		return nil
-	}
-
-	fmt.Printf("📦 Found %d orphaned packages:\n", len(orphans))
-	for _, pkg := range orphans {
-		fmt.Printf("  - %s\n", pkg)
-	}
-
-	// Remove orphaned packages
-	shouldRemove := true
-	if interactive {
-		fmt.Printf("\nRemove these %d orphaned packages? (y/n): ", len(orphans))
-		var response string
-		fmt.Scanln(&response)
-		shouldRemove = response == "y" || response == "Y" || response == "yes"
-	}
-
-	if shouldRemove {
-		if err := cleanup.RemoveOrphanedPackages(orphans); err != nil {
-			return fmt.Errorf("failed to remove orphaned packages: %w", err)
-		}
-		fmt.Println("✅ Orphaned packages removed successfully")
-	} else {
-		fmt.Println("⏭️  Skipped removal of orphaned packages")
-	}
-
-	return nil
-}
-
-// runKernelsCleanup handles unused kernels only
-func runKernelsCleanup(cleanup *system.PackageCleanup, interactive bool) error {
-	fmt.Println("🔍 Finding unused kernels...")
-
-	// Find unused kernels
-	kernels, err := cleanup.FindUnusedKernels()
-	if err != nil {
-		return fmt.Errorf("failed to find unused kernels: %w", err)
-	}
-
-	if len(kernels) == 0 {
-		fmt.Println("✅ No unused kernels found")
-		return nil
-	}
-
-	fmt.Printf("🐧 Found %d unused kernels:\n", len(kernels))
-	for _, kernel := range kernels {
-		fmt.Printf("  - %s\n", kernel)
-	}
-
-	// Remove unused kernels
-	shouldRemove := false
-	if interactive {
-		fmt.Printf("\nRemove these %d unused kernels? (y/n): ", len(kernels))
-		var response string
-		fmt.Scanln(&response)
-		shouldRemove = response == "y" || response == "Y" || response == "yes"
-	}
-
-	if shouldRemove {
-		if err := cleanup.RemoveUnusedKernels(kernels); err != nil {
-			return fmt.Errorf("failed to remove unused kernels: %w", err)
-		}
-		fmt.Println("✅ Unused kernels removed successfully")
-	} else {
-		fmt.Println("⏭️  Skipped removal of unused kernels")
-	}
-
-	return nil
-}
+// Cleanup functionality has been moved to cmd/update/cleanup.go

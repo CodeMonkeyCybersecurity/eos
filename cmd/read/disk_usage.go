@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -50,7 +51,7 @@ Examples:
 
 func init() {
 	diskUsageCmd.Flags().Bool("json", false, "Output in JSON format")
-	
+
 	ReadCmd.AddCommand(diskUsageCmd)
 }
 
@@ -69,14 +70,14 @@ func outputDiskUsageTable(usage map[string]disk_management.DiskUsageInfo) error 
 	fmt.Printf("Disk Usage Information (%d filesystems)\n\n", len(usage))
 
 	// Print header
-	fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n", 
+	fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n",
 		"FILESYSTEM", "SIZE", "USED", "AVAIL", "USE%", "MOUNTED ON")
 	fmt.Println(strings.Repeat("-", 80))
 
 	// Print usage information
 	for _, info := range usage {
 		fmt.Printf("%-20s %-10s %-10s %-10s %-8s %s\n",
-			truncateString(info.Filesystem, 20),
+			utils.TruncateString(info.Filesystem, 20),
 			info.Size,
 			info.Used,
 			info.Available,
@@ -85,12 +86,4 @@ func outputDiskUsageTable(usage map[string]disk_management.DiskUsageInfo) error 
 	}
 
 	return nil
-}
-
-// Helper function
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
 }

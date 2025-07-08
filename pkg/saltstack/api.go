@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-// Client represents a Salt API client
-type Client struct {
+// APIClient represents a Salt API client
+type APIClient struct {
 	BaseURL    string
 	Username   string
 	Password   string
@@ -21,9 +21,9 @@ type Client struct {
 	HTTPClient *http.Client
 }
 
-// NewClient creates a new Salt API client
-func NewClient(baseURL, username, password string) *Client {
-	return &Client{
+// NewAPIClient creates a new Salt API client
+func NewAPIClient(baseURL, username, password string) *APIClient {
+	return &APIClient{
 		BaseURL:  baseURL,
 		Username: username,
 		Password: password,
@@ -51,7 +51,7 @@ type LoginResponse struct {
 }
 
 // Login authenticates with the Salt API and stores the token
-func (c *Client) Login() error {
+func (c *APIClient) Login() error {
 	loginData := map[string]string{
 		"username": c.Username,
 		"password": c.Password,
@@ -92,7 +92,7 @@ func (c *Client) Login() error {
 }
 
 // doRequest executes an authenticated request
-func (c *Client) doRequest(method, endpoint string, data interface{}) (json.RawMessage, error) {
+func (c *APIClient) doRequest(method, endpoint string, data interface{}) (json.RawMessage, error) {
 	if c.Token == "" {
 		if err := c.Login(); err != nil {
 			return nil, fmt.Errorf("authentication failed: %w", err)
@@ -147,7 +147,7 @@ func (c *Client) doRequest(method, endpoint string, data interface{}) (json.RawM
 }
 
 // RunCommand executes a Salt command on targeted minions
-func (c *Client) RunCommand(target, targetType, function string, args []interface{}, kwargs map[string]interface{}) (map[string]interface{}, error) {
+func (c *APIClient) RunCommand(target, targetType, function string, args []interface{}, kwargs map[string]interface{}) (map[string]interface{}, error) {
 	requestData := map[string]interface{}{
 		"client": "local",
 		"tgt":    target,
@@ -188,7 +188,7 @@ func (c *Client) RunCommand(target, targetType, function string, args []interfac
 }
 
 // ApplyState applies a Salt state to targeted minions
-func (c *Client) ApplyState(target, targetType, state string, pillar map[string]interface{}) (map[string]interface{}, error) {
+func (c *APIClient) ApplyState(target, targetType, state string, pillar map[string]interface{}) (map[string]interface{}, error) {
 	kwargs := make(map[string]interface{})
 	if pillar != nil {
 		kwargs["pillar"] = pillar
@@ -198,7 +198,7 @@ func (c *Client) ApplyState(target, targetType, state string, pillar map[string]
 }
 
 // GetGrains retrieves grains from targeted minions
-func (c *Client) GetGrains(target, targetType string, grains []string) (map[string]interface{}, error) {
+func (c *APIClient) GetGrains(target, targetType string, grains []string) (map[string]interface{}, error) {
 	// Convert []string to []interface{} for RunCommand
 	args := make([]interface{}, len(grains))
 	for i, grain := range grains {
@@ -215,7 +215,7 @@ type JobResult struct {
 }
 
 // RunJobAsync starts an asynchronous Salt job
-func (c *Client) RunJobAsync(target, targetType, function string, args []interface{}) (string, error) {
+func (c *APIClient) RunJobAsync(target, targetType, function string, args []interface{}) (string, error) {
 	requestData := map[string]interface{}{
 		"client": "local_async",
 		"tgt":    target,
@@ -252,7 +252,7 @@ func (c *Client) RunJobAsync(target, targetType, function string, args []interfa
 }
 
 // GetJobResult retrieves the result of an asynchronous job
-func (c *Client) GetJobResult(jid string) (*JobResult, error) {
+func (c *APIClient) GetJobResult(jid string) (*JobResult, error) {
 	requestData := map[string]interface{}{
 		"client": "runner",
 		"fun":    "jobs.lookup_jid",

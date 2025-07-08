@@ -30,7 +30,7 @@ var SelfCmd = &cobra.Command{
 	}),
 }
 
-var updateCmd = &cobra.Command{
+var UpdateCmd = &cobra.Command{
 	Use:   "update",
 	Short: "Update Eos to the latest version",
 	Long: `Update Eos to the latest version by pulling from git repository and reinstalling.
@@ -93,7 +93,7 @@ This command performs the equivalent of: su, cd /opt/eos && git pull && ./instal
 }
 
 func init() {
-	SelfCmd.AddCommand(updateCmd)
+	SelfCmd.AddCommand(UpdateCmd)
 	SelfCmd.AddCommand(NewSecretsCmd())
 	SelfCmd.AddCommand(git.GitCmd)
 	// Add SelfCmd to ConfigCmd so 'eos config self' works

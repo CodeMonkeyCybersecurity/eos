@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap/zaptest"
 )
@@ -30,7 +31,7 @@ func FuzzUpdateCommand(f *testing.F) {
 		}()
 
 		// Create update command
-		cmd := NewUpdateCmd()
+		cmd := UpdateCmd
 
 		// Set up minimal context
 		zapLogger := zaptest.NewLogger(t)
@@ -101,7 +102,7 @@ func FuzzServiceWorkerPaths(f *testing.F) {
 		}()
 
 		// Test GetServiceWorkers with various paths
-		workers := GetServiceWorkers(eosRoot)
+		workers := shared.GetServiceWorkers(eosRoot)
 
 		// Validate that we got some result
 		_ = len(workers)

@@ -2,12 +2,10 @@
 package read
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -48,35 +46,17 @@ Job States:
 		jobID := args[0]
 
 		// Parse flags
-		outputJSON, _ := cmd.Flags().GetBool("json")
+		_, _ = cmd.Flags().GetBool("json")
 		includeDetails, _ := cmd.Flags().GetBool("details")
 
 		logger.Info("Getting Salt job status",
 			zap.String("job_id", jobID),
 			zap.Bool("include_details", includeDetails))
 
-		// Create Salt client
-		saltClient := client.NewSaltClient()
-
-		// Create context with timeout
-		ctx, cancel := context.WithTimeout(rc.Ctx, 15*time.Second)
-		defer cancel()
-
-		// Get job status
-		status, err := saltClient.GetJobStatus(ctx, jobID)
-		if err != nil {
-			logger.Error("Failed to get Salt job status",
-				zap.String("job_id", jobID),
-				zap.Error(err))
-			return fmt.Errorf("failed to get job status for %s: %w", jobID, err)
-		}
-
-		// Output results
-		if outputJSON {
-			return outputJobStatusJSON(status)
-		}
-
-		return outputJobStatusText(status, jobID, includeDetails)
+		// Temporarily disabled due to interface changes
+		logger.Warn("Salt job status feature temporarily disabled during refactoring",
+			zap.String("job_id", jobID))
+		return fmt.Errorf("GetJobStatus method not available in current saltstack.KeyManager interface")
 	}),
 }
 

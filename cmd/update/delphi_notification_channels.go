@@ -5,6 +5,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi_channels"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -67,9 +68,9 @@ Examples:
 		standardizer := delphi_channels.NewChannelStandardizer(config)
 
 		if analyze {
-			return runAnalysis(standardizer, outputJSON, logger)
+			return pipeline.RunAnalysis(standardizer, outputJSON, logger)
 		} else {
-			return runStandardization(standardizer, outputJSON, dryRun, logger)
+			return pipeline.RunStandardization(standardizer, outputJSON, dryRun, logger)
 		}
 	}),
 }

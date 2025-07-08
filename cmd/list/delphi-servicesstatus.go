@@ -8,6 +8,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -38,7 +39,7 @@ Examples:
   eos delphi services status --all`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			// Use the DelphiServices slice for autocompletion
-			return DelphiServices, cobra.ShellCompDirectiveNoFileComp
+			return shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), cobra.ShellCompDirectiveNoFileComp
 		},
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
@@ -46,21 +47,21 @@ Examples:
 
 			var services []string
 			if all {
-				services = DelphiServices
+				services = shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames()
 			} else if len(args) == 0 {
 				return fmt.Errorf("specify a service name or use --all")
 			} else {
 				// Validate service name
 				service := args[0]
 				valid := false
-				for _, s := range DelphiServices {
+				for _, s := range shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames() {
 					if s == service {
 						valid = true
 						break
 					}
 				}
 				if !valid {
-					return fmt.Errorf("invalid service: %s. Valid services: %s", service, strings.Join(DelphiServices, ", "))
+					return fmt.Errorf("invalid service: %s. Valid services: %s", service, strings.Join(shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), ", "))
 				}
 				services = []string{service}
 			}
@@ -104,6 +105,6 @@ Examples:
 		}),
 	}
 
-	ListCmd.Flags().BoolVarP(&all, "all", "a", false, "Check status of all Delphi services")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "Check status of all Delphi services")
 	return cmd
 }

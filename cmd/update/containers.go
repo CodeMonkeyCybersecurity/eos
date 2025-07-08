@@ -1,12 +1,8 @@
 package update
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-
-	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container_management"
+	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -31,7 +27,7 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		searchPaths, _ := cmd.Flags().GetStringSlice("path")
 		force, _ := cmd.Flags().GetBool("force")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -54,7 +50,7 @@ Examples:
 			Timeout:        timeout,
 		}
 
-		logger.Info("Stopping Docker Compose projects", 
+		logger.Info("Stopping Docker Compose projects",
 			zap.Strings("search_paths", searchPaths),
 			zap.Bool("force", force),
 			zap.Bool("dry_run", dryRun))
@@ -67,10 +63,10 @@ Examples:
 		}
 
 		if outputJSON {
-			return outputComposeStopJSON(result)
+			return container_management.OutputComposeStopJSON(result)
 		}
 
-		return outputComposeStopTable(result)
+		return container_management.OutputComposeStopTable(result)
 	}),
 }
 
@@ -87,46 +83,4 @@ func init() {
 
 	// Register with parent command
 	UpdateCmd.AddCommand(containerComposeCmd)
-}
-
-func outputComposeStopJSON(result *container_management.ComposeMultiStopResult) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
-
-func outputComposeStopTable(result *container_management.ComposeMultiStopResult) error {
-	summary := result.Summary
-
-	fmt.Printf("Compose Stop Summary:\n")
-	fmt.Printf("  Total projects: %d\n", summary.TotalProjects)
-	fmt.Printf("  Successfully stopped: %d\n", summary.ProjectsStopped)
-	fmt.Printf("  Skipped: %d\n", summary.ProjectsSkipped)
-	fmt.Printf("  Failed: %d\n", summary.ProjectsFailed)
-	fmt.Printf("  Duration: %v\n", summary.Duration)
-	fmt.Printf("  Success: %t\n\n", summary.Success)
-
-	if len(result.Operations) > 0 {
-		fmt.Println("Operations:")
-		for _, op := range result.Operations {
-			status := "✓"
-			if !op.Success {
-				status = "✗"
-			}
-			if op.DryRun {
-				status = "[DRY RUN]"
-			}
-
-			fmt.Printf("  %s %s: %s\n", status, op.Project.Path, op.Message)
-		}
-	}
-
-	if len(summary.Errors) > 0 {
-		fmt.Println("\nErrors:")
-		for _, err := range summary.Errors {
-			fmt.Printf("  ✗ %s\n", err)
-		}
-	}
-
-	return nil
 }

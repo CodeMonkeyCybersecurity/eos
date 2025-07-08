@@ -41,7 +41,7 @@ Examples:
   eos delphi prompts delete temp-prompt --backup --force`,
 		Args: cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			prompts, err := ListSystemPrompts()
+			prompts, err := pipeline.ListSystemPrompts()
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
@@ -58,7 +58,7 @@ Examples:
 			logger.Info(" Deleting system prompt",
 				zap.String("prompt_name", promptName))
 
-			promptsDir, err := GetSystemPromptsDir()
+			promptsDir, err := pipeline.GetSystemPromptsDir()
 			if err != nil {
 				return err
 			}

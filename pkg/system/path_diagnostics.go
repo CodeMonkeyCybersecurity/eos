@@ -242,7 +242,7 @@ func (pd *PathDiagnostics) GenerateReport(info *PathInfo) string {
 	}
 
 	if len(info.DuplicateEntries) > 0 {
-		report.WriteString("\n⚠️  Duplicate PATH entries found:\n")
+		report.WriteString("\nDuplicate PATH entries found:\n")
 		for _, dup := range info.DuplicateEntries {
 			report.WriteString(fmt.Sprintf("  - %s\n", dup))
 		}

@@ -684,7 +684,7 @@ func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) 
 	log.Info(" ")
 
 	if vaultAvailable {
-		log.Info(" 🔐 VAULT INTEGRATION:")
+		log.Info("  VAULT INTEGRATION:")
 		log.Info("   • Vault service automatically registered")
 		log.Info("   • Health monitoring enabled")
 		log.Info("   • Service discovery available via DNS:")

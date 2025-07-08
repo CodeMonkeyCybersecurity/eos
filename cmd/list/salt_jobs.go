@@ -11,7 +11,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt/client"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -55,18 +55,21 @@ Job States:
 			zap.Bool("include_complete", includeComplete))
 
 		// Create Salt client
-		saltClient := client.NewSaltClient()
+		saltClient := saltstack.NewClient(otelzap.Ctx(rc.Ctx))
 
 		// Create context with timeout
 		ctx, cancel := context.WithTimeout(rc.Ctx, 30*time.Second)
 		defer cancel()
 
-		// Get job list
-		jobs, err := saltClient.ListJobs(ctx, limit, functionFilter, includeComplete)
+		// Get job list using basic Salt command
+		output, err := saltClient.CmdRun(ctx, "*", "saltutil.running")
 		if err != nil {
 			logger.Error("Failed to list Salt jobs", zap.Error(err))
 			return fmt.Errorf("failed to list Salt jobs: %w", err)
 		}
+		
+		// For now, just return the raw output as jobs
+		jobs := map[string]interface{}{"output": output}
 
 		// Output results
 		if outputJSON {
@@ -92,7 +95,7 @@ func outputJobsJSON(jobs interface{}) error {
 	return encoder.Encode(jobs)
 }
 
-func outputJobsTable(jobs interface{}, logger *zap.Logger) error {
+func outputJobsTable(jobs interface{}, logger otelzap.LoggerWithCtx) error {
 	fmt.Println("Recent Salt Jobs")
 	fmt.Println(strings.Repeat("=", 80))
 

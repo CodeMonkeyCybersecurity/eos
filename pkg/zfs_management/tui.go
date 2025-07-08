@@ -450,11 +450,11 @@ func (m *TUIModel) renderInputView() string {
 		}
 	case "destroy_pool":
 		s.WriteString("Destroy ZFS Pool\n")
-		s.WriteString("⚠️  WARNING: This will permanently destroy the pool and ALL data!\n")
+		s.WriteString("WARNING: This will permanently destroy the pool and ALL data!\n")
 		s.WriteString("Enter the name of the pool to destroy:\n\n")
 	case "destroy_filesystem":
 		s.WriteString("Destroy ZFS Filesystem\n")
-		s.WriteString("⚠️  WARNING: This will permanently destroy the filesystem and ALL data!\n")
+		s.WriteString("WARNING: This will permanently destroy the filesystem and ALL data!\n")
 		s.WriteString("Enter the name of the filesystem to destroy:\n\n")
 	}
 

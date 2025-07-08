@@ -265,7 +265,7 @@ run_ci_fuzz_test() {
     
     # CI-specific result handling
     if (( exit_code == 0 )); then
-        ci_log "INFO" "✅ $test_name: ${new_inputs} inputs, ${executions} execs, ${elapsed}s"
+        ci_log "INFO" "$test_name: ${new_inputs} inputs, ${executions} execs, ${elapsed}s"
     else
         ci_log "ERROR" "❌ $test_name failed: exit $exit_code, ${crashes} crashes, ${elapsed}s"
         
@@ -500,7 +500,7 @@ EOF
     # Add recommendations
     if (( total_failed == 0 && total_crashes == 0 )); then
         cat >> "$report_file" << EOF
-## ✅ All Tests Passed
+## All Tests Passed
 
 The code changes appear to maintain security standards.
 Consider running extended fuzzing before deployment.
@@ -508,7 +508,7 @@ Consider running extended fuzzing before deployment.
 EOF
     elif (( total_failed > 0 && total_crashes == 0 )); then
         cat >> "$report_file" << EOF
-## ⚠️ Test Failures Detected
+## Test Failures Detected
 
 Some tests failed without security implications.
 Review logs for configuration or logic issues.
@@ -616,7 +616,7 @@ main() {
     
     # Final status
     if (( total_failed == 0 )); then
-        ci_log "INFO" "✅ CI fuzzing completed successfully"
+        ci_log "INFO" "CI fuzzing completed successfully"
         github_set_output "fuzzing_status" "success"
     else
         ci_log "ERROR" "❌ CI fuzzing detected issues ($total_failed failures)"

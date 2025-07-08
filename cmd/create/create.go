@@ -43,9 +43,11 @@ func init() {
 
 // Global flags
 var (
-	dryRun     bool
-	backup     bool
-	jsonOutput bool
+	dryRun      bool
+	backup      bool
+	jsonOutput  bool
+	force       bool
+	interactive bool
 )
 
 // SetupCmd represents the setup command
@@ -70,6 +72,9 @@ Examples:
 }
 
 func init() {
+	// Register SetupCmd as a subcommand of CreateCmd
+	CreateCmd.AddCommand(SetupCmd)
+	
 	// Add global flags
 	SetupCmd.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "Simulate setup without making changes")
 	SetupCmd.PersistentFlags().BoolVarP(&force, "force", "f", false, "Force setup even if already configured")
@@ -103,7 +108,7 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 			zap.String("type", string(configType)),
 			zap.Duration("duration", result.Duration))
 
-		fmt.Printf("\n✅ %s Setup Complete!\n\n", configType)
+		fmt.Printf("\n%s Setup Complete!\n\n", configType)
 		fmt.Printf("⏱️ Duration: %s\n", result.Duration)
 
 		if len(result.Changes) > 0 {
@@ -114,14 +119,14 @@ func setupConfiguration(rc *eos_io.RuntimeContext, configType system_config.Conf
 		}
 
 		if len(result.Warnings) > 0 {
-			fmt.Printf("\n⚠️ Warnings:\n")
+			fmt.Printf("\nWarnings:\n")
 			for _, warning := range result.Warnings {
 				fmt.Printf("   • %s\n", warning)
 			}
 		}
 
 		if len(result.Steps) > 0 {
-			fmt.Printf("\n🔧 Steps Completed:\n")
+			fmt.Printf("\nSteps Completed:\n")
 			for _, step := range result.Steps {
 				status := "✅"
 				if step.Status == "failed" {

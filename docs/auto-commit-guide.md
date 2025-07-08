@@ -248,7 +248,7 @@ preferences:
 ## Best Practices
 
 ### **When to Use Auto-Commit**
-✅ **Good for:**
+**Good for:**
 - Daily development commits
 - Work-in-progress saves
 - Small bug fixes

@@ -147,7 +147,7 @@ func Update(rc *eos_io.RuntimeContext, namespace string, config *Config) error {
 func Delete(rc *eos_io.RuntimeContext, namespace string, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("🗑️ Deleting Penpot deployment",
+	logger.Info("Deleting Penpot deployment",
 		zap.String("namespace", namespace),
 		zap.Bool("force", force))
 

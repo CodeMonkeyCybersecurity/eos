@@ -127,10 +127,10 @@ To handle natural language variations, use command aliases:
 - ❌ `cmd/vault/`
 
 Instead, use verb-first structure:
-- ✅ `eos create database`
-- ✅ `eos update delphi`  
-- ✅ `eos list containers`
-- ✅ `eos read vault status`
+- `eos create database`
+- `eos update delphi`  
+- `eos list containers`
+- `eos read vault status`
 
 #### Directory Structure
 ```

@@ -2,12 +2,65 @@
 package update
 
 import (
+	"fmt"
+
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage"
 	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
+// Global flags
+var (
+	resizeFilesystem bool
+	lvPath          string
+	devicePath      string
+	mountpoint      string
+	fsType          string
+)
+
+// runUpdateStorage handles the storage update operation
+func runUpdateStorage(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("Starting storage update operation")
+	
+	if resizeFilesystem {
+		logger.Info("Auto-resizing Ubuntu LVM")
+		if err := storage.AutoResizeUbuntuLVM(rc); err != nil {
+			return fmt.Errorf("failed to auto-resize LVM: %w", err)
+		}
+		logger.Info("LVM auto-resize completed successfully")
+		return nil
+	}
+	
+	if lvPath != "" {
+		logger.Info("Extending logical volume", zap.String("lv_path", lvPath))
+		if err := storage.ExtendLogicalVolume(rc, lvPath); err != nil {
+			return fmt.Errorf("failed to extend logical volume: %w", err)
+		}
+		logger.Info("Logical volume extended successfully")
+	}
+	
+	if devicePath != "" {
+		logger.Info("Resizing filesystem", 
+			zap.String("device", devicePath),
+			zap.String("fs_type", fsType))
+		if err := storage.ResizeFilesystem(rc, devicePath, fsType, mountpoint); err != nil {
+			return fmt.Errorf("failed to resize filesystem: %w", err)
+		}
+		logger.Info("Filesystem resized successfully")
+	}
+	
+	if lvPath == "" && devicePath == "" && !resizeFilesystem {
+		logger.Info("No storage operations specified")
+		return fmt.Errorf("no storage operation specified. Use --resize, --lv-path, or --device")
+	}
+	
+	return nil
+}
 
 
 // updateStorageCmd handles updating storage information

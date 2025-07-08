@@ -5,10 +5,42 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// ServiceStatus represents the status of a service
+type ServiceStatus struct {
+	Active  string
+	Enabled string
+}
+
+// getServiceStatus returns the status of a service
+func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus, error) {
+	var status ServiceStatus
+	
+	// Check if service is active
+	if eos_unix.ServiceExists(serviceName) {
+		if err := eos_unix.CheckServiceStatus(rc.Ctx, serviceName); err == nil {
+			status.Active = "active"
+		} else {
+			status.Active = "inactive"
+		}
+	} else {
+		status.Active = "not-installed"
+	}
+	
+	// Check if service is enabled (simplified check)
+	if status.Active == "active" {
+		status.Enabled = "enabled"
+	} else {
+		status.Enabled = "disabled"
+	}
+	
+	return status, nil
+}
 
 // NewListCmd creates the list command
 func NewListCmd() *cobra.Command {
@@ -39,7 +71,7 @@ Examples:
 			logger.Info(" Listing Delphi services")
 
 			// Get all service configurations
-			configs := pipeline.GetServiceConfigurations()
+			configs := shared.GetGlobalDelphiServiceRegistry().GetActiveServices()
 
 			// Count totals
 			var totalServices, activeServices, enabledServices, installedServices int
@@ -57,7 +89,7 @@ Examples:
 				}
 
 				// Check if files exist
-				workerExists := eos_unix.FileExists(config.WorkerFile)
+				workerExists := eos_unix.FileExists(config.WorkerScript)
 				serviceExists := eos_unix.FileExists(config.ServiceFile)
 				isInstalled := workerExists && serviceExists
 
@@ -79,7 +111,7 @@ Examples:
 						zap.String("enabled", status.Enabled),
 						zap.Bool("worker_exists", workerExists),
 						zap.Bool("service_exists", serviceExists),
-						zap.String("worker_path", config.WorkerFile),
+						zap.String("worker_path", config.WorkerScript),
 						zap.String("service_path", config.ServiceFile))
 				} else {
 					statusIcon := ""

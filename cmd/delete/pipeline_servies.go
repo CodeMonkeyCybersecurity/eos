@@ -9,6 +9,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -42,7 +43,7 @@ Examples:
   eos delphi services delete prompt-ab-tester --force`,
 		Args: cobra.ExactArgs(1),
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			configs := pipeline.pipeline.GetServiceConfigurations()
+			configs := pipeline.GetServiceConfigurations()
 			var services []string
 			for name := range configs {
 				services = append(services, name)
@@ -53,7 +54,7 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			serviceName := args[0]
 
-			logger.Info("🗑️ Deleting Delphi service",
+			logger.Info("Deleting Delphi service",
 				zap.String("service", serviceName))
 
 			// Check if running as root
@@ -89,7 +90,7 @@ Examples:
 
 			// Additional cleanup for worker script (lifecycle manager handles systemd parts)
 			if eos_unix.FileExists(config.WorkerFile) {
-				logger.Info("🗑️  Removing worker script",
+				logger.Info(" Removing worker script",
 					zap.String("file", config.WorkerFile))
 
 				if err := os.Remove(config.WorkerFile); err != nil {

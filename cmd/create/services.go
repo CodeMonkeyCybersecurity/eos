@@ -3,13 +3,11 @@
 package create
 
 import (
-	"encoding/json"
-	"fmt"
-	"strings"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/service_deployment"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
@@ -76,19 +74,23 @@ Examples:
 		orchestrationManager := system.NewOrchestrationManager(saltManager, terraformDir, vaultPath, nomadConfig)
 
 		// Generate service deployment configuration
-		deployment, err := generateServiceDeployment(serviceName, deploymentType, image, configFile)
+		deployment, err := service_deployment.GenerateServiceDeployment(rc, serviceName, deploymentType, image, configFile)
 		if err != nil {
 			return cerr.Wrap(err, "failed to generate service deployment configuration")
 		}
 
+		// Convert to system deployment type  
+		systemDeployment := service_deployment.ConvertToSystemDeployment(deployment)
+		
 		// Deploy service
-		result, err := orchestrationManager.DeployService(rc, deployment)
+		result, err := orchestrationManager.DeployService(rc, systemDeployment)
 		if err != nil {
 			return cerr.Wrap(err, "service deployment failed")
 		}
 
 		// Display deployment results
-		displayDeploymentResult(rc, result)
+		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
+		service_deployment.DisplayDeploymentResult(rc, convertedResult)
 
 		return nil
 	}),
@@ -158,7 +160,8 @@ Examples:
 			return cerr.Wrap(err, "Grafana deployment failed")
 		}
 
-		displayDeploymentResult(rc, result)
+		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
+		service_deployment.DisplayDeploymentResult(rc, convertedResult)
 
 		return nil
 	}),
@@ -229,164 +232,11 @@ Examples:
 			return cerr.Wrap(err, "Mattermost deployment failed")
 		}
 
-		displayDeploymentResult(rc, result)
+		convertedResult := service_deployment.ConvertFromSystemDeploymentResult(result)
+		service_deployment.DisplayDeploymentResult(rc, convertedResult)
 
 		return nil
 	}),
-}
-
-func generateServiceDeployment(serviceName, deploymentType, image, configFile string) (*system.ServiceDeployment, error) {
-	deployment := &system.ServiceDeployment{
-		Name: serviceName,
-		Type: deploymentType,
-		Resources: system.ResourceRequirements{
-			CPU:    500,  // 500 MHz
-			Memory: 512,  // 512 MB
-			Disk:   1024, // 1 GB
-		},
-		HealthChecks: []system.HealthCheck{
-			{
-				Type:     "http",
-				Endpoint: "/health",
-				Port:     8080,
-				Interval: 30 * time.Second,
-				Timeout:  5 * time.Second,
-				Retries:  3,
-			},
-		},
-		UpdateStrategy: system.UpdateStrategy{
-			Type:            "rolling",
-			MaxUnavailable:  1,
-			MaxSurge:        1,
-			ProgressTimeout: 5 * time.Minute,
-			RollbackOnError: true,
-		},
-	}
-
-	switch deploymentType {
-	case "nomad":
-		deployment.JobSpec = &system.NomadJobSpec{
-			ID:          serviceName,
-			Name:        serviceName,
-			Type:        "service",
-			Region:      "global",
-			Datacenters: []string{"dc1"},
-			Groups: []system.TaskGroup{
-				{
-					Name:  serviceName,
-					Count: 1,
-					Tasks: []system.Task{
-						{
-							Name:   serviceName,
-							Driver: "docker",
-							Config: map[string]interface{}{
-								"image": image,
-								"ports": []string{"http"},
-							},
-							Resources: system.Resources{
-								CPU:    500,
-								Memory: 512,
-								Ports: map[string]int{
-									"http": 8080,
-								},
-							},
-						},
-					},
-				},
-			},
-		}
-
-	case "docker":
-		deployment.DockerConfig = &system.DockerServiceConfig{
-			Image: extractImageName(image),
-			Tag:   extractImageTag(image),
-			Ports: []system.PortMapping{
-				{
-					HostPort:      8080,
-					ContainerPort: 8080,
-					Protocol:      "tcp",
-				},
-			},
-			RestartPolicy: "unless-stopped",
-		}
-
-	case "systemd":
-		deployment.SystemdConfig = &system.SystemdServiceConfig{
-			ExecStart: fmt.Sprintf("/usr/bin/%s", serviceName),
-			User:      serviceName,
-			Group:     serviceName,
-			Type:      "simple",
-			Restart:   "always",
-			WantedBy:  []string{"multi-user.target"},
-		}
-
-	default:
-		return nil, cerr.New(fmt.Sprintf("unsupported deployment type: %s", deploymentType))
-	}
-
-	return deployment, nil
-}
-
-func extractImageName(image string) string {
-	// Extract image name from full image string (e.g., "nginx:1.20" -> "nginx")
-	if idx := strings.LastIndex(image, ":"); idx != -1 {
-		return image[:idx]
-	}
-	return image
-}
-
-func extractImageTag(image string) string {
-	// Extract tag from full image string (e.g., "nginx:1.20" -> "1.20")
-	if idx := strings.LastIndex(image, ":"); idx != -1 {
-		return image[idx+1:]
-	}
-	return "latest"
-}
-
-func displayDeploymentResult(rc *eos_io.RuntimeContext, result *system.DeploymentResult) {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	if result.Success {
-		logger.Info("Service deployment completed successfully",
-			zap.String("service", result.ServiceName),
-			zap.String("type", result.Type),
-			zap.Duration("duration", result.Duration),
-			zap.String("job_id", result.JobID),
-			zap.Int("allocations", result.AllocationsCreated))
-	} else {
-		logger.Error("Service deployment failed",
-			zap.String("service", result.ServiceName),
-			zap.String("type", result.Type),
-			zap.Duration("duration", result.Duration),
-			zap.Strings("errors", result.Errors))
-	}
-
-	// Display service endpoints
-	if len(result.Endpoints) > 0 {
-		logger.Info("Service endpoints available")
-		for _, endpoint := range result.Endpoints {
-			logger.Info("Endpoint",
-				zap.String("name", endpoint.Name),
-				zap.String("address", endpoint.Address),
-				zap.Int("port", endpoint.Port),
-				zap.String("protocol", endpoint.Protocol),
-				zap.String("health", endpoint.Health))
-		}
-	}
-
-	// Display health status
-	if len(result.HealthStatus) > 0 {
-		logger.Info("Health check results")
-		for checkType, status := range result.HealthStatus {
-			logger.Info("Health check",
-				zap.String("type", checkType),
-				zap.String("status", status))
-		}
-	}
-
-	// Log as JSON for machine parsing
-	resultJSON, _ := json.MarshalIndent(result, "", "  ")
-	logger.Debug("Complete deployment result", zap.String("result_json", string(resultJSON)))
 }
 
 func init() {

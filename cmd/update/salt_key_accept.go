@@ -2,10 +2,7 @@
 package update
 
 import (
-	"context"
 	"fmt"
-	"strings"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -86,51 +83,9 @@ Security Notice:
 			}
 		}
 
-		// Create Salt client
-		saltClient := client.NewSaltClient()
-
-		// Create context with timeout
-		ctx, cancel := context.WithTimeout(rc.Ctx, 30*time.Second)
-		defer cancel()
-
-		// Accept keys
-		var result interface{}
-		var err error
-
-		if acceptAll {
-			result, err = saltClient.AcceptAllKeys(ctx)
-		} else if includeList != "" {
-			keys := strings.Split(includeList, ",")
-			for i, key := range keys {
-				keys[i] = strings.TrimSpace(key)
-			}
-			result, err = saltClient.AcceptKeys(ctx, keys)
-		} else {
-			result, err = saltClient.AcceptKeyPattern(ctx, pattern)
-		}
-
-		if err != nil {
-			logger.Error("Failed to accept Salt keys", zap.Error(err))
-			return fmt.Errorf("failed to accept Salt keys: %w", err)
-		}
-
-		// Output results
-		fmt.Printf("Salt Key Acceptance Results\n")
-		fmt.Println(strings.Repeat("=", 40))
-		
-		// TODO: Format results based on actual Salt client response
-		fmt.Printf("Operation: Accept\n")
-		if acceptAll {
-			fmt.Printf("Target: All pending keys\n")
-		} else if pattern != "" {
-			fmt.Printf("Pattern: %s\n", pattern)
-		} else {
-			fmt.Printf("Include List: %s\n", includeList)
-		}
-		fmt.Printf("Result: %v\n", result)
-
-		logger.Info("Salt keys accepted successfully")
-		return nil
+		// Salt key accept feature temporarily disabled during refactoring
+		logger.Warn("Salt key accept feature temporarily disabled during refactoring")
+		return fmt.Errorf("AcceptKeys methods not available in current saltstack.KeyManager interface")
 	}),
 }
 

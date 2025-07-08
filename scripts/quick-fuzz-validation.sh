@@ -41,7 +41,7 @@ for test_spec in "${tests[@]}"; do
     
     # Check if test exists
     if ! go test -list=Fuzz "${package}" 2>/dev/null | grep -q "^${test_name}$"; then
-        echo "⚠️  Test ${test_name} not found in ${package}, skipping..."
+        echo "Test ${test_name} not found in ${package}, skipping..."
         ((total--))
         continue
     fi
@@ -50,7 +50,7 @@ for test_spec in "${tests[@]}"; do
     log_file="${LOG_DIR}/${test_name}_quick_${TIMESTAMP}.log"
     if go test -run=^$ -fuzz=^${test_name}$ -fuzztime="${DURATION}" "${package}" > "${log_file}" 2>&1; then
         executions=$(grep -o 'execs: [0-9]*' "${log_file}" | tail -1 | sed 's/execs: //' || echo "0")
-        echo "✅ ${test_name}: PASSED (${executions} executions)"
+        echo "${test_name}: PASSED (${executions} executions)"
         ((passed++))
     else
         echo "❌ ${test_name}: FAILED (check ${log_file})"
@@ -61,7 +61,7 @@ done
 echo ""
 echo -e "${PURPLE}📊 Quick Validation Results:${NC}"
 echo -e "${PURPLE}==========================${NC}"
-echo -e "${GREEN}✅ Passed: ${passed}/${total}${NC}"
+echo -e "${GREEN}Passed: ${passed}/${total}${NC}"
 echo -e "${RED}❌ Failed: ${failed}/${total}${NC}"
 
 if [ ${failed} -eq 0 ]; then
@@ -74,7 +74,7 @@ if [ ${failed} -eq 0 ]; then
     exit 0
 else
     echo ""
-    echo -e "${YELLOW}⚠️  ${failed} test(s) failed. Check logs in ${LOG_DIR}${NC}"
+    echo -e "${YELLOW}${failed} test(s) failed. Check logs in ${LOG_DIR}${NC}"
     echo -e "${CYAN}🔍 Debug with: ${GREEN}go test -v -run=^$ -fuzz=^TestName$ -fuzztime=10s ./package${NC}"
     exit 1
 fi

@@ -19,10 +19,10 @@ import (
 // TestVaultSecurity_PathValidation tests secure path handling
 func TestVaultSecurity_PathValidation(t *testing.T) {
 	tests := []struct {
-		name     string
-		path     string
-		valid    bool
-		concern  string
+		name    string
+		path    string
+		valid   bool
+		concern string
 	}{
 		{
 			name:  "normal_secret_path",
@@ -68,9 +68,9 @@ func TestVaultSecurity_PathValidation(t *testing.T) {
 			valid: false,
 		},
 		{
-			name:    "path_with_spaces",
-			path:    "secret/data/my app/config",
-			valid:   true, // Vault should handle this
+			name:  "path_with_spaces",
+			path:  "secret/data/my app/config",
+			valid: true, // Vault should handle this
 		},
 	}
 
@@ -78,7 +78,7 @@ func TestVaultSecurity_PathValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test path validation logic
 			isValid := isValidVaultPath(tt.path)
-			
+
 			if tt.valid {
 				assert.True(t, isValid, "Path should be valid: %s", tt.path)
 			} else {
@@ -136,7 +136,7 @@ func TestVaultSecurity_SecretDataValidation(t *testing.T) {
 		{
 			name: "unicode_content",
 			data: map[string]interface{}{
-				"message": "Hello 世界 🔐",
+				"message": "Hello 世界 ",
 				"name":    "José María",
 			},
 			valid: true,
@@ -167,7 +167,7 @@ func TestVaultSecurity_SecretDataValidation(t *testing.T) {
 						"password": "secret123",
 					},
 					"replica": map[string]interface{}{
-						"host":     "db2.example.com", 
+						"host":     "db2.example.com",
 						"username": "readonly",
 						"password": "readonly123",
 					},
@@ -180,7 +180,7 @@ func TestVaultSecurity_SecretDataValidation(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			isValid := isValidSecretData(tt.data)
-			
+
 			if tt.valid {
 				assert.True(t, isValid, "Secret data should be valid")
 			} else {
@@ -251,7 +251,7 @@ func TestVaultSecurity_TokenHandling(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			isValid := validateVaultTokenFormat(tt.token)
-			
+
 			if tt.valid {
 				assert.True(t, isValid, "Token should be valid")
 			} else {
@@ -275,11 +275,11 @@ func TestVaultSecurity_EnvironmentValidation(t *testing.T) {
 	}()
 
 	tests := []struct {
-		name        string
-		vaultAddr   string
-		vaultToken  string
-		valid       bool
-		concern     string
+		name       string
+		vaultAddr  string
+		vaultToken string
+		valid      bool
+		concern    string
 	}{
 		{
 			name:       "secure_https_production",
@@ -300,32 +300,32 @@ func TestVaultSecurity_EnvironmentValidation(t *testing.T) {
 			valid:      true,
 		},
 		{
-			name:        "http_in_production",
-			vaultAddr:   "http://vault.example.com:8200",
-			vaultToken:  "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
-			valid:       false,
-			concern:     "HTTP in production",
+			name:       "http_in_production",
+			vaultAddr:  "http://vault.example.com:8200",
+			vaultToken: "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
+			valid:      false,
+			concern:    "HTTP in production",
 		},
 		{
-			name:        "missing_vault_addr",
-			vaultAddr:   "",
-			vaultToken:  "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
-			valid:       false,
-			concern:     "missing VAULT_ADDR",
+			name:       "missing_vault_addr",
+			vaultAddr:  "",
+			vaultToken: "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
+			valid:      false,
+			concern:    "missing VAULT_ADDR",
 		},
 		{
-			name:        "missing_vault_token",
-			vaultAddr:   "https://vault.example.com:8200",
-			vaultToken:  "",
-			valid:       false,
-			concern:     "missing VAULT_TOKEN",
+			name:       "missing_vault_token",
+			vaultAddr:  "https://vault.example.com:8200",
+			vaultToken: "",
+			valid:      false,
+			concern:    "missing VAULT_TOKEN",
 		},
 		{
-			name:        "invalid_url_format",
-			vaultAddr:   "not-a-valid-url",
-			vaultToken:  "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
-			valid:       false,
-			concern:     "invalid URL format",
+			name:       "invalid_url_format",
+			vaultAddr:  "not-a-valid-url",
+			vaultToken: "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx",
+			valid:      false,
+			concern:    "invalid URL format",
 		},
 	}
 
@@ -336,7 +336,7 @@ func TestVaultSecurity_EnvironmentValidation(t *testing.T) {
 			os.Setenv("VAULT_TOKEN", tt.vaultToken)
 
 			isValid := isValidVaultEnvironment()
-			
+
 			if tt.valid {
 				assert.True(t, isValid, "Environment should be valid")
 			} else {
@@ -411,14 +411,14 @@ func TestVaultSecurity_FilePermissions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filePath := filepath.Join(tempDir, tt.filename)
-			
+
 			// Create file with content
 			err := os.WriteFile(filePath, []byte(tt.content), tt.permissions)
 			require.NoError(t, err)
 
 			// Test file security
 			isSecure := isSecureFilePermissions(filePath)
-			
+
 			if tt.shouldSecure {
 				assert.True(t, isSecure, "File should have secure permissions: %s", tt.filename)
 			} else {
@@ -522,7 +522,7 @@ ui = true
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			isValid := isValidVaultConfig(tt.config)
-			
+
 			if tt.valid {
 				assert.True(t, isValid, "Config should be valid")
 			} else {
@@ -550,9 +550,9 @@ func TestVaultClient_SecurityInitialization(t *testing.T) {
 		os.Setenv("VAULT_TOKEN", "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx")
 
 		rc := createTestRuntimeContext(t)
-		
+
 		client, err := GetVaultClient(rc)
-		
+
 		// In test environment, this will fail due to missing Vault
 		// but we can verify the security validation worked
 		if err != nil {
@@ -568,7 +568,7 @@ func TestVaultClient_SecurityInitialization(t *testing.T) {
 		os.Setenv("VAULT_TOKEN", "")
 
 		rc := createTestRuntimeContext(t)
-		
+
 		_, err := GetVaultClient(rc)
 		assert.Error(t, err, "Should reject insecure environment")
 	})
@@ -588,10 +588,10 @@ func TestVaultSecurity_ConcurrentAccess(t *testing.T) {
 				// Test different security functions concurrently
 				path := fmt.Sprintf("secret/data/test-%d-%d", goroutineID, i)
 				token := "hvs.AAAAAQAAABAAAbCdEfGhIjKlMnOpQrStUvWx"
-				
+
 				pathValid := isValidVaultPath(path)
 				tokenValid := validateVaultTokenFormat(token)
-				
+
 				results <- pathValid && tokenValid
 			}
 		}(g)
@@ -610,22 +610,22 @@ func isValidVaultPath(path string) bool {
 	if path == "" {
 		return false
 	}
-	
+
 	// Check for path traversal attempts
 	if strings.Contains(path, "..") {
 		return false
 	}
-	
+
 	// Check for absolute paths
 	if strings.HasPrefix(path, "/") {
 		return false
 	}
-	
+
 	// Check for null bytes
 	if strings.Contains(path, "\x00") {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -633,7 +633,7 @@ func isValidSecretData(data map[string]interface{}) bool {
 	if data == nil {
 		return false
 	}
-	
+
 	// All data is considered valid for Vault storage
 	// Vault handles serialization securely
 	return true
@@ -643,40 +643,40 @@ func validateVaultTokenFormat(token string) bool {
 	if token == "" {
 		return false
 	}
-	
+
 	// Check for basic Vault token format
-	if !strings.HasPrefix(token, "hvs.") && 
-	   !strings.HasPrefix(token, "s.") && 
-	   !strings.HasPrefix(token, "b.") {
+	if !strings.HasPrefix(token, "hvs.") &&
+		!strings.HasPrefix(token, "s.") &&
+		!strings.HasPrefix(token, "b.") {
 		return false
 	}
-	
+
 	// Check for whitespace
 	if strings.Contains(token, " ") || strings.Contains(token, "\n") {
 		return false
 	}
-	
+
 	// Check minimum length
 	if len(token) < 10 {
 		return false
 	}
-	
+
 	return true
 }
 
 func isValidVaultEnvironment() bool {
 	addr := os.Getenv("VAULT_ADDR")
 	token := os.Getenv("VAULT_TOKEN")
-	
+
 	if addr == "" || token == "" {
 		return false
 	}
-	
+
 	// Basic URL validation
 	if !strings.HasPrefix(addr, "http://") && !strings.HasPrefix(addr, "https://") {
 		return false
 	}
-	
+
 	return validateVaultTokenFormat(token)
 }
 
@@ -685,14 +685,14 @@ func isSecureFilePermissions(filePath string) bool {
 	if err != nil {
 		return false
 	}
-	
+
 	mode := info.Mode()
-	
+
 	// Check if file is readable/writable by group or others
 	if mode&0077 != 0 {
 		return false
 	}
-	
+
 	return true
 }
 
@@ -700,21 +700,21 @@ func isValidVaultConfig(config string) bool {
 	if config == "" {
 		return false
 	}
-	
+
 	// Basic validation - should contain storage and listener
 	hasStorage := strings.Contains(config, "storage")
 	hasListener := strings.Contains(config, "listener")
-	
+
 	// Check for insecure patterns
 	hasInMemStorage := strings.Contains(config, `storage "inmem"`)
-	
+
 	return hasStorage && hasListener && !hasInMemStorage
 }
 
 func createTestRuntimeContext(t *testing.T) *eos_io.RuntimeContext {
 	logger := zaptest.NewLogger(t)
 	ctx := context.Background()
-	
+
 	return &eos_io.RuntimeContext{
 		Ctx:        ctx,
 		Log:        logger,

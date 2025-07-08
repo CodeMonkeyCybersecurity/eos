@@ -13,6 +13,17 @@ import (
 	"go.uber.org/zap"
 )
 
+// Flag variables for Tailscale hosts command
+var (
+	hostsOutputFile       string
+	hostsFormat           string
+	hostsExcludeOffline   bool
+	hostsExcludeSelf      bool
+	hostsIncludeComments  bool
+	hostsFilterHosts      []string
+	generateAnsible       bool
+)
+
 // CreateTailscaleCmd installs Tailscale VPN
 var CreateTailscaleCmd = &cobra.Command{
 	Use:   "tailscale",
@@ -64,8 +75,8 @@ Examples:
 			logger.Info("Tailscale installation completed successfully",
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ Tailscale Installation Complete!\n\n")
-			fmt.Printf("🔐 Service Details:\n")
+			fmt.Printf("\nTailscale Installation Complete!\n\n")
+			fmt.Printf(" Service Details:\n")
 			fmt.Printf("   Method: %s\n", result.Method)
 			fmt.Printf("   Duration: %s\n", result.Duration)
 
@@ -116,16 +127,6 @@ func init() {
 	CreateTailscaleCmd.Flags().Bool("auto-start", false, "Automatically start Tailscale after installation")
 }
 
-var (
-	hostsOutputFile      string
-	hostsFormat          string
-	hostsExcludeOffline  bool
-	hostsExcludeSelf     bool
-	hostsIncludeComments bool
-	hostsFilterHosts     []string
-	generateAnsible      bool
-)
-
 // CreateTailscaleHostsCmd represents the create tailscale-hosts command
 var CreateTailscaleHostsCmd = &cobra.Command{
 	Use:   "tailscale-hosts",
@@ -148,44 +149,8 @@ Examples:
   eos create tailscale-hosts --exclude-offline            # Exclude offline peers
   eos create tailscale-hosts --ansible                    # Generate Ansible inventory`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runCreateTailscaleHosts(rc, cmd, args)
+		return network.RunCreateTailscaleHosts(rc, cmd, args)
 	}),
-}
-
-func runCreateTailscaleHosts(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Generating Tailscale hosts configuration")
-
-	// Handle Ansible inventory generation
-	if generateAnsible {
-		outputFile := hostsOutputFile
-		if outputFile == "" {
-			outputFile = "/tmp/tailscale_inventory.ini"
-		}
-		return network.GetTailscaleHostsForAnsible(rc, outputFile)
-	}
-
-	// Create configuration
-	config := &network.HostsConfig{
-		OutputFile:      hostsOutputFile,
-		Format:          hostsFormat,
-		ExcludeOffline:  hostsExcludeOffline,
-		ExcludeSelf:     hostsExcludeSelf,
-		IncludeComments: hostsIncludeComments,
-		FilterHosts:     hostsFilterHosts,
-	}
-
-	// Generate hosts configuration
-	if err := network.GenerateTailscaleHostsConfig(rc, config); err != nil {
-		logger.Error("Failed to generate Tailscale hosts configuration", zap.Error(err))
-		return err
-	}
-
-	logger.Info("Tailscale hosts configuration generated successfully",
-		zap.String("output_file", config.OutputFile),
-		zap.String("format", config.Format))
-
-	return nil
 }
 
 func init() {

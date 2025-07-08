@@ -36,7 +36,7 @@ fi
 
 # Check git status
 if git diff --quiet && git diff --cached --quiet && [ -z "$(git ls-files --others --exclude-standard)" ]; then
-    echo -e "${GREEN}✅ No changes to commit${NC}"
+    echo -e "${GREEN}No changes to commit${NC}"
     exit 0
 fi
 
@@ -46,7 +46,7 @@ echo -e "${BLUE}📂 Branch: ${BRANCH}${NC}"
 
 # Warn about protected branches
 if [[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" ]]; then
-    echo -e "${YELLOW}⚠️  Warning: Committing to protected branch '${BRANCH}'${NC}"
+    echo -e "${YELLOW}Warning: Committing to protected branch '${BRANCH}'${NC}"
     if [ "$FORCE" != "true" ]; then
         read -p "Continue? (y/N): " -n 1 -r
         echo
@@ -58,7 +58,7 @@ if [[ "$BRANCH" == "main" || "$BRANCH" == "master" || "$BRANCH" == "production" 
 fi
 
 # Show status
-echo -e "${CYAN}📋 Files to be committed:${NC}"
+echo -e "${CYAN}Files to be committed:${NC}"
 git status --porcelain
 
 # Use custom message or generate one
@@ -117,14 +117,14 @@ git add -A
 git commit -m "$COMMIT_MSG"
 
 if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ Commit successful!${NC}"
+    echo -e "${GREEN}Commit successful!${NC}"
     
     # Push if requested
     if [ "$PUSH" == "true" ]; then
         echo -e "${CYAN}📤 Pushing to remote...${NC}"
         git push
         if [ $? -eq 0 ]; then
-            echo -e "${GREEN}✅ Push successful!${NC}"
+            echo -e "${GREEN}Push successful!${NC}"
         else
             echo -e "${RED}❌ Push failed${NC}"
             exit 1

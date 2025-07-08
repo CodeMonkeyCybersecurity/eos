@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var liveRun bool
-
 var SyncDelphiLDAPCmd = &cobra.Command{
 	Use:   "ldap",
 	Short: "Sync LDAP configuration into Delphi (Wazuh)",
@@ -65,5 +63,4 @@ var SyncDelphiLDAPCmd = &cobra.Command{
 
 func init() {
 	UpdateCmd.AddCommand(SyncDelphiLDAPCmd)
-	SyncDelphiLDAPCmd.Flags().BoolVar(&liveRun, "live-run", false, "Actually apply changes (default is dry-run)")
 }

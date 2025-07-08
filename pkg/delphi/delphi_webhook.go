@@ -136,7 +136,7 @@ func runSystemCommand(cmd string) error {
 }
 
 func printPostDeploymentInstructions(logger otelzap.LoggerWithCtx) {
-	logger.Info("📋 Post-deployment configuration steps:")
+	logger.Info("Post-deployment configuration steps:")
 	logger.Info("")
 	logger.Info("1. Create environment file for webhook configuration:")
 	logger.Info("   sudo tee /var/ossec/integrations/.env << EOF")

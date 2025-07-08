@@ -88,7 +88,7 @@ Examples:
 				zap.Int("port", result.Port),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ Mattermost Installation Complete!\n\n")
+			fmt.Printf("\nMattermost Installation Complete!\n\n")
 			fmt.Printf("💬 Service Details:\n")
 			fmt.Printf("   Version: %s\n", result.Version)
 			fmt.Printf("   Port: %d\n", result.Port)
@@ -103,7 +103,7 @@ Examples:
 			}
 
 			if len(result.Credentials) > 0 {
-				fmt.Printf("\n🔐 Database Credentials:\n")
+				fmt.Printf("\n Database Credentials:\n")
 				for key, value := range result.Credentials {
 					fmt.Printf("   %s: %s\n", key, value)
 				}
@@ -152,7 +152,7 @@ func init() {
 }
 
 func runInteractiveMattermostSetup(options *service_installation.ServiceInstallOptions) error {
-	fmt.Printf("🔧 Interactive Mattermost Setup\n")
+	fmt.Printf("Interactive Mattermost Setup\n")
 	fmt.Printf("================================\n\n")
 
 	// Version
@@ -200,7 +200,7 @@ func runInteractiveMattermostSetup(options *service_installation.ServiceInstallO
 		}
 	}
 
-	fmt.Printf("\n📋 Configuration Summary:\n")
+	fmt.Printf("\nConfiguration Summary:\n")
 	fmt.Printf("   Version: %s\n", options.Version)
 	fmt.Printf("   Port: %d\n", options.Port)
 	if siteURL, exists := options.Config["SITE_URL"]; exists {

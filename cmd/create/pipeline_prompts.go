@@ -59,7 +59,7 @@ Examples:
 			// The GetSystemPromptsDir function remains the same,
 			// but we now use the eos_utils.DefaultSystemPromptsDir constant
 			// and ensure the directory's existence and permissions.
-			promptsDir, err := GetSystemPromptsDir()
+			promptsDir, err := pipeline.GetSystemPromptsDir()
 			if err != nil {
 				return err
 			}

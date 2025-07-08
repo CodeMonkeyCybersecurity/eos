@@ -2,6 +2,7 @@ package container_management
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,48 @@ import (
 	"go.uber.org/zap"
 )
 
+func OutputComposeStopJSON(result *ComposeMultiStopResult) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(result)
+}
+
+func OutputComposeStopTable(result *ComposeMultiStopResult) error {
+	summary := result.Summary
+
+	fmt.Printf("Compose Stop Summary:\n")
+	fmt.Printf("  Total projects: %d\n", summary.TotalProjects)
+	fmt.Printf("  Successfully stopped: %d\n", summary.ProjectsStopped)
+	fmt.Printf("  Skipped: %d\n", summary.ProjectsSkipped)
+	fmt.Printf("  Failed: %d\n", summary.ProjectsFailed)
+	fmt.Printf("  Duration: %v\n", summary.Duration)
+	fmt.Printf("  Success: %t\n\n", summary.Success)
+
+	if len(result.Operations) > 0 {
+		fmt.Println("Operations:")
+		for _, op := range result.Operations {
+			status := "✓"
+			if !op.Success {
+				status = "✗"
+			}
+			if op.DryRun {
+				status = "[DRY RUN]"
+			}
+
+			fmt.Printf("  %s %s: %s\n", status, op.Project.Path, op.Message)
+		}
+	}
+
+	if len(summary.Errors) > 0 {
+		fmt.Println("\nErrors:")
+		for _, err := range summary.Errors {
+			fmt.Printf("  ✗ %s\n", err)
+		}
+	}
+
+	return nil
+}
+
 // ContainerManager handles container and compose operations
 type ContainerManager struct {
 	config *ComposeConfig
@@ -24,7 +67,7 @@ func NewContainerManager(config *ComposeConfig) *ContainerManager {
 	if config == nil {
 		config = DefaultComposeConfig()
 	}
-	
+
 	return &ContainerManager{
 		config: config,
 	}
@@ -39,7 +82,7 @@ func (cm *ContainerManager) FindComposeProjects(rc *eos_io.RuntimeContext, searc
 		searchPaths = cm.expandSearchPaths()
 	}
 
-	logger.Info("Searching for Docker Compose projects", 
+	logger.Info("Searching for Docker Compose projects",
 		zap.Strings("search_paths", searchPaths),
 		zap.Int("max_depth", cm.config.MaxDepth))
 
@@ -62,15 +105,15 @@ func (cm *ContainerManager) FindComposeProjects(rc *eos_io.RuntimeContext, searc
 		}
 
 		result.Projects = append(result.Projects, projects...)
-		logger.Debug("Found projects in directory", 
-			zap.String("path", rootPath), 
+		logger.Debug("Found projects in directory",
+			zap.String("path", rootPath),
 			zap.Int("count", len(projects)))
 	}
 
 	result.TotalFound = len(result.Projects)
 	result.SearchDuration = time.Since(startTime)
 
-	logger.Info("Compose project search completed", 
+	logger.Info("Compose project search completed",
 		zap.Int("total_found", result.TotalFound),
 		zap.Duration("duration", result.SearchDuration))
 
@@ -109,7 +152,7 @@ func (cm *ContainerManager) ListRunningContainers(rc *eos_io.RuntimeContext) (*C
 		Timestamp:  time.Now(),
 	}
 
-	logger.Info("Container listing completed", 
+	logger.Info("Container listing completed",
 		zap.Int("total", result.Total),
 		zap.Int("running", result.Running))
 
@@ -125,7 +168,7 @@ func (cm *ContainerManager) StopAllComposeProjects(rc *eos_io.RuntimeContext, op
 		options = DefaultComposeStopOptions()
 	}
 
-	logger.Info("Starting to stop all compose projects", 
+	logger.Info("Starting to stop all compose projects",
 		zap.Bool("dry_run", options.DryRun),
 		zap.Bool("force", options.Force))
 
@@ -193,7 +236,7 @@ func (cm *ContainerManager) StopAllComposeProjects(rc *eos_io.RuntimeContext, op
 		Timestamp:  time.Now(),
 	}
 
-	logger.Info("Compose project stop operation completed", 
+	logger.Info("Compose project stop operation completed",
 		zap.Int("total", summary.TotalProjects),
 		zap.Int("stopped", summary.ProjectsStopped),
 		zap.Int("failed", summary.ProjectsFailed),
@@ -214,7 +257,7 @@ func (cm *ContainerManager) StopComposeProject(rc *eos_io.RuntimeContext, projec
 		DryRun:    options.DryRun,
 	}
 
-	logger.Info("Stopping compose project", 
+	logger.Info("Stopping compose project",
 		zap.String("path", project.Path),
 		zap.String("compose_file", project.ComposeFile),
 		zap.Bool("dry_run", options.DryRun))
@@ -228,7 +271,7 @@ func (cm *ContainerManager) StopComposeProject(rc *eos_io.RuntimeContext, projec
 
 	// Build docker compose command
 	args := []string{"compose", "-f", project.ComposeFile, "down"}
-	
+
 	if options.RemoveVolumes {
 		args = append(args, "--volumes")
 	}
@@ -249,8 +292,8 @@ func (cm *ContainerManager) StopComposeProject(rc *eos_io.RuntimeContext, projec
 	if err != nil {
 		operation.Success = false
 		operation.Message = fmt.Sprintf("Failed to stop project: %v", err)
-		logger.Error("Compose down failed", 
-			zap.String("path", project.Path), 
+		logger.Error("Compose down failed",
+			zap.String("path", project.Path),
 			zap.Error(err),
 			zap.String("output", operation.Output))
 		return operation, err
@@ -259,7 +302,7 @@ func (cm *ContainerManager) StopComposeProject(rc *eos_io.RuntimeContext, projec
 	operation.Success = true
 	operation.Message = fmt.Sprintf("Successfully stopped compose project: %s", project.Path)
 
-	logger.Info("Compose project stopped successfully", 
+	logger.Info("Compose project stopped successfully",
 		zap.String("path", project.Path),
 		zap.Duration("duration", operation.Duration))
 
@@ -440,13 +483,13 @@ func (cm *ContainerManager) handleRunningContainers(rc *eos_io.RuntimeContext, o
 		if container.State == "running" {
 			cmd := exec.CommandContext(rc.Ctx, "docker", "stop", container.ID)
 			if err := cmd.Run(); err != nil {
-				logger.Warn("Failed to stop container", 
-					zap.String("id", container.ID), 
-					zap.String("name", container.Name), 
+				logger.Warn("Failed to stop container",
+					zap.String("id", container.ID),
+					zap.String("name", container.Name),
 					zap.Error(err))
 			} else {
-				logger.Debug("Stopped container", 
-					zap.String("id", container.ID), 
+				logger.Debug("Stopped container",
+					zap.String("id", container.ID),
 					zap.String("name", container.Name))
 			}
 		}
@@ -487,3 +530,4 @@ func parsePortString(portStr string) map[string]string {
 
 	return ports
 }
+

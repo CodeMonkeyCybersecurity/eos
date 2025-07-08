@@ -57,10 +57,10 @@ Examples:
 		}
 
 		if outputJSON {
-			return outputFormatOpJSON(result)
+			return disk_management.OutputFormatOpJSON(result)
 		}
 
-		return outputFormatOpText(result)
+		return disk_management.OutputFormatOpText(result)
 	}),
 }
 

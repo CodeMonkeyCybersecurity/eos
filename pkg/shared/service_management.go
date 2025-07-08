@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -381,6 +382,45 @@ func (sm *ServiceManager) CheckServiceExists(serviceName string) bool {
 	cmd := exec.Command("systemctl", "cat", serviceName)
 	err := cmd.Run()
 	return err == nil
+}
+
+// GetServiceWorkers returns information about all delphi service workers
+// This function needs the eosRoot to correctly determine source paths.
+func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
+	timestamp := time.Now().Format("20060102_150405")
+
+	return []ServiceWorkerInfo{
+		{
+			ServiceName: "delphi-listener",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-listener.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-listener.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "delphi-agent-enricher",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "delphi-agent-enricher.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/delphi-agent-enricher.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/delphi-agent-enricher.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "llm-worker",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "llm-worker.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/llm-worker.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/llm-worker.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "email-structurer",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "email-structurer.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/email-structurer.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/email-structurer.py.%s.bak", timestamp),
+		},
+		{
+			ServiceName: "prompt-ab-tester",
+			SourcePath:  filepath.Join(eosRoot, "assets", "python_workers", "prompt-ab-tester.py"),
+			TargetPath:  "/opt/stackstorm/packs/delphi/prompt-ab-tester.py",
+			BackupPath:  fmt.Sprintf("/opt/stackstorm/packs/delphi/prompt-ab-tester.py.%s.bak", timestamp),
+		},
+	}
 }
 
 // GetServiceWorkersForUpdate returns service worker information for update operations

@@ -13,11 +13,85 @@ import (
 	"go.uber.org/zap"
 )
 
+var interactive bool
+
+func RunInteractiveGrafanaSetup(options *ServiceInstallOptions) error {
+	fmt.Printf("Interactive Grafana Setup\n")
+	fmt.Printf("============================\n\n")
+
+	// Version
+	fmt.Printf("Grafana version [%s]: ", options.Version)
+	var version string
+	fmt.Scanln(&version)
+	if version != "" {
+		options.Version = version
+	}
+
+	// Port
+	fmt.Printf("Port [%d]: ", options.Port)
+	var portStr string
+	fmt.Scanln(&portStr)
+	if portStr != "" {
+		var port int
+		if _, err := fmt.Sscanf(portStr, "%d", &port); err == nil {
+			options.Port = port
+		}
+	}
+
+	// Admin password
+	fmt.Print("Set custom admin password? [y/N]: ")
+	var setPassword string
+	fmt.Scanln(&setPassword)
+	if setPassword == "y" || setPassword == "Y" {
+		fmt.Print("Admin password: ")
+		var password string
+		fmt.Scanln(&password)
+		if password != "" {
+			options.Environment["GF_SECURITY_ADMIN_PASSWORD"] = password
+		}
+	}
+
+	// Anonymous access
+	fmt.Print("Enable anonymous access? [y/N]: ")
+	var anonymous string
+	fmt.Scanln(&anonymous)
+	if anonymous == "y" || anonymous == "Y" {
+		options.Environment["GF_AUTH_ANONYMOUS_ENABLED"] = "true"
+		options.Environment["GF_AUTH_ANONYMOUS_ORG_ROLE"] = "Viewer"
+	}
+
+	// Persistence
+	fmt.Print("Enable data persistence? [Y/n]: ")
+	var persistence string
+	fmt.Scanln(&persistence)
+	if persistence != "n" && persistence != "N" {
+		options.Volumes = append(options.Volumes, VolumeMount{
+			Source:      "grafana-data",
+			Destination: "/var/lib/grafana",
+		})
+	}
+
+	fmt.Printf("\nConfiguration Summary:\n")
+	fmt.Printf("   Version: %s\n", options.Version)
+	fmt.Printf("   Port: %d\n", options.Port)
+	fmt.Printf("   Persistence: %t\n", len(options.Volumes) > 0)
+	fmt.Printf("   Anonymous Access: %s\n", options.Environment["GF_AUTH_ANONYMOUS_ENABLED"])
+
+	fmt.Print("\nProceed with installation? [Y/n]: ")
+	var proceed string
+	fmt.Scanln(&proceed)
+	if proceed == "n" || proceed == "N" {
+		return fmt.Errorf("installation cancelled by user")
+	}
+
+	return nil
+}
+
 // installGrafana installs Grafana using Docker
 func (sim *ServiceInstallationManager) installGrafana(rc *eos_io.RuntimeContext, options *ServiceInstallOptions, result *InstallationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	logger.Info("Installing Grafana", 
+	logger.Info("Installing Grafana",
 		zap.String("version", options.Version),
 		zap.Int("port", options.Port),
 		zap.String("method", string(options.Method)))
@@ -110,7 +184,7 @@ func (sim *ServiceInstallationManager) installGrafana(rc *eos_io.RuntimeContext,
 	result.Port = options.Port
 	result.Message = fmt.Sprintf("Grafana installed successfully and running on port %d", options.Port)
 	result.Endpoints = []string{fmt.Sprintf("http://localhost:%d", options.Port)}
-	
+
 	// Add default credentials to result
 	result.Credentials = map[string]string{
 		"username": "admin",
@@ -182,7 +256,7 @@ func (sim *ServiceInstallationManager) getGrafanaStatus(rc *eos_io.RuntimeContex
 		}
 	}
 
-	logger.Info("Grafana status retrieved", 
+	logger.Info("Grafana status retrieved",
 		zap.String("status", status.Status),
 		zap.Int("port", status.Port))
 

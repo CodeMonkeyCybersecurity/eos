@@ -421,7 +421,7 @@ func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkO
 
 	// Show warnings
 	if len(summary.Warnings) > 0 && !checkOnly {
-		fmt.Printf("\n⚠️  WARNINGS (%d):\n", len(summary.Warnings))
+		fmt.Printf("\nWARNINGS (%d):\n", len(summary.Warnings))
 		for _, warn := range summary.Warnings {
 			fmt.Printf("   • [%s] %s\n", warn.Source, warn.Message)
 		}
@@ -443,7 +443,7 @@ func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkO
 	if summary.Success {
 		fmt.Println(" ALL CHECKS PASSED - Delphi is ready for production!")
 	} else if len(summary.Errors) == 0 {
-		fmt.Println("⚠️  WARNINGS FOUND - Delphi should work but check warnings")
+		fmt.Println("WARNINGS FOUND - Delphi should work but check warnings")
 	} else {
 		fmt.Println("❌ CRITICAL ERRORS FOUND - Fix errors before running Delphi")
 

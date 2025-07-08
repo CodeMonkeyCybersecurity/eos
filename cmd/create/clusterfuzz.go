@@ -1314,7 +1314,7 @@ func deployInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) 
 	// Deploy core services job
 	logger.Info("Deploying core services to Nomad...")
 	coreJobPath := filepath.Join(config.ConfigDir, "jobs", "clusterfuzz-core.nomad")
-	
+
 	if _, err := executeCommand(rc, "nomad", "job", "run", "-address="+config.NomadAddress, coreJobPath); err != nil {
 		return fmt.Errorf("failed to deploy core services: %w", err)
 	}
@@ -1328,7 +1328,7 @@ func buildDockerImages(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 	// Build web image
 	webDockerfilePath := filepath.Join(config.ConfigDir, "docker", "web.Dockerfile")
 	dockerDir := filepath.Join(config.ConfigDir, "docker")
-	
+
 	logger.Info("Building ClusterFuzz web image...")
 	if _, err := executeCommand(rc, "docker", "build", "-t", "clusterfuzz/web:custom", "-f", webDockerfilePath, dockerDir); err != nil {
 		logger.Warn("Failed to build web image, will use default",
@@ -1337,7 +1337,7 @@ func buildDockerImages(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 
 	// Build bot image
 	botDockerfilePath := filepath.Join(config.ConfigDir, "docker", "bot.Dockerfile")
-	
+
 	logger.Info("Building ClusterFuzz bot image...")
 	if _, err := executeCommand(rc, "docker", "build", "-t", "clusterfuzz/bot:custom", "-f", botDockerfilePath, dockerDir); err != nil {
 		logger.Warn("Failed to build bot image, will use default",
@@ -1380,7 +1380,7 @@ func waitForInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig)
 		if err := waitForService(ctx, svc.host, svc.port); err != nil {
 			return fmt.Errorf("%s service failed to start: %w", svc.name, err)
 		}
-		
+
 		logger.Info("Service is ready", zap.String("service", svc.name))
 	}
 
@@ -1411,14 +1411,14 @@ func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) er
 	// Initialize database
 	logger.Info("Initializing database schema...")
 	dbScriptPath := filepath.Join(config.ConfigDir, "init", "db-setup.sql")
-	
+
 	switch config.DatabaseBackend {
 	case "postgresql":
 		// Set password environment variable
 		os.Setenv("PGPASSWORD", config.DatabaseConfig.Password)
 		defer os.Unsetenv("PGPASSWORD")
-		
-		if _, err := executeCommand(rc, "psql", 
+
+		if _, err := executeCommand(rc, "psql",
 			"-h", "localhost", // Use localhost for initial setup
 			"-p", fmt.Sprintf("%d", config.DatabaseConfig.Port),
 			"-U", config.DatabaseConfig.Username,
@@ -1432,7 +1432,7 @@ func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) er
 	if config.StorageBackend == "minio" {
 		logger.Info("Initializing MinIO storage...")
 		storageScriptPath := filepath.Join(config.ConfigDir, "init", "storage-setup.sh")
-		
+
 		// Install mc (MinIO client) if not available
 		if _, err := executeCommand(rc, "which", "mc"); err != nil {
 			logger.Info("Installing MinIO client...")
@@ -1449,7 +1449,7 @@ func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) er
 				}
 			}
 		}
-		
+
 		// Run storage setup
 		if _, err := executeCommand(rc, "bash", storageScriptPath); err != nil {
 			logger.Warn("Storage initialization had warnings", zap.Error(err))
@@ -1467,14 +1467,14 @@ func deployApplication(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 
 	// Verify web interface is accessible
 	webURL := fmt.Sprintf("http://%s:8080/health", config.Domain)
-	
+
 	retries := 10
 	for i := 0; i < retries; i++ {
 		if _, err := executeCommand(rc, "curl", "-f", "-s", webURL); err == nil {
 			logger.Info("Web interface is accessible", zap.String("url", webURL))
 			break
 		}
-		
+
 		if i < retries-1 {
 			logger.Info("Waiting for web interface to start...",
 				zap.Int("attempt", i+1),
@@ -1494,7 +1494,7 @@ func deployBots(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	// Deploy bot jobs
 	logger.Info("Deploying fuzzing bots to Nomad...")
 	botJobPath := filepath.Join(config.ConfigDir, "jobs", "clusterfuzz-bots.nomad")
-	
+
 	if _, err := executeCommand(rc, "nomad", "job", "run", "-address="+config.NomadAddress, botJobPath); err != nil {
 		return fmt.Errorf("failed to deploy bots: %w", err)
 	}
@@ -1511,14 +1511,14 @@ func verifyDeployment(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) erro
 
 	// Check job status
 	logger.Info("Verifying deployment status...")
-	
+
 	jobs := []string{"clusterfuzz-core", "clusterfuzz-bots"}
 	for _, job := range jobs {
 		output, err := executeCommand(rc, "nomad", "job", "status", "-address="+config.NomadAddress, job)
 		if err != nil {
 			return fmt.Errorf("failed to check status of job %s: %w", job, err)
 		}
-		
+
 		if strings.Contains(output, "running") {
 			logger.Info("Job is running", zap.String("job", job))
 		} else {
@@ -1532,8 +1532,8 @@ func verifyDeployment(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) erro
 }
 
 func displaySuccessInfo(config *ClusterfuzzConfig) {
-	fmt.Println("\n✅ ClusterFuzz deployment completed successfully!")
-	fmt.Println("\n📋 Deployment Summary:")
+	fmt.Println("\nClusterFuzz deployment completed successfully!")
+	fmt.Println("\nDeployment Summary:")
 	fmt.Printf("   • Web Interface: http://%s:8080\n", config.Domain)
 	if config.StorageBackend == "minio" {
 		fmt.Printf("   • MinIO Console: http://%s:9001\n", config.Domain)
@@ -1544,21 +1544,21 @@ func displaySuccessInfo(config *ClusterfuzzConfig) {
 	fmt.Printf("   • Queue: %s on port %d\n", config.QueueBackend, config.QueueConfig.Port)
 	fmt.Printf("   • Regular Bots: %d\n", config.BotCount)
 	fmt.Printf("   • Preemptible Bots: %d\n", config.PreemptibleBotCount)
-	
+
 	fmt.Println("\n🚀 Next Steps:")
 	fmt.Println("   1. Access the web interface to configure fuzzing jobs")
 	fmt.Println("   2. Upload your fuzzing targets")
 	fmt.Println("   3. Monitor fuzzing progress and crashes")
-	
-	fmt.Println("\n📁 Configuration saved to:", config.ConfigDir)
+
+	fmt.Println("\n Configuration saved to:", config.ConfigDir)
 	fmt.Println("\n💡 Useful Commands:")
 	fmt.Printf("   • View logs: nomad alloc logs -address=%s <alloc-id>\n", config.NomadAddress)
 	fmt.Printf("   • Check status: nomad job status -address=%s clusterfuzz-core\n", config.NomadAddress)
 	fmt.Printf("   • Scale bots: nomad job scale -address=%s clusterfuzz-bots regular-bots %d\n",
 		config.NomadAddress, config.BotCount+2)
-	
+
 	if config.UseVault {
-		fmt.Printf("\n🔐 Secrets stored in Vault at: %s\n", config.VaultPath)
+		fmt.Printf("\n Secrets stored in Vault at: %s\n", config.VaultPath)
 	}
 }
 
@@ -1598,7 +1598,7 @@ func checkVaultConnectivity(rc *eos_io.RuntimeContext) error {
 	if err != nil {
 		return err
 	}
-	
+
 	// Try to check health to verify connectivity
 	healthy, err := vaultClient.Sys().Health()
 	if err != nil {
@@ -1607,11 +1607,11 @@ func checkVaultConnectivity(rc *eos_io.RuntimeContext) error {
 			return fmt.Errorf("cannot connect to Vault")
 		}
 	}
-	
+
 	if healthy != nil {
 		// Vault is accessible
 		return nil
 	}
-	
+
 	return nil
 }

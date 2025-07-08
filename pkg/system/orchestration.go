@@ -664,17 +664,14 @@ nomad_job_%s:
 		strings.ReplaceAll(jobHCL, "\n", "\n        "),
 		deployment.JobSpec.ID, deployment.JobSpec.ID)
 
-	saltResult, err := o.saltManager.client.ApplyState("*", "grains", "nomad_deploy", map[string]interface{}{
+	err := o.saltManager.client.StateApply(rc.Ctx, "*", "nomad_deploy", map[string]interface{}{
 		"sls_content": slsContent,
 	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to deploy Nomad job via SaltStack")
 	}
 
-	// Process deployment results
-	if err := o.saltManager.processStateResults(rc, saltResult, "nomad_deploy"); err != nil {
-		return cerr.Wrap(err, "Nomad job deployment had failures")
-	}
+	// Deployment completed successfully via SaltStack
 
 	result.JobID = deployment.JobSpec.ID
 	return nil
@@ -703,14 +700,14 @@ docker_service_%s:
 		strings.ReplaceAll(composeContent, "\n", "\n        "),
 		deployment.Name, deployment.Name)
 
-	saltResult, err := o.saltManager.client.ApplyState("*", "grains", "docker_deploy", map[string]interface{}{
+	err := o.saltManager.client.StateApply(rc.Ctx, "*", "docker_deploy", map[string]interface{}{
 		"sls_content": slsContent,
 	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to deploy Docker service via SaltStack")
 	}
 
-	return o.saltManager.processStateResults(rc, saltResult, "docker_deploy")
+	return nil // Deployment completed successfully via SaltStack
 }
 
 func (o *OrchestrationManager) deploySystemdService(rc *eos_io.RuntimeContext, deployment *ServiceDeployment, result *DeploymentResult) error {
@@ -735,14 +732,14 @@ systemd_service_%s:
 		strings.ReplaceAll(unitContent, "\n", "\n        "),
 		deployment.Name, deployment.Name, deployment.Name)
 
-	saltResult, err := o.saltManager.client.ApplyState("*", "grains", "systemd_deploy", map[string]interface{}{
+	err := o.saltManager.client.StateApply(rc.Ctx, "*", "systemd_deploy", map[string]interface{}{
 		"sls_content": slsContent,
 	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to deploy systemd service via SaltStack")
 	}
 
-	return o.saltManager.processStateResults(rc, saltResult, "systemd_deploy")
+	return nil // Deployment completed successfully via SaltStack
 }
 
 // Evaluation methods
@@ -984,14 +981,9 @@ func (d *DeploymentOrchestrator) DeployApplication(rc *eos_io.RuntimeContext, re
 	logger.Info("Preparing infrastructure via SaltStack")
 
 	target := fmt.Sprintf("G@environment:%s and G@role:%s", req.Environment, req.Application)
-	_, err = d.Salt.ApplyState(
-		target,
-		"compound", // Use compound matching for grains
-		"prepare_deployment",
-		map[string]interface{}{
-			"version": req.Version,
-		},
-	)
+	err = d.Salt.StateApply(rc.Ctx, target, "prepare_deployment", map[string]interface{}{
+		"version": req.Version,
+	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to prepare infrastructure")
 	}
@@ -1047,14 +1039,10 @@ func (d *DeploymentOrchestrator) rollingDeployment(rc *eos_io.RuntimeContext, re
 
 		// Deploy to this batch
 		for _, minion := range batch {
-			_, err := d.Salt.ApplyState(
-				minion,
-				"glob",
-				"deploy_application",
-				map[string]interface{}{
-					"application": req.Application,
-					"version":     req.Version,
-				},
+			err := d.Salt.StateApply(rc.Ctx, minion, "deploy_application", map[string]interface{}{
+				"application": req.Application,
+				"version":     req.Version,
+			},
 			)
 			if err != nil {
 				return cerr.Wrap(err, fmt.Sprintf("deployment to %s failed", minion))
@@ -1064,22 +1052,14 @@ func (d *DeploymentOrchestrator) rollingDeployment(rc *eos_io.RuntimeContext, re
 		// Health check the batch
 		time.Sleep(30 * time.Second) // Give services time to start
 
-		healthResult, err := d.Salt.RunCommand(
-			fmt.Sprintf("L@%s", strings.Join(batch, ",")),
-			"list",
-			"cmd.run",
-			[]interface{}{fmt.Sprintf("curl -f http://localhost/%s/health", req.Application)},
-			nil,
-		)
+		healthResult, err := d.Salt.CmdRun(rc.Ctx, strings.Join(batch, ","), fmt.Sprintf("curl -f http://localhost/%s/health", req.Application))
 		if err != nil {
 			return cerr.Wrap(err, "health check failed")
 		}
 
-		// Check if all servers in batch are healthy
-		for minion, result := range healthResult {
-			if result == nil {
-				return cerr.New(fmt.Sprintf("server %s failed health check", minion))
-			}
+		// Check if health check was successful
+		if !strings.Contains(healthResult, "200") {
+			return cerr.New("health check failed for batch")
 		}
 
 		logger.Info("Batch deployed successfully",

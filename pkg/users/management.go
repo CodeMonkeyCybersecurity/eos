@@ -32,7 +32,7 @@ type UserCreationOptions struct {
 
 // CreateUser creates a new user account with specified options
 func CreateUser(rc *eos_io.RuntimeContext, options *UserCreationOptions) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.CreateUser")
+	ctx, span := telemetry.Start(rc.Ctx, "CreateUser")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -94,7 +94,7 @@ func CreateUser(rc *eos_io.RuntimeContext, options *UserCreationOptions) error {
 
 // CreateUserInteractive creates a user with interactive prompts
 func CreateUserInteractive(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.CreateUserInteractive")
+	ctx, span := telemetry.Start(rc.Ctx, "CreateUserInteractive")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -151,7 +151,7 @@ func CreateUserInteractive(rc *eos_io.RuntimeContext) error {
 
 // ChangeUserPassword changes the password for an existing user
 func ChangeUserPassword(rc *eos_io.RuntimeContext, username, newPassword string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.ChangeUserPassword")
+	ctx, span := telemetry.Start(rc.Ctx, "ChangeUserPassword")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -174,7 +174,7 @@ func ChangeUserPassword(rc *eos_io.RuntimeContext, username, newPassword string)
 
 // ChangeUserPasswordInteractive changes password with interactive prompts
 func ChangeUserPasswordInteractive(rc *eos_io.RuntimeContext) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.ChangeUserPasswordInteractive")
+	ctx, span := telemetry.Start(rc.Ctx, "ChangeUserPasswordInteractive")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -198,7 +198,7 @@ func ChangeUserPasswordInteractive(rc *eos_io.RuntimeContext) error {
 
 // ListUsersWithSSHAccess lists all users who have SSH access
 func ListUsersWithSSHAccess(rc *eos_io.RuntimeContext) ([]string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "users.ListUsersWithSSHAccess")
+	ctx, span := telemetry.Start(rc.Ctx, "ListUsersWithSSHAccess")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -244,7 +244,7 @@ func ListUsersWithSSHAccess(rc *eos_io.RuntimeContext) ([]string, error) {
 
 // GrantSSHAccess grants SSH access to a user by adding them to AllowUsers
 func GrantSSHAccess(rc *eos_io.RuntimeContext, username string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.GrantSSHAccess")
+	ctx, span := telemetry.Start(rc.Ctx, "GrantSSHAccess")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -311,7 +311,7 @@ func GetUserHostnameStamp() (string, error) {
 
 // validateUsername validates that a username meets requirements
 func validateUsername(rc *eos_io.RuntimeContext, username string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.validateUsername")
+	ctx, span := telemetry.Start(rc.Ctx, "validateUsername")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -346,7 +346,7 @@ func userExists(username string) bool {
 
 // createUserAccount creates the user account using useradd
 func createUserAccount(rc *eos_io.RuntimeContext, options *UserCreationOptions) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.createUserAccount")
+	ctx, span := telemetry.Start(rc.Ctx, "createUserAccount")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -378,7 +378,7 @@ func createUserAccount(rc *eos_io.RuntimeContext, options *UserCreationOptions) 
 
 // setUserPassword sets the password for a user using chpasswd
 func setUserPassword(rc *eos_io.RuntimeContext, username, password string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.setUserPassword")
+	ctx, span := telemetry.Start(rc.Ctx, "setUserPassword")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -405,7 +405,7 @@ func setUserPassword(rc *eos_io.RuntimeContext, username, password string) error
 
 // addUserToSudoGroup adds a user to the sudo group
 func addUserToSudoGroup(rc *eos_io.RuntimeContext, username string) error {
-	ctx, span := telemetry.Start(rc.Ctx, "users.addUserToSudoGroup")
+	ctx, span := telemetry.Start(rc.Ctx, "addUserToSudoGroup")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -444,7 +444,7 @@ func promptPassword(rc *eos_io.RuntimeContext, prompt string) (string, error) {
 
 // getUsersWithBashShell gets all users with /bin/bash shell from /etc/passwd
 func getUsersWithBashShell(rc *eos_io.RuntimeContext) ([]string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "users.getUsersWithBashShell")
+	ctx, span := telemetry.Start(rc.Ctx, "getUsersWithBashShell")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -487,7 +487,7 @@ func getUsersWithBashShell(rc *eos_io.RuntimeContext) ([]string, error) {
 
 // getSSHAllowedUsers gets the list of users from AllowUsers directive in SSH config
 func getSSHAllowedUsers(rc *eos_io.RuntimeContext) ([]string, error) {
-	ctx, span := telemetry.Start(rc.Ctx, "users.getSSHAllowedUsers")
+	ctx, span := telemetry.Start(rc.Ctx, "getSSHAllowedUsers")
 	defer span.End()
 
 	logger := otelzap.Ctx(ctx)
@@ -641,17 +641,17 @@ func reloadSSHDaemon(rc *eos_io.RuntimeContext) error {
 	return eos_err.NewExpectedError(ctx, fmt.Errorf("could not reload SSH daemon automatically. Please reload it manually with 'sudo systemctl reload sshd' or 'sudo service ssh reload'"))
 }
 
-func runUpdateUserPassword(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+func RunUpdateUserPassword(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 	otelzap.Ctx(rc.Ctx).Info("Starting user password update")
 
 	// Use interactive mode if no username provided
 	if len(args) == 0 {
-		return users.ChangeUserPasswordInteractive(rc)
+		return ChangeUserPasswordInteractive(rc)
 	}
 
 	username := strings.TrimSpace(args[0])
 	if username == "" {
-		return users.ChangeUserPasswordInteractive(rc)
+		return ChangeUserPasswordInteractive(rc)
 	}
 
 	// Get new password interactively for security
@@ -686,5 +686,34 @@ func runUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args 
 		return fmt.Errorf("username cannot be empty")
 	}
 
+	return GrantSSHAccess(rc, username)
+}
+
+// RunUpdateUserSSHAccess handles SSH access grant operations  
+func RunUpdateUserSSHAccess(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Starting SSH access grant operation")
+	
+	// ASSESS - Determine username
+	var username string
+	if len(args) > 0 {
+		username = args[0]
+	} else {
+		// Interactive mode - prompt for username
+		logger.Info("terminal prompt: Enter username to grant SSH access to")
+		var err error
+		username, err = interaction.PromptSecret(rc.Ctx, "Enter username: ")
+		if err != nil {
+			return fmt.Errorf("failed to read username: %w", err)
+		}
+	}
+	
+	if username == "" {
+		return fmt.Errorf("username cannot be empty")
+	}
+	
+	logger.Info("Granting SSH access to user", zap.String("username", username))
+	
+	// INTERVENE - Grant SSH access using existing function
 	return GrantSSHAccess(rc, username)
 }

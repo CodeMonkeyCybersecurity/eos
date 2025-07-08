@@ -240,7 +240,7 @@ Next steps:
 2. **User MFA Setup**
 ```bash
 $ sudo setup-mfa
-🔐 MFA Setup for john
+ MFA Setup for john
 ====================
 
  Setting up authenticator app...

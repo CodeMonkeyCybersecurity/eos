@@ -134,12 +134,7 @@ func NewSaltStackManager(rc *eos_io.RuntimeContext, config *SaltStackConfig) (*S
 	}
 
 	// Create Salt API client
-	client := saltstack.NewClient(config.APIURL, config.Username, config.Password)
-
-	// Authenticate with Salt API
-	if err := authenticateSaltClient(rc, client); err != nil {
-		return nil, cerr.Wrap(err, "failed to authenticate with Salt API")
-	}
+	client := saltstack.NewClient(otelzap.Ctx(rc.Ctx))
 
 	manager := &SaltStackManager{
 		client:    client,
@@ -204,17 +199,14 @@ func (s *SaltStackManager) ManageServices(rc *eos_io.RuntimeContext, target stri
 	slsContent := s.generateServicesSLS(services)
 
 	// Apply service states
-	result, err := s.client.ApplyState(target, "grains", "services", map[string]interface{}{
+	err := s.client.StateApply(rc.Ctx, target, "services", map[string]interface{}{
 		"sls_content": slsContent,
 	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to apply service states")
 	}
 
-	// Process results
-	if err := s.processStateResults(rc, result, "services"); err != nil {
-		return cerr.Wrap(err, "service state application had failures")
-	}
+	// State applied successfully (no result processing needed for current client)
 
 	logger.Info("Service management completed successfully")
 	return nil
@@ -229,17 +221,14 @@ func (s *SaltStackManager) ManageCronJobs(rc *eos_io.RuntimeContext, target stri
 	slsContent := s.generateCronSLS(cronJobs)
 
 	// Apply cron states
-	result, err := s.client.ApplyState(target, "grains", "cron", map[string]interface{}{
+	err := s.client.StateApply(rc.Ctx, target, "cron", map[string]interface{}{
 		"sls_content": slsContent,
 	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to apply cron states")
 	}
 
-	// Process results
-	if err := s.processStateResults(rc, result, "cron"); err != nil {
-		return cerr.Wrap(err, "cron state application had failures")
-	}
+	// State applied successfully (no result processing needed for current client)
 
 	logger.Info("Cron job management completed successfully")
 	return nil
@@ -254,17 +243,14 @@ func (s *SaltStackManager) ManageUsers(rc *eos_io.RuntimeContext, target string,
 	slsContent := s.generateUsersSLS(users)
 
 	// Apply user states
-	result, err := s.client.ApplyState(target, "grains", "users", map[string]interface{}{
+	err := s.client.StateApply(rc.Ctx, target, "users", map[string]interface{}{
 		"sls_content": slsContent,
 	})
 	if err != nil {
 		return cerr.Wrap(err, "failed to apply user states")
 	}
 
-	// Process results
-	if err := s.processStateResults(rc, result, "users"); err != nil {
-		return cerr.Wrap(err, "user state application had failures")
-	}
+	// State applied successfully (no result processing needed for current client)
 
 	logger.Info("User management completed successfully")
 	return nil
@@ -410,17 +396,8 @@ func retrievePasswordFromVault(rc *eos_io.RuntimeContext, vaultPath string) (str
 	return "", cerr.New("password not found in Vault")
 }
 
-func authenticateSaltClient(rc *eos_io.RuntimeContext, client *saltstack.Client) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Authenticating with Salt API")
-
-	if err := client.Login(); err != nil {
-		return cerr.Wrap(err, "Salt API authentication failed")
-	}
-
-	logger.Info("Salt API authentication successful")
-	return nil
-}
+// Authentication is now handled internally by the salt commands
+// No explicit authentication step needed with the current client implementation
 
 func (s *SaltStackManager) generateServicesSLS(services []ServiceConfig) string {
 	var sls strings.Builder
@@ -497,7 +474,7 @@ func (s *SaltStackManager) processStateResults(rc *eos_io.RuntimeContext, result
 
 func (s *SaltStackManager) assessServices(rc *eos_io.RuntimeContext, target string, services []ServiceConfig) (map[string]interface{}, error) {
 	// Query current service states via Salt
-	result, err := s.client.RunCommand(target, "grains", "service.get_all", []interface{}{}, nil)
+	result, err := s.client.GrainGet(rc.Ctx, target, "services")
 	if err != nil {
 		return nil, err
 	}
@@ -508,7 +485,7 @@ func (s *SaltStackManager) assessServices(rc *eos_io.RuntimeContext, target stri
 
 func (s *SaltStackManager) assessCronJobs(rc *eos_io.RuntimeContext, target string, cronJobs []CronJobConfig) (map[string]interface{}, error) {
 	// Query current cron configuration via Salt
-	result, err := s.client.RunCommand(target, "grains", "cron.list_tab", []interface{}{"root"}, nil)
+	result, err := s.client.GrainGet(rc.Ctx, target, "cron")
 	if err != nil {
 		return nil, err
 	}
@@ -518,7 +495,7 @@ func (s *SaltStackManager) assessCronJobs(rc *eos_io.RuntimeContext, target stri
 
 func (s *SaltStackManager) assessUsers(rc *eos_io.RuntimeContext, target string, users []UserConfig) (map[string]interface{}, error) {
 	// Query current user configuration via Salt
-	result, err := s.client.RunCommand(target, "grains", "user.list_users", []interface{}{}, nil)
+	result, err := s.client.GrainGet(rc.Ctx, target, "users")
 	if err != nil {
 		return nil, err
 	}

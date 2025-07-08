@@ -481,7 +481,7 @@ func outputServiceOperation(result *system_services.ServiceOperation, outputJSON
 	fmt.Println(strings.Repeat("=", 50))
 
 	if result.Success {
-		fmt.Println("✅ Operation completed successfully!")
+		fmt.Println("Operation completed successfully!")
 	} else {
 		fmt.Println("❌ Operation failed!")
 	}
@@ -511,13 +511,13 @@ func outputServiceStatus(result *system_services.ServiceInfo, outputJSON bool) e
 	fmt.Printf("Sub State: %s\n", result.SubState)
 
 	if result.Running {
-		fmt.Println("Status: ✅ RUNNING")
+		fmt.Println("Status: RUNNING")
 	} else {
 		fmt.Println("Status: ❌ NOT RUNNING")
 	}
 
 	if result.Enabled {
-		fmt.Println("Boot Status: ✅ ENABLED")
+		fmt.Println("Boot Status: ENABLED")
 	} else {
 		fmt.Println("Boot Status: ❌ DISABLED")
 	}

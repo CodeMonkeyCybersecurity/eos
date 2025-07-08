@@ -8,6 +8,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/fileops"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,7 @@ Usage:
 		token := "{{BACKEND_IP}}" // Make sure this token matches what you use in your asset files
 
 		fmt.Printf("Updating backend IP to %s in assets directory...\n", backendIP)
-		if err := updateFilesInDir(assetsDir, token, backendIP); err != nil {
+		if err := fileops.UpdateFilesInDir(assetsDir, token, backendIP); err != nil {
 			fmt.Printf("Error updating files: %v\n", err)
 			return nil
 		}

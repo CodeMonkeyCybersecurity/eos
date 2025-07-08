@@ -77,8 +77,8 @@ Examples:
 				zap.Int("port", result.Port),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ Apache Guacamole Installation Complete!\n\n")
-			fmt.Printf("🖥️ Service Details:\n")
+			fmt.Printf("\nApache Guacamole Installation Complete!\n\n")
+			fmt.Printf(" Service Details:\n")
 			fmt.Printf("   Version: %s\n", result.Version)
 			fmt.Printf("   Port: %d\n", result.Port)
 			fmt.Printf("   Method: %s\n", result.Method)
@@ -92,7 +92,7 @@ Examples:
 			}
 
 			if len(result.Credentials) > 0 {
-				fmt.Printf("\n🔐 Default Credentials:\n")
+				fmt.Printf("\n Default Credentials:\n")
 				for key, value := range result.Credentials {
 					if key != "DB_PASSWORD" && key != "DB_USER" && key != "DB_NAME" {
 						fmt.Printf("   %s: %s\n", key, value)

@@ -70,7 +70,7 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ Loki Installation Complete!\n\n")
+			fmt.Printf("\nLoki Installation Complete!\n\n")
 			fmt.Printf("📊 Service Details:\n")
 			fmt.Printf("   Version: %s\n", result.Version)
 			fmt.Printf("   Method: %s\n", result.Method)

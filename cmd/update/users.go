@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/hera"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/users"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -40,7 +41,7 @@ Examples:
   eos update users password john     # Change password for user 'john'
   eos update users password          # Interactive mode - prompt for username`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runUpdateUserPassword(rc, cmd, args)
+		return users.RunUpdateUserPassword(rc, cmd, args)
 	}),
 }
 
@@ -54,7 +55,7 @@ Examples:
   eos update users ssh-access alice  # Grant SSH access to user 'alice'
   eos update users ssh-access        # Interactive mode - prompt for username`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runUpdateUserSSHAccess(rc, cmd, args)
+		return users.RunUpdateUserSSHAccess(rc, cmd, args)
 	}),
 }
 

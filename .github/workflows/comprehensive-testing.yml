@@ -373,7 +373,7 @@ jobs:
           echo "" >> security_report.md
           find . -name "*.md" -exec grep -H "SECURITY VIOLATION\|CRASH DETECTED" {} \; >> security_report.md
         else
-          echo "✅ **No security violations detected**" >> security_report.md
+          echo "**No security violations detected**" >> security_report.md
         fi
         
         echo "" >> security_report.md

@@ -2,10 +2,6 @@
 package update
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/disk_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -51,10 +47,10 @@ Examples:
 		}
 
 		if outputJSON {
-			return outputMountOpJSON(result)
+			return disk_management.OutputMountOpJSON(result)
 		}
 
-		return outputMountOpText(result)
+		return disk_management.OutputMountOpText(result)
 	}),
 }
 
@@ -64,24 +60,4 @@ func init() {
 	diskMountCmd.Flags().Bool("json", false, "Output in JSON format")
 
 	UpdateCmd.AddCommand(diskMountCmd)
-}
-
-func outputMountOpJSON(result *disk_management.MountOperation) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
-
-func outputMountOpText(result *disk_management.MountOperation) error {
-	if result.DryRun {
-		fmt.Printf("[DRY RUN] %s\n", result.Message)
-	} else if result.Success {
-		fmt.Printf("✓ %s\n", result.Message)
-		if result.Duration > 0 {
-			fmt.Printf("  Duration: %v\n", result.Duration)
-		}
-	} else {
-		fmt.Printf("✗ %s\n", result.Message)
-	}
-	return nil
 }

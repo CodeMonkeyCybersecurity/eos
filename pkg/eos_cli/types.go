@@ -9,3 +9,9 @@ type WrapValidation struct {
 	PolicyPath  string
 	PolicyInput func() any
 }
+
+var (
+	nonInteractive bool
+	orphansOnly    bool
+	kernelsOnly    bool
+)

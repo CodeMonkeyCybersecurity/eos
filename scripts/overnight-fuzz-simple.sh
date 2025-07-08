@@ -22,7 +22,7 @@ REPORT_FILE="${LOG_DIR}/fuzz-report-${TIMESTAMP}.md"
 mkdir -p "${LOG_DIR}"
 
 echo -e "${CYAN}🧪 Starting Overnight Eos Fuzzing at $(date)${NC}"
-echo -e "📁 Logs will be saved to: ${YELLOW}${LOG_DIR}${NC}"
+echo -e " Logs will be saved to: ${YELLOW}${LOG_DIR}${NC}"
 echo -e "⏰ Long duration: ${YELLOW}${FUZZTIME_LONG}${NC}"
 echo "⏰ Medium duration: ${FUZZTIME_MEDIUM}"
 echo "⏰ Short duration: ${FUZZTIME_SHORT}"
@@ -54,14 +54,14 @@ run_fuzz_test() {
     local start_time=$(date +%s)
     
     echo "🚀 Running ${test_name} (${duration}, priority: ${priority})..."
-    echo "📦 Package: ${package}"
+    echo "Package: ${package}"
     echo "⏱️  Started at: $(date)"
     echo "📄 Log: ${log_file}"
     
     # Check if test exists first
     if ! go test -list=Fuzz "${package}" 2>/dev/null | grep -q "^${test_name}$"; then
-        echo "⚠️  Test ${test_name} not found in ${package}, skipping..."
-        echo "- ⚠️  **${test_name}** (${package}): SKIPPED - test not found" >> "${REPORT_FILE}"
+        echo "Test ${test_name} not found in ${package}, skipping..."
+        echo "- **${test_name}** (${package}): SKIPPED - test not found" >> "${REPORT_FILE}"
         echo ""
         return 0
     fi
@@ -73,11 +73,11 @@ run_fuzz_test() {
         local inputs=$(grep -c "new interesting input" "${log_file}" 2>/dev/null || echo "0")
         local executions=$(grep -o 'execs: [0-9]*' "${log_file}" | tail -1 | sed 's/execs: //' || echo "0")
         
-        echo "✅ ${test_name} completed successfully"
+        echo "${test_name} completed successfully"
         echo "📊 Found ${inputs} new inputs, executed ${executions} cases in ${elapsed}s"
         
         # Update report
-        echo "- ✅ **${test_name}** (${package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
+        echo "- **${test_name}** (${package}): SUCCESS - ${inputs} inputs, ${executions} executions, ${elapsed}s" >> "${REPORT_FILE}"
         echo ""
         return 0
     else
@@ -200,8 +200,8 @@ if [ -f "${LOG_DIR}/crashes_${TIMESTAMP}.log" ]; then
     
     exit_code=1
 else
-    echo "✅ SUCCESS: No crashes detected during overnight fuzzing"
-    echo -e "\n## ✅ All Tests Passed Successfully\n" >> "${REPORT_FILE}"
+    echo "SUCCESS: No crashes detected during overnight fuzzing"
+    echo -e "\n## All Tests Passed Successfully\n" >> "${REPORT_FILE}"
     echo "No crashes or critical issues were detected during this fuzzing session." >> "${REPORT_FILE}"
     exit_code=0
 fi
@@ -209,7 +209,7 @@ fi
 echo ""
 echo "📊 COMPREHENSIVE SUMMARY:"
 echo "========================="
-echo "📁 Log directory: ${LOG_DIR}"
+echo " Log directory: ${LOG_DIR}"
 echo "📄 Main report: ${REPORT_FILE}"
 echo "📈 Tests executed: ${total_tests} (${passed_tests} passed, ${failed_tests} failed, ${skipped_tests} skipped)"
 echo ""
@@ -224,7 +224,7 @@ echo ""
 if [ "${failed_tests}" -eq 0 ]; then
     echo "🎉 Eos framework passed all fuzz tests!"
 else
-    echo "⚠️  Please address the ${failed_tests} failed tests before production deployment."
+    echo "Please address the ${failed_tests} failed tests before production deployment."
 fi
 
 exit ${exit_code}

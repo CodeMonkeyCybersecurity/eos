@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-var CreateDockerCmd = &cobra.Command{
+var CreateContainersCmd = &cobra.Command{
 	Use:   "docker",
 	Short: "Install Docker and configure it for non-root usage",
 	Long:  "Installs Docker CE, sets up repo and user permissions, and verifies with hello-world.",
@@ -45,7 +45,7 @@ var CreateDockerCmd = &cobra.Command{
 }
 
 func init() {
-	CreateCmd.AddCommand(CreateDockerCmd)
+	CreateCmd.AddCommand(CreateContainersCmd)
 }
 
 var containerInstallCmd = &cobra.Command{

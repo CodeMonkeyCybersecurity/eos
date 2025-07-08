@@ -4,7 +4,7 @@ package list
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -45,16 +45,12 @@ Examples:
 			zap.Bool("detailed", detailed),
 			zap.String("status_filter", statusFilter))
 
-		// Get service information using eos_unix
-		services, err := eos_unix.GetDelphiServiceStatus()
-		if err != nil {
-			logger.Error("Failed to get Delphi service status", zap.Error(err))
-			return err
-		}
+		// Get service information using shared registry
+		services := shared.GetGlobalDelphiServiceRegistry().GetActiveServices()
 
 		// Apply status filter if specified
 		if statusFilter != "" && statusFilter != "all" {
-			services = filterServicesByStatus(services, statusFilter)
+			services = filterServicesByStatus(services, statusFilter).(map[string]shared.DelphiServiceDefinition)
 		}
 
 		// Display services
@@ -71,6 +67,7 @@ func init() {
 
 func filterServicesByStatus(services interface{}, status string) interface{} {
 	// TODO: Implement filtering based on actual service structure
+	// For now, just return the services as-is
 	return services
 }
 

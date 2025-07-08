@@ -12,10 +12,81 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
+	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
+
+var (
+	OutputPath   string
+	TemplateMode bool
+)
+
+func RunCreateCloudInit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Generating cloud-init configuration")
+
+	generator := NewGenerator(rc)
+
+	// Generate template if requested
+	if TemplateMode {
+		logger.Info("Generating cloud-init template", zap.String("output", OutputPath))
+		if err := generator.GenerateTemplate(OutputPath); err != nil {
+			return fmt.Errorf("failed to generate template: %w", err)
+		}
+		return nil
+	}
+
+	// Gather system information
+	logger.Info("Gathering system information")
+	info, err := generator.GatherSystemInfo()
+	if err != nil {
+		return fmt.Errorf("failed to gather system info: %w", err)
+	}
+
+	logger.Info("System information gathered",
+		zap.String("hostname", info.Hostname),
+		zap.String("username", info.Username),
+		zap.Int("packages", len(info.InstalledPackages)),
+		zap.Bool("ssh_key_found", info.SSHPublicKey != ""))
+
+	// Generate configuration
+	config, err := generator.GenerateConfig(info)
+	if err != nil {
+		return fmt.Errorf("failed to generate config: %w", err)
+	}
+
+	// Validate configuration
+	if err := generator.ValidateConfig(config); err != nil {
+		return fmt.Errorf("config validation failed: %w", err)
+	}
+
+	// Write configuration
+	if err := generator.WriteConfig(config, OutputPath); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	logger.Info("Cloud-init configuration generated successfully",
+		zap.String("output", OutputPath),
+		zap.String("hostname", config.Hostname),
+		zap.Int("users", len(config.Users)),
+		zap.Int("packages", len(config.Packages)))
+
+	fmt.Printf("\nCloud-init configuration generated successfully!\n")
+	fmt.Printf("Output: %s\n", OutputPath)
+	fmt.Printf("Hostname: %s\n", config.Hostname)
+	fmt.Printf(" User: %s\n", info.Username)
+	fmt.Printf("Packages: %d\n", len(config.Packages))
+
+	if info.SSHPublicKey != "" {
+		fmt.Printf("SSH Key: Configured\n")
+	} else {
+		fmt.Printf("SSH Key: Not found - manual configuration needed\n")
+	}
+
+	return nil
+}
 
 // CloudInitConfig represents cloud-init configuration
 type CloudInitConfig struct {
@@ -91,7 +162,7 @@ type SystemInfo struct {
 
 // GatherSystemInfo collects current system information
 func (g *Generator) GatherSystemInfo() (*SystemInfo, error) {
-	_, span := telemetry.Start(g.rc.Ctx, "cloudinit.GatherSystemInfo")
+	_, span := telemetry.Start(g.rc.Ctx, "GatherSystemInfo")
 	defer span.End()
 
 	info := &SystemInfo{}
@@ -196,7 +267,7 @@ func (g *Generator) getUserGroups(username string) ([]string, error) {
 
 // GenerateConfig creates a cloud-init configuration
 func (g *Generator) GenerateConfig(info *SystemInfo) (*CloudInitConfig, error) {
-	_, span := telemetry.Start(g.rc.Ctx, "cloudinit.GenerateConfig")
+	_, span := telemetry.Start(g.rc.Ctx, "GenerateConfig")
 	defer span.End()
 
 	if info.SSHPublicKey == "" {
@@ -258,7 +329,7 @@ Check /var/log/cloud-init-output.log for detailed setup logs.`,
 
 // WriteConfig writes the cloud-init configuration to a file
 func (g *Generator) WriteConfig(config *CloudInitConfig, outputPath string) error {
-	_, span := telemetry.Start(g.rc.Ctx, "cloudinit.WriteConfig")
+	_, span := telemetry.Start(g.rc.Ctx, "WriteConfig")
 	defer span.End()
 
 	g.logger.Info("Writing cloud-init configuration",
@@ -295,7 +366,7 @@ func (g *Generator) WriteConfig(config *CloudInitConfig, outputPath string) erro
 
 // ValidateConfig performs basic validation on the configuration
 func (g *Generator) ValidateConfig(config *CloudInitConfig) error {
-	_, span := telemetry.Start(g.rc.Ctx, "cloudinit.ValidateConfig")
+	_, span := telemetry.Start(g.rc.Ctx, "ValidateConfig")
 	defer span.End()
 
 	if config.Hostname == "" {
@@ -320,7 +391,7 @@ func (g *Generator) ValidateConfig(config *CloudInitConfig) error {
 
 // GenerateTemplate creates a customizable cloud-init template
 func (g *Generator) GenerateTemplate(outputPath string) error {
-	_, span := telemetry.Start(g.rc.Ctx, "cloudinit.GenerateTemplate")
+	_, span := telemetry.Start(g.rc.Ctx, "GenerateTemplate")
 	defer span.End()
 
 	template := `#cloud-config

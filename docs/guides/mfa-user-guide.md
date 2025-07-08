@@ -25,7 +25,7 @@ sudo setup-mfa
 
 You'll see:
 ```
-🔐 MFA Setup for [your-username]
+ MFA Setup for [your-username]
 ════════════════════════════════════════════════
 
 This setup will:
@@ -70,7 +70,7 @@ Press ENTER after adding to your app...
 ## Step 3: Save Backup Codes
 
 ```
-🔑 Emergency Backup Codes
+Emergency Backup Codes
 ════════════════════════════════════════════════
 
 IMPORTANT: Save these codes in a secure location!

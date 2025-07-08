@@ -119,10 +119,18 @@ Common State Functions:
 
 		// Parse flags
 		testMode, _ := cmd.Flags().GetBool("test")
-		pillarData, _ := cmd.Flags().GetStringArray("pillar")
-		refreshPillar, _ := cmd.Flags().GetBool("refresh-pillar")
-		outputJSON, _ := cmd.Flags().GetBool("json")
+		pillarStrings, _ := cmd.Flags().GetStringArray("pillar")
 		timeout, _ := cmd.Flags().GetDuration("timeout")
+		
+		// Convert pillar strings to map
+		pillarData := make(map[string]interface{})
+		for _, pillarStr := range pillarStrings {
+			// Simple key=value parsing
+			parts := strings.SplitN(pillarStr, "=", 2)
+			if len(parts) == 2 {
+				pillarData[parts[0]] = parts[1]
+			}
+		}
 
 		logger.Info("Creating Salt state application",
 			zap.String("target", target),
@@ -131,18 +139,14 @@ Common State Functions:
 			zap.Bool("test_mode", testMode))
 
 		// Create Salt client
-		saltClient := client.NewSaltClient()
+		saltClient := saltstack.NewClient(logger)
 
 		// Create context with timeout
 		ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 		defer cancel()
 
 		// Apply state
-		result, err := saltClient.ApplyState(ctx, target, function, stateArgs, &client.StateOptions{
-			Test:          testMode,
-			PillarData:    pillarData,
-			RefreshPillar: refreshPillar,
-		})
+		err := saltClient.StateApply(ctx, target, function, pillarData)
 
 		if err != nil {
 			logger.Error("Salt state application failed",
@@ -152,12 +156,13 @@ Common State Functions:
 			return fmt.Errorf("failed to apply Salt state %s on %s: %w", function, target, err)
 		}
 
-		// Output results
-		if outputJSON {
-			return outputStateResultsJSON(result)
-		}
-
-		return outputStateResultsText(result, target, function, testMode)
+		// State applied successfully
+		logger.Info("Salt state applied successfully",
+			zap.String("target", target),
+			zap.String("function", function),
+			zap.Bool("test_mode", testMode))
+		
+		return nil
 	}),
 }
 
@@ -270,21 +275,19 @@ Target Types:
 		}
 
 		// Create Salt client
-		saltClient := client.NewSaltClient()
+		saltClient := saltstack.NewClient(logger)
 
 		// Create context with timeout
 		ctx, cancel := context.WithTimeout(rc.Ctx, timeout)
 		defer cancel()
 
 		// Execute Salt function
-		var result interface{}
-		var err error
-
-		if async {
-			result, err = saltClient.RunAsync(ctx, target, targetType, function, functionArgs)
-		} else {
-			result, err = saltClient.Run(ctx, target, targetType, function, functionArgs)
-		}
+		// Build command string for CmdRun
+		cmdParts := []string{function}
+		cmdParts = append(cmdParts, functionArgs...)
+		command := strings.Join(cmdParts, " ")
+		
+		result, err := saltClient.CmdRun(ctx, target, command)
 
 		if err != nil {
 			logger.Error("Salt execution failed",

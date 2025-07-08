@@ -97,7 +97,7 @@ func (pc *PackageCleanup) FindOrphanedPackages() ([]string, error) {
 
 	// Parse output
 	orphans := strings.Fields(strings.TrimSpace(string(output)))
-	
+
 	pc.logger.Info("Found orphaned packages",
 		zap.Int("count", len(orphans)),
 		zap.Strings("packages", orphans))
@@ -129,7 +129,7 @@ func (pc *PackageCleanup) FindUnusedKernels() ([]string, error) {
 
 	var unusedKernels []string
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
-	
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		// Look for linux-image packages
@@ -236,7 +236,7 @@ func (pc *PackageCleanup) PerformFullCleanup(interactive bool) (*CleanupResult, 
 		pc.logger.Warn("Failed to find orphaned packages", zap.Error(err))
 	} else {
 		result.OrphanedPackages = orphans
-		
+
 		if len(orphans) > 0 {
 			if interactive {
 				if pc.promptYesNo(fmt.Sprintf("Remove %d orphaned packages?", len(orphans))) {
@@ -279,7 +279,7 @@ func (pc *PackageCleanup) PerformFullCleanup(interactive bool) (*CleanupResult, 
 		pc.logger.Warn("Failed to find unused kernels", zap.Error(err))
 	} else {
 		result.UnusedKernels = kernels
-		
+
 		if len(kernels) > 0 {
 			if interactive {
 				if pc.promptYesNo(fmt.Sprintf("Remove %d unused kernels?", len(kernels))) {
@@ -303,7 +303,7 @@ func (pc *PackageCleanup) PerformFullCleanup(interactive bool) (*CleanupResult, 
 // runCommand executes a system command
 func (pc *PackageCleanup) runCommand(name string, args ...string) error {
 	cmd := exec.Command(name, args...)
-	
+
 	pc.logger.Debug("Executing command",
 		zap.String("command", name),
 		zap.Strings("args", args))
@@ -318,10 +318,10 @@ func (pc *PackageCleanup) runCommand(name string, args ...string) error {
 // promptYesNo prompts the user for a yes/no answer
 func (pc *PackageCleanup) promptYesNo(prompt string) bool {
 	fmt.Printf("%s (y/n): ", prompt)
-	
+
 	var response string
 	fmt.Scanln(&response)
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
@@ -334,18 +334,18 @@ func (result *CleanupResult) FormatResult() string {
 	buf.WriteString("=========================\n\n")
 
 	if len(result.OrphanedPackages) > 0 {
-		buf.WriteString(fmt.Sprintf("📦 Orphaned packages found: %d\n", len(result.OrphanedPackages)))
+		buf.WriteString(fmt.Sprintf("Orphaned packages found: %d\n", len(result.OrphanedPackages)))
 		if result.OrphansRemoved {
-			buf.WriteString("✅ Orphaned packages removed\n")
+			buf.WriteString("Orphaned packages removed\n")
 		} else {
 			buf.WriteString("⏭️  Orphaned packages not removed\n")
 		}
 	} else {
-		buf.WriteString("📦 No orphaned packages found\n")
+		buf.WriteString("No orphaned packages found\n")
 	}
 
 	if result.AutoremoveRan {
-		buf.WriteString("✅ Autoremove completed\n")
+		buf.WriteString("Autoremove completed\n")
 	} else {
 		buf.WriteString("⏭️  Autoremove skipped\n")
 	}
@@ -353,7 +353,7 @@ func (result *CleanupResult) FormatResult() string {
 	if len(result.UnusedKernels) > 0 {
 		buf.WriteString(fmt.Sprintf("🐧 Unused kernels found: %d\n", len(result.UnusedKernels)))
 		if result.KernelsRemoved {
-			buf.WriteString("✅ Unused kernels removed\n")
+			buf.WriteString("Unused kernels removed\n")
 		} else {
 			buf.WriteString("⏭️  Unused kernels not removed\n")
 		}
@@ -361,7 +361,7 @@ func (result *CleanupResult) FormatResult() string {
 		buf.WriteString("🐧 No unused kernels found\n")
 	}
 
-	buf.WriteString("\n✅ System cleanup completed!\n")
+	buf.WriteString("\nSystem cleanup completed!\n")
 
 	return buf.String()
 }

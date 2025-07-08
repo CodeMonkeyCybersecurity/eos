@@ -105,7 +105,7 @@ Examples:
 				zap.String("version", result.Version),
 				zap.Duration("duration", result.Duration))
 
-			fmt.Printf("\n✅ Caddy Installation Complete!\n\n")
+			fmt.Printf("\nCaddy Installation Complete!\n\n")
 			fmt.Printf("🌐 Service Details:\n")
 			fmt.Printf("   Version: %s\n", result.Version)
 			fmt.Printf("   Method: %s (repository)\n", result.Method)
@@ -119,7 +119,7 @@ Examples:
 			}
 
 			if len(result.ConfigFiles) > 0 {
-				fmt.Printf("\n📁 Configuration Files:\n")
+				fmt.Printf("\n Configuration Files:\n")
 				for _, configFile := range result.ConfigFiles {
 					fmt.Printf("   %s\n", configFile)
 				}
@@ -168,7 +168,7 @@ func init() {
 }
 
 func runInteractiveCaddySetup(options *service_installation.ServiceInstallOptions) error {
-	fmt.Printf("🔧 Interactive Caddy Setup\n")
+	fmt.Printf("Interactive Caddy Setup\n")
 	fmt.Printf("==========================\n\n")
 
 	// Domain configuration
@@ -234,7 +234,7 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 		options.Config["root_dir"] = rootDir
 	}
 
-	fmt.Printf("\n📋 Configuration Summary:\n")
+	fmt.Printf("\nConfiguration Summary:\n")
 	fmt.Printf("   Domain: %s\n", options.Domain)
 	fmt.Printf("   Auto HTTPS: %s\n", options.Config["auto_https"])
 	fmt.Printf("   Port: %d\n", options.Port)

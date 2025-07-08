@@ -11,7 +11,7 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt/client"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -51,22 +51,25 @@ Examples:
 			zap.String("status_filter", statusFilter))
 
 		// Create Salt client
-		saltClient := client.NewSaltClient()
+		saltClient := saltstack.NewClient(otelzap.Ctx(rc.Ctx))
 
 		// Create context with timeout
 		ctx, cancel := context.WithTimeout(rc.Ctx, 15*time.Second)
 		defer cancel()
 
-		// Get key list
-		keys, err := saltClient.ListKeys(ctx, pattern)
+		// Get key list using salt-key command
+		output, err := saltClient.CmdRun(ctx, "local", "salt-key -L")
 		if err != nil {
 			logger.Error("Failed to list Salt keys", zap.Error(err))
 			return fmt.Errorf("failed to list Salt keys: %w", err)
 		}
+		
+		// For now, just use the raw output as keys
+		keys := map[string]interface{}{"output": output}
 
 		// Apply status filter if specified
 		if statusFilter != "" && statusFilter != "all" {
-			keys = filterKeysByStatus(keys, statusFilter)
+			keys = filterKeysByStatus(keys, statusFilter).(map[string]interface{})
 		}
 
 		// Output results

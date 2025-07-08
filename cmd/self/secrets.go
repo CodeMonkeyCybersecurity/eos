@@ -79,7 +79,7 @@ that require access to secrets, including the Delphi dashboard.`,
 			reader := bufio.NewReader(os.Stdin)
 
 			// Step 1: Vault Address
-			fmt.Printf("\n🔐 Vault Configuration Setup\n")
+			fmt.Printf("\n Vault Configuration Setup\n")
 			fmt.Printf("================================\n\n")
 
 			currentAddr := os.Getenv("VAULT_ADDR")
@@ -124,7 +124,7 @@ that require access to secrets, including the Delphi dashboard.`,
 			fmt.Printf(" Vault server is reachable\n")
 
 			// Step 3: Authentication setup
-			fmt.Printf("\n🔑 Authentication Setup\n")
+			fmt.Printf("\nAuthentication Setup\n")
 			fmt.Printf("Available authentication methods:\n")
 			fmt.Printf("1. Token (recommended for initial setup)\n")
 			fmt.Printf("2. Username/Password (userpass)\n")
@@ -319,7 +319,7 @@ Shows:
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Checking Vault status")
 
-			fmt.Printf("🔐 Vault Status\n")
+			fmt.Printf(" Vault Status\n")
 			fmt.Printf("===============\n\n")
 
 			// Check basic configuration
