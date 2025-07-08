@@ -249,6 +249,9 @@ func scheduleStatus(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		// timerName := fmt.Sprintf("eos-backup-%s.timer", profileName)
 		status := "Not scheduled"
 		nextRun := "-"
+		
+		// TODO: Implement timer status checking
+		_ = status // Will be used when timer status checking is implemented
 
 		// Check systemd timer status
 		// TODO: Parse systemctl output properly

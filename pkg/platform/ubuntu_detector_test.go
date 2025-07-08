@@ -37,12 +37,14 @@ LOGO=ubuntu-logo`
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpFile.Name())
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 
 	if _, err := tmpFile.WriteString(ubuntu2404Content); err != nil {
 		t.Fatal(err)
 	}
-	tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	// Temporarily replace the /etc/os-release path in the function
 	// This is a bit of a hack but necessary for testing

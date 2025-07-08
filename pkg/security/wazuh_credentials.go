@@ -166,19 +166,19 @@ func updateWazuhConfiguration(rc *eos_io.RuntimeContext, config WazuhCredentialC
 	
 	// Admin password
 	if err := replaceInFile(rc, dockerComposePath, "INDEXER_PASSWORD=SecretPassword", 
-		fmt.Sprintf("INDEXER_PASSWORD=${WAZUH_ADMIN_PASSWORD}")); err != nil {
+		"INDEXER_PASSWORD=${WAZUH_ADMIN_PASSWORD}"); err != nil {
 		return cerr.Wrap(err, "failed to update admin password in docker-compose.yml")
 	}
 
 	// Kibana password
 	if err := replaceInFile(rc, dockerComposePath, "DASHBOARD_PASSWORD=kibanaserver", 
-		fmt.Sprintf("DASHBOARD_PASSWORD=${WAZUH_KIBANA_PASSWORD}")); err != nil {
+		"DASHBOARD_PASSWORD=${WAZUH_KIBANA_PASSWORD}"); err != nil {
 		return cerr.Wrap(err, "failed to update kibana password in docker-compose.yml")
 	}
 
 	// API password
 	if err := replaceInFile(rc, dockerComposePath, "API_PASSWORD=MyS3cr37P450r.*-", 
-		fmt.Sprintf("API_PASSWORD=${WAZUH_API_PASSWORD}")); err != nil {
+		"API_PASSWORD=${WAZUH_API_PASSWORD}"); err != nil {
 		return cerr.Wrap(err, "failed to update API password in docker-compose.yml")
 	}
 

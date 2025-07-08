@@ -422,9 +422,11 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			// Return mock response
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"records": []interface{}{},
-			})
+			}); err != nil {
+				t.Errorf("failed to encode response: %v", err)
+			}
 		}))
 		defer testServer.Close()
 

@@ -135,10 +135,7 @@ func restoreSnapshot(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []strin
 		logger.Info("Verifying restored files")
 		
 		// List restored files
-		verifyArgs := []string{"ls", snapshotID, "--json"}
-		for _, include := range includes {
-			verifyArgs = append(verifyArgs, include)
-		}
+		verifyArgs := append([]string{"ls", snapshotID, "--json"}, includes...)
 		
 		_, err := client.RunRestic(verifyArgs...)
 		if err != nil {

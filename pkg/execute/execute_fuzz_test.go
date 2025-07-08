@@ -11,16 +11,26 @@ import (
 // FuzzRun tests command execution with potentially malicious inputs
 func FuzzRun(f *testing.F) {
 	// Seed with safe commands
-	f.Add("echo", []string{"hello"})
-	f.Add("ls", []string{"-la"})
-	f.Add("true", []string{})
+	f.Add("echo hello")
+	f.Add("ls -la")
+	f.Add("true")
 	
 	// Seed with potentially dangerous patterns
-	f.Add("echo", []string{"$(id)"})      // Command substitution
-	f.Add("cat", []string{"/etc/passwd"}) // Sensitive file access
-	f.Add("sh", []string{"-c", "echo test"}) // Shell invocation
+	f.Add("echo $(id)")      // Command substitution
+	f.Add("cat /etc/passwd") // Sensitive file access
+	f.Add("sh -c echo test") // Shell invocation
 	
-	f.Fuzz(func(t *testing.T, command string, args []string) {
+	f.Fuzz(func(t *testing.T, commandLine string) {
+		// Parse command line into command and args
+		parts := strings.Fields(commandLine)
+		if len(parts) == 0 {
+			return
+		}
+		command := parts[0]
+		var args []string
+		if len(parts) > 1 {
+			args = parts[1:]
+		}
 		// Skip empty commands
 		if command == "" {
 			return

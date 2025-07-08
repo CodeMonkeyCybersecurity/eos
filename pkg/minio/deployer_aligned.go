@@ -162,8 +162,10 @@ func (ad *AlignedDeployer) applySaltTerraformGeneration(rc *eos_io.RuntimeContex
 		Timeout: 300 * time.Second,
 	})
 	if err != nil {
-		logger.Warn("Base MinIO state application failed", zap.Error(err))
+		logger.Error("Salt state apply failed", zap.Error(err), zap.String("output", output))
+		return fmt.Errorf("base MinIO state application failed: %w", err)
 	}
+	logger.Debug("Salt state apply output", zap.String("output", output))
 	
 	return nil
 }
@@ -192,7 +194,9 @@ func (ad *AlignedDeployer) validateTerraformState(rc *eos_io.RuntimeContext, ter
 		Timeout: 180 * time.Second,
 	})
 	if err != nil {
-		logger.Warn("Terraform refresh failed, may be first deployment", zap.Error(err))
+		logger.Warn("Terraform refresh failed, may be first deployment", zap.Error(err), zap.String("output", output))
+	} else {
+		logger.Debug("Terraform refresh output", zap.String("output", output))
 	}
 	
 	// Validate configuration
@@ -203,8 +207,10 @@ func (ad *AlignedDeployer) validateTerraformState(rc *eos_io.RuntimeContext, ter
 		Timeout: 60 * time.Second,
 	})
 	if err != nil {
+		logger.Error("Terraform validate failed", zap.Error(err), zap.String("output", output))
 		return fmt.Errorf("terraform validation failed: %w", err)
 	}
+	logger.Debug("Terraform validate output", zap.String("output", output))
 	logger.Info("Terraform configuration validated successfully")
 	
 	return nil

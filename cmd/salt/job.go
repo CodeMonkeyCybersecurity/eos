@@ -100,7 +100,11 @@ Real-time Monitoring:
 		if err != nil {
 			return fmt.Errorf("Salt API authentication failed: %w", err)
 		}
-		defer saltClient.Logout(rc.Ctx)
+		defer func() {
+			if err := saltClient.Logout(rc.Ctx); err != nil {
+				logger.Warn("Failed to logout from Salt API", zap.Error(err))
+			}
+		}()
 
 		// Route to appropriate subcommand
 		switch subcommand {
@@ -405,7 +409,7 @@ func displayJobResultTable(ctx context.Context, job *client.JobResult) error {
 	fmt.Printf("Function: %s\n", job.Function)
 	fmt.Printf("=========================\n")
 
-	if job.Result == nil || len(job.Result) == 0 {
+	if len(job.Result) == 0 {
 		fmt.Printf("⚠️  No results available yet\n")
 		fmt.Printf("Job may still be running or failed to start\n")
 		return nil

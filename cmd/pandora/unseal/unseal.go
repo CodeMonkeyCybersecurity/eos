@@ -368,7 +368,7 @@ func performSecureManualUnseal(rc *eos_io.RuntimeContext, client *api.Client, au
 		}
 
 		// Clear the key from memory immediately
-		key = ""
+		_ = key // Explicitly ignore the key value after use
 
 		log.Info(" Key applied successfully",
 			zap.Int("progress", resp.Progress),

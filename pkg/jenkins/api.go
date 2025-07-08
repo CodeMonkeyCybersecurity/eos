@@ -66,7 +66,7 @@ func (c *Client) doRequest(method, path string, body interface{}) ([]byte, error
     if err != nil {
         return nil, fmt.Errorf("request failed: %w", err)
     }
-    defer resp.Body.Close()
+    defer func() { _ = resp.Body.Close() }()
     
     // Read the response
     respBody, err := io.ReadAll(resp.Body)
@@ -149,7 +149,7 @@ func (c *Client) TriggerBuild(jobName string, params BuildParameters) error {
         if err != nil {
             return err
         }
-        defer resp.Body.Close()
+        defer func() { _ = resp.Body.Close() }()
         
         if resp.StatusCode >= 400 {
             body, _ := io.ReadAll(resp.Body)

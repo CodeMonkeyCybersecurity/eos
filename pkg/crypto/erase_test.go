@@ -145,6 +145,7 @@ func TestSecureEraseSecurity(t *testing.T) {
 		err = SecureErase(ctx, filePath)
 		// Should handle cancelled context gracefully
 		// May succeed or fail depending on timing, but shouldn't panic
+		_ = err // Explicitly ignore error as this tests cancellation handling
 	})
 
 	t.Run("handles malicious file names", func(t *testing.T) {

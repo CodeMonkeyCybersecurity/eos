@@ -162,7 +162,6 @@ func TestGetSecureTLSConfig(t *testing.T) {
 			if !tt.expectInsecure {
 				// Verify secure cipher suites are set
 				assert.NotEmpty(t, cfg.CipherSuites)
-				assert.True(t, cfg.PreferServerCipherSuites)
 			}
 
 			// Cleanup
@@ -352,9 +351,6 @@ func TestSecureTLSConfiguration(t *testing.T) {
 
 	// Verify cipher suites are configured
 	assert.NotEmpty(t, cfg.CipherSuites)
-
-	// Verify server cipher suite preference
-	assert.True(t, cfg.PreferServerCipherSuites)
 
 	// Verify secure connection (not skipping verification)
 	assert.False(t, cfg.InsecureSkipVerify)

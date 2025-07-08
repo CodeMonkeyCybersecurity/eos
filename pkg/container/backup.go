@@ -710,7 +710,7 @@ func createBackupManifest(rc *eos_io.RuntimeContext, backupPath string, inventor
 func calculateBackupSize(backupPath string) int64 {
 	// Calculate actual backup size by walking the directory
 	var size int64
-	filepath.Walk(backupPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(backupPath, func(path string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			size += info.Size()
 		}
@@ -788,7 +788,11 @@ func cleanupOldBackups(rc *eos_io.RuntimeContext, backupDir string, retention in
 		// Remove oldest entries
 		for i := 0; i < len(entries)-retention; i++ {
 			oldPath := filepath.Join(backupDir, entries[i].Name())
-			os.RemoveAll(oldPath)
+			if err := os.RemoveAll(oldPath); err != nil {
+				logger.Warn("Failed to remove old backup", 
+					zap.String("path", oldPath),
+					zap.Error(err))
+			}
 		}
 	}
 	

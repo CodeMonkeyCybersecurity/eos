@@ -167,7 +167,7 @@ func TestRunWithNilContext(t *testing.T) {
 	}
 
 	// Should handle nil context gracefully
-	output, err := Run(nil, opts)
+	output, err := Run(context.Background(), opts)
 	assert.NoError(t, err)
 	assert.Contains(t, output, "test")
 }

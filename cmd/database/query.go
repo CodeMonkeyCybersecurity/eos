@@ -169,7 +169,12 @@ func outputTableQueryResult(result *database_management.DatabaseOperationResult)
 		if len(result.Data) > 0 {
 			// Create table writer
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			defer w.Flush()
+			defer func() {
+				if err := w.Flush(); err != nil {
+					// Best effort - log but don't fail
+					fmt.Fprintf(os.Stderr, "Warning: failed to flush output: %v\n", err)
+				}
+			}()
 
 			// Get column names from first row
 			var columns []string
@@ -180,20 +185,32 @@ func outputTableQueryResult(result *database_management.DatabaseOperationResult)
 			// Print header
 			for i, col := range columns {
 				if i > 0 {
-					fmt.Fprint(w, "\t")
+					if _, err := fmt.Fprint(w, "\t"); err != nil {
+						return fmt.Errorf("failed to write tab: %w", err)
+					}
 				}
-				fmt.Fprint(w, col)
+				if _, err := fmt.Fprint(w, col); err != nil {
+					return fmt.Errorf("failed to write column header: %w", err)
+				}
 			}
-			fmt.Fprintln(w)
+			if _, err := fmt.Fprintln(w); err != nil {
+				return fmt.Errorf("failed to write newline: %w", err)
+			}
 
 			// Print separator
 			for i := range columns {
 				if i > 0 {
-					fmt.Fprint(w, "\t")
+					if _, err := fmt.Fprint(w, "\t"); err != nil {
+						return fmt.Errorf("failed to write separator tab: %w", err)
+					}
 				}
-				fmt.Fprint(w, "---")
+				if _, err := fmt.Fprint(w, "---"); err != nil {
+					return fmt.Errorf("failed to write separator: %w", err)
+				}
 			}
-			fmt.Fprintln(w)
+			if _, err := fmt.Fprintln(w); err != nil {
+				return fmt.Errorf("failed to write separator newline: %w", err)
+			}
 
 			// Print data rows (limit to first 50 for readability)
 			maxRows := len(result.Data)
@@ -205,15 +222,23 @@ func outputTableQueryResult(result *database_management.DatabaseOperationResult)
 				row := result.Data[i]
 				for j, col := range columns {
 					if j > 0 {
-						fmt.Fprint(w, "\t")
+						if _, err := fmt.Fprint(w, "\t"); err != nil {
+							return fmt.Errorf("failed to write data tab: %w", err)
+						}
 					}
 					if val, ok := row[col]; ok && val != nil {
-						fmt.Fprintf(w, "%v", val)
+						if _, err := fmt.Fprintf(w, "%v", val); err != nil {
+							return fmt.Errorf("failed to write value: %w", err)
+						}
 					} else {
-						fmt.Fprint(w, "NULL")
+						if _, err := fmt.Fprint(w, "NULL"); err != nil {
+							return fmt.Errorf("failed to write NULL: %w", err)
+						}
 					}
 				}
-				fmt.Fprintln(w)
+				if _, err := fmt.Fprintln(w); err != nil {
+					return fmt.Errorf("failed to write row newline: %w", err)
+				}
 			}
 
 			if len(result.Data) > 50 {

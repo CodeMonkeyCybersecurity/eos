@@ -102,7 +102,8 @@ func (m *MockBackupClient) CheckRepository() error {
 // Test helper to create runtime context for testing
 func createTestRuntimeContext(t *testing.T) *eos_io.RuntimeContext {
 	logger := zaptest.NewLogger(t)
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
 	
 	return &eos_io.RuntimeContext{
 		Ctx:        ctx,

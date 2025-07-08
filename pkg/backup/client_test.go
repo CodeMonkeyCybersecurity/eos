@@ -201,13 +201,8 @@ func TestSnapshot(t *testing.T) {
 			snapshot.Username, snapshot.Parent,
 		}
 		
-		for _, tag := range snapshot.Tags {
-			fields = append(fields, tag)
-		}
-		
-		for _, path := range snapshot.Paths {
-			fields = append(fields, path)
-		}
+		fields = append(fields, snapshot.Tags...)
+		fields = append(fields, snapshot.Paths...)
 
 		for i, field := range fields {
 			if containsAnyDangerousBackup(field) {

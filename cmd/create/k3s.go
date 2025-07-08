@@ -433,6 +433,8 @@ func runCreateKubeadm(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []stri
 			return fmt.Errorf("failed to get control plane endpoint: %w", err)
 		}
 		controlPlaneEndpoint = strings.TrimSpace(controlPlaneEndpoint)
+		// TODO: Use controlPlaneEndpoint in the K3s configuration
+		_ = controlPlaneEndpoint
 	}
 
 	// TODO: Fix missing container.KubernetesInstallOptions and related functions

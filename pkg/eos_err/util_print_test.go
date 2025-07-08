@@ -25,7 +25,7 @@ func captureStderr(fn func()) string {
 	// Start a goroutine to read from the pipe
 	go func() {
 		var buf bytes.Buffer
-		io.Copy(&buf, r)
+		_, _ = io.Copy(&buf, r)
 		outputCh <- buf.String()
 	}()
 	
@@ -33,7 +33,7 @@ func captureStderr(fn func()) string {
 	fn()
 	
 	// Close the writer and restore stderr
-	w.Close()
+	_ = w.Close()
 	os.Stderr = originalStderr
 	
 	// Get the captured output

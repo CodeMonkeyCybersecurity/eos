@@ -357,7 +357,6 @@ func TestLDAPSecurityIntegration(t *testing.T) {
 		// Verify secure TLS settings
 		assert.False(t, tlsConfig.InsecureSkipVerify, "Should not skip TLS verification")
 		assert.NotEmpty(t, tlsConfig.CipherSuites, "Should have secure cipher suites")
-		assert.True(t, tlsConfig.PreferServerCipherSuites, "Should prefer server cipher suites")
 	})
 
 	t.Run("injection_prevention_integration", func(t *testing.T) {

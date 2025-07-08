@@ -376,7 +376,7 @@ func displayOrchestrationResultsTable(ctx context.Context, response *client.Orch
 			}
 		}
 		
-		if result.Data != nil && len(result.Data) > 0 {
+		if len(result.Data) > 0 {
 			fmt.Printf("   Data:\n")
 			for key, value := range result.Data {
 				if key != "changes" { // Don't duplicate changes

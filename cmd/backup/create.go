@@ -75,7 +75,9 @@ func init() {
 	createRepoCmd.Flags().String("path", "", "Local path for 'local' backend")
 	createRepoCmd.Flags().StringSlice("env", nil, "Environment variables for backend (KEY=VALUE)")
 	createRepoCmd.Flags().Bool("init", true, "Initialize repository after creation")
-	createRepoCmd.MarkFlagRequired("backend")
+	if err := createRepoCmd.MarkFlagRequired("backend"); err != nil {
+		panic(fmt.Sprintf("failed to mark 'backend' flag as required: %v", err))
+	}
 
 	// Profile flags
 	createProfileCmd.Flags().String("repo", "", "Repository to use for this profile")
@@ -95,8 +97,12 @@ func init() {
 	// Schedule flag
 	createProfileCmd.Flags().String("schedule", "", "Cron expression for automatic backups")
 
-	createProfileCmd.MarkFlagRequired("repo")
-	createProfileCmd.MarkFlagRequired("paths")
+	if err := createProfileCmd.MarkFlagRequired("repo"); err != nil {
+		panic(fmt.Sprintf("failed to mark 'repo' flag as required: %v", err))
+	}
+	if err := createProfileCmd.MarkFlagRequired("paths"); err != nil {
+		panic(fmt.Sprintf("failed to mark 'paths' flag as required: %v", err))
+	}
 }
 
 // createRepository creates a new backup repository

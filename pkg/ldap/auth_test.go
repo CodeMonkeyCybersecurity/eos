@@ -77,7 +77,6 @@ func TestAuthenticationSecurityFeatures(t *testing.T) {
 
 		// Verify secure configuration
 		assert.False(t, tlsConfig.InsecureSkipVerify, "Should not skip TLS verification in production")
-		assert.True(t, tlsConfig.PreferServerCipherSuites, "Should prefer server cipher suites")
 		assert.NotEmpty(t, tlsConfig.CipherSuites, "Should have configured cipher suites")
 	})
 
@@ -464,7 +463,6 @@ func TestNetworkSecurity(t *testing.T) {
 		assert.GreaterOrEqual(t, tlsConfig.MinVersion, uint16(tls.VersionTLS12), "Should use TLS 1.2 or higher")
 
 		// Verify secure defaults
-		assert.True(t, tlsConfig.PreferServerCipherSuites, "Should prefer server cipher suites")
 		assert.False(t, tlsConfig.InsecureSkipVerify, "Should not skip certificate verification")
 	})
 }

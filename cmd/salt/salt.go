@@ -129,10 +129,10 @@ func getSaltConfig() (*SaltClientConfig, error) {
 
 	// Validate required configuration
 	if config.URL == "" {
-		return nil, fmt.Errorf("Salt API URL is required (use --salt-url or SALT_API_URL)")
+		return nil, fmt.Errorf("salt API URL is required (use --salt-url or SALT_API_URL)")
 	}
 	if config.Username == "" {
-		return nil, fmt.Errorf("Salt API username is required (use --salt-username or SALT_USERNAME)")
+		return nil, fmt.Errorf("salt API username is required (use --salt-username or SALT_USERNAME)")
 	}
 	if config.Password == "" {
 		return nil, fmt.Errorf("Salt API password is required (use --salt-password or SALT_PASSWORD)")

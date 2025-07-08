@@ -120,7 +120,7 @@ func ValidateVaultTokenFormat(token string) error {
 	}
 
 	if !validFormat {
-		return fmt.Errorf("vault token has invalid format: must start with hvs., hvb., or s.")
+		return fmt.Errorf("vault token has invalid format: must start with hvs., hvb., or s")
 	}
 
 	// Minimum length check

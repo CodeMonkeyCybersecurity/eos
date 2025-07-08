@@ -82,9 +82,18 @@ func TestWriteAndUpJenkins(t *testing.T) {
 			// Create temp directory for testing
 			tempDir := t.TempDir()
 			// Change working directory to temp for the test
-			origWd, _ := os.Getwd()
-			defer os.Chdir(origWd)
-			os.Chdir(tempDir)
+			origWd, err := os.Getwd()
+			if err != nil {
+				t.Fatalf("failed to get working directory: %v", err)
+			}
+			defer func() {
+				if err := os.Chdir(origWd); err != nil {
+					t.Errorf("failed to restore working directory: %v", err)
+				}
+			}()
+			if err := os.Chdir(tempDir); err != nil {
+				t.Fatalf("failed to change to temp directory: %v", err)
+			}
 
 			err := WriteAndUpJenkins(rc, tc.appName, tc.opts)
 

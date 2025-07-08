@@ -3,6 +3,7 @@ package eos_io
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"strings"
 	"testing"
@@ -80,10 +81,15 @@ func FuzzReadYAML(f *testing.F) {
 
 // FuzzWriteYAML tests YAML marshaling with complex data structures
 func FuzzWriteYAML(f *testing.F) {
-	f.Add(map[string]interface{}{"key": "value"})
-	f.Add(map[string]interface{}{"list": []string{"a", "b", "c"}})
+	f.Add(`{"key": "value"}`)
+	f.Add(`{"list": ["a", "b", "c"]}`)
 	
-	f.Fuzz(func(t *testing.T, data map[string]interface{}) {
+	f.Fuzz(func(t *testing.T, dataStr string) {
+		// Parse JSON string to map
+		var data map[string]interface{}
+		if err := json.Unmarshal([]byte(dataStr), &data); err != nil {
+			return // Skip invalid JSON
+		}
 		ctx := context.Background()
 		tmpFile := t.TempDir() + "/test.yaml"
 		

@@ -124,23 +124,42 @@ func outputTableHealthCheck(healthCheck *database_management.DatabaseHealthCheck
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			// Best effort - log but don't fail
+			fmt.Fprintf(os.Stderr, "Warning: failed to flush output: %v\n", err)
+		}
+	}()
 
-	fmt.Fprintf(w, "Database:\t%s\n", healthCheck.Database)
-	fmt.Fprintf(w, "Overall Status:\t%s\n", status)
-	fmt.Fprintf(w, "Response Time:\t%s\n", healthCheck.ResponseTime.String())
-	fmt.Fprintf(w, "Check Time:\t%s\n", healthCheck.Timestamp.Format("2006-01-02 15:04:05"))
+	if _, err := fmt.Fprintf(w, "Database:\t%s\n", healthCheck.Database); err != nil {
+		return fmt.Errorf("failed to write database: %w", err)
+	}
+	if _, err := fmt.Fprintf(w, "Overall Status:\t%s\n", status); err != nil {
+		return fmt.Errorf("failed to write overall status: %w", err)
+	}
+	if _, err := fmt.Fprintf(w, "Response Time:\t%s\n", healthCheck.ResponseTime.String()); err != nil {
+		return fmt.Errorf("failed to write response time: %w", err)
+	}
+	if _, err := fmt.Fprintf(w, "Check Time:\t%s\n", healthCheck.Timestamp.Format("2006-01-02 15:04:05")); err != nil {
+		return fmt.Errorf("failed to write check time: %w", err)
+	}
 
 	if healthCheck.Error != "" {
-		fmt.Fprintf(w, "Error:\t%s\n", healthCheck.Error)
+		if _, err := fmt.Fprintf(w, "Error:\t%s\n", healthCheck.Error); err != nil {
+			return fmt.Errorf("failed to write error: %w", err)
+		}
 	}
 
 	fmt.Printf("\nIndividual Checks:\n")
 	fmt.Printf("------------------\n")
 
 	checkW := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(checkW, "Check\tStatus\tMessage\n")
-	fmt.Fprintf(checkW, "-----\t------\t-------\n")
+	if _, err := fmt.Fprintf(checkW, "Check\tStatus\tMessage\n"); err != nil {
+		return fmt.Errorf("failed to write check header: %w", err)
+	}
+	if _, err := fmt.Fprintf(checkW, "-----\t------\t-------\n"); err != nil {
+		return fmt.Errorf("failed to write check separator: %w", err)
+	}
 
 	for _, check := range healthCheck.Checks {
 		statusIcon := "❌"
@@ -153,9 +172,14 @@ func outputTableHealthCheck(healthCheck *database_management.DatabaseHealthCheck
 			message = "-"
 		}
 
-		fmt.Fprintf(checkW, "%s\t%s %s\t%s\n", check.Name, statusIcon, check.Status, message)
+		if _, err := fmt.Fprintf(checkW, "%s\t%s %s\t%s\n", check.Name, statusIcon, check.Status, message); err != nil {
+			return fmt.Errorf("failed to write check: %w", err)
+		}
 	}
-	checkW.Flush()
+	if err := checkW.Flush(); err != nil {
+		// Best effort - log but don't fail
+		fmt.Fprintf(os.Stderr, "Warning: failed to flush check output: %v\n", err)
+	}
 
 	// Summary
 	passed := 0

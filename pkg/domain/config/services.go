@@ -158,7 +158,7 @@ func (s *service) LoadWithDefaults(ctx context.Context, path string, target inte
 	// Cache the result
 	if s.cache != nil {
 		info, _ := s.repository.Stat(ctx, path)
-		s.cache.Set(path, CachedConfig{
+		_ = s.cache.Set(path, CachedConfig{
 			Data:     parsed,
 			LoadedAt: time.Now(),
 			ModTime:  info.ModTime,
@@ -240,7 +240,11 @@ func (s *service) SaveFile(ctx context.Context, path string, source interface{},
 		if exists {
 			backupPath := fmt.Sprintf("%s.backup.%d", path, time.Now().Unix())
 			if data, err := s.repository.Read(ctx, path); err == nil {
-				s.repository.Write(ctx, backupPath, data, opts.Permission)
+				if err := s.repository.Write(ctx, backupPath, data, opts.Permission); err != nil {
+					s.logger.Warn("Failed to create backup",
+						zap.String("backup", backupPath),
+						zap.Error(err))
+				}
 				s.logger.Info("Created configuration backup",
 					zap.String("backup", backupPath))
 			}
@@ -259,7 +263,7 @@ func (s *service) SaveFile(ctx context.Context, path string, source interface{},
 
 	// Invalidate cache
 	if s.cache != nil {
-		s.cache.Delete(path)
+		_ = s.cache.Delete(path)
 	}
 
 	s.logger.Info("Configuration saved successfully",
@@ -310,7 +314,11 @@ func (s *service) Watch(ctx context.Context, path string, callback WatchCallback
 		s.watchMutex.Lock()
 		delete(s.watchers, path)
 		s.watchMutex.Unlock()
-		watcher.Stop()
+		if err := watcher.Stop(); err != nil {
+			s.logger.Warn("Failed to stop watcher", 
+				zap.String("path", path),
+				zap.Error(err))
+		}
 	}, nil
 }
 
@@ -453,7 +461,7 @@ func (s *service) structToMap(v interface{}) map[string]interface{} {
 	// Use JSON as intermediate format for simplicity
 	data, _ := json.Marshal(v)
 	var result map[string]interface{}
-	json.Unmarshal(data, &result)
+	_ = json.Unmarshal(data, &result)
 	return result
 }
 

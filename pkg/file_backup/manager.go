@@ -361,13 +361,13 @@ func (fbm *FileBackupManager) copyFile(src, dst string, preservePermissions bool
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return fmt.Errorf("failed to create destination file: %w", err)
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }()
 
 	// Copy file contents
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
@@ -409,7 +409,7 @@ func (fbm *FileBackupManager) calculateFileHash(filePath string) (string, error)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	hasher := md5.New()
 	if _, err := io.Copy(hasher, file); err != nil {

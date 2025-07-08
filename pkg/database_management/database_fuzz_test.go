@@ -123,19 +123,24 @@ func FuzzDatabaseConfig(f *testing.F) {
 // FuzzRoleStatements tests SQL role creation/revocation statements for injection
 func FuzzRoleStatements(f *testing.F) {
 	// Safe role statements
-	f.Add([]string{"CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'"})
-	f.Add([]string{"GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\""})
-	f.Add([]string{"DROP USER \"{{name}}\""})
+	f.Add("CREATE USER \"{{name}}\" WITH PASSWORD '{{password}}'")
+	f.Add("GRANT SELECT ON ALL TABLES IN SCHEMA public TO \"{{name}}\"")
+	f.Add("DROP USER \"{{name}}\"")
 	
 	// Potentially dangerous role statements
-	f.Add([]string{"CREATE USER {{name}} WITH PASSWORD '{{password}}'; DROP TABLE users; --"})
-	f.Add([]string{"GRANT ALL PRIVILEGES ON *.* TO '{{name}}'@'%' WITH GRANT OPTION"})
-	f.Add([]string{"CREATE USER \"{{name}}\" WITH SUPERUSER PASSWORD '{{password}}'"})
-	f.Add([]string{"'; DELETE FROM users; CREATE USER malicious WITH PASSWORD 'evil'; --"})
-	f.Add([]string{"GRANT EXECUTE ON FUNCTION load_file TO \"{{name}}\""})
-	f.Add([]string{"CREATE USER \"{{name}}\"; EXEC xp_cmdshell('net user hacker hacker /add'); --"})
+	f.Add("CREATE USER {{name}} WITH PASSWORD '{{password}}'; DROP TABLE users; --")
+	f.Add("GRANT ALL PRIVILEGES ON *.* TO '{{name}}'@'%' WITH GRANT OPTION")
+	f.Add("CREATE USER \"{{name}}\" WITH SUPERUSER PASSWORD '{{password}}'")
+	f.Add("'; DELETE FROM users; CREATE USER malicious WITH PASSWORD 'evil'; --")
+	f.Add("GRANT EXECUTE ON FUNCTION load_file TO \"{{name}}\"")
+	f.Add("CREATE USER \"{{name}}\"; EXEC xp_cmdshell('net user hacker hacker /add'); --")
 	
-	f.Fuzz(func(t *testing.T, statements []string) {
+	f.Fuzz(func(t *testing.T, statementsStr string) {
+		// Parse the input string into statements
+		statements := strings.Split(statementsStr, "\n")
+		if len(statements) == 0 || (len(statements) == 1 && statements[0] == "") {
+			return
+		}
 		if len(statements) == 0 {
 			return
 		}

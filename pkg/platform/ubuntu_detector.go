@@ -200,7 +200,7 @@ func ValidateUbuntuVersion(release *UbuntuRelease, supportedVersions []string) e
 		}
 	}
 	
-	return fmt.Errorf("Ubuntu version %s (%s) is not supported. Supported versions: %v", 
+	return fmt.Errorf("ubuntu version %s (%s) is not supported, supported versions: %v", 
 		release.Version, release.Codename, supportedVersions)
 }
 

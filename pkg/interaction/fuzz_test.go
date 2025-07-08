@@ -169,7 +169,7 @@ func FuzzValidateEmailSecurity(f *testing.F) {
 			}
 		}()
 		
-		ValidateEmail(email)
+		_ = ValidateEmail(email)
 	})
 }
 
@@ -219,7 +219,7 @@ func FuzzValidateUsernameSecurity(f *testing.F) {
 			}
 		}()
 		
-		ValidateUsername(username)
+		_ = ValidateUsername(username)
 	})
 }
 
@@ -260,7 +260,7 @@ func FuzzValidateURLSecurity(f *testing.F) {
 			}
 		}()
 		
-		ValidateURL(urlStr)
+		_ = ValidateURL(urlStr)
 	})
 }
 

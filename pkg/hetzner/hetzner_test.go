@@ -139,26 +139,26 @@ func TestHetznerTokenSecurity(t *testing.T) {
 		defer func() {
 			// Restore original tokens
 			if originalToken != "" {
-				os.Setenv("HCLOUD_TOKEN", originalToken)
+				_ = os.Setenv("HCLOUD_TOKEN", originalToken)
 			} else {
-				os.Unsetenv("HCLOUD_TOKEN")
+				_ = os.Unsetenv("HCLOUD_TOKEN")
 			}
 			if originalHetznerToken != "" {
-				os.Setenv("HETZNER_TOKEN", originalHetznerToken)
+				_ = os.Setenv("HETZNER_TOKEN", originalHetznerToken)
 			} else {
-				os.Unsetenv("HETZNER_TOKEN")
+				_ = os.Unsetenv("HETZNER_TOKEN")
 			}
 		}()
 
 		// Test with valid token
-		os.Setenv("HCLOUD_TOKEN", "test-token-12345")
+		_ = os.Setenv("HCLOUD_TOKEN", "test-token-12345")
 		
 		// Test token is read correctly
 		token := os.Getenv("HCLOUD_TOKEN")
 		assert.Equal(t, "test-token-12345", token)
 		
 		// Clear token
-		os.Unsetenv("HCLOUD_TOKEN")
+		_ = os.Unsetenv("HCLOUD_TOKEN")
 		token = os.Getenv("HCLOUD_TOKEN")
 		assert.Empty(t, token)
 	})

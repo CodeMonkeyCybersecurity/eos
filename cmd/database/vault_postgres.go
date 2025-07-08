@@ -159,7 +159,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Database host [localhost]: ")
 	var host string
-	fmt.Scanln(&host)
+	if _, err := fmt.Scanln(&host); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read host input", zap.Error(err))
+		return fmt.Errorf("failed to read host: %w", err)
+	}
 	if host == "" {
 		host = "localhost"
 	}
@@ -167,18 +170,27 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Database port [5432]: ")
 	var portStr string
-	fmt.Scanln(&portStr)
+	if _, err := fmt.Scanln(&portStr); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read port input", zap.Error(err))
+		return fmt.Errorf("failed to read port: %w", err)
+	}
 	if portStr == "" {
 		options.DatabaseConfig.Port = 5432
 	} else {
 		var port int
-		fmt.Sscanf(portStr, "%d", &port)
+		if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
+			logger.Warn("Failed to parse port", zap.Error(err))
+			return fmt.Errorf("invalid port number: %w", err)
+		}
 		options.DatabaseConfig.Port = port
 	}
 
 	fmt.Print("Database name [delphi]: ")
 	var database string
-	fmt.Scanln(&database)
+	if _, err := fmt.Scanln(&database); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read database input", zap.Error(err))
+		return fmt.Errorf("failed to read database: %w", err)
+	}
 	if database == "" {
 		database = "delphi"
 	}
@@ -186,7 +198,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("SSL mode [disable]: ")
 	var sslMode string
-	fmt.Scanln(&sslMode)
+	if _, err := fmt.Scanln(&sslMode); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read SSL mode input", zap.Error(err))
+		return fmt.Errorf("failed to read SSL mode: %w", err)
+	}
 	if sslMode == "" {
 		sslMode = "disable"
 	}
@@ -197,7 +212,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Admin username [postgres]: ")
 	var adminUsername string
-	fmt.Scanln(&adminUsername)
+	if _, err := fmt.Scanln(&adminUsername); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read admin username input", zap.Error(err))
+		return fmt.Errorf("failed to read admin username: %w", err)
+	}
 	if adminUsername == "" {
 		adminUsername = "postgres"
 	}
@@ -205,7 +223,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Admin password: ")
 	var adminPassword string
-	fmt.Scanln(&adminPassword)
+	if _, err := fmt.Scanln(&adminPassword); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read admin password input", zap.Error(err))
+		return fmt.Errorf("failed to read admin password: %w", err)
+	}
 	if adminPassword == "" {
 		return fmt.Errorf("admin password is required")
 	}
@@ -216,7 +237,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Connection name [delphi-postgresql]: ")
 	var connectionName string
-	fmt.Scanln(&connectionName)
+	if _, err := fmt.Scanln(&connectionName); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read connection name input", zap.Error(err))
+		return fmt.Errorf("failed to read connection name: %w", err)
+	}
 	if connectionName == "" {
 		connectionName = "delphi-postgresql"
 	}
@@ -224,7 +248,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Engine mount point [database]: ")
 	var engineMount string
-	fmt.Scanln(&engineMount)
+	if _, err := fmt.Scanln(&engineMount); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read engine mount input", zap.Error(err))
+		return fmt.Errorf("failed to read engine mount: %w", err)
+	}
 	if engineMount == "" {
 		engineMount = "database"
 	}
@@ -232,7 +259,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Test connection after setup? [Y/n]: ")
 	var testResponse string
-	fmt.Scanln(&testResponse)
+	if _, err := fmt.Scanln(&testResponse); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read test response input", zap.Error(err))
+		return fmt.Errorf("failed to read test response: %w", err)
+	}
 	options.TestConnection = testResponse != "n" && testResponse != "N"
 
 	// Create default roles
@@ -263,7 +293,10 @@ func runInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *database_manag
 
 	fmt.Print("Proceed with setup? [Y/n]: ")
 	var confirmResponse string
-	fmt.Scanln(&confirmResponse)
+	if _, err := fmt.Scanln(&confirmResponse); err != nil && err.Error() != "unexpected newline" {
+		logger.Warn("Failed to read confirmation input", zap.Error(err))
+		return fmt.Errorf("failed to read confirmation: %w", err)
+	}
 	if confirmResponse == "n" || confirmResponse == "N" {
 		logger.Info("Setup cancelled by user")
 		return nil

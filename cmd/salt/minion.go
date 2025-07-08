@@ -103,7 +103,11 @@ Data Types:
 		if err != nil {
 			return fmt.Errorf("Salt API authentication failed: %w", err)
 		}
-		defer saltClient.Logout(rc.Ctx)
+		defer func() {
+			if err := saltClient.Logout(rc.Ctx); err != nil {
+				logger.Warn("Failed to logout from Salt API", zap.Error(err))
+			}
+		}()
 
 		// Route to appropriate subcommand
 		switch subcommand {

@@ -255,6 +255,9 @@ Examples:
 				}
 
 				result, err = manager.DestroyPool(rc, name)
+			if err != nil {
+				return err
+			}
 
 			case "filesystem":
 				// Validate filesystem exists
@@ -267,6 +270,9 @@ Examples:
 				}
 
 				result, err = manager.DestroyFilesystem(rc, name)
+			if err != nil {
+				return err
+			}
 
 			default:
 				return fmt.Errorf("invalid destroy target: %s. Use 'pool' or 'filesystem'", target)

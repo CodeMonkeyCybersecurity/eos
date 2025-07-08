@@ -90,12 +90,15 @@ func handlePostgreSQLCredentials(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 	if database == "" {
 		database = "postgres" // Default database
 	}
+	_ = database // TODO: Use database in credential generation
 	if host == "" {
 		host = "localhost" // Default host
 	}
+	_ = host // TODO: Use host in credential generation
 	if port == "" {
 		port = "5432" // Default port
 	}
+	_ = port // TODO: Use port in credential generation
 
 	config := security.CredentialConfig{
 		Service:   "postgresql",
