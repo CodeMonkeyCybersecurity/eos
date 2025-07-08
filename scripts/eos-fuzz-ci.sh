@@ -6,6 +6,12 @@
 set -euo pipefail
 IFS=$'\n\t'
 
+# Source the common preflight checks
+source "$(dirname "${BASH_SOURCE[0]}")/fuzz-preflight-common.sh"
+
+# Run preflight checks
+eos_run_preflight_checks
+
 # ============================================================================
 # CI/CD SPECIFIC CONFIGURATION
 # ============================================================================

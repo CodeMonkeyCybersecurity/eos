@@ -4,6 +4,84 @@
 
 set -e
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+# Preflight check function
+preflight_check() {
+    echo -e "${CYAN}🔍 Running preflight checks...${NC}"
+    
+    # Check if we're in the project root or can find it
+    local current_dir="$(pwd)"
+    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local expected_root="$(cd "$script_dir/.." && pwd)"
+    
+    # Check for go.mod file as indicator of project root
+    if [ -f "go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "go.mod" 2>/dev/null; then
+        echo -e "${GREEN}✅ Already in EOS project root${NC}"
+        return 0
+    elif [ -f "$expected_root/go.mod" ] && grep -q "module github.com/CodeMonkeyCybersecurity/eos" "$expected_root/go.mod" 2>/dev/null; then
+        echo -e "${YELLOW}📂 Changing to project root: $expected_root${NC}"
+        cd "$expected_root" || { 
+            echo -e "${RED}❌ Failed to change to project root${NC}"
+            exit 1
+        }
+        return 0
+    else
+        echo -e "${RED}❌ ERROR: Not in EOS project directory${NC}"
+        echo -e "${RED}Current directory: $current_dir${NC}"
+        echo ""
+        echo -e "${YELLOW}📋 To run this script correctly:${NC}"
+        echo ""
+        echo -e "  1. ${CYAN}Change to the EOS project root:${NC}"
+        echo -e "     ${GREEN}cd /opt/eos${NC}  ${YELLOW}# or wherever you cloned the EOS repository${NC}"
+        echo ""
+        echo -e "  2. ${CYAN}Then run the script:${NC}"
+        echo -e "     ${GREEN}./scripts/$(basename "$0")${NC} [duration] [package] [function]"
+        echo ""
+        echo -e "${YELLOW}💡 Examples:${NC}"
+        echo -e "   ${GREEN}./scripts/$(basename "$0")${NC}              # Run all tests for 10s"
+        echo -e "   ${GREEN}./scripts/$(basename "$0") 30s${NC}          # Run all tests for 30s"
+        echo -e "   ${GREEN}./scripts/$(basename "$0") 1m ./pkg/security${NC}  # Run security tests for 1m"
+        echo ""
+        exit 1
+    fi
+}
+
+# Verify required tools
+verify_tools() {
+    echo -e "${CYAN}🔧 Verifying required tools...${NC}"
+    
+    if ! command -v go &> /dev/null; then
+        echo -e "${RED}❌ ERROR: Go is not installed${NC}"
+        echo ""
+        echo -e "${YELLOW}📋 To install Go:${NC}"
+        echo -e "   ${GREEN}sudo apt-get update && sudo apt-get install -y golang-go${NC}"
+        echo ""
+        exit 1
+    fi
+    
+    echo -e "${GREEN}✅ Required tools verified${NC}"
+}
+
+# Run preflight checks
+echo -e "${PURPLE}🚀 EOS Fuzz Test Runner - Preflight${NC}"
+echo "===================================="
+echo ""
+
+preflight_check
+verify_tools
+
+echo ""
+echo -e "${GREEN}✅ Preflight checks passed!${NC}"
+echo ""
+
 # Configuration with environment variable overrides
 FUZZTIME="${1:-10s}"
 PACKAGE="${2:-}"
@@ -16,11 +94,12 @@ PARALLEL_JOBS="${PARALLEL_JOBS:-4}"
 # Create log directory
 mkdir -p "${LOG_DIR}"
 
-echo "🧪 Eos Fuzz Test Runner"
+echo -e "${CYAN}🧪 Eos Fuzz Test Runner${NC}"
 echo "======================="
-echo "⏰ Duration: ${FUZZTIME}"
-echo "🔄 Parallel jobs: ${PARALLEL_JOBS}"
-echo "📁 Logs: ${LOG_DIR}"
+echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
+echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
+echo -e "🔄 Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
+echo -e "📁 Logs: ${YELLOW}${LOG_DIR}${NC}"
 echo ""
 
 # Initialize report

@@ -4,6 +4,12 @@
 
 set -e
 
+# Source the common preflight checks
+source "$(dirname "${BASH_SOURCE[0]}")/fuzz-preflight-common.sh"
+
+# Run preflight checks
+eos_run_preflight_checks
+
 DURATION="${1:-5s}"
 LOG_DIR="${LOG_DIR:-/tmp/eos-fuzz-logs}"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
@@ -53,22 +59,22 @@ for test_spec in "${tests[@]}"; do
 done
 
 echo ""
-echo "📊 Quick Validation Results:"
-echo "=========================="
-echo "✅ Passed: ${passed}/${total}"
-echo "❌ Failed: ${failed}/${total}"
+echo -e "${PURPLE}📊 Quick Validation Results:${NC}"
+echo -e "${PURPLE}==========================${NC}"
+echo -e "${GREEN}✅ Passed: ${passed}/${total}${NC}"
+echo -e "${RED}❌ Failed: ${failed}/${total}${NC}"
 
 if [ ${failed} -eq 0 ]; then
     echo ""
-    echo "🎉 SUCCESS: All essential fuzz tests are working!"
-    echo "🚀 Ready for overnight fuzzing:"
-    echo "   ./assets/overnight-fuzz-simple.sh"
-    echo "   # or with custom durations:"
-    echo "   FUZZTIME_LONG=1h FUZZTIME_MEDIUM=30m FUZZTIME_SHORT=10m ./assets/overnight-fuzz-simple.sh"
+    echo -e "${GREEN}🎉 SUCCESS: All essential fuzz tests are working!${NC}"
+    echo -e "${CYAN}🚀 Ready for overnight fuzzing:${NC}"
+    echo -e "   ${GREEN}./assets/overnight-fuzz-simple.sh${NC}"
+    echo -e "   ${YELLOW}# or with custom durations:${NC}"
+    echo -e "   ${GREEN}FUZZTIME_LONG=1h FUZZTIME_MEDIUM=30m FUZZTIME_SHORT=10m ./assets/overnight-fuzz-simple.sh${NC}"
     exit 0
 else
     echo ""
-    echo "⚠️  ${failed} test(s) failed. Check logs in ${LOG_DIR}"
-    echo "🔍 Debug with: go test -v -run=^$ -fuzz=^TestName$ -fuzztime=10s ./package"
+    echo -e "${YELLOW}⚠️  ${failed} test(s) failed. Check logs in ${LOG_DIR}${NC}"
+    echo -e "${CYAN}🔍 Debug with: ${GREEN}go test -v -run=^$ -fuzz=^TestName$ -fuzztime=10s ./package${NC}"
     exit 1
 fi

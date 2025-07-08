@@ -4,6 +4,12 @@
 
 set -e
 
+# Source common preflight checks
+source "$(dirname "${BASH_SOURCE[0]}")/fuzz-preflight-common.sh"
+
+# Run preflight checks
+eos_run_preflight_checks
+
 # Configuration
 FUZZTIME_LONG="${FUZZTIME_LONG:-8h}"     # 8 hours per critical test
 FUZZTIME_MEDIUM="${FUZZTIME_MEDIUM:-2h}" # 2 hours per important test  
@@ -18,10 +24,11 @@ SLACK_WEBHOOK="${SLACK_WEBHOOK:-}"
 # Create log directory
 mkdir -p "${LOG_DIR}"
 
-echo " Starting overnight Eos fuzzing at $(date)"
-echo "📁 Logs will be saved to: ${LOG_DIR}"
-echo "⏰ Long fuzz duration: ${FUZZTIME_LONG}"
-echo "⏰ Short fuzz duration: ${FUZZTIME_SHORT}"
+echo -e "${CYAN}🌙 Starting overnight Eos fuzzing at $(date)${NC}"
+echo -e "📁 Logs will be saved to: ${YELLOW}${LOG_DIR}${NC}"
+echo -e "⏰ Long fuzz duration: ${YELLOW}${FUZZTIME_LONG}${NC}"
+echo -e "⏰ Medium fuzz duration: ${YELLOW}${FUZZTIME_MEDIUM}${NC}"
+echo -e "⏰ Short fuzz duration: ${YELLOW}${FUZZTIME_SHORT}${NC}"
 echo ""
 
 # Enhanced fuzz test runner with parallel execution and detailed logging

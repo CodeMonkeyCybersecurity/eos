@@ -4,6 +4,12 @@
 
 set -e
 
+# Source common preflight checks
+source "$(dirname "${BASH_SOURCE[0]}")/fuzz-preflight-common.sh"
+
+# Run preflight checks
+eos_run_preflight_checks
+
 # Configuration with environment variable overrides
 FUZZTIME_LONG="${FUZZTIME_LONG:-8h}"
 FUZZTIME_MEDIUM="${FUZZTIME_MEDIUM:-2h}" 
@@ -15,9 +21,9 @@ REPORT_FILE="${LOG_DIR}/fuzz-report-${TIMESTAMP}.md"
 # Create log directory
 mkdir -p "${LOG_DIR}"
 
-echo "🧪 Starting Overnight Eos Fuzzing at $(date)"
-echo "📁 Logs will be saved to: ${LOG_DIR}"
-echo "⏰ Long duration: ${FUZZTIME_LONG}"
+echo -e "${CYAN}🧪 Starting Overnight Eos Fuzzing at $(date)${NC}"
+echo -e "📁 Logs will be saved to: ${YELLOW}${LOG_DIR}${NC}"
+echo -e "⏰ Long duration: ${YELLOW}${FUZZTIME_LONG}${NC}"
 echo "⏰ Medium duration: ${FUZZTIME_MEDIUM}"
 echo "⏰ Short duration: ${FUZZTIME_SHORT}"
 echo ""
