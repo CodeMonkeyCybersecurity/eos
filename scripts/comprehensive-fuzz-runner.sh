@@ -4,6 +4,11 @@
 
 set -e
 
+# Ensure we're in the project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT" || { echo "Failed to change to project root"; exit 1; }
+
 # Configuration
 FUZZTIME="${1:-30s}"
 CHAOS_MODE="${CHAOS_MODE:-false}"
@@ -26,6 +31,7 @@ NC='\033[0m' # No Color
 
 echo -e "${CYAN}🧪 EOS Comprehensive Fuzz Test Runner${NC}"
 echo "============================================="
+echo -e "📂 Working directory: ${YELLOW}$(pwd)${NC}"
 echo -e "⏰ Duration: ${YELLOW}${FUZZTIME}${NC}"
 echo -e "🔄 Parallel jobs: ${YELLOW}${PARALLEL_JOBS}${NC}"
 echo -e "🎯 Security focus: ${YELLOW}${SECURITY_FOCUS}${NC}"
