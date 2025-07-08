@@ -776,6 +776,8 @@ func validateVolumeBackups(rc *eos_io.RuntimeContext, backupPath string) error {
 }
 
 func cleanupOldBackups(rc *eos_io.RuntimeContext, backupDir string, retention int) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
 	// Remove old backup directories beyond retention policy
 	entries, err := os.ReadDir(backupDir)
 	if err != nil {

@@ -44,7 +44,13 @@ func (c *Configurer) Configure(rc *eos_io.RuntimeContext, config *Config) error 
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to create test state: %w", err))
 	}
 	
-	// Step 4: Set permissions
+	// Step 4: Deploy Eos salt states
+	logger.Info("Deploying Eos salt states")
+	if err := c.deployStates(rc); err != nil {
+		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to deploy states: %w", err))
+	}
+	
+	// Step 5: Set permissions
 	logger.Info("Setting permissions on Salt directories")
 	if err := c.setPermissions(rc); err != nil {
 		return eos_err.NewExpectedError(rc.Ctx, fmt.Errorf("failed to set permissions: %w", err))
@@ -218,5 +224,58 @@ func (c *Configurer) backupFile(rc *eos_io.RuntimeContext, source, destination s
 	}
 	
 	logger.Debug("File backed up", zap.String("source", source), zap.String("destination", destination))
+	return nil
+}
+
+// deployStates copies Eos salt states from the codebase to the Salt file system
+func (c *Configurer) deployStates(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// Get the current working directory to find the Eos codebase
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+	
+	// Find the Eos salt states directory
+	saltStatesSourceDir := filepath.Join(cwd, "salt", "states")
+	
+	// Check if the source directory exists
+	if _, err := os.Stat(saltStatesSourceDir); os.IsNotExist(err) {
+		// Try alternative path (might be running from different location)
+		altPath := "/usr/local/share/eos/salt/states"
+		if _, err := os.Stat(altPath); os.IsNotExist(err) {
+			logger.Warn("Salt states source directory not found, skipping deployment",
+				zap.String("primary_path", saltStatesSourceDir),
+				zap.String("alternative_path", altPath))
+			return nil
+		}
+		saltStatesSourceDir = altPath
+	}
+	
+	logger.Info("Deploying salt states from source",
+		zap.String("source", saltStatesSourceDir),
+		zap.String("destination", SaltStatesDir))
+	
+	// Copy the entire states directory to /srv/salt
+	_, err = execute.Run(rc.Ctx, execute.Options{
+		Command: "cp",
+		Args:    []string{"-r", saltStatesSourceDir + "/.", SaltStatesDir},
+		Timeout: 60 * time.Second,
+	})
+	
+	if err != nil {
+		return fmt.Errorf("failed to copy salt states: %w", err)
+	}
+	
+	// Verify key states were deployed
+	minioStatePath := filepath.Join(SaltStatesDir, "minio", "init.sls")
+	if _, err := os.Stat(minioStatePath); err != nil {
+		return fmt.Errorf("failed to verify minio state deployment: %w", err)
+	}
+	
+	logger.Info("Salt states deployed successfully",
+		zap.String("verified_state", minioStatePath))
+	
 	return nil
 }

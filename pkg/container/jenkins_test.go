@@ -95,7 +95,7 @@ func TestWriteAndUpJenkins(t *testing.T) {
 				t.Fatalf("failed to change to temp directory: %v", err)
 			}
 
-			err := WriteAndUpJenkins(rc, tc.appName, tc.opts)
+			err = WriteAndUpJenkins(rc, tc.appName, tc.opts)
 
 			if tc.wantErr {
 				testutil.AssertError(t, err)

@@ -654,7 +654,7 @@ func setSMTPCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.Secre
 }
 
 func setOpenAICredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
-	fmt.Printf("\n🤖 OpenAI API Key Setup\n")
+	fmt.Printf("\n OpenAI API Key Setup\n")
 	fmt.Printf("=======================\n")
 
 	fmt.Printf("OpenAI API Key: ")

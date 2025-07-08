@@ -1,0 +1,107 @@
+# EOS Auto-Commit Configuration
+# This file controls the behavior of `eos self git commit`
+
+# Safety checks configuration
+safety:
+  # Enable secret scanning before commits
+  scan_secrets: true
+  
+  # Maximum file size to allow (in MB)
+  max_file_size: 50
+  
+  # Check for build artifacts and temporary files
+  check_artifacts: true
+  
+  # Protected branches that require confirmation
+  protected_branches:
+    - main
+    - master
+    - production
+    - prod
+    - release
+  
+  # File patterns to always exclude (in addition to .gitignore)
+  exclude_patterns:
+    - "*.log"
+    - "*.tmp"
+    - "*.swp"
+    - "*.swo"
+    - "*~"
+    - ".DS_Store"
+    - "Thumbs.db"
+    - "node_modules/"
+    - "vendor/"
+    - "coverage.out"
+    - "*.test"
+
+# Secret detection patterns (regex)
+secret_patterns:
+  - '(?i)(password|passwd|pwd)\s*[:=]\s*[''\"]\w+[''\""]'
+  - '(?i)(api[_-]?key|apikey)\s*[:=]\s*[''\"]\w+[''\""]'
+  - '(?i)(secret|token)\s*[:=]\s*[''\"]\w+[''\""]'
+  - '-----BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY-----'
+  - '(?i)aws_access_key_id'
+  - '(?i)aws_secret_access_key'
+  - '(?i)github_token'
+  - '(?i)jwt_secret'
+  - '(?i)database_url.*://.*:.*@'
+
+# Commit message generation
+message_generation:
+  # Enable smart commit message generation
+  smart_messages: true
+  
+  # Include file statistics in commit messages
+  include_stats: true
+  
+  # Include package information for Go projects
+  include_packages: true
+  
+  # Custom message templates for different types of changes
+  templates:
+    test_changes: "Add/update tests for {packages}"
+    doc_changes: "Update documentation for {packages}"
+    config_changes: "Configure {packages}"
+    new_files: "Add {subject}"
+    default: "Update {subject}"
+
+# Default behavior
+defaults:
+  # Skip confirmation prompt by default (can be overridden with --force flag)
+  auto_confirm: false
+  
+  # Automatically push after successful commit
+  auto_push: false
+  
+  # Skip pre-commit hooks by default
+  skip_verify: false
+  
+  # Show detailed diff before committing
+  show_diff: true
+
+# Integration settings
+integration:
+  # Enable integration with external tools
+  enable_hooks: true
+  
+  # Pre-commit commands to run (if not using git hooks)
+  pre_commit_commands:
+    - "go fmt ./..."
+    - "go vet ./..."
+  
+  # Post-commit commands to run
+  post_commit_commands: []
+
+# User preferences
+preferences:
+  # Preferred commit message style
+  message_style: "conventional"  # Options: conventional, simple, detailed
+  
+  # Maximum commit message length
+  max_message_length: 50
+  
+  # Include emoji in commit messages
+  use_emoji: true
+  
+  # Preferred branch naming convention
+  branch_prefix: "feature/"  # For auto-branch creation (future feature)
