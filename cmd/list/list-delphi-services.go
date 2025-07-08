@@ -20,7 +20,7 @@ type ServiceStatus struct {
 // getServiceStatus returns the status of a service
 func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus, error) {
 	var status ServiceStatus
-	
+
 	// Check if service is active
 	if eos_unix.ServiceExists(serviceName) {
 		if err := eos_unix.CheckServiceStatus(rc.Ctx, serviceName); err == nil {
@@ -31,14 +31,14 @@ func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceSta
 	} else {
 		status.Active = "not-installed"
 	}
-	
+
 	// Check if service is enabled (simplified check)
 	if status.Active == "active" {
 		status.Enabled = "enabled"
 	} else {
 		status.Enabled = "disabled"
 	}
-	
+
 	return status, nil
 }
 
