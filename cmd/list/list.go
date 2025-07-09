@@ -25,3 +25,10 @@ var ListCmd = &cobra.Command{
 		return nil
 	}),
 }
+
+// log is a package-level variable for the Zap logger.
+
+func init() {
+	// Initialize the shared logger for the entire deploy package
+
+}

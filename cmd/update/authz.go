@@ -1,3 +1,5 @@
+// TODO: Pattern 1 - This command needs to be registered with UpdateCmd in init() function
+// TODO: Pattern 1 - Based on the "secure permissions" example paths, this might belong in a different command structure
 package update
 
 import (
@@ -14,12 +16,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewPermissionsCmd creates the permissions command
-func NewPermissionsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "permissions",
-		Short: "Manage security permissions for SSH keys and system files",
-		Long: `Manages security permissions for SSH keys, system files, and SSL certificates.
+// permissionsCmd manages security permissions for SSH keys and system files
+var permissionsCmd = &cobra.Command{
+	Use:   "permissions",
+	Short: "Manage security permissions for SSH keys and system files",
+	Long: `Manages security permissions for SSH keys, system files, and SSL certificates.
 This command helps ensure proper file permissions are set according to security best practices.
 
 Categories:
@@ -30,7 +31,7 @@ Categories:
 Operations:
 - check: Analyze current permissions without making changes
 - fix: Correct permission issues (with optional dry-run mode)`,
-		Example: `  # Check SSH permissions
+	Example: `  # Check SSH permissions
   eos secure permissions check ssh
   
   # Fix SSH permissions
@@ -41,27 +42,22 @@ Operations:
   
   # Check with custom SSH directory
   eos secure permissions check ssh --ssh-dir /custom/ssh`,
-	}
-
-	cmd.AddCommand(NewPermissionsCheckCmd())
-	cmd.AddCommand(NewPermissionsFixCmd())
-	return cmd
 }
 
-// NewPermissionsCheckCmd creates the check subcommand
-func NewPermissionsCheckCmd() *cobra.Command {
-	var (
-		sshDir     string
-		outputJSON bool
-	)
+// Flag variables for permissions check command
+var (
+	permissionsCheckSSHDir     string
+	permissionsCheckOutputJSON bool
+)
 
-	cmd := &cobra.Command{
-		Use:   "check [categories...]",
-		Short: "Check file permissions without making changes",
-		Long: `Analyzes current file permissions and reports issues without making any changes.
+// permissionsCheckCmd checks file permissions without making changes
+var permissionsCheckCmd = &cobra.Command{
+	Use:   "check [categories...]",
+	Short: "Check file permissions without making changes",
+	Long: `Analyzes current file permissions and reports issues without making any changes.
 		
 Available categories: ssh, system, ssl`,
-		Example: `  # Check SSH permissions
+	Example: `  # Check SSH permissions
   eos secure permissions check ssh
   
   # Check all categories
@@ -69,58 +65,52 @@ Available categories: ssh, system, ssl`,
   
   # Check with JSON output
   eos secure permissions check ssh --json`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	Args: cobra.MinimumNArgs(1),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			logger.Info("Checking security permissions",
-				zap.Strings("categories", args),
-				zap.String("ssh_dir", sshDir))
+		logger.Info("Checking security permissions",
+			zap.Strings("categories", args),
+			zap.String("ssh_dir", permissionsCheckSSHDir))
 
-			config := &security_permissions.SecurityConfig{
-				SSHDirectory: sshDir,
-				DryRun:       true, // Check is always dry-run
-			}
+		config := &security_permissions.SecurityConfig{
+			SSHDirectory: permissionsCheckSSHDir,
+			DryRun:       true, // Check is always dry-run
+		}
 
-			manager := security_permissions.NewPermissionManager(config)
-			result, err := manager.CheckPermissions(args)
-			if err != nil {
-				logger.Error("Permission check failed", zap.Error(err))
-				return fmt.Errorf("permission check failed: %v", err)
-			}
+		manager := security_permissions.NewPermissionManager(config)
+		result, err := manager.CheckPermissions(args)
+		if err != nil {
+			logger.Error("Permission check failed", zap.Error(err))
+			return fmt.Errorf("permission check failed: %v", err)
+		}
 
-			if outputJSON {
-				return outputJSONResult(result)
-			} else {
-				return outputTextResult(result, true)
-			}
-		}),
-	}
-
-	cmd.Flags().StringVar(&sshDir, "ssh-dir", os.ExpandEnv("$HOME/.ssh"), "SSH directory to check")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output results in JSON format")
-
-	return cmd
+		if permissionsCheckOutputJSON {
+			return outputJSONResult(result)
+		} else {
+			return outputTextResult(result, true)
+		}
+	}),
 }
 
-// NewPermissionsFixCmd creates the fix subcommand
-func NewPermissionsFixCmd() *cobra.Command {
-	var (
-		sshDir        string
-		outputJSON    bool
-		dryRun        bool
-		createBackups bool
-	)
+// Flag variables for permissions fix command
+var (
+	permissionsFixSSHDir        string
+	permissionsFixOutputJSON    bool
+	permissionsFixDryRun        bool
+	permissionsFixCreateBackups bool
+)
 
-	cmd := &cobra.Command{
-		Use:   "fix [categories...]",
-		Short: "Fix file permission issues",
-		Long: `Corrects file permission issues according to security best practices.
+// permissionsFixCmd fixes file permission issues
+var permissionsFixCmd = &cobra.Command{
+	Use:   "fix [categories...]",
+	Short: "Fix file permission issues",
+	Long: `Corrects file permission issues according to security best practices.
 		
 Available categories: ssh, system, ssl
 
 Creates backups by default before making changes.`,
-		Example: `  # Fix SSH permissions
+	Example: `  # Fix SSH permissions
   eos secure permissions fix ssh
   
   # Fix with dry run (preview changes)
@@ -128,42 +118,34 @@ Creates backups by default before making changes.`,
   
   # Fix without creating backups
   eos secure permissions fix ssh --no-backups`,
-		Args: cobra.MinimumNArgs(1),
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	Args: cobra.MinimumNArgs(1),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			logger.Info("Fixing security permissions",
-				zap.Strings("categories", args),
-				zap.String("ssh_dir", sshDir),
-				zap.Bool("dry_run", dryRun))
+		logger.Info("Fixing security permissions",
+			zap.Strings("categories", args),
+			zap.String("ssh_dir", permissionsFixSSHDir),
+			zap.Bool("dry_run", permissionsFixDryRun))
 
-			config := &security_permissions.SecurityConfig{
-				SSHDirectory:  sshDir,
-				CreateBackups: createBackups,
-				DryRun:        dryRun,
-			}
+		config := &security_permissions.SecurityConfig{
+			SSHDirectory:  permissionsFixSSHDir,
+			CreateBackups: permissionsFixCreateBackups,
+			DryRun:        permissionsFixDryRun,
+		}
 
-			manager := security_permissions.NewPermissionManager(config)
-			result, err := manager.FixPermissions(args)
-			if err != nil {
-				logger.Error("Permission fix failed", zap.Error(err))
-				return fmt.Errorf("permission fix failed: %v", err)
-			}
+		manager := security_permissions.NewPermissionManager(config)
+		result, err := manager.FixPermissions(args)
+		if err != nil {
+			logger.Error("Permission fix failed", zap.Error(err))
+			return fmt.Errorf("permission fix failed: %v", err)
+		}
 
-			if outputJSON {
-				return outputJSONResult(result)
-			} else {
-				return outputTextResult(result, dryRun)
-			}
-		}),
-	}
-
-	cmd.Flags().StringVar(&sshDir, "ssh-dir", os.ExpandEnv("$HOME/.ssh"), "SSH directory to fix")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output results in JSON format")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be changed without making modifications")
-	cmd.Flags().BoolVar(&createBackups, "backups", true, "Create backup files before modification")
-
-	return cmd
+		if permissionsFixOutputJSON {
+			return outputJSONResult(result)
+		} else {
+			return outputTextResult(result, permissionsFixDryRun)
+		}
+	}),
 }
 
 // outputJSONResult outputs results in JSON format
@@ -240,4 +222,25 @@ func outputJSON(result *security_permissions.PermissionFixResult) error {
 // Helper function for legacy outputText calls
 func outputText(result *security_permissions.PermissionFixResult, isCheck bool) error {
 	return outputTextResult(result, isCheck)
+}
+
+// init registers permissions commands and their flags
+func init() {
+	// TODO: Pattern 1 - Need to determine correct parent command for registration
+	// Based on examples showing "eos secure permissions", this might need a "secure" parent command
+	// UpdateCmd.AddCommand(permissionsCmd)
+	
+	// Add subcommands to permissions command
+	permissionsCmd.AddCommand(permissionsCheckCmd)
+	permissionsCmd.AddCommand(permissionsFixCmd)
+
+	// Add flags for permissions check command
+	permissionsCheckCmd.Flags().StringVar(&permissionsCheckSSHDir, "ssh-dir", os.ExpandEnv("$HOME/.ssh"), "SSH directory to check")
+	permissionsCheckCmd.Flags().BoolVar(&permissionsCheckOutputJSON, "json", false, "Output results in JSON format")
+
+	// Add flags for permissions fix command
+	permissionsFixCmd.Flags().StringVar(&permissionsFixSSHDir, "ssh-dir", os.ExpandEnv("$HOME/.ssh"), "SSH directory to fix")
+	permissionsFixCmd.Flags().BoolVar(&permissionsFixOutputJSON, "json", false, "Output results in JSON format")
+	permissionsFixCmd.Flags().BoolVar(&permissionsFixDryRun, "dry-run", false, "Show what would be changed without making modifications")
+	permissionsFixCmd.Flags().BoolVar(&permissionsFixCreateBackups, "backups", true, "Create backup files before modification")
 }
