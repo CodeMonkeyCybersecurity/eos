@@ -1,4 +1,3 @@
-// TODO: PATTERN 2 - Inline runCreateCephFSVolume, runCreateCephFSMount functions into their respective command RunE fields
 package create
 
 import (
@@ -133,15 +132,116 @@ ideal for shared storage across multiple nodes.`,
 var createCephFSVolumeCmd = &cobra.Command{
 	Use:   "volume [name]",
 	Short: "Create a CephFS volume",
+	Long: `Create a CephFS distributed storage volume.
+
+This command creates a new CephFS filesystem with dedicated data and metadata pools.
+The volume provides a distributed, scalable file system that can be mounted on multiple
+nodes simultaneously.
+
+Examples:
+  # Create a basic CephFS volume
+  eos create storage-cephfs volume shared-data
+  
+  # Create a volume with custom pools
+  eos create storage-cephfs volume webfiles --data-pool web_data --metadata-pool web_meta
+  
+  # Create a volume with custom replication
+  eos create storage-cephfs volume critical-data --replication 5
+  
+  # Create a volume with more placement groups for larger deployments
+  eos create storage-cephfs volume bigdata --pg-num 256 --replication 3`,
 	Args:  cobra.ExactArgs(1),
-	RunE:  eos_cli.Wrap(runCreateCephFSVolume),
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		name := args[0]
+
+		replication, _ := cmd.Flags().GetInt("replication")
+		pgNum, _ := cmd.Flags().GetInt("pg-num")
+
+		config := &cephfs.Config{
+			Name:            name,
+			DataPool:        cmd.Flag("data-pool").Value.String(),
+			MetadataPool:    cmd.Flag("metadata-pool").Value.String(),
+			ReplicationSize: replication,
+			PGNum:           pgNum,
+		}
+
+		// Set default pool names if not specified
+		if config.DataPool == "" {
+			config.DataPool = name + "_data"
+		}
+		if config.MetadataPool == "" {
+			config.MetadataPool = name + "_metadata"
+		}
+
+		logger.Info("Creating CephFS volume",
+			zap.String("name", name),
+			zap.String("dataPool", config.DataPool),
+			zap.String("metadataPool", config.MetadataPool),
+			zap.Int("replication", replication))
+
+		return cephfs.CreateVolume(rc, config)
+	}),
 }
 
 var createCephFSMountCmd = &cobra.Command{
 	Use:   "mount [volume-name] [mount-point]",
 	Short: "Mount a CephFS volume",
+	Long: `Mount an existing CephFS volume to a local directory.
+
+This command configures and mounts a CephFS filesystem at the specified mount point.
+It handles authentication, creates the mount directory if needed, and configures
+/etc/fstab for persistent mounts.
+
+Examples:
+  # Mount a CephFS volume with default settings
+  eos create storage-cephfs mount shared-data /mnt/shared
+  
+  # Mount with specific monitors
+  eos create storage-cephfs mount webfiles /var/www/shared --monitors 10.0.1.10:6789,10.0.1.11:6789
+  
+  # Mount with custom user and credentials
+  eos create storage-cephfs mount appdata /opt/data --user appuser --secret-file /etc/ceph/ceph.client.appuser.keyring
+  
+  # Mount with performance optimizations
+  eos create storage-cephfs mount fastdata /mnt/fast --performance
+  
+  # Mount with custom options
+  eos create storage-cephfs mount readonly /mnt/readonly --mount-options noatime,ro`,
 	Args:  cobra.ExactArgs(2),
-	RunE:  eos_cli.Wrap(runCreateCephFSMount),
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		volumeName := args[0]
+		mountPoint := args[1]
+
+		monitors, _ := cmd.Flags().GetStringSlice("monitors")
+		mountOptions, _ := cmd.Flags().GetStringSlice("mount-options")
+		usePerformance, _ := cmd.Flags().GetBool("performance")
+
+		config := &cephfs.Config{
+			Name:         volumeName,
+			MountPoint:   mountPoint,
+			MonitorHosts: monitors,
+			User:         cmd.Flag("user").Value.String(),
+			SecretFile:   cmd.Flag("secret-file").Value.String(),
+			MountOptions: mountOptions,
+		}
+
+		// Add performance options if requested
+		if usePerformance {
+			config.MountOptions = append(config.MountOptions, cephfs.MountOptions["performance"]...)
+			logger.Info("Using performance-optimized mount options")
+		}
+
+		logger.Info("Mounting CephFS volume",
+			zap.String("volume", volumeName),
+			zap.String("mountPoint", mountPoint),
+			zap.Strings("monitors", monitors))
+
+		return cephfs.CreateMountPoint(rc, config)
+	}),
 }
 
 func init() {
@@ -163,68 +263,3 @@ func init() {
 	createCephFSMountCmd.Flags().Bool("performance", false, "Use performance-optimized mount options")
 }
 
-func runCreateCephFSVolume(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	name := args[0]
-
-	replication, _ := cmd.Flags().GetInt("replication")
-	pgNum, _ := cmd.Flags().GetInt("pg-num")
-
-	config := &cephfs.Config{
-		Name:            name,
-		DataPool:        cmd.Flag("data-pool").Value.String(),
-		MetadataPool:    cmd.Flag("metadata-pool").Value.String(),
-		ReplicationSize: replication,
-		PGNum:           pgNum,
-	}
-
-	// Set default pool names if not specified
-	if config.DataPool == "" {
-		config.DataPool = name + "_data"
-	}
-	if config.MetadataPool == "" {
-		config.MetadataPool = name + "_metadata"
-	}
-
-	logger.Info("Creating CephFS volume",
-		zap.String("name", name),
-		zap.String("dataPool", config.DataPool),
-		zap.String("metadataPool", config.MetadataPool),
-		zap.Int("replication", replication))
-
-	return cephfs.CreateVolume(rc, config)
-}
-
-func runCreateCephFSMount(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	volumeName := args[0]
-	mountPoint := args[1]
-
-	monitors, _ := cmd.Flags().GetStringSlice("monitors")
-	mountOptions, _ := cmd.Flags().GetStringSlice("mount-options")
-	usePerformance, _ := cmd.Flags().GetBool("performance")
-
-	config := &cephfs.Config{
-		Name:         volumeName,
-		MountPoint:   mountPoint,
-		MonitorHosts: monitors,
-		User:         cmd.Flag("user").Value.String(),
-		SecretFile:   cmd.Flag("secret-file").Value.String(),
-		MountOptions: mountOptions,
-	}
-
-	// Add performance options if requested
-	if usePerformance {
-		config.MountOptions = append(config.MountOptions, cephfs.MountOptions["performance"]...)
-		logger.Info("Using performance-optimized mount options")
-	}
-
-	logger.Info("Mounting CephFS volume",
-		zap.String("volume", volumeName),
-		zap.String("mountPoint", mountPoint),
-		zap.Strings("monitors", monitors))
-
-	return cephfs.CreateMountPoint(rc, config)
-}

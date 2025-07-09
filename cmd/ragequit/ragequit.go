@@ -1,4 +1,3 @@
-// TODO: PATTERN 2 - Inline runRagequit function into command RunE field
 package ragequit
 
 import (
@@ -35,8 +34,116 @@ Features:
 - Database and queue system diagnostics
 - Security incident response data collection
 - Post-reboot recovery automation
-- Configurable notification systems`,
-	RunE: eos.Wrap(runRagequit),
+- Configurable notification systems
+
+Examples:
+  # Emergency diagnostics with reboot
+  eos ragequit --reason "systemd loop detected"
+  
+  # Diagnostics only (no reboot)
+  eos ragequit --no-reboot --reason "investigating high CPU"
+  
+  # Force immediate action (skip confirmation)
+  eos ragequit --force --reason "critical system failure"
+  
+  # Minimal diagnostics for quick recovery
+  eos ragequit --actions minimal --reason "stuck processes"`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		logger.Warn(" EMERGENCY: Ragequit initiated",
+			zap.String("user", os.Getenv("USER")),
+			zap.String("hostname", getHostname()),
+			zap.String("reason", reason),
+			zap.Bool("no_reboot", noReboot),
+			zap.String("actions", actions))
+
+		// Confirmation prompt unless forced
+		if !force {
+			if !confirmRagequit(rc) {
+				logger.Info("Ragequit cancelled by user")
+				return nil
+			}
+		}
+
+		// Create timestamp file for tracking
+		createTimestampFile(rc, reason)
+
+		// Start diagnostic collection
+		logger.Info("Starting emergency diagnostic collection",
+			zap.String("phase", "diagnostics"),
+			zap.String("output_dir", getHomeDir()))
+
+		var wg sync.WaitGroup
+
+		// Run all diagnostic functions in parallel for speed
+		diagnosticFuncs := []func(*eos_io.RuntimeContext){
+			detectEnvironment,
+			checkResources,
+			checkQueues,
+			checkDatabases,
+			securitySnapshot,
+			containerDiagnostics,
+			performanceSnapshot,
+			systemctlDiagnostics,
+			networkDiagnostics,
+			customHooks,
+		}
+
+		for _, fn := range diagnosticFuncs {
+			wg.Add(1)
+			go func(diagFunc func(*eos_io.RuntimeContext)) {
+				defer wg.Done()
+				diagFunc(rc)
+			}(fn)
+		}
+
+		// Wait for all diagnostics to complete (with timeout)
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
+
+		select {
+		case <-done:
+			logger.Info("All diagnostics completed successfully")
+		case <-time.After(30 * time.Second):
+			logger.Warn("Diagnostic collection timeout, proceeding anyway",
+				zap.Duration("timeout", 30*time.Second))
+		}
+
+		// Generate recovery plan
+		generateRecoveryPlan(rc)
+
+		// Setup post-reboot automation
+		createPostRebootRecovery(rc)
+
+		// Send notifications
+		notifyRagequit(rc)
+
+		// Final preparations before reboot
+		flushDataSafety(rc)
+
+		if !noReboot {
+			logger.Error("🔥 INITIATING EMERGENCY REBOOT",
+				zap.String("countdown", "5 seconds"),
+				zap.String("reason", reason))
+
+			// Final countdown
+			for i := 5; i > 0; i-- {
+				logger.Warn("Rebooting in", zap.Int("seconds", i))
+				time.Sleep(1 * time.Second)
+			}
+
+			// Execute reboot
+			return executeReboot(rc)
+		} else {
+			logger.Info("Diagnostic collection complete - no reboot requested",
+				zap.String("investigation_file", filepath.Join(getHomeDir(), "investigate-ragequit.md")))
+			return nil
+		}
+	}),
 }
 
 var (
@@ -53,102 +160,6 @@ func init() {
 	RagequitCmd.Flags().StringVar(&actions, "actions", "all", "Actions to perform: all, minimal, diagnostics-only, custom")
 }
 
-func runRagequit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Warn(" EMERGENCY: Ragequit initiated",
-		zap.String("user", os.Getenv("USER")),
-		zap.String("hostname", getHostname()),
-		zap.String("reason", reason),
-		zap.Bool("no_reboot", noReboot),
-		zap.String("actions", actions))
-
-	// Confirmation prompt unless forced
-	if !force {
-		if !confirmRagequit(rc) {
-			logger.Info("Ragequit cancelled by user")
-			return nil
-		}
-	}
-
-	// Create timestamp file for tracking
-	createTimestampFile(rc, reason)
-
-	// Start diagnostic collection
-	logger.Info("Starting emergency diagnostic collection",
-		zap.String("phase", "diagnostics"),
-		zap.String("output_dir", getHomeDir()))
-
-	var wg sync.WaitGroup
-
-	// Run all diagnostic functions in parallel for speed
-	diagnosticFuncs := []func(*eos_io.RuntimeContext){
-		detectEnvironment,
-		checkResources,
-		checkQueues,
-		checkDatabases,
-		securitySnapshot,
-		containerDiagnostics,
-		performanceSnapshot,
-		systemctlDiagnostics,
-		networkDiagnostics,
-		customHooks,
-	}
-
-	for _, fn := range diagnosticFuncs {
-		wg.Add(1)
-		go func(diagFunc func(*eos_io.RuntimeContext)) {
-			defer wg.Done()
-			diagFunc(rc)
-		}(fn)
-	}
-
-	// Wait for all diagnostics to complete (with timeout)
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		logger.Info("All diagnostics completed successfully")
-	case <-time.After(30 * time.Second):
-		logger.Warn("Diagnostic collection timeout, proceeding anyway",
-			zap.Duration("timeout", 30*time.Second))
-	}
-
-	// Generate recovery plan
-	generateRecoveryPlan(rc)
-
-	// Setup post-reboot automation
-	createPostRebootRecovery(rc)
-
-	// Send notifications
-	notifyRagequit(rc)
-
-	// Final preparations before reboot
-	flushDataSafety(rc)
-
-	if !noReboot {
-		logger.Error("🔥 INITIATING EMERGENCY REBOOT",
-			zap.String("countdown", "5 seconds"),
-			zap.String("reason", reason))
-
-		// Final countdown
-		for i := 5; i > 0; i-- {
-			logger.Warn("Rebooting in", zap.Int("seconds", i))
-			time.Sleep(1 * time.Second)
-		}
-
-		// Execute reboot
-		return executeReboot(rc)
-	} else {
-		logger.Info("Diagnostic collection complete - no reboot requested",
-			zap.String("investigation_file", filepath.Join(getHomeDir(), "investigate-ragequit.md")))
-		return nil
-	}
-}
 
 func confirmRagequit(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)

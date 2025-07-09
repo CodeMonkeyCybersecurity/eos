@@ -1,5 +1,4 @@
 /* cmd/delphi/inspect/inspect.go */
-// TODO: PATTERN 1 - Transform NewInspectCmd(), NewPipelineFunctionalityCmd(), NewVerifyPipelineSchemaCmd() functions to variables
 
 package read
 
@@ -45,45 +44,26 @@ Subcommands are required to specify which type of information to read.`,
 	}),
 }
 
-func init() {
-	// Add subcommands to the delphi read command
-	readDelphiCmd.AddCommand(delphiAgentsCmd)
-	readDelphiCmd.AddCommand(delphiDashboardCmd)
-	readDelphiCmd.AddCommand(ReadKeepAliveCmd)
-	
-	// Add any flags specific to 'read' itself, if it were a terminal command or had persistent flags.
-	// ReadCmd.Flags().BoolVarP(&showSecrets, "show-secrets", "s", false, "Show sensitive secret values (use with caution)")
-}
-
-// NewInspectCmd creates the inspect command with subcommands
-func NewInspectCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "inspect",
-		Short: "Inspect Delphi components and pipeline functionality",
-		Long: `Interactive inspection tools for Delphi monitoring system.
+// inspectCmd provides inspection tools for Delphi components
+var inspectCmd = &cobra.Command{
+	Use:   "inspect",
+	Short: "Inspect Delphi components and pipeline functionality",
+	Long: `Interactive inspection tools for Delphi monitoring system.
 		
 Available commands:
   pipeline-functionality - Interactive dashboard for pipeline monitoring
   verify-pipeline-schema  - Verify database schema matches schema.sql`,
-		Aliases: []string{"get", "read"},
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-
-	// Add subcommands
-	cmd.AddCommand(NewPipelineFunctionalityCmd())
-	cmd.AddCommand(NewVerifyPipelineSchemaCmd())
-
-	return cmd
+	Aliases: []string{"get", "read"},
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return cmd.Help()
+	},
 }
 
-// NewPipelineFunctionalityCmd creates the pipeline-functionality command
-func NewPipelineFunctionalityCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "pipeline-functionality",
-		Short: "Interactive dashboard for Delphi pipeline monitoring",
-		Long: `Launch an interactive terminal dashboard to monitor the Delphi pipeline.
+// pipelineFunctionalityCmd launches the interactive pipeline dashboard
+var pipelineFunctionalityCmd = &cobra.Command{
+	Use:   "pipeline-functionality",
+	Short: "Interactive dashboard for Delphi pipeline monitoring",
+	Long: `Launch an interactive terminal dashboard to monitor the Delphi pipeline.
 
 The dashboard provides real-time views of:
 - Pipeline health across all stages (new → enriched → analyzed → structured → formatted → sent)
@@ -101,7 +81,7 @@ Navigation:
 
 The dashboard connects to your PostgreSQL database and uses the pipeline monitoring views
 defined in schema.sql to provide comprehensive visibility into your alert processing pipeline.`,
-		Example: `  # Launch the interactive pipeline dashboard
+	Example: `  # Launch the interactive pipeline dashboard
   eos delphi inspect pipeline-functionality
   
   # This will connect to your Delphi database and display:
@@ -109,61 +89,133 @@ defined in schema.sql to provide comprehensive visibility into your alert proces
   # - Performance bottleneck analysis
   # - Error rate monitoring
   # - Historical trend analysis`,
-		RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting Delphi pipeline functionality dashboard")
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info(" Starting Delphi pipeline functionality dashboard")
 
-			// Get database connection from Delphi configuration
-			db, err := connectToDelphiDatabase(rc)
-			if err != nil {
-				logger.Error(" Failed to connect to Delphi database",
-					zap.Error(err),
-					zap.String("troubleshooting", "Ensure PostgreSQL is running and Delphi configuration is correct"))
-				return fmt.Errorf("failed to connect to database: %w", err)
+		// Get database connection from Delphi configuration
+		db, err := connectToDelphiDatabase(rc)
+		if err != nil {
+			logger.Error(" Failed to connect to Delphi database",
+				zap.Error(err),
+				zap.String("troubleshooting", "Ensure PostgreSQL is running and Delphi configuration is correct"))
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer func() {
+			if closeErr := db.Close(); closeErr != nil {
+				logger.Warn(" Failed to close database connection", zap.Error(closeErr))
 			}
-			defer func() {
-				if closeErr := db.Close(); closeErr != nil {
-					logger.Warn(" Failed to close database connection", zap.Error(closeErr))
-				}
-			}()
+		}()
 
-			logger.Info(" Database connection established")
+		logger.Info(" Database connection established")
 
-			// Verify database schema
-			if err := verifyDatabaseSchema(rc, db); err != nil {
-				logger.Warn(" Database schema verification failed",
-					zap.Error(err),
-					zap.String("note", "Some dashboard features may not work correctly"))
-			}
+		// Verify database schema
+		if err := verifyDatabaseSchema(rc, db); err != nil {
+			logger.Warn(" Database schema verification failed",
+				zap.Error(err),
+				zap.String("note", "Some dashboard features may not work correctly"))
+		}
 
-			// Initialize and run the Bubble Tea dashboard
-			logger.Info("🎛️ Launching interactive dashboard",
-				zap.String("controls", "Use ←/→ to navigate, 'r' to refresh, 'q' to quit"))
+		// Initialize and run the Bubble Tea dashboard
+		logger.Info("🎛️ Launching interactive dashboard",
+			zap.String("controls", "Use ←/→ to navigate, 'r' to refresh, 'q' to quit"))
 
-			dashboardModel := delphi.InitializeDashboard(db, rc)
+		dashboardModel := delphi.InitializeDashboard(db, rc)
 
-			// Create a Bubble Tea program
-			program := tea.NewProgram(
-				dashboardModel,
-				tea.WithAltScreen(),
-				tea.WithMouseCellMotion(),
-			)
+		// Create a Bubble Tea program
+		program := tea.NewProgram(
+			dashboardModel,
+			tea.WithAltScreen(),
+			tea.WithMouseCellMotion(),
+		)
 
-			// Run the program
-			if _, err := program.Run(); err != nil {
-				logger.Error(" Dashboard terminated with error",
-					zap.Error(err))
-				return fmt.Errorf("dashboard error: %w", err)
-			}
+		// Run the program
+		if _, err := program.Run(); err != nil {
+			logger.Error(" Dashboard terminated with error",
+				zap.Error(err))
+			return fmt.Errorf("dashboard error: %w", err)
+		}
 
-			logger.Info(" Dashboard session completed")
-			return nil
-		}),
-	}
-
-	return cmd
+		logger.Info(" Dashboard session completed")
+		return nil
+	}),
 }
 
+// verifyPipelineSchemaCmd verifies database schema
+var verifyPipelineSchemaCmd = &cobra.Command{
+	Use:   "verify-pipeline-schema",
+	Short: "Verify database schema matches schema.sql requirements",
+	Long: `Comprehensive verification of the Delphi database schema.
+
+This command systematically checks your PostgreSQL database to ensure it matches
+the expected schema.sql structure required for proper pipeline operation.
+
+The verification includes:
+- ENUM types (alert_state, parser_type)
+- Core tables (agents, alerts, parser_metrics) with column validation
+- Performance indexes for optimal query speed
+- Monitoring views (pipeline_health, parser_performance, etc.)
+- Pipeline functions (archive_old_alerts, get_pipeline_stats, etc.)
+- State change triggers for real-time notifications
+
+For each component, the tool reports:
+✓ EXISTS       - Component is properly configured
+⚠ EXISTS BUT BROKEN - Component exists but may need recreation
+✗ MISSING      - Component needs to be created
+✗ CANNOT VERIFY - Prerequisites are missing
+
+Example Output:
+  ENUM Types:
+    ✓ EXISTS        alert_state (6 values: new, enriched, analyzed, structured, formatted, sent)
+    ✓ EXISTS        parser_type (11 values: ossec, windows_eventchannel, syslog, ...)
+  
+  Tables:
+    ✓ EXISTS        agents (6 columns)
+    ✓ EXISTS        alerts (20 columns)
+    ✓ EXISTS        parser_metrics (4 columns)
+  
+  Indexes:
+    ✓ EXISTS        idx_alerts_timestamp
+    ✗ MISSING       idx_alerts_state_timestamp
+  
+  Views:
+    ✓ EXISTS        pipeline_health
+    ⚠ EXISTS BUT BROKEN   parser_performance (missing column: avg_parse_time)
+  
+  Functions:
+    ✓ EXISTS        archive_old_alerts()
+    ✗ MISSING       get_pipeline_stats()
+  
+  Triggers:
+    ✓ EXISTS        notify_alert_state_change
+
+Use this tool after database migrations or when troubleshooting pipeline issues
+to ensure your database schema is properly configured.`,
+	Example: `  # Verify the Delphi database schema
+  eos delphi inspect verify-pipeline-schema
+  
+  # The command will connect to your database and verify:
+  # - All required database objects exist
+  # - Table structures match expectations
+  # - Performance optimizations are in place
+  # - Monitoring infrastructure is configured`,
+	RunE: eos_cli.Wrap(delphi.RunVerifyPipelineSchema),
+}
+
+func init() {
+	// Add subcommands to the delphi read command
+	readDelphiCmd.AddCommand(delphiAgentsCmd)
+	readDelphiCmd.AddCommand(delphiDashboardCmd)
+	readDelphiCmd.AddCommand(ReadKeepAliveCmd)
+	
+	// Add the inspect command with its subcommands
+	inspectCmd.AddCommand(pipelineFunctionalityCmd)
+	inspectCmd.AddCommand(verifyPipelineSchemaCmd)
+	readDelphiCmd.AddCommand(inspectCmd)
+	
+	// Add any flags specific to 'read' itself, if it were a terminal command or had persistent flags.
+	// ReadCmd.Flags().BoolVarP(&showSecrets, "show-secrets", "s", false, "Show sensitive secret values (use with caution)")
+}
 
 // connectToDelphiDatabase establishes a connection to the Delphi PostgreSQL database
 func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
@@ -292,97 +344,3 @@ func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 	logger.Info(" Database schema verification completed")
 	return nil
 }
-
-// NewVerifyPipelineSchemaCmd creates the verify-pipeline-schema command
-func NewVerifyPipelineSchemaCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "verify-pipeline-schema",
-		Short: "Verify database schema matches schema.sql requirements",
-		Long: `Comprehensive verification of the Delphi database schema.
-
-This command systematically checks your PostgreSQL database to ensure it matches
-the expected schema.sql structure required for proper pipeline operation.
-
-The verification includes:
-- ENUM types (alert_state, parser_type)
-- Core tables (agents, alerts, parser_metrics) with column validation
-- Performance indexes for optimal query speed
-- Monitoring views (pipeline_health, parser_performance, etc.)
-- Pipeline functions (archive_old_alerts, get_pipeline_stats, etc.)
-- State change triggers for real-time notifications
-
-For each component, the tool reports:
-✓ EXISTS       - Component is properly configured
-⚠ EXISTS BUT BROKEN - Component exists but may need recreation
-✗ MISSING      - Component needs to be created
-✗ CANNOT VERIFY - Prerequisites are missing
-
-The tool provides specific SQL commands to fix any issues found.`,
-		Example: `  # Verify the complete schema
-  eos delphi inspect verify-pipeline-schema
-  
-  # Example output:
-  #  Database fully matches schema.sql!
-  # OR
-  #  Database requires updates: 3 missing objects, 1 warnings
-  #
-  # The report will show exactly what needs to be fixed:
-  # - Missing enum types with CREATE TYPE commands
-  # - Missing tables with references to schema.sql
-  # - Missing indexes affecting performance
-  # - Broken views that need recreation`,
-		RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting database schema verification")
-
-			// Connect to database
-			db, err := connectToDelphiDatabase(rc)
-			if err != nil {
-				logger.Error(" Failed to connect to Delphi database",
-					zap.Error(err),
-					zap.String("troubleshooting", "Ensure PostgreSQL is running and connection parameters are correct"))
-				return fmt.Errorf("database connection failed: %w", err)
-			}
-			defer func() {
-				if closeErr := db.Close(); closeErr != nil {
-					logger.Warn(" Failed to close database connection", zap.Error(closeErr))
-				}
-			}()
-
-			logger.Info(" Database connection established")
-
-			// Create schema verifier and run verification
-			verifier := delphi.NewSchemaVerifier(db)
-			result, err := verifier.VerifyCompleteSchema(rc)
-			if err != nil {
-				logger.Error(" Schema verification failed",
-					zap.Error(err))
-				return fmt.Errorf("verification failed: %w", err)
-			}
-
-			// Generate and display the report
-			report := result.GenerateReport()
-
-			// Log the summary
-			logger.Info(" Schema verification completed",
-				zap.String("overall_status", result.OverallStatus),
-				zap.Int("missing_objects", result.MissingCount),
-				zap.Time("verification_time", result.Timestamp))
-
-			// Print the full report to stdout (this is what users will see)
-			fmt.Print(report)
-
-			// Return non-zero exit code if there are missing objects
-			if result.MissingCount > 0 {
-				logger.Warn(" Schema verification found issues - see report above")
-				return fmt.Errorf("schema verification found %d missing objects", result.MissingCount)
-			}
-
-			logger.Info(" Schema verification passed - database is properly configured")
-			return nil
-		}),
-	}
-
-	return cmd
-}
-

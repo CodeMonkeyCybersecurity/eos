@@ -16,7 +16,7 @@ import (
 
 func init() {
 	// Attach the hetzner-dns subcommand here
-	CreateCmd.AddCommand(NewCreateHetznerWildcardCmd())
+	CreateCmd.AddCommand(hetznerWildcardCmd)
 	CreateCmd.AddCommand(CreateHecateCmd)
 }
 

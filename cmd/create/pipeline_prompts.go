@@ -1,5 +1,4 @@
 // cmd/create/create-pipeline-prompts.go
-// TODO: PATTERN 1 - Transform NewCreateCmd() function to createPipelinePromptsCmd variable
 package create
 
 import (
@@ -20,18 +19,17 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewCreateCmd creates the create command
-func NewCreateCmd() *cobra.Command {
-	var (
-		fromFile    string
-		interactive bool
-		description string
-	)
+var (
+	pipelinePromptFromFile    string
+	pipelinePromptInteractive bool
+	pipelinePromptDescription string
+)
 
-	cmd := &cobra.Command{
-		Use:   "create <prompt-name>",
-		Short: "Create a new system prompt",
-		Long: `Create a new system prompt file in the /srv/eos/system-prompts directory.
+// createPipelinePromptsCmd creates a new system prompt
+var createPipelinePromptsCmd = &cobra.Command{
+	Use:   "create <prompt-name>",
+	Short: "Create a new system prompt",
+	Long: `Create a new system prompt file in the /srv/eos/system-prompts directory.
 
 The prompt name should be specified without the .txt extension.
 
@@ -44,180 +42,162 @@ Examples:
   eos delphi prompts create my-custom-prompt --interactive
   eos delphi prompts create security-alert --from-file /path/to/template.txt
   eos delphi prompts create incident-response --description "Incident response prompt"`,
-		Args: cobra.ExactArgs(1),
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			promptName := args[0]
+	Args: cobra.ExactArgs(1),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		promptName := args[0]
 
-			logger.Info("Creating new system prompt",
-				zap.String("prompt_name", promptName))
+		// Get sudo user's home directory
+		currentUser, err := user.Current()
+		if err != nil {
+			logger.Error("Failed to get current user", zap.Error(err))
+			return fmt.Errorf("failed to get current user: %w", err)
+		}
 
-			// Validate prompt name
-			if err := validatePromptName(promptName); err != nil {
-				return err
-			}
-
-			// The GetSystemPromptsDir function remains the same,
-			// but we now use the eos_utils.DefaultSystemPromptsDir constant
-			// and ensure the directory's existence and permissions.
-			promptsDir, err := pipeline.GetSystemPromptsDir()
-			if err != nil {
-				return err
-			}
-
-			// --- NEW INTEGRATION START ---
-			// Ensure the system prompts directory exists and has correct permissions/ownership.
-			// Assuming 'stanley' is the user and group that needs ownership, based on previous context.
-			// You might want to make these owner details configurable in a real-world application.
-			err = pipeline.EnsureSystemPromptsDirectory(
-				pipeline.DefaultSystemPromptsDir,
-				"stanley", // User for ownership
-				"stanley", // Group for ownership
-				0755,      // Directory permissions: rwx for owner, rx for group and others
-				logger,
-			)
-			if err != nil {
-				// This is a critical error, as the directory cannot be prepared.
-				return fmt.Errorf("failed to ensure system prompts directory: %w", err)
-			}
-			// --- NEW INTEGRATION END ---
-
-			// Add .txt extension if not present
-			filename := promptName
-			if !strings.HasSuffix(filename, ".txt") {
-				filename += ".txt"
-			}
-
-			promptPath := filepath.Join(promptsDir, filename)
-
-			// Check if prompt already exists
-			if pipeline.FileExists(promptPath) {
-				return fmt.Errorf("system prompt already exists: %s", promptName)
-			}
-
-			logger.Info("Output file determined",
-				zap.String("file_path", promptPath),
-				zap.String("directory", promptsDir),
-				zap.Bool("exists", false))
-
-			var content string
-
-			if fromFile != "" {
-				// Read content from file
-				logger.Info("Reading content from file",
-					zap.String("source_file", fromFile))
-
-				contentBytes, err := os.ReadFile(fromFile)
-				if err != nil {
-					return fmt.Errorf("failed to read source file: %w", err)
-				}
-				content = string(contentBytes)
-
-				logger.Info("Content loaded from file",
-					zap.String("size", pipeline.FormatFileSize(int64(len(content)))))
-			} else if interactive {
-				// Interactive mode
-				logger.Info("Entering interactive mode")
-				logger.Info("Enter prompt content (press Ctrl+D when finished):")
-
-				var lines []string
-				scanner := bufio.NewScanner(os.Stdin)
-				for scanner.Scan() {
-					lines = append(lines, scanner.Text())
-				}
-
-				if err := scanner.Err(); err != nil {
-					return fmt.Errorf("error reading input: %w", err)
-				}
-
-				content = strings.Join(lines, "\n")
-				logger.Info("Content entered interactively",
-					zap.Int("lines", len(lines)),
-					zap.String("size", pipeline.FormatFileSize(int64(len(content)))))
+		var realUsername string
+		if currentUser.Uid == "0" {
+			// Running as root, check SUDO_USER
+			if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
+				realUsername = sudoUser
 			} else {
-				// Create empty template
-				content = createPromptTemplate(promptName, description)
-				logger.Info("Created template content",
-					zap.String("template_type", "default"))
+				realUsername = "root"
 			}
+		} else {
+			realUsername = currentUser.Username
+		}
 
-			// Write the prompt file
-			logger.Info("Writing prompt file",
-				zap.String("file_path", promptPath),
-				zap.String("size", pipeline.FormatFileSize(int64(len(content)))))
+		// Get system user ID
+		systemUser, err := user.Lookup(realUsername)
+		if err != nil {
+			logger.Error("Failed to lookup user", zap.String("username", realUsername), zap.Error(err))
+			return fmt.Errorf("failed to lookup user %s: %w", realUsername, err)
+		}
 
-			// Set file permissions to 0644 (rw-r--r--)
-			if err := os.WriteFile(promptPath, []byte(content), 0644); err != nil {
-				return fmt.Errorf("failed to write prompt file: %w", err)
-			}
+		// Convert UID to integer
+		uid, err := strconv.Atoi(systemUser.Uid)
+		if err != nil {
+			logger.Error("Failed to convert UID", zap.String("uid", systemUser.Uid), zap.Error(err))
+			return fmt.Errorf("failed to convert UID: %w", err)
+		}
 
-			// After writing the file, ensure its ownership is correct.
-			// This is important because os.WriteFile might create the file with root ownership
-			// if the command is run with sudo, but the prompt's intended user (stanley) might
-			// need to read/write it later.
-			usr, err := user.Lookup("stanley") // Look up the 'stanley' user
+		// Convert GID to integer
+		gid, err := strconv.Atoi(systemUser.Gid)
+		if err != nil {
+			logger.Error("Failed to convert GID", zap.String("gid", systemUser.Gid), zap.Error(err))
+			return fmt.Errorf("failed to convert GID: %w", err)
+		}
+
+		promptsDir := "/srv/eos/system-prompts"
+		promptPath := filepath.Join(promptsDir, promptName+".txt")
+
+		// Check if prompt already exists
+		if _, err := os.Stat(promptPath); err == nil {
+			logger.Error("Prompt already exists", zap.String("path", promptPath))
+			return fmt.Errorf("prompt '%s' already exists at %s", promptName, promptPath)
+		}
+
+		// Ensure prompts directory exists
+		if err := os.MkdirAll(promptsDir, 0755); err != nil {
+			logger.Error("Failed to create prompts directory", zap.String("dir", promptsDir), zap.Error(err))
+			return fmt.Errorf("failed to create prompts directory: %w", err)
+		}
+
+		var content string
+
+		// Determine content source
+		switch {
+		case pipelinePromptFromFile != "":
+			// Read content from file
+			data, err := os.ReadFile(pipelinePromptFromFile)
 			if err != nil {
-				logger.Warn("Failed to lookup 'stanley' user for chown, leaving file ownership as is.", zap.Error(err))
-			} else {
-				uid, _ := strconv.Atoi(usr.Uid)
-				gid, _ := strconv.Atoi(usr.Gid)
-				if err := os.Chown(promptPath, uid, gid); err != nil {
-					logger.Warn("Failed to change ownership of new prompt file, leaving as is.",
-						zap.String("file", promptPath),
-						zap.Error(err),
-					)
-				} else {
-					logger.Info("New prompt file ownership set",
-						zap.String("file", promptPath),
-						zap.String("owner", "stanley"),
-						zap.String("group", "stanley"),
-					)
-				}
+				logger.Error("Failed to read source file", zap.String("file", pipelinePromptFromFile), zap.Error(err))
+				return fmt.Errorf("failed to read source file: %w", err)
 			}
+			content = string(data)
+			logger.Info("Read prompt content from file", zap.String("source", pipelinePromptFromFile))
 
-			// Verify file was created successfully
-			if stat, err := os.Stat(promptPath); err == nil {
-				logger.Info("Prompt created successfully",
-					zap.String("name", promptName),
-					zap.String("path", promptPath),
-					zap.String("size", pipeline.FormatFileSize(stat.Size())),
-					zap.String("permissions", stat.Mode().String()))
+		case pipelinePromptInteractive:
+			// Interactive mode
+			logger.Info("terminal prompt: Enter prompt content (press Ctrl+D when done):")
+			fmt.Println("Enter prompt content (press Ctrl+D when done):")
+
+			scanner := bufio.NewScanner(os.Stdin)
+			var lines []string
+			for scanner.Scan() {
+				lines = append(lines, scanner.Text())
 			}
+			if err := scanner.Err(); err != nil {
+				logger.Error("Failed to read user input", zap.Error(err))
+				return fmt.Errorf("failed to read user input: %w", err)
+			}
+			content = strings.Join(lines, "\n")
 
-			return nil
-		}),
-	}
+		default:
+			// Use template
+			content = createPromptTemplate(promptName, pipelinePromptDescription)
+			logger.Info("Created prompt from template", zap.String("name", promptName))
+		}
 
-	cmd.Flags().StringVarP(&fromFile, "from-file", "f", "", "Create prompt from existing file")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Enter content interactively")
-	cmd.Flags().StringVarP(&description, "description", "d", "", "Description for the prompt template")
+		// Write the prompt file
+		if err := os.WriteFile(promptPath, []byte(content), 0644); err != nil {
+			logger.Error("Failed to write prompt file", zap.String("path", promptPath), zap.Error(err))
+			return fmt.Errorf("failed to write prompt file: %w", err)
+		}
 
-	return cmd
+		// Change ownership to the actual user
+		if err := os.Chown(promptPath, uid, gid); err != nil {
+			logger.Error("Failed to set ownership", zap.String("path", promptPath), zap.Error(err))
+			return fmt.Errorf("failed to set ownership: %w", err)
+		}
+
+		logger.Info("Successfully created prompt", zap.String("name", promptName), zap.String("path", promptPath))
+		fmt.Printf("Successfully created prompt '%s' at %s\n", promptName, promptPath)
+
+		// Check if the prompts directory is already mounted to Delphi containers
+		mounted, err := pipeline.IsPromptsDirectoryMounted(rc)
+		if err != nil {
+			logger.Warn("Failed to check if prompts directory is mounted", zap.Error(err))
+		} else if !mounted {
+			fmt.Println("\nNote: The prompts directory is not currently mounted to Delphi containers.")
+			fmt.Println("Run 'eos update delphi services' to mount the prompts directory.")
+		}
+
+		return nil
+	}),
+	PreRunE: func(cmd *cobra.Command, args []string) error {
+		// Validate flags
+		if pipelinePromptFromFile != "" && pipelinePromptInteractive {
+			return fmt.Errorf("cannot use both --from-file and --interactive flags")
+		}
+		return nil
+	},
 }
 
-// validatePromptName validates the prompt name
-func validatePromptName(name string) error {
-	if name == "" {
-		return fmt.Errorf("prompt name cannot be empty")
+func init() {
+	createPipelinePromptsCmd.Flags().StringVar(&pipelinePromptFromFile, "from-file", "", "Copy content from an existing file")
+	createPipelinePromptsCmd.Flags().BoolVar(&pipelinePromptInteractive, "interactive", false, "Enter content interactively")
+	createPipelinePromptsCmd.Flags().StringVar(&pipelinePromptDescription, "description", "", "Brief description of the prompt (used in template)")
+}
+
+// getSystemUser returns the actual system user (not root) when running under sudo
+func getSystemUser() (*user.User, error) {
+	currentUser, err := user.Current()
+	if err != nil {
+		return nil, err
 	}
 
-	// Check for invalid characters
-	invalidChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
-	for _, char := range invalidChars {
-		if strings.Contains(name, char) {
-			return fmt.Errorf("prompt name contains invalid character: %s", char)
-		}
+	// If not running as root, return current user
+	if currentUser.Uid != "0" {
+		return currentUser, nil
 	}
 
-	// Check for reserved names
-	reserved := []string{".", "..", "con", "prn", "aux", "nul"}
-	for _, res := range reserved {
-		if strings.EqualFold(name, res) {
-			return fmt.Errorf("prompt name is reserved: %s", name)
-		}
+	// Running as root, check for SUDO_USER
+	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
+		return user.Lookup(sudoUser)
 	}
 
-	return nil
+	// No SUDO_USER, return root
+	return currentUser, nil
 }
 
 // createPromptTemplate creates a basic template for a new prompt

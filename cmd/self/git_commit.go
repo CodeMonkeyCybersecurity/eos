@@ -1,4 +1,3 @@
-// TODO: PATTERN 2 - Inline runGitCommit function into command RunE field
 package self
 
 import (
@@ -35,8 +34,107 @@ Options:
   --force      Skip safety checks and confirmation
   --message    Use custom commit message instead of auto-generated
   --push       Automatically push after successful commit
-  --no-verify  Skip pre-commit hooks (dangerous!)`,
-	RunE: eos_cli.Wrap(runGitCommit),
+  --no-verify  Skip pre-commit hooks (dangerous!)
+
+Examples:
+  # Auto-commit with generated message
+  eos self git commit
+  
+  # Commit with custom message
+  eos self git commit --message "Fix critical bug in auth module"
+  
+  # Commit and push in one step
+  eos self git commit --push
+  
+  # Force commit (skip safety checks)
+  eos self git commit --force --message "Emergency fix"
+  
+  # Dry run to see what would be committed
+  eos self git commit --dry-run`,
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		// Parse flags
+		force := cmd.Flag("force").Value.String() == "true"
+		customMessage := cmd.Flag("message").Value.String()
+		autoPush := cmd.Flag("push").Value.String() == "true"
+		noVerify := cmd.Flag("no-verify").Value.String() == "true"
+		dryRun := cmd.Flag("dry-run").Value.String() == "true"
+
+		logger.Info("Starting auto-commit process",
+			zap.Bool("force", force),
+			zap.String("custom_message", customMessage),
+			zap.Bool("auto_push", autoPush),
+			zap.Bool("dry_run", dryRun))
+
+		// Ensure we're in the EOS project root
+		if err := ensureInProjectRoot(rc); err != nil {
+			return err
+		}
+
+		// Check git status
+		status, err := getGitStatus(rc)
+		if err != nil {
+			return fmt.Errorf("failed to get git status: %w", err)
+		}
+
+		if status.IsClean {
+			logger.Info("No changes to commit")
+			return nil
+		}
+
+		// Safety checks
+		if !force {
+			if err := runSafetyChecks(rc, status); err != nil {
+				return err
+			}
+		}
+
+		// Generate commit message
+		var commitMessage string
+		if customMessage != "" {
+			commitMessage = customMessage
+		} else {
+			commitMessage, err = generateSmartCommitMessage(rc, status)
+			if err != nil {
+				return fmt.Errorf("failed to generate commit message: %w", err)
+			}
+		}
+
+		// Show summary
+		if err := showCommitSummary(rc, status, commitMessage); err != nil {
+			return err
+		}
+
+		// Confirm if not forced
+		if !force && !dryRun {
+			if !confirmCommit(rc) {
+				logger.Info("Commit cancelled by user")
+				return nil
+			}
+		}
+
+		if dryRun {
+			logger.Info("Dry run complete - no changes made")
+			return nil
+		}
+
+		// Execute commit
+		if err := executeCommit(rc, commitMessage, noVerify); err != nil {
+			return err
+		}
+
+		// Auto-push if requested
+		if autoPush {
+			if err := executePush(rc); err != nil {
+				logger.Warn("Commit successful but push failed", zap.Error(err))
+				return err
+			}
+		}
+
+		logger.Info("Auto-commit completed successfully")
+		return nil
+	}),
 }
 
 func init() {
@@ -47,90 +145,6 @@ func init() {
 	gitCommitCmd.Flags().Bool("dry-run", false, "Show what would be committed without actually committing")
 }
 
-func runGitCommit(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Parse flags
-	force := cmd.Flag("force").Value.String() == "true"
-	customMessage := cmd.Flag("message").Value.String()
-	autoPush := cmd.Flag("push").Value.String() == "true"
-	noVerify := cmd.Flag("no-verify").Value.String() == "true"
-	dryRun := cmd.Flag("dry-run").Value.String() == "true"
-
-	logger.Info("Starting auto-commit process",
-		zap.Bool("force", force),
-		zap.String("custom_message", customMessage),
-		zap.Bool("auto_push", autoPush),
-		zap.Bool("dry_run", dryRun))
-
-	// Ensure we're in the EOS project root
-	if err := ensureInProjectRoot(rc); err != nil {
-		return err
-	}
-
-	// Check git status
-	status, err := getGitStatus(rc)
-	if err != nil {
-		return fmt.Errorf("failed to get git status: %w", err)
-	}
-
-	if status.IsClean {
-		logger.Info("No changes to commit")
-		return nil
-	}
-
-	// Safety checks
-	if !force {
-		if err := runSafetyChecks(rc, status); err != nil {
-			return err
-		}
-	}
-
-	// Generate commit message
-	var commitMessage string
-	if customMessage != "" {
-		commitMessage = customMessage
-	} else {
-		commitMessage, err = generateSmartCommitMessage(rc, status)
-		if err != nil {
-			return fmt.Errorf("failed to generate commit message: %w", err)
-		}
-	}
-
-	// Show summary
-	if err := showCommitSummary(rc, status, commitMessage); err != nil {
-		return err
-	}
-
-	// Confirm if not forced
-	if !force && !dryRun {
-		if !confirmCommit(rc) {
-			logger.Info("Commit cancelled by user")
-			return nil
-		}
-	}
-
-	if dryRun {
-		logger.Info("Dry run complete - no changes made")
-		return nil
-	}
-
-	// Execute commit
-	if err := executeCommit(rc, commitMessage, noVerify); err != nil {
-		return err
-	}
-
-	// Auto-push if requested
-	if autoPush {
-		if err := executePush(rc); err != nil {
-			logger.Warn("Commit successful but push failed", zap.Error(err))
-			return err
-		}
-	}
-
-	logger.Info("Auto-commit completed successfully")
-	return nil
-}
 
 type GitStatus struct {
 	IsClean      bool
