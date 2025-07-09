@@ -6,9 +6,9 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -120,21 +120,21 @@ func outputTableDatabaseStatus(status *database_management.DatabaseStatus) error
 	fmt.Fprintf(w, "Type:\t%s\n", status.Type)
 	fmt.Fprintf(w, "Version:\t%s\n", status.Version)
 	fmt.Fprintf(w, "Status:\t%s\n", status.Status)
-	
+
 	if status.Uptime > 0 {
 		fmt.Fprintf(w, "Uptime:\t%s\n", status.Uptime.String())
 	}
-	
+
 	fmt.Fprintf(w, "Connections:\t%d/%d\n", status.Connections, status.MaxConnections)
-	
+
 	if status.DatabaseSize != "" {
 		fmt.Fprintf(w, "Database Size:\t%s\n", status.DatabaseSize)
 	}
-	
+
 	if status.Memory != "" {
 		fmt.Fprintf(w, "Memory Usage:\t%s\n", status.Memory)
 	}
-	
+
 	if status.CPU > 0 {
 		fmt.Fprintf(w, "CPU Usage:\t%.2f%%\n", status.CPU)
 	}

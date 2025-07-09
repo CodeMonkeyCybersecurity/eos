@@ -1,4 +1,4 @@
-// cmd/delphi/prompts/list.go
+// cmd/list/delphi_pipeline_prompts.go
 package list
 
 import (
@@ -10,17 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewValidateCmd creates the validate command
-func NewValidateCmd() *cobra.Command {
-	var (
-		verbose bool
-		fix     bool
-	)
-
-	cmd := &cobra.Command{
-		Use:   "validate [prompt-name]",
-		Short: "Validate system prompt formatting and content",
-		Long: `Validate system prompt files for proper formatting, content quality, and adherence to best practices.
+var delphiPromptsValidateCmd = &cobra.Command{
+	Use:   "delphi-prompts-validate [prompt-name]",
+	Aliases: []string{"delphi-prompts", "validate-delphi-prompts"},
+	Short: "Validate system prompt formatting and content",
+	Long: `Validate system prompt files for proper formatting, content quality, and adherence to best practices.
 
 If no prompt name is specified, all prompts in the directory will be validated.
 
@@ -32,41 +26,45 @@ The validation checks include:
 - Potential issues and improvements
 
 Examples:
-  eos delphi prompts validate
-  eos delphi prompts validate cybersobar
-  eos delphi prompts validate delphi-notify-long --verbose
-  eos delphi prompts validate custom-prompt --fix`,
-		Args: cobra.MaximumNArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			prompts, err := pipeline.ListSystemPrompts()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-			var names []string
-			for _, prompt := range prompts {
-				names = append(names, prompt.Name)
-			}
-			return names, cobra.ShellCompDirectiveNoFileComp
-		},
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+  eos list delphi-prompts-validate
+  eos list delphi-prompts-validate cybersobar
+  eos list delphi-prompts-validate delphi-notify-long --verbose
+  eos list delphi-prompts-validate custom-prompt --fix`,
+	Args: cobra.MaximumNArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		prompts, err := pipeline.ListSystemPrompts()
+		if err != nil {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		var names []string
+		for _, prompt := range prompts {
+			names = append(names, prompt.Name)
+		}
+		return names, cobra.ShellCompDirectiveNoFileComp
+	},
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if len(args) == 0 {
-				// Validate all prompts
-				logger.Info(" Validating all system prompts")
-				return pipeline.ValidateAllPrompts(rc, verbose, fix)
-			} else {
-				// Validate specific prompt
-				promptName := args[0]
-				logger.Info(" Validating system prompt",
-					zap.String("prompt_name", promptName))
-				return pipeline.ValidateSinglePrompt(rc, promptName, verbose, fix)
-			}
-		}),
-	}
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		fix, _ := cmd.Flags().GetBool("fix")
 
-	cmd.Flags().BoolVarP(&verbose, "verbose", "v", false, "Show detailed validation information")
-	cmd.Flags().BoolVar(&fix, "fix", false, "Attempt to fix common issues automatically")
+		if len(args) == 0 {
+			// Validate all prompts
+			logger.Info(" Validating all system prompts")
+			return pipeline.ValidateAllPrompts(rc, verbose, fix)
+		} else {
+			// Validate specific prompt
+			promptName := args[0]
+			logger.Info(" Validating system prompt",
+				zap.String("prompt_name", promptName))
+			return pipeline.ValidateSinglePrompt(rc, promptName, verbose, fix)
+		}
+	}),
+}
 
-	return cmd
+func init() {
+	delphiPromptsValidateCmd.Flags().BoolP("verbose", "v", false, "Show detailed validation information")
+	delphiPromptsValidateCmd.Flags().Bool("fix", false, "Attempt to fix common issues automatically")
+
+	ListCmd.AddCommand(delphiPromptsValidateCmd)
 }

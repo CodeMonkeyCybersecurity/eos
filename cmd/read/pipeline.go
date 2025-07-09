@@ -19,19 +19,18 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewAllCmd creates the combined watch command
-func NewAllCmd() *cobra.Command {
-	var (
-		alertLimit int
-		agentLimit int
-		refresh    int
-		dsn        string
-	)
+var (
+	pipelineAllAlertLimit int
+	pipelineAllAgentLimit int
+	pipelineAllRefresh    int
+	pipelineAllDsn        string
+)
 
-	cmd := &cobra.Command{
-		Use:   "all",
-		Short: "Watch both alerts and agents tables simultaneously",
-		Long: `Watch both alerts and agents tables for real-time changes in a combined view.
+// pipelineAllCmd watches both alerts and agents tables simultaneously
+var pipelineAllCmd = &cobra.Command{
+	Use:   "all",
+	Short: "Watch both alerts and agents tables simultaneously",
+	Long: `Watch both alerts and agents tables for real-time changes in a combined view.
 
 This command displays both alerts and agents in separate sections that update
 automatically when changes occur in either table.
@@ -42,51 +41,50 @@ The combined view shows:
 - Real-time updates via PostgreSQL LISTEN/NOTIFY
 
 Example:
-  eos delphi watch all --alert-limit 5 --agent-limit 10 --refresh 3`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting combined alerts & agents watch",
-				zap.Int("alert_limit", alertLimit),
-				zap.Int("agent_limit", agentLimit),
-				zap.Int("refresh_seconds", refresh))
+  eos read pipeline all --alert-limit 5 --agent-limit 10 --refresh 3`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info(" Starting combined alerts & agents watch",
+			zap.Int("alert_limit", pipelineAllAlertLimit),
+			zap.Int("agent_limit", pipelineAllAgentLimit),
+			zap.Int("refresh_seconds", pipelineAllRefresh))
 
-			// Get database DSN
-			if dsn == "" {
-				dsn = os.Getenv("AGENTS_PG_DSN")
-				if dsn == "" {
-					return fmt.Errorf("database DSN not provided. Set AGENTS_PG_DSN environment variable or use --dsn flag")
-				}
+		// Get database DSN
+		if pipelineAllDsn == "" {
+			pipelineAllDsn = os.Getenv("AGENTS_PG_DSN")
+			if pipelineAllDsn == "" {
+				return fmt.Errorf("database DSN not provided. Set AGENTS_PG_DSN environment variable or use --dsn flag")
 			}
+		}
 
-			// Connect to database
-			db, err := sql.Open("postgres", dsn)
-			if err != nil {
-				return fmt.Errorf("failed to connect to database: %w", err)
+		// Connect to database
+		db, err := sql.Open("postgres", pipelineAllDsn)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				logger.Error(" Failed to close database connection", zap.Error(err))
 			}
-			defer func() {
-				if err := db.Close(); err != nil {
-					logger.Error(" Failed to close database connection", zap.Error(err))
-				}
-			}()
+		}()
 
-			// Test connection
-			if err := db.Ping(); err != nil {
-				return fmt.Errorf("failed to ping database: %w", err)
-			}
+		// Test connection
+		if err := db.Ping(); err != nil {
+			return fmt.Errorf("failed to ping database: %w", err)
+		}
 
-			logger.Info(" Connected to PostgreSQL database")
+		logger.Info(" Connected to PostgreSQL database")
 
-			// Start watching
-			return watchAll(rc.Ctx, logger, db, alertLimit, agentLimit, refresh)
-		}),
-	}
+		// Start watching
+		return watchAll(rc.Ctx, logger, db, pipelineAllAlertLimit, pipelineAllAgentLimit, pipelineAllRefresh)
+	}),
+}
 
-	cmd.Flags().IntVar(&alertLimit, "alert-limit", 5, "Number of recent alerts to display")
-	cmd.Flags().IntVar(&agentLimit, "agent-limit", 8, "Number of agents to display")
-	cmd.Flags().IntVarP(&refresh, "refresh", "r", 5, "Refresh interval in seconds")
-	cmd.Flags().StringVarP(&dsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
-
-	return cmd
+func init() {
+	pipelineAllCmd.Flags().IntVar(&pipelineAllAlertLimit, "alert-limit", 5, "Number of recent alerts to display")
+	pipelineAllCmd.Flags().IntVar(&pipelineAllAgentLimit, "agent-limit", 8, "Number of agents to display")
+	pipelineAllCmd.Flags().IntVarP(&pipelineAllRefresh, "refresh", "r", 5, "Refresh interval in seconds")
+	pipelineAllCmd.Flags().StringVarP(&pipelineAllDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
 
 func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, alertLimit, agentLimit, refresh int) error {

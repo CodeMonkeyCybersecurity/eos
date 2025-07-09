@@ -45,11 +45,11 @@ Subcommands are required to specify which type of information to read.`,
 }
 
 func init() {
-	// You would typically add subcommands specific to 'read' here.
-	// For example, if you want 'eos delphi read alerts' or 'eos delphi read config':
-	// ReadCmd.AddCommand(NewReadAlertsCmd()) // Assuming you have an alerts subcommand
-	// ReadCmd.AddCommand(NewReadConfigCmd()) // Assuming you have a config subcommand
-
+	// Add subcommands to the delphi read command
+	readDelphiCmd.AddCommand(delphiAgentsCmd)
+	readDelphiCmd.AddCommand(delphiDashboardCmd)
+	readDelphiCmd.AddCommand(ReadKeepAliveCmd)
+	
 	// Add any flags specific to 'read' itself, if it were a terminal command or had persistent flags.
 	// ReadCmd.Flags().BoolVarP(&showSecrets, "show-secrets", "s", false, "Show sensitive secret values (use with caution)")
 }
@@ -108,63 +108,61 @@ defined in schema.sql to provide comprehensive visibility into your alert proces
   # - Performance bottleneck analysis
   # - Error rate monitoring
   # - Historical trend analysis`,
-		RunE: eos_cli.Wrap(runPipelineFunctionalityDashboard),
+		RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+			logger := otelzap.Ctx(rc.Ctx)
+			logger.Info(" Starting Delphi pipeline functionality dashboard")
+
+			// Get database connection from Delphi configuration
+			db, err := connectToDelphiDatabase(rc)
+			if err != nil {
+				logger.Error(" Failed to connect to Delphi database",
+					zap.Error(err),
+					zap.String("troubleshooting", "Ensure PostgreSQL is running and Delphi configuration is correct"))
+				return fmt.Errorf("failed to connect to database: %w", err)
+			}
+			defer func() {
+				if closeErr := db.Close(); closeErr != nil {
+					logger.Warn(" Failed to close database connection", zap.Error(closeErr))
+				}
+			}()
+
+			logger.Info(" Database connection established")
+
+			// Verify database schema
+			if err := verifyDatabaseSchema(rc, db); err != nil {
+				logger.Warn(" Database schema verification failed",
+					zap.Error(err),
+					zap.String("note", "Some dashboard features may not work correctly"))
+			}
+
+			// Initialize and run the Bubble Tea dashboard
+			logger.Info("🎛️ Launching interactive dashboard",
+				zap.String("controls", "Use ←/→ to navigate, 'r' to refresh, 'q' to quit"))
+
+			dashboardModel := delphi.InitializeDashboard(db, rc)
+
+			// Create a Bubble Tea program
+			program := tea.NewProgram(
+				dashboardModel,
+				tea.WithAltScreen(),
+				tea.WithMouseCellMotion(),
+			)
+
+			// Run the program
+			if _, err := program.Run(); err != nil {
+				logger.Error(" Dashboard terminated with error",
+					zap.Error(err))
+				return fmt.Errorf("dashboard error: %w", err)
+			}
+
+			logger.Info(" Dashboard session completed")
+			return nil
+		}),
 	}
 
 	return cmd
 }
 
-// runPipelineFunctionalityDashboard launches the interactive Bubble Tea dashboard
-func runPipelineFunctionalityDashboard(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info(" Starting Delphi pipeline functionality dashboard")
-
-	// Get database connection from Delphi configuration
-	db, err := connectToDelphiDatabase(rc)
-	if err != nil {
-		logger.Error(" Failed to connect to Delphi database",
-			zap.Error(err),
-			zap.String("troubleshooting", "Ensure PostgreSQL is running and Delphi configuration is correct"))
-		return fmt.Errorf("failed to connect to database: %w", err)
-	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn(" Failed to close database connection", zap.Error(closeErr))
-		}
-	}()
-
-	logger.Info(" Database connection established")
-
-	// Verify database schema
-	if err := verifyDatabaseSchema(rc, db); err != nil {
-		logger.Warn(" Database schema verification failed",
-			zap.Error(err),
-			zap.String("note", "Some dashboard features may not work correctly"))
-	}
-
-	// Initialize and run the Bubble Tea dashboard
-	logger.Info("🎛️ Launching interactive dashboard",
-		zap.String("controls", "Use ←/→ to navigate, 'r' to refresh, 'q' to quit"))
-
-	dashboardModel := delphi.InitializeDashboard(db, rc)
-
-	// Create a Bubble Tea program
-	program := tea.NewProgram(
-		dashboardModel,
-		tea.WithAltScreen(),
-		tea.WithMouseCellMotion(),
-	)
-
-	// Run the program
-	if _, err := program.Run(); err != nil {
-		logger.Error(" Dashboard terminated with error",
-			zap.Error(err))
-		return fmt.Errorf("dashboard error: %w", err)
-	}
-
-	logger.Info(" Dashboard session completed")
-	return nil
-}
 
 // connectToDelphiDatabase establishes a connection to the Delphi PostgreSQL database
 func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
@@ -332,60 +330,58 @@ The tool provides specific SQL commands to fix any issues found.`,
   # - Missing tables with references to schema.sql
   # - Missing indexes affecting performance
   # - Broken views that need recreation`,
-		RunE: eos_cli.Wrap(runVerifyPipelineSchema),
+		RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+			logger := otelzap.Ctx(rc.Ctx)
+			logger.Info(" Starting database schema verification")
+
+			// Connect to database
+			db, err := connectToDelphiDatabase(rc)
+			if err != nil {
+				logger.Error(" Failed to connect to Delphi database",
+					zap.Error(err),
+					zap.String("troubleshooting", "Ensure PostgreSQL is running and connection parameters are correct"))
+				return fmt.Errorf("database connection failed: %w", err)
+			}
+			defer func() {
+				if closeErr := db.Close(); closeErr != nil {
+					logger.Warn(" Failed to close database connection", zap.Error(closeErr))
+				}
+			}()
+
+			logger.Info(" Database connection established")
+
+			// Create schema verifier and run verification
+			verifier := delphi.NewSchemaVerifier(db)
+			result, err := verifier.VerifyCompleteSchema(rc)
+			if err != nil {
+				logger.Error(" Schema verification failed",
+					zap.Error(err))
+				return fmt.Errorf("verification failed: %w", err)
+			}
+
+			// Generate and display the report
+			report := result.GenerateReport()
+
+			// Log the summary
+			logger.Info(" Schema verification completed",
+				zap.String("overall_status", result.OverallStatus),
+				zap.Int("missing_objects", result.MissingCount),
+				zap.Time("verification_time", result.Timestamp))
+
+			// Print the full report to stdout (this is what users will see)
+			fmt.Print(report)
+
+			// Return non-zero exit code if there are missing objects
+			if result.MissingCount > 0 {
+				logger.Warn(" Schema verification found issues - see report above")
+				return fmt.Errorf("schema verification found %d missing objects", result.MissingCount)
+			}
+
+			logger.Info(" Schema verification passed - database is properly configured")
+			return nil
+		}),
 	}
 
 	return cmd
 }
 
-// runVerifyPipelineSchema performs comprehensive schema verification
-func runVerifyPipelineSchema(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info(" Starting database schema verification")
-
-	// Connect to database
-	db, err := connectToDelphiDatabase(rc)
-	if err != nil {
-		logger.Error(" Failed to connect to Delphi database",
-			zap.Error(err),
-			zap.String("troubleshooting", "Ensure PostgreSQL is running and connection parameters are correct"))
-		return fmt.Errorf("database connection failed: %w", err)
-	}
-	defer func() {
-		if closeErr := db.Close(); closeErr != nil {
-			logger.Warn(" Failed to close database connection", zap.Error(closeErr))
-		}
-	}()
-
-	logger.Info(" Database connection established")
-
-	// Create schema verifier and run verification
-	verifier := delphi.NewSchemaVerifier(db)
-	result, err := verifier.VerifyCompleteSchema(rc)
-	if err != nil {
-		logger.Error(" Schema verification failed",
-			zap.Error(err))
-		return fmt.Errorf("verification failed: %w", err)
-	}
-
-	// Generate and display the report
-	report := result.GenerateReport()
-
-	// Log the summary
-	logger.Info(" Schema verification completed",
-		zap.String("overall_status", result.OverallStatus),
-		zap.Int("missing_objects", result.MissingCount),
-		zap.Time("verification_time", result.Timestamp))
-
-	// Print the full report to stdout (this is what users will see)
-	fmt.Print(report)
-
-	// Return non-zero exit code if there are missing objects
-	if result.MissingCount > 0 {
-		logger.Warn(" Schema verification found issues - see report above")
-		return fmt.Errorf("schema verification found %d missing objects", result.MissingCount)
-	}
-
-	logger.Info(" Schema verification passed - database is properly configured")
-	return nil
-}

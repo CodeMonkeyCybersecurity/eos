@@ -23,6 +23,5 @@ safety and security standards.`,
 }
 
 func init() {
-	SelfCmd.AddCommand(gitCmd)
 	gitCmd.AddCommand(gitCommitCmd)
 }

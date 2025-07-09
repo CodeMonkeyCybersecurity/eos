@@ -6,9 +6,9 @@ import (
 	"os"
 	"text/tabwriter"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/database_management"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -117,7 +117,7 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 	if _, err := fmt.Fprintf(w, "Username:\t%s\n", credential.Username); err != nil {
 		return fmt.Errorf("failed to write username: %w", err)
 	}
-	
+
 	if showPassword {
 		if _, err := fmt.Fprintf(w, "Password:\t%s\n", credential.Password); err != nil {
 			return fmt.Errorf("failed to write password: %w", err)
@@ -127,7 +127,7 @@ func outputTableCredential(credential *database_management.DatabaseCredential, s
 			return fmt.Errorf("failed to write password placeholder: %w", err)
 		}
 	}
-	
+
 	if _, err := fmt.Fprintf(w, "Lease ID:\t%s\n", credential.LeaseID); err != nil {
 		return fmt.Errorf("failed to write lease ID: %w", err)
 	}

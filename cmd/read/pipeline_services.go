@@ -18,14 +18,15 @@ import (
 )
 
 
-// ReadPipelinePrompts creates the read command
-func ReadPipelinePrompts() *cobra.Command {
-	var showConfig bool
+var (
+	pipelineServicesShowConfig bool
+)
 
-	cmd := &cobra.Command{
-		Use:   "read <service-name>",
-		Short: "Display detailed information about a Delphi service",
-		Long: `Display comprehensive information about a Delphi service including:
+// pipelineServicesCmd displays detailed information about a Delphi service
+var pipelineServicesCmd = &cobra.Command{
+	Use:   "services <service-name>",
+	Short: "Display detailed information about a Delphi service",
+	Long: `Display comprehensive information about a Delphi service including:
 - Service status and health
 - Configuration files and their existence
 - Worker script details
@@ -40,102 +41,102 @@ Available services:
 - prompt-ab-tester: A/B testing worker for prompt optimization
 
 Examples:
-  eos delphi services read llm-worker
-  eos delphi services read prompt-ab-tester --show-config`,
-		Args: cobra.ExactArgs(1),
-		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-			configs := pipeline.GetServiceConfigurations()
-			var services []string
-			for name := range configs {
-				services = append(services, name)
+  eos read services llm-worker
+  eos read services prompt-ab-tester --show-config`,
+	Args: cobra.ExactArgs(1),
+	ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		configs := pipeline.GetServiceConfigurations()
+		var services []string
+		for name := range configs {
+			services = append(services, name)
+		}
+		return services, cobra.ShellCompDirectiveNoFileComp
+	},
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		serviceName := args[0]
+
+		logger.Info(" Reading Delphi service information",
+			zap.String("service", serviceName))
+
+		// Get service configuration
+		configs := pipeline.GetServiceConfigurations()
+		config, exists := configs[serviceName]
+		if !exists {
+			return fmt.Errorf("unknown service: %s", serviceName)
+		}
+
+		// Display basic service information
+		logger.Info(" Service Information",
+			zap.String("name", config.Name),
+			zap.String("description", config.Description))
+
+		// Check service status
+		status, err := getServiceStatus(rc, serviceName)
+		if err != nil {
+			logger.Warn(" Failed to get service status", zap.Error(err))
+		} else {
+			logger.Info(" Service Status",
+				zap.String("status", status.Status),
+				zap.String("active", status.Active),
+				zap.String("enabled", status.Enabled),
+				zap.String("uptime", status.Uptime))
+		}
+
+		// Check worker script
+		workerExists := eos_unix.FileExists(config.WorkerFile)
+		workerInfo := getFileInfo(config.WorkerFile)
+		logger.Info(" Worker Script",
+			zap.String("path", config.WorkerFile),
+			zap.Bool("exists", workerExists),
+			zap.String("permissions", workerInfo.Permissions),
+			zap.String("size", workerInfo.Size),
+			zap.String("modified", workerInfo.Modified))
+
+		// Check service file
+		serviceExists := eos_unix.FileExists(config.ServiceFile)
+		serviceInfo := getFileInfo(config.ServiceFile)
+		logger.Info(" Service File",
+			zap.String("path", config.ServiceFile),
+			zap.Bool("exists", serviceExists),
+			zap.String("permissions", serviceInfo.Permissions),
+			zap.String("size", serviceInfo.Size),
+			zap.String("modified", serviceInfo.Modified))
+
+		// Check configuration files
+		logger.Info(" Configuration Files")
+		for _, configFile := range config.ConfigFiles {
+			configExists := eos_unix.FileExists(configFile)
+			configInfo := getFileInfo(configFile)
+			logger.Info(" "+filepath.Base(configFile),
+				zap.String("path", configFile),
+				zap.Bool("exists", configExists),
+				zap.String("permissions", configInfo.Permissions),
+				zap.String("size", configInfo.Size))
+		}
+
+		// Display dependencies
+		logger.Info(" Dependencies",
+			zap.Strings("required", config.Dependencies))
+
+		// Show recent logs
+		if err := showRecentLogs(rc, serviceName); err != nil {
+			logger.Warn(" Failed to retrieve recent logs", zap.Error(err))
+		}
+
+		// Show configuration content if requested
+		if pipelineServicesShowConfig {
+			if err := showServiceConfiguration(rc, config); err != nil {
+				logger.Warn(" Failed to display configuration", zap.Error(err))
 			}
-			return services, cobra.ShellCompDirectiveNoFileComp
-		},
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			serviceName := args[0]
+		}
 
-			logger.Info(" Reading Delphi service information",
-				zap.String("service", serviceName))
+		return nil
+	}),
+}
 
-			// Get service configuration
-			configs := pipeline.GetServiceConfigurations()
-			config, exists := configs[serviceName]
-			if !exists {
-				return fmt.Errorf("unknown service: %s", serviceName)
-			}
-
-			// Display basic service information
-			logger.Info(" Service Information",
-				zap.String("name", config.Name),
-				zap.String("description", config.Description))
-
-			// Check service status
-			status, err := getServiceStatus(rc, serviceName)
-			if err != nil {
-				logger.Warn(" Failed to get service status", zap.Error(err))
-			} else {
-				logger.Info(" Service Status",
-					zap.String("status", status.Status),
-					zap.String("active", status.Active),
-					zap.String("enabled", status.Enabled),
-					zap.String("uptime", status.Uptime))
-			}
-
-			// Check worker script
-			workerExists := eos_unix.FileExists(config.WorkerFile)
-			workerInfo := getFileInfo(config.WorkerFile)
-			logger.Info(" Worker Script",
-				zap.String("path", config.WorkerFile),
-				zap.Bool("exists", workerExists),
-				zap.String("permissions", workerInfo.Permissions),
-				zap.String("size", workerInfo.Size),
-				zap.String("modified", workerInfo.Modified))
-
-			// Check service file
-			serviceExists := eos_unix.FileExists(config.ServiceFile)
-			serviceInfo := getFileInfo(config.ServiceFile)
-			logger.Info(" Service File",
-				zap.String("path", config.ServiceFile),
-				zap.Bool("exists", serviceExists),
-				zap.String("permissions", serviceInfo.Permissions),
-				zap.String("size", serviceInfo.Size),
-				zap.String("modified", serviceInfo.Modified))
-
-			// Check configuration files
-			logger.Info(" Configuration Files")
-			for _, configFile := range config.ConfigFiles {
-				configExists := eos_unix.FileExists(configFile)
-				configInfo := getFileInfo(configFile)
-				logger.Info(" "+filepath.Base(configFile),
-					zap.String("path", configFile),
-					zap.Bool("exists", configExists),
-					zap.String("permissions", configInfo.Permissions),
-					zap.String("size", configInfo.Size))
-			}
-
-			// Display dependencies
-			logger.Info(" Dependencies",
-				zap.Strings("required", config.Dependencies))
-
-			// Show recent logs
-			if err := showRecentLogs(rc, serviceName); err != nil {
-				logger.Warn(" Failed to retrieve recent logs", zap.Error(err))
-			}
-
-			// Show configuration content if requested
-			if showConfig {
-				if err := showServiceConfiguration(rc, config); err != nil {
-					logger.Warn(" Failed to display configuration", zap.Error(err))
-				}
-			}
-
-			return nil
-		}),
-	}
-
-	cmd.Flags().BoolVarP(&showConfig, "show-config", "c", false, "Display service configuration file content")
-	return cmd
+func init() {
+	pipelineServicesCmd.Flags().BoolVarP(&pipelineServicesShowConfig, "show-config", "c", false, "Display service configuration file content")
 }
 
 // ServiceStatus represents systemd service status information

@@ -17,13 +17,13 @@ import (
 type Config struct {
 	// Default repository to use if not specified
 	DefaultRepository string `yaml:"default_repository"`
-	
+
 	// Repository configurations
 	Repositories map[string]Repository `yaml:"repositories"`
-	
+
 	// Backup profiles
 	Profiles map[string]Profile `yaml:"profiles"`
-	
+
 	// Global settings
 	Settings Settings `yaml:"settings"`
 }
@@ -61,7 +61,7 @@ type Retention struct {
 
 // Schedule defines backup scheduling
 type Schedule struct {
-	Cron     string `yaml:"cron,omitempty"`     // Cron expression
+	Cron       string `yaml:"cron,omitempty"`        // Cron expression
 	OnCalendar string `yaml:"on_calendar,omitempty"` // Systemd OnCalendar format
 }
 
@@ -76,13 +76,13 @@ type Hooks struct {
 type Settings struct {
 	// Parallelism for backup operations
 	Parallelism int `yaml:"parallelism,omitempty"`
-	
+
 	// Check repository health periodically
 	CheckInterval string `yaml:"check_interval,omitempty"`
-	
+
 	// Default retention if not specified in profile
 	DefaultRetention *Retention `yaml:"default_retention,omitempty"`
-	
+
 	// Notification settings
 	Notifications Notifications `yaml:"notifications,omitempty"`
 }
@@ -110,7 +110,7 @@ type Snapshot struct {
 // LoadConfig loads the backup configuration
 func LoadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	configPath := "/etc/eos/backup.yaml"
 	logger.Info("Loading backup configuration",
 		zap.String("path", configPath))
@@ -146,7 +146,7 @@ func LoadConfig(rc *eos_io.RuntimeContext) (*Config, error) {
 // SaveConfig saves the backup configuration
 func SaveConfig(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	configPath := "/etc/eos/backup.yaml"
 	logger.Info("Saving backup configuration",
 		zap.String("path", configPath))
@@ -195,7 +195,7 @@ func (c *Config) Validate() error {
 		if len(profile.Paths) == 0 {
 			return fmt.Errorf("profile %q has no paths configured", name)
 		}
-		
+
 		// Verify repository exists
 		if profile.Repository != "" {
 			if _, exists := c.Repositories[profile.Repository]; !exists {
@@ -217,7 +217,7 @@ func (c *Config) Validate() error {
 // defaultConfig returns a default configuration
 func defaultConfig() *Config {
 	hostname, _ := os.Hostname()
-	
+
 	return &Config{
 		DefaultRepository: "local",
 		Repositories: map[string]Repository{
@@ -288,4 +288,3 @@ func defaultConfig() *Config {
 		},
 	}
 }
-

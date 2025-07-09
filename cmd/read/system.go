@@ -37,60 +37,86 @@ var ReadSystemCmd = &cobra.Command{
 This command is equivalent to the collectUbuntuInfo.sh script but provides
 structured logging and optional file output.
 
-Examples:
-  eos read system                           # Display all information
-  eos read system --output /tmp/sysinfo.txt # Save to file
-  eos read system --display-only            # Only display, don't save
-  eos read system --include-procs           # Include only process info
-  eos read system --include-net             # Include only network info`,
+The collection process includes:
+1. System Overview - OS version, kernel, hardware information
+2. Process Analysis - Running processes, CPU usage, memory consumption
+3. Package Management - APT packages, Snap packages, update status
+4. Storage Information - Disk usage, filesystem mounts, storage health
+5. Network Configuration - Interface status, routing, DNS configuration
+6. System Logs - Recent system events, error messages, warnings
+7. Scheduled Tasks - Crontab entries, systemd timers
+8. User Analysis - Active users, login history, permissions
+
+Filtering options allow you to collect specific categories of information
+for targeted troubleshooting or analysis.
+
+Output can be displayed to console and/or saved to a file for documentation
+and further analysis.`,
+	Example: `  # Display all system information
+  eos read system
+  
+  # Save to custom file location
+  eos read system --output /tmp/sysinfo.txt
+  
+  # Only display, don't save to file
+  eos read system --display-only
+  
+  # Include only process and user information
+  eos read system --include-procs
+  
+  # Include only network configuration
+  eos read system --include-net
+  
+  # Include only history and log information
+  eos read system --include-hist
+  
+  # Default file location (if not specified):
+  # /tmp/ubuntu_system_info_<timestamp>.txt`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runReadSystem(rc, cmd, args)
-	}),
-}
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Starting Ubuntu system information collection")
 
-func runReadSystem(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting Ubuntu system information collection")
-
-	// Collect system information
-	info, err := system.CollectSystemInfo(rc)
-	if err != nil {
-		logger.Error("Failed to collect system information", zap.Error(err))
-		return err
-	}
-
-	// Filter information if specific flags are set
-	if includeProcs || includeNet || includeHist {
-		info = filterSystemInfo(info, includeProcs, includeNet, includeHist)
-	}
-
-	// Display information
-	if err := system.DisplaySystemInfo(rc, info); err != nil {
-		logger.Error("Failed to display system information", zap.Error(err))
-		return err
-	}
-
-	// Save to file if requested and not display-only
-	if !displayOnly {
-		filename := outputFile
-		if filename == "" {
-			// Generate default filename
-			timestamp := time.Now().Format("20060102-150405")
-			filename = filepath.Join("/tmp", fmt.Sprintf("ubuntu_system_info_%s.txt", timestamp))
-		}
-
-		logger.Info("Saving system information to file", zap.String("filename", filename))
-		if err := system.SaveSystemInfoToFile(rc, info, filename); err != nil {
-			logger.Error("Failed to save system information", zap.Error(err))
+		// Collect system information
+		info, err := system.CollectSystemInfo(rc)
+		if err != nil {
+			logger.Error("Failed to collect system information", zap.Error(err))
 			return err
 		}
 
-		logger.Info("System information saved successfully", zap.String("filename", filename))
-	}
+		// Filter information if specific flags are set
+		if includeProcs || includeNet || includeHist {
+			info = filterSystemInfo(info, includeProcs, includeNet, includeHist)
+		}
 
-	logger.Info("System information collection completed")
-	return nil
+		// Display information
+		if err := system.DisplaySystemInfo(rc, info); err != nil {
+			logger.Error("Failed to display system information", zap.Error(err))
+			return err
+		}
+
+		// Save to file if requested and not display-only
+		if !displayOnly {
+			filename := outputFile
+			if filename == "" {
+				// Generate default filename
+				timestamp := time.Now().Format("20060102-150405")
+				filename = filepath.Join("/tmp", fmt.Sprintf("ubuntu_system_info_%s.txt", timestamp))
+			}
+
+			logger.Info("Saving system information to file", zap.String("filename", filename))
+			if err := system.SaveSystemInfoToFile(rc, info, filename); err != nil {
+				logger.Error("Failed to save system information", zap.Error(err))
+				return err
+			}
+
+			logger.Info("System information saved successfully", zap.String("filename", filename))
+		}
+
+		logger.Info("System information collection completed")
+		return nil
+	}),
 }
+
 
 // filterSystemInfo creates a filtered copy of SystemInfo based on flags
 func filterSystemInfo(info *system.SystemInfo, procs, net, hist bool) *system.SystemInfo {

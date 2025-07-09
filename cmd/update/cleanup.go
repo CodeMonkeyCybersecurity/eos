@@ -27,45 +27,50 @@ This command performs comprehensive system cleanup by:
 - Running apt autoremove for unused dependencies  
 - Identifying and optionally removing unused kernel packages
 
-By default, runs in interactive mode for safety.`,
-	RunE: eos_cli.Wrap(runSystemCleanup),
+By default, runs in interactive mode for safety. Use --yes to run non-interactively.
+
+Examples:
+  eos update cleanup                    # Interactive cleanup of all components
+  eos update cleanup --yes              # Non-interactive cleanup
+  eos update cleanup --orphans-only     # Only remove orphaned packages
+  eos update cleanup --kernels-only     # Only remove unused kernels
+  eos update cleanup --yes --orphans-only  # Non-interactive orphan cleanup`,
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Starting system cleanup",
+			zap.Bool("non_interactive", nonInteractive),
+			zap.Bool("orphans_only", orphansOnly),
+			zap.Bool("kernels_only", kernelsOnly))
+
+		// Create cleanup instance
+		cleanup := system.NewPackageCleanup(rc)
+
+		// Check root privileges
+		if err := cleanup.CheckRoot(); err != nil {
+			return err
+		}
+
+		// Execute cleanup based on flags
+		if orphansOnly {
+			return runOrphansOnlyCleanup(cleanup, !nonInteractive)
+		}
+
+		if kernelsOnly {
+			return runKernelsOnlyCleanup(cleanup, !nonInteractive)
+		}
+
+		// Full cleanup
+		result, err := cleanup.PerformFullCleanup(!nonInteractive)
+		if err != nil {
+			return err
+		}
+
+		// Display results using the FormatResult method
+		logger.Info(result.FormatResult())
+		return nil
+	}),
 }
 
-// runSystemCleanup executes system cleanup operations
-func runSystemCleanup(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting system cleanup",
-		zap.Bool("non_interactive", nonInteractive),
-		zap.Bool("orphans_only", orphansOnly),
-		zap.Bool("kernels_only", kernelsOnly))
-
-	// Create cleanup instance
-	cleanup := system.NewPackageCleanup(rc)
-
-	// Check root privileges
-	if err := cleanup.CheckRoot(); err != nil {
-		return err
-	}
-
-	// Execute cleanup based on flags
-	if orphansOnly {
-		return runOrphansOnlyCleanup(cleanup, !nonInteractive)
-	}
-
-	if kernelsOnly {
-		return runKernelsOnlyCleanup(cleanup, !nonInteractive)
-	}
-
-	// Full cleanup
-	result, err := cleanup.PerformFullCleanup(!nonInteractive)
-	if err != nil {
-		return err
-	}
-
-	// Display results using the FormatResult method
-	logger.Info(result.FormatResult())
-	return nil
-}
 
 // runOrphansOnlyCleanup handles orphaned packages only
 func runOrphansOnlyCleanup(cleanup *system.PackageCleanup, interactive bool) error {

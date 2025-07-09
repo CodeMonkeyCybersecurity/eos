@@ -14,25 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// newConfigCmd creates the Git configuration command
-func newConfigCmd() *cobra.Command {
-	var (
-		name          string
-		email         string
-		defaultBranch string
-		pullRebase    bool
-		noColorUI     bool
-		global        bool
-		interactive   bool
-		outputJSON    bool
-		showConfig    bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "config",
-		Aliases: []string{"cfg"},
-		Short:   "Configure Git settings",
-		Long: `Configure Git settings locally or globally.
+var ConfigCmd = &cobra.Command{
+	Use:     "config",
+	Aliases: []string{"cfg"},
+	Short:   "Configure Git settings",
+	Long: `Configure Git settings locally or globally.
 
 This command provides comprehensive Git configuration management:
 - Set user name and email
@@ -48,7 +34,16 @@ Examples:
   eos git config --show --json                   # Show current config as JSON
   eos git config --default-branch main --global  # Set default branch`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		name, _ := cmd.Flags().GetString("name")
+		email, _ := cmd.Flags().GetString("email")
+		defaultBranch, _ := cmd.Flags().GetString("default-branch")
+		pullRebase, _ := cmd.Flags().GetBool("pull-rebase")
+		noColorUI, _ := cmd.Flags().GetBool("no-color")
+		global, _ := cmd.Flags().GetBool("global")
+		interactive, _ := cmd.Flags().GetBool("interactive")
+		outputJSON, _ := cmd.Flags().GetBool("json")
+		showConfig, _ := cmd.Flags().GetBool("show")
 			logger := otelzap.Ctx(rc.Ctx)
 
 			manager := git_management.NewGitManager()
@@ -85,19 +80,18 @@ Examples:
 
 			return manager.ConfigureGit(rc, config, global)
 		}),
-	}
+}
 
-	cmd.Flags().StringVar(&name, "name", "", "Git user name")
-	cmd.Flags().StringVar(&email, "email", "", "Git user email")
-	cmd.Flags().StringVar(&defaultBranch, "default-branch", "", "Default branch name (e.g., main)")
-	cmd.Flags().BoolVar(&pullRebase, "pull-rebase", false, "Use rebase for git pull")
-	cmd.Flags().BoolVar(&noColorUI, "no-color", false, "Disable color output")
-	cmd.Flags().BoolVar(&global, "global", false, "Configure globally (default: local)")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive configuration mode")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output configuration in JSON format")
-	cmd.Flags().BoolVar(&showConfig, "show", false, "Show current configuration")
-
-	return cmd
+func init() {
+	ConfigCmd.Flags().String("name", "", "Git user name")
+	ConfigCmd.Flags().String("email", "", "Git user email")
+	ConfigCmd.Flags().String("default-branch", "", "Default branch name (e.g., main)")
+	ConfigCmd.Flags().Bool("pull-rebase", false, "Use rebase for git pull")
+	ConfigCmd.Flags().Bool("no-color", false, "Disable color output")
+	ConfigCmd.Flags().Bool("global", false, "Configure globally (default: local)")
+	ConfigCmd.Flags().BoolP("interactive", "i", false, "Interactive configuration mode")
+	ConfigCmd.Flags().Bool("json", false, "Output configuration in JSON format")
+	ConfigCmd.Flags().Bool("show", false, "Show current configuration")
 }
 
 func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitManager, global, outputJSON bool) error {

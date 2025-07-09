@@ -42,13 +42,13 @@ Examples:
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
-		
+
 		hours, _ := cmd.Flags().GetInt("hours")
 		export, _ := cmd.Flags().GetString("export")
 		outputFile, _ := cmd.Flags().GetString("output")
 		compare, _ := cmd.Flags().GetStringSlice("compare")
 		quiet, _ := cmd.Flags().GetBool("quiet")
-		
+
 		logger.Info("Reading A/B testing results",
 			zap.Int("hours_back", hours),
 			zap.String("export_format", export),

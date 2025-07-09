@@ -1,0 +1,121 @@
+package read
+
+import (
+	"fmt"
+	"os"
+	"text/tabwriter"
+	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/storage_monitor"
+	"github.com/spf13/cobra"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
+)
+
+var readStorageMetricsCmd = &cobra.Command{
+	Use:   "storage-metrics",
+	Short: "Read storage performance metrics",
+	Long: `Display storage performance metrics including I/O rates, latency, 
+and throughput for all storage devices.`,
+	RunE: eos_cli.Wrap(runReadStorageMetrics),
+}
+
+func init() {
+	readStorageMetricsCmd.Flags().String("device", "", "Specific device to monitor")
+	readStorageMetricsCmd.Flags().Bool("watch", false, "Continuously monitor metrics")
+	readStorageMetricsCmd.Flags().Duration("interval", 5*time.Second, "Update interval for watch mode")
+}
+
+func runReadStorageMetrics(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+
+	device, _ := cmd.Flags().GetString("device")
+	watch, _ := cmd.Flags().GetBool("watch")
+	interval, _ := cmd.Flags().GetDuration("interval")
+
+	logger.Info("Reading storage metrics",
+		zap.String("device", device),
+		zap.Bool("watch", watch))
+
+	if watch {
+		return watchMetrics(rc, device, interval)
+	}
+
+	// One-time collection
+	metrics, err := storage_monitor.CollectIOMetrics(rc)
+	if err != nil {
+		return fmt.Errorf("failed to collect I/O metrics: %w", err)
+	}
+
+	// Filter by device if specified
+	if device != "" {
+		filtered := make([]storage_monitor.IOMetrics, 0)
+		for _, m := range metrics {
+			if m.Device == device {
+				filtered = append(filtered, m)
+			}
+		}
+		metrics = filtered
+	}
+
+	return displayMetrics(metrics)
+}
+
+func displayMetrics(metrics []storage_monitor.IOMetrics) error {
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+
+	fmt.Fprintf(w, "DEVICE\tREAD MB/s\tWRITE MB/s\tREAD IOPS\tWRITE IOPS\tREAD LAT(ms)\tWRITE LAT(ms)\n")
+
+	for _, m := range metrics {
+		fmt.Fprintf(w, "%s\t%.2f\t%.2f\t%.0f\t%.0f\t%.2f\t%.2f\n",
+			m.Device,
+			m.ReadBytesPerSec/storage_monitor.MB,
+			m.WriteBytesPerSec/storage_monitor.MB,
+			m.ReadOpsPerSec,
+			m.WriteOpsPerSec,
+			m.AvgReadLatency,
+			m.AvgWriteLatency)
+	}
+
+	return w.Flush()
+}
+
+func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	// Clear screen
+	fmt.Print("\033[2J\033[H")
+
+	for {
+		select {
+		case <-rc.Ctx.Done():
+			return nil
+		case <-ticker.C:
+			// Clear screen and move cursor to top
+			fmt.Print("\033[2J\033[H")
+
+			metrics, err := storage_monitor.CollectIOMetrics(rc)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+				continue
+			}
+
+			// Filter if needed
+			if device != "" {
+				filtered := make([]storage_monitor.IOMetrics, 0)
+				for _, m := range metrics {
+					if m.Device == device {
+						filtered = append(filtered, m)
+					}
+				}
+				metrics = filtered
+			}
+
+			fmt.Printf("Storage Metrics - %s\n\n", time.Now().Format("15:04:05"))
+			displayMetrics(metrics)
+		}
+	}
+}

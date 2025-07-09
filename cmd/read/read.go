@@ -37,4 +37,10 @@ func init() {
 	ReadCmd.AddCommand(readDelphiCmd)
 	ReadCmd.AddCommand(readHecateCmd)
 	ReadCmd.AddCommand(readSecretsCmd)
+	ReadCmd.AddCommand(analyzeABResultsCmd)
+	ReadCmd.AddCommand(parserHealthCmd)
+	ReadCmd.AddCommand(pipelineAllCmd)
+	ReadCmd.AddCommand(pipelineAlertsCmd)
+	ReadCmd.AddCommand(pipelinePromptsCmd)
+	ReadCmd.AddCommand(pipelineServicesCmd)
 }

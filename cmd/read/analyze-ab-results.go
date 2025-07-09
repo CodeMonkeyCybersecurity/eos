@@ -15,20 +15,19 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewAnalyzeABResultsCmd creates the analyze-ab-results command
-func NewAnalyzeABResultsCmd() *cobra.Command {
-	var (
-		hours      int
-		export     string
-		outputFile string
-		compare    []string
-		quiet      bool
-	)
+var (
+	analyzeABResultsHours      int
+	analyzeABResultsExport     string
+	analyzeABResultsOutputFile string
+	analyzeABResultsCompare    []string
+	analyzeABResultsQuiet      bool
+)
 
-	cmd := &cobra.Command{
-		Use:   "analyze-ab-results",
-		Short: "Analyze A/B testing results for prompt optimization",
-		Long: `Analyze A/B testing results from the prompt-ab-tester service to evaluate prompt effectiveness.
+// analyzeABResultsCmd analyzes A/B testing results for prompt optimization
+var analyzeABResultsCmd = &cobra.Command{
+	Use:   "analyze-ab-results",
+	Short: "Analyze A/B testing results for prompt optimization",
+	Long: `Analyze A/B testing results from the prompt-ab-tester service to evaluate prompt effectiveness.
 
 This command runs the ab-test-analyzer.py script to provide:
 - Performance comparison across prompt variants
@@ -44,104 +43,103 @@ The analysis includes metrics such as:
 - User satisfaction and business impact
 
 Examples:
-  eos delphi services analyze-ab-results
-  eos delphi services analyze-ab-results --hours 168 --export csv
-  eos delphi services analyze-ab-results --compare cybersobar delphi_notify_long
-  eos delphi services analyze-ab-results --export json --output /tmp/ab-results.json`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting A/B testing results analysis",
-				zap.Int("hours_back", hours),
-				zap.String("export_format", export),
-				zap.Bool("quiet", quiet))
+  eos read analyze-ab-results
+  eos read analyze-ab-results --hours 168 --export csv
+  eos read analyze-ab-results --compare cybersobar delphi_notify_long
+  eos read analyze-ab-results --export json --output /tmp/ab-results.json`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info(" Starting A/B testing results analysis",
+			zap.Int("hours_back", analyzeABResultsHours),
+			zap.String("export_format", analyzeABResultsExport),
+			zap.Bool("quiet", analyzeABResultsQuiet))
 
-			// Create file service container
-			fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
-			if err != nil {
-				return fmt.Errorf("failed to initialize file operations: %w", err)
-			}
+		// Create file service container
+		fileContainer, err := cmd_helpers.NewFileServiceContainer(rc)
+		if err != nil {
+			return fmt.Errorf("failed to initialize file operations: %w", err)
+		}
 
-			// Verify analyzer script exists
-			analyzerScript := "/usr/local/bin/ab-test-analyzer.py"
-			if !fileContainer.FileExists(analyzerScript) {
-				return fmt.Errorf("A/B testing analyzer not found: %s (deploy with: eos delphi services update prompt-ab-tester)", analyzerScript)
-			}
+		// Verify analyzer script exists
+		analyzerScript := "/usr/local/bin/ab-test-analyzer.py"
+		if !fileContainer.FileExists(analyzerScript) {
+			return fmt.Errorf("A/B testing analyzer not found: %s (deploy with: eos delphi services update prompt-ab-tester)", analyzerScript)
+		}
 
-			// Build command arguments
-			cmdArgs := []string{
-				analyzerScript,
-				"--hours", strconv.Itoa(hours),
-			}
+		// Build command arguments
+		cmdArgs := []string{
+			analyzerScript,
+			"--hours", strconv.Itoa(analyzeABResultsHours),
+		}
 
-			if export != "" {
-				cmdArgs = append(cmdArgs, "--export", export)
-			}
+		if analyzeABResultsExport != "" {
+			cmdArgs = append(cmdArgs, "--export", analyzeABResultsExport)
+		}
 
-			if outputFile != "" {
-				cmdArgs = append(cmdArgs, "--output", outputFile)
-			}
+		if analyzeABResultsOutputFile != "" {
+			cmdArgs = append(cmdArgs, "--output", analyzeABResultsOutputFile)
+		}
 
-			if len(compare) == 2 {
-				cmdArgs = append(cmdArgs, "--compare", compare[0], compare[1])
-			} else if len(compare) > 0 {
-				return fmt.Errorf("compare requires exactly 2 variant names")
-			}
+		if len(analyzeABResultsCompare) == 2 {
+			cmdArgs = append(cmdArgs, "--compare", analyzeABResultsCompare[0], analyzeABResultsCompare[1])
+		} else if len(analyzeABResultsCompare) > 0 {
+			return fmt.Errorf("compare requires exactly 2 variant names")
+		}
 
-			if quiet {
-				cmdArgs = append(cmdArgs, "--quiet")
-			}
+		if analyzeABResultsQuiet {
+			cmdArgs = append(cmdArgs, "--quiet")
+		}
 
-			logger.Info(" Running A/B testing analysis",
-				zap.String("analyzer", analyzerScript),
-				zap.Strings("arguments", cmdArgs[1:]))
+		logger.Info(" Running A/B testing analysis",
+			zap.String("analyzer", analyzerScript),
+			zap.Strings("arguments", cmdArgs[1:]))
 
-			// Execute analyzer
-			output, err := execute.Run(rc.Ctx, execute.Options{
-				Command: "python3",
-				Args:    cmdArgs,
-			})
+		// Execute analyzer
+		output, err := execute.Run(rc.Ctx, execute.Options{
+			Command: "python3",
+			Args:    cmdArgs,
+		})
 
-			if err != nil {
-				logger.Error(" Analysis failed",
-					zap.Error(err),
-					zap.String("output", output))
-				return fmt.Errorf("A/B testing analysis failed: %w", err)
-			}
+		if err != nil {
+			logger.Error(" Analysis failed",
+				zap.Error(err),
+				zap.String("output", output))
+			return fmt.Errorf("A/B testing analysis failed: %w", err)
+		}
 
-			if !quiet {
-				// Display output
-				if output != "" {
-					lines := strings.Split(output, "\n")
-					for _, line := range lines {
-						if strings.TrimSpace(line) != "" {
-							logger.Info(line)
-						}
+		if !analyzeABResultsQuiet {
+			// Display output
+			if output != "" {
+				lines := strings.Split(output, "\n")
+				for _, line := range lines {
+					if strings.TrimSpace(line) != "" {
+						logger.Info(line)
 					}
 				}
 			}
+		}
 
-			logger.Info(" A/B testing analysis completed")
+		logger.Info(" A/B testing analysis completed")
 
-			// Show next steps if export was used
-			if export != "" && outputFile != "" {
-				logger.Info(" Results exported",
-					zap.String("file", outputFile),
-					zap.String("format", export))
-				logger.Info(" Next steps:")
-				logger.Info("   - Review exported results for insights")
-				logger.Info("   - Consider adjusting prompt weights in /opt/delphi/ab-test-config.json")
-				logger.Info("   - Monitor ongoing experiments with: eos delphi services logs prompt-ab-tester")
-			}
+		// Show next steps if export was used
+		if analyzeABResultsExport != "" && analyzeABResultsOutputFile != "" {
+			logger.Info(" Results exported",
+				zap.String("file", analyzeABResultsOutputFile),
+				zap.String("format", analyzeABResultsExport))
+			logger.Info(" Next steps:")
+			logger.Info("   - Review exported results for insights")
+			logger.Info("   - Consider adjusting prompt weights in /opt/delphi/ab-test-config.json")
+			logger.Info("   - Monitor ongoing experiments with: eos delphi services logs prompt-ab-tester")
+		}
 
-			return nil
-		}),
-	}
+		return nil
+	}),
+}
 
-	cmd.Flags().IntVar(&hours, "hours", 24, "Hours of data to analyze (default: 24)")
-	cmd.Flags().StringVar(&export, "export", "", "Export format: json, csv, txt")
-	cmd.Flags().StringVar(&outputFile, "output", "", "Output file path for exported results")
-	cmd.Flags().StringSliceVar(&compare, "compare", nil, "Compare two specific variants (requires exactly 2 variant names)")
-	cmd.Flags().BoolVar(&quiet, "quiet", false, "Suppress console output")
-
-	return cmd
+func init() {
+	analyzeABResultsCmd.Flags().IntVar(&analyzeABResultsHours, "hours", 24, "Hours of data to analyze (default: 24)")
+	analyzeABResultsCmd.Flags().StringVar(&analyzeABResultsExport, "export", "", "Export format: json, csv, txt")
+	analyzeABResultsCmd.Flags().StringVar(&analyzeABResultsOutputFile, "output", "", "Output file path for exported results")
+	analyzeABResultsCmd.Flags().StringSliceVar(&analyzeABResultsCompare, "compare", nil, "Compare two specific variants (requires exactly 2 variant names)")
+	analyzeABResultsCmd.Flags().BoolVar(&analyzeABResultsQuiet, "quiet", false, "Suppress console output")
 }

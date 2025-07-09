@@ -11,17 +11,21 @@ import (
 	"go.uber.org/zap"
 )
 
-// CleanCmd is the root command for create operations
+// CleanCmd is the root command for clean operations
 var CleanCmd = &cobra.Command{
 	Use:     "clean",
 	Aliases: []string{"sanitise", "sanitize"},
-	Short:   "Create, deploy, install resources programmes and components (e.g., processes, users, storage, application containers)",
-	Long: `The create command allows you to create various resources such as processes, users, or storage, components or dependencies.
-For example:
-	eos create trivy 
-	eos create vault
-	eos create umami
-	eos create hecate`,
+	Short:   "Clean and sanitize system resources and components",
+	Long: `Clean and sanitize system resources including temporary files, caches, logs, and unused data.
+
+This command provides various cleaning operations to maintain system health and free up disk space.
+The clean command serves as a parent for various cleaning subcommands.
+
+Examples:
+  eos update clean system          # Clean system temporary files
+  eos update clean cache           # Clean application caches
+  eos update clean logs            # Clean old log files
+  eos update clean docker          # Clean Docker images and containers`,
 
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 

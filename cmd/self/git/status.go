@@ -14,19 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// newStatusCmd creates the Git status command
-func newStatusCmd() *cobra.Command {
-	var (
-		path       string
-		outputJSON bool
-		detailed   bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "status",
-		Aliases: []string{"st"},
-		Short:   "Get Git repository status",
-		Long: `Get comprehensive status information about a Git repository.
+var StatusCmd = &cobra.Command{
+	Use:     "status",
+	Aliases: []string{"st"},
+	Short:   "Get Git repository status",
+	Long: `Get comprehensive status information about a Git repository.
 
 This command provides detailed information about:
 - Current branch and tracking status
@@ -40,7 +32,10 @@ Examples:
   eos git status --json            # JSON output
   eos git status --detailed        # Detailed file information`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		path, _ := cmd.Flags().GetString("path")
+		outputJSON, _ := cmd.Flags().GetBool("json")
+		detailed, _ := cmd.Flags().GetBool("detailed")
 			logger := otelzap.Ctx(rc.Ctx)
 
 			if path == "" {
@@ -70,13 +65,12 @@ Examples:
 
 			return outputTableStatus(status, detailed)
 		}),
-	}
+}
 
-	cmd.Flags().StringVarP(&path, "path", "p", "", "Path to Git repository (default: current directory)")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-	cmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed file information")
-
-	return cmd
+func init() {
+	StatusCmd.Flags().StringP("path", "p", "", "Path to Git repository (default: current directory)")
+	StatusCmd.Flags().Bool("json", false, "Output in JSON format")
+	StatusCmd.Flags().BoolP("detailed", "d", false, "Show detailed file information")
 }
 
 func outputJSONStatus(status *git_management.GitStatus) error {

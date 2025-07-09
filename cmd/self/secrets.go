@@ -19,12 +19,10 @@ import (
 	"golang.org/x/term"
 )
 
-// NewSecretsCmd creates the secrets management command
-func NewSecretsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "secrets",
-		Short: "Configure Vault connection and manage secrets",
-		Long: `Configure Vault connection settings and manage secrets for Eos services.
+var SecretsCmd = &cobra.Command{
+	Use:   "secrets",
+	Short: "Configure Vault connection and manage secrets",
+	Long: `Configure Vault connection settings and manage secrets for Eos services.
 
 This command helps you set up Vault integration for secure credential management,
 particularly for database connections and other sensitive configuration.
@@ -44,25 +42,17 @@ Examples:
   eos self secrets test               # Test Vault connection
   eos self secrets set delphi-db     # Set database credentials
   eos self secrets status            # Show configuration status`,
-		Aliases: []string{"vault", "creds"},
-	}
-
-	// Add subcommands
-	cmd.AddCommand(NewSecretsConfigureCmd())
-	cmd.AddCommand(NewSecretsTestCmd())
-	cmd.AddCommand(NewSecretsSetCmd())
-	cmd.AddCommand(NewSecretsGetCmd())
-	cmd.AddCommand(NewSecretsStatusCmd())
-
-	return cmd
+	Aliases: []string{"vault", "creds"},
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for secrets command")
+		return cmd.Help()
+	}),
 }
 
-// NewSecretsConfigureCmd creates the configure command
-func NewSecretsConfigureCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "configure",
-		Short: "Configure Vault connection settings",
-		Long: `Interactive configuration of Vault connection settings.
+var SecretsConfigureCmd = &cobra.Command{
+	Use:   "configure",
+	Short: "Configure Vault connection settings",
+	Long: `Interactive configuration of Vault connection settings.
 
 This will guide you through setting up:
 - Vault server address (VAULT_ADDR)
@@ -72,7 +62,7 @@ This will guide you through setting up:
 
 The configuration will be stored securely and used by all Eos services
 that require access to secrets, including the Delphi dashboard.`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Starting Vault configuration setup")
 
@@ -170,17 +160,12 @@ that require access to secrets, including the Delphi dashboard.`,
 			logger.Info("Vault configuration completed successfully")
 			return nil
 		}),
-	}
-
-	return cmd
 }
 
-// NewSecretsSetCmd creates the set command for storing secrets
-func NewSecretsSetCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "set <secret-name>",
-		Short: "Store secrets in Vault",
-		Long: `Store secrets in Vault for use by Eos services.
+var SecretsSetCmd = &cobra.Command{
+	Use:   "set <secret-name>",
+	Short: "Store secrets in Vault",
+	Long: `Store secrets in Vault for use by Eos services.
 
 Available secret types:
 - delphi-db: Database credentials for Delphi pipeline (static)
@@ -196,9 +181,9 @@ Examples:
   eos self secrets set delphi-db-engine  # Configure dynamic database engine
   eos self secrets set smtp              # Set SMTP credentials  
   eos self secrets set openai            # Set OpenAI API key`,
-		Args:      cobra.ExactArgs(1),
-		ValidArgs: []string{"delphi-db", "delphi-db-config", "delphi-db-engine", "smtp", "openai", "custom"},
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	Args:      cobra.ExactArgs(1),
+	ValidArgs: []string{"delphi-db", "delphi-db-config", "delphi-db-engine", "smtp", "openai", "custom"},
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 			secretName := args[0]
 
@@ -234,24 +219,19 @@ Examples:
 				return fmt.Errorf("unknown secret type: %s", secretName)
 			}
 		}),
-	}
-
-	return cmd
 }
 
-// NewSecretsTestCmd creates the test command
-func NewSecretsTestCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "test",
-		Short: "Test Vault connectivity and authentication",
-		Long: `Test Vault connectivity and authentication setup.
+var SecretsTestCmd = &cobra.Command{
+	Use:   "test",
+	Short: "Test Vault connectivity and authentication",
+	Long: `Test Vault connectivity and authentication setup.
 
 This command will:
 - Test connection to Vault server
 - Verify authentication credentials
 - Test secret reading/writing permissions
 - Display connection status and diagnostics`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Testing Vault connectivity")
 
@@ -298,24 +278,19 @@ This command will:
 
 			return nil
 		}),
-	}
-
-	return cmd
 }
 
-// NewSecretsStatusCmd creates the status command
-func NewSecretsStatusCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status",
-		Short: "Show Vault connection status and available secrets",
-		Long: `Display Vault connection status and list available secrets.
+var SecretsStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show Vault connection status and available secrets",
+	Long: `Display Vault connection status and list available secrets.
 
 Shows:
 - Vault server address and connectivity
 - Authentication status
 - Available secret paths
 - Service-specific credential status`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Checking Vault status")
 
@@ -402,27 +377,21 @@ Shows:
 
 			return nil
 		}),
-	}
-
-	return cmd
 }
 
-// NewSecretsGetCmd creates the get command for retrieving secrets
-func NewSecretsGetCmd() *cobra.Command {
-	var showValue bool
-
-	cmd := &cobra.Command{
-		Use:   "get <secret-path>",
-		Short: "Retrieve secrets from Vault",
-		Long: `Retrieve and display secrets from Vault.
+var SecretsGetCmd = &cobra.Command{
+	Use:   "get <secret-path>",
+	Short: "Retrieve secrets from Vault",
+	Long: `Retrieve and display secrets from Vault.
 
 Examples:
   eos self secrets get delphi/database/username
   eos self secrets get delphi/database/password --show-value
   eos self secrets get openai/api_key`,
-		Args: cobra.ExactArgs(1),
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	Args: cobra.ExactArgs(1),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			secretPath := args[0]
+			showValue, _ := cmd.Flags().GetBool("show-value")
 
 			// Initialize Vault
 			if err := vault.InitializeServiceFacade(rc); err != nil {
@@ -450,10 +419,17 @@ Examples:
 
 			return nil
 		}),
-	}
+}
 
-	cmd.Flags().BoolVar(&showValue, "show-value", false, "Show the actual secret value (use with caution)")
-	return cmd
+func init() {
+	SecretsGetCmd.Flags().Bool("show-value", false, "Show the actual secret value (use with caution)")
+	
+	// Add subcommands to SecretsCmd
+	SecretsCmd.AddCommand(SecretsConfigureCmd)
+	SecretsCmd.AddCommand(SecretsTestCmd)
+	SecretsCmd.AddCommand(SecretsSetCmd)
+	SecretsCmd.AddCommand(SecretsGetCmd)
+	SecretsCmd.AddCommand(SecretsStatusCmd)
 }
 
 // Helper functions for authentication setup

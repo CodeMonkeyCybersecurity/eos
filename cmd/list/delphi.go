@@ -181,96 +181,98 @@ If any dependencies are missing, use 'eos delphi services install' to install th
 }
 
 func init() {
+	delphiConfigValidateCmd.Flags().String("env-file", "", "Load environment variables from file")
+	delphiConfigValidateCmd.Flags().Bool("json", false, "Output results in JSON format")
+	delphiConfigValidateCmd.Flags().Bool("verbose", false, "Show detailed information messages")
+	delphiConfigValidateCmd.Flags().Bool("check-only", false, "Only show summary, suppress detailed output")
+
+	delphiValidateCmd.AddCommand(delphiConfigValidateCmd)
+
+	ListCmd.AddCommand(delphiValidateCmd)
+	ListCmd.AddCommand(delphiConfigValidateCmd)
 	ListCmd.AddCommand(checkCmd)
 }
 
-// CheckPipeline creates the validate command
-func CheckPipeline() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "validate",
-		Short: "Validate Delphi pipeline configuration",
-		Long: `Validate the complete Delphi pipeline configuration including:
+var delphiValidateCmd = &cobra.Command{
+	Use:   "delphi-validate",
+	Aliases: []string{"delphi-check", "validate-delphi", "delphi-validation"},
+	Short: "Validate Delphi pipeline configuration",
+	Long: `Validate the complete Delphi pipeline configuration including:
 - Database connectivity and schema
 - Environment variables and LLM configuration
 - SMTP and notification channel setup
 - File paths and security settings
-- Parser and Wazuh API configuration`,
-	}
+- Parser and Wazuh API configuration
 
-	cmd.AddCommand(NewConfigCmd())
-	return cmd
+Examples:
+  eos list delphi-validate
+  eos list delphi-validate --help`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Delphi validation - use subcommands for specific validation")
+		return cmd.Help()
+	}),
 }
 
-// NewConfigCmd creates the config validation command
-func NewConfigCmd() *cobra.Command {
-	var (
-		envFile    string
-		outputJSON bool
-		verbose    bool
-		checkOnly  bool
-	)
-
-	cmd := &cobra.Command{
-		Use:   "config",
-		Short: "Validate Delphi configuration and environment",
-		Long: `Validates the complete Delphi pipeline configuration including database schema,
+var delphiConfigValidateCmd = &cobra.Command{
+	Use:   "delphi-config-validate",
+	Aliases: []string{"delphi-config", "validate-delphi-config"},
+	Short: "Validate Delphi configuration and environment",
+	Long: `Validates the complete Delphi pipeline configuration including database schema,
 environment variables, notification channels, file paths, and external service connectivity.
 
 This command performs comprehensive validation of all Delphi components and reports
 errors, warnings, and informational messages about the configuration state.`,
-		Example: `  # Validate current configuration
-  eos delphi validate config
+	Example: `  # Validate current configuration
+  eos list delphi-config-validate
 
   # Load environment from custom file
-  eos delphi validate config --env-file /opt/stackstorm/packs/delphi/.env
+  eos list delphi-config-validate --env-file /opt/stackstorm/packs/delphi/.env
 
   # Output detailed JSON results
-  eos delphi validate config --json --verbose
+  eos list delphi-config-validate --json --verbose
 
   # Check configuration without detailed output
-  eos delphi validate config --check-only`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+  eos list delphi-config-validate --check-only`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			logger.Info("Starting Delphi configuration validation",
-				zap.String("env_file", envFile),
-				zap.Bool("json_output", outputJSON),
-				zap.Bool("verbose", verbose),
-				zap.Bool("check_only", checkOnly))
+		envFile, _ := cmd.Flags().GetString("env-file")
+		outputJSON, _ := cmd.Flags().GetBool("json")
+		verbose, _ := cmd.Flags().GetBool("verbose")
+		checkOnly, _ := cmd.Flags().GetBool("check-only")
 
-			// Load environment file if specified
-			if envFile != "" {
-				if err := loadEnvFile(envFile); err != nil {
-					logger.Warn("Failed to load environment file",
-						zap.String("file", envFile),
-						zap.Error(err))
-				} else {
-					logger.Info("Loaded environment file", zap.String("file", envFile))
-				}
-			}
+		logger.Info("Starting Delphi configuration validation",
+			zap.String("env_file", envFile),
+			zap.Bool("json_output", outputJSON),
+			zap.Bool("verbose", verbose),
+			zap.Bool("check_only", checkOnly))
 
-			// Create configuration from environment and defaults
-			config := createConfigFromEnvironment()
-
-			// Create validator and run validation
-			validator := delphi_config.NewConfigValidator(config)
-			summary := validator.ValidateAll()
-
-			// Output results
-			if outputJSON {
-				return outputJSONResults(summary, verbose)
+		// Load environment file if specified
+		if envFile != "" {
+			if err := loadEnvFile(envFile); err != nil {
+				logger.Warn("Failed to load environment file",
+					zap.String("file", envFile),
+					zap.Error(err))
 			} else {
-				return outputTextResults(summary, verbose, checkOnly)
+				logger.Info("Loaded environment file", zap.String("file", envFile))
 			}
-		}),
-	}
+		}
 
-	cmd.Flags().StringVar(&envFile, "env-file", "", "Load environment variables from file")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output results in JSON format")
-	cmd.Flags().BoolVar(&verbose, "verbose", false, "Show detailed information messages")
-	cmd.Flags().BoolVar(&checkOnly, "check-only", false, "Only show summary, suppress detailed output")
+		// Create configuration from environment and defaults
+		config := createConfigFromEnvironment()
 
-	return cmd
+		// Create validator and run validation
+		validator := delphi_config.NewConfigValidator(config)
+		summary := validator.ValidateAll()
+
+		// Output results
+		if outputJSON {
+			return outputJSONResults(summary, verbose)
+		} else {
+			return outputTextResults(summary, verbose, checkOnly)
+		}
+	}),
 }
 
 // loadEnvFile loads environment variables from a file

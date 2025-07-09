@@ -1,9 +1,8 @@
-// cmd/update/vault.go
+// cmd/update/secrets.go
 
 package update
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
@@ -18,11 +17,23 @@ import (
 var VaultUpdateCmd = &cobra.Command{
 	Use:   "vault",
 	Short: "Updates Vault using the system's package manager",
-	Long:  `Updates Vault using dnf or apt depending on the host's Linux distribution.`,
+	Long: `Updates HashiCorp Vault using the system's package manager.
+
+This command automatically detects the Linux distribution and uses the appropriate package manager:
+- RHEL/CentOS/Fedora: Uses dnf to upgrade vault
+- Debian/Ubuntu: Uses apt to install/update vault
+
+The command requires root privileges to perform system package updates.
+
+Examples:
+  sudo eos update vault             # Update Vault on current system
+  eos update vault                  # Will prompt for root if not running as root`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 
+		logger := otelzap.Ctx(rc.Ctx)
+
 		if os.Geteuid() != 0 {
-			otelzap.Ctx(rc.Ctx).Fatal("This command must be run with sudo or as root.")
+			logger.Fatal("This command must be run with sudo or as root.")
 		}
 
 		distro := platform.DetectLinuxDistro(rc)
@@ -30,26 +41,26 @@ var VaultUpdateCmd = &cobra.Command{
 
 		switch distro {
 		case "rhel":
-			fmt.Println(" Updating Vault via dnf...")
+			logger.Info("Updating Vault via dnf", zap.String("distro", distro))
 			updateCmd = exec.Command("dnf", "upgrade", "-y", "vault")
 		case "debian":
-			fmt.Println(" Updating Vault via apt...")
+			logger.Info("Updating Vault via apt", zap.String("distro", distro))
 			updateCmd = exec.Command("apt", "update")
 			if err := updateCmd.Run(); err != nil {
-				otelzap.Ctx(rc.Ctx).Fatal("Failed to run apt update", zap.Error(err))
+				logger.Fatal("Failed to run apt update", zap.Error(err))
 			}
 			updateCmd = exec.Command("apt", "install", "-y", "vault")
 		default:
-			otelzap.Ctx(rc.Ctx).Fatal("Unsupported or unknown distro", zap.String("distro", distro))
+			logger.Fatal("Unsupported or unknown distro", zap.String("distro", distro))
 		}
 
 		updateCmd.Stdout = os.Stdout
 		updateCmd.Stderr = os.Stderr
 
 		if err := updateCmd.Run(); err != nil {
-			otelzap.Ctx(rc.Ctx).Fatal("Failed to update Vault", zap.Error(err))
+			logger.Fatal("Failed to update Vault", zap.Error(err))
 		}
-		fmt.Println(" Vault updated successfully.")
+		logger.Info("Vault updated successfully")
 		return nil
 	}),
 }

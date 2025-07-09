@@ -34,7 +34,7 @@ The display updates in real-time showing the latest entries in a spreadsheet-lik
 
 func init() {
 	// Add subcommands for watching different tables
-	WatchCmd.AddCommand(NewAlertsCmd())
-	WatchCmd.AddCommand(NewAgentsCmd())
-	WatchCmd.AddCommand(NewAllCmd())
+	WatchCmd.AddCommand(pipelineAlertsCmd)
+	WatchCmd.AddCommand(delphiAgentsCmd)
+	WatchCmd.AddCommand(pipelineAllCmd)
 }

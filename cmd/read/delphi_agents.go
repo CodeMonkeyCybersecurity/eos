@@ -35,18 +35,17 @@ type Agent struct {
 	APIFetchTimestamp *time.Time `json:"api_fetch_timestamp"`
 }
 
-// NewAgentsCmd creates the agents watch command
-func NewAgentsCmd() *cobra.Command {
-	var (
-		limit   int
-		refresh int
-		dsn     string
-	)
+var (
+	delphiAgentsLimit   int
+	delphiAgentsRefresh int
+	delphiAgentsDsn     string
+)
 
-	cmd := &cobra.Command{
-		Use:   "agents",
-		Short: "Watch agents table for real-time changes",
-		Long: `Watch the agents table for real-time agent status updates.
+// delphiAgentsCmd watches agents table for real-time changes
+var delphiAgentsCmd = &cobra.Command{
+	Use:   "agents",
+	Short: "Watch agents table for real-time changes",
+	Long: `Watch the agents table for real-time agent status updates.
 
 This command displays agents in a spreadsheet-like format and updates automatically
 when agent information changes or new agents are registered.
@@ -58,49 +57,48 @@ The display shows:
 - Current status and node assignment
 
 Example:
-  eos delphi watch agents --limit 25 --refresh 3`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting agents watch",
-				zap.Int("limit", limit),
-				zap.Int("refresh_seconds", refresh))
+  eos read delphi agents --limit 25 --refresh 3`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info(" Starting agents watch",
+			zap.Int("limit", delphiAgentsLimit),
+			zap.Int("refresh_seconds", delphiAgentsRefresh))
 
-			// Get database DSN
-			if dsn == "" {
-				dsn = os.Getenv("AGENTS_PG_DSN")
-				if dsn == "" {
-					return fmt.Errorf("database DSN not provided. Set AGENTS_PG_DSN environment variable or use --dsn flag")
-				}
+		// Get database DSN
+		if delphiAgentsDsn == "" {
+			delphiAgentsDsn = os.Getenv("AGENTS_PG_DSN")
+			if delphiAgentsDsn == "" {
+				return fmt.Errorf("database DSN not provided. Set AGENTS_PG_DSN environment variable or use --dsn flag")
 			}
+		}
 
-			// Connect to database
-			db, err := sql.Open("postgres", dsn)
-			if err != nil {
-				return fmt.Errorf("failed to connect to database: %w", err)
+		// Connect to database
+		db, err := sql.Open("postgres", delphiAgentsDsn)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer func() {
+			if err := db.Close(); err != nil {
+				logger.Error(" Failed to close database connection", zap.Error(err))
 			}
-			defer func() {
-				if err := db.Close(); err != nil {
-					logger.Error(" Failed to close database connection", zap.Error(err))
-				}
-			}()
+		}()
 
-			// Test connection
-			if err := db.Ping(); err != nil {
-				return fmt.Errorf("failed to ping database: %w", err)
-			}
+		// Test connection
+		if err := db.Ping(); err != nil {
+			return fmt.Errorf("failed to ping database: %w", err)
+		}
 
-			logger.Info(" Connected to PostgreSQL database")
+		logger.Info(" Connected to PostgreSQL database")
 
-			// Start watching
-			return watchAgents(rc.Ctx, logger, db, limit, refresh)
-		}),
-	}
+		// Start watching
+		return watchAgents(rc.Ctx, logger, db, delphiAgentsLimit, delphiAgentsRefresh)
+	}),
+}
 
-	cmd.Flags().IntVarP(&limit, "limit", "l", 15, "Number of agents to display")
-	cmd.Flags().IntVarP(&refresh, "refresh", "r", 10, "Refresh interval in seconds")
-	cmd.Flags().StringVarP(&dsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
-
-	return cmd
+func init() {
+	delphiAgentsCmd.Flags().IntVarP(&delphiAgentsLimit, "limit", "l", 15, "Number of agents to display")
+	delphiAgentsCmd.Flags().IntVarP(&delphiAgentsRefresh, "refresh", "r", 10, "Refresh interval in seconds")
+	delphiAgentsCmd.Flags().StringVarP(&delphiAgentsDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
 
 func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit, refresh int) error {

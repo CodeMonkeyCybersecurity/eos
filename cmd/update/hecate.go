@@ -1,4 +1,4 @@
-/* cmd/hecate/update/update.go */
+/* cmd/update/hecate.go */
 
 package update
 

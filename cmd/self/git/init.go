@@ -12,24 +12,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// newInitCmd creates the Git repository initialization command
-func newInitCmd() *cobra.Command {
-	var (
-		path           string
-		remoteURL      string
-		remoteName     string
-		defaultBranch  string
-		initialCommit  bool
-		commitMessage  string
-		setupGitHub    bool
-		interactive    bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "init",
-		Aliases: []string{"initialize"},
-		Short:   "Initialize a new Git repository",
-		Long: `Initialize a new Git repository with optional remote and initial commit.
+var InitCmd = &cobra.Command{
+	Use:     "init",
+	Aliases: []string{"initialize"},
+	Short:   "Initialize a new Git repository",
+	Long: `Initialize a new Git repository with optional remote and initial commit.
 
 This command provides comprehensive repository initialization:
 - Create new Git repository
@@ -44,7 +31,15 @@ Examples:
   eos git init --remote-url https://github.com/user/repo.git --initial-commit
   eos git init --interactive                     # Interactive mode`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		path, _ := cmd.Flags().GetString("path")
+		remoteURL, _ := cmd.Flags().GetString("remote-url")
+		remoteName, _ := cmd.Flags().GetString("remote-name")
+		defaultBranch, _ := cmd.Flags().GetString("default-branch")
+		initialCommit, _ := cmd.Flags().GetBool("initial-commit")
+		commitMessage, _ := cmd.Flags().GetString("commit-message")
+		setupGitHub, _ := cmd.Flags().GetBool("setup-github")
+		interactive, _ := cmd.Flags().GetBool("interactive")
 			logger := otelzap.Ctx(rc.Ctx)
 
 			if path == "" {
@@ -80,18 +75,17 @@ Examples:
 
 			return manager.InitRepository(rc, options)
 		}),
-	}
+}
 
-	cmd.Flags().StringVarP(&path, "path", "p", "", "Path for new repository (default: current directory)")
-	cmd.Flags().StringVar(&remoteURL, "remote-url", "", "Remote repository URL")
-	cmd.Flags().StringVar(&remoteName, "remote-name", "origin", "Remote name")
-	cmd.Flags().StringVar(&defaultBranch, "default-branch", "main", "Default branch name")
-	cmd.Flags().BoolVarP(&initialCommit, "initial-commit", "c", false, "Create initial commit")
-	cmd.Flags().StringVar(&commitMessage, "commit-message", "Initial commit", "Initial commit message")
-	cmd.Flags().BoolVar(&setupGitHub, "setup-github", false, "Setup GitHub repository using gh CLI")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode")
-
-	return cmd
+func init() {
+	InitCmd.Flags().StringP("path", "p", "", "Path for new repository (default: current directory)")
+	InitCmd.Flags().String("remote-url", "", "Remote repository URL")
+	InitCmd.Flags().String("remote-name", "origin", "Remote name")
+	InitCmd.Flags().String("default-branch", "main", "Default branch name")
+	InitCmd.Flags().BoolP("initial-commit", "c", false, "Create initial commit")
+	InitCmd.Flags().String("commit-message", "Initial commit", "Initial commit message")
+	InitCmd.Flags().Bool("setup-github", false, "Setup GitHub repository using gh CLI")
+	InitCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 }
 
 func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitManager) error {

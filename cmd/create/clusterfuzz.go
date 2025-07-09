@@ -45,11 +45,119 @@ var (
 var clusterfuzzCmd = &cobra.Command{
 	Use:   "clusterfuzz",
 	Short: "Deploy ClusterFuzz fuzzing infrastructure on Nomad",
-	Long: `Deploy ClusterFuzz on Nomad with configurable backends.
-	
+	Long: `Deploy ClusterFuzz fuzzing infrastructure on Nomad with configurable backends.
+
 ClusterFuzz is Google's scalable fuzzing infrastructure, adapted for Nomad deployment.
-This command sets up all required services including database, queue, storage, and fuzzing bots.`,
-	RunE: eos_cli.Wrap(runClusterfuzz),
+This command sets up all required services including database, queue, storage, and fuzzing bots.
+
+FEATURES:
+• Configurable storage backends (MinIO, S3, local)
+• Database backend support (PostgreSQL, MongoDB)
+• Queue backend support (Redis, RabbitMQ)
+• Scalable fuzzing bot deployment
+• Vault integration for secrets management
+• Comprehensive health monitoring
+• Production-ready configuration
+
+EXAMPLES:
+  # Deploy with default settings (PostgreSQL, Redis, MinIO)
+  eos create clusterfuzz
+
+  # Deploy with custom storage backend
+  eos create clusterfuzz --storage-backend s3 --s3-endpoint s3.amazonaws.com
+
+  # Deploy with MongoDB and RabbitMQ
+  eos create clusterfuzz --database-backend mongodb --queue-backend rabbitmq
+
+  # Deploy with Vault integration
+  eos create clusterfuzz --use-vault --vault-path secret/clusterfuzz
+
+  # Deploy with custom bot configuration
+  eos create clusterfuzz --bot-count 5 --preemptible-bot-count 10`,
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Starting ClusterFuzz deployment on Nomad",
+			zap.String("nomad_address", nomadAddress),
+			zap.String("storage_backend", storageBackend),
+			zap.String("database_backend", databaseBackend))
+
+		// Validate configuration
+		if err := validateClusterfuzzConfig(); err != nil {
+			return fmt.Errorf("invalid configuration: %w", err)
+		}
+
+		// Create configuration
+		config := createClusterfuzzConfig()
+
+		// Check prerequisites
+		if !skipPrereqCheck {
+			logger.Info("Checking prerequisites...")
+			if err := checkPrerequisites(rc, config); err != nil {
+				return fmt.Errorf("prerequisite check failed: %w", err)
+			}
+		}
+
+		// Create configuration directory
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return fmt.Errorf("failed to create config directory: %w", err)
+		}
+
+		// Generate configurations
+		logger.Info("Generating ClusterFuzz configurations...")
+		if err := generateConfigurations(rc, config); err != nil {
+			return fmt.Errorf("failed to generate configurations: %w", err)
+		}
+
+		// Store secrets in Vault if enabled
+		if useVault {
+			logger.Info("Storing secrets in Vault...")
+			if err := storeSecretsInVault(rc, config); err != nil {
+				return fmt.Errorf("failed to store secrets in Vault: %w", err)
+			}
+		}
+
+		// Deploy infrastructure services
+		logger.Info("Deploying infrastructure services...")
+		if err := deployInfrastructure(rc, config); err != nil {
+			return fmt.Errorf("failed to deploy infrastructure: %w", err)
+		}
+
+		// Wait for infrastructure to be ready
+		logger.Info("Waiting for infrastructure services to be ready...")
+		if err := waitForInfrastructure(rc, config); err != nil {
+			return fmt.Errorf("infrastructure failed to become ready: %w", err)
+		}
+
+		// Initialize databases and storage
+		logger.Info("Initializing databases and storage...")
+		if err := initializeServices(rc, config); err != nil {
+			return fmt.Errorf("failed to initialize services: %w", err)
+		}
+
+		// Deploy ClusterFuzz application
+		logger.Info("Deploying ClusterFuzz application...")
+		if err := deployApplication(rc, config); err != nil {
+			return fmt.Errorf("failed to deploy application: %w", err)
+		}
+
+		// Deploy fuzzing bots
+		logger.Info("Deploying fuzzing bots...")
+		if err := deployBots(rc, config); err != nil {
+			return fmt.Errorf("failed to deploy bots: %w", err)
+		}
+
+		// Verify deployment
+		logger.Info("Verifying deployment...")
+		if err := verifyDeployment(rc, config); err != nil {
+			return fmt.Errorf("deployment verification failed: %w", err)
+		}
+
+		// Display success information
+		displaySuccessInfo(config)
+
+		logger.Info("ClusterFuzz deployment completed successfully")
+		return nil
+	}),
 }
 
 func init() {
@@ -120,90 +228,6 @@ type QueueConfig struct {
 	Password string
 }
 
-func runClusterfuzz(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Starting ClusterFuzz deployment on Nomad",
-		zap.String("nomad_address", nomadAddress),
-		zap.String("storage_backend", storageBackend),
-		zap.String("database_backend", databaseBackend))
-
-	// Validate configuration
-	if err := validateClusterfuzzConfig(); err != nil {
-		return fmt.Errorf("invalid configuration: %w", err)
-	}
-
-	// Create configuration
-	config := createClusterfuzzConfig()
-
-	// Check prerequisites
-	if !skipPrereqCheck {
-		logger.Info("Checking prerequisites...")
-		if err := checkPrerequisites(rc, config); err != nil {
-			return fmt.Errorf("prerequisite check failed: %w", err)
-		}
-	}
-
-	// Create configuration directory
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("failed to create config directory: %w", err)
-	}
-
-	// Generate configurations
-	logger.Info("Generating ClusterFuzz configurations...")
-	if err := generateConfigurations(rc, config); err != nil {
-		return fmt.Errorf("failed to generate configurations: %w", err)
-	}
-
-	// Store secrets in Vault if enabled
-	if useVault {
-		logger.Info("Storing secrets in Vault...")
-		if err := storeSecretsInVault(rc, config); err != nil {
-			return fmt.Errorf("failed to store secrets in Vault: %w", err)
-		}
-	}
-
-	// Deploy infrastructure services
-	logger.Info("Deploying infrastructure services...")
-	if err := deployInfrastructure(rc, config); err != nil {
-		return fmt.Errorf("failed to deploy infrastructure: %w", err)
-	}
-
-	// Wait for infrastructure to be ready
-	logger.Info("Waiting for infrastructure services to be ready...")
-	if err := waitForInfrastructure(rc, config); err != nil {
-		return fmt.Errorf("infrastructure failed to become ready: %w", err)
-	}
-
-	// Initialize databases and storage
-	logger.Info("Initializing databases and storage...")
-	if err := initializeServices(rc, config); err != nil {
-		return fmt.Errorf("failed to initialize services: %w", err)
-	}
-
-	// Deploy ClusterFuzz application
-	logger.Info("Deploying ClusterFuzz application...")
-	if err := deployApplication(rc, config); err != nil {
-		return fmt.Errorf("failed to deploy application: %w", err)
-	}
-
-	// Deploy fuzzing bots
-	logger.Info("Deploying fuzzing bots...")
-	if err := deployBots(rc, config); err != nil {
-		return fmt.Errorf("failed to deploy bots: %w", err)
-	}
-
-	// Verify deployment
-	logger.Info("Verifying deployment...")
-	if err := verifyDeployment(rc, config); err != nil {
-		return fmt.Errorf("deployment verification failed: %w", err)
-	}
-
-	// Display success information
-	displaySuccessInfo(config)
-
-	logger.Info("ClusterFuzz deployment completed successfully")
-	return nil
-}
 
 func validateClusterfuzzConfig() error {
 	// Validate storage backend

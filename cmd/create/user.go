@@ -219,6 +219,7 @@ var createUserSimpleCmd = &cobra.Command{
 	Use:   "user-simple",
 	Short: "Create a new user account with interactive prompts (replaces addUser.sh)",
 	Long: `Create a new user account using interactive prompts for username, password, and privileges.
+
 This is a simple replacement for the addUser.sh script with the same functionality:
 - Interactive username and password prompts
 - Password confirmation for security
@@ -226,11 +227,56 @@ This is a simple replacement for the addUser.sh script with the same functionali
 - Optional SSH access
 - Home directory creation with bash shell
 
-Examples:
-  eos create user-simple  # Interactive mode
-  eos create user-simple --username john --sudo --ssh`,
+FEATURES:
+• Interactive username and password prompts
+• Secure password confirmation
+• Optional sudo privileges
+• Optional SSH access configuration
+• Automatic home directory creation
+• Bash shell as default
+
+EXAMPLES:
+  # Interactive mode with prompts
+  eos create user-simple
+
+  # Create user with flags
+  eos create user-simple --username john --sudo --ssh
+
+  # Create user with specific password
+  eos create user-simple --username alice --password mypass123`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runCreateUserSimple(rc, cmd, args)
+		otelzap.Ctx(rc.Ctx).Info("Starting simple user creation")
+
+		// Check for command line arguments
+		usernameFlag, _ := cmd.Flags().GetString("username")
+		passwordFlag, _ := cmd.Flags().GetString("password")
+		sudoFlag, _ := cmd.Flags().GetBool("sudo")
+		sshFlag, _ := cmd.Flags().GetBool("ssh")
+
+		// Use interactive mode if username not provided
+		if usernameFlag == "" {
+			return users.CreateUserInteractive(rc)
+		}
+
+		// Create user with provided options
+		options := &users.UserCreationOptions{
+			Username:   usernameFlag,
+			Password:   passwordFlag,
+			SudoAccess: sudoFlag,
+			Shell:      "/bin/bash",
+			SSHAccess:  sshFlag,
+		}
+
+		// Get password if not provided
+		if options.Password == "" {
+			var err error
+			options.Password, err = promptSecurePassword(rc, "Enter password: ")
+			if err != nil {
+				return fmt.Errorf("failed to get password: %w", err)
+			}
+		}
+
+		return users.CreateUser(rc, options)
 	}),
 }
 
@@ -242,41 +288,6 @@ func contains(slice []string, item string) bool {
 		}
 	}
 	return false
-}
-
-func runCreateUserSimple(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	otelzap.Ctx(rc.Ctx).Info("Starting simple user creation")
-
-	// Check for command line arguments
-	usernameFlag, _ := cmd.Flags().GetString("username")
-	passwordFlag, _ := cmd.Flags().GetString("password")
-	sudoFlag, _ := cmd.Flags().GetBool("sudo")
-	sshFlag, _ := cmd.Flags().GetBool("ssh")
-
-	// Use interactive mode if username not provided
-	if usernameFlag == "" {
-		return users.CreateUserInteractive(rc)
-	}
-
-	// Create user with provided options
-	options := &users.UserCreationOptions{
-		Username:   usernameFlag,
-		Password:   passwordFlag,
-		SudoAccess: sudoFlag,
-		Shell:      "/bin/bash",
-		SSHAccess:  sshFlag,
-	}
-
-	// Get password if not provided
-	if options.Password == "" {
-		var err error
-		options.Password, err = promptSecurePassword(rc, "Enter password: ")
-		if err != nil {
-			return fmt.Errorf("failed to get password: %w", err)
-		}
-	}
-
-	return users.CreateUser(rc, options)
 }
 
 func promptSecurePassword(rc *eos_io.RuntimeContext, prompt string) (string, error) {

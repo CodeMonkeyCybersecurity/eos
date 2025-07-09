@@ -35,13 +35,13 @@ FEATURES:
 • Production-ready security settings
 
 CONFIGURATION:
-• HTTP API on port " + strconv.Itoa(shared.PortConsul) + " (instead of default 8500)
+• HTTP API on port ` + fmt.Sprintf("%d", shared.PortConsul) + ` (instead of default 8500)
 • Consul Connect enabled for service mesh
 • UI enabled for management
 • Automatic Vault service registration
 • DNS service discovery on port 8600
 
-USAGE:
+EXAMPLES:
   # Install Consul with default configuration
   eos create consul
 
@@ -49,8 +49,75 @@ USAGE:
   eos create consul --datacenter production
 
   # Install without Vault integration
-  eos create consul --no-vault-integration`,
-	RunE: eos.Wrap(installConsul),
+  eos create consul --no-vault-integration
+
+  # Install with debug logging enabled
+  eos create consul --debug --datacenter staging`,
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		log := otelzap.Ctx(rc.Ctx)
+		log.Info("Starting advanced Consul installation and configuration",
+			zap.String("datacenter", datacenterName),
+			zap.Bool("vault_integration", !disableVaultIntegration),
+			zap.Bool("debug_logging", enableDebugLogging))
+
+		// Check if running as root
+		if os.Geteuid() != 0 {
+			return fmt.Errorf("this command must be run as root")
+		}
+
+		// Install Consul binary
+		if err := installConsulBinary(rc); err != nil {
+			return fmt.Errorf("install Consul binary: %w", err)
+		}
+
+		// Create system user and directories
+		if err := setupConsulSystemUser(rc); err != nil {
+			return fmt.Errorf("setup system user: %w", err)
+		}
+
+		// Detect if Vault is available for integration
+		vaultAvailable := false
+		if !disableVaultIntegration {
+			vaultAvailable = detectVaultInstallation(rc)
+		}
+
+		// Generate main Consul configuration
+		if err := generateConsulConfig(rc, vaultAvailable); err != nil {
+			return fmt.Errorf("generate Consul config: %w", err)
+		}
+
+		// Generate Vault service registration if Vault is available
+		if vaultAvailable {
+			if err := generateVaultServiceConfig(rc); err != nil {
+				log.Warn("Failed to create Vault service registration", zap.Error(err))
+			}
+		}
+
+		// Create systemd service
+		if err := createConsulSystemdService(rc); err != nil {
+			return fmt.Errorf("create systemd service: %w", err)
+		}
+
+		// Create helper script
+		if err := createConsulHelperScript(rc); err != nil {
+			return fmt.Errorf("create helper script: %w", err)
+		}
+
+		// Start and enable service
+		if err := startConsulService(rc); err != nil {
+			return fmt.Errorf("start Consul service: %w", err)
+		}
+
+		// Wait for service to be ready
+		if err := waitForConsulReady(rc); err != nil {
+			return fmt.Errorf("wait for Consul ready: %w", err)
+		}
+
+		// Display success information
+		displayInstallationSummary(rc, vaultAvailable)
+
+		return nil
+	}),
 }
 
 var (
@@ -68,71 +135,6 @@ func init() {
 	CreateCmd.AddCommand(CreateConsulCmd)
 }
 
-func installConsul(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	log := otelzap.Ctx(rc.Ctx)
-	log.Info(" Starting advanced Consul installation and configuration",
-		zap.String("datacenter", datacenterName),
-		zap.Bool("vault_integration", !disableVaultIntegration),
-		zap.Bool("debug_logging", enableDebugLogging))
-
-	// Check if running as root
-	if os.Geteuid() != 0 {
-		return fmt.Errorf("this command must be run as root")
-	}
-
-	// Install Consul binary
-	if err := installConsulBinary(rc); err != nil {
-		return fmt.Errorf("install Consul binary: %w", err)
-	}
-
-	// Create system user and directories
-	if err := setupConsulSystemUser(rc); err != nil {
-		return fmt.Errorf("setup system user: %w", err)
-	}
-
-	// Detect if Vault is available for integration
-	vaultAvailable := false
-	if !disableVaultIntegration {
-		vaultAvailable = detectVaultInstallation(rc)
-	}
-
-	// Generate main Consul configuration
-	if err := generateConsulConfig(rc, vaultAvailable); err != nil {
-		return fmt.Errorf("generate Consul config: %w", err)
-	}
-
-	// Generate Vault service registration if Vault is available
-	if vaultAvailable {
-		if err := generateVaultServiceConfig(rc); err != nil {
-			log.Warn(" Failed to create Vault service registration", zap.Error(err))
-		}
-	}
-
-	// Create systemd service
-	if err := createConsulSystemdService(rc); err != nil {
-		return fmt.Errorf("create systemd service: %w", err)
-	}
-
-	// Create helper script
-	if err := createConsulHelperScript(rc); err != nil {
-		return fmt.Errorf("create helper script: %w", err)
-	}
-
-	// Start and enable service
-	if err := startConsulService(rc); err != nil {
-		return fmt.Errorf("start Consul service: %w", err)
-	}
-
-	// Wait for service to be ready
-	if err := waitForConsulReady(rc); err != nil {
-		return fmt.Errorf("wait for Consul ready: %w", err)
-	}
-
-	// Display success information
-	displayInstallationSummary(rc, vaultAvailable)
-
-	return nil
-}
 
 func installConsulBinary(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)

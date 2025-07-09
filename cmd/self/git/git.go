@@ -37,10 +37,10 @@ Examples:
 
 func init() {
 	// Add subcommands
-	GitCmd.AddCommand(newStatusCmd())
-	GitCmd.AddCommand(newConfigCmd())
-	GitCmd.AddCommand(newInitCmd())
-	GitCmd.AddCommand(newCommitCmd())
+	GitCmd.AddCommand(StatusCmd)
+	GitCmd.AddCommand(ConfigCmd)
+	GitCmd.AddCommand(InitCmd)
+	GitCmd.AddCommand(CommitCmd)
 	GitCmd.AddCommand(newRemoteCmd())
 	GitCmd.AddCommand(newDeployCmd())
 	GitCmd.AddCommand(newInfoCmd())

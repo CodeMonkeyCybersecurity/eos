@@ -9,8 +9,6 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
-
-
 // BackupCmd is the main backup command that follows CRUD pattern
 var BackupCmd = &cobra.Command{
 	Use:   "backup",

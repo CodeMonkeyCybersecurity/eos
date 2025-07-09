@@ -1,4 +1,4 @@
-// cmd/delphi/services/status.go
+// cmd/list/delphi-servicesstatus.go
 package list
 
 import (
@@ -14,12 +14,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// NewStatusCmd creates the status command
-func NewStatusCmd() *cobra.Command {
-	var all bool
-
-	cmd := &cobra.Command{
-		Use:   "status [service-name]",
+var delphiServicesStatusCmd = &cobra.Command{
+		Use:   "delphi-services-status [service-name]",
+		Aliases: []string{"delphi-status", "delphi-svc-status", "delphi-services-check"},
 		Short: "Check status of Delphi pipeline services",
 		Long: `Check the status of one or more Delphi pipeline services.
 
@@ -35,8 +32,8 @@ Available services:
 - email-sender: Email sending service
 
 Examples:
-  eos delphi services status delphi-listener
-  eos delphi services status --all`,
+  eos list delphi-services-status delphi-listener
+  eos list delphi-services-status --all`,
 		ValidArgsFunction: func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 			// Use the DelphiServices slice for autocompletion
 			return shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames(), cobra.ShellCompDirectiveNoFileComp
@@ -45,6 +42,7 @@ Examples:
 			logger := otelzap.Ctx(rc.Ctx)
 			logger.Info("Checking Delphi services status")
 
+			all, _ := cmd.Flags().GetBool("all")
 			var services []string
 			if all {
 				services = shared.GetGlobalDelphiServiceRegistry().GetActiveServiceNames()
@@ -103,8 +101,10 @@ Examples:
 
 			return nil
 		}),
-	}
+}
 
-	cmd.Flags().BoolVarP(&all, "all", "a", false, "Check status of all Delphi services")
-	return cmd
+func init() {
+	delphiServicesStatusCmd.Flags().BoolP("all", "a", false, "Check status of all Delphi services")
+
+	ListCmd.AddCommand(delphiServicesStatusCmd)
 }

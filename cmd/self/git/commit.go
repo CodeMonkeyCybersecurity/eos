@@ -12,24 +12,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// newCommitCmd creates the Git commit command
-func newCommitCmd() *cobra.Command {
-	var (
-		message     string
-		addAll      bool
-		push        bool
-		remote      string
-		branch      string
-		force       bool
-		interactive bool
-		path        string
-	)
-
-	cmd := &cobra.Command{
-		Use:     "commit",
-		Aliases: []string{"ci"},
-		Short:   "Commit changes and optionally push",
-		Long: `Commit changes to the Git repository and optionally push to remote.
+var CommitCmd = &cobra.Command{
+	Use:     "commit",
+	Aliases: []string{"ci"},
+	Short:   "Commit changes and optionally push",
+	Long: `Commit changes to the Git repository and optionally push to remote.
 
 This command provides automated commit and push functionality:
 - Add all files before committing (--add-all)
@@ -44,7 +31,15 @@ Examples:
   eos git commit --interactive                     # Interactive mode
   eos git commit --message "Fix" --force --push   # Force push after commit`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		message, _ := cmd.Flags().GetString("message")
+		addAll, _ := cmd.Flags().GetBool("add-all")
+		push, _ := cmd.Flags().GetBool("push")
+		remote, _ := cmd.Flags().GetString("remote")
+		branch, _ := cmd.Flags().GetString("branch")
+		force, _ := cmd.Flags().GetBool("force")
+		interactive, _ := cmd.Flags().GetBool("interactive")
+		path, _ := cmd.Flags().GetString("path")
 			logger := otelzap.Ctx(rc.Ctx)
 
 			if path == "" {
@@ -90,18 +85,17 @@ Examples:
 
 			return manager.CommitAndPush(rc, path, options)
 		}),
-	}
+}
 
-	cmd.Flags().StringVarP(&message, "message", "m", "", "Commit message")
-	cmd.Flags().BoolVarP(&addAll, "add-all", "a", false, "Add all files before committing")
-	cmd.Flags().BoolVarP(&push, "push", "p", false, "Push after committing")
-	cmd.Flags().StringVar(&remote, "remote", "origin", "Remote name for push")
-	cmd.Flags().StringVar(&branch, "branch", "", "Branch name for push (default: current branch)")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force push")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode")
-	cmd.Flags().StringVar(&path, "path", "", "Path to Git repository (default: current directory)")
-
-	return cmd
+func init() {
+	CommitCmd.Flags().StringP("message", "m", "", "Commit message")
+	CommitCmd.Flags().BoolP("add-all", "a", false, "Add all files before committing")
+	CommitCmd.Flags().BoolP("push", "p", false, "Push after committing")
+	CommitCmd.Flags().String("remote", "origin", "Remote name for push")
+	CommitCmd.Flags().String("branch", "", "Branch name for push (default: current branch)")
+	CommitCmd.Flags().BoolP("force", "f", false, "Force push")
+	CommitCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
+	CommitCmd.Flags().String("path", "", "Path to Git repository (default: current directory)")
 }
 
 func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.GitManager, path string) error {

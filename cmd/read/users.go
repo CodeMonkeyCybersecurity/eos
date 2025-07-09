@@ -25,12 +25,88 @@ var InspectUsersCmd = &cobra.Command{
 - Users with SSH access (replaces part of usersWithRemoteSsh.sh)
 - User hostname stamps
 
-Examples:
-  eos read users              # List all system users
-  eos read users --ssh-only   # List only users with SSH access
-  eos read users --stamp      # Get user-hostname stamp`,
+The command provides three modes of operation:
+1. Default: Lists all system users from /etc/passwd
+2. SSH-only: Lists only users with SSH access capabilities
+3. Stamp: Shows user-hostname stamp for identification
+
+User enumeration process:
+- Parses /etc/passwd to extract user information
+- Filters out system accounts when appropriate
+- Checks SSH access permissions when requested
+- Generates user-hostname stamps for identification
+
+SSH access detection includes:
+- Users with valid shell access
+- Users with SSH key configurations
+- Users with SSH directory permissions
+- Users with authorized_keys files`,
+	Example: `  # List all system users
+  eos read users
+  
+  # List only users with SSH access
+  eos read users --ssh-only
+  
+  # Get user-hostname stamp
+  eos read users --stamp
+  
+  # Example output for all users:
+  # - System account enumeration
+  # - User ID and group information
+  # - Home directory status
+  # - Shell configuration
+  
+  # Example output for SSH users:
+  # - SSH-enabled user accounts
+  # - SSH key availability
+  # - SSH configuration status`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-		return runReadUsers(rc, cmd, args)
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Reading user information")
+
+		sshOnly, _ := cmd.Flags().GetBool("ssh-only")
+		showStamp, _ := cmd.Flags().GetBool("stamp")
+
+		// Show user-hostname stamp if requested
+		if showStamp {
+			stamp, err := users.GetUserHostnameStamp()
+			if err != nil {
+				logger.Error("Failed to get user-hostname stamp", zap.Error(err))
+				return fmt.Errorf("failed to get user-hostname stamp: %w", err)
+			}
+			logger.Info("User-hostname stamp", zap.String("stamp", stamp))
+			return nil
+		}
+
+		// Show users with SSH access if requested
+		if sshOnly {
+			sshUsers, err := users.ListUsersWithSSHAccess(rc)
+			if err != nil {
+				logger.Error("Failed to list users with SSH access", zap.Error(err))
+				return fmt.Errorf("failed to list users with SSH access: %w", err)
+			}
+
+			logger.Info("Users with SSH access:")
+			for _, user := range sshUsers {
+				logger.Info("SSH user", zap.String("username", user))
+			}
+			return nil
+		}
+
+		// Show all system users
+		logger.Info("Reading all system users...")
+		allUsers, err := getSystemUsers(rc)
+		if err != nil {
+			logger.Error("Error reading users", zap.Error(err))
+			return err
+		}
+
+		logger.Info("Current system users:")
+		for _, user := range allUsers {
+			logger.Info("System user", zap.String("username", user))
+		}
+
+		return nil
 	}),
 }
 
@@ -62,54 +138,6 @@ func getSystemUsers(rc *eos_io.RuntimeContext) ([]string, error) {
 	return users, nil
 }
 
-func runReadUsers(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Reading user information")
-
-	sshOnly, _ := cmd.Flags().GetBool("ssh-only")
-	showStamp, _ := cmd.Flags().GetBool("stamp")
-
-	// Show user-hostname stamp if requested
-	if showStamp {
-		stamp, err := users.GetUserHostnameStamp()
-		if err != nil {
-			logger.Error("Failed to get user-hostname stamp", zap.Error(err))
-			return fmt.Errorf("failed to get user-hostname stamp: %w", err)
-		}
-		logger.Info("User-hostname stamp", zap.String("stamp", stamp))
-		return nil
-	}
-
-	// Show users with SSH access if requested
-	if sshOnly {
-		sshUsers, err := users.ListUsersWithSSHAccess(rc)
-		if err != nil {
-			logger.Error("Failed to list users with SSH access", zap.Error(err))
-			return fmt.Errorf("failed to list users with SSH access: %w", err)
-		}
-
-		logger.Info("Users with SSH access:")
-		for _, user := range sshUsers {
-			logger.Info("SSH user", zap.String("username", user))
-		}
-		return nil
-	}
-
-	// Show all system users
-	logger.Info("Reading all system users...")
-	allUsers, err := getSystemUsers(rc)
-	if err != nil {
-		logger.Error("Error reading users", zap.Error(err))
-		return err
-	}
-
-	logger.Info("Current system users:")
-	for _, user := range allUsers {
-		logger.Info("System user", zap.String("username", user))
-	}
-
-	return nil
-}
 
 // init registers subcommands for the read command
 func init() {

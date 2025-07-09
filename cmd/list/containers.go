@@ -10,50 +10,42 @@ import (
 	"go.uber.org/zap"
 )
 
-// ListContainers creates the container listing command
-func ListContainers() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "list",
-		Aliases: []string{"ls", "ps"},
-		Short:   "List running Docker containers",
-		Long: `List all running Docker containers with their details.
+var containersCmd = &cobra.Command{
+	Use:     "containers",
+	Aliases: []string{"container", "docker", "docker-containers"},
+	Short:   "List running Docker containers",
+	Long: `List all running Docker containers with their details.
 
 Shows container ID, name, image, status, and port mappings.
 
 Examples:
-  eos container list                       # List running containers
-  eos container list --json               # Output in JSON format
-  eos container list --all                # List all containers (running and stopped)`,
+  eos list containers                       # List running containers
+  eos list containers --json               # Output in JSON format
+  eos list containers --all                # List all containers (running and stopped)`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			outputJSON, _ := cmd.Flags().GetBool("json")
-			showAll, _ := cmd.Flags().GetBool("all")
+		outputJSON, _ := cmd.Flags().GetBool("json")
+		showAll, _ := cmd.Flags().GetBool("all")
 
-			logger.Info("Listing Docker containers",
-				zap.Bool("json", outputJSON),
-				zap.Bool("all", showAll))
+		logger.Info("Listing Docker containers",
+			zap.Bool("json", outputJSON),
+			zap.Bool("all", showAll))
 
-			manager := container_management.NewContainerManager(nil)
-			result, err := manager.ListRunningContainers(rc)
-			if err != nil {
-				logger.Error("Failed to list containers", zap.Error(err))
-				return err
-			}
+		manager := container_management.NewContainerManager(nil)
+		result, err := manager.ListRunningContainers(rc)
+		if err != nil {
+			logger.Error("Failed to list containers", zap.Error(err))
+			return err
+		}
 
-			if outputJSON {
-				return container.OutputContainerJSON(result)
-			}
+		if outputJSON {
+			return container.OutputContainerJSON(result)
+		}
 
-			return container.OutputContainerTable(result)
-		}),
-	}
-
-	cmd.Flags().Bool("json", false, "Output in JSON format")
-	cmd.Flags().BoolP("all", "a", false, "Show all containers (running and stopped)")
-
-	return cmd
+		return container.OutputContainerTable(result)
+	}),
 }
 
 var containerComposeCmd = &cobra.Command{
@@ -94,9 +86,13 @@ Examples:
 }
 
 func init() {
+	containersCmd.Flags().Bool("json", false, "Output in JSON format")
+	containersCmd.Flags().BoolP("all", "a", false, "Show all containers (running and stopped)")
+
 	containerComposeCmd.Flags().StringSliceP("path", "p", []string{}, "Search paths (default: $HOME, /opt, /srv, /home)")
 	containerComposeCmd.Flags().Bool("json", false, "Output in JSON format")
 
 	// Register with parent command
+	ListCmd.AddCommand(containersCmd)
 	ListCmd.AddCommand(containerComposeCmd)
 }
