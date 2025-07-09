@@ -20,7 +20,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/delete"
 
 	// "github.com/CodeMonkeyCybersecurity/eos/cmd/delphi" // TODO: Migrate to verb directories
-	// "github.com/CodeMonkeyCybersecurity/eos/cmd/list"   // TODO: Fix package conflicts
+	"github.com/CodeMonkeyCybersecurity/eos/cmd/list"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/read"
 	"github.com/CodeMonkeyCybersecurity/eos/cmd/self"
@@ -64,7 +64,7 @@ func RegisterCommands(rc *eos_io.RuntimeContext) {
 	for _, subCmd := range []*cobra.Command{
 		create.CreateCmd, // VERB-FIRST ARCHITECTURE
 		read.ReadCmd,     // VERB-FIRST ARCHITECTURE
-		// list.ListCmd,        // TODO: Fix package conflicts
+		list.ListCmd,     // VERB-FIRST ARCHITECTURE
 		update.UpdateCmd, // VERB-FIRST ARCHITECTURE
 		delete.DeleteCmd, // VERB-FIRST ARCHITECTURE
 		self.SelfCmd,     // SPECIAL CASE (Eos self-management)
