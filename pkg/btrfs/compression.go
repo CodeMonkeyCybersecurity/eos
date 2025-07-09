@@ -3,10 +3,10 @@ package btrfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -68,7 +68,7 @@ func ConfigureCompression(rc *eos_io.RuntimeContext, path string, algorithm stri
 	// Set compression property
 	if info.IsDir() {
 		// For directories, set the compression property
-		propCmd := eos_cli.Wrap(rc, "btrfs", "property", "set", path, "compression", compression)
+		propCmd := exec.CommandContext(rc.Ctx, "btrfs", "property", "set", path, "compression", compression)
 		if output, err := propCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to set compression property: %w, output: %s", err, string(output))
 		}
@@ -82,7 +82,7 @@ func ConfigureCompression(rc *eos_io.RuntimeContext, path string, algorithm stri
 		}
 	} else {
 		// For files, we need to defragment with compression
-		defragCmd := eos_cli.Wrap(rc, "btrfs", "filesystem", "defragment",
+		defragCmd := exec.CommandContext(rc.Ctx, "btrfs", "filesystem", "defragment",
 			"-c"+compression, path)
 		if output, err := defragCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to compress file: %w, output: %s", err, string(output))
@@ -143,8 +143,8 @@ func GetCompressionStats(rc *eos_io.RuntimeContext, path string) (*CompressionSt
 	}
 
 	// Use compsize tool if available for detailed stats
-	if _, err := eos_cli.LookPath("compsize"); err == nil {
-		compsizeCmd := eos_cli.Wrap(rc, "compsize", path)
+	if _, err := exec.LookPath("compsize"); err == nil {
+		compsizeCmd := exec.CommandContext(rc.Ctx, "compsize", path)
 		if output, err := compsizeCmd.Output(); err == nil {
 			parseCompsizeOutput(string(output), stats)
 		}
@@ -205,7 +205,7 @@ func DefragmentWithCompression(rc *eos_io.RuntimeContext, path string, algorithm
 	// Add flush to ensure data is written
 	args = append(args, "-f")
 
-	defragCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	defragCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := defragCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("defragmentation failed: %w, output: %s", err, string(output))
@@ -231,7 +231,7 @@ func DefragmentWithCompression(rc *eos_io.RuntimeContext, path string, algorithm
 // Helper functions
 
 func getCompressionProperty(rc *eos_io.RuntimeContext, path string) (string, error) {
-	propCmd := eos_cli.Wrap(rc, "btrfs", "property", "get", path, "compression")
+	propCmd := exec.CommandContext(rc.Ctx, "btrfs", "property", "get", path, "compression")
 	output, err := propCmd.Output()
 	if err != nil {
 		return "", err
@@ -269,7 +269,7 @@ func recompressDirectory(rc *eos_io.RuntimeContext, dir string, compression stri
 			zap.String("file", path))
 
 		// Defragment file with new compression
-		defragCmd := eos_cli.Wrap(rc, "btrfs", "filesystem", "defragment",
+		defragCmd := exec.CommandContext(rc.Ctx, "btrfs", "filesystem", "defragment",
 			"-c"+compression, path)
 		if output, err := defragCmd.CombinedOutput(); err != nil {
 			logger.Warn("Failed to recompress file",
@@ -330,7 +330,7 @@ func parseCompsizeOutput(output string, stats *CompressionStats) {
 
 func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *CompressionStats) error {
 	// Use du to get apparent size vs actual disk usage
-	duCmd := eos_cli.Wrap(rc, "du", "-sb", "--apparent-size", path)
+	duCmd := exec.CommandContext(rc.Ctx, "du", "-sb", "--apparent-size", path)
 	if output, err := duCmd.Output(); err == nil {
 		fields := strings.Fields(string(output))
 		if len(fields) >= 1 {
@@ -339,7 +339,7 @@ func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *Com
 	}
 
 	// Get actual disk usage
-	duCmd = eos_cli.Wrap(rc, "du", "-sb", path)
+	duCmd = exec.CommandContext(rc.Ctx, "du", "-sb", path)
 	if output, err := duCmd.Output(); err == nil {
 		fields := strings.Fields(string(output))
 		if len(fields) >= 1 {

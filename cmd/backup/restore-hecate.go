@@ -21,7 +21,12 @@ var timestampFlag string
 var RestoreCmd = &cobra.Command{
 	Use:   "restore",
 	Short: "Restore configuration and files from backup",
-	RunE:  eos_cli.Wrap(runRestore),
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
+		if timestampFlag != "" {
+			return autoRestore(rc, timestampFlag)
+		}
+		return interactiveRestore(rc)
+	}),
 }
 
 func init() {
@@ -29,12 +34,6 @@ func init() {
 		"Backup timestamp (YYYYMMDD-HHMMSS). Omit for interactive mode.")
 }
 
-func runRestore(rc *eos_io.RuntimeContext, _ *cobra.Command, _ []string) error {
-	if timestampFlag != "" {
-		return autoRestore(rc, timestampFlag)
-	}
-	return interactiveRestore(rc)
-}
 
 func autoRestore(rc *eos_io.RuntimeContext, ts string) error {
 	resources := []struct{ prefix, dest string }{

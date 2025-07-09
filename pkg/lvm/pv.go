@@ -3,9 +3,9 @@ package lvm
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -26,7 +26,7 @@ func CreatePhysicalVolume(rc *eos_io.RuntimeContext, config *PhysicalVolumeConfi
 	}
 
 	// Check if device is already a PV
-	checkCmd := eos_cli.Wrap(rc, "pvdisplay", config.Device)
+	checkCmd := exec.CommandContext(rc.Ctx, "pvdisplay", config.Device)
 	if err := checkCmd.Run(); err == nil {
 		if !config.Force {
 			return eos_err.NewUserError("device %s is already an LVM physical volume. Use --force to overwrite", config.Device)
@@ -75,7 +75,7 @@ func CreatePhysicalVolume(rc *eos_io.RuntimeContext, config *PhysicalVolumeConfi
 
 	args = append(args, config.Device)
 
-	createCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	createCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := createCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create physical volume: %w, output: %s", err, string(output))
@@ -117,7 +117,7 @@ func GetPhysicalVolume(rc *eos_io.RuntimeContext, device string) (*PhysicalVolum
 	logger.Info("Reading physical volume information")
 
 	// Use pvdisplay with separator for parsing
-	displayCmd := eos_cli.Wrap(rc, "pvdisplay", "-C", "--noheadings", "--separator", "|", device)
+	displayCmd := exec.CommandContext(rc.Ctx, "pvdisplay", "-C", "--noheadings", "--separator", "|", device)
 	output, err := displayCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("physical volume not found: %w", err)
@@ -136,7 +136,7 @@ func GetPhysicalVolume(rc *eos_io.RuntimeContext, device string) (*PhysicalVolum
 	}
 
 	// Get detailed information using pvs
-	pvsCmd := eos_cli.Wrap(rc, "pvs", "--units", "b", "--noheadings", "-o",
+	pvsCmd := exec.CommandContext(rc.Ctx, "pvs", "--units", "b", "--noheadings", "-o",
 		"pv_name,pv_uuid,pv_size,pv_free,pv_used,pv_pe_count,pv_pe_alloc_count,pe_start",
 		"--separator", "|", device)
 
@@ -195,7 +195,7 @@ func ListPhysicalVolumes(rc *eos_io.RuntimeContext) ([]*PhysicalVolume, error) {
 	logger.Info("Listing physical volumes")
 
 	// Get list of all PVs
-	pvsCmd := eos_cli.Wrap(rc, "pvs", "--noheadings", "-o", "pv_name", "--separator", " ")
+	pvsCmd := exec.CommandContext(rc.Ctx, "pvs", "--noheadings", "-o", "pv_name", "--separator", " ")
 	output, err := pvsCmd.Output()
 	if err != nil {
 		logger.Debug("No physical volumes found")
@@ -266,7 +266,7 @@ func RemovePhysicalVolume(rc *eos_io.RuntimeContext, device string, force bool) 
 		logger.Debug("Removing PV from volume group",
 			zap.String("vg", pv.VolumeGroup))
 
-		vgReduceCmd := eos_cli.Wrap(rc, "vgreduce", pv.VolumeGroup, device)
+		vgReduceCmd := exec.CommandContext(rc.Ctx, "vgreduce", pv.VolumeGroup, device)
 		if output, err := vgReduceCmd.CombinedOutput(); err != nil && !force {
 			return fmt.Errorf("failed to remove PV from volume group: %w, output: %s", err, string(output))
 		}
@@ -279,7 +279,7 @@ func RemovePhysicalVolume(rc *eos_io.RuntimeContext, device string, force bool) 
 	}
 	args = append(args, device)
 
-	removeCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	removeCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := removeCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to remove physical volume: %w, output: %s", err, string(output))
@@ -289,7 +289,7 @@ func RemovePhysicalVolume(rc *eos_io.RuntimeContext, device string, force bool) 
 	logger.Info("Verifying physical volume removal")
 
 	// Verify PV was removed
-	checkCmd := eos_cli.Wrap(rc, "pvdisplay", device)
+	checkCmd := exec.CommandContext(rc.Ctx, "pvdisplay", device)
 	if err := checkCmd.Run(); err == nil {
 		return fmt.Errorf("physical volume removal verification failed: PV still exists")
 	}
@@ -322,7 +322,7 @@ func ResizePhysicalVolume(rc *eos_io.RuntimeContext, device string) error {
 		zap.Int64("currentSize", oldSize))
 
 	// Resize the PV
-	resizeCmd := eos_cli.Wrap(rc, "pvresize", device)
+	resizeCmd := exec.CommandContext(rc.Ctx, "pvresize", device)
 	output, err := resizeCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to resize physical volume: %w, output: %s", err, string(output))
@@ -361,7 +361,7 @@ func isDeviceMounted(rc *eos_io.RuntimeContext, device string) (bool, string) {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check if device is mounted
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-n", "-o", "TARGET", device)
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-n", "-o", "TARGET", device)
 	output, err := findmntCmd.Output()
 	if err != nil {
 		logger.Debug("Device not mounted",
@@ -381,7 +381,7 @@ func deviceHasFilesystem(rc *eos_io.RuntimeContext, device string) (bool, string
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Use blkid to check for filesystem
-	blkidCmd := eos_cli.Wrap(rc, "blkid", "-o", "value", "-s", "TYPE", device)
+	blkidCmd := exec.CommandContext(rc.Ctx, "blkid", "-o", "value", "-s", "TYPE", device)
 	output, err := blkidCmd.Output()
 	if err != nil {
 		logger.Debug("No filesystem detected on device",

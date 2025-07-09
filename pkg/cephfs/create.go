@@ -3,10 +3,10 @@ package cephfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -22,12 +22,12 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 		zap.String("volume", config.Name))
 
 	// Check if ceph command is available
-	if _, err := eos_cli.LookPath("ceph"); err != nil {
+	if _, err := exec.LookPath("ceph"); err != nil {
 		return eos_err.NewUserError("ceph command not found. Please install ceph-common package")
 	}
 
 	// Check if volume already exists
-	checkCmd := eos_cli.Wrap(rc, "ceph", "fs", "ls", "--format", "json")
+	checkCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "ls", "--format", "json")
 	if output, err := checkCmd.Output(); err == nil {
 		if strings.Contains(string(output), config.Name) {
 			return eos_err.NewUserError("CephFS volume '%s' already exists", config.Name)
@@ -70,7 +70,7 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 		createArgs = append(createArgs, config.DataPool)
 	}
 
-	createCmd := eos_cli.Wrap(rc, "ceph", createArgs...)
+	createCmd := exec.CommandContext(rc.Ctx, "ceph", createArgs...)
 	if output, err := createCmd.CombinedOutput(); err != nil {
 		// Rollback pool creation
 		deletePool(rc, config.DataPool)
@@ -91,7 +91,7 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	logger.Info("Verifying CephFS volume creation")
 
 	// Check volume status
-	statusCmd := eos_cli.Wrap(rc, "ceph", "fs", "status", config.Name, "--format", "json")
+	statusCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "status", config.Name, "--format", "json")
 	if output, err := statusCmd.Output(); err != nil {
 		return fmt.Errorf("failed to verify volume creation: %w", err)
 	} else {
@@ -100,7 +100,7 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 
 	// Check MDS status
-	mdsCmd := eos_cli.Wrap(rc, "ceph", "mds", "stat", "--format", "json")
+	mdsCmd := exec.CommandContext(rc.Ctx, "ceph", "mds", "stat", "--format", "json")
 	if output, err := mdsCmd.Output(); err != nil {
 		logger.Warn("Failed to check MDS status",
 			zap.Error(err))
@@ -143,7 +143,7 @@ func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 
 	// Build mount command
 	mountArgs := buildMountArgs(config)
-	mountCmd := eos_cli.Wrap(rc, "mount", mountArgs...)
+	mountCmd := exec.CommandContext(rc.Ctx, "mount", mountArgs...)
 
 	if output, err := mountCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount CephFS: %w, output: %s", err, string(output))
@@ -209,13 +209,13 @@ func createPool(rc *eos_io.RuntimeContext, poolName string, pgNum int) error {
 		zap.String("pool", poolName),
 		zap.Int("pgNum", pgNum))
 
-	createCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "create", poolName, fmt.Sprintf("%d", pgNum))
+	createCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "create", poolName, fmt.Sprintf("%d", pgNum))
 	if output, err := createCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create pool %s: %w, output: %s", poolName, err, string(output))
 	}
 
 	// Enable application
-	appCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "application", "enable", poolName, "cephfs")
+	appCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "application", "enable", poolName, "cephfs")
 	if err := appCmd.Run(); err != nil {
 		logger.Warn("Failed to enable cephfs application on pool",
 			zap.String("pool", poolName),
@@ -235,7 +235,7 @@ func deletePool(rc *eos_io.RuntimeContext, poolName string) {
 		zap.String("pool", poolName))
 
 	// Ceph requires confirmation for pool deletion
-	deleteCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "delete", poolName, poolName, "--yes-i-really-really-mean-it")
+	deleteCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "delete", poolName, poolName, "--yes-i-really-really-mean-it")
 	if err := deleteCmd.Run(); err != nil {
 		logger.Warn("Failed to delete pool during rollback",
 			zap.String("pool", poolName),
@@ -259,7 +259,7 @@ func setReplication(rc *eos_io.RuntimeContext, config *Config) error {
 			zap.String("pool", pool),
 			zap.Int("size", config.ReplicationSize))
 
-		sizeCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "set", pool, "size", fmt.Sprintf("%d", config.ReplicationSize))
+		sizeCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "set", pool, "size", fmt.Sprintf("%d", config.ReplicationSize))
 		if err := sizeCmd.Run(); err != nil {
 			return fmt.Errorf("failed to set replication size for pool %s: %w", pool, err)
 		}
@@ -270,7 +270,7 @@ func setReplication(rc *eos_io.RuntimeContext, config *Config) error {
 			minSize = 1
 		}
 
-		minSizeCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "set", pool, "min_size", fmt.Sprintf("%d", minSize))
+		minSizeCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "set", pool, "min_size", fmt.Sprintf("%d", minSize))
 		if err := minSizeCmd.Run(); err != nil {
 			logger.Warn("Failed to set min_size",
 				zap.String("pool", pool),
@@ -284,7 +284,7 @@ func setReplication(rc *eos_io.RuntimeContext, config *Config) error {
 func isMounted(rc *eos_io.RuntimeContext, mountPoint string) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 
-	mountCmd := eos_cli.Wrap(rc, "findmnt", "-n", mountPoint)
+	mountCmd := exec.CommandContext(rc.Ctx, "findmnt", "-n", mountPoint)
 	if err := mountCmd.Run(); err != nil {
 		logger.Debug("Mount point not found",
 			zap.String("mountPoint", mountPoint))

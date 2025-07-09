@@ -69,3 +69,4 @@ coverage.*
 *.out
 gosec-report.*
 
+.aider*

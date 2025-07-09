@@ -3,10 +3,10 @@ package btrfs
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -70,7 +70,7 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 
 	args = append(args, config.Device)
 
-	mkfsCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	mkfsCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := mkfsCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create BTRFS volume: %w, output: %s", err, string(output))
@@ -137,7 +137,7 @@ func CreateSubvolume(rc *eos_io.RuntimeContext, config *Config) error {
 		zap.String("path", config.SubvolumePath))
 
 	// Create subvolume
-	createCmd := eos_cli.Wrap(rc, "btrfs", "subvolume", "create", config.SubvolumePath)
+	createCmd := exec.CommandContext(rc.Ctx, "btrfs", "subvolume", "create", config.SubvolumePath)
 	output, err := createCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create subvolume: %w, output: %s", err, string(output))
@@ -191,7 +191,7 @@ func GetVolumeInfo(rc *eos_io.RuntimeContext, device string) (*VolumeInfo, error
 	}
 
 	// Get filesystem info
-	showCmd := eos_cli.Wrap(rc, "btrfs", "filesystem", "show", device)
+	showCmd := exec.CommandContext(rc.Ctx, "btrfs", "filesystem", "show", device)
 	output, err := showCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get volume info: %w", err)
@@ -270,7 +270,7 @@ func GetSubvolumeInfo(rc *eos_io.RuntimeContext, path string) (*SubvolumeInfo, e
 	logger.Info("Reading subvolume information")
 
 	// Get subvolume info
-	showCmd := eos_cli.Wrap(rc, "btrfs", "subvolume", "show", path)
+	showCmd := exec.CommandContext(rc.Ctx, "btrfs", "subvolume", "show", path)
 	output, err := showCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get subvolume info: %w", err)
@@ -348,7 +348,7 @@ func mountVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 	args = append(args, config.Device, config.MountPoint)
 
-	mountCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	mountCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	if output, err := mountCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount: %w, output: %s", err, string(output))
 	}
@@ -362,7 +362,7 @@ func mountVolume(rc *eos_io.RuntimeContext, config *Config) error {
 }
 
 func isDeviceMounted(rc *eos_io.RuntimeContext, device string) (bool, string) {
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-n", "-o", "TARGET", device)
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-n", "-o", "TARGET", device)
 	if output, err := findmntCmd.Output(); err == nil {
 		return true, strings.TrimSpace(string(output))
 	}
@@ -370,7 +370,7 @@ func isDeviceMounted(rc *eos_io.RuntimeContext, device string) (bool, string) {
 }
 
 func deviceHasFilesystem(rc *eos_io.RuntimeContext, device string) (bool, string) {
-	blkidCmd := eos_cli.Wrap(rc, "blkid", "-o", "value", "-s", "TYPE", device)
+	blkidCmd := exec.CommandContext(rc.Ctx, "blkid", "-o", "value", "-s", "TYPE", device)
 	if output, err := blkidCmd.Output(); err == nil {
 		fsType := strings.TrimSpace(string(output))
 		return fsType != "", fsType
@@ -379,7 +379,7 @@ func deviceHasFilesystem(rc *eos_io.RuntimeContext, device string) (bool, string
 }
 
 func isPathOnBTRFS(rc *eos_io.RuntimeContext, path string) bool {
-	statCmd := eos_cli.Wrap(rc, "stat", "-f", "-c", "%T", path)
+	statCmd := exec.CommandContext(rc.Ctx, "stat", "-f", "-c", "%T", path)
 	if output, err := statCmd.Output(); err == nil {
 		return strings.TrimSpace(string(output)) == "btrfs"
 	}
@@ -397,7 +397,7 @@ func setCompression(rc *eos_io.RuntimeContext, path string, algorithm string, le
 		compression = fmt.Sprintf("%s:%d", algorithm, level)
 	}
 
-	propCmd := eos_cli.Wrap(rc, "btrfs", "property", "set", path, "compression", compression)
+	propCmd := exec.CommandContext(rc.Ctx, "btrfs", "property", "set", path, "compression", compression)
 	if output, err := propCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to set compression: %w, output: %s", err, string(output))
 	}
@@ -407,7 +407,7 @@ func setCompression(rc *eos_io.RuntimeContext, path string, algorithm string, le
 
 func disableCoW(rc *eos_io.RuntimeContext, path string) error {
 	// Use chattr to disable CoW
-	chattrCmd := eos_cli.Wrap(rc, "chattr", "+C", path)
+	chattrCmd := exec.CommandContext(rc.Ctx, "chattr", "+C", path)
 	if output, err := chattrCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to disable CoW: %w, output: %s", err, string(output))
 	}

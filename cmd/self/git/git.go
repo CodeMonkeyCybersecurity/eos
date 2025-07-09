@@ -41,7 +41,7 @@ func init() {
 	GitCmd.AddCommand(ConfigCmd)
 	GitCmd.AddCommand(InitCmd)
 	GitCmd.AddCommand(CommitCmd)
-	GitCmd.AddCommand(newRemoteCmd())
-	GitCmd.AddCommand(newDeployCmd())
-	GitCmd.AddCommand(newInfoCmd())
+	GitCmd.AddCommand(remoteCmd)
+	GitCmd.AddCommand(deployCmd)
+	GitCmd.AddCommand(infoCmd)
 }

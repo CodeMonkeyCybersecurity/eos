@@ -3,9 +3,9 @@ package cephfs
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -20,7 +20,7 @@ func ListVolumes(rc *eos_io.RuntimeContext) ([]*VolumeInfo, error) {
 	logger.Info("Assessing CephFS for volume listing")
 
 	// Check if ceph command is available
-	if _, err := eos_cli.LookPath("ceph"); err != nil {
+	if _, err := exec.LookPath("ceph"); err != nil {
 		return nil, eos_err.NewUserError("ceph command not found. Please install ceph-common package")
 	}
 
@@ -28,7 +28,7 @@ func ListVolumes(rc *eos_io.RuntimeContext) ([]*VolumeInfo, error) {
 	logger.Info("Listing CephFS volumes")
 
 	// Get list of filesystems
-	listCmd := eos_cli.Wrap(rc, "ceph", "fs", "ls", "--format", "json")
+	listCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "ls", "--format", "json")
 	output, err := listCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list volumes: %w", err)
@@ -86,7 +86,7 @@ func ListMounts(rc *eos_io.RuntimeContext) ([]*MountInfo, error) {
 	logger.Info("Listing CephFS mount points")
 
 	// Find all CephFS mounts
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-t", "ceph", "-J")
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-t", "ceph", "-J")
 	output, err := findmntCmd.Output()
 	if err != nil {
 		// No CephFS mounts found
@@ -143,7 +143,7 @@ func ListPools(rc *eos_io.RuntimeContext) (map[string]interface{}, error) {
 	logger.Info("Listing Ceph pools")
 
 	// Get all pools
-	poolCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "ls", "detail", "--format", "json")
+	poolCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "ls", "detail", "--format", "json")
 	output, err := poolCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list pools: %w", err)

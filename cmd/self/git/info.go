@@ -14,15 +14,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// newInfoCmd creates the Git repository information command
-func newInfoCmd() *cobra.Command {
-	var (
-		path       string
-		outputJSON bool
-		detailed   bool
-	)
+// Package-level variables for info command flags
+var (
+	infoPath       string
+	infoOutputJSON bool
+	infoDetailed   bool
+)
 
-	cmd := &cobra.Command{
+// infoCmd provides comprehensive Git repository information
+var infoCmd = &cobra.Command{
 		Use:     "info",
 		Aliases: []string{"information"},
 		Short:   "Get comprehensive Git repository information",
@@ -43,9 +43,9 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 
-			if path == "" {
+			if infoPath == "" {
 				var err error
-				path, err = os.Getwd()
+				infoPath, err = os.Getwd()
 				if err != nil {
 					return fmt.Errorf("failed to get current directory: %w", err)
 				}
@@ -53,30 +53,29 @@ Examples:
 
 			manager := git_management.NewGitManager()
 			
-			if !manager.IsGitRepository(rc, path) {
-				return fmt.Errorf("not a git repository: %s", path)
+			if !manager.IsGitRepository(rc, infoPath) {
+				return fmt.Errorf("not a git repository: %s", infoPath)
 			}
 
-			logger.Info("Getting Git repository information", zap.String("path", path))
+			logger.Info("Getting Git repository information", zap.String("path", infoPath))
 
-			repo, err := manager.GetRepositoryInfo(rc, path)
+			repo, err := manager.GetRepositoryInfo(rc, infoPath)
 			if err != nil {
 				return fmt.Errorf("failed to get repository info: %w", err)
 			}
 
-			if outputJSON {
+			if infoOutputJSON {
 				return outputJSONInfo(repo)
 			}
 
-			return outputTableInfo(repo, detailed)
+			return outputTableInfo(repo, infoDetailed)
 		}),
-	}
+}
 
-	cmd.Flags().StringVarP(&path, "path", "p", "", "Path to Git repository (default: current directory)")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-	cmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed information")
-
-	return cmd
+func init() {
+	infoCmd.Flags().StringVarP(&infoPath, "path", "p", "", "Path to Git repository (default: current directory)")
+	infoCmd.Flags().BoolVar(&infoOutputJSON, "json", false, "Output in JSON format")
+	infoCmd.Flags().BoolVarP(&infoDetailed, "detailed", "d", false, "Show detailed information")
 }
 
 func outputJSONInfo(repo *git_management.GitRepository) error {

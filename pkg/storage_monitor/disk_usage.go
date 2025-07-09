@@ -3,13 +3,13 @@ package storage_monitor
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -111,7 +111,7 @@ func MonitorDiskUsage(rc *eos_io.RuntimeContext, config *MonitorConfig) ([]Alert
 				Message:   fmt.Sprintf("Critical disk usage on %s: %.1f%% used", path, usage.UsedPercent),
 				Value:     usage.UsedPercent,
 				Threshold: config.DiskUsageCritical,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 
@@ -129,7 +129,7 @@ func MonitorDiskUsage(rc *eos_io.RuntimeContext, config *MonitorConfig) ([]Alert
 				Message:   fmt.Sprintf("Warning: disk usage on %s: %.1f%% used", path, usage.UsedPercent),
 				Value:     usage.UsedPercent,
 				Threshold: config.DiskUsageWarning,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 
@@ -149,7 +149,7 @@ func MonitorDiskUsage(rc *eos_io.RuntimeContext, config *MonitorConfig) ([]Alert
 				Message:   fmt.Sprintf("Critical inode usage on %s: %.1f%% used", path, usage.InodesUsedPercent),
 				Value:     usage.InodesUsedPercent,
 				Threshold: 90.0,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 		}
@@ -181,7 +181,7 @@ func FindLargeDirectories(rc *eos_io.RuntimeContext, path string, topN int) ([]D
 	dirSizes := make(map[string]DirectoryInfo)
 
 	// Use du command for efficiency
-	duCmd := eos_cli.Wrap(rc, "du", "-xb", "--max-depth=3", path)
+	duCmd := exec.CommandContext(rc.Ctx, "du", "-xb", "--max-depth=3", path)
 	output, err := duCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to run du command: %w", err)
@@ -267,7 +267,7 @@ func FindLargeFiles(rc *eos_io.RuntimeContext, path string, minSize int64, topN 
 	logger.Info("Searching for large files")
 
 	// Use find command for efficiency
-	findCmd := eos_cli.Wrap(rc, "find", path, "-type", "f", "-size",
+	findCmd := exec.CommandContext(rc.Ctx, "find", path, "-type", "f", "-size",
 		fmt.Sprintf("+%dc", minSize), "-printf", "%s %p\n")
 
 	output, err := findCmd.Output()
@@ -305,7 +305,7 @@ func FindLargeFiles(rc *eos_io.RuntimeContext, path string, minSize int64, topN 
 
 			// Get access time
 			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				fileInfo.AccessTime = time.Unix(stat.Atim.Sec, stat.Atim.Nsec)
+				fileInfo.AccessTime = time.Unix(stat.Atimespec.Sec, stat.Atimespec.Nsec)
 			}
 		}
 
@@ -367,7 +367,7 @@ func getDiskUsageForPath(rc *eos_io.RuntimeContext, path string) (*DiskUsage, er
 }
 
 func getAllMountPoints(rc *eos_io.RuntimeContext) ([]string, error) {
-	mountCmd := eos_cli.Wrap(rc, "findmnt", "-rno", "TARGET")
+	mountCmd := exec.CommandContext(rc.Ctx, "findmnt", "-rno", "TARGET")
 	output, err := mountCmd.Output()
 	if err != nil {
 		return nil, err
@@ -387,7 +387,7 @@ func getAllMountPoints(rc *eos_io.RuntimeContext) ([]string, error) {
 }
 
 func getMountInfo(rc *eos_io.RuntimeContext, path string) (device, filesystem string, options []string) {
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-rno", "SOURCE,FSTYPE,OPTIONS", "-T", path)
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-rno", "SOURCE,FSTYPE,OPTIONS", "-T", path)
 	if output, err := findmntCmd.Output(); err == nil {
 		parts := strings.Fields(string(output))
 		if len(parts) >= 3 {
@@ -444,7 +444,7 @@ func findLargeFilesManual(rc *eos_io.RuntimeContext, path string, minSize int64,
 			}
 
 			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				fileInfo.AccessTime = time.Unix(stat.Atim.Sec, stat.Atim.Nsec)
+				fileInfo.AccessTime = time.Unix(stat.Atimespec.Sec, stat.Atimespec.Nsec)
 			}
 
 			files = append(files, fileInfo)

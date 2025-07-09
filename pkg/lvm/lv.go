@@ -2,10 +2,11 @@ package lvm
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -39,7 +40,7 @@ func CreateLogicalVolume(rc *eos_io.RuntimeContext, config *LogicalVolumeConfig)
 
 	// Check if LV already exists
 	lvPath := fmt.Sprintf("/dev/%s/%s", config.VolumeGroup, config.Name)
-	checkCmd := eos_cli.Wrap(rc, "lvdisplay", lvPath)
+	checkCmd := exec.CommandContext(rc.Ctx, "lvdisplay", lvPath)
 	if err := checkCmd.Run(); err == nil {
 		return eos_err.NewUserError("logical volume %s already exists in volume group %s",
 			config.Name, config.VolumeGroup)
@@ -88,7 +89,7 @@ func CreateLogicalVolume(rc *eos_io.RuntimeContext, config *LogicalVolumeConfig)
 
 	args = append(args, config.VolumeGroup)
 
-	createCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	createCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := createCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create logical volume: %w, output: %s", err, string(output))
@@ -103,7 +104,7 @@ func CreateLogicalVolume(rc *eos_io.RuntimeContext, config *LogicalVolumeConfig)
 			// Rollback LV creation
 			logger.Warn("Failed to create filesystem, rolling back LV creation",
 				zap.Error(err))
-			removeCmd := eos_cli.Wrap(rc, "lvremove", "-y", "-f", lvPath)
+			removeCmd := exec.CommandContext(rc.Ctx, "lvremove", "-y", "-f", lvPath)
 			removeCmd.Run()
 			return fmt.Errorf("failed to create filesystem: %w", err)
 		}
@@ -153,7 +154,7 @@ func GetLogicalVolume(rc *eos_io.RuntimeContext, vgName, lvName string) (*Logica
 	lvPath := fmt.Sprintf("%s/%s", vgName, lvName)
 
 	// Get detailed information using lvs
-	lvsCmd := eos_cli.Wrap(rc, "lvs", "--units", "b", "--noheadings", "-o",
+	lvsCmd := exec.CommandContext(rc.Ctx, "lvs", "--units", "b", "--noheadings", "-o",
 		"lv_name,lv_path,vg_name,lv_uuid,lv_size,origin,lv_attr,lv_kernel_major,lv_kernel_minor,seg_count",
 		"--separator", "|", lvPath)
 
@@ -304,7 +305,7 @@ func ResizeLogicalVolume(rc *eos_io.RuntimeContext, vgName, lvName, newSize stri
 
 	args = append(args, "-L", sizeChange, lv.Path)
 
-	resizeCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	resizeCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := resizeCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to resize logical volume: %w, output: %s", err, string(output))
@@ -364,7 +365,7 @@ func RemoveLogicalVolume(rc *eos_io.RuntimeContext, vgName, lvName string, force
 	// Unmount if needed
 	if lv.MountPoint != "" && force {
 		logger.Debug("Force unmounting volume")
-		umountCmd := eos_cli.Wrap(rc, "umount", lv.MountPoint)
+		umountCmd := exec.CommandContext(rc.Ctx, "umount", lv.MountPoint)
 		if err := umountCmd.Run(); err != nil {
 			logger.Warn("Failed to unmount volume",
 				zap.String("mountPoint", lv.MountPoint),
@@ -379,7 +380,7 @@ func RemoveLogicalVolume(rc *eos_io.RuntimeContext, vgName, lvName string, force
 	}
 	args = append(args, lv.Path)
 
-	removeCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	removeCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := removeCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to remove logical volume: %w, output: %s", err, string(output))
@@ -389,7 +390,7 @@ func RemoveLogicalVolume(rc *eos_io.RuntimeContext, vgName, lvName string, force
 	logger.Info("Verifying logical volume removal")
 
 	// Verify LV was removed
-	checkCmd := eos_cli.Wrap(rc, "lvdisplay", lv.Path)
+	checkCmd := exec.CommandContext(rc.Ctx, "lvdisplay", lv.Path)
 	if err := checkCmd.Run(); err == nil {
 		return fmt.Errorf("logical volume removal verification failed: LV still exists")
 	}
@@ -409,7 +410,7 @@ func createFilesystem(rc *eos_io.RuntimeContext, device string, config *LogicalV
 		zap.String("device", device),
 		zap.String("type", config.FileSystem))
 
-	var mkfsCmd *eos_cli.WrappedCommand
+	var mkfsCmd *exec.Cmd
 
 	switch config.FileSystem {
 	case "xfs":
@@ -430,7 +431,7 @@ func createFilesystem(rc *eos_io.RuntimeContext, device string, config *LogicalV
 		}
 
 		args = append(args, device)
-		mkfsCmd = eos_cli.Wrap(rc, args[0], args[1:]...)
+		mkfsCmd = exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 
 	case "ext4":
 		args := []string{"mkfs.ext4", "-F"}
@@ -443,10 +444,10 @@ func createFilesystem(rc *eos_io.RuntimeContext, device string, config *LogicalV
 		}
 
 		args = append(args, device)
-		mkfsCmd = eos_cli.Wrap(rc, args[0], args[1:]...)
+		mkfsCmd = exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 
 	case "btrfs":
-		mkfsCmd = eos_cli.Wrap(rc, "mkfs.btrfs", "-f", device)
+		mkfsCmd = exec.CommandContext(rc.Ctx, "mkfs.btrfs", "-f", device)
 
 	default:
 		return eos_err.NewUserError("unsupported filesystem type: %s", config.FileSystem)
@@ -467,7 +468,7 @@ func mountLogicalVolume(rc *eos_io.RuntimeContext, device string, config *Logica
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Create mount point
-	if err := eos_cli.MkdirAll(config.MountPoint, 0755); err != nil {
+	if err := os.MkdirAll(config.MountPoint, 0755); err != nil {
 		return fmt.Errorf("failed to create mount point: %w", err)
 	}
 
@@ -498,7 +499,7 @@ func mountLogicalVolume(rc *eos_io.RuntimeContext, device string, config *Logica
 	}
 	args = append(args, device, config.MountPoint)
 
-	mountCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	mountCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	if output, err := mountCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to mount filesystem: %w, output: %s", err, string(output))
 	}
@@ -549,7 +550,7 @@ func parseSize(sizeStr string) (int64, error) {
 }
 
 func getMountPoint(rc *eos_io.RuntimeContext, device string) (string, error) {
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-n", "-o", "TARGET", device)
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-n", "-o", "TARGET", device)
 	output, err := findmntCmd.Output()
 	if err != nil {
 		return "", err
@@ -559,7 +560,7 @@ func getMountPoint(rc *eos_io.RuntimeContext, device string) (string, error) {
 }
 
 func getFilesystemType(rc *eos_io.RuntimeContext, device string) (string, error) {
-	blkidCmd := eos_cli.Wrap(rc, "blkid", "-o", "value", "-s", "TYPE", device)
+	blkidCmd := exec.CommandContext(rc.Ctx, "blkid", "-o", "value", "-s", "TYPE", device)
 	output, err := blkidCmd.Output()
 	if err != nil {
 		return "", err
@@ -570,7 +571,7 @@ func getFilesystemType(rc *eos_io.RuntimeContext, device string) (string, error)
 
 func hasSnapshots(rc *eos_io.RuntimeContext, lvPath string) bool {
 	// Check if LV has snapshots
-	lvsCmd := eos_cli.Wrap(rc, "lvs", "--noheadings", "-o", "lv_name", "-S",
+	lvsCmd := exec.CommandContext(rc.Ctx, "lvs", "--noheadings", "-o", "lv_name", "-S",
 		fmt.Sprintf("origin=%s", filepath.Base(lvPath)))
 
 	if output, err := lvsCmd.Output(); err == nil {
@@ -587,13 +588,13 @@ func shrinkFilesystem(rc *eos_io.RuntimeContext, device, fsType string, newSize 
 	case "ext4", "ext3", "ext2":
 		// Need to unmount first
 		if mp, _ := getMountPoint(rc, device); mp != "" {
-			umountCmd := eos_cli.Wrap(rc, "umount", device)
+			umountCmd := exec.CommandContext(rc.Ctx, "umount", device)
 			if err := umountCmd.Run(); err != nil {
 				return fmt.Errorf("failed to unmount for resize: %w", err)
 			}
 			defer func() {
 				// Remount after resize
-				mountCmd := eos_cli.Wrap(rc, "mount", device, mp)
+				mountCmd := exec.CommandContext(rc.Ctx, "mount", device, mp)
 				if err := mountCmd.Run(); err != nil {
 					logger.Warn("Failed to remount after resize",
 						zap.String("device", device),
@@ -603,14 +604,14 @@ func shrinkFilesystem(rc *eos_io.RuntimeContext, device, fsType string, newSize 
 		}
 
 		// Check filesystem
-		e2fsckCmd := eos_cli.Wrap(rc, "e2fsck", "-f", "-y", device)
+		e2fsckCmd := exec.CommandContext(rc.Ctx, "e2fsck", "-f", "-y", device)
 		if err := e2fsckCmd.Run(); err != nil {
 			logger.Warn("Filesystem check reported issues",
 				zap.Error(err))
 		}
 
 		// Resize filesystem
-		resize2fsCmd := eos_cli.Wrap(rc, "resize2fs", device, fmt.Sprintf("%dK", newSize/1024))
+		resize2fsCmd := exec.CommandContext(rc.Ctx, "resize2fs", device, fmt.Sprintf("%dK", newSize/1024))
 		if output, err := resize2fsCmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("failed to resize ext filesystem: %w, output: %s", err, string(output))
 		}
@@ -621,7 +622,7 @@ func shrinkFilesystem(rc *eos_io.RuntimeContext, device, fsType string, newSize 
 	case "btrfs":
 		// BTRFS can be resized while mounted
 		if mp, _ := getMountPoint(rc, device); mp != "" {
-			btrfsCmd := eos_cli.Wrap(rc, "btrfs", "filesystem", "resize",
+			btrfsCmd := exec.CommandContext(rc.Ctx, "btrfs", "filesystem", "resize",
 				fmt.Sprintf("%d", newSize), mp)
 			if output, err := btrfsCmd.CombinedOutput(); err != nil {
 				return fmt.Errorf("failed to resize btrfs: %w, output: %s", err, string(output))

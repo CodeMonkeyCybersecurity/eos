@@ -2,9 +2,9 @@ package lvm
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -30,7 +30,7 @@ func CreateVolumeGroup(rc *eos_io.RuntimeContext, config *VolumeGroupConfig) err
 	}
 
 	// Check if VG already exists
-	checkCmd := eos_cli.Wrap(rc, "vgdisplay", config.Name)
+	checkCmd := exec.CommandContext(rc.Ctx, "vgdisplay", config.Name)
 	if err := checkCmd.Run(); err == nil {
 		return eos_err.NewUserError("volume group %s already exists", config.Name)
 	}
@@ -71,7 +71,7 @@ func CreateVolumeGroup(rc *eos_io.RuntimeContext, config *VolumeGroupConfig) err
 	args = append(args, config.Name)
 	args = append(args, config.PhysicalVolumes...)
 
-	createCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	createCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := createCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create volume group: %w, output: %s", err, string(output))
@@ -132,7 +132,7 @@ func GetVolumeGroup(rc *eos_io.RuntimeContext, name string) (*VolumeGroup, error
 	}
 
 	// Get detailed information using vgs
-	vgsCmd := eos_cli.Wrap(rc, "vgs", "--units", "b", "--noheadings", "-o",
+	vgsCmd := exec.CommandContext(rc.Ctx, "vgs", "--units", "b", "--noheadings", "-o",
 		"vg_name,vg_uuid,vg_size,vg_free,vg_extent_size,vg_extent_count,vg_free_count,pv_count,lv_count,snap_count,vg_attr",
 		"--separator", "|", name)
 
@@ -175,7 +175,7 @@ func GetVolumeGroup(rc *eos_io.RuntimeContext, name string) (*VolumeGroup, error
 	}
 
 	// Get physical volumes
-	pvsCmd := eos_cli.Wrap(rc, "pvs", "--noheadings", "-o", "pv_name", "-S", fmt.Sprintf("vg_name=%s", name))
+	pvsCmd := exec.CommandContext(rc.Ctx, "pvs", "--noheadings", "-o", "pv_name", "-S", fmt.Sprintf("vg_name=%s", name))
 	if output, err := pvsCmd.Output(); err == nil {
 		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 		for _, line := range lines {
@@ -187,7 +187,7 @@ func GetVolumeGroup(rc *eos_io.RuntimeContext, name string) (*VolumeGroup, error
 	}
 
 	// Get logical volumes
-	lvsCmd := eos_cli.Wrap(rc, "lvs", "--noheadings", "-o", "lv_name", "-S", fmt.Sprintf("vg_name=%s", name))
+	lvsCmd := exec.CommandContext(rc.Ctx, "lvs", "--noheadings", "-o", "lv_name", "-S", fmt.Sprintf("vg_name=%s", name))
 	if output, err := lvsCmd.Output(); err == nil {
 		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 		for _, line := range lines {
@@ -243,7 +243,7 @@ func ExtendVolumeGroup(rc *eos_io.RuntimeContext, vgName string, pvs []string) e
 
 	// Extend the VG
 	args := append([]string{"vgextend", "-y", vgName}, pvs...)
-	extendCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	extendCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 
 	output, err := extendCmd.CombinedOutput()
 	if err != nil {
@@ -321,7 +321,7 @@ func ReduceVolumeGroup(rc *eos_io.RuntimeContext, vgName string, pvs []string) e
 
 	// Check if PVs have allocated extents
 	for _, pv := range pvs {
-		checkCmd := eos_cli.Wrap(rc, "pvs", "--noheadings", "-o", "pv_pe_alloc_count", pv)
+		checkCmd := exec.CommandContext(rc.Ctx, "pvs", "--noheadings", "-o", "pv_pe_alloc_count", pv)
 		if output, err := checkCmd.Output(); err == nil {
 			if allocCount, err := parseIntValue(string(output)); err == nil && allocCount > 0 {
 				return eos_err.NewUserError("physical volume %s has %d allocated extents. Move data first with pvmove",
@@ -337,7 +337,7 @@ func ReduceVolumeGroup(rc *eos_io.RuntimeContext, vgName string, pvs []string) e
 
 	// Reduce the VG
 	args := append([]string{"vgreduce", "-y", vgName}, pvs...)
-	reduceCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	reduceCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 
 	output, err := reduceCmd.CombinedOutput()
 	if err != nil {
@@ -403,7 +403,7 @@ func RemoveVolumeGroup(rc *eos_io.RuntimeContext, name string, force bool) error
 	if force && len(vg.LogicalVolumes) > 0 {
 		logger.Debug("Force removing logical volumes")
 		for _, lv := range vg.LogicalVolumes {
-			removeCmd := eos_cli.Wrap(rc, "lvremove", "-y", "-f", fmt.Sprintf("%s/%s", name, lv))
+			removeCmd := exec.CommandContext(rc.Ctx, "lvremove", "-y", "-f", fmt.Sprintf("%s/%s", name, lv))
 			if output, err := removeCmd.CombinedOutput(); err != nil {
 				logger.Warn("Failed to remove logical volume",
 					zap.String("lv", lv),
@@ -420,7 +420,7 @@ func RemoveVolumeGroup(rc *eos_io.RuntimeContext, name string, force bool) error
 	}
 	args = append(args, name)
 
-	removeCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
+	removeCmd := exec.CommandContext(rc.Ctx, args[0], args[1:]...)
 	output, err := removeCmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to remove volume group: %w, output: %s", err, string(output))
@@ -430,7 +430,7 @@ func RemoveVolumeGroup(rc *eos_io.RuntimeContext, name string, force bool) error
 	logger.Info("Verifying volume group removal")
 
 	// Verify VG was removed
-	checkCmd := eos_cli.Wrap(rc, "vgdisplay", name)
+	checkCmd := exec.CommandContext(rc.Ctx, "vgdisplay", name)
 	if err := checkCmd.Run(); err == nil {
 		return fmt.Errorf("volume group removal verification failed: VG still exists")
 	}

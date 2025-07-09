@@ -3,10 +3,10 @@ package cephfs
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -22,7 +22,7 @@ func ReadVolumeInfo(rc *eos_io.RuntimeContext, volumeName string) (*VolumeInfo, 
 		zap.String("volume", volumeName))
 
 	// Check if ceph command is available
-	if _, err := eos_cli.LookPath("ceph"); err != nil {
+	if _, err := exec.LookPath("ceph"); err != nil {
 		return nil, eos_err.NewUserError("ceph command not found. Please install ceph-common package")
 	}
 
@@ -35,7 +35,7 @@ func ReadVolumeInfo(rc *eos_io.RuntimeContext, volumeName string) (*VolumeInfo, 
 	}
 
 	// Get filesystem status
-	statusCmd := eos_cli.Wrap(rc, "ceph", "fs", "status", volumeName, "--format", "json")
+	statusCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "status", volumeName, "--format", "json")
 	statusOutput, err := statusCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get volume status: %w", err)
@@ -68,7 +68,7 @@ func ReadVolumeInfo(rc *eos_io.RuntimeContext, volumeName string) (*VolumeInfo, 
 	}
 
 	// Get volume statistics
-	statsCmd := eos_cli.Wrap(rc, "ceph", "fs", "get", volumeName, "--format", "json")
+	statsCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "get", volumeName, "--format", "json")
 	statsOutput, err := statsCmd.Output()
 	if err != nil {
 		logger.Warn("Failed to get volume statistics",
@@ -131,7 +131,7 @@ func ReadMountInfo(rc *eos_io.RuntimeContext, mountPoint string) (*MountInfo, er
 	}
 
 	// Use findmnt to get detailed mount information
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-J", "-T", mountPoint)
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-J", "-T", mountPoint)
 	output, err := findmntCmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("mount point not found: %w", err)
@@ -190,7 +190,7 @@ func ReadPerformanceMetrics(rc *eos_io.RuntimeContext, volumeName string) (map[s
 	metrics := make(map[string]interface{})
 
 	// Get MDS performance stats
-	mdsCmd := eos_cli.Wrap(rc, "ceph", "fs", "perf", "stats", volumeName, "--format", "json")
+	mdsCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "perf", "stats", volumeName, "--format", "json")
 	if output, err := mdsCmd.Output(); err == nil {
 		var perfStats map[string]interface{}
 		if err := json.Unmarshal(output, &perfStats); err == nil {
@@ -199,7 +199,7 @@ func ReadPerformanceMetrics(rc *eos_io.RuntimeContext, volumeName string) (map[s
 	}
 
 	// Get client I/O stats
-	clientCmd := eos_cli.Wrap(rc, "ceph", "fs", "status", volumeName, "--format", "json")
+	clientCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "status", volumeName, "--format", "json")
 	if output, err := clientCmd.Output(); err == nil {
 		var status map[string]interface{}
 		if err := json.Unmarshal(output, &status); err == nil {
@@ -234,7 +234,7 @@ func readDiskUsage(rc *eos_io.RuntimeContext, volumeName string, info *VolumeInf
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Get disk usage from df stats
-	dfCmd := eos_cli.Wrap(rc, "ceph", "fs", "df", volumeName, "--format", "json")
+	dfCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "df", volumeName, "--format", "json")
 	output, err := dfCmd.Output()
 	if err != nil {
 		return fmt.Errorf("failed to get disk usage: %w", err)
@@ -266,7 +266,7 @@ func readMountPoints(rc *eos_io.RuntimeContext, volumeName string) ([]string, er
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Find all CephFS mounts
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-t", "ceph", "-n", "-o", "TARGET,SOURCE")
+	findmntCmd := exec.CommandContext(rc.Ctx, "findmnt", "-t", "ceph", "-n", "-o", "TARGET,SOURCE")
 	output, err := findmntCmd.Output()
 	if err != nil {
 		return nil, err
@@ -303,7 +303,7 @@ func getVolumePools(rc *eos_io.RuntimeContext, volumeName string) ([]string, err
 	pools := []string{}
 
 	// Get volume details
-	getCmd := eos_cli.Wrap(rc, "ceph", "fs", "get", volumeName, "--format", "json")
+	getCmd := exec.CommandContext(rc.Ctx, "ceph", "fs", "get", volumeName, "--format", "json")
 	output, err := getCmd.Output()
 	if err != nil {
 		return nil, err
@@ -341,7 +341,7 @@ func getPoolStats(rc *eos_io.RuntimeContext, poolName string) (map[string]interf
 	stats := make(map[string]interface{})
 
 	// Get pool statistics
-	statsCmd := eos_cli.Wrap(rc, "ceph", "osd", "pool", "stats", poolName, "--format", "json")
+	statsCmd := exec.CommandContext(rc.Ctx, "ceph", "osd", "pool", "stats", poolName, "--format", "json")
 	output, err := statsCmd.Output()
 	if err != nil {
 		return nil, err

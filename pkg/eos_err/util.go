@@ -74,6 +74,11 @@ func NewExpectedError(ctx context.Context, err error) error {
 	return &UserError{cause: err}
 }
 
+// NewUserError creates a new user error with formatting support.
+func NewUserError(format string, args ...interface{}) error {
+	return &UserError{cause: fmt.Errorf(format, args...)}
+}
+
 // IsExpectedUserError checks if the error is marked as expected.
 func IsExpectedUserError(err error) bool {
 	var e *UserError
