@@ -16,7 +16,6 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/zfs_management"
-	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -405,45 +404,8 @@ func InteractiveFstabManager(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
-func RunUpdateStorage(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	if resizeFilesystem {
-		logger.Info("Starting automatic Ubuntu LVM resize")
-		return AutoResizeUbuntuLVM(rc)
-	}
-
-	if lvPath != "" {
-		logger.Info("Extending logical volume", zap.String("lv_path", lvPath))
-		if err := ExtendLogicalVolume(rc, lvPath); err != nil {
-			return err
-		}
-
-		// If device path is provided, resize the filesystem too
-		if devicePath != "" {
-			logger.Info("Resizing filesystem", zap.String("device_path", devicePath))
-			if fsType == "xfs" && mountpoint != "" {
-				return ResizeXfsFilesystem(rc, mountpoint)
-			} else {
-				return ResizeExt4Filesystem(rc, devicePath)
-			}
-		}
-		return nil
-	}
-
-	if devicePath != "" {
-		logger.Info("Resizing filesystem", zap.String("device_path", devicePath))
-		if fsType == "xfs" && mountpoint != "" {
-			return ResizeXfsFilesystem(rc, mountpoint)
-		} else {
-			return ResizeExt4Filesystem(rc, devicePath)
-		}
-	}
-
-	// Default: show help
-	logger.Info("No specific action specified, showing help")
-	return cmd.Help()
-}
+// RunUpdateStorage has been moved to cmd/ directory where it belongs
+// This function should not be in the business logic package
 
 func OutputZFSOperationResult(result *zfs_management.ZFSOperationResult, outputJSON bool) error {
 	if outputJSON {
