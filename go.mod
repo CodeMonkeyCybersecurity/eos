@@ -43,7 +43,6 @@ require (
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/uptrace/opentelemetry-go-extra/otelzap v0.3.2
 	github.com/zclconf/go-cty v1.13.0
-	go.opentelemetry.io/contrib/bridges/otelzap v0.12.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.35.0
 	go.opentelemetry.io/otel/metric v1.37.0
