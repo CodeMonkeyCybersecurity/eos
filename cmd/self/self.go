@@ -100,5 +100,6 @@ func init() {
 	SelfCmd.AddCommand(ai.AICmd)
 	SelfCmd.AddCommand(test.TestCmd)
 	SelfCmd.AddCommand(TelemetryCmd)
+	SelfCmd.AddCommand(EnrollCmd)
 	// Add SelfCmd to ConfigCmd so 'eos config self' works
 }

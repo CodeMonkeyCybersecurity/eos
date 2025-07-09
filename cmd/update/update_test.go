@@ -545,38 +545,18 @@ func TestUpdateCommandAutoInstallation(t *testing.T) {
 	}
 }
 
-// TestNewUpdateCmd tests command creation and flag setup
-func TestNewUpdateCmd(t *testing.T) {
-	cmd := NewUpdateCmd()
+// TestUpdateCmd tests command creation and flag setup
+func TestUpdateCmd(t *testing.T) {
+	cmd := UpdateCmd
 
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "update", cmd.Use)
-	assert.Contains(t, cmd.Short, "Update Delphi service workers")
+	assert.Contains(t, cmd.Short, "Update resources")
+	assert.Equal(t, []string{"upgrade", "modify", "change"}, cmd.Aliases)
 
-	// Check flags
-	allFlag := cmd.Flags().Lookup("all")
-	assert.NotNil(t, allFlag)
-	assert.Equal(t, "false", allFlag.DefValue)
-
-	dryRunFlag := cmd.Flags().Lookup("dry-run")
-	assert.NotNil(t, dryRunFlag)
-	assert.Equal(t, "false", dryRunFlag.DefValue)
-
-	skipBackupFlag := cmd.Flags().Lookup("skip-backup")
-	assert.NotNil(t, skipBackupFlag)
-	assert.Equal(t, "false", skipBackupFlag.DefValue)
-
-	skipRestartFlag := cmd.Flags().Lookup("skip-restart")
-	assert.NotNil(t, skipRestartFlag)
-	assert.Equal(t, "false", skipRestartFlag.DefValue)
-
-	skipInstallationCheckFlag := cmd.Flags().Lookup("skip-installation-check")
-	assert.NotNil(t, skipInstallationCheckFlag)
-	assert.Equal(t, "false", skipInstallationCheckFlag.DefValue)
-
-	timeoutFlag := cmd.Flags().Lookup("timeout")
-	assert.NotNil(t, timeoutFlag)
-	assert.Equal(t, "10m0s", timeoutFlag.DefValue)
+	// UpdateCmd is a parent command without its own flags
+	// It only displays help when run without subcommands
+	assert.NotNil(t, cmd.RunE)
 }
 
 // TestServiceWorkerListConsistency ensures the worker list matches the registry

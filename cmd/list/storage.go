@@ -33,8 +33,19 @@ Examples:
 		logger.Info("Listing disk devices")
 
 		outputJSON, _ := cmd.Flags().GetBool("json")
+		bootstrap, _ := cmd.Flags().GetBool("bootstrap")
 
-		manager := disk_management.NewDiskManager(nil)
+		var manager *disk_management.DiskManager
+		if bootstrap {
+			logger.Info("Using bootstrap mode (direct execution without Salt)")
+			manager = disk_management.NewDiskManager(nil)
+		} else {
+			// For now, still use direct execution even without bootstrap flag
+			// TODO: When Salt integration is ready, check for Salt client here
+			logger.Info("Salt not configured, falling back to direct execution")
+			manager = disk_management.NewDiskManager(nil)
+		}
+		
 		result, err := manager.ListDisks(rc)
 		if err != nil {
 			logger.Error("Failed to list disks", zap.Error(err))
@@ -51,6 +62,7 @@ Examples:
 
 func init() {
 	disksCmd.Flags().Bool("json", false, "Output in JSON format")
+	disksCmd.Flags().Bool("bootstrap", false, "Use direct execution without Salt (for initial system discovery)")
 
 	ListCmd.AddCommand(disksCmd)
 }

@@ -2,10 +2,12 @@ package disk_management
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -37,7 +39,14 @@ func OutputMountOpText(result *MountOperation) error {
 
 // DiskManager handles disk and partition operations
 type DiskManager struct {
-	config *DiskManagerConfig
+	config     *DiskManagerConfig
+	useSalt    bool
+	saltClient SaltClientInterface
+}
+
+// SaltClientInterface defines the interface for Salt operations
+type SaltClientInterface interface {
+	CmdRun(ctx context.Context, target string, command string) (string, error)
 }
 
 // NewDiskManager creates a new disk manager
@@ -47,33 +56,54 @@ func NewDiskManager(config *DiskManagerConfig) *DiskManager {
 	}
 
 	return &DiskManager{
-		config: config,
+		config:  config,
+		useSalt: false, // Default to direct execution
+	}
+}
+
+// NewDiskManagerWithSalt creates a new disk manager that uses Salt for execution
+func NewDiskManagerWithSalt(config *DiskManagerConfig, saltClient SaltClientInterface) *DiskManager {
+	if config == nil {
+		config = DefaultDiskManagerConfig()
+	}
+
+	return &DiskManager{
+		config:     config,
+		useSalt:    true,
+		saltClient: saltClient,
 	}
 }
 
 // ListDisks lists all available disk devices
 func (dm *DiskManager) ListDisks(rc *eos_io.RuntimeContext) (*DiskListResult, error) {
 	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Listing disk devices")
+	logger.Info("Listing disk devices", zap.String("platform", runtime.GOOS))
 
 	result := &DiskListResult{
 		Disks:     make([]DiskInfo, 0),
 		Timestamp: time.Now(),
 	}
 
-	// Use lsblk to get disk information
-	cmd := exec.CommandContext(rc.Ctx, "lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,REMOVABLE,FSTYPE,LABEL,UUID")
-	output, err := cmd.Output()
-	if err != nil {
-		logger.Error("Failed to list disks with lsblk", zap.Error(err))
-		return nil, fmt.Errorf("failed to list disks: %w", err)
-	}
+	var disks []DiskInfo
+	var err error
 
-	// Parse lsblk JSON output (simplified parsing for now)
-	disks, err := dm.parseLsblkOutput(string(output))
-	if err != nil {
-		logger.Error("Failed to parse lsblk output", zap.Error(err))
-		return nil, fmt.Errorf("failed to parse disk information: %w", err)
+	switch runtime.GOOS {
+	case "darwin":
+		// macOS uses diskutil
+		disks, err = dm.listDisksDarwin(rc)
+		if err != nil {
+			logger.Error("Failed to list disks on macOS", zap.Error(err))
+			return nil, fmt.Errorf("failed to list disks on macOS: %w", err)
+		}
+	case "linux":
+		// Linux uses lsblk
+		disks, err = dm.listDisksLinux(rc)
+		if err != nil {
+			logger.Error("Failed to list disks on Linux", zap.Error(err))
+			return nil, fmt.Errorf("failed to list disks on Linux: %w", err)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
 
 	result.Disks = disks
@@ -81,6 +111,90 @@ func (dm *DiskManager) ListDisks(rc *eos_io.RuntimeContext) (*DiskListResult, er
 
 	logger.Info("Disk listing completed", zap.Int("total_disks", result.Total))
 	return result, nil
+}
+
+// listDisksLinux lists disks on Linux using lsblk
+func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	var output []byte
+	var err error
+	
+	if dm.useSalt && dm.saltClient != nil {
+		// Execute through Salt
+		logger.Info("Executing lsblk through Salt")
+		cmdStr := "lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,REMOVABLE,FSTYPE,LABEL,UUID"
+		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
+		if err != nil {
+			logger.Error("Failed to run lsblk through Salt", 
+				zap.Error(err),
+				zap.String("output", outputStr))
+			return nil, fmt.Errorf("lsblk failed through Salt: %w", err)
+		}
+		output = []byte(outputStr)
+	} else {
+		// Execute directly
+		logger.Info("Executing lsblk directly (bootstrap mode)")
+		cmd := exec.CommandContext(rc.Ctx, "lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,REMOVABLE,FSTYPE,LABEL,UUID")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			logger.Error("Failed to run lsblk directly", 
+				zap.Error(err),
+				zap.String("output", string(output)))
+			
+			// Check if lsblk exists
+			if _, lookupErr := exec.LookPath("lsblk"); lookupErr != nil {
+				return nil, fmt.Errorf("lsblk command not found. This command requires the lsblk utility which is typically part of util-linux package")
+			}
+			
+			return nil, fmt.Errorf("lsblk failed: %w (output: %s)", err, string(output))
+		}
+	}
+
+	return dm.parseLsblkOutput(string(output))
+}
+
+// listDisksDarwin lists disks on macOS using diskutil
+func (dm *DiskManager) listDisksDarwin(rc *eos_io.RuntimeContext) ([]DiskInfo, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	var output []byte
+	var err error
+	
+	if dm.useSalt && dm.saltClient != nil {
+		// Execute through Salt
+		logger.Info("Executing diskutil through Salt")
+		cmdStr := "diskutil list -plist"
+		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
+		if err != nil {
+			logger.Error("Failed to run diskutil through Salt", 
+				zap.Error(err),
+				zap.String("output", outputStr))
+			return nil, fmt.Errorf("diskutil failed through Salt: %w", err)
+		}
+		output = []byte(outputStr)
+	} else {
+		// Execute directly
+		logger.Info("Executing diskutil directly (bootstrap mode)")
+		cmd := exec.CommandContext(rc.Ctx, "diskutil", "list", "-plist")
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			logger.Error("Failed to run diskutil directly", 
+				zap.Error(err),
+				zap.String("output", string(output)))
+			
+			// Check if diskutil exists
+			if _, lookupErr := exec.LookPath("diskutil"); lookupErr != nil {
+				return nil, fmt.Errorf("diskutil command not found. This is a system command that should be available on macOS")
+			}
+			
+			return nil, fmt.Errorf("diskutil failed: %w (output: %s)", err, string(output))
+		}
+	}
+
+	// For now, parse basic diskutil output
+	// In a full implementation, we would parse the plist XML format
+	return dm.parseDiskutilOutput(string(output))
 }
 
 // CreatePartition creates a new partition on the specified disk
@@ -345,38 +459,213 @@ func (dm *DiskManager) MountPartition(rc *eos_io.RuntimeContext, device string, 
 // Helper methods
 
 func (dm *DiskManager) parseLsblkOutput(output string) ([]DiskInfo, error) {
-	// This is a simplified parser - in production, you'd use proper JSON parsing
-	// For now, return a basic structure
+	// Parse JSON output from lsblk
+	type lsblkDevice struct {
+		Name       string        `json:"name"`
+		Size       string        `json:"size"`
+		Type       string        `json:"type"`
+		Mountpoint string        `json:"mountpoint"`
+		Vendor     string        `json:"vendor"`
+		Model      string        `json:"model"`
+		Serial     string        `json:"serial"`
+		Removable  bool          `json:"rm"`
+		Fstype     string        `json:"fstype"`
+		Label      string        `json:"label"`
+		UUID       string        `json:"uuid"`
+		Children   []lsblkDevice `json:"children"`
+	}
+
+	type lsblkOutput struct {
+		Blockdevices []lsblkDevice `json:"blockdevices"`
+	}
+
+	var lsblkData lsblkOutput
+	if err := json.Unmarshal([]byte(output), &lsblkData); err != nil {
+		return nil, fmt.Errorf("failed to parse lsblk JSON output: %w", err)
+	}
+
 	var disks []DiskInfo
 
-	// Parse the output line by line for basic information
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.Contains(line, "blockdevices") {
+	for _, device := range lsblkData.Blockdevices {
+		// Only process disk type devices (not partitions)
+		if device.Type != "disk" {
 			continue
 		}
 
-		// This is a very basic parser - would need proper JSON parsing for production
-		if strings.Contains(line, "/dev/") {
-			// Extract basic device info
-			parts := strings.Fields(line)
-			if len(parts) > 0 {
-				device := "/dev/" + parts[0]
-				disk := DiskInfo{
-					Device:      device,
-					Name:        parts[0],
-					Description: fmt.Sprintf("Block device %s", parts[0]),
-					Mountpoints: make([]MountPoint, 0),
-					Partitions:  make([]PartitionInfo, 0),
-					Properties:  make(map[string]string),
+		disk := DiskInfo{
+			Device:      "/dev/" + device.Name,
+			Name:        device.Name,
+			Description: fmt.Sprintf("%s %s", device.Vendor, device.Model),
+			SizeHuman:   device.Size,
+			IsRemovable: device.Removable,
+			Vendor:      strings.TrimSpace(device.Vendor),
+			Model:       strings.TrimSpace(device.Model),
+			Serial:      strings.TrimSpace(device.Serial),
+			Mountpoints: make([]MountPoint, 0),
+			Partitions:  make([]PartitionInfo, 0),
+			Properties:  make(map[string]string),
+		}
+
+		// Add mount point if disk is directly mounted
+		if device.Mountpoint != "" {
+			disk.Mountpoints = append(disk.Mountpoints, MountPoint{
+				Path:     device.Mountpoint,
+				Readonly: false, // Would need to parse mount options to determine this
+			})
+		}
+
+		// Process partitions (children)
+		for _, child := range device.Children {
+			if child.Type == "part" {
+				partition := PartitionInfo{
+					Device:     "/dev/" + child.Name,
+					SizeHuman:  child.Size,
+					Type:       child.Type,
+					Filesystem: child.Fstype,
+					Label:      child.Label,
+					UUID:       child.UUID,
+					IsMounted:  child.Mountpoint != "",
+					MountPoint: child.Mountpoint,
 				}
-				disks = append(disks, disk)
+				disk.Partitions = append(disk.Partitions, partition)
+
+				// Add partition mount points to disk mount points
+				if child.Mountpoint != "" {
+					disk.Mountpoints = append(disk.Mountpoints, MountPoint{
+						Path:     child.Mountpoint,
+						Readonly: false,
+					})
+				}
 			}
 		}
+
+		// Set properties
+		disk.Properties["uuid"] = device.UUID
+		disk.Properties["fstype"] = device.Fstype
+		disk.Properties["label"] = device.Label
+
+		disks = append(disks, disk)
 	}
 
 	return disks, nil
+}
+
+// parseDiskutilOutput parses output from diskutil on macOS
+func (dm *DiskManager) parseDiskutilOutput(output string) ([]DiskInfo, error) {
+	// For a simple implementation, parse the text output from diskutil list
+	// A production implementation would parse the plist XML format
+	var disks []DiskInfo
+	
+	// Run diskutil info for each disk to get detailed information
+	// First, get list of disks
+	cmd := exec.Command("diskutil", "list")
+	listOutput, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get disk list: %w", err)
+	}
+	
+	// Parse the output to find disk identifiers
+	lines := strings.Split(string(listOutput), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "/dev/disk") {
+			// Extract disk identifier
+			parts := strings.Fields(line)
+			if len(parts) > 0 {
+				diskID := parts[0]
+				
+				// Get detailed info for this disk
+				infoCmd := exec.Command("diskutil", "info", diskID)
+				infoOutput, err := infoCmd.Output()
+				if err != nil {
+					continue // Skip disks we can't get info for
+				}
+				
+				disk := parseDiskutilInfo(diskID, string(infoOutput))
+				if disk != nil {
+					disks = append(disks, *disk)
+				}
+			}
+		}
+	}
+	
+	return disks, nil
+}
+
+// parseDiskutilInfo parses the output of diskutil info command
+func parseDiskutilInfo(device string, output string) *DiskInfo {
+	disk := &DiskInfo{
+		Device:      device,
+		Name:        device,
+		Mountpoints: make([]MountPoint, 0),
+		Partitions:  make([]PartitionInfo, 0),
+		Properties:  make(map[string]string),
+	}
+	
+	// Parse the diskutil info output
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		
+		// Parse key-value pairs
+		colonIndex := strings.Index(line, ":")
+		if colonIndex > 0 {
+			key := strings.TrimSpace(line[:colonIndex])
+			value := strings.TrimSpace(line[colonIndex+1:])
+			
+			switch key {
+			case "Device / Media Name":
+				disk.Name = value
+			case "Disk Size":
+				// Extract human-readable size
+				parts := strings.Fields(value)
+				if len(parts) >= 2 {
+					disk.SizeHuman = parts[0] + parts[1]
+				}
+			case "Device Block Size":
+				disk.Properties["block_size"] = value
+			case "Volume Name":
+				disk.Properties["volume_name"] = value
+			case "Mounted":
+				// Mount point is handled in the "Mount Point" case below
+				_ = value // Mark as used
+			case "Mount Point":
+				if value != "" && value != "Not applicable" {
+					disk.Mountpoints = append(disk.Mountpoints, MountPoint{
+						Path:     value,
+						Readonly: false,
+					})
+				}
+			case "Content":
+				disk.Properties["content"] = value
+			case "Volume UUID":
+				disk.Properties["uuid"] = value
+			case "Disk / Partition UUID":
+				if disk.Properties["uuid"] == "" {
+					disk.Properties["uuid"] = value
+				}
+			case "Removable Media":
+				disk.IsRemovable = (value == "Yes" || value == "Removable")
+			case "Protocol":
+				disk.Properties["protocol"] = value
+				if strings.Contains(value, "USB") {
+					disk.IsUSB = true
+				}
+			}
+		}
+	}
+	
+	// Set a description
+	if mediaName, ok := disk.Properties["volume_name"]; ok && mediaName != "" {
+		disk.Description = mediaName
+	} else {
+		disk.Description = fmt.Sprintf("Disk %s", disk.Name)
+	}
+	
+	return disk
 }
 
 func (dm *DiskManager) performSafetyChecks(device string) error {
@@ -397,7 +686,13 @@ func (dm *DiskManager) performSafetyChecks(device string) error {
 	if err != nil {
 		return fmt.Errorf("failed to check mounts: %w", err)
 	}
-	defer mountsFile.Close()
+	defer func() {
+		if err := mountsFile.Close(); err != nil {
+			// Log but don't fail the operation
+			logger := otelzap.Ctx(context.Background())
+			logger.Warn("Failed to close mounts file", zap.Error(err))
+		}
+	}()
 
 	scanner := bufio.NewScanner(mountsFile)
 	for scanner.Scan() {
@@ -442,7 +737,7 @@ func (dm *DiskManager) backupPartitionTable(rc *eos_io.RuntimeContext, device st
 func (dm *DiskManager) promptForConfirmation(message string) bool {
 	fmt.Printf("%s? [y/N]: ", message)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response) // Ignore error as empty input is valid
 	return response == "y" || response == "Y" || response == "yes"
 }
 
