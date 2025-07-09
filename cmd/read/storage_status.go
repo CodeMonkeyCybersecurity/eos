@@ -1,6 +1,7 @@
 package read
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"text/tabwriter"
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
 )
 
 var readStorageStatusCmd = &cobra.Command{
@@ -115,6 +117,18 @@ func isPseudoFilesystem(fs string) bool {
 		}
 	}
 	return false
+}
+
+func outputJSON(usage []storage_monitor.DiskUsage) error {
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(usage)
+}
+
+func outputYAML(usage []storage_monitor.DiskUsage) error {
+	encoder := yaml.NewEncoder(os.Stdout)
+	defer encoder.Close()
+	return encoder.Encode(usage)
 }
 
 func formatBytes(bytes int64) string {

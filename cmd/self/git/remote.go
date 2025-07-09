@@ -99,8 +99,6 @@ var remoteListCmd = &cobra.Command{
 		}),
 	}
 
-}
-
 // Package-level variables for remote add command flags
 var (
 	remoteAddPath string
@@ -159,8 +157,6 @@ Examples:
 		}),
 	}
 
-}
-
 // Package-level variables for remote set-url command flags
 var (
 	remoteSetURLPath string
@@ -218,8 +214,6 @@ Examples:
 			return manager.ManageRemote(rc, remoteSetURLPath, operation)
 		}),
 	}
-
-}
 
 // Package-level variables for remote remove command flags
 var (
