@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
@@ -1420,7 +1421,7 @@ func waitForService(ctx context.Context, host string, port int) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-ticker.C:
-			conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", host, port))
+			conn, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 			if err == nil {
 				conn.Close()
 				return nil
