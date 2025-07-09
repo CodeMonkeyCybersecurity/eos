@@ -269,8 +269,6 @@ Examples:
 		}),
 	}
 
-}
-
 // Package-level variables for remote rename command flags
 var (
 	remoteRenamePath    string
