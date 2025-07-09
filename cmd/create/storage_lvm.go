@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runCreateLVMPV, runCreateLVMVG, runCreateLVMLV functions into their respective command RunE fields
 package create
 
 import (

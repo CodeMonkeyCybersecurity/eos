@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runCreateCephFSVolume, runCreateCephFSMount functions into their respective command RunE fields
 package create
 
 import (

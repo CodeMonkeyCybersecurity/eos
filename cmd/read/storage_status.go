@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runReadStorageStatus function into command RunE field
 package read
 
 import (

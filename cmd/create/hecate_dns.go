@@ -1,4 +1,5 @@
 // cmd/create/hecate-dns.go
+// TODO: PATTERN 1 - Transform NewCreateHetznerWildcardCmd() function to hetznerWildcardCmd variable
 
 package create
 

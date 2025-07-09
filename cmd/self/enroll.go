@@ -1,4 +1,5 @@
 // cmd/self/enroll.go
+// TODO: PATTERN 2 - Inline runEnroll function into command RunE field
 package self
 
 import (

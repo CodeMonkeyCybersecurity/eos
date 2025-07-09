@@ -1,4 +1,5 @@
 // cmd/update/storage.go
+// TODO: PATTERN 2 - Inline runUpdateStorage function into command RunE field
 package update
 
 import (

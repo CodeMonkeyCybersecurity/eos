@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runSecureSSH, runCheckSSHCredentials, runDisableRoot, runCopyKeys, runDistributeKeys functions into their respective command RunE fields
 package update
 
 import (

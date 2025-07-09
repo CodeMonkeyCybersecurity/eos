@@ -1,4 +1,5 @@
 // cmd/vault_status_enhanced.go - Example of vault command using enhanced container pattern
+// TODO: PATTERN 2 - Inline _vaultStatusEnhanced function into command RunE field
 package list
 
 import (

@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runCreateStorageVolume function into command RunE field
 package create
 
 import (

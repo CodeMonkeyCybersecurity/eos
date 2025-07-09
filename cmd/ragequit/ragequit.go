@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runRagequit function into command RunE field
 package ragequit
 
 import (

@@ -1,4 +1,5 @@
 /* cmd/delphi/inspect/inspect.go */
+// TODO: PATTERN 1 - Transform NewInspectCmd(), NewPipelineFunctionalityCmd(), NewVerifyPipelineSchemaCmd() functions to variables
 
 package read
 

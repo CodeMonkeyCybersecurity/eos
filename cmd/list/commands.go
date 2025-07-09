@@ -1,4 +1,5 @@
 // cmd/list/commands.go
+// TODO: PATTERN 2 - Inline runListCommands function into command RunE field
 package list
 
 import (

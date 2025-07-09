@@ -1,4 +1,5 @@
 // cmd/test/fuzz.go
+// TODO: PATTERN 2 - Inline runFuzzTests function into command RunE field
 package test
 
 import (

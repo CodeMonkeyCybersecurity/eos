@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runGitCommit function into command RunE field
 package self
 
 import (

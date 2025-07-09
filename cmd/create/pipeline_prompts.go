@@ -1,4 +1,5 @@
 // cmd/create/create-pipeline-prompts.go
+// TODO: PATTERN 1 - Transform NewCreateCmd() function to createPipelinePromptsCmd variable
 package create
 
 import (

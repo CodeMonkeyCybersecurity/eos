@@ -1,4 +1,5 @@
 // cmd/create/kvm_tenant.go
+// TODO: PATTERN 1 - Transform NewKvmTenantCmd() function to kvmTenantCmd variable
 
 package create
 

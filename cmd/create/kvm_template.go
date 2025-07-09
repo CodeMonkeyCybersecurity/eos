@@ -1,4 +1,5 @@
 // cmd/create/kvm_template.go
+// TODO: PATTERN 1 - Transform NewKvmTemplateCmd() function to kvmTemplateCmd variable
 
 package create
 

@@ -1,3 +1,4 @@
+// TODO: PATTERN 2 - Inline runReadStorageMetrics function into command RunE field
 package read
 
 import (
