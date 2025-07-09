@@ -305,7 +305,7 @@ func FindLargeFiles(rc *eos_io.RuntimeContext, path string, minSize int64, topN 
 
 			// Get access time
 			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				fileInfo.AccessTime = time.Unix(stat.Atimespec.Sec, stat.Atimespec.Nsec)
+				fileInfo.AccessTime = getAccessTime(stat)
 			}
 		}
 
@@ -444,7 +444,7 @@ func findLargeFilesManual(rc *eos_io.RuntimeContext, path string, minSize int64,
 			}
 
 			if stat, ok := info.Sys().(*syscall.Stat_t); ok {
-				fileInfo.AccessTime = time.Unix(stat.Atimespec.Sec, stat.Atimespec.Nsec)
+				fileInfo.AccessTime = getAccessTime(stat)
 			}
 
 			files = append(files, fileInfo)
