@@ -34,9 +34,8 @@ func init() {
 	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check")
 	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation")
 
-	// Add mapping and JWT commands
+	// Add mapping command
 	CreateCmd.AddCommand(mappingCmd)
-	CreateCmd.AddCommand(CreateJWTCmd)
 }
 
 var CreateDelphiCmd = &cobra.Command{
@@ -344,27 +343,36 @@ Examples:
 
 func init() {
 	// Add subcommands
-	DeployCmd.AddCommand(newDockerDeployCmd())
-	DeployCmd.AddCommand(newCredentialsCmd())
-	DeployCmd.AddCommand(newCleanupCmd())
+	DeployCmd.AddCommand(dockerDeployCmd)
+	DeployCmd.AddCommand(delphiCredentialsCmd)
+	DeployCmd.AddCommand(cleanupCmd)
+	
+	// Set up flags for dockerDeployCmd
+	dockerDeployCmd.Flags().StringP("version", "v", "", "Wazuh version to deploy (e.g., 4.10.1)")
+	dockerDeployCmd.Flags().Bool("single-node", false, "Deploy as single-node")
+	dockerDeployCmd.Flags().Bool("multi-node", false, "Deploy as multi-node")
+	dockerDeployCmd.Flags().String("proxy", "", "Proxy address for certificate generation")
+	dockerDeployCmd.Flags().IntP("port", "p", 8011, "External port for Wazuh dashboard")
+	dockerDeployCmd.Flags().BoolP("force", "f", false, "Force deployment without prompts")
+	
+	// Set up flags for delphiCredentialsCmd
+	delphiCredentialsCmd.Flags().String("admin-password", "", "New admin password")
+	delphiCredentialsCmd.Flags().String("kibana-password", "", "New Kibana dashboard password")
+	delphiCredentialsCmd.Flags().String("api-password", "", "New API password")
+	delphiCredentialsCmd.Flags().String("deploy-type", "", "Deployment type (single-node or multi-node)")
+	delphiCredentialsCmd.Flags().BoolP("interactive", "i", false, "Interactive mode with prompts")
+	
+	// Set up flags for cleanupCmd
+	cleanupCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompts")
+	cleanupCmd.Flags().Bool("remove-data", false, "Remove volumes and persistent data")
 }
 
-// newDockerDeployCmd creates the Docker deployment command
-func newDockerDeployCmd() *cobra.Command {
-	var (
-		version      string
-		singleNode   bool
-		multiNode    bool
-		proxyAddress string
-		port         int
-		force        bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "docker",
-		Aliases: []string{"container"},
-		Short:   "Deploy Wazuh using Docker containers",
-		Long: `Deploy Wazuh using Docker containers with automatic setup.
+// dockerDeployCmd deploys Wazuh using Docker containers
+var dockerDeployCmd = &cobra.Command{
+	Use:     "docker",
+	Aliases: []string{"container"},
+	Short:   "Deploy Wazuh using Docker containers",
+	Long: `Deploy Wazuh using Docker containers with automatic setup.
 
 This command handles the complete Docker-based Wazuh deployment process:
 - Clones the official Wazuh Docker repository
@@ -374,65 +382,54 @@ This command handles the complete Docker-based Wazuh deployment process:
 - Configures port mappings for Hecate compatibility
 
 Examples:
-  eos delphi deploy docker --version 4.10.1 --single-node
-  eos delphi deploy docker --version 4.10.1 --multi-node --proxy proxy.example.com
-  eos delphi deploy docker --version 4.10.1 --port 8011`,
+  eos create delphi deploy docker --version 4.10.1 --single-node
+  eos create delphi deploy docker --version 4.10.1 --multi-node --proxy proxy.example.com
+  eos create delphi deploy docker --version 4.10.1 --port 8011`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			// Check privileges
-			privilegeManager := privilege_check.NewPrivilegeManager(nil)
-			if err := privilegeManager.CheckSudoOnly(rc); err != nil {
-				logger.Error("Root privileges required for Docker deployment", zap.Error(err))
-				return err
-			}
+		// Check privileges
+		privilegeManager := privilege_check.NewPrivilegeManager(nil)
+		if err := privilegeManager.CheckSudoOnly(rc); err != nil {
+			logger.Error("Root privileges required for Docker deployment", zap.Error(err))
+			return err
+		}
 
-			// Determine deployment type
-			deployType := ""
-			if singleNode && multiNode {
-				return fmt.Errorf("cannot specify both --single-node and --multi-node")
-			} else if singleNode {
-				deployType = "single-node"
-			} else if multiNode {
-				deployType = "multi-node"
-			}
+		// Get flag values
+		version, _ := cmd.Flags().GetString("version")
+		singleNode, _ := cmd.Flags().GetBool("single-node")
+		multiNode, _ := cmd.Flags().GetBool("multi-node")
+		proxyAddress, _ := cmd.Flags().GetString("proxy")
+		port, _ := cmd.Flags().GetInt("port")
+		force, _ := cmd.Flags().GetBool("force")
 
-			logger.Info("Starting Wazuh Docker deployment",
-				zap.String("version", version),
-				zap.String("deploy_type", deployType),
-				zap.String("proxy", proxyAddress),
-				zap.Int("port", port))
+		// Determine deployment type
+		deployType := ""
+		if singleNode && multiNode {
+			return fmt.Errorf("cannot specify both --single-node and --multi-node")
+		} else if singleNode {
+			deployType = "single-node"
+		} else if multiNode {
+			deployType = "multi-node"
+		}
 
-			return runDockerDeployment(rc, version, deployType, proxyAddress, port, force)
-		}),
-	}
+		logger.Info("Starting Wazuh Docker deployment",
+			zap.String("version", version),
+			zap.String("deploy_type", deployType),
+			zap.String("proxy", proxyAddress),
+			zap.Int("port", port))
 
-	cmd.Flags().StringVarP(&version, "version", "v", "", "Wazuh version to deploy (e.g., 4.10.1)")
-	cmd.Flags().BoolVar(&singleNode, "single-node", false, "Deploy as single-node")
-	cmd.Flags().BoolVar(&multiNode, "multi-node", false, "Deploy as multi-node")
-	cmd.Flags().StringVar(&proxyAddress, "proxy", "", "Proxy address for certificate generation")
-	cmd.Flags().IntVarP(&port, "port", "p", 8011, "External port for Wazuh dashboard")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deployment without prompts")
-
-	return cmd
+		return runDockerDeployment(rc, version, deployType, proxyAddress, port, force)
+	}),
 }
 
-// newCredentialsCmd creates the credentials management command
-func newCredentialsCmd() *cobra.Command {
-	var (
-		adminPassword  string
-		kibanaPassword string
-		apiPassword    string
-		deployType     string
-		interactive    bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "credentials",
-		Aliases: []string{"creds", "passwords"},
-		Short:   "Change default Wazuh credentials",
-		Long: `Change default Wazuh credentials with secure password hashing.
+// delphiCredentialsCmd changes default Wazuh credentials
+var delphiCredentialsCmd = &cobra.Command{
+	Use:     "credentials",
+	Aliases: []string{"creds", "passwords"},
+	Short:   "Change default Wazuh credentials",
+	Long: `Change default Wazuh credentials with secure password hashing.
 
 This command helps change the default passwords for:
 - Admin user (indexer password)
@@ -442,41 +439,33 @@ This command helps change the default passwords for:
 The passwords are automatically hashed using bcrypt for security.
 
 Examples:
-  eos delphi deploy credentials --interactive
-  eos delphi deploy credentials --admin-password "newpass" --deploy-type single-node`,
+  eos create delphi deploy credentials --interactive
+  eos create delphi deploy credentials --admin-password "newpass" --deploy-type single-node`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			logger.Info("Changing Wazuh credentials",
-				zap.String("deploy_type", deployType),
-				zap.Bool("interactive", interactive))
+		// Get flag values
+		adminPassword, _ := cmd.Flags().GetString("admin-password")
+		kibanaPassword, _ := cmd.Flags().GetString("kibana-password")
+		apiPassword, _ := cmd.Flags().GetString("api-password")
+		deployType, _ := cmd.Flags().GetString("deploy-type")
+		interactive, _ := cmd.Flags().GetBool("interactive")
 
-			return runCredentialsChange(rc, adminPassword, kibanaPassword, apiPassword, deployType, interactive)
-		}),
-	}
+		logger.Info("Changing Wazuh credentials",
+			zap.String("deploy_type", deployType),
+			zap.Bool("interactive", interactive))
 
-	cmd.Flags().StringVar(&adminPassword, "admin-password", "", "New admin password")
-	cmd.Flags().StringVar(&kibanaPassword, "kibana-password", "", "New Kibana dashboard password")
-	cmd.Flags().StringVar(&apiPassword, "api-password", "", "New API password")
-	cmd.Flags().StringVar(&deployType, "deploy-type", "", "Deployment type (single-node or multi-node)")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode with prompts")
-
-	return cmd
+		return runCredentialsChange(rc, adminPassword, kibanaPassword, apiPassword, deployType, interactive)
+	}),
 }
 
-// newCleanupCmd creates the cleanup/removal command
-func newCleanupCmd() *cobra.Command {
-	var (
-		force      bool
-		removeData bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "cleanup",
-		Aliases: []string{"remove", "uninstall"},
-		Short:   "Remove Wazuh Docker deployment",
-		Long: `Remove Wazuh Docker deployment and optionally clean up data.
+// cleanupCmd removes Wazuh Docker deployment
+var cleanupCmd = &cobra.Command{
+	Use:     "cleanup",
+	Aliases: []string{"remove", "uninstall"},
+	Short:   "Remove Wazuh Docker deployment",
+	Long: `Remove Wazuh Docker deployment and optionally clean up data.
 
 This command safely removes the Wazuh Docker deployment:
 - Stops all containers
@@ -484,25 +473,23 @@ This command safely removes the Wazuh Docker deployment:
 - Optionally removes volumes and data
 
 Examples:
-  eos delphi deploy cleanup                   # Remove deployment, keep data
-  eos delphi deploy cleanup --remove-data    # Remove deployment and data
-  eos delphi deploy cleanup --force          # Skip confirmation`,
+  eos create delphi deploy cleanup                   # Remove deployment, keep data
+  eos create delphi deploy cleanup --remove-data    # Remove deployment and data
+  eos create delphi deploy cleanup --force          # Skip confirmation`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			logger.Info("Cleaning up Wazuh deployment",
-				zap.Bool("remove_data", removeData),
-				zap.Bool("force", force))
+		// Get flag values
+		force, _ := cmd.Flags().GetBool("force")
+		removeData, _ := cmd.Flags().GetBool("remove-data")
 
-			return runCleanup(rc, removeData, force)
-		}),
-	}
+		logger.Info("Cleaning up Wazuh deployment",
+			zap.Bool("remove_data", removeData),
+			zap.Bool("force", force))
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip confirmation prompts")
-	cmd.Flags().BoolVar(&removeData, "remove-data", false, "Remove volumes and persistent data")
-
-	return cmd
+		return runCleanup(rc, removeData, force)
+	}),
 }
 
 // Implementation functions

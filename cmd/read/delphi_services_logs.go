@@ -108,7 +108,7 @@ func init() {
 	delphiServicesLogsCmd.Flags().Int("lines", 50, "Number of log lines to show")
 	delphiServicesLogsCmd.Flags().Bool("all", false, "View logs for all Delphi services")
 
-	ReadCmd.AddCommand(delphiServicesLogsCmd)
+	readDelphiCmd.AddCommand(delphiServicesLogsCmd)
 }
 
 // viewAllServiceLogs displays logs for all Delphi services with pretty formatting

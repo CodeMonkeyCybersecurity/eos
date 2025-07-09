@@ -64,7 +64,7 @@ var ReadAPICmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(ReadAPICmd)
+	readDelphiCmd.AddCommand(ReadAPICmd)
 	ReadAPICmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 	ReadAPICmd.Flags().BoolVar(&showPermissions, "permissions", false, "Display user permissions")
 	ReadAPICmd.Flags().BoolVar(&showVersion, "version", false, "Display Wazuh manager version")

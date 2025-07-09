@@ -27,14 +27,18 @@ import (
 )
 
 // jenkinsCmd represents the Jenkins installation command.
-var CreateJenkinsCmd = &cobra.Command{
+var jenkinsCmd = &cobra.Command{
 	Use:   "jenkins",
 	Short: "Install and deploy Jenkins",
 	Long: `Install and deploy Jenkins to /opt/jenkins by:
 - Rendering the Jenkins Docker Compose template to /opt/jenkins
 - Running "docker compose up -d" to deploy
 - Waiting 5 seconds and listing running containers via "docker ps"
-- Informing the user to navigate to :8059 and log in`,
+- Informing the user to navigate to :8059 and log in
+
+Examples:
+  eos create jenkins                     # Install Jenkins with default settings
+  eos create jenkins --timeout 10m      # Install with custom timeout`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		otelzap.Ctx(rc.Ctx).Info("Starting Jenkins installation using Eos")
 
@@ -183,83 +187,88 @@ var CreateJenkinsCmd = &cobra.Command{
 }
 
 func init() {
-	CreateCmd.AddCommand(CreateJenkinsCmd)
+	// Register Jenkins commands with CreateCmd
+	CreateCmd.AddCommand(jenkinsCmd)
+	CreateCmd.AddCommand(deployJenkinsCmd)
 }
 
-func NewDeployJenkinsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "jenkins",
-		Short: "Deploy reverse proxy for Jenkins",
-		Long: `Deploy the reverse proxy configuration for Jenkins using Hecate.
+// deployJenkinsCmd deploys reverse proxy for Jenkins using Hecate
+var deployJenkinsCmd = &cobra.Command{
+	Use:   "jenkins-proxy",
+	Short: "Deploy reverse proxy for Jenkins",
+	Long: `Deploy the reverse proxy configuration for Jenkins using Hecate.
 
 This command stops the Hecate container (if running) and then organizes assets by moving files 
-that are not relevant to Jenkins into the "other" directory at the project root.`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			otelzap.Ctx(rc.Ctx).Info("Starting Jenkins deployment")
+that are not relevant to Jenkins into the "other" directory at the project root.
 
-			// Stop the container if it's running.
-			if err := container.StopContainersBySubstring(rc, "hecate"); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Error stopping container", zap.String("substring", "hecate"), zap.Error(err))
-				fmt.Printf("Error stopping container: %v\n", err)
-				return err
-			}
-			otelzap.Ctx(rc.Ctx).Info("Containers with 'hecate' in the name stopped successfully")
+Examples:
+  eos create jenkins-proxy               # Deploy Jenkins reverse proxy
+  eos create jenkins-proxy --force       # Force deploy without confirmation`,
 
-			// Organize assets for Jenkins.
-			if err := utils.OrganizeAssetsForDeployment("jenkins"); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Failed to organize assets", zap.Error(err))
-				fmt.Printf("Failed to organize assets: %v\n", err)
-				return err
-			}
-			otelzap.Ctx(rc.Ctx).Info("Assets organized successfully for Jenkins")
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("Starting Jenkins deployment")
 
-			// Load configuration from .hecate.conf.
-			cfg, err := hecate.LoadConfig(rc, "jenkins")
-			if err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Configuration error", zap.Error(err))
-				fmt.Printf("Configuration error: %v\n", err)
-				return err
-			}
-			otelzap.Ctx(rc.Ctx).Info("Configuration loaded", zap.Any("config", cfg))
-			fmt.Printf("Configuration loaded:\n  Base Domain: %s\n  Backend IP: %s\n  Subdomain: %s\n  Email: %s\n",
-				cfg.BaseDomain, cfg.BackendIP, cfg.Subdomain, cfg.Email)
+		// Stop the container if it's running.
+		if err := container.StopContainersBySubstring(rc, "hecate"); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Error stopping container", zap.String("substring", "hecate"), zap.Error(err))
+			fmt.Printf("Error stopping container: %v\n", err)
+			return err
+		}
+		otelzap.Ctx(rc.Ctx).Info("Containers with 'hecate' in the name stopped successfully")
 
-			assetsDir := "./assets" // or the appropriate directory
-			if err := utils.ReplaceTokensInAllFiles(assetsDir, cfg.BaseDomain, cfg.BackendIP); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Failed to replace tokens in assets", zap.Error(err))
-				fmt.Printf("Error replacing tokens: %v\n", err)
-				return err
-			}
-			otelzap.Ctx(rc.Ctx).Info("Tokens replaced successfully in all files under assets")
+		// Organize assets for Jenkins.
+		if err := utils.OrganizeAssetsForDeployment("jenkins"); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Failed to organize assets", zap.Error(err))
+			fmt.Printf("Failed to organize assets: %v\n", err)
+			return err
+		}
+		otelzap.Ctx(rc.Ctx).Info("Assets organized successfully for Jenkins")
 
-			// Define fullDomain using subdomain and base domain.
-			fullDomain := fmt.Sprintf("%s.%s", cfg.Subdomain, cfg.BaseDomain)
+		// Load configuration from .hecate.conf.
+		cfg, err := hecate.LoadConfig(rc, "jenkins")
+		if err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Configuration error", zap.Error(err))
+			fmt.Printf("Configuration error: %v\n", err)
+			return err
+		}
+		otelzap.Ctx(rc.Ctx).Info("Configuration loaded", zap.Any("config", cfg))
+		fmt.Printf("Configuration loaded:\n  Base Domain: %s\n  Backend IP: %s\n  Subdomain: %s\n  Email: %s\n",
+			cfg.BaseDomain, cfg.BackendIP, cfg.Subdomain, cfg.Email)
 
-			if err := crypto.EnsureCertificates(cfg.Subdomain, cfg.BaseDomain, cfg.Email); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Certificate generation failed", zap.Error(err))
-				fmt.Printf("Certificate generation failed: %v\n", err)
-				return err
-			}
-			otelzap.Ctx(rc.Ctx).Info("Certificate retrieved successfully", zap.String("domain", fullDomain))
+		assetsDir := "./assets" // or the appropriate directory
+		if err := utils.ReplaceTokensInAllFiles(assetsDir, cfg.BaseDomain, cfg.BackendIP); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Failed to replace tokens in assets", zap.Error(err))
+			fmt.Printf("Error replacing tokens: %v\n", err)
+			return err
+		}
+		otelzap.Ctx(rc.Ctx).Info("Tokens replaced successfully in all files under assets")
 
-			// Uncomment lines in docker-compose.yml relevant to Jenkins.
-			if err := container.UncommentSegment("uncomment if using Jenkins behind Hecate"); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Failed to uncomment Jenkins section", zap.Error(err))
-				fmt.Printf("Failed to uncomment Jenkins section: %v\n", err)
-				return err
-			}
-			otelzap.Ctx(rc.Ctx).Info("Successfully uncommented Jenkins lines")
+		// Define fullDomain using subdomain and base domain.
+		fullDomain := fmt.Sprintf("%s.%s", cfg.Subdomain, cfg.BaseDomain)
 
-			// Now use the compose file for starting the services.
-			if err := container.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
-				otelzap.Ctx(rc.Ctx).Error("Failed to start Docker services", zap.Error(err))
-				fmt.Printf("Failed to run docker compose up: %v\n", err)
-				return err
-			}
+		if err := crypto.EnsureCertificates(cfg.Subdomain, cfg.BaseDomain, cfg.Email); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Certificate generation failed", zap.Error(err))
+			fmt.Printf("Certificate generation failed: %v\n", err)
+			return err
+		}
+		otelzap.Ctx(rc.Ctx).Info("Certificate retrieved successfully", zap.String("domain", fullDomain))
 
-			fmt.Println(" Jenkins reverse proxy deployed successfully.")
-			return nil
-		}),
-	}
-	return cmd
+		// Uncomment lines in docker-compose.yml relevant to Jenkins.
+		if err := container.UncommentSegment("uncomment if using Jenkins behind Hecate"); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Failed to uncomment Jenkins section", zap.Error(err))
+			fmt.Printf("Failed to uncomment Jenkins section: %v\n", err)
+			return err
+		}
+		otelzap.Ctx(rc.Ctx).Info("Successfully uncommented Jenkins lines")
+
+		// Now use the compose file for starting the services.
+		if err := container.RunDockerComposeAllServices(shared.DefaultComposeYML, "jenkins"); err != nil {
+			otelzap.Ctx(rc.Ctx).Error("Failed to start Docker services", zap.Error(err))
+			fmt.Printf("Failed to run docker compose up: %v\n", err)
+			return err
+		}
+
+		fmt.Println(" Jenkins reverse proxy deployed successfully.")
+		return nil
+	}),
 }

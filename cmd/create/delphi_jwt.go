@@ -14,9 +14,20 @@ import (
 	"go.uber.org/zap"
 )
 
-var CreateJWTCmd = &cobra.Command{
+// jwtCmd generates and stores a JWT token for Delphi (Wazuh) API access
+var jwtCmd = &cobra.Command{
 	Use:   "jwt",
 	Short: "Generate and store a JWT token for Delphi (Wazuh) API access",
+	Long: `Generate and store a JWT token for Delphi (Wazuh) API access.
+
+This command authenticates with the Wazuh API and stores the JWT token
+for subsequent API calls. The token is stored in the configuration file
+for reuse.
+
+Examples:
+  eos create jwt                         # Generate JWT token
+  eos create jwt --interactive           # Interactive mode with prompts`,
+
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		cfg, err := delphi.ReadConfig(rc)
 		if err != nil {
@@ -63,4 +74,9 @@ var CreateJWTCmd = &cobra.Command{
 		otelzap.Ctx(rc.Ctx).Info("JWT token retrieved successfully", zap.String("token", token))
 		return nil
 	}),
+}
+
+func init() {
+	// Register jwtCmd with CreateCmd
+	CreateCmd.AddCommand(jwtCmd)
 }

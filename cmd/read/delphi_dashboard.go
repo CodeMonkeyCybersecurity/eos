@@ -1,6 +1,6 @@
 /* cmd/delphi/dashboard/dashboard.go */
 
-package dashboard
+package read
 
 import (
 	"fmt"

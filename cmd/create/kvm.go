@@ -16,7 +16,7 @@ var CreateKvmCmd = &cobra.Command{
 
 func init() {
 	CreateCmd.AddCommand(CreateKvmCmd)
-	CreateKvmCmd.AddCommand(NewKvmInstallCmd())
+	CreateKvmCmd.AddCommand(kvmInstallCmd)
 	CreateKvmCmd.AddCommand(NewKvmTenantCmd())
 	CreateKvmCmd.AddCommand(NewKvmTemplateCmd())
 }

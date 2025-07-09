@@ -38,5 +38,5 @@ var ReadUsersCmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(ReadUsersCmd)
+	readDelphiCmd.AddCommand(ReadUsersCmd)
 }

@@ -1,5 +1,5 @@
 // cmd/delphi/watch/all.go
-package watch
+package read
 
 import (
 	"context"

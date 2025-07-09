@@ -82,6 +82,6 @@ var ReadCredentialsCmd = &cobra.Command{
 }
 
 func init() {
-	ReadCmd.AddCommand(ReadCredentialsCmd)
+	readDelphiCmd.AddCommand(ReadCredentialsCmd)
 	ReadCredentialsCmd.Flags().BoolVar(&showSecrets, "show-secrets", false, "Display sensitive fields like password and token")
 }

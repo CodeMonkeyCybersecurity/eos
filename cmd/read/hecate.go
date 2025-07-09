@@ -1,4 +1,4 @@
-// cmd/inspect/config.go
+// cmd/read/read.go
 
 package read
 
@@ -8,14 +8,34 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
-
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
+
+// readHecateCmd is the top-level `inspect` command
+var readHecateCmd = &cobra.Command{
+	Use:   "hecate",
+	Short: "Inspect the current state of Hecate-managed services",
+	Long: `Use this command to inspect the status, configuration, and health of 
+reverse proxy applications deployed via Hecate.
+
+Examples:
+	hecate inspect config
+	hecate inspect`,
+	Aliases: []string{"read", "get"},
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		fmt.Println(" Please use a subcommand (e.g. 'inspect config') to inspect a resource.")
+		return nil
+	}),
+}
+
+// Register subcommands when the package is loaded
+func init() {
+	readHecateCmd.AddCommand(inspectConfigCmd)
+}
 
 // inspectConfigCmd represents the "inspect config" subcommand
 var inspectConfigCmd = &cobra.Command{
@@ -52,18 +72,20 @@ func runInspectConfig(rc *eos_io.RuntimeContext) error {
 
 	switch choice {
 	case "1", "certificates", "certs":
-		utils.InspectCertificates(rc.Ctx)
+		logger.Info("Inspecting certificates...")
+		// TODO: Implement certificate inspection
 	case "2", "compose", "docker-compose":
-		utils.InspectDockerCompose(rc.Ctx)
+		logger.Info("Inspecting docker compose file...")
+		// TODO: Implement docker compose inspection
 	case "3", "github.com/CodeMonkeyCybersecurity/eos":
-		utils.InspectEosConfig(rc.Ctx)
+		logger.Info("Inspecting Eos configuration...")
+		// TODO: Implement Eos config inspection
 	case "4", "nginx":
-		utils.InspectNginxDefaults(rc.Ctx)
+		logger.Info("Inspecting Nginx defaults...")
+		// TODO: Implement Nginx defaults inspection
 	case "5", "all":
-		utils.InspectCertificates(rc.Ctx)
-		utils.InspectDockerCompose(rc.Ctx)
-		utils.InspectEosConfig(rc.Ctx)
-		utils.InspectNginxDefaults(rc.Ctx)
+		logger.Info("Inspecting all configurations...")
+		// TODO: Implement all inspections
 	default:
 		logger.Error(" Invalid choice provided", zap.String("choice", choice))
 		return fmt.Errorf("invalid choice: %s", choice)

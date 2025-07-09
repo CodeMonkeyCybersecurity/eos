@@ -1,27 +1,22 @@
 package backup
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
 	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/file_backup"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup/file_backup"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// newFileCmd creates the file backup command
-func newFileCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "file",
-		Aliases: []string{"single"},
-		Short:   "Simple file backup operations",
-		Long: `Simple file backup operations for individual files.
+// fileCmd is the file backup command
+var fileCmd = &cobra.Command{
+	Use:     "file",
+	Aliases: []string{"single"},
+	Short:   "Simple file backup operations",
+	Long: `Simple file backup operations for individual files.
 
 This command provides basic file backup functionality similar to the original 
 backupAFile.sh script but with enhanced features and proper integration.
@@ -32,36 +27,27 @@ Examples:
   eos backup file list                            # List all file backups
   eos backup file restore backup.txt.backup.Monday_2006-01-02_150405 /tmp/restored.txt`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			otelzap.Ctx(rc.Ctx).Info("No subcommand provided for file backup command")
-			_ = cmd.Help()
-			return nil
-		}),
-	}
-
-	// Add subcommands
-	cmd.AddCommand(newFileBackupCmd())
-	cmd.AddCommand(newFileListCmd())
-	cmd.AddCommand(newFileRestoreCmd())
-
-	return cmd
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for file backup command")
+		_ = cmd.Help()
+		return nil
+	}),
 }
 
-// newFileBackupCmd creates the file backup subcommand
-func newFileBackupCmd() *cobra.Command {
-	var (
-		backupDir     string
-		customName    string
-		interactive   bool
-		force         bool
-		dryRun        bool
-		noVerify      bool
-		noPreserve    bool
-		createSymlink bool
-		outputJSON    bool
-	)
+// fileBackupCmd is the file backup subcommand
+var (
+	fileBackupBackupDir     string
+	fileBackupCustomName    string
+	fileBackupInteractive   bool
+	fileBackupForce         bool
+	fileBackupDryRun        bool
+	fileBackupNoVerify      bool
+	fileBackupNoPreserve    bool
+	fileBackupCreateSymlink bool
+	fileBackupOutputJSON    bool
+)
 
-	cmd := &cobra.Command{
+var fileBackupCmd = &cobra.Command{
 		Use:     "create <file>",
 		Aliases: []string{"backup", "cp"},
 		Short:   "Create a backup of a single file",
@@ -84,26 +70,26 @@ Examples:
 
 			logger.Info("Creating file backup",
 				zap.String("file", filePath),
-				zap.String("backup_dir", backupDir),
-				zap.Bool("dry_run", dryRun))
+				zap.String("backup_dir", fileBackupBackupDir),
+				zap.Bool("dry_run", fileBackupDryRun))
 
 			config := file_backup.DefaultFileBackupConfig()
-			if backupDir != "" {
-				config.DefaultBackupDir = backupDir
+			if fileBackupBackupDir != "" {
+				config.DefaultBackupDir = fileBackupBackupDir
 			}
-			config.VerifyAfterBackup = !noVerify
-			config.PreservePermissions = !noPreserve
-			config.CreateSymlinks = createSymlink
+			config.VerifyAfterBackup = !fileBackupNoVerify
+			config.PreservePermissions = !fileBackupNoPreserve
+			config.CreateSymlinks = fileBackupCreateSymlink
 
 			options := &file_backup.BackupOptions{
-				BackupDir:           backupDir,
-				CustomName:          customName,
-				Interactive:         interactive,
-				Force:               force,
-				DryRun:              dryRun,
-				VerifyAfterBackup:   !noVerify,
-				PreservePermissions: !noPreserve,
-				CreateSymlink:       createSymlink,
+				BackupDir:           fileBackupBackupDir,
+				CustomName:          fileBackupCustomName,
+				Interactive:         fileBackupInteractive,
+				Force:               fileBackupForce,
+				DryRun:              fileBackupDryRun,
+				VerifyAfterBackup:   !fileBackupNoVerify,
+				PreservePermissions: !fileBackupNoPreserve,
+				CreateSymlink:       fileBackupCreateSymlink,
 			}
 
 			manager := file_backup.NewFileBackupManager(config)
@@ -113,35 +99,21 @@ Examples:
 				return err
 			}
 
-			if outputJSON {
-				return outputFileBackupJSON(result)
+			if fileBackupOutputJSON {
+				return file_backup.OutputFileBackupJSON(result)
 			}
 
-			return outputFileBackupText(result)
+			return file_backup.OutputFileBackupText(result)
 		}),
-	}
-
-	cmd.Flags().StringVar(&backupDir, "backup-dir", "", "Directory to store backups (default: /tmp/eos-file-backups)")
-	cmd.Flags().StringVar(&customName, "name", "", "Custom name for backup file")
-	cmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Prompt for confirmation before backup")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing backup")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
-	cmd.Flags().BoolVar(&noVerify, "no-verify", false, "Skip backup verification")
-	cmd.Flags().BoolVar(&noPreserve, "no-preserve-permissions", false, "Don't preserve file permissions")
-	cmd.Flags().BoolVar(&createSymlink, "symlink", false, "Create a symlink to latest backup")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-
-	return cmd
 }
 
-// newFileListCmd creates the file list subcommand
-func newFileListCmd() *cobra.Command {
-	var (
-		backupDir  string
-		outputJSON bool
-	)
+// fileListCmd is the file list subcommand
+var (
+	fileListBackupDir  string
+	fileListOutputJSON bool
+)
 
-	cmd := &cobra.Command{
+var fileListCmd = &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
 		Short:   "List all file backups",
@@ -157,38 +129,31 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 
-			logger.Info("Listing file backups", zap.String("backup_dir", backupDir))
+			logger.Info("Listing file backups", zap.String("backup_dir", fileListBackupDir))
 
 			manager := file_backup.NewFileBackupManager(nil)
-			result, err := manager.ListBackups(rc, backupDir)
+			result, err := manager.ListBackups(rc, fileListBackupDir)
 			if err != nil {
 				logger.Error("Failed to list backups", zap.Error(err))
 				return err
 			}
 
-			if outputJSON {
-				return outputFileListJSON(result)
+			if fileListOutputJSON {
+				return file_backup.OutputFileListJSON(result)
 			}
 
-			return outputFileListText(result)
+			return file_backup.OutputFileListText(result)
 		}),
-	}
-
-	cmd.Flags().StringVar(&backupDir, "backup-dir", "", "Directory to search for backups (default: /tmp/eos-file-backups)")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-
-	return cmd
 }
 
-// newFileRestoreCmd creates the file restore subcommand
-func newFileRestoreCmd() *cobra.Command {
-	var (
-		force      bool
-		dryRun     bool
-		outputJSON bool
-	)
+// fileRestoreCmd is the file restore subcommand
+var (
+	fileRestoreForce      bool
+	fileRestoreDryRun     bool
+	fileRestoreOutputJSON bool
+)
 
-	cmd := &cobra.Command{
+var fileRestoreCmd = &cobra.Command{
 		Use:   "restore <backup-file> [restore-path]",
 		Short: "Restore a backup file",
 		Long: `Restore a backup file to the original location or a specified path.
@@ -228,115 +193,46 @@ Examples:
 			logger.Info("Restoring file backup",
 				zap.String("backup_path", backupPath),
 				zap.String("restore_path", restorePath),
-				zap.Bool("dry_run", dryRun))
+				zap.Bool("dry_run", fileRestoreDryRun))
 
 			manager := file_backup.NewFileBackupManager(nil)
-			result, err := manager.RestoreFile(rc, backupPath, restorePath, force, dryRun)
+			result, err := manager.RestoreFile(rc, backupPath, restorePath, fileRestoreForce, fileRestoreDryRun)
 			if err != nil {
 				logger.Error("File restore failed", zap.Error(err))
 				return err
 			}
 
-			if outputJSON {
-				return outputFileRestoreJSON(result)
+			if fileRestoreOutputJSON {
+				return file_backup.OutputFileRestoreJSON(result)
 			}
 
-			return outputFileRestoreText(result)
+			return file_backup.OutputFileRestoreText(result)
 		}),
-	}
-
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing file")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Show what would be done without making changes")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-
-	return cmd
 }
 
-// Output formatting functions
+func init() {
+	// Add subcommands
+	fileCmd.AddCommand(fileBackupCmd)
+	fileCmd.AddCommand(fileListCmd)
+	fileCmd.AddCommand(fileRestoreCmd)
 
-func outputFileBackupJSON(result *file_backup.FileBackupOperation) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
+	// fileBackupCmd flags
+	fileBackupCmd.Flags().StringVar(&fileBackupBackupDir, "backup-dir", "", "Directory to store backups (default: /tmp/eos-file-backups)")
+	fileBackupCmd.Flags().StringVar(&fileBackupCustomName, "name", "", "Custom name for backup file")
+	fileBackupCmd.Flags().BoolVarP(&fileBackupInteractive, "interactive", "i", false, "Prompt for confirmation before backup")
+	fileBackupCmd.Flags().BoolVarP(&fileBackupForce, "force", "f", false, "Overwrite existing backup")
+	fileBackupCmd.Flags().BoolVar(&fileBackupDryRun, "dry-run", false, "Show what would be done without making changes")
+	fileBackupCmd.Flags().BoolVar(&fileBackupNoVerify, "no-verify", false, "Skip backup verification")
+	fileBackupCmd.Flags().BoolVar(&fileBackupNoPreserve, "no-preserve-permissions", false, "Don't preserve file permissions")
+	fileBackupCmd.Flags().BoolVar(&fileBackupCreateSymlink, "symlink", false, "Create a symlink to latest backup")
+	fileBackupCmd.Flags().BoolVar(&fileBackupOutputJSON, "json", false, "Output in JSON format")
 
-func outputFileBackupText(result *file_backup.FileBackupOperation) error {
-	if result.DryRun {
-		fmt.Printf("[DRY RUN] %s\n", result.Message)
-	} else if result.Success {
-		fmt.Printf("✓ %s\n", result.Message)
-		if result.Duration > 0 {
-			fmt.Printf("  Duration: %v\n", result.Duration)
-		}
-		if result.FileSize > 0 {
-			fmt.Printf("  Size: %d bytes\n", result.FileSize)
-		}
-	} else {
-		fmt.Printf("✗ %s\n", result.Message)
-	}
-	return nil
-}
+	// fileListCmd flags
+	fileListCmd.Flags().StringVar(&fileListBackupDir, "backup-dir", "", "Directory to search for backups (default: /tmp/eos-file-backups)")
+	fileListCmd.Flags().BoolVar(&fileListOutputJSON, "json", false, "Output in JSON format")
 
-func outputFileListJSON(result *file_backup.BackupListResult) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
-
-func outputFileListText(result *file_backup.BackupListResult) error {
-	if result.TotalBackups == 0 {
-		fmt.Printf("No backups found in %s\n", result.BackupDir)
-		return nil
-	}
-
-	fmt.Printf("Found %d backups in %s\n", result.TotalBackups, result.BackupDir)
-	fmt.Printf("Total size: %d bytes\n\n", result.TotalSize)
-
-	// Print header
-	fmt.Printf("%-30s %-20s %-12s %s\n", "BACKUP NAME", "ORIGINAL FILE", "SIZE", "BACKUP TIME")
-	fmt.Println(strings.Repeat("-", 80))
-
-	// Print backups
-	for _, backup := range result.Backups {
-		originalFile := backup.OriginalFile
-		if originalFile == "" {
-			originalFile = "-"
-		}
-
-		backupTime := "-"
-		if !backup.BackupTime.IsZero() {
-			backupTime = backup.BackupTime.Format("01-02 15:04")
-		}
-
-		fmt.Printf("%-30s %-20s %-12d %s\n",
-			utils.TruncateString(backup.Name, 30),
-			utils.TruncateString(originalFile, 20),
-			backup.Size,
-			backupTime)
-	}
-
-	return nil
-}
-
-func outputFileRestoreJSON(result *file_backup.RestoreOperation) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(result)
-}
-
-func outputFileRestoreText(result *file_backup.RestoreOperation) error {
-	if result.DryRun {
-		fmt.Printf("[DRY RUN] %s\n", result.Message)
-	} else if result.Success {
-		fmt.Printf("✓ %s\n", result.Message)
-		if result.Overwritten {
-			fmt.Printf("  (File was overwritten)\n")
-		}
-		if result.Duration > 0 {
-			fmt.Printf("  Duration: %v\n", result.Duration)
-		}
-	} else {
-		fmt.Printf("✗ %s\n", result.Message)
-	}
-	return nil
+	// fileRestoreCmd flags
+	fileRestoreCmd.Flags().BoolVarP(&fileRestoreForce, "force", "f", false, "Overwrite existing file")
+	fileRestoreCmd.Flags().BoolVar(&fileRestoreDryRun, "dry-run", false, "Show what would be done without making changes")
+	fileRestoreCmd.Flags().BoolVar(&fileRestoreOutputJSON, "json", false, "Output in JSON format")
 }

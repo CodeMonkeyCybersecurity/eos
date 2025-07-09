@@ -1,5 +1,5 @@
 // cmd/delphi/watch/watch.go
-package watch
+package read
 
 import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"

@@ -38,7 +38,10 @@ Examples:
   # S3 repository
   eos backup create repository s3 --backend s3 --url s3:s3.amazonaws.com/mybucket`,
 	Args: cobra.ExactArgs(1),
-	RunE: eos.Wrap(createRepository),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// TODO: Implement repository creation
+		return fmt.Errorf("createRepository not yet implemented")
+	}),
 }
 
 var createProfileCmd = &cobra.Command{
@@ -62,7 +65,10 @@ Examples:
     --exclude "*/.cache,*/Downloads" \
     --schedule "0 2 * * *"`,
 	Args: cobra.ExactArgs(1),
-	RunE: eos.Wrap(createProfile),
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// TODO: Implement profile creation
+		return fmt.Errorf("createProfile not yet implemented")
+	}),
 }
 
 func init() {
@@ -104,16 +110,3 @@ func init() {
 		panic(fmt.Sprintf("failed to mark 'paths' flag as required: %v", err))
 	}
 }
-
-// createRepository creates a new backup repository
-func createRepository(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// TODO: Implement repository creation
-	return fmt.Errorf("createRepository not yet implemented")
-}
-
-// createProfile creates a new backup profile
-func createProfile(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	// TODO: Implement profile creation
-	return fmt.Errorf("createProfile not yet implemented")
-}
-

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/salt/client"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -21,15 +21,15 @@ type OrchestrationManager struct {
 
 // ManagerConfig contains orchestration manager configuration
 type ManagerConfig struct {
-	DefaultTimeout     time.Duration                  `json:"default_timeout"`
-	DefaultRetries     int                           `json:"default_retries"`
-	BatchSize          int                           `json:"batch_size"`
-	ConcurrentJobs     int                           `json:"concurrent_jobs"`
-	StateEnvironment   string                        `json:"state_environment"`
-	PillarDefaults     map[string]interface{}        `json:"pillar_defaults"`
-	TargetSelectors    map[string]string             `json:"target_selectors"`
-	WorkflowTemplates  map[string]*WorkflowTemplate  `json:"workflow_templates"`
-	HashiCorpConfig    *HashiCorpIntegrationConfig   `json:"hashicorp_config"`
+	DefaultTimeout    time.Duration                `json:"default_timeout"`
+	DefaultRetries    int                          `json:"default_retries"`
+	BatchSize         int                          `json:"batch_size"`
+	ConcurrentJobs    int                          `json:"concurrent_jobs"`
+	StateEnvironment  string                       `json:"state_environment"`
+	PillarDefaults    map[string]interface{}       `json:"pillar_defaults"`
+	TargetSelectors   map[string]string            `json:"target_selectors"`
+	WorkflowTemplates map[string]*WorkflowTemplate `json:"workflow_templates"`
+	HashiCorpConfig   *HashiCorpIntegrationConfig  `json:"hashicorp_config"`
 }
 
 // HashiCorpIntegrationConfig contains HashiCorp tools integration settings
@@ -61,20 +61,20 @@ type TerraformConfig struct {
 
 // ConsulConfig contains Consul integration settings
 type ConsulConfig struct {
-	Enabled      bool              `json:"enabled"`
-	StateModule  string            `json:"state_module"`
-	ServicePrefix string           `json:"service_prefix"`
-	KVPrefix     string            `json:"kv_prefix"`
-	ACLConfig    map[string]string `json:"acl_config"`
+	Enabled       bool              `json:"enabled"`
+	StateModule   string            `json:"state_module"`
+	ServicePrefix string            `json:"service_prefix"`
+	KVPrefix      string            `json:"kv_prefix"`
+	ACLConfig     map[string]string `json:"acl_config"`
 }
 
 // NomadConfig contains Nomad integration settings
 type NomadConfig struct {
-	Enabled       bool              `json:"enabled"`
-	StateModule   string            `json:"state_module"`
-	JobPrefix     string            `json:"job_prefix"`
-	NamespacePrefix string          `json:"namespace_prefix"`
-	PolicyMapping map[string]string `json:"policy_mapping"`
+	Enabled         bool              `json:"enabled"`
+	StateModule     string            `json:"state_module"`
+	JobPrefix       string            `json:"job_prefix"`
+	NamespacePrefix string            `json:"namespace_prefix"`
+	PolicyMapping   map[string]string `json:"policy_mapping"`
 }
 
 // PackerConfig contains Packer integration settings
@@ -114,16 +114,16 @@ type WorkflowStep struct {
 
 // WorkflowExecution represents an active workflow execution
 type WorkflowExecution struct {
-	ID            string                        `json:"id"`
-	WorkflowName  string                        `json:"workflow_name"`
-	Status        string                        `json:"status"`
-	StartTime     time.Time                     `json:"start_time"`
-	EndTime       *time.Time                    `json:"end_time,omitempty"`
-	CurrentStep   int                           `json:"current_step"`
-	StepResults   []WorkflowStepResult          `json:"step_results"`
-	Variables     map[string]interface{}        `json:"variables"`
-	Error         string                        `json:"error,omitempty"`
-	JobIDs        []string                      `json:"job_ids"`
+	ID           string                 `json:"id"`
+	WorkflowName string                 `json:"workflow_name"`
+	Status       string                 `json:"status"`
+	StartTime    time.Time              `json:"start_time"`
+	EndTime      *time.Time             `json:"end_time,omitempty"`
+	CurrentStep  int                    `json:"current_step"`
+	StepResults  []WorkflowStepResult   `json:"step_results"`
+	Variables    map[string]interface{} `json:"variables"`
+	Error        string                 `json:"error,omitempty"`
+	JobIDs       []string               `json:"job_ids"`
 }
 
 // WorkflowStepResult represents the result of a workflow step execution
@@ -141,14 +141,14 @@ type WorkflowStepResult struct {
 
 // OrchestrationRequest represents a high-level orchestration request
 type OrchestrationRequest struct {
-	Type          string                 `json:"type"` // workflow, hashicorp, custom
-	Name          string                 `json:"name"`
-	Target        string                 `json:"target"`
-	Variables     map[string]interface{} `json:"variables,omitempty"`
-	Pillar        map[string]interface{} `json:"pillar,omitempty"`
-	DryRun        bool                   `json:"dry_run,omitempty"`
-	Timeout       time.Duration          `json:"timeout,omitempty"`
-	ConcurrentJobs int                   `json:"concurrent_jobs,omitempty"`
+	Type           string                 `json:"type"` // workflow, hashicorp, custom
+	Name           string                 `json:"name"`
+	Target         string                 `json:"target"`
+	Variables      map[string]interface{} `json:"variables,omitempty"`
+	Pillar         map[string]interface{} `json:"pillar,omitempty"`
+	DryRun         bool                   `json:"dry_run,omitempty"`
+	Timeout        time.Duration          `json:"timeout,omitempty"`
+	ConcurrentJobs int                    `json:"concurrent_jobs,omitempty"`
 }
 
 // HashiCorpOperation represents a HashiCorp tool operation
@@ -164,7 +164,7 @@ type HashiCorpOperation struct {
 // NewOrchestrationManager creates a new orchestration manager
 func NewOrchestrationManager(rc *eos_io.RuntimeContext, saltClient client.SaltClient, config *ManagerConfig) *OrchestrationManager {
 	logger := otelzap.Ctx(rc.Ctx)
-	
+
 	if config == nil {
 		config = getDefaultConfig()
 	}
@@ -203,20 +203,20 @@ func NewOrchestrationManager(rc *eos_io.RuntimeContext, saltClient client.SaltCl
 // getDefaultConfig returns default orchestration manager configuration
 func getDefaultConfig() *ManagerConfig {
 	return &ManagerConfig{
-		DefaultTimeout:   30 * time.Minute,
-		DefaultRetries:   3,
-		BatchSize:        10,
-		ConcurrentJobs:   5,
-		StateEnvironment: "base",
-		PillarDefaults:   make(map[string]interface{}),
-		TargetSelectors:  make(map[string]string),
+		DefaultTimeout:    30 * time.Minute,
+		DefaultRetries:    3,
+		BatchSize:         10,
+		ConcurrentJobs:    5,
+		StateEnvironment:  "base",
+		PillarDefaults:    make(map[string]interface{}),
+		TargetSelectors:   make(map[string]string),
 		WorkflowTemplates: make(map[string]*WorkflowTemplate),
 		HashiCorpConfig: &HashiCorpIntegrationConfig{
 			VaultConfig: &VaultConfig{
-				Enabled:      true,
-				StateModule:  "vault",
-				PillarPrefix: "vault:",
-				SecretMounts: make(map[string]string),
+				Enabled:       true,
+				StateModule:   "vault",
+				PillarPrefix:  "vault:",
+				SecretMounts:  make(map[string]string),
 				PolicyMapping: make(map[string]string),
 			},
 			TerraformConfig: &TerraformConfig{
@@ -253,7 +253,7 @@ func getDefaultConfig() *ManagerConfig {
 // ExecuteOrchestration executes a high-level orchestration request
 func (om *OrchestrationManager) ExecuteOrchestration(ctx context.Context, req *OrchestrationRequest) (*WorkflowExecution, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	logger.Info("Starting orchestration execution",
 		zap.String("type", req.Type),
 		zap.String("name", req.Name),
@@ -275,7 +275,7 @@ func (om *OrchestrationManager) ExecuteOrchestration(ctx context.Context, req *O
 // executeWorkflow executes a predefined workflow template
 func (om *OrchestrationManager) executeWorkflow(ctx context.Context, req *OrchestrationRequest) (*WorkflowExecution, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	template, exists := om.config.WorkflowTemplates[req.Name]
 	if !exists {
 		return nil, fmt.Errorf("workflow template '%s' not found", req.Name)
@@ -319,7 +319,7 @@ func (om *OrchestrationManager) executeWorkflow(ctx context.Context, req *Orches
 		if err != nil {
 			execution.Status = "failed"
 			execution.Error = fmt.Sprintf("step %d failed: %v", i, err)
-			
+
 			logger.Error("Workflow step failed",
 				zap.String("execution_id", execution.ID),
 				zap.Int("step", i),
@@ -368,7 +368,7 @@ func (om *OrchestrationManager) executeWorkflow(ctx context.Context, req *Orches
 // executeHashiCorpOperation executes HashiCorp tool operations through Salt
 func (om *OrchestrationManager) executeHashiCorpOperation(ctx context.Context, req *OrchestrationRequest) (*WorkflowExecution, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	// Parse HashiCorp operation from request variables
 	var operation HashiCorpOperation
 	if opData, ok := req.Variables["operation"]; ok {
@@ -448,7 +448,7 @@ func (om *OrchestrationManager) executeHashiCorpOperation(ctx context.Context, r
 // executeCustomOrchestration executes custom orchestration logic
 func (om *OrchestrationManager) executeCustomOrchestration(ctx context.Context, req *OrchestrationRequest) (*WorkflowExecution, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	execution := &WorkflowExecution{
 		ID:           generateExecutionID(),
 		WorkflowName: req.Name,
@@ -496,7 +496,7 @@ func (om *OrchestrationManager) checkStepDependencies(step WorkflowStep, executi
 
 func (om *OrchestrationManager) executeWorkflowStep(ctx context.Context, step WorkflowStep, execution *WorkflowExecution, dryRun bool) (*WorkflowStepResult, error) {
 	logger := otelzap.Ctx(ctx)
-	
+
 	result := &WorkflowStepResult{
 		StepName:   step.Name,
 		Status:     "running",
@@ -546,7 +546,7 @@ func (om *OrchestrationManager) executeWorkflowStep(ctx context.Context, step Wo
 		if err == nil {
 			break
 		}
-		
+
 		lastErr = err
 		logger.Warn("Workflow step attempt failed",
 			zap.String("execution_id", execution.ID),
@@ -571,12 +571,12 @@ func (om *OrchestrationManager) executeWorkflowStep(ctx context.Context, step Wo
 
 func (om *OrchestrationManager) executeStateStep(ctx context.Context, step WorkflowStep, result *WorkflowStepResult, dryRun bool) error {
 	req := &client.StateRequest{
-		Client:     client.ClientTypeLocal,
-		Target:     step.Target,
-		Function:   step.Function,
-		Args:       step.Args,
-		Pillar:     step.Pillar,
-		Test:       dryRun,
+		Client:   client.ClientTypeLocal,
+		Target:   step.Target,
+		Function: step.Function,
+		Args:     step.Args,
+		Pillar:   step.Pillar,
+		Test:     dryRun,
 	}
 
 	resp, err := om.saltClient.RunState(ctx, req)
@@ -586,7 +586,7 @@ func (om *OrchestrationManager) executeStateStep(ctx context.Context, step Workf
 
 	result.JobID = resp.JobID
 	result.Result = make(map[string]interface{})
-	
+
 	if len(resp.Return) > 0 {
 		result.Result["return"] = resp.Return
 	}
@@ -619,7 +619,7 @@ func (om *OrchestrationManager) executeCommandStep(ctx context.Context, step Wor
 
 	result.JobID = resp.JobID
 	result.Result = make(map[string]interface{})
-	
+
 	if len(resp.Return) > 0 {
 		result.Result["return"] = resp.Return
 	}
@@ -637,7 +637,7 @@ func (om *OrchestrationManager) executeOrchestrateStep(ctx context.Context, step
 
 	if dryRun {
 		result.Result = map[string]interface{}{
-			"dry_run": true,
+			"dry_run":       true,
 			"orchestration": req,
 		}
 		return nil
@@ -650,7 +650,7 @@ func (om *OrchestrationManager) executeOrchestrateStep(ctx context.Context, step
 
 	result.JobID = resp.JobID
 	result.Result = make(map[string]interface{})
-	
+
 	if len(resp.Return) > 0 {
 		result.Result["return"] = resp.Return
 	}
@@ -689,7 +689,7 @@ func (om *OrchestrationManager) executeConditionStep(ctx context.Context, step W
 
 func (om *OrchestrationManager) executeRollback(ctx context.Context, template *WorkflowTemplate, execution *WorkflowExecution) error {
 	logger := otelzap.Ctx(ctx)
-	
+
 	if len(template.Rollback) == 0 {
 		return nil
 	}
@@ -721,7 +721,7 @@ func (om *OrchestrationManager) executeVaultOperation(ctx context.Context, opera
 	logger.Info("Executing Vault operation via Salt",
 		zap.String("action", operation.Action),
 		zap.String("target", operation.Target))
-	
+
 	// Implementation would use Salt states to manage Vault
 	// This is a placeholder
 	return nil
@@ -732,7 +732,7 @@ func (om *OrchestrationManager) executeTerraformOperation(ctx context.Context, o
 	logger.Info("Executing Terraform operation via Salt",
 		zap.String("action", operation.Action),
 		zap.String("target", operation.Target))
-	
+
 	// Implementation would use Salt states to manage Terraform
 	// This is a placeholder
 	return nil
@@ -743,7 +743,7 @@ func (om *OrchestrationManager) executeConsulOperation(ctx context.Context, oper
 	logger.Info("Executing Consul operation via Salt",
 		zap.String("action", operation.Action),
 		zap.String("target", operation.Target))
-	
+
 	// Implementation would use Salt states to manage Consul
 	// This is a placeholder
 	return nil
@@ -754,7 +754,7 @@ func (om *OrchestrationManager) executeNomadOperation(ctx context.Context, opera
 	logger.Info("Executing Nomad operation via Salt",
 		zap.String("action", operation.Action),
 		zap.String("target", operation.Target))
-	
+
 	// Implementation would use Salt states to manage Nomad
 	// This is a placeholder
 	return nil
@@ -765,7 +765,7 @@ func (om *OrchestrationManager) executePackerOperation(ctx context.Context, oper
 	logger.Info("Executing Packer operation via Salt",
 		zap.String("action", operation.Action),
 		zap.String("target", operation.Target))
-	
+
 	// Implementation would use Salt states to manage Packer
 	// This is a placeholder
 	return nil
@@ -779,17 +779,17 @@ func generateExecutionID() string {
 
 func mergeVariables(template, request map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{})
-	
+
 	// Copy template variables
 	for k, v := range template {
 		result[k] = v
 	}
-	
+
 	// Override with request variables
 	for k, v := range request {
 		result[k] = v
 	}
-	
+
 	return result
 }
 
@@ -807,7 +807,7 @@ func (om *OrchestrationManager) RegisterWorkflowTemplate(template *WorkflowTempl
 	if template.Name == "" {
 		return fmt.Errorf("workflow template name is required")
 	}
-	
+
 	om.config.WorkflowTemplates[template.Name] = template
 	return nil
 }
@@ -826,11 +826,11 @@ func (om *OrchestrationManager) ValidateWorkflowTemplate(template *WorkflowTempl
 	if template.Name == "" {
 		return fmt.Errorf("workflow name is required")
 	}
-	
+
 	if len(template.Steps) == 0 {
 		return fmt.Errorf("workflow must have at least one step")
 	}
-	
+
 	// Validate each step
 	for i, step := range template.Steps {
 		if step.Name == "" {
@@ -846,6 +846,6 @@ func (om *OrchestrationManager) ValidateWorkflowTemplate(template *WorkflowTempl
 			return fmt.Errorf("step %d: function is required for type %s", i, step.Type)
 		}
 	}
-	
+
 	return nil
 }

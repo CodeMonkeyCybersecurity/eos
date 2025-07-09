@@ -10,22 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func init() {
-	CreateCmd.AddCommand(NewDelphiWebhookCmd())
-}
-
-// NewDelphiWebhookCmd creates the delphi-webhook command
-func NewDelphiWebhookCmd() *cobra.Command {
-	var (
-		targetDir    string
-		dryRun       bool
-		forceInstall bool
-	)
-
-	cmd := &cobra.Command{
-		Use:   "delphi-webhook",
-		Short: "Deploy Delphi webhook integration scripts to Wazuh",
-		Long: `Deploy the custom Delphi webhook integration scripts to Wazuh server.
+// delphiWebhookCmd deploys Delphi webhook integration scripts to Wazuh
+var delphiWebhookCmd = &cobra.Command{
+	Use:   "delphi-webhook",
+	Short: "Deploy Delphi webhook integration scripts to Wazuh",
+	Long: `Deploy the custom Delphi webhook integration scripts to Wazuh server.
 
 This command deploys two files to /var/ossec/integrations/:
 - custom-delphi-webhook (bash wrapper script)
@@ -37,25 +26,25 @@ After deployment, you need to:
 1. Configure /var/ossec/etc/ossec.conf with the webhook integration
 2. Restart Wazuh manager to activate the integration
 
-Example:
-  eos create delphi-webhook
-  eos create delphi-webhook --target-dir /custom/path --dry-run`,
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
-			logger.Info(" Starting Delphi webhook deployment",
-				zap.String("target_dir", targetDir),
-				zap.Bool("dry_run", dryRun),
-				zap.Bool("force", forceInstall))
+Examples:
+  eos create delphi-webhook                       # Deploy to default location
+  eos create delphi-webhook --target-dir /custom/path # Deploy to custom location
+  eos create delphi-webhook --dry-run             # Preview deployment`,
 
-			return delphi.DeployDelphiWebhook(rc.Ctx, logger, targetDir, dryRun, forceInstall)
-		}),
-	}
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		
+		targetDir, _ := cmd.Flags().GetString("target-dir")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		forceInstall, _ := cmd.Flags().GetBool("force")
 
-	cmd.Flags().StringVarP(&targetDir, "target-dir", "t", "/var/ossec/integrations", "Target directory for webhook scripts")
-	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Show what would be done without making changes")
-	cmd.Flags().BoolVarP(&forceInstall, "force", "f", false, "Overwrite existing files")
+		logger.Info("Starting Delphi webhook deployment",
+			zap.String("target_dir", targetDir),
+			zap.Bool("dry_run", dryRun),
+			zap.Bool("force", forceInstall))
 
-	return cmd
+		return delphi.DeployDelphiWebhook(rc.Ctx, logger, targetDir, dryRun, forceInstall)
+	}),
 }
 
 var pipelineWebhookCmd = &cobra.Command{
@@ -96,9 +85,17 @@ Examples:
 }
 
 func init() {
+	// Register webhook commands with CreateCmd
+	CreateCmd.AddCommand(delphiWebhookCmd)
+	CreateCmd.AddCommand(pipelineWebhookCmd)
+	
+	// Set up flags for delphiWebhookCmd
+	delphiWebhookCmd.Flags().StringP("target-dir", "t", "/var/ossec/integrations", "Target directory for webhook scripts")
+	delphiWebhookCmd.Flags().BoolP("dry-run", "n", false, "Show what would be done without making changes")
+	delphiWebhookCmd.Flags().BoolP("force", "f", false, "Overwrite existing files")
+	
+	// Set up flags for pipelineWebhookCmd
 	pipelineWebhookCmd.Flags().String("target-dir", "/var/ossec/integrations", "Target directory for webhook scripts")
 	pipelineWebhookCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	pipelineWebhookCmd.Flags().Bool("force", false, "Overwrite existing files")
-
-	CreateCmd.AddCommand(pipelineWebhookCmd)
 }

@@ -14,13 +14,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// CreateCredentialsCmd creates the credentials management command
-func CreateCredentialsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "credentials",
-		Aliases: []string{"creds"},
-		Short:   "Manage dynamic database credentials",
-		Long: `Manage dynamic database credentials through Vault.
+// credentialsCmd manages dynamic database credentials
+var credentialsCmd = &cobra.Command{
+	Use:     "credentials",
+	Aliases: []string{"creds"},
+	Short:   "Manage dynamic database credentials",
+	Long: `Manage dynamic database credentials through Vault.
 
 This command provides credential management functionality:
 - Generate new dynamic credentials
@@ -29,137 +28,130 @@ This command provides credential management functionality:
 - Renew credentials
 
 Examples:
-  eos database credentials generate --role delphi-readonly
-  eos database credentials revoke --lease-id vault:db:123
-  eos database credentials list --role delphi-readonly`,
+  eos create credentials generate --role delphi-readonly
+  eos create credentials revoke --lease-id vault:db:123
+  eos create credentials list --role delphi-readonly`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			otelzap.Ctx(rc.Ctx).Info("No subcommand provided for credentials command")
-			_ = cmd.Help()
-			return nil
-		}),
-	}
-
-	// Add subcommands
-	CreateCmd.AddCommand(newGenerateCredentialsCmd())
-	CreateCmd.AddCommand(newRevokeCredentialsCmd())
-
-	return cmd
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		otelzap.Ctx(rc.Ctx).Info("No subcommand provided for credentials command")
+		_ = cmd.Help()
+		return nil
+	}),
 }
 
-func newGenerateCredentialsCmd() *cobra.Command {
-	var (
-		roleName     string
-		engineMount  string
-		outputJSON   bool
-		showPassword bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "generate",
-		Aliases: []string{"gen"},
-		Short:   "Generate new dynamic database credentials",
-		Long: `Generate new dynamic database credentials for a specific role.
+// generateCredentialsCmd generates new dynamic database credentials
+var generateCredentialsCmd = &cobra.Command{
+	Use:     "generate",
+	Aliases: []string{"gen"},
+	Short:   "Generate new dynamic database credentials",
+	Long: `Generate new dynamic database credentials for a specific role.
 
 Examples:
-  eos database credentials generate --role delphi-readonly
-  eos database credentials generate --role delphi-readonly --json
-  eos database credentials generate --role myapp-user --show-password`,
+  eos create credentials generate --role delphi-readonly
+  eos create credentials generate --role delphi-readonly --json
+  eos create credentials generate --role myapp-user --show-password`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if roleName == "" {
-				return fmt.Errorf("role name is required (use --role)")
-			}
+		roleName, _ := cmd.Flags().GetString("role")
+		if roleName == "" {
+			return fmt.Errorf("role name is required (use --role)")
+		}
 
-			logger.Info("Generating dynamic database credentials", zap.String("role", roleName))
+		logger.Info("Generating dynamic database credentials", zap.String("role", roleName))
 
-			manager := database_management.NewDatabaseManager()
+		manager := database_management.NewDatabaseManager()
 
-			options := &database_management.VaultOperationOptions{
-				EngineMount: engineMount,
-				RoleName:    roleName,
-			}
+		engineMount, _ := cmd.Flags().GetString("engine-mount")
+		options := &database_management.VaultOperationOptions{
+			EngineMount: engineMount,
+			RoleName:    roleName,
+		}
 
-			if options.EngineMount == "" {
-				options.EngineMount = "database"
-			}
+		if options.EngineMount == "" {
+			options.EngineMount = "database"
+		}
 
-			credential, err := manager.GenerateCredentials(rc, options)
-			if err != nil {
-				return fmt.Errorf("failed to generate credentials: %w", err)
-			}
+		credential, err := manager.GenerateCredentials(rc, options)
+		if err != nil {
+			return fmt.Errorf("failed to generate credentials: %w", err)
+		}
 
-			if outputJSON {
-				return outputJSONCredential(credential, showPassword)
-			}
+		outputJSON, _ := cmd.Flags().GetBool("json")
+		showPassword, _ := cmd.Flags().GetBool("show-password")
 
-			return outputTableCredential(credential, showPassword)
-		}),
-	}
+		if outputJSON {
+			return outputJSONCredential(credential, showPassword)
+		}
 
-	cmd.Flags().StringVarP(&roleName, "role", "r", "", "Database role name")
-	cmd.Flags().StringVar(&engineMount, "engine-mount", "database", "Vault database engine mount point")
-	cmd.Flags().BoolVar(&outputJSON, "json", false, "Output in JSON format")
-	cmd.Flags().BoolVar(&showPassword, "show-password", false, "Show password in output")
-
-	return cmd
+		return outputTableCredential(credential, showPassword)
+	}),
 }
 
-func newRevokeCredentialsCmd() *cobra.Command {
-	var (
-		leaseID string
-		force   bool
-	)
-
-	cmd := &cobra.Command{
-		Use:     "revoke",
-		Aliases: []string{"rev"},
-		Short:   "Revoke dynamic database credentials",
-		Long: `Revoke dynamic database credentials by lease ID.
+// revokeCredentialsCmd revokes dynamic database credentials
+var revokeCredentialsCmd = &cobra.Command{
+	Use:     "revoke",
+	Aliases: []string{"rev"},
+	Short:   "Revoke dynamic database credentials",
+	Long: `Revoke dynamic database credentials by lease ID.
 
 Examples:
-  eos database credentials revoke --lease-id vault:db:123456
-  eos database credentials revoke --lease-id vault:db:123456 --force`,
+  eos create credentials revoke --lease-id vault:db:123456
+  eos create credentials revoke --lease-id vault:db:123456 --force`,
 
-		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			logger := otelzap.Ctx(rc.Ctx)
+	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
 
-			if leaseID == "" {
-				return fmt.Errorf("lease ID is required (use --lease-id)")
+		leaseID, _ := cmd.Flags().GetString("lease-id")
+		if leaseID == "" {
+			return fmt.Errorf("lease ID is required (use --lease-id)")
+		}
+
+		logger.Info("Revoking database credentials", zap.String("lease_id", leaseID))
+
+		force, _ := cmd.Flags().GetBool("force")
+		if !force {
+			fmt.Printf("Are you sure you want to revoke lease %s? [y/N]: ", leaseID)
+			var response string
+			if _, err := fmt.Scanln(&response); err != nil {
+				logger.Warn("Failed to read user input", zap.Error(err))
+				return fmt.Errorf("failed to read confirmation: %w", err)
+			}
+			if response != "y" && response != "Y" {
+				logger.Info("Revocation cancelled")
+				return nil
+			}
+		}
+
+		manager := database_management.NewDatabaseManager()
+
+		if err := manager.RevokeCredentials(rc, leaseID); err != nil {
+			return fmt.Errorf("failed to revoke credentials: %w", err)
 			}
 
-			logger.Info("Revoking database credentials", zap.String("lease_id", leaseID))
+		logger.Info("Credentials revoked successfully")
+		return nil
+	}),
+}
 
-			if !force {
-				fmt.Printf("Are you sure you want to revoke lease %s? [y/N]: ", leaseID)
-				var response string
-				if _, err := fmt.Scanln(&response); err != nil {
-					logger.Warn("Failed to read user input", zap.Error(err))
-					return fmt.Errorf("failed to read confirmation: %w", err)
-				}
-				if response != "y" && response != "Y" {
-					logger.Info("Revocation cancelled")
-					return nil
-				}
-			}
-
-			manager := database_management.NewDatabaseManager()
-
-			if err := manager.RevokeCredentials(rc, leaseID); err != nil {
-				return fmt.Errorf("failed to revoke credentials: %w", err)
-			}
-
-			logger.Info("Credentials revoked successfully")
-			return nil
-		}),
-	}
-
-	cmd.Flags().StringVarP(&leaseID, "lease-id", "l", "", "Vault lease ID to revoke")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Skip confirmation prompt")
-
-	return cmd
+func init() {
+	// Register credentialsCmd with CreateCmd
+	CreateCmd.AddCommand(credentialsCmd)
+	
+	// Add subcommands to credentialsCmd
+	credentialsCmd.AddCommand(generateCredentialsCmd)
+	credentialsCmd.AddCommand(revokeCredentialsCmd)
+	
+	// Set up flags for generateCredentialsCmd
+	generateCredentialsCmd.Flags().StringP("role", "r", "", "Database role name")
+	generateCredentialsCmd.Flags().String("engine-mount", "database", "Vault database engine mount point")
+	generateCredentialsCmd.Flags().Bool("json", false, "Output in JSON format")
+	generateCredentialsCmd.Flags().Bool("show-password", false, "Show password in output")
+	
+	// Set up flags for revokeCredentialsCmd
+	revokeCredentialsCmd.Flags().StringP("lease-id", "l", "", "Vault lease ID to revoke")
+	revokeCredentialsCmd.Flags().BoolP("force", "f", false, "Skip confirmation prompt")
 }
 
 func outputJSONCredential(credential *database_management.DatabaseCredential, showPassword bool) error {

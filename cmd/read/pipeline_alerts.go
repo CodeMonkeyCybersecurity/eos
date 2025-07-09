@@ -1,5 +1,5 @@
 // cmd/delphi/watch/alerts.go
-package watch
+package read
 
 import (
 	"context"
