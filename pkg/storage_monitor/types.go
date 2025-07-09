@@ -18,6 +18,7 @@ type DiskUsage struct {
 	Device            string
 	Filesystem        string
 	MountOptions      []string
+	Timestamp         time.Time
 }
 
 // IOMetrics represents I/O performance metrics
@@ -37,6 +38,7 @@ type IOMetrics struct {
 	WriteOpsPerSec   float64
 	AvgReadLatency   float64
 	AvgWriteLatency  float64
+	Utilization      float64
 	Timestamp        time.Time
 }
 

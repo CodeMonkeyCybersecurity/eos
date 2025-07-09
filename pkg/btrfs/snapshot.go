@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -44,7 +44,7 @@ func CreateSnapshot(rc *eos_io.RuntimeContext, config *SnapshotConfig) error {
 		zap.Bool("readonly", config.Readonly))
 
 	// Build snapshot command
-	args := []string{"btrfs", "subvolume", "snapshot"}
+	args := []string{"subvolume", "snapshot"}
 
 	if config.Readonly {
 		args = append(args, "-r")
@@ -52,14 +52,17 @@ func CreateSnapshot(rc *eos_io.RuntimeContext, config *SnapshotConfig) error {
 
 	args = append(args, config.SourcePath, config.SnapshotPath)
 
-	snapCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
-	output, err := snapCmd.CombinedOutput()
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "btrfs",
+		Args:    args,
+		Capture: true,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to create snapshot: %w, output: %s", err, string(output))
+		return fmt.Errorf("failed to create snapshot: %w, output: %s", err, output)
 	}
 
 	logger.Debug("Snapshot created",
-		zap.String("output", string(output)))
+		zap.String("output", output))
 
 	// EVALUATE
 	logger.Info("Verifying snapshot creation")
@@ -110,8 +113,11 @@ func ListSnapshots(rc *eos_io.RuntimeContext, sourcePath string) ([]*SubvolumeIn
 	}
 
 	// List all subvolumes
-	listCmd := eos_cli.Wrap(rc, "btrfs", "subvolume", "list", "-u", "-q", rootMount)
-	output, err := listCmd.Output()
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "btrfs",
+		Args:    []string{"subvolume", "list", "-u", "-q", rootMount},
+		Capture: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list subvolumes: %w", err)
 	}
@@ -119,7 +125,7 @@ func ListSnapshots(rc *eos_io.RuntimeContext, sourcePath string) ([]*SubvolumeIn
 	snapshots := make([]*SubvolumeInfo, 0)
 
 	// Parse output and find snapshots
-	lines := strings.Split(string(output), "\n")
+	lines := strings.Split(output, "\n")
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
@@ -184,7 +190,7 @@ func DeleteSnapshot(rc *eos_io.RuntimeContext, snapshotPath string, force bool) 
 		zap.Bool("force", force))
 
 	// Delete the snapshot
-	args := []string{"btrfs", "subvolume", "delete"}
+	args := []string{"subvolume", "delete"}
 
 	if force {
 		// Add commit flag for immediate deletion
@@ -193,10 +199,13 @@ func DeleteSnapshot(rc *eos_io.RuntimeContext, snapshotPath string, force bool) 
 
 	args = append(args, snapshotPath)
 
-	deleteCmd := eos_cli.Wrap(rc, args[0], args[1:]...)
-	output, err := deleteCmd.CombinedOutput()
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "btrfs",
+		Args:    args,
+		Capture: true,
+	})
 	if err != nil {
-		return fmt.Errorf("failed to delete snapshot: %w, output: %s", err, string(output))
+		return fmt.Errorf("failed to delete snapshot: %w, output: %s", err, output)
 	}
 
 	// EVALUATE
@@ -295,15 +304,19 @@ func RotateSnapshots(rc *eos_io.RuntimeContext, sourcePath string, maxSnapshots 
 
 func isSubvolume(rc *eos_io.RuntimeContext, path string) bool {
 	// Check if path is a BTRFS subvolume
-	showCmd := eos_cli.Wrap(rc, "btrfs", "subvolume", "show", path)
-	return showCmd.Run() == nil
+	err := execute.RunSimple(rc.Ctx, "btrfs", "subvolume", "show", path)
+	return err == nil
 }
 
 func findBTRFSRoot(rc *eos_io.RuntimeContext, path string) string {
 	// Find the root mount point of the BTRFS filesystem
-	findmntCmd := eos_cli.Wrap(rc, "findmnt", "-n", "-o", "TARGET", "-T", path, "-t", "btrfs")
-	if output, err := findmntCmd.Output(); err == nil {
-		return strings.TrimSpace(string(output))
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "findmnt",
+		Args:    []string{"-n", "-o", "TARGET", "-T", path, "-t", "btrfs"},
+		Capture: true,
+	})
+	if err == nil {
+		return strings.TrimSpace(output)
 	}
 	return ""
 }

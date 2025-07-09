@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -134,7 +135,7 @@ func MonitorIOPerformance(rc *eos_io.RuntimeContext, config *MonitorConfig) ([]A
 				Message:   fmt.Sprintf("High I/O latency on %s: %.1fms", metric.Device, avgLatency),
 				Value:     avgLatency,
 				Threshold: config.IOLatencyWarning,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 
@@ -153,7 +154,7 @@ func MonitorIOPerformance(rc *eos_io.RuntimeContext, config *MonitorConfig) ([]A
 				Message:   fmt.Sprintf("I/O saturation on %s: %d%% busy", metric.Device, metric.IOTime/10),
 				Value:     float64(metric.IOTime) / 10,
 				Threshold: 90.0,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 		}
@@ -175,7 +176,7 @@ func GetIOStats(rc *eos_io.RuntimeContext, device string) (*IOMetrics, error) {
 		zap.String("device", device))
 
 	// Check if iostat is available
-	if _, err := eos_cli.LookPath("iostat"); err != nil {
+	if _, err := exec.LookPath("iostat"); err != nil {
 		// Fallback to /proc/diskstats
 		return getIOStatsFromProc(rc, device)
 	}
@@ -184,14 +185,17 @@ func GetIOStats(rc *eos_io.RuntimeContext, device string) (*IOMetrics, error) {
 	logger.Info("Collecting I/O statistics using iostat")
 
 	// Run iostat
-	iostatCmd := eos_cli.Wrap(rc, "iostat", "-dx", device, "1", "2")
-	output, err := iostatCmd.Output()
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "iostat",
+		Args:    []string{"-dx", device, "1", "2"},
+		Capture: true,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to run iostat: %w", err)
 	}
 
 	// Parse iostat output
-	metric := parseIOStatOutput(string(output), device)
+	metric := parseIOStatOutput(output, device)
 	if metric == nil {
 		return nil, fmt.Errorf("failed to parse iostat output")
 	}

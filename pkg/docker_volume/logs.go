@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/docker/docker/api/types"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -174,7 +174,7 @@ func MonitorLogSizes(rc *eos_io.RuntimeContext) (map[string]*LogRotationStats, e
 	defer cli.Close()
 
 	// List all containers
-	containers, err := cli.ContainerList(rc.Ctx, types.ContainerListOptions{All: true})
+	containers, err := cli.ContainerList(rc.Ctx, container.ListOptions{All: true})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -311,8 +311,7 @@ func copyFile(src, dst string) error {
 }
 
 func compressFile(rc *eos_io.RuntimeContext, filePath string) error {
-	gzipCmd := eos_cli.Wrap(rc, "gzip", filePath)
-	return gzipCmd.Run()
+	return execute.RunSimple(rc.Ctx, "gzip", filePath)
 }
 
 func cleanupOldLogs(rc *eos_io.RuntimeContext, containerID string, keepCount int) error {

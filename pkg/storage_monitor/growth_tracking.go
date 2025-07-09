@@ -3,11 +3,13 @@ package storage_monitor
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"time"
 	
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
@@ -171,11 +173,8 @@ func AnalyzeGrowthTrends(rc *eos_io.RuntimeContext, historyFile string, path str
 		firstHalf := pathHistory[:len(pathHistory)/2]
 		secondHalf := pathHistory[len(pathHistory)/2:]
 		
-		firstRate := calculateAverageGrowthRate(firstHalf, 24*time
-
-
-	firstRate := calculateAverageGrowthRate(firstHalf, 24*time.Hour)
-			secondRate := calculateAverageGrowthRate(secondHalf, 24*time.Hour)
+		firstRate := calculateAverageGrowthRate(firstHalf, 24*time.Hour)
+		secondRate := calculateAverageGrowthRate(secondHalf, 24*time.Hour)
 			
 			if firstRate > 0 {
 				analysis.GrowthAcceleration = (secondRate - firstRate) / firstRate * 100
@@ -242,7 +241,7 @@ func MonitorGrowthRate(rc *eos_io.RuntimeContext, config *MonitorConfig, history
 				Message:   fmt.Sprintf("High growth rate on %s: %.1f GB/day", metric.Path, growthGBPerDay),
 				Value:     growthGBPerDay,
 				Threshold: config.GrowthRateWarning,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 			
@@ -267,7 +266,7 @@ func MonitorGrowthRate(rc *eos_io.RuntimeContext, config *MonitorConfig, history
 					metric.Path, metric.DaysUntilFull),
 				Value:     metric.DaysUntilFull,
 				Threshold: 7.0,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 		}

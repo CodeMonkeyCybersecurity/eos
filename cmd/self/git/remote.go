@@ -41,8 +41,6 @@ Examples:
 		}),
 	}
 
-}
-
 // Package-level variables for remote list command flags
 var (
 	remoteListPath       string

@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -23,7 +24,7 @@ func DetectContention(rc *eos_io.RuntimeContext) ([]ContentionMetrics, error) {
 
 	// Check if we have necessary tools
 	hasIostat := true
-	if _, err := eos_cli.LookPath("iostat"); err != nil {
+	if _, err := exec.LookPath("iostat"); err != nil {
 		hasIostat = false
 		logger.Debug("iostat not available, using /proc/stat")
 	}
@@ -113,7 +114,7 @@ func MonitorContention(rc *eos_io.RuntimeContext, config *MonitorConfig) ([]Aler
 				Message:   fmt.Sprintf("I/O contention detected on %s: score %.1f/100", metric.Device, metric.ContentionScore),
 				Value:     metric.ContentionScore,
 				Threshold: config.ContentionWarning,
-				Timestamp: rc.Now(),
+				Timestamp: time.Now(),
 			}
 			alerts = append(alerts, alert)
 
@@ -229,13 +230,16 @@ type ContentionAnalysis struct {
 
 func detectContentionWithIostat(rc *eos_io.RuntimeContext) ([]ContentionMetrics, error) {
 	// Run iostat with extended statistics
-	iostatCmd := eos_cli.Wrap(rc, "iostat", "-dx", "1", "2")
-	output, err := iostatCmd.Output()
+	output, err := execute.Run(rc.Ctx, execute.Options{
+		Command: "iostat",
+		Args:    []string{"-dx", "1", "2"},
+		Capture: true,
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	return parseIostatForContention(string(output)), nil
+	return parseIostatForContention(output), nil
 }
 
 func detectContentionFromProc(rc *eos_io.RuntimeContext) ([]ContentionMetrics, error) {

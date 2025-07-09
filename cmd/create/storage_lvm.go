@@ -146,7 +146,7 @@ func runCreateLVMLV(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 		zap.String("filesystem", filesystem))
 
 	// Special handling for database volumes
-	if filesystem == "xfs" && (contains(name, "postgres") || contains(name, "db")) {
+	if filesystem == "xfs" && (strings.Contains(strings.ToLower(name), "postgres") || strings.Contains(strings.ToLower(name), "db")) {
 		logger.Info("Detected database volume, using optimized XFS settings")
 		if len(mountOptions) == 0 {
 			config.MountOptions = lvm.XFSMountOptions["database"]
@@ -156,6 +156,3 @@ func runCreateLVMLV(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string
 	return lvm.CreateLogicalVolume(rc, config)
 }
 
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
-}
