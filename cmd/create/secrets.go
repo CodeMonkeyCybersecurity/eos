@@ -20,7 +20,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	length int
 	format string
@@ -173,6 +173,11 @@ func init() {
 	CreateCmd.AddCommand(CreateVaultEnhancedCmd)
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/orchestrator or pkg/saltstack/orchestrator
+// Type: Business Logic
+// Related functions: executeVaultWithSalt, displayVaultOrchestrationResult
+// Dependencies: orchestrator
+// TODO
 // createVaultSaltOperation creates the Salt operation for Vault installation
 func createVaultSaltOperation(opts *orchestrator.OrchestrationOptions) *orchestrator.SaltOperation {
 	// Create pillar data from command flags and orchestration options
@@ -199,6 +204,11 @@ func createVaultSaltOperation(opts *orchestrator.OrchestrationOptions) *orchestr
 	}
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/orchestrator or pkg/saltstack/orchestrator
+// Type: Business Logic
+// Related functions: createVaultSaltOperation, displayVaultOrchestrationResult
+// Dependencies: eos_io, orchestrator, client, otelzap, zap, fmt, time
+// TODO
 // executeVaultWithSalt executes Vault installation using Salt orchestration
 func executeVaultWithSalt(rc *eos_io.RuntimeContext, opts *orchestrator.OrchestrationOptions, directExec orchestrator.DirectExecutor, saltOp *orchestrator.SaltOperation) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -249,7 +259,11 @@ func executeVaultWithSalt(rc *eos_io.RuntimeContext, opts *orchestrator.Orchestr
 	// Display results
 	return displayVaultOrchestrationResult(rc, result)
 }
-
+// TODO: HELPER_REFACTOR - Move to pkg/vault/display or pkg/saltstack/display
+// Type: Output Formatter
+// Related functions: executeVaultWithSalt
+// Dependencies: eos_io, orchestrator, otelzap, fmt, zap
+// TODO
 // displayVaultOrchestrationResult displays the orchestration results
 func displayVaultOrchestrationResult(rc *eos_io.RuntimeContext, result *orchestrator.OrchestrationResult) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -299,22 +313,38 @@ func displayVaultOrchestrationResult(rc *eos_io.RuntimeContext, result *orchestr
 
 	return nil
 }
-
+// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
+// Type: Utility
+// Related functions: getSaltUsernameFromEnv, getSaltPasswordFromEnv, getSaltEauthFromEnv
+// Dependencies: None (should use os)
+// TODO
 // Helper functions to get Salt configuration from environment
 func getSaltURLFromEnv() string {
 	// This would typically read from environment variables or config files
 	// For now, return empty to trigger fallback
 	return ""
 }
-
+// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
+// Type: Utility
+// Related functions: getSaltURLFromEnv, getSaltPasswordFromEnv, getSaltEauthFromEnv
+// Dependencies: None (should use os)
+// TODO
 func getSaltUsernameFromEnv() string {
 	return ""
 }
-
+// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
+// Type: Utility
+// Related functions: getSaltURLFromEnv, getSaltUsernameFromEnv, getSaltEauthFromEnv
+// Dependencies: None (should use os)
+// TODO
 func getSaltPasswordFromEnv() string {
 	return ""
 }
-
+// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
+// Type: Utility
+// Related functions: getSaltURLFromEnv, getSaltUsernameFromEnv, getSaltPasswordFromEnv
+// Dependencies: None
+// TODO
 func getSaltEauthFromEnv() string {
 	return "pam"
 }

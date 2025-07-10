@@ -10,13 +10,13 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO
 // ServiceStatus represents the status of a service
 type ServiceStatus struct {
 	Active  string
 	Enabled string
 }
-
+// TODO
 // getServiceStatus returns the status of a service
 func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceStatus, error) {
 	var status ServiceStatus

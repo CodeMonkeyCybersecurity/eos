@@ -3,14 +3,12 @@ package list
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	out "github.com/CodeMonkeyCybersecurity/eos/pkg/output"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -62,21 +60,29 @@ Job States:
 		defer cancel()
 
 		// Get job list using basic Salt command
-		output, err := saltClient.CmdRun(ctx, "*", "saltutil.running")
+		cmdOutput, err := saltClient.CmdRun(ctx, "*", "saltutil.running")
 		if err != nil {
 			logger.Error("Failed to list Salt jobs", zap.Error(err))
 			return fmt.Errorf("failed to list Salt jobs: %w", err)
 		}
 		
 		// For now, just return the raw output as jobs
-		jobs := map[string]interface{}{"output": output}
+		jobs := map[string]interface{}{"output": cmdOutput}
 
 		// Output results
 		if outputJSON {
-			return outputJobsJSON(jobs)
+			return out.JSONToStdout(jobs)
 		}
 
-		return outputJobsTable(jobs, logger)
+		// Create table output
+		tw := out.NewTable().
+			WithHeaders("JOB ID", "STATE", "FUNCTION", "START TIME", "TARGET")
+		
+		// TODO: Add actual job data once Salt client response format is known
+		logger.Info("Recent Salt Jobs")
+		tw.AddRow("(Job listing implementation pending Salt client structure)", "", "", "", "")
+		
+		return tw.Render()
 	}),
 }
 
@@ -89,25 +95,4 @@ func init() {
 	ListCmd.AddCommand(saltJobsCmd)
 }
 
-func outputJobsJSON(jobs interface{}) error {
-	encoder := json.NewEncoder(os.Stdout)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(jobs)
-}
-
-func outputJobsTable(jobs interface{}, logger otelzap.LoggerWithCtx) error {
-	fmt.Println("Recent Salt Jobs")
-	fmt.Println(strings.Repeat("=", 80))
-
-	// This would need to be implemented based on the actual job data structure
-	// from the Salt client. For now, showing the pattern:
-
-	fmt.Printf("%-20s %-15s %-20s %-15s %s\n",
-		"JOB ID", "STATE", "FUNCTION", "START TIME", "TARGET")
-	fmt.Println(strings.Repeat("-", 80))
-
-	// TODO: Implement actual job listing based on Salt client response format
-	fmt.Println("(Job listing implementation pending Salt client structure)")
-
-	return nil
-}
+// All output formatting functions have been moved to pkg/output/

@@ -23,7 +23,7 @@ import (
 // Removed embedded templates for now - templates are generated dynamically
 // //go:embed templates/clusterfuzz/*
 // var clusterfuzzTemplates embed.FS
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	nomadAddress        string
 	consulAddress       string
@@ -181,7 +181,7 @@ func init() {
 	clusterfuzzCmd.Flags().StringVar(&s3Bucket, "s3-bucket", "clusterfuzz", "S3 bucket name")
 	clusterfuzzCmd.Flags().BoolVar(&skipPrereqCheck, "skip-prereq-check", false, "Skip prerequisite checks")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // ClusterfuzzConfig holds the configuration for deployment
 type ClusterfuzzConfig struct {
 	NomadAddress        string
@@ -200,7 +200,7 @@ type ClusterfuzzConfig struct {
 	QueueConfig         QueueConfig
 	Timestamp           string
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // S3Config holds S3/MinIO configuration
 type S3Config struct {
 	Endpoint  string
@@ -209,7 +209,7 @@ type S3Config struct {
 	Bucket    string
 	UseSSL    bool
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
 	Type     string
@@ -219,7 +219,7 @@ type DatabaseConfig struct {
 	Username string
 	Password string
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // QueueConfig holds queue configuration
 type QueueConfig struct {
 	Type     string
@@ -229,7 +229,12 @@ type QueueConfig struct {
 	Password string
 }
 
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config or pkg/clusterfuzz/validation
+// Type: Validation
+// Related functions: createClusterfuzzConfig, checkPrerequisites
+// Dependencies: fmt, strings
+// TODO: Move to pkg/clusterfuzz/config or pkg/clusterfuzz/validation
 func validateClusterfuzzConfig() error {
 	// Validate storage backend
 	validStorage := []string{"minio", "s3", "local"}
@@ -267,6 +272,11 @@ func validateClusterfuzzConfig() error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config
+// Type: Business Logic
+// Related functions: validateClusterfuzzConfig, generateConfigurations
+// Dependencies: time, strings
+// TODO: Move to pkg/clusterfuzz/config
 func createClusterfuzzConfig() *ClusterfuzzConfig {
 	config := &ClusterfuzzConfig{
 		NomadAddress:        nomadAddress,
@@ -338,6 +348,11 @@ func createClusterfuzzConfig() *ClusterfuzzConfig {
 	return config
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/prerequisites or pkg/clusterfuzz/validation
+// Type: Validation
+// Related functions: validateClusterfuzzConfig, checkVaultConnectivity
+// Dependencies: eos_io, otelzap, zap, fmt
+// TODO: Move to pkg/clusterfuzz/prerequisites or pkg/clusterfuzz/validation
 func checkPrerequisites(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -373,6 +388,11 @@ func checkPrerequisites(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) er
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
+// Type: Business Logic
+// Related functions: generateNomadJobs, generateEnvironmentFiles, generateInitScripts, generateDockerfiles, generateTerraformConfig
+// Dependencies: eos_io, otelzap, os, filepath
+// TODO: Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
 func generateConfigurations(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -426,6 +446,11 @@ func generateConfigurations(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/nomad or pkg/clusterfuzz/generator
+// Type: Business Logic
+// Related functions: generateConfigurations, generateEnvironmentFiles
+// Dependencies: template, filepath, os, fmt
+// TODO: Move to pkg/clusterfuzz/nomad or pkg/clusterfuzz/generator
 func generateNomadJobs(config *ClusterfuzzConfig) error {
 	// Template for core services job
 	coreJobTemplate := `job "clusterfuzz-core" {
@@ -775,6 +800,11 @@ EOF
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
+// Type: Business Logic
+// Related functions: generateConfigurations, generateNomadJobs
+// Dependencies: fmt, filepath, os
+// TODO: Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
 func generateEnvironmentFiles(config *ClusterfuzzConfig) error {
 	// Core environment file
 	coreEnv := fmt.Sprintf(`# ClusterFuzz Core Environment
@@ -836,6 +866,11 @@ BOT_WORKING_DIR=/tmp/clusterfuzz
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/scripts or pkg/clusterfuzz/generator
+// Type: Business Logic
+// Related functions: generateConfigurations, generateEnvironmentFiles
+// Dependencies: fmt, filepath, os
+// TODO: Move to pkg/clusterfuzz/scripts or pkg/clusterfuzz/generator
 func generateInitScripts(config *ClusterfuzzConfig) error {
 	// Database initialization script
 	var dbScript string
@@ -969,6 +1004,11 @@ echo "MinIO storage setup complete"
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/docker or pkg/clusterfuzz/generator
+// Type: Business Logic
+// Related functions: generateConfigurations, buildDockerImages
+// Dependencies: filepath, os
+// TODO: Move to pkg/clusterfuzz/docker or pkg/clusterfuzz/generator
 func generateDockerfiles(config *ClusterfuzzConfig) error {
 	// Web Dockerfile
 	webDockerfile := `FROM python:3.11-slim
@@ -1183,6 +1223,11 @@ exec "$@"
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/terraform or pkg/clusterfuzz/generator
+// Type: Business Logic
+// Related functions: generateConfigurations
+// Dependencies: template, filepath, os, fmt
+// TODO: Move to pkg/clusterfuzz/terraform or pkg/clusterfuzz/generator
 func generateTerraformConfig(config *ClusterfuzzConfig) error {
 	// Only generate if using S3/MinIO or Vault
 	if config.StorageBackend != "s3" && config.StorageBackend != "minio" && !config.UseVault {
@@ -1271,6 +1316,11 @@ output "minio_console" {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/vault or pkg/clusterfuzz/secrets
+// Type: Business Logic
+// Related functions: checkVaultConnectivity
+// Dependencies: eos_io, vault, otelzap, zap, fmt
+// TODO: Move to pkg/clusterfuzz/vault or pkg/clusterfuzz/secrets
 func storeSecretsInVault(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1327,6 +1377,11 @@ func storeSecretsInVault(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) e
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/infrastructure
+// Type: Business Logic
+// Related functions: buildDockerImages, deployApplication, deployBots
+// Dependencies: eos_io, otelzap, zap, fmt
+// TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/infrastructure
 func deployInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1347,6 +1402,11 @@ func deployInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) 
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/docker or pkg/clusterfuzz/build
+// Type: Business Logic
+// Related functions: deployInfrastructure, generateDockerfiles
+// Dependencies: eos_io, otelzap, zap, filepath
+// TODO: Move to pkg/clusterfuzz/docker or pkg/clusterfuzz/build
 func buildDockerImages(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1372,6 +1432,11 @@ func buildDockerImages(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/wait
+// Type: Business Logic
+// Related functions: waitForService, deployInfrastructure
+// Dependencies: eos_io, otelzap, context, time, zap, fmt
+// TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/wait
 func waitForInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1412,6 +1477,11 @@ func waitForInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig)
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/shared/network or pkg/eos_io
+// Type: Utility
+// Related functions: waitForInfrastructure
+// Dependencies: context, time, net, strconv
+// TODO: Move to pkg/shared/network or pkg/eos_io
 func waitForService(ctx context.Context, host string, port int) error {
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
@@ -1430,6 +1500,11 @@ func waitForService(ctx context.Context, host string, port int) error {
 	}
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/init or pkg/clusterfuzz/services
+// Type: Business Logic
+// Related functions: deployInfrastructure, deployApplication
+// Dependencies: eos_io, otelzap, os, fmt, zap
+// TODO: Move to pkg/clusterfuzz/init or pkg/clusterfuzz/services
 func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1484,6 +1559,11 @@ func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) er
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/application
+// Type: Business Logic
+// Related functions: deployInfrastructure, deployBots
+// Dependencies: eos_io, otelzap, fmt, time, zap
+// TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/application
 func deployApplication(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1513,6 +1593,11 @@ func deployApplication(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/bots
+// Type: Business Logic
+// Related functions: deployInfrastructure, deployApplication
+// Dependencies: eos_io, otelzap, filepath, fmt, zap
+// TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/bots
 func deployBots(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1531,6 +1616,11 @@ func deployBots(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/verify or pkg/clusterfuzz/validation
+// Type: Validation
+// Related functions: checkPrerequisites
+// Dependencies: eos_io, otelzap, strings, fmt, zap
+// TODO: Move to pkg/clusterfuzz/verify or pkg/clusterfuzz/validation
 func verifyDeployment(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -1556,6 +1646,11 @@ func verifyDeployment(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) erro
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/display or pkg/clusterfuzz/output
+// Type: Output Formatter
+// Related functions: None visible in this file
+// Dependencies: fmt
+// TODO: Move to pkg/clusterfuzz/display or pkg/clusterfuzz/output
 func displaySuccessInfo(config *ClusterfuzzConfig) {
 	fmt.Println("\nClusterFuzz deployment completed successfully!")
 	fmt.Println("\nDeployment Summary:")
@@ -1589,6 +1684,11 @@ func displaySuccessInfo(config *ClusterfuzzConfig) {
 
 // Helper functions
 
+// TODO: HELPER_REFACTOR - Move to pkg/eos_cli or pkg/system
+// Type: Utility
+// Related functions: Used throughout the file
+// Dependencies: eos_io, execute
+// TODO: Move to pkg/eos_cli or pkg/system
 func executeCommand(rc *eos_io.RuntimeContext, command string, args ...string) (string, error) {
 	output, err := execute.Run(rc.Ctx, execute.Options{
 		Command: command,
@@ -1598,6 +1698,11 @@ func executeCommand(rc *eos_io.RuntimeContext, command string, args ...string) (
 	return output, err
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/shared/slice or pkg/eos_io
+// Type: Utility
+// Related functions: None visible in this file
+// Dependencies: None
+// TODO: Move to pkg/shared/slice or pkg/eos_io
 func containsString(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -1607,6 +1712,11 @@ func containsString(slice []string, item string) bool {
 	return false
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/shared/password or pkg/security
+// Type: Utility
+// Related functions: None visible in this file
+// Dependencies: time
+// TODO: Move to pkg/shared/password or pkg/security
 func generatePassword() string {
 	// Simple password generation (should be replaced with crypto/rand in production)
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -1617,6 +1727,11 @@ func generatePassword() string {
 	return string(b)
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault or pkg/shared/vault
+// Type: Validation
+// Related functions: checkPrerequisites, storeSecretsInVault
+// Dependencies: eos_io, vault, strings, fmt
+// TODO: Move to pkg/vault or pkg/shared/vault
 func checkVaultConnectivity(rc *eos_io.RuntimeContext) error {
 	// Check if Vault is accessible
 	vaultClient, err := vault.NewClient(rc)

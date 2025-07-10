@@ -33,7 +33,7 @@ Examples:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // fileBackupCmd is the file backup subcommand
 var (
 	fileBackupBackupDir     string
@@ -106,7 +106,7 @@ Examples:
 		return file_backup.OutputFileBackupText(result)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // fileListCmd is the file list subcommand
 var (
 	fileListBackupDir  string
@@ -145,7 +145,7 @@ Examples:
 		return file_backup.OutputFileListText(result)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // fileRestoreCmd is the file restore subcommand
 var (
 	fileRestoreForce      bool

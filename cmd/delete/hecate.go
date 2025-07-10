@@ -59,7 +59,7 @@ var deleteResourcesCmd = &cobra.Command{
 func init() {
 	DeleteCmd.AddCommand(deleteResourcesCmd)
 }
-
+// TODO
 // runDeleteConfig presents an interactive menu for delete actions.
 func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -97,7 +97,7 @@ func runDeleteConfig(rc *eos_io.RuntimeContext) error {
 	}
 	return nil
 }
-
+// TODO
 func deleteCertificates(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	certsDir := "/opt/hecate/certs"
@@ -111,7 +111,7 @@ func deleteCertificates(rc *eos_io.RuntimeContext) {
 		logger.Info(" Certificates deleted", zap.String("directory", certsDir))
 	}
 }
-
+// TODO
 func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -139,7 +139,7 @@ func deleteDockerCompose(rc *eos_io.RuntimeContext) {
 		logger.Info(" Removed main docker compose file", zap.String("file", mainCompose))
 	}
 }
-
+// TODO
 func deleteEosConfig(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	confDir := "/opt/hecate/assets/conf.d"
@@ -153,7 +153,7 @@ func deleteEosConfig(rc *eos_io.RuntimeContext) {
 		logger.Info(" Eos backend configuration files deleted", zap.String("directory", confDir))
 	}
 }
-
+// TODO
 func deleteNginxDefaults(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	configFile := "/opt/hecate/nginx.conf"

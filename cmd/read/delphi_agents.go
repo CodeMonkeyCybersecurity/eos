@@ -19,7 +19,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Agent represents an agent record for display
 type Agent struct {
 	ID                string     `json:"id"`
@@ -34,7 +34,7 @@ type Agent struct {
 	DisconnectionTime *time.Time `json:"disconnection_time"`
 	APIFetchTimestamp *time.Time `json:"api_fetch_timestamp"`
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	delphiAgentsLimit   int
 	delphiAgentsRefresh int
@@ -101,6 +101,7 @@ func init() {
 	delphiAgentsCmd.Flags().StringVarP(&delphiAgentsDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
 
+// TODO: Move to pkg/delphi/monitoring or pkg/delphi/agents
 func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit, refresh int) error {
 	// Set up signal handling
 	sigChan := make(chan os.Signal, 1)
@@ -132,6 +133,7 @@ func watchAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 	}
 }
 
+// TODO: Move to pkg/delphi/display or pkg/delphi/output
 func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
@@ -220,6 +222,7 @@ func displayAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 		activeCount, totalCount, len(agents))
 }
 
+// TODO: Move to pkg/shared/format or pkg/eos_io
 func formatOptionalString(s *string, maxLen int) string {
 	if s == nil {
 		return "-"
@@ -231,6 +234,7 @@ func formatOptionalString(s *string, maxLen int) string {
 	return str
 }
 
+// TODO: Move to pkg/shared/format or pkg/shared/time
 func formatOptionalTimeShort(t *time.Time) string {
 	if t == nil {
 		return "-"
@@ -250,6 +254,7 @@ func formatOptionalTimeShort(t *time.Time) string {
 	}
 }
 
+// TODO: Move to pkg/delphi/display or pkg/shared/terminal
 func getAgentStatusColor(status *string) string {
 	if status == nil {
 		return "\033[90m" // Gray
@@ -269,6 +274,7 @@ func getAgentStatusColor(status *string) string {
 	}
 }
 
+// TODO: Move to pkg/delphi/agents or pkg/delphi/stats
 func countAgentsByStatus(ctx context.Context, db *sql.DB) (active, total int) {
 	// Count active agents
 	err := db.QueryRowContext(ctx, "SELECT COUNT(*) FROM agents WHERE status_text = 'active'").Scan(&active)

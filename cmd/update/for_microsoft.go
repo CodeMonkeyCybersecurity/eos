@@ -10,7 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/spf13/cobra"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // command-scoped flag
 var flagMicrosoft bool
 

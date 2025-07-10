@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,22 +44,8 @@ func TestRagequitCommand(t *testing.T) {
 			}()
 			_ = os.Setenv("HOME", tempDir)
 
-			// Create runtime context
-			rc := eos_io.NewContext(context.Background(), "test-ragequit")
-
-			// Create command instance
-			cmd := &cobra.Command{
-				Use: "test-ragequit",
-				RunE: func(cmd *cobra.Command, args []string) error {
-					return runRagequit(rc, cmd, args)
-				},
-			}
-
-			// Add flags
-			cmd.Flags().StringVar(&reason, "reason", "", "Document why ragequit was triggered")
-			cmd.Flags().BoolVar(&noReboot, "no-reboot", false, "Collect diagnostics but don't reboot")
-			cmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")
-			cmd.Flags().StringVar(&actions, "actions", "all", "Actions to perform")
+			// Use the actual RagequitCmd
+			cmd := RagequitCmd
 
 			// Set arguments
 			cmd.SetArgs(tt.args)

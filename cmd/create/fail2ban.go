@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	enableEmail    bool
 	emailAddr      string
@@ -85,7 +85,7 @@ Examples:
 		return ubuntu.ConfigureFail2banEnhanced(rc, config)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func parseDuration(s string) (time.Duration, error) {
 	// Handle common duration formats
 	switch s {

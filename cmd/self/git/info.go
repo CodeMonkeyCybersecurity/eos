@@ -77,7 +77,7 @@ func init() {
 	infoCmd.Flags().BoolVar(&infoOutputJSON, "json", false, "Output in JSON format")
 	infoCmd.Flags().BoolVarP(&infoDetailed, "detailed", "d", false, "Show detailed information")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJSONInfo(repo *git_management.GitRepository) error {
 	data, err := json.MarshalIndent(repo, "", "  ")
 	if err != nil {
@@ -86,7 +86,7 @@ func outputJSONInfo(repo *git_management.GitRepository) error {
 	fmt.Println(string(data))
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableInfo(repo *git_management.GitRepository, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()

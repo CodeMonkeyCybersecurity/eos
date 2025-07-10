@@ -390,6 +390,10 @@ var consulServiceMeshCmd = &cobra.Command{
 	}),
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/terraform/consul or pkg/terraform/generator
+// Type: Business Logic
+// Related functions: generateConsulVaultSecretsSetup
+// Dependencies: fmt, os, terraform
 // Helper functions
 func generateConsulClusterVariables(outputDir string, data terraform.ConsulTemplateData) error {
 	variables := fmt.Sprintf(`
@@ -451,6 +455,10 @@ variable "ssh_key_name" {
 	return os.WriteFile(outputDir+"/variables.tf", []byte(variables), 0644)
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/terraform/consul or pkg/terraform/scripts
+// Type: Business Logic
+// Related functions: generateConsulClusterVariables
+// Dependencies: fmt, os, terraform
 func generateConsulVaultSecretsSetup(outputDir string, data terraform.ConsulTemplateData) error {
 	script := fmt.Sprintf(`#!/bin/bash
 # Setup Vault and Consul secrets for Terraform deployment

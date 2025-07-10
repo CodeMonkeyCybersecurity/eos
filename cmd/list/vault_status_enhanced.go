@@ -1,5 +1,4 @@
 // cmd/vault_status_enhanced.go - Example of vault command using enhanced container pattern
-// TODO: PATTERN 2 - Inline _vaultStatusEnhanced function into command RunE field
 package list
 
 import (
@@ -28,61 +27,74 @@ This command uses:
 - Domain services for business logic  
 - Infrastructure abstractions for vault operations
 - Proper error handling and logging
-- Graceful fallback when vault is unavailable`,
-	RunE: eos_cli.Wrap(_vaultStatusEnhanced),
-}
+- Graceful fallback when vault is unavailable
 
-// _vaultStatusEnhanced demonstrates enhanced vault status checking
-// Prefixed with underscore to indicate it's intentionally unused (example/demo code)
-//
-//nolint:unused
-func _vaultStatusEnhanced(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := rc.Log.Named("vault.status.enhanced")
+Features:
+  - Comprehensive health checks
+  - Secret store availability testing
+  - Domain service operations
+  - Graceful fallback handling
 
-	logger.Info(" Starting enhanced vault status check")
+Examples:
+  # Run enhanced vault status check
+  eos list vault-status-enhanced
+  
+  # Check vault health and test secret store operations
+  eos list vault-status-enhanced --verbose`,
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := rc.Log.Named("vault.status.enhanced")
 
-	// Create enhanced vault container with dependency injection
-	vaultContainer, err := vaultpkg.NewEnhancedVaultContainer(rc)
-	if err != nil {
-		logger.Error(" Failed to create enhanced vault container", zap.Error(err))
-		return err
-	}
+		logger.Info(" Starting enhanced vault status check")
 
-	// Start container to initialize all services
-	if err := vaultContainer.Start(); err != nil {
-		logger.Error(" Failed to start vault container", zap.Error(err))
-		return err
-	}
-
-	// Ensure proper cleanup
-	defer func() {
-		if err := vaultContainer.Stop(); err != nil {
-			logger.Error(" Failed to stop vault container", zap.Error(err))
+		// Create enhanced vault container with dependency injection
+		vaultContainer, err := vaultpkg.NewEnhancedVaultContainer(rc)
+		if err != nil {
+			logger.Error(" Failed to create enhanced vault container", zap.Error(err))
+			return err
 		}
-	}()
 
-	logger.Info(" Enhanced vault container started successfully")
+		// Start container to initialize all services
+		if err := vaultContainer.Start(); err != nil {
+			logger.Error(" Failed to start vault container", zap.Error(err))
+			return err
+		}
 
-	// Perform comprehensive status check
-	if err := _performStatusChecks(rc, vaultContainer, logger); err != nil {
-		// Log error but don't fail - status checks should be informational
-		logger.Error("Status checks encountered issues", zap.Error(err))
-	}
+		// Ensure proper cleanup
+		defer func() {
+			if err := vaultContainer.Stop(); err != nil {
+				logger.Error(" Failed to stop vault container", zap.Error(err))
+			}
+		}()
 
-	// Demonstrate various vault operations
-	if err := _demonstrateVaultOperations(rc, vaultContainer, logger); err != nil {
-		logger.Error(" Vault operations demonstration failed", zap.Error(err))
-		return err
-	}
+		logger.Info(" Enhanced vault container started successfully")
 
-	logger.Info(" Enhanced vault status check completed successfully")
-	return nil
+		// Perform comprehensive status check
+		if err := _performStatusChecks(rc, vaultContainer, logger); err != nil {
+			// Log error but don't fail - status checks should be informational
+			logger.Error("Status checks encountered issues", zap.Error(err))
+		}
+
+		// Demonstrate various vault operations
+		if err := _demonstrateVaultOperations(rc, vaultContainer, logger); err != nil {
+			logger.Error(" Vault operations demonstration failed", zap.Error(err))
+			return err
+		}
+
+		logger.Info(" Enhanced vault status check completed successfully")
+		return nil
+	}),
 }
+
 
 // _performStatusChecks demonstrates status checking using domain services
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
 //
 //nolint:unused
+// TODO: HELPER_REFACTOR - Move to pkg/vault/status or pkg/vault/health
+// Type: Validation
+// Related functions: _demonstrateVaultOperations
+// Dependencies: eos_io, vaultpkg, zap, context, time
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos 
 func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
 	logger.Info(" Performing comprehensive status checks")
 
@@ -133,6 +145,12 @@ func _performStatusChecks(rc *eos_io.RuntimeContext, container *vaultpkg.Enhance
 // Prefixed with underscore to indicate it's intentionally unused (example/demo code)
 //
 //nolint:unused
+// TODO: HELPER_REFACTOR - Move to pkg/vault/demo or pkg/vault/operations
+// Type: Business Logic
+// Related functions: _performStatusChecks
+// Dependencies: eos_io, vaultpkg, zap, context, time
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functinos 
+
 func _demonstrateVaultOperations(rc *eos_io.RuntimeContext, container *vaultpkg.EnhancedVaultContainer, logger *zap.Logger) error {
 	logger.Info(" Demonstrating vault operations with clean architecture")
 

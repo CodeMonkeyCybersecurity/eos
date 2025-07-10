@@ -91,7 +91,7 @@ Examples:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // parseTerraformGraphFlags parses command line flags and returns a Terraform graph configuration
 func parseTerraformGraphFlags(cmd *cobra.Command) (*terraform.GraphConfig, error) {
 	// Start with default configuration

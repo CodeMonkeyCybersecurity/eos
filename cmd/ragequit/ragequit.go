@@ -145,7 +145,7 @@ Examples:
 		}
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	reason   string
 	noReboot bool
@@ -161,6 +161,7 @@ func init() {
 }
 
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func confirmRagequit(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -184,6 +185,7 @@ func confirmRagequit(rc *eos_io.RuntimeContext) bool {
 	return response == "yes" || response == "y"
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func createTimestampFile(rc *eos_io.RuntimeContext, reason string) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -202,6 +204,7 @@ func createTimestampFile(rc *eos_io.RuntimeContext, reason string) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func detectEnvironment(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -255,6 +258,7 @@ func detectEnvironment(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func checkResources(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -315,6 +319,7 @@ func checkResources(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func checkQueues(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -355,6 +360,7 @@ func checkQueues(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func checkDatabases(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -386,6 +392,7 @@ func checkDatabases(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func securitySnapshot(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -425,6 +432,7 @@ func securitySnapshot(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func containerDiagnostics(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -481,6 +489,7 @@ func containerDiagnostics(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func performanceSnapshot(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -525,6 +534,7 @@ func performanceSnapshot(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func systemctlDiagnostics(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -564,6 +574,7 @@ func systemctlDiagnostics(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func networkDiagnostics(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -589,6 +600,7 @@ func networkDiagnostics(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func customHooks(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	hooksDir := "/etc/eos/ragequit-hooks"
@@ -630,6 +642,7 @@ func customHooks(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func generateRecoveryPlan(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -687,6 +700,7 @@ func generateRecoveryPlan(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func createPostRebootRecovery(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 	homeDir := getHomeDir()
@@ -750,6 +764,7 @@ fi
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func notifyRagequit(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -789,6 +804,7 @@ func notifyRagequit(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func flushDataSafety(rc *eos_io.RuntimeContext) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -814,6 +830,7 @@ func flushDataSafety(rc *eos_io.RuntimeContext) {
 	}
 }
 
+// TODO: Move to pkg/ragequit or pkg/system/emergency
 func executeReboot(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -831,6 +848,7 @@ func executeReboot(rc *eos_io.RuntimeContext) error {
 
 // Utility functions
 
+// TODO: Move to pkg/system or pkg/eos_io
 func getHostname() string {
 	if hostname, err := os.Hostname(); err == nil {
 		return hostname
@@ -838,6 +856,7 @@ func getHostname() string {
 	return "unknown"
 }
 
+// TODO: Move to pkg/system or pkg/eos_io
 func getHomeDir() string {
 	if home, err := os.UserHomeDir(); err == nil {
 		return home
@@ -845,31 +864,37 @@ func getHomeDir() string {
 	return "/tmp"
 }
 
+// TODO: Move to pkg/eos_io or pkg/shared/files
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
 }
 
+// TODO: Move to pkg/eos_io or pkg/shared/files
 func dirExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.IsDir()
 }
 
+// TODO: Move to pkg/system or pkg/eos_cli
 func commandExists(command string) bool {
 	_, err := exec.LookPath(command)
 	return err == nil
 }
 
+// TODO: Move to pkg/eos_io or pkg/shared/files
 func isExecutable(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode()&0111 != 0
 }
 
+// TODO: Move to pkg/eos_io or pkg/shared/files
 func containsString(filePath, searchString string) bool {
 	content := readFile(filePath)
 	return strings.Contains(content, searchString)
 }
 
+// TODO: Move to pkg/eos_io or pkg/shared/files
 func readFile(path string) string {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -878,6 +903,7 @@ func readFile(path string) string {
 	return string(content)
 }
 
+// TODO: Move to pkg/system or pkg/eos_cli
 func runCommandWithTimeout(command string, args []string, timeout time.Duration) string {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()

@@ -18,7 +18,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	pipelineAllAlertLimit int
 	pipelineAllAgentLimit int
@@ -86,7 +86,7 @@ func init() {
 	pipelineAllCmd.Flags().IntVarP(&pipelineAllRefresh, "refresh", "r", 5, "Refresh interval in seconds")
 	pipelineAllCmd.Flags().StringVarP(&pipelineAllDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, alertLimit, agentLimit, refresh int) error {
 	// Set up signal handling
 	sigChan := make(chan os.Signal, 1)
@@ -154,7 +154,7 @@ func watchAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, ale
 		}
 	}
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, alertLimit, agentLimit int) {
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
@@ -180,7 +180,7 @@ func displayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 	displaySummaryStats(ctx, db)
 	fmt.Println("\n Press Ctrl+C to exit")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	query := `
 		SELECT 
@@ -236,7 +236,7 @@ func displayRecentAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		fmt.Println("No recent alerts")
 	}
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	query := `
 		SELECT 
@@ -310,7 +310,7 @@ func displayRecentAgents(ctx context.Context, logger otelzap.LoggerWithCtx, db *
 		fmt.Println("No active agents")
 	}
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displaySummaryStats(ctx context.Context, db *sql.DB) {
 	logger := otelzap.Ctx(ctx)
 
@@ -379,7 +379,7 @@ func displaySummaryStats(ctx context.Context, db *sql.DB) {
 		alertStats.total, alertStats.new, alertStats.sent, alertStats.failed, alertStats.last24h,
 		agentStats.total, agentStats.active, agentStats.disconnected, agentStats.lastHour)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func formatRelativeTime(t time.Time) string {
 	diff := time.Since(t)
 

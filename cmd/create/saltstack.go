@@ -176,12 +176,14 @@ func init() {
 	CreateCmd.AddCommand(saltStateCmd)
 }
 
+// TODO
 func outputStateResultsJSON(result interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
+// TODO
 func outputStateResultsText(result interface{}, target, function string, testMode bool) error {
 	fmt.Printf("Salt State Application Results\n")
 	fmt.Println(strings.Repeat("=", 50))
@@ -316,12 +318,14 @@ func init() {
 	CreateCmd.AddCommand(saltExecutionCmd)
 }
 
+// TODO
 func outputExecutionResultsJSON(result interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
 
+// TODO
 func outputExecutionResultsText(result interface{}, target, function string, async bool) error {
 	fmt.Printf("Salt Execution Results\n")
 	fmt.Println(strings.Repeat("=", 50))

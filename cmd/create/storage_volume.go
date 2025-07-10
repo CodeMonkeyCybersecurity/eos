@@ -12,7 +12,7 @@ import (
 )
 
 // Storage volume creation command variables
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	// Flags for volume creation
 	volumeName      string

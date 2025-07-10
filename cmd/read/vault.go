@@ -305,7 +305,7 @@ var InspectSecretsCmd = &cobra.Command{
 }
 
 // Helper functions for the new export features
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // TODO: Convert to structured logging when RuntimeContext is available
 func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
 	data, err := json.MarshalIndent(info, "", "  ")
@@ -320,7 +320,7 @@ func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) err
 	fmt.Print(string(data))
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // TODO: Convert to structured logging when RuntimeContext is available
 func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
 	if options.OutputPath == "" {
@@ -347,7 +347,7 @@ func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOption
 	fmt.Printf(" Vault init data exported securely to: %s\n", options.OutputPath)
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayStatusOnly(info *vault.VaultInitInfo) error {
 	// Note: This function doesn't have access to RuntimeContext, so we'll use a fallback logger
 	// In a proper implementation, this function should accept RuntimeContext as parameter
@@ -389,7 +389,7 @@ func displayStatusOnly(info *vault.VaultInitInfo) error {
 	fmt.Println("\n Use --no-redact flag to view sensitive initialization data")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // displayAgentStatus provides human-readable display of Vault Agent status
 // TODO: Convert to structured logging when RuntimeContext is available
 func displayAgentStatus(status *vault.AgentStatus) {

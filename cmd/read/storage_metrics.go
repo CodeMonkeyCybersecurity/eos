@@ -1,4 +1,3 @@
-// TODO: PATTERN 2 - Inline runReadStorageMetrics function into command RunE field
 package read
 
 import (
@@ -19,8 +18,69 @@ var readStorageMetricsCmd = &cobra.Command{
 	Use:   "storage-metrics",
 	Short: "Read storage performance metrics",
 	Long: `Display storage performance metrics including I/O rates, latency, 
-and throughput for all storage devices.`,
-	RunE: eos_cli.Wrap(runReadStorageMetrics),
+and throughput for all storage devices.
+
+This command provides real-time insights into storage device performance,
+helping identify bottlenecks and monitor system health.
+
+Features:
+  - Displays read/write throughput in MB/s
+  - Shows IOPS (Input/Output Operations Per Second)
+  - Reports average read/write latency in milliseconds
+  - Supports filtering by specific device
+  - Continuous monitoring mode with configurable interval
+
+Metrics displayed:
+  - Read/Write MB/s: Data transfer rates
+  - Read/Write IOPS: Operation rates
+  - Read/Write Latency: Average response times
+
+Examples:
+  # Display current metrics for all devices
+  eos read storage-metrics
+  
+  # Monitor specific device
+  eos read storage-metrics --device sda
+  
+  # Watch metrics continuously (5-second interval)
+  eos read storage-metrics --watch
+  
+  # Watch with custom interval
+  eos read storage-metrics --watch --interval 10s`,
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+
+		device, _ := cmd.Flags().GetString("device")
+		watch, _ := cmd.Flags().GetBool("watch")
+		interval, _ := cmd.Flags().GetDuration("interval")
+
+		logger.Info("Reading storage metrics",
+			zap.String("device", device),
+			zap.Bool("watch", watch))
+
+		if watch {
+			return watchMetrics(rc, device, interval)
+		}
+
+		// One-time collection
+		metrics, err := storage_monitor.CollectIOMetrics(rc)
+		if err != nil {
+			return fmt.Errorf("failed to collect I/O metrics: %w", err)
+		}
+
+		// Filter by device if specified
+		if device != "" {
+			filtered := make([]storage_monitor.IOMetrics, 0)
+			for _, m := range metrics {
+				if m.Device == device {
+					filtered = append(filtered, m)
+				}
+			}
+			metrics = filtered
+		}
+
+		return displayMetrics(metrics)
+	}),
 }
 
 func init() {
@@ -28,42 +88,7 @@ func init() {
 	readStorageMetricsCmd.Flags().Bool("watch", false, "Continuously monitor metrics")
 	readStorageMetricsCmd.Flags().Duration("interval", 5*time.Second, "Update interval for watch mode")
 }
-
-func runReadStorageMetrics(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	device, _ := cmd.Flags().GetString("device")
-	watch, _ := cmd.Flags().GetBool("watch")
-	interval, _ := cmd.Flags().GetDuration("interval")
-
-	logger.Info("Reading storage metrics",
-		zap.String("device", device),
-		zap.Bool("watch", watch))
-
-	if watch {
-		return watchMetrics(rc, device, interval)
-	}
-
-	// One-time collection
-	metrics, err := storage_monitor.CollectIOMetrics(rc)
-	if err != nil {
-		return fmt.Errorf("failed to collect I/O metrics: %w", err)
-	}
-
-	// Filter by device if specified
-	if device != "" {
-		filtered := make([]storage_monitor.IOMetrics, 0)
-		for _, m := range metrics {
-			if m.Device == device {
-				filtered = append(filtered, m)
-			}
-		}
-		metrics = filtered
-	}
-
-	return displayMetrics(metrics)
-}
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayMetrics(metrics []storage_monitor.IOMetrics) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 
@@ -82,7 +107,7 @@ func displayMetrics(metrics []storage_monitor.IOMetrics) error {
 
 	return w.Flush()
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func watchMetrics(rc *eos_io.RuntimeContext, device string, interval time.Duration) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()

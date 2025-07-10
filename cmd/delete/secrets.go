@@ -121,6 +121,10 @@ func init() {
 	DeleteVaultSecureCmd.Flags().BoolVar(&force, "force", false, "Continue even if some cleanup steps fail (default: false)")
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/service or pkg/vault/cleanup
+// Type: Business Logic
+// Related functions: removeVaultPackages, purgeVaultFiles, cleanupSystemHardening
+// Dependencies: eos_io, otelzap, execute, time, zap
 func stopVaultServices(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Stopping and disabling Vault services")
@@ -161,6 +165,10 @@ func stopVaultServices(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/package or pkg/vault/cleanup
+// Type: Business Logic
+// Related functions: stopVaultServices, cleanupPackageRepos
+// Dependencies: eos_io, otelzap, execute, fmt, zap
 func removeVaultPackages(rc *eos_io.RuntimeContext, distro string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Removing Vault packages", zap.String("distro", distro))
@@ -184,6 +192,10 @@ func removeVaultPackages(rc *eos_io.RuntimeContext, distro string) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/purge or pkg/vault/cleanup
+// Type: Business Logic
+// Related functions: removePathSecurely, cleanupSystemHardening
+// Dependencies: eos_io, otelzap, vault, strings, filepath, zap
 func purgeVaultFiles(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("🧹 Purging Vault files and directories")
@@ -231,6 +243,10 @@ func purgeVaultFiles(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/shared/file or pkg/eos_unix
+// Type: Utility
+// Related functions: purgeVaultFiles, cleanupSystemHardening, cleanupEosUser
+// Dependencies: eos_io, otelzap, os, execute, fmt, zap
 func removePathSecurely(rc *eos_io.RuntimeContext, path string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -248,6 +264,10 @@ func removePathSecurely(rc *eos_io.RuntimeContext, path string) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/hardening or pkg/vault/cleanup
+// Type: Business Logic
+// Related functions: removePathSecurely, purgeVaultFiles
+// Dependencies: eos_io, otelzap, zap
 func cleanupSystemHardening(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Cleaning up system hardening configurations")
@@ -276,6 +296,10 @@ func cleanupSystemHardening(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/cleanup or pkg/user
+// Type: Business Logic
+// Related functions: removePathSecurely
+// Dependencies: eos_io, otelzap, execute, shared, zap
 func cleanupEosUser(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Cleaning up eos user and related files")
@@ -308,6 +332,10 @@ func cleanupEosUser(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/package or pkg/platform
+// Type: Business Logic
+// Related functions: removePathSecurely, removeVaultPackages
+// Dependencies: eos_io, otelzap, execute, zap
 func cleanupPackageRepos(rc *eos_io.RuntimeContext, distro string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Cleaning up package repositories", zap.String("distro", distro))
@@ -337,6 +365,10 @@ func cleanupPackageRepos(rc *eos_io.RuntimeContext, distro string) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/vault/verify or pkg/vault/cleanup
+// Type: Validation
+// Related functions: stopVaultServices
+// Dependencies: eos_io, otelzap, execute, strings, os, fmt, zap
 func verifyCleanup(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Verifying cleanup completion")

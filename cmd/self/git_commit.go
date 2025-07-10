@@ -145,7 +145,7 @@ func init() {
 	gitCommitCmd.Flags().Bool("dry-run", false, "Show what would be committed without actually committing")
 }
 
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type GitStatus struct {
 	IsClean      bool
 	Branch       string
@@ -155,6 +155,7 @@ type GitStatus struct {
 	HasConflicts bool
 }
 
+// TODO: Move to pkg/git or pkg/project
 func ensureInProjectRoot(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -182,6 +183,7 @@ func ensureInProjectRoot(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: Move to pkg/git or pkg/project
 func findProjectRoot(startDir string) (string, error) {
 	dir := startDir
 
@@ -207,6 +209,7 @@ func findProjectRoot(startDir string) (string, error) {
 	return "", fmt.Errorf("EOS project root not found (no go.mod with EOS module)")
 }
 
+// TODO: Move to pkg/git or pkg/git_management
 func getGitStatus(rc *eos_io.RuntimeContext) (*GitStatus, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -274,6 +277,7 @@ func getGitStatus(rc *eos_io.RuntimeContext) (*GitStatus, error) {
 	return status, nil
 }
 
+// TODO: Move to pkg/git/safety or pkg/git_management
 func runSafetyChecks(rc *eos_io.RuntimeContext, status *GitStatus) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -312,6 +316,7 @@ func runSafetyChecks(rc *eos_io.RuntimeContext, status *GitStatus) error {
 	return nil
 }
 
+// TODO: Move to pkg/security/secrets or pkg/git/safety
 func scanForSecrets(rc *eos_io.RuntimeContext, files []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -371,6 +376,7 @@ func scanForSecrets(rc *eos_io.RuntimeContext, files []string) error {
 	return nil
 }
 
+// TODO: Move to pkg/git/validation or pkg/git/safety
 func checkFileSizes(rc *eos_io.RuntimeContext, files []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	const maxFileSize = 50 * 1024 * 1024 // 50MB
@@ -400,6 +406,7 @@ func checkFileSizes(rc *eos_io.RuntimeContext, files []string) error {
 	return nil
 }
 
+// TODO: Move to pkg/git/validation or pkg/git/safety
 func checkForArtifacts(rc *eos_io.RuntimeContext, files []string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -429,6 +436,7 @@ func checkForArtifacts(rc *eos_io.RuntimeContext, files []string) error {
 	return nil
 }
 
+// TODO: Move to pkg/git/patterns or pkg/git/safety
 func getArtifactPatterns() []string {
 	common := []string{
 		"*.log", "*.tmp", "*.swp", "*.swo", "*~",
@@ -455,6 +463,7 @@ func getArtifactPatterns() []string {
 	return common
 }
 
+// TODO: Move to pkg/git/commit or pkg/git_management
 func generateSmartCommitMessage(rc *eos_io.RuntimeContext, status *GitStatus) (string, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -480,7 +489,7 @@ func generateSmartCommitMessage(rc *eos_io.RuntimeContext, status *GitStatus) (s
 	logger.Debug("Generated commit message", zap.String("message", message))
 	return message, nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type ChangeAnalysis struct {
 	PrimaryAction string
 	FileTypes     map[string]int
@@ -493,6 +502,7 @@ type ChangeAnalysis struct {
 	LinesRemoved  int
 }
 
+// TODO: Move to pkg/git/analysis or pkg/git_management
 func analyzeChanges(status *GitStatus, diffStats string) *ChangeAnalysis {
 	analysis := &ChangeAnalysis{
 		FileTypes: make(map[string]int),
@@ -573,6 +583,7 @@ func analyzeChanges(status *GitStatus, diffStats string) *ChangeAnalysis {
 	return analysis
 }
 
+// TODO: Move to pkg/git/commit or pkg/git_management
 func buildCommitMessage(analysis *ChangeAnalysis) string {
 	var parts []string
 
@@ -629,6 +640,7 @@ func buildCommitMessage(analysis *ChangeAnalysis) string {
 	return title
 }
 
+// TODO: Move to pkg/git/commit or pkg/git_management
 func generateSimpleMessage(status *GitStatus) string {
 	totalFiles := len(status.Staged) + len(status.Modified) + len(status.Untracked)
 
@@ -639,6 +651,7 @@ func generateSimpleMessage(status *GitStatus) string {
 	return fmt.Sprintf("Update project files\n\n- %d files modified", totalFiles)
 }
 
+// TODO: Move to pkg/git/display or pkg/git/output
 func showCommitSummary(rc *eos_io.RuntimeContext, status *GitStatus, message string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -666,6 +679,7 @@ func showCommitSummary(rc *eos_io.RuntimeContext, status *GitStatus, message str
 	return nil
 }
 
+// TODO: Move to pkg/git/interaction or pkg/interaction
 func confirmCommit(rc *eos_io.RuntimeContext) bool {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -681,6 +695,7 @@ func confirmCommit(rc *eos_io.RuntimeContext) bool {
 	return response == "y" || response == "yes"
 }
 
+// TODO: Move to pkg/git/commit or pkg/git_management
 func executeCommit(rc *eos_io.RuntimeContext, message string, noVerify bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -703,6 +718,7 @@ func executeCommit(rc *eos_io.RuntimeContext, message string, noVerify bool) err
 	return nil
 }
 
+// TODO: Move to pkg/git/push or pkg/git_management
 func executePush(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

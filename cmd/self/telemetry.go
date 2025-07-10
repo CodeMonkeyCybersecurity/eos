@@ -66,7 +66,7 @@ Commands:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getTelemetryFilePath returns the path to the telemetry file, following the same logic as the telemetry package
 func getTelemetryFilePath() string {
 	// Try system directory first (Ubuntu/production)
@@ -78,7 +78,7 @@ func getTelemetryFilePath() string {
 	// Fallback to user directory (development/macOS)
 	return filepath.Join(os.Getenv("HOME"), ".eos", "telemetry", "telemetry.jsonl")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // showTelemetryInfo displays telemetry configuration details
 func showTelemetryInfo(log otelzap.LoggerWithCtx) {
 	telemetryPath := getTelemetryFilePath()
@@ -92,7 +92,7 @@ func showTelemetryInfo(log otelzap.LoggerWithCtx) {
 		zap.String("success_rate", "jq -r 'select(.attributes.success == true) | .name' "+telemetryPath+" | wc -l"),
 		zap.String("avg_duration", "jq -r 'select(.attributes.duration_ms) | \"\\(.name) \\(.attributes.duration_ms)\"' "+telemetryPath))
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // showTelemetryStatus displays current telemetry status and statistics
 func showTelemetryStatus(log otelzap.LoggerWithCtx, stateFile string) error {
 	// Check if telemetry is enabled
@@ -146,7 +146,7 @@ func showTelemetryStatus(log otelzap.LoggerWithCtx, stateFile string) error {
 	showTelemetryInfo(log)
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // TelemetryStats holds statistics about telemetry data
 type TelemetryStats struct {
 	TotalCommands      int
@@ -158,12 +158,12 @@ type TelemetryStats struct {
 	NewestEntry        string
 	TopCommands        []CommandCount
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type CommandCount struct {
 	Name  string
 	Count int
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getTelemetryStats analyzes the telemetry file and returns statistics
 func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 	file, err := os.Open(filePath)
@@ -263,7 +263,7 @@ func getTelemetryStats(filePath string) (*TelemetryStats, error) {
 
 	return stats, scanner.Err()
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // formatFileSize converts bytes to human-readable format
 func formatFileSize(bytes int64) string {
 	const unit = 1024

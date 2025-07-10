@@ -73,12 +73,13 @@ func init() {
 	CreateCmd.AddCommand(diskPartitionCmd)
 }
 
+// TODO
 func outputPartitionOpJSON(result *disk_management.PartitionOperation) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
-
+// TODO
 func outputPartitionOpText(result *disk_management.PartitionOperation) error {
 	if result.DryRun {
 		fmt.Printf("[DRY RUN] %s\n", result.Message)

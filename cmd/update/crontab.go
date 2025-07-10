@@ -12,9 +12,6 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-var email string
-
 var CrontabCmd = &cobra.Command{
 	Use:   "crontab",
 	Short: "Update the crontab to send email alerts on job failures",
@@ -29,7 +26,8 @@ Examples:
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		log := otelzap.Ctx(rc.Ctx)
 
-		// Trim and prompt if needed
+		// Get email from flag and trim
+		email, _ := cmd.Flags().GetString("email")
 		email = strings.TrimSpace(email)
 		if email == "" {
 			email = interaction.PromptInput(rc.Ctx, " Email address for cron failure alerts", "e.g., your@email.com")
@@ -73,7 +71,7 @@ Examples:
 }
 
 func init() {
-	CrontabCmd.Flags().StringVar(&email, "email", "", "Email address for cron failure alerts")
+	CrontabCmd.Flags().String("email", "", "Email address for cron failure alerts")
 	UpdateCmd.AddCommand(CrontabCmd)
 }
 

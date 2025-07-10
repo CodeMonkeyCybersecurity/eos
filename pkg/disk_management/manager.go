@@ -123,7 +123,7 @@ func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, er
 	if dm.useSalt && dm.saltClient != nil {
 		// Execute through Salt
 		logger.Info("Executing lsblk through Salt")
-		cmdStr := "lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,REMOVABLE,FSTYPE,LABEL,UUID"
+		cmdStr := "lsblk -J -o NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,RM,FSTYPE,LABEL,UUID"
 		outputStr, err := dm.saltClient.CmdRun(rc.Ctx, "*", cmdStr)
 		if err != nil {
 			logger.Error("Failed to run lsblk through Salt", 
@@ -135,7 +135,7 @@ func (dm *DiskManager) listDisksLinux(rc *eos_io.RuntimeContext) ([]DiskInfo, er
 	} else {
 		// Execute directly
 		logger.Info("Executing lsblk directly (bootstrap mode)")
-		cmd := exec.CommandContext(rc.Ctx, "lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,REMOVABLE,FSTYPE,LABEL,UUID")
+		cmd := exec.CommandContext(rc.Ctx, "lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,VENDOR,MODEL,SERIAL,RM,FSTYPE,LABEL,UUID")
 		output, err = cmd.CombinedOutput()
 		if err != nil {
 			logger.Error("Failed to run lsblk directly", 

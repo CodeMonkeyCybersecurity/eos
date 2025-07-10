@@ -1,4 +1,32 @@
+// Package pipeline provides types and utilities for the Eos pipeline infrastructure.
+// This includes webhook management, service workers, alerts, prompts, and A/B testing.
 package pipeline
+
+
+// WebhookStatus represents the status of a webhook configuration
+type WebhookStatus struct {
+	URL        string `json:"url"`
+	Configured bool   `json:"configured"`
+	Active     bool   `json:"active"`
+	Error      string `json:"error,omitempty"`
+}
+
+// AlertStatus represents the status of alert configurations
+type AlertStatus struct {
+	Provider   string `json:"provider"`
+	Configured bool   `json:"configured"`
+	Active     bool   `json:"active"`
+	Error      string `json:"error,omitempty"`
+}
+
+// PromptTemplate represents a prompt template configuration
+type PromptTemplate struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Content     string   `json:"content"`
+	Category    string   `json:"category"`
+	Tags        []string `json:"tags,omitempty"`
+}
 
 // ABTestConfig represents the structure from prompt-ab-tester.py
 type ABTestConfig struct {

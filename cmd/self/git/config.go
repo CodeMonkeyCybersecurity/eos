@@ -93,7 +93,7 @@ func init() {
 	ConfigCmd.Flags().Bool("json", false, "Output configuration in JSON format")
 	ConfigCmd.Flags().Bool("show", false, "Show current configuration")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitManager, global, outputJSON bool) error {
 	path := "."
 	if global {
@@ -140,7 +140,7 @@ func showCurrentConfig(rc *eos_io.RuntimeContext, manager *git_management.GitMan
 
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveConfig(rc *eos_io.RuntimeContext, manager *git_management.GitManager, global bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	showDevices  bool
 	showLVM      bool
@@ -150,7 +150,7 @@ while legacy mode offers traditional Unix command output for script compatibilit
 }
 
 
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // runCommand executes a system command and prints its output
 func runCommand(command string, args ...string) error {
 	cmd := exec.Command(command, args...)

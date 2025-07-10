@@ -150,7 +150,7 @@ func init() {
 	CreateMattermostCmd.Flags().Bool("dry-run", false, "Simulate installation without making changes")
 	CreateMattermostCmd.Flags().String("work-dir", "", "Working directory for Mattermost installation")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveMattermostSetup(options *service_installation.ServiceInstallOptions) error {
 	fmt.Printf("Interactive Mattermost Setup\n")
 	fmt.Printf("================================\n\n")

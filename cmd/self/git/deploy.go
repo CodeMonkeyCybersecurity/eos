@@ -11,7 +11,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for deploy command flags
 var (
 	deployRepositoryPath string
@@ -100,7 +100,7 @@ func init() {
 	deployCmd.Flags().BoolVar(&deployDryRun, "dry-run", false, "Simulate deployment without making changes")
 	deployCmd.Flags().BoolVarP(&deployForce, "force", "f", false, "Force push changes")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runDryRunDeployment(rc *eos_io.RuntimeContext, manager *git_management.GitManager, options *git_management.GitDeploymentOptions) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

@@ -54,13 +54,13 @@ func init() {
 
 	ReadCmd.AddCommand(diskUsageCmd)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputDiskUsageJSON(usage map[string]disk_management.DiskUsageInfo) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(usage)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputDiskUsageTable(usage map[string]disk_management.DiskUsageInfo) error {
 	if len(usage) == 0 {
 		fmt.Println("No mounted filesystems found.")

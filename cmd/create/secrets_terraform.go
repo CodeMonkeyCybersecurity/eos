@@ -233,7 +233,7 @@ var syncOutputsCmd = &cobra.Command{
 		return tfManager.SyncTerraformOutputsToVault(rc, vaultPath, outputs)
 	}),
 }
-
+// TODO
 // Helper functions
 func loadSecretReferences(filename string) ([]terraform.VaultSecretReference, error) {
 	// This would parse a YAML/JSON file with secret references
@@ -242,7 +242,7 @@ func loadSecretReferences(filename string) ([]terraform.VaultSecretReference, er
 	// TODO: Implement proper file parsing (YAML/JSON) for secret references
 	return []terraform.VaultSecretReference{}, nil
 }
-
+// TODO
 func getOutputNames(rc *eos_io.RuntimeContext, tfManager *terraform.Manager) ([]string, error) {
 	// Get all outputs by running terraform output command
 	output, err := tfManager.Output(rc, "")

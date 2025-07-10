@@ -3,7 +3,6 @@ package update
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,39 +10,26 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// ServiceWorkerInfo contains information about a service worker
-type ServiceWorkerInfo struct {
-	ServiceName string
-	SourcePath  string
-	TargetPath  string
-	BackupPath  string
-}
+// TODO: The following functions have been migrated to pkg/pipeline and pkg/shared
+// Remove these after updating all references
 
-// CopyFile copies a file from src to dst
-func CopyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
+// Deprecated: Use shared.ServiceWorkerInfo instead
+type ServiceWorkerInfo = shared.ServiceWorkerInfo
 
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
-	return err
-}
+// Deprecated: Use pipeline.CopyFile instead
+var CopyFile = pipeline.CopyFile
 
 // GetServiceWorkers returns information about all delphi service workers
-func GetServiceWorkers(eosRoot string) []ServiceWorkerInfo {
+// TODO: This function conflicts with the one in pkg/pipeline/services.go
+// Need to reconcile the different service lists
+func GetServiceWorkers(eosRoot string) []shared.ServiceWorkerInfo {
 	return []ServiceWorkerInfo{
 		{
 			ServiceName: "delphi-listener",
@@ -144,6 +130,7 @@ func init() {
 	UpdateCmd.AddCommand(PipelineServicesCmd)
 }
 
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // updateServiceWorker handles the update of a single service worker
 func updateServiceWorker(rc *eos_io.RuntimeContext, worker ServiceWorkerInfo) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -207,6 +194,7 @@ func updateServiceWorker(rc *eos_io.RuntimeContext, worker ServiceWorkerInfo) er
 	return nil
 }
 
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // restartServiceIfRunning restarts a systemd service if it's currently running
 func restartServiceIfRunning(ctx context.Context, serviceName string) error {
 	// Check if service is active
@@ -233,26 +221,4 @@ func restartServiceIfRunning(ctx context.Context, serviceName string) error {
 	return nil
 }
 
-// verifyOneshotCompletion verifies that a oneshot service has completed successfully
-func verifyOneshotCompletion(ctx context.Context, serviceName string) error {
-	// For oneshot services, we expect them to be in "inactive" state after completion
-	output, err := execute.Run(ctx, execute.Options{
-		Command: "systemctl",
-		Args:    []string{"is-active", serviceName},
-	})
-
-	if err != nil {
-		// Check if it's inactive (expected for completed oneshot services)
-		if strings.Contains(output, "inactive") {
-			return nil // This is normal for completed oneshot services
-		}
-		return fmt.Errorf("oneshot service in unexpected state: %w", err)
-	}
-
-	state := strings.TrimSpace(output)
-	if state == "inactive" {
-		return nil // This is the expected state for completed oneshot services
-	}
-
-	return fmt.Errorf("oneshot service in unexpected active state: %s", state)
-}
+// All helper functions have been moved to pkg/pipeline/

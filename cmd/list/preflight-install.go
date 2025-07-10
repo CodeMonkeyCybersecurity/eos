@@ -71,8 +71,9 @@ Requires sudo privileges for system-wide installation.`,
 
 	}),
 }
-
+// TODO
 // installLinuxPackages installs Python packages on Linux systems
+// TODO: Move to pkg/python or pkg/system/packages
 func installLinuxPackages(logger otelzap.LoggerWithCtx) error {
 	// Check if this is a Debian/Ubuntu system
 	if isDebianBased() {
@@ -83,7 +84,7 @@ func installLinuxPackages(logger otelzap.LoggerWithCtx) error {
 	logger.Info("🐧 Non-Debian Linux system, attempting pip3 with fallback options")
 	return installWithPip3(logger, true)
 }
-
+// TODO
 // installDebianPackages installs Python packages using apt on Debian/Ubuntu
 func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 	// Map pip package names to Debian package names
@@ -147,13 +148,13 @@ func installDebianPackages(logger otelzap.LoggerWithCtx) error {
 
 	return verifyAllPackages(logger)
 }
-
+// TODO
 // installMacOSPackages installs Python packages on macOS
 func installMacOSPackages(logger otelzap.LoggerWithCtx) error {
 	logger.Info("🍎 Detected macOS, using pip3 directly")
 	return installWithPip3(logger, false)
 }
-
+// TODO
 // installWithPip3 installs packages using pip3 with optional system package breaking
 func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) error {
 	packages := []string{
@@ -207,8 +208,9 @@ func installWithPip3(logger otelzap.LoggerWithCtx, useBreakSystemPackages bool) 
 	logger.Info(" pip3 packages installed successfully")
 	return verifyAllPackages(logger)
 }
-
+// TODO
 // isDebianBased checks if the current system is Debian/Ubuntu based
+// TODO: Move to pkg/system/os or pkg/platform
 func isDebianBased() bool {
 	// Check for /etc/debian_version
 	if _, err := os.Stat("/etc/debian_version"); err == nil {
@@ -222,8 +224,9 @@ func isDebianBased() bool {
 
 	return false
 }
-
+// TODO
 // verifyAllPackages verifies that all required packages can be imported
+// TODO: Move to pkg/python or pkg/system/packages
 func verifyAllPackages(logger otelzap.LoggerWithCtx) error {
 	logger.Info(" Verifying package installation")
 

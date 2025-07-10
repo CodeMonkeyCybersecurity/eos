@@ -12,7 +12,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	outputFile   string
 	displayOnly  bool
@@ -21,7 +21,6 @@ var (
 	includeNet   bool
 	includeHist  bool
 )
-
 // ReadSystemCmd represents the read system command
 var ReadSystemCmd = &cobra.Command{
 	Use:   "system",
@@ -117,7 +116,7 @@ and further analysis.`,
 	}),
 }
 
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // filterSystemInfo creates a filtered copy of SystemInfo based on flags
 func filterSystemInfo(info *system.SystemInfo, procs, net, hist bool) *system.SystemInfo {
 	filtered := &system.SystemInfo{

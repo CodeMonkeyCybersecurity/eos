@@ -60,7 +60,7 @@ var DockerListenerCmd = &cobra.Command{
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func patchDockerListener(rc *eos_io.RuntimeContext) error {
 	path := shared.DockerListener
 	if _, err := os.Stat(path); os.IsNotExist(err) {

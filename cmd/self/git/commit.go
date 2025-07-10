@@ -97,7 +97,11 @@ func init() {
 	CommitCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 	CommitCmd.Flags().String("path", "", "Path to Git repository (default: current directory)")
 }
-
+// TODO: HELPER_REFACTOR - Move to pkg/git_management/interactive or pkg/cli/interactive
+// Type: Business Logic
+// Related functions: None visible in this file
+// Dependencies: eos_io, git_management, otelzap, fmt, zap
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveCommit(rc *eos_io.RuntimeContext, manager *git_management.GitManager, path string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

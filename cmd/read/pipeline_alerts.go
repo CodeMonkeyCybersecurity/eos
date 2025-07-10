@@ -18,7 +18,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Alert represents an alert record for display
 type Alert struct {
 	ID                 int64      `json:"id"`
@@ -32,7 +32,7 @@ type Alert struct {
 	ResponseReceivedAt *time.Time `json:"response_received_at"`
 	AlertSentAt        *time.Time `json:"alert_sent_at"`
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	pipelineAlertsLimit   int
 	pipelineAlertsRefresh int
@@ -98,7 +98,7 @@ func init() {
 	pipelineAlertsCmd.Flags().IntVarP(&pipelineAlertsRefresh, "refresh", "r", 5, "Refresh interval in seconds")
 	pipelineAlertsCmd.Flags().StringVarP(&pipelineAlertsDsn, "dsn", "d", "", "PostgreSQL connection string (defaults to AGENTS_PG_DSN env var)")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit, refresh int) error {
 	// Set up signal handling
 	sigChan := make(chan os.Signal, 1)
@@ -175,7 +175,7 @@ func watchAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, 
 		}
 	}
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, limit int) {
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
@@ -259,14 +259,14 @@ func displayAlerts(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB
 
 	fmt.Printf("\n Total alerts shown: %d | Press Ctrl+C to exit\n", len(alerts))
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func formatOptionalTime(t *time.Time) string {
 	if t == nil {
 		return "-"
 	}
 	return t.Format("15:04:05")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func getStateColor(state string) string {
 	switch state {
 	case "new":

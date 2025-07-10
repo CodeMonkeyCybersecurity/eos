@@ -12,7 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var backendIP string
 
 // jenkinsCmd updates the Jenkins backend IP configuration.

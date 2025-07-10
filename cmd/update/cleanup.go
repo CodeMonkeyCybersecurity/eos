@@ -9,14 +9,6 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
-// Global flags
-var (
-	nonInteractive bool
-	orphansOnly    bool
-	kernelsOnly    bool
-)
-
 var cleanupCmd = &cobra.Command{
 	Use:   "cleanup",
 	Short: "Clean up unused packages and system files",
@@ -37,6 +29,11 @@ Examples:
   eos update cleanup --yes --orphans-only  # Non-interactive orphan cleanup`,
 	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
+		// Get flags
+		nonInteractive, _ := cmd.Flags().GetBool("yes")
+		orphansOnly, _ := cmd.Flags().GetBool("orphans-only")
+		kernelsOnly, _ := cmd.Flags().GetBool("kernels-only")
+		
 		logger.Info("Starting system cleanup",
 			zap.Bool("non_interactive", nonInteractive),
 			zap.Bool("orphans_only", orphansOnly),
@@ -52,11 +49,11 @@ Examples:
 
 		// Execute cleanup based on flags
 		if orphansOnly {
-			return runOrphansOnlyCleanup(cleanup, !nonInteractive)
+			return system.RunOrphansOnlyCleanup(rc, cleanup, !nonInteractive)
 		}
 
 		if kernelsOnly {
-			return runKernelsOnlyCleanup(cleanup, !nonInteractive)
+			return system.RunKernelsOnlyCleanup(rc, cleanup, !nonInteractive)
 		}
 
 		// Full cleanup
@@ -71,56 +68,15 @@ Examples:
 	}),
 }
 
-
-// runOrphansOnlyCleanup handles orphaned packages only
-func runOrphansOnlyCleanup(cleanup *system.PackageCleanup, interactive bool) error {
-	// Ensure deborphan is available
-	if err := cleanup.EnsureDeborphan(); err != nil {
-		return err
-	}
-
-	// Find orphaned packages
-	orphans, err := cleanup.FindOrphanedPackages()
-	if err != nil {
-		return err
-	}
-
-	if len(orphans) == 0 {
-		return nil
-	}
-
-	// Remove orphaned packages
-	return cleanup.RemoveOrphanedPackages(orphans)
-}
-
-// runKernelsOnlyCleanup handles unused kernels only
-func runKernelsOnlyCleanup(cleanup *system.PackageCleanup, interactive bool) error {
-	// Find unused kernels
-	kernels, err := cleanup.FindUnusedKernels()
-	if err != nil {
-		return err
-	}
-
-	if len(kernels) == 0 {
-		return nil
-	}
-
-	// For safety, skip kernel removal in non-interactive mode
-	if !interactive {
-		return nil
-	}
-
-	// Remove unused kernels
-	return cleanup.RemoveUnusedKernels(kernels)
-}
+// All helper functions have been moved to pkg/system/
 
 func init() {
 	UpdateCmd.AddCommand(cleanupCmd)
 
-	cleanupCmd.Flags().BoolVarP(&nonInteractive, "yes", "y", false,
+	cleanupCmd.Flags().BoolP("yes", "y", false,
 		"Run in non-interactive mode (skip prompts)")
-	cleanupCmd.Flags().BoolVar(&orphansOnly, "orphans-only", false,
+	cleanupCmd.Flags().Bool("orphans-only", false,
 		"Only remove orphaned packages")
-	cleanupCmd.Flags().BoolVar(&kernelsOnly, "kernels-only", false,
+	cleanupCmd.Flags().Bool("kernels-only", false,
 		"Only remove unused kernels")
 }

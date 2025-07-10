@@ -60,14 +60,14 @@ func init() {
 	// Register with parent command
 	ReadCmd.AddCommand(containerComposeCmd)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Output formatting functions
 func outputComposeSearchJSON(result *container_management.ComposeSearchResult) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(result)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputComposeSearchTable(result *container_management.ComposeSearchResult) error {
 	fmt.Printf("Searched paths: %s\n", strings.Join(result.SearchPaths, ", "))
 	fmt.Printf("Search duration: %v\n", result.SearchDuration)

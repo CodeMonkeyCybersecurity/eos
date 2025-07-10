@@ -72,7 +72,7 @@ func init() {
 	StatusCmd.Flags().Bool("json", false, "Output in JSON format")
 	StatusCmd.Flags().BoolP("detailed", "d", false, "Show detailed file information")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputJSONStatus(status *git_management.GitStatus) error {
 	data, err := json.MarshalIndent(status, "", "  ")
 	if err != nil {
@@ -81,7 +81,7 @@ func outputJSONStatus(status *git_management.GitStatus) error {
 	fmt.Println(string(data))
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputTableStatus(status *git_management.GitStatus, detailed bool) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	defer w.Flush()

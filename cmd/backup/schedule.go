@@ -315,6 +315,10 @@ func init() {
 
 
 
+// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/systemd
+// Type: Utility
+// Related functions: runSystemctl
+// Dependencies: fmt, strings
 // cronToOnCalendar converts a cron expression to systemd OnCalendar format
 // This is a simplified conversion - not all cron expressions can be converted
 func cronToOnCalendar(cron string) string {
@@ -342,6 +346,10 @@ func cronToOnCalendar(cron string) string {
 	}
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/systemd or pkg/eos_unix
+// Type: Business Logic
+// Related functions: cronToOnCalendar
+// Dependencies: exec (to be implemented)
 func runSystemctl(args ...string) error {
 	// TODO: Implement proper systemctl execution
 	return nil

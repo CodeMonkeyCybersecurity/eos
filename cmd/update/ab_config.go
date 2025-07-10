@@ -45,7 +45,7 @@ Example experiment workflow:
 Configuration file: /opt/delphi/ab-test-config.json`,
 	Aliases: []string{"ab", "abtest"},
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for ab-config create command
 var (
 	abConfigCreateName           string
@@ -162,7 +162,7 @@ Examples:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for ab-config status command
 var abConfigStatusDetailed bool
 
@@ -259,6 +259,11 @@ Examples:
 
 // Helper functions for A/B testing configuration management
 
+// TODO: HELPER_REFACTOR - Move to pkg/pipeline/abtest or pkg/pipeline/config
+// Type: Business Logic
+// Related functions: saveABTestConfig, loadABTestMetrics
+// Dependencies: os, json, fmt, pipeline
+// TODO: Move to pkg/pipeline/abtest or pkg/pipeline/config
 func loadABTestConfig(path string) (*pipeline.ABTestConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -273,6 +278,11 @@ func loadABTestConfig(path string) (*pipeline.ABTestConfig, error) {
 	return &config, nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/pipeline/abtest or pkg/pipeline/config
+// Type: Business Logic
+// Related functions: loadABTestConfig
+// Dependencies: os, json, fmt, filepath, pipeline
+// TODO: Move to pkg/pipeline/abtest or pkg/pipeline/config
 func saveABTestConfig(path string, config *pipeline.ABTestConfig) error {
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -291,6 +301,11 @@ func saveABTestConfig(path string, config *pipeline.ABTestConfig) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/pipeline/abtest or pkg/pipeline/metrics
+// Type: Business Logic
+// Related functions: loadABTestConfig
+// Dependencies: os, json, fmt, strings
+// TODO: Move to pkg/pipeline/abtest or pkg/pipeline/metrics
 func loadABTestMetrics(path string) (map[string]interface{}, error) {
 	// Load the most recent metrics from JSONL file
 	data, err := os.ReadFile(path)

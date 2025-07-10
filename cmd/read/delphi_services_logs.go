@@ -110,7 +110,7 @@ func init() {
 
 	readDelphiCmd.AddCommand(delphiServicesLogsCmd)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // viewAllServiceLogs displays logs for all Delphi services with pretty formatting
 func viewAllServiceLogs(rc *eos_io.RuntimeContext, logger *otelzap.LoggerWithCtx, lines int, follow bool, services []string) error {
 	if follow {

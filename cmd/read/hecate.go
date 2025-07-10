@@ -52,7 +52,7 @@ You can choose from:
 		return runInspectConfig(rc)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // runInspectConfig presents an interactive menu for inspection
 func runInspectConfig(rc *eos_io.RuntimeContext) error {
 	logger := otelzap.Ctx(rc.Ctx)

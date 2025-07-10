@@ -119,7 +119,7 @@ EXAMPLES:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	datacenterName          string
 	disableVaultIntegration bool
@@ -136,6 +136,11 @@ func init() {
 }
 
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/install or pkg/hashicorp/consul
+// Type: Business Logic
+// Related functions: setupConsulSystemUser, startConsulService
+// Dependencies: eos_io, otelzap, execute, eos_unix, fmt, strings, zap
+// TODO: Move to pkg/consul/install or pkg/hashicorp/consul
 func installConsulBinary(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -197,6 +202,11 @@ func installConsulBinary(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/setup or pkg/consul/system
+// Type: Business Logic
+// Related functions: installConsulBinary, createConsulSystemdService
+// Dependencies: eos_io, otelzap, execute, strings, zap
+// TODO: Move to pkg/consul/setup or pkg/consul/system
 func setupConsulSystemUser(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Setting up Consul system user and directories")
@@ -232,6 +242,11 @@ func setupConsulSystemUser(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/detect or pkg/hashicorp/detect
+// Type: Validation
+// Related functions: generateVaultServiceConfig
+// Dependencies: eos_io, otelzap, os, vault, zap
+// TODO: Move to pkg/consul/detect or pkg/hashicorp/detect
 func detectVaultInstallation(rc *eos_io.RuntimeContext) bool {
 	log := otelzap.Ctx(rc.Ctx)
 
@@ -261,6 +276,11 @@ func detectVaultInstallation(rc *eos_io.RuntimeContext) bool {
 	return true
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/config or pkg/consul/generator
+// Type: Business Logic
+// Related functions: generateVaultServiceConfig, createConsulSystemdService
+// Dependencies: eos_io, otelzap, eos_unix, time, shared, os, execute, fmt, zap
+// TODO: Move to pkg/consul/config or pkg/consul/generator
 func generateConsulConfig(rc *eos_io.RuntimeContext, vaultAvailable bool) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Generating Consul configuration",
@@ -408,6 +428,11 @@ watches = [
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/vault or pkg/consul/services
+// Type: Business Logic
+// Related functions: detectVaultInstallation, generateConsulConfig
+// Dependencies: eos_io, otelzap, os, eos_unix, strings, execute, fmt, zap
+// TODO: Move to pkg/consul/vault or pkg/consul/services
 func generateVaultServiceConfig(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Generating Vault service registration for Consul")
@@ -480,6 +505,11 @@ func generateVaultServiceConfig(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/systemd or pkg/consul/service
+// Type: Business Logic
+// Related functions: setupConsulSystemUser, startConsulService
+// Dependencies: eos_io, otelzap, shared, os, execute, fmt, zap
+// TODO: Move to pkg/consul/systemd or pkg/consul/service
 func createConsulSystemdService(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Creating Consul systemd service")
@@ -521,6 +551,11 @@ WantedBy=multi-user.target`, shared.PortConsul)
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/scripts or pkg/consul/helpers
+// Type: Business Logic
+// Related functions: None visible in this file
+// Dependencies: eos_io, otelzap, shared, os, fmt, zap
+// TODO: Move to pkg/consul/scripts or pkg/consul/helpers
 func createConsulHelperScript(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Creating Consul helper script")
@@ -614,6 +649,11 @@ esac`, shared.PortConsul)
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/service or pkg/consul/start
+// Type: Business Logic
+// Related functions: createConsulSystemdService, waitForConsulReady
+// Dependencies: eos_io, otelzap, execute, strings, fmt, zap
+// TODO: Move to pkg/consul/service or pkg/consul/start
 func startConsulService(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Starting Consul service")
@@ -633,6 +673,11 @@ func startConsulService(rc *eos_io.RuntimeContext) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/wait or pkg/consul/health
+// Type: Business Logic
+// Related functions: startConsulService
+// Dependencies: eos_io, otelzap, execute, shared, time, fmt, zap
+// TODO: Move to pkg/consul/wait or pkg/consul/health
 func waitForConsulReady(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	log.Info(" Waiting for Consul to be ready")
@@ -652,6 +697,11 @@ func waitForConsulReady(rc *eos_io.RuntimeContext) error {
 	return fmt.Errorf("consul failed to become ready after %d attempts", maxAttempts)
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/consul/display or pkg/consul/output
+// Type: Output Formatter
+// Related functions: None visible in this file
+// Dependencies: eos_io, otelzap, eos_unix, shared, fmt
+// TODO: Move to pkg/consul/display or pkg/consul/output
 func displayInstallationSummary(rc *eos_io.RuntimeContext, vaultAvailable bool) {
 	log := otelzap.Ctx(rc.Ctx)
 	hostname := eos_unix.GetInternalHostname()

@@ -1,4 +1,8 @@
 #!/bin/bash
+# TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+# TODO 
+# TODO
+# TODO
 
 # Variables
 REPO_FILE="/etc/apt/sources.list.d/mcp.list"

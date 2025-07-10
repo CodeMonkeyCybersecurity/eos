@@ -191,6 +191,7 @@ var generateVaultHetznerCmd = &cobra.Command{
 	}),
 }
 
+// TODO
 // Helper functions
 func generateVaultK3sVariables(outputDir string, data terraform.VaultTemplateData) error {
 	variables := fmt.Sprintf(`
@@ -240,6 +241,7 @@ variable "ssh_key_name" {
 	return os.WriteFile(filepath.Join(outputDir, "variables.tf"), []byte(variables), 0644)
 }
 
+// TODO
 func generateVaultHetznerVariables(outputDir string, data terraform.VaultTemplateData) error {
 	variables := fmt.Sprintf(`
 variable "vault_addr" {
@@ -282,6 +284,7 @@ variable "ssh_key_name" {
 	return os.WriteFile(filepath.Join(outputDir, "variables.tf"), []byte(variables), 0644)
 }
 
+// TODO
 func generateHetznerCloudInit(outputDir string) error {
 	cloudInit := `#cloud-config
 package_update: true
@@ -312,6 +315,7 @@ runcmd:
 	return os.WriteFile(filepath.Join(outputDir, "cloud-init.yaml"), []byte(cloudInit), 0644)
 }
 
+// TODO
 func generateVaultSecretsSetup(outputDir string, data terraform.VaultTemplateData) error {
 	script := fmt.Sprintf(`#!/bin/bash
 # Setup Vault secrets for Terraform deployment

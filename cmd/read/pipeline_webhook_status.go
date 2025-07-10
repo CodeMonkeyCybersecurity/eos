@@ -59,7 +59,7 @@ func init() {
 
 	ReadCmd.AddCommand(pipelineWebhookStatusCmd)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // WebhookStatus represents the status of webhook deployment
 type WebhookStatus struct {
 	Timestamp       time.Time         `json:"timestamp"`
@@ -71,7 +71,7 @@ type WebhookStatus struct {
 	Connectivity    bool              `json:"connectivity"`
 	Issues          []string          `json:"issues"`
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // checkWebhookStatus checks the current webhook deployment status
 func checkWebhookStatus(rc *eos_io.RuntimeContext, verbose bool) *WebhookStatus {
 	status := &WebhookStatus{
@@ -119,7 +119,7 @@ func checkWebhookStatus(rc *eos_io.RuntimeContext, verbose bool) *WebhookStatus 
 }
 
 // Helper functions
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func allFilesPresent(files map[string]bool) bool {
 	for _, present := range files {
 		if !present {
@@ -128,7 +128,7 @@ func allFilesPresent(files map[string]bool) bool {
 	}
 	return true
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func checkEnvVar(envFile, varName string) bool {
 	// Simple check - in production you'd want proper env file parsing
 	data, err := os.ReadFile(envFile)
@@ -137,13 +137,13 @@ func checkEnvVar(envFile, varName string) bool {
 	}
 	return strings.Contains(string(data), varName+"=")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputStatusJSON(status *WebhookStatus) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(status)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputStatusText(status *WebhookStatus, logger otelzap.LoggerWithCtx) error {
 	logger.Info("Delphi Webhook Integration Status")
 	logger.Info(strings.Repeat("=", 50))

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
@@ -17,7 +18,7 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	showSecrets bool
 )
@@ -199,7 +200,49 @@ to ensure your database schema is properly configured.`,
   # - Table structures match expectations
   # - Performance optimizations are in place
   # - Monitoring infrastructure is configured`,
-	RunE: eos_cli.Wrap(delphi.RunVerifyPipelineSchema),
+	RunE: eos_cli.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		logger := otelzap.Ctx(rc.Ctx)
+		logger.Info("Verifying Delphi pipeline database schema")
+
+		// Connect to database
+		db, err := connectToDelphiDatabase(rc)
+		if err != nil {
+			return fmt.Errorf("failed to connect to database: %w", err)
+		}
+		defer db.Close()
+
+		// Create schema verifier
+		verifier := delphi.NewSchemaVerifier(db)
+
+		// Run verification
+		result, err := verifier.VerifyCompleteSchema(rc)
+		if err != nil {
+			return fmt.Errorf("schema verification failed: %w", err)
+		}
+
+		// Display results
+		fmt.Printf("\n=== Delphi Pipeline Schema Verification ===\n")
+		fmt.Printf("Timestamp: %s\n", result.Timestamp.Format(time.RFC3339))
+		fmt.Printf("Overall Status: %s\n", result.OverallStatus)
+		fmt.Printf("Missing Objects: %d\n\n", result.MissingCount)
+
+		// Display detailed results for each object type
+		displaySchemaObjects("Enum Types", result.EnumTypes)
+		displaySchemaObjects("Tables", result.Tables)
+		displaySchemaObjects("Indexes", result.Indexes)
+		displaySchemaObjects("Views", result.Views)
+		displaySchemaObjects("Functions", result.Functions)
+		displaySchemaObjects("Triggers", result.Triggers)
+
+		if result.MissingCount > 0 {
+			fmt.Printf("\n⚠️  Schema verification found %d missing objects.\n", result.MissingCount)
+			fmt.Println("Run 'eos create delphi deploy' to deploy the complete schema.")
+		} else {
+			fmt.Println("\n✅ All schema objects are present and verified.")
+		}
+
+		return nil
+	}),
 }
 
 func init() {
@@ -217,7 +260,34 @@ func init() {
 	// ReadCmd.Flags().BoolVarP(&showSecrets, "show-secrets", "s", false, "Show sensitive secret values (use with caution)")
 }
 
+
+// displaySchemaObjects displays verification results for a specific object type
+// TODO: Move to pkg/delphi/display or pkg/delphi/output
+func displaySchemaObjects(objectType string, objects []delphi.SchemaObject) {
+	if len(objects) == 0 {
+		return
+	}
+
+	fmt.Printf("\n%s:\n", objectType)
+	for _, obj := range objects {
+		statusSymbol := "✓"
+		if obj.Status != "OK" {
+			statusSymbol = "✗"
+		}
+		
+		fmt.Printf("  %s %s", statusSymbol, obj.Name)
+		if obj.Details != "" {
+			fmt.Printf(" - %s", obj.Details)
+		}
+		if obj.ActionNeeded != "" {
+			fmt.Printf("\n    Action: %s", obj.ActionNeeded)
+		}
+		fmt.Println()
+	}
+}
+
 // connectToDelphiDatabase establishes a connection to the Delphi PostgreSQL database
+// TODO: Move to pkg/delphi/database or pkg/database_management
 func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -276,6 +346,7 @@ func connectToDelphiDatabase(rc *eos_io.RuntimeContext) (*sql.DB, error) {
 }
 
 // verifyDatabaseSchema checks that required views and tables exist
+// TODO: Move to pkg/delphi/database or pkg/delphi/schema
 func verifyDatabaseSchema(rc *eos_io.RuntimeContext, db *sql.DB) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info(" Verifying database schema")

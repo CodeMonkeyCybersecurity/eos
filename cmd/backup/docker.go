@@ -180,12 +180,20 @@ func init() {
   eos backup docker restore /path/to/backup --verify-only`
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/container
+// Type: Business Logic
+// Related functions: None visible in this file
+// Dependencies: container.BackupConfig, cobra, fmt
 // parseDockerBackupFlags parses Docker backup configuration from flags
 func parseDockerBackupFlags(cmd *cobra.Command) (*container.BackupConfig, error) {
 	// TODO: Implement Docker backup flag parsing
 	return nil, fmt.Errorf("parseDockerBackupFlags not yet implemented")
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/container
+// Type: Output Formatter
+// Related functions: None visible in this file
+// Dependencies: otelzap, zap
 // logBackupResults logs the results of a backup operation
 func logBackupResults(logger otelzap.LoggerWithCtx, result interface{}) {
 	// TODO: Implement backup result logging

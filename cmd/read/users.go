@@ -109,7 +109,7 @@ SSH access detection includes:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getSystemUsers reads the /etc/passwd file and returns a list of usernames
 func getSystemUsers(rc *eos_io.RuntimeContext) ([]string, error) {
 	file, err := os.Open("/etc/passwd")

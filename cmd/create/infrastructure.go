@@ -48,7 +48,7 @@ Examples:
 		}
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func deployTailscaleInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Deploying Tailscale infrastructure")
@@ -94,7 +94,7 @@ func deployTailscaleInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command
 
 	return network.DeployTailscaleInfrastructure(rc, config)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func deployTraefikInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Deploying Traefik infrastructure")
@@ -124,7 +124,7 @@ func deployTraefikInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) 
 	logger.Info("Traefik infrastructure deployment completed")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func deployHeadscaleInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Deploying Headscale infrastructure")

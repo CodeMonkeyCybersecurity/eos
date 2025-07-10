@@ -166,7 +166,7 @@ func init() {
 	CreateCaddyCmd.Flags().BoolP("force", "f", false, "Force installation even if conflicts exist")
 	CreateCaddyCmd.Flags().Bool("skip-health-check", false, "Skip post-installation health check")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveCaddySetup(options *service_installation.ServiceInstallOptions) error {
 	fmt.Printf("Interactive Caddy Setup\n")
 	fmt.Printf("==========================\n\n")

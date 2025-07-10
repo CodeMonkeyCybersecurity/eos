@@ -1,25 +1,15 @@
 package update
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/output"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system_services"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-)
-
-// Package-level flag variables with prefixes to avoid conflicts
-var (
-	servicesOutputJSON bool
-	servicesDryRun     bool
-	servicesShowAll    bool
-	servicesSudo       bool
 )
 
 // servicesCmd manages systemd services
@@ -49,7 +39,7 @@ Examples:
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for services list command
 var (
 	servicesListState      []string
@@ -143,10 +133,10 @@ Examples:
 			return err
 		}
 
-		return outputServiceList(result, outputJSON)
+		return output.ServiceListToStdout(result, outputJSON)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for services start command
 var servicesStartEnable bool
 
@@ -190,10 +180,10 @@ Examples:
 			return err
 		}
 
-		return outputServiceOperation(result, outputJSON)
+		return output.ServiceOperationToStdout(result, outputJSON)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for services stop command
 var servicesStopDisable bool
 
@@ -237,7 +227,7 @@ Examples:
 			return err
 		}
 
-		return outputServiceOperation(result, outputJSON)
+		return output.ServiceOperationToStdout(result, outputJSON)
 	}),
 }
 
@@ -279,7 +269,7 @@ Examples:
 			return err
 		}
 
-		return outputServiceOperation(result, outputJSON)
+		return output.ServiceOperationToStdout(result, outputJSON)
 	}),
 }
 
@@ -314,10 +304,10 @@ Examples:
 			return err
 		}
 
-		return outputServiceStatus(result, outputJSON)
+		return output.ServiceStatusToStdout(result, outputJSON)
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Flag variables for services logs command
 var (
 	servicesLogsFollow     bool
@@ -379,8 +369,9 @@ Examples:
 	}),
 }
 
-// Helper functions for output formatting
+// All output formatting functions have been moved to pkg/output/services.go
 
+// Deprecated: Use output.ServiceListToStdout instead
 func outputServiceList(result *system_services.ServiceListResult, outputJSON bool) error {
 	if outputJSON {
 		encoder := json.NewEncoder(os.Stdout)
@@ -408,7 +399,7 @@ func outputServiceList(result *system_services.ServiceListResult, outputJSON boo
 
 	return nil
 }
-
+// Deprecated: Use output.ServiceOperationToStdout instead
 func outputServiceOperation(result *system_services.ServiceOperation, outputJSON bool) error {
 	if outputJSON {
 		encoder := json.NewEncoder(os.Stdout)
@@ -436,7 +427,7 @@ func outputServiceOperation(result *system_services.ServiceOperation, outputJSON
 
 	return nil
 }
-
+// Deprecated: Use output.ServiceStatusToStdout instead  
 func outputServiceStatus(result *system_services.ServiceInfo, outputJSON bool) error {
 	if outputJSON {
 		encoder := json.NewEncoder(os.Stdout)

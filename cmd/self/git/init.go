@@ -87,7 +87,7 @@ func init() {
 	InitCmd.Flags().Bool("setup-github", false, "Setup GitHub repository using gh CLI")
 	InitCmd.Flags().BoolP("interactive", "i", false, "Interactive mode")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runInteractiveInit(rc *eos_io.RuntimeContext, manager *git_management.GitManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

@@ -25,7 +25,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
 )
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var ignoreHardwareCheck bool
 var overwriteInstall bool
 
@@ -155,7 +155,8 @@ EXAMPLES:
 	}),
 }
 
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/delphi/install or pkg/delphi/wazuh
 func extractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	for _, dir := range searchPaths {
@@ -182,19 +183,19 @@ var mappingCmd = &cobra.Command{
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type OSInfo struct {
 	Name         string `json:"name"`
 	Version      string `json:"version"`
 	Architecture string `json:"architecture"`
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type Agent struct {
 	ID      string `json:"id"`
 	Version string `json:"version"`
 	OS      OSInfo `json:"os"`
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type AgentsResponse struct {
 	Data struct {
 		AffectedItems []Agent `json:"affected_items"`
@@ -202,14 +203,15 @@ type AgentsResponse struct {
 	Error   int    `json:"error"`
 	Message string `json:"message"`
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type PackageMapping struct {
 	Distribution string
 	MinVersion   int
 	Arch         string
 	Package      string
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/delphi/agents or pkg/delphi/mapping
 func runMapping(rc *eos_io.RuntimeContext) {
 	cfg, err := delphi.ResolveConfig(rc)
 	if err != nil {
@@ -250,7 +252,8 @@ func runMapping(rc *eos_io.RuntimeContext) {
 		}
 	}
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/delphi/api or pkg/delphi/client
 func fetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsResponse, error) {
 	url := strings.TrimRight(baseURL, "/") + "/agents?select=id,os,version"
 	req, _ := http.NewRequest("GET", url, nil)
@@ -270,12 +273,14 @@ func fetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	}
 	return &parsed, nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/delphi/display or pkg/delphi/output
 func printAgentInfo(agent Agent) {
 	fmt.Printf("\n Agent %s:\n", agent.ID)
 	fmt.Printf("  OS: %s %s (%s)\n", agent.OS.Name, agent.OS.Version, agent.OS.Architecture)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/delphi/agents or pkg/delphi/mapping
 func matchPackage(mappings []PackageMapping, arch string, major int) string {
 	for _, m := range mappings {
 		if m.Arch == arch && major >= m.MinVersion {
@@ -284,15 +289,17 @@ func matchPackage(mappings []PackageMapping, arch string, major int) string {
 	}
 	return ""
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/shared/strings or pkg/eos_io
 func defaultStr(val, fallback string) string {
 	if val == "" {
 		return fallback
 	}
 	return val
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getAgentFetchTLSConfig returns TLS configuration with proper security settings for agent fetching
+// TODO: Move to pkg/delphi/tls or pkg/shared/tls
 func getAgentFetchTLSConfig() *tls.Config {
 	// Allow insecure TLS only in development/testing environments
 	if os.Getenv("Eos_INSECURE_TLS") == "true" || os.Getenv("GO_ENV") == "test" {
@@ -314,7 +321,8 @@ func getAgentFetchTLSConfig() *tls.Config {
 		PreferServerCipherSuites: true,
 	}
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// TODO: Move to pkg/delphi/agents or pkg/delphi/mapping
 func getMappings(distribution string) []PackageMapping {
 	switch strings.ToLower(distribution) {
 	case "centos":
@@ -339,6 +347,7 @@ func getMappings(distribution string) []PackageMapping {
 	}
 }
 
+// TODO: Move to pkg/shared/version or pkg/eos_io
 func getMajorVersion(versionStr string) (int, error) {
 	parts := strings.Split(versionStr, ".")
 	return strconv.Atoi(parts[0])
@@ -522,7 +531,7 @@ Examples:
 }
 
 // Implementation functions
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runDockerDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAddress string, port int, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -632,7 +641,7 @@ func runDockerDeployment(rc *eos_io.RuntimeContext, version, deployType, proxyAd
 	logger.Info("Wazuh deployment completed successfully")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func configureProxy(proxyAddress string) error {
 	// Add proxy configuration to generate-indexer-certs.yml
 	proxyConfig := fmt.Sprintf(`
@@ -648,7 +657,7 @@ func configureProxy(proxyAddress string) error {
 	_, err = file.WriteString(proxyConfig)
 	return err
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func configurePortMapping(port int) error {
 	// Read docker-compose.yml
 	content, err := os.ReadFile("docker-compose.yml")
@@ -665,7 +674,7 @@ func configurePortMapping(port int) error {
 	// Write back to file
 	return os.WriteFile("docker-compose.yml", []byte(newContent), 0644)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPassword, apiPassword, deployType string, interactive bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -735,7 +744,7 @@ func runCredentialsChange(rc *eos_io.RuntimeContext, adminPassword, kibanaPasswo
 	logger.Info("Credentials updated successfully")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func updateAdminPassword(password string) error {
 	// Update docker-compose.yml
 	if err := updateComposeFile("INDEXER_PASSWORD=SecretPassword", fmt.Sprintf("INDEXER_PASSWORD=%s", password)); err != nil {
@@ -750,7 +759,7 @@ func updateAdminPassword(password string) error {
 
 	return updateInternalUsers("$2y$12$K/SpwjtB.wOHJ/Nc6GVRDuc1h0rM1DfvziFRNPtk27P.c4yDr9njO", hash)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func updateKibanaPassword(password string) error {
 	// Update docker-compose.yml
 	if err := updateComposeFile("DASHBOARD_PASSWORD=kibanaserver", fmt.Sprintf("DASHBOARD_PASSWORD=%s", password)); err != nil {
@@ -765,7 +774,7 @@ func updateKibanaPassword(password string) error {
 
 	return updateInternalUsers("$2a$12$4AcgAt3xwOWadA5s5blL6ev39OXDNhmOesEoo33eZtrq2N0YrU3H.", hash)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func updateAPIPassword(password string) error {
 	// Update docker-compose.yml
 	if err := updateComposeFile("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password)); err != nil {
@@ -775,19 +784,19 @@ func updateAPIPassword(password string) error {
 	// Update wazuh.yml
 	return updateWazuhYML("API_PASSWORD=MyS3cr37P450r.*-", fmt.Sprintf("API_PASSWORD=%s", password))
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func updateComposeFile(oldValue, newValue string) error {
 	return replaceInFile("docker-compose.yml", oldValue, newValue)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func updateInternalUsers(oldHash, newHash string) error {
 	return replaceInFile("config/wazuh_indexer/internal_users.yml", oldHash, newHash)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func updateWazuhYML(oldValue, newValue string) error {
 	return replaceInFile("config/wazuh_dashboard/wazuh.yml", oldValue, newValue)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func replaceInFile(filename, oldValue, newValue string) error {
 	content, err := os.ReadFile(filename)
 	if err != nil {
@@ -797,7 +806,7 @@ func replaceInFile(filename, oldValue, newValue string) error {
 	newContent := strings.ReplaceAll(string(content), oldValue, newValue)
 	return os.WriteFile(filename, []byte(newContent), 0644)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func generatePasswordHash(password string) (string, error) {
 	// Use Docker to generate hash
 	cmd := exec.Command("docker", "run", "--rm", "-i", "wazuh/wazuh-indexer:latest",
@@ -819,7 +828,7 @@ func generatePasswordHash(password string) (string, error) {
 
 	return "", fmt.Errorf("failed to extract hash from output")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func runCleanup(rc *eos_io.RuntimeContext, removeData, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 

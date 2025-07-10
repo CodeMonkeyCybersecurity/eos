@@ -13,7 +13,6 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline" // Import the new package
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -153,14 +152,15 @@ Examples:
 		logger.Info("Successfully created prompt", zap.String("name", promptName), zap.String("path", promptPath))
 		fmt.Printf("Successfully created prompt '%s' at %s\n", promptName, promptPath)
 
-		// Check if the prompts directory is already mounted to Delphi containers
-		mounted, err := pipeline.IsPromptsDirectoryMounted(rc)
-		if err != nil {
-			logger.Warn("Failed to check if prompts directory is mounted", zap.Error(err))
-		} else if !mounted {
-			fmt.Println("\nNote: The prompts directory is not currently mounted to Delphi containers.")
-			fmt.Println("Run 'eos update delphi services' to mount the prompts directory.")
-		}
+		// TODO: Check if the prompts directory is already mounted to Delphi containers
+		// This functionality needs to be implemented in the pipeline package
+		// mounted, err := pipeline.IsPromptsDirectoryMounted(rc)
+		// if err != nil {
+		// 	logger.Warn("Failed to check if prompts directory is mounted", zap.Error(err))
+		// } else if !mounted {
+		// 	fmt.Println("\nNote: The prompts directory is not currently mounted to Delphi containers.")
+		// 	fmt.Println("Run 'eos update delphi services' to mount the prompts directory.")
+		// }
 
 		return nil
 	}),
@@ -180,6 +180,7 @@ func init() {
 }
 
 // getSystemUser returns the actual system user (not root) when running under sudo
+// TODO: Move to pkg/user or pkg/system
 func getSystemUser() (*user.User, error) {
 	currentUser, err := user.Current()
 	if err != nil {
@@ -201,6 +202,7 @@ func getSystemUser() (*user.User, error) {
 }
 
 // createPromptTemplate creates a basic template for a new prompt
+// TODO: Move to pkg/pipeline
 func createPromptTemplate(name, description string) string {
 	if description == "" {
 		description = "Custom system prompt for Delphi AI processing"
@@ -234,6 +236,7 @@ Please provide your analysis based on the security data provided.
 }
 
 // titleCase converts a string to title case using proper Unicode handling
+// TODO: Move to pkg/shared/strings or pkg/eos_io
 func titleCase(s string) string {
 	if s == "" {
 		return s

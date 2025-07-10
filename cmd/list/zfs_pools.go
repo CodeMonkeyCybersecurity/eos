@@ -62,7 +62,7 @@ func init() {
 
 	ListCmd.AddCommand(zfsPoolsCmd)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func outputZFSPoolsResult(result *zfs_management.ZFSListResult, outputJSON bool) error {
 	if outputJSON {
 		encoder := json.NewEncoder(os.Stdout)

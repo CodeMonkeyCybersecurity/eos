@@ -431,7 +431,7 @@ func init() {
 	SecretsCmd.AddCommand(SecretsGetCmd)
 	SecretsCmd.AddCommand(SecretsStatusCmd)
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Helper functions for authentication setup
 func configureTokenAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 	fmt.Printf("Enter Vault token: ")
@@ -446,7 +446,7 @@ func configureTokenAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func configureUserPassAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 	fmt.Printf("Enter username: ")
 	username, err := reader.ReadString('\n')
@@ -468,7 +468,7 @@ func configureUserPassAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) erro
 
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func configureAppRoleAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 	fmt.Printf("Enter Role ID: ")
 	roleID, err := reader.ReadString('\n')
@@ -489,7 +489,7 @@ func configureAppRoleAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error
 
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func saveVaultConfig(vaultAddr, authMethod string) error {
 	// Create /etc/eos directory if it doesn't exist
 	configDir := "/etc/eos"
@@ -514,7 +514,7 @@ func saveVaultConfig(vaultAddr, authMethod string) error {
 
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Helper functions for setting specific secrets
 func setDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
 	fmt.Printf("\n🗄️  Database Credentials Setup\n")
@@ -579,7 +579,7 @@ func setDatabaseCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.S
 	fmt.Printf(" Database credentials stored successfully\n")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func setSMTPCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
 	fmt.Printf("\n📧 SMTP Credentials Setup\n")
 	fmt.Printf("=========================\n")
@@ -628,7 +628,7 @@ func setSMTPCredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.Secre
 	fmt.Printf(" SMTP credentials stored successfully\n")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func setOpenAICredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
 	fmt.Printf("\n OpenAI API Key Setup\n")
 	fmt.Printf("=======================\n")
@@ -653,7 +653,7 @@ func setOpenAICredentials(rc *eos_io.RuntimeContext, secretStore vaultDomain.Sec
 	fmt.Printf(" OpenAI API key stored successfully\n")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 func setCustomSecret(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
 	fmt.Printf("\n Custom Secret Setup\n")
 	fmt.Printf("======================\n")
@@ -682,7 +682,7 @@ func setCustomSecret(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretSt
 	fmt.Printf(" Custom secret stored successfully\n")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // setDatabaseConfig sets database connection parameters (not credentials)
 func setDatabaseConfig(rc *eos_io.RuntimeContext, secretStore vaultDomain.SecretStore, reader *bufio.Reader) error {
 	fmt.Printf("\n🗄️  Database Connection Configuration\n")
@@ -736,7 +736,7 @@ func setDatabaseConfig(rc *eos_io.RuntimeContext, secretStore vaultDomain.Secret
 	fmt.Printf("- Or set static credentials: eos self secrets set delphi-db\n")
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // setupDatabaseEngine guides the user through setting up Vault's database secrets engine
 func setupDatabaseEngine(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 	fmt.Printf("\n🏗️  Vault Database Secrets Engine Setup\n")

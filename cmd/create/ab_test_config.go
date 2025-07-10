@@ -163,7 +163,12 @@ func init() {
 	CreateCmd.AddCommand(abTestConfigCmd)
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/pipeline/abtest or pkg/pipeline/validation
+// Type: Validation
+// Related functions: None visible in this file
+// Dependencies: execute, context, fmt
 // validateABConfigJSON validates the JSON syntax and structure of A/B config
+// TODO: Move to pkg/pipeline/abtest or pkg/pipeline/validation
 func validateABConfigJSON(configPath string) error {
 	// Basic JSON validation using Python (available on most systems)
 	_, err := execute.Run(context.TODO(), execute.Options{

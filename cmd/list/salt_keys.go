@@ -88,18 +88,18 @@ func init() {
 
 	ListCmd.AddCommand(saltKeysCmd)
 }
-
+// TODO
 func filterKeysByStatus(keys interface{}, status string) interface{} {
 	// TODO: Implement filtering based on actual Salt client response format
 	return keys
 }
-
+// TODO
 func outputKeysJSON(keys interface{}) error {
 	encoder := json.NewEncoder(os.Stdout)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(keys)
 }
-
+// TODO
 func outputKeysTable(keys interface{}, pattern, statusFilter string) error {
 	fmt.Printf("Salt Minion Keys")
 	if pattern != "" {

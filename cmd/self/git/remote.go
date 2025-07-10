@@ -40,7 +40,7 @@ Examples:
 			return nil
 		}),
 	}
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for remote list command flags
 var (
 	remoteListPath       string
@@ -98,7 +98,7 @@ var remoteListCmd = &cobra.Command{
 			return nil
 		}),
 	}
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for remote add command flags
 var (
 	remoteAddPath string
@@ -156,7 +156,7 @@ Examples:
 			return manager.ManageRemote(rc, remoteAddPath, operation)
 		}),
 	}
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for remote set-url command flags
 var (
 	remoteSetURLPath string
@@ -214,7 +214,7 @@ Examples:
 			return manager.ManageRemote(rc, remoteSetURLPath, operation)
 		}),
 	}
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for remote remove command flags
 var (
 	remoteRemovePath string
@@ -268,7 +268,7 @@ Examples:
 			return manager.ManageRemote(rc, remoteRemovePath, operation)
 		}),
 	}
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // Package-level variables for remote rename command flags
 var (
 	remoteRenamePath    string

@@ -35,6 +35,11 @@ func init() {
 }
 
 
+// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/hecate/backup
+// Type: Business Logic
+// Related functions: interactiveRestore, restoreResource
+// Dependencies: eos_io, shared, fmt, zap
+// TODO: Move to pkg/backup or pkg/hecate/backup
 func autoRestore(rc *eos_io.RuntimeContext, ts string) error {
 	resources := []struct{ prefix, dest string }{
 		{fmt.Sprintf("%s.%s.bak", shared.DefaultConfDir, ts), shared.DefaultConfDir},
@@ -50,6 +55,11 @@ func autoRestore(rc *eos_io.RuntimeContext, ts string) error {
 	return nil
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/hecate/backup
+// Type: Business Logic
+// Related functions: autoRestore, restoreResource
+// Dependencies: eos_io, bufio, fmt, strings, os
+// TODO: Move to pkg/backup or pkg/hecate/backup
 func interactiveRestore(rc *eos_io.RuntimeContext) error {
 	menu := []struct {
 		label, prefix, dest string
@@ -84,6 +94,11 @@ func interactiveRestore(rc *eos_io.RuntimeContext) error {
 	}
 }
 
+// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/hecate/backup
+// Type: Business Logic
+// Related functions: autoRestore, interactiveRestore
+// Dependencies: eos_io, eos_unix, fmt, zap
+// TODO: Move to pkg/backup or pkg/hecate/backup
 func restoreResource(
 	rc *eos_io.RuntimeContext,
 	backupPattern, destDir string,

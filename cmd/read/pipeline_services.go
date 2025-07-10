@@ -17,7 +17,7 @@ import (
 	"go.uber.org/zap"
 )
 
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	pipelineServicesShowConfig bool
 )
@@ -138,7 +138,7 @@ Examples:
 func init() {
 	pipelineServicesCmd.Flags().BoolVarP(&pipelineServicesShowConfig, "show-config", "c", false, "Display service configuration file content")
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // ServiceStatus represents systemd service status information
 type ServiceStatus struct {
 	Status  string
@@ -146,14 +146,14 @@ type ServiceStatus struct {
 	Enabled string
 	Uptime  string
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // FileInfo represents file information
 type FileInfo struct {
 	Permissions string
 	Size        string
 	Modified    string
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getServiceStatus retrieves systemd service status
 func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceStatus, error) {
 	status := &ServiceStatus{}
@@ -200,7 +200,7 @@ func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceSt
 
 	return status, nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // getFileInfo retrieves file information
 func getFileInfo(path string) FileInfo {
 	info := FileInfo{
@@ -220,7 +220,7 @@ func getFileInfo(path string) FileInfo {
 
 	return info
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // showRecentLogs displays recent service logs
 func showRecentLogs(rc *eos_io.RuntimeContext, serviceName string) error {
 	logger := otelzap.Ctx(rc.Ctx)
@@ -242,7 +242,7 @@ func showRecentLogs(rc *eos_io.RuntimeContext, serviceName string) error {
 
 	return nil
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 // showServiceConfiguration displays service configuration file content
 func showServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.ServiceConfiguration) error {
 	logger := otelzap.Ctx(rc.Ctx)

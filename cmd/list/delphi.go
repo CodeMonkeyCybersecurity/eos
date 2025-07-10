@@ -274,7 +274,7 @@ errors, warnings, and informational messages about the configuration state.`,
 		}
 	}),
 }
-
+// TODO
 // loadEnvFile loads environment variables from a file
 func loadEnvFile(filename string) error {
 	content, err := os.ReadFile(filename)
@@ -307,7 +307,7 @@ func loadEnvFile(filename string) error {
 
 	return nil
 }
-
+// TODO
 // createConfigFromEnvironment creates a DelphiConfig from environment variables
 func createConfigFromEnvironment() *delphi_config.DelphiConfig {
 	config := delphi_config.DefaultDelphiConfig()
@@ -377,7 +377,7 @@ func createConfigFromEnvironment() *delphi_config.DelphiConfig {
 
 	return config
 }
-
+// TODO
 // outputJSONResults outputs validation results in JSON format
 func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) error {
 	if !verbose {
@@ -403,7 +403,7 @@ func outputJSONResults(summary *delphi_config.ValidationSummary, verbose bool) e
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(summary)
 }
-
+// TODO
 // outputTextResults outputs validation results in human-readable format
 func outputTextResults(summary *delphi_config.ValidationSummary, verbose, checkOnly bool) error {
 	if !checkOnly {

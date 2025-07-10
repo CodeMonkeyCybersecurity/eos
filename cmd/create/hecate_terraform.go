@@ -149,7 +149,7 @@ location = "%s"`, serverType, location)
 		return nil
 	}),
 }
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 const HecateTerraformTemplate = `
 terraform {
   required_providers {
@@ -485,7 +485,7 @@ output "container_ips" {
   }
 }
 `
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 const HecateCloudInitTemplate = `#cloud-config
 package_update: true
 package_upgrade: true
@@ -517,7 +517,7 @@ write_files:
         reverse_proxy hecate-stalwart:8080
       }
 `
-
+// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 type HecateConfig struct {
 	UseHetzner bool
 	DockerHost string

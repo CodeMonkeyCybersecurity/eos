@@ -160,6 +160,7 @@ Examples:
 }
 
 // assessUserExistence checks if user already exists on target systems
+// TODO: Move to pkg/users or pkg/system/users
 func assessUserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Assessing user existence", zap.String("username", username))
@@ -171,12 +172,14 @@ func assessUserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStac
 }
 
 // generateSecurePassword creates a cryptographically secure password
+// TODO: Move to pkg/security/password or pkg/crypto
 func generateSecurePassword() (string, error) {
 	// Use the crypto package for password generation
 	return crypto.GeneratePassword(16)
 }
 
 // storeUserPasswordInVault securely stores the user password in Vault
+// TODO: Move to pkg/users/vault or pkg/vault/users
 func storeUserPasswordInVault(rc *eos_io.RuntimeContext, vaultPath, username, password string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -204,6 +207,7 @@ func storeUserPasswordInVault(rc *eos_io.RuntimeContext, vaultPath, username, pa
 }
 
 // evaluateUserCreation verifies that the user was created successfully
+// TODO: Move to pkg/users or pkg/system/users
 func evaluateUserCreation(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Evaluating user creation", zap.String("username", username))
@@ -281,6 +285,7 @@ EXAMPLES:
 }
 
 // Helper function to check if slice contains string
+// TODO: Move to pkg/shared/slice or pkg/eos_io
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -290,6 +295,7 @@ func contains(slice []string, item string) bool {
 	return false
 }
 
+// TODO: Move to pkg/interaction or pkg/eos_io
 func promptSecurePassword(rc *eos_io.RuntimeContext, prompt string) (string, error) {
 	// Use the interaction package to prompt for password
 	return interaction.PromptUser(rc, prompt)
