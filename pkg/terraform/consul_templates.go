@@ -2,6 +2,206 @@
 
 package terraform
 
+const ConsulVaultIntegrationTemplate = `
+terraform {
+  required_providers {
+    consul = {
+      source  = "hashicorp/consul"
+      version = "~> 2.0"
+    }
+    vault = {
+      source  = "hashicorp/vault"
+      version = "~> 3.0"
+    }
+  }
+}
+
+provider "consul" {
+  address    = "{{.ConsulAddr}}"
+  datacenter = "{{.Datacenter}}"
+}
+
+provider "vault" {
+  address = "{{.VaultAddr}}"
+}
+
+{{if .UseServices}}
+# Service discovery configuration
+resource "consul_service" "terraform_managed" {
+  name = "{{.ServicePrefix}}-service"
+  tags = ["terraform", "managed"]
+  
+  check {
+    id       = "{{.ServicePrefix}}-health"
+    name     = "{{.ServicePrefix}} Health Check"
+    http     = "http://localhost:8080/health"
+    interval = "10s"
+    timeout  = "5s"
+  }
+}
+{{end}}
+
+{{if .UseConsulKV}}
+# Consul KV configuration
+resource "consul_keys" "terraform_config" {
+  key {
+    path  = "{{.KVPrefix}}/config/version"
+    value = "1.0.0"
+  }
+  
+  key {
+    path  = "{{.KVPrefix}}/config/environment"
+    value = "production"
+  }
+}
+{{end}}
+
+{{if .UseVaultSecrets}}
+# Vault secrets configuration
+data "vault_generic_secret" "consul_tokens" {
+  path = "consul/creds/terraform"
+}
+
+resource "consul_acl_token" "terraform" {
+  description = "Token for Terraform operations"
+  policies    = ["terraform-policy"]
+  
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+{{end}}
+`
+
+const ConsulProviderConfig = `
+provider "consul" {
+  address    = "{{.ConsulAddr}}"
+  datacenter = "{{.ConsulDatacenter}}"
+  token      = var.consul_token
+}
+
+variable "consul_token" {
+  description = "Consul ACL token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+`
+
+const ConsulNetworkConfig = `
+# Network configuration for Consul cluster
+resource "hcloud_network" "consul_network" {
+  name     = "{{.ClusterName}}-network"
+  ip_range = "10.0.0.0/16"
+}
+
+resource "hcloud_network_subnet" "consul_subnet" {
+  network_id   = hcloud_network.consul_network.id
+  type         = "cloud"
+  network_zone = "eu-central"
+  ip_range     = "10.0.1.0/24"
+}
+
+resource "hcloud_firewall" "consul_firewall" {
+  name = "{{.ClusterName}}-firewall"
+  
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "8300-8302"
+    source_ips = ["10.0.0.0/16"]
+  }
+  
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "8500"
+    source_ips = ["0.0.0.0/0"]
+  }
+  
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "8600"
+    source_ips = ["10.0.0.0/16"]
+  }
+  
+  rule {
+    direction = "in"
+    protocol  = "tcp"
+    port      = "22"
+    source_ips = ["0.0.0.0/0"]
+  }
+}
+`
+
+const ConsulServerConfig = `
+# Consul server instances
+resource "hcloud_server" "consul_servers" {
+  count       = var.server_count
+  name        = "${var.cluster_name}-server-${count.index + 1}"
+  server_type = var.server_type
+  image       = "ubuntu-22.04"
+  location    = var.location
+  
+  ssh_keys = [var.ssh_key_name]
+  
+  user_data = templatefile("${path.module}/consul-server-init.yaml", {
+    ConsulDatacenter  = var.consul_datacenter
+    NodeIndex         = count.index + 1
+    ConsulRetryJoin   = join(",", [for i in range(var.server_count) : "10.0.1.${i + 10}"])
+    ConsulEncryptKey  = data.vault_kv_secret_v2.consul_config.data["encrypt_key"]
+    ConsulServerCount = var.server_count
+  })
+  
+  network {
+    network_id = hcloud_network.consul_network.id
+    ip         = "10.0.1.${count.index + 10}"
+  }
+  
+  firewall_ids = [hcloud_firewall.consul_firewall.id]
+  
+  labels = {
+    role        = "consul-server"
+    datacenter  = var.consul_datacenter
+    cluster     = var.cluster_name
+  }
+}
+`
+
+const ConsulClientConfig = `
+# Consul client instances
+resource "hcloud_server" "consul_clients" {
+  count       = var.client_count
+  name        = "${var.cluster_name}-client-${count.index + 1}"
+  server_type = var.server_type
+  image       = "ubuntu-22.04"
+  location    = var.location
+  
+  ssh_keys = [var.ssh_key_name]
+  
+  user_data = templatefile("${path.module}/consul-client-init.yaml", {
+    ConsulDatacenter = var.consul_datacenter
+    NodeIndex        = count.index + 1
+    ConsulRetryJoin  = join(",", [for i in range(var.server_count) : "10.0.1.${i + 10}"])
+    ConsulEncryptKey = data.vault_kv_secret_v2.consul_config.data["encrypt_key"]
+  })
+  
+  network {
+    network_id = hcloud_network.consul_network.id
+    ip         = "10.0.1.${count.index + 50}"
+  }
+  
+  firewall_ids = [hcloud_firewall.consul_firewall.id]
+  
+  labels = {
+    role        = "consul-client"
+    datacenter  = var.consul_datacenter
+    cluster     = var.cluster_name
+  }
+}
+`
+
 const ConsulClusterTemplate = `
 terraform {
   required_providers {
@@ -723,6 +923,11 @@ type ConsulTemplateData struct {
 	ConsulRetryJoin   string
 	ConsulEncryptKey  string
 	ConsulServerCount int
+	EncryptKey        string
+	EnableACL         bool
+	EnableTLS         bool
+	ConsulVersion     string
+	ConsulPort        int
 }
 
 // ConsulServiceTemplate represents a service configuration for templates
@@ -756,4 +961,19 @@ type ConsulResolver struct {
 type ConsulSubset struct {
 	Filter      string
 	OnlyPassing bool
+}
+
+// ServiceMeshTemplateData holds data for service mesh configuration
+type ServiceMeshTemplateData struct {
+	ServiceName   string
+	Datacenter    string
+	EnableMetrics bool
+	EnableTracing bool
+	ConsulPort    int
+	Upstreams     []UpstreamService
+	Intentions    []ServiceIntention
+	ConsulAddr    string
+	VaultAddr     string
+	KVPrefix      string
+	Services      []ConsulServiceTemplate
 }

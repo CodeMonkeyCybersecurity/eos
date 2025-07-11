@@ -3,27 +3,18 @@
 package create
 
 import (
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/hex"
-	"errors"
 	"fmt"
-	"time"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/logger"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/client"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/saltstack/orchestrator"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/secrets"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	vaultorch "github.com/CodeMonkeyCybersecurity/eos/pkg/vault/orchestrator"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
-)
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-var (
-	length int
-	format string
 )
 
 var CreateSecretCmd = &cobra.Command{
@@ -33,6 +24,11 @@ var CreateSecretCmd = &cobra.Command{
   eos create secret --length 64
   eos create secret --length 24 --format base64`,
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
+		// Get flags
+		length, _ := cmd.Flags().GetInt("length")
+		format, _ := cmd.Flags().GetString("format")
+		
+		// Set defaults
 		if length <= 0 {
 			length = 32 // Default to openssl rand -hex 32
 		}
@@ -40,27 +36,26 @@ var CreateSecretCmd = &cobra.Command{
 			format = "hex"
 		}
 
-		buf := make([]byte, length)
-		if _, err := rand.Read(buf); err != nil {
-			return fmt.Errorf("failed to generate secure random bytes: %w", err)
+		// Generate secret using the secrets package
+		opts := &secrets.GenerateSecretOptions{
+			Length: length,
+			Format: format,
 		}
-
-		switch format {
-		case "hex":
-			fmt.Println(hex.EncodeToString(buf))
-		case "base64":
-			fmt.Println(base64.StdEncoding.EncodeToString(buf))
-		default:
-			return errors.New("unsupported format: must be 'hex' or 'base64'")
+		
+		secret, err := secrets.Generate(opts)
+		if err != nil {
+			return err
 		}
+		
+		fmt.Println(secret)
 		return nil
 	}),
 }
 
 func init() {
 	CreateCmd.AddCommand(CreateSecretCmd)
-	CreateSecretCmd.Flags().IntVar(&length, "length", 0, "Length of random bytes to generate (default: 32)")
-	CreateSecretCmd.Flags().StringVar(&format, "format", "", "Output format: hex (default) or base64")
+	CreateSecretCmd.Flags().Int("length", 0, "Length of random bytes to generate (default: 32)")
+	CreateSecretCmd.Flags().String("format", "", "Output format: hex (default) or base64")
 }
 
 var CreateVaultCmd = &cobra.Command{
@@ -142,11 +137,11 @@ Environment Variables:
 		}
 
 		// Define Salt operation
-		saltOp := createVaultSaltOperation(opts)
+		saltOp := vaultorch.CreateSaltOperation(opts)
 
 		// Execute based on orchestration mode
 		if opts.Mode == orchestrator.OrchestrationModeSalt {
-			return executeVaultWithSalt(rc, opts, directExec, saltOp)
+			return vaultorch.ExecuteWithSalt(rc, opts, directExec, saltOp)
 		}
 
 		// Execute directly
@@ -173,178 +168,4 @@ func init() {
 	CreateCmd.AddCommand(CreateVaultEnhancedCmd)
 }
 
-// TODO: HELPER_REFACTOR - Move to pkg/vault/orchestrator or pkg/saltstack/orchestrator
-// Type: Business Logic
-// Related functions: executeVaultWithSalt, displayVaultOrchestrationResult
-// Dependencies: orchestrator
-// TODO
-// createVaultSaltOperation creates the Salt operation for Vault installation
-func createVaultSaltOperation(opts *orchestrator.OrchestrationOptions) *orchestrator.SaltOperation {
-	// Create pillar data from command flags and orchestration options
-	pillar := make(map[string]interface{})
 
-	// Copy orchestration pillar
-	for k, v := range opts.Pillar {
-		pillar[k] = v
-	}
-
-	// Add default Vault configuration
-	pillar["vault"] = map[string]interface{}{
-		"version":     "latest",
-		"config_path": "/etc/vault.d",
-		"data_path":   "/opt/vault/data",
-		"tls_enabled": true,
-		"backend":     "file",
-	}
-
-	return &orchestrator.SaltOperation{
-		Type:   "orchestrate",
-		Module: "hashicorp.vault.deploy",
-		Pillar: pillar,
-	}
-}
-
-// TODO: HELPER_REFACTOR - Move to pkg/vault/orchestrator or pkg/saltstack/orchestrator
-// Type: Business Logic
-// Related functions: createVaultSaltOperation, displayVaultOrchestrationResult
-// Dependencies: eos_io, orchestrator, client, otelzap, zap, fmt, time
-// TODO
-// executeVaultWithSalt executes Vault installation using Salt orchestration
-func executeVaultWithSalt(rc *eos_io.RuntimeContext, opts *orchestrator.OrchestrationOptions, directExec orchestrator.DirectExecutor, saltOp *orchestrator.SaltOperation) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Executing Vault installation via Salt orchestration")
-
-	// Create Salt client configuration
-	saltConfig := &client.ClientConfig{
-		BaseURL:    getSaltURLFromEnv(),
-		Username:   getSaltUsernameFromEnv(),
-		Password:   getSaltPasswordFromEnv(),
-		Eauth:      getSaltEauthFromEnv(),
-		Timeout:    30 * time.Second,
-		MaxRetries: 3,
-		RetryDelay: 2 * time.Second,
-	}
-
-	// Check if Salt configuration is available
-	if saltConfig.BaseURL == "" || saltConfig.Username == "" || saltConfig.Password == "" {
-		logger.Warn("Salt configuration not available, falling back to direct execution")
-		return directExec(rc)
-	}
-
-	// Create Salt client
-	saltClient, err := client.NewHTTPSaltClient(rc, saltConfig)
-	if err != nil {
-		logger.Warn("Failed to create Salt client, falling back to direct execution",
-			zap.Error(err))
-		return directExec(rc)
-	}
-
-	// Authenticate
-	_, err = saltClient.Login(rc.Ctx, nil)
-	if err != nil {
-		logger.Warn("Salt authentication failed, falling back to direct execution",
-			zap.Error(err))
-		return directExec(rc)
-	}
-	defer saltClient.Logout(rc.Ctx)
-
-	// Create enhancer and execute
-	enhancer := orchestrator.NewEnhancer(rc, saltClient)
-	result, err := enhancer.ExecuteWithOrchestration(rc.Ctx, opts, directExec, saltOp)
-	if err != nil {
-		return fmt.Errorf("orchestrated Vault installation failed: %w", err)
-	}
-
-	// Display results
-	return displayVaultOrchestrationResult(rc, result)
-}
-// TODO: HELPER_REFACTOR - Move to pkg/vault/display or pkg/saltstack/display
-// Type: Output Formatter
-// Related functions: executeVaultWithSalt
-// Dependencies: eos_io, orchestrator, otelzap, fmt, zap
-// TODO
-// displayVaultOrchestrationResult displays the orchestration results
-func displayVaultOrchestrationResult(rc *eos_io.RuntimeContext, result *orchestrator.OrchestrationResult) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info("Vault orchestration completed",
-		zap.String("mode", string(result.Mode)),
-		zap.Bool("success", result.Success),
-		zap.Duration("duration", result.Duration))
-
-	fmt.Printf("\n🏛️  Vault Installation Result\n")
-	fmt.Printf("============================\n")
-	fmt.Printf("Mode: %s\n", result.Mode)
-	fmt.Printf("Status: ")
-	if result.Success {
-		fmt.Printf("SUCCESS\n")
-	} else {
-		fmt.Printf("❌ FAILED\n")
-	}
-	fmt.Printf("Duration: %s\n", result.Duration)
-	fmt.Printf("Message: %s\n", result.Message)
-
-	if result.JobID != "" {
-		fmt.Printf("Salt Job ID: %s\n", result.JobID)
-	}
-
-	if len(result.Minions) > 0 {
-		fmt.Printf("\n🎯 Target Minions (%d):\n", len(result.Minions))
-		for _, minion := range result.Minions {
-			fmt.Printf("   • %s\n", minion)
-		}
-	}
-
-	if len(result.Failed) > 0 {
-		fmt.Printf("\n❌ Failed Minions (%d):\n", len(result.Failed))
-		for _, minion := range result.Failed {
-			fmt.Printf("   • %s\n", minion)
-		}
-	}
-
-	if result.Mode == orchestrator.OrchestrationModeSalt && result.Success {
-		fmt.Printf("\n💡 Next Steps:\n")
-		fmt.Printf("   • Check Vault status: eos salt run '%s' vault.status\n", "vault-*")
-		fmt.Printf("   • Initialize Vault: eos salt run '%s' vault.init\n", "vault-*")
-		fmt.Printf("   • Unseal Vault: eos salt run '%s' vault.unseal\n", "vault-*")
-		fmt.Printf("   • View logs: eos salt run '%s' cmd.run 'journalctl -u vault -f'\n", "vault-*")
-	}
-
-	return nil
-}
-// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
-// Type: Utility
-// Related functions: getSaltUsernameFromEnv, getSaltPasswordFromEnv, getSaltEauthFromEnv
-// Dependencies: None (should use os)
-// TODO
-// Helper functions to get Salt configuration from environment
-func getSaltURLFromEnv() string {
-	// This would typically read from environment variables or config files
-	// For now, return empty to trigger fallback
-	return ""
-}
-// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
-// Type: Utility
-// Related functions: getSaltURLFromEnv, getSaltPasswordFromEnv, getSaltEauthFromEnv
-// Dependencies: None (should use os)
-// TODO
-func getSaltUsernameFromEnv() string {
-	return ""
-}
-// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
-// Type: Utility
-// Related functions: getSaltURLFromEnv, getSaltUsernameFromEnv, getSaltEauthFromEnv
-// Dependencies: None (should use os)
-// TODO
-func getSaltPasswordFromEnv() string {
-	return ""
-}
-// TODO: HELPER_REFACTOR - Move to pkg/saltstack/config or pkg/config
-// Type: Utility
-// Related functions: getSaltURLFromEnv, getSaltUsernameFromEnv, getSaltPasswordFromEnv
-// Dependencies: None
-// TODO
-func getSaltEauthFromEnv() string {
-	return "pam"
-}

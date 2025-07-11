@@ -39,16 +39,6 @@ Examples:
 		return nil
 	}),
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Flag variables for services list command
-var (
-	servicesListState      []string
-	servicesListPattern    string
-	servicesListEnabled    *bool
-	servicesListRunning    *bool
-	servicesListEnabledStr string
-	servicesListRunningStr string
-)
 
 // servicesListCmd lists systemd services
 var servicesListCmd = &cobra.Command{
@@ -69,33 +59,6 @@ Examples:
   eos manage services list --pattern "nginx.*"       # List services matching pattern
   eos manage services list --enabled=true            # List enabled services
   eos manage services list --running=false           # List stopped services`,
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if servicesListEnabledStr != "" {
-			if servicesListEnabledStr == "true" {
-				val := true
-				servicesListEnabled = &val
-			} else if servicesListEnabledStr == "false" {
-				val := false
-				servicesListEnabled = &val
-			} else {
-				return fmt.Errorf("invalid value for --enabled: %s (use true or false)", servicesListEnabledStr)
-			}
-		}
-
-		if servicesListRunningStr != "" {
-			if servicesListRunningStr == "true" {
-				val := true
-				servicesListRunning = &val
-			} else if servicesListRunningStr == "false" {
-				val := false
-				servicesListRunning = &val
-			} else {
-				return fmt.Errorf("invalid value for --running: %s (use true or false)", servicesListRunningStr)
-			}
-		}
-
-		return nil
-	},
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		logger := otelzap.Ctx(rc.Ctx)
 
@@ -108,17 +71,49 @@ Examples:
 
 		manager := system_services.NewServiceManager(config)
 
+		// Get flag values
+		pattern, _ := cmd.Flags().GetString("pattern")
+		stateFilter, _ := cmd.Flags().GetStringSlice("state")
+		enabledStr, _ := cmd.Flags().GetString("enabled")
+		runningStr, _ := cmd.Flags().GetString("running")
+
+		// Parse enabled/running flags
+		var enabled, running *bool
+		if enabledStr != "" {
+			if enabledStr == "true" {
+				val := true
+				enabled = &val
+			} else if enabledStr == "false" {
+				val := false
+				enabled = &val
+			} else {
+				return fmt.Errorf("invalid value for --enabled: %s (use true or false)", enabledStr)
+			}
+		}
+
+		if runningStr != "" {
+			if runningStr == "true" {
+				val := true
+				running = &val
+			} else if runningStr == "false" {
+				val := false
+				running = &val
+			} else {
+				return fmt.Errorf("invalid value for --running: %s (use true or false)", runningStr)
+			}
+		}
+
 		// Build filter options
 		filter := &system_services.ServiceFilterOptions{
-			Pattern: servicesListPattern,
-			Enabled: servicesListEnabled,
-			Running: servicesListRunning,
+			Pattern: pattern,
+			Enabled: enabled,
+			Running: running,
 		}
 
 		// Parse state filter
-		if len(servicesListState) > 0 {
+		if len(stateFilter) > 0 {
 			var states []system_services.ServiceState
-			for _, s := range servicesListState {
+			for _, s := range stateFilter {
 				states = append(states, system_services.ServiceState(s))
 			}
 			filter.State = states
@@ -126,7 +121,7 @@ Examples:
 
 		logger.Info("Listing services",
 			zap.Bool("show_all", showAll),
-			zap.String("pattern", servicesListPattern))
+			zap.String("pattern", pattern))
 
 		result, err := manager.ListServices(rc, filter)
 		if err != nil {
@@ -136,9 +131,6 @@ Examples:
 		return output.ServiceListToStdout(result, outputJSON)
 	}),
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Flag variables for services start command
-var servicesStartEnable bool
 
 // servicesStartCmd starts a systemd service
 var servicesStartCmd = &cobra.Command{
@@ -160,6 +152,7 @@ Examples:
 		outputJSON, _ := cmd.Flags().GetBool("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		sudo, _ := cmd.Flags().GetBool("sudo")
+		enable, _ := cmd.Flags().GetBool("enable")
 
 		serviceName := args[0]
 
@@ -172,10 +165,10 @@ Examples:
 
 		logger.Info("Starting service",
 			zap.String("service", serviceName),
-			zap.Bool("enable", servicesStartEnable),
+			zap.Bool("enable", enable),
 			zap.Bool("dry_run", dryRun))
 
-		result, err := manager.StartService(rc, serviceName, servicesStartEnable)
+		result, err := manager.StartService(rc, serviceName, enable)
 		if err != nil {
 			return err
 		}
@@ -183,9 +176,6 @@ Examples:
 		return output.ServiceOperationToStdout(result, outputJSON)
 	}),
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Flag variables for services stop command
-var servicesStopDisable bool
 
 // servicesStopCmd stops a systemd service
 var servicesStopCmd = &cobra.Command{
@@ -207,6 +197,7 @@ Examples:
 		outputJSON, _ := cmd.Flags().GetBool("json")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		sudo, _ := cmd.Flags().GetBool("sudo")
+		disable, _ := cmd.Flags().GetBool("disable")
 
 		serviceName := args[0]
 
@@ -219,10 +210,10 @@ Examples:
 
 		logger.Info("Stopping service",
 			zap.String("service", serviceName),
-			zap.Bool("disable", servicesStopDisable),
+			zap.Bool("disable", disable),
 			zap.Bool("dry_run", dryRun))
 
-		result, err := manager.StopService(rc, serviceName, servicesStopDisable)
+		result, err := manager.StopService(rc, serviceName, disable)
 		if err != nil {
 			return err
 		}
@@ -307,18 +298,6 @@ Examples:
 		return output.ServiceStatusToStdout(result, outputJSON)
 	}),
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Flag variables for services logs command
-var (
-	servicesLogsFollow     bool
-	servicesLogsLines      int
-	servicesLogsSince      string
-	servicesLogsUntil      string
-	servicesLogsPriority   string
-	servicesLogsGrep       string
-	servicesLogsReverse    bool
-	servicesLogsNoHostname bool
-)
 
 // servicesLogsCmd views logs for a systemd service
 var servicesLogsCmd = &cobra.Command{
@@ -347,23 +326,33 @@ Examples:
 
 		serviceName := args[0]
 
+		// Get flag values
+		follow, _ := cmd.Flags().GetBool("follow")
+		lines, _ := cmd.Flags().GetInt("lines")
+		since, _ := cmd.Flags().GetString("since")
+		until, _ := cmd.Flags().GetString("until")
+		priority, _ := cmd.Flags().GetString("priority")
+		grep, _ := cmd.Flags().GetString("grep")
+		reverse, _ := cmd.Flags().GetBool("reverse")
+		noHostname, _ := cmd.Flags().GetBool("no-hostname")
+
 		options := &system_services.LogsOptions{
-			Follow:     servicesLogsFollow,
-			Lines:      servicesLogsLines,
-			Since:      servicesLogsSince,
-			Until:      servicesLogsUntil,
-			Priority:   servicesLogsPriority,
+			Follow:     follow,
+			Lines:      lines,
+			Since:      since,
+			Until:      until,
+			Priority:   priority,
 			Unit:       serviceName,
-			Grep:       servicesLogsGrep,
-			Reverse:    servicesLogsReverse,
-			NoHostname: servicesLogsNoHostname,
+			Grep:       grep,
+			Reverse:    reverse,
+			NoHostname: noHostname,
 		}
 
 		manager := system_services.NewServiceManager(nil)
 
 		logger.Info("Viewing service logs",
 			zap.String("service", serviceName),
-			zap.Bool("follow", servicesLogsFollow))
+			zap.Bool("follow", follow))
 
 		return manager.ViewLogs(rc, serviceName, options)
 	}),
@@ -385,30 +374,30 @@ func init() {
 	servicesCmd.AddCommand(servicesLogsCmd)
 
 	// Add persistent flags for services command
-	servicesCmd.PersistentFlags().BoolVar(&servicesOutputJSON, "json", false, "Output results in JSON format")
-	servicesCmd.PersistentFlags().BoolVar(&servicesDryRun, "dry-run", false, "Show what would be done without making changes")
-	servicesCmd.PersistentFlags().BoolVar(&servicesShowAll, "all", false, "Show all services including inactive")
-	servicesCmd.PersistentFlags().BoolVar(&servicesSudo, "sudo", true, "Use sudo for service operations")
+	servicesCmd.PersistentFlags().Bool("json", false, "Output results in JSON format")
+	servicesCmd.PersistentFlags().Bool("dry-run", false, "Show what would be done without making changes")
+	servicesCmd.PersistentFlags().Bool("all", false, "Show all services including inactive")
+	servicesCmd.PersistentFlags().Bool("sudo", true, "Use sudo for service operations")
 
 	// Add flags for services list command
-	servicesListCmd.Flags().StringSliceVar(&servicesListState, "state", nil, "Filter by service state (active,inactive,failed,etc)")
-	servicesListCmd.Flags().StringVar(&servicesListPattern, "pattern", "", "Filter services by name pattern (regex)")
-	servicesListCmd.Flags().StringVar(&servicesListEnabledStr, "enabled", "", "Filter by enabled status (true/false)")
-	servicesListCmd.Flags().StringVar(&servicesListRunningStr, "running", "", "Filter by running status (true/false)")
+	servicesListCmd.Flags().StringSlice("state", nil, "Filter by service state (active,inactive,failed,etc)")
+	servicesListCmd.Flags().String("pattern", "", "Filter services by name pattern (regex)")
+	servicesListCmd.Flags().String("enabled", "", "Filter by enabled status (true/false)")
+	servicesListCmd.Flags().String("running", "", "Filter by running status (true/false)")
 
 	// Add flags for services start command
-	servicesStartCmd.Flags().BoolVar(&servicesStartEnable, "enable", false, "Also enable the service at boot")
+	servicesStartCmd.Flags().Bool("enable", false, "Also enable the service at boot")
 
 	// Add flags for services stop command
-	servicesStopCmd.Flags().BoolVar(&servicesStopDisable, "disable", false, "Also disable the service at boot")
+	servicesStopCmd.Flags().Bool("disable", false, "Also disable the service at boot")
 
 	// Add flags for services logs command
-	servicesLogsCmd.Flags().BoolVarP(&servicesLogsFollow, "follow", "f", false, "Follow logs in real-time")
-	servicesLogsCmd.Flags().IntVarP(&servicesLogsLines, "lines", "n", 50, "Number of lines to show")
-	servicesLogsCmd.Flags().StringVar(&servicesLogsSince, "since", "", "Show logs since this time (e.g., '1 hour ago')")
-	servicesLogsCmd.Flags().StringVar(&servicesLogsUntil, "until", "", "Show logs until this time")
-	servicesLogsCmd.Flags().StringVarP(&servicesLogsPriority, "priority", "p", "", "Filter by priority (emerg, alert, crit, err, warning, notice, info, debug)")
-	servicesLogsCmd.Flags().StringVar(&servicesLogsGrep, "grep", "", "Filter logs by pattern")
-	servicesLogsCmd.Flags().BoolVarP(&servicesLogsReverse, "reverse", "r", false, "Show newest entries first")
-	servicesLogsCmd.Flags().BoolVar(&servicesLogsNoHostname, "no-hostname", false, "Don't show hostname field")
+	servicesLogsCmd.Flags().BoolP("follow", "f", false, "Follow logs in real-time")
+	servicesLogsCmd.Flags().IntP("lines", "n", 50, "Number of lines to show")
+	servicesLogsCmd.Flags().String("since", "", "Show logs since this time (e.g., '1 hour ago')")
+	servicesLogsCmd.Flags().String("until", "", "Show logs until this time")
+	servicesLogsCmd.Flags().StringP("priority", "p", "", "Filter by priority (emerg, alert, crit, err, warning, notice, info, debug)")
+	servicesLogsCmd.Flags().String("grep", "", "Filter logs by pattern")
+	servicesLogsCmd.Flags().BoolP("reverse", "r", false, "Show newest entries first")
+	servicesLogsCmd.Flags().Bool("no-hostname", false, "Don't show hostname field")
 }

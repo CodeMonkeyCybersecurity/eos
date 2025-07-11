@@ -24,15 +24,16 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/privilege_check"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/utils"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/credentials"
 )
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-var ignoreHardwareCheck bool
-var overwriteInstall bool
+// Configuration flags moved to pkg/delphi/config
+var delphiFlags = config.DefaultFlags()
 
 func init() {
 	CreateCmd.AddCommand(CreateDelphiCmd)
-	CreateDelphiCmd.Flags().BoolVar(&ignoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check")
-	CreateDelphiCmd.Flags().BoolVar(&overwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation")
+	CreateDelphiCmd.Flags().BoolVar(&delphiFlags.IgnoreHardwareCheck, "ignore", false, "Ignore Wazuh hardware requirements check")
+	CreateDelphiCmd.Flags().BoolVar(&delphiFlags.OverwriteInstall, "overwrite", false, "Overwrite existing Wazuh installation")
 
 	// Add mapping command
 	CreateCmd.AddCommand(mappingCmd)
@@ -94,11 +95,11 @@ EXAMPLES:
 		}
 
 		args = []string{"-a"}
-		if ignoreHardwareCheck {
+		if delphiFlags.IgnoreHardwareCheck {
 			log.Info("Ignoring hardware checks (passing -i)")
 			args = append(args, "-i")
 		}
-		if overwriteInstall {
+		if delphiFlags.OverwriteInstall {
 			log.Info("Overwriting existing installation (passing -o)")
 			args = append(args, "-o")
 		}
@@ -114,7 +115,7 @@ EXAMPLES:
 		log.Info("Wazuh installation completed")
 
 		log.Info("Attempting to extract Wazuh admin credentials")
-		if err := extractWazuhPasswords(rc); err != nil {
+		if err := credentials.ExtractWazuhPasswords(rc); err != nil {
 			log.Warn("Could not extract Wazuh credentials", zap.Error(err))
 		}
 
@@ -155,8 +156,8 @@ EXAMPLES:
 	}),
 }
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// TODO: Move to pkg/delphi/install or pkg/delphi/wazuh
+// extractWazuhPasswords moved to pkg/delphi/credentials
+// DEPRECATED: Use credentials.ExtractWazuhPasswords instead
 func extractWazuhPasswords(rc *eos_io.RuntimeContext) error {
 	searchPaths := []string{"/root", "/tmp", "/opt", "/var/tmp", "."}
 	for _, dir := range searchPaths {
@@ -183,19 +184,22 @@ var mappingCmd = &cobra.Command{
 		return nil
 	}),
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// OSInfo moved to pkg/delphi/agents/types.go
+// DEPRECATED: Use agents.OSInfo instead
 type OSInfo struct {
 	Name         string `json:"name"`
 	Version      string `json:"version"`
 	Architecture string `json:"architecture"`
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// Agent moved to pkg/delphi/agents/types.go
+// DEPRECATED: Use agents.Agent instead
 type Agent struct {
 	ID      string `json:"id"`
 	Version string `json:"version"`
 	OS      OSInfo `json:"os"`
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// AgentsResponse moved to pkg/delphi/agents/types.go
+// DEPRECATED: Use agents.AgentsResponse instead
 type AgentsResponse struct {
 	Data struct {
 		AffectedItems []Agent `json:"affected_items"`
@@ -203,7 +207,8 @@ type AgentsResponse struct {
 	Error   int    `json:"error"`
 	Message string `json:"message"`
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
+// PackageMapping moved to pkg/delphi/agents/types.go
+// DEPRECATED: Use agents.PackageMapping instead
 type PackageMapping struct {
 	Distribution string
 	MinVersion   int

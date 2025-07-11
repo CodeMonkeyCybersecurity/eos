@@ -60,7 +60,7 @@ Examples:
 		// Parse command line flags
 		config, err := parseEnrollmentFlags(cmd)
 		if err != nil {
-			return eos_err.NewUserError(err.Error())
+			return eos_err.NewUserError("failed to parse enrollment flags: %s", err.Error())
 		}
 		
 		// Set dry-run in runtime context attributes
@@ -74,7 +74,7 @@ Examples:
 		
 		// Validate configuration
 		if err := validateEnrollmentConfig(config); err != nil {
-			return eos_err.NewUserError(err.Error())
+			return eos_err.NewUserError("invalid enrollment configuration: %s", err.Error())
 		}
 		
 		// ASSESS - System Discovery Phase

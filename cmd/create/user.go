@@ -6,15 +6,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/crypto"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/system"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/users"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/vault"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/users/assessment"
+	usersvault "github.com/CodeMonkeyCybersecurity/eos/pkg/users/vault"
+	secpassword "github.com/CodeMonkeyCybersecurity/eos/pkg/security/password"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared/slice"
 	cerr "github.com/cockroachdb/errors"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -81,7 +82,7 @@ Examples:
 		}
 
 		// Add sudo group if requested
-		if sudo && !contains(groups, "sudo") {
+		if sudo && !slice.Contains(groups, "sudo") {
 			groups = append(groups, "sudo")
 		}
 
@@ -105,20 +106,20 @@ Examples:
 		}
 
 		// Check if user already exists
-		if err := assessUserExistence(rc, saltManager, target, username); err != nil {
+		if err := assessment.UserExistence(rc, saltManager, target, username); err != nil {
 			return cerr.Wrap(err, "user existence assessment failed")
 		}
 
 		// Intervention: Generate secure password and create user
 		var password string
 		if generatePassword {
-			password, err = generateSecurePassword()
+			password, err = secpassword.GenerateSecure()
 			if err != nil {
 				return cerr.Wrap(err, "failed to generate secure password")
 			}
 
 			// Store password in Vault
-			if err := storeUserPasswordInVault(rc, vaultPath, username, password); err != nil {
+			if err := usersvault.StoreUserPassword(rc, vaultPath, username, password); err != nil {
 				return cerr.Wrap(err, "failed to store password in Vault")
 			}
 
@@ -141,7 +142,7 @@ Examples:
 		}
 
 		// Evaluation: Verify user was created successfully
-		if err := evaluateUserCreation(rc, saltManager, target, username); err != nil {
+		if err := assessment.UserCreation(rc, saltManager, target, username); err != nil {
 			return cerr.Wrap(err, "user creation verification failed")
 		}
 
@@ -159,8 +160,9 @@ Examples:
 	}),
 }
 
-// assessUserExistence checks if user already exists on target systems
-// TODO: Move to pkg/users or pkg/system/users
+// assessUserExistence moved to pkg/users/assessment
+// DEPRECATED: Use assessment.UserExistence instead
+/*
 func assessUserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Assessing user existence", zap.String("username", username))
@@ -170,16 +172,20 @@ func assessUserExistence(rc *eos_io.RuntimeContext, saltManager *system.SaltStac
 	logger.Info("User existence check completed")
 	return nil
 }
+*/
 
-// generateSecurePassword creates a cryptographically secure password
-// TODO: Move to pkg/security/password or pkg/crypto
+// generateSecurePassword moved to pkg/security/password
+// DEPRECATED: Use password.GenerateSecure instead
+/*
 func generateSecurePassword() (string, error) {
 	// Use the crypto package for password generation
 	return crypto.GeneratePassword(16)
 }
+*/
 
-// storeUserPasswordInVault securely stores the user password in Vault
-// TODO: Move to pkg/users/vault or pkg/vault/users
+// storeUserPasswordInVault moved to pkg/users/vault
+// DEPRECATED: Use usersvault.StoreUserPassword instead
+/*
 func storeUserPasswordInVault(rc *eos_io.RuntimeContext, vaultPath, username, password string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
@@ -205,9 +211,11 @@ func storeUserPasswordInVault(rc *eos_io.RuntimeContext, vaultPath, username, pa
 	logger.Info("Password stored in Vault", zap.String("path", secretPath))
 	return nil
 }
+*/
 
-// evaluateUserCreation verifies that the user was created successfully
-// TODO: Move to pkg/users or pkg/system/users
+// evaluateUserCreation moved to pkg/users/assessment
+// DEPRECATED: Use assessment.UserCreation instead
+/*
 func evaluateUserCreation(rc *eos_io.RuntimeContext, saltManager *system.SaltStackManager, target, username string) error {
 	logger := otelzap.Ctx(rc.Ctx)
 	logger.Info("Evaluating user creation", zap.String("username", username))
@@ -217,6 +225,7 @@ func evaluateUserCreation(rc *eos_io.RuntimeContext, saltManager *system.SaltSta
 	logger.Info("User creation verified successfully")
 	return nil
 }
+*/
 
 // Simple user creation command (replaces addUser.sh)
 var createUserSimpleCmd = &cobra.Command{
@@ -274,7 +283,7 @@ EXAMPLES:
 		// Get password if not provided
 		if options.Password == "" {
 			var err error
-			options.Password, err = promptSecurePassword(rc, "Enter password: ")
+			options.Password, err = eos_io.PromptSecurePassword(rc, "Enter password: ")
 			if err != nil {
 				return fmt.Errorf("failed to get password: %w", err)
 			}
@@ -284,8 +293,9 @@ EXAMPLES:
 	}),
 }
 
-// Helper function to check if slice contains string
-// TODO: Move to pkg/shared/slice or pkg/eos_io
+// contains moved to pkg/shared/slice
+// DEPRECATED: Use slice.Contains instead
+/*
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
 		if s == item {
@@ -294,12 +304,16 @@ func contains(slice []string, item string) bool {
 	}
 	return false
 }
+*/
 
-// TODO: Move to pkg/interaction or pkg/eos_io
+// promptSecurePassword moved to pkg/eos_io
+// DEPRECATED: Use eos_io.PromptSecurePassword instead
+/*
 func promptSecurePassword(rc *eos_io.RuntimeContext, prompt string) (string, error) {
 	// Use the interaction package to prompt for password
 	return interaction.PromptUser(rc, prompt)
 }
+*/
 
 func init() {
 	// Legacy command

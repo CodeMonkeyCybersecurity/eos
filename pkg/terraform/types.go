@@ -175,3 +175,30 @@ type ModuleConfig struct {
 	Version string
 	Inputs  map[string]interface{}
 }
+
+// ConsulVaultTemplate holds data for Consul-Vault integration templates
+type ConsulVaultTemplate struct {
+	ConsulAddr      string
+	VaultAddr       string
+	Datacenter      string
+	ServicePrefix   string
+	KVPrefix        string
+	UseServices     bool
+	UseConsulKV     bool
+	UseVaultSecrets bool
+}
+
+
+// UpstreamService represents an upstream service configuration
+type UpstreamService struct {
+	Name       string
+	LocalPort  int
+	Datacenter string
+}
+
+// ServiceIntention represents a service intention configuration
+type ServiceIntention struct {
+	Source      string
+	Destination string
+	Action      string
+}

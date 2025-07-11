@@ -2,7 +2,6 @@
 package create
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +10,7 @@ import (
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline/abtest"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -76,7 +76,7 @@ Examples:
 		// Validate JSON syntax if requested
 		if validate {
 			logger.Info("Validating configuration syntax")
-			if err := validateABConfigJSON(sourceConfig); err != nil {
+			if err := abtest.ValidateConfigJSON(rc, sourceConfig); err != nil {
 				return fmt.Errorf("configuration validation failed: %w", err)
 			}
 			logger.Info("Configuration syntax is valid")
@@ -161,23 +161,4 @@ func init() {
 	abTestConfigCmd.Flags().Bool("validate", false, "Validate configuration syntax before deployment")
 
 	CreateCmd.AddCommand(abTestConfigCmd)
-}
-
-// TODO: HELPER_REFACTOR - Move to pkg/pipeline/abtest or pkg/pipeline/validation
-// Type: Validation
-// Related functions: None visible in this file
-// Dependencies: execute, context, fmt
-// validateABConfigJSON validates the JSON syntax and structure of A/B config
-// TODO: Move to pkg/pipeline/abtest or pkg/pipeline/validation
-func validateABConfigJSON(configPath string) error {
-	// Basic JSON validation using Python (available on most systems)
-	_, err := execute.Run(context.TODO(), execute.Options{
-		Command: "python3",
-		Args:    []string{"-c", fmt.Sprintf("import json; json.load(open('%s'))", configPath)},
-	})
-	if err != nil {
-		return fmt.Errorf("invalid JSON syntax in configuration file")
-	}
-
-	return nil
 }

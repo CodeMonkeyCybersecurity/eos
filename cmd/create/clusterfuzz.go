@@ -11,6 +11,11 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/config"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/generator"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/prerequisites"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/clusterfuzz/validation"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
@@ -83,17 +88,20 @@ EXAMPLES:
 			zap.String("database_backend", databaseBackend))
 
 		// Validate configuration
-		if err := validateClusterfuzzConfig(); err != nil {
+		if err := validation.ValidateConfig(storageBackend, databaseBackend, queueBackend, 
+			botCount, preemptibleBotCount, s3Endpoint, s3AccessKey, s3SecretKey); err != nil {
 			return fmt.Errorf("invalid configuration: %w", err)
 		}
 
 		// Create configuration
-		config := createClusterfuzzConfig()
+		cfg := config.CreateConfig(nomadAddress, consulAddress, storageBackend, databaseBackend, 
+			queueBackend, botCount, preemptibleBotCount, domain, configDir, useVault, 
+			vaultPath, s3Endpoint, s3AccessKey, s3SecretKey, s3Bucket)
 
 		// Check prerequisites
 		if !skipPrereqCheck {
 			logger.Info("Checking prerequisites...")
-			if err := checkPrerequisites(rc, config); err != nil {
+			if err := prerequisites.Check(rc, cfg); err != nil {
 				return fmt.Errorf("prerequisite check failed: %w", err)
 			}
 		}
@@ -105,56 +113,56 @@ EXAMPLES:
 
 		// Generate configurations
 		logger.Info("Generating ClusterFuzz configurations...")
-		if err := generateConfigurations(rc, config); err != nil {
+		if err := generator.GenerateConfigurations(rc, cfg); err != nil {
 			return fmt.Errorf("failed to generate configurations: %w", err)
 		}
 
 		// Store secrets in Vault if enabled
 		if useVault {
 			logger.Info("Storing secrets in Vault...")
-			if err := storeSecretsInVault(rc, config); err != nil {
+			if err := storeSecretsInVault(rc, cfg); err != nil {
 				return fmt.Errorf("failed to store secrets in Vault: %w", err)
 			}
 		}
 
 		// Deploy infrastructure services
 		logger.Info("Deploying infrastructure services...")
-		if err := deployInfrastructure(rc, config); err != nil {
+		if err := deployInfrastructure(rc, cfg); err != nil {
 			return fmt.Errorf("failed to deploy infrastructure: %w", err)
 		}
 
 		// Wait for infrastructure to be ready
 		logger.Info("Waiting for infrastructure services to be ready...")
-		if err := waitForInfrastructure(rc, config); err != nil {
+		if err := waitForInfrastructure(rc, cfg); err != nil {
 			return fmt.Errorf("infrastructure failed to become ready: %w", err)
 		}
 
 		// Initialize databases and storage
 		logger.Info("Initializing databases and storage...")
-		if err := initializeServices(rc, config); err != nil {
+		if err := initializeServices(rc, cfg); err != nil {
 			return fmt.Errorf("failed to initialize services: %w", err)
 		}
 
 		// Deploy ClusterFuzz application
 		logger.Info("Deploying ClusterFuzz application...")
-		if err := deployApplication(rc, config); err != nil {
+		if err := deployApplication(rc, cfg); err != nil {
 			return fmt.Errorf("failed to deploy application: %w", err)
 		}
 
 		// Deploy fuzzing bots
 		logger.Info("Deploying fuzzing bots...")
-		if err := deployBots(rc, config); err != nil {
+		if err := deployBots(rc, cfg); err != nil {
 			return fmt.Errorf("failed to deploy bots: %w", err)
 		}
 
 		// Verify deployment
 		logger.Info("Verifying deployment...")
-		if err := verifyDeployment(rc, config); err != nil {
+		if err := verifyDeployment(rc, cfg); err != nil {
 			return fmt.Errorf("deployment verification failed: %w", err)
 		}
 
 		// Display success information
-		displaySuccessInfo(config)
+		displaySuccessInfo(cfg)
 
 		logger.Info("ClusterFuzz deployment completed successfully")
 		return nil
@@ -181,277 +189,17 @@ func init() {
 	clusterfuzzCmd.Flags().StringVar(&s3Bucket, "s3-bucket", "clusterfuzz", "S3 bucket name")
 	clusterfuzzCmd.Flags().BoolVar(&skipPrereqCheck, "skip-prereq-check", false, "Skip prerequisite checks")
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// ClusterfuzzConfig holds the configuration for deployment
-type ClusterfuzzConfig struct {
-	NomadAddress        string
-	ConsulAddress       string
-	StorageBackend      string
-	DatabaseBackend     string
-	QueueBackend        string
-	BotCount            int
-	PreemptibleBotCount int
-	Domain              string
-	ConfigDir           string
-	UseVault            bool
-	VaultPath           string
-	S3Config            S3Config
-	DatabaseConfig      DatabaseConfig
-	QueueConfig         QueueConfig
-	Timestamp           string
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// S3Config holds S3/MinIO configuration
-type S3Config struct {
-	Endpoint  string
-	AccessKey string
-	SecretKey string
-	Bucket    string
-	UseSSL    bool
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// DatabaseConfig holds database configuration
-type DatabaseConfig struct {
-	Type     string
-	Host     string
-	Port     int
-	Database string
-	Username string
-	Password string
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// QueueConfig holds queue configuration
-type QueueConfig struct {
-	Type     string
-	Host     string
-	Port     int
-	Username string
-	Password string
-}
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config or pkg/clusterfuzz/validation
-// Type: Validation
-// Related functions: createClusterfuzzConfig, checkPrerequisites
-// Dependencies: fmt, strings
-// TODO: Move to pkg/clusterfuzz/config or pkg/clusterfuzz/validation
-func validateClusterfuzzConfig() error {
-	// Validate storage backend
-	validStorage := []string{"minio", "s3", "local"}
-	if !containsString(validStorage, storageBackend) {
-		return fmt.Errorf("invalid storage backend: %s (valid: %v)", storageBackend, validStorage)
-	}
 
-	// Validate database backend
-	validDB := []string{"postgresql", "mongodb"}
-	if !containsString(validDB, databaseBackend) {
-		return fmt.Errorf("invalid database backend: %s (valid: %v)", databaseBackend, validDB)
-	}
 
-	// Validate queue backend
-	validQueue := []string{"redis", "rabbitmq"}
-	if !containsString(validQueue, queueBackend) {
-		return fmt.Errorf("invalid queue backend: %s (valid: %v)", queueBackend, validQueue)
-	}
 
-	// Validate S3 configuration if using S3/MinIO
-	if storageBackend == "s3" || storageBackend == "minio" {
-		if s3Endpoint == "" && storageBackend == "minio" {
-			s3Endpoint = "http://localhost:9000" // Default MinIO endpoint
-		}
-		if s3AccessKey == "" || s3SecretKey == "" {
-			return fmt.Errorf("S3 access key and secret key are required for %s backend", storageBackend)
-		}
-	}
-
-	// Validate bot counts
-	if botCount < 0 || preemptibleBotCount < 0 {
-		return fmt.Errorf("bot counts must be non-negative")
-	}
-
-	return nil
-}
-
-// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config
-// Type: Business Logic
-// Related functions: validateClusterfuzzConfig, generateConfigurations
-// Dependencies: time, strings
-// TODO: Move to pkg/clusterfuzz/config
-func createClusterfuzzConfig() *ClusterfuzzConfig {
-	config := &ClusterfuzzConfig{
-		NomadAddress:        nomadAddress,
-		ConsulAddress:       consulAddress,
-		StorageBackend:      storageBackend,
-		DatabaseBackend:     databaseBackend,
-		QueueBackend:        queueBackend,
-		BotCount:            botCount,
-		PreemptibleBotCount: preemptibleBotCount,
-		Domain:              domain,
-		ConfigDir:           configDir,
-		UseVault:            useVault,
-		VaultPath:           vaultPath,
-		Timestamp:           time.Now().Format("20060102-150405"),
-	}
-
-	// Configure S3/MinIO
-	if storageBackend == "s3" || storageBackend == "minio" {
-		config.S3Config = S3Config{
-			Endpoint:  s3Endpoint,
-			AccessKey: s3AccessKey,
-			SecretKey: s3SecretKey,
-			Bucket:    s3Bucket,
-			UseSSL:    !strings.HasPrefix(s3Endpoint, "http://"),
-		}
-	}
-
-	// Configure database
-	switch databaseBackend {
-	case "postgresql":
-		config.DatabaseConfig = DatabaseConfig{
-			Type:     "postgresql",
-			Host:     "clusterfuzz-postgres.service.consul",
-			Port:     5432,
-			Database: "clusterfuzz",
-			Username: "clusterfuzz",
-			Password: generatePassword(),
-		}
-	case "mongodb":
-		config.DatabaseConfig = DatabaseConfig{
-			Type:     "mongodb",
-			Host:     "clusterfuzz-mongodb.service.consul",
-			Port:     27017,
-			Database: "clusterfuzz",
-			Username: "clusterfuzz",
-			Password: generatePassword(),
-		}
-	}
-
-	// Configure queue
-	switch queueBackend {
-	case "redis":
-		config.QueueConfig = QueueConfig{
-			Type:     "redis",
-			Host:     "clusterfuzz-redis.service.consul",
-			Port:     6379,
-			Password: generatePassword(),
-		}
-	case "rabbitmq":
-		config.QueueConfig = QueueConfig{
-			Type:     "rabbitmq",
-			Host:     "clusterfuzz-rabbitmq.service.consul",
-			Port:     5672,
-			Username: "clusterfuzz",
-			Password: generatePassword(),
-		}
-	}
-
-	return config
-}
-
-// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/prerequisites or pkg/clusterfuzz/validation
-// Type: Validation
-// Related functions: validateClusterfuzzConfig, checkVaultConnectivity
-// Dependencies: eos_io, otelzap, zap, fmt
-// TODO: Move to pkg/clusterfuzz/prerequisites or pkg/clusterfuzz/validation
-func checkPrerequisites(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Check Nomad connectivity
-	logger.Info("Checking Nomad connectivity...")
-	if _, err := executeCommand(rc, "nomad", "status", "-address="+config.NomadAddress); err != nil {
-		return fmt.Errorf("cannot connect to Nomad at %s: %w", config.NomadAddress, err)
-	}
-
-	// Check Consul connectivity
-	logger.Info("Checking Consul connectivity...")
-	if _, err := executeCommand(rc, "consul", "members", "-http-addr="+config.ConsulAddress); err != nil {
-		logger.Warn("Consul not available, service discovery will be limited",
-			zap.String("consul_address", config.ConsulAddress))
-	}
-
-	// Check if required tools are installed
-	requiredTools := []string{"nomad", "docker"}
-	for _, tool := range requiredTools {
-		if _, err := executeCommand(rc, "which", tool); err != nil {
-			return fmt.Errorf("%s is required but not found in PATH", tool)
-		}
-	}
-
-	// Check if Vault is accessible if enabled
-	if config.UseVault {
-		logger.Info("Checking Vault connectivity...")
-		if err := checkVaultConnectivity(rc); err != nil {
-			return fmt.Errorf("Vault check failed: %w", err)
-		}
-	}
-
-	return nil
-}
-
-// TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
-// Type: Business Logic
-// Related functions: generateNomadJobs, generateEnvironmentFiles, generateInitScripts, generateDockerfiles, generateTerraformConfig
-// Dependencies: eos_io, otelzap, os, filepath
-// TODO: Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
-func generateConfigurations(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	// Create directory structure
-	dirs := []string{
-		filepath.Join(config.ConfigDir, "jobs"),
-		filepath.Join(config.ConfigDir, "env"),
-		filepath.Join(config.ConfigDir, "init"),
-		filepath.Join(config.ConfigDir, "docker"),
-		filepath.Join(config.ConfigDir, "terraform"),
-	}
-
-	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory %s: %w", dir, err)
-		}
-	}
-
-	// Generate Nomad job files
-	logger.Info("Generating Nomad job files...")
-	if err := generateNomadJobs(config); err != nil {
-		return fmt.Errorf("failed to generate Nomad jobs: %w", err)
-	}
-
-	// Generate environment files
-	logger.Info("Generating environment configuration files...")
-	if err := generateEnvironmentFiles(config); err != nil {
-		return fmt.Errorf("failed to generate environment files: %w", err)
-	}
-
-	// Generate initialization scripts
-	logger.Info("Generating initialization scripts...")
-	if err := generateInitScripts(config); err != nil {
-		return fmt.Errorf("failed to generate init scripts: %w", err)
-	}
-
-	// Generate Dockerfiles
-	logger.Info("Generating Dockerfiles...")
-	if err := generateDockerfiles(config); err != nil {
-		return fmt.Errorf("failed to generate Dockerfiles: %w", err)
-	}
-
-	// Generate Terraform configuration if using Terraform
-	if config.UseVault || storageBackend == "s3" {
-		logger.Info("Generating Terraform configuration...")
-		if err := generateTerraformConfig(config); err != nil {
-			return fmt.Errorf("failed to generate Terraform config: %w", err)
-		}
-	}
-
-	return nil
-}
 
 // TODO: HELPER_REFACTOR - Move to pkg/clusterfuzz/nomad or pkg/clusterfuzz/generator
 // Type: Business Logic
 // Related functions: generateConfigurations, generateEnvironmentFiles
 // Dependencies: template, filepath, os, fmt
 // TODO: Move to pkg/clusterfuzz/nomad or pkg/clusterfuzz/generator
-func generateNomadJobs(config *ClusterfuzzConfig) error {
+func generateNomadJobs(config *clusterfuzz.Config) error {
 	// Template for core services job
 	coreJobTemplate := `job "clusterfuzz-core" {
   datacenters = ["dc1"]
@@ -805,7 +553,7 @@ EOF
 // Related functions: generateConfigurations, generateNomadJobs
 // Dependencies: fmt, filepath, os
 // TODO: Move to pkg/clusterfuzz/config or pkg/clusterfuzz/generator
-func generateEnvironmentFiles(config *ClusterfuzzConfig) error {
+func generateEnvironmentFiles(config *clusterfuzz.Config) error {
 	// Core environment file
 	coreEnv := fmt.Sprintf(`# ClusterFuzz Core Environment
 DATABASE_TYPE=%s
@@ -871,7 +619,7 @@ BOT_WORKING_DIR=/tmp/clusterfuzz
 // Related functions: generateConfigurations, generateEnvironmentFiles
 // Dependencies: fmt, filepath, os
 // TODO: Move to pkg/clusterfuzz/scripts or pkg/clusterfuzz/generator
-func generateInitScripts(config *ClusterfuzzConfig) error {
+func generateInitScripts(config *clusterfuzz.Config) error {
 	// Database initialization script
 	var dbScript string
 	switch config.DatabaseBackend {
@@ -1009,7 +757,7 @@ echo "MinIO storage setup complete"
 // Related functions: generateConfigurations, buildDockerImages
 // Dependencies: filepath, os
 // TODO: Move to pkg/clusterfuzz/docker or pkg/clusterfuzz/generator
-func generateDockerfiles(config *ClusterfuzzConfig) error {
+func generateDockerfiles(config *clusterfuzz.Config) error {
 	// Web Dockerfile
 	webDockerfile := `FROM python:3.11-slim
 
@@ -1228,7 +976,7 @@ exec "$@"
 // Related functions: generateConfigurations
 // Dependencies: template, filepath, os, fmt
 // TODO: Move to pkg/clusterfuzz/terraform or pkg/clusterfuzz/generator
-func generateTerraformConfig(config *ClusterfuzzConfig) error {
+func generateTerraformConfig(config *clusterfuzz.Config) error {
 	// Only generate if using S3/MinIO or Vault
 	if config.StorageBackend != "s3" && config.StorageBackend != "minio" && !config.UseVault {
 		return nil
@@ -1321,7 +1069,7 @@ output "minio_console" {
 // Related functions: checkVaultConnectivity
 // Dependencies: eos_io, vault, otelzap, zap, fmt
 // TODO: Move to pkg/clusterfuzz/vault or pkg/clusterfuzz/secrets
-func storeSecretsInVault(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func storeSecretsInVault(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Store database credentials
@@ -1382,7 +1130,7 @@ func storeSecretsInVault(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) e
 // Related functions: buildDockerImages, deployApplication, deployBots
 // Dependencies: eos_io, otelzap, zap, fmt
 // TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/infrastructure
-func deployInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func deployInfrastructure(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Build Docker images first
@@ -1407,7 +1155,7 @@ func deployInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) 
 // Related functions: deployInfrastructure, generateDockerfiles
 // Dependencies: eos_io, otelzap, zap, filepath
 // TODO: Move to pkg/clusterfuzz/docker or pkg/clusterfuzz/build
-func buildDockerImages(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func buildDockerImages(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Build web image
@@ -1437,7 +1185,7 @@ func buildDockerImages(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 // Related functions: waitForService, deployInfrastructure
 // Dependencies: eos_io, otelzap, context, time, zap, fmt
 // TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/wait
-func waitForInfrastructure(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func waitForInfrastructure(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	services := []struct {
@@ -1505,7 +1253,7 @@ func waitForService(ctx context.Context, host string, port int) error {
 // Related functions: deployInfrastructure, deployApplication
 // Dependencies: eos_io, otelzap, os, fmt, zap
 // TODO: Move to pkg/clusterfuzz/init or pkg/clusterfuzz/services
-func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func initializeServices(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Initialize database
@@ -1564,7 +1312,7 @@ func initializeServices(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) er
 // Related functions: deployInfrastructure, deployBots
 // Dependencies: eos_io, otelzap, fmt, time, zap
 // TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/application
-func deployApplication(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func deployApplication(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// The web application is already deployed as part of core services
@@ -1598,7 +1346,7 @@ func deployApplication(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) err
 // Related functions: deployInfrastructure, deployApplication
 // Dependencies: eos_io, otelzap, filepath, fmt, zap
 // TODO: Move to pkg/clusterfuzz/deploy or pkg/clusterfuzz/bots
-func deployBots(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func deployBots(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Deploy bot jobs
@@ -1621,7 +1369,7 @@ func deployBots(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
 // Related functions: checkPrerequisites
 // Dependencies: eos_io, otelzap, strings, fmt, zap
 // TODO: Move to pkg/clusterfuzz/verify or pkg/clusterfuzz/validation
-func verifyDeployment(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) error {
+func verifyDeployment(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
 	// Check job status
@@ -1651,7 +1399,7 @@ func verifyDeployment(rc *eos_io.RuntimeContext, config *ClusterfuzzConfig) erro
 // Related functions: None visible in this file
 // Dependencies: fmt
 // TODO: Move to pkg/clusterfuzz/display or pkg/clusterfuzz/output
-func displaySuccessInfo(config *ClusterfuzzConfig) {
+func displaySuccessInfo(config *clusterfuzz.Config) {
 	fmt.Println("\nClusterFuzz deployment completed successfully!")
 	fmt.Println("\nDeployment Summary:")
 	fmt.Printf("   • Web Interface: http://%s:8080\n", config.Domain)
