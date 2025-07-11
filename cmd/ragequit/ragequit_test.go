@@ -8,6 +8,10 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/diagnostics"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/emergency"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/recovery"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/system"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -67,13 +71,13 @@ func TestRagequitCommand(t *testing.T) {
 
 func TestUtilityFunctions(t *testing.T) {
 	t.Run("getHostname", func(t *testing.T) {
-		hostname := getHostname()
+		hostname := system.GetHostname()
 		assert.NotEmpty(t, hostname)
 		assert.NotEqual(t, "unknown", hostname)
 	})
 
 	t.Run("getHomeDir", func(t *testing.T) {
-		homeDir := getHomeDir()
+		homeDir := system.GetHomeDir()
 		assert.NotEmpty(t, homeDir)
 	})
 
@@ -83,20 +87,20 @@ func TestUtilityFunctions(t *testing.T) {
 		err := os.WriteFile(tempFile, []byte("test"), 0644)
 		require.NoError(t, err)
 		
-		assert.True(t, fileExists(tempFile))
-		assert.False(t, fileExists("/nonexistent/file"))
+		assert.True(t, system.FileExists(tempFile))
+		assert.False(t, system.FileExists("/nonexistent/file"))
 	})
 
 	t.Run("dirExists", func(t *testing.T) {
 		tempDir := t.TempDir()
-		assert.True(t, dirExists(tempDir))
-		assert.False(t, dirExists("/nonexistent/directory"))
+		assert.True(t, system.DirExists(tempDir))
+		assert.False(t, system.DirExists("/nonexistent/directory"))
 	})
 
 	t.Run("commandExists", func(t *testing.T) {
 		// Test with a command that should exist on most systems
-		assert.True(t, commandExists("echo"))
-		assert.False(t, commandExists("nonexistent-command-12345"))
+		assert.True(t, system.CommandExists("echo"))
+		assert.False(t, system.CommandExists("nonexistent-command-12345"))
 	})
 
 	t.Run("readFile", func(t *testing.T) {
@@ -105,25 +109,25 @@ func TestUtilityFunctions(t *testing.T) {
 		err := os.WriteFile(tempFile, []byte(testContent), 0644)
 		require.NoError(t, err)
 
-		content := readFile(tempFile)
+		content := system.ReadFile(tempFile)
 		assert.Equal(t, testContent, content)
 
 		// Test with nonexistent file
-		emptyContent := readFile("/nonexistent/file")
+		emptyContent := system.ReadFile("/nonexistent/file")
 		assert.Empty(t, emptyContent)
 	})
 
 	t.Run("runCommandWithTimeout", func(t *testing.T) {
 		// Test successful command
-		output := runCommandWithTimeout("echo", []string{"hello", "world"}, 5*time.Second)
+		output := system.RunCommandWithTimeout("echo", []string{"hello", "world"}, 5*time.Second)
 		assert.Contains(t, output, "hello world")
 
 		// Test command timeout
-		output = runCommandWithTimeout("sleep", []string{"10"}, 100*time.Millisecond)
+		output = system.RunCommandWithTimeout("sleep", []string{"10"}, 100*time.Millisecond)
 		assert.Empty(t, output)
 
 		// Test nonexistent command
-		output = runCommandWithTimeout("nonexistent-command", []string{}, 5*time.Second)
+		output = system.RunCommandWithTimeout("nonexistent-command", []string{}, 5*time.Second)
 		assert.Empty(t, output)
 	})
 }
@@ -143,12 +147,12 @@ func TestCreateTimestampFile(t *testing.T) {
 	rc := eos_io.NewContext(context.Background(), "test")
 
 	testReason := "test emergency"
-	createTimestampFile(rc, testReason)
+	emergency.CreateTimestampFile(rc, testReason)
 
 	timestampFile := filepath.Join(tempDir, "ragequit-timestamp.txt")
-	assert.True(t, fileExists(timestampFile))
+	assert.True(t, system.FileExists(timestampFile))
 
-	content := readFile(timestampFile)
+	content := system.ReadFile(timestampFile)
 	assert.Contains(t, content, "Ragequit executed at:")
 	assert.Contains(t, content, testReason)
 	assert.Contains(t, content, "Triggered by:")
@@ -168,17 +172,15 @@ func TestGenerateRecoveryPlan(t *testing.T) {
 
 	rc := eos_io.NewContext(context.Background(), "test")
 
-	reason = "test recovery plan"
-	generateRecoveryPlan(rc)
+	recovery.GenerateRecoveryPlan(rc)
 
-	recoveryFile := filepath.Join(tempDir, "investigate-ragequit.md")
-	assert.True(t, fileExists(recoveryFile))
+	recoveryFile := filepath.Join(tempDir, "RAGEQUIT-RECOVERY-PLAN.md")
+	assert.True(t, system.FileExists(recoveryFile))
 
-	content := readFile(recoveryFile)
-	assert.Contains(t, content, "# Ragequit Investigation Checklist")
-	assert.Contains(t, content, "## Investigation Steps")
-	assert.Contains(t, content, "## Recovery Commands")
-	assert.Contains(t, content, reason)
+	content := system.ReadFile(recoveryFile)
+	assert.Contains(t, content, "# RAGEQUIT RECOVERY PLAN")
+	assert.Contains(t, content, "## IMMEDIATE ACTIONS AFTER REBOOT")
+	assert.Contains(t, content, "## SERVICE RECOVERY")
 }
 
 func TestEnvironmentDetection(t *testing.T) {
@@ -195,12 +197,12 @@ func TestEnvironmentDetection(t *testing.T) {
 
 	rc := eos_io.NewContext(context.Background(), "test")
 
-	detectEnvironment(rc)
+	diagnostics.DetectEnvironment(rc)
 
 	envFile := filepath.Join(tempDir, "ragequit-environment.txt")
-	assert.True(t, fileExists(envFile))
+	assert.True(t, system.FileExists(envFile))
 
-	content := readFile(envFile)
+	content := system.ReadFile(envFile)
 	assert.Contains(t, content, "=== Environment Detection ===")
 	assert.Contains(t, content, "Environment:")
 	// Init detection is optional since it depends on system state
