@@ -9,8 +9,10 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/backup/schedule"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/systemd"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -104,7 +106,7 @@ WantedBy=multi-user.target
 		// Convert cron to OnCalendar if needed
 		onCalendar := profile.Schedule.OnCalendar
 		if onCalendar == "" && profile.Schedule.Cron != "" {
-			onCalendar = cronToOnCalendar(profile.Schedule.Cron)
+			onCalendar = schedule.CronToOnCalendar(rc, profile.Schedule.Cron)
 		}
 		
 		timerContent := fmt.Sprintf(`[Unit]
@@ -137,7 +139,7 @@ WantedBy=timers.target
 		}
 		
 		for _, cmdArgs := range cmds {
-			if err := runSystemctl(cmdArgs...); err != nil {
+			if err := systemd.RunSystemctl(rc, cmdArgs...); err != nil {
 				return fmt.Errorf("running %s: %w", strings.Join(cmdArgs, " "), err)
 			}
 		}
@@ -178,7 +180,7 @@ Examples:
 		}
 		
 		for _, cmdArgs := range cmds {
-			if err := runSystemctl(cmdArgs...); err != nil {
+			if err := systemd.RunSystemctl(rc, cmdArgs...); err != nil {
 				logger.Warn("Failed to run systemctl command",
 					zap.Strings("command", cmdArgs),
 					zap.Error(err))
@@ -200,7 +202,7 @@ Examples:
 		}
 		
 		// Reload systemd
-		if err := runSystemctl("systemctl", "daemon-reload"); err != nil {
+		if err := systemd.RunSystemctl(rc, "systemctl", "daemon-reload"); err != nil {
 			logger.Warn("Failed to reload systemd",
 				zap.Error(err))
 		}
@@ -251,12 +253,16 @@ Examples:
 			status := "Not scheduled"
 			nextRun := "-"
 			
-			// TODO: Implement timer status checking
-			_ = status // Will be used when timer status checking is implemented
-			
 			// Check systemd timer status
-			// TODO: Parse systemctl output properly
-			status = "Unknown"
+			timerName := fmt.Sprintf("eos-backup-%s.timer", profileName)
+			if timerStatus, nextRunTime, err := systemd.GetTimerStatus(rc, timerName); err != nil {
+				logger.Debug("Failed to get timer status",
+					zap.String("timer", timerName),
+					zap.Error(err))
+			} else {
+				status = timerStatus
+				nextRun = nextRunTime
+			}
 			
 			fmt.Printf("%-20s %-20s %-20s %s\n",
 				profileName, schedule, status, nextRun)
@@ -289,7 +295,7 @@ Examples:
 		serviceName := fmt.Sprintf("eos-backup-%s.service", profileName)
 		
 		// Start the service
-		if err := runSystemctl("systemctl", "start", serviceName); err != nil {
+		if err := systemd.RunSystemctl(rc, "systemctl", "start", serviceName); err != nil {
 			return fmt.Errorf("starting backup service: %w", err)
 		}
 		
@@ -315,42 +321,6 @@ func init() {
 
 
 
-// TODO: HELPER_REFACTOR - Move to pkg/backup or pkg/systemd
-// Type: Utility
-// Related functions: runSystemctl
-// Dependencies: fmt, strings
-// cronToOnCalendar converts a cron expression to systemd OnCalendar format
-// This is a simplified conversion - not all cron expressions can be converted
-func cronToOnCalendar(cron string) string {
-	// Simple conversion for common patterns
-	switch cron {
-	case "0 0 * * *":
-		return "daily"
-	case "0 0 * * 0":
-		return "weekly"
-	case "0 0 1 * *":
-		return "monthly"
-	case "0 * * * *":
-		return "hourly"
-	default:
-		// Try to parse and convert
-		parts := strings.Split(cron, " ")
-		if len(parts) == 5 {
-			// Convert "0 2 * * *" to "*-*-* 02:00:00"
-			if parts[2] == "*" && parts[3] == "*" && parts[4] == "*" {
-				return fmt.Sprintf("*-*-* %02s:%02s:00", parts[1], parts[0])
-			}
-		}
-		// Fallback to daily
-		return "daily"
-	}
-}
-
-// TODO: HELPER_REFACTOR - Move to pkg/systemd or pkg/eos_unix
-// Type: Business Logic
-// Related functions: cronToOnCalendar
-// Dependencies: exec (to be implemented)
-func runSystemctl(args ...string) error {
-	// TODO: Implement proper systemctl execution
-	return nil
-}
+// Helper functions have been migrated to:
+// - pkg/backup/schedule/converter.go (cronToOnCalendar)
+// - pkg/systemd/systemctl.go (runSystemctl)
