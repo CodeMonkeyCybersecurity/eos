@@ -5,7 +5,7 @@ package create
 import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/network"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/infrastructure/deploy"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -37,116 +37,21 @@ Examples:
 
 		switch serviceName {
 		case "tailscale":
-			return deployTailscaleInfrastructure(rc, cmd)
+			return deploy.DeployTailscale(rc, cmd)
 		case "traefik":
-			return deployTraefikInfrastructure(rc, cmd)
+			return deploy.DeployTraefik(rc, cmd)
 		case "headscale":
-			return deployHeadscaleInfrastructure(rc, cmd)
+			return deploy.DeployHeadscale(rc, cmd)
 		default:
 			logger.Error("Unsupported infrastructure service", zap.String("service", serviceName))
 			return cmd.Help()
 		}
 	}),
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func deployTailscaleInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Deploying Tailscale infrastructure")
-
-	// Get command flags
-	hostname, _ := cmd.Flags().GetString("hostname")
-	advertiseRoutes, _ := cmd.Flags().GetStringSlice("advertise-routes")
-	acceptRoutes, _ := cmd.Flags().GetBool("accept-routes")
-	tags, _ := cmd.Flags().GetStringSlice("tags")
-	terraformDir, _ := cmd.Flags().GetString("terraform-dir")
-	vaultPath, _ := cmd.Flags().GetString("vault-path")
-	useExitNode, _ := cmd.Flags().GetBool("exit-node")
-	useShield, _ := cmd.Flags().GetBool("shield")
-
-	// Set defaults
-	if hostname == "" {
-		hostname = "eos-node"
-	}
-	if vaultPath == "" {
-		vaultPath = "tailscale"
-	}
-
-	config := &network.TailscaleConfig{
-		Hostname:         hostname,
-		AdvertiseRoutes:  advertiseRoutes,
-		AcceptRoutes:     acceptRoutes,
-		Tags:             tags,
-		TerraformDir:     terraformDir,
-		VaultPath:        vaultPath,
-		UseAdvertiseExit: useExitNode,
-		UseShield:        useShield,
-		Metadata: map[string]string{
-			"deployed_by": "eos",
-			"component":   "tailscale",
-		},
-	}
-
-	logger.Info("Tailscale configuration",
-		zap.String("hostname", config.Hostname),
-		zap.Strings("advertise_routes", config.AdvertiseRoutes),
-		zap.String("vault_path", config.VaultPath),
-		zap.Bool("use_terraform", terraformDir != ""))
-
-	return network.DeployTailscaleInfrastructure(rc, config)
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func deployTraefikInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Deploying Traefik infrastructure")
-
-	// Get command flags
-	domain, _ := cmd.Flags().GetString("domain")
-	email, _ := cmd.Flags().GetString("email")
-	httpPort, _ := cmd.Flags().GetString("http-port")
-	httpsPort, _ := cmd.Flags().GetString("https-port")
-
-	// Set defaults
-	if httpPort == "" {
-		httpPort = "80"
-	}
-	if httpsPort == "" {
-		httpsPort = "443"
-	}
-
-	logger.Info("Traefik configuration",
-		zap.String("domain", domain),
-		zap.String("email", email),
-		zap.String("http_port", httpPort),
-		zap.String("https_port", httpsPort))
-
-	// This would implement Traefik deployment similar to Tailscale
-	// For now, return a placeholder implementation
-	logger.Info("Traefik infrastructure deployment completed")
-	return nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func deployHeadscaleInfrastructure(rc *eos_io.RuntimeContext, cmd *cobra.Command) error {
-	logger := otelzap.Ctx(rc.Ctx)
-	logger.Info("Deploying Headscale infrastructure")
-
-	// Get command flags
-	domain, _ := cmd.Flags().GetString("domain")
-	database, _ := cmd.Flags().GetString("database")
-
-	// Set defaults
-	if database == "" {
-		database = "sqlite"
-	}
-
-	logger.Info("Headscale configuration",
-		zap.String("domain", domain),
-		zap.String("database", database))
-
-	// This would implement Headscale deployment similar to Tailscale
-	// For now, return a placeholder implementation
-	logger.Info("Headscale infrastructure deployment completed")
-	return nil
-}
+// Helper functions have been migrated to:
+// - pkg/infrastructure/deploy/tailscale.go (DeployTailscale)
+// - pkg/infrastructure/deploy/traefik.go (DeployTraefik)
+// - pkg/infrastructure/deploy/headscale.go (DeployHeadscale)
 
 func init() {
 	// Add infrastructure command to create
