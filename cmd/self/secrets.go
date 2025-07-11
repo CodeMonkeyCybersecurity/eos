@@ -198,21 +198,20 @@ Examples:
 			}
 
 			secretStore := facade.GetSecretStore()
-			reader := bufio.NewReader(os.Stdin)
 
 			switch secretName {
 			case "delphi-db":
-				return secrets.SetDatabaseCredentials(rc, secretStore, reader)
+				return secrets.SetDatabaseCredentials(rc, secretStore)
 			case "delphi-db-config":
-				return secrets.SetDatabaseConfig(rc, secretStore, reader)
+				return secrets.SetDatabaseConfig(rc, secretStore)
 			case "delphi-db-engine":
-				return secrets.SetupDatabaseEngine(rc, reader)
+				return secrets.SetDatabaseEngine(rc, secretStore)
 			case "smtp":
-				return secrets.SetSMTPCredentials(rc, secretStore, reader)
+				return fmt.Errorf("smtp secrets not yet migrated - use legacy version")
 			case "openai":
-				return secrets.SetOpenAICredentials(rc, secretStore, reader)
+				return fmt.Errorf("openai secrets not yet migrated - use legacy version")
 			case "custom":
-				return secrets.SetCustomSecret(rc, secretStore, reader)
+				return fmt.Errorf("custom secrets not yet migrated - use legacy version")
 			default:
 				return fmt.Errorf("unknown secret type: %s", secretName)
 			}
