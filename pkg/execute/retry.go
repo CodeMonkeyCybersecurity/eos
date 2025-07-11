@@ -2,13 +2,6 @@
 
 package execute
 
-// TODO: MIGRATION IN PROGRESS
-// This file has 4 fmt.Printf/Println violations in retry logic.
-// See retry_refactored.go for the migrated version that follows Eos standards:
-// - All user output uses stderr to preserve stdout
-// - All debug/info logging uses structured logging
-// - Enhanced error handling and context
-
 import (
 	"bytes"
 	"fmt"
@@ -17,15 +10,38 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
-// RetryCommand retries execution with live output and structured logging.
+// Package execute provides retry functionality with structured logging
+// This implementation follows Eos standards:
+// - All fmt.Printf/Println replaced with structured logging
+// - User-facing output uses stderr to preserve stdout
+// - Enhanced error handling and context
+
+// RetryCommand retries execution with structured logging and proper error handling
 func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("Starting command retry execution",
+		zap.String("command", name),
+		zap.Strings("args", args),
+		zap.Int("max_attempts", maxAttempts),
+		zap.Duration("delay", delay))
+
 	var lastErr error
 	for i := 1; i <= maxAttempts; i++ {
-		fmt.Printf(" Attempt %d: %s %s\n", i, name, joinArgs(args))
+		logger.Info("Executing command attempt",
+			zap.Int("attempt", i),
+			zap.String("command", name),
+			zap.Strings("args", args))
+		
+		// Display attempt info to user via stderr
+		if _, err := fmt.Fprintf(os.Stderr, "[Attempt %d] %s %s\n", i, name, joinArgs(args)); err != nil {
+			logger.Warn("Failed to write attempt info to stderr", zap.Error(err))
+		}
 
 		cmd := exec.CommandContext(rc.Ctx, name, args...)
 
@@ -35,40 +51,110 @@ func RetryCommand(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duratio
 
 		err := cmd.Run()
 		if err == nil {
-			fmt.Printf(" Attempt %d succeeded\n", i)
+			logger.Info("Command attempt succeeded",
+				zap.Int("attempt", i),
+				zap.String("command", name))
+				
+			// Display success info to user via stderr
+			if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command succeeded\n", i); writeErr != nil {
+				logger.Warn("Failed to write success info to stderr", zap.Error(writeErr))
+			}
 			return nil
 		}
 
-		output := buf.String()
-		summary := eos_err.ExtractSummary(rc.Ctx, output, 2)
-		lastErr = fmt.Errorf(" attempt %d failed: %w\noutput:\n%s", i, err, summary)
+		lastErr = err
+		logger.Warn("Command attempt failed",
+			zap.Int("attempt", i),
+			zap.String("command", name),
+			zap.Error(err))
+		
+		// Display failure info to user via stderr
+		if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command failed: %v\n", i, err); writeErr != nil {
+			logger.Warn("Failed to write failure info to stderr", zap.Error(writeErr))
+		}
 
+		// Wait before retry (except on last attempt)
 		if i < maxAttempts {
+			logger.Info("Waiting before retry",
+				zap.Duration("delay", delay),
+				zap.Int("next_attempt", i+1))
 			time.Sleep(delay)
 		}
 	}
-	return fmt.Errorf(" all %d attempts failed: %w", maxAttempts, lastErr)
+
+	logger.Error("All command attempts failed",
+		zap.String("command", name),
+		zap.Int("total_attempts", maxAttempts),
+		zap.Error(lastErr))
+	
+	return fmt.Errorf("command failed after %d attempts: %v", maxAttempts, lastErr)
 }
 
-// RetryCaptureOutput runs a command with retries and returns captured output.
-func RetryCaptureOutput(rc *eos_io.RuntimeContext, retries int, delay time.Duration, name string, args ...string) ([]byte, error) {
-	var out []byte
-	var err error
+// RetryCommandCaptureRefactored retries execution with output capture and structured logging
+func RetryCommandCaptureRefactored(rc *eos_io.RuntimeContext, maxAttempts int, delay time.Duration, name string, args ...string) (string, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("Starting command retry execution with capture",
+		zap.String("command", name),
+		zap.Strings("args", args),
+		zap.Int("max_attempts", maxAttempts),
+		zap.Duration("delay", delay))
 
-	for i := 1; i <= retries; i++ {
-		cmd := exec.CommandContext(rc.Ctx, name, args...)
-		fmt.Printf(" Capturing attempt %d: %s %s\n", i, name, joinArgs(args))
-		out, err = cmd.CombinedOutput()
-
-		if err == nil {
-			return out, nil
+	var lastErr error
+	var output string
+	
+	for i := 1; i <= maxAttempts; i++ {
+		logger.Info("Executing command attempt with capture",
+			zap.Int("attempt", i),
+			zap.String("command", name),
+			zap.Strings("args", args))
+		
+		// Display attempt info to user via stderr
+		if _, err := fmt.Fprintf(os.Stderr, "[Capturing Attempt %d] %s %s\n", i, name, joinArgs(args)); err != nil {
+			logger.Warn("Failed to write attempt info to stderr", zap.Error(err))
 		}
 
-		fmt.Printf(" attempt %d failed: %s\n", i, err)
-		if i < retries {
+		cmd := exec.CommandContext(rc.Ctx, name, args...)
+		var buf bytes.Buffer
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+
+		err := cmd.Run()
+		output = buf.String()
+		
+		if err == nil {
+			logger.Info("Command attempt with capture succeeded",
+				zap.Int("attempt", i),
+				zap.String("command", name),
+				zap.Int("output_length", len(output)))
+			return output, nil
+		}
+
+		lastErr = err
+		logger.Warn("Command attempt with capture failed",
+			zap.Int("attempt", i),
+			zap.String("command", name),
+			zap.Error(err),
+			zap.String("output", output))
+		
+		// Display failure info to user via stderr
+		if _, writeErr := fmt.Fprintf(os.Stderr, "[Attempt %d] Command failed: %v\n", i, err); writeErr != nil {
+			logger.Warn("Failed to write failure info to stderr", zap.Error(writeErr))
+		}
+
+		// Wait before retry (except on last attempt)
+		if i < maxAttempts {
+			logger.Info("Waiting before retry",
+				zap.Duration("delay", delay),
+				zap.Int("next_attempt", i+1))
 			time.Sleep(delay)
 		}
 	}
 
-	return out, fmt.Errorf("all %d attempts failed: %w\noutput:\n%s", retries, err, string(out))
+	logger.Error("All command attempts with capture failed",
+		zap.String("command", name),
+		zap.Int("total_attempts", maxAttempts),
+		zap.Error(lastErr))
+	
+	return output, fmt.Errorf("command failed after %d attempts: %v", maxAttempts, lastErr)
 }

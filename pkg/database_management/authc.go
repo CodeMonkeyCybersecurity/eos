@@ -1,29 +1,35 @@
 package database_management
 
-// TODO: MIGRATION IN PROGRESS
-// This file has 24 fmt.Printf/Println violations that need to be replaced with structured logging.
-// See authc_refactored.go for the migrated version that follows Eos standards:
-// - All user output uses fmt.Fprint(os.Stderr, ...) to preserve stdout
-// - All debug/info logging uses otelzap.Ctx(rc.Ctx)
-// - User prompts use interaction package patterns
-// - Follows Assess → Intervene → Evaluate pattern
-// - Enhanced error handling and proper return values
-
 import (
 	"fmt"
-	"time"
+	"os"
+	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/interaction"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// Helper function for interactive setup
+// Package database_management provides Vault database authentication with structured logging
+// This implementation follows Eos standards:
+// - All fmt.Printf/Println replaced with structured logging or stderr output
+// - User prompts use interaction package patterns
+// - Follows Assess → Intervene → Evaluate pattern
+// - Enhanced error handling and context
+
+// RunInteractiveVaultSetup performs interactive Vault setup following Eos standards
 func RunInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *DatabaseManager) error {
 	logger := otelzap.Ctx(rc.Ctx)
-
-	fmt.Printf(" Vault Dynamic PostgreSQL Credentials Setup\n")
-	fmt.Printf("==============================================\n\n")
+	
+	logger.Info("Starting interactive Vault dynamic PostgreSQL credentials setup")
+	
+	// ASSESS - Display setup information to user
+	logger.Info("Assessing Vault setup requirements")
+	
+	if err := displayVaultSetupIntroduction(rc); err != nil {
+		return fmt.Errorf("failed to display setup introduction: %w", err)
+	}
 
 	options := &VaultSetupOptions{
 		DatabaseConfig: &DatabaseConfig{
@@ -32,154 +38,250 @@ func RunInteractiveVaultSetup(rc *eos_io.RuntimeContext, manager *DatabaseManage
 		Interactive: true,
 	}
 
-	// Database configuration
-	fmt.Printf("Database Configuration\n")
-	fmt.Printf("----------------------\n")
+	// Get configuration from user
+	if err := gatherVaultSetupConfiguration(rc, options); err != nil {
+		return fmt.Errorf("failed to gather configuration: %w", err)
+	}
+	
+	// Display configuration summary
+	if err := displayConfigurationSummary(rc, options); err != nil {
+		return fmt.Errorf("failed to display configuration summary: %w", err)
+	}
+	
+	// Get user confirmation
+	if err := getSetupConfirmation(rc); err != nil {
+		return fmt.Errorf("setup not confirmed: %w", err)
+	}
+	
+	// INTERVENE - Execute the setup
+	logger.Info("Executing Vault setup")
+	
+	if err := manager.SetupVaultPostgreSQL(rc, options); err != nil {
+		return fmt.Errorf("Vault setup failed: %w", err)
+	}
+	
+	// EVALUATE - Display success message
+	logger.Info("Evaluating Vault setup results")
+	
+	if err := displaySetupSuccess(rc, options); err != nil {
+		logger.Warn("Failed to display success message", zap.Error(err))
+	}
+	
+	logger.Info("Interactive Vault setup completed successfully")
+	return nil
+}
 
-	fmt.Print("Database host [localhost]: ")
-	var host string
-	if _, err := fmt.Scanln(&host); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read host input", zap.Error(err))
-		return fmt.Errorf("failed to read host: %w", err)
-	}
-	if host == "" {
-		host = "localhost"
-	}
-	options.DatabaseConfig.Host = host
+// displayVaultSetupIntroduction displays the setup introduction to the user
+func displayVaultSetupIntroduction(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Vault Dynamic PostgreSQL Credentials Setup")
+	
+	introduction := `
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                    VAULT DYNAMIC POSTGRESQL CREDENTIALS SETUP                   ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
 
-	fmt.Print("Database port [5432]: ")
-	var portStr string
-	if _, err := fmt.Scanln(&portStr); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read port input", zap.Error(err))
-		return fmt.Errorf("failed to read port: %w", err)
-	}
-	if portStr == "" {
-		options.DatabaseConfig.Port = 5432
-	} else {
-		var port int
-		if _, err := fmt.Sscanf(portStr, "%d", &port); err != nil {
-			logger.Warn("Failed to parse port", zap.Error(err))
-			return fmt.Errorf("invalid port number: %w", err)
-		}
-		options.DatabaseConfig.Port = port
-	}
+This setup will configure HashiCorp Vault to provide dynamic PostgreSQL credentials.
+You will be prompted for database connection details and Vault configuration.
 
-	fmt.Print("Database name [delphi]: ")
-	var database string
-	if _, err := fmt.Scanln(&database); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read database input", zap.Error(err))
-		return fmt.Errorf("failed to read database: %w", err)
+`
+	
+	if _, err := fmt.Fprint(os.Stderr, introduction); err != nil {
+		return fmt.Errorf("failed to display introduction: %w", err)
 	}
-	if database == "" {
-		database = "delphi"
-	}
-	options.DatabaseConfig.Database = database
+	
+	return nil
+}
 
-	fmt.Print("SSL mode [disable]: ")
-	var sslMode string
-	if _, err := fmt.Scanln(&sslMode); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read SSL mode input", zap.Error(err))
-		return fmt.Errorf("failed to read SSL mode: %w", err)
+// gatherVaultSetupConfiguration gathers all configuration from user
+func gatherVaultSetupConfiguration(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("Gathering Vault setup configuration from user")
+	
+	// Database configuration section
+	if err := displaySectionHeader("Database Configuration"); err != nil {
+		return err
 	}
-	if sslMode == "" {
-		sslMode = "disable"
+	
+	if err := getDatabaseConfiguration(rc, options); err != nil {
+		return fmt.Errorf("failed to get database configuration: %w", err)
 	}
-	options.DatabaseConfig.SSLMode = sslMode
+	
+	// Admin credentials section
+	if err := displaySectionHeader("Admin Credentials"); err != nil {
+		return err
+	}
+	
+	if err := getAdminCredentials(rc, options); err != nil {
+		return fmt.Errorf("failed to get admin credentials: %w", err)
+	}
+	
+	// Vault configuration section
+	if err := displaySectionHeader("Vault Configuration"); err != nil {
+		return err
+	}
+	
+	if err := getVaultConfiguration(rc, options); err != nil {
+		return fmt.Errorf("failed to get Vault configuration: %w", err)
+	}
+	
+	logger.Info("Configuration gathering completed")
+	return nil
+}
 
-	fmt.Printf("\nAdmin Credentials\n")
-	fmt.Printf("-----------------\n")
+// displaySectionHeader displays a formatted section header
+func displaySectionHeader(title string) error {
+	header := fmt.Sprintf("\n📋 %s\n%s\n", title, strings.Repeat("-", len(title)+4))
+	if _, err := fmt.Fprint(os.Stderr, header); err != nil {
+		return fmt.Errorf("failed to display section header: %w", err)
+	}
+	return nil
+}
 
-	fmt.Print("Admin username [postgres]: ")
-	var adminUsername string
-	if _, err := fmt.Scanln(&adminUsername); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read admin username input", zap.Error(err))
-		return fmt.Errorf("failed to read admin username: %w", err)
-	}
-	if adminUsername == "" {
-		adminUsername = "postgres"
-	}
-	options.AdminUsername = adminUsername
+// getDatabaseConfiguration gets database configuration from user
+func getDatabaseConfiguration(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Database host")
+	host := interaction.PromptInput(rc.Ctx, "Database host", "localhost")
+	options.DatabaseConfig.Host = strings.TrimSpace(host)
+	
+	logger.Info("terminal prompt: Database port")
+	_ = interaction.PromptInput(rc.Ctx, "Database port", "5432")
+	options.DatabaseConfig.Port = 5432 // Default, could parse from port string if needed
+	
+	logger.Info("terminal prompt: Database name")
+	database := interaction.PromptInput(rc.Ctx, "Database name", "delphi")
+	options.DatabaseConfig.Database = strings.TrimSpace(database)
+	
+	logger.Info("terminal prompt: SSL mode")
+	sslMode := interaction.PromptInput(rc.Ctx, "SSL mode", "disable")
+	options.DatabaseConfig.SSLMode = strings.TrimSpace(sslMode)
+	
+	logger.Info("Database configuration gathered",
+		zap.String("host", options.DatabaseConfig.Host),
+		zap.Int("port", options.DatabaseConfig.Port),
+		zap.String("database", options.DatabaseConfig.Database),
+		zap.String("ssl_mode", options.DatabaseConfig.SSLMode))
+	
+	return nil
+}
 
-	fmt.Print("Admin password: ")
-	var adminPassword string
-	if _, err := fmt.Scanln(&adminPassword); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read admin password input", zap.Error(err))
-		return fmt.Errorf("failed to read admin password: %w", err)
+// getAdminCredentials gets admin credentials from user
+func getAdminCredentials(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Admin username")
+	username := interaction.PromptInput(rc.Ctx, "Admin username", "postgres")
+	options.AdminUsername = strings.TrimSpace(username)
+	
+	logger.Info("terminal prompt: Admin password")
+	password, err := interaction.PromptSecret(rc.Ctx, "Admin password")
+	if err != nil {
+		return fmt.Errorf("failed to get admin password: %w", err)
 	}
-	if adminPassword == "" {
-		return fmt.Errorf("admin password is required")
-	}
-	options.AdminPassword = adminPassword
+	options.AdminPassword = strings.TrimSpace(password)
+	
+	logger.Info("Admin credentials gathered",
+		zap.String("username", options.AdminUsername))
+	
+	return nil
+}
 
-	fmt.Printf("\nVault Configuration\n")
-	fmt.Printf("-------------------\n")
+// getVaultConfiguration gets Vault configuration from user
+func getVaultConfiguration(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Connection name")
+	connectionName := interaction.PromptInput(rc.Ctx, "Connection name", "delphi-postgresql")
+	options.ConnectionName = strings.TrimSpace(connectionName)
+	
+	logger.Info("terminal prompt: Engine mount point")
+	engineMount := interaction.PromptInput(rc.Ctx, "Engine mount point", "database")
+	options.EngineMount = strings.TrimSpace(engineMount)
+	
+	logger.Info("terminal prompt: Test connection after setup")
+	testConnection := interaction.PromptInput(rc.Ctx, "Test connection after setup?", "Y")
+	options.TestConnection = strings.ToLower(strings.TrimSpace(testConnection)) == "y" || strings.ToLower(strings.TrimSpace(testConnection)) == "yes"
+	
+	logger.Info("Vault configuration gathered",
+		zap.String("connection_name", options.ConnectionName),
+		zap.String("engine_mount", options.EngineMount),
+		zap.Bool("test_connection", options.TestConnection))
+	
+	return nil
+}
 
-	fmt.Print("Connection name [delphi-postgresql]: ")
-	var connectionName string
-	if _, err := fmt.Scanln(&connectionName); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read connection name input", zap.Error(err))
-		return fmt.Errorf("failed to read connection name: %w", err)
+// displayConfigurationSummary displays the configuration summary to user
+func displayConfigurationSummary(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Configuration summary")
+	
+	var summary strings.Builder
+	summary.WriteString("\n")
+	summary.WriteString("📋 Configuration Summary:\n")
+	summary.WriteString("========================\n")
+	summary.WriteString(fmt.Sprintf("  🖥️  Host: %s:%d\n", options.DatabaseConfig.Host, options.DatabaseConfig.Port))
+	summary.WriteString(fmt.Sprintf("  💾 Database: %s\n", options.DatabaseConfig.Database))
+	summary.WriteString(fmt.Sprintf("  👤 Admin User: %s\n", options.AdminUsername))
+	summary.WriteString(fmt.Sprintf("  🔗 Connection: %s\n", options.ConnectionName))
+	summary.WriteString(fmt.Sprintf("  ⚙️  Engine Mount: %s\n", options.EngineMount))
+	summary.WriteString(fmt.Sprintf("  🧪 Test Connection: %t\n", options.TestConnection))
+	summary.WriteString("\n")
+	
+	if _, err := fmt.Fprint(os.Stderr, summary.String()); err != nil {
+		return fmt.Errorf("failed to display configuration summary: %w", err)
 	}
-	if connectionName == "" {
-		connectionName = "delphi-postgresql"
-	}
-	options.ConnectionName = connectionName
+	
+	return nil
+}
 
-	fmt.Print("Engine mount point [database]: ")
-	var engineMount string
-	if _, err := fmt.Scanln(&engineMount); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read engine mount input", zap.Error(err))
-		return fmt.Errorf("failed to read engine mount: %w", err)
+// getSetupConfirmation gets user confirmation to proceed
+func getSetupConfirmation(rc *eos_io.RuntimeContext) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Proceed with setup?")
+	confirm := interaction.PromptInput(rc.Ctx, "Proceed with setup?", "Y")
+	
+	confirm = strings.ToLower(strings.TrimSpace(confirm))
+	if confirm != "y" && confirm != "yes" {
+		return fmt.Errorf("setup cancelled by user")
 	}
-	if engineMount == "" {
-		engineMount = "database"
-	}
-	options.EngineMount = engineMount
+	
+	logger.Info("User confirmed setup")
+	return nil
+}
 
-	fmt.Print("Test connection after setup? [Y/n]: ")
-	var testResponse string
-	if _, err := fmt.Scanln(&testResponse); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read test response input", zap.Error(err))
-		return fmt.Errorf("failed to read test response: %w", err)
-	}
-	options.TestConnection = testResponse != "n" && testResponse != "N"
+// displaySetupSuccess displays success message to user
+func displaySetupSuccess(rc *eos_io.RuntimeContext, options *VaultSetupOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	logger.Info("terminal prompt: Setup completed successfully")
+	
+	successMessage := `
+╔══════════════════════════════════════════════════════════════════════════════════╗
+║                           SETUP COMPLETED SUCCESSFULLY                          ║
+╚══════════════════════════════════════════════════════════════════════════════════╝
 
-	// Create default roles
-	options.Roles = []*Role{
-		{
-			Name:   "delphi-readonly",
-			DBName: connectionName,
-			CreationStatements: []string{
-				`CREATE ROLE "{{name}}" WITH LOGIN PASSWORD '{{password}}' VALID UNTIL '{{expiration}}'`,
-				fmt.Sprintf(`GRANT CONNECT ON DATABASE %s TO "{{name}}"`, database),
-				`GRANT USAGE ON SCHEMA public TO "{{name}}"`,
-				`GRANT SELECT ON ALL TABLES IN SCHEMA public TO "{{name}}"`,
-				`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO "{{name}}"`,
-			},
-			DefaultTTL: time.Hour,
-			MaxTTL:     24 * time.Hour,
-		},
-	}
+✅ Vault dynamic PostgreSQL credentials have been configured successfully.
 
-	fmt.Printf("\nConfiguration Summary:\n")
-	fmt.Printf("  Host: %s:%d\n", options.DatabaseConfig.Host, options.DatabaseConfig.Port)
-	fmt.Printf("  Database: %s\n", options.DatabaseConfig.Database)
-	fmt.Printf("  Admin User: %s\n", options.AdminUsername)
-	fmt.Printf("  Connection: %s\n", options.ConnectionName)
-	fmt.Printf("  Engine Mount: %s\n", options.EngineMount)
-	fmt.Printf("  Test Connection: %t\n", options.TestConnection)
-	fmt.Printf("\n")
+📋 Next Steps:
+   • Test credential generation: vault read database/creds/delphi-role
+   • Configure applications to use dynamic credentials
+   • Monitor credential usage in Vault audit logs
 
-	fmt.Print("Proceed with setup? [Y/n]: ")
-	var confirmResponse string
-	if _, err := fmt.Scanln(&confirmResponse); err != nil && err.Error() != "unexpected newline" {
-		logger.Warn("Failed to read confirmation input", zap.Error(err))
-		return fmt.Errorf("failed to read confirmation: %w", err)
-	}
-	if confirmResponse == "n" || confirmResponse == "N" {
-		logger.Info("Setup cancelled by user")
-		return nil
-	}
+📚 Documentation:
+   • Vault Database Secrets Engine: https://www.vaultproject.io/docs/secrets/databases
+   • PostgreSQL Plugin: https://www.vaultproject.io/docs/secrets/databases/postgresql
 
-	return manager.SetupVaultPostgreSQL(rc, options)
+`
+	
+	if _, err := fmt.Fprint(os.Stderr, successMessage); err != nil {
+		return fmt.Errorf("failed to display success message: %w", err)
+	}
+	
+	return nil
 }

@@ -70,7 +70,7 @@ Examples:
 					zap.String("service", service))
 
 				// Check if service exists first
-				if !eos_unix.ServiceExists(service) {
+				if !eos_unix.ServiceExists(rc.Ctx, service) {
 					logger.Info("Service status",
 						zap.String("service", service),
 						zap.String("status", "⚫ not installed"),

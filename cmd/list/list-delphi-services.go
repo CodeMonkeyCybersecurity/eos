@@ -22,7 +22,7 @@ func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (ServiceSta
 	var status ServiceStatus
 
 	// Check if service is active
-	if eos_unix.ServiceExists(serviceName) {
+	if eos_unix.ServiceExists(rc.Ctx, serviceName) {
 		if err := eos_unix.CheckServiceStatus(rc.Ctx, serviceName); err == nil {
 			status.Active = "active"
 		} else {

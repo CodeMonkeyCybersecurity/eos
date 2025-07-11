@@ -466,7 +466,7 @@ func (m *ServicesModule) getServiceStatus(serviceName string) ServiceStatus {
 	}
 
 	// Check if service exists
-	if !eos_unix.ServiceExists(serviceName) {
+	if !eos_unix.ServiceExists(m.rc.Ctx, serviceName) {
 		return status
 	}
 
