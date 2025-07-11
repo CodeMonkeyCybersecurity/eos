@@ -3,21 +3,18 @@ package read
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline/services"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
 
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
 var (
 	pipelineServicesShowConfig bool
 )
@@ -72,7 +69,7 @@ Examples:
 			zap.String("description", config.Description))
 
 		// Check service status
-		status, err := getServiceStatus(rc, serviceName)
+		status, err := services.GetServiceStatus(rc, serviceName)
 		if err != nil {
 			logger.Warn(" Failed to get service status", zap.Error(err))
 		} else {
@@ -85,7 +82,7 @@ Examples:
 
 		// Check worker script
 		workerExists := eos_unix.FileExists(config.WorkerFile)
-		workerInfo := getFileInfo(config.WorkerFile)
+		workerInfo := services.GetFileInfo(rc, config.WorkerFile)
 		logger.Info(" Worker Script",
 			zap.String("path", config.WorkerFile),
 			zap.Bool("exists", workerExists),
@@ -95,7 +92,7 @@ Examples:
 
 		// Check service file
 		serviceExists := eos_unix.FileExists(config.ServiceFile)
-		serviceInfo := getFileInfo(config.ServiceFile)
+		serviceInfo := services.GetFileInfo(rc, config.ServiceFile)
 		logger.Info(" Service File",
 			zap.String("path", config.ServiceFile),
 			zap.Bool("exists", serviceExists),
@@ -107,7 +104,7 @@ Examples:
 		logger.Info(" Configuration Files")
 		for _, configFile := range config.ConfigFiles {
 			configExists := eos_unix.FileExists(configFile)
-			configInfo := getFileInfo(configFile)
+			configInfo := services.GetFileInfo(rc, configFile)
 			logger.Info(" "+filepath.Base(configFile),
 				zap.String("path", configFile),
 				zap.Bool("exists", configExists),
@@ -120,13 +117,13 @@ Examples:
 			zap.Strings("required", config.Dependencies))
 
 		// Show recent logs
-		if err := showRecentLogs(rc, serviceName); err != nil {
+		if err := services.ShowRecentLogs(rc, serviceName); err != nil {
 			logger.Warn(" Failed to retrieve recent logs", zap.Error(err))
 		}
 
 		// Show configuration content if requested
 		if pipelineServicesShowConfig {
-			if err := showServiceConfiguration(rc, config); err != nil {
+			if err := services.ShowServiceConfiguration(rc, config); err != nil {
 				logger.Warn(" Failed to display configuration", zap.Error(err))
 			}
 		}
@@ -138,129 +135,4 @@ Examples:
 func init() {
 	pipelineServicesCmd.Flags().BoolVarP(&pipelineServicesShowConfig, "show-config", "c", false, "Display service configuration file content")
 }
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// ServiceStatus represents systemd service status information
-type ServiceStatus struct {
-	Status  string
-	Active  string
-	Enabled string
-	Uptime  string
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// FileInfo represents file information
-type FileInfo struct {
-	Permissions string
-	Size        string
-	Modified    string
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// getServiceStatus retrieves systemd service status
-func getServiceStatus(rc *eos_io.RuntimeContext, serviceName string) (*ServiceStatus, error) {
-	status := &ServiceStatus{}
-
-	// Get service status
-	cmd := exec.Command("systemctl", "is-active", serviceName)
-	output, err := cmd.Output()
-	if err == nil {
-		status.Active = strings.TrimSpace(string(output))
-	} else {
-		status.Active = "inactive"
-	}
-
-	// Get enabled status
-	cmd = exec.Command("systemctl", "is-enabled", serviceName)
-	output, err = cmd.Output()
-	if err == nil {
-		status.Enabled = strings.TrimSpace(string(output))
-	} else {
-		status.Enabled = "disabled"
-	}
-
-	// Get overall status
-	cmd = exec.Command("systemctl", "show", "-p", "SubState", serviceName)
-	output, err = cmd.Output()
-	if err == nil {
-		parts := strings.Split(strings.TrimSpace(string(output)), "=")
-		if len(parts) == 2 {
-			status.Status = parts[1]
-		}
-	}
-
-	// Get uptime if active
-	if status.Active == "active" {
-		cmd = exec.Command("systemctl", "show", "-p", "ActiveEnterTimestamp", serviceName)
-		output, err = cmd.Output()
-		if err == nil {
-			parts := strings.Split(strings.TrimSpace(string(output)), "=")
-			if len(parts) == 2 {
-				status.Uptime = parts[1]
-			}
-		}
-	}
-
-	return status, nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// getFileInfo retrieves file information
-func getFileInfo(path string) FileInfo {
-	info := FileInfo{
-		Permissions: "unknown",
-		Size:        "unknown",
-		Modified:    "unknown",
-	}
-
-	stat, err := os.Stat(path)
-	if err != nil {
-		return info
-	}
-
-	info.Permissions = stat.Mode().String()
-	info.Size = fmt.Sprintf("%d bytes", stat.Size())
-	info.Modified = stat.ModTime().Format("2006-01-02 15:04:05")
-
-	return info
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// showRecentLogs displays recent service logs
-func showRecentLogs(rc *eos_io.RuntimeContext, serviceName string) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info(" Recent Logs (last 10 lines)")
-
-	cmd := exec.Command("journalctl", "-u", serviceName, "-n", "10", "--no-pager")
-	output, err := cmd.Output()
-	if err != nil {
-		return err
-	}
-
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			logger.Info("  " + line)
-		}
-	}
-
-	return nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// showServiceConfiguration displays service configuration file content
-func showServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.ServiceConfiguration) error {
-	logger := otelzap.Ctx(rc.Ctx)
-
-	logger.Info(" Service Configuration Content")
-
-	if eos_unix.FileExists(config.ServiceFile) {
-		content, err := os.ReadFile(config.ServiceFile)
-		if err != nil {
-			return err
-		}
-
-		logger.Info(" " + filepath.Base(config.ServiceFile) + " content:")
-		lines := strings.Split(string(content), "\n")
-		for _, line := range lines {
-			logger.Info("  " + line)
-		}
-	}
-
-	return nil
-}
+// All helper functions have been migrated to pkg/pipeline/services/
