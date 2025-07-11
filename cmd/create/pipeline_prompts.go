@@ -5,14 +5,14 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"unicode"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
+	eosuser "github.com/CodeMonkeyCybersecurity/eos/pkg/user"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -46,30 +46,11 @@ Examples:
 		logger := otelzap.Ctx(rc.Ctx)
 		promptName := args[0]
 
-		// Get sudo user's home directory
-		currentUser, err := user.Current()
+		// Get system user (handles sudo properly)
+		systemUser, err := eosuser.GetSystemUser(rc)
 		if err != nil {
-			logger.Error("Failed to get current user", zap.Error(err))
-			return fmt.Errorf("failed to get current user: %w", err)
-		}
-
-		var realUsername string
-		if currentUser.Uid == "0" {
-			// Running as root, check SUDO_USER
-			if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
-				realUsername = sudoUser
-			} else {
-				realUsername = "root"
-			}
-		} else {
-			realUsername = currentUser.Username
-		}
-
-		// Get system user ID
-		systemUser, err := user.Lookup(realUsername)
-		if err != nil {
-			logger.Error("Failed to lookup user", zap.String("username", realUsername), zap.Error(err))
-			return fmt.Errorf("failed to lookup user %s: %w", realUsername, err)
+			logger.Error("Failed to get system user", zap.Error(err))
+			return fmt.Errorf("failed to get system user: %w", err)
 		}
 
 		// Convert UID to integer
@@ -133,7 +114,7 @@ Examples:
 
 		default:
 			// Use template
-			content = createPromptTemplate(promptName, pipelinePromptDescription)
+			content = pipeline.CreatePromptTemplate(rc, promptName, pipelinePromptDescription)
 			logger.Info("Created prompt from template", zap.String("name", promptName))
 		}
 
@@ -179,82 +160,7 @@ func init() {
 	createPipelinePromptsCmd.Flags().StringVar(&pipelinePromptDescription, "description", "", "Brief description of the prompt (used in template)")
 }
 
-// getSystemUser returns the actual system user (not root) when running under sudo
-// TODO: Move to pkg/user or pkg/system
-func getSystemUser() (*user.User, error) {
-	currentUser, err := user.Current()
-	if err != nil {
-		return nil, err
-	}
-
-	// If not running as root, return current user
-	if currentUser.Uid != "0" {
-		return currentUser, nil
-	}
-
-	// Running as root, check for SUDO_USER
-	if sudoUser := os.Getenv("SUDO_USER"); sudoUser != "" {
-		return user.Lookup(sudoUser)
-	}
-
-	// No SUDO_USER, return root
-	return currentUser, nil
-}
-
-// createPromptTemplate creates a basic template for a new prompt
-// TODO: Move to pkg/pipeline
-func createPromptTemplate(name, description string) string {
-	if description == "" {
-		description = "Custom system prompt for Delphi AI processing"
-	}
-
-	return fmt.Sprintf(`# %s
-
-## Description
-%s
-
-## Instructions
-You are an AI assistant analyzing security alerts and incidents. Your role is to:
-
-1. Analyze the provided security data
-2. Identify potential threats and risks
-3. Provide clear, actionable recommendations
-4. Communicate findings in a user-friendly manner
-
-## Response Format
-- Be concise but comprehensive
-- Use clear, non-technical language when possible
-- Highlight critical information
-- Provide specific next steps
-
-## Context
-This prompt is used by the Delphi alerting pipeline to process security events and generate user-friendly notifications.
-
----
-Please provide your analysis based on the security data provided.
-`, titleCase(strings.ReplaceAll(name, "-", " ")), description)
-}
-
-// titleCase converts a string to title case using proper Unicode handling
-// TODO: Move to pkg/shared/strings or pkg/eos_io
-func titleCase(s string) string {
-	if s == "" {
-		return s
-	}
-
-	words := strings.Fields(s)
-	for i, word := range words {
-		if word == "" {
-			continue
-		}
-
-		runes := []rune(word)
-		runes[0] = unicode.ToUpper(runes[0])
-		for j := 1; j < len(runes); j++ {
-			runes[j] = unicode.ToLower(runes[j])
-		}
-		words[i] = string(runes)
-	}
-
-	return strings.Join(words, " ")
-}
+// Helper functions have been migrated to:
+// - pkg/user/system.go (GetSystemUser)
+// - pkg/pipeline/prompts.go (CreatePromptTemplate, IsPromptsDirectoryMounted)
+// - pkg/shared/strings/case.go (TitleCase)
