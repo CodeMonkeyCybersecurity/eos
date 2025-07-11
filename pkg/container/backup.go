@@ -194,7 +194,7 @@ func AssessDockerEnvironment(rc *eos_io.RuntimeContext, config *BackupConfig) (*
 
 	// Find docker-compose files
 	if config.IncludeCompose {
-		composeFiles, err := findComposeFiles(rc)
+		composeFiles, err := findComposeFilesRecursive(rc)
 		if err != nil {
 			logger.Warn("Failed to find compose files", zap.Error(err))
 		} else {
@@ -463,7 +463,7 @@ func inventoryNetworks(rc *eos_io.RuntimeContext) ([]NetworkInfo, error) {
 	return networks, nil
 }
 
-func findComposeFiles(rc *eos_io.RuntimeContext) ([]string, error) {
+func findComposeFilesRecursive(rc *eos_io.RuntimeContext) ([]string, error) {
 	// Find docker-compose files in common locations
 	patterns := []string{
 		"docker-compose.yml",
