@@ -58,7 +58,7 @@ Examples:
 		logger.Info("Starting eos self enrollment process")
 		
 		// Parse command line flags
-		config, err := parseEnrollmentFlags(cmd)
+		config, err := enrollment.ParseEnrollmentFlags(cmd)
 		if err != nil {
 			return eos_err.NewUserError("failed to parse enrollment flags: %s", err.Error())
 		}
@@ -73,7 +73,7 @@ Examples:
 		}
 		
 		// Validate configuration
-		if err := validateEnrollmentConfig(config); err != nil {
+		if err := enrollment.ValidateEnrollmentConfig(config); err != nil {
 			return eos_err.NewUserError("invalid enrollment configuration: %s", err.Error())
 		}
 		
@@ -98,7 +98,7 @@ Examples:
 		// Auto-detect role if requested
 		if config.AutoDetect {
 			logger.Info("Auto-detecting role based on system characteristics")
-			detectedRole, err := detectRole(rc, systemInfo)
+			detectedRole, err := enrollment.DetectRole(rc, systemInfo)
 			if err != nil {
 				return fmt.Errorf("role auto-detection failed: %w", err)
 			}
@@ -165,7 +165,7 @@ Examples:
 			logger.Warn("Failed to generate verification report", zap.Error(err))
 		} else {
 			result.Duration = time.Since(startTime)
-			logEnrollmentResults(logger, result)
+			enrollment.LogEnrollmentResults(logger, result)
 		}
 		
 		duration := time.Since(startTime)
@@ -197,110 +197,4 @@ func init() {
 	// Mark required flags
 	EnrollCmd.MarkFlagRequired("datacenter")
 }
-
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// parseEnrollmentFlags parses command line flags into EnrollmentConfig
-func parseEnrollmentFlags(cmd *cobra.Command) (*enrollment.EnrollmentConfig, error) {
-	role, _ := cmd.Flags().GetString("role")
-	masterAddress, _ := cmd.Flags().GetString("master-address")
-	datacenter, _ := cmd.Flags().GetString("datacenter")
-	networkMode, _ := cmd.Flags().GetString("network-mode")
-	autoDetect, _ := cmd.Flags().GetBool("auto-detect")
-	transitionMode, _ := cmd.Flags().GetBool("transition-mode")
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	
-	config := &enrollment.EnrollmentConfig{
-		Role:           role,
-		MasterAddress:  masterAddress,
-		Datacenter:     datacenter,
-		NetworkMode:    networkMode,
-		AutoDetect:     autoDetect,
-		TransitionMode: transitionMode,
-		DryRun:         dryRun,
-	}
-	
-	return config, nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// validateEnrollmentConfig validates the enrollment configuration
-func validateEnrollmentConfig(config *enrollment.EnrollmentConfig) error {
-	if config.Datacenter == "" {
-		return fmt.Errorf("datacenter is required")
-	}
-	
-	if !config.AutoDetect && config.Role == "" {
-		return fmt.Errorf("role is required unless --auto-detect is specified")
-	}
-	
-	if config.Role == enrollment.RoleMinion && config.MasterAddress == "" {
-		return fmt.Errorf("master-address is required for minion role")
-	}
-	
-	if config.Role == enrollment.RoleMaster && config.MasterAddress != "" {
-		return fmt.Errorf("master-address should not be specified for master role")
-	}
-	
-	validNetworkModes := []string{enrollment.NetworkModeDirect, enrollment.NetworkModeConsul, enrollment.NetworkModeWireGuard}
-	if config.NetworkMode != "" {
-		found := false
-		for _, mode := range validNetworkModes {
-			if config.NetworkMode == mode {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("invalid network-mode: %s (valid options: %v)", config.NetworkMode, validNetworkModes)
-		}
-	}
-	
-	return nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// detectRole automatically detects the appropriate role based on system characteristics
-func detectRole(rc *eos_io.RuntimeContext, info *enrollment.SystemInfo) (string, error) {
-	logger := otelzap.Ctx(rc.Ctx)
-	
-	// Simple heuristics for role detection
-	// TODO: 2025-01-09T22:00:00Z - Implement more sophisticated role detection
-	// Could check for:
-	// - Existing infrastructure (consul, nomad, etc.)
-	// - Network topology
-	// - System resources
-	// - Environment variables
-	// - Configuration files
-	
-	logger.Debug("Analyzing system characteristics for role detection",
-		zap.Int("cpu_cores", info.CPUCores),
-		zap.Int("memory_gb", info.MemoryGB),
-		zap.Int("disk_gb", info.DiskSpaceGB))
-	
-	// High-resource systems default to master
-	if info.CPUCores >= 4 && info.MemoryGB >= 8 {
-		logger.Info("Detected high-resource system, suggesting master role")
-		return enrollment.RoleMaster, nil
-	}
-	
-	// Lower-resource systems default to minion
-	logger.Info("Detected standard system, suggesting minion role")
-	return enrollment.RoleMinion, nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// logEnrollmentResults logs the final enrollment results
-func logEnrollmentResults(logger otelzap.LoggerWithCtx, result *enrollment.EnrollmentResult) {
-	if result.Success {
-		logger.Info("Enrollment verification report",
-			zap.String("role", result.Role),
-			zap.String("master", result.MasterAddress),
-			zap.Strings("services_setup", result.ServicesSetup),
-			zap.Strings("configs_updated", result.ConfigsUpdated),
-			zap.Strings("backups_created", result.BackupsCreated),
-			zap.Duration("duration", result.Duration))
-	} else {
-		logger.Error("Enrollment completed with errors",
-			zap.String("role", result.Role),
-			zap.String("master", result.MasterAddress),
-			zap.Strings("errors", result.Errors),
-			zap.Duration("duration", result.Duration))
-	}
-}
+// All helper functions have been migrated to pkg/enrollment/
