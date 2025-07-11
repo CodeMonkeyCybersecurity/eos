@@ -2,6 +2,14 @@
 
 package eos_unix
 
+// TODO: MIGRATION IN PROGRESS
+// This file has 3 fmt.Printf/Println violations that need to be replaced with structured logging.
+// See systemctl_refactored.go for the migrated version that follows Eos standards:
+// - All user output uses fmt.Fprint(os.Stderr, ...) to preserve stdout
+// - All debug/info logging uses otelzap.Ctx(rc.Ctx)
+// - Proper RuntimeContext usage throughout
+// - Uses execute.Run where appropriate
+
 import (
 	"bufio"
 	"bytes"

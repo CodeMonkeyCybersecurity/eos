@@ -9,6 +9,17 @@ import (
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 )
 
+// TODO: Refactor Vault package to implement shared.ToolInterface:
+// 1. Create VaultTool struct that implements Install(), Configure(), Verify() methods
+// 2. Consolidate lifecycle phases into the standard Assess → Intervene → Evaluate pattern
+// 3. Move installation check to use shared.InstallationChecker
+// 4. Use shared.ServiceManager for systemd operations
+// 5. Use shared.ConfigManager for configuration file management
+// 6. Replace direct exec.Command with shared.RunCommand
+// 7. Standardize port management using shared.PortChecker
+// 8. Integrate with shared.CaddyManager for reverse proxy setup
+// 9. Add Authentik integration for SSO support
+
 func OrchestrateVaultCreate(rc *eos_io.RuntimeContext) error {
 	otelzap.Ctx(rc.Ctx).Info(" Starting full Vault create lifecycle")
 

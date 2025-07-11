@@ -1,5 +1,14 @@
 package vault
 
+// TODO: MIGRATION IN PROGRESS
+// This file has 42 fmt.Printf/Println violations that need to be replaced with structured logging.
+// See export_display_refactored.go for the migrated version that follows Eos standards:
+// - All user output uses fmt.Fprint(os.Stderr, ...) to preserve stdout
+// - All debug/info logging uses otelzap.Ctx(rc.Ctx)
+// - Follows Assess → Intervene → Evaluate pattern
+// - Enhanced error handling and proper return values
+// - Proper display formatting with structured builders
+
 import (
 	"encoding/json"
 	"fmt"

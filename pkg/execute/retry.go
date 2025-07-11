@@ -2,6 +2,13 @@
 
 package execute
 
+// TODO: MIGRATION IN PROGRESS
+// This file has 4 fmt.Printf/Println violations in retry logic.
+// See retry_refactored.go for the migrated version that follows Eos standards:
+// - All user output uses stderr to preserve stdout
+// - All debug/info logging uses structured logging
+// - Enhanced error handling and context
+
 import (
 	"bytes"
 	"fmt"

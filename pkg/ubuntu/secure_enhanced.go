@@ -8,6 +8,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO: MIGRATION IN PROGRESS
+// This file has 50+ fmt.Printf/Println violations that need to be replaced with structured logging.
+// See secure_enhanced_refactored.go for the migrated version that follows Eos standards:
+// - All user output uses fmt.Fprint(os.Stderr, ...) to preserve stdout
+// - All debug/info logging uses otelzap.Ctx(rc.Ctx)
+// - Follows Assess → Intervene → Evaluate pattern
+// The printSecuritySummary function especially needs refactoring (lines 120-180)
+
 // SecureUbuntuEnhanced performs comprehensive security hardening with enhanced MFA options
 func SecureUbuntuEnhanced(rc *eos_io.RuntimeContext, mfaMode string) error {
 	logger := otelzap.Ctx(rc.Ctx)

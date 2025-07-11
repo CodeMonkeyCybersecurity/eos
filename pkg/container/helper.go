@@ -17,6 +17,17 @@ import (
 	cerr "github.com/cockroachdb/errors"
 )
 
+// TODO: This package needs major refactoring:
+// 1. Replace all fmt.Printf/Println with structured logging using otelzap.Ctx(rc.Ctx)
+// 2. Use shared.RunCommand() instead of direct exec.Command usage
+// 3. Implement proper Assess → Intervene → Evaluate pattern
+// 4. Migrate to shared.ServiceManager for service operations
+// 5. Use shared.InstallationChecker for checking if Docker is installed
+// 6. Standardize error handling with proper wrapping
+//
+// MIGRATION IN PROGRESS: See helper_refactored.go for the fully migrated version
+// that follows all Eos standards. Once tested, it will replace this implementation.
+
 // DeployCompose performs the following actions:
 // 1. Gets the current working directory and uses its base name as the application name.
 // 2. Creates a target directory under /opt using the app name.

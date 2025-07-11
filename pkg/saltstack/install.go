@@ -15,6 +15,15 @@ import (
 	"go.uber.org/zap"
 )
 
+// TODO: Refactor SaltStack package to use new shared utilities:
+// 1. Implement shared.ToolInterface - create SaltStackTool struct
+// 2. Replace execute.Run with shared.RunCommand throughout
+// 3. Use shared.InstallationChecker instead of custom CheckInstallation
+// 4. Use shared.ServiceManager for systemd operations
+// 5. Good example of Assess → Intervene → Evaluate pattern already in use
+// 6. Consider using shared.ConfigManager for minion configuration
+// 7. Add version resolution using pkg/platform/version_resolver.go
+
 // Installer handles SaltStack installation operations
 type Installer struct {
 	configurer *Configurer

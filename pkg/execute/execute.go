@@ -2,6 +2,13 @@
 
 package execute
 
+// TODO: MIGRATION IN PROGRESS
+// This file has 2 fmt.Printf/Println violations in fallback logging functions.
+// See execute_refactored.go for the migrated version that follows Eos standards:
+// - Fallback logging uses stderr instead of stdout to preserve stdout
+// - Enhanced error handling and context
+// - All logging follows structured logging patterns
+
 import (
 	"bytes"
 	"context"

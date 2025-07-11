@@ -547,6 +547,19 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
 6. **Deployment of new resources**
    - use version resolver in pkg/platform/version_resolver.go when deciding what version of something to download (eg. saltstack, nomad, etc.) to programatically make sure the most recent version of something is downloaded and installed when using `eos create ...` 
 
+
+7. **High-level 'strategic' changes in the codebase**
+    - should be documented in a .md file in the docs/ directory.
+    - this includes things like the declaration of a new standard (eg essential eight compliance, the software stack being used)
+    - it does not include specific changes to the codebase which are planned (eg. refactoring logic, tests which need to be written, notes to self)
+
+8. **More specific 'tactical' changes in the codebase**
+    - these changes need to be marked inline in the codebase with a // TODO: describing what needs to be done or considerations 
+    - if a // TODO is not really appropriate, then a // Comment is fine
+    - Eg. // TODO: More tests needed here, or // This has been done this way because ...
+    - Does not include higher level decisions like "Oh I want to add some completely new bit of software to the stack" or "We should rewrite this whole thing in Powershell".  
+
+
 ## Common Pitfalls
 
 ### Things You Must NEVER Do:

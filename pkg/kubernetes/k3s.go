@@ -1,5 +1,16 @@
 package kubernetes
 
+// TODO: DEPRECATION NOTICE - STRATEGIC ARCHITECTURE CHANGE
+// This package is being deprecated in favor of the SaltStack → Terraform → Nomad architecture.
+// K3s/Kubernetes functionality should be replaced with:
+// - SaltStack for configuration management
+// - Terraform for infrastructure provisioning  
+// - Nomad for container orchestration
+// 
+// Rather than refactoring the 39 fmt.Printf/Println violations, the entire K3s approach
+// should be reimplemented using the standard Eos orchestration hierarchy.
+// See docs/stack.md for architectural details.
+
 import (
 	"bufio"
 	"fmt"
