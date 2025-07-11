@@ -17,16 +17,19 @@ type Agent struct {
 // AgentsResponse represents the API response containing agents
 type AgentsResponse struct {
 	Data struct {
-		Agents []Agent `json:"items"`
-		Total  int     `json:"total_items"`
+		AffectedItems []Agent `json:"affected_items"`
+		TotalItems    int     `json:"total_items"`
+		TotalAffected int     `json:"total_affected_items"`
+		FailedItems   int     `json:"failed_items"`
 	} `json:"data"`
+	Error   int    `json:"error"`
 	Message string `json:"message"`
 }
 
 // PackageMapping represents a package mapping for different distributions
 type PackageMapping struct {
 	Distribution string
-	Major        int
+	MinVersion   int
 	Arch         string
 	Package      string
 }

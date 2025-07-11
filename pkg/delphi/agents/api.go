@@ -19,13 +19,13 @@ func FetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	log := otelzap.Ctx(rc.Ctx)
 	
 	// ASSESS - Validate inputs
-	log.Info("Assessing API fetch parameters",
+	log.Info("🔍 Assessing API fetch parameters",
 		zap.String("base_url", baseURL))
 	
 	url := strings.TrimRight(baseURL, "/") + "/agents?select=id,os,version"
 	
 	// INTERVENE - Make API request
-	log.Debug("Fetching agents from API", zap.String("url", url))
+	log.Debug("🚀 Fetching agents from API", zap.String("url", url))
 	
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -52,7 +52,7 @@ func FetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 	}
 	
 	// EVALUATE - Parse and validate response
-	log.Debug("Parsing API response", zap.Int("status_code", resp.StatusCode))
+	log.Debug("📊 Parsing API response", zap.Int("status_code", resp.StatusCode))
 	
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
@@ -63,8 +63,8 @@ func FetchAgents(rc *eos_io.RuntimeContext, baseURL, token string) (*AgentsRespo
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 	
-	log.Info("Successfully fetched agents",
-		zap.Int("agent_count", len(parsed.Data.Agents)))
+	log.Info("✅ Successfully fetched agents",
+		zap.Int("agent_count", len(parsed.Data.AffectedItems)))
 	
 	return &parsed, nil
 }

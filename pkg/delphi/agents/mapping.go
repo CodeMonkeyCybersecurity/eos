@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi/utils"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -17,35 +18,44 @@ func RunMapping(rc *eos_io.RuntimeContext) error {
 	log := otelzap.Ctx(rc.Ctx)
 	
 	// ASSESS - Check configuration and connectivity
-	log.Info("Assessing Delphi configuration for agent mapping")
+	log.Info("🔍 Assessing Delphi configuration for agent mapping")
 	
 	cfg, err := delphi.ResolveConfig(rc)
 	if err != nil {
 		return fmt.Errorf("failed to resolve config: %w", err)
 	}
 
-	log.Info("Using API",
-		zap.String("endpoint", cfg.Endpoint),
-		zap.String("port", cfg.Port))
+	log.Info("📊 Using API",
+		zap.String("fqdn", cfg.FQDN),
+		zap.String("port", utils.DefaultStr(cfg.Port, "55000")))
 
-	baseURL := fmt.Sprintf("%s://%s:%s", cfg.Protocol, cfg.Endpoint, cfg.Port)
+	baseURL := fmt.Sprintf("%s://%s:%s", 
+		utils.DefaultStr(cfg.Protocol, "https"), 
+		cfg.FQDN, 
+		utils.DefaultStr(cfg.Port, "55000"))
 
 	// INTERVENE - Fetch and process agent data
-	log.Info("Fetching agents from API")
+	log.Info("🚀 Fetching agents from API")
 	
-	agentsResp, err := FetchAgents(rc, baseURL, cfg.Token)
+	// Authenticate first
+	token, err := delphi.Authenticate(rc, cfg)
+	if err != nil {
+		return fmt.Errorf("authentication failed: %w", err)
+	}
+	
+	agentsResp, err := FetchAgents(rc, baseURL, token)
 	if err != nil {
 		return fmt.Errorf("failed to fetch agents: %w", err)
 	}
 
-	if len(agentsResp.Data.Agents) == 0 {
-		log.Info("No agents found")
+	if len(agentsResp.Data.AffectedItems) == 0 {
+		log.Info("📭 No agents found")
 		return nil
 	}
 
-	log.Info("Found agents", zap.Int("count", len(agentsResp.Data.Agents)))
+	log.Info("📋 Found agents", zap.Int("count", len(agentsResp.Data.AffectedItems)))
 
-	for _, agent := range agentsResp.Data.Agents {
+	for _, agent := range agentsResp.Data.AffectedItems {
 		PrintAgentInfo(agent)
 		
 		majorVersion, err := GetMajorVersion(agent.OS.Version)
@@ -57,18 +67,23 @@ func RunMapping(rc *eos_io.RuntimeContext) error {
 		}
 
 		mappings := GetMappings(agent.OS.Name)
-		pkgName := MatchPackage(mappings, agent.OS.Architecture, majorVersion)
+		if mappings == nil {
+			fmt.Printf("❓ No mapping for distribution: %s\n", agent.OS.Name)
+			continue
+		}
+		
+		pkgName := MatchPackage(mappings, strings.ToLower(agent.OS.Architecture), majorVersion)
 		
 		if pkgName != "" {
-			fmt.Printf("    Package: %s\n", pkgName)
+			fmt.Printf("✅ Recommended package: %s\n", pkgName)
 		} else {
-			fmt.Printf("    Package: Not found (arch: %s, major: %d)\n", 
-				agent.OS.Architecture, majorVersion)
+			fmt.Printf("❌ No suitable package for version %s (%s)\n", 
+				agent.OS.Version, agent.OS.Architecture)
 		}
 	}
 
 	// EVALUATE - Log completion
-	log.Info("Agent mapping completed successfully")
+	log.Info("✅ Agent mapping completed successfully")
 	return nil
 }
 
@@ -76,20 +91,25 @@ func RunMapping(rc *eos_io.RuntimeContext) error {
 // Migrated from cmd/create/delphi.go getMappings
 func GetMappings(distribution string) []PackageMapping {
 	switch strings.ToLower(distribution) {
-	case "almalinux", "rocky":
-		return []PackageMapping{
-			{"almalinux", 8, "x86_64", "wazuh-agent-4.9.2-1.el8.x86_64.rpm"},
-			{"almalinux", 9, "x86_64", "wazuh-agent-4.9.2-1.el9.x86_64.rpm"},
-			{"rocky", 8, "x86_64", "wazuh-agent-4.9.2-1.el8.x86_64.rpm"},
-			{"rocky", 9, "x86_64", "wazuh-agent-4.9.2-1.el9.x86_64.rpm"},
-		}
 	case "centos":
 		return []PackageMapping{
-			{"centos", 7, "x86_64", "wazuh-agent-4.9.2-1.el7.x86_64.rpm"},
-			{"centos", 8, "x86_64", "wazuh-agent-4.9.2-1.el8.x86_64.rpm"},
+			{"centos", 7, "x86_64", "wazuh-agent-4.11.0-1.x86_64.rpm"},
+			{"centos", 7, "i386", "wazuh-agent-4.11.0-1.i386.rpm"},
+			{"centos", 7, "aarch64", "wazuh-agent-4.11.0-1.aarch64.rpm"},
+			{"centos", 7, "armhf", "wazuh-agent-4.11.0-1.armv7hl.rpm"},
+		}
+	case "debian":
+		return []PackageMapping{
+			{"debian", 8, "amd64", "wazuh-agent_4.11.0-1_amd64.deb"},
+			{"debian", 8, "i386", "wazuh-agent_4.11.0-1_i386.deb"},
+		}
+	case "ubuntu":
+		return []PackageMapping{
+			{"ubuntu", 13, "amd64", "wazuh-agent_4.11.0-1_amd64.deb"},
+			{"ubuntu", 13, "i386", "wazuh-agent_4.11.0-1_i386.deb"},
 		}
 	default:
-		return []PackageMapping{}
+		return nil
 	}
 }
 
@@ -97,7 +117,7 @@ func GetMappings(distribution string) []PackageMapping {
 // Migrated from cmd/create/delphi.go matchPackage
 func MatchPackage(mappings []PackageMapping, arch string, major int) string {
 	for _, m := range mappings {
-		if m.Major == major && strings.Contains(m.Arch, arch) {
+		if m.Arch == arch && major >= m.MinVersion {
 			return m.Package
 		}
 	}
