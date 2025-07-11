@@ -97,13 +97,13 @@ Examples:
 		// Handle different output formats
 		switch options.ExportFormat {
 		case "json":
-			return exportToJSON(info, options)
+			return vault.ExportToJSON(rc, info, options)
 		case "secure":
-			return exportToSecureFile(info, options)
+			return vault.ExportToSecureFile(rc, info, options)
 		default:
 			// Display to console
 			if statusOnly {
-				return displayStatusOnly(info)
+				return vault.DisplayStatusOnly(rc, info)
 			}
 			return vault.DisplayVaultInitInfo(info, options)
 		}
@@ -209,7 +209,7 @@ Examples:
 		}
 
 		// Display human-readable status
-		displayAgentStatus(status)
+		vault.DisplayAgentStatus(rc, status)
 
 		// Handle different health statuses appropriately
 		switch status.HealthStatus {
@@ -304,151 +304,4 @@ var InspectSecretsCmd = &cobra.Command{
 	}),
 }
 
-// Helper functions for the new export features
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// TODO: Convert to structured logging when RuntimeContext is available
-func exportToJSON(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
-	data, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	if options.OutputPath != "" {
-		return os.WriteFile(options.OutputPath, data, 0600)
-	}
-
-	fmt.Print(string(data))
-	return nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// TODO: Convert to structured logging when RuntimeContext is available
-func exportToSecureFile(info *vault.VaultInitInfo, options *vault.ReadInitOptions) error {
-	if options.OutputPath == "" {
-		return fmt.Errorf("output path required for secure export")
-	}
-
-	// Create secure directory
-	dir := filepath.Dir(options.OutputPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
-		return fmt.Errorf("failed to create output directory: %w", err)
-	}
-
-	// Marshal with indentation
-	data, err := json.MarshalIndent(info, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal JSON: %w", err)
-	}
-
-	// Write with secure permissions
-	if err := os.WriteFile(options.OutputPath, data, 0600); err != nil {
-		return fmt.Errorf("failed to write secure file: %w", err)
-	}
-
-	fmt.Printf(" Vault init data exported securely to: %s\n", options.OutputPath)
-	return nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-func displayStatusOnly(info *vault.VaultInitInfo) error {
-	// Note: This function doesn't have access to RuntimeContext, so we'll use a fallback logger
-	// In a proper implementation, this function should accept RuntimeContext as parameter
-	fmt.Println("\n Vault Status Overview")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-	// Display file information
-	if info.FileInfo != nil {
-		fmt.Printf("\n Init File: %s\n", info.FileInfo.Path)
-		fmt.Printf("   Exists: %v\n", info.FileInfo.Exists)
-		fmt.Printf("   Readable: %v\n", info.FileInfo.Readable)
-		if info.FileInfo.Exists {
-			fmt.Printf("   Size: %d bytes\n", info.FileInfo.Size)
-			fmt.Printf("   Modified: %s\n", info.FileInfo.ModTime.Format("2006-01-02 15:04:05"))
-		}
-	}
-
-	// Display Vault status
-	if info.VaultStatus != nil {
-		// TODO: Convert to structured logging when RuntimeContext is available
-		fmt.Printf("\n🏛️ Vault Status\n")
-		fmt.Printf("   Address: %s\n", info.VaultStatus.Address)
-		fmt.Printf("   Running: %v\n", info.VaultStatus.Running)
-		fmt.Printf("   Reachable: %v\n", info.VaultStatus.Reachable)
-		fmt.Printf("   Initialized: %v\n", info.VaultStatus.Initialized)
-		fmt.Printf("   Sealed: %v\n", info.VaultStatus.Sealed)
-		fmt.Printf("   Health: %s\n", info.VaultStatus.HealthStatus)
-	}
-
-	// Display security status
-	if info.SecurityStatus != nil {
-		fmt.Printf("\n Security Status\n")
-		fmt.Printf("   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled)
-		fmt.Printf("   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled)
-		fmt.Printf("   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied)
-		fmt.Printf("   Auth Methods: %d\n", len(info.SecurityStatus.AuthMethods))
-	}
-
-	fmt.Println("\n Use --no-redact flag to view sensitive initialization data")
-	return nil
-}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// displayAgentStatus provides human-readable display of Vault Agent status
-// TODO: Convert to structured logging when RuntimeContext is available
-func displayAgentStatus(status *vault.AgentStatus) {
-	fmt.Println("\n Vault Agent Status")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-
-	// Service status
-	if status.ServiceRunning {
-		fmt.Println(" Service: Running")
-	} else {
-		fmt.Println(" Service: Not Running")
-	}
-
-	// Token status
-	if status.TokenAvailable {
-		fmt.Println(" Token: Available")
-		if !status.LastTokenTime.IsZero() {
-			fmt.Printf("   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
-		}
-		if status.TokenValid {
-			fmt.Println(" Token: Valid")
-		} else {
-			fmt.Println("Token: Invalid or Empty")
-		}
-	} else {
-		fmt.Println(" Token: Not Available")
-	}
-
-	// Configuration status
-	if status.ConfigValid {
-		fmt.Println(" Configuration: Valid")
-	} else {
-		fmt.Println(" Configuration: Missing or Invalid")
-	}
-
-	// Overall health
-	fmt.Printf("\n Overall Health: ")
-	switch status.HealthStatus {
-	case "healthy":
-		fmt.Println(" Healthy")
-	case "degraded":
-		fmt.Println("Degraded")
-	case "unhealthy":
-		fmt.Println(" Unhealthy")
-	default:
-		fmt.Printf("❓ Unknown (%s)\n", status.HealthStatus)
-	}
-
-	// Recommendations
-	if status.HealthStatus != "healthy" {
-		fmt.Println("\n Recommendations:")
-		if !status.ServiceRunning {
-			fmt.Println("   • Start the service: sudo systemctl start vault-agent-eos")
-		}
-		if !status.TokenAvailable || !status.TokenValid {
-			fmt.Println("   • Check agent authentication: journalctl -fu vault-agent-eos")
-		}
-		if !status.ConfigValid {
-			fmt.Println("   • Verify configuration: eos enable vault")
-		}
-	}
-}
+// All helper functions have been migrated to pkg/vault/export_display.go
