@@ -3,10 +3,10 @@ package git
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/git/remote"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/git_management"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -40,13 +40,6 @@ Examples:
 			return nil
 		}),
 	}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Package-level variables for remote list command flags
-var (
-	remoteListPath       string
-	remoteListOutputJSON bool
-)
-
 // remoteListCmd lists all configured Git remotes
 var remoteListCmd = &cobra.Command{
 		Use:     "list",
@@ -55,26 +48,29 @@ var remoteListCmd = &cobra.Command{
 		Long:    "List all configured Git remotes for the repository.",
 
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
-			if remoteListPath == "" {
-				var err error
-				remoteListPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+			config := remote.NewConfig()
+			config.OutputJSON, _ = cmd.Flags().GetBool("json")
+			
+			if pathFlag, _ := cmd.Flags().GetString("path"); pathFlag != "" {
+				config.Path = pathFlag
+			}
+			
+			if err := config.SetDefaultPath(rc); err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
 
 			manager := git_management.NewGitManager()
 			
-			if !manager.IsGitRepository(rc, remoteListPath) {
-				return fmt.Errorf("not a git repository: %s", remoteListPath)
+			if !manager.IsGitRepository(rc, config.Path) {
+				return fmt.Errorf("not a git repository: %s", config.Path)
 			}
 
-			repo, err := manager.GetRepositoryInfo(rc, remoteListPath)
+			repo, err := manager.GetRepositoryInfo(rc, config.Path)
 			if err != nil {
 				return fmt.Errorf("failed to get repository info: %w", err)
 			}
 
-			if remoteListOutputJSON {
+			if config.OutputJSON {
 				data, err := json.MarshalIndent(repo.RemoteURLs, "", "  ")
 				if err != nil {
 					return fmt.Errorf("failed to marshal JSON: %w", err)
@@ -98,14 +94,6 @@ var remoteListCmd = &cobra.Command{
 			return nil
 		}),
 	}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Package-level variables for remote add command flags
-var (
-	remoteAddPath string
-	remoteAddName string
-	remoteAddURL  string
-)
-
 // remoteAddCmd adds a new Git remote
 var remoteAddCmd = &cobra.Command{
 		Use:   "add",
@@ -119,51 +107,44 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 
-			if remoteAddPath == "" {
-				var err error
-				remoteAddPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+			config := remote.NewConfig()
+			if pathFlag, _ := cmd.Flags().GetString("path"); pathFlag != "" {
+				config.Path = pathFlag
+			}
+			if nameFlag, _ := cmd.Flags().GetString("name"); nameFlag != "" {
+				config.AddName = nameFlag
+			}
+			if urlFlag, _ := cmd.Flags().GetString("url"); urlFlag != "" {
+				config.AddURL = urlFlag
 			}
 
-			// Get name and URL from args if not provided via flags
-			if len(args) >= 2 && remoteAddName == "" && remoteAddURL == "" {
-				remoteAddName = args[0]
-				remoteAddURL = args[1]
+			if err := config.SetDefaultPath(rc); err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
 
-			if remoteAddName == "" || remoteAddURL == "" {
-				return fmt.Errorf("both remote name and URL are required")
+			if err := config.ValidateAddOperation(args); err != nil {
+				return err
 			}
 
 			manager := git_management.NewGitManager()
 			
-			if !manager.IsGitRepository(rc, remoteAddPath) {
-				return fmt.Errorf("not a git repository: %s", remoteAddPath)
+			if !manager.IsGitRepository(rc, config.Path) {
+				return fmt.Errorf("not a git repository: %s", config.Path)
 			}
 
 			operation := &git_management.GitRemoteOperation{
 				Operation: "add",
-				Name:      remoteAddName,
-				URL:       remoteAddURL,
+				Name:      config.AddName,
+				URL:       config.AddURL,
 			}
 
-			logger.Info("Adding Git remote", 
-				zap.String("name", remoteAddName),
-				zap.String("url", remoteAddURL))
+			logger.Info("🔗 Adding Git remote", 
+				zap.String("name", config.AddName),
+				zap.String("url", config.AddURL))
 
-			return manager.ManageRemote(rc, remoteAddPath, operation)
+			return manager.ManageRemote(rc, config.Path, operation)
 		}),
 	}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Package-level variables for remote set-url command flags
-var (
-	remoteSetURLPath string
-	remoteSetURLName string
-	remoteSetURLURL  string
-)
-
 // remoteSetURLCmd changes the URL of an existing Git remote
 var remoteSetURLCmd = &cobra.Command{
 		Use:   "set-url",
@@ -177,50 +158,44 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 
-			if remoteSetURLPath == "" {
-				var err error
-				remoteSetURLPath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+			config := remote.NewConfig()
+			if pathFlag, _ := cmd.Flags().GetString("path"); pathFlag != "" {
+				config.Path = pathFlag
+			}
+			if nameFlag, _ := cmd.Flags().GetString("name"); nameFlag != "" {
+				config.SetURLName = nameFlag
+			}
+			if urlFlag, _ := cmd.Flags().GetString("url"); urlFlag != "" {
+				config.SetURLURL = urlFlag
 			}
 
-			// Get name and URL from args if not provided via flags
-			if len(args) >= 2 && remoteSetURLName == "" && remoteSetURLURL == "" {
-				remoteSetURLName = args[0]
-				remoteSetURLURL = args[1]
+			if err := config.SetDefaultPath(rc); err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
 
-			if remoteSetURLName == "" || remoteSetURLURL == "" {
-				return fmt.Errorf("both remote name and new URL are required")
+			if err := config.ValidateSetURLOperation(args); err != nil {
+				return err
 			}
 
 			manager := git_management.NewGitManager()
 			
-			if !manager.IsGitRepository(rc, remoteSetURLPath) {
-				return fmt.Errorf("not a git repository: %s", remoteSetURLPath)
+			if !manager.IsGitRepository(rc, config.Path) {
+				return fmt.Errorf("not a git repository: %s", config.Path)
 			}
 
 			operation := &git_management.GitRemoteOperation{
 				Operation: "set-url",
-				Name:      remoteSetURLName,
-				URL:       remoteSetURLURL,
+				Name:      config.SetURLName,
+				URL:       config.SetURLURL,
 			}
 
-			logger.Info("Changing Git remote URL", 
-				zap.String("name", remoteSetURLName),
-				zap.String("new_url", remoteSetURLURL))
+			logger.Info("🔄 Changing Git remote URL", 
+				zap.String("name", config.SetURLName),
+				zap.String("new_url", config.SetURLURL))
 
-			return manager.ManageRemote(rc, remoteSetURLPath, operation)
+			return manager.ManageRemote(rc, config.Path, operation)
 		}),
 	}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Package-level variables for remote remove command flags
-var (
-	remoteRemovePath string
-	remoteRemoveName string
-)
-
 // remoteRemoveCmd removes a Git remote
 var remoteRemoveCmd = &cobra.Command{
 		Use:     "remove",
@@ -235,47 +210,38 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 
-			if remoteRemovePath == "" {
-				var err error
-				remoteRemovePath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+			config := remote.NewConfig()
+			if pathFlag, _ := cmd.Flags().GetString("path"); pathFlag != "" {
+				config.Path = pathFlag
+			}
+			if nameFlag, _ := cmd.Flags().GetString("name"); nameFlag != "" {
+				config.RemoveName = nameFlag
 			}
 
-			// Get name from args if not provided via flag
-			if len(args) >= 1 && remoteRemoveName == "" {
-				remoteRemoveName = args[0]
+			if err := config.SetDefaultPath(rc); err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
 
-			if remoteRemoveName == "" {
-				return fmt.Errorf("remote name is required")
+			if err := config.ValidateRemoveOperation(args); err != nil {
+				return err
 			}
 
 			manager := git_management.NewGitManager()
 			
-			if !manager.IsGitRepository(rc, remoteRemovePath) {
-				return fmt.Errorf("not a git repository: %s", remoteRemovePath)
+			if !manager.IsGitRepository(rc, config.Path) {
+				return fmt.Errorf("not a git repository: %s", config.Path)
 			}
 
 			operation := &git_management.GitRemoteOperation{
 				Operation: "remove",
-				Name:      remoteRemoveName,
+				Name:      config.RemoveName,
 			}
 
-			logger.Info("Removing Git remote", zap.String("name", remoteRemoveName))
+			logger.Info("🗑️ Removing Git remote", zap.String("name", config.RemoveName))
 
-			return manager.ManageRemote(rc, remoteRemovePath, operation)
+			return manager.ManageRemote(rc, config.Path, operation)
 		}),
 	}
-// TODO move to pkg/ to DRY up this code base but putting it with other similar functions
-// Package-level variables for remote rename command flags
-var (
-	remoteRenamePath    string
-	remoteRenameOldName string
-	remoteRenameNewName string
-)
-
 // remoteRenameCmd renames a Git remote
 var remoteRenameCmd = &cobra.Command{
 		Use:   "rename",
@@ -289,41 +255,42 @@ Examples:
 		RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 			logger := otelzap.Ctx(rc.Ctx)
 
-			if remoteRenamePath == "" {
-				var err error
-				remoteRenamePath, err = os.Getwd()
-				if err != nil {
-					return fmt.Errorf("failed to get current directory: %w", err)
-				}
+			config := remote.NewConfig()
+			if pathFlag, _ := cmd.Flags().GetString("path"); pathFlag != "" {
+				config.Path = pathFlag
+			}
+			if oldNameFlag, _ := cmd.Flags().GetString("old-name"); oldNameFlag != "" {
+				config.RenameOldName = oldNameFlag
+			}
+			if newNameFlag, _ := cmd.Flags().GetString("new-name"); newNameFlag != "" {
+				config.RenameNewName = newNameFlag
 			}
 
-			// Get names from args if not provided via flags
-			if len(args) >= 2 && remoteRenameOldName == "" && remoteRenameNewName == "" {
-				remoteRenameOldName = args[0]
-				remoteRenameNewName = args[1]
+			if err := config.SetDefaultPath(rc); err != nil {
+				return fmt.Errorf("failed to get current directory: %w", err)
 			}
 
-			if remoteRenameOldName == "" || remoteRenameNewName == "" {
-				return fmt.Errorf("both old and new remote names are required")
+			if err := config.ValidateRenameOperation(args); err != nil {
+				return err
 			}
 
 			manager := git_management.NewGitManager()
 			
-			if !manager.IsGitRepository(rc, remoteRenamePath) {
-				return fmt.Errorf("not a git repository: %s", remoteRenamePath)
+			if !manager.IsGitRepository(rc, config.Path) {
+				return fmt.Errorf("not a git repository: %s", config.Path)
 			}
 
 			operation := &git_management.GitRemoteOperation{
 				Operation: "rename",
-				Name:      remoteRenameOldName,
-				NewName:   remoteRenameNewName,
+				Name:      config.RenameOldName,
+				NewName:   config.RenameNewName,
 			}
 
-			logger.Info("Renaming Git remote", 
-				zap.String("old_name", remoteRenameOldName),
-				zap.String("new_name", remoteRenameNewName))
+			logger.Info("🏷️ Renaming Git remote", 
+				zap.String("old_name", config.RenameOldName),
+				zap.String("new_name", config.RenameNewName))
 
-			return manager.ManageRemote(rc, remoteRenamePath, operation)
+			return manager.ManageRemote(rc, config.Path, operation)
 		}),
 }
 
@@ -336,25 +303,26 @@ func init() {
 	remoteCmd.AddCommand(remoteRenameCmd)
 	
 	// Configure flags for remote list
-	remoteListCmd.Flags().StringVarP(&remoteListPath, "path", "p", "", "Path to Git repository (default: current directory)")
-	remoteListCmd.Flags().BoolVar(&remoteListOutputJSON, "json", false, "Output in JSON format")
+	remoteListCmd.Flags().StringP("path", "p", "", "Path to Git repository (default: current directory)")
+	remoteListCmd.Flags().Bool("json", false, "Output in JSON format")
 	
 	// Configure flags for remote add
-	remoteAddCmd.Flags().StringVarP(&remoteAddPath, "path", "p", "", "Path to Git repository (default: current directory)")
-	remoteAddCmd.Flags().StringVar(&remoteAddName, "name", "", "Remote name")
-	remoteAddCmd.Flags().StringVar(&remoteAddURL, "url", "", "Remote URL")
+	remoteAddCmd.Flags().StringP("path", "p", "", "Path to Git repository (default: current directory)")
+	remoteAddCmd.Flags().String("name", "", "Remote name")
+	remoteAddCmd.Flags().String("url", "", "Remote URL")
 	
 	// Configure flags for remote set-url
-	remoteSetURLCmd.Flags().StringVarP(&remoteSetURLPath, "path", "p", "", "Path to Git repository (default: current directory)")
-	remoteSetURLCmd.Flags().StringVar(&remoteSetURLName, "name", "", "Remote name")
-	remoteSetURLCmd.Flags().StringVar(&remoteSetURLURL, "url", "", "New remote URL")
+	remoteSetURLCmd.Flags().StringP("path", "p", "", "Path to Git repository (default: current directory)")
+	remoteSetURLCmd.Flags().String("name", "", "Remote name")
+	remoteSetURLCmd.Flags().String("url", "", "New remote URL")
 	
 	// Configure flags for remote remove
-	remoteRemoveCmd.Flags().StringVarP(&remoteRemovePath, "path", "p", "", "Path to Git repository (default: current directory)")
-	remoteRemoveCmd.Flags().StringVar(&remoteRemoveName, "name", "", "Remote name to remove")
+	remoteRemoveCmd.Flags().StringP("path", "p", "", "Path to Git repository (default: current directory)")
+	remoteRemoveCmd.Flags().String("name", "", "Remote name to remove")
 	
 	// Configure flags for remote rename
-	remoteRenameCmd.Flags().StringVarP(&remoteRenamePath, "path", "p", "", "Path to Git repository (default: current directory)")
-	remoteRenameCmd.Flags().StringVar(&remoteRenameOldName, "old-name", "", "Current remote name")
-	remoteRenameCmd.Flags().StringVar(&remoteRenameNewName, "new-name", "", "New remote name")
+	remoteRenameCmd.Flags().StringP("path", "p", "", "Path to Git repository (default: current directory)")
+	remoteRenameCmd.Flags().String("old-name", "", "Current remote name")
+	remoteRenameCmd.Flags().String("new-name", "", "New remote name")
 }
+// All helper functions have been migrated to pkg/git/remote/
