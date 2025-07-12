@@ -4,11 +4,9 @@ package interaction
 import (
 	"errors"
 	"fmt"
-	"net"
-	"net/mail"
-	"net/url"
-	"regexp"
 	"strings"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 // PromptValidated asks for input until the validator passes.
@@ -34,38 +32,27 @@ func ValidateNonEmpty(input string) error {
 }
 
 // ValidateUsername ensures the input is a valid UNIX-style username.
+// DEPRECATED: Use shared.ValidateUsername instead
 func ValidateUsername(input string) error {
-	re := regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
-	if !re.MatchString(input) {
-		return errors.New("invalid username (use lowercase letters, digits, underscore, dash)")
-	}
-	return nil
+	return shared.ValidateUsername(input)
 }
 
 // ValidateEmail uses net/mail to check email format.
+// DEPRECATED: Use shared.ValidateEmail instead  
 func ValidateEmail(input string) error {
-	_, err := mail.ParseAddress(input)
-	if err != nil {
-		return errors.New("invalid email format")
-	}
-	return nil
+	return shared.ValidateEmail(input)
 }
 
 // ValidateURL ensures a valid absolute URL.
+// DEPRECATED: Use shared.ValidateURL instead
 func ValidateURL(input string) error {
-	u, err := url.Parse(input)
-	if err != nil || !u.IsAbs() {
-		return errors.New("invalid URL (must be absolute)")
-	}
-	return nil
+	return shared.ValidateURL(input)
 }
 
 // ValidateIP ensures the input is a valid IP address.
+// DEPRECATED: Use shared.ValidateIPAddress instead
 func ValidateIP(input string) error {
-	if net.ParseIP(input) == nil {
-		return errors.New("invalid IP address")
-	}
-	return nil
+	return shared.ValidateIPAddress(input)
 }
 
 // ValidateNoShellMeta blocks shell metacharacters.

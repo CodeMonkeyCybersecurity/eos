@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
@@ -91,16 +92,18 @@ func ValidateNginx(rc *eos_io.RuntimeContext) error {
 
 // RestartNginx reloads the Nginx service
 func RestartNginx(rc *eos_io.RuntimeContext) error {
-	otelzap.Ctx(rc.Ctx).Info("Restarting Nginx...")
-	cmd := exec.Command("systemctl", "reload", "nginx")
-	output, err := cmd.CombinedOutput() // Capture full output
-	fmt.Println(string(output))         // Print to console
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Restarting Nginx...")
 
-	if err != nil {
-		otelzap.Ctx(rc.Ctx).Error("Failed to restart Nginx",
-			zap.Error(err), zap.String("output", string(output)))
-		return fmt.Errorf("nginx reload failed: %s", output)
+	// Use shared service manager for consistent service operations
+	serviceManager := serviceutil.NewServiceManager(rc)
+	
+	// Reload nginx service (systemctl reload nginx)
+	if err := serviceManager.Reload("nginx"); err != nil {
+		logger.Error("Failed to restart Nginx", zap.Error(err))
+		return fmt.Errorf("nginx reload failed: %w", err)
 	}
-	otelzap.Ctx(rc.Ctx).Info("Nginx restarted successfully", zap.String("output", "\n"+string(output)))
+
+	logger.Info("Nginx restarted successfully")
 	return nil
 }

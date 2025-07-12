@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -207,7 +208,7 @@ func RunCommand(rc *eos_io.RuntimeContext, step string, command string, args ...
 
 // BackupFile creates a backup of a file with timestamp
 func BackupFile(filePath string) (string, error) {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+	if !shared.FileExists(filePath) {
 		return "", nil // File doesn't exist, no backup needed
 	}
 
@@ -257,25 +258,27 @@ func AppendToFile(filePath, content string) error {
 }
 
 // CheckFileExists checks if a file exists
+// DEPRECATED: Use shared.FileExists instead
 func CheckFileExists(filePath string) bool {
-	_, err := os.Stat(filePath)
-	return !os.IsNotExist(err)
+	return shared.FileExists(filePath)
 }
 
 // CheckServiceStatus checks if a service is active and enabled
+// DEPRECATED: Use shared.ServiceManager instead
 func CheckServiceStatus(serviceName string) (ServiceState, error) {
 	var state ServiceState
-
-	// Check if service is enabled
-	cmd := exec.Command("systemctl", "is-enabled", serviceName)
-	if err := cmd.Run(); err == nil {
-		state.Enabled = true
+	
+	// Use simple service manager for compatibility
+	// This is a bridge function until full migration is complete
+	sm := shared.NewSimpleServiceManager()
+	
+	// Use shared service manager
+	if active, err := sm.IsActive(serviceName); err == nil {
+		state.Active = active
 	}
-
-	// Check if service is active
-	cmd = exec.Command("systemctl", "is-active", serviceName)
-	if err := cmd.Run(); err == nil {
-		state.Active = true
+	
+	if enabled, err := sm.IsEnabled(serviceName); err == nil {
+		state.Enabled = enabled
 	}
 
 	return state, nil

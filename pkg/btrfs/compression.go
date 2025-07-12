@@ -338,6 +338,7 @@ func parseCompsizeOutput(output string, stats *CompressionStats) {
 }
 
 func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *CompressionStats) error {
+	logger := otelzap.Ctx(rc.Ctx)
 	// Use du to get apparent size vs actual disk usage
 	duCmd := exec.CommandContext(rc.Ctx, "du", "-sb", "--apparent-size", path)
 	if output, err := duCmd.Output(); err == nil {
@@ -345,7 +346,9 @@ func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *Com
 		if len(fields) >= 1 {
 			if _, err := fmt.Sscanf(fields[0], "%d", &stats.UncompressedSize); err != nil {
 				// Log warning but continue - this is not critical for operation
-				fmt.Printf("Warning: Failed to parse uncompressed size '%s': %v\n", fields[0], err)
+				logger.Warn("Failed to parse uncompressed size",
+					zap.String("value", fields[0]),
+					zap.Error(err))
 			}
 		}
 	}
@@ -357,7 +360,9 @@ func estimateCompressionStats(rc *eos_io.RuntimeContext, path string, stats *Com
 		if len(fields) >= 1 {
 			if _, err := fmt.Sscanf(fields[0], "%d", &stats.CompressedSize); err != nil {
 				// Log warning but continue - this is not critical for operation
-				fmt.Printf("Warning: Failed to parse compressed size '%s': %v\n", fields[0], err)
+				logger.Warn("Failed to parse compressed size",
+					zap.String("value", fields[0]),
+					zap.Error(err))
 			}
 		}
 	}

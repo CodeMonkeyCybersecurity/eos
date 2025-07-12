@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -74,13 +75,16 @@ func (sim *ServiceInstallationManager) installQemuGuest(rc *eos_io.RuntimeContex
 	}
 	step3Start := time.Now()
 
+	// Use shared service manager for consistent service operations
+	serviceManager := serviceutil.NewServiceManager(rc)
+	
 	// Enable the service
-	if err := sim.runCommand(rc, "Enable service", "sudo", "systemctl", "enable", "qemu-guest-agent"); err != nil {
+	if err := serviceManager.Enable("qemu-guest-agent"); err != nil {
 		logger.Warn("Failed to enable QEMU Guest Agent service", zap.Error(err))
 	}
 
 	// Start the service
-	if err := sim.runCommand(rc, "Start service", "sudo", "systemctl", "start", "qemu-guest-agent"); err != nil {
+	if err := serviceManager.Start("qemu-guest-agent"); err != nil {
 		logger.Warn("Failed to start QEMU Guest Agent service", zap.Error(err))
 	}
 

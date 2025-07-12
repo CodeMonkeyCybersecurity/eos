@@ -91,7 +91,7 @@ func (skm *SSHKeyManager) Validate() error {
 	}
 
 	// Check if file already exists and overwrite is false
-	if CheckFileExists(skm.config.FilePath) && !skm.config.Overwrite {
+	if shared.FileExists(skm.config.FilePath) && !skm.config.Overwrite {
 		return fmt.Errorf("SSH key already exists at %s (use --overwrite to replace)", skm.config.FilePath)
 	}
 
@@ -113,7 +113,7 @@ func (skm *SSHKeyManager) Backup() (*ConfigurationBackup, error) {
 	logger.Info("Creating SSH key backup")
 
 	// Backup existing private key
-	if CheckFileExists(skm.config.FilePath) {
+	if shared.FileExists(skm.config.FilePath) {
 		content, err := os.ReadFile(skm.config.FilePath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read existing private key: %w", err)
@@ -123,7 +123,7 @@ func (skm *SSHKeyManager) Backup() (*ConfigurationBackup, error) {
 
 	// Backup existing public key
 	pubKeyPath := skm.config.FilePath + ".pub"
-	if CheckFileExists(pubKeyPath) {
+	if shared.FileExists(pubKeyPath) {
 		content, err := os.ReadFile(pubKeyPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read existing public key: %w", err)
@@ -310,7 +310,7 @@ func (skm *SSHKeyManager) setPermissions(result *ConfigurationResult) error {
 
 	// Set permissions on public key (644 - read for all, write for owner)
 	pubKeyPath := skm.config.FilePath + ".pub"
-	if CheckFileExists(pubKeyPath) {
+	if shared.FileExists(pubKeyPath) {
 		if err := os.Chmod(pubKeyPath, 0644); err != nil {
 			step.Status = "failed"
 			step.Error = err.Error()
@@ -350,7 +350,7 @@ func (skm *SSHKeyManager) Rollback(backup *ConfigurationBackup) error {
 	// If no backup existed, remove the generated files
 	if len(backup.Files) == 0 {
 		// Remove private key
-		if CheckFileExists(skm.config.FilePath) {
+		if shared.FileExists(skm.config.FilePath) {
 			if err := os.Remove(skm.config.FilePath); err != nil {
 				logger.Warn("Failed to remove private key", zap.String("file", skm.config.FilePath), zap.Error(err))
 			}
@@ -358,7 +358,7 @@ func (skm *SSHKeyManager) Rollback(backup *ConfigurationBackup) error {
 
 		// Remove public key
 		pubKeyPath := skm.config.FilePath + ".pub"
-		if CheckFileExists(pubKeyPath) {
+		if shared.FileExists(pubKeyPath) {
 			if err := os.Remove(pubKeyPath); err != nil {
 				logger.Warn("Failed to remove public key", zap.String("file", pubKeyPath), zap.Error(err))
 			}
@@ -372,7 +372,7 @@ func (skm *SSHKeyManager) Rollback(backup *ConfigurationBackup) error {
 func (skm *SSHKeyManager) Status() (*ConfigurationStatus, error) {
 	status := &ConfigurationStatus{
 		Type:       ConfigTypeSSHKey,
-		Configured: CheckFileExists(skm.config.FilePath),
+		Configured: shared.FileExists(skm.config.FilePath),
 		Health: ConfigurationHealth{
 			Status: "unknown",
 			Checks: make([]HealthCheck, 0),
@@ -381,7 +381,7 @@ func (skm *SSHKeyManager) Status() (*ConfigurationStatus, error) {
 	}
 
 	// Check private key
-	if CheckFileExists(skm.config.FilePath) {
+	if shared.FileExists(skm.config.FilePath) {
 		fileInfo, err := os.Stat(skm.config.FilePath)
 		if err == nil {
 			status.Files = append(status.Files, FileStatus{
@@ -411,7 +411,7 @@ func (skm *SSHKeyManager) Status() (*ConfigurationStatus, error) {
 
 	// Check public key
 	pubKeyPath := skm.config.FilePath + ".pub"
-	if CheckFileExists(pubKeyPath) {
+	if shared.FileExists(pubKeyPath) {
 		fileInfo, err := os.Stat(pubKeyPath)
 		if err == nil {
 			status.Files = append(status.Files, FileStatus{

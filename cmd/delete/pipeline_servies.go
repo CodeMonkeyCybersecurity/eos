@@ -4,12 +4,12 @@ package delete
 import (
 	"fmt"
 	"os"
-	"os/exec"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -111,7 +111,8 @@ Examples:
 
 			// Final systemd daemon reload (lifecycle manager may have already done this, but safe to repeat)
 			logger.Info("🔄 Final systemd daemon reload")
-			if err := exec.Command("systemctl", "daemon-reload").Run(); err != nil {
+			serviceManager := serviceutil.NewServiceManager(rc)
+			if err := serviceManager.DaemonReload(); err != nil {
 				logger.Warn(" Failed to reload systemd daemon", zap.Error(err))
 			} else {
 				logger.Info(" Systemd daemon reloaded")

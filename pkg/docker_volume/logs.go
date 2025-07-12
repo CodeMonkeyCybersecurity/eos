@@ -3,7 +3,6 @@ package docker_volume
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -34,7 +34,7 @@ func ConfigureLogRotation(rc *eos_io.RuntimeContext, config *ContainerLogConfig)
 	}
 	defer func() {
 		if err := cli.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close Docker client: %v\n", err)
+			logger.Warn("Failed to close Docker client", zap.Error(err))
 		}
 	}()
 
@@ -177,7 +177,7 @@ func MonitorLogSizes(rc *eos_io.RuntimeContext) (map[string]*LogRotationStats, e
 	}
 	defer func() {
 		if err := cli.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close Docker client: %v\n", err)
+			logger.Warn("Failed to close Docker client", zap.Error(err))
 		}
 	}()
 
@@ -302,28 +302,8 @@ func SetDefaultLogLimits(rc *eos_io.RuntimeContext, maxSize string, maxFiles int
 // Helper functions
 
 func copyFile(src, dst string) error {
-	sourceFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := sourceFile.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close source file: %v\n", err)
-		}
-	}()
-
-	destFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err := destFile.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close destination file: %v\n", err)
-		}
-	}()
-
-	_, err = io.Copy(destFile, sourceFile)
-	return err
+	// Use shared file operations instead of custom implementation
+	return shared.CopyFile(src, dst)
 }
 
 func compressFile(rc *eos_io.RuntimeContext, filePath string) error {

@@ -8,6 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/docker/docker/client"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
@@ -30,7 +31,7 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	}
 	defer func() {
 		if err := cli.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close Docker client: %v\n", err)
+			logger.Warn("Failed to close Docker client", zap.Error(err))
 		}
 	}()
 
@@ -141,7 +142,8 @@ func CreateBindMount(rc *eos_io.RuntimeContext, mount *BindMount) error {
 
 	// Create a marker file to indicate this is a Docker bind mount
 	markerPath := filepath.Join(mount.Source, ".docker-bind-mount")
-	if err := os.WriteFile(markerPath, []byte(fmt.Sprintf("target=%s\n", mount.Target)), 0644); err != nil {
+	markerContent := fmt.Sprintf("target=%s\n", mount.Target)
+	if err := shared.SafeWriteFile(markerPath, []byte(markerContent), 0644); err != nil {
 		logger.Debug("Failed to create marker file",
 			zap.Error(err))
 	}

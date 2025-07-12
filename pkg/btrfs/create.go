@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -147,10 +148,8 @@ func CreateSubvolume(rc *eos_io.RuntimeContext, config *Config) error {
 		zap.String("path", config.SubvolumePath))
 
 	// Create subvolume
-	createCmd := exec.CommandContext(rc.Ctx, "btrfs", "subvolume", "create", config.SubvolumePath)
-	output, err := createCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to create subvolume: %w, output: %s", err, string(output))
+	if err := execute.RunSimple(rc.Ctx, "btrfs", "subvolume", "create", config.SubvolumePath); err != nil {
+		return fmt.Errorf("failed to create subvolume: %w", err)
 	}
 
 	// Set compression if specified
@@ -229,7 +228,9 @@ func GetVolumeInfo(rc *eos_io.RuntimeContext, device string) (*VolumeInfo, error
 			for i, field := range fields {
 				if field == "devices" && i > 0 {
 					if _, err := fmt.Sscanf(fields[i-1], "%d", &info.DeviceCount); err != nil {
-						fmt.Printf("Warning: Failed to parse device count '%s': %v\n", fields[i-1], err)
+						logger.Warn("Failed to parse device count",
+							zap.String("value", fields[i-1]),
+							zap.Error(err))
 					}
 				}
 			}
@@ -419,12 +420,7 @@ func setCompression(rc *eos_io.RuntimeContext, path string, algorithm string, le
 
 func disableCoW(rc *eos_io.RuntimeContext, path string) error {
 	// Use chattr to disable CoW
-	chattrCmd := exec.CommandContext(rc.Ctx, "chattr", "+C", path)
-	if output, err := chattrCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to disable CoW: %w, output: %s", err, string(output))
-	}
-
-	return nil
+	return execute.RunSimple(rc.Ctx, "chattr", "+C", path)
 }
 
 func getUsageInfo(rc *eos_io.RuntimeContext, device string) (*UsageInfo, error) {

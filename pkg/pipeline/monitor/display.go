@@ -20,6 +20,7 @@ func DisplayAll(ctx context.Context, logger otelzap.LoggerWithCtx, db *sql.DB, a
 		zap.Int("agent_limit", agentLimit))
 
 	// INTERVENE - Clear screen and display data
+	logger.Info("Updating real-time monitor display")
 	// Clear screen and move cursor to top
 	fmt.Print("\033[2J\033[H")
 

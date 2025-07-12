@@ -173,11 +173,17 @@ func (m *Manager) reportStatus(step string, success bool, message string, detail
 	select {
 	case m.statusChan <- status:
 	default:
-		// Channel full, log the status instead
+		// Channel full, use structured logging fallback
+		// Note: Using background context since this is a fallback scenario
+		logger := otelzap.L()
 		if success {
-			fmt.Printf(" [%s] %s\n", step, message)
+			logger.Info("Deployment status", 
+				zap.String("step", step), 
+				zap.String("message", message))
 		} else {
-			fmt.Printf(" [%s] %s\n", step, message)
+			logger.Error("Deployment status", 
+				zap.String("step", step), 
+				zap.String("message", message))
 		}
 	}
 }
