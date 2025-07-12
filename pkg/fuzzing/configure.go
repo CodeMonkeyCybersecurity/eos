@@ -109,17 +109,17 @@ func validateConfig(config *Config) error {
 }
 
 // checkEnvironmentPrerequisites verifies the environment is ready for fuzzing
-func checkEnvironmentPrerequisites(ctx context.Context, logger otelzap.LoggerWithCtx) error {
+func checkEnvironmentPrerequisites(_ context.Context, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("Checking environment prerequisites")
 	
 	// Check Go installation
 	if err := checkGoInstallation(logger); err != nil {
-		return fmt.Errorf("Go installation check failed: %w", err)
+		return fmt.Errorf("go installation check failed: %w", err)
 	}
 	
 	// Check if we're in a Go module
 	if err := checkGoModule(logger); err != nil {
-		return fmt.Errorf("Go module check failed: %w", err)
+		return fmt.Errorf("go module check failed: %w", err)
 	}
 	
 	// Check for test files
@@ -156,7 +156,7 @@ func setupLogDirectory(config *Config, logger otelzap.LoggerWithCtx) error {
 	if err := os.WriteFile(testFile, []byte("test"), 0644); err != nil {
 		return fmt.Errorf("log directory is not writable: %w", err)
 	}
-	os.Remove(testFile)
+	_ = os.Remove(testFile)
 	
 	logger.Debug("Log directory configured",
 		zap.String("path", config.LogDir))
@@ -233,20 +233,20 @@ func verifyConfiguration(config *Config, logger otelzap.LoggerWithCtx) error {
 
 // Helper functions for environment checks
 
-func checkGoInstallation(logger otelzap.LoggerWithCtx) error {
+func checkGoInstallation(_ otelzap.LoggerWithCtx) error {
 	if _, err := os.Stat("/usr/local/go/bin/go"); err == nil {
 		return nil
 	}
 	
 	// Check if go is in PATH
 	if _, err := exec.LookPath("go"); err != nil {
-		return fmt.Errorf("Go not found in PATH or /usr/local/go/bin/go")
+		return fmt.Errorf("go not found in PATH or /usr/local/go/bin/go")
 	}
 	
 	return nil
 }
 
-func checkGoModule(logger otelzap.LoggerWithCtx) error {
+func checkGoModule(_ otelzap.LoggerWithCtx) error {
 	if _, err := os.Stat("go.mod"); os.IsNotExist(err) {
 		return fmt.Errorf("go.mod not found - fuzzing must be run from a Go module")
 	}

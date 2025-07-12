@@ -103,6 +103,7 @@ func (r *Runner) RunTest(ctx context.Context, test FuzzTest, config Config) (*Te
 	startTime := time.Now()
 	
 	// Build the go test command
+	// #nosec G204 -- Test function and package are discovered from local codebase, duration is validated
 	cmd := exec.CommandContext(ctx, "go", "test",
 		"-fuzz="+test.Function,
 		"-fuzztime="+config.Duration.String(),
@@ -244,7 +245,7 @@ func (r *Runner) GenerateReport(session *FuzzSession) (string, error) {
 
 // Helper functions
 
-func extractFuzzTests(filePath string, logger otelzap.LoggerWithCtx) ([]FuzzTest, error) {
+func extractFuzzTests(filePath string, _ otelzap.LoggerWithCtx) ([]FuzzTest, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filePath, err)
@@ -455,7 +456,7 @@ func (r *Runner) calculateSummary(results []TestResult) SessionSummary {
 func (r *Runner) generateMarkdownReport(session *FuzzSession) (string, error) {
 	var report strings.Builder
 	
-	report.WriteString(fmt.Sprintf("# Fuzzing Session Report\n\n"))
+	report.WriteString("# Fuzzing Session Report\n\n")
 	report.WriteString(fmt.Sprintf("**Session ID:** %s\n", session.ID))
 	report.WriteString(fmt.Sprintf("**Start Time:** %s\n", session.StartTime.Format(time.RFC3339)))
 	report.WriteString(fmt.Sprintf("**End Time:** %s\n", session.EndTime.Format(time.RFC3339)))
@@ -496,7 +497,7 @@ func (r *Runner) generateMarkdownReport(session *FuzzSession) (string, error) {
 	return report.String(), nil
 }
 
-func (r *Runner) generateJSONReport(session *FuzzSession) (string, error) {
+func (r *Runner) generateJSONReport(_ *FuzzSession) (string, error) {
 	// Would implement JSON serialization of session
 	return "{\"error\": \"JSON report not implemented yet\"}", nil
 }
@@ -504,8 +505,8 @@ func (r *Runner) generateJSONReport(session *FuzzSession) (string, error) {
 func (r *Runner) generateTextReport(session *FuzzSession) (string, error) {
 	var report strings.Builder
 	
-	report.WriteString(fmt.Sprintf("FUZZING SESSION REPORT\n"))
-	report.WriteString(fmt.Sprintf("=====================\n\n"))
+	report.WriteString("FUZZING SESSION REPORT\n")
+	report.WriteString("=====================\n\n")
 	report.WriteString(fmt.Sprintf("Session ID: %s\n", session.ID))
 	report.WriteString(fmt.Sprintf("Duration: %s\n", session.Summary.TotalDuration))
 	report.WriteString(fmt.Sprintf("Tests: %d/%d passed (%.1f%%)\n",

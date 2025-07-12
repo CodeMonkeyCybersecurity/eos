@@ -53,7 +53,7 @@ func Install(rc *eos_io.RuntimeContext, config *Config) error {
 }
 
 // assessInstallationNeeds determines what fuzzing components need to be installed
-func assessInstallationNeeds(ctx context.Context, logger otelzap.LoggerWithCtx) (bool, error) {
+func assessInstallationNeeds(_ context.Context, logger otelzap.LoggerWithCtx) (bool, error) {
 	logger.Debug("Checking fuzzing installation status")
 	
 	checks := []struct {
@@ -83,12 +83,12 @@ func assessInstallationNeeds(ctx context.Context, logger otelzap.LoggerWithCtx) 
 }
 
 // installGoFuzzDependencies installs necessary Go fuzzing dependencies
-func installGoFuzzDependencies(ctx context.Context, logger otelzap.LoggerWithCtx) error {
+func installGoFuzzDependencies(_ context.Context, logger otelzap.LoggerWithCtx) error {
 	logger.Info("Installing Go fuzzing dependencies")
 	
 	// Check Go version supports fuzzing (Go 1.18+)
 	if err := checkGoVersion(); err != nil {
-		return fmt.Errorf("Go version check failed: %w", err)
+		return fmt.Errorf("go version check failed: %w", err)
 	}
 	
 	// Download dependencies for all test packages
@@ -134,12 +134,12 @@ func setupFuzzingInfrastructure(config *Config, logger otelzap.LoggerWithCtx) er
 }
 
 // verifyInstallation checks that the fuzzing installation is working correctly
-func verifyInstallation(ctx context.Context, logger otelzap.LoggerWithCtx) error {
+func verifyInstallation(_ context.Context, logger otelzap.LoggerWithCtx) error {
 	logger.Debug("Verifying fuzzing installation")
 	
 	// Verify Go can run fuzz tests
 	if err := verifyGoFuzzCapability(logger); err != nil {
-		return fmt.Errorf("Go fuzz capability verification failed: %w", err)
+		return fmt.Errorf("go fuzz capability verification failed: %w", err)
 	}
 	
 	// Verify test discovery works
@@ -154,6 +154,7 @@ func verifyInstallation(ctx context.Context, logger otelzap.LoggerWithCtx) error
 // Helper functions for installation checks
 
 func checkGoVersion() error {
+	// #nosec G204 -- Hardcoded command with no user input
 	cmd := exec.Command("go", "version")
 	output, err := cmd.Output()
 	if err != nil {
@@ -180,7 +181,7 @@ func checkGoModulesSupport() error {
 	
 	mode := strings.TrimSpace(string(output))
 	if mode == "off" {
-		return fmt.Errorf("Go modules are disabled (GO111MODULE=off)")
+		return fmt.Errorf("go modules are disabled (GO111MODULE=off)")
 	}
 	
 	return nil
@@ -195,7 +196,7 @@ func checkFuzzingSupport() error {
 	}
 	
 	if !strings.Contains(string(output), "fuzz") {
-		return fmt.Errorf("Go installation does not support fuzzing")
+		return fmt.Errorf("go installation does not support fuzzing")
 	}
 	
 	return nil
@@ -210,6 +211,7 @@ func checkTestCompilation() error {
 			continue // Skip if directory doesn't exist
 		}
 		
+		// #nosec G204 -- Directory path is from controlled list, not user input
 		cmd := exec.Command("go", "test", "-c", dir)
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to compile tests in %s: %w", dir, err)
@@ -251,6 +253,7 @@ func compileTestPackages(logger otelzap.LoggerWithCtx) error {
 		}
 		
 		logger.Debug("Compiling package tests", zap.String("package", pkg))
+		// #nosec G204 -- Package path is from controlled list, not user input
 		cmd := exec.Command("go", "test", "-c", "-o", "/dev/null", pkg)
 		if err := cmd.Run(); err != nil {
 			// Log warning but don't fail - some packages might not have tests
@@ -295,7 +298,7 @@ func verifyGoFuzzCapability(logger otelzap.LoggerWithCtx) error {
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 	
 	// Write a simple fuzz test
 	testContent := `package main

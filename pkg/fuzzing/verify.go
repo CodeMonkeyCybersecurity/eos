@@ -59,7 +59,7 @@ type FuzzingStatus struct {
 }
 
 // assessFuzzingStatus evaluates the current state of the fuzzing environment
-func assessFuzzingStatus(ctx context.Context, logger otelzap.LoggerWithCtx) (*FuzzingStatus, error) {
+func assessFuzzingStatus(_ context.Context, logger otelzap.LoggerWithCtx) (*FuzzingStatus, error) {
 	status := &FuzzingStatus{
 		LastVerified: time.Now(),
 		Issues:       []string{},
@@ -107,7 +107,7 @@ func assessFuzzingStatus(ctx context.Context, logger otelzap.LoggerWithCtx) (*Fu
 }
 
 // runVerificationTests executes a series of tests to verify fuzzing functionality
-func runVerificationTests(ctx context.Context, status *FuzzingStatus, logger otelzap.LoggerWithCtx) error {
+func runVerificationTests(_ context.Context, _ *FuzzingStatus, logger otelzap.LoggerWithCtx) error {
 	tests := []struct {
 		name string
 		fn   func(otelzap.LoggerWithCtx) error
@@ -244,6 +244,7 @@ func verifyPackageCompilation(logger otelzap.LoggerWithCtx) (int, error) {
 		}
 		
 		// Try to compile tests
+		// #nosec G204 -- Package path is validated from local filesystem walk, not user input
 		cmd := exec.Command("go", "test", "-c", "-o", "/dev/null", pkg)
 		if err := cmd.Run(); err != nil {
 			logger.Debug("Package compilation failed",
@@ -315,6 +316,7 @@ func verifyTestCompilationDetailed(logger otelzap.LoggerWithCtx) error {
 			continue // Skip if package doesn't exist
 		}
 		
+		// #nosec G204 -- Package path is from hardcoded list of trusted paths, not user input
 		cmd := exec.Command("go", "test", "-c", "-o", "/dev/null", pkg)
 		if err := cmd.Run(); err != nil {
 			logger.Debug("Test compilation failed",
@@ -335,7 +337,7 @@ func verifyFuzzingExecution(logger otelzap.LoggerWithCtx) error {
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 	
 	// Create a simple fuzz test
 	testContent := `package verify
@@ -386,7 +388,7 @@ func verifyOutputHandling(logger otelzap.LoggerWithCtx) error {
 	if err != nil {
 		return fmt.Errorf("failed to create temp directory: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 	
 	// Test that we can write to the temp directory
 	testFile := filepath.Join(tempDir, "output_test.txt")
