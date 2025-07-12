@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -807,14 +809,19 @@ func generateSessionID() string {
 
 // Mock implementations
 func HashPassword(password string) (string, error) {
-	// This would use bcrypt or argon2 in real implementation
-	return base64.StdEncoding.EncodeToString([]byte(password)), nil
+	// Use proper bcrypt hashing with random salt
+	cost := 12
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), cost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
 func VerifyPassword(password, hash string) bool {
-	// This would use bcrypt or argon2 in real implementation
-	expected, _ := base64.StdEncoding.DecodeString(hash)
-	return string(expected) == password
+	// Use bcrypt comparison
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
 
 type Session struct {

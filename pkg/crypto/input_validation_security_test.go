@@ -430,7 +430,7 @@ func TestSanitizationEffectiveness(t *testing.T) {
 		{"remove_null_bytes", "cmd\x00test", "cmdtest"},
 		{"remove_backslash", "cmd\\test", "cmdtest"},
 		{"preserve_safe", "cmd-test.txt", "cmd-test.txt"},
-		{"complex_injection", "cmd;rm|whoami`id`$HOME", "cmdrmidhOME"},
+		{"complex_injection", "cmd;rm|whoami`id`$HOME", "cmdrmwhoamiidHOME"},
 	}
 
 	for _, tc := range sanitizationTests {

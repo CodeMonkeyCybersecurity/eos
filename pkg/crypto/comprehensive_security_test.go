@@ -475,7 +475,7 @@ func TestPasswordValidation_SecurityEdgeCases(t *testing.T) {
 	})
 
 	t.Run("common_substitutions", func(t *testing.T) {
-		password := "P@ssw0rd123!"
+		password := "P@ssw0rd123!#$" // 14 chars to meet minimum length
 		err := ValidateStrongPassword(ctx, password)
 		assert.NoError(t, err, "Should pass common substitution patterns")
 	})

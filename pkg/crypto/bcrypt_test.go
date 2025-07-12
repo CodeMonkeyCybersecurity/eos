@@ -443,10 +443,13 @@ func TestBcryptErrorHandling(t *testing.T) {
 
 	// Test extremely long passwords (over bcrypt limit)
 	veryLongPassword := strings.Repeat("a", 1000)
-	hash, err := HashPassword(veryLongPassword)
-	assert.NoError(t, err) // bcrypt should handle this gracefully
+	_, err = HashPassword(veryLongPassword)
+	assert.Error(t, err) // bcrypt should reject passwords over 72 bytes
+	assert.Contains(t, err.Error(), "password length")
 
-	// The hash should verify the truncated version
-	truncated := veryLongPassword[:72] // bcrypt truncates at 72 bytes
-	assert.True(t, ComparePasswordBool(hash, truncated))
+	// Test password at the bcrypt limit (72 bytes)
+	limitPassword := strings.Repeat("a", 72)
+	hash, err := HashPassword(limitPassword)
+	assert.NoError(t, err)
+	assert.True(t, ComparePasswordBool(hash, limitPassword))
 }
