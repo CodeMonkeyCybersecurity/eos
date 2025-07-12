@@ -17,6 +17,11 @@ import (
 func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate configuration for security
+	if err := validateBtrfsConfig(config); err != nil {
+		return err
+	}
+
 	// ASSESS
 	logger.Info("Assessing device for BTRFS volume creation",
 		zap.String("device", config.Device))
@@ -111,6 +116,11 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 // CreateSubvolume creates a BTRFS subvolume
 func CreateSubvolume(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Validate configuration for security
+	if err := validateBtrfsConfig(config); err != nil {
+		return err
+	}
 
 	// ASSESS
 	logger.Info("Assessing subvolume creation requirements",
@@ -439,4 +449,268 @@ func parseBTRFSSize(sizeStr string) int64 {
 	// Parse size strings like "10.00GiB"
 	// Implementation would handle various size formats
 	return 0
+}
+
+// validateBtrfsConfig validates BTRFS configuration for security vulnerabilities
+func validateBtrfsConfig(config *Config) error {
+	// Validate device path
+	if err := validateDevicePath(config.Device); err != nil {
+		return fmt.Errorf("invalid device path: %w", err)
+	}
+
+	// Validate mount point if specified
+	if config.MountPoint != "" {
+		if err := validateMountPath(config.MountPoint); err != nil {
+			return fmt.Errorf("invalid mount point: %w", err)
+		}
+	}
+
+	// Validate subvolume paths if specified
+	if config.SubvolumePath != "" {
+		if err := validateSubvolumePath(config.SubvolumePath); err != nil {
+			return fmt.Errorf("invalid subvolume path: %w", err)
+		}
+	}
+
+	// Validate mount options
+	for _, option := range config.MountOptions {
+		if err := validateMountOption(option); err != nil {
+			return fmt.Errorf("invalid mount option: %w", err)
+		}
+	}
+
+	// Validate label for command injection
+	if config.Label != "" {
+		if err := validateLabel(config.Label); err != nil {
+			return fmt.Errorf("invalid label: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// validateDevicePath validates that a device path is safe
+func validateDevicePath(path string) error {
+	// Check for empty path
+	if path == "" {
+		return fmt.Errorf("device path cannot be empty")
+	}
+
+	// Check for null bytes and control characters
+	if strings.ContainsAny(path, "\x00\n\r\t") {
+		return fmt.Errorf("device path cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(path, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("device path contains command injection patterns")
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("device path cannot contain '..' (path traversal)")
+	}
+
+	// Device paths should be absolute and start with /dev/
+	if !strings.HasPrefix(path, "/dev/") {
+		return fmt.Errorf("device path must start with /dev/")
+	}
+
+	// Clean the path and check it hasn't changed
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("device path contains unsafe elements")
+	}
+
+	// Check path length limit
+	if len(path) > 256 {
+		return fmt.Errorf("device path too long (max 256 characters)")
+	}
+
+	return nil
+}
+
+// validateMountPath validates that a mount path is safe
+func validateMountPath(path string) error {
+	// Check for empty path
+	if path == "" {
+		return fmt.Errorf("mount path cannot be empty")
+	}
+
+	// Check for null bytes and control characters
+	if strings.ContainsAny(path, "\x00\n\r\t") {
+		return fmt.Errorf("mount path cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(path, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("mount path contains command injection patterns")
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("mount path cannot contain '..' (path traversal)")
+	}
+
+	// Ensure path is absolute
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("mount path must be absolute (start with /)")
+	}
+
+	// Clean the path and check it hasn't changed
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("mount path contains unsafe elements")
+	}
+
+	// Check for sensitive system paths
+	sensitivePaths := []string{"/", "/etc", "/boot", "/dev", "/proc", "/sys", "/root"}
+	for _, sensitive := range sensitivePaths {
+		if cleanPath == sensitive || strings.HasPrefix(cleanPath, sensitive+"/") {
+			return fmt.Errorf("cannot mount on sensitive system path: %s", sensitive)
+		}
+	}
+
+	// Check path length limit
+	if len(path) > 4096 {
+		return fmt.Errorf("mount path too long (max 4096 characters)")
+	}
+
+	return nil
+}
+
+// validateSubvolumePath validates that a subvolume path is safe
+func validateSubvolumePath(path string) error {
+	// Check for empty path
+	if path == "" {
+		return fmt.Errorf("subvolume path cannot be empty")
+	}
+
+	// Check for null bytes and control characters
+	if strings.ContainsAny(path, "\x00\n\r\t") {
+		return fmt.Errorf("subvolume path cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(path, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("subvolume path contains command injection patterns")
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("subvolume path cannot contain '..' (path traversal)")
+	}
+
+	// Ensure path is absolute
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("subvolume path must be absolute (start with /)")
+	}
+
+	// Clean the path and check it hasn't changed
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("subvolume path contains unsafe elements")
+	}
+
+	// Check for sensitive system paths
+	sensitivePaths := []string{"/", "/etc", "/boot", "/dev", "/proc", "/sys", "/root"}
+	for _, sensitive := range sensitivePaths {
+		if cleanPath == sensitive || strings.HasPrefix(cleanPath, sensitive+"/") {
+			return fmt.Errorf("cannot create subvolume on sensitive system path: %s", sensitive)
+		}
+	}
+
+	// Check path length limit
+	if len(path) > 4096 {
+		return fmt.Errorf("subvolume path too long (max 4096 characters)")
+	}
+
+	return nil
+}
+
+// validateMountOption validates that a mount option is safe
+func validateMountOption(option string) error {
+	// Check for empty option
+	if option == "" {
+		return fmt.Errorf("mount option cannot be empty")
+	}
+
+	// Check for null bytes and control characters
+	if strings.ContainsAny(option, "\x00\n\r\t") {
+		return fmt.Errorf("mount option cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(option, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("mount option contains command injection patterns")
+	}
+
+	// Check option length limit
+	if len(option) > 256 {
+		return fmt.Errorf("mount option too long (max 256 characters)")
+	}
+
+	// Validate against known safe mount options
+	validOptions := map[string]bool{
+		"compress":        true,
+		"compress-force":  true,
+		"noatime":         true,
+		"nodatacow":       true,
+		"nodatasum":       true,
+		"autodefrag":      true,
+		"space_cache":     true,
+		"space_cache=v2":  true,
+		"ssd":             true,
+		"discard":         true,
+		"discard=async":   true,
+		"nossd":           true,
+		"noacl":           true,
+		"barrier":         true,
+		"nobarrier":       true,
+		"datacow":         true,
+		"datasum":         true,
+		"treelog":         true,
+		"notreelog":       true,
+		"flushoncommit":   true,
+		"noflushoncommit": true,
+		"degraded":        true,
+		"ro":              true,
+		"rw":              true,
+	}
+
+	// Extract base option (before = or :)
+	baseOption := strings.Split(strings.Split(option, "=")[0], ":")[0]
+
+	// Check for compression options with levels
+	if strings.HasPrefix(baseOption, "compress") {
+		// Allow compress, compress-force with compression types and levels
+		return nil
+	}
+
+	// Check if it's a known valid option
+	if !validOptions[baseOption] {
+		return fmt.Errorf("unknown or unsafe mount option: %s", baseOption)
+	}
+
+	return nil
+}
+
+// validateLabel validates that a filesystem label is safe
+func validateLabel(label string) error {
+	// Check for null bytes and control characters
+	if strings.ContainsAny(label, "\x00\n\r\t") {
+		return fmt.Errorf("label cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(label, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("label contains command injection patterns")
+	}
+
+	// Check label length limit (BTRFS max is 256 bytes)
+	if len(label) > 256 {
+		return fmt.Errorf("label too long (max 256 characters)")
+	}
+
+	return nil
 }

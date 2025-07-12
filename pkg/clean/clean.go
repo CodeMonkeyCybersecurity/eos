@@ -10,8 +10,8 @@ import (
 	"strings"
 )
 
-// Forbidden characters for Windows filenames
-var forbidden = regexp.MustCompile(`[<>:"/\\|?*]`)
+// Forbidden characters for Windows filenames (including control characters)
+var forbidden = regexp.MustCompile(`[<>:"/\\|?*\x00\n\r\t]`)
 
 // Reserved Windows device names
 var reserved = map[string]bool{
@@ -29,8 +29,14 @@ var _ = regexp.MustCompile(`[^a-zA-Z0-9._-]+`)
 
 // Sanitize a single file/directory name for Windows
 func SanitizeName(name string) string {
-	// Remove forbidden characters
+	// Limit length to prevent DoS (Windows max filename is 255)
+	if len(name) > 255 {
+		name = name[:255]
+	}
+	
+	// Remove forbidden characters (including null bytes and control characters)
 	clean := forbidden.ReplaceAllString(name, "_")
+	
 	// Remove trailing spaces or dots
 	clean = strings.TrimRight(clean, " .")
 

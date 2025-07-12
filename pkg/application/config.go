@@ -68,6 +68,11 @@ func DisplayOptions() {
 }
 
 func GetAppByOption(option string) (App, bool) {
+	// Validate option input for security
+	if err := validateAppOption(option); err != nil {
+		return App{}, false
+	}
+
 	for _, app := range Apps {
 		if app.Option == option {
 			return app, true
@@ -89,6 +94,12 @@ func GetUserSelection(defaultSelection string) (map[string]App, string) {
 	selection = strings.TrimSpace(selection)
 	if selection == "" && defaultSelection != "" {
 		selection = defaultSelection
+	}
+
+	// Validate user input for security
+	if err := validateUserSelection(selection); err != nil {
+		fmt.Printf("Invalid input: %v\n", err)
+		return GetUserSelection(defaultSelection)
 	}
 
 	selectedApps := make(map[string]App)
@@ -115,4 +126,77 @@ func GetUserSelection(defaultSelection string) (map[string]App, string) {
 		return GetUserSelection(defaultSelection)
 	}
 	return selectedApps, selection
+}
+
+// validateAppOption validates that an app option is safe
+func validateAppOption(option string) error {
+	// Check for empty option
+	if option == "" {
+		return fmt.Errorf("app option cannot be empty")
+	}
+
+	// Check for null bytes and control characters
+	if strings.ContainsAny(option, "\x00\n\r\t") {
+		return fmt.Errorf("app option cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(option, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("app option contains command injection patterns")
+	}
+
+	// Check length limit
+	if len(option) > 10 {
+		return fmt.Errorf("app option too long (max 10 characters)")
+	}
+
+	// Only allow alphanumeric characters for app options
+	for _, char := range option {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')) {
+			return fmt.Errorf("app option can only contain alphanumeric characters")
+		}
+	}
+
+	return nil
+}
+
+// validateUserSelection validates user selection input for security
+func validateUserSelection(selection string) error {
+	// Check for null bytes and control characters
+	if strings.ContainsAny(selection, "\x00\n\r\t") {
+		return fmt.Errorf("selection cannot contain null bytes or control characters")
+	}
+
+	// Check for command injection patterns
+	if strings.ContainsAny(selection, ";|&`$(){}[]<>\"'") {
+		return fmt.Errorf("selection contains command injection patterns")
+	}
+
+	// Check length limit to prevent DoS
+	if len(selection) > 256 {
+		return fmt.Errorf("selection too long (max 256 characters)")
+	}
+
+	// If it's "all", that's valid
+	if strings.ToLower(selection) == "all" {
+		return nil
+	}
+
+	// Otherwise, validate comma-separated list of numbers
+	parts := strings.Split(selection, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+
+		// Each part should be a number or alphanumeric (for backward compatibility)
+		for _, char := range part {
+			if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')) {
+				return fmt.Errorf("selection can only contain numbers, letters, commas, and spaces")
+			}
+		}
+	}
+
+	return nil
 }

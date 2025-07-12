@@ -18,6 +18,11 @@ import (
 func CreateSnapshot(rc *eos_io.RuntimeContext, config *SnapshotConfig) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate snapshot configuration for security
+	if err := validateSnapshotConfig(config); err != nil {
+		return err
+	}
+
 	// ASSESS
 	logger.Info("Assessing snapshot creation requirements",
 		zap.String("source", config.SourcePath),
@@ -92,6 +97,11 @@ func CreateSnapshot(rc *eos_io.RuntimeContext, config *SnapshotConfig) error {
 func ListSnapshots(rc *eos_io.RuntimeContext, sourcePath string) ([]*SubvolumeInfo, error) {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate source path for security
+	if err := validateSubvolumePath(sourcePath); err != nil {
+		return nil, fmt.Errorf("invalid source path: %w", err)
+	}
+
 	// ASSESS
 	logger.Info("Assessing subvolume for snapshot listing",
 		zap.String("source", sourcePath))
@@ -163,6 +173,11 @@ func ListSnapshots(rc *eos_io.RuntimeContext, sourcePath string) ([]*SubvolumeIn
 func DeleteSnapshot(rc *eos_io.RuntimeContext, snapshotPath string, force bool) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate snapshot path for security
+	if err := validateSubvolumePath(snapshotPath); err != nil {
+		return fmt.Errorf("invalid snapshot path: %w", err)
+	}
+
 	// ASSESS
 	logger.Info("Assessing snapshot for deletion",
 		zap.String("path", snapshotPath))
@@ -225,6 +240,11 @@ func DeleteSnapshot(rc *eos_io.RuntimeContext, snapshotPath string, force bool) 
 // RotateSnapshots implements snapshot rotation policy
 func RotateSnapshots(rc *eos_io.RuntimeContext, sourcePath string, maxSnapshots int, maxAge time.Duration) error {
 	logger := otelzap.Ctx(rc.Ctx)
+
+	// Validate source path for security
+	if err := validateSubvolumePath(sourcePath); err != nil {
+		return fmt.Errorf("invalid source path: %w", err)
+	}
 
 	// ASSESS
 	logger.Info("Assessing snapshots for rotation",
@@ -364,3 +384,20 @@ func sortSnapshotsByTime(snapshots []*SubvolumeInfo) {
 		}
 	}
 }
+
+// validateSnapshotConfig validates snapshot configuration for security vulnerabilities
+func validateSnapshotConfig(config *SnapshotConfig) error {
+	// Validate source path
+	if err := validateSubvolumePath(config.SourcePath); err != nil {
+		return fmt.Errorf("invalid source path: %w", err)
+	}
+
+	// Validate snapshot path
+	if err := validateSubvolumePath(config.SnapshotPath); err != nil {
+		return fmt.Errorf("invalid snapshot path: %w", err)
+	}
+
+	return nil
+}
+
+// Note: validateSubvolumePath function is defined in create.go and reused here

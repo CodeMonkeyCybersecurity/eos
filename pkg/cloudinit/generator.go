@@ -332,6 +332,11 @@ func (g *Generator) WriteConfig(config *CloudInitConfig, outputPath string) erro
 	_, span := telemetry.Start(g.rc.Ctx, "WriteConfig")
 	defer span.End()
 
+	// Validate output path
+	if err := validateOutputPath(outputPath); err != nil {
+		return fmt.Errorf("invalid output path: %w", err)
+	}
+
 	g.logger.Info("Writing cloud-init configuration",
 		zap.String("path", outputPath))
 
@@ -472,6 +477,55 @@ final_message: |
 
 	fmt.Printf("Cloud-init template generated at %s\n", outputPath)
 	fmt.Println("Edit this file and use it with your cloud provider.")
+
+	return nil
+}
+
+// validateOutputPath validates that an output file path is safe to use
+func validateOutputPath(path string) error {
+	// Check for empty path
+	if path == "" {
+		return fmt.Errorf("output path cannot be empty")
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("output path cannot contain '..' (path traversal)")
+	}
+
+	// Check for null bytes
+	if strings.Contains(path, "\x00") {
+		return fmt.Errorf("output path cannot contain null bytes")
+	}
+
+	// Check for control characters
+	if strings.ContainsAny(path, "\n\r\t") {
+		return fmt.Errorf("output path cannot contain control characters")
+	}
+
+	// Clean the path and check it hasn't changed
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path && path != "./" + cleanPath {
+		// Allow relative paths that get cleaned (e.g., "./file" -> "file")
+		if !strings.HasPrefix(path, "./") || cleanPath != strings.TrimPrefix(path, "./") {
+			return fmt.Errorf("output path contains unsafe elements")
+		}
+	}
+
+	// Check for sensitive system paths (absolute paths only)
+	if filepath.IsAbs(path) {
+		sensitivePaths := []string{"/etc/passwd", "/etc/shadow", "/etc/sudoers", "/boot", "/sys", "/proc"}
+		for _, sensitive := range sensitivePaths {
+			if strings.HasPrefix(cleanPath, sensitive) {
+				return fmt.Errorf("cannot write to sensitive system path: %s", sensitive)
+			}
+		}
+	}
+
+	// Check path length limit
+	if len(path) > 4096 {
+		return fmt.Errorf("output path too long (max 4096 characters)")
+	}
 
 	return nil
 }

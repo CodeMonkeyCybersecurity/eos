@@ -184,9 +184,9 @@ func (ci *CommandInstaller) ValidateDefinition(def *CommandDefinition) error {
 		return fmt.Errorf("command content is required")
 	}
 
-	// Check for shell metacharacters in name
-	if strings.ContainsAny(def.Name, ";&|<>(){}[]\\\"'*?~") {
-		return fmt.Errorf("command name contains invalid characters")
+	// Use the same validation as validateCommandName
+	if err := ci.validateCommandName(def.Name); err != nil {
+		return err
 	}
 
 	return nil
@@ -359,10 +359,20 @@ func (ci *CommandInstaller) extractDescription(path string) (string, error) {
 	return "", fmt.Errorf("no description found")
 }
 
-// validateCommandName validates a command name
-func (ci *CommandInstaller) validateCommandName(name string) error {
+// ValidateCommandName validates a command name (public function for external use)
+func ValidateCommandName(name string) error {
 	if name == "" {
 		return fmt.Errorf("command name cannot be empty")
+	}
+
+	// Check for null bytes
+	if strings.Contains(name, "\x00") {
+		return fmt.Errorf("command name cannot contain null bytes")
+	}
+
+	// Check for control characters (newlines, carriage returns, tabs)
+	if strings.ContainsAny(name, "\n\r\t") {
+		return fmt.Errorf("command name cannot contain control characters (newlines, tabs)")
 	}
 
 	// Check for shell metacharacters in name
@@ -375,7 +385,17 @@ func (ci *CommandInstaller) validateCommandName(name string) error {
 		return fmt.Errorf("command name cannot contain spaces")
 	}
 
+	// Check for excessively long names (prevent DoS)
+	if len(name) > 255 {
+		return fmt.Errorf("command name too long (max 255 characters)")
+	}
+
 	return nil
+}
+
+// validateCommandName validates a command name
+func (ci *CommandInstaller) validateCommandName(name string) error {
+	return ValidateCommandName(name)
 }
 
 // RemoveCommand removes a custom command

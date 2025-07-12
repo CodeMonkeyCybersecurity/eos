@@ -157,6 +157,31 @@ This report documents the comprehensive test coverage improvements made to the E
 - `FuzzPathSeparatorsSecurity` - Tests path separator sanitization
 - `FuzzUnicodeSecurity` - Tests Unicode security issues
 
+### 9. pkg/container (11.0% → 11.0% coverage)
+**Tests Created:**
+- `container_security_fuzz_test.go` - 500 lines
+- `comprehensive_test.go` - 600 lines
+
+**Note:** Coverage remained at 11.0% because most functions require Docker daemon to be running. However, comprehensive security tests were added for the data structures and configuration.
+
+**Security Findings:**
+- Command injection vulnerabilities in container names, service names, and exec commands
+- YAML injection possibilities through newlines in configuration
+- Path traversal in volume mounts (mounting sensitive paths like /etc, /root)
+- Network configuration accepts overly broad subnets (0.0.0.0/0, ::/0)
+- Port mapping vulnerabilities (negative ports, port 0)
+- Image name manipulation for registry hijacking
+- Environment variable injection (LD_*, PATH manipulation)
+- Null byte injection in various fields
+
+**Key Fuzz Tests:**
+- `FuzzComposeFileSecurity` - Tests Docker Compose configuration security
+- `FuzzDockerNetworkConfigSecurity` - Tests network configuration validation
+- `FuzzUncommentSegmentSecurity` - Tests file manipulation security
+- `FuzzContainerConfigSecurity` - Tests container configuration parameters
+- `FuzzDockerClientOperationsSecurity` - Tests Docker client operations
+- `FuzzDockerExecSecurity` - Found command injection vulnerabilities
+
 ## Security Vulnerabilities Discovered
 
 ### Critical Findings:
@@ -242,8 +267,9 @@ This report documents the comprehensive test coverage improvements made to the E
 | pkg/application/vault | 0.0% | 100.0% | 2 files, 800+ lines |
 | pkg/btrfs | 0.0% | 15.3% | 3 files, 1750+ lines |
 | pkg/clean | 0.0% | 90.6% | 2 files, 950+ lines |
+| pkg/container | 11.0% | 11.0% | 2 files, 1100+ lines |
 
-**Total New Test Code:** ~8,300 lines of security-focused tests
+**Total New Test Code:** ~9,400 lines of security-focused tests
 
 ## Conclusion
 
@@ -257,7 +283,8 @@ The comprehensive fuzz testing initiative has successfully:
    - pkg/application/vault: 0.0% → 100.0%
    - pkg/btrfs: 0.0% → 15.3%
    - pkg/clean: 0.0% → 90.6%
-3. Established a pattern for security-focused testing with over 8,300 lines of new test code
+   - pkg/container: 11.0% → 11.0% (added security tests, but coverage limited by Docker dependency)
+3. Established a pattern for security-focused testing with over 9,400 lines of new test code
 4. Created a foundation for ongoing security improvements
 
 The fuzz tests are designed to continuously discover new edge cases and should be integrated into the regular testing workflow to maintain security posture.

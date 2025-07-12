@@ -119,6 +119,11 @@ func CreateVolume(rc *eos_io.RuntimeContext, config *Config) error {
 func CreateMountPoint(rc *eos_io.RuntimeContext, config *Config) error {
 	logger := otelzap.Ctx(rc.Ctx)
 
+	// Validate mount point path
+	if err := validateMountPath(config.MountPoint); err != nil {
+		return err
+	}
+
 	// ASSESS
 	logger.Info("Assessing mount point requirements",
 		zap.String("mountPoint", config.MountPoint))
@@ -361,6 +366,55 @@ func addToFstab(rc *eos_io.RuntimeContext, config *Config) error {
 
 	logger.Debug("Added fstab entry",
 		zap.String("entry", strings.TrimSpace(entry)))
+
+	return nil
+}
+
+// validateMountPath validates that a mount path is safe to use
+func validateMountPath(path string) error {
+	// Check for empty path
+	if path == "" {
+		return fmt.Errorf("mount path cannot be empty")
+	}
+
+	// Check for path traversal attempts
+	if strings.Contains(path, "..") {
+		return fmt.Errorf("mount path cannot contain '..' (path traversal)")
+	}
+
+	// Check for null bytes
+	if strings.Contains(path, "\x00") {
+		return fmt.Errorf("mount path cannot contain null bytes")
+	}
+
+	// Check for control characters
+	if strings.ContainsAny(path, "\n\r\t") {
+		return fmt.Errorf("mount path cannot contain control characters")
+	}
+
+	// Ensure path is absolute
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("mount path must be absolute (start with /)")
+	}
+
+	// Clean the path and check it hasn't changed (prevents various injection attempts)
+	cleanPath := filepath.Clean(path)
+	if cleanPath != path {
+		return fmt.Errorf("mount path contains unsafe elements")
+	}
+
+	// Check for sensitive system paths
+	sensitivePaths := []string{"/", "/etc", "/boot", "/dev", "/proc", "/sys", "/root"}
+	for _, sensitive := range sensitivePaths {
+		if cleanPath == sensitive || strings.HasPrefix(cleanPath, sensitive+"/") {
+			return fmt.Errorf("cannot mount on sensitive system path: %s", sensitive)
+		}
+	}
+
+	// Check path length limit
+	if len(path) > 4096 {
+		return fmt.Errorf("mount path too long (max 4096 characters)")
+	}
 
 	return nil
 }
