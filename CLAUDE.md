@@ -539,10 +539,15 @@ go test -v -run "Security|Validation|Auth" ./pkg/...
    - Use `eos_err.NewUserError()` for user-correctable issues
    - Use `eos_err.NewSystemError()` for system failures
 
-5. **User Interaction**
+5. **User Interaction and Interactive Prompting**
+   - **CRITICAL RULE**: If required flags are not provided and would cause the command to fail, prompt the user for them interactively
    - Use flags for configuration when possible
-   - Prompt interactively when flags not provided
+   - Prompt interactively when flags not provided for required values
    - Always log prompts as: `logger.Info("terminal prompt: [question]")`
+   - Use `eos_io.PromptInput()` for general input prompting
+   - Use `eos_io.PromptSecurePassword()` for password prompting
+   - Remove `MarkFlagRequired()` for flags that are handled with interactive prompts
+   - Update flag descriptions to indicate "(prompted if not provided)" for required flags
 
 6. **Deployment of new resources**
    - use version resolver in pkg/platform/version_resolver.go when deciding what version of something to download (eg. saltstack, nomad, etc.) to programatically make sure the most recent version of something is downloaded and installed when using `eos create ...` 

@@ -123,7 +123,10 @@ func WithMockHTTPClient(t *testing.T, transport *MockHTTPTransport) func() {
 
 	originalClient := httpclient.DefaultClient()
 	mockClient := &http.Client{Transport: transport}
-	httpclient.SetDefaultClient(mockClient)
+	err := httpclient.SetDefaultHTTPClient(mockClient)
+	if err != nil {
+		t.Fatalf("failed to set mock HTTP client: %v", err)
+	}
 
 	return func() {
 		httpclient.SetDefaultClient(originalClient)

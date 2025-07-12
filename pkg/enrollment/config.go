@@ -36,6 +36,67 @@ func ParseEnrollmentFlags(cmd *cobra.Command) (*EnrollmentConfig, error) {
 	return config, nil
 }
 
+// ParseEnrollmentFlagsWithPrompts parses command line flags and prompts for missing required values
+func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Command) (*EnrollmentConfig, error) {
+	logger := otelzap.Ctx(rc.Ctx)
+	
+	// ASSESS - Extract flag values
+	role, _ := cmd.Flags().GetString("role")
+	masterAddress, _ := cmd.Flags().GetString("master-address")
+	datacenter, _ := cmd.Flags().GetString("datacenter")
+	networkMode, _ := cmd.Flags().GetString("network-mode")
+	autoDetect, _ := cmd.Flags().GetBool("auto-detect")
+	transitionMode, _ := cmd.Flags().GetBool("transition-mode")
+	dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+	// INTERVENE - Prompt for missing required values
+	if datacenter == "" {
+		logger.Info("Datacenter not provided via flag, prompting user")
+		var err error
+		datacenter, err = eos_io.PromptInput(rc, "Enter datacenter identifier: ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to read datacenter: %w", err)
+		}
+	}
+
+	if !autoDetect && role == "" {
+		logger.Info("Role not provided via flag and auto-detect disabled, prompting user")
+		var err error
+		role, err = eos_io.PromptInput(rc, "Enter role (master or minion): ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to read role: %w", err)
+		}
+		
+		// Validate role input
+		if role != RoleMaster && role != RoleMinion {
+			return nil, fmt.Errorf("invalid role '%s': must be 'master' or 'minion'", role)
+		}
+	}
+
+	if role == RoleMinion && masterAddress == "" {
+		logger.Info("Master address not provided via flag for minion role, prompting user")
+		var err error
+		masterAddress, err = eos_io.PromptInput(rc, "Enter Salt master address: ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to read master address: %w", err)
+		}
+	}
+
+	// Create configuration
+	config := &EnrollmentConfig{
+		Role:           role,
+		MasterAddress:  masterAddress,
+		Datacenter:     datacenter,
+		NetworkMode:    networkMode,
+		AutoDetect:     autoDetect,
+		TransitionMode: transitionMode,
+		DryRun:         dryRun,
+	}
+
+	// EVALUATE - Return parsed configuration
+	return config, nil
+}
+
 // ValidateEnrollmentConfig validates the enrollment configuration
 // Migrated from cmd/self/enroll.go validateEnrollmentConfig
 func ValidateEnrollmentConfig(config *EnrollmentConfig) error {

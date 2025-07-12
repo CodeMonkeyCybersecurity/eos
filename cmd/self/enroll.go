@@ -57,8 +57,8 @@ Examples:
 
 		logger.Info("Starting eos self enrollment process")
 
-		// Parse command line flags
-		config, err := enrollment.ParseEnrollmentFlags(cmd)
+		// Parse command line flags and prompt for missing required values
+		config, err := enrollment.ParseEnrollmentFlagsWithPrompts(rc, cmd)
 		if err != nil {
 			return eos_err.NewUserError("failed to parse enrollment flags: %s", err.Error())
 		}
@@ -182,9 +182,9 @@ func init() {
 	SelfCmd.AddCommand(EnrollCmd)
 
 	// Role configuration
-	EnrollCmd.Flags().String("role", "", "Salt role: master or minion (required unless --auto-detect)")
-	EnrollCmd.Flags().String("master-address", "", "Salt master address (required for minion role)")
-	EnrollCmd.Flags().String("datacenter", "", "Datacenter identifier (required)")
+	EnrollCmd.Flags().String("role", "", "Salt role: master or minion (prompted if not provided unless --auto-detect)")
+	EnrollCmd.Flags().String("master-address", "", "Salt master address (prompted if not provided for minion role)")
+	EnrollCmd.Flags().String("datacenter", "", "Datacenter identifier (prompted if not provided)")
 
 	// Network configuration
 	EnrollCmd.Flags().String("network-mode", "direct", "Network mode: direct, consul-connect, or wireguard")
@@ -194,11 +194,7 @@ func init() {
 	EnrollCmd.Flags().Bool("transition-mode", false, "Force transition from masterless mode")
 	EnrollCmd.Flags().Bool("dry-run", false, "Preview changes without applying them")
 
-	// Mark required flags
-	if err := EnrollCmd.MarkFlagRequired("datacenter"); err != nil {
-		// This should only fail if the flag doesn't exist, which is a programming error
-		panic(fmt.Sprintf("Failed to mark datacenter flag as required: %v", err))
-	}
+	// Note: datacenter flag is not marked as required because we prompt for it interactively
 }
 
 // All helper functions have been migrated to pkg/enrollment/

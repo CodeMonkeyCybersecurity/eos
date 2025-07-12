@@ -113,7 +113,10 @@ func (m *mockResponseBody) Close() error {
 func TestResolveWazuhUserID(t *testing.T) {
 	// Store original client and restore after test
 	originalClient := httpclient.DefaultClient()
-	httpclient.SetDefaultClient(createMockHTTPClient())
+	err := httpclient.SetDefaultHTTPClient(createMockHTTPClient())
+	if err != nil {
+		t.Fatalf("failed to set mock client: %v", err)
+	}
 	defer httpclient.SetDefaultClient(originalClient)
 
 	// Create test context
@@ -142,7 +145,10 @@ func TestResolveWazuhUserID(t *testing.T) {
 func TestResolveWazuhRoleID(t *testing.T) {
 	// Store original client and restore after test
 	originalClient := httpclient.DefaultClient()
-	httpclient.SetDefaultClient(createMockHTTPClient())
+	err := httpclient.SetDefaultHTTPClient(createMockHTTPClient())
+	if err != nil {
+		t.Fatalf("failed to set mock client: %v", err)
+	}
 	defer httpclient.SetDefaultClient(originalClient)
 
 	// Create test context
@@ -171,7 +177,10 @@ func TestResolveWazuhRoleID(t *testing.T) {
 func TestResolveWazuhPolicyID(t *testing.T) {
 	// Store original client and restore after test
 	originalClient := httpclient.DefaultClient()
-	httpclient.SetDefaultClient(createMockHTTPClient())
+	err := httpclient.SetDefaultHTTPClient(createMockHTTPClient())
+	if err != nil {
+		t.Fatalf("failed to set mock client: %v", err)
+	}
 	defer httpclient.SetDefaultClient(originalClient)
 
 	// Create test context
@@ -224,7 +233,10 @@ func TestResolveWazuhUserID_TableDriven(t *testing.T) {
 
 	// Store original client and restore after test
 	originalClient := httpclient.DefaultClient()
-	httpclient.SetDefaultClient(createMockHTTPClient())
+	err := httpclient.SetDefaultHTTPClient(createMockHTTPClient())
+	if err != nil {
+		t.Fatalf("failed to set mock client: %v", err)
+	}
 	defer httpclient.SetDefaultClient(originalClient)
 
 	rc := newTestRuntimeContext()

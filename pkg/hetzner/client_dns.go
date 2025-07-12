@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 	"github.com/cockroachdb/errors"
 	"go.uber.org/zap"
 )
@@ -17,14 +18,23 @@ import (
 const baseURL = "https://api.hetzner.cloud/v1"
 
 type DNSClient struct {
-	Token string
-	Log   *zap.Logger
+	Token      string
+	Log        *zap.Logger
+	httpClient *httpclient.Client
 }
 
 func NewClient(token string, log *zap.Logger) *DNSClient {
+	// Create enhanced HTTP client with Hetzner-specific configuration
+	client, err := httpclient.MigrateFromHetznerClient(token)
+	if err != nil {
+		// Fallback to default client if migration fails
+		client, _ = httpclient.NewClient(httpclient.DefaultConfig())
+	}
+	
 	return &DNSClient{
-		Token: token,
-		Log:   log.Named("hetzner"),
+		Token:      token,
+		Log:        log.Named("hetzner"),
+		httpClient: client,
 	}
 }
 
@@ -34,11 +44,13 @@ func (c *DNSClient) doRequest(rc *eos_io.RuntimeContext, method, path string, bo
 		return nil, errors.Wrap(err, "creating Hetzner API request")
 	}
 
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-	req.Header.Set("Content-Type", "application/json")
+	// Content-Type header (authentication is handled by httpclient)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
-	c.Log.Debug("🌐 Sending Hetzner API request", zap.String("method", method), zap.String("path", path))
-	resp, err := http.DefaultClient.Do(req)
+	c.Log.Debug("Sending Hetzner API request", zap.String("method", method), zap.String("path", path))
+	resp, err := c.httpClient.DoWithContext(rc.Ctx, req)
 	if err != nil {
 		return nil, errors.Wrap(err, "executing Hetzner API request")
 	}

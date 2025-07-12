@@ -6,36 +6,57 @@ This directory contains comprehensive documentation for the Eos Ubuntu server ad
 
 ### Core Concepts
 - **[CLAUDE.md](../CLAUDE.md)** - Complete development guide and coding standards
-- **[STACK.md](../STACK.md)** - Technology stack and architectural principles
-- **[IMPROVEMENT_ROADMAP.md](../IMPROVEMENT_ROADMAP.md)** - Current improvement priorities
+- **[STACK.md](user-guides/STACK.md)** - Technology stack and architectural principles
+
+### Components
+- **[components/](./components/)** - Component-specific documentation
+  - **[DELPHI.md](./components/DELPHI.md)** - Delphi monitoring platform
+  - **[VAULT.md](./components/VAULT.md)** - HashiCorp Vault integration
+  - **[UBUNTU.md](./components/UBUNTU.md)** - Ubuntu system operations
+  - **[HECATE.md](./components/HECATE.md)** - Reverse proxy framework
+  - **[STORAGE_OPS.md](./components/STORAGE_OPS.md)** - Storage operations
+  - **[EOS_INFRASTRUCTURE_COMPILER.md](./components/EOS_INFRASTRUCTURE_COMPILER.md)** - Infrastructure compiler
+
+### Security
+- **[security/](./security/)** - Security documentation and compliance
+  - **[SECURITY_CHECKLIST.md](./security/SECURITY_CHECKLIST.md)** - Developer security checklist
+  - **[SECURITY_COMPLIANCE.md](./security/SECURITY_COMPLIANCE.md)** - Compliance framework
+  - **[SECURITY_ANALYSIS.md](./security/SECURITY_ANALYSIS.md)** - Security analysis and findings
+
+### Testing
+- **[testing/](./testing/)** - Testing documentation and guides
+  - **[TEST_COVERAGE_REPORT.md](./testing/TEST_COVERAGE_REPORT.md)** - Comprehensive test coverage report
+  - **[TESTING_GUIDE.md](./testing/TESTING_GUIDE.md)** - Testing best practices
+  - **[FUZZING_GUIDE.md](./testing/FUZZING_GUIDE.md)** - Fuzz testing guidelines
+  - **[COMPREHENSIVE_TESTING.md](./testing/COMPREHENSIVE_TESTING.md)** - Comprehensive testing implementation
+
+### Development
+- **[development/](./development/)** - Development guides and roadmaps
+  - **[IMPROVEMENT_ROADMAP.md](./development/IMPROVEMENT_ROADMAP.md)** - Current improvement priorities
+  - **[BOOTSTRAP_ARCHITECTURE.md](./development/BOOTSTRAP_ARCHITECTURE.md)** - Bootstrap architecture
+  - **[REFACTORING_GUIDE.md](./development/REFACTORING_GUIDE.md)** - Refactoring guidelines
 
 ### User Guides
-- **[ADMINISTRATION.md](./ADMINISTRATION.md)** - Complete server administration guide
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and design patterns
-- **[AUTHENTICATION.md](./AUTHENTICATION.md)** - Authentication and authorization systems
-- **[BACKUP.md](./BACKUP.md)** - Backup and disaster recovery procedures
-- **[COMPLIANCE.md](./COMPLIANCE.md)** - Security compliance and hardening
-- **[CONTAINERS.md](./CONTAINERS.md)** - Container orchestration and management
-- **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development setup and workflows
-- **[INFRASTRUCTURE.md](./INFRASTRUCTURE.md)** - Infrastructure deployment and management
-- **[MONITORING.md](./MONITORING.md)** - System monitoring and observability
-- **[NETWORKING.md](./NETWORKING.md)** - Network configuration and security
-- **[SECURITY.md](./SECURITY.md)** - Security best practices and threat modeling
-- **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** - Common issues and solutions
+- **[user-guides/](./user-guides/)** - User and migration guides
+  - **[MIGRATION_GUIDE.md](./user-guides/MIGRATION_GUIDE.md)** - Migration documentation
+  - **[STACK.md](./user-guides/STACK.md)** - Technology stack overview
 
-### Component Documentation
-- **[DELPHI_COMMANDS.md](./DELPHI_COMMANDS.md)** - Delphi monitoring platform commands
-- **[PIPELINE.md](./PIPELINE.md)** - CI/CD pipeline configuration
+### Commands
+- **[commands/](./commands/)** - Command-specific documentation
+  - **[README.md](./commands/README.md)** - Commands overview
+  - **[clusterfuzz.md](./commands/clusterfuzz.md)** - ClusterFuzz operations
+  - **[hcl.md](./commands/hcl.md)** - HCL operations
+  - **[secure-ubuntu.md](./commands/secure-ubuntu.md)** - Ubuntu hardening
 
 ### Archive
 - **[archive/](./archive/)** - Historical documentation and consolidated files
 
 ## Quick Start
 
-1. **New Users**: Start with [ADMINISTRATION.md](./ADMINISTRATION.md)
-2. **Developers**: Read [CLAUDE.md](../CLAUDE.md) and [DEVELOPMENT.md](./DEVELOPMENT.md)
-3. **Security Teams**: Review [SECURITY.md](./SECURITY.md) and [COMPLIANCE.md](./COMPLIANCE.md)
-4. **Operations**: Focus on [MONITORING.md](./MONITORING.md) and [BACKUP.md](./BACKUP.md)
+1. **New Users**: Start with [CLAUDE.md](../CLAUDE.md) and explore component documentation
+2. **Developers**: Read [CLAUDE.md](../CLAUDE.md) and [development/](./development/) guides
+3. **Security Teams**: Review [security/](./security/) documentation and compliance frameworks
+4. **Testing**: See [testing/](./testing/) directory for comprehensive testing documentation
 
 ## Getting Help
 
@@ -45,4 +66,4 @@ This directory contains comprehensive documentation for the Eos Ubuntu server ad
 
 ---
 
-*This documentation is actively maintained and updated. Last reorganized: 2025-01-11*
+*This documentation is actively maintained and updated. Last reorganized: 2025-01-12*
