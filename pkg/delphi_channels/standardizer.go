@@ -339,7 +339,12 @@ func (cs *ChannelStandardizer) analyzeWorkerFile(workerPath string, info *Worker
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Use logger if available, otherwise print
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

@@ -12,12 +12,12 @@ import (
 func TestCommandInjectionPrevention(t *testing.T) {
 	// Set production environment to ensure all security checks are active
 	originalEnv := os.Getenv("GO_ENV")
-	os.Setenv("GO_ENV", "production")
+	_ = os.Setenv("GO_ENV", "production") // Test setup, error not critical
 	defer func() {
 		if originalEnv == "" {
-			os.Unsetenv("GO_ENV")
+			_ = os.Unsetenv("GO_ENV") // Test cleanup, error not critical
 		} else {
-			os.Setenv("GO_ENV", originalEnv)
+			_ = os.Setenv("GO_ENV", originalEnv) // Test cleanup, error not critical
 		}
 	}()
 
@@ -322,12 +322,12 @@ func TestSuspiciousDomainDetection(t *testing.T) {
 func TestReservedNameValidation(t *testing.T) {
 	// Set production environment to ensure reserved name checking is active
 	originalEnv := os.Getenv("GO_ENV")
-	os.Setenv("GO_ENV", "production")
+	_ = os.Setenv("GO_ENV", "production") // Test setup, error not critical
 	defer func() {
 		if originalEnv == "" {
-			os.Unsetenv("GO_ENV")
+			_ = os.Unsetenv("GO_ENV") // Test cleanup, error not critical
 		} else {
-			os.Setenv("GO_ENV", originalEnv)
+			_ = os.Setenv("GO_ENV", originalEnv) // Test cleanup, error not critical
 		}
 	}()
 

@@ -29,18 +29,18 @@ func TestAIAssistantCreation(t *testing.T) {
 
 	t.Run("default_anthropic_configuration", func(t *testing.T) {
 		// Clear environment variables
-		os.Unsetenv("ANTHROPIC_API_KEY")
-		os.Unsetenv("AI_API_KEY")
+		_ = os.Unsetenv("ANTHROPIC_API_KEY") // Test setup, error not critical
+		_ = os.Unsetenv("AI_API_KEY")       // Test setup, error not critical
 
 		// Create isolated config manager with temp directory
 		tempDir, err := os.MkdirTemp("", "ai-config-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }() // Test cleanup, error not critical
 
 		// Mock the config path for this test
 		originalConfigDir := os.Getenv("HOME")
-		os.Setenv("HOME", tempDir)
-		defer os.Setenv("HOME", originalConfigDir)
+		_ = os.Setenv("HOME", tempDir) // Test setup, error not critical
+		defer func() { _ = os.Setenv("HOME", originalConfigDir) }() // Test cleanup, error not critical
 
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)
@@ -69,7 +69,7 @@ func TestAIAssistantCreation(t *testing.T) {
 		// Create temp config file with Azure settings
 		tempDir, err := os.MkdirTemp("", "azure-config-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }() // Test cleanup, error not critical
 
 		_ = &ConfigManager{
 			configPath: filepath.Join(tempDir, "azure-config.yaml"),
@@ -93,12 +93,12 @@ func TestAIAssistantCreation(t *testing.T) {
 		// Create isolated config manager with temp directory
 		tempDir, err := os.MkdirTemp("", "timeout-config-test")
 		require.NoError(t, err)
-		defer os.RemoveAll(tempDir)
+		defer func() { _ = os.RemoveAll(tempDir) }() // Test cleanup, error not critical
 
 		// Mock the config path for this test
 		originalConfigDir := os.Getenv("HOME")
-		os.Setenv("HOME", tempDir)
-		defer os.Setenv("HOME", originalConfigDir)
+		_ = os.Setenv("HOME", tempDir) // Test setup, error not critical
+		defer func() { _ = os.Setenv("HOME", originalConfigDir) }() // Test cleanup, error not critical
 
 		assistant, err := NewAIAssistant(rc)
 		require.NoError(t, err)

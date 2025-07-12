@@ -318,7 +318,7 @@ func TestDisplayOptions(t *testing.T) {
 
 			DisplayOptions()
 
-			w.Close()
+			_ = w.Close() // Test output, error not critical
 			os.Stdout = originalStdout
 
 			var buf bytes.Buffer
@@ -400,7 +400,7 @@ func TestGetUserSelection_ValidInput(t *testing.T) {
 
 			// Write test input
 			go func() {
-				defer w.Close()
+				defer func() { _ = w.Close() }() // Test output, error not critical
 				io.WriteString(w, tt.userInput)
 			}()
 
@@ -462,7 +462,7 @@ func TestGetUserSelection_InvalidInput(t *testing.T) {
 
 			// Write test inputs
 			go func() {
-				defer w.Close()
+				defer func() { _ = w.Close() }() // Test output, error not critical
 				for _, input := range tt.userInputs {
 					io.WriteString(w, input)
 				}
@@ -473,7 +473,7 @@ func TestGetUserSelection_InvalidInput(t *testing.T) {
 			// Should eventually get valid selection
 			assert.Greater(t, len(selectedApps), 0)
 
-			w.Close()
+			_ = w.Close() // Test output, error not critical
 			outW.Close()
 			os.Stdout = oldStdout
 
@@ -603,7 +603,7 @@ func TestEdgeCases(t *testing.T) {
 		// Should not panic
 		DisplayOptions()
 
-		w.Close()
+		_ = w.Close() // Test output, error not critical
 		os.Stdout = originalStdout
 
 		var buf bytes.Buffer

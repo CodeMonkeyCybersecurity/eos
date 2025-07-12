@@ -490,13 +490,14 @@ func FuzzPathValidation(f *testing.F) {
 			for _, pattern := range dangerousPatterns {
 				if strings.Contains(path, pattern) {
 					patternName := pattern
-					if pattern == "\x00" {
+					switch pattern {
+					case "\x00":
 						patternName = "null byte"
-					} else if pattern == "\n" {
+					case "\n":
 						patternName = "newline"
-					} else if pattern == "\r" {
+					case "\r":
 						patternName = "carriage return"
-					} else if pattern == "\t" {
+					case "\t":
 						patternName = "tab"
 					}
 					t.Logf("Potentially dangerous pattern '%s' detected in path: %q", patternName, path)

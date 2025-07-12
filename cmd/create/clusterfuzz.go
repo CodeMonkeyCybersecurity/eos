@@ -371,7 +371,9 @@ func waitForService(ctx context.Context, host string, port int) error {
 		case <-ticker.C:
 			conn, err := net.Dial("tcp", net.JoinHostPort(host, strconv.Itoa(port)))
 			if err == nil {
-				conn.Close()
+				if closeErr := conn.Close(); closeErr != nil {
+					fmt.Printf("Warning: Failed to close connection: %v\n", closeErr)
+				}
 				return nil
 			}
 		}
@@ -393,8 +395,14 @@ func initializeServices(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) e
 	switch config.DatabaseBackend {
 	case "postgresql":
 		// Set password environment variable
-		os.Setenv("PGPASSWORD", config.DatabaseConfig.Password)
-		defer os.Unsetenv("PGPASSWORD")
+		if err := os.Setenv("PGPASSWORD", config.DatabaseConfig.Password); err != nil {
+			return fmt.Errorf("failed to set PGPASSWORD: %w", err)
+		}
+		defer func() {
+			if err := os.Unsetenv("PGPASSWORD"); err != nil {
+				fmt.Printf("Warning: Failed to unset PGPASSWORD: %v\n", err)
+			}
+		}()
 
 		if _, err := executeCommand(rc, "psql",
 			"-h", "localhost", // Use localhost for initial setup

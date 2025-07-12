@@ -319,10 +319,10 @@ func FuzzNetworkConfigSecurity(f *testing.F) {
 			// Interface names should be alphanumeric with limited special chars
 			validIface := true
 			for _, char := range iface {
-				if !((char >= 'a' && char <= 'z') ||
-					(char >= 'A' && char <= 'Z') ||
-					(char >= '0' && char <= '9') ||
-					char == '-' || char == '_') {
+				if (char < 'a' || char > 'z') &&
+					(char < 'A' || char > 'Z') &&
+					(char < '0' || char > '9') &&
+					char != '-' && char != '_' {
 					validIface = false
 					break
 				}

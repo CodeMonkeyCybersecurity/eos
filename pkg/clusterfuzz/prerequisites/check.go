@@ -42,7 +42,7 @@ func Check(rc *eos_io.RuntimeContext, config *clusterfuzz.Config) error {
 	if config.UseVault {
 		logger.Info("Checking Vault connectivity...")
 		if err := CheckVaultConnectivity(rc); err != nil {
-			return fmt.Errorf("Vault check failed: %w", err)
+			return fmt.Errorf("vault check failed: %w", err)
 		}
 	}
 

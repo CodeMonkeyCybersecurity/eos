@@ -1,6 +1,7 @@
 package ragequit
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -178,7 +179,10 @@ var (
 
 func init() {
 	RagequitCmd.Flags().StringVar(&reason, "reason", "", "Reason for ragequit (required)")
-	RagequitCmd.MarkFlagRequired("reason")
+	if err := RagequitCmd.MarkFlagRequired("reason"); err != nil {
+		// This is a programming error, not a runtime error
+		panic(fmt.Sprintf("Failed to mark reason flag as required: %v", err))
+	}
 
 	RagequitCmd.Flags().BoolVar(&noReboot, "no-reboot", false, "Collect diagnostics without rebooting")
 	RagequitCmd.Flags().BoolVar(&force, "force", false, "Skip confirmation prompt")

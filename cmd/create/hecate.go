@@ -141,9 +141,10 @@ Examples:
 				fmt.Printf("\nInstallation Steps:\n")
 				for _, step := range result.Steps {
 					status := ""
-					if step.Status == "failed" {
+					switch step.Status {
+					case "failed":
 						status = "❌"
-					} else if step.Status == "running" {
+					case "running":
 						status = "⏳"
 					}
 					fmt.Printf("   %s %s (%s)\n", status, step.Name, step.Duration)
@@ -175,7 +176,10 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 	// Domain configuration
 	fmt.Print("Primary domain for Caddy [example.com]: ")
 	var domain string
-	fmt.Scanln(&domain)
+	if _, err := fmt.Scanln(&domain); err != nil {
+		// If we can't read input, continue with empty domain
+		fmt.Printf("Warning: Failed to read domain input: %v\n", err)
+	}
 	if domain != "" {
 		options.Domain = domain
 		options.Config["primary_domain"] = domain
@@ -184,7 +188,11 @@ func runInteractiveCaddySetup(options *service_installation.ServiceInstallOption
 	// Auto HTTPS
 	fmt.Print("Enable automatic HTTPS? [Y/n]: ")
 	var autoHTTPS string
-	fmt.Scanln(&autoHTTPS)
+	if _, err := fmt.Scanln(&autoHTTPS); err != nil {
+		// If we can't read input, default to enabled
+		fmt.Printf("Warning: Failed to read HTTPS input, defaulting to enabled: %v\n", err)
+		autoHTTPS = "Y"
+	}
 	if autoHTTPS != "n" && autoHTTPS != "N" {
 		options.Config["auto_https"] = "true"
 	} else {

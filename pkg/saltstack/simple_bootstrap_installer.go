@@ -270,7 +270,11 @@ func (sbi *SimpleBootstrapInstaller) calculateSHA256(filepath string) (string, e
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {

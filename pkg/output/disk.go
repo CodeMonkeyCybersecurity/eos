@@ -31,7 +31,9 @@ func DiskUsageTable(usage []storage_monitor.DiskUsage, showInodes bool) error {
 			u.Path)
 	}
 
-	w.Flush()
+	if err := w.Flush(); err != nil {
+		fmt.Printf("Warning: Failed to flush output: %v\n", err)
+	}
 
 	// EVALUATE - Add inode table if requested
 	if showInodes {
@@ -48,7 +50,9 @@ func DiskUsageTable(usage []storage_monitor.DiskUsage, showInodes bool) error {
 				u.InodesUsedPercent)
 		}
 
-		w.Flush()
+		if err := w.Flush(); err != nil {
+		fmt.Printf("Warning: Failed to flush output: %v\n", err)
+	}
 	}
 
 	return nil

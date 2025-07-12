@@ -56,7 +56,7 @@ func ConfigureCustomer(rc *eos_io.RuntimeContext, customer *CustomerConfig) erro
 	}
 
 	if !exists {
-		return eos_err.NewUserError(fmt.Sprintf("customer %s does not exist", customer.ID))
+		return eos_err.NewUserError("customer %s does not exist", customer.ID)
 	}
 
 	// INTERVENE - Apply customer configuration

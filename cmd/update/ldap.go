@@ -3,7 +3,9 @@ package update
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
+	"regexp"
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
@@ -24,6 +26,11 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 	RunE: eos.Wrap(func(rc *eos_io.RuntimeContext, cmd *cobra.Command, args []string) error {
 		if ipSAN == "" {
 			return fmt.Errorf("--ip flag is required to set SAN IP")
+		}
+
+		// Validate IP address to prevent command injection
+		if err := validateIPAddress(ipSAN); err != nil {
+			return fmt.Errorf("invalid IP address: %w", err)
 		}
 
 		cmds := []string{
@@ -52,6 +59,22 @@ in the SAN field. Useful when clients (like Delphi/Wazuh) need to connect via IP
 
 		return nil
 	}),
+}
+
+// validateIPAddress validates that the input is a valid IP address and doesn't contain injection characters
+func validateIPAddress(ip string) error {
+	// Check for basic IP format
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return fmt.Errorf("invalid IP address format")
+	}
+
+	// Additional security check: ensure no shell metacharacters
+	if matched, _ := regexp.MatchString(`[;&|<>$()\x00-\x1f\x7f-\x9f]`, ip); matched {
+		return fmt.Errorf("IP address contains forbidden characters")
+	}
+
+	return nil
 }
 
 func init() {

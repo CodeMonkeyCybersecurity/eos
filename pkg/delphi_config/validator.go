@@ -76,7 +76,11 @@ func (v *ConfigValidator) validateDatabase() {
 		v.addError("database", fmt.Sprintf("Database connection failed: %v", err))
 		return
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			v.addError("database", fmt.Sprintf("Failed to close database connection: %v", err))
+		}
+	}()
 
 	if err := db.Ping(); err != nil {
 		v.addError("database", fmt.Sprintf("Database ping failed: %v", err))
@@ -145,7 +149,11 @@ func (v *ConfigValidator) validateNotificationChannels() {
 	if err != nil {
 		return // Skip if database connection fails
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			v.addWarning("database", fmt.Sprintf("Failed to close database connection: %v", err))
+		}
+	}()
 
 	// Check notification functions
 	functions := v.getNotificationFunctions(db)
@@ -359,7 +367,11 @@ func (v *ConfigValidator) getTableColumns(db *sql.DB, tableName string) []string
 	if err != nil {
 		return columns
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			v.addWarning("database", fmt.Sprintf("Failed to close database rows: %v", err))
+		}
+	}()
 
 	for rows.Next() {
 		var column string
@@ -377,7 +389,11 @@ func (v *ConfigValidator) getEnumValues(db *sql.DB, enumType string) []string {
 	if err != nil {
 		return values
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			v.addWarning("database", fmt.Sprintf("Failed to close database rows: %v", err))
+		}
+	}()
 
 	for rows.Next() {
 		var value string
@@ -406,7 +422,11 @@ func (v *ConfigValidator) getNotificationFunctions(db *sql.DB) []string {
 	if err != nil {
 		return functions
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			v.addWarning("database", fmt.Sprintf("Failed to close database rows: %v", err))
+		}
+	}()
 
 	for rows.Next() {
 		var function string
@@ -424,7 +444,11 @@ func (v *ConfigValidator) getTableTriggers(db *sql.DB, tableName string) []strin
 	if err != nil {
 		return triggers
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			v.addWarning("database", fmt.Sprintf("Failed to close database rows: %v", err))
+		}
+	}()
 
 	for rows.Next() {
 		var trigger string

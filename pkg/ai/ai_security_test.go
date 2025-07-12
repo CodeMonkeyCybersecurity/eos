@@ -236,9 +236,7 @@ func TestConversationContextSecurity(t *testing.T) {
 			{Role: "user", Content: "Second message"},
 		}
 
-		for _, msg := range messages {
-			ctx.Messages = append(ctx.Messages, msg)
-		}
+		ctx.Messages = append(ctx.Messages, messages...)
 
 		// Verify all messages are preserved correctly
 		require.Len(t, ctx.Messages, 3)

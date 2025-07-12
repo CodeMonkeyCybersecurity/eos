@@ -35,7 +35,7 @@ func ProvisionCustomer(rc *eos_io.RuntimeContext, config *wazuh_mssp.CustomerCon
 		return fmt.Errorf("failed to check customer existence: %w", err)
 	}
 	if exists {
-		return eos_err.NewUserError(fmt.Sprintf("customer %s already exists", config.ID))
+		return eos_err.NewUserError("customer %s already exists", config.ID)
 	}
 
 	// INTERVENE - Create customer resources

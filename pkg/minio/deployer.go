@@ -163,7 +163,11 @@ func (d *Deployer) renderTemplate(tmplPath, outputPath string, opts *DeploymentO
 	if err != nil {
 		return fmt.Errorf("failed to create output file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	if err := tmpl.Execute(file, opts); err != nil {
 		return fmt.Errorf("failed to execute template: %w", err)

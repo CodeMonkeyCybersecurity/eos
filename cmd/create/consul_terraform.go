@@ -70,8 +70,12 @@ Example:
 		tfManager := terraform.NewManager(rc, targetDir)
 
 		// Set environment variables
-		os.Setenv("CONSUL_HTTP_ADDR", consulAddr)
-		os.Setenv("VAULT_ADDR", vaultAddr)
+		if err := os.Setenv("CONSUL_HTTP_ADDR", consulAddr); err != nil {
+			return fmt.Errorf("failed to set CONSUL_HTTP_ADDR: %w", err)
+		}
+		if err := os.Setenv("VAULT_ADDR", vaultAddr); err != nil {
+			return fmt.Errorf("failed to set VAULT_ADDR: %w", err)
+		}
 
 		// Validate connectivity
 		logger.Info("Validating Consul connectivity",

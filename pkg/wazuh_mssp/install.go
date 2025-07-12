@@ -63,7 +63,7 @@ func assessPlatformPrerequisites(rc *eos_io.RuntimeContext, config *PlatformConf
 		if _, err := exec.LookPath(tool); err != nil {
 			logger.Warn("Required tool not found",
 				zap.String("tool", tool))
-			return eos_err.NewUserError(fmt.Sprintf("%s is required but not found in PATH. Please install it first", tool))
+			return eos_err.NewUserError("%s is required but not found in PATH. Please install it first", tool)
 		}
 	}
 

@@ -318,7 +318,11 @@ func (ci *CommandInstaller) isEosCommand(path string) bool {
 	if err != nil {
 		return false
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	// Read first few lines
 	scanner := bufio.NewScanner(file)
@@ -340,7 +344,11 @@ func (ci *CommandInstaller) extractDescription(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close file: %v\n", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

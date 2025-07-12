@@ -659,7 +659,11 @@ func (c *HTTPSaltClient) makeRequest(ctx context.Context, method, path string, d
 			Type:    ErrConnectionFailed,
 		}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close response body: %v\n", err)
+		}
+	}()
 
 	// Read response body
 	responseBody, err := io.ReadAll(resp.Body)
