@@ -110,8 +110,8 @@ func RenderEmail(a Alert) (Rendered, error) {
 func buildMime(from mail.Address, to []mail.Address, subj, txt, html string) []byte {
 	var buf bytes.Buffer
 	boundary := fmt.Sprintf("delphi-%d", time.Now().UnixNano())
-	fmt.Fprintf(&buf, "From: %s\r\n", from)
-	fmt.Fprintf(&buf, "To: %s\r\n", to[0])
+	fmt.Fprintf(&buf, "From: %s\r\n", from.String())
+	fmt.Fprintf(&buf, "To: %s\r\n", to[0].String())
 	fmt.Fprintf(&buf, "Subject: %s\r\n", mime.QEncoding.Encode("utf-8", subj))
 	fmt.Fprintf(&buf, "MIME-Version: 1.0\r\n")
 	fmt.Fprintf(&buf, "Content-Type: multipart/alternative; boundary=%s\r\n\r\n", boundary)

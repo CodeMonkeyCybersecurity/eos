@@ -1,8 +1,7 @@
 package vault
 
-// TODO: MIGRATION IN PROGRESS
-// This file has 42 fmt.Printf/Println violations that need to be replaced with structured logging.
-// See export_display_refactored.go for the migrated version that follows Eos standards:
+// Package vault provides secure vault display operations with structured logging
+// This implementation follows Eos standards:
 // - All user output uses fmt.Fprint(os.Stderr, ...) to preserve stdout
 // - All debug/info logging uses otelzap.Ctx(rc.Ctx)
 // - Follows Assess → Intervene → Evaluate pattern
@@ -106,7 +105,10 @@ func ExportToSecureFile(rc *eos_io.RuntimeContext, info *VaultInitInfo, options 
 		zap.Int("bytes", len(data)),
 		zap.String("permissions", "0600"))
 		
-	fmt.Printf("🔐 Vault init data exported securely to: %s\n", options.OutputPath)
+	// User notification via stderr
+	if _, err := fmt.Fprintf(os.Stderr, "🔐 Vault init data exported securely to: %s\n", options.OutputPath); err != nil {
+		return fmt.Errorf("failed to display export message: %w", err)
+	}
 	return nil
 }
 
@@ -119,17 +121,33 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 	logger.Info("📊 Assessing status display requirements")
 	
 	// INTERVENE - Display formatted status information
-	fmt.Println("\n🏛️ Vault Status Overview")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// User display via stderr
+	if _, err := fmt.Fprint(os.Stderr, "\n🏛️ Vault Status Overview\n"); err != nil {
+		return fmt.Errorf("failed to display header: %w", err)
+	}
+	if _, err := fmt.Fprint(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"); err != nil {
+		return fmt.Errorf("failed to display header: %w", err)
+	}
 	
 	// Display file information
 	if info.FileInfo != nil {
-		fmt.Printf("\n📁 Init File: %s\n", info.FileInfo.Path)
-		fmt.Printf("   Exists: %v\n", info.FileInfo.Exists)
-		fmt.Printf("   Readable: %v\n", info.FileInfo.Readable)
+		// Display file info via stderr
+		if _, err := fmt.Fprintf(os.Stderr, "\n📁 Init File: %s\n", info.FileInfo.Path); err != nil {
+			return fmt.Errorf("failed to display file info: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Exists: %v\n", info.FileInfo.Exists); err != nil {
+			return fmt.Errorf("failed to display file info: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Readable: %v\n", info.FileInfo.Readable); err != nil {
+			return fmt.Errorf("failed to display file info: %w", err)
+		}
 		if info.FileInfo.Exists {
-			fmt.Printf("   Size: %d bytes\n", info.FileInfo.Size)
-			fmt.Printf("   Modified: %s\n", info.FileInfo.ModTime.Format("2006-01-02 15:04:05"))
+			if _, err := fmt.Fprintf(os.Stderr, "   Size: %d bytes\n", info.FileInfo.Size); err != nil {
+				return fmt.Errorf("failed to display file info: %w", err)
+			}
+			if _, err := fmt.Fprintf(os.Stderr, "   Modified: %s\n", info.FileInfo.ModTime.Format("2006-01-02 15:04:05")); err != nil {
+				return fmt.Errorf("failed to display file info: %w", err)
+			}
 		}
 		
 		logger.Debug("Displayed file information",
@@ -139,13 +157,28 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 	
 	// Display Vault status
 	if info.VaultStatus != nil {
-		fmt.Printf("\n🏛️ Vault Status\n")
-		fmt.Printf("   Address: %s\n", info.VaultStatus.Address)
-		fmt.Printf("   Running: %v\n", info.VaultStatus.Running)
-		fmt.Printf("   Reachable: %v\n", info.VaultStatus.Reachable)
-		fmt.Printf("   Initialized: %v\n", info.VaultStatus.Initialized)
-		fmt.Printf("   Sealed: %v\n", info.VaultStatus.Sealed)
-		fmt.Printf("   Health: %s\n", info.VaultStatus.HealthStatus)
+		// Display vault status via stderr
+		if _, err := fmt.Fprintf(os.Stderr, "\n🏛️ Vault Status\n"); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Address: %s\n", info.VaultStatus.Address); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Running: %v\n", info.VaultStatus.Running); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Reachable: %v\n", info.VaultStatus.Reachable); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Initialized: %v\n", info.VaultStatus.Initialized); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Sealed: %v\n", info.VaultStatus.Sealed); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Health: %s\n", info.VaultStatus.HealthStatus); err != nil {
+			return fmt.Errorf("failed to display vault status: %w", err)
+		}
 		
 		logger.Debug("Displayed vault status",
 			zap.Bool("running", info.VaultStatus.Running),
@@ -155,11 +188,22 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 	
 	// Display security status
 	if info.SecurityStatus != nil {
-		fmt.Printf("\n🔐 Security Status\n")
-		fmt.Printf("   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled)
-		fmt.Printf("   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled)
-		fmt.Printf("   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied)
-		fmt.Printf("   Auth Methods: %d\n", len(info.SecurityStatus.AuthMethods))
+		// Display security status via stderr
+		if _, err := fmt.Fprintf(os.Stderr, "\n🔐 Security Status\n"); err != nil {
+			return fmt.Errorf("failed to display security status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled); err != nil {
+			return fmt.Errorf("failed to display security status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled); err != nil {
+			return fmt.Errorf("failed to display security status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied); err != nil {
+			return fmt.Errorf("failed to display security status: %w", err)
+		}
+		if _, err := fmt.Fprintf(os.Stderr, "   Auth Methods: %d\n", len(info.SecurityStatus.AuthMethods)); err != nil {
+			return fmt.Errorf("failed to display security status: %w", err)
+		}
 		
 		logger.Debug("Displayed security status",
 			zap.Bool("mfa_enabled", info.SecurityStatus.MFAEnabled),
@@ -167,7 +211,10 @@ func DisplayStatusOnly(rc *eos_io.RuntimeContext, info *VaultInitInfo) error {
 			zap.Int("auth_methods", len(info.SecurityStatus.AuthMethods)))
 	}
 	
-	fmt.Println("\n💡 Use --no-redact flag to view sensitive initialization data")
+	// Display usage tip via stderr
+	if _, err := fmt.Fprint(os.Stderr, "\n💡 Use --no-redact flag to view sensitive initialization data\n"); err != nil {
+		return fmt.Errorf("failed to display usage tip: %w", err)
+	}
 	
 	// EVALUATE - Status display completed
 	logger.Info("✅ Status display completed successfully")
@@ -183,63 +230,67 @@ func DisplayAgentStatus(rc *eos_io.RuntimeContext, status *AgentStatus) {
 	logger.Info("🤖 Assessing agent status display",
 		zap.String("health", status.HealthStatus))
 	
-	// INTERVENE - Display formatted agent status
-	fmt.Println("\n🤖 Vault Agent Status")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// INTERVENE - Display formatted agent status via stderr
+	if _, err := fmt.Fprint(os.Stderr, "\n🤖 Vault Agent Status\n"); err != nil {
+		return
+	}
+	if _, err := fmt.Fprint(os.Stderr, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"); err != nil {
+		return
+	}
 	
 	// Service status
 	if status.ServiceRunning {
-		fmt.Println("✅ Service: Running")
+		fmt.Fprint(os.Stderr, "✅ Service: Running\n")
 	} else {
-		fmt.Println("❌ Service: Not Running")
+		fmt.Fprint(os.Stderr, "❌ Service: Not Running\n")
 	}
 	
 	// Token status
 	if status.TokenAvailable {
-		fmt.Println("✅ Token: Available")
+		fmt.Fprint(os.Stderr, "✅ Token: Available\n")
 		if !status.LastTokenTime.IsZero() {
-			fmt.Printf("   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
+			fmt.Fprintf(os.Stderr, "   Last Updated: %s\n", status.LastTokenTime.Format("2006-01-02 15:04:05"))
 		}
 		if status.TokenValid {
-			fmt.Println("✅ Token: Valid")
+			fmt.Fprint(os.Stderr, "✅ Token: Valid\n")
 		} else {
-			fmt.Println("❌ Token: Invalid or Empty")
+			fmt.Fprint(os.Stderr, "❌ Token: Invalid or Empty\n")
 		}
 	} else {
-		fmt.Println("❌ Token: Not Available")
+		fmt.Fprint(os.Stderr, "❌ Token: Not Available\n")
 	}
 	
 	// Configuration status
 	if status.ConfigValid {
-		fmt.Println("✅ Configuration: Valid")
+		fmt.Fprint(os.Stderr, "✅ Configuration: Valid\n")
 	} else {
-		fmt.Println("❌ Configuration: Missing or Invalid")
+		fmt.Fprint(os.Stderr, "❌ Configuration: Missing or Invalid\n")
 	}
 	
 	// Overall health
-	fmt.Printf("\n🏥 Overall Health: ")
+	fmt.Fprint(os.Stderr, "\n🏥 Overall Health: ")
 	switch status.HealthStatus {
 	case "healthy":
-		fmt.Println("✅ Healthy")
+		fmt.Fprint(os.Stderr, "✅ Healthy\n")
 	case "degraded":
-		fmt.Println("⚠️ Degraded")
+		fmt.Fprint(os.Stderr, "⚠️ Degraded\n")
 	case "unhealthy":
-		fmt.Println("❌ Unhealthy")
+		fmt.Fprint(os.Stderr, "❌ Unhealthy\n")
 	default:
-		fmt.Printf("❓ Unknown (%s)\n", status.HealthStatus)
+		fmt.Fprintf(os.Stderr, "❓ Unknown (%s)\n", status.HealthStatus)
 	}
 	
 	// Recommendations
 	if status.HealthStatus != "healthy" {
-		fmt.Println("\n💡 Recommendations:")
+		fmt.Fprint(os.Stderr, "\n💡 Recommendations:\n")
 		if !status.ServiceRunning {
-			fmt.Println("   • Start the service: sudo systemctl start vault-agent-eos")
+			fmt.Fprint(os.Stderr, "   • Start the service: sudo systemctl start vault-agent-eos\n")
 		}
 		if !status.TokenAvailable || !status.TokenValid {
-			fmt.Println("   • Check agent authentication: journalctl -fu vault-agent-eos")
+			fmt.Fprint(os.Stderr, "   • Check agent authentication: journalctl -fu vault-agent-eos\n")
 		}
 		if !status.ConfigValid {
-			fmt.Println("   • Verify configuration: eos enable vault")
+			fmt.Fprint(os.Stderr, "   • Verify configuration: eos enable vault\n")
 		}
 	}
 	

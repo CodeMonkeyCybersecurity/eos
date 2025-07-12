@@ -1,15 +1,22 @@
 package eos_unix
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 )
 
 func TestUserExists(t *testing.T) {
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
+	}
+
 	tests := []struct {
 		name     string
 		username string
@@ -58,7 +65,7 @@ func TestUserExists(t *testing.T) {
 				}
 			}()
 
-			exists := UserExists(tt.username)
+			exists := UserExists(rc, tt.username)
 			
 			if tt.wantErr && exists {
 				t.Errorf("UserExists() = true, expected false for %s", tt.username)
@@ -76,6 +83,10 @@ func TestGetUserShell(t *testing.T) {
 	// Skip if getent is not available
 	if _, err := exec.LookPath("getent"); err != nil {
 		t.Skip("getent command not available")
+	}
+
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
 	}
 
 	tests := []struct {
@@ -107,7 +118,7 @@ func TestGetUserShell(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			shell, err := GetUserShell(tt.username)
+			shell, err := GetUserShell(rc, tt.username)
 			
 			if (err != nil) != tt.wantErr {
 				t.Errorf("GetUserShell() error = %v, wantErr %v", err, tt.wantErr)
@@ -233,6 +244,10 @@ func TestSetPassword_Validation(t *testing.T) {
 }
 
 func TestUserSecurity(t *testing.T) {
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
+	}
+
 	t.Run("user command injection prevention", func(t *testing.T) {
 		// Test that user functions would handle injection attempts safely
 		injectionAttempts := []string{
@@ -249,7 +264,7 @@ func TestUserSecurity(t *testing.T) {
 			t.Run("injection_"+username, func(t *testing.T) {
 				// Test UserExists with injection attempts
 				// The function should handle these safely (return false)
-				exists := UserExists(username)
+				exists := UserExists(rc, username)
 				
 				// These should all return false (user doesn't exist)
 				// and shouldn't cause command injection
@@ -302,6 +317,10 @@ func TestUserSecurity(t *testing.T) {
 }
 
 func TestUserOperationsSafety(t *testing.T) {
+	rc := &eos_io.RuntimeContext{
+		Ctx: context.Background(),
+	}
+
 	t.Run("concurrent user operations", func(t *testing.T) {
 		// Test that user existence checks can be done concurrently safely
 		username := "root" // Should exist on most systems
@@ -309,7 +328,7 @@ func TestUserOperationsSafety(t *testing.T) {
 		done := make(chan bool, 5)
 		for i := 0; i < 5; i++ {
 			go func() {
-				exists := UserExists(username)
+				exists := UserExists(rc, username)
 				t.Logf("Concurrent check: user %s exists: %v", username, exists)
 				done <- true
 			}()

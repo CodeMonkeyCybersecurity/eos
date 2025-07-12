@@ -224,7 +224,7 @@ func TestRetryCaptureOutput(t *testing.T) {
 			t.Parallel()
 			
 			start := time.Now()
-			output, err := RetryCaptureOutput(rc, tt.Input.retries, tt.Input.delay, tt.Input.command, tt.Input.args...)
+			output, err := RetryCommandCaptureRefactored(rc, tt.Input.retries, tt.Input.delay, tt.Input.command, tt.Input.args...)
 			elapsed := time.Since(start)
 			
 			if tt.Input.wantErr {
@@ -377,7 +377,7 @@ func TestRetryCaptureOutputSecurity(t *testing.T) {
 			t.Parallel()
 			
 			// Should handle malicious input safely
-			output, err := RetryCaptureOutput(rc, 1, 0, tt.Input.command, tt.Input.args...)
+			output, err := RetryCommandCaptureRefactored(rc, 1, 0, tt.Input.command, tt.Input.args...)
 			
 			// Check that malicious content appears as literal text if command succeeds
 			if err == nil && tt.Input.command == "echo" {
@@ -424,7 +424,7 @@ func TestRetryCaptureOutputContextCancellation(t *testing.T) {
 
 	// Long-running command that should be cancelled
 	start := time.Now()
-	_, err := RetryCaptureOutput(rc, 5, 50*time.Millisecond, "sleep", "2")
+	_, err := RetryCommandCaptureRefactored(rc, 5, 50*time.Millisecond, "sleep", "2")
 	elapsed := time.Since(start)
 
 	assert.Error(t, err)
@@ -531,6 +531,6 @@ func BenchmarkRetryCaptureOutput(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		RetryCaptureOutput(rc, 1, 0, "echo", "benchmark")
+		RetryCommandCaptureRefactored(rc, 1, 0, "echo", "benchmark")
 	}
 }
