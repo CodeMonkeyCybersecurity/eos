@@ -21,8 +21,7 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 ## Testing
 - [Testing Guide](testing/TESTING_GUIDE.md) - General testing guidelines
 - [Comprehensive Testing](testing/COMPREHENSIVE_TESTING.md) - Comprehensive testing approach
-- [Fuzzing Guide](testing/FUZZING_GUIDE.md) - Fuzzing test guidelines
-- [Fuzzing Overview](testing/FUZZING_OVERVIEW.md) - Fuzzing implementation overview
+- [Fuzzing Guide](testing/FUZZING_GUIDE.md) - Complete fuzzing test guidelines (consolidated)
 - [Test Coverage Report](testing/TEST_COVERAGE_REPORT.md) - Test coverage analysis
 
 ## Security
@@ -43,9 +42,14 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 ## Components
 - [Delphi](components/DELPHI.md) - Delphi monitoring component
 - [Hecate](components/HECATE.md) - Hecate reverse proxy component
+- [Hecate Complete Setup](components/hecate-complete.md) - Complete Hecate setup guide
+- [Hecate Advanced Usage](components/hecate_advanced_usage.md) - Advanced Hecate management
 - [Storage Operations](components/STORAGE_OPS.md) - Storage operations component
 - [Ubuntu](components/UBUNTU.md) - Ubuntu-specific components
 - [Vault](components/VAULT.md) - HashiCorp Vault integration
+- [Vault Database Dynamic Credentials](components/vault-database-dynamic-credentials.md) - Vault database integration
+- [Vault Delphi Integration](components/vault-delphi-integration.md) - Vault and Delphi integration
+- [Wazuh MSSP Complete](components/wazuh-mssp-complete.md) - Complete Wazuh MSSP setup
 
 ## Guides & Tutorials
 - [Emergency Recovery](guides/emergency-recovery.md) - Emergency recovery procedures
@@ -63,14 +67,12 @@ This is the complete documentation index for the Eos CLI tool for Ubuntu server 
 ## Specialized Topics
 - [Delphi Commands](DELPHI_COMMANDS.md) - Delphi-specific command reference
 - [Delphi Dashboard Architecture](delphi-dashboard-architecture.md) - Dashboard architecture
-- [Hecate Complete](hecate-complete.md) - Complete Hecate setup guide
-- [Hecate Advanced Usage](hecate_advanced_usage.md) - Advanced Hecate usage
-- [Vault Database Dynamic Credentials](vault-database-dynamic-credentials.md) - Vault database integration
-- [Vault Delphi Integration](vault-delphi-integration.md) - Vault and Delphi integration
-- [Wazuh MSSP Complete](wazuh-mssp-complete.md) - Complete Wazuh MSSP setup
 
 ## Analysis & Reports
 - [Consolidation Summary](consolidation-summary.md) - Codebase consolidation analysis
+- [Consolidation Completion Report](CONSOLIDATION_COMPLETION_REPORT.md) - Final consolidation status
+- [Documentation Consolidation Summary](DOCUMENTATION_CONSOLIDATION_SUMMARY.md) - Documentation reorganization results
+- [Remaining Migration Plan](REMAINING_MIGRATION_PLAN.md) - Future migration opportunities
 - [Documentation Reorganization Plan](DOCUMENTATION_REORGANIZATION_PLAN.md) - Documentation restructuring
 - [Scripts Migration Analysis](scripts_migration_analysis.md) - Script migration analysis
 - [Test Summary](test_summary.md) - Testing summary and status

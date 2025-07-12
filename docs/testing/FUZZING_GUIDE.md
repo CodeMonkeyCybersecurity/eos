@@ -44,31 +44,63 @@ The fuzzing framework organizes tests into 6 priority-based phases:
 ### Basic Execution
 
 ```bash
-# Quick validation (essential tests for 3-5 seconds each)
-./scripts/run-fuzz-tests.sh 5s
+# 🆕 New Framework (Recommended)
+./scripts/eos-fuzz.sh 30s
 
-# Run all fuzz tests for 10 minutes
-./scripts/run-fuzz-tests.sh 10m
+# Security-focused testing
+SECURITY_FOCUS=true ./scripts/eos-fuzz.sh 5m
 
-# Run specific package
-./scripts/run-fuzz-tests.sh 2m ./pkg/crypto
+# Architecture compliance testing  
+ARCHITECTURE_TESTING=true ./scripts/eos-fuzz.sh 2m
 
-# Run specific function
-./scripts/run-fuzz-tests.sh 5m ./pkg/crypto FuzzValidateStrongPassword
+# 🔄 Legacy Framework (Deprecated)
+./scripts/run-fuzz-tests.sh 5s  # Use eos-fuzz.sh instead
 ```
 
 ### Overnight Fuzzing
 
 ```bash
-# Full overnight run with default settings (8h long tests, 2h medium, 30m short)
-./assets/overnight-fuzz.sh
+# 🆕 New Framework (Recommended)
+SECURITY_FOCUS=true ARCHITECTURE_TESTING=true ./scripts/eos-fuzz.sh 8h
 
-# Custom configuration for weekend testing
-FUZZTIME_LONG=24h FUZZTIME_MEDIUM=6h FUZZTIME_SHORT=2h ./assets/overnight-fuzz.sh
-
-# Testing mode (quick validation)
-FUZZTIME_LONG=5m FUZZTIME_MEDIUM=2m FUZZTIME_SHORT=1m ./assets/overnight-fuzz.sh
+# 🔄 Legacy Framework (Deprecated)
+./assets/overnight-fuzz.sh  # Use eos-fuzz.sh instead
 ```
+
+## Framework Selection
+
+### 🆕 New Framework (Recommended)
+
+#### `eos-fuzz.sh` - Main Fuzzing Framework
+Architecturally aligned, secure, and operationally sane fuzzing framework.
+
+**Features:**
+- STACK.md Section 4.1 compliant
+- Dynamic test discovery
+- Resource monitoring and limits
+- Comprehensive error handling
+- Security hardening
+- Structured reporting
+
+#### `eos-fuzz-ci.sh` - CI/CD Optimized
+Lightweight version optimized for continuous integration environments.
+
+**Features:**
+- GitHub Actions integration
+- CI-specific optimizations
+- Automated reporting
+- Security alerting
+- Performance optimized
+
+### 🔄 Legacy Scripts (Deprecated)
+
+#### `run-fuzz-tests.sh` - Legacy Framework
+Original fuzzing script with architectural and security issues.
+**DEPRECATED**: Use `eos-fuzz.sh` instead.
+
+#### `comprehensive-fuzz-runner.sh` - Legacy Comprehensive
+Original comprehensive fuzzing with complexity issues.
+**DEPRECATED**: Use `eos-fuzz.sh` or `eos-fuzz-ci.sh` instead.
 
 ## Deployment
 
@@ -720,6 +752,114 @@ git diff --name-only HEAD~1 | grep "\.go$" | \
 - Command injection prevention
 - Buffer overflow detection
 - Input sanitization validation
+
+## Migration Guide
+
+### From Legacy Scripts
+
+#### From `run-fuzz-tests.sh`
+
+```bash
+# Old
+./scripts/run-fuzz-tests.sh 30s ./pkg/crypto FuzzHashString
+
+# New (automatic discovery)
+SECURITY_FOCUS=true ./scripts/eos-fuzz.sh 30s
+```
+
+#### From `comprehensive-fuzz-runner.sh`
+
+```bash
+# Old
+CHAOS_MODE=true ./scripts/comprehensive-fuzz-runner.sh 5m
+
+# New
+SECURITY_FOCUS=true ARCHITECTURE_TESTING=true ./scripts/eos-fuzz.sh 5m
+```
+
+#### CI/CD Migration
+
+```bash
+# Old CI usage
+./scripts/run-fuzz-tests.sh 60s
+
+# New CI usage
+./scripts/eos-fuzz-ci.sh pr-validation
+```
+
+### Configuration Migration
+
+#### Environment Variables
+
+| Legacy Variable | New Variable | Default | Description |
+|----------------|--------------|---------|-------------|
+| `FUZZTIME` | `FUZZTIME` | `30s` | Duration per fuzz test |
+| `PARALLEL_JOBS` | `PARALLEL_JOBS` | `4` | Number of parallel jobs |
+| `LOG_DIR` | `LOG_DIR` | `~/.cache/eos-fuzz` | Log directory |
+| N/A | `SECURITY_FOCUS` | `true` | Enable security-critical tests |
+| N/A | `ARCHITECTURE_TESTING` | `false` | Enable architecture tests |
+| N/A | `VERBOSE` | `false` | Enable debug logging |
+
+#### CI/CD Specific Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CI_FUZZTIME` | `60s` | CI test duration |
+| `CI_PARALLEL_JOBS` | `4` | CI parallel jobs |
+| `CI_LOG_DIR` | `./fuzz-results` | CI log directory |
+
+### Test Categories
+
+#### Security-Critical Tests
+Focus on security vulnerabilities and injection prevention:
+- Input sanitization (`pkg/security`)
+- Cryptographic functions (`pkg/crypto`) 
+- Command execution (`pkg/execute`)
+- Template generation (`pkg/saltstack`, `pkg/terraform`)
+
+#### Architecture Tests
+Validate STACK.md compliance:
+- Orchestration workflows (SaltStack → Terraform → Nomad)
+- Cross-boundary integration (bare metal ↔ containerized)
+- State consistency validation
+- Resource contention scenarios
+
+#### Component Tests
+Standard functionality testing:
+- Input validation (`pkg/interaction`)
+- Data parsing (`pkg/parse`, `pkg/eos_io`)
+- File operations (`pkg/eos_unix`)
+- Database operations (`pkg/database_management`)
+
+### GitHub Actions Integration
+
+#### Workflow Configuration
+
+```yaml
+- name: Run Security Fuzzing
+  run: ./scripts/eos-fuzz-ci.sh security-focused
+
+- name: Run PR Validation
+  if: github.event_name == 'pull_request'
+  run: ./scripts/eos-fuzz-ci.sh pr-validation
+
+- name: Check Security Alerts
+  if: steps.fuzzing.outputs.security_alert == 'true'
+  run: |
+    echo "Security issues detected!"
+    exit 1
+```
+
+#### Available Outputs
+
+| Output | Description |
+|--------|-------------|
+| `security_alert` | `true` if crashes detected |
+| `security_test` | Test name that found crashes |
+| `crash_count` | Number of crashes found |
+| `tests_total` | Total tests executed |
+| `tests_failed` | Number of failed tests |
+| `success_rate` | Percentage of passed tests |
 
 ## Conclusion
 
