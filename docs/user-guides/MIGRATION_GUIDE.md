@@ -256,6 +256,110 @@ pkg/
 │   └── *_test.go      // Corresponding test files
 ```
 
+## Manager Framework Migration
+
+The Eos codebase has 37+ different manager implementations with duplicated patterns. The unified manager framework consolidates them into a consistent, secure, and maintainable pattern.
+
+### Unified Manager Interface
+
+All managers must implement `ResourceManager[T]`:
+
+```go
+type ResourceManager[T any] interface {
+    // Core CRUD operations
+    Create(ctx context.Context, resource T) (*OperationResult, error)
+    Read(ctx context.Context, id string) (T, error)
+    Update(ctx context.Context, resource T) (*OperationResult, error)
+    Delete(ctx context.Context, id string) (*OperationResult, error)
+    List(ctx context.Context, options *ListOptions) ([]T, error)
+
+    // Lifecycle management
+    Start(ctx context.Context, id string) (*OperationResult, error)
+    Stop(ctx context.Context, id string) (*OperationResult, error)
+    Restart(ctx context.Context, id string) (*OperationResult, error)
+
+    // Health and status
+    GetStatus(ctx context.Context, id string) (*ResourceStatus, error)
+    HealthCheck(ctx context.Context, id string) (*HealthCheckResult, error)
+
+    // Validation and configuration
+    Validate(ctx context.Context, resource T) error
+    Configure(ctx context.Context, id string, config map[string]interface{}) (*OperationResult, error)
+}
+```
+
+### Manager Migration Steps
+
+1. **Define Resource Type**:
+```go
+type MyResource struct {
+    ID          string                 `json:"id"`
+    Name        string                 `json:"name"`
+    Config      map[string]interface{} `json:"config"`
+    Timestamp   time.Time              `json:"timestamp"`
+}
+```
+
+2. **Create Manager with BaseManager**:
+```go
+type MyManager struct {
+    *BaseManager
+    legacyManager *existing.Manager
+}
+
+func NewMyManager(config *ManagerConfig) *MyManager {
+    return &MyManager{
+        BaseManager:   NewBaseManager("my.manager", config),
+        legacyManager: existing.NewManager(),
+    }
+}
+```
+
+3. **Implement Methods with AIE Pattern**:
+```go
+func (m *MyManager) Create(ctx context.Context, resource MyResource) (*OperationResult, error) {
+    start := time.Now()
+    
+    // ASSESS - Validate inputs
+    if err := m.Validate(ctx, resource); err != nil {
+        return m.CreateOperationResult(false, "Validation failed", time.Since(start), err), err
+    }
+    
+    // INTERVENE - Perform the operation
+    if !m.GetConfig().DryRun {
+        if err := m.legacyManager.CreateSomething(resource); err != nil {
+            return m.CreateOperationResult(false, "Creation failed", time.Since(start), err), err
+        }
+    }
+    
+    // EVALUATE - Verify the result
+    if !m.GetConfig().DryRun {
+        if err := m.verifyCreation(ctx, resource.ID); err != nil {
+            logger.Warn("Creation verification failed", zap.Error(err))
+        }
+    }
+    
+    return m.CreateOperationResult(true, "Successfully created", time.Since(start), nil), nil
+}
+```
+
+4. **Register with Global Registry**:
+```go
+func init() {
+    config := managers.DefaultManagerConfig()
+    manager := NewMyManager(config)
+    managers.RegisterMyManager("my-service", manager)
+}
+```
+
+### Manager Migration Priority
+
+1. **Security managers** (highest impact on security)
+2. **Database managers** (critical for data integrity)  
+3. **Service managers** (high usage)
+4. **Container managers** (moderate complexity)
+5. **System managers** (lowest risk)
+
 ### Interface-Based Design
 
 Define interfaces for testability and flexibility:

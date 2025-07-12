@@ -41,7 +41,7 @@ func EnableFileAudit(rc *eos_io.RuntimeContext, _ *api.Client) error { // 🔥 I
 		zap.String("audit_id", shared.AuditID),
 		zap.String("file_path", "/opt/vault/logs/vault_audit.log"))
 
-	err = enableFeature(client, shared.MountPath,
+	err = enableFeature(rc, client, shared.MountPath,
 		map[string]interface{}{
 			"type": "file",
 			"options": map[string]string{

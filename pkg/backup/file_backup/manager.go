@@ -1,7 +1,7 @@
 package file_backup
 
 import (
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	"os"
@@ -411,7 +411,7 @@ func (fbm *FileBackupManager) calculateFileHash(filePath string) (string, error)
 	}
 	defer func() { _ = file.Close() }()
 
-	hasher := md5.New()
+	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
 		return "", err
 	}

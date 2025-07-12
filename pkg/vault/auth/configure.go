@@ -22,13 +22,12 @@ func ConfigureTokenAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error {
 	logger.Info("Assessing token authentication configuration")
 
 	// INTERVENE - Get token from user
-	fmt.Printf("Enter Vault token: ")
+	logger.Info("terminal prompt: Enter Vault token")
 	token, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		logger.Error("Failed to read token", zap.Error(err))
 		return fmt.Errorf("failed to read token: %w", err)
 	}
-	fmt.Printf("\n")
 
 	// Set token environment variable
 	os.Setenv("VAULT_TOKEN", string(token))
@@ -48,7 +47,7 @@ func ConfigureUserPassAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) erro
 	logger.Info("Assessing userpass authentication configuration")
 
 	// INTERVENE - Get credentials from user
-	fmt.Printf("Enter username: ")
+	logger.Info("terminal prompt: Enter username")
 	username, err := reader.ReadString('\n')
 	if err != nil {
 		logger.Error("Failed to read username", zap.Error(err))
@@ -56,13 +55,12 @@ func ConfigureUserPassAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) erro
 	}
 	username = strings.TrimSpace(username)
 
-	fmt.Printf("Enter password: ")
+	logger.Info("terminal prompt: Enter password")
 	password, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		logger.Error("Failed to read password", zap.Error(err))
 		return fmt.Errorf("failed to read password: %w", err)
 	}
-	fmt.Printf("\n")
 
 	// Store credentials
 	os.Setenv("VAULT_AUTH_USERNAME", username)
@@ -84,7 +82,7 @@ func ConfigureAppRoleAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error
 	logger.Info("Assessing AppRole authentication configuration")
 
 	// INTERVENE - Get AppRole credentials from user
-	fmt.Printf("Enter Role ID: ")
+	logger.Info("terminal prompt: Enter Role ID")
 	roleID, err := reader.ReadString('\n')
 	if err != nil {
 		logger.Error("Failed to read role ID", zap.Error(err))
@@ -92,13 +90,12 @@ func ConfigureAppRoleAuth(rc *eos_io.RuntimeContext, reader *bufio.Reader) error
 	}
 	roleID = strings.TrimSpace(roleID)
 
-	fmt.Printf("Enter Secret ID: ")
+	logger.Info("terminal prompt: Enter Secret ID")
 	secretID, err := term.ReadPassword(int(syscall.Stdin))
 	if err != nil {
 		logger.Error("Failed to read secret ID", zap.Error(err))
 		return fmt.Errorf("failed to read secret ID: %w", err)
 	}
-	fmt.Printf("\n")
 
 	// Store credentials
 	os.Setenv("VAULT_ROLE_ID", roleID)
@@ -140,7 +137,7 @@ func SaveVaultConfig(rc *eos_io.RuntimeContext, vaultAddr, authMethod string) er
 	}
 	defer func() {
 		if err := file.Close(); err != nil {
-			fmt.Printf("Warning: Failed to close file: %v\n", err)
+			logger.Warn("Failed to close config file", zap.Error(err))
 		}
 	}()
 

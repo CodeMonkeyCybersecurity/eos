@@ -119,10 +119,10 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 			return logger.LogErrAndWrap(rc, "enable Vault Agent", err)
 		}
 		log.Info(" Vault Agent enabled successfully")
-		fmt.Println(" Vault Agent is now running and configured for automatic authentication")
+		log.Info("terminal prompt: Vault Agent is now running and configured for automatic authentication")
 	} else {
 		log.Info("⏭️ Vault Agent enablement skipped by user")
-		fmt.Println(" Vault Agent not enabled. You can enable it later with manual configuration.")
+		log.Info("terminal prompt: Vault Agent not enabled. You can enable it later with manual configuration.")
 	}
 
 	// Step 15: Apply core secrets and verify readiness
@@ -134,24 +134,27 @@ func EnableVault(rc *eos_io.RuntimeContext, client *api.Client, log *zap.Logger)
 	if interaction.PromptYesNo(rc.Ctx, "Revoke root token for enhanced security? (Ensure alternative auth methods work first)", false) {
 		if err := revokeRootTokenSafely(rc, client); err != nil {
 			log.Warn("Root token revocation failed", zap.Error(err))
-			fmt.Println("Root token revocation failed. You can revoke it later using 'eos secure vault --comprehensive'")
+			log.Info("terminal prompt: Root token revocation failed. You can revoke it later using 'eos secure vault --comprehensive'")
 		} else {
 			log.Info(" Root token revoked successfully")
-			fmt.Println(" Root token has been revoked. Use alternative authentication methods for future access.")
+			log.Info("terminal prompt: Root token has been revoked. Use alternative authentication methods for future access.")
 		}
 	} else {
 		log.Info(" Root token kept active - remember to revoke it after setting up alternative auth")
 	}
 
 	log.Info(" Vault enablement process completed successfully")
-	PrintEnableNextSteps()
+	PrintEnableNextSteps(rc)
 	return nil
 }
 
-func PrintEnableNextSteps() {
-	fmt.Println("\n Vault setup is now complete!")
-	fmt.Println(" Next steps:")
-	fmt.Println("   1. Run: eos secure vault   (to finalize hardening and cleanup)")
-	fmt.Println("   2. Test Vault Agent: eos read vault agent")
-	fmt.Println("   3. Optionally onboard new users, configure roles, or deploy additional services.")
+func PrintEnableNextSteps(rc *eos_io.RuntimeContext) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: Vault setup is now complete!")
+	logger.Info("Next steps completed",
+		zap.Strings("next_steps", []string{
+			"Run: eos secure vault (to finalize hardening and cleanup)",
+			"Test Vault Agent: eos read vault agent",
+			"Optionally onboard new users, configure roles, or deploy additional services",
+		}))
 }

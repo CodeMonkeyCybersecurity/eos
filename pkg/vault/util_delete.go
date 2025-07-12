@@ -17,8 +17,9 @@ import (
 
 // ConfirmIrreversibleDeletion gets final consent before wiping unseal material.
 func ConfirmIrreversibleDeletion(rc *eos_io.RuntimeContext) error {
-	fmt.Println("Confirm irreversible deletion of unseal materials. This action is final.")
-	fmt.Print("Type 'yes' to proceed: ")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: Confirm irreversible deletion of unseal materials. This action is final.")
+	logger.Info("terminal prompt: Type 'yes' to proceed")
 
 	reader := bufio.NewReader(os.Stdin)
 	resp, _ := reader.ReadString('\n')
@@ -26,7 +27,7 @@ func ConfirmIrreversibleDeletion(rc *eos_io.RuntimeContext) error {
 	if resp != "yes" {
 		return fmt.Errorf("user aborted deletion confirmation")
 	}
-	otelzap.Ctx(rc.Ctx).Info("🧹 User confirmed deletion of in-memory secrets")
+	logger.Info("🧹 User confirmed deletion of in-memory secrets")
 	return nil
 }
 
@@ -37,10 +38,8 @@ func DeleteTestDataFromDisk(rc *eos_io.RuntimeContext) error {
 		return fmt.Errorf("delete fallback test-data file: %w", err)
 	}
 
-	fmt.Println()
-	fmt.Println("  Test Data Deletion Summary")
-	fmt.Println("   Disk: SUCCESS")
-	fmt.Printf("     Path: %s\n\n", path)
-	otelzap.Ctx(rc.Ctx).Info(" Test-data deleted successfully (fallback)", zap.String("path", path))
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Test Data Deletion Summary - Disk: SUCCESS", zap.String("path", path))
+	logger.Info(" Test-data deleted successfully (fallback)", zap.String("path", path))
 	return nil
 }

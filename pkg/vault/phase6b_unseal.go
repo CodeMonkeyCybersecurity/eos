@@ -177,7 +177,8 @@ func Unseal(rc *eos_io.RuntimeContext, client *api.Client, init *api.InitRespons
 }
 
 func ConfirmUnsealMaterialSaved(rc *eos_io.RuntimeContext, init *api.InitResponse) error {
-	fmt.Println("\n Re-enter 3 unseal keys + root token to confirm you've saved them.")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: Re-enter 3 unseal keys + root token to confirm you've saved them.")
 	keys, err := interaction.PromptSecrets(rc.Ctx, "Unseal Key", 3)
 	if err != nil {
 		otelzap.Ctx(rc.Ctx).Error(" Failed to prompt unseal keys", zap.Error(err))

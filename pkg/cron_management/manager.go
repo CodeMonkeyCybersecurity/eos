@@ -2,7 +2,7 @@ package cron_management
 
 import (
 	"bufio"
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"os/exec"
@@ -394,7 +394,7 @@ func (cm *CronManager) writeCrontab(rc *eos_io.RuntimeContext, content string) e
 
 func (cm *CronManager) generateJobID(job *CronJob) string {
 	data := fmt.Sprintf("%s|%s", job.Schedule, job.Command)
-	hash := md5.Sum([]byte(data))
+	hash := sha256.Sum256([]byte(data))
 	return fmt.Sprintf("%x", hash)[:8]
 }
 

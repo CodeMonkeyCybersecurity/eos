@@ -6,22 +6,34 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/hashicorp/vault/api"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"go.uber.org/zap"
 )
 
 /* enableFeature is a generic Logical().Write wrapper for enabling things like audit devices, etc. */
-func enableFeature(client *api.Client, path string, payload map[string]interface{}, successMsg string) error {
-	fmt.Printf("\n Enabling feature at %s...\n", path)
+func enableFeature(rc *eos_io.RuntimeContext, client *api.Client, path string, payload map[string]interface{}, successMsg string) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("Enabling Vault feature",
+		zap.String("path", path),
+		zap.Any("payload", payload))
 
 	_, err := client.Logical().Write(path, payload)
 	if err != nil {
 		if strings.Contains(err.Error(), "already enabled") || strings.Contains(err.Error(), "already exists") {
-			fmt.Printf("Feature already enabled at %s\n", path)
+			logger.Info("Feature already enabled",
+				zap.String("path", path))
 			return nil
 		}
+		logger.Error("Failed to enable feature",
+			zap.String("path", path),
+			zap.Error(err))
 		return fmt.Errorf("failed to enable feature at %s: %w", path, err)
 	}
 
-	fmt.Println(successMsg)
+	logger.Info("Feature enabled successfully",
+		zap.String("path", path),
+		zap.String("message", successMsg))
 	return nil
 }

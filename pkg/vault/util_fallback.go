@@ -81,11 +81,12 @@ func mustNewClient(rc *eos_io.RuntimeContext) (*api.Client, error) {
 }
 
 func MaybeWriteVaultInitFallback(rc *eos_io.RuntimeContext, init *api.InitResponse) error {
-	fmt.Print(" Save Vault init material to fallback file? (y/N): ")
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("terminal prompt: Save Vault init material to fallback file? (y/N)")
 	var resp string
 	shared.SafeScanln(&resp)
 	if strings.ToLower(resp) != "y" {
-		otelzap.Ctx(rc.Ctx).Warn(" Skipping fallback write at user request")
+		logger.Warn(" Skipping fallback write at user request")
 		return nil
 	}
 	return SaveInitResult(rc, init)

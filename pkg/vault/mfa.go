@@ -660,12 +660,12 @@ func SetupUserTOTP(rc *eos_io.RuntimeContext, client *api.Client, username strin
 		if err != nil {
 			log.Warn("TOTP code verification failed", zap.Error(err))
 			log.Error(" TOTP code verification failed - user needs to check authenticator app")
-			fmt.Println(" TOTP code verification failed. Please check your authenticator app setup.")
+			// Error already logged above with structured logging
 			return cerr.Wrap(err, "TOTP verification failed")
 		}
 
 		log.Info(" TOTP code verified successfully")
-		fmt.Println(" TOTP code verified successfully!")
+		// Success already logged above with structured logging
 	}
 
 	log.Info(" TOTP MFA setup completed for user", zap.String("username", username))

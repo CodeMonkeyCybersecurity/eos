@@ -180,12 +180,11 @@ func performSecurityVerification(rc *eos_io.RuntimeContext, options *ReadInitOpt
 	// Require confirmation for sensitive data access
 	if options.RequireConfirm && !options.RedactSensitive {
 		log.Warn(" SECURITY WARNING: Requesting access to sensitive Vault initialization data")
-		fmt.Println(" SECURITY WARNING")
-		fmt.Println("You are requesting access to highly sensitive Vault initialization data including:")
-		fmt.Println("   • Root token (full Vault administrative access)")
-		fmt.Println("   • Unseal keys (ability to unseal Vault)")
-		fmt.Println("   • Eos user credentials")
-		fmt.Println()
+		log.Info("terminal prompt: SECURITY WARNING")
+		log.Info("terminal prompt: You are requesting access to highly sensitive Vault initialization data including:")
+		log.Info("terminal prompt:    • Root token (full Vault administrative access)")
+		log.Info("terminal prompt:    • Unseal keys (ability to unseal Vault)")
+		log.Info("terminal prompt:    • Eos user credentials")
 
 		reason := options.AccessReason
 		if reason == "" {
@@ -460,109 +459,145 @@ func getRedactionMode(redacted bool) string {
 }
 
 // DisplayVaultInitInfo presents the vault init information in a user-friendly format
-func DisplayVaultInitInfo(info *VaultInitInfo, options *ReadInitOptions) error {
-	fmt.Println("\n Vault Initialization Information")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+func DisplayVaultInitInfo(rc *eos_io.RuntimeContext, info *VaultInitInfo, options *ReadInitOptions) error {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Vault Initialization Information")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Display file information
 	if info.FileInfo != nil {
-		fmt.Printf("\n Init File Information\n")
-		fmt.Printf("   Path: %s\n", info.FileInfo.Path)
-		fmt.Printf("   Size: %d bytes\n", info.FileInfo.Size)
-		fmt.Printf("   Modified: %s\n", info.FileInfo.ModTime.Format(time.RFC3339))
-		fmt.Printf("   Checksum: %s\n", info.FileInfo.Checksum[:16]+"...")
-		fmt.Printf("   Permissions: %s\n", info.FileInfo.Permissions)
+		logger.Info("Init File Information")
+		logger.Info("File details",
+			zap.String("path", info.FileInfo.Path),
+			zap.Int64("size_bytes", info.FileInfo.Size),
+			zap.String("modified", info.FileInfo.ModTime.Format(time.RFC3339)),
+			zap.String("checksum_preview", info.FileInfo.Checksum[:16]+"..."),
+			zap.String("permissions", info.FileInfo.Permissions))
 	}
 
 	// Display Vault status
 	if info.VaultStatus != nil {
-		fmt.Printf("\n🏛️ Vault Status\n")
-		fmt.Printf("   Address: %s\n", info.VaultStatus.Address)
-		fmt.Printf("   Running: %v\n", info.VaultStatus.Running)
-		fmt.Printf("   Initialized: %v\n", info.VaultStatus.Initialized)
-		fmt.Printf("   Sealed: %v\n", info.VaultStatus.Sealed)
-		fmt.Printf("   Health: %s\n", info.VaultStatus.HealthStatus)
-		if info.VaultStatus.Version != "" {
-			fmt.Printf("   Version: %s\n", info.VaultStatus.Version)
-		}
+		logger.Info("🏛️ Vault Status")
+		logger.Info("Vault service status",
+			zap.String("address", info.VaultStatus.Address),
+			zap.Bool("running", info.VaultStatus.Running),
+			zap.Bool("initialized", info.VaultStatus.Initialized),
+			zap.Bool("sealed", info.VaultStatus.Sealed),
+			zap.String("health", info.VaultStatus.HealthStatus),
+			zap.String("version", info.VaultStatus.Version))
 	}
 
 	// Display security status
 	if info.SecurityStatus != nil {
-		fmt.Printf("\n Security Status\n")
-		fmt.Printf("   MFA Enabled: %v\n", info.SecurityStatus.MFAEnabled)
-		fmt.Printf("   Audit Enabled: %v\n", info.SecurityStatus.AuditEnabled)
-		fmt.Printf("   Hardening Applied: %v\n", info.SecurityStatus.HardeningApplied)
-		fmt.Printf("   Auth Methods: %v\n", len(info.SecurityStatus.AuthMethods))
-		for _, method := range info.SecurityStatus.AuthMethods {
-			fmt.Printf("     • %s\n", method)
-		}
+		logger.Info("Security Status")
+		logger.Info("Security configuration",
+			zap.Bool("mfa_enabled", info.SecurityStatus.MFAEnabled),
+			zap.Bool("audit_enabled", info.SecurityStatus.AuditEnabled),
+			zap.Bool("hardening_applied", info.SecurityStatus.HardeningApplied),
+			zap.Int("auth_methods_count", len(info.SecurityStatus.AuthMethods)),
+			zap.Strings("auth_methods", info.SecurityStatus.AuthMethods))
 	}
 
 	// Display initialization data
 	if info.InitResponse != nil {
-		fmt.Printf("\n Vault Initialization Data\n")
+		logger.Info("Vault Initialization Data")
 
 		if options.RedactSensitive {
-			fmt.Printf("   Root Token: %s\n", crypto.Redact(info.InitResponse.RootToken))
+			logger.Info("Vault initialization credentials (redacted)",
+				zap.String("root_token", crypto.Redact(info.InitResponse.RootToken)),
+				zap.Int("unseal_keys_count", len(info.InitResponse.KeysB64)))
+			
 			for i, key := range info.InitResponse.KeysB64 {
-				fmt.Printf("   Unseal Key %d: %s\n", i+1, crypto.Redact(key))
+				logger.Info("Unseal key (redacted)",
+					zap.Int("key_number", i+1),
+					zap.String("key_value", crypto.Redact(key)))
 			}
-			fmt.Println("\n    Sensitive data is redacted. Use --no-redact flag to show plaintext.")
+			logger.Info("terminal prompt: Sensitive data is redacted. Use --no-redact flag to show plaintext.")
 		} else {
-			fmt.Printf("   Root Token: %s\n", info.InitResponse.RootToken)
+			// SECURITY: Log plaintext credentials with high security audit level
+			logger.Error("SECURITY AUDIT: Displaying plaintext Vault credentials",
+				zap.String("event_type", "sensitive_data_display"),
+				zap.String("data_type", "vault_init_credentials"))
+			
+			logger.Info("Vault initialization credentials (PLAINTEXT)",
+				zap.String("root_token", info.InitResponse.RootToken),
+				zap.Int("unseal_keys_count", len(info.InitResponse.KeysB64)))
+			
 			for i, key := range info.InitResponse.KeysB64 {
-				fmt.Printf("   Unseal Key %d: %s\n", i+1, key)
+				logger.Info("Unseal key (PLAINTEXT)",
+					zap.Int("key_number", i+1),
+					zap.String("key_value", key))
 			}
 		}
 	}
 
 	// Display Eos credentials
 	if info.EosCredentials != nil {
-		fmt.Printf("\n Eos User Credentials\n")
-		fmt.Printf("   Username: %s\n", info.EosCredentials.Username)
+		logger.Info("Eos User Credentials")
+		
 		if options.RedactSensitive {
-			fmt.Printf("   Password: %s\n", crypto.Redact(info.EosCredentials.Password))
+			logger.Info("Eos credentials (redacted)",
+				zap.String("username", info.EosCredentials.Username),
+				zap.String("password", crypto.Redact(info.EosCredentials.Password)))
 		} else {
-			fmt.Printf("   Password: %s\n", info.EosCredentials.Password)
+			// SECURITY: Log plaintext credentials with high security audit level
+			logger.Error("SECURITY AUDIT: Displaying plaintext Eos credentials",
+				zap.String("event_type", "sensitive_data_display"),
+				zap.String("data_type", "eos_user_credentials"))
+			
+			logger.Info("Eos credentials (PLAINTEXT)",
+				zap.String("username", info.EosCredentials.Username),
+				zap.String("password", info.EosCredentials.Password))
 		}
 	}
 
 	// Display next steps
-	displayNextSteps(info)
+	displayNextSteps(rc, info)
 
 	// Display security reminders
-	fmt.Println("\nSecurity Reminders")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	fmt.Println("   • Store this information securely (password manager, encrypted storage)")
-	fmt.Println("   • Never share root tokens or unseal keys via insecure channels")
-	fmt.Println("   • Consider revoking root token after setting up alternative auth")
-	fmt.Println("   • Ensure Vault is properly hardened before production use")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Security Reminders")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Security best practices",
+		zap.Strings("reminders", []string{
+			"Store this information securely (password manager, encrypted storage)",
+			"Never share root tokens or unseal keys via insecure channels",
+			"Consider revoking root token after setting up alternative auth",
+			"Ensure Vault is properly hardened before production use",
+		}))
 
 	return nil
 }
 
 // displayNextSteps provides contextual guidance based on Vault status
-func displayNextSteps(info *VaultInitInfo) {
-	fmt.Println("\n Recommended Next Steps")
-	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+func displayNextSteps(rc *eos_io.RuntimeContext, info *VaultInitInfo) {
+	logger := otelzap.Ctx(rc.Ctx)
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	logger.Info("Recommended Next Steps")
+	logger.Info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	if info.VaultStatus == nil {
-		fmt.Println("   • Check Vault installation and configuration")
+		logger.Info("Next step: Check Vault installation and configuration")
 		return
 	}
 
+	var nextSteps []string
+	
 	if !info.VaultStatus.Running {
-		fmt.Println("   • Start Vault service: systemctl start vault")
+		nextSteps = append(nextSteps, "Start Vault service: systemctl start vault")
 	} else if info.VaultStatus.Sealed {
-		fmt.Println("   • Unseal Vault: eos enable vault")
+		nextSteps = append(nextSteps, "Unseal Vault: eos enable vault")
 	} else if !info.SecurityStatus.MFAEnabled {
-		fmt.Println("   • Configure MFA: Run enable vault workflow")
+		nextSteps = append(nextSteps, "Configure MFA: Run enable vault workflow")
 	} else if !info.SecurityStatus.HardeningApplied {
-		fmt.Println("   • Apply security hardening: eos secure vault --comprehensive")
+		nextSteps = append(nextSteps, "Apply security hardening: eos secure vault --comprehensive")
 	} else {
-		fmt.Println("   • Vault appears to be properly configured")
-		fmt.Println("   • Consider backing up this initialization data securely")
-		fmt.Println("   • Review audit logs regularly")
+		nextSteps = append(nextSteps, 
+			"Vault appears to be properly configured",
+			"Consider backing up this initialization data securely",
+			"Review audit logs regularly")
 	}
+	
+	logger.Info("Recommended actions", zap.Strings("next_steps", nextSteps))
 }

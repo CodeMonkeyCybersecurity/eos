@@ -105,7 +105,7 @@ Examples:
 			if statusOnly {
 				return vault.DisplayStatusOnly(rc, info)
 			}
-			return vault.DisplayVaultInitInfo(info, options)
+			return vault.DisplayVaultInitInfo(rc, info, options)
 		}
 	}),
 }

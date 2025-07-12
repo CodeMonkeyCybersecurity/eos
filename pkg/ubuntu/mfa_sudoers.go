@@ -2,7 +2,7 @@ package ubuntu
 
 import (
 	"bufio"
-	"crypto/md5"
+	"crypto/sha256"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -262,8 +262,8 @@ func (m *MFAManager) verifySudoersIntegrity(originalFingerprint string) error {
 
 	if originalFingerprint != currentFingerprint {
 		m.logger.Warn("Sudoers configuration changed during MFA setup",
-			zap.String("original_hash", fmt.Sprintf("%x", md5.Sum([]byte(originalFingerprint)))),
-			zap.String("current_hash", fmt.Sprintf("%x", md5.Sum([]byte(currentFingerprint)))))
+			zap.String("original_hash", fmt.Sprintf("%x", sha256.Sum256([]byte(originalFingerprint)))),
+			zap.String("current_hash", fmt.Sprintf("%x", sha256.Sum256([]byte(currentFingerprint)))))
 		// This is a warning, not an error - configuration may have legitimately changed
 	}
 

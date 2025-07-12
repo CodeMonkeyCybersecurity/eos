@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"regexp"
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
@@ -103,12 +104,26 @@ func CanInteractiveSudo() bool {
 }
 
 func CheckSudoersMembership(username string) bool {
+	// Validate username to prevent command injection
+	if !isValidUsername(username) {
+		return false
+	}
+	
 	// Use sudo to safely check sudoers membership
-	cmd := exec.Command("sudo", "grep", "-r", username, "/etc/sudoers", "/etc/sudoers.d")
+	cmd := exec.Command("sudo", "grep", "-r", "--", username, "/etc/sudoers", "/etc/sudoers.d")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf(" sudoers membership check failed: %v\n", err)
+		// Use structured logging instead of fmt.Printf
 		return false
 	}
 	return strings.Contains(string(out), username)
+}
+
+// isValidUsername validates that a username contains only safe characters
+// to prevent command injection attacks
+func isValidUsername(username string) bool {
+	// Unix usernames should only contain letters, numbers, underscores, hyphens
+	// and cannot start with a number or hyphen
+	validUsername := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
+	return validUsername.MatchString(username) && len(username) <= 32
 }
