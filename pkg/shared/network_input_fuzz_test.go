@@ -282,7 +282,7 @@ func FuzzQueryParameters(f *testing.F) {
 		
 		// Test parameter length validation
 		if len(param) > 0 {
-			isValidLength := validateParameterLength(param)
+			isValidLength := validateParameterLengthNetwork(param)
 			_ = isValidLength
 		}
 	})
@@ -500,7 +500,7 @@ func detectInjectionPatterns(param string) bool {
 	return false
 }
 
-func validateParameterLength(param string) bool {
+func validateParameterLengthNetwork(param string) bool {
 	// TODO: Implement parameter length validation
 	return len(param) <= 4096
 }

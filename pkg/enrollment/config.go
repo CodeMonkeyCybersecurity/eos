@@ -53,7 +53,7 @@ func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Comma
 	if datacenter == "" {
 		logger.Info("Datacenter not provided via flag, prompting user")
 		var err error
-		datacenter, err = eos_io.PromptInputWithRetry(rc, "Enter datacenter identifier: ", nil, 3)
+		datacenter, err = eos_io.PromptInputWithValidation(rc, "Enter datacenter identifier: ", "datacenter")
 		if err != nil {
 			return nil, fmt.Errorf("failed to read datacenter: %w", err)
 		}
@@ -62,7 +62,7 @@ func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Comma
 	if !autoDetect && role == "" {
 		logger.Info("Role not provided via flag and auto-detect disabled, prompting user")
 		var err error
-		role, err = eos_io.PromptValidatedInput(rc, "Enter role (master or minion): ", []string{RoleMaster, RoleMinion}, 3)
+		role, err = eos_io.PromptInputWithValidation(rc, "Enter role (master or minion): ", "role")
 		if err != nil {
 			return nil, fmt.Errorf("failed to read role: %w", err)
 		}
@@ -71,7 +71,7 @@ func ParseEnrollmentFlagsWithPrompts(rc *eos_io.RuntimeContext, cmd *cobra.Comma
 	if role == RoleMinion && masterAddress == "" {
 		logger.Info("Master address not provided via flag for minion role, prompting user")
 		var err error
-		masterAddress, err = eos_io.PromptInputWithRetry(rc, "Enter Salt master address: ", nil, 3)
+		masterAddress, err = eos_io.PromptInputWithValidation(rc, "Enter Salt master address: ", "master-address")
 		if err != nil {
 			return nil, fmt.Errorf("failed to read master address: %w", err)
 		}

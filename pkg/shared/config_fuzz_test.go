@@ -130,7 +130,7 @@ func FuzzConfigParsing(f *testing.F) {
 		if len(configData) > 0 {
 			keys := extractConfigKeys(configData)
 			for _, key := range keys {
-				if containsDangerousPatterns(key) {
+				if containsDangerousPatternsConfig(key) {
 					t.Errorf("Config key contains dangerous pattern: %s", key)
 				}
 			}
@@ -343,7 +343,7 @@ func FuzzConfigurationMerging(f *testing.F) {
 		}
 		
 		// Validate merged configuration
-		if hasPrototypePollution(merged) {
+		if hasPrototypePollutionConfig(merged) {
 			t.Error("Configuration merge resulted in prototype pollution")
 		}
 		
@@ -396,10 +396,10 @@ func parseENVConfig(data string) (map[string]interface{}, error) {
 func validateConfigData(t *testing.T, config map[string]interface{}, format string) {
 	// TODO: Implement configuration validation
 	for key, value := range config {
-		if containsDangerousPatterns(key) {
+		if containsDangerousPatternsConfig(key) {
 			t.Errorf("%s config key contains dangerous pattern: %s", format, key)
 		}
-		if str, ok := value.(string); ok && containsDangerousPatterns(str) {
+		if str, ok := value.(string); ok && containsDangerousPatternsConfig(str) {
 			t.Errorf("%s config value contains dangerous pattern: %s", format, str)
 		}
 	}
@@ -420,7 +420,7 @@ func extractConfigKeys(data string) []string {
 	return []string{}
 }
 
-func containsDangerousPatterns(input string) bool {
+func containsDangerousPatternsConfig(input string) bool {
 	dangerous := []string{
 		"rm -rf", "$(", "`", "javascript:", "<script>",
 		"'; DROP", "../", "..\\", "\x00",
@@ -467,7 +467,7 @@ func expandEnvVarSafely(envVar string) string {
 }
 
 func containsCommandInjection(input string) bool {
-	return containsDangerousPatterns(input)
+	return containsDangerousPatternsConfig(input)
 }
 
 func makeShellSafe(input string) string {
@@ -504,7 +504,7 @@ func executeTemplateSafely(template string, data interface{}) string {
 }
 
 func containsDangerousOutput(output string) bool {
-	return containsDangerousPatterns(output)
+	return containsDangerousPatternsConfig(output)
 }
 
 func getSampleData() interface{} {
@@ -539,7 +539,7 @@ func mergeConfigurations(base map[string]interface{}, configJSON string) (map[st
 	return base, nil
 }
 
-func hasPrototypePollution(config map[string]interface{}) bool {
+func hasPrototypePollutionConfig(config map[string]interface{}) bool {
 	dangerous := []string{"__proto__", "constructor", "prototype"}
 	for key := range config {
 		for _, d := range dangerous {
