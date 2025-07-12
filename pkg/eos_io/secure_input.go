@@ -10,6 +10,14 @@ import (
 	"golang.org/x/term"
 )
 
+// TODO: Add comprehensive input validation and sanitization functions
+// - validateUserInput: Check for control characters, length limits, injection patterns
+// - sanitizeUserInput: Remove dangerous characters like escape sequences, null bytes
+// - validatePasswordInput: Validate password requirements and detect injection attempts  
+// - sanitizePasswordInput: Remove control characters while preserving valid Unicode
+// - parseYesNoInput: Safely parse yes/no responses with injection protection
+// See pkg/eos_io/secure_input_fuzz_test.go for comprehensive test coverage
+
 // PromptSecurePassword prompts for a password without echoing to screen
 // Migrated from cmd/create/user.go promptSecurePassword
 func PromptSecurePassword(rc *RuntimeContext, prompt string) (string, error) {

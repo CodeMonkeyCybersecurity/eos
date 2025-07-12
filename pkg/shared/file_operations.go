@@ -12,6 +12,15 @@ import (
 
 // Common file operation utilities to reduce duplication across the codebase
 
+// TODO: Add comprehensive file path and content validation functions
+// - validateFilePath: Check for directory traversal, null bytes, dangerous paths
+// - sanitizeFilePath: Remove dangerous path elements and normalize
+// - validateFileName: Check for reserved names, dangerous characters, length limits
+// - sanitizeFileName: Remove illegal characters and ensure safe naming
+// - validateFileContent: Detect malicious content types, scripts, binaries
+// - validateFileUpload: Comprehensive upload validation with extension whitelist
+// See pkg/shared/file_operations_fuzz_test.go for security testing coverage
+
 // FileExists checks if a file or directory exists
 func FileExists(path string) bool {
 	_, err := os.Stat(path)

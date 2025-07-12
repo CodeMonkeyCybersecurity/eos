@@ -13,6 +13,14 @@ import (
 
 // Common validation utilities to reduce duplication across the codebase
 
+// TODO: Add comprehensive network and HTTP input validation functions
+// - validateURL: Check for SSRF attacks, protocol validation, hostname verification
+// - validateHTTPHeader: Prevent header injection, validate encoding, length limits
+// - validateQueryParameter: Detect SQL/XSS/command injection in query params
+// - validateIPAddress: IP validation with private network detection for SSRF protection  
+// - sanitizeNetworkConfig: Secure network configuration input handling
+// See pkg/shared/network_input_fuzz_test.go for injection attack testing
+
 // ValidationError represents a validation error with field context
 type ValidationError struct {
 	Field   string `json:"field"`
