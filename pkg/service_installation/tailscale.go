@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -87,13 +88,16 @@ func (sim *ServiceInstallationManager) installTailscale(rc *eos_io.RuntimeContex
 	}
 	step3Start := time.Now()
 
+	// Use standardized service manager for consistent service operations
+	serviceManager := serviceutil.NewServiceManager(rc)
+	
 	// Enable the service
-	if err := sim.runCommand(rc, "Enable service", "sudo", "systemctl", "enable", "tailscaled"); err != nil {
+	if err := serviceManager.Enable("tailscaled"); err != nil {
 		logger.Warn("Failed to enable Tailscale service", zap.Error(err))
 	}
 
 	// Start the service if not already running
-	if err := sim.runCommand(rc, "Start service", "sudo", "systemctl", "start", "tailscaled"); err != nil {
+	if err := serviceManager.Start("tailscaled"); err != nil {
 		logger.Warn("Failed to start Tailscale service", zap.Error(err))
 	}
 
@@ -135,10 +139,15 @@ func (sim *ServiceInstallationManager) getTailscaleStatus(rc *eos_io.RuntimeCont
 		status.Version = strings.TrimSpace(string(output))
 	}
 
-	// Check service status
-	cmd = exec.Command("systemctl", "is-active", "tailscaled")
-	if output, err := cmd.Output(); err == nil {
-		serviceStatus := strings.TrimSpace(string(output))
+	// Check service status using standardized service manager
+	serviceManager := serviceutil.NewServiceManager(rc)
+	if active, err := serviceManager.IsActive("tailscaled"); err == nil {
+		var serviceStatus string
+		if active {
+			serviceStatus = "active"
+		} else {
+			serviceStatus = "inactive"
+		}
 		switch serviceStatus {
 		case "active":
 			status.Status = "running"
@@ -175,6 +184,7 @@ func (sim *ServiceInstallationManager) getTailscaleStatus(rc *eos_io.RuntimeCont
 		}
 
 		// Get uptime
+		// TODO: Migrate to ServiceManager.GetUptime() when that method is implemented
 		cmd = exec.Command("systemctl", "show", "tailscaled", "--property=ActiveEnterTimestamp", "--value")
 		if output, err := cmd.Output(); err == nil {
 			timestampStr := strings.TrimSpace(string(output))

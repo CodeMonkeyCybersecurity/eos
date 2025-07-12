@@ -851,6 +851,7 @@ func checkKeyAcceptanceOnMaster(rc *eos_io.RuntimeContext, masterAddr string) er
 }
 
 // isServiceRunning checks if a systemd service is running
+// TODO: Replace with serviceutil.NewServiceManager().IsActive() when RuntimeContext is available
 func isServiceRunning(serviceName string) bool {
 	cmd := exec.Command("systemctl", "is-active", serviceName)
 	output, err := cmd.Output()

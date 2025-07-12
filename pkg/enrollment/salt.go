@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -356,21 +357,40 @@ func manageSaltServices(rc *eos_io.RuntimeContext, services []string, action str
 		}
 	}
 
+	// Use standardized service manager for consistent service operations
+	serviceManager := serviceutil.NewServiceManager(rc)
+	
 	for _, service := range services {
 		logger.Info("Managing Salt service",
 			zap.String("service", service),
 			zap.String("action", action))
 
-		// Try systemctl first
-		if err := manageSystemdService(service, action); err == nil {
+		// Use standardized service manager
+		var err error
+		switch action {
+		case "start":
+			err = serviceManager.Start(service)
 			// Also enable the service to start at boot
-			if action == "start" {
-				if err := manageSystemdService(service, "enable"); err != nil {
+			if err == nil {
+				if enableErr := serviceManager.Enable(service); enableErr != nil {
 					logger.Warn("Failed to enable service",
 						zap.String("service", service),
-						zap.Error(err))
+						zap.Error(enableErr))
 				}
 			}
+		case "stop":
+			err = serviceManager.Stop(service)
+		case "restart":
+			err = serviceManager.Restart(service)
+		case "enable":
+			err = serviceManager.Enable(service)
+		case "disable":
+			err = serviceManager.Disable(service)
+		default:
+			err = fmt.Errorf("unsupported action: %s", action)
+		}
+		
+		if err == nil {
 			continue
 		}
 
@@ -385,19 +405,7 @@ func manageSaltServices(rc *eos_io.RuntimeContext, services []string, action str
 	return nil
 }
 
-// manageSystemdService manages a systemd service
-func manageSystemdService(service, action string) error {
-	if _, err := exec.LookPath("systemctl"); err != nil {
-		return fmt.Errorf("systemctl not found")
-	}
-
-	cmd := exec.Command("systemctl", action, service)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("systemctl %s %s failed: %s", action, service, string(output))
-	}
-
-	return nil
-}
+// manageSystemdService function removed - migrated to use shared.SystemdServiceManager
 
 // createDirectoryIfNotExists creates a directory if it doesn't exist
 func createDirectoryIfNotExists(rc *eos_io.RuntimeContext, path string) error {

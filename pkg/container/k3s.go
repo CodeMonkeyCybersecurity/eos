@@ -8,6 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_err"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/telemetry"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -255,11 +256,17 @@ func startK3sServer(rc *eos_io.RuntimeContext, options *K3sInstallOptions) error
 		return fmt.Errorf("failed to start K3s server: %w", err)
 	}
 
-	// Enable and start K3s service
-	serviceCmd := exec.CommandContext(ctx, "systemctl", "enable", "--now", "k3s")
-	if err := serviceCmd.Run(); err != nil {
+	// Enable and start K3s service using standardized service manager
+	serviceManager := serviceutil.NewServiceManager(rc)
+	
+	if err := serviceManager.Enable("k3s"); err != nil {
 		logger.Error("Failed to enable K3s service", zap.Error(err))
 		return fmt.Errorf("failed to enable K3s service: %w", err)
+	}
+	
+	if err := serviceManager.Start("k3s"); err != nil {
+		logger.Error("Failed to start K3s service", zap.Error(err))
+		return fmt.Errorf("failed to start K3s service: %w", err)
 	}
 
 	logger.Info("K3s server started successfully")

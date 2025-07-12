@@ -146,7 +146,9 @@ func (f *InstallationFramework) assessPrerequisites(config *InstallationConfig) 
 	
 	// Check network connectivity for download methods
 	if f.requiresNetwork(config.Method) {
-		// TODO: Add network connectivity check
+		f.logger.Debug("Network-based installation method detected",
+			zap.String("method", string(config.Method)))
+		// TODO: Add network connectivity check when needed
 	}
 	
 	// Install dependencies first
@@ -231,12 +233,18 @@ func (f *InstallationFramework) installViaDpkg(config *InstallationConfig, resul
 	if err := f.downloadFile(config.URL, tempFile); err != nil {
 		return err
 	}
-	defer os.Remove(tempFile)
+	defer func() {
+		if err := os.Remove(tempFile); err != nil {
+			f.logger.Warn("Failed to remove temporary file", zap.String("file", tempFile), zap.Error(err))
+		}
+	}()
 	
 	// Install with dpkg
 	if err := f.runCommand( "dpkg", "-i", tempFile); err != nil {
 		// Try to fix dependencies
-		f.runCommand( "apt-get", "install", "-f", "-y")
+		if fixErr := f.runCommand( "apt-get", "install", "-f", "-y"); fixErr != nil {
+			f.logger.Warn("Failed to fix dependencies after dpkg failure", zap.Error(fixErr))
+		}
 		return err
 	}
 	
@@ -259,7 +267,11 @@ func (f *InstallationFramework) installViaWget(config *InstallationConfig, resul
 	if err := f.downloadFile(config.URL, tempFile); err != nil {
 		return err
 	}
-	defer os.Remove(tempFile)
+	defer func() {
+		if err := os.Remove(tempFile); err != nil {
+			f.logger.Warn("Failed to remove temporary file", zap.String("file", tempFile), zap.Error(err))
+		}
+	}()
 	
 	// Extract if it's an archive
 	if f.isArchive(tempFile) {

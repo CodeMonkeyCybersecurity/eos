@@ -101,14 +101,18 @@ func CopyFile(src, dst string) error {
 	if err != nil {
 		return WrapFileOperationError("open source", src, err)
 	}
-	defer srcFile.Close()
+	defer func() {
+		_ = srcFile.Close() // Ignore error in cleanup
+	}()
 	
 	// Create destination file
 	dstFile, err := os.Create(dst)
 	if err != nil {
 		return WrapFileOperationError("create destination", dst, err)
 	}
-	defer dstFile.Close()
+	defer func() {
+		_ = dstFile.Close() // Ignore error in cleanup
+	}()
 	
 	// Copy contents
 	if _, err := io.Copy(dstFile, srcFile); err != nil {
@@ -219,7 +223,9 @@ func AppendToFile(path string, content []byte) error {
 	if err != nil {
 		return WrapFileOperationError("open for append", path, err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Ignore error in cleanup
+	}()
 	
 	if _, err := file.Write(content); err != nil {
 		return WrapFileOperationError("append", path, err)
@@ -252,7 +258,9 @@ func GetFileHash(path string) (string, error) {
 	if err != nil {
 		return "", WrapFileOperationError("open for hashing", path, err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Ignore error in cleanup
+	}()
 	
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
@@ -392,19 +400,19 @@ func SafeWriteFile(path string, content []byte, perm os.FileMode) error {
 	// Clean up temp file on error
 	defer func() {
 		if FileExists(tmpPath) {
-			os.Remove(tmpPath)
+			_ = os.Remove(tmpPath) // Ignore error in cleanup
 		}
 	}()
 	
 	// Write content to temp file
 	if _, err := tmpFile.Write(content); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close() // Ignore error in cleanup
 		return WrapFileOperationError("write to temporary file", tmpPath, err)
 	}
 	
 	// Set permissions
 	if err := tmpFile.Chmod(perm); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close() // Ignore error in cleanup
 		return WrapFileOperationError("set permissions on temporary file", tmpPath, err)
 	}
 	
@@ -477,7 +485,9 @@ func SecureDelete(path string) error {
 	if err != nil {
 		return WrapFileOperationError("open for secure delete", path, err)
 	}
-	defer file.Close()
+	defer func() {
+		_ = file.Close() // Ignore error in cleanup
+	}()
 	
 	// Overwrite with zeros
 	zeros := make([]byte, 1024)
@@ -502,7 +512,7 @@ func SecureDelete(path string) error {
 	}
 	
 	// Close and delete
-	file.Close()
+	_ = file.Close() // Ignore error in cleanup
 	if err := os.Remove(path); err != nil {
 		return WrapFileOperationError("remove after secure delete", path, err)
 	}

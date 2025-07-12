@@ -25,7 +25,7 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 				Name:          "delphi-listener",
 				WorkerScript:  "/opt/stackstorm/packs/delphi/delphi-listener.py",
 				ServiceFile:   "/etc/systemd/system/delphi-listener.service",
-				Description:   "Webhook listener for Wazuh alerts - Pipeline entry point",
+				Description:   "Webhook listener for Wazuh alerts - Pipeline entry point (includes alert-to-db dependency)",
 				PipelineStage: "ingestion",
 				User:          "stanley",
 				Group:         "stanley",
@@ -33,30 +33,20 @@ func TestDelphiServiceRegistry_GetService(t *testing.T) {
 			},
 		},
 		{
-			name:        "get alert-to-db service",
+			name:        "get alert-to-db service (merged into delphi-listener)",
 			serviceName: "alert-to-db",
-			shouldExist: true,
-			expectedService: DelphiServiceDefinition{
-				Name:          "alert-to-db",
-				WorkerScript:  "/opt/stackstorm/packs/delphi/alert-to-db.py",
-				ServiceFile:   "/etc/systemd/system/alert-to-db.service",
-				Description:   "Database operations for alerts - Handles alert persistence and state transitions",
-				PipelineStage: "processing",
-				User:          "stanley",
-				Group:         "stanley",
-				Permissions:   "0750",
-			},
+			shouldExist: false, // Service was consolidated into delphi-listener
 		},
 		{
-			name:        "get ab-test-analyzer service",
-			serviceName: "ab-test-analyzer",
+			name:        "get prompt-ab-tester service",
+			serviceName: "prompt-ab-tester",
 			shouldExist: true,
 			expectedService: DelphiServiceDefinition{
-				Name:          "ab-test-analyzer",
-				WorkerScript:  "/usr/local/bin/ab-test-analyzer.py",
-				ServiceFile:   "/etc/systemd/system/ab-test-analyzer.service",
-				Description:   "A/B test results analyzer - Evaluates experiment performance and provides insights",
-				PipelineStage: "analysis",
+				Name:          "prompt-ab-tester",
+				WorkerScript:  "/usr/local/bin/prompt-ab-tester.py",
+				ServiceFile:   "/etc/systemd/system/prompt-ab-tester.service",
+				Description:   "A/B testing coordinator for prompt optimization - Assigns prompt variants and tracks experiments",
+				PipelineStage: "analysis", 
 				User:          "stanley",
 				Group:         "stanley",
 				Permissions:   "0750",
@@ -117,11 +107,10 @@ func TestDelphiServiceRegistry_GetActiveServices(t *testing.T) {
 	// Check that critical services from the crash are present
 	criticalServices := []string{
 		"delphi-listener",
-		"alert-to-db",
-		"ab-test-analyzer",
-		"llm-worker",
+		"delphi-agent-enricher", 
 		"prompt-ab-tester",
-		"delphi-agent-enricher",
+		"llm-worker",
+		"delphi-emailer",
 	}
 
 	for _, serviceName := range criticalServices {
@@ -272,14 +261,14 @@ func TestDelphiServiceRegistry_GetServicePipelineStage(t *testing.T) {
 			shouldExist:   true,
 		},
 		{
-			name:          "alert-to-db stage",
+			name:          "alert-to-db stage (service merged)",
 			serviceName:   "alert-to-db",
-			expectedStage: "processing",
-			shouldExist:   true,
+			expectedStage: "",
+			shouldExist:   false, // Service was consolidated into delphi-listener
 		},
 		{
-			name:          "ab-test-analyzer stage",
-			serviceName:   "ab-test-analyzer",
+			name:          "prompt-ab-tester stage",
+			serviceName:   "prompt-ab-tester",
 			expectedStage: "analysis",
 			shouldExist:   true,
 		},

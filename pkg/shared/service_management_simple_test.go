@@ -47,7 +47,9 @@ func TestServiceManager_CreateAndBasicFunctionality(t *testing.T) {
 func TestServiceManager_GetEnhancedServiceStatus_BasicFlow(t *testing.T) {
 	// Setup logger
 	logger := zaptest.NewLogger(t)
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // Ignore error in test cleanup
+	}()
 	otelLogger := otelzap.New(logger)
 	otelzap.ReplaceGlobals(otelLogger)
 	ctx := context.Background()
@@ -76,7 +78,9 @@ func TestServiceManager_GetEnhancedServiceStatus_BasicFlow(t *testing.T) {
 func TestServiceManager_GetServicesRequiringInstallation_BasicFlow(t *testing.T) {
 	// Setup logger
 	logger := zaptest.NewLogger(t)
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // Ignore error in test cleanup
+	}()
 	otelLogger := otelzap.New(logger)
 	otelzap.ReplaceGlobals(otelLogger)
 	ctx := context.Background()
@@ -125,7 +129,9 @@ func TestServiceManager_GetServicesRequiringInstallation_BasicFlow(t *testing.T)
 func TestServiceManager_AutoInstallServices_BasicFlow(t *testing.T) {
 	// Setup logger
 	logger := zaptest.NewLogger(t)
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // Ignore error in test cleanup
+	}()
 	otelLogger := otelzap.New(logger)
 	otelzap.ReplaceGlobals(otelLogger)
 	ctx := context.Background()
@@ -144,7 +150,9 @@ func TestServiceManager_CrashPrevention(t *testing.T) {
 
 	// Setup logger
 	logger := zaptest.NewLogger(t)
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // Ignore error in test cleanup
+	}()
 	otelLogger := otelzap.New(logger)
 	otelzap.ReplaceGlobals(otelLogger)
 	ctx := context.Background()
@@ -180,7 +188,9 @@ func TestServiceManager_Integration_CrashPrevention(t *testing.T) {
 
 	// Setup logger
 	logger := zaptest.NewLogger(t)
-	defer logger.Sync()
+	defer func() {
+		_ = logger.Sync() // Ignore error in test cleanup
+	}()
 	otelLogger := otelzap.New(logger)
 	otelzap.ReplaceGlobals(otelLogger)
 	ctx := context.Background()

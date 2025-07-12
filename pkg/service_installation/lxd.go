@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -158,10 +159,15 @@ func (sim *ServiceInstallationManager) getLxdStatus(rc *eos_io.RuntimeContext, s
 		}
 	}
 
-	// Check LXD service status
-	cmd = exec.Command("systemctl", "is-active", "snap.lxd.daemon.service")
-	if output, err := cmd.Output(); err == nil {
-		serviceStatus := strings.TrimSpace(string(output))
+	// Check LXD service status using standardized service manager
+	serviceManager := serviceutil.NewServiceManager(rc)
+	if active, err := serviceManager.IsActive("snap.lxd.daemon.service"); err == nil {
+		var serviceStatus string
+		if active {
+			serviceStatus = "active"
+		} else {
+			serviceStatus = "inactive"
+		}
 		switch serviceStatus {
 		case "active":
 			status.Status = "running"

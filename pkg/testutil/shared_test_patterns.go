@@ -8,6 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/installation"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,7 @@ type ConfigTestCase struct {
 // TestServiceManager provides utilities for testing service operations
 type TestServiceManager struct {
 	rc            *eos_io.RuntimeContext
-	serviceManager *shared.ServiceManager
+	serviceManager *shared.SystemdServiceManager
 	createdServices []string // Track services created during tests
 }
 
@@ -63,7 +64,7 @@ func NewTestServiceManager(t *testing.T) *TestServiceManager {
 	rc := TestRuntimeContext(t)
 	return &TestServiceManager{
 		rc:            rc,
-		serviceManager: shared.NewServiceManager(rc),
+		serviceManager: serviceutil.NewServiceManager(rc),
 		createdServices: make([]string, 0),
 	}
 }
@@ -134,7 +135,7 @@ func NewTestConfigManager(t *testing.T) *TestConfigManager {
 	
 	return &TestConfigManager{
 		rc:            rc,
-		configManager: shared.NewConfigManager(rc),
+		configManager: serviceutil.NewConfigManager(rc),
 		tempDir:       tempDir,
 		createdFiles:  make([]string, 0),
 	}
@@ -262,7 +263,7 @@ func (tif *TestInstallationFramework) RunInstallationTests(t *testing.T, testCas
 func AssertServiceRunning(t *testing.T, serviceName string) {
 	t.Helper()
 	rc := TestRuntimeContext(t)
-	sm := shared.NewServiceManager(rc)
+	sm := serviceutil.NewServiceManager(rc)
 	
 	active, err := sm.IsActive(serviceName)
 	require.NoError(t, err, "Should be able to check service status")
@@ -273,7 +274,7 @@ func AssertServiceRunning(t *testing.T, serviceName string) {
 func AssertServiceStopped(t *testing.T, serviceName string) {
 	t.Helper()
 	rc := TestRuntimeContext(t)
-	sm := shared.NewServiceManager(rc)
+	sm := serviceutil.NewServiceManager(rc)
 	
 	active, err := sm.IsActive(serviceName)
 	require.NoError(t, err, "Should be able to check service status")
@@ -284,7 +285,7 @@ func AssertServiceStopped(t *testing.T, serviceName string) {
 func AssertConfigValue(t *testing.T, configPath, key string, expected interface{}) {
 	t.Helper()
 	rc := TestRuntimeContext(t)
-	cm := shared.NewConfigManager(rc)
+	cm := serviceutil.NewConfigManager(rc)
 	
 	value, err := cm.GetConfigValue(configPath, key)
 	require.NoError(t, err, "Should be able to get config value")

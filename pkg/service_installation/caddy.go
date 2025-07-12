@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/serviceutil"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -139,11 +140,14 @@ func (sim *ServiceInstallationManager) installCaddy(rc *eos_io.RuntimeContext, o
 	}
 	step6Start := time.Now()
 
-	if err := sim.runCommand(rc, "Enable Caddy service", "sudo", "systemctl", "enable", "caddy"); err != nil {
+	// Use standardized service manager for consistent service operations
+	serviceManager := serviceutil.NewServiceManager(rc)
+	
+	if err := serviceManager.Enable("caddy"); err != nil {
 		logger.Warn("Failed to enable Caddy service", zap.Error(err))
 	}
 
-	if err := sim.runCommand(rc, "Start Caddy service", "sudo", "systemctl", "start", "caddy"); err != nil {
+	if err := serviceManager.Start("caddy"); err != nil {
 		logger.Warn("Failed to start Caddy service", zap.Error(err))
 	}
 
@@ -189,10 +193,15 @@ func (sim *ServiceInstallationManager) getCaddyStatus(rc *eos_io.RuntimeContext,
 		}
 	}
 
-	// Check systemd service status
-	cmd = exec.Command("systemctl", "is-active", "caddy")
-	if output, err := cmd.Output(); err == nil {
-		serviceStatus := strings.TrimSpace(string(output))
+	// Check systemd service status using standardized service manager
+	serviceManager := serviceutil.NewServiceManager(rc)
+	if active, err := serviceManager.IsActive("caddy"); err == nil {
+		var serviceStatus string
+		if active {
+			serviceStatus = "active"
+		} else {
+			serviceStatus = "inactive"
+		}
 		switch serviceStatus {
 		case "active":
 			status.Status = "running"
@@ -208,6 +217,7 @@ func (sim *ServiceInstallationManager) getCaddyStatus(rc *eos_io.RuntimeContext,
 	}
 
 	// Get service uptime if running
+	// TODO: Migrate to ServiceManager.GetUptime() when that method is implemented
 	if status.Status == "running" {
 		cmd = exec.Command("systemctl", "show", "caddy", "--property=ActiveEnterTimestamp", "--value")
 		if output, err := cmd.Output(); err == nil {

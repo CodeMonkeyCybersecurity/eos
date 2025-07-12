@@ -53,7 +53,7 @@ type ServiceConfig struct {
 	ExecStop      string        `json:"exec_stop,omitempty"`
 	Environment   []string      `json:"environment,omitempty"`
 	Restart       string        `json:"restart,omitempty"`
-	RestartSec    time.Duration `json:"restart_sec,omitempty"`
+	RestartDelay  time.Duration `json:"restart_sec,omitempty"` // Keep JSON tag for compatibility
 	WantedBy      string        `json:"wanted_by,omitempty"`
 	After         []string      `json:"after,omitempty"`
 	Requires      []string      `json:"requires,omitempty"`
@@ -359,8 +359,8 @@ func (sm *SystemdServiceManager) RemoveService(serviceName string) error {
 		zap.String("service", serviceName))
 
 	// Stop and disable service first
-	sm.Stop(serviceName)     // Ignore errors
-	sm.Disable(serviceName) // Ignore errors
+	_ = sm.Stop(serviceName)     // Ignore errors - service might not be running
+	_ = sm.Disable(serviceName)  // Ignore errors - service might not be enabled
 
 	// Remove service file
 	serviceFile := fmt.Sprintf("/etc/systemd/system/%s.service", serviceName)
@@ -455,8 +455,8 @@ func (sm *SystemdServiceManager) generateServiceFile(config *ServiceConfig) stri
 		content.WriteString("Restart=always\n")
 	}
 	
-	if config.RestartSec > 0 {
-		content.WriteString(fmt.Sprintf("RestartSec=%ds\n", int(config.RestartSec.Seconds())))
+	if config.RestartDelay > 0 {
+		content.WriteString(fmt.Sprintf("RestartSec=%ds\n", int(config.RestartDelay.Seconds())))
 	}
 	
 	content.WriteString("\n")
