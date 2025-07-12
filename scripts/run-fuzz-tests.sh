@@ -1,8 +1,19 @@
 #!/bin/bash
 # Enhanced fuzz test runner for Eos CLI
 # Supports individual test execution, reporting, and integration with overnight fuzzing
+#
+# ⚠️  DEPRECATED: This script has been integrated into the Eos framework
+# ⚠️  Use: eos self fuzz <subcommand> instead
+# ⚠️  Migration guide: docs/testing/FUZZING_GUIDE.md
 
 set -e
+
+# Display deprecation warning
+echo "⚠️  DEPRECATION WARNING: scripts/run-fuzz-tests.sh is deprecated" >&2
+echo "⚠️  Please use: eos self fuzz quick --duration <duration> instead" >&2
+echo "⚠️  Migration guide: docs/testing/FUZZING_GUIDE.md" >&2
+echo "⚠️  This script will be removed in a future version" >&2
+echo "" >&2
 
 # Colors for output
 RED='\033[0;31m'

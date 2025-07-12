@@ -2,9 +2,20 @@
 # EOS Fuzzing Framework - Architecturally Aligned and Operationally Sane
 # Implements STACK.md Section 4.1 (Testing Strategy Framework) requirements
 # Version: 2.0.0
+#
+# ⚠️  DEPRECATED: This script has been integrated into the Eos framework
+# ⚠️  Use: eos self fuzz <subcommand> instead
+# ⚠️  Migration guide: docs/testing/FUZZING_GUIDE.md
 
 set -euo pipefail
 IFS=$'\n\t'
+
+# Display deprecation warning
+echo "⚠️  DEPRECATION WARNING: scripts/eos-fuzz.sh is deprecated" >&2
+echo "⚠️  Please use: eos self fuzz <subcommand> instead" >&2
+echo "⚠️  Migration guide: docs/testing/FUZZING_GUIDE.md" >&2
+echo "⚠️  This script will be removed in a future version" >&2
+echo "" >&2
 
 # ============================================================================
 # CONFIGURATION AND VALIDATION
