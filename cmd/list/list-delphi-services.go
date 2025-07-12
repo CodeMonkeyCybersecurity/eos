@@ -90,8 +90,8 @@ Examples:
 			}
 
 			// Check if files exist
-			workerExists := eos_unix.FileExists(config.WorkerScript)
-			serviceExists := eos_unix.FileExists(config.ServiceFile)
+			workerExists := shared.FileExists(config.WorkerScript)
+			serviceExists := shared.FileExists(config.ServiceFile)
 			isInstalled := workerExists && serviceExists
 
 			if isInstalled {

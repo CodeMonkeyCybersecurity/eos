@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 func TestSystemConfigManagerCreation(t *testing.T) {
@@ -105,7 +106,7 @@ func TestUtilityFunctions(t *testing.T) {
 		t.Error("CheckFileExists should return false for nonexistent file")
 	}
 
-	// Test ValidateEmail
+	// Test shared.ValidateEmail
 	validEmails := []string{
 		"test@example.com",
 		"user.name@domain.org",
@@ -113,7 +114,7 @@ func TestUtilityFunctions(t *testing.T) {
 	}
 
 	for _, email := range validEmails {
-		if err := ValidateEmail(email); err != nil {
+		if err := shared.ValidateEmail(email); err != nil {
 			t.Errorf("Valid email %s failed validation: %v", email, err)
 		}
 	}
@@ -127,7 +128,7 @@ func TestUtilityFunctions(t *testing.T) {
 	}
 
 	for _, email := range invalidEmails {
-		if err := ValidateEmail(email); err == nil {
+		if err := shared.ValidateEmail(email); err == nil {
 			t.Errorf("Invalid email %s passed validation", email)
 		}
 	}
@@ -167,6 +168,6 @@ func BenchmarkGenerateSecureToken(b *testing.B) {
 func BenchmarkValidateEmail(b *testing.B) {
 	email := "test@example.com"
 	for i := 0; i < b.N; i++ {
-		ValidateEmail(email)
+		_ = shared.ValidateEmail(email)
 	}
 }

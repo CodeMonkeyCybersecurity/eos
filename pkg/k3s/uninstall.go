@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/execute"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -29,7 +29,7 @@ func Uninstall(rc *eos_io.RuntimeContext) error {
 
 	var scriptsFound []string
 	for role, path := range UninstallScripts {
-		if eos_unix.Exists(path) {
+		if shared.FileExists(path) {
 			logger.Debug("Found uninstall script",
 				zap.String("role", role),
 				zap.String("path", path))
@@ -48,7 +48,7 @@ func Uninstall(rc *eos_io.RuntimeContext) error {
 
 	var ranAny bool
 	for role, path := range UninstallScripts {
-		if eos_unix.Exists(path) {
+		if shared.FileExists(path) {
 			logger.Info("▶ Running uninstall script",
 				zap.String("role", role),
 				zap.String("path", path))
@@ -74,14 +74,14 @@ func Uninstall(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Check if K3s binary still exists
-	if eos_unix.Exists("/usr/local/bin/k3s") {
+	if shared.FileExists("/usr/local/bin/k3s") {
 		logger.Warn("K3s binary still exists after uninstall")
 	} else {
 		logger.Info("K3s binary successfully removed")
 	}
 
 	// Check if K3s data directory still exists
-	if eos_unix.Exists("/var/lib/rancher/k3s") {
+	if shared.FileExists("/var/lib/rancher/k3s") {
 		logger.Info("K3s data directory still exists - may contain persistent data")
 	}
 

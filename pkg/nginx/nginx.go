@@ -12,6 +12,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/container"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 )
 
 //
@@ -32,7 +33,7 @@ func DeployApp(rc *eos_io.RuntimeContext, app string, cmd *cobra.Command) error 
 
 	// HTTP config
 	if err := copyConf(filepath.Join(AssetsPath, "servers"), NginxConfPath); err != nil {
-		if !eos_unix.Exists(filepath.Join(AssetsPath, "servers", app+".conf")) {
+		if !shared.FileExists(filepath.Join(AssetsPath, "servers", app+".conf")) {
 			otelzap.Ctx(rc.Ctx).Error("Missing HTTP config", zap.String("file", filepath.Join(AssetsPath, "servers", app+".conf")))
 			return fmt.Errorf("missing Nginx HTTP config for %s", app)
 		}
@@ -40,7 +41,7 @@ func DeployApp(rc *eos_io.RuntimeContext, app string, cmd *cobra.Command) error 
 	}
 
 	// Stream config (optional)
-	if eos_unix.Exists(filepath.Join(AssetsPath, "stream", app+".conf")) {
+	if shared.FileExists(filepath.Join(AssetsPath, "stream", app+".conf")) {
 		if err := copyConf(filepath.Join(AssetsPath, "stream"), NginxStreamPath); err != nil {
 			return fmt.Errorf("copy Stream config: %w", err)
 		}

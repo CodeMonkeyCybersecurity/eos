@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -42,7 +43,7 @@ func (skm *SSHKeyManager) GetType() ConfigurationType {
 // Validate validates the SSH key configuration
 func (skm *SSHKeyManager) Validate() error {
 	// Validate email
-	if err := ValidateEmail(skm.config.Email); err != nil {
+	if err := shared.ValidateEmail(skm.config.Email); err != nil {
 		return fmt.Errorf("invalid email: %w", err)
 	}
 

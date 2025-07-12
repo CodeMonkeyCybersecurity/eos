@@ -2,11 +2,11 @@ package ai
 
 import (
 	"encoding/json"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 )
 
@@ -138,7 +138,7 @@ func FuzzAPIKeyValidation(f *testing.F) {
 			baseURL:   config.BaseURL,
 			model:     config.Model,
 			maxTokens: 4096,
-			client:    &http.Client{Timeout: 30 * time.Second},
+			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
 		}
 
 		// Test that API key handling doesn't crash
@@ -246,7 +246,7 @@ func FuzzURLValidation(f *testing.F) {
 			apiKey:   config.APIKey,
 			baseURL:  config.BaseURL,
 			model:    config.Model,
-			client:   &http.Client{Timeout: 30 * time.Second},
+			client:   func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
 		}
 
 		// Validate URL is stored correctly

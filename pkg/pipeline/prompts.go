@@ -28,7 +28,7 @@ func CreatePromptTemplate(rc *eos_io.RuntimeContext, name, description string) s
 	logger.Debug("Creating prompt template")
 
 	// Convert name to title case
-	titleName := stringutils.TitleCase(rc, strings.ReplaceAll(name, "-", " "))
+	titleName := stringutils.TitleCase(strings.ReplaceAll(name, "-", " "))
 
 	template := fmt.Sprintf(`# %s
 

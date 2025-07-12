@@ -7,9 +7,9 @@ import (
 
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline/services"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -81,7 +81,7 @@ Examples:
 		}
 
 		// Check worker script
-		workerExists := eos_unix.FileExists(config.WorkerFile)
+		workerExists := shared.FileExists(config.WorkerFile)
 		workerInfo := services.GetFileInfo(rc, config.WorkerFile)
 		logger.Info(" Worker Script",
 			zap.String("path", config.WorkerFile),
@@ -91,7 +91,7 @@ Examples:
 			zap.String("modified", workerInfo.Modified))
 
 		// Check service file
-		serviceExists := eos_unix.FileExists(config.ServiceFile)
+		serviceExists := shared.FileExists(config.ServiceFile)
 		serviceInfo := services.GetFileInfo(rc, config.ServiceFile)
 		logger.Info(" Service File",
 			zap.String("path", config.ServiceFile),
@@ -103,7 +103,7 @@ Examples:
 		// Check configuration files
 		logger.Info(" Configuration Files")
 		for _, configFile := range config.ConfigFiles {
-			configExists := eos_unix.FileExists(configFile)
+			configExists := shared.FileExists(configFile)
 			configInfo := services.GetFileInfo(rc, configFile)
 			logger.Info(" "+filepath.Base(configFile),
 				zap.String("path", configFile),

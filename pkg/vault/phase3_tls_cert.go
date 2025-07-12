@@ -61,7 +61,7 @@ func GenerateTLS(rc *eos_io.RuntimeContext) error {
 // ensureTLS checks/generates cert+key.
 func ensureTLS(rc *eos_io.RuntimeContext) (crt, key string, err error) {
 	crt, key = shared.TLSCrt, shared.TLSKey
-	exists := eos_unix.FileExists(crt) && eos_unix.FileExists(key)
+	exists := shared.FileExists(crt) && shared.FileExists(key)
 	hasSAN, _ := checkSAN(crt)
 	if !exists || !hasSAN {
 		otelzap.Ctx(rc.Ctx).Warn("regenerating Vault TLS", zap.Bool("exists", exists), zap.Bool("hasSAN", hasSAN))
@@ -179,7 +179,7 @@ func EnsureVaultAgentCAExists(rc *eos_io.RuntimeContext) error {
 	dst := shared.VaultAgentCACopyPath
 
 	// If it already exists, nothing to do
-	if eos_unix.FileExists(dst) {
+	if shared.FileExists(dst) {
 		otelzap.Ctx(rc.Ctx).Debug("Vault Agent CA cert exists", zap.String("path", dst))
 		return nil
 	}

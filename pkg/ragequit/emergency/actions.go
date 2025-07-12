@@ -8,6 +8,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -31,7 +32,7 @@ func FlushDataSafety(rc *eos_io.RuntimeContext) error {
 
 	// Drop caches
 	logger.Debug("Dropping system caches")
-	if system.FileExists("/proc/sys/vm/drop_caches") {
+	if shared.FileExists("/proc/sys/vm/drop_caches") {
 		if err := os.WriteFile("/proc/sys/vm/drop_caches", []byte("3\n"), 0644); err != nil {
 			logger.Warn("Failed to drop caches", zap.Error(err))
 		}
@@ -143,7 +144,7 @@ func NotifyRagequit(rc *eos_io.RuntimeContext, reason string) error {
 
 	// Write to /etc/motd for next login
 	motdPath := "/etc/motd"
-	if system.FileExists(motdPath) {
+	if shared.FileExists(motdPath) {
 		motdMsg := fmt.Sprintf("\n=== RAGEQUIT RECOVERY ===\n%s\nSee ~/RAGEQUIT-RECOVERY-PLAN.md for details\n\n", message)
 		if currentMotd, err := os.ReadFile(motdPath); err == nil {
 			os.WriteFile(motdPath+".bak", currentMotd, 0644)

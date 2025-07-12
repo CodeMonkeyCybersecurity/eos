@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -30,7 +31,7 @@ func TestAIAssistantCreation(t *testing.T) {
 	t.Run("default_anthropic_configuration", func(t *testing.T) {
 		// Clear environment variables
 		_ = os.Unsetenv("ANTHROPIC_API_KEY") // Test setup, error not critical
-		_ = os.Unsetenv("AI_API_KEY")       // Test setup, error not critical
+		_ = os.Unsetenv("AI_API_KEY")        // Test setup, error not critical
 
 		// Create isolated config manager with temp directory
 		tempDir, err := os.MkdirTemp("", "ai-config-test")
@@ -39,7 +40,7 @@ func TestAIAssistantCreation(t *testing.T) {
 
 		// Mock the config path for this test
 		originalConfigDir := os.Getenv("HOME")
-		_ = os.Setenv("HOME", tempDir) // Test setup, error not critical
+		_ = os.Setenv("HOME", tempDir)                              // Test setup, error not critical
 		defer func() { _ = os.Setenv("HOME", originalConfigDir) }() // Test cleanup, error not critical
 
 		assistant, err := NewAIAssistant(rc)
@@ -97,7 +98,7 @@ func TestAIAssistantCreation(t *testing.T) {
 
 		// Mock the config path for this test
 		originalConfigDir := os.Getenv("HOME")
-		_ = os.Setenv("HOME", tempDir) // Test setup, error not critical
+		_ = os.Setenv("HOME", tempDir)                              // Test setup, error not critical
 		defer func() { _ = os.Setenv("HOME", originalConfigDir) }() // Test cleanup, error not critical
 
 		assistant, err := NewAIAssistant(rc)
@@ -105,7 +106,7 @@ func TestAIAssistantCreation(t *testing.T) {
 
 		// Verify HTTP client timeout is set
 		assert.NotNil(t, assistant.client)
-		assert.Equal(t, 60*time.Second, assistant.client.Timeout)
+		assert.Equal(t, 60*time.Second, assistant.client.GetConfig().Timeout)
 	})
 }
 
@@ -317,7 +318,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			baseURL:   server.URL,
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
-			client:    &http.Client{Timeout: 10 * time.Second},
+			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second}); return c }(),
 		}
 
 		ctx := NewConversationContext("test")
@@ -339,7 +340,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			baseURL:   server.URL,
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
-			client:    &http.Client{Timeout: 500 * time.Millisecond}, // Short timeout
+			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 500 * time.Millisecond}); return c }(), // Short timeout
 		}
 
 		ctx := NewConversationContext("test")
@@ -400,7 +401,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 					baseURL:   server.URL,
 					model:     "claude-3-sonnet",
 					maxTokens: 100,
-					client:    &http.Client{Timeout: 10 * time.Second},
+					client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second}); return c }(),
 				}
 
 				ctx := NewConversationContext("test")
@@ -443,7 +444,7 @@ func TestHTTPRequestSecurity(t *testing.T) {
 			baseURL:   server.URL,
 			model:     "claude-3-sonnet",
 			maxTokens: 100,
-			client:    &http.Client{Timeout: 10 * time.Second},
+			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 10 * time.Second}); return c }(),
 		}
 
 		// Cancel context before making request

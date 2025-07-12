@@ -14,6 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
+
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -25,7 +27,7 @@ type AIAssistant struct {
 	apiKey    string
 	baseURL   string
 	model     string
-	client    *http.Client
+	client    *httpclient.Client
 	maxTokens int
 
 	// Azure OpenAI specific fields
@@ -313,6 +315,13 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		timeout = 60 * time.Second
 	}
 
+	// Create enhanced HTTP client using unified framework
+	client, err := httpclient.MigrateFromLLMClient(apiKey, string(provider))
+	if err != nil {
+		// Fallback to default client if migration fails
+		client, _ = httpclient.NewClient(httpclient.DefaultConfig())
+	}
+
 	return &AIAssistant{
 		provider:        provider,
 		apiKey:          apiKey,
@@ -321,10 +330,8 @@ func NewAIAssistant(rc *eos_io.RuntimeContext) (*AIAssistant, error) {
 		azureEndpoint:   azureEndpoint,
 		azureAPIVersion: azureAPIVersion,
 		azureDeployment: azureDeployment,
-		client: &http.Client{
-			Timeout: timeout,
-		},
-		maxTokens: maxTokens,
+		client:          client,
+		maxTokens:       maxTokens,
 	}, nil
 }
 
@@ -436,8 +443,8 @@ func (ai *AIAssistant) sendRequest(rc *eos_io.RuntimeContext, request AIRequest)
 		req.Header.Set("anthropic-version", "2023-06-01")
 	}
 
-	// Send request
-	resp, err := ai.client.Do(req)
+	// Send request using unified client
+	resp, err := ai.client.DoWithContext(rc.Ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}

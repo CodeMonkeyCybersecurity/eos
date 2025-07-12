@@ -17,6 +17,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/delphi_channels"
 	eos "github.com/CodeMonkeyCybersecurity/eos/pkg/eos_cli"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/spf13/cobra"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
@@ -133,7 +134,7 @@ func ListSystemPrompts() ([]PromptInfo, error) {
 		return nil, err
 	}
 
-	if !FileExists(promptsDir) {
+	if !shared.FileExists(promptsDir) {
 		return nil, fmt.Errorf("system prompts directory not found: %s", promptsDir)
 	}
 
@@ -394,7 +395,7 @@ func validatePrompt(promptName string, _ bool) (ValidationResult, error) {
 	}
 
 	promptPath := filepath.Join(promptsDir, filename)
-	if !FileExists(promptPath) {
+	if !shared.FileExists(promptPath) {
 		result.Errors = append(result.Errors, "Prompt file not found")
 		result.IsValid = false
 		return result, nil
@@ -778,11 +779,7 @@ func EnsureSystemPromptsDirectory(
 	return nil
 }
 
-// FileExists checks if a file exists
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
+// FileExists has been removed - use shared.FileExists instead
 
 // FormatFileSize formats file size in human readable format
 func FormatFileSize(bytes int64) string {

@@ -33,12 +33,6 @@ func GetHomeDir() string {
 	return user.HomeDir
 }
 
-// FileExists checks if a file exists
-// Migrated from cmd/ragequit/ragequit.go fileExists
-func FileExists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
 
 // DirExists checks if a directory exists
 // Migrated from cmd/ragequit/ragequit.go dirExists

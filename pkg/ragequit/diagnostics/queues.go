@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -60,7 +61,7 @@ func CheckQueues(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Kafka
-	if system.FileExists("/opt/kafka") || system.CommandExists("kafka-topics.sh") {
+	if shared.FileExists("/opt/kafka") || system.CommandExists("kafka-topics.sh") {
 		output.WriteString("\n=== Kafka Status ===\n")
 		if kafkaTopics := system.RunCommandWithTimeout("kafka-topics.sh",
 			[]string{"--list", "--bootstrap-server", "localhost:9092"}, 5*time.Second); kafkaTopics != "" {

@@ -17,6 +17,7 @@ import (
 
 	cerr "github.com/cockroachdb/errors"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 )
 
 // ───────────────────────── Config (env driven) ────────────────────────────
@@ -188,9 +189,15 @@ func CallAzure(ctx context.Context, payload map[string]any, retries int, delay t
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("api-key", apiKey)
 
-	cl := &http.Client{Timeout: 20 * time.Second}
+	// Use unified HTTP client for enhanced security and reliability
+	cl, err := httpclient.MigrateFromLLMClient(apiKey, "azure")
+	if err != nil {
+		// Fallback to basic client if migration fails
+		cl, _ = httpclient.NewClient(httpclient.DefaultConfig())
+	}
+	
 	for i := 0; i < retries; i++ {
-		resp, err := cl.Do(req)
+		resp, err := cl.DoWithContext(ctx, req)
 		if err == nil {
 			return resp, nil
 		}

@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -52,7 +53,7 @@ func SecuritySnapshot(rc *eos_io.RuntimeContext) error {
 	}
 
 	// Failed login attempts
-	if system.FileExists("/var/log/auth.log") {
+	if shared.FileExists("/var/log/auth.log") {
 		if failedLogins := system.RunCommandWithTimeout("grep",
 			[]string{"Failed password", "/var/log/auth.log", "|", "tail", "-20"}, 5*time.Second); failedLogins != "" {
 			output.WriteString("\n=== Recent Failed Logins ===\n")

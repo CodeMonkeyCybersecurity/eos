@@ -9,6 +9,7 @@ import (
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -76,7 +77,7 @@ func GenerateRecoveryPlan(rc *eos_io.RuntimeContext) error {
 		plan.WriteString("```\n\n")
 	}
 
-	if system.FileExists("/etc/postgresql") || system.CommandExists("psql") {
+	if shared.FileExists("/etc/postgresql") || system.CommandExists("psql") {
 		plan.WriteString("### PostgreSQL Recovery\n")
 		plan.WriteString("```bash\n")
 		plan.WriteString("# Check PostgreSQL status\n")
@@ -87,7 +88,7 @@ func GenerateRecoveryPlan(rc *eos_io.RuntimeContext) error {
 		plan.WriteString("```\n\n")
 	}
 
-	if system.FileExists("/etc/mysql") || system.CommandExists("mysql") {
+	if shared.FileExists("/etc/mysql") || system.CommandExists("mysql") {
 		plan.WriteString("### MySQL Recovery\n")
 		plan.WriteString("```bash\n")
 		plan.WriteString("# Check MySQL status\n")

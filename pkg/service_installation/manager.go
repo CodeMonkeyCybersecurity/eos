@@ -2,14 +2,15 @@
 package service_installation
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"time"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -192,8 +193,13 @@ func (sim *ServiceInstallationManager) PerformHealthCheck(rc *eos_io.RuntimeCont
 
 	// HTTP health check
 	if endpoint != "" {
-		client := &http.Client{Timeout: 10 * time.Second}
-		resp, err := client.Get(endpoint)
+		// Use unified HTTP client for enhanced security and retry logic
+		client, err := httpclient.NewClient(httpclient.DefaultConfig())
+		if err != nil {
+			result.Error = fmt.Sprintf("Failed to create HTTP client: %v", err)
+			return result, err
+		}
+		resp, err := client.Get(context.Background(), endpoint)
 		if err != nil {
 			result.Error = err.Error()
 			result.Checks = append(result.Checks, HealthCheck{

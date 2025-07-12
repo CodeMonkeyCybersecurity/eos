@@ -10,6 +10,7 @@ import (
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/ragequit/system"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -36,14 +37,14 @@ func DetectEnvironment(rc *eos_io.RuntimeContext) (*ragequit.EnvironmentInfo, er
 	// INTERVENE - Detect container environment
 	logger.Debug("Detecting container environment")
 
-	if system.FileExists("/.dockerenv") {
+	if shared.FileExists("/.dockerenv") {
 		envInfo.Type = "Docker"
 		output.WriteString("Environment: Docker Container\n")
 		if dockerInfo := system.RunCommandWithTimeout("docker", []string{"info"}, 5*time.Second); dockerInfo != "" {
 			output.WriteString(dockerInfo)
 			envInfo.Metadata["docker_info"] = dockerInfo
 		}
-	} else if system.FileExists("/run/.containerenv") {
+	} else if shared.FileExists("/run/.containerenv") {
 		envInfo.Type = "Podman"
 		output.WriteString("Environment: Podman Container\n")
 	} else if system.ContainsString("/proc/1/cgroup", "kubernetes") {

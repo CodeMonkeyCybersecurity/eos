@@ -1,11 +1,11 @@
 package ai
 
 import (
-	"net/http"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/httpclient"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -343,7 +343,7 @@ func TestAIErrorHandling(t *testing.T) {
 			baseURL:   "https://api.anthropic.com/v1",
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
-			client:    &http.Client{Timeout: 30 * time.Second},
+			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
 		}
 
 		ctx := &ConversationContext{
@@ -365,7 +365,7 @@ func TestAIErrorHandling(t *testing.T) {
 			baseURL:   "invalid-url", // Invalid URL
 			model:     "claude-3-sonnet-20240229",
 			maxTokens: 100,
-			client:    &http.Client{Timeout: 30 * time.Second},
+			client:    func() *httpclient.Client { c, _ := httpclient.NewClient(&httpclient.Config{Timeout: 30 * time.Second}); return c }(),
 		}
 
 		ctx := &ConversationContext{

@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_io"
-	"github.com/CodeMonkeyCybersecurity/eos/pkg/eos_unix"
 	"github.com/CodeMonkeyCybersecurity/eos/pkg/pipeline"
+	"github.com/CodeMonkeyCybersecurity/eos/pkg/shared"
 	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.uber.org/zap"
 )
@@ -26,7 +26,7 @@ func ShowServiceConfiguration(rc *eos_io.RuntimeContext, config pipeline.Service
 	logger.Info("⚙️ Service Configuration Content")
 
 	// INTERVENE - Display configuration content
-	if eos_unix.FileExists(config.ServiceFile) {
+	if shared.FileExists(config.ServiceFile) {
 		logger.Debug("Reading service configuration file")
 
 		content, err := os.ReadFile(config.ServiceFile)

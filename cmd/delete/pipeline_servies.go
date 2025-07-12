@@ -89,7 +89,7 @@ Examples:
 			}
 
 			// Additional cleanup for worker script (lifecycle manager handles systemd parts)
-			if eos_unix.FileExists(config.WorkerFile) {
+			if shared.FileExists(config.WorkerFile) {
 				logger.Info(" Removing worker script",
 					zap.String("file", config.WorkerFile))
 
