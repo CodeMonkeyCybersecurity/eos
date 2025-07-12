@@ -65,7 +65,7 @@ func TestLoadServicesFromFile(t *testing.T) {
 
 			// Create temporary file
 			tmpFile := createTempFile(t, tt.content)
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			services, err := LoadServicesFromFile(rc, tmpFile)
 
@@ -122,7 +122,7 @@ func TestLoadCronJobsFromFile(t *testing.T) {
 			rc := testutil.TestRuntimeContext(t)
 
 			tmpFile := createTempFile(t, tt.content)
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			jobs, err := LoadCronJobsFromFile(rc, tmpFile)
 
@@ -177,7 +177,7 @@ func TestLoadUsersFromFile(t *testing.T) {
 			rc := testutil.TestRuntimeContext(t)
 
 			tmpFile := createTempFile(t, tt.content)
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			users, err := LoadUsersFromFile(rc, tmpFile)
 
@@ -256,7 +256,7 @@ func TestLoadSystemStateFromFile(t *testing.T) {
 			rc := testutil.TestRuntimeContext(t)
 
 			tmpFile := createTempFile(t, tt.content)
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			state, err := LoadSystemStateFromFile(rc, tmpFile)
 
@@ -347,7 +347,7 @@ func createTempFile(t *testing.T, content string) string {
 	_, err = tmpFile.WriteString(content)
 	require.NoError(t, err)
 	
-	err = tmpFile.Close()
+	_ = tmpFile.Close()
 	require.NoError(t, err)
 	
 	return tmpFile.Name()

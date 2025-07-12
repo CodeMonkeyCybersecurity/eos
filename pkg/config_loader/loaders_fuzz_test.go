@@ -29,13 +29,13 @@ func FuzzLoadServicesFromFile(f *testing.F) {
 		if err != nil {
 			t.Skip("Cannot create temp file")
 		}
-		defer os.Remove(tmpFile.Name())
-		defer tmpFile.Close()
+		defer func() { _ = os.Remove(tmpFile.Name()) }()
+		defer func() { _ = tmpFile.Close() }()
 
 		if _, err := tmpFile.WriteString(jsonContent); err != nil {
 			t.Skip("Cannot write to temp file")
 		}
-		tmpFile.Close()
+		_ = tmpFile.Close()
 
 		// Test should not panic regardless of input
 		defer func() {
@@ -71,13 +71,13 @@ func FuzzLoadSystemStateFromFile(f *testing.F) {
 		if err != nil {
 			t.Skip("Cannot create temp file")
 		}
-		defer os.Remove(tmpFile.Name())
-		defer tmpFile.Close()
+		defer func() { _ = os.Remove(tmpFile.Name()) }()
+		defer func() { _ = tmpFile.Close() }()
 
 		if _, err := tmpFile.WriteString(jsonContent); err != nil {
 			t.Skip("Cannot write to temp file")
 		}
-		tmpFile.Close()
+		_ = tmpFile.Close()
 
 		// Test should not panic regardless of input
 		defer func() {

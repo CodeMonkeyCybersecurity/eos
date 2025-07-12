@@ -184,7 +184,11 @@ EOF
 	if err != nil {
 		return fmt.Errorf("failed to create job file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			fmt.Printf("Warning: Failed to close job file: %v\n", err)
+		}
+	}()
 
 	// EVALUATE - Execute template
 	if err := tmpl.Execute(file, config); err != nil {
@@ -315,7 +319,12 @@ CLUSTERFUZZ_S3_BUCKET={{.S3Config.Bucket}}
 	if err != nil {
 		return fmt.Errorf("failed to create bot job file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Use fmt.Printf since logger may not be available in this scope
+			fmt.Printf("Warning: Failed to close bot job file: %v\n", err)
+		}
+	}()
 
 	// Execute template
 	return tmpl.Execute(file, config)
@@ -391,7 +400,12 @@ func generateWebJob(config *clusterfuzz.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to create web job file: %w", err)
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			// Use fmt.Printf since logger may not be available in this scope
+			fmt.Printf("Warning: Failed to close web job file: %v\n", err)
+		}
+	}()
 
 	return tmpl.Execute(file, config)
 }

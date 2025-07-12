@@ -48,12 +48,12 @@ func FuzzValidateDomainName(f *testing.F) {
 	f.Fuzz(func(t *testing.T, domain string) {
 		// Set production environment for consistent testing
 		originalEnv := os.Getenv("GO_ENV")
-		os.Setenv("GO_ENV", "production")
+		_ = os.Setenv("GO_ENV", "production")
 		defer func() {
 			if originalEnv == "" {
-				os.Unsetenv("GO_ENV")
+				_ = os.Unsetenv("GO_ENV")
 			} else {
-				os.Setenv("GO_ENV", originalEnv)
+				_ = os.Setenv("GO_ENV", originalEnv)
 			}
 		}()
 
@@ -230,12 +230,12 @@ func FuzzValidateAppName(f *testing.F) {
 	f.Fuzz(func(t *testing.T, appName string) {
 		// Set production environment for reserved name checking
 		originalEnv := os.Getenv("GO_ENV")
-		os.Setenv("GO_ENV", "production")
+		_ = os.Setenv("GO_ENV", "production")
 		defer func() {
 			if originalEnv == "" {
-				os.Unsetenv("GO_ENV")
+				_ = os.Unsetenv("GO_ENV")
 			} else {
-				os.Setenv("GO_ENV", originalEnv)
+				_ = os.Setenv("GO_ENV", originalEnv)
 			}
 		}()
 
@@ -356,12 +356,12 @@ func FuzzValidateAllCertificateInputs(f *testing.F) {
 	f.Fuzz(func(t *testing.T, appName, baseDomain, email string) {
 		// Set production environment
 		originalEnv := os.Getenv("GO_ENV")
-		os.Setenv("GO_ENV", "production")
+		_ = os.Setenv("GO_ENV", "production")
 		defer func() {
 			if originalEnv == "" {
-				os.Unsetenv("GO_ENV")
+				_ = os.Unsetenv("GO_ENV")
 			} else {
-				os.Setenv("GO_ENV", originalEnv)
+				_ = os.Setenv("GO_ENV", originalEnv)
 			}
 		}()
 

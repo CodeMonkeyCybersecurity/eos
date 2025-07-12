@@ -101,7 +101,12 @@ func (dm *DatabaseManager) ExecuteQuery(rc *eos_io.RuntimeContext, config *Datab
 		result.Duration = time.Since(start)
 		return result, err
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			// Log error but don't override the main function's return error
+			fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+		}
+	}()
 
 	if operation.Transaction {
 		return dm.executeTransaction(db, operation, start)
@@ -657,7 +662,9 @@ func (dm *DatabaseManager) executeTransaction(db *sql.DB, operation *DatabaseOpe
 
 	res, err := tx.Exec(operation.Query)
 	if err != nil {
-		tx.Rollback()
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			fmt.Printf("Warning: Failed to rollback transaction: %v\n", rollbackErr)
+		}
 		result.Error = err.Error()
 		result.Duration = time.Since(start)
 		return result, err

@@ -466,7 +466,10 @@ func (cm *ContainerManager) handleRunningContainers(rc *eos_io.RuntimeContext, o
 	if !options.Force && !options.DryRun {
 		fmt.Printf("There are %d running containers. Would you like to stop them? [y/N]: ", containerList.Running)
 		var response string
-		fmt.Scanln(&response)
+		if _, err := fmt.Scanln(&response); err != nil {
+			// If we can't read user input, default to safe behavior
+			return fmt.Errorf("failed to read user confirmation: %w", err)
+		}
 		if response != "y" && response != "Y" && response != "yes" {
 			return fmt.Errorf("please stop running containers before proceeding")
 		}
@@ -501,7 +504,10 @@ func (cm *ContainerManager) handleRunningContainers(rc *eos_io.RuntimeContext, o
 func (cm *ContainerManager) promptForConfirmation(projectPath string) bool {
 	fmt.Printf("Stop compose project in %s? [y/N]: ", projectPath)
 	var response string
-	fmt.Scanln(&response)
+	if _, err := fmt.Scanln(&response); err != nil {
+		// If we can't read input, default to safe behavior (no)
+		return false
+	}
 	return response == "y" || response == "Y" || response == "yes"
 }
 

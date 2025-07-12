@@ -300,7 +300,10 @@ func parseCompressionLevel(compression string) int {
 	parts := strings.Split(compression, ":")
 	if len(parts) > 1 {
 		var level int
-		fmt.Sscanf(parts[1], "%d", &level)
+		if _, err := fmt.Sscanf(parts[1], "%d", &level); err != nil {
+			// If parsing fails, return default level 0
+			return 0
+		}
 		return level
 	}
 	return 0
@@ -321,8 +324,14 @@ func parseCompsizeOutput(output string, stats *CompressionStats) {
 			fields := strings.Fields(line)
 			if len(fields) >= 4 {
 				// Fields: TOTAL uncompressed compressed ratio
-				fmt.Sscanf(fields[1], "%d", &stats.UncompressedSize)
-				fmt.Sscanf(fields[2], "%d", &stats.CompressedSize)
+				if _, err := fmt.Sscanf(fields[1], "%d", &stats.UncompressedSize); err != nil {
+					// Log parsing error but continue - compression stats are not critical
+					continue
+				}
+				if _, err := fmt.Sscanf(fields[2], "%d", &stats.CompressedSize); err != nil {
+					// Log parsing error but continue - compression stats are not critical
+					continue
+				}
 			}
 		}
 	}

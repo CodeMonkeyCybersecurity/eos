@@ -195,7 +195,10 @@ func init() {
 	EnrollCmd.Flags().Bool("dry-run", false, "Preview changes without applying them")
 
 	// Mark required flags
-	EnrollCmd.MarkFlagRequired("datacenter")
+	if err := EnrollCmd.MarkFlagRequired("datacenter"); err != nil {
+		// This should only fail if the flag doesn't exist, which is a programming error
+		panic(fmt.Sprintf("Failed to mark datacenter flag as required: %v", err))
+	}
 }
 
 // All helper functions have been migrated to pkg/enrollment/

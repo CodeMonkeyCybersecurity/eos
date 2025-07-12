@@ -215,12 +215,12 @@ func FuzzUserSelectionSecurity(f *testing.F) {
 		os.Stdin = r
 		defer func() { 
 			os.Stdin = oldStdin
-			r.Close()
+			_ = r.Close()
 		}()
 
 		// Write user input
 		go func() {
-			defer w.Close()
+			defer func() { _ = w.Close() }()
 			io.WriteString(w, userInput+"\n")
 			// Write a valid selection to avoid infinite loop
 			io.WriteString(w, "1\n")
@@ -301,7 +301,7 @@ func FuzzDisplayOptionsSecurity(f *testing.F) {
 		
 		DisplayOptions()
 		
-		w.Close()
+		_ = w.Close()
 		os.Stdout = oldStdout
 		
 		var buf bytes.Buffer

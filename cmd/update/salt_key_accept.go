@@ -77,7 +77,10 @@ Security Notice:
 		if acceptAll && !force {
 			fmt.Print("WARNING: This will accept ALL pending keys. Continue? [y/N]: ")
 			var response string
-			fmt.Scanln(&response)
+			if _, err := fmt.Scanln(&response); err != nil {
+				// If we can't read user input, default to cancel for security
+				return fmt.Errorf("failed to read user confirmation: %w", err)
+			}
 			if response != "y" && response != "Y" && response != "yes" {
 				return fmt.Errorf("operation cancelled by user")
 			}
